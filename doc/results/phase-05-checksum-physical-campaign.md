@@ -15,6 +15,7 @@ related:
   - '[[Phase-04-Synthetic-Streaming]]'
   - '[[Firmware-Resource-Map]]'
   - '[[ADR-002-Checksum-Selection]]'
+  - '[[Phase-05-Checksum-Benchmark]]'
 ---
 
 # Phase 05 checksum physical campaign
@@ -265,8 +266,9 @@ subtests. The clean pinned firmware build produced the accepted manifest and
 artifact above.
 
 This campaign supplies one accepted 60-second stream per candidate, with
-repeatability inside every four-batch target profile. It does not make the
-fixed-policy production choice and is not the later requirement for three
-consecutive selected-checksum validation runs. Those are deliberately separate
-playbook tasks. The finite corruption evidence remains bounded as documented
-in [[Phase-05-Checksum-Correctness]] and makes no security claim.
+repeatability inside every four-batch target profile. It does not itself make
+the fixed-policy production choice or satisfy the separate requirement for
+three consecutive selected-checksum validation runs. That later gate is
+complete in [[Phase-05-Checksum-Benchmark]]. The finite corruption evidence
+remains bounded as documented in [[Phase-05-Checksum-Correctness]] and makes no
+security claim.

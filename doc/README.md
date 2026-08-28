@@ -13,6 +13,7 @@ related:
   - '[[Phase-05-Checksum-Correctness]]'
   - '[[Phase-05-Checksum-Local-Gate]]'
   - '[[Phase-05-Checksum-Physical-Campaign]]'
+  - '[[Phase-05-Checksum-Benchmark]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
@@ -51,8 +52,10 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   corruption, negotiation, parser-recovery, and benchmark-arithmetic evidence
   and the pre-rig [[Phase-05-Checksum-Local-Gate]] correctness, build-resource,
   and repeated host-timing result. The candidate-isolated target evidence is
-  in [[Phase-05-Checksum-Physical-Campaign]], and the fixed production choice
-  is recorded in [[ADR-002-Checksum-Selection]].
+  in [[Phase-05-Checksum-Physical-Campaign]], the fixed production choice is
+  recorded in [[ADR-002-Checksum-Selection]], and the clean selected-image
+  rebuild plus three-run acceptance is consolidated in
+  [[Phase-05-Checksum-Benchmark]].
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`

@@ -249,7 +249,10 @@ resource-delta, and repeated host-timing gate is recorded in
 The accepted candidate-isolated on-device microbenchmarks and sequential
 60-second Adler-32, CRC-32C, and CRC-32/ISO-HDLC streams are recorded in
 `doc/results/phase-05-checksum-physical-campaign.md`; the fixed-policy checksum
-selection is documented in `doc/decisions/adr-002-checksum-selection.md`.
+selection is documented in `doc/decisions/adr-002-checksum-selection.md`. The
+clean selected-image rebuild and three consecutive 60-second Adler-32
+acceptance runs are consolidated in
+`doc/results/phase-05-checksum-benchmark.md`.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source

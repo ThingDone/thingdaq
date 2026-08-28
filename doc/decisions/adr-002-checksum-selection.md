@@ -13,6 +13,7 @@ related:
   - '[[Protocol-V1]]'
   - '[[Phase-05-Checksum-Correctness]]'
   - '[[Phase-05-Checksum-Physical-Campaign]]'
+  - '[[Phase-05-Checksum-Benchmark]]'
   - '[[Firmware-Resource-Map]]'
 ---
 
@@ -149,3 +150,8 @@ Golden fixtures continue to use Adler-32 for both production-default data and
 bootstrap control frames. Their source provenance was regenerated after this
 decision; their wire bytes remain stable because the selected default is the
 same algorithm used before selection.
+
+The subsequent clean selected-image rebuild and three consecutive 60-second
+full-rate acceptance runs passed without loss, corruption, queue exhaustion,
+or Phase 04 latency violations. Their raw summaries and retained job identities
+are recorded in [[Phase-05-Checksum-Benchmark]].
