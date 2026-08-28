@@ -838,11 +838,17 @@ class SyntheticValidator:
         self.gpio = StreamTotals()
         self.first_receive_time: float | None = None
         self.last_receive_time: float | None = None
+        self.maximum_receive_gap_seconds = 0.0
 
     def accept(self, frame: Frame) -> None:
         received_at = time.monotonic()
         if self.first_receive_time is None:
             self.first_receive_time = received_at
+        if self.last_receive_time is not None:
+            self.maximum_receive_gap_seconds = max(
+                self.maximum_receive_gap_seconds,
+                received_at - self.last_receive_time,
+            )
         self.last_receive_time = received_at
         if frame.run_id != self.run_id:
             raise ProtocolFailure(
@@ -1471,7 +1477,14 @@ def run_acceptance(
         completed = not evidence.failures
     except Exception as error:  # noqa: BLE001 - stdout is the remote diagnosis
         message = f"{type(error).__name__}: {error}"
-        emit_event("fatal", error=message)
+        diagnostics: dict[str, object] = {}
+        if validator is not None:
+            diagnostics = {
+                "accepted_adc_frames": validator.adc.frames,
+                "accepted_gpio_frames": validator.gpio.frames,
+                "maximum_receive_gap_seconds": (validator.maximum_receive_gap_seconds),
+            }
+        emit_event("fatal", error=message, **diagnostics)
         evidence.failures.append(message)
     finally:
         if not completed:
@@ -1490,6 +1503,31 @@ def run_acceptance(
                     "cleanup_stop_failed",
                     error=f"{type(cleanup_error).__name__}: {cleanup_error}",
                 )
+            else:
+                try:
+                    failure_frame, failure_latency = link.exchange(
+                        GET_STATUS_REQUEST,
+                        timeout=COMMAND_DEADLINE_SECONDS,
+                        on_data=lambda _frame: None,
+                    )
+                    failure_status = decode_status(failure_frame)
+                    emit_event(
+                        "failure_status",
+                        adc_frames_emitted=failure_status.adc_frames_emitted,
+                        adc_items_dropped=failure_status.adc_items_dropped,
+                        gpio_frames_emitted=failure_status.gpio_frames_emitted,
+                        gpio_items_dropped=failure_status.gpio_items_dropped,
+                        latency_seconds=failure_latency,
+                        parser_errors=failure_status.parser_errors,
+                        state=failure_status.device_state,
+                        stats_generation=failure_status.stats_generation,
+                        transport_errors=failure_status.transport_errors,
+                    )
+                except Exception as status_error:  # noqa: BLE001 - diagnostics only
+                    emit_event(
+                        "failure_status_failed",
+                        error=f"{type(status_error).__name__}: {status_error}",
+                    )
     return evidence
 
 

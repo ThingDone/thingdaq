@@ -291,6 +291,16 @@ class RigScriptIndependenceTests(unittest.TestCase):
         ):
             rig.validate_running_status(status, frame, validator, 3, (11, 9))
 
+    def test_validator_tracks_largest_receive_gap(self) -> None:
+        frame = rig.FrameParser().feed((FIXTURES / "adc-data.bin").read_bytes())[0]
+        validator = rig.SyntheticValidator(frame.run_id)
+        validator.last_receive_time = 10.0
+
+        with patch.object(rig.time, "monotonic", return_value=10.125):
+            validator.accept(frame)
+
+        self.assertEqual(0.125, validator.maximum_receive_gap_seconds)
+
     def test_full_program_streams_statuses_stops_and_reconciles(self) -> None:
         fake = PacedRigSerial()
         output = io.StringIO()
