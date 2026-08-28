@@ -63,12 +63,14 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
 ```
 
 `DeviceInfo`, `DeviceCapabilities`, `DAQConfiguration`, `Status`, `ADCBlock`,
-`GPIOBlock`, `StreamGap`, `FirmwareCounters`, `HostCounters`, and
-`LossCounters` validate their values when constructed. The Phase 01 names
+`GPIOBlock`, `GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
+`StreamGap`, `FirmwareCounters`, `HostCounters`, and `LossCounters` validate
+their values when constructed. The Phase 01 names
 `Info`, `Configuration`, `AdcBlock`, and `GpioBlock` remain aliases. INFO,
 GET_STATUS, and STOP are legal in every post-boot state; CONFIGURE and
 RESET_STATS are limited to IDLE/CONFIGURED; START requires CONFIGURED; and
-block reads require the RUNNING epoch established by this facade.
+block reads require the RUNNING epoch established by this facade. The optional
+GPIO clock diagnostic requires IDLE and its advertised capability bit.
 
 `DeviceInfo.data_checksum_algorithm` reports the generated device default in
 IDLE and the applied selection otherwise. `Status.data_checksum_algorithm`
@@ -84,6 +86,24 @@ compatibility decision:
 ```bash
 python -m teensy_daq.checksum_benchmark --algorithms all
 ```
+
+On firmware 0.6.0 or newer, the target-only clock diagnostic returns one
+read-only register/count snapshot without starting acquisition or touching a
+GPIO pad:
+
+```python
+with TeensyDAQ.open(hardware_serial=12345670) as daq:
+    evidence = daq.gpio_clock_diagnostic(rate_hz=4_000_000, event_count=8192)
+    if not evidence.healthy:
+        raise RuntimeError(evidence.hardware_error_flags)
+    print(evidence.measured_rate_hz, evidence.count_error)
+```
+
+Accepted rates must divide both the 24 MHz PIT clock and 600 MHz DWT clock
+exactly and cannot exceed the immutable 4 MHz production rate. The simulator
+does not advertise this capability and raises `DeviceCapabilityError` instead
+of fabricating target register evidence. See [[Protocol-V1]] and
+[[ADR-003-GPIO-Clock-DMA]].
 
 For hardware, pass a discovery result or select a stable serial directly. A
 selected port is INFO-probed again so hot re-enumeration cannot silently open a

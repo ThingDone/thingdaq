@@ -19,6 +19,7 @@ LoopReport FirmwareRuntime::service() {
     report.command_dispatched = true;
     control::DispatchReadiness readiness{};
     benchmark::RunResult benchmark_result{};
+    gpio_clock::RunResult gpio_clock_result{};
     if (command.request.kind == protocol_v1::CommandKind::kConfigure) {
       readiness.configuration_ready =
           packet_pipeline_.quiescent() && !synthetic_source_.running();
@@ -41,6 +42,21 @@ LoopReport FirmwareRuntime::service() {
       } else {
         readiness.checksum_benchmark_error =
             protocol_v1::ErrorCode::kInternalError;
+      }
+    } else if (command.request.kind ==
+                   protocol_v1::CommandKind::kGpioClockDiagnostic &&
+               control_.state() == protocol_v1::DeviceState::kIdle &&
+               gpio_clock_diagnostic_ != nullptr) {
+      gpio_clock_result = gpio_clock_diagnostic_->run(
+          command.request.gpio_clock_diagnostic);
+      if (gpio_clock_result.ok()) {
+        readiness.gpio_clock_response = &gpio_clock_result.response;
+        readiness.gpio_clock_error = protocol_v1::ErrorCode::kOk;
+      } else if (gpio_clock_result.status ==
+                 gpio_clock::RunStatus::kInvalidRequest) {
+        readiness.gpio_clock_error = protocol_v1::ErrorCode::kInvalidPayload;
+      } else {
+        readiness.gpio_clock_error = protocol_v1::ErrorCode::kInternalError;
       }
     }
     const control::DispatchResult dispatched =

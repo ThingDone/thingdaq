@@ -206,6 +206,45 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     ) > int(benchmark["max_operations"]):
         raise ContractError("checksum benchmark batch bounds exceed operation bound")
 
+    gpio_clock = contract["gpio_clock_diagnostic"]
+    positive_gpio_clock_fields = (
+        "pit_clock_hz",
+        "cycle_counter_hz",
+        "production_rate_hz",
+        "minimum_rate_hz",
+        "minimum_event_count",
+        "maximum_event_count",
+        "maximum_elapsed_cycles",
+        "duplicate_guard_events",
+        "count_tolerance",
+    )
+    if any(int(gpio_clock[name]) <= 0 for name in positive_gpio_clock_fields):
+        raise ContractError("GPIO clock diagnostic bounds must all be positive")
+    if int(gpio_clock["production_rate_hz"]) != int(
+        timing["gpio_sample_rate_hz"]
+    ):
+        raise ContractError(
+            "GPIO clock production rate must equal advertised GPIO timing"
+        )
+    if int(gpio_clock["pit_clock_hz"]) % int(
+        gpio_clock["production_rate_hz"]
+    ):
+        raise ContractError("GPIO production rate must divide the PIT clock exactly")
+    if int(gpio_clock["minimum_rate_hz"]) > int(
+        gpio_clock["production_rate_hz"]
+    ):
+        raise ContractError("GPIO diagnostic minimum exceeds production rate")
+    if int(gpio_clock["minimum_event_count"]) > int(
+        gpio_clock["maximum_event_count"]
+    ):
+        raise ContractError("GPIO diagnostic event-count bounds are inverted")
+    maximum_major_count = (
+        2 * int(gpio_clock["maximum_event_count"])
+        + int(gpio_clock["duplicate_guard_events"])
+    )
+    if maximum_major_count > 0x7FFF:
+        raise ContractError("GPIO diagnostic eDMA major count exceeds ELINKNO width")
+
     flag_values = enum_map(contract["flags"])
     validate_enum_width("flags", contract["flags"], 16)
     if any(value == 0 or value & (value - 1) for value in flag_values.values()):
@@ -214,6 +253,15 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     validate_enum_width("capability_bits", contract["enums"]["capability_bits"], 32)
     if any(value == 0 or value & (value - 1) for value in capability_values.values()):
         raise ContractError("every named capability must be one nonzero bit")
+    gpio_clock_error_values = enum_map(contract["enums"]["gpio_clock_error"])
+    validate_enum_width(
+        "gpio_clock_error", contract["enums"]["gpio_clock_error"], 32
+    )
+    if any(
+        value == 0 or value & (value - 1)
+        for value in gpio_clock_error_values.values()
+    ):
+        raise ContractError("every GPIO clock error must be one nonzero bit")
 
     checksums = enum_map(contract["checksum_algorithms"])
     validate_enum_width("checksum_algorithms", contract["checksum_algorithms"], 8)
@@ -319,6 +367,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         "benchmark_vector": 8,
         "benchmark_memory_region": 8,
         "benchmark_cache_state": 8,
+        "gpio_clock_error": 32,
     }.items():
         enum_map(contract["enums"][enum_name])
         validate_enum_width(enum_name, contract["enums"][enum_name], bits)
@@ -377,6 +426,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     limits = contract["limits"]
     timing = contract["timing"]
     benchmark = contract["checksum_benchmark"]
+    gpio_clock = contract["gpio_clock_diagnostic"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -454,6 +504,15 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             f"{int(benchmark['timer_calibration_samples'])}"
         ),
         f"CHECKSUM_BENCHMARK_WARMUP_OPERATIONS = {int(benchmark['warmup_operations'])}",
+        f"GPIO_CLOCK_PIT_HZ = {int(gpio_clock['pit_clock_hz'])}",
+        f"GPIO_CLOCK_DWT_HZ = {int(gpio_clock['cycle_counter_hz'])}",
+        f"GPIO_CLOCK_PRODUCTION_RATE_HZ = {int(gpio_clock['production_rate_hz'])}",
+        f"GPIO_CLOCK_MIN_RATE_HZ = {int(gpio_clock['minimum_rate_hz'])}",
+        f"GPIO_CLOCK_MIN_EVENT_COUNT = {int(gpio_clock['minimum_event_count'])}",
+        f"GPIO_CLOCK_MAX_EVENT_COUNT = {int(gpio_clock['maximum_event_count'])}",
+        f"GPIO_CLOCK_MAX_ELAPSED_CYCLES = {int(gpio_clock['maximum_elapsed_cycles'])}",
+        f"GPIO_CLOCK_DUPLICATE_GUARD_EVENTS = {int(gpio_clock['duplicate_guard_events'])}",
+        f"GPIO_CLOCK_COUNT_TOLERANCE = {int(gpio_clock['count_tolerance'])}",
         f"ADC_BYTES_PER_PAIR = {int(layouts['adc']['bytes_per_item'])}",
         f"ADC_PAIRS_PER_FRAME = {int(layouts['adc']['items_per_frame'])}",
         f"ADC_RESOLUTION_BITS = {int(layouts['adc']['resolution_bits'])}",
@@ -506,6 +565,14 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.extend(
         python_enum("BenchmarkCacheState", contract["enums"]["benchmark_cache_state"])
     )
+    lines.extend(
+        python_enum(
+            "GpioClockError",
+            contract["enums"]["gpio_clock_error"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
 
     lines.extend(
         [
@@ -531,6 +598,15 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.append(
         "KNOWN_CAPABILITY_MASK = "
         + str(sum(int(entry["value"]) for entry in capabilities))
+    )
+    lines.append(
+        "KNOWN_GPIO_CLOCK_ERROR_MASK = "
+        + str(
+            sum(
+                int(entry["value"])
+                for entry in contract["enums"]["gpio_clock_error"]
+            )
+        )
     )
     lines.extend(["", ""])
 
@@ -640,6 +716,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     limits = contract["limits"]
     timing = contract["timing"]
     benchmark = contract["checksum_benchmark"]
+    gpio_clock = contract["gpio_clock_diagnostic"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -743,6 +820,33 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             "kChecksumBenchmarkWarmupOperations = "
             f"{int(benchmark['warmup_operations'])}U;"
         ),
+        f"inline constexpr std::uint32_t kGpioClockPitHz = {int(gpio_clock['pit_clock_hz'])}U;",
+        f"inline constexpr std::uint32_t kGpioClockDwtHz = {int(gpio_clock['cycle_counter_hz'])}U;",
+        (
+            "inline constexpr std::uint32_t kGpioClockProductionRateHz = "
+            f"{int(gpio_clock['production_rate_hz'])}U;"
+        ),
+        f"inline constexpr std::uint32_t kGpioClockMinRateHz = {int(gpio_clock['minimum_rate_hz'])}U;",
+        (
+            "inline constexpr std::uint16_t kGpioClockMinEventCount = "
+            f"{int(gpio_clock['minimum_event_count'])}U;"
+        ),
+        (
+            "inline constexpr std::uint16_t kGpioClockMaxEventCount = "
+            f"{int(gpio_clock['maximum_event_count'])}U;"
+        ),
+        (
+            "inline constexpr std::uint32_t kGpioClockMaxElapsedCycles = "
+            f"{int(gpio_clock['maximum_elapsed_cycles'])}U;"
+        ),
+        (
+            "inline constexpr std::uint16_t kGpioClockDuplicateGuardEvents = "
+            f"{int(gpio_clock['duplicate_guard_events'])}U;"
+        ),
+        (
+            "inline constexpr std::uint32_t kGpioClockCountTolerance = "
+            f"{int(gpio_clock['count_tolerance'])}U;"
+        ),
         f"inline constexpr std::size_t kAdcBytesPerPair = {int(layouts['adc']['bytes_per_item'])}U;",
         f"inline constexpr std::size_t kAdcPairsPerFrame = {int(layouts['adc']['items_per_frame'])}U;",
         f"inline constexpr std::uint8_t kAdcResolutionBits = {int(layouts['adc']['resolution_bits'])}U;",
@@ -800,6 +904,13 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             contract["enums"]["benchmark_cache_state"],
         )
     )
+    lines.extend(
+        cpp_enum(
+            "GpioClockError",
+            "std::uint32_t",
+            contract["enums"]["gpio_clock_error"],
+        )
+    )
 
     lines.extend(
         [
@@ -821,6 +932,14 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             + "U;",
             "inline constexpr std::uint32_t kKnownCapabilityMask = "
             + str(sum(int(entry["value"]) for entry in capabilities))
+            + "U;",
+            "inline constexpr std::uint32_t kKnownGpioClockErrorMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["gpio_clock_error"]
+                )
+            )
             + "U;",
             "",
         ]

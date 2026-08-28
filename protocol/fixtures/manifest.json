@@ -170,6 +170,23 @@
       "total_length": 56
     },
     {
+      "checksum": "0xbe440469",
+      "checksum_algorithm": "ADLER32",
+      "file": "gpio-clock-diagnostic-request.bin",
+      "first_sample_ticks": 0,
+      "flags": 0,
+      "frame_hex": "efbeadde011800002c000100380000000800000000000000000000000900000000000000000000000000000040420f0000100000690444be",
+      "frame_sha256": "7d5fb760c5f6ad97fceb2576e248c0f9cefec7923db55a4e2c3f910dac995c66",
+      "item_count": 0,
+      "kind": "GPIO_CLOCK_DIAGNOSTIC_REQUEST",
+      "payload_length": 8,
+      "payload_sha256": "e50557eb391a5f62d9be6f9d6eb3e1b2798c8c3556e2bd38f9d9d916e93796a6",
+      "request_id": 9,
+      "run_id": 0,
+      "sequence": 0,
+      "total_length": 56
+    },
+    {
       "checksum": "0x343d0fd2",
       "checksum_algorithm": "ADLER32",
       "file": "info-response.bin",
@@ -306,18 +323,35 @@
       "total_length": 144
     },
     {
-      "checksum": "0xed4405d1",
+      "checksum": "0x70630e1f",
+      "checksum_algorithm": "ADLER32",
+      "file": "gpio-clock-diagnostic-response.bin",
+      "first_sample_ticks": 0,
+      "flags": 0,
+      "frame_hex": "efbeadde019800002c000100bc0000008c0000000000000000000000090000000000000000000000000000000000000040420f0000093d0000366e01170000000010000000100000001000000046c323008025000000000040000000003000000000c000c00000000000000017000000160000000100000001000000380005001e000080020000000000000004000000000000000000000008c01b4000002020040000000f0c03001010102008000202003800021e0200001f0e6370",
+      "frame_sha256": "6fd1ba4a5db9ecfb731162cc865698e43ff38c2e229811daa01a5892ab7f37b4",
+      "item_count": 0,
+      "kind": "GPIO_CLOCK_DIAGNOSTIC_RESPONSE",
+      "payload_length": 140,
+      "payload_sha256": "e3bd22edc6111d78cc9ceb498639fcde39cc826307d506977e7828d874733dd5",
+      "request_id": 9,
+      "run_id": 0,
+      "sequence": 0,
+      "total_length": 188
+    },
+    {
+      "checksum": "0xed5c05d2",
       "checksum_algorithm": "ADLER32",
       "file": "error-response.bin",
       "first_sample_ticks": 0,
       "flags": 32768,
-      "frame_hex": "efbeadde019f00802c000100380000000800000000000000000000000900000000000000000000000000000001000200fe010000d10544ed",
-      "frame_sha256": "4def4bcec7eb7ef0d83c4362f2d00ebf2d786fd7f399a8a8de53c1a704d75cb4",
+      "frame_hex": "efbeadde019f00802c000100380000000800000000000000000000000a00000000000000000000000000000001000200fe010000d2055ced",
+      "frame_sha256": "5a0574846de8d095c861233863551d33098d3e7b7bd3df31e5cde0916c541413",
       "item_count": 0,
       "kind": "ERROR_RESPONSE",
       "payload_length": 8,
       "payload_sha256": "1df9e085f4f65897f3abe4d1fc47f753951d7c2727dae86cfae54155412ea904",
-      "request_id": 9,
+      "request_id": 10,
       "run_id": 0,
       "sequence": 0,
       "total_length": 56
@@ -326,5 +360,5 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 1,
   "source": "protocol/protocol-v1.json",
-  "source_sha256": "8adde2428ca6058f658a2ddc8b6581dbe42e326e1cbb5320fb8daa406e44ad84"
+  "source_sha256": "a2da2fdd7617ec5ed496b1481620d457fa71ff3f3090089d49cb2bfab7dec8e3"
 }

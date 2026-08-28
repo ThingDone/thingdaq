@@ -15,14 +15,15 @@ namespace constants = teensy_daq::protocol_v1;
 
 int failures = 0;
 
-constexpr std::array<const char *, 8U> kRequestFixtures{
+constexpr std::array<const char *, 9U> kRequestFixtures{
     "info-request.bin",       "configure-request.bin",
     "start-request.bin",      "get-status-request.bin",
     "stop-request.bin",       "reset-stats-request.bin",
     "ping-request.bin",       "checksum-benchmark-request.bin",
+    "gpio-clock-diagnostic-request.bin",
 };
 
-constexpr std::array<constants::CommandKind, 8U> kRequestKinds{
+constexpr std::array<constants::CommandKind, 9U> kRequestKinds{
     constants::CommandKind::kInfo,
     constants::CommandKind::kConfigure,
     constants::CommandKind::kStart,
@@ -31,6 +32,7 @@ constexpr std::array<constants::CommandKind, 8U> kRequestKinds{
     constants::CommandKind::kResetStats,
     constants::CommandKind::kPing,
     constants::CommandKind::kChecksumBenchmark,
+    constants::CommandKind::kGpioClockDiagnostic,
 };
 
 void expect(bool condition, const std::string &message) {
@@ -176,7 +178,7 @@ void testEndianAndChecksum() {
 }
 
 void testGoldenDecode(const std::string &fixture_directory) {
-  const std::array<const char *, 19U> fixtures{
+  const std::array<const char *, 21U> fixtures{
       "adc-data.bin",
       "gpio-data.bin",
       "info-request.bin",
@@ -187,6 +189,7 @@ void testGoldenDecode(const std::string &fixture_directory) {
       "reset-stats-request.bin",
       "ping-request.bin",
       "checksum-benchmark-request.bin",
+      "gpio-clock-diagnostic-request.bin",
       "info-response.bin",
       "configure-response.bin",
       "start-response.bin",
@@ -195,6 +198,7 @@ void testGoldenDecode(const std::string &fixture_directory) {
       "reset-stats-response.bin",
       "ping-response.bin",
       "checksum-benchmark-response.bin",
+      "gpio-clock-diagnostic-response.bin",
       "error-response.bin",
   };
   for (const char *name : fixtures) {
@@ -260,6 +264,15 @@ void testGoldenDecode(const std::string &fixture_directory) {
              benchmark.checksum_benchmark.batch_count == 4U &&
              benchmark.checksum_benchmark.iterations_per_batch == 64U,
          "typed CHECKSUM_BENCHMARK values");
+
+  wire::Request gpio_clock{};
+  const std::vector<std::uint8_t> gpio_clock_bytes =
+      readFixture(fixture_directory, "gpio-clock-diagnostic-request.bin");
+  expect(wire::decodeRequest(view(gpio_clock_bytes), gpio_clock).ok(),
+         "decode GPIO_CLOCK_DIAGNOSTIC values");
+  expect(gpio_clock.gpio_clock_diagnostic.rate_hz == 1000000U &&
+             gpio_clock.gpio_clock_diagnostic.event_count == 4096U,
+         "typed GPIO_CLOCK_DIAGNOSTIC values");
 }
 
 void testPythonGeneratedCommands(const std::string &fixture_directory,
@@ -446,8 +459,60 @@ void testGoldenEncode(const std::string &fixture_directory,
               "CHECKSUM_BENCHMARK response golden");
   writeFrame(response_directory, "checksum-benchmark-response.bin", response);
 
+  wire::Request gpio_clock =
+      request(constants::CommandKind::kGpioClockDiagnostic, 9U);
+  gpio_clock.gpio_clock_diagnostic.rate_hz = 1000000U;
+  gpio_clock.gpio_clock_diagnostic.event_count = 4096U;
+  wire::GpioClockDiagnosticResponse gpio_clock_response{};
+  gpio_clock_response.configured_rate_hz = 1000000U;
+  gpio_clock_response.production_rate_hz = 4000000U;
+  gpio_clock_response.pit_clock_hz = 24000000U;
+  gpio_clock_response.pit_load_value = 23U;
+  gpio_clock_response.requested_event_count = 4096U;
+  gpio_clock_response.scheduled_event_count = 4096U;
+  gpio_clock_response.dma_sample_count = 4096U;
+  gpio_clock_response.dwt_counter_hz = 600000000U;
+  gpio_clock_response.dwt_elapsed_cycles = 2457600U;
+  gpio_clock_response.ccm_cscmr1_configured = 64U;
+  gpio_clock_response.ccm_ccgr1_configured = 12288U;
+  gpio_clock_response.ccm_ccgr2_configured = 12582912U;
+  gpio_clock_response.ccm_ccgr5_configured = 192U;
+  gpio_clock_response.pit_ldval_configured = 23U;
+  gpio_clock_response.pit_cval_final = 22U;
+  gpio_clock_response.pit_tctrl_configured = 1U;
+  gpio_clock_response.pit_tflg_final = 1U;
+  gpio_clock_response.xbar_sel_configured = 56U;
+  gpio_clock_response.xbar_ctrl_configured = 5U;
+  gpio_clock_response.dmamux_chcfg_configured = 0x8000001EU;
+  gpio_clock_response.dma_cr_configured = 2U;
+  gpio_clock_response.dma_erq_configured = 4U;
+  gpio_clock_response.tcd_saddr = 0x401BC008U;
+  gpio_clock_response.tcd_daddr = 0x20200000U;
+  gpio_clock_response.tcd_nbytes = 4U;
+  gpio_clock_response.last_sample_word = 0x00030C0FU;
+  gpio_clock_response.tcd_citer_final = 4112U;
+  gpio_clock_response.tcd_biter = 8208U;
+  gpio_clock_response.tcd_csr_final = 8U;
+  gpio_clock_response.tcd_attr = 0x0202U;
+  gpio_clock_response.pit_channel = 0U;
+  gpio_clock_response.xbar_input = 56U;
+  gpio_clock_response.xbar_output = 0U;
+  gpio_clock_response.edma_channel = 2U;
+  gpio_clock_response.dmamux_source = 30U;
+  gpio_clock_response.edma_priority = 2U;
+  expect(wire::encodeGpioClockDiagnosticResponse(
+             gpio_clock, 0U, gpio_clock_response, response)
+             .ok(),
+         "encode GPIO_CLOCK_DIAGNOSTIC response");
+  expectFrame(response,
+              readFixture(fixture_directory,
+                          "gpio-clock-diagnostic-response.bin"),
+              "GPIO_CLOCK_DIAGNOSTIC response golden");
+  writeFrame(response_directory, "gpio-clock-diagnostic-response.bin",
+             response);
+
   expect(wire::encodeRejectedFrameResponse(
-             9U, 0xFEU, 1U, constants::ErrorCode::kUnknownFrameKind, response)
+             10U, 0xFEU, 1U, constants::ErrorCode::kUnknownFrameKind, response)
              .ok(),
          "encode generic error response");
   expectFrame(response, readFixture(fixture_directory, "error-response.bin"),

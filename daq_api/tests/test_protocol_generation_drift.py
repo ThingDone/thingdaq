@@ -68,7 +68,7 @@ class ProtocolGenerationDriftTests(unittest.TestCase):
         second = generate_protocol.expected_outputs(self.contract, self.source_bytes)
 
         self.assertEqual(first, second)
-        self.assertEqual(22, len(first))
+        self.assertEqual(24, len(first))
         for path, expected in first.items():
             with self.subTest(path=path.relative_to(REPOSITORY_ROOT)):
                 self.assertTrue(path.is_file())

@@ -18,6 +18,7 @@ namespace benchmark = teensy_daq::benchmark;
 namespace board = teensy_daq::board;
 namespace constants = teensy_daq::protocol_v1;
 namespace control = teensy_daq::control;
+namespace gpio_clock = teensy_daq::gpio_clock;
 namespace identity = teensy_daq::identity;
 namespace packet = teensy_daq::packet;
 namespace synthetic = teensy_daq::synthetic;
@@ -129,6 +130,30 @@ wire::CommandFrame checksumBenchmarkRequest(std::uint32_t request_id) {
   return frame;
 }
 
+wire::CommandFrame gpioClockDiagnosticRequest(std::uint32_t request_id,
+                                              std::uint32_t rate_hz,
+                                              std::uint16_t event_count) {
+  std::array<std::uint8_t,
+             constants::kGpioClockDiagnosticRequestPayloadSize>
+      payload{};
+  expect(wire::storeU32(
+             {payload.data(), payload.size()},
+             constants::kGpioClockDiagnosticRequestRateHzOffset, rate_hz) &&
+             wire::storeU16(
+                 {payload.data(), payload.size()},
+                 constants::kGpioClockDiagnosticRequestEventCountOffset,
+                 event_count),
+         "encode GPIO clock diagnostic window");
+  wire::FrameFields fields{};
+  fields.kind = constants::FrameKind::kGpioClockDiagnosticRequest;
+  fields.request_id = request_id;
+  wire::CommandFrame frame{};
+  expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame)
+             .ok(),
+         "encode GPIO_CLOCK_DIAGNOSTIC request");
+  return frame;
+}
+
 class FakeCdcStream final : public usb::CdcByteStream {
  public:
   usb::IoCount available() override {
@@ -221,6 +246,32 @@ class FakeBenchmarkPlatform final : public benchmark::Platform {
   std::uint32_t cycles_ = 0U;
   std::uint32_t pair_count_ = 0U;
   bool pair_open_ = false;
+};
+
+class FakeGpioClockPlatform final : public gpio_clock::Platform {
+ public:
+  bool execute(const gpio_clock::Plan &plan,
+               wire::GpioClockDiagnosticResponse &snapshot) override {
+    ++calls;
+    observed = plan;
+    snapshot.dwt_counter_hz = constants::kGpioClockDwtHz;
+    snapshot.dwt_elapsed_cycles = plan.measurement_cycles;
+    snapshot.tcd_biter = plan.tcd_major_count;
+    snapshot.tcd_citer_final = static_cast<std::uint16_t>(
+        plan.tcd_major_count - plan.requested_event_count);
+    snapshot.dma_sample_count = plan.requested_event_count;
+    snapshot.pit_channel = board::kGpioPitChannel;
+    snapshot.xbar_input = board::kGpioXbarInput;
+    snapshot.xbar_output = board::kGpioXbarOutput;
+    snapshot.edma_channel = board::kGpioEdmaChannel;
+    snapshot.dmamux_source = board::kGpioDmamuxSource;
+    snapshot.edma_priority = board::kGpioEdmaPriority;
+    snapshot.tcd_nbytes = sizeof(std::uint32_t);
+    return true;
+  }
+
+  std::uint32_t calls = 0U;
+  gpio_clock::Plan observed{};
 };
 
 struct DrainResult {
@@ -797,6 +848,67 @@ void testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState() {
          "runtime benchmark excludes interrupts only during timed intervals");
 }
 
+void testGpioClockRoundTripPreservesIdleAcquisitionState() {
+  FakeCdcStream stream{};
+  packet::OwnedPacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  FakeGpioClockPlatform platform{};
+  gpio_clock::Runner diagnostic{platform};
+  app::FirmwareRuntime firmware{
+      stream, packet_storage, clock, synthetic::Mode::kRealtime, nullptr,
+      &diagnostic};
+  expect(firmware.begin(9877U), "GPIO clock runtime completes BOOT");
+  const teensy_daq::stats::Snapshot before =
+      firmware.statistics().snapshot();
+
+  stream.appendInput(gpioClockDiagnosticRequest(302U, 1000000U, 4096U));
+  const DrainResult drained = drain(firmware, stream);
+  expect(drained.quiescent && firmware.state() == constants::DeviceState::kIdle,
+         "GPIO clock round trip returns with runtime in IDLE");
+  const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
+  expect(frames.size() == 1U &&
+             frames[0].header.kind ==
+                 constants::FrameKind::kGpioClockDiagnosticResponse &&
+             responseError(frames[0]) == constants::ErrorCode::kOk,
+         "runtime emits one typed GPIO clock response");
+  if (frames.size() == 1U) {
+    std::uint32_t configured_rate = 0U;
+    std::uint32_t scheduled_events = 0U;
+    std::uint32_t dma_samples = 0U;
+    std::uint32_t error_flags = 1U;
+    expect(wire::loadU32(
+               frames[0].payload,
+               constants::kGpioClockDiagnosticResponseConfiguredRateHzOffset,
+               configured_rate) &&
+               wire::loadU32(
+                   frames[0].payload,
+                   constants::
+                       kGpioClockDiagnosticResponseScheduledEventCountOffset,
+                   scheduled_events) &&
+               wire::loadU32(
+                   frames[0].payload,
+                   constants::kGpioClockDiagnosticResponseDmaSampleCountOffset,
+                   dma_samples) &&
+               wire::loadU32(
+                   frames[0].payload,
+                   constants::
+                       kGpioClockDiagnosticResponseHardwareErrorFlagsOffset,
+                   error_flags) &&
+               configured_rate == 1000000U && scheduled_events == 4096U &&
+               dma_samples == 4096U && error_flags == 0U,
+           "runtime transports exact rate, counts, and hardware status");
+  }
+  const teensy_daq::stats::Snapshot after =
+      firmware.statistics().snapshot();
+  expect(platform.calls == 1U && platform.observed.pit_load_value == 23U &&
+             after.generation == before.generation &&
+             after.adc_frames_emitted == before.adc_frames_emitted &&
+             after.gpio_frames_emitted == before.gpio_frames_emitted &&
+             firmware.packetSnapshot().run_id == 0U &&
+             !firmware.syntheticSnapshot().running,
+         "GPIO clock diagnostic is one isolated hardware call without an epoch");
+}
+
 }  // namespace
 
 int main() {
@@ -805,6 +917,7 @@ int main() {
   testStartupSchedulingJitterFitsPacketPool();
   testStopDrainGatesNextStartAndPreventsStaleRunData();
   testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState();
+  testGpioClockRoundTripPreservesIdleAcquisitionState();
   if (failures != 0) {
     std::cerr << failures << " firmware runtime assertion(s) failed\n";
     return 1;

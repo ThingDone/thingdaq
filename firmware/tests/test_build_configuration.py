@@ -36,7 +36,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(6, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(7, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -165,6 +165,26 @@ class BuildConfigurationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.packet_buffer_usage(symbols.splitlines()[0])
+
+    def test_gpio_clock_diagnostic_buffer_requires_isolated_ocram_line(self) -> None:
+        symbols = (
+            "2025f000 00000020 B "
+            "teensy_daq::gpio_clock::g_gpio_clock_diagnostic_buffer"
+        )
+        resource = build_firmware.gpio_clock_diagnostic_buffer_usage(symbols)
+
+        self.assertEqual(32, resource["bytes"])
+        self.assertEqual("0x2025f000", resource["address"])
+        with self.assertRaisesRegex(build_firmware.BuildError, "cache-line aligned"):
+            build_firmware.gpio_clock_diagnostic_buffer_usage(
+                symbols.replace("2025f000", "2025f004")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
+            build_firmware.gpio_clock_diagnostic_buffer_usage(
+                symbols.replace("2025f000", "2005f000")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
+            build_firmware.gpio_clock_diagnostic_buffer_usage("")
 
     def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
         responses = [

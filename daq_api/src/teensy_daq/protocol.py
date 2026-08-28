@@ -21,6 +21,7 @@ _HEADER = struct.Struct(constants.HEADER_STRUCT_FORMAT)
 _TRAILER = struct.Struct("<I")
 _CONFIGURATION = struct.Struct("<BBBBI")
 _CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
+_GPIO_CLOCK_DIAGNOSTIC_REQUEST = struct.Struct("<IHH")
 _RESPONSE_PREFIX = struct.Struct("<BBH")
 _DATA_KINDS = frozenset({constants.FrameKind.ADC_DATA, constants.FrameKind.GPIO_DATA})
 _REQUEST_KINDS = frozenset(constants.REQUEST_RESPONSE_KIND)
@@ -632,6 +633,115 @@ def _validate_checksum_benchmark_response(payload: bytes) -> None:
         raise FrameValidationError("checksum benchmark derived metrics disagree")
 
 
+def _valid_gpio_clock_selection(rate_hz: int, event_count: int) -> bool:
+    if (
+        not constants.GPIO_CLOCK_MIN_RATE_HZ
+        <= rate_hz
+        <= constants.GPIO_CLOCK_PRODUCTION_RATE_HZ
+        or constants.GPIO_CLOCK_PIT_HZ % rate_hz != 0
+        or constants.GPIO_CLOCK_DWT_HZ % rate_hz != 0
+        or not constants.GPIO_CLOCK_MIN_EVENT_COUNT
+        <= event_count
+        <= constants.GPIO_CLOCK_MAX_EVENT_COUNT
+    ):
+        return False
+    elapsed_cycles = event_count * (constants.GPIO_CLOCK_DWT_HZ // rate_hz)
+    major_count = 2 * event_count + constants.GPIO_CLOCK_DUPLICATE_GUARD_EVENTS
+    return (
+        elapsed_cycles <= constants.GPIO_CLOCK_MAX_ELAPSED_CYCLES
+        and major_count <= 0x7FFF
+    )
+
+
+def _validate_gpio_clock_diagnostic_request(payload: bytes, offset: int = 0) -> None:
+    rate_hz, event_count, reserved = _GPIO_CLOCK_DIAGNOSTIC_REQUEST.unpack_from(
+        payload, offset
+    )
+    if reserved != 0:
+        raise FrameValidationError("GPIO clock diagnostic reserved field must be zero")
+    if not _valid_gpio_clock_selection(rate_hz, event_count):
+        raise FrameValidationError("GPIO clock diagnostic selection is invalid")
+
+
+def _validate_gpio_clock_diagnostic_response(payload: bytes) -> None:
+    def u32(offset: int) -> int:
+        return struct.unpack_from("<I", payload, offset)[0]
+
+    configured_rate = u32(
+        constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_CONFIGURED_RATE_HZ_OFFSET
+    )
+    production_rate = u32(
+        constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PRODUCTION_RATE_HZ_OFFSET
+    )
+    pit_clock = u32(constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_CLOCK_HZ_OFFSET)
+    pit_load = u32(constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_LOAD_VALUE_OFFSET)
+    requested_events = u32(
+        constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_REQUESTED_EVENT_COUNT_OFFSET
+    )
+    scheduled_events = u32(
+        constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_SCHEDULED_EVENT_COUNT_OFFSET
+    )
+    samples = u32(constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMA_SAMPLE_COUNT_OFFSET)
+    dwt_hz = u32(constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DWT_COUNTER_HZ_OFFSET)
+    elapsed_cycles = u32(
+        constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DWT_ELAPSED_CYCLES_OFFSET
+    )
+    error_flags = u32(
+        constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_HARDWARE_ERROR_FLAGS_OFFSET
+    )
+    citer = struct.unpack_from(
+        "<H", payload, constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_CITER_FINAL_OFFSET
+    )[0]
+    biter = struct.unpack_from(
+        "<H", payload, constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_BITER_OFFSET
+    )[0]
+    selection_valid = _valid_gpio_clock_selection(configured_rate, requested_events)
+    expected_major_count = (
+        2 * requested_events + constants.GPIO_CLOCK_DUPLICATE_GUARD_EVENTS
+    )
+    unarmed_errors = int(
+        constants.GpioClockError.DWT_UNAVAILABLE
+        | constants.GpioClockError.RESOURCE_BUSY
+    )
+    configuration_was_armed = error_flags & unarmed_errors == 0
+    expected_scheduled = (
+        elapsed_cycles // (constants.GPIO_CLOCK_DWT_HZ // configured_rate)
+        if selection_valid and dwt_hz == constants.GPIO_CLOCK_DWT_HZ
+        else 0
+    )
+    if (
+        not selection_valid
+        or production_rate != constants.GPIO_CLOCK_PRODUCTION_RATE_HZ
+        or pit_clock != constants.GPIO_CLOCK_PIT_HZ
+        or pit_load != constants.GPIO_CLOCK_PIT_HZ // configured_rate - 1
+        or error_flags & ~constants.KNOWN_GPIO_CLOCK_ERROR_MASK
+        or (
+            configuration_was_armed
+            and (
+                biter != expected_major_count
+                or citer > biter
+                or samples != biter - citer
+            )
+        )
+        or (
+            dwt_hz == constants.GPIO_CLOCK_DWT_HZ
+            and scheduled_events != expected_scheduled
+        )
+        or (
+            error_flags == 0
+            and (
+                dwt_hz != constants.GPIO_CLOCK_DWT_HZ
+                or elapsed_cycles == 0
+                or abs(scheduled_events - requested_events)
+                > constants.GPIO_CLOCK_COUNT_TOLERANCE
+                or abs(samples - scheduled_events)
+                > constants.GPIO_CLOCK_COUNT_TOLERANCE
+            )
+        )
+    ):
+        raise FrameValidationError("GPIO clock diagnostic evidence is inconsistent")
+
+
 def _validate_info_payload(payload: bytes) -> None:
     if payload[constants.INFO_RESPONSE_RESERVED_0_OFFSET] != 0:
         raise FrameValidationError("INFO reserved_0 must be zero")
@@ -827,6 +937,9 @@ def _validate_payload(header: FrameHeader, payload: bytes) -> None:
     if header.kind is constants.FrameKind.CHECKSUM_BENCHMARK_REQUEST:
         _validate_checksum_benchmark_request(payload)
         return
+    if header.kind is constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST:
+        _validate_gpio_clock_diagnostic_request(payload)
+        return
     if header.kind in _REQUEST_KINDS:
         return
 
@@ -877,6 +990,8 @@ def _validate_payload(header: FrameHeader, payload: bytes) -> None:
         raise FrameValidationError("PING response reserved byte must be zero")
     elif header.kind is constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE:
         _validate_checksum_benchmark_response(payload)
+    elif header.kind is constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_RESPONSE:
+        _validate_gpio_clock_diagnostic_response(payload)
 
 
 def encode_frame(

@@ -2,6 +2,7 @@
 type: reference
 title: System Overview
 created: 2026-08-27
+updated: 2026-08-28
 tags:
   - teensy-daq
   - architecture
@@ -39,6 +40,8 @@ authorities:
 | `firmware/src/firmware_identity.h` | Product, board, MCU, CPU, core, compiler, USB/menu, semantic firmware, protocol, source, build, and timestamp identity |
 | `firmware/src/board_config.h` | The single pin, timer, XBAR, ADC_ETC, eDMA, queue, DMA-memory, alignment, and future-owner registry |
 | `firmware/src/firmware_capabilities.h` | The exact INFO metadata projected from generated protocol constants and the resource registry |
+| `firmware/src/gpio_clock_diagnostic.{h,cpp}` | Portable exact-rate planning, duration bounds, and dead/duplicate/count-error classification |
+| `firmware/src/gpio_clock_diagnostic_teensy.{h,cpp}` | The guarded PIT0/XBARA1/eDMA register adapter and isolated OCRAM sentinel transfer |
 | `firmware/src/synthetic_source.{h,cpp}` | Deterministic ADC/GPIO formulas, shared epoch, real-time and unpaced-diagnostic scheduling, and bounded source telemetry |
 | `firmware/src/packet_buffer_pipeline.{h,cpp}` | Fixed aligned complete-frame storage, explicit ownership transitions, per-source sequences/counters, bounded ready/transmit index queues, and high-water telemetry |
 | `firmware/src/usb_transport.{h,cpp}` | Portable bounded CDC receive/transmit scheduling, complete command/response queues, frame ownership, and transport diagnostics |
@@ -168,8 +171,9 @@ Every `loop()` calls one portable runtime service step in this fixed order:
 2. dequeue and dispatch at most one complete command when a response slot is
    reserved;
 3. preflight START ownership, consume the bounded START-epoch/STOP event mask
-   in main-loop context, and admit a successful lifecycle response only after
-   the corresponding resources accept it;
+   in main-loop context, or run one explicitly requested IDLE-only diagnostic,
+   and admit a successful response only after the corresponding resources
+   accept it;
 4. poll one 8 MHz clock value and generate at most two due synthetic frames;
 5. promote at most four complete ready frames into transport ownership; and
 6. transmit at most 2,048 bytes and eight core write calls, requesting at most
@@ -227,6 +231,13 @@ GPIO acquisition remain later milestones. CONFIGURE accepts any nonempty
 ADC/GPIO subset with source `synthetic`, Adler-32, and a 4,096-byte data-frame
 size. The former Phase 03 zero-stream hardware profile remains only the IDLE
 wire placeholder and is now rejected by CONFIGURE.
+
+Phase 06 additionally advertises `GPIO_CLOCK_DIAGNOSTIC`. That capability is
+not `HARDWARE_SOURCE`: while IDLE, it performs one bounded sentinel transfer
+through the silicon-verified 24 MHz PIT0/XBARA1 rising-edge/eDMA route and
+returns raw register/count evidence. It never remaps or reads D6-D13, produces
+no data frame, allocates no run ID, and leaves acquisition statistics intact.
+[[ADR-003-GPIO-Clock-DMA]] records the accepted route and failed alternatives.
 
 One successful START allocates the next nonzero run ID and captures one shared
 clock reading. Data timestamps are unsigned 64-bit 8 MHz ticks relative to that

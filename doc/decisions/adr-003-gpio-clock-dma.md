@@ -2,6 +2,7 @@
 type: analysis
 title: 'ADR 003: GPIO Clock and DMA'
 created: 2026-08-28
+updated: 2026-08-28
 tags:
   - teensy-daq
   - decision
@@ -21,11 +22,12 @@ related:
 
 ## Status
 
-Accepted as the Phase 06 resource assignment and hardware-spike order. The
-register path remains a candidate until it is measured on the Teensy 4.0 rig;
-this decision does not enable or advertise the physical GPIO source. A failed
-candidate must follow the ordered fallbacks below and update both this record
-and the centralized registry before the physical capability can be enabled.
+Accepted and verified on the Teensy 4.0 rig. The fixed production clock route
+is 24 MHz PERCLK through PIT0, XBARA1 input 56/output 0 with **rising-edge-only**
+DMA request generation, DMAMUX source 30, and eDMA channel 2. The optional
+IDLE-only clock diagnostic is advertised; this decision still does not enable
+or advertise the physical GPIO source, whose pad mapping and capture ring are
+later Phase 06 work.
 
 ## Context
 
@@ -55,7 +57,7 @@ firmware build. The following inputs were reinspected on 2026-08-28:
 | `cores/teensy4/imxrt.h` | PIT trigger 0 is XBARA1 input 56; DMA request 30 is XBARA1 output 0 and DMAMUX source 30; the RT1062 exposes four PIT and 32 eDMA channels. |
 | `cores/teensy4/IntervalTimer.cpp` | `IntervalTimer` scans for the first PIT channel whose control register is unused, so it cannot enforce this project's PIT0/PIT1 ownership. |
 | `cores/teensy4/DMAChannel.{h,cpp}` | Default allocation selects an available channel dynamically; fixed project ownership therefore requires an explicit channel. |
-| `libraries/OctoWS2811/OctoWS2811_imxrt.cpp` | Reusable patterns are selective fast-to-standard GPIO remapping, XBAR edge-triggered DMA, explicit TCD setup, aligned `DMAMEM`, and cache maintenance. Its concrete timer/XBAR/DMA owners are not reusable concurrently. |
+| `libraries/OctoWS2811/OctoWS2811_imxrt.cpp` | Reusable patterns are selective fast-to-standard GPIO remapping, XBAR edge-triggered DMA, explicit TCD setup, aligned `DMAMEM`, and cache maintenance. Its dual-edge setting is specific to its QuadTimer waveform and over-counts the PIT source at 4 MHz; its concrete timer/XBAR/DMA owners are not reusable concurrently. |
 | `libraries/ADC/AnalogBufferDMA.cpp` and DMA examples | Reusable patterns are 32-byte aligned OCRAM buffers, scatter/gather major loops, and cache invalidation. Their first-free DMA allocation policy is not reused. |
 
 The official NXP RT1062 definitions independently confirm the PIT-to-XBARA and
@@ -67,6 +69,10 @@ TCD alignment. The primary references are the
 [PIT example](https://mcuxpresso.nxp.com/mcuxsdk/latest/html/examples/driver_examples/pit/readme.html),
 [XBARA example](https://mcuxpresso.nxp.com/mcuxsdk/latest/html/examples/driver_examples/xbara/readme.html),
 and [eDMA examples](https://mcuxpresso.nxp.com/mcuxsdk/latest/html/examples/driver_examples/edma/index.html).
+The official
+[XBARA API](https://mcuxpresso.nxp.com/api_doc/dev/1262/group__xbara.html)
+defines active-edge value 1 as rising-only and value 3 as rising-and-falling;
+the accepted configuration uses value 1.
 The exact reviewed NXP header revision is commit
 [`8a289764`](https://github.com/nxp-mcuxpresso/legacy-mcux-sdk/blob/8a289764d763ad06e0c3a05c885644ed98b970af/devices/MIMXRT1062/MIMXRT1062.h).
 
@@ -96,34 +102,42 @@ must use a read-modify-write that clears only this mask in
 the fixed 32-bit `GPIO2_PSR` address. Unrelated GPR and direction bits remain
 owned by the core or other peripherals.
 
-### Primary clock and DMA route
+### Verified clock and DMA route
 
-The isolated hardware spike will use this fixed path:
+The isolated hardware spike uses this fixed path:
 
 ```text
 24 MHz PERCLK -> PIT0 (LDVAL 5) -> XBARA1 input 56
-               -> XBARA1 output 0 -> DMAMUX source 30
-               -> eDMA channel 2 -> 32-bit GPIO2_PSR samples
+               -> rising-edge detector -> XBARA1 output 0
+               -> DMAMUX source 30 -> eDMA channel 2
+               -> 32-bit diagnostic transfer (later: GPIO2_PSR samples)
 ```
 
 NXP PIT arithmetic is `period = LDVAL + 1` clocks, so six 24 MHz clocks are
-250 ns and the candidate event rate is exactly 4 MHz. The spike must verify
-the clock selector, divider, request-edge behavior, event/sample ratio, and
-elapsed DWT cycles on silicon before treating that arithmetic as evidence of a
-working acquisition route.
+250 ns and the event rate is exactly 4 MHz. Hardware jobs
+`f8ffbc96-4259-4f82-a42a-a6b8415a1b0f` and final-image job
+`db75db1e-45c0-4f66-a09a-bb4adee26b77` verified the clock selector, divider,
+rising-edge request mode (`XBARA1_CTRL0=0x0005`), event/sample ratio, and
+elapsed 600 MHz DWT cycles at 1 kHz, 1 MHz, and three consecutive 4 MHz
+windows each. The final `tdaq-e5da045334978b23` image captured 8,192 samples
+in every production window while the independently timed DWT window covered
+8,193 boundaries, within the explicit one-event tolerance, with zero
+hardware/eDMA errors.
 
 eDMA channels 0 and 1 remain reserved for ADC1 and ADC2 through DMAMUX sources
-24 and 88. GPIO owns fixed channel 2 and DMAMUX source 30. The raw destination
-is the already budgeted four-buffer, 32-byte-aligned OCRAM ring; each transfer
-is a fixed 32-bit source read and destination write. Channel priority, TCD
-linkage, cache ownership, and major-loop interrupt policy are implementation
-details for the subsequent acquisition task and may not change these owners
+24 and 88. GPIO owns fixed channel 2 at priority 2 and DMAMUX source 30. The
+isolated diagnostic transfers one fixed sentinel word into another word in a
+dedicated 32-byte-aligned OCRAM cache line; it does not remap or sample a pad.
+The later physical path will use the already budgeted four-buffer OCRAM ring
+and fixed-width `GPIO2_PSR` reads. Channel priority, TCD linkage, cache
+ownership, and major-loop interrupt policy may not change these owners
 silently.
 
 ## Reused patterns and boundaries
 
 - Reuse the narrow OctoWS2811 GPR-mask technique, XBAR edge/DMA-enable
-  configuration shape, explicit TCD construction, and cache-line discipline.
+  configuration shape, explicit TCD construction, and cache-line discipline;
+  use the PIT-proven rising edge rather than copying its dual-edge mode.
 - Reuse the ADC DMA examples' aligned `DMAMEM` and scatter/gather ownership
   patterns after adapting them to a fixed channel and a read-only peripheral
   source.
@@ -146,36 +160,42 @@ silently.
 | Teensy startup | Writes all ones to GPR27, selecting GPIO7. | Apply the narrow `0x00030C0F` clear only when arming GPIO capture. |
 | USB Serial | Uses its own core-owned USB DMA buffers rather than project eDMA channels. | Preserve its separate ownership; no channel change is required. |
 
-## Ordered fallbacks
+## Hardware-spike findings and retained fallback order
 
-If the primary route does not produce one GPIO word per measured event on the
-rig, preserve the exact 4 MHz requirement and investigate in this order:
+The first implementation inherited OctoWS2811's dual-edge mode. The spike
+then followed the identity fallbacks in order before isolating edge polarity:
 
-1. Keep PIT0 and try the next free XBARA1 DMA request pair: output 1/source 31,
-   then output 2/source 94, then output 3/source 95. Reserve the selected pair
-   centrally before using it.
-2. If PIT0 itself is the conflict, test PIT2/input 58 and then PIT3/input 59
-   with the same 24 MHz, `LDVAL=5` arithmetic. PIT1 stays reserved for the ADC
-   acquisition schedule.
-3. Only after those routes fail, measure an explicitly configured QuadTimer,
-   FlexPWM, or FlexIO source and accept one only if its production event is
-   exactly 4 MHz and its complete resource set is conflict-free.
-4. If none is proven, keep the physical GPIO capability disabled and report
-   the hardware error. Never substitute an approximate rate or silently
-   change capability metadata.
+| Job | PIT/input | XBAR output/source | Result |
+| --- | --- | --- | --- |
+| `775a4457-4bd4-410d-8d62-5e82d7407da1` | PIT0 / 56 | 0 / 30 | Low rates passed; 4 MHz produced 8,443 samples for 8,193 scheduled. |
+| `c1655c5d-09c9-451e-81b0-f488a71ac854` | PIT0 / 56 | 1 / 31 | Rejected at 1 kHz: 64 samples for 32 scheduled. |
+| `45938e6e-376e-4ef1-a480-40f079f70453` | PIT0 / 56 | 2 / 94 | Rejected at 1 kHz: 64 samples for 32 scheduled. |
+| `909a7745-18ff-4638-a391-4984cecb1440` | PIT0 / 56 | 3 / 95 | Two 4 MHz windows passed; the third produced 12,288 samples for 8,193 scheduled. |
+| `8a967689-6fc4-48c8-aced-3c01541efe90` | PIT2 / 58 | 3 / 95 | 4 MHz produced 12,288 samples for 8,192 scheduled. |
+| `50dedf8b-046b-42f7-89ca-0258112b3734` | PIT3 / 59 | 3 / 95 | 4 MHz produced 12,288 samples for 8,192 scheduled. |
+| `f8ffbc96-4259-4f82-a42a-a6b8415a1b0f` | PIT0 / 56 | 0 / 30, rising-only | Accepted: low rates and three repeated 4 MHz windows all had exact event/sample counts and zero error flags. |
+| `db75db1e-45c0-4f66-a09a-bb4adee26b77` | PIT0 / 56 | 0 / 30, rising-only | Final image accepted: low rates had exact counts; all three 4 MHz windows had 8,192 samples for 8,193 DWT-scheduled boundaries, within tolerance, with zero error flags. |
 
-Every accepted fallback requires an updated [[Firmware-Resource-Map]], core
-macro assertions where available, register-configuration tests, and measured
-rig evidence in the Phase 06 result record.
+These results reject dual-edge request generation, not the exact PIT divisor.
+If the accepted path regresses on another board, preserve rising-edge mode and
+retry outputs 1/source 31, 2/source 94, and 3/source 95 in that order, followed
+by PIT2/input 58 and PIT3/input 59. PIT1 stays reserved for ADC acquisition.
+Only then may a conflict-free QuadTimer, FlexPWM, or FlexIO source be measured;
+it is acceptable only at exactly 4 MHz. An accepted fallback requires an
+updated [[Firmware-Resource-Map]], core macro assertions, register tests, and
+rig evidence. Never substitute an approximate rate or silently weaken
+capability metadata.
 
 ## Consequences
 
+- The exact PIT divisor and rising-edge PIT/XBARA/eDMA event path are proven on
+  the target; external pad transitions and sustained capture remain unproven.
 - Packed GPIO order and standard-port bit identities can no longer drift from
   the pinned core without a target compile failure.
 - Host compilation validates duplicate, range, order, and exact-mask errors
   without depending on Teensy headers.
 - The resource assignment is deterministic and reviewable; acquisition code
   cannot silently use a first-free timer, XBAR output, or DMA channel.
-- This decision deliberately makes no claim about external pad transitions,
-  sustained DMA/cache correctness, or the candidate route's silicon behavior.
-  Those claims require the later isolated spike and full Phase 06 gate.
+- The optional diagnostic is bounded to IDLE, never remaps D6-D13, and reports
+  raw register/count evidence. Physical GPIO capability remains disabled until
+  later Phase 06 mapping, rotating-buffer, packing, and streaming gates pass.

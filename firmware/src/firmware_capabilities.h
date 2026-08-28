@@ -54,7 +54,8 @@ inline constexpr std::uint32_t kCapabilityBits =
     capabilityBit(protocol_v1::Capability::kSyntheticSource) |
     capabilityBit(protocol_v1::Capability::kResetStats) |
     capabilityBit(protocol_v1::Capability::kPing) |
-    capabilityBit(protocol_v1::Capability::kChecksumBenchmark);
+    capabilityBit(protocol_v1::Capability::kChecksumBenchmark) |
+    capabilityBit(protocol_v1::Capability::kGpioClockDiagnostic);
 inline constexpr std::uint32_t kAdc0PhaseTicks = 0U;
 
 inline constexpr CapabilityMetadata kMetadata{
@@ -109,5 +110,8 @@ static_assert(kMetadata.adc0_phase_ticks == 0U &&
 static_assert(kMetadata.gpio_pin_count == 8U);
 static_assert(kMetadata.max_command_frame_bytes <=
               kMetadata.max_control_frame_bytes);
+static_assert(kMetadata.gpio_sample_rate_hz ==
+              protocol_v1::kGpioClockProductionRateHz,
+              "diagnostic rates must not weaken the production GPIO rate");
 
 }  // namespace teensy_daq::capabilities

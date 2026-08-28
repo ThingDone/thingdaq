@@ -14,6 +14,7 @@ from .protocol import Frame, FrameValidationError
 
 _CONFIGURATION = struct.Struct("<BBBBI")
 _CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
+_GPIO_CLOCK_DIAGNOSTIC_REQUEST = struct.Struct("<IHH")
 _RESPONSE_PREFIX = struct.Struct("<BBH")
 _STATUS_COUNTERS = struct.Struct("<QQQQII")
 _ResponseValue = TypeVar("_ResponseValue")
@@ -184,6 +185,81 @@ def _benchmark_vector_bytes(vector: constants.BenchmarkVector) -> int:
             constants.DATA_FRAME_BYTES - constants.TRAILER_SIZE
         ),
     }[vector]
+
+
+def _validate_gpio_clock_selection(rate_hz: int, event_count: int) -> None:
+    _unsigned("rate_hz", rate_hz, 32)
+    _unsigned("event_count", event_count, 16)
+    if (
+        not constants.GPIO_CLOCK_MIN_RATE_HZ
+        <= rate_hz
+        <= constants.GPIO_CLOCK_PRODUCTION_RATE_HZ
+        or constants.GPIO_CLOCK_PIT_HZ % rate_hz != 0
+        or constants.GPIO_CLOCK_DWT_HZ % rate_hz != 0
+        or not constants.GPIO_CLOCK_MIN_EVENT_COUNT
+        <= event_count
+        <= constants.GPIO_CLOCK_MAX_EVENT_COUNT
+    ):
+        raise ValueError("GPIO clock diagnostic selection is invalid")
+    elapsed_cycles = event_count * (constants.GPIO_CLOCK_DWT_HZ // rate_hz)
+    major_count = 2 * event_count + constants.GPIO_CLOCK_DUPLICATE_GUARD_EVENTS
+    if elapsed_cycles > constants.GPIO_CLOCK_MAX_ELAPSED_CYCLES or major_count > 0x7FFF:
+        raise ValueError("GPIO clock diagnostic exceeds its duration bound")
+
+
+@dataclass(frozen=True, slots=True)
+class GpioClockDiagnosticRequest:
+    """One bounded exact-divisor PIT/XBARA/eDMA measurement selection."""
+
+    rate_hz: int = constants.GPIO_CLOCK_PRODUCTION_RATE_HZ
+    event_count: int = constants.GPIO_CLOCK_MAX_EVENT_COUNT
+
+    def __post_init__(self) -> None:
+        _validate_gpio_clock_selection(self.rate_hz, self.event_count)
+
+    @property
+    def pit_load_value(self) -> int:
+        """Exact PIT load required for this requested event rate."""
+
+        return constants.GPIO_CLOCK_PIT_HZ // self.rate_hz - 1
+
+    @property
+    def expected_elapsed_cycles(self) -> int:
+        """DWT window length for the requested number of events."""
+
+        return self.event_count * (constants.GPIO_CLOCK_DWT_HZ // self.rate_hz)
+
+    @property
+    def tcd_major_count(self) -> int:
+        """Guarded eDMA major-loop count used to detect duplicate requests."""
+
+        return 2 * self.event_count + constants.GPIO_CLOCK_DUPLICATE_GUARD_EVENTS
+
+    def to_payload(self) -> bytes:
+        """Encode the exact eight-byte diagnostic request payload."""
+
+        return _GPIO_CLOCK_DIAGNOSTIC_REQUEST.pack(self.rate_hz, self.event_count, 0)
+
+    @classmethod
+    def from_payload(
+        cls, payload: bytes | bytearray | memoryview
+    ) -> GpioClockDiagnosticRequest:
+        payload_bytes = bytes(payload)
+        if len(payload_bytes) != constants.GPIO_CLOCK_DIAGNOSTIC_REQUEST_PAYLOAD_SIZE:
+            raise FrameValidationError(
+                "GPIO clock diagnostic request body must be eight bytes"
+            )
+        rate_hz, event_count, reserved = _GPIO_CLOCK_DIAGNOSTIC_REQUEST.unpack(
+            payload_bytes
+        )
+        if reserved != 0:
+            raise FrameValidationError(
+                "GPIO clock diagnostic reserved field must be zero"
+            )
+        try:
+            return cls(rate_hz=rate_hz, event_count=event_count)
+        except ValueError as exc:
+            raise FrameValidationError(str(exc)) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -480,6 +556,334 @@ class ChecksumBenchmarkResult:
                 constants.CHECKSUM_BENCHMARK_RESPONSE_TARGET_FRAMED_BYTES_PER_SECOND_OFFSET
             ),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class GpioClockDiagnosticResult:
+    """Read-only evidence from one bounded PIT/XBARA/eDMA measurement."""
+
+    request: GpioClockDiagnosticRequest
+    production_rate_hz: int
+    pit_clock_hz: int
+    pit_load_value: int
+    scheduled_event_count: int
+    dma_sample_count: int
+    dwt_counter_hz: int
+    dwt_elapsed_cycles: int
+    hardware_error_flags: constants.GpioClockError
+    ccm_cscmr1_configured: int
+    ccm_ccgr1_configured: int
+    ccm_ccgr2_configured: int
+    ccm_ccgr5_configured: int
+    pit_mcr_configured: int
+    pit_ldval_configured: int
+    pit_cval_final: int
+    pit_tctrl_configured: int
+    pit_tflg_final: int
+    xbar_sel_configured: int
+    xbar_ctrl_configured: int
+    dmamux_chcfg_configured: int
+    dma_cr_configured: int
+    dma_es_final: int
+    dma_erq_configured: int
+    dma_err_final: int
+    dma_hrs_final: int
+    tcd_saddr: int
+    tcd_daddr: int
+    tcd_nbytes: int
+    last_sample_word: int
+    tcd_citer_final: int
+    tcd_biter: int
+    tcd_csr_final: int
+    tcd_attr: int
+    pit_channel: int
+    xbar_input: int
+    xbar_output: int
+    edma_channel: int
+    dmamux_source: int
+    edma_priority: int
+    tcd_soff: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.request, GpioClockDiagnosticRequest):
+            raise TypeError("request must be a GpioClockDiagnosticRequest")
+        for name in (
+            "production_rate_hz",
+            "pit_clock_hz",
+            "pit_load_value",
+            "scheduled_event_count",
+            "dma_sample_count",
+            "dwt_counter_hz",
+            "dwt_elapsed_cycles",
+            "ccm_cscmr1_configured",
+            "ccm_ccgr1_configured",
+            "ccm_ccgr2_configured",
+            "ccm_ccgr5_configured",
+            "pit_mcr_configured",
+            "pit_ldval_configured",
+            "pit_cval_final",
+            "pit_tctrl_configured",
+            "pit_tflg_final",
+            "dmamux_chcfg_configured",
+            "dma_cr_configured",
+            "dma_es_final",
+            "dma_erq_configured",
+            "dma_err_final",
+            "dma_hrs_final",
+            "tcd_saddr",
+            "tcd_daddr",
+            "tcd_nbytes",
+            "last_sample_word",
+        ):
+            _unsigned(name, getattr(self, name), 32)
+        for name in (
+            "xbar_sel_configured",
+            "xbar_ctrl_configured",
+            "tcd_citer_final",
+            "tcd_biter",
+            "tcd_csr_final",
+            "tcd_attr",
+            "tcd_soff",
+        ):
+            _unsigned(name, getattr(self, name), 16)
+        for name in (
+            "pit_channel",
+            "xbar_input",
+            "xbar_output",
+            "edma_channel",
+            "dmamux_source",
+            "edma_priority",
+        ):
+            _unsigned(name, getattr(self, name), 8)
+        if isinstance(self.hardware_error_flags, bool):
+            raise TypeError("hardware_error_flags contains reserved bits")
+        raw_errors = int(self.hardware_error_flags)
+        if raw_errors & ~constants.KNOWN_GPIO_CLOCK_ERROR_MASK:
+            raise ValueError("hardware_error_flags contains reserved bits")
+        errors = constants.GpioClockError(raw_errors)
+        object.__setattr__(self, "hardware_error_flags", errors)
+
+        unarmed_errors = (
+            constants.GpioClockError.DWT_UNAVAILABLE
+            | constants.GpioClockError.RESOURCE_BUSY
+        )
+        configuration_was_armed = not errors & unarmed_errors
+        expected_scheduled = (
+            self.dwt_elapsed_cycles
+            // (constants.GPIO_CLOCK_DWT_HZ // self.request.rate_hz)
+            if self.dwt_counter_hz == constants.GPIO_CLOCK_DWT_HZ
+            else 0
+        )
+        if (
+            self.production_rate_hz != constants.GPIO_CLOCK_PRODUCTION_RATE_HZ
+            or self.pit_clock_hz != constants.GPIO_CLOCK_PIT_HZ
+            or self.pit_load_value != self.request.pit_load_value
+            or (
+                configuration_was_armed
+                and (
+                    self.tcd_biter != self.request.tcd_major_count
+                    or self.tcd_citer_final > self.tcd_biter
+                    or self.dma_sample_count != self.tcd_biter - self.tcd_citer_final
+                )
+            )
+            or (
+                self.dwt_counter_hz == constants.GPIO_CLOCK_DWT_HZ
+                and self.scheduled_event_count != expected_scheduled
+            )
+            or (
+                not errors
+                and (
+                    self.dwt_counter_hz != constants.GPIO_CLOCK_DWT_HZ
+                    or self.dwt_elapsed_cycles == 0
+                    or abs(self.scheduled_event_count - self.request.event_count)
+                    > constants.GPIO_CLOCK_COUNT_TOLERANCE
+                    or abs(self.dma_sample_count - self.scheduled_event_count)
+                    > constants.GPIO_CLOCK_COUNT_TOLERANCE
+                )
+            )
+        ):
+            raise ValueError("GPIO clock diagnostic evidence is inconsistent")
+
+    @property
+    def configured_rate_hz(self) -> int:
+        return self.request.rate_hz
+
+    @property
+    def requested_event_count(self) -> int:
+        return self.request.event_count
+
+    @property
+    def healthy(self) -> bool:
+        """Whether all hardware configuration and count checks passed."""
+
+        return self.hardware_error_flags == constants.GpioClockError.NONE
+
+    @property
+    def count_error(self) -> int:
+        """Observed DMA samples minus DWT-derived scheduled events."""
+
+        return self.dma_sample_count - self.scheduled_event_count
+
+    @property
+    def measured_rate_hz(self) -> float:
+        """DMA sample rate measured by DWT, or zero without a valid window."""
+
+        if self.dwt_counter_hz == 0 or self.dwt_elapsed_cycles == 0:
+            return 0.0
+        return (self.dma_sample_count * self.dwt_counter_hz) / self.dwt_elapsed_cycles
+
+    @classmethod
+    def from_payload(
+        cls, payload: bytes | bytearray | memoryview
+    ) -> GpioClockDiagnosticResult:
+        payload_bytes = bytes(payload)
+        _success_prefix(
+            payload_bytes, constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE
+        )
+
+        def u8(offset: int) -> int:
+            return payload_bytes[offset]
+
+        def u16(offset: int) -> int:
+            return struct.unpack_from("<H", payload_bytes, offset)[0]
+
+        def u32(offset: int) -> int:
+            return struct.unpack_from("<I", payload_bytes, offset)[0]
+
+        rate_hz = u32(
+            constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_CONFIGURED_RATE_HZ_OFFSET
+        )
+        requested_events = u32(
+            constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_REQUESTED_EVENT_COUNT_OFFSET
+        )
+        if requested_events > 0xFFFF:
+            raise FrameValidationError(
+                "GPIO clock diagnostic event count exceeds the request field"
+            )
+        try:
+            return cls(
+                request=GpioClockDiagnosticRequest(rate_hz, requested_events),
+                production_rate_hz=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PRODUCTION_RATE_HZ_OFFSET
+                ),
+                pit_clock_hz=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_CLOCK_HZ_OFFSET
+                ),
+                pit_load_value=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_LOAD_VALUE_OFFSET
+                ),
+                scheduled_event_count=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_SCHEDULED_EVENT_COUNT_OFFSET
+                ),
+                dma_sample_count=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMA_SAMPLE_COUNT_OFFSET
+                ),
+                dwt_counter_hz=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DWT_COUNTER_HZ_OFFSET
+                ),
+                dwt_elapsed_cycles=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DWT_ELAPSED_CYCLES_OFFSET
+                ),
+                hardware_error_flags=constants.GpioClockError(
+                    u32(
+                        constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_HARDWARE_ERROR_FLAGS_OFFSET
+                    )
+                ),
+                ccm_cscmr1_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_CCM_CSCMR1_CONFIGURED_OFFSET
+                ),
+                ccm_ccgr1_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_CCM_CCGR1_CONFIGURED_OFFSET
+                ),
+                ccm_ccgr2_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_CCM_CCGR2_CONFIGURED_OFFSET
+                ),
+                ccm_ccgr5_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_CCM_CCGR5_CONFIGURED_OFFSET
+                ),
+                pit_mcr_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_MCR_CONFIGURED_OFFSET
+                ),
+                pit_ldval_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_LDVAL_CONFIGURED_OFFSET
+                ),
+                pit_cval_final=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_CVAL_FINAL_OFFSET
+                ),
+                pit_tctrl_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_TCTRL_CONFIGURED_OFFSET
+                ),
+                pit_tflg_final=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_TFLG_FINAL_OFFSET
+                ),
+                xbar_sel_configured=u16(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_XBAR_SEL_CONFIGURED_OFFSET
+                ),
+                xbar_ctrl_configured=u16(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_XBAR_CTRL_CONFIGURED_OFFSET
+                ),
+                dmamux_chcfg_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMAMUX_CHCFG_CONFIGURED_OFFSET
+                ),
+                dma_cr_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMA_CR_CONFIGURED_OFFSET
+                ),
+                dma_es_final=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMA_ES_FINAL_OFFSET
+                ),
+                dma_erq_configured=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMA_ERQ_CONFIGURED_OFFSET
+                ),
+                dma_err_final=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMA_ERR_FINAL_OFFSET
+                ),
+                dma_hrs_final=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMA_HRS_FINAL_OFFSET
+                ),
+                tcd_saddr=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_SADDR_OFFSET
+                ),
+                tcd_daddr=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_DADDR_OFFSET
+                ),
+                tcd_nbytes=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_NBYTES_OFFSET
+                ),
+                last_sample_word=u32(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_LAST_SAMPLE_WORD_OFFSET
+                ),
+                tcd_citer_final=u16(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_CITER_FINAL_OFFSET
+                ),
+                tcd_biter=u16(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_BITER_OFFSET
+                ),
+                tcd_csr_final=u16(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_CSR_FINAL_OFFSET
+                ),
+                tcd_attr=u16(constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_ATTR_OFFSET),
+                pit_channel=u8(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PIT_CHANNEL_OFFSET
+                ),
+                xbar_input=u8(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_XBAR_INPUT_OFFSET
+                ),
+                xbar_output=u8(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_XBAR_OUTPUT_OFFSET
+                ),
+                edma_channel=u8(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_EDMA_CHANNEL_OFFSET
+                ),
+                dmamux_source=u8(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_DMAMUX_SOURCE_OFFSET
+                ),
+                edma_priority=u8(
+                    constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_EDMA_PRIORITY_OFFSET
+                ),
+                tcd_soff=u16(constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_TCD_SOFF_OFFSET),
+            )
+        except (TypeError, ValueError) as exc:
+            raise FrameValidationError(str(exc)) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -1745,6 +2149,7 @@ ResponseValue = (
     | Configuration
     | Status
     | ChecksumBenchmarkResult
+    | GpioClockDiagnosticResult
     | constants.DeviceState
     | int
 )
@@ -1791,6 +2196,8 @@ def decode_response(frame: Frame) -> CommandResponse[ResponseValue]:
             )[0]
         elif frame.header.kind is constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE:
             value = ChecksumBenchmarkResult.from_payload(frame.payload)
+        elif frame.header.kind is constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_RESPONSE:
+            value = GpioClockDiagnosticResult.from_payload(frame.payload)
     elif frame.header.kind is constants.FrameKind.ERROR_RESPONSE:
         rejected_kind = frame.payload[constants.ERROR_RESPONSE_REJECTED_KIND_OFFSET]
         rejected_version = frame.payload[
@@ -1840,6 +2247,8 @@ __all__ = [
     "GPIOBlock",
     "GpioBlock",
     "GpioChannelView",
+    "GpioClockDiagnosticRequest",
+    "GpioClockDiagnosticResult",
     "HostCounters",
     "Info",
     "LossCounters",

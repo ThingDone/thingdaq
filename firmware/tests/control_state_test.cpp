@@ -162,7 +162,9 @@ void testBootAndInfo() {
              (value & static_cast<std::uint32_t>(
                           constants::Capability::kPing)) != 0U &&
              (value & static_cast<std::uint32_t>(
-                          constants::Capability::kChecksumBenchmark)) != 0U,
+                          constants::Capability::kChecksumBenchmark)) != 0U &&
+             (value & static_cast<std::uint32_t>(
+                          constants::Capability::kGpioClockDiagnostic)) != 0U,
          "INFO capability bits distinguish synthetic from physical data");
 
   const std::size_t build_offset = constants::kInfoResponseBuildIdOffset;
@@ -643,6 +645,65 @@ void testChecksumBenchmarkIsIdleAndAcquisitionAtomic() {
                       "configured benchmark rejection");
 }
 
+void testGpioClockDiagnosticIsIdleAndAcquisitionAtomic() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(78U), "GPIO clock test completes BOOT");
+
+  wire::Request diagnostic_request =
+      request(constants::CommandKind::kGpioClockDiagnostic, 64U);
+  diagnostic_request.gpio_clock_diagnostic.rate_hz = 4000000U;
+  diagnostic_request.gpio_clock_diagnostic.event_count = 64U;
+  wire::GpioClockDiagnosticResponse measurement{};
+  measurement.configured_rate_hz = 4000000U;
+  measurement.production_rate_hz = 4000000U;
+  measurement.pit_clock_hz = 24000000U;
+  measurement.pit_load_value = 5U;
+  measurement.requested_event_count = 64U;
+  measurement.scheduled_event_count = 64U;
+  measurement.dma_sample_count = 64U;
+  measurement.dwt_counter_hz = 600000000U;
+  measurement.dwt_elapsed_cycles = 9600U;
+  measurement.tcd_citer_final = 80U;
+  measurement.tcd_biter = 144U;
+
+  const stats::Snapshot before = state.statistics().snapshot();
+  control::DispatchReadiness readiness{};
+  readiness.gpio_clock_response = &measurement;
+  readiness.gpio_clock_error = constants::ErrorCode::kOk;
+  const control::DispatchResult accepted =
+      state.dispatch(diagnostic_request, response, readiness);
+  expect(accepted.commandAccepted(), "GPIO clock diagnostic succeeds in IDLE");
+  expectTypedResponse(response,
+                      constants::FrameKind::kGpioClockDiagnosticResponse,
+                      64U, constants::ErrorCode::kOk,
+                      "GPIO clock diagnostic response");
+  const stats::Snapshot after = state.statistics().snapshot();
+  expect(state.state() == constants::DeviceState::kIdle &&
+             state.runId() == 0U && !state.hasConfiguration() &&
+             state.takePendingEvents().mask == 0U,
+         "GPIO clock diagnostic remains in clean IDLE");
+  expect(after.generation == before.generation &&
+             after.adc_frames_emitted == before.adc_frames_emitted &&
+             after.gpio_frames_emitted == before.gpio_frames_emitted &&
+             after.adc_items_dropped == before.adc_items_dropped &&
+             after.gpio_items_dropped == before.gpio_items_dropped,
+         "GPIO clock diagnostic does not mutate acquisition statistics");
+
+  expect(state.dispatch(configureRequest(65U), response).commandAccepted(),
+         "GPIO clock state test reaches CONFIGURED");
+  diagnostic_request.request_id = 66U;
+  const control::DispatchResult configured =
+      state.dispatch(diagnostic_request, response, readiness);
+  expect(!configured.commandAccepted() &&
+             state.state() == constants::DeviceState::kConfigured,
+         "GPIO clock diagnostic is rejected atomically outside IDLE");
+  expectTypedResponse(response,
+                      constants::FrameKind::kGpioClockDiagnosticResponse,
+                      66U, constants::ErrorCode::kInvalidState,
+                      "configured GPIO clock rejection");
+}
+
 void testConfigurationReadinessBusyIsAtomic() {
   control::ControlState state{};
   wire::ControlFrame response{};
@@ -792,6 +853,7 @@ int main() {
   testStartReadinessBusyIsAtomic();
   testConfigurationValidationAndAtomicity();
   testChecksumBenchmarkIsIdleAndAcquisitionAtomic();
+  testGpioClockDiagnosticIsIdleAndAcquisitionAtomic();
   testConfigurationReadinessBusyIsAtomic();
   testRecoverableFaultReturnsIdle();
   testStatisticsDetailAndSaturation();

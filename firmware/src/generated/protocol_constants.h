@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 8adde2428ca6058f658a2ddc8b6581dbe42e326e1cbb5320fb8daa406e44ad84
+// Source SHA-256: a2da2fdd7617ec5ed496b1481620d457fa71ff3f3090089d49cb2bfab7dec8e3
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "8adde2428ca6058f658a2ddc8b6581dbe42e326e1cbb5320fb8daa406e44ad84";
+inline constexpr char kSourceSha256[] = "a2da2fdd7617ec5ed496b1481620d457fa71ff3f3090089d49cb2bfab7dec8e3";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -37,6 +37,15 @@ inline constexpr std::uint32_t kChecksumBenchmarkMaxOperations = 32768U;
 inline constexpr std::uint32_t kChecksumBenchmarkMaxProcessedBytes = 8388608U;
 inline constexpr std::uint16_t kChecksumBenchmarkTimerCalibrationSamples = 32U;
 inline constexpr std::uint16_t kChecksumBenchmarkWarmupOperations = 4U;
+inline constexpr std::uint32_t kGpioClockPitHz = 24000000U;
+inline constexpr std::uint32_t kGpioClockDwtHz = 600000000U;
+inline constexpr std::uint32_t kGpioClockProductionRateHz = 4000000U;
+inline constexpr std::uint32_t kGpioClockMinRateHz = 1000U;
+inline constexpr std::uint16_t kGpioClockMinEventCount = 32U;
+inline constexpr std::uint16_t kGpioClockMaxEventCount = 8192U;
+inline constexpr std::uint32_t kGpioClockMaxElapsedCycles = 60000000U;
+inline constexpr std::uint16_t kGpioClockDuplicateGuardEvents = 16U;
+inline constexpr std::uint32_t kGpioClockCountTolerance = 1U;
 inline constexpr std::size_t kAdcBytesPerPair = 4U;
 inline constexpr std::size_t kAdcPairsPerFrame = 1012U;
 inline constexpr std::uint8_t kAdcResolutionBits = 12U;
@@ -70,6 +79,7 @@ enum class FrameKind : std::uint8_t {
   kResetStatsRequest = 21U,
   kPingRequest = 22U,
   kChecksumBenchmarkRequest = 23U,
+  kGpioClockDiagnosticRequest = 24U,
   kInfoResponse = 144U,
   kConfigureResponse = 145U,
   kStartResponse = 146U,
@@ -78,6 +88,7 @@ enum class FrameKind : std::uint8_t {
   kResetStatsResponse = 149U,
   kPingResponse = 150U,
   kChecksumBenchmarkResponse = 151U,
+  kGpioClockDiagnosticResponse = 152U,
   kErrorResponse = 159U,
 };
 
@@ -90,6 +101,7 @@ enum class CommandKind : std::uint8_t {
   kResetStats = 21U,
   kPing = 22U,
   kChecksumBenchmark = 23U,
+  kGpioClockDiagnostic = 24U,
 };
 
 enum class FrameFlag : std::uint16_t {
@@ -148,6 +160,7 @@ enum class Capability : std::uint32_t {
   kResetStats = 16U,
   kPing = 32U,
   kChecksumBenchmark = 64U,
+  kGpioClockDiagnostic = 128U,
 };
 
 enum class Source : std::uint8_t {
@@ -183,13 +196,32 @@ enum class BenchmarkCacheState : std::uint8_t {
   kColdInvalidated = 1U,
 };
 
+enum class GpioClockError : std::uint32_t {
+  kDwtUnavailable = 1U,
+  kResourceBusy = 2U,
+  kPerclkMismatch = 4U,
+  kPitGateDisabled = 8U,
+  kXbarGateDisabled = 16U,
+  kDmaGateDisabled = 32U,
+  kPitConfigMismatch = 64U,
+  kXbarConfigMismatch = 128U,
+  kDmamuxConfigMismatch = 256U,
+  kEdmaConfigMismatch = 512U,
+  kEdmaChannelError = 1024U,
+  kDeadTrigger = 2048U,
+  kDuplicateTrigger = 4096U,
+  kCountOutOfTolerance = 8192U,
+  kMeasurementOverflow = 16384U,
+};
+
 inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr std::uint32_t kSupportedChecksumMask = 14U;
 inline constexpr std::uint16_t kKnownFrameFlagMask = 32783U;
-inline constexpr std::uint32_t kKnownCapabilityMask = 127U;
+inline constexpr std::uint32_t kKnownCapabilityMask = 255U;
+inline constexpr std::uint32_t kKnownGpioClockErrorMask = 32767U;
 
 inline constexpr std::size_t kEmptyPayloadSize = 0U;
 inline constexpr std::size_t kAdcDataPayloadSize = 4048U;
@@ -319,6 +351,56 @@ inline constexpr std::size_t kChecksumBenchmarkResponseCyclesPerByteQ16Offset = 
 inline constexpr std::size_t kChecksumBenchmarkResponseMbPerSecondQ16Offset = 84U;
 inline constexpr std::size_t kChecksumBenchmarkResponseProjectedCpuPercentQ16Offset = 88U;
 inline constexpr std::size_t kChecksumBenchmarkResponseTargetFramedBytesPerSecondOffset = 92U;
+inline constexpr std::size_t kGpioClockDiagnosticRequestPayloadSize = 8U;
+inline constexpr std::size_t kGpioClockDiagnosticRequestRateHzOffset = 0U;
+inline constexpr std::size_t kGpioClockDiagnosticRequestEventCountOffset = 4U;
+inline constexpr std::size_t kGpioClockDiagnosticRequestReservedOffset = 6U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePayloadSize = 140U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseResponseStatusOffset = 0U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseReserved0Offset = 1U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseErrorCodeOffset = 2U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseConfiguredRateHzOffset = 4U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseProductionRateHzOffset = 8U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePitClockHzOffset = 12U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePitLoadValueOffset = 16U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseRequestedEventCountOffset = 20U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseScheduledEventCountOffset = 24U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDmaSampleCountOffset = 28U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDwtCounterHzOffset = 32U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDwtElapsedCyclesOffset = 36U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseHardwareErrorFlagsOffset = 40U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseCcmCscmr1ConfiguredOffset = 44U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseCcmCcgr1ConfiguredOffset = 48U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseCcmCcgr2ConfiguredOffset = 52U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseCcmCcgr5ConfiguredOffset = 56U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePitMcrConfiguredOffset = 60U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePitLdvalConfiguredOffset = 64U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePitCvalFinalOffset = 68U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePitTctrlConfiguredOffset = 72U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePitTflgFinalOffset = 76U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseXbarSelConfiguredOffset = 80U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseXbarCtrlConfiguredOffset = 82U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDmamuxChcfgConfiguredOffset = 84U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDmaCrConfiguredOffset = 88U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDmaEsFinalOffset = 92U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDmaErqConfiguredOffset = 96U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDmaErrFinalOffset = 100U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDmaHrsFinalOffset = 104U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseTcdSaddrOffset = 108U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseTcdDaddrOffset = 112U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseTcdNbytesOffset = 116U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseLastSampleWordOffset = 120U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseTcdCiterFinalOffset = 124U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseTcdBiterOffset = 126U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseTcdCsrFinalOffset = 128U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseTcdAttrOffset = 130U;
+inline constexpr std::size_t kGpioClockDiagnosticResponsePitChannelOffset = 132U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseXbarInputOffset = 133U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseXbarOutputOffset = 134U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseEdmaChannelOffset = 135U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseDmamuxSourceOffset = 136U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseEdmaPriorityOffset = 137U;
+inline constexpr std::size_t kGpioClockDiagnosticResponseTcdSoffOffset = 138U;
 inline constexpr std::size_t kErrorResponsePayloadSize = 8U;
 inline constexpr std::size_t kErrorResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kErrorResponseReserved0Offset = 1U;
@@ -349,6 +431,8 @@ constexpr std::uint16_t allowedFlags(FrameKind kind) {
       return 0U;
     case FrameKind::kChecksumBenchmarkRequest:
       return 0U;
+    case FrameKind::kGpioClockDiagnosticRequest:
+      return 0U;
     case FrameKind::kInfoResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kConfigureResponse:
@@ -364,6 +448,8 @@ constexpr std::uint16_t allowedFlags(FrameKind kind) {
     case FrameKind::kPingResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kChecksumBenchmarkResponse:
+      return static_cast<std::uint16_t>(FrameFlag::kResponseError);
+    case FrameKind::kGpioClockDiagnosticResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kErrorResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
@@ -389,6 +475,8 @@ constexpr FrameKind requestFrameKind(CommandKind command) {
       return FrameKind::kPingRequest;
     case CommandKind::kChecksumBenchmark:
       return FrameKind::kChecksumBenchmarkRequest;
+    case CommandKind::kGpioClockDiagnostic:
+      return FrameKind::kGpioClockDiagnosticRequest;
   }
   return FrameKind::kInfoRequest;
 }
@@ -411,6 +499,8 @@ constexpr FrameKind responseFrameKind(CommandKind command) {
       return FrameKind::kPingResponse;
     case CommandKind::kChecksumBenchmark:
       return FrameKind::kChecksumBenchmarkResponse;
+    case CommandKind::kGpioClockDiagnostic:
+      return FrameKind::kGpioClockDiagnosticResponse;
   }
   return FrameKind::kInfoResponse;
 }

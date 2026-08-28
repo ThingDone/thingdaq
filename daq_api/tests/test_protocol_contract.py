@@ -116,6 +116,9 @@ class ProtocolContractTests(unittest.TestCase):
             constants.FrameKind.CHECKSUM_BENCHMARK_REQUEST: (
                 constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE
             ),
+            constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST: (
+                constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_RESPONSE
+            ),
         }
         self.assertEqual(expected_pairs, constants.REQUEST_RESPONSE_KIND)
         self.assertEqual(0, constants.ErrorCode.OK)
@@ -141,6 +144,9 @@ class ProtocolContractTests(unittest.TestCase):
             constants.CommandKind.CHECKSUM_BENCHMARK: (
                 constants.FrameKind.CHECKSUM_BENCHMARK_REQUEST
             ),
+            constants.CommandKind.GPIO_CLOCK_DIAGNOSTIC: (
+                constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST
+            ),
         }
         self.assertEqual(expected_commands, constants.COMMAND_REQUEST_KIND)
         for command, request_kind in expected_commands.items():
@@ -159,7 +165,7 @@ class ProtocolContractTests(unittest.TestCase):
         self.assertEqual(56, constants.MAX_COMMAND_FRAME_BYTES)
         self.assertEqual(8, constants.MAX_COMMAND_PAYLOAD_BYTES)
         self.assertEqual(
-            0x7F,
+            0xFF,
             int(
                 constants.Capability.ADC_STREAM
                 | constants.Capability.GPIO_STREAM
@@ -168,9 +174,10 @@ class ProtocolContractTests(unittest.TestCase):
                 | constants.Capability.RESET_STATS
                 | constants.Capability.PING
                 | constants.Capability.CHECKSUM_BENCHMARK
+                | constants.Capability.GPIO_CLOCK_DIAGNOSTIC
             ),
         )
-        self.assertEqual(0x7F, constants.KNOWN_CAPABILITY_MASK)
+        self.assertEqual(0xFF, constants.KNOWN_CAPABILITY_MASK)
 
     def test_scalar_field_table_and_control_schemas_are_unambiguous(self) -> None:
         self.assertEqual(
@@ -189,6 +196,17 @@ class ProtocolContractTests(unittest.TestCase):
         self.assertEqual(12, constants.PING_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(8, constants.CHECKSUM_BENCHMARK_REQUEST_PAYLOAD_SIZE)
         self.assertEqual(96, constants.CHECKSUM_BENCHMARK_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(8, constants.GPIO_CLOCK_DIAGNOSTIC_REQUEST_PAYLOAD_SIZE)
+        self.assertEqual(
+            140, constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE
+        )
+        self.assertEqual(24_000_000, constants.GPIO_CLOCK_PIT_HZ)
+        self.assertEqual(600_000_000, constants.GPIO_CLOCK_DWT_HZ)
+        self.assertEqual(4_000_000, constants.GPIO_CLOCK_PRODUCTION_RATE_HZ)
+        self.assertEqual(
+            0x7FFF,
+            constants.KNOWN_GPIO_CLOCK_ERROR_MASK,
+        )
         self.assertEqual(600_000_000, constants.CHECKSUM_BENCHMARK_CYCLE_COUNTER_HZ)
         self.assertEqual(
             8_100_000,

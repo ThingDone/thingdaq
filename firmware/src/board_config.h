@@ -47,6 +47,7 @@ enum class MemoryUse : std::uint8_t {
   kAdcDmaRing,
   kGpioRawDmaRing,
   kGpioPackedRing,
+  kGpioClockDiagnosticSink,
   kChecksumBenchmarkDtcmBuffer,
   kChecksumBenchmarkOcramBuffer,
 };
@@ -128,6 +129,9 @@ inline constexpr std::uint32_t kGpio2PsrCaptureMask =
     (std::uint32_t{1U} << 1U) | (std::uint32_t{1U} << 3U);
 inline constexpr std::uint32_t kGpio7ToGpio2Gpr27ClearMask =
     kGpio2PsrCaptureMask;
+inline constexpr std::uint8_t kGpioPitChannel = 0U;
+inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
+inline constexpr std::uint8_t kGpioEdmaPriority = 2U;
 
 inline constexpr PinAllocation kPinAllocations[] = {
     {kAdc0Pin, ResourceOwner::kAdc0Capture},
@@ -142,11 +146,11 @@ inline constexpr PinAllocation kPinAllocations[] = {
     {kGpioPinsByBit[7], ResourceOwner::kGpioCapture},
 };
 
-// PIT0 is the proposed exact 4 MHz GPIO master. PIT1 is chained down to the
-// proposed 1 MHz ADC-pair event. These are reservations, not a claim that the
-// Phase 04 CPU-generated synthetic source enables either timer.
+// PIT0 is the exact 4 MHz GPIO master. PIT1 is chained down to the proposed
+// 1 MHz ADC-pair event. These are reservations, not a claim that the Phase 04
+// CPU-generated synthetic source enables either timer.
 inline constexpr PitAllocation kPitAllocations[] = {
-    {0U, ResourceOwner::kGpioCapture},
+    {kGpioPitChannel, ResourceOwner::kGpioCapture},
     {1U, ResourceOwner::kAcquisitionClock},
 };
 
@@ -154,12 +158,21 @@ inline constexpr PitAllocation kPitAllocations[] = {
 // ADC_ETC outputs by design; XBAR outputs, rather than inputs, must be unique.
 inline constexpr std::uint8_t kXbarPitTrigger0Input = 56U;
 inline constexpr std::uint8_t kXbarPitTrigger1Input = 57U;
+inline constexpr std::uint8_t kXbarPitTrigger2Input = 58U;
+inline constexpr std::uint8_t kXbarPitTrigger3Input = 59U;
 inline constexpr std::uint8_t kXbarDmaRequest30Output = 0U;
+inline constexpr std::uint8_t kXbarDmaRequest31Output = 1U;
+inline constexpr std::uint8_t kXbarDmaRequest94Output = 2U;
+inline constexpr std::uint8_t kXbarDmaRequest95Output = 3U;
 inline constexpr std::uint8_t kXbarAdcEtcTrigger0Output = 103U;
 inline constexpr std::uint8_t kXbarAdcEtcTrigger4Output = 107U;
+// The PIT trigger is a periodic transition source. Detect one rising edge per
+// period; the inherited dual-edge setting over-counted at 4 MHz on silicon.
+inline constexpr std::uint8_t kGpioXbarInput = kXbarPitTrigger0Input;
+inline constexpr std::uint8_t kGpioXbarOutput = kXbarDmaRequest30Output;
+inline constexpr std::uint8_t kGpioXbarActiveEdge = 1U;
 inline constexpr XbarRoute kXbarRoutes[] = {
-    {kXbarPitTrigger0Input, kXbarDmaRequest30Output,
-     ResourceOwner::kGpioCapture},
+    {kGpioXbarInput, kGpioXbarOutput, ResourceOwner::kGpioCapture},
     {kXbarPitTrigger1Input, kXbarAdcEtcTrigger0Output,
      ResourceOwner::kAdc0Capture},
     {kXbarPitTrigger1Input, kXbarAdcEtcTrigger4Output,
@@ -173,11 +186,16 @@ inline constexpr AdcEtcAllocation kAdcEtcAllocations[] = {
 
 inline constexpr std::uint8_t kDmamuxAdc1Source = 24U;
 inline constexpr std::uint8_t kDmamuxXbar1Request0Source = 30U;
+inline constexpr std::uint8_t kDmamuxXbar1Request1Source = 31U;
+inline constexpr std::uint8_t kDmamuxXbar1Request2Source = 94U;
+inline constexpr std::uint8_t kDmamuxXbar1Request3Source = 95U;
 inline constexpr std::uint8_t kDmamuxAdc2Source = 88U;
+inline constexpr std::uint8_t kGpioDmamuxSource =
+    kDmamuxXbar1Request0Source;
 inline constexpr EdmaAllocation kEdmaAllocations[] = {
     {0U, kDmamuxAdc1Source, ResourceOwner::kAdc0Capture},
     {1U, kDmamuxAdc2Source, ResourceOwner::kAdc1Capture},
-    {2U, kDmamuxXbar1Request0Source, ResourceOwner::kGpioCapture},
+    {kGpioEdmaChannel, kGpioDmamuxSource, ResourceOwner::kGpioCapture},
 };
 
 inline constexpr std::size_t kCommandParserCapacityBytes = 64U;
@@ -207,6 +225,7 @@ inline constexpr std::size_t kSyntheticFramesPerLoop = 2U;
 inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 8192U;
 inline constexpr std::size_t kChecksumBenchmarkBufferBytes =
     protocol_v1::kDataFrameBytes;
+inline constexpr std::size_t kGpioClockDiagnosticSinkBytes = kCacheLineBytes;
 // Pinned Teensy 1.62 cores/teensy4/usb_serial.c constants. The core owns this
 // aligned DMAMEM ring; it is documented here but is not project allocation.
 inline constexpr std::size_t kPinnedUsbCdcTxBufferCount = 4U;
@@ -274,6 +293,9 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kGpioPackedRing, MemoryRegion::kOcramRam2Dma,
      kGpioPackedRingDepth * kGpioPackedBufferStrideBytes, kCacheLineBytes,
      ResourceOwner::kGpioPacker},
+    {MemoryUse::kGpioClockDiagnosticSink, MemoryRegion::kOcramRam2Dma,
+     kGpioClockDiagnosticSinkBytes, kCacheLineBytes,
+     ResourceOwner::kGpioCapture},
     {MemoryUse::kChecksumBenchmarkOcramBuffer,
      MemoryRegion::kOcramRam2Dma, kChecksumBenchmarkBufferBytes,
      kCacheLineBytes, ResourceOwner::kChecksumBenchmark},
@@ -527,12 +549,20 @@ static_assert(kGpio2PsrCaptureMask ==
                   CORE_PIN12_BITMASK | CORE_PIN13_BITMASK));
 static_assert(kXbarPitTrigger0Input == XBARA1_IN_PIT_TRIGGER0);
 static_assert(kXbarPitTrigger1Input == XBARA1_IN_PIT_TRIGGER1);
+static_assert(kXbarPitTrigger2Input == XBARA1_IN_PIT_TRIGGER2);
+static_assert(kXbarPitTrigger3Input == XBARA1_IN_PIT_TRIGGER3);
 static_assert(kXbarDmaRequest30Output == XBARA1_OUT_DMA_CH_MUX_REQ30);
+static_assert(kXbarDmaRequest31Output == XBARA1_OUT_DMA_CH_MUX_REQ31);
+static_assert(kXbarDmaRequest94Output == XBARA1_OUT_DMA_CH_MUX_REQ94);
+static_assert(kXbarDmaRequest95Output == XBARA1_OUT_DMA_CH_MUX_REQ95);
 static_assert(kXbarAdcEtcTrigger0Output == XBARA1_OUT_ADC_ETC_TRIG00);
 static_assert(kXbarAdcEtcTrigger4Output == XBARA1_OUT_ADC_ETC_TRIG10);
 static_assert(kDmamuxAdc1Source == DMAMUX_SOURCE_ADC1);
 static_assert(kDmamuxAdc2Source == DMAMUX_SOURCE_ADC2);
 static_assert(kDmamuxXbar1Request0Source == DMAMUX_SOURCE_XBAR1_0);
+static_assert(kDmamuxXbar1Request1Source == DMAMUX_SOURCE_XBAR1_1);
+static_assert(kDmamuxXbar1Request2Source == DMAMUX_SOURCE_XBAR1_2);
+static_assert(kDmamuxXbar1Request3Source == DMAMUX_SOURCE_XBAR1_3);
 #endif
 
 }  // namespace teensy_daq::board

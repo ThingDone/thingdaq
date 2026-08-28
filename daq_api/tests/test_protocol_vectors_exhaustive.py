@@ -29,6 +29,7 @@ _KIND_NAMES = {
     0x15: "RESET_STATS_REQUEST",
     0x16: "PING_REQUEST",
     0x17: "CHECKSUM_BENCHMARK_REQUEST",
+    0x18: "GPIO_CLOCK_DIAGNOSTIC_REQUEST",
     0x90: "INFO_RESPONSE",
     0x91: "CONFIGURE_RESPONSE",
     0x92: "START_RESPONSE",
@@ -37,6 +38,7 @@ _KIND_NAMES = {
     0x95: "RESET_STATS_RESPONSE",
     0x96: "PING_RESPONSE",
     0x97: "CHECKSUM_BENCHMARK_RESPONSE",
+    0x98: "GPIO_CLOCK_DIAGNOSTIC_RESPONSE",
     0x9F: "ERROR_RESPONSE",
 }
 
@@ -88,6 +90,54 @@ def _info_payload() -> bytes:
     return bytes(payload)
 
 
+def _gpio_clock_diagnostic_payload() -> bytes:
+    payload = bytearray(140)
+    struct.pack_into("<BBH", payload, 0, 0, 0, 0)
+    for offset, value in enumerate(
+        (
+            1_000_000,
+            4_000_000,
+            24_000_000,
+            23,
+            4096,
+            4096,
+            4096,
+            600_000_000,
+            2_457_600,
+            0,
+            64,
+            12_288,
+            12_582_912,
+            192,
+            0,
+            23,
+            22,
+            1,
+            1,
+        )
+    ):
+        struct.pack_into("<I", payload, 4 + 4 * offset, value)
+    struct.pack_into("<HH", payload, 80, 56, 5)
+    for offset, value in enumerate(
+        (
+            0x8000001E,
+            2,
+            0,
+            4,
+            0,
+            0,
+            0x401BC008,
+            0x20200000,
+            4,
+            0x00030C0F,
+        )
+    ):
+        struct.pack_into("<I", payload, 84 + 4 * offset, value)
+    struct.pack_into("<HHHH", payload, 124, 4112, 8208, 8, 0x0202)
+    struct.pack_into("<BBBBBBH", payload, 132, 0, 56, 0, 2, 30, 2, 0)
+    return bytes(payload)
+
+
 def _golden_vectors() -> tuple[_GoldenVector, ...]:
     adc_payload = b"".join(
         struct.pack("<HH", 2 * pair_index, 2 * pair_index + 1)
@@ -136,6 +186,12 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
             0x17,
             struct.pack("<BBBBHH", 1, 1, 0, 0, 4, 64),
             request_id=8,
+        ),
+        _GoldenVector(
+            "gpio-clock-diagnostic-request",
+            0x18,
+            struct.pack("<IHH", 1_000_000, 4096, 0),
+            request_id=9,
         ),
         _GoldenVector("info-response", 0x90, _info_payload(), request_id=1),
         _GoldenVector(
@@ -231,11 +287,17 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
             request_id=8,
         ),
         _GoldenVector(
+            "gpio-clock-diagnostic-response",
+            0x98,
+            _gpio_clock_diagnostic_payload(),
+            request_id=9,
+        ),
+        _GoldenVector(
             "error-response",
             0x9F,
             struct.pack("<BBHBBH", 1, 0, 2, 0xFE, 1, 0),
             flags=0x8000,
-            request_id=9,
+            request_id=10,
         ),
     )
 
@@ -280,8 +342,8 @@ class ExhaustiveProtocolVectorTests(unittest.TestCase):
 
     def test_every_frame_kind_matches_an_independent_wire_image(self) -> None:
         vectors = _golden_vectors()
-        self.assertEqual(19, len(vectors))
-        self.assertEqual(19, len({vector.kind for vector in vectors}))
+        self.assertEqual(21, len(vectors))
+        self.assertEqual(21, len({vector.kind for vector in vectors}))
         self.assertEqual(
             {f"{vector.name}.bin" for vector in vectors},
             {path.name for path in FIXTURE_DIRECTORY.glob("*.bin")},

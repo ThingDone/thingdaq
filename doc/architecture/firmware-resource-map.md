@@ -2,6 +2,7 @@
 type: reference
 title: Firmware Resource Map
 created: 2026-08-28
+updated: 2026-08-28
 tags:
   - teensy-daq
   - teensy-4-0
@@ -18,15 +19,15 @@ related:
 # Firmware resource map
 
 This is the human-readable projection of the compile-time registry in
-`firmware/src/board_config.h`. Numeric allocations are reserved now so future
-acquisition modules cannot silently compete. Phase 05 does not enable the PIT,
-XBAR, ADC_ETC, or eDMA acquisition path, but it advertises both data layouts
-for the CPU-generated synthetic source. The generators and packetizer remain
-cooperative and do not claim physical acquisition resources. Phase 06 has now
-accepted the deterministic pin, PIT, XBAR, and eDMA assignment in
-[[ADR-003-GPIO-Clock-DMA]], but physical GPIO remains disabled until its
-isolated hardware spike passes. See [[System-Overview]] for that boundary and
-[[Protocol-V1]] with [[ADR-001-Wire-Protocol]] for the wire metadata.
+`firmware/src/board_config.h`. Numeric allocations are fixed so acquisition
+modules cannot silently compete. Phase 06 has silicon-verified the isolated
+PIT/XBAR/eDMA clock path in [[ADR-003-GPIO-Clock-DMA]] and advertises its
+IDLE-only diagnostic. That diagnostic does not remap or read D6-D13, and the
+physical GPIO source remains disabled until the later mapping, rotating-buffer,
+packing, and streaming gates pass. The existing synthetic generators and
+packetizer remain cooperative and do not claim physical acquisition
+resources. See [[System-Overview]] for that boundary and [[Protocol-V1]] with
+[[ADR-001-Wire-Protocol]] for the wire metadata.
 
 ## Fixed platform
 
@@ -72,20 +73,24 @@ identify a Teensy 4.0 with an i.MX RT1062.
 
 | Resource | Numeric ID | Planned route | Future owner |
 | --- | ---: | --- | --- |
-| PIT channel | 0 | 24 MHz / 6 candidate for exact 4 MHz GPIO event | GPIO capture |
+| PIT channel | 0 | 24 MHz / 6, verified exact 4 MHz GPIO event | GPIO capture |
 | PIT channel | 1 | Chained / 4 candidate for exact 1 MHz ADC-pair event | Acquisition clock |
 | XBAR input | 56 | `XBARA1_IN_PIT_TRIGGER0` | GPIO capture |
 | XBAR input | 57 | `XBARA1_IN_PIT_TRIGGER1`, deliberate fan-out | ADC0 and ADC1 capture |
-| XBAR output | 0 | `XBARA1_OUT_DMA_CH_MUX_REQ30` | GPIO capture |
+| XBAR output | 0 | `XBARA1_OUT_DMA_CH_MUX_REQ30`, rising-edge DMA | GPIO capture |
 | XBAR output | 103 | `XBARA1_OUT_ADC_ETC_TRIG00` | ADC0 capture |
 | XBAR output | 107 | `XBARA1_OUT_ADC_ETC_TRIG10` | ADC1 capture |
 | ADC_ETC trigger queue | 0 | NXP ADC1 / logical ADC0 | ADC0 capture |
 | ADC_ETC trigger queue | 4 | NXP ADC2 / logical ADC1, planned relative delay | ADC1 capture |
 
-The accepted primary GPIO route is 24 MHz PERCLK to PIT0 with `LDVAL=5`, then
-XBARA1 input 56 to output 0 and DMAMUX source 30. Six timer clocks give the
-candidate exact 4 MHz event; [[ADR-003-GPIO-Clock-DMA]] records the required
-on-silicon proof and ordered fallbacks.
+The accepted GPIO route is 24 MHz PERCLK to PIT0 with `LDVAL=5`, then XBARA1
+input 56 to rising-edge-only output 0 and DMAMUX source 30. Six timer clocks
+give the exact 4 MHz event. Final-image hardware job
+`db75db1e-45c0-4f66-a09a-bb4adee26b77` passed 1 kHz, 1 MHz, and three repeated
+4 MHz windows; each production window had 8,192 samples for 8,193
+DWT-scheduled boundaries, within the explicit one-event tolerance, and zero
+hardware/eDMA errors. [[ADR-003-GPIO-Clock-DMA]] records the rejected
+dual-edge routes and retained fallback order.
 
 PIT channels, XBAR outputs, ADC_ETC queues, and ADC peripheral ownership must
 be unique. Repeated XBAR input 57 is legal because one event intentionally
@@ -174,11 +179,12 @@ to two frames per service call and waits when no packet buffer is free.
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
+| GPIO clock diagnostic sink | OCRAM / RAM2 `.dmabuffers` | one isolated cache line | 32 | 32 | GPIO capture |
 | Packet-buffer reserve | OCRAM / RAM2 `.dmabuffers` | `94 × 4,096` | 385,024 | 32 | Packetizer |
 | Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | **RAM1 subtotal** |  |  | **450,976** |  |  |
-| **RAM2 subtotal** |  |  | **486,400** |  |  |
+| **RAM2 subtotal** |  |  | **486,432** |  |  |
 
 The application packet pool is split between an aligned ordinary-global DTCM
 primary and an aligned `DMAMEM` OCRAM reserve. Both are CPU-owned; Teensy USB
@@ -188,7 +194,8 @@ distinct future OCRAM allocations with explicit cache maintenance at ownership
 transitions. Compile-time checks bind the two banks to 819,200 total bytes, cap
 pipeline metadata at 8,192 bytes, and reject zero-sized, non-power-of-two,
 misaligned, or over-budget registry entries. The build manifest additionally
-checks the linked addresses and sizes of both packet banks.
+checks the linked addresses and sizes of both packet banks and the isolated
+GPIO clock diagnostic cache line.
 
 The optional IDLE-only checksum benchmark owns no PIT, XBAR, ADC_ETC, eDMA, or
 USB resource. Its ordinary global buffer is link-verified inside DTCM; its
@@ -198,6 +205,13 @@ another owner. The DWT counter is enabled without resetting it, each timed
 interval restores the prior interrupt mask, and no benchmark work overlaps an
 acquisition epoch. The build manifest records both addresses and the combined
 8,192-byte working set.
+
+The optional GPIO clock diagnostic owns PIT0, XBARA1 input 56/output 0,
+DMAMUX source 30, and eDMA channel 2 only while IDLE. Its 32-byte aligned
+`.dmabuffers` cache line contains a fixed source sentinel and fixed destination
+word, so each event proves the trigger/count path without touching a pad or
+the future raw GPIO ring. The diagnostic disables PIT, eDMA requests, DMAMUX,
+and XBAR DMA generation before returning its read-only snapshot.
 
 ## Ownership transitions
 

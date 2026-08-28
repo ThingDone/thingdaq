@@ -121,7 +121,7 @@ inline constexpr std::uint16_t kExpectedTeensyduinoMacro = 160U;
 inline constexpr char kExpectedCompilerVersion[] = "15.2.1";
 inline constexpr char kUsbMode[] = "USB Serial";
 inline constexpr char kOptimization[] = "o2std (-O2)";
-inline constexpr SemanticVersion kFirmwareVersion{0U, 5U, 0U};
+inline constexpr SemanticVersion kFirmwareVersion{0U, 6U, 0U};
 inline constexpr std::uint8_t kProtocolVersion =
     protocol_v1::kProtocolVersion;
 inline constexpr protocol_v1::BoardId kBoardId =

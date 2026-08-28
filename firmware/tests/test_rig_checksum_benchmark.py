@@ -61,7 +61,7 @@ class HardwareBenchmarkDevice(SimulatedDevice):
             device_state=self.state,
             build_id="tdaq-0123456789abcdef",
             hardware_serial=12_345_670,
-            firmware_version=(0, 5, 0),
+            firmware_version=(0, 6, 0),
             board_id=BoardId.TEENSY_40,
             mcu_id=McuId.IMXRT1062,
             supported_stream_mask=StreamMask.ADC | StreamMask.GPIO,
@@ -74,6 +74,7 @@ class HardwareBenchmarkDevice(SimulatedDevice):
                 | Capability.RESET_STATS
                 | Capability.PING
                 | Capability.CHECKSUM_BENCHMARK
+                | Capability.GPIO_CLOCK_DIAGNOSTIC
             ),
         )
         return self._success_response(request, info.to_payload())
@@ -388,7 +389,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         wire.extend((FIXTURES / "gpio-data.bin").read_bytes())
         for offset in range(0, len(wire), 509):
             decoded.extend(parser.feed(bytes(wire[offset : offset + 509])))
-        self.assertEqual(11, len(decoded))
+        self.assertEqual(12, len(decoded))
         self.assertEqual(0, parser.errors)
 
         valid = (FIXTURES / "gpio-data.bin").read_bytes()

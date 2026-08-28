@@ -4,6 +4,7 @@
 
 #include "checksum_benchmark.h"
 #include "control_state.h"
+#include "gpio_clock_diagnostic.h"
 #include "packet_buffer_pipeline.h"
 #include "synthetic_source.h"
 #include "usb_transport.h"
@@ -43,13 +44,15 @@ class FirmwareRuntime {
                   packet::PacketBufferStorage &packet_storage,
                   synthetic::TickClock &clock,
                   synthetic::Mode source_mode = synthetic::Mode::kRealtime,
-                  benchmark::Runner *checksum_benchmark = nullptr)
+                  benchmark::Runner *checksum_benchmark = nullptr,
+                  gpio_clock::Runner *gpio_clock_diagnostic = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
         clock_(clock),
         transport_{stream, control_.statistics(), &packet_pipeline_},
-        checksum_benchmark_(checksum_benchmark) {}
+        checksum_benchmark_(checksum_benchmark),
+        gpio_clock_diagnostic_(gpio_clock_diagnostic) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -92,6 +95,7 @@ class FirmwareRuntime {
   synthetic::TickClock &clock_;
   usb::CdcTransport transport_;
   benchmark::Runner *checksum_benchmark_ = nullptr;
+  gpio_clock::Runner *gpio_clock_diagnostic_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
 };
 

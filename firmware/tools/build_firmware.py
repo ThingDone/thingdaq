@@ -34,7 +34,7 @@ OUTPUT_DIRECTORY = (
     SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 6
+MANIFEST_SCHEMA_VERSION = 7
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
@@ -95,6 +95,13 @@ PACKET_BUFFER_SYMBOLS = {
     ),
 }
 PACKET_BUFFER_ALIGNMENT = 32
+GPIO_CLOCK_DIAGNOSTIC_BUFFER_SYMBOL = (
+    "teensy_daq::gpio_clock::g_gpio_clock_diagnostic_buffer"
+)
+GPIO_CLOCK_DIAGNOSTIC_BUFFER_BYTES = 32
+GPIO_CLOCK_DIAGNOSTIC_BUFFER_ALIGNMENT = 32
+OCRAM_START = 0x20200000
+OCRAM_END = 0x20280000
 MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES = 32 * 1024
 
 
@@ -621,6 +628,44 @@ def packet_buffer_usage(nm_output: str) -> dict[str, Any]:
     }
 
 
+def gpio_clock_diagnostic_buffer_usage(nm_output: str) -> dict[str, Any]:
+    """Verify the isolated clock-diagnostic cache line is DMA-visible OCRAM."""
+
+    symbols = parse_nm_symbols(nm_output)
+    record = symbols.get(GPIO_CLOCK_DIAGNOSTIC_BUFFER_SYMBOL)
+    if record is None:
+        raise BuildError(
+            "firmware ELF is missing GPIO clock diagnostic buffer "
+            f"{GPIO_CLOCK_DIAGNOSTIC_BUFFER_SYMBOL}"
+        )
+    address, size, symbol_type = record
+    if size != GPIO_CLOCK_DIAGNOSTIC_BUFFER_BYTES:
+        raise BuildError(
+            f"{GPIO_CLOCK_DIAGNOSTIC_BUFFER_SYMBOL} occupies {size} bytes, "
+            f"expected {GPIO_CLOCK_DIAGNOSTIC_BUFFER_BYTES}"
+        )
+    if address % GPIO_CLOCK_DIAGNOSTIC_BUFFER_ALIGNMENT != 0:
+        raise BuildError("GPIO clock diagnostic buffer is not cache-line aligned")
+    if not OCRAM_START <= address or address + size > OCRAM_END:
+        raise BuildError(
+            "GPIO clock diagnostic buffer is outside DMA-visible OCRAM: "
+            f"0x{address:08x}"
+        )
+    if symbol_type.upper() != "B":
+        raise BuildError(
+            "GPIO clock diagnostic buffer is not zero-initialized writable storage"
+        )
+    return {
+        "symbol": GPIO_CLOCK_DIAGNOSTIC_BUFFER_SYMBOL,
+        "symbol_type": symbol_type,
+        "address": f"0x{address:08x}",
+        "bytes": size,
+        "alignment_bytes": GPIO_CLOCK_DIAGNOSTIC_BUFFER_ALIGNMENT,
+        "range_start": f"0x{OCRAM_START:08x}",
+        "range_end_exclusive": f"0x{OCRAM_END:08x}",
+    }
+
+
 def git_source_state() -> dict[str, Any]:
     """Record the Git commit and dirtiness of the exact firmware inputs."""
 
@@ -746,6 +791,9 @@ def build(arduino_cli_name: str) -> Path:
     checksum_resources = checksum_resource_usage(nm_result.stdout)
     benchmark_buffers = benchmark_buffer_usage(nm_result.stdout)
     packet_buffers = packet_buffer_usage(nm_result.stdout)
+    gpio_clock_diagnostic_buffer = gpio_clock_diagnostic_buffer_usage(
+        nm_result.stdout
+    )
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -771,6 +819,7 @@ def build(arduino_cli_name: str) -> Path:
             "checksum_resources": checksum_resources,
             "checksum_benchmark_buffers": benchmark_buffers,
             "packet_buffers": packet_buffers,
+            "gpio_clock_diagnostic_buffer": gpio_clock_diagnostic_buffer,
         },
         "source": {
             "source_id": identity.source_id,

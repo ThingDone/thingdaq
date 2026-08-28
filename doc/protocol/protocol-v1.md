@@ -2,6 +2,7 @@
 type: reference
 title: Protocol V1
 created: 2026-08-27
+updated: 2026-08-28
 tags:
   - teensy-daq
   - protocol
@@ -11,6 +12,7 @@ related:
   - '[[System-Overview]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
+  - '[[ADR-003-GPIO-Clock-DMA]]'
 ---
 
 # Protocol v1
@@ -92,6 +94,7 @@ applying a request.
 | `0x15` | `RESET_STATS_REQUEST` | Empty |
 | `0x16` | `PING_REQUEST` | 8-byte nonce |
 | `0x17` | `CHECKSUM_BENCHMARK_REQUEST` | 8-byte bounded benchmark selection |
+| `0x18` | `GPIO_CLOCK_DIAGNOSTIC_REQUEST` | 8-byte exact-rate diagnostic selection |
 | `0x90` | `INFO_RESPONSE` | Typed identity and capabilities |
 | `0x91` | `CONFIGURE_RESPONSE` | Typed applied configuration |
 | `0x92` | `START_RESPONSE` | Typed applied configuration; new run ID in header |
@@ -100,12 +103,14 @@ applying a request.
 | `0x95` | `RESET_STATS_RESPONSE` | New statistics generation |
 | `0x96` | `PING_RESPONSE` | Echoed nonce |
 | `0x97` | `CHECKSUM_BENCHMARK_RESPONSE` | 96-byte cycle/resource result |
+| `0x98` | `GPIO_CLOCK_DIAGNOSTIC_RESPONSE` | 140-byte register/count snapshot |
 | `0x9F` | `ERROR_RESPONSE` | Error for a structurally valid but unknown kind |
 
 The numeric command kind is the request frame-kind byte: INFO is `0x10`,
 CONFIGURE is `0x11`, START is `0x12`, GET_STATUS is `0x13`, STOP is `0x14`,
-RESET_STATS is `0x15`, PING is `0x16`, and CHECKSUM_BENCHMARK is `0x17`. A
-successful or typed-error response kind is the command kind ORed with `0x80`;
+RESET_STATS is `0x15`, PING is `0x16`, CHECKSUM_BENCHMARK is `0x17`, and
+GPIO_CLOCK_DIAGNOSTIC is `0x18`. A successful or typed-error response kind is
+the command kind ORed with `0x80`;
 generated mappings enforce this relationship. A device copies the request ID
 into its response, allowing
 control traffic to be matched while ADC and GPIO frames are interspersed.
@@ -276,6 +281,7 @@ version, and two reserved zero bytes.
 | RESET_STATS | No response | Valid | Valid | `INVALID_STATE` |
 | PING | No response | Valid if advertised | Valid if advertised | Valid if advertised |
 | CHECKSUM_BENCHMARK | No response | Valid if advertised | `INVALID_STATE` | `INVALID_STATE` |
+| GPIO_CLOCK_DIAGNOSTIC | No response | Valid if advertised | `INVALID_STATE` | `INVALID_STATE` |
 
 ### INFO
 
@@ -347,11 +353,13 @@ Capability bits are independent, one-bit values:
 | `0x00000010` | `RESET_STATS` | RESET_STATS is implemented |
 | `0x00000020` | `PING` | Optional PING is implemented |
 | `0x00000040` | `CHECKSUM_BENCHMARK` | Optional on-device checksum benchmark is implemented |
+| `0x00000080` | `GPIO_CLOCK_DIAGNOSTIC` | Optional exact-rate PIT/XBARA/eDMA diagnostic is implemented |
 
 The first four capability bits must agree with the stream/source masks. Bits
-outside `0x0000007F` are reserved and rejected in protocol v1. PING and
-CHECKSUM_BENCHMARK callers must check their capability bits; all other commands
-in the initial set are mandatory. Device states are BOOT = 0, IDLE = 1,
+outside `0x000000FF` are reserved and rejected in protocol v1. PING,
+CHECKSUM_BENCHMARK, and GPIO_CLOCK_DIAGNOSTIC callers must check their
+capability bits; all other commands in the initial set are mandatory. Device
+states are BOOT = 0, IDLE = 1,
 CONFIGURED = 2, and RUNNING = 3. BOOT does not answer commands.
 
 ### CONFIGURE
@@ -564,6 +572,115 @@ derived field before exposing the result. Code bytes describe the selected
 algorithm body; the shared narrow dispatch is recorded separately in build
 provenance. CRC table bytes are 8,192 and Adler table bytes are zero.
 
+### GPIO_CLOCK_DIAGNOSTIC
+
+GPIO_CLOCK_DIAGNOSTIC is an optional, bounded, IDLE-only measurement of the
+fixed PIT0 → XBARA1 input 56 → rising-edge output 0 → DMAMUX source 30 → eDMA
+channel 2 path selected by [[ADR-003-GPIO-Clock-DMA]]. It never changes a pad
+mux, reads a user pin, allocates a run ID, changes acquisition configuration,
+emits data, or resets statistics. The DMA source and destination are isolated
+words in one aligned 32-byte OCRAM allocation. CONFIGURED and RUNNING requests
+return `INVALID_STATE`; firmware without capability bit `0x00000080` returns
+`UNSUPPORTED_CONFIGURATION`. The route and edge mode passed the hardware rig
+at 1 kHz, 1 MHz, and three consecutive 4 MHz windows in final-image job
+`db75db1e-45c0-4f66-a09a-bb4adee26b77`.
+
+The immutable production rate remains 4,000,000 samples/s in INFO regardless
+of the selected diagnostic rate. A diagnostic rate is accepted only when it
+is from 1,000 through 4,000,000 Hz, divides both the 24 MHz PIT clock and the
+600 MHz DWT clock exactly, and keeps the measurement at or below 60,000,000
+DWT cycles (100 ms). Event count is 32 through 8,192. The guarded eDMA major
+count is `2 * event_count + 16` and must fit the 15-bit ELINKNO count.
+
+The eight-byte request is:
+
+| Offset | Type | Field | Constraint |
+| ---: | --- | --- | --- |
+| 0 | `u32` | rate Hz | Exact permitted divisor; production is 4,000,000 |
+| 4 | `u16` | event count | 32 through 8,192 and within the duration bound |
+| 6 | `u16` | reserved | Zero |
+
+The 140-byte success response is a read-only evidence snapshot. Configured
+fields are captured after the channel is armed and before PIT starts;
+terminal fields are captured after PIT, eDMA request, DMAMUX, and XBAR DMA
+output are disabled in that order.
+
+| Offset | Type | Field |
+| ---: | --- | --- |
+| 0 | response prefix | Successful status/error prefix |
+| 4 | `u32` | configured rate Hz |
+| 8 | `u32` | immutable production rate Hz, exactly 4,000,000 |
+| 12 | `u32` | PIT clock Hz, exactly 24,000,000 |
+| 16 | `u32` | PIT load value, `24000000 / rate_hz - 1` |
+| 20 | `u32` | requested event count |
+| 24 | `u32` | events scheduled from elapsed DWT cycles |
+| 28 | `u32` | completed eDMA samples |
+| 32 | `u32` | DWT counter Hz, normally 600,000,000 |
+| 36 | `u32` | elapsed DWT cycles |
+| 40 | `u32` | GPIO clock hardware-error flags |
+| 44 | `u32` | configured `CCM_CSCMR1` |
+| 48 | `u32` | configured `CCM_CCGR1` |
+| 52 | `u32` | configured `CCM_CCGR2` |
+| 56 | `u32` | configured `CCM_CCGR5` |
+| 60 | `u32` | configured `PIT_MCR` |
+| 64 | `u32` | configured PIT `LDVAL` |
+| 68 | `u32` | final PIT `CVAL` |
+| 72 | `u32` | configured PIT `TCTRL` |
+| 76 | `u32` | final PIT `TFLG` |
+| 80 | `u16` | configured XBARA selection register |
+| 82 | `u16` | configured XBARA control register; the accepted output-0 rising-edge/DMA bits are `0x0005` |
+| 84 | `u32` | configured DMAMUX channel register |
+| 88 | `u32` | configured eDMA `CR` |
+| 92 | `u32` | final eDMA `ES` |
+| 96 | `u32` | configured eDMA `ERQ` |
+| 100 | `u32` | final eDMA `ERR` |
+| 104 | `u32` | final eDMA `HRS` |
+| 108 | `u32` | TCD source address |
+| 112 | `u32` | TCD destination address |
+| 116 | `u32` | TCD bytes per minor loop |
+| 120 | `u32` | cache-invalidated final destination word |
+| 124 | `u16` | final TCD current iteration count |
+| 126 | `u16` | configured TCD beginning iteration count |
+| 128 | `u16` | final TCD control/status |
+| 130 | `u16` | configured TCD attributes |
+| 132 | `u8` | PIT channel ID |
+| 133 | `u8` | XBARA input ID |
+| 134 | `u8` | XBARA output ID |
+| 135 | `u8` | eDMA channel ID |
+| 136 | `u8` | DMAMUX source ID |
+| 137 | `u8` | eDMA priority |
+| 138 | `u16` | TCD source offset |
+
+The host derives scheduled events with integer division of elapsed DWT cycles
+by exact cycles per event. A healthy result requires zero hardware-error
+flags, a scheduled count within one of the requested count, and a sampled
+count within one of the scheduled count.
+Known hardware-error bits are:
+
+| Bit value | Name | Meaning |
+| ---: | --- | --- |
+| `0x00000001` | `DWT_UNAVAILABLE` | Cycle counter absent, stopped, or not 600 MHz |
+| `0x00000002` | `RESOURCE_BUSY` | Reserved PIT/XBAR/eDMA owner was already active |
+| `0x00000004` | `PERCLK_MISMATCH` | PIT peripheral clock is not exact 24 MHz |
+| `0x00000008` | `PIT_GATE_DISABLED` | PIT clock gate snapshot is not enabled |
+| `0x00000010` | `XBAR_GATE_DISABLED` | XBARA1 clock gate snapshot is not enabled |
+| `0x00000020` | `DMA_GATE_DISABLED` | eDMA clock gate snapshot is not enabled |
+| `0x00000040` | `PIT_CONFIG_MISMATCH` | PIT enable/load snapshot differs from the plan |
+| `0x00000080` | `XBAR_CONFIG_MISMATCH` | XBAR input/edge/DMA-enable snapshot differs |
+| `0x00000100` | `DMAMUX_CONFIG_MISMATCH` | DMAMUX source or enable differs |
+| `0x00000200` | `EDMA_CONFIG_MISMATCH` | TCD, request, priority, or copied sentinel differs |
+| `0x00000400` | `EDMA_CHANNEL_ERROR` | eDMA global/channel error was observed |
+| `0x00000800` | `DEAD_TRIGGER` | Scheduled events produced no DMA sample |
+| `0x00001000` | `DUPLICATE_TRIGGER` | DMA samples exceed scheduled events by more than one |
+| `0x00002000` | `COUNT_OUT_OF_TOLERANCE` | Absolute scheduled/sample difference exceeds one |
+| `0x00004000` | `MEASUREMENT_OVERFLOW` | Guard major loop completed or TCD counts are invalid |
+
+An unarmed `DWT_UNAVAILABLE` or `RESOURCE_BUSY` snapshot may retain preexisting
+TCD values; no sample-count claim is inferred from it. All other successful
+responses must prove `dma_sample_count == BITER - CITER`, and a zero-error
+response must include a nonzero 600 MHz DWT interval. Unknown flag bits and
+inconsistent derived fields are rejected as `INVALID_PAYLOAD`.
+
 ## Error codes
 
 | Value | Name | Meaning |
@@ -624,8 +741,8 @@ and discard leading garbage as it scans.
 
 ## Golden fixtures and drift
 
-`protocol/fixtures/` contains one complete Adler-32 frame for all 19 v1 frame
-kinds (two data, eight requests, eight typed responses, and one generic error)
+`protocol/fixtures/` contains one complete Adler-32 frame for all 21 v1 frame
+kinds (two data, nine requests, nine typed responses, and one generic error)
 plus a deterministic `manifest.json` with decoded header values, payload
 and frame SHA-256 hashes, checksums, and inline hex for small control frames.
 The ADC vector is the little-endian pair ramp `(0, 1), (2, 3), ...`; the GPIO

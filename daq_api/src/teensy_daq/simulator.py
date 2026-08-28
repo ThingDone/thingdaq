@@ -213,6 +213,9 @@ class SimulatedDevice:
             constants.FrameKind.CHECKSUM_BENCHMARK_REQUEST: (
                 self._handle_checksum_benchmark
             ),
+            constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST: (
+                self._handle_gpio_clock_diagnostic
+            ),
         }
         return handlers[request.header.kind](request)
 
@@ -341,6 +344,11 @@ class SimulatedDevice:
     def _handle_checksum_benchmark(self, request: Frame) -> bytes:
         # The offline simulator has no 600 MHz DWT or Teensy memory regions and
         # therefore deliberately does not advertise or fabricate this result.
+        return self._typed_error(request, constants.ErrorCode.UNSUPPORTED_CONFIGURATION)
+
+    def _handle_gpio_clock_diagnostic(self, request: Frame) -> bytes:
+        # The simulator has no PIT/XBARA/eDMA route and does not invent target
+        # register snapshots or timing evidence.
         return self._typed_error(request, constants.ErrorCode.UNSUPPORTED_CONFIGURATION)
 
     def _reset_epoch(self) -> None:

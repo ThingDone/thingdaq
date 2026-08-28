@@ -37,6 +37,8 @@ from .models import (
     DeviceInfo,
     FirmwareCounters,
     GPIOBlock,
+    GpioClockDiagnosticRequest,
+    GpioClockDiagnosticResult,
     HostCounters,
     LossCounters,
     ResponseValue,
@@ -131,6 +133,9 @@ class DAQStateError(DeviceCommandError):
         )
         self.command = {
             "configure": constants.FrameKind.CONFIGURE_REQUEST,
+            "gpio_clock_diagnostic": (
+                constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST
+            ),
             "start": constants.FrameKind.START_REQUEST,
             "reset_stats": constants.FrameKind.RESET_STATS_REQUEST,
             "stop": constants.FrameKind.STOP_REQUEST,
@@ -735,6 +740,40 @@ class TeensyDAQ:
                     "RESET_STATS response has no nonzero generation"
                 )
             self._last_status = None
+            return response.value
+
+    def gpio_clock_diagnostic(
+        self,
+        *,
+        rate_hz: int = constants.GPIO_CLOCK_PRODUCTION_RATE_HZ,
+        event_count: int = constants.GPIO_CLOCK_MAX_EVENT_COUNT,
+    ) -> GpioClockDiagnosticResult:
+        """Measure the isolated PIT/XBARA/eDMA trigger path while IDLE."""
+
+        request = GpioClockDiagnosticRequest(rate_hz=rate_hz, event_count=event_count)
+        with self._lock:
+            self._require_verified_identity()
+            self._require_state("gpio_clock_diagnostic", constants.DeviceState.IDLE)
+            capabilities = self.capabilities
+            if capabilities is not None and not capabilities.supports(
+                constants.Capability.GPIO_CLOCK_DIAGNOSTIC
+            ):
+                raise DeviceCapabilityError(
+                    "device does not advertise GPIO clock diagnostics",
+                    command=constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST,
+                )
+            response = self._command(
+                constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST,
+                request.to_payload(),
+            )
+            if not isinstance(response.value, GpioClockDiagnosticResult):
+                raise UnexpectedMessageError(
+                    "GPIO clock diagnostic response has no snapshot value"
+                )
+            if response.value.request != request:
+                raise UnexpectedMessageError(
+                    "GPIO clock diagnostic response changed the requested window"
+                )
             return response.value
 
     def stop(self) -> constants.DeviceState:

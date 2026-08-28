@@ -67,7 +67,9 @@ core, performs a clean all-warnings compile with the complete
 Arduino CLI, compiler, resolved menu properties, deterministic source/build
 identity, source-input Git state, reproducible UTC timestamp policy, Flash/RAM
 usage, command, and SHA-256 hashes in a gitignored build manifest. The exported
-artifacts include the HEX, ELF, and linker map needed for pre-upload review:
+artifacts include the HEX, ELF, and linker map needed for pre-upload review;
+ELF inspection also proves the packet banks, checksum buffers/tables, and GPIO
+clock diagnostic cache line occupy their claimed regions:
 
 ```bash
 python3 firmware/tools/build_firmware.py
@@ -132,6 +134,15 @@ header-plus-payload. Separate 4,096-byte buffers exercise native DTCM and
 DMA-visible OCRAM in hot and meaningful cold-invalidated states. The protocol
 and method are specified in `doc/protocol/protocol-v1.md`.
 
+Phase 06 adds an optional IDLE-only `GPIO_CLOCK_DIAGNOSTIC` command. It drives
+the fixed 24 MHz PERCLK → PIT0 → XBARA1 rising-edge request → DMAMUX → eDMA
+channel 2 path at exact divisors from 1 kHz through the immutable 4 MHz
+production rate, without remapping or reading D6-D13. The response exposes the
+clock gates, timer, XBAR, DMAMUX, eDMA/TCD registers, 600 MHz DWT interval,
+scheduled/sample counts, route IDs, and typed hardware errors. The accepted
+route and rejected dual-edge alternatives are recorded in
+`doc/decisions/adr-003-gpio-clock-dma.md`.
+
 The Python codec uses exact standard-library C implementations for Adler-32
 and CRC-32/ISO-HDLC and a bounded table-driven fallback for CRC-32C. Its
 machine-readable benchmark measures full 4,096-byte ADC and GPIO encode and
@@ -144,9 +155,10 @@ PYTHONPATH=daq_api/src .venv/bin/python -m teensy_daq.checksum_benchmark
 
 The portable firmware control module implements bounded BOOT → IDLE,
 CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
-STOP, RESET_STATS, PING, and optional CHECKSUM_BENCHMARK. Phase 04 accepts nonempty ADC/GPIO subsets only
-for the implemented synthetic source; INFO and STATUS distinguish that source
-from the still-unavailable physical path.
+STOP, RESET_STATS, PING, optional CHECKSUM_BENCHMARK, and optional
+GPIO_CLOCK_DIAGNOSTIC. Phase 04 accepts nonempty ADC/GPIO subsets only for the
+implemented synthetic source; INFO and STATUS distinguish that source from the
+still-unavailable physical path.
 
 The Teensy USB layer retains PJRC's USB Serial VID/PID and chip-derived serial
 number while overriding only the weak product string with `Teensy DAQ`. Boot
@@ -194,8 +206,9 @@ and 94-frame CPU-owned OCRAM reserve cover 101.200 ms at the nominal combined
 framed rate, plus 1.012 ms in the core ring. This absorbs the 60.715 ms service
 gap observed by the Phase 05 CRC campaign while the exact linker gate retains
 at least 32 KiB for locals and stack. The compile-time registry reserves
-450,976 bytes of RAM1 project data and 486,400 bytes of RAM2 storage, including
-the future acquisition rings and isolated benchmark buffers; see
+450,976 bytes of RAM1 project data and 486,432 bytes of RAM2 storage, including
+the future acquisition rings, isolated benchmark buffers, and the GPIO clock
+diagnostic cache line; see
 `doc/architecture/firmware-resource-map.md` and
 `doc/reference/Foundation-Reuse-Inventory.md`.
 
@@ -218,8 +231,9 @@ a stale or incompatible image before control changes.
 ## Portable firmware tests
 
 The firmware test suite host-compiles the production protocol, control,
-statistics, checksum benchmark, synthetic-source, packet-pipeline, transport, and runtime sources with
-allocation-free C++17 flags.
+statistics, checksum benchmark, GPIO clock diagnostic, synthetic-source,
+packet-pipeline, transport, and runtime sources with allocation-free C++17
+flags.
 It exercises every split and truncation point for every command, corrupt-stream
 recovery, the complete state-transition matrix, idempotency, counters, and
 fixed frame/queue boundaries. A bidirectional interoperability test sends
@@ -253,6 +267,14 @@ selection is documented in `doc/decisions/adr-002-checksum-selection.md`. The
 clean selected-image rebuild and three consecutive 60-second Adler-32
 acceptance runs are consolidated in
 `doc/results/phase-05-checksum-benchmark.md`.
+
+The GPIO clock tests independently prove exact PIT/DWT divisor arithmetic,
+request duration and TCD bounds, dead/duplicate/short-window classification,
+unarmed resource behavior, protocol round trips, IDLE-only state atomicity,
+and simulator refusal to fabricate target-only evidence. The pinned target
+build and hardware spike additionally validate the explicit register adapter;
+the accepted evidence is consolidated in
+`doc/decisions/adr-003-gpio-clock-dma.md`.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source
@@ -331,12 +353,15 @@ drop instead of hiding sustained backpressure.
 
 ## Synchronous Python API and offline simulator
 
-The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS
-through the same background reader for serial hardware and the in-memory
-simulator. Its typed models preserve raw ADC converter identity and packed GPIO
-data; production iterators emit visible `StreamGap` events, strict mode raises
-on any gap, and firmware versus host queue-loss counters remain separate.
-NumPy is not required.
+The Python facade runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS and
+optional diagnostics through the same background reader for serial hardware
+and the in-memory simulator. `TeensyDAQ.gpio_clock_diagnostic()` returns a
+typed, read-only register/count result after identity, capability, and IDLE
+checks; the simulator rejects it rather than fabricate hardware evidence. The
+stream models preserve raw ADC converter identity and packed GPIO data;
+production iterators emit visible `StreamGap` events, strict mode raises on any
+gap, and firmware versus host queue-loss counters remain separate. NumPy is
+not required.
 
 The Phase 04 streaming path uses one reusable 64 KiB receive buffer whenever a
 transport offers `readinto`, retains bounded decoded queues (512 data frames by

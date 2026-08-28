@@ -77,6 +77,9 @@ struct DispatchReadiness {
       nullptr;
   protocol_v1::ErrorCode checksum_benchmark_error =
       protocol_v1::ErrorCode::kUnsupportedConfiguration;
+  const protocol::GpioClockDiagnosticResponse *gpio_clock_response = nullptr;
+  protocol_v1::ErrorCode gpio_clock_error =
+      protocol_v1::ErrorCode::kUnsupportedConfiguration;
 };
 
 class ControlState {

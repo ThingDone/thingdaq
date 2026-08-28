@@ -225,6 +225,26 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
               request, run_id_, *readiness.checksum_benchmark_response,
               response),
           response);
+
+    case protocol_v1::CommandKind::kGpioClockDiagnostic:
+      if (!capabilityEnabled(
+              protocol_v1::Capability::kGpioClockDiagnostic)) {
+        return reject(request,
+                      protocol_v1::ErrorCode::kUnsupportedConfiguration,
+                      response);
+      }
+      if (state_ != protocol_v1::DeviceState::kIdle) {
+        return reject(request, protocol_v1::ErrorCode::kInvalidState,
+                      response);
+      }
+      if (readiness.gpio_clock_response == nullptr) {
+        return reject(request, readiness.gpio_clock_error, response);
+      }
+      return encoded(
+          request, protocol_v1::ErrorCode::kOk,
+          protocol::encodeGpioClockDiagnosticResponse(
+              request, run_id_, *readiness.gpio_clock_response, response),
+          response);
   }
 
   statistics_.recordCommandRejected(

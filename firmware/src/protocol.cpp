@@ -21,6 +21,11 @@ constexpr std::uint8_t kValidStreamMask =
 constexpr std::uint16_t kResponseErrorFlag =
     static_cast<std::uint16_t>(protocol_v1::FrameFlag::kResponseError);
 
+constexpr std::uint32_t absoluteDifference(std::uint32_t left,
+                                           std::uint32_t right) {
+  return left >= right ? left - right : right - left;
+}
+
 constexpr Result badMagic() {
   return Result::failure(protocol_v1::ErrorCode::kInvalidLength,
                          ValidationIssue::kBadMagic);
@@ -88,6 +93,7 @@ constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kResetStatsRequest:
     case protocol_v1::FrameKind::kPingRequest:
     case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
+    case protocol_v1::FrameKind::kGpioClockDiagnosticRequest:
     case protocol_v1::FrameKind::kInfoResponse:
     case protocol_v1::FrameKind::kConfigureResponse:
     case protocol_v1::FrameKind::kStartResponse:
@@ -96,6 +102,7 @@ constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kResetStatsResponse:
     case protocol_v1::FrameKind::kPingResponse:
     case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
+    case protocol_v1::FrameKind::kGpioClockDiagnosticResponse:
     case protocol_v1::FrameKind::kErrorResponse:
       return true;
   }
@@ -112,6 +119,7 @@ constexpr bool isRequestKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kResetStatsRequest:
     case protocol_v1::FrameKind::kPingRequest:
     case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
+    case protocol_v1::FrameKind::kGpioClockDiagnosticRequest:
       return true;
     default:
       return false;
@@ -152,6 +160,7 @@ constexpr bool isTypedResponseKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kResetStatsResponse:
     case protocol_v1::FrameKind::kPingResponse:
     case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
+    case protocol_v1::FrameKind::kGpioClockDiagnosticResponse:
       return true;
     default:
       return false;
@@ -217,6 +226,9 @@ bool commandForKind(protocol_v1::FrameKind kind,
     case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
       command = protocol_v1::CommandKind::kChecksumBenchmark;
       return true;
+    case protocol_v1::FrameKind::kGpioClockDiagnosticRequest:
+      command = protocol_v1::CommandKind::kGpioClockDiagnostic;
+      return true;
     default:
       return false;
   }
@@ -251,6 +263,9 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
     case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
       size = protocol_v1::kChecksumBenchmarkRequestPayloadSize;
       return true;
+    case protocol_v1::FrameKind::kGpioClockDiagnosticRequest:
+      size = protocol_v1::kGpioClockDiagnosticRequestPayloadSize;
+      return true;
     case protocol_v1::FrameKind::kInfoResponse:
       size = protocol_v1::kInfoResponsePayloadSize;
       return true;
@@ -272,6 +287,9 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
       return true;
     case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
       size = protocol_v1::kChecksumBenchmarkResponsePayloadSize;
+      return true;
+    case protocol_v1::FrameKind::kGpioClockDiagnosticResponse:
+      size = protocol_v1::kGpioClockDiagnosticResponsePayloadSize;
       return true;
     case protocol_v1::FrameKind::kErrorResponse:
       size = protocol_v1::kErrorResponsePayloadSize;
@@ -660,6 +678,33 @@ Result decodeChecksumBenchmarkRequest(ByteView payload,
   return Result::success();
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(
+    ".flashmem.protocol.gpio_clock_diagnostic_request")
+Result decodeGpioClockDiagnosticRequest(
+    ByteView payload, GpioClockDiagnosticRequest &request) {
+  if (payload.size != protocol_v1::kGpioClockDiagnosticRequestPayloadSize) {
+    return badLength();
+  }
+  GpioClockDiagnosticRequest decoded{};
+  std::uint16_t reserved = 1U;
+  if (!loadU32(payload,
+               protocol_v1::kGpioClockDiagnosticRequestRateHzOffset,
+               decoded.rate_hz) ||
+      !loadU16(payload,
+               protocol_v1::kGpioClockDiagnosticRequestEventCountOffset,
+               decoded.event_count) ||
+      !loadU16(payload,
+               protocol_v1::kGpioClockDiagnosticRequestReservedOffset,
+               reserved)) {
+    return badLength();
+  }
+  if (reserved != 0U || !validGpioClockDiagnosticRequest(decoded)) {
+    return badPayload();
+  }
+  request = decoded;
+  return Result::success();
+}
+
 Result validateChecksumBenchmarkResponse(ByteView payload) {
   ChecksumBenchmarkResponse decoded{};
   decoded.request.checksum_algorithm =
@@ -812,6 +857,100 @@ Result validateChecksumBenchmarkResponse(ByteView payload) {
   return Result::success();
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(
+    ".flashmem.protocol.gpio_clock_diagnostic_validation")
+Result validateGpioClockDiagnosticResponse(ByteView payload) {
+  GpioClockDiagnosticRequest request{};
+  std::uint32_t production_rate = 0U;
+  std::uint32_t pit_clock = 0U;
+  std::uint32_t pit_load = 0U;
+  std::uint32_t requested_events = 0U;
+  std::uint32_t scheduled_events = 0U;
+  std::uint32_t samples = 0U;
+  std::uint32_t dwt_hz = 0U;
+  std::uint32_t elapsed_cycles = 0U;
+  std::uint32_t error_flags = 0U;
+  std::uint16_t citer = 0U;
+  std::uint16_t biter = 0U;
+  if (!loadU32(payload,
+               protocol_v1::kGpioClockDiagnosticResponseConfiguredRateHzOffset,
+               request.rate_hz) ||
+      !loadU32(payload,
+               protocol_v1::kGpioClockDiagnosticResponseProductionRateHzOffset,
+               production_rate) ||
+      !loadU32(payload,
+               protocol_v1::kGpioClockDiagnosticResponsePitClockHzOffset,
+               pit_clock) ||
+      !loadU32(payload,
+               protocol_v1::kGpioClockDiagnosticResponsePitLoadValueOffset,
+               pit_load) ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioClockDiagnosticResponseRequestedEventCountOffset,
+          requested_events) ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioClockDiagnosticResponseScheduledEventCountOffset,
+          scheduled_events) ||
+      !loadU32(payload,
+               protocol_v1::kGpioClockDiagnosticResponseDmaSampleCountOffset,
+               samples) ||
+      !loadU32(payload,
+               protocol_v1::kGpioClockDiagnosticResponseDwtCounterHzOffset,
+               dwt_hz) ||
+      !loadU32(payload,
+               protocol_v1::kGpioClockDiagnosticResponseDwtElapsedCyclesOffset,
+               elapsed_cycles) ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioClockDiagnosticResponseHardwareErrorFlagsOffset,
+          error_flags) ||
+      !loadU16(payload,
+               protocol_v1::kGpioClockDiagnosticResponseTcdCiterFinalOffset,
+               citer) ||
+      !loadU16(payload,
+               protocol_v1::kGpioClockDiagnosticResponseTcdBiterOffset,
+               biter)) {
+    return badLength();
+  }
+  if (requested_events > std::numeric_limits<std::uint16_t>::max()) {
+    return badPayload();
+  }
+  request.event_count = static_cast<std::uint16_t>(requested_events);
+  const std::uint32_t expected_major_count =
+      2U * requested_events + protocol_v1::kGpioClockDuplicateGuardEvents;
+  const std::uint32_t unarmed_error_mask =
+      static_cast<std::uint32_t>(
+          protocol_v1::GpioClockError::kDwtUnavailable) |
+      static_cast<std::uint32_t>(
+          protocol_v1::GpioClockError::kResourceBusy);
+  const bool configuration_was_armed =
+      (error_flags & unarmed_error_mask) == 0U;
+  const std::uint32_t expected_scheduled =
+      dwt_hz == protocol_v1::kGpioClockDwtHz && request.rate_hz != 0U
+          ? elapsed_cycles / (protocol_v1::kGpioClockDwtHz / request.rate_hz)
+          : 0U;
+  if (!validGpioClockDiagnosticRequest(request) ||
+      production_rate != protocol_v1::kGpioClockProductionRateHz ||
+      pit_clock != protocol_v1::kGpioClockPitHz ||
+      pit_load != protocol_v1::kGpioClockPitHz / request.rate_hz - 1U ||
+      (error_flags & ~protocol_v1::kKnownGpioClockErrorMask) != 0U ||
+      (configuration_was_armed &&
+       (biter != expected_major_count || citer > biter ||
+        samples != static_cast<std::uint32_t>(biter - citer))) ||
+      (dwt_hz == protocol_v1::kGpioClockDwtHz &&
+       scheduled_events != expected_scheduled) ||
+      (error_flags == 0U &&
+       (dwt_hz != protocol_v1::kGpioClockDwtHz || elapsed_cycles == 0U ||
+        absoluteDifference(scheduled_events, requested_events) >
+            protocol_v1::kGpioClockCountTolerance ||
+        absoluteDifference(samples, scheduled_events) >
+            protocol_v1::kGpioClockCountTolerance))) {
+    return badPayload();
+  }
+  return Result::success();
+}
+
 Result validatePayload(const FrameHeader &header, ByteView payload) {
   if (!payload.valid() || payload.size != header.payload_length) {
     return badLength();
@@ -835,6 +974,11 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
   if (header.kind == protocol_v1::FrameKind::kChecksumBenchmarkRequest) {
     ChecksumBenchmarkRequest request{};
     return decodeChecksumBenchmarkRequest(payload, request);
+  }
+  if (header.kind ==
+      protocol_v1::FrameKind::kGpioClockDiagnosticRequest) {
+    GpioClockDiagnosticRequest request{};
+    return decodeGpioClockDiagnosticRequest(payload, request);
   }
   if (isRequestKind(header.kind)) {
     return Result::success();
@@ -894,6 +1038,8 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
                  : badPayload();
     case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
       return validateChecksumBenchmarkResponse(payload);
+    case protocol_v1::FrameKind::kGpioClockDiagnosticResponse:
+      return validateGpioClockDiagnosticResponse(payload);
     default:
       return badPayload();
   }
@@ -1121,6 +1267,28 @@ bool validChecksumBenchmarkRequest(const ChecksumBenchmarkRequest &request) {
       operations * static_cast<std::uint64_t>(benchmarkVectorBytes(request.vector));
   return operations <= protocol_v1::kChecksumBenchmarkMaxOperations &&
          processed <= protocol_v1::kChecksumBenchmarkMaxProcessedBytes;
+}
+
+TEENSY_DAQ_PROTOCOL_COLD_CODE(
+    ".flashmem.protocol.gpio_clock_diagnostic_bounds")
+bool validGpioClockDiagnosticRequest(
+    const GpioClockDiagnosticRequest &request) {
+  if (request.rate_hz < protocol_v1::kGpioClockMinRateHz ||
+      request.rate_hz > protocol_v1::kGpioClockProductionRateHz ||
+      protocol_v1::kGpioClockPitHz % request.rate_hz != 0U ||
+      protocol_v1::kGpioClockDwtHz % request.rate_hz != 0U ||
+      request.event_count < protocol_v1::kGpioClockMinEventCount ||
+      request.event_count > protocol_v1::kGpioClockMaxEventCount) {
+    return false;
+  }
+  const std::uint64_t elapsed_cycles =
+      static_cast<std::uint64_t>(request.event_count) *
+      (protocol_v1::kGpioClockDwtHz / request.rate_hz);
+  const std::uint32_t major_count =
+      2U * static_cast<std::uint32_t>(request.event_count) +
+      protocol_v1::kGpioClockDuplicateGuardEvents;
+  return elapsed_cycles <= protocol_v1::kGpioClockMaxElapsedCycles &&
+         major_count <= std::numeric_limits<std::int16_t>::max();
 }
 
 bool populateChecksumBenchmarkMetrics(ChecksumBenchmarkResponse &response) {
@@ -1389,6 +1557,13 @@ Result decodeRequest(ByteView input, Request &request) {
   } else if (command == protocol_v1::CommandKind::kChecksumBenchmark) {
     result = decodeChecksumBenchmarkRequest(frame.payload,
                                             decoded.checksum_benchmark);
+    if (!result.ok()) {
+      return result;
+    }
+  } else if (command ==
+             protocol_v1::CommandKind::kGpioClockDiagnostic) {
+    result = decodeGpioClockDiagnosticRequest(
+        frame.payload, decoded.gpio_clock_diagnostic);
     if (!result.ok()) {
       return result;
     }
@@ -1694,6 +1869,100 @@ Result encodeChecksumBenchmarkResponse(
   return encodeFrame(
       responseFields(protocol_v1::FrameKind::kChecksumBenchmarkResponse,
                      request, run_id),
+      view(payload), output);
+}
+
+TEENSY_DAQ_PROTOCOL_COLD_CODE(
+    ".flashmem.protocol.gpio_clock_diagnostic_response")
+Result encodeGpioClockDiagnosticResponse(
+    const Request &request, std::uint32_t run_id,
+    const GpioClockDiagnosticResponse &response, ControlFrame &output) {
+  Result result = verifyRequestKind(
+      request, protocol_v1::CommandKind::kGpioClockDiagnostic);
+  if (!result.ok() ||
+      !validGpioClockDiagnosticRequest(
+          request.gpio_clock_diagnostic) ||
+      response.configured_rate_hz !=
+          request.gpio_clock_diagnostic.rate_hz ||
+      response.requested_event_count !=
+          request.gpio_clock_diagnostic.event_count ||
+      response.production_rate_hz !=
+          protocol_v1::kGpioClockProductionRateHz ||
+      response.pit_clock_hz != protocol_v1::kGpioClockPitHz ||
+      response.pit_load_value !=
+          protocol_v1::kGpioClockPitHz / response.configured_rate_hz - 1U ||
+      (response.hardware_error_flags &
+       ~protocol_v1::kKnownGpioClockErrorMask) != 0U) {
+    return result.ok() ? badPayload() : result;
+  }
+
+  std::array<std::uint8_t,
+             protocol_v1::kGpioClockDiagnosticResponsePayloadSize>
+      payload{};
+  MutableByteView bytes = mutableView(payload);
+  writeSuccessPrefix(bytes);
+#define STORE_GPIO_CLOCK_U32(field, member)                                 \
+  storeU32(bytes,                                                           \
+           protocol_v1::kGpioClockDiagnosticResponse##field##Offset,        \
+           response.member)
+#define STORE_GPIO_CLOCK_U16(field, member)                                 \
+  storeU16(bytes,                                                           \
+           protocol_v1::kGpioClockDiagnosticResponse##field##Offset,        \
+           response.member)
+  STORE_GPIO_CLOCK_U32(ConfiguredRateHz, configured_rate_hz);
+  STORE_GPIO_CLOCK_U32(ProductionRateHz, production_rate_hz);
+  STORE_GPIO_CLOCK_U32(PitClockHz, pit_clock_hz);
+  STORE_GPIO_CLOCK_U32(PitLoadValue, pit_load_value);
+  STORE_GPIO_CLOCK_U32(RequestedEventCount, requested_event_count);
+  STORE_GPIO_CLOCK_U32(ScheduledEventCount, scheduled_event_count);
+  STORE_GPIO_CLOCK_U32(DmaSampleCount, dma_sample_count);
+  STORE_GPIO_CLOCK_U32(DwtCounterHz, dwt_counter_hz);
+  STORE_GPIO_CLOCK_U32(DwtElapsedCycles, dwt_elapsed_cycles);
+  STORE_GPIO_CLOCK_U32(HardwareErrorFlags, hardware_error_flags);
+  STORE_GPIO_CLOCK_U32(CcmCscmr1Configured, ccm_cscmr1_configured);
+  STORE_GPIO_CLOCK_U32(CcmCcgr1Configured, ccm_ccgr1_configured);
+  STORE_GPIO_CLOCK_U32(CcmCcgr2Configured, ccm_ccgr2_configured);
+  STORE_GPIO_CLOCK_U32(CcmCcgr5Configured, ccm_ccgr5_configured);
+  STORE_GPIO_CLOCK_U32(PitMcrConfigured, pit_mcr_configured);
+  STORE_GPIO_CLOCK_U32(PitLdvalConfigured, pit_ldval_configured);
+  STORE_GPIO_CLOCK_U32(PitCvalFinal, pit_cval_final);
+  STORE_GPIO_CLOCK_U32(PitTctrlConfigured, pit_tctrl_configured);
+  STORE_GPIO_CLOCK_U32(PitTflgFinal, pit_tflg_final);
+  STORE_GPIO_CLOCK_U16(XbarSelConfigured, xbar_sel_configured);
+  STORE_GPIO_CLOCK_U16(XbarCtrlConfigured, xbar_ctrl_configured);
+  STORE_GPIO_CLOCK_U32(DmamuxChcfgConfigured, dmamux_chcfg_configured);
+  STORE_GPIO_CLOCK_U32(DmaCrConfigured, dma_cr_configured);
+  STORE_GPIO_CLOCK_U32(DmaEsFinal, dma_es_final);
+  STORE_GPIO_CLOCK_U32(DmaErqConfigured, dma_erq_configured);
+  STORE_GPIO_CLOCK_U32(DmaErrFinal, dma_err_final);
+  STORE_GPIO_CLOCK_U32(DmaHrsFinal, dma_hrs_final);
+  STORE_GPIO_CLOCK_U32(TcdSaddr, tcd_saddr);
+  STORE_GPIO_CLOCK_U32(TcdDaddr, tcd_daddr);
+  STORE_GPIO_CLOCK_U32(TcdNbytes, tcd_nbytes);
+  STORE_GPIO_CLOCK_U32(LastSampleWord, last_sample_word);
+  STORE_GPIO_CLOCK_U16(TcdCiterFinal, tcd_citer_final);
+  STORE_GPIO_CLOCK_U16(TcdBiter, tcd_biter);
+  STORE_GPIO_CLOCK_U16(TcdCsrFinal, tcd_csr_final);
+  STORE_GPIO_CLOCK_U16(TcdAttr, tcd_attr);
+  payload[protocol_v1::kGpioClockDiagnosticResponsePitChannelOffset] =
+      response.pit_channel;
+  payload[protocol_v1::kGpioClockDiagnosticResponseXbarInputOffset] =
+      response.xbar_input;
+  payload[protocol_v1::kGpioClockDiagnosticResponseXbarOutputOffset] =
+      response.xbar_output;
+  payload[protocol_v1::kGpioClockDiagnosticResponseEdmaChannelOffset] =
+      response.edma_channel;
+  payload[protocol_v1::kGpioClockDiagnosticResponseDmamuxSourceOffset] =
+      response.dmamux_source;
+  payload[protocol_v1::kGpioClockDiagnosticResponseEdmaPriorityOffset] =
+      response.edma_priority;
+  STORE_GPIO_CLOCK_U16(TcdSoff, tcd_soff);
+#undef STORE_GPIO_CLOCK_U16
+#undef STORE_GPIO_CLOCK_U32
+  return encodeFrame(
+      responseFields(
+          protocol_v1::FrameKind::kGpioClockDiagnosticResponse, request,
+          run_id),
       view(payload), output);
 }
 

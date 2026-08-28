@@ -108,6 +108,18 @@
     "warmup_operations": 4,
     "semantics": "The optional command is valid only in IDLE. Each timed checksum interval excludes interrupt service, subtracts calibrated counter/read overhead, and is shorter than one 32-bit DWT wrap. Cold OCRAM cache maintenance is timed separately. The command never resets or mutates acquisition counters."
   },
+  "gpio_clock_diagnostic": {
+    "pit_clock_hz": 24000000,
+    "cycle_counter_hz": 600000000,
+    "production_rate_hz": 4000000,
+    "minimum_rate_hz": 1000,
+    "minimum_event_count": 32,
+    "maximum_event_count": 8192,
+    "maximum_elapsed_cycles": 60000000,
+    "duplicate_guard_events": 16,
+    "count_tolerance": 1,
+    "semantics": "The optional command is valid only in IDLE and runs one bounded PIT/XBARA/eDMA measurement without remapping GPIO pads or producing data frames. Requested rates must divide the fixed 24 MHz PIT clock exactly and may not exceed the immutable 4 MHz production rate. scheduled_event_count is derived from measured DWT elapsed cycles; dma_sample_count comes independently from the eDMA major-loop counter."
+  },
   "data_layouts": {
     "adc": {
       "bytes_per_item": 4,
@@ -259,6 +271,14 @@
       "allowed_flags": []
     },
     {
+      "name": "GPIO_CLOCK_DIAGNOSTIC_REQUEST",
+      "value": 24,
+      "class": "request",
+      "payload_schema": "gpio_clock_diagnostic_request",
+      "response_kind": "GPIO_CLOCK_DIAGNOSTIC_RESPONSE",
+      "allowed_flags": []
+    },
+    {
       "name": "INFO_RESPONSE",
       "value": 144,
       "class": "response",
@@ -323,6 +343,14 @@
       "allowed_flags": ["RESPONSE_ERROR"]
     },
     {
+      "name": "GPIO_CLOCK_DIAGNOSTIC_RESPONSE",
+      "value": 152,
+      "class": "response",
+      "payload_schema": "gpio_clock_diagnostic_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
       "name": "ERROR_RESPONSE",
       "value": 159,
       "class": "error_response",
@@ -338,7 +366,8 @@
     {"name": "STOP", "value": 20, "request_kind": "STOP_REQUEST", "response_kind": "STOP_RESPONSE", "optional": false},
     {"name": "RESET_STATS", "value": 21, "request_kind": "RESET_STATS_REQUEST", "response_kind": "RESET_STATS_RESPONSE", "optional": false},
     {"name": "PING", "value": 22, "request_kind": "PING_REQUEST", "response_kind": "PING_RESPONSE", "optional": true},
-    {"name": "CHECKSUM_BENCHMARK", "value": 23, "request_kind": "CHECKSUM_BENCHMARK_REQUEST", "response_kind": "CHECKSUM_BENCHMARK_RESPONSE", "optional": true}
+    {"name": "CHECKSUM_BENCHMARK", "value": 23, "request_kind": "CHECKSUM_BENCHMARK_REQUEST", "response_kind": "CHECKSUM_BENCHMARK_RESPONSE", "optional": true},
+    {"name": "GPIO_CLOCK_DIAGNOSTIC", "value": 24, "request_kind": "GPIO_CLOCK_DIAGNOSTIC_REQUEST", "response_kind": "GPIO_CLOCK_DIAGNOSTIC_RESPONSE", "optional": true}
   ],
   "enums": {
     "response_status": [
@@ -377,7 +406,8 @@
       {"name": "SYNTHETIC_SOURCE", "value": 8},
       {"name": "RESET_STATS", "value": 16},
       {"name": "PING", "value": 32},
-      {"name": "CHECKSUM_BENCHMARK", "value": 64}
+      {"name": "CHECKSUM_BENCHMARK", "value": 64},
+      {"name": "GPIO_CLOCK_DIAGNOSTIC", "value": 128}
     ],
     "source": [
       {"name": "HARDWARE", "value": 0},
@@ -405,6 +435,23 @@
     "benchmark_cache_state": [
       {"name": "HOT_OR_NATIVE", "value": 0},
       {"name": "COLD_INVALIDATED", "value": 1}
+    ],
+    "gpio_clock_error": [
+      {"name": "DWT_UNAVAILABLE", "value": 1},
+      {"name": "RESOURCE_BUSY", "value": 2},
+      {"name": "PERCLK_MISMATCH", "value": 4},
+      {"name": "PIT_GATE_DISABLED", "value": 8},
+      {"name": "XBAR_GATE_DISABLED", "value": 16},
+      {"name": "DMA_GATE_DISABLED", "value": 32},
+      {"name": "PIT_CONFIG_MISMATCH", "value": 64},
+      {"name": "XBAR_CONFIG_MISMATCH", "value": 128},
+      {"name": "DMAMUX_CONFIG_MISMATCH", "value": 256},
+      {"name": "EDMA_CONFIG_MISMATCH", "value": 512},
+      {"name": "EDMA_CHANNEL_ERROR", "value": 1024},
+      {"name": "DEAD_TRIGGER", "value": 2048},
+      {"name": "DUPLICATE_TRIGGER", "value": 4096},
+      {"name": "COUNT_OUT_OF_TOLERANCE", "value": 8192},
+      {"name": "MEASUREMENT_OVERFLOW", "value": 16384}
     ]
   },
   "payload_schemas": {
@@ -590,6 +637,64 @@
         {"name": "target_framed_bytes_per_second", "offset": 92, "type": "u32"}
       ]
     },
+    "gpio_clock_diagnostic_request": {
+      "size": 8,
+      "fields": [
+        {"name": "rate_hz", "offset": 0, "type": "u32"},
+        {"name": "event_count", "offset": 4, "type": "u16"},
+        {"name": "reserved", "offset": 6, "type": "u16", "required": 0}
+      ]
+    },
+    "gpio_clock_diagnostic_response": {
+      "size": 140,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"},
+        {"name": "configured_rate_hz", "offset": 4, "type": "u32"},
+        {"name": "production_rate_hz", "offset": 8, "type": "u32"},
+        {"name": "pit_clock_hz", "offset": 12, "type": "u32"},
+        {"name": "pit_load_value", "offset": 16, "type": "u32"},
+        {"name": "requested_event_count", "offset": 20, "type": "u32"},
+        {"name": "scheduled_event_count", "offset": 24, "type": "u32"},
+        {"name": "dma_sample_count", "offset": 28, "type": "u32"},
+        {"name": "dwt_counter_hz", "offset": 32, "type": "u32"},
+        {"name": "dwt_elapsed_cycles", "offset": 36, "type": "u32"},
+        {"name": "hardware_error_flags", "offset": 40, "type": "u32"},
+        {"name": "ccm_cscmr1_configured", "offset": 44, "type": "u32"},
+        {"name": "ccm_ccgr1_configured", "offset": 48, "type": "u32"},
+        {"name": "ccm_ccgr2_configured", "offset": 52, "type": "u32"},
+        {"name": "ccm_ccgr5_configured", "offset": 56, "type": "u32"},
+        {"name": "pit_mcr_configured", "offset": 60, "type": "u32"},
+        {"name": "pit_ldval_configured", "offset": 64, "type": "u32"},
+        {"name": "pit_cval_final", "offset": 68, "type": "u32"},
+        {"name": "pit_tctrl_configured", "offset": 72, "type": "u32"},
+        {"name": "pit_tflg_final", "offset": 76, "type": "u32"},
+        {"name": "xbar_sel_configured", "offset": 80, "type": "u16"},
+        {"name": "xbar_ctrl_configured", "offset": 82, "type": "u16"},
+        {"name": "dmamux_chcfg_configured", "offset": 84, "type": "u32"},
+        {"name": "dma_cr_configured", "offset": 88, "type": "u32"},
+        {"name": "dma_es_final", "offset": 92, "type": "u32"},
+        {"name": "dma_erq_configured", "offset": 96, "type": "u32"},
+        {"name": "dma_err_final", "offset": 100, "type": "u32"},
+        {"name": "dma_hrs_final", "offset": 104, "type": "u32"},
+        {"name": "tcd_saddr", "offset": 108, "type": "u32"},
+        {"name": "tcd_daddr", "offset": 112, "type": "u32"},
+        {"name": "tcd_nbytes", "offset": 116, "type": "u32"},
+        {"name": "last_sample_word", "offset": 120, "type": "u32"},
+        {"name": "tcd_citer_final", "offset": 124, "type": "u16"},
+        {"name": "tcd_biter", "offset": 126, "type": "u16"},
+        {"name": "tcd_csr_final", "offset": 128, "type": "u16"},
+        {"name": "tcd_attr", "offset": 130, "type": "u16"},
+        {"name": "pit_channel", "offset": 132, "type": "u8"},
+        {"name": "xbar_input", "offset": 133, "type": "u8"},
+        {"name": "xbar_output", "offset": 134, "type": "u8"},
+        {"name": "edma_channel", "offset": 135, "type": "u8"},
+        {"name": "dmamux_source", "offset": 136, "type": "u8"},
+        {"name": "edma_priority", "offset": 137, "type": "u8"},
+        {"name": "tcd_soff", "offset": 138, "type": "u16"}
+      ]
+    },
     "error_response": {
       "size": 8,
       "fields": [
@@ -691,6 +796,18 @@
           "cache_state": 0,
           "batch_count": 4,
           "iterations_per_batch": 64
+        }
+      }
+    },
+    {
+      "name": "gpio-clock-diagnostic-request",
+      "kind": "GPIO_CLOCK_DIAGNOSTIC_REQUEST",
+      "request_id": 9,
+      "payload": {
+        "schema": "gpio_clock_diagnostic_request",
+        "values": {
+          "rate_hz": 1000000,
+          "event_count": 4096
         }
       }
     },
@@ -864,10 +981,64 @@
       }
     },
     {
+      "name": "gpio-clock-diagnostic-response",
+      "kind": "GPIO_CLOCK_DIAGNOSTIC_RESPONSE",
+      "request_id": 9,
+      "payload": {
+        "schema": "gpio_clock_diagnostic_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "configured_rate_hz": 1000000,
+          "production_rate_hz": 4000000,
+          "pit_clock_hz": 24000000,
+          "pit_load_value": 23,
+          "requested_event_count": 4096,
+          "scheduled_event_count": 4096,
+          "dma_sample_count": 4096,
+          "dwt_counter_hz": 600000000,
+          "dwt_elapsed_cycles": 2457600,
+          "hardware_error_flags": 0,
+          "ccm_cscmr1_configured": 64,
+          "ccm_ccgr1_configured": 12288,
+          "ccm_ccgr2_configured": 12582912,
+          "ccm_ccgr5_configured": 192,
+          "pit_mcr_configured": 0,
+          "pit_ldval_configured": 23,
+          "pit_cval_final": 22,
+          "pit_tctrl_configured": 1,
+          "pit_tflg_final": 1,
+          "xbar_sel_configured": 56,
+          "xbar_ctrl_configured": 5,
+          "dmamux_chcfg_configured": 2147483678,
+          "dma_cr_configured": 2,
+          "dma_es_final": 0,
+          "dma_erq_configured": 4,
+          "dma_err_final": 0,
+          "dma_hrs_final": 0,
+          "tcd_saddr": 1075560456,
+          "tcd_daddr": 538968064,
+          "tcd_nbytes": 4,
+          "last_sample_word": 199695,
+          "tcd_citer_final": 4112,
+          "tcd_biter": 8208,
+          "tcd_csr_final": 8,
+          "tcd_attr": 514,
+          "pit_channel": 0,
+          "xbar_input": 56,
+          "xbar_output": 0,
+          "edma_channel": 2,
+          "dmamux_source": 30,
+          "edma_priority": 2,
+          "tcd_soff": 0
+        }
+      }
+    },
+    {
       "name": "error-response",
       "kind": "ERROR_RESPONSE",
       "flags": ["RESPONSE_ERROR"],
-      "request_id": 9,
+      "request_id": 10,
       "payload": {
         "schema": "error_response",
         "values": {

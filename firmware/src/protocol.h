@@ -181,6 +181,11 @@ struct ChecksumBenchmarkRequest {
   std::uint16_t iterations_per_batch = 1U;
 };
 
+struct GpioClockDiagnosticRequest {
+  std::uint32_t rate_hz = protocol_v1::kGpioClockProductionRateHz;
+  std::uint16_t event_count = protocol_v1::kGpioClockMaxEventCount;
+};
+
 constexpr std::uint32_t benchmarkVectorBytes(
     protocol_v1::BenchmarkVector vector) {
   switch (vector) {
@@ -200,12 +205,15 @@ constexpr std::uint32_t benchmarkVectorBytes(
 }
 
 bool validChecksumBenchmarkRequest(const ChecksumBenchmarkRequest &request);
+bool validGpioClockDiagnosticRequest(
+    const GpioClockDiagnosticRequest &request);
 
 struct Request {
   protocol_v1::CommandKind kind = protocol_v1::CommandKind::kInfo;
   std::uint32_t request_id = 0U;
   Configuration configuration{};
   ChecksumBenchmarkRequest checksum_benchmark{};
+  GpioClockDiagnosticRequest gpio_clock_diagnostic{};
   std::uint64_t nonce = 0U;
 };
 
@@ -285,6 +293,55 @@ struct ChecksumBenchmarkResponse {
       protocol_v1::kChecksumBenchmarkTargetFramedBytesPerSecond;
 };
 
+// Read-only register and count evidence from one bounded, IDLE-only
+// PIT/XBARA/eDMA clock measurement. Configuration fields are captured while
+// armed; terminal fields are captured after the trigger has been stopped.
+struct GpioClockDiagnosticResponse {
+  std::uint32_t configured_rate_hz = 0U;
+  std::uint32_t production_rate_hz =
+      protocol_v1::kGpioClockProductionRateHz;
+  std::uint32_t pit_clock_hz = protocol_v1::kGpioClockPitHz;
+  std::uint32_t pit_load_value = 0U;
+  std::uint32_t requested_event_count = 0U;
+  std::uint32_t scheduled_event_count = 0U;
+  std::uint32_t dma_sample_count = 0U;
+  std::uint32_t dwt_counter_hz = 0U;
+  std::uint32_t dwt_elapsed_cycles = 0U;
+  std::uint32_t hardware_error_flags = 0U;
+  std::uint32_t ccm_cscmr1_configured = 0U;
+  std::uint32_t ccm_ccgr1_configured = 0U;
+  std::uint32_t ccm_ccgr2_configured = 0U;
+  std::uint32_t ccm_ccgr5_configured = 0U;
+  std::uint32_t pit_mcr_configured = 0U;
+  std::uint32_t pit_ldval_configured = 0U;
+  std::uint32_t pit_cval_final = 0U;
+  std::uint32_t pit_tctrl_configured = 0U;
+  std::uint32_t pit_tflg_final = 0U;
+  std::uint16_t xbar_sel_configured = 0U;
+  std::uint16_t xbar_ctrl_configured = 0U;
+  std::uint32_t dmamux_chcfg_configured = 0U;
+  std::uint32_t dma_cr_configured = 0U;
+  std::uint32_t dma_es_final = 0U;
+  std::uint32_t dma_erq_configured = 0U;
+  std::uint32_t dma_err_final = 0U;
+  std::uint32_t dma_hrs_final = 0U;
+  std::uint32_t tcd_saddr = 0U;
+  std::uint32_t tcd_daddr = 0U;
+  std::uint32_t tcd_nbytes = 0U;
+  std::uint32_t last_sample_word = 0U;
+  std::uint16_t tcd_citer_final = 0U;
+  std::uint16_t tcd_biter = 0U;
+  std::uint16_t tcd_csr_final = 0U;
+  std::uint16_t tcd_attr = 0U;
+  std::uint8_t pit_channel = 0U;
+  std::uint8_t xbar_input = 0U;
+  std::uint8_t xbar_output = 0U;
+  std::uint8_t edma_channel = 0U;
+  std::uint8_t dmamux_source = 0U;
+  std::uint8_t edma_priority = 0U;
+  std::uint16_t tcd_soff = 0U;
+};
+
 // Fill processed-byte and fixed-point derived fields from the raw measurement.
 // Returns false on an invalid request, zero nonempty work, or integer overflow.
 bool populateChecksumBenchmarkMetrics(ChecksumBenchmarkResponse &response);
@@ -310,6 +367,9 @@ Result encodePingResponse(const Request &request, std::uint32_t run_id,
 Result encodeChecksumBenchmarkResponse(
     const Request &request, std::uint32_t run_id,
     const ChecksumBenchmarkResponse &response, ControlFrame &output);
+Result encodeGpioClockDiagnosticResponse(
+    const Request &request, std::uint32_t run_id,
+    const GpioClockDiagnosticResponse &response, ControlFrame &output);
 Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
                                 protocol_v1::ErrorCode error,
                                 ControlFrame &output);

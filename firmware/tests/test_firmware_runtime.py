@@ -53,6 +53,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
                     str(FIRMWARE_SOURCE / "checksum.cpp"),
                     str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
+                    str(FIRMWARE_SOURCE / "gpio_clock_diagnostic.cpp"),
                     "-o",
                     str(executable),
                 ],

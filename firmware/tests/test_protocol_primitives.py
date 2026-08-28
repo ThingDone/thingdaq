@@ -122,6 +122,12 @@ class ProtocolPrimitiveTests(unittest.TestCase):
                     ),
                     8,
                 ),
+                (
+                    "gpio-clock-diagnostic-request.bin",
+                    constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST,
+                    struct.pack("<IHH", 1_000_000, 4096, 0),
+                    9,
+                ),
             )
             for name, kind, payload, request_id in request_specs:
                 python_wire = encode_frame(
@@ -174,7 +180,12 @@ class ProtocolPrimitiveTests(unittest.TestCase):
                     constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE,
                     8,
                 ),
-                ("error-response.bin", constants.FrameKind.ERROR_RESPONSE, 9),
+                (
+                    "gpio-clock-diagnostic-response.bin",
+                    constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_RESPONSE,
+                    9,
+                ),
+                ("error-response.bin", constants.FrameKind.ERROR_RESPONSE, 10),
             )
             for name, kind, request_id in response_specs:
                 cpp_wire = (cpp_responses / name).read_bytes()

@@ -4,6 +4,13 @@
 
 #include "checksum.h"
 
+#if defined(__IMXRT1062__)
+#define TEENSY_DAQ_BENCHMARK_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define TEENSY_DAQ_BENCHMARK_COLD_CODE(section_name)
+#endif
+
 namespace teensy_daq::benchmark {
 namespace {
 
@@ -181,6 +188,7 @@ bool Runner::measureInvalidate(Buffer &buffer, std::size_t input_bytes,
   return true;
 }
 
+TEENSY_DAQ_BENCHMARK_COLD_CODE(".flashmem.checksum_benchmark.runner")
 RunResult Runner::run(const protocol::ChecksumBenchmarkRequest &request) {
   RunResult result{};
   result.response.request = request;
@@ -293,3 +301,5 @@ RunResult Runner::run(const protocol::ChecksumBenchmarkRequest &request) {
 }
 
 }  // namespace teensy_daq::benchmark
+
+#undef TEENSY_DAQ_BENCHMARK_COLD_CODE
