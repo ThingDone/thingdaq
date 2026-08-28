@@ -27,9 +27,11 @@ static_assert(teensy_daq::identity::kFirmwareVersion.minor == 3U);
 static_assert(teensy_daq::identity::kFirmwareVersion.patch == 0U);
 static_assert(teensy_daq::board::kAdc0Pin == 14U);
 static_assert(teensy_daq::board::kAdc1Pin == 15U);
+static_assert(teensy_daq::board::kReservedRam1Bytes == 4512U);
 static_assert(teensy_daq::board::kReservedRam2Bytes == 113664U);
 static_assert(teensy_daq::capabilities::kMetadata.supported_stream_mask == 0U);
 static_assert(teensy_daq::capabilities::kMetadata.gpio_pin_count == 8U);
+static_assert(teensy_daq::identity::usbProductNameMatchesIdentity());
 
 }  // namespace
 

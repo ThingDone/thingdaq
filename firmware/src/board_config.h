@@ -3,6 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 
+#if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
+#include <core_pins.h>
+#include <imxrt.h>
+#endif
+
 #include "generated/protocol_constants.h"
 #include "protocol.h"
 
@@ -27,6 +32,7 @@ enum class MemoryRegion : std::uint8_t {
 
 enum class MemoryUse : std::uint8_t {
   kCommandParser,
+  kUsbRxScratch,
   kCommandQueue,
   kResponseQueue,
   kAdcDmaRing,
@@ -145,6 +151,7 @@ inline constexpr EdmaAllocation kEdmaAllocations[] = {
 };
 
 inline constexpr std::size_t kCommandParserCapacityBytes = 64U;
+inline constexpr std::size_t kUsbRxScratchBytes = 128U;
 inline constexpr std::size_t kCommandQueueDepth = 4U;
 inline constexpr std::size_t kResponseQueueDepth = 4U;
 inline constexpr std::size_t kAdcDmaRingDepth = 4U;
@@ -153,6 +160,8 @@ inline constexpr std::size_t kGpioPackedRingDepth = 4U;
 inline constexpr std::size_t kDataTransmitQueueDepth = 4U;
 inline constexpr std::size_t kUsbRxBudgetBytesPerLoop = 1024U;
 inline constexpr std::size_t kUsbTxBudgetBytesPerLoop = 2048U;
+inline constexpr std::size_t kUsbRxCallsPerLoop = 8U;
+inline constexpr std::size_t kUsbTxCallsPerLoop = 8U;
 
 constexpr std::size_t alignUp(std::size_t value, std::size_t alignment) {
   return ((value + alignment - 1U) / alignment) * alignment;
@@ -168,6 +177,8 @@ inline constexpr std::size_t kGpioPackedBufferStrideBytes =
 inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kCommandParser, MemoryRegion::kDtcmRam1,
      kCommandParserCapacityBytes, 4U, ResourceOwner::kControlPlane},
+    {MemoryUse::kUsbRxScratch, MemoryRegion::kDtcmRam1,
+     kUsbRxScratchBytes, 4U, ResourceOwner::kUsbTransport},
     {MemoryUse::kCommandQueue, MemoryRegion::kDtcmRam1,
      kCommandQueueDepth * protocol_v1::kMaxCommandFrameBytes, 4U,
      ResourceOwner::kControlPlane},
@@ -349,6 +360,13 @@ static_assert(kReservedRam2Bytes <= kRam2BudgetBytes,
 static_assert(kCommandParserCapacityBytes >=
                   protocol::kCommandParserStorageBytes,
               "parser must retain a full command and partial next magic");
+static_assert(kUsbRxScratchBytes >= protocol_v1::kMaxCommandFrameBytes,
+              "USB scratch must hold at least one maximum command");
+static_assert(kUsbRxCallsPerLoop * kUsbRxScratchBytes >=
+                  kUsbRxBudgetBytesPerLoop,
+              "USB read-call bound must be able to reach its byte budget");
+static_assert(kUsbTxCallsPerLoop > 0U && kUsbRxCallsPerLoop > 0U,
+              "USB per-loop call budgets must be nonzero");
 static_assert(sameBytes(kGpioPinsByBit, protocol_v1::kGpioPinsByBit),
               "resource registry and protocol GPIO maps disagree");
 

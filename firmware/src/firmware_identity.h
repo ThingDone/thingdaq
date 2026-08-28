@@ -108,6 +108,9 @@ struct SemanticVersion {
 };
 
 inline constexpr char kProductName[] = "Teensy DAQ";
+inline constexpr std::array<std::uint16_t, 10U> kUsbProductNameUtf16{
+    'T', 'e', 'e', 'n', 's', 'y', ' ', 'D', 'A', 'Q',
+};
 inline constexpr char kBoardName[] = "Teensy 4.0";
 inline constexpr char kMcuName[] = "NXP i.MX RT1062";
 inline constexpr char kCpuArchitecture[] = "Arm Cortex-M7";
@@ -127,6 +130,19 @@ inline constexpr protocol_v1::McuId kMcuId =
     protocol_v1::McuId::kImxrt1062;
 inline constexpr std::uint64_t kBuildTimestampEpoch =
     static_cast<std::uint64_t>(TEENSY_DAQ_BUILD_EPOCH);
+
+constexpr bool usbProductNameMatchesIdentity() {
+  if (sizeof(kProductName) != kUsbProductNameUtf16.size() + 1U) {
+    return false;
+  }
+  for (std::size_t index = 0U; index < kUsbProductNameUtf16.size(); ++index) {
+    if (kUsbProductNameUtf16[index] !=
+        static_cast<std::uint8_t>(kProductName[index])) {
+      return false;
+    }
+  }
+  return kProductName[kUsbProductNameUtf16.size()] == '\0';
+}
 
 constexpr bool isLowerHex(char value) {
   return (value >= '0' && value <= '9') ||
@@ -215,6 +231,8 @@ constexpr bool isLowerHexString(const std::array<char, N> &value) {
 }
 
 static_assert(kProtocolVersion == 1U);
+static_assert(usbProductNameMatchesIdentity(),
+              "USB descriptor product must match firmware identity");
 static_assert(stringLength(kSourceId) == 64U,
               "source ID must be a full SHA-256");
 static_assert(isLowerHexString(kSourceId),

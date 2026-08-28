@@ -38,6 +38,8 @@ Phase 03 centralizes three portable identity/resource authorities:
 | `firmware/src/firmware_identity.h` | Product, board, MCU, CPU, core, compiler, USB/menu, semantic firmware, protocol, source, build, and timestamp identity |
 | `firmware/src/board_config.h` | The single pin, timer, XBAR, ADC_ETC, eDMA, queue, DMA-memory, alignment, and future-owner registry |
 | `firmware/src/firmware_capabilities.h` | The exact INFO metadata projected from generated protocol constants and the resource registry |
+| `firmware/src/usb_transport.{h,cpp}` | Portable bounded CDC receive/transmit scheduling, complete command/response queues, frame ownership, and transport diagnostics |
+| `firmware/src/teensy_usb.{h,cpp}` | The narrow Teensy-core byte-stream adapter, product descriptor override, and bridge to the core-generated chip serial number |
 
 `firmware/firmware.ino` consumes these authorities and owns only the Arduino
 startup boundary. `firmware/src/protocol.{h,cpp}` owns bounded frame parsing and
@@ -61,6 +63,48 @@ also rejects a wrong board, MCU, CPU frequency, USB mode, core compile macro,
 language mode, unvalidated optimization selection, or compiler major/minor at
 compile time. The helper establishes the optimization marker only after the
 resolved menu property equals `-O2`.
+
+## USB identity and boot contract
+
+The project supplies the strong `usb_string_product_name` descriptor expected
+by the pinned core, encoded as UTF-16 `Teensy DAQ`. It does not replace the
+manufacturer, serial descriptor, VID, or PID: USB Serial remains PJRC's
+legitimate `0x16C0:0x0483`, and `usb_init_serialnumber()` still derives the
+decimal serial string from the i.MX RT1062 fuse. The adapter exposes INFO's
+numeric hardware serial by decoding those same core-generated descriptor code
+units, so enumeration and protocol identity cannot silently diverge.
+
+Native USB initialization happens before Arduino `setup()`. The sketch does
+not call `Serial.begin()`, wait for `Serial`/DTR, or place a startup banner in
+the framed command stream. It therefore completes bounded BOOT work even when
+no host enumerates or opens the port. The Teensy adapter uses the core's direct
+CDC available/read/write-capacity/write functions and never gates command
+service on the host-open boolean.
+
+## Bounded CDC transport
+
+`CdcTransport` accepts arbitrary USB chunks into a fixed 128-byte scratch
+buffer and feeds the existing incremental parser. Complete decoded commands
+enter a four-entry FIFO. A command can leave that FIFO only when one of the
+four complete-response slots is reserved, preventing a valid request from
+being consumed and then losing its response to queue pressure. Parser
+rejection deltas are projected into the shared firmware statistics exactly
+once.
+
+Receive and transmit service calls process at most 1,024 and 2,048 bytes,
+respectively, and each performs at most eight core read or write calls. A zero
+read/write or unavailable endpoint returns control to the cooperative loop
+without spinning. Partial writes retain the frame and offset at the queue
+front; no other frame may interleave until it completes. At a frame boundary,
+queued command responses precede an optional lower-priority data source. If a
+data frame has already emitted bytes, it finishes before a newly queued
+response, preserving byte-stream framing.
+
+The transport snapshot exposes current/high-water command and response queue
+depths, optional lower-priority depth, pending RX and active TX offsets, byte
+and call totals, partial/zero operations, I/O errors, budget exhaustion, and
+current/consecutive/maximum stall counts. Normal no-host backpressure is a
+stall, not a blocking wait or a fabricated transport failure.
 
 ## Reproducible build identity
 

@@ -110,6 +110,14 @@ configuration to exercise that lifecycle without advertising or emitting ADC
 or GPIO data; acquisition remains unavailable until later phases enable its
 capability bits.
 
+The Teensy USB layer retains PJRC's USB Serial VID/PID and chip-derived serial
+number while overriding only the weak product string with `Teensy DAQ`. Boot
+does not wait for a host or emit an unframed banner. Its portable CDC transport
+uses fixed command/response queues, bounded byte and call budgets, exact
+partial-write continuation, response-first frame scheduling, and exposed
+queue/stall diagnostics. The next Phase 03 integration step connects that
+transport to the portable control dispatcher in the cooperative sketch loop.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→RESET_STATS→STOP

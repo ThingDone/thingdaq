@@ -32,7 +32,7 @@ support. See [[System-Overview]] for that capability boundary and
 | CPU | 600,000,000 Hz |
 | Core | `teensy:avr` 1.62.0; pinned compile macro `TEENSYDUINO=160` |
 | Toolchain | Arm GNU 15.2.1, GNU C++17 |
-| USB | USB Serial, legitimate Teensy `0x16C0:0x0483` VID/PID |
+| USB | USB Serial, `Teensy DAQ` product, legitimate Teensy `0x16C0:0x0483` VID/PID, core-generated chip serial |
 | Optimization | `o2std`, standard `-O2` |
 | Cache line | 32 bytes |
 | RAM1 / RAM2 budget | 512 KiB DTCM / 512 KiB OCRAM |
@@ -103,6 +103,7 @@ use an unconstrained first-free allocator.
 | Bound | Value | Owner |
 | --- | ---: | --- |
 | Incremental command parser storage | 64 bytes | Control plane |
+| USB receive scratch | 128 bytes | USB transport |
 | Complete command queue | 4 frames | Control plane |
 | Complete response queue | 4 frames | USB transport |
 | ADC DMA ring | 4 buffers | ADC capture |
@@ -111,24 +112,31 @@ use an unconstrained first-free allocator.
 | Complete data transmit queue | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
 | USB transmit work per loop | 2,048 bytes | USB transport |
+| USB read calls per loop | 8 | USB transport |
+| USB write calls per loop | 8 | USB transport |
 
 The 64-byte parser capacity covers the generated 56-byte maximum command plus
-three possible bytes of the next magic and alignment slack. Control responses
-reserve the generated 1,024-byte defensive maximum even though current typed
-responses are smaller. These values are capacities, never heap-growth hints.
+three possible bytes of the next magic and alignment slack. The separate
+128-byte scratch preserves already-read bytes when the complete-command queue
+fills. Control responses reserve the generated 1,024-byte defensive maximum
+even though current typed responses are smaller. The byte and call limits both
+bound each cooperative-loop visit, including a backend that repeatedly returns
+short or zero-length operations. These values are capacities, never
+heap-growth hints.
 
 ## Memory reservations
 
 | Use | Region | Calculation | Reserved bytes | Alignment | Future owner |
 | --- | --- | ---: | ---: | ---: | --- |
 | Command parser | DTCM / RAM1 | fixed | 64 | 4 | Control plane |
+| USB RX scratch | DTCM / RAM1 | fixed | 128 | 4 | USB transport |
 | Command queue | DTCM / RAM1 | `4 × 56` | 224 | 4 | Control plane |
 | Response queue | DTCM / RAM1 | `4 × 1,024` | 4,096 | 4 | USB transport |
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
 | Data transmit queue | OCRAM / RAM2 | `4 × 4,096` | 16,384 | 32 | Packetizer |
-| **RAM1 subtotal** |  |  | **4,384** |  |  |
+| **RAM1 subtotal** |  |  | **4,512** |  |  |
 | **RAM2 subtotal** |  |  | **113,664** |  |  |
 
 DMA-visible buffers belong in `DMAMEM` OCRAM/RAM2, begin on 32-byte cache
@@ -148,7 +156,11 @@ FREE -> DMA_FILLING -> READY -> PACKING/FRAMING -> QUEUED -> FREE
 ADC interleaved storage is READY only after both ADC eDMA completions. GPIO raw
 storage becomes READY after its eDMA major loop, then moves to a distinct
 packed buffer. A complete frame admitted to the USB queue cannot be abandoned
-after its first byte is transmitted. When an unsent queue is full, loss policy
-operates on whole buffers and reports counters/gap flags defined by
-[[Protocol-V1]]. No ISR parses commands, calculates checksums, writes USB,
-waits, or performs broad control-state mutation.
+after its first byte is transmitted. Command responses are selected before
+unsent data at each frame boundary; a data frame that has already emitted
+bytes finishes before a new response. Partial and zero writes retain both
+frame ownership and the byte offset for a later bounded loop visit. When an
+unsent data queue is full, loss policy operates on whole buffers and reports
+counters/gap flags defined by [[Protocol-V1]]. No ISR parses commands,
+calculates checksums, writes USB, waits, or performs broad control-state
+mutation.

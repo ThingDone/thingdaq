@@ -146,18 +146,24 @@ class BuildConfigurationTests(unittest.TestCase):
         with self.assertRaisesRegex(build_firmware.BuildError, "build.fcpu"):
             build_firmware.validate_build_properties(properties)
 
-    def test_sketch_uses_central_identity_and_keeps_a_bounded_idle_boot(self) -> None:
+    def test_sketch_boot_is_independent_of_host_open_and_has_no_banner(self) -> None:
         sketch = (REPOSITORY_ROOT / "firmware/firmware.ino").read_text(encoding="utf-8")
+        usb_adapter = (REPOSITORY_ROOT / "firmware/src/teensy_usb.cpp").read_text(
+            encoding="utf-8"
+        )
+        usb_header = (REPOSITORY_ROOT / "firmware/src/teensy_usb.h").read_text(
+            encoding="utf-8"
+        )
 
-        self.assertIn("src/firmware_identity.h", sketch)
-        self.assertIn("src/firmware_capabilities.h", sketch)
         self.assertNotIn("kBuildId[] =", sketch)
         self.assertIn("DeviceState::kIdle", sketch)
-        self.assertIn("while (!Serial &&", sketch)
-        self.assertIn("kSerialWaitMilliseconds", sketch)
-        self.assertIn("acquisition=unsupported", sketch)
-        self.assertNotIn("while (!Serial) {", sketch)
+        self.assertNotIn("while (!Serial", sketch)
+        self.assertNotIn("Serial.begin(115200)", sketch)
+        self.assertNotIn("Serial.print", sketch)
         self.assertIn("src/generated/protocol_constants.h", sketch)
+        self.assertIn('include "firmware_identity.h"', usb_header)
+        self.assertIn("usb_string_product_name =", usb_adapter)
+        self.assertNotIn("usb_string_serial_number =", usb_adapter)
 
 
 if __name__ == "__main__":
