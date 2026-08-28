@@ -1,0 +1,556 @@
+{
+  "name": "teensy-daq",
+  "protocol_version": 1,
+  "byte_order": "little",
+  "magic": 3735928559,
+  "header": {
+    "size": 44,
+    "fields": [
+      {"name": "magic", "offset": 0, "type": "u32"},
+      {"name": "version", "offset": 4, "type": "u8"},
+      {"name": "kind", "offset": 5, "type": "u8"},
+      {"name": "flags", "offset": 6, "type": "u16"},
+      {"name": "header_length", "offset": 8, "type": "u16"},
+      {"name": "checksum_algorithm", "offset": 10, "type": "u8"},
+      {"name": "reserved", "offset": 11, "type": "u8", "required": 0},
+      {"name": "total_length", "offset": 12, "type": "u32"},
+      {"name": "payload_length", "offset": 16, "type": "u32"},
+      {"name": "run_id", "offset": 20, "type": "u32"},
+      {"name": "sequence", "offset": 24, "type": "u32"},
+      {"name": "request_id", "offset": 28, "type": "u32"},
+      {"name": "first_sample_ticks", "offset": 32, "type": "u64"},
+      {"name": "item_count", "offset": 40, "type": "u32"}
+    ]
+  },
+  "trailer": {
+    "size": 4,
+    "type": "u32",
+    "byte_order": "little",
+    "coverage": "all header and payload bytes, excluding the trailer"
+  },
+  "limits": {
+    "data_frame_bytes": 4096,
+    "max_control_frame_bytes": 1024,
+    "min_frame_bytes": 48
+  },
+  "timing": {
+    "timestamp_hz": 8000000,
+    "adc_pair_rate_hz": 1000000,
+    "adc_pair_period_ticks": 8,
+    "adc1_phase_ticks": 4,
+    "gpio_sample_rate_hz": 4000000,
+    "gpio_sample_period_ticks": 2
+  },
+  "data_layouts": {
+    "adc": {
+      "bytes_per_item": 4,
+      "items_per_frame": 1012,
+      "payload_bytes": 4048,
+      "container_bits": 16,
+      "resolution_bits": 12,
+      "order": ["adc0", "adc1"]
+    },
+    "gpio": {
+      "bytes_per_item": 1,
+      "items_per_frame": 4048,
+      "payload_bytes": 4048,
+      "pins_by_bit": [6, 7, 8, 9, 10, 11, 12, 13]
+    }
+  },
+  "flags": [
+    {
+      "name": "SYNTHETIC",
+      "value": 1,
+      "description": "Data payload was produced by the deterministic test source."
+    },
+    {
+      "name": "GAP_BEFORE",
+      "value": 2,
+      "description": "At least one item or frame was dropped before this data frame."
+    },
+    {
+      "name": "EPOCH_START",
+      "value": 4,
+      "description": "This is the first frame for this stream in a new run."
+    },
+    {
+      "name": "RESPONSE_ERROR",
+      "value": 32768,
+      "description": "The response prefix reports a nonzero error code."
+    }
+  ],
+  "checksum_algorithms": [
+    {
+      "name": "NONE_RESERVED",
+      "value": 0,
+      "enabled_in_v1": false,
+      "description": "Reserved invalid value; every v1 frame has a checksum."
+    },
+    {
+      "name": "ADLER32",
+      "value": 1,
+      "enabled_in_v1": true,
+      "description": "RFC 1950 Adler-32 with initial value 1 and modulus 65521."
+    },
+    {
+      "name": "CRC32C",
+      "value": 2,
+      "enabled_in_v1": false,
+      "description": "Reserved for Castagnoli CRC-32C benchmarking and later negotiation."
+    }
+  ],
+  "default_checksum_algorithm": "ADLER32",
+  "frame_kinds": [
+    {
+      "name": "ADC_DATA",
+      "value": 1,
+      "class": "data",
+      "payload_schema": "adc_data",
+      "allowed_flags": ["SYNTHETIC", "GAP_BEFORE", "EPOCH_START"]
+    },
+    {
+      "name": "GPIO_DATA",
+      "value": 2,
+      "class": "data",
+      "payload_schema": "gpio_data",
+      "allowed_flags": ["SYNTHETIC", "GAP_BEFORE", "EPOCH_START"]
+    },
+    {
+      "name": "INFO_REQUEST",
+      "value": 16,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "INFO_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "CONFIGURE_REQUEST",
+      "value": 17,
+      "class": "request",
+      "payload_schema": "configure_request",
+      "response_kind": "CONFIGURE_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "START_REQUEST",
+      "value": 18,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "START_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "STATUS_REQUEST",
+      "value": 19,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "STATUS_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "STOP_REQUEST",
+      "value": 20,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "STOP_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "INFO_RESPONSE",
+      "value": 144,
+      "class": "response",
+      "payload_schema": "info_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
+      "name": "CONFIGURE_RESPONSE",
+      "value": 145,
+      "class": "response",
+      "payload_schema": "configure_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
+      "name": "START_RESPONSE",
+      "value": 146,
+      "class": "response",
+      "payload_schema": "configure_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
+      "name": "STATUS_RESPONSE",
+      "value": 147,
+      "class": "response",
+      "payload_schema": "status_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
+      "name": "STOP_RESPONSE",
+      "value": 148,
+      "class": "response",
+      "payload_schema": "stop_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
+      "name": "ERROR_RESPONSE",
+      "value": 159,
+      "class": "error_response",
+      "payload_schema": "error_response",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    }
+  ],
+  "enums": {
+    "response_status": [
+      {"name": "OK", "value": 0},
+      {"name": "ERROR", "value": 1}
+    ],
+    "error_code": [
+      {"name": "OK", "value": 0},
+      {"name": "UNSUPPORTED_VERSION", "value": 1},
+      {"name": "UNKNOWN_FRAME_KIND", "value": 2},
+      {"name": "INVALID_FLAGS", "value": 3},
+      {"name": "INVALID_LENGTH", "value": 4},
+      {"name": "INVALID_PAYLOAD", "value": 5},
+      {"name": "UNSUPPORTED_CHECKSUM", "value": 6},
+      {"name": "INVALID_STATE", "value": 7},
+      {"name": "UNSUPPORTED_CONFIGURATION", "value": 8},
+      {"name": "INVALID_REQUEST_ID", "value": 9},
+      {"name": "BUSY", "value": 10},
+      {"name": "INTERNAL_ERROR", "value": 11},
+      {"name": "CHECKSUM_MISMATCH", "value": 12}
+    ],
+    "device_state": [
+      {"name": "BOOT", "value": 0},
+      {"name": "IDLE", "value": 1},
+      {"name": "CONFIGURED", "value": 2},
+      {"name": "RUNNING", "value": 3}
+    ],
+    "stream_mask": [
+      {"name": "ADC", "value": 1},
+      {"name": "GPIO", "value": 2}
+    ],
+    "source": [
+      {"name": "HARDWARE", "value": 0},
+      {"name": "SYNTHETIC", "value": 1}
+    ],
+    "board_id": [
+      {"name": "SIMULATOR", "value": 0},
+      {"name": "TEENSY_40", "value": 1}
+    ],
+    "mcu_id": [
+      {"name": "SIMULATED", "value": 0},
+      {"name": "IMXRT1062", "value": 1}
+    ]
+  },
+  "payload_schemas": {
+    "empty": {"size": 0, "fields": []},
+    "adc_data": {
+      "size": 4048,
+      "fields": [
+        {
+          "name": "pairs",
+          "offset": 0,
+          "type": "repeated_u16_pair",
+          "count": 1012,
+          "order": ["adc0", "adc1"]
+        }
+      ]
+    },
+    "gpio_data": {
+      "size": 4048,
+      "fields": [
+        {"name": "samples", "offset": 0, "type": "bytes", "count": 4048}
+      ]
+    },
+    "configure_request": {
+      "size": 8,
+      "fields": [
+        {"name": "stream_mask", "offset": 0, "type": "u8"},
+        {"name": "source", "offset": 1, "type": "u8"},
+        {"name": "data_checksum_algorithm", "offset": 2, "type": "u8"},
+        {"name": "reserved", "offset": 3, "type": "u8", "required": 0},
+        {"name": "data_frame_bytes", "offset": 4, "type": "u32"}
+      ]
+    },
+    "response_prefix": {
+      "size": 4,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"}
+      ]
+    },
+    "info_response": {
+      "size": 94,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"},
+        {"name": "device_state", "offset": 4, "type": "u8"},
+        {"name": "protocol_version", "offset": 5, "type": "u8"},
+        {"name": "supported_stream_mask", "offset": 6, "type": "u8"},
+        {"name": "supported_source_mask", "offset": 7, "type": "u8"},
+        {"name": "supported_checksum_mask", "offset": 8, "type": "u32"},
+        {"name": "timestamp_hz", "offset": 12, "type": "u32"},
+        {"name": "data_frame_bytes", "offset": 16, "type": "u32"},
+        {"name": "max_control_frame_bytes", "offset": 20, "type": "u32"},
+        {"name": "adc_pair_rate_hz", "offset": 24, "type": "u32"},
+        {"name": "gpio_sample_rate_hz", "offset": 28, "type": "u32"},
+        {"name": "adc_pair_period_ticks", "offset": 32, "type": "u16"},
+        {"name": "adc1_phase_ticks", "offset": 34, "type": "u16"},
+        {"name": "gpio_sample_period_ticks", "offset": 36, "type": "u16"},
+        {"name": "adc_resolution_bits", "offset": 38, "type": "u8"},
+        {"name": "adc_container_bytes", "offset": 39, "type": "u8"},
+        {"name": "gpio_pin_count", "offset": 40, "type": "u8"},
+        {"name": "reserved_1", "offset": 41, "type": "u8", "required": 0},
+        {"name": "gpio_pin_map", "offset": 42, "type": "u8_array", "count": 8},
+        {"name": "hardware_serial", "offset": 50, "type": "u32"},
+        {"name": "firmware_version_major", "offset": 54, "type": "u8"},
+        {"name": "firmware_version_minor", "offset": 55, "type": "u8"},
+        {"name": "firmware_version_patch", "offset": 56, "type": "u8"},
+        {"name": "reserved_2", "offset": 57, "type": "u8", "required": 0},
+        {"name": "board_id", "offset": 58, "type": "u16"},
+        {"name": "mcu_id", "offset": 60, "type": "u16"},
+        {"name": "build_id", "offset": 62, "type": "nul_ascii", "count": 32}
+      ]
+    },
+    "configure_response": {
+      "size": 12,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"},
+        {"name": "stream_mask", "offset": 4, "type": "u8"},
+        {"name": "source", "offset": 5, "type": "u8"},
+        {"name": "data_checksum_algorithm", "offset": 6, "type": "u8"},
+        {"name": "reserved_1", "offset": 7, "type": "u8", "required": 0},
+        {"name": "data_frame_bytes", "offset": 8, "type": "u32"}
+      ]
+    },
+    "status_response": {
+      "size": 52,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"},
+        {"name": "device_state", "offset": 4, "type": "u8"},
+        {"name": "stream_mask", "offset": 5, "type": "u8"},
+        {"name": "source", "offset": 6, "type": "u8"},
+        {"name": "data_checksum_algorithm", "offset": 7, "type": "u8"},
+        {"name": "data_frame_bytes", "offset": 8, "type": "u32"},
+        {"name": "adc_frames_emitted", "offset": 12, "type": "u64"},
+        {"name": "gpio_frames_emitted", "offset": 20, "type": "u64"},
+        {"name": "adc_items_dropped", "offset": 28, "type": "u64"},
+        {"name": "gpio_items_dropped", "offset": 36, "type": "u64"},
+        {"name": "parser_errors", "offset": 44, "type": "u32"},
+        {"name": "transport_errors", "offset": 48, "type": "u32"}
+      ]
+    },
+    "stop_response": {
+      "size": 8,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"},
+        {"name": "device_state", "offset": 4, "type": "u8"},
+        {"name": "reserved_1", "offset": 5, "type": "u8", "required": 0},
+        {"name": "reserved_2", "offset": 6, "type": "u16", "required": 0}
+      ]
+    },
+    "error_response": {
+      "size": 8,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"},
+        {"name": "rejected_kind", "offset": 4, "type": "u8"},
+        {"name": "rejected_version", "offset": 5, "type": "u8"},
+        {"name": "reserved_1", "offset": 6, "type": "u16", "required": 0}
+      ]
+    }
+  },
+  "golden_fixtures": [
+    {
+      "name": "adc-data",
+      "kind": "ADC_DATA",
+      "flags": ["SYNTHETIC", "EPOCH_START"],
+      "run_id": 7,
+      "sequence": 0,
+      "request_id": 0,
+      "first_sample_ticks": 0,
+      "item_count": 1012,
+      "payload": {"pattern": "adc_interleaved_ramp", "start_index": 0}
+    },
+    {
+      "name": "gpio-data",
+      "kind": "GPIO_DATA",
+      "flags": ["SYNTHETIC", "EPOCH_START"],
+      "run_id": 7,
+      "sequence": 0,
+      "request_id": 0,
+      "first_sample_ticks": 0,
+      "item_count": 4048,
+      "payload": {"pattern": "gpio_byte_ramp", "start_index": 0}
+    },
+    {
+      "name": "info-request",
+      "kind": "INFO_REQUEST",
+      "request_id": 1,
+      "payload": {"schema": "empty", "values": {}}
+    },
+    {
+      "name": "configure-request",
+      "kind": "CONFIGURE_REQUEST",
+      "request_id": 2,
+      "payload": {
+        "schema": "configure_request",
+        "values": {
+          "stream_mask": 3,
+          "source": 1,
+          "data_checksum_algorithm": 1,
+          "data_frame_bytes": 4096
+        }
+      }
+    },
+    {
+      "name": "start-request",
+      "kind": "START_REQUEST",
+      "request_id": 3,
+      "payload": {"schema": "empty", "values": {}}
+    },
+    {
+      "name": "status-request",
+      "kind": "STATUS_REQUEST",
+      "request_id": 4,
+      "payload": {"schema": "empty", "values": {}}
+    },
+    {
+      "name": "stop-request",
+      "kind": "STOP_REQUEST",
+      "request_id": 5,
+      "payload": {"schema": "empty", "values": {}}
+    },
+    {
+      "name": "info-response",
+      "kind": "INFO_RESPONSE",
+      "request_id": 1,
+      "payload": {
+        "schema": "info_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "device_state": 1,
+          "protocol_version": 1,
+          "supported_stream_mask": 3,
+          "supported_source_mask": 3,
+          "supported_checksum_mask": 2,
+          "timestamp_hz": 8000000,
+          "data_frame_bytes": 4096,
+          "max_control_frame_bytes": 1024,
+          "adc_pair_rate_hz": 1000000,
+          "gpio_sample_rate_hz": 4000000,
+          "adc_pair_period_ticks": 8,
+          "adc1_phase_ticks": 4,
+          "gpio_sample_period_ticks": 2,
+          "adc_resolution_bits": 12,
+          "adc_container_bytes": 2,
+          "gpio_pin_count": 8,
+          "gpio_pin_map": [6, 7, 8, 9, 10, 11, 12, 13],
+          "hardware_serial": 305419896,
+          "firmware_version_major": 0,
+          "firmware_version_minor": 0,
+          "firmware_version_patch": 0,
+          "board_id": 0,
+          "mcu_id": 0,
+          "build_id": "synthetic-golden-v1"
+        }
+      }
+    },
+    {
+      "name": "configure-response",
+      "kind": "CONFIGURE_RESPONSE",
+      "request_id": 2,
+      "payload": {
+        "schema": "configure_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "stream_mask": 3,
+          "source": 1,
+          "data_checksum_algorithm": 1,
+          "data_frame_bytes": 4096
+        }
+      }
+    },
+    {
+      "name": "start-response",
+      "kind": "START_RESPONSE",
+      "run_id": 7,
+      "request_id": 3,
+      "payload": {
+        "schema": "configure_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "stream_mask": 3,
+          "source": 1,
+          "data_checksum_algorithm": 1,
+          "data_frame_bytes": 4096
+        }
+      }
+    },
+    {
+      "name": "status-response",
+      "kind": "STATUS_RESPONSE",
+      "run_id": 7,
+      "request_id": 4,
+      "payload": {
+        "schema": "status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "device_state": 3,
+          "stream_mask": 3,
+          "source": 1,
+          "data_checksum_algorithm": 1,
+          "data_frame_bytes": 4096,
+          "adc_frames_emitted": 1,
+          "gpio_frames_emitted": 1,
+          "adc_items_dropped": 0,
+          "gpio_items_dropped": 0,
+          "parser_errors": 0,
+          "transport_errors": 0
+        }
+      }
+    },
+    {
+      "name": "stop-response",
+      "kind": "STOP_RESPONSE",
+      "run_id": 7,
+      "request_id": 5,
+      "payload": {
+        "schema": "stop_response",
+        "values": {"response_status": 0, "error_code": 0, "device_state": 1}
+      }
+    },
+    {
+      "name": "error-response",
+      "kind": "ERROR_RESPONSE",
+      "flags": ["RESPONSE_ERROR"],
+      "request_id": 6,
+      "payload": {
+        "schema": "error_response",
+        "values": {
+          "response_status": 1,
+          "error_code": 2,
+          "rejected_kind": 254,
+          "rejected_version": 1
+        }
+      }
+    }
+  ]
+}

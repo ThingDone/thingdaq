@@ -83,3 +83,20 @@ python3 -m venv .venv
 The `teensy-daq-local` distribution name and `Private :: Do Not Upload`
 classifier are deliberate publication guards. Rename and review the
 distribution metadata before any future package-index release.
+
+## Protocol contract
+
+Protocol v1 uses one generated, explicitly little-endian frame contract for
+firmware and Python. ADC/GPIO frames are fixed at 4,096 bytes; bounded control
+frames use request IDs and typed responses over the same resynchronizable
+envelope. The normative specification is
+`doc/protocol/protocol-v1.md`, with rationale in
+`doc/decisions/ADR-001-Protocol-Wire-Contract.md`.
+
+Regenerate the Python constants, C++ constants, and shared golden frames—or
+check that tracked output has not drifted—with:
+
+```bash
+python3 tools/generate_protocol.py
+python3 tools/generate_protocol.py --check
+```

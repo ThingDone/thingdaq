@@ -9,6 +9,7 @@ tags:
 related:
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
+  - '[[ADR-001-Protocol-Wire-Contract]]'
 ---
 
 # System overview
@@ -24,8 +25,10 @@ Teensy DAQ is split into three independently testable areas:
 The intended runtime boundary is a versioned binary protocol carried over the
 Teensy 4.0 native USB CDC byte stream. The host API must also support an
 in-memory simulator so protocol and public-API behavior can be validated
-without hardware. Wire constants will be generated from one machine-readable
-source rather than maintained independently in C++ and Python.
+without hardware. Wire constants are generated from
+`protocol/protocol-v1.json` rather than maintained independently in C++ and
+Python. See [[Protocol-V1]] for the wire contract and
+[[ADR-001-Protocol-Wire-Contract]] for its framing decisions.
 
 This foundation does not yet claim acquisition, command, or streaming support.
 Those capabilities are added behind the boundaries above in later tasks. See

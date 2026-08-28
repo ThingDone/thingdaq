@@ -8,6 +8,8 @@ tags:
 related:
   - '[[System-Overview]]'
   - '[[Foundation-Reuse-Inventory]]'
+  - '[[Protocol-V1]]'
+  - '[[ADR-001-Protocol-Wire-Contract]]'
 ---
 
 # Teensy DAQ documentation
@@ -20,13 +22,15 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
 
 - `architecture/` describes system boundaries and component relationships,
   beginning with [[System-Overview]].
-- `protocol/` contains versioned wire-contract specifications and generated
-  format guidance.
-- `decisions/` contains architecture decision records.
+- `protocol/` contains versioned wire-contract specifications, beginning with
+  [[Protocol-V1]].
+- `decisions/` contains architecture decision records, beginning with
+  [[ADR-001-Protocol-Wire-Contract]].
 - `reference/` records durable inventories and implementation references,
   beginning with [[Foundation-Reuse-Inventory]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence.
 
 Generated captures and scratch results remain outside version control. Small,
-deterministic fixtures belong under `firmware/tests/fixtures/` or
-`daq_api/tests/fixtures/` and remain tracked.
+deterministic implementation fixtures belong under `firmware/tests/fixtures/`
+or `daq_api/tests/fixtures/`; cross-language golden wire frames belong under
+`protocol/fixtures/`. All remain tracked.
