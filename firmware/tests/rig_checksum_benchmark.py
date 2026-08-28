@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 import zlib
+from array import array
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ SERIAL_WRITE_TIMEOUT_SECONDS = 0.5
 SERIAL_READ_BYTES = 64 * 1024
 SERIAL_READER_QUEUE_CHUNKS = 8
 SERIAL_READER_QUEUE_BYTES = SERIAL_READ_BYTES * SERIAL_READER_QUEUE_CHUNKS
+FIRMWARE_PACKET_CAPACITY_FRAMES = 106
 STARTUP_DRAIN_SECONDS = 0.25
 SYNC_ATTEMPTS = 4
 SYNC_DEADLINE_SECONDS = 0.75
@@ -67,6 +69,11 @@ DATA_FRAME_BYTES = 4_096
 DATA_PAYLOAD_BYTES = 4_048
 MAX_CONTROL_FRAME_BYTES = 1_024
 MAX_FRAME_BYTES = DATA_FRAME_BYTES
+CRC32C_ORACLE_DRAIN_MARGIN_FRAMES = (
+    FIRMWARE_PACKET_CAPACITY_FRAMES
+    + math.ceil(SERIAL_READ_BYTES / DATA_FRAME_BYTES)
+    + 4
+)
 
 CHECKSUM_ADLER32 = 1
 CHECKSUM_CRC32C = 2
@@ -747,7 +754,9 @@ class FrameParser:
         self.bytes_discarded = 0
         self.high_water_bytes = 0
         self.synthetic_crc32c_combined_checks = 0
+        self.synthetic_crc32c_oracle_checks = 0
         self.full_crc32c_data_checks = 0
+        self.synthetic_crc32c_oracle: SyntheticCrc32cOracle | None = None
 
     @property
     def errors(self) -> int:
@@ -782,10 +791,15 @@ class FrameParser:
             try:
                 expected: int | None = None
                 if fields[2] in DATA_KINDS and fields[5] == CHECKSUM_CRC32C:
-                    expected = _synthetic_crc32c_data_checksum(
-                        self.buffer,
-                        fields,
-                    )
+                    if self.synthetic_crc32c_oracle is not None:
+                        expected = self.synthetic_crc32c_oracle.checksum(fields)
+                        if expected is not None:
+                            self.synthetic_crc32c_oracle_checks += 1
+                    if expected is None:
+                        expected = _synthetic_crc32c_data_checksum(
+                            self.buffer,
+                            fields,
+                        )
                     if expected is None:
                         self.full_crc32c_data_checks += 1
                     else:
@@ -1677,6 +1691,142 @@ def _build_synthetic_crc32c_payload_checksums() -> dict[tuple[int, int], int]:
 SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS = _build_synthetic_crc32c_payload_checksums()
 
 
+def _shift_crc32c_header(header_checksum: int) -> int:
+    shift_0, shift_1, shift_2, shift_3 = CRC32C_PAYLOAD_SHIFT_BYTE_TABLES
+    return (
+        shift_0[header_checksum & 0xFF]
+        ^ shift_1[(header_checksum >> 8) & 0xFF]
+        ^ shift_2[(header_checksum >> 16) & 0xFF]
+        ^ shift_3[header_checksum >> 24]
+    )
+
+
+def _synthetic_crc32c_payload_checksum(
+    kind: int,
+    first_sample_ticks: int,
+) -> int | None:
+    if kind == ADC_DATA:
+        start_pair = first_sample_ticks // ADC_PAIR_PERIOD_TICKS
+        offset = (start_pair * ADC_BYTES_PER_PAIR) % len(ADC_PATTERN)
+    elif kind == GPIO_DATA:
+        start_sample = first_sample_ticks // GPIO_SAMPLE_PERIOD_TICKS
+        offset = start_sample & 0xFF
+    else:
+        return None
+    return SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS.get((kind, offset))
+
+
+@dataclass(frozen=True)
+class SyntheticCrc32cOracle:
+    """Compact expected trailers for one bounded deterministic run epoch."""
+
+    run_id: int
+    checksums_by_kind: dict[int, array[int]]
+    preparation_seconds: float
+
+    @property
+    def entry_count(self) -> int:
+        return sum(len(values) for values in self.checksums_by_kind.values())
+
+    @property
+    def storage_bytes(self) -> int:
+        return sum(
+            len(values) * values.itemsize for values in self.checksums_by_kind.values()
+        )
+
+    @property
+    def sequences_per_stream(self) -> int:
+        return min(len(values) for values in self.checksums_by_kind.values())
+
+    def checksum(self, fields: tuple[int, ...]) -> int | None:
+        kind = fields[2]
+        flags = fields[3]
+        run_id = fields[9]
+        sequence = fields[10]
+        request_id = fields[11]
+        first_sample_ticks = fields[12]
+        item_count = fields[13]
+        expected_flags = FLAG_SYNTHETIC
+        if sequence == 0:
+            expected_flags |= FLAG_EPOCH_START
+        expected_ticks = sequence * FRAME_COVERAGE_TICKS
+        expected_items = (
+            ADC_PAIRS_PER_FRAME if kind == ADC_DATA else GPIO_SAMPLES_PER_FRAME
+        )
+        values = self.checksums_by_kind.get(kind)
+        if (
+            values is None
+            or run_id != self.run_id
+            or flags != expected_flags
+            or request_id != 0
+            or first_sample_ticks != expected_ticks
+            or item_count != expected_items
+            or sequence >= len(values)
+        ):
+            return None
+        return int(values[sequence])
+
+
+def build_synthetic_crc32c_oracle(
+    run_id: int,
+    capture_seconds: float,
+) -> SyntheticCrc32cOracle:
+    """Precompute exact trailers while CONFIGURED, before streaming begins."""
+
+    if not 1 <= run_id <= 0xFFFFFFFF:
+        raise ValueError("CRC-32C oracle run ID must be a nonzero uint32")
+    sequence_count = (
+        math.ceil(capture_seconds * TIMESTAMP_HZ / FRAME_COVERAGE_TICKS)
+        + CRC32C_ORACLE_DRAIN_MARGIN_FRAMES
+    )
+    if sequence_count <= 0 or sequence_count > 0xFFFFFFFF:
+        raise ValueError("CRC-32C oracle sequence capacity is invalid")
+    started = time.monotonic()
+    checksums_by_kind: dict[int, array[int]] = {}
+    for kind, item_count in (
+        (ADC_DATA, ADC_PAIRS_PER_FRAME),
+        (GPIO_DATA, GPIO_SAMPLES_PER_FRAME),
+    ):
+        values = array("I")
+        if values.itemsize != 4:
+            raise ProtocolFailure("host uint32 array does not use four-byte items")
+        for sequence in range(sequence_count):
+            first_sample_ticks = sequence * FRAME_COVERAGE_TICKS
+            flags = FLAG_SYNTHETIC
+            if sequence == 0:
+                flags |= FLAG_EPOCH_START
+            header = HEADER.pack(
+                MAGIC,
+                PROTOCOL_VERSION,
+                kind,
+                flags,
+                HEADER_SIZE,
+                CHECKSUM_CRC32C,
+                0,
+                DATA_FRAME_BYTES,
+                DATA_PAYLOAD_BYTES,
+                run_id,
+                sequence,
+                0,
+                first_sample_ticks,
+                item_count,
+            )
+            payload_checksum = _synthetic_crc32c_payload_checksum(
+                kind,
+                first_sample_ticks,
+            )
+            if payload_checksum is None:
+                raise ProtocolFailure("synthetic CRC-32C payload cache is incomplete")
+            header_checksum = _table_crc32(header, CRC32C_TABLE)
+            values.append(_shift_crc32c_header(header_checksum) ^ payload_checksum)
+        checksums_by_kind[kind] = values
+    return SyntheticCrc32cOracle(
+        run_id=run_id,
+        checksums_by_kind=checksums_by_kind,
+        preparation_seconds=time.monotonic() - started,
+    )
+
+
 def _synthetic_crc32c_data_checksum(
     buffer: bytearray,
     fields: tuple[int, ...],
@@ -1694,29 +1844,17 @@ def _synthetic_crc32c_data_checksum(
     first_sample_ticks = fields[12]
     if not flags & FLAG_SYNTHETIC:
         return None
-    if kind == ADC_DATA:
-        start_pair = first_sample_ticks // ADC_PAIR_PERIOD_TICKS
-        offset = (start_pair * ADC_BYTES_PER_PAIR) % len(ADC_PATTERN)
-    elif kind == GPIO_DATA:
-        start_sample = first_sample_ticks // GPIO_SAMPLE_PERIOD_TICKS
-        offset = start_sample & 0xFF
-    else:
-        return None
-    payload_checksum = SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS.get((kind, offset))
+    payload_checksum = _synthetic_crc32c_payload_checksum(
+        kind,
+        first_sample_ticks,
+    )
     if payload_checksum is None:
         return None
     header_checksum = _table_crc32(
         memoryview(buffer)[:HEADER_SIZE],
         CRC32C_TABLE,
     )
-    shift_0, shift_1, shift_2, shift_3 = CRC32C_PAYLOAD_SHIFT_BYTE_TABLES
-    shifted_header = (
-        shift_0[header_checksum & 0xFF]
-        ^ shift_1[(header_checksum >> 8) & 0xFF]
-        ^ shift_2[(header_checksum >> 16) & 0xFF]
-        ^ shift_3[header_checksum >> 24]
-    )
-    return shifted_header ^ payload_checksum
+    return _shift_crc32c_header(header_checksum) ^ payload_checksum
 
 
 class SyntheticValidator:
@@ -1927,11 +2065,13 @@ def run_candidate_stream(
     """Run one full-rate epoch and return a bounded machine-readable record."""
 
     _require(not link.parser.buffer, "parser retained bytes before candidate stream")
+    link.parser.synthetic_crc32c_oracle = None
     parser_error_baseline = link.parser.errors
     parser_frames_baseline = link.parser.frames_decoded
     parser_discard_baseline = link.parser.bytes_discarded
     stale_baseline = link.stale_responses
     crc32c_combined_baseline = link.parser.synthetic_crc32c_combined_checks
+    crc32c_oracle_baseline = link.parser.synthetic_crc32c_oracle_checks
     crc32c_full_baseline = link.parser.full_crc32c_data_checks
     link.parser.high_water_bytes = len(link.parser.buffer)
     control_latencies: dict[str, float] = {}
@@ -1981,6 +2121,24 @@ def run_candidate_stream(
         "configured INFO does not expose the selected checksum",
     )
 
+    crc32c_oracle: SyntheticCrc32cOracle | None = None
+    predicted_run_id = (configured_status_frame.run_id + 1) & 0xFFFFFFFF
+    predicted_run_id = predicted_run_id or 1
+    if checksum_algorithm == CHECKSUM_CRC32C:
+        crc32c_oracle = build_synthetic_crc32c_oracle(
+            predicted_run_id,
+            capture_seconds,
+        )
+        link.parser.synthetic_crc32c_oracle = crc32c_oracle
+        emit_event(
+            "crc32c_oracle_ready",
+            entry_count=crc32c_oracle.entry_count,
+            preparation_seconds=crc32c_oracle.preparation_seconds,
+            run_id=crc32c_oracle.run_id,
+            sequences_per_stream=crc32c_oracle.sequences_per_stream,
+            storage_bytes=crc32c_oracle.storage_bytes,
+        )
+
     deferred_data: list[Frame] = []
 
     def defer_start_data(frame: Frame) -> None:
@@ -1995,6 +2153,10 @@ def run_candidate_stream(
     control_latencies["start"] = latency
     response_success(start_frame, START_RESPONSE)
     _require(1 <= start_frame.run_id <= 0xFFFFFFFF, "START run ID is invalid")
+    _require(
+        start_frame.run_id == predicted_run_id,
+        "START did not allocate the documented next nonzero run ID",
+    )
     _require(
         decode_configuration(start_frame, START_RESPONSE)
         == (STREAM_BOTH, SOURCE_SYNTHETIC, checksum_algorithm, DATA_FRAME_BYTES),
@@ -2151,6 +2313,9 @@ def run_candidate_stream(
     crc32c_combined_checks = (
         link.parser.synthetic_crc32c_combined_checks - crc32c_combined_baseline
     )
+    crc32c_oracle_checks = (
+        link.parser.synthetic_crc32c_oracle_checks - crc32c_oracle_baseline
+    )
     crc32c_full_checks = link.parser.full_crc32c_data_checks - crc32c_full_baseline
     reader_queue = link.reader_queue_metrics()
     _require(parser_errors == 0, "host parser reported an error during stream")
@@ -2165,6 +2330,10 @@ def run_candidate_stream(
         _require(
             crc32c_combined_checks == data_frames and crc32c_full_checks == 0,
             "not every CRC-32C data trailer used the bounded synthetic validator",
+        )
+        _require(
+            crc32c_oracle_checks == data_frames,
+            "not every CRC-32C data trailer used the precomputed bounded oracle",
         )
     if reader_queue["enabled"]:
         _require(
@@ -2201,6 +2370,16 @@ def run_candidate_stream(
         },
         "checksum_validation": {
             "crc32c_full_data_checks": crc32c_full_checks,
+            "crc32c_oracle_checks": crc32c_oracle_checks,
+            "crc32c_oracle_entry_count": (
+                crc32c_oracle.entry_count if crc32c_oracle is not None else 0
+            ),
+            "crc32c_oracle_preparation_seconds": (
+                crc32c_oracle.preparation_seconds if crc32c_oracle is not None else 0.0
+            ),
+            "crc32c_oracle_storage_bytes": (
+                crc32c_oracle.storage_bytes if crc32c_oracle is not None else 0
+            ),
             "crc32c_synthetic_combined_checks": crc32c_combined_checks,
             "synthetic_crc32c_payload_cache_entries": len(
                 SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS
@@ -2213,7 +2392,7 @@ def run_candidate_stream(
         "maximum_receive_gap_seconds": validator.maximum_receive_gap_seconds,
         "queue": {
             "firmware_internal_depth_available_in_protocol_v1": False,
-            "firmware_packet_capacity_frames": 106,
+            "firmware_packet_capacity_frames": FIRMWARE_PACKET_CAPACITY_FRAMES,
             "firmware_queue_exhaustion_observed": False,
             "host_parser_buffered_bytes_final": len(link.parser.buffer),
             "host_parser_high_water_bytes": link.parser.high_water_bytes,
@@ -2449,9 +2628,17 @@ def run_campaign(
         }
     finally:
         if not completed:
+            active_oracle = link.parser.synthetic_crc32c_oracle
             emit_event(
                 "campaign_failure_diagnostics",
                 crc32c_full_data_checks=link.parser.full_crc32c_data_checks,
+                crc32c_oracle_checks=link.parser.synthetic_crc32c_oracle_checks,
+                crc32c_oracle_entry_count=(
+                    active_oracle.entry_count if active_oracle is not None else 0
+                ),
+                crc32c_oracle_storage_bytes=(
+                    active_oracle.storage_bytes if active_oracle is not None else 0
+                ),
                 crc32c_synthetic_combined_checks=(
                     link.parser.synthetic_crc32c_combined_checks
                 ),
@@ -2471,6 +2658,23 @@ def run_campaign(
                     "cleanup_stop",
                     latency_seconds=cleanup_latency,
                     state=(cleanup.payload[4] if len(cleanup.payload) > 4 else None),
+                )
+                status_frame, status_latency = link.exchange(
+                    GET_STATUS_REQUEST,
+                    timeout=COMMAND_DEADLINE_SECONDS,
+                    on_data=lambda _frame: None,
+                )
+                status = decode_status(status_frame)
+                emit_event(
+                    "campaign_failure_status",
+                    adc_frames_emitted=status.adc_frames_emitted,
+                    adc_items_dropped=status.adc_items_dropped,
+                    device_state=status.device_state,
+                    gpio_frames_emitted=status.gpio_frames_emitted,
+                    gpio_items_dropped=status.gpio_items_dropped,
+                    latency_seconds=status_latency,
+                    parser_errors=status.parser_errors,
+                    transport_errors=status.transport_errors,
                 )
             except Exception as error:  # noqa: BLE001 - best-effort diagnostics
                 emit_event(

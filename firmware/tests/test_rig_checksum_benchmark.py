@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import io
+import math
 import os
 import stat
 import struct
@@ -239,6 +240,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         self.assertEqual(
             {
                 "__future__",
+                "array",
                 "collections",
                 "dataclasses",
                 "gc",
@@ -416,10 +418,20 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         )
         body = header + payload
         valid = body + rig.TRAILER.pack(rig.compute_checksum(body, rig.CHECKSUM_CRC32C))
+        oracle = rig.build_synthetic_crc32c_oracle(7, 0.01)
+        expected_sequences = (
+            math.ceil(0.01 * rig.TIMESTAMP_HZ / rig.FRAME_COVERAGE_TICKS)
+            + rig.CRC32C_ORACLE_DRAIN_MARGIN_FRAMES
+        )
+        self.assertEqual(expected_sequences, oracle.sequences_per_stream)
+        self.assertEqual(2 * expected_sequences, oracle.entry_count)
+        self.assertEqual(oracle.entry_count * 4, oracle.storage_bytes)
         parser = rig.FrameParser()
+        parser.synthetic_crc32c_oracle = oracle
         frames = parser.feed(valid)
         self.assertEqual(1, len(frames))
         self.assertEqual(1, parser.synthetic_crc32c_combined_checks)
+        self.assertEqual(1, parser.synthetic_crc32c_oracle_checks)
         self.assertEqual(0, parser.full_crc32c_data_checks)
         rig.SyntheticValidator(7, rig.CHECKSUM_CRC32C).accept(frames[0])
 
@@ -430,10 +442,12 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
             rig.compute_checksum(changed_body, rig.CHECKSUM_CRC32C)
         )
         checksum_guard = rig.FrameParser()
+        checksum_guard.synthetic_crc32c_oracle = oracle
         self.assertEqual([], checksum_guard.feed(changed_wire))
         self.assertEqual(1, checksum_guard.checksum_errors)
 
         formula_guard = rig.FrameParser()
+        formula_guard.synthetic_crc32c_oracle = oracle
         formula_frames = formula_guard.feed(bytes(changed_body) + valid[-4:])
         self.assertEqual(1, len(formula_frames))
         with self.assertRaisesRegex(rig.ProtocolFailure, "ADC pair"):
@@ -586,7 +600,13 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         self.assertEqual(
             expected_data_frames, validation["crc32c_synthetic_combined_checks"]
         )
+        self.assertEqual(expected_data_frames, validation["crc32c_oracle_checks"])
         self.assertEqual(0, validation["crc32c_full_data_checks"])
+        self.assertGreater(validation["crc32c_oracle_entry_count"], 0)
+        self.assertEqual(
+            validation["crc32c_oracle_entry_count"] * 4,
+            validation["crc32c_oracle_storage_bytes"],
+        )
         self.assertEqual(1, output.getvalue().count("CANDIDATE "))
         self.assertEqual(constants.DeviceState.IDLE, fake.device.state)
 
