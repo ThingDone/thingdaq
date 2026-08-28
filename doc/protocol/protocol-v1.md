@@ -290,7 +290,7 @@ version, and two reserved zero bytes.
 ### INFO
 
 INFO is idempotent and valid in IDLE, CONFIGURED, and RUNNING. Its request is
-empty. Its 180-byte success payload reports:
+empty. Its 324-byte success payload reports:
 
 - state and protocol version;
 - supported stream and source masks;
@@ -306,7 +306,10 @@ empty. Its 180-byte success payload reports:
   IDs reserved by physical GPIO acquisition;
 - the actual ADC resolution/code range, reference/range and clock/sample
   configuration, fixed converter routes, per-converter calibration outcome and
-  cycle count, and typed initialization flags/errors.
+  cycle count, and typed initialization flags/errors;
+- the exact shared PIT/XBAR/ADC_ETC trigger plan, raw/effective phase delays,
+  configured-register readbacks, bounded completion counts/timing, and typed
+  trigger errors.
 
 | Offset | Width/type | Field |
 | ---: | --- | --- |
@@ -371,6 +374,32 @@ empty. Its 180-byte success payload reports:
 | 168 | 8 / `u32[2]` | ADC0 and ADC1 calibration elapsed DWT cycles |
 | 176 | 4 / `u32` | ADC initialization error flags |
 
+The final 144-byte ADC trigger block starts at INFO offset 180 and at STATUS
+offset 224. The relative layout is identical in both responses:
+
+| Relative offset | Width/type | Field |
+| ---: | --- | --- |
+| 0 | 2 / `u16` | trigger configuration/readback/diagnostic flags |
+| 2 | 2 / `u16` | reserved, zero |
+| 4 | 4 / `u32` | typed trigger configuration/diagnostic errors |
+| 8 | 20 / `u32[5]` | PIT clock, DWT clock, GPIO-master rate, ADC-pair rate, IPG clock |
+| 28 | 12 / `u8[12]` | master/pair PIT IDs and loads, predivider, chain length, ADC0/ADC1 XBAR inputs/outputs and queue IDs |
+| 40 | 10 / `u16[5]` | ADC0/ADC1 raw initial delays, effective delays, and relative IPG cycles |
+| 50 | 2 / `u16` | reserved, zero |
+| 52 | 24 / `u32[6]` | configured CCM CSCMR1/CCGR1/CCGR2, PIT MCR, master TCTRL, pair TCTRL |
+| 76 | 4 / `u32` | configured ADC_ETC CTRL |
+| 80 | 8 / `u32[2]` | ADC0/ADC1 ADC_ETC trigger CTRL readbacks |
+| 88 | 8 / `u32[2]` | ADC0/ADC1 ADC_ETC trigger COUNTER readbacks |
+| 96 | 8 / `u32[2]` | ADC0/ADC1 ADC_ETC chain readbacks |
+| 104 | 8 / `u32[2]` | final DONE0/DONE1 and DONE2/error IRQ words |
+| 112 | 8 / `u32[2]` | ADC0/ADC1 diagnostic completion counts |
+| 120 | 4 / `u32` | observed first-completion delta in 600 MHz DWT cycles |
+| 124 | 4 / `u32` | expected completion delta, exactly 300 DWT cycles |
+| 128 | 4 / `u32` | completion-delta tolerance, exactly 120 DWT cycles |
+| 132 | 4 / `u32` | observed diagnostic elapsed DWT cycles; failure telemetry may exceed the wait deadline slightly due to scheduling or the terminal counter read |
+| 136 | 4 / `u32` | ADC_ETC trigger-error interrupt count |
+| 140 | 4 / `u16[2]` | configured XBAR selection-register readbacks |
+
 ADC reference ID 1 means VREFH/VREFL with a nominal 3.3 V board reference;
 clock-source ID 1 means synchronous IPG. Calibration states are `NOT_RUN` (0),
 `SUCCEEDED` (1), `FAILED` (2), `TIMED_OUT` (3), `ROUTE_INVALID` (4),
@@ -390,6 +419,18 @@ calibration timeouts (128/256), and post-calibration readback errors
 (512/1,024). This metadata reports nominal board/reference limits; it is not a
 per-unit voltage calibration or an analog-accuracy claim. See
 [[ADR-004-ADC-Trigger-DMA]].
+
+Trigger configuration flags are `CONFIGURED_STOPPED` (1), `CLOCKS_VALID` (2),
+`XBAR_ROUTES_VALID` (4), `QUEUES_VALID` (8),
+`ADC_HARDWARE_TRIGGER_VALID` (16), `ARM_SEQUENCE_EXERCISED` (32),
+`COMPLETION_TIMING_VALID` (64), and `STOPPED_AFTER_DIAGNOSTIC` (128). The
+healthy snapshot has every bit set and no trigger errors. Error bits distinguish
+converter readiness, resource conflicts, PERCLK/IPG mismatch, DWT failure,
+PIT/XBAR/ADC_ETC/ADC readback faults, arm/cleanup faults, deadline/count faults,
+ADC_ETC trigger errors, and out-of-tolerance completion timing. Raw delays 0/75
+mean effective delays 1/76 at 150 MHz, an exact 75-cycle or 500 ns difference.
+The observed DWT value is conversion-completion interrupt timing only; it is
+not an analog aperture measurement or an analog phase-accuracy claim.
 
 Stream-mask bits are ADC = 1 and GPIO = 2. Source IDs are hardware = 0 and
 synthetic = 1; the INFO supported-source mask uses `1 << source_id`. Board IDs
@@ -466,11 +507,11 @@ preflight changes no acquisition registers and allocates no run ID.
 ### GET_STATUS
 
 GET_STATUS is idempotent in every post-boot state and has an empty request. Its
-224-byte success payload contains the common prefix, configuration and legacy
+368-byte success payload contains the common prefix, configuration and legacy
 stream counters, followed by physical GPIO stage counts, queue depths/high-
 water marks, resource conflicts, lifecycle failures, stale-completion
-diagnostics, and the same immutable ADC initialization snapshot reported by
-INFO. The header carries the current or most recent run ID. INFO,
+diagnostics, and the same immutable ADC initialization and trigger snapshots
+reported by INFO. The header carries the current or most recent run ID. INFO,
 GET_STATUS, and STOP are dispatched before bounded GPIO pack/packet work so
 they remain responsive during GPIO-only streaming.
 
@@ -527,6 +568,7 @@ they remain responsive during GPIO-only streaming.
 | 208 | 4 / `u32` | per-converter calibration deadline in us |
 | 212 | 8 / `u32[2]` | ADC0 and ADC1 calibration elapsed DWT cycles |
 | 220 | 4 / `u32` | ADC initialization error flags |
+| 224 | 144 / ADC trigger block | exact trigger plan, register evidence, completion timing/counts, and errors; same relative layout defined under INFO |
 
 | Counter | Wire type | Unit |
 | --- | --- | --- |

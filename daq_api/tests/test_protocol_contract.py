@@ -196,8 +196,8 @@ class ProtocolContractTests(unittest.TestCase):
             },
             self.contract["scalar_types"],
         )
-        self.assertEqual(180, constants.INFO_RESPONSE_PAYLOAD_SIZE)
-        self.assertEqual(224, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(324, constants.INFO_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(368, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(8, constants.RESET_STATS_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(8, constants.PING_REQUEST_PAYLOAD_SIZE)
         self.assertEqual(12, constants.PING_RESPONSE_PAYLOAD_SIZE)
@@ -220,6 +220,13 @@ class ProtocolContractTests(unittest.TestCase):
             constants.CHECKSUM_BENCHMARK_TARGET_FRAMED_BYTES_PER_SECOND,
         )
         self.assertEqual(8, constants.FrameFlag.OVERRUN_BEFORE)
+        self.assertEqual(24_000_000, constants.ADC_TRIGGER_PIT_CLOCK_HZ)
+        self.assertEqual(4_000_000, constants.ADC_TRIGGER_GPIO_MASTER_RATE_HZ)
+        self.assertEqual(1_000_000, constants.ADC_TRIGGER_PAIR_RATE_HZ)
+        self.assertEqual((0, 4), constants.ADC_TRIGGER_QUEUES)
+        self.assertEqual((0, 75), constants.ADC_TRIGGER_INITIAL_DELAYS)
+        self.assertEqual((1, 76), constants.ADC_TRIGGER_EFFECTIVE_DELAYS)
+        self.assertEqual(300, constants.ADC_COMPLETION_EXPECTED_DWT_CYCLES)
 
     def test_generated_python_and_cpp_record_the_same_source_hash(self) -> None:
         source_hash = hashlib.sha256(CONTRACT_PATH.read_bytes()).hexdigest()

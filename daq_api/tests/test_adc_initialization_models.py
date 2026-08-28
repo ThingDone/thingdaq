@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from teensy_daq import DeviceInfo, Status
+from teensy_daq import AdcTriggerMetadata, DeviceInfo, Status
 from teensy_daq._generated import protocol_constants as constants
 from teensy_daq.protocol import FrameValidationError
 
@@ -21,6 +21,86 @@ READY_FLAGS = (
 
 
 class AdcInitializationModelTests(unittest.TestCase):
+    def test_exact_trigger_schedule_and_completion_timing_round_trip(self) -> None:
+        trigger = AdcTriggerMetadata(
+            configuration_flags=constants.AdcTriggerConfigurationFlag(
+                constants.KNOWN_ADC_TRIGGER_CONFIGURATION_FLAG_MASK
+            ),
+            ccm_cscmr1_configured=0x40,
+            ccm_ccgr1_configured=0x00103000,
+            ccm_ccgr2_configured=0x00C00000,
+            pair_tctrl_configured=4,
+            trigger_counter_configured=(0, 75),
+            completion_counts=(1, 1),
+            completion_delta_cycles=300,
+            diagnostic_elapsed_cycles=600,
+            xbar_sel_configured=(0x3900, 0x3900),
+        )
+        info = DeviceInfo(
+            device_state=constants.DeviceState.IDLE,
+            build_id="tdaq-adc-trigger",
+            adc_trigger=trigger,
+        )
+
+        decoded = DeviceInfo.from_payload(info.to_payload())
+        self.assertEqual(trigger, decoded.adc_trigger)
+        self.assertTrue(decoded.adc_trigger.ready)
+        self.assertEqual(500.0, decoded.adc_trigger.completion_timing_delta_ns)
+        self.assertEqual((0, 4), decoded.adc_trigger.trigger_queues)
+        self.assertEqual((1, 76), decoded.adc_trigger.effective_delays)
+
+    def test_trigger_failure_is_observable_and_bad_timing_is_rejected(self) -> None:
+        failed = AdcTriggerMetadata(
+            configuration_flags=(
+                constants.AdcTriggerConfigurationFlag.CONFIGURED_STOPPED
+                | constants.AdcTriggerConfigurationFlag.CLOCKS_VALID
+            ),
+            error_flags=constants.AdcTriggerError.XBAR_CONFIG_MISMATCH,
+        )
+        status = Status(
+            device_state=constants.DeviceState.IDLE,
+            stream_mask=constants.StreamMask.NONE,
+            source=constants.Source.HARDWARE,
+            data_checksum_algorithm=constants.DEFAULT_CHECKSUM_ALGORITHM,
+            adc_trigger=failed,
+        )
+        decoded = Status.from_payload(status.to_payload())
+        self.assertEqual(
+            constants.AdcTriggerError.XBAR_CONFIG_MISMATCH,
+            decoded.adc_trigger.error_flags,
+        )
+        self.assertFalse(decoded.adc_trigger.ready)
+
+        timeout = AdcTriggerMetadata(
+            configuration_flags=(
+                constants.AdcTriggerConfigurationFlag.CONFIGURED_STOPPED
+                | constants.AdcTriggerConfigurationFlag.ARM_SEQUENCE_EXERCISED
+                | constants.AdcTriggerConfigurationFlag.STOPPED_AFTER_DIAGNOSTIC
+            ),
+            error_flags=(
+                constants.AdcTriggerError.DIAGNOSTIC_TIMEOUT
+                | constants.AdcTriggerError.COMPLETION_COUNT_MISMATCH
+            ),
+            diagnostic_elapsed_cycles=(
+                constants.ADC_TRIGGER_DWT_CLOCK_HZ
+                * constants.ADC_TRIGGER_DIAGNOSTIC_DEADLINE_US
+                // 1_000_000
+                + 1
+            ),
+        )
+        self.assertFalse(timeout.ready)
+
+        with self.assertRaisesRegex(ValueError, "completion timing"):
+            AdcTriggerMetadata(
+                configuration_flags=(
+                    constants.AdcTriggerConfigurationFlag.ARM_SEQUENCE_EXERCISED
+                    | constants.AdcTriggerConfigurationFlag.COMPLETION_TIMING_VALID
+                    | constants.AdcTriggerConfigurationFlag.STOPPED_AFTER_DIAGNOSTIC
+                ),
+                completion_counts=(1, 1),
+                completion_delta_cycles=500,
+            )
+
     def test_info_and_status_round_trip_actual_success_snapshot(self) -> None:
         metadata = {
             "adc_configuration_flags": READY_FLAGS,

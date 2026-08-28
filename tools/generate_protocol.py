@@ -207,6 +207,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         raise ContractError("checksum benchmark batch bounds exceed operation bound")
 
     gpio_clock = contract["gpio_clock_diagnostic"]
+    gpio_capture = contract["gpio_capture"]
     positive_gpio_clock_fields = (
         "pit_clock_hz",
         "cycle_counter_hz",
@@ -282,6 +283,76 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     if not 0 < deadline_cycles <= 0xFFFFFFFF:
         raise ContractError("ADC calibration deadline must fit one DWT interval")
 
+    adc_trigger = contract["adc_trigger"]
+    positive_adc_trigger_fields = (
+        "pit_clock_hz",
+        "dwt_clock_hz",
+        "gpio_master_rate_hz",
+        "pair_rate_hz",
+        "ipg_clock_hz",
+        "chain_length",
+        "phase_ipg_cycles",
+        "completion_expected_dwt_cycles",
+        "completion_tolerance_dwt_cycles",
+        "diagnostic_deadline_us",
+        "diagnostic_poll_limit",
+        "irq_priority",
+    )
+    if any(int(adc_trigger[name]) <= 0 for name in positive_adc_trigger_fields):
+        raise ContractError("ADC trigger schedule bounds must be positive")
+    if (
+        int(adc_trigger["pit_clock_hz"]) != int(gpio_clock["pit_clock_hz"])
+        or int(adc_trigger["gpio_master_rate_hz"]) != int(timing["gpio_sample_rate_hz"])
+        or int(adc_trigger["pair_rate_hz"]) != int(timing["adc_pair_rate_hz"])
+        or int(adc_trigger["ipg_clock_hz"]) != int(adc_initialization["ipg_clock_hz"])
+    ):
+        raise ContractError("ADC trigger clocks/rates disagree with shared timing")
+    pit_clock_hz = int(adc_trigger["pit_clock_hz"])
+    master_rate_hz = int(adc_trigger["gpio_master_rate_hz"])
+    pair_rate_hz = int(adc_trigger["pair_rate_hz"])
+    if (
+        pit_clock_hz % master_rate_hz
+        or master_rate_hz % pair_rate_hz
+        or pit_clock_hz // master_rate_hz - 1
+        != int(adc_trigger["gpio_master_pit_load"])
+        or master_rate_hz // pair_rate_hz - 1 != int(adc_trigger["pair_pit_load"])
+    ):
+        raise ContractError("ADC trigger PIT divisors are not exact")
+    if (
+        int(adc_trigger["gpio_master_pit_channel"]) != int(gpio_capture["pit_channel"])
+        or int(adc_trigger["pair_pit_channel"]) != 1
+        or int(adc_trigger["predivider"]) != 0
+        or int(adc_trigger["chain_length"]) != 1
+        or list(adc_trigger["xbar_inputs"]) != [57, 57]
+        or list(adc_trigger["xbar_outputs"]) != [103, 107]
+        or list(adc_trigger["queues"]) != [0, 4]
+    ):
+        raise ContractError("ADC trigger route identities changed")
+    initial_delays = [int(value) for value in adc_trigger["initial_delays"]]
+    effective_delays = [int(value) for value in adc_trigger["effective_delays"]]
+    if (
+        initial_delays != [0, 75]
+        or effective_delays != [value + 1 for value in initial_delays]
+        or effective_delays[1] - effective_delays[0]
+        != int(adc_trigger["phase_ipg_cycles"])
+    ):
+        raise ContractError("ADC trigger initial-delay arithmetic is inconsistent")
+    phase_cycles = int(adc_trigger["phase_ipg_cycles"])
+    ipg_clock_hz = int(adc_trigger["ipg_clock_hz"])
+    dwt_clock_hz = int(adc_trigger["dwt_clock_hz"])
+    if (
+        phase_cycles * int(timing["timestamp_hz"])
+        != int(timing["adc1_phase_ticks"]) * ipg_clock_hz
+        or phase_cycles * dwt_clock_hz
+        != int(adc_trigger["completion_expected_dwt_cycles"]) * ipg_clock_hz
+    ):
+        raise ContractError("ADC trigger phase does not map exactly across clocks")
+    diagnostic_deadline_cycles = (
+        dwt_clock_hz * int(adc_trigger["diagnostic_deadline_us"]) // 1_000_000
+    )
+    if not 0 < diagnostic_deadline_cycles <= 0xFFFFFFFF:
+        raise ContractError("ADC trigger diagnostic deadline must fit DWT")
+
     flag_values = enum_map(contract["flags"])
     validate_enum_width("flags", contract["flags"], 16)
     if any(value == 0 or value & (value - 1) for value in flag_values.values()):
@@ -296,7 +367,12 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         value == 0 or value & (value - 1) for value in gpio_clock_error_values.values()
     ):
         raise ContractError("every GPIO clock error must be one nonzero bit")
-    for enum_name in ("adc_configuration_flag", "adc_initialization_error"):
+    for enum_name in (
+        "adc_configuration_flag",
+        "adc_initialization_error",
+        "adc_trigger_configuration_flag",
+        "adc_trigger_error",
+    ):
         values = enum_map(contract["enums"][enum_name])
         validate_enum_width(enum_name, contract["enums"][enum_name], 32)
         if any(value == 0 or value & (value - 1) for value in values.values()):
@@ -412,6 +488,8 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         "adc_calibration_state": 8,
         "adc_configuration_flag": 16,
         "adc_initialization_error": 32,
+        "adc_trigger_configuration_flag": 16,
+        "adc_trigger_error": 32,
     }.items():
         enum_map(contract["enums"][enum_name])
         validate_enum_width(enum_name, contract["enums"][enum_name], bits)
@@ -474,6 +552,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     gpio_capture = contract["gpio_capture"]
     gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
     adc_initialization = contract["adc_initialization"]
+    adc_trigger = contract["adc_trigger"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -598,6 +677,28 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"ADC_PINS = {tuple(adc_initialization['pins'])!r}",
         f"ADC_PERIPHERALS = {tuple(adc_initialization['peripherals'])!r}",
         f"ADC_CHANNELS = {tuple(adc_initialization['channels'])!r}",
+        f"ADC_TRIGGER_PIT_CLOCK_HZ = {int(adc_trigger['pit_clock_hz'])}",
+        f"ADC_TRIGGER_DWT_CLOCK_HZ = {int(adc_trigger['dwt_clock_hz'])}",
+        f"ADC_TRIGGER_GPIO_MASTER_RATE_HZ = {int(adc_trigger['gpio_master_rate_hz'])}",
+        f"ADC_TRIGGER_PAIR_RATE_HZ = {int(adc_trigger['pair_rate_hz'])}",
+        f"ADC_TRIGGER_IPG_CLOCK_HZ = {int(adc_trigger['ipg_clock_hz'])}",
+        f"ADC_TRIGGER_GPIO_MASTER_PIT_CHANNEL = {int(adc_trigger['gpio_master_pit_channel'])}",
+        f"ADC_TRIGGER_PAIR_PIT_CHANNEL = {int(adc_trigger['pair_pit_channel'])}",
+        f"ADC_TRIGGER_GPIO_MASTER_PIT_LOAD = {int(adc_trigger['gpio_master_pit_load'])}",
+        f"ADC_TRIGGER_PAIR_PIT_LOAD = {int(adc_trigger['pair_pit_load'])}",
+        f"ADC_TRIGGER_PREDIVIDER = {int(adc_trigger['predivider'])}",
+        f"ADC_TRIGGER_CHAIN_LENGTH = {int(adc_trigger['chain_length'])}",
+        f"ADC_TRIGGER_XBAR_INPUTS = {tuple(adc_trigger['xbar_inputs'])!r}",
+        f"ADC_TRIGGER_XBAR_OUTPUTS = {tuple(adc_trigger['xbar_outputs'])!r}",
+        f"ADC_TRIGGER_QUEUES = {tuple(adc_trigger['queues'])!r}",
+        f"ADC_TRIGGER_INITIAL_DELAYS = {tuple(adc_trigger['initial_delays'])!r}",
+        f"ADC_TRIGGER_EFFECTIVE_DELAYS = {tuple(adc_trigger['effective_delays'])!r}",
+        f"ADC_TRIGGER_PHASE_IPG_CYCLES = {int(adc_trigger['phase_ipg_cycles'])}",
+        f"ADC_COMPLETION_EXPECTED_DWT_CYCLES = {int(adc_trigger['completion_expected_dwt_cycles'])}",
+        f"ADC_COMPLETION_TOLERANCE_DWT_CYCLES = {int(adc_trigger['completion_tolerance_dwt_cycles'])}",
+        f"ADC_TRIGGER_DIAGNOSTIC_DEADLINE_US = {int(adc_trigger['diagnostic_deadline_us'])}",
+        f"ADC_TRIGGER_DIAGNOSTIC_POLL_LIMIT = {int(adc_trigger['diagnostic_poll_limit'])}",
+        f"ADC_TRIGGER_IRQ_PRIORITY = {int(adc_trigger['irq_priority'])}",
         f"ADC_BYTES_PER_PAIR = {int(layouts['adc']['bytes_per_item'])}",
         f"ADC_PAIRS_PER_FRAME = {int(layouts['adc']['items_per_frame'])}",
         f"ADC_RESOLUTION_BITS = {int(layouts['adc']['resolution_bits'])}",
@@ -701,6 +802,22 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             include_none=True,
         )
     )
+    lines.extend(
+        python_enum(
+            "AdcTriggerConfigurationFlag",
+            contract["enums"]["adc_trigger_configuration_flag"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
+    lines.extend(
+        python_enum(
+            "AdcTriggerError",
+            contract["enums"]["adc_trigger_error"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
 
     lines.extend(
         [
@@ -766,6 +883,21 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
                 int(entry["value"])
                 for entry in contract["enums"]["adc_initialization_error"]
             )
+        )
+    )
+    lines.append(
+        "KNOWN_ADC_TRIGGER_CONFIGURATION_FLAG_MASK = "
+        + str(
+            sum(
+                int(entry["value"])
+                for entry in contract["enums"]["adc_trigger_configuration_flag"]
+            )
+        )
+    )
+    lines.append(
+        "KNOWN_ADC_TRIGGER_ERROR_MASK = "
+        + str(
+            sum(int(entry["value"]) for entry in contract["enums"]["adc_trigger_error"])
         )
     )
     lines.extend(["", ""])
@@ -880,6 +1012,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     gpio_capture = contract["gpio_capture"]
     gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
     adc_initialization = contract["adc_initialization"]
+    adc_trigger = contract["adc_trigger"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -1055,6 +1188,38 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         "inline constexpr std::uint8_t kAdcChannels[] = {"
         + ", ".join(f"{int(value)}U" for value in adc_initialization["channels"])
         + "};",
+        f"inline constexpr std::uint32_t kAdcTriggerPitClockHz = {int(adc_trigger['pit_clock_hz'])}U;",
+        f"inline constexpr std::uint32_t kAdcTriggerDwtClockHz = {int(adc_trigger['dwt_clock_hz'])}U;",
+        f"inline constexpr std::uint32_t kAdcTriggerGpioMasterRateHz = {int(adc_trigger['gpio_master_rate_hz'])}U;",
+        f"inline constexpr std::uint32_t kAdcTriggerPairRateHz = {int(adc_trigger['pair_rate_hz'])}U;",
+        f"inline constexpr std::uint32_t kAdcTriggerIpgClockHz = {int(adc_trigger['ipg_clock_hz'])}U;",
+        f"inline constexpr std::uint8_t kAdcTriggerGpioMasterPitChannel = {int(adc_trigger['gpio_master_pit_channel'])}U;",
+        f"inline constexpr std::uint8_t kAdcTriggerPairPitChannel = {int(adc_trigger['pair_pit_channel'])}U;",
+        f"inline constexpr std::uint8_t kAdcTriggerGpioMasterPitLoad = {int(adc_trigger['gpio_master_pit_load'])}U;",
+        f"inline constexpr std::uint8_t kAdcTriggerPairPitLoad = {int(adc_trigger['pair_pit_load'])}U;",
+        f"inline constexpr std::uint8_t kAdcTriggerPredivider = {int(adc_trigger['predivider'])}U;",
+        f"inline constexpr std::uint8_t kAdcTriggerChainLength = {int(adc_trigger['chain_length'])}U;",
+        "inline constexpr std::uint8_t kAdcTriggerXbarInputs[] = {"
+        + ", ".join(f"{int(value)}U" for value in adc_trigger["xbar_inputs"])
+        + "};",
+        "inline constexpr std::uint8_t kAdcTriggerXbarOutputs[] = {"
+        + ", ".join(f"{int(value)}U" for value in adc_trigger["xbar_outputs"])
+        + "};",
+        "inline constexpr std::uint8_t kAdcTriggerQueues[] = {"
+        + ", ".join(f"{int(value)}U" for value in adc_trigger["queues"])
+        + "};",
+        "inline constexpr std::uint16_t kAdcTriggerInitialDelays[] = {"
+        + ", ".join(f"{int(value)}U" for value in adc_trigger["initial_delays"])
+        + "};",
+        "inline constexpr std::uint16_t kAdcTriggerEffectiveDelays[] = {"
+        + ", ".join(f"{int(value)}U" for value in adc_trigger["effective_delays"])
+        + "};",
+        f"inline constexpr std::uint16_t kAdcTriggerPhaseIpgCycles = {int(adc_trigger['phase_ipg_cycles'])}U;",
+        f"inline constexpr std::uint32_t kAdcCompletionExpectedDwtCycles = {int(adc_trigger['completion_expected_dwt_cycles'])}U;",
+        f"inline constexpr std::uint32_t kAdcCompletionToleranceDwtCycles = {int(adc_trigger['completion_tolerance_dwt_cycles'])}U;",
+        f"inline constexpr std::uint32_t kAdcTriggerDiagnosticDeadlineUs = {int(adc_trigger['diagnostic_deadline_us'])}U;",
+        f"inline constexpr std::uint32_t kAdcTriggerDiagnosticPollLimit = {int(adc_trigger['diagnostic_poll_limit'])}U;",
+        f"inline constexpr std::uint8_t kAdcTriggerIrqPriority = {int(adc_trigger['irq_priority'])}U;",
         f"inline constexpr std::size_t kAdcBytesPerPair = {int(layouts['adc']['bytes_per_item'])}U;",
         f"inline constexpr std::size_t kAdcPairsPerFrame = {int(layouts['adc']['items_per_frame'])}U;",
         f"inline constexpr std::uint8_t kAdcResolutionBits = {int(layouts['adc']['resolution_bits'])}U;",
@@ -1171,6 +1336,20 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             contract["enums"]["adc_initialization_error"],
         )
     )
+    lines.extend(
+        cpp_enum(
+            "AdcTriggerConfigurationFlag",
+            "std::uint16_t",
+            contract["enums"]["adc_trigger_configuration_flag"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "AdcTriggerError",
+            "std::uint32_t",
+            contract["enums"]["adc_trigger_error"],
+        )
+    )
 
     lines.extend(
         [
@@ -1231,6 +1410,23 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
                 sum(
                     int(entry["value"])
                     for entry in contract["enums"]["adc_initialization_error"]
+                )
+            )
+            + "U;",
+            "inline constexpr std::uint16_t "
+            "kKnownAdcTriggerConfigurationFlagMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["adc_trigger_configuration_flag"]
+                )
+            )
+            + "U;",
+            "inline constexpr std::uint32_t kKnownAdcTriggerErrorMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["adc_trigger_error"]
                 )
             )
             + "U;",

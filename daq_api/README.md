@@ -62,7 +62,7 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
     generation = daq.reset_stats()  # valid after STOP, or while CONFIGURED
 ```
 
-`DeviceInfo`, `DeviceCapabilities`, `DAQConfiguration`, `Status`, `ADCBlock`,
+`DeviceInfo`, `DeviceCapabilities`, `AdcTriggerMetadata`, `DAQConfiguration`, `Status`, `ADCBlock`,
 `GPIOBlock`, `GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
 `GpioCaptureDiagnosticResult`, `StreamGap`, `FirmwareCounters`, `HostCounters`,
 and `LossCounters` validate
@@ -74,6 +74,13 @@ block reads require the RUNNING epoch established by this facade. The optional
 GPIO clock diagnostic requires IDLE and its advertised capability bit. The
 capture diagnostic additionally requires a fully quiescent physical GPIO
 pipeline.
+
+`DeviceInfo.adc_trigger` and `Status.adc_trigger` expose the exact 24 MHz PIT
+root, 4 MHz master, chained 1 MHz pair schedule, queues 0/4, raw/effective
+delays 0/75 and 1/76, configured-register readbacks, completion counts, and
+typed trigger errors. `completion_timing_delta_ns` converts the first
+conversion-completion IRQ delta from the 600 MHz DWT counter; it is not an
+analog aperture measurement.
 
 `DeviceInfo.data_checksum_algorithm` reports the generated device default in
 IDLE and the applied selection otherwise. `Status.data_checksum_algorithm`

@@ -158,8 +158,14 @@ under a 10 ms DWT deadline. The target adapter defers Teensy core's normally
 unbounded startup calibration so this is the sole ADC calibration path.
 INFO/STATUS publish the actual settings, fixed A0/ADC1/channel-7 and
 A1/ADC2/channel-8 routes, per-converter calibration states/cycles, and typed
-initialization faults. Physical ADC capability remains disabled until the later
-trigger, DMA, integration, and rig gates pass.
+initialization faults. The BOOT boundary also programs the shared PIT0 4 MHz
+to chained PIT1 1 MHz source, fans PIT1 through XBARA1 to independent ADC_ETC
+queues 0/4, and writes raw delays 0/75 (effective 1/76 IPG cycles, exactly
+500 ns apart). A bounded stopped-to-armed-to-stopped diagnostic publishes
+first conversion-completion IRQ timing, trigger errors, completion counts, and
+clock/XBAR/queue/register readbacks in INFO/STATUS. That DWT delta is
+completion timing, not analog aperture evidence. Physical ADC capability
+remains disabled until the later DMA, integration, and rig gates pass.
 
 The advertised physical GPIO mode selectively returns only D6-D13 from
 GPIO7 to GPIO2, keeps them inputs on START/STOP/error, and uses channel 2 to

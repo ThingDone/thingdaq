@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "adc_initializer.h"
+#include "adc_trigger.h"
 #include "checksum_benchmark.h"
 #include "control_state.h"
 #include "gpio_batch_packer.h"
@@ -65,7 +66,8 @@ class FirmwareRuntime {
                   gpio_capture::HardwareCapture *gpio_capture = nullptr,
                   gpio_packer::GpioBatchPacker *gpio_packer = nullptr,
                   gpio_diagnostic::Runner *gpio_capture_diagnostic = nullptr,
-                  adc::Initializer *adc_initializer = nullptr)
+                  adc::Initializer *adc_initializer = nullptr,
+                  adc_trigger::Scheduler *adc_trigger_scheduler = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
@@ -76,7 +78,8 @@ class FirmwareRuntime {
         gpio_capture_(gpio_capture),
         gpio_packer_(gpio_packer),
         gpio_capture_diagnostic_(gpio_capture_diagnostic),
-        adc_initializer_(adc_initializer) {}
+        adc_initializer_(adc_initializer),
+        adc_trigger_scheduler_(adc_trigger_scheduler) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -132,6 +135,7 @@ class FirmwareRuntime {
   gpio_packer::GpioBatchPacker *gpio_packer_ = nullptr;
   gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
   adc::Initializer *adc_initializer_ = nullptr;
+  adc_trigger::Scheduler *adc_trigger_scheduler_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
   bool physical_run_active_ = false;
   bool physical_drain_pending_ = false;

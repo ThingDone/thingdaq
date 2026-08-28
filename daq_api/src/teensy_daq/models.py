@@ -26,6 +26,182 @@ _DEFAULT_ADC_CONFIGURATION_FLAGS = (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class AdcTriggerMetadata:
+    """Observable 1 MHz ADC_ETC schedule and completion-timing evidence.
+
+    ``completion_delta_cycles`` measures conversion-completion interrupt
+    timing. It is a bounded digital cross-check, not an analog aperture
+    measurement. ``diagnostic_elapsed_cycles`` may include a small deadline
+    overshoot from scheduling or the terminal counter read on a failed check.
+    """
+
+    configuration_flags: constants.AdcTriggerConfigurationFlag = (
+        constants.AdcTriggerConfigurationFlag.NONE
+    )
+    error_flags: constants.AdcTriggerError = constants.AdcTriggerError.NONE
+    pit_clock_hz: int = constants.ADC_TRIGGER_PIT_CLOCK_HZ
+    dwt_clock_hz: int = constants.ADC_TRIGGER_DWT_CLOCK_HZ
+    gpio_master_rate_hz: int = constants.ADC_TRIGGER_GPIO_MASTER_RATE_HZ
+    pair_rate_hz: int = constants.ADC_TRIGGER_PAIR_RATE_HZ
+    ipg_clock_hz: int = constants.ADC_TRIGGER_IPG_CLOCK_HZ
+    gpio_master_pit_channel: int = constants.ADC_TRIGGER_GPIO_MASTER_PIT_CHANNEL
+    pair_pit_channel: int = constants.ADC_TRIGGER_PAIR_PIT_CHANNEL
+    gpio_master_pit_load: int = constants.ADC_TRIGGER_GPIO_MASTER_PIT_LOAD
+    pair_pit_load: int = constants.ADC_TRIGGER_PAIR_PIT_LOAD
+    predivider: int = constants.ADC_TRIGGER_PREDIVIDER
+    chain_length: int = constants.ADC_TRIGGER_CHAIN_LENGTH
+    xbar_inputs: tuple[int, int] = constants.ADC_TRIGGER_XBAR_INPUTS
+    xbar_outputs: tuple[int, int] = constants.ADC_TRIGGER_XBAR_OUTPUTS
+    trigger_queues: tuple[int, int] = constants.ADC_TRIGGER_QUEUES
+    initial_delays: tuple[int, int] = constants.ADC_TRIGGER_INITIAL_DELAYS
+    effective_delays: tuple[int, int] = constants.ADC_TRIGGER_EFFECTIVE_DELAYS
+    phase_ipg_cycles: int = constants.ADC_TRIGGER_PHASE_IPG_CYCLES
+    ccm_cscmr1_configured: int = 0
+    ccm_ccgr1_configured: int = 0
+    ccm_ccgr2_configured: int = 0
+    pit_mcr_configured: int = 0
+    gpio_master_tctrl_configured: int = 0
+    pair_tctrl_configured: int = 0
+    adc_etc_ctrl_configured: int = 0
+    trigger_ctrl_configured: tuple[int, int] = (0, 0)
+    trigger_counter_configured: tuple[int, int] = (0, 0)
+    chain_configured: tuple[int, int] = (0, 0)
+    done0_1_irq_final: int = 0
+    done2_err_irq_final: int = 0
+    completion_counts: tuple[int, int] = (0, 0)
+    completion_delta_cycles: int = 0
+    completion_expected_delta_cycles: int = constants.ADC_COMPLETION_EXPECTED_DWT_CYCLES
+    completion_tolerance_cycles: int = constants.ADC_COMPLETION_TOLERANCE_DWT_CYCLES
+    diagnostic_elapsed_cycles: int = 0
+    trigger_error_count: int = 0
+    xbar_sel_configured: tuple[int, int] = (0, 0)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.configuration_flags, bool) or isinstance(
+            self.error_flags, bool
+        ):
+            raise TypeError("ADC trigger metadata contains an unknown flag")
+        try:
+            flags = constants.AdcTriggerConfigurationFlag(self.configuration_flags)
+            errors = constants.AdcTriggerError(self.error_flags)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("ADC trigger metadata contains an unknown flag") from exc
+        if int(flags) & ~constants.KNOWN_ADC_TRIGGER_CONFIGURATION_FLAG_MASK:
+            raise ValueError("ADC trigger configuration contains reserved flags")
+        if int(errors) & ~constants.KNOWN_ADC_TRIGGER_ERROR_MASK:
+            raise ValueError("ADC trigger metadata contains reserved error flags")
+
+        fixed_scalars = (
+            ("pit_clock_hz", constants.ADC_TRIGGER_PIT_CLOCK_HZ),
+            ("dwt_clock_hz", constants.ADC_TRIGGER_DWT_CLOCK_HZ),
+            ("gpio_master_rate_hz", constants.ADC_TRIGGER_GPIO_MASTER_RATE_HZ),
+            ("pair_rate_hz", constants.ADC_TRIGGER_PAIR_RATE_HZ),
+            ("ipg_clock_hz", constants.ADC_TRIGGER_IPG_CLOCK_HZ),
+            (
+                "gpio_master_pit_channel",
+                constants.ADC_TRIGGER_GPIO_MASTER_PIT_CHANNEL,
+            ),
+            ("pair_pit_channel", constants.ADC_TRIGGER_PAIR_PIT_CHANNEL),
+            ("gpio_master_pit_load", constants.ADC_TRIGGER_GPIO_MASTER_PIT_LOAD),
+            ("pair_pit_load", constants.ADC_TRIGGER_PAIR_PIT_LOAD),
+            ("predivider", constants.ADC_TRIGGER_PREDIVIDER),
+            ("chain_length", constants.ADC_TRIGGER_CHAIN_LENGTH),
+            ("phase_ipg_cycles", constants.ADC_TRIGGER_PHASE_IPG_CYCLES),
+            (
+                "completion_expected_delta_cycles",
+                constants.ADC_COMPLETION_EXPECTED_DWT_CYCLES,
+            ),
+            (
+                "completion_tolerance_cycles",
+                constants.ADC_COMPLETION_TOLERANCE_DWT_CYCLES,
+            ),
+        )
+        if any(
+            not isinstance(getattr(self, name), int)
+            or isinstance(getattr(self, name), bool)
+            or getattr(self, name) != expected
+            for name, expected in fixed_scalars
+        ):
+            raise ValueError("ADC trigger schedule is incompatible with protocol v1")
+
+        fixed_pairs = (
+            ("xbar_inputs", constants.ADC_TRIGGER_XBAR_INPUTS),
+            ("xbar_outputs", constants.ADC_TRIGGER_XBAR_OUTPUTS),
+            ("trigger_queues", constants.ADC_TRIGGER_QUEUES),
+            ("initial_delays", constants.ADC_TRIGGER_INITIAL_DELAYS),
+            ("effective_delays", constants.ADC_TRIGGER_EFFECTIVE_DELAYS),
+        )
+        for name, expected in fixed_pairs:
+            values = tuple(getattr(self, name))
+            if values != expected:
+                raise ValueError("ADC trigger routes/delays are incompatible")
+            object.__setattr__(self, name, values)
+
+        for name in (
+            "trigger_ctrl_configured",
+            "trigger_counter_configured",
+            "chain_configured",
+            "completion_counts",
+            "xbar_sel_configured",
+        ):
+            values = tuple(getattr(self, name))
+            if len(values) != 2:
+                raise ValueError(f"{name} must contain two converter values")
+            bits = 16 if name == "xbar_sel_configured" else 32
+            for item in values:
+                _unsigned(name, item, bits)
+            object.__setattr__(self, name, values)
+
+        for name in (
+            "ccm_cscmr1_configured",
+            "ccm_ccgr1_configured",
+            "ccm_ccgr2_configured",
+            "pit_mcr_configured",
+            "gpio_master_tctrl_configured",
+            "pair_tctrl_configured",
+            "adc_etc_ctrl_configured",
+            "done0_1_irq_final",
+            "done2_err_irq_final",
+            "completion_delta_cycles",
+            "diagnostic_elapsed_cycles",
+            "trigger_error_count",
+        ):
+            _unsigned(name, getattr(self, name), 32)
+
+        timing_valid = constants.AdcTriggerConfigurationFlag.COMPLETION_TIMING_VALID
+        required_timing_flags = (
+            constants.AdcTriggerConfigurationFlag.ARM_SEQUENCE_EXERCISED
+            | constants.AdcTriggerConfigurationFlag.STOPPED_AFTER_DIAGNOSTIC
+        )
+        if flags & timing_valid and (
+            errors
+            or flags & required_timing_flags != required_timing_flags
+            or not all(self.completion_counts)
+            or abs(self.completion_delta_cycles - self.completion_expected_delta_cycles)
+            > self.completion_tolerance_cycles
+        ):
+            raise ValueError("ADC completion timing evidence is inconsistent")
+        object.__setattr__(self, "configuration_flags", flags)
+        object.__setattr__(self, "error_flags", errors)
+
+    @property
+    def ready(self) -> bool:
+        """Return whether every schedule/readback/diagnostic gate passed."""
+
+        return (
+            int(self.configuration_flags)
+            == constants.KNOWN_ADC_TRIGGER_CONFIGURATION_FLAG_MASK
+            and not self.error_flags
+        )
+
+    @property
+    def completion_timing_delta_ns(self) -> float:
+        """Return completion timing in ns; this is not aperture timing."""
+
+        return self.completion_delta_cycles * 1_000_000_000 / self.dwt_clock_hz
+
+
 def _unsigned(name: str, value: int, bits: int) -> None:
     if (
         not isinstance(value, int)
@@ -73,6 +249,8 @@ def _normalize_adc_metadata(value: Any) -> None:
     """Validate and normalize the common INFO/STATUS ADC metadata fields."""
 
     resolution = value.adc_resolution_bits
+    if not isinstance(value.adc_trigger, AdcTriggerMetadata):
+        raise TypeError("adc_trigger must be AdcTriggerMetadata")
     if resolution not in (
         constants.ADC_PRIMARY_RESOLUTION_BITS,
         constants.ADC_FALLBACK_RESOLUTION_BITS,
@@ -193,6 +371,177 @@ def _adc_offset(prefix: str, field: str) -> int:
     return int(getattr(constants, f"{prefix}_ADC{separator}{field}_OFFSET"))
 
 
+def _trigger_offset(prefix: str, field: str) -> int:
+    return int(getattr(constants, f"{prefix}_{field}_OFFSET"))
+
+
+def _pack_adc_trigger_metadata(
+    payload: bytearray, trigger: AdcTriggerMetadata, prefix: str
+) -> None:
+    def u16(field: str, value: int) -> None:
+        struct.pack_into("<H", payload, _trigger_offset(prefix, field), value)
+
+    def u32(field: str, value: int) -> None:
+        struct.pack_into("<I", payload, _trigger_offset(prefix, field), value)
+
+    u16("ADC_TRIGGER_CONFIGURATION_FLAGS", int(trigger.configuration_flags))
+    u32("ADC_TRIGGER_ERROR_FLAGS", int(trigger.error_flags))
+    for field, value in (
+        ("ADC_TRIGGER_PIT_CLOCK_HZ", trigger.pit_clock_hz),
+        ("ADC_TRIGGER_DWT_CLOCK_HZ", trigger.dwt_clock_hz),
+        ("ADC_TRIGGER_GPIO_MASTER_RATE_HZ", trigger.gpio_master_rate_hz),
+        ("ADC_TRIGGER_PAIR_RATE_HZ", trigger.pair_rate_hz),
+        ("ADC_TRIGGER_IPG_CLOCK_HZ", trigger.ipg_clock_hz),
+    ):
+        u32(field, value)
+    for field, value in (
+        ("ADC_TRIGGER_GPIO_MASTER_PIT_CHANNEL", trigger.gpio_master_pit_channel),
+        ("ADC_TRIGGER_PAIR_PIT_CHANNEL", trigger.pair_pit_channel),
+        ("ADC_TRIGGER_GPIO_MASTER_PIT_LOAD", trigger.gpio_master_pit_load),
+        ("ADC_TRIGGER_PAIR_PIT_LOAD", trigger.pair_pit_load),
+        ("ADC_TRIGGER_PREDIVIDER", trigger.predivider),
+        ("ADC_TRIGGER_CHAIN_LENGTH", trigger.chain_length),
+        ("ADC0_TRIGGER_XBAR_INPUT", trigger.xbar_inputs[0]),
+        ("ADC1_TRIGGER_XBAR_INPUT", trigger.xbar_inputs[1]),
+        ("ADC0_TRIGGER_XBAR_OUTPUT", trigger.xbar_outputs[0]),
+        ("ADC1_TRIGGER_XBAR_OUTPUT", trigger.xbar_outputs[1]),
+        ("ADC0_ETC_TRIGGER_QUEUE", trigger.trigger_queues[0]),
+        ("ADC1_ETC_TRIGGER_QUEUE", trigger.trigger_queues[1]),
+    ):
+        payload[_trigger_offset(prefix, field)] = value
+    for field, value in (
+        ("ADC0_TRIGGER_INITIAL_DELAY", trigger.initial_delays[0]),
+        ("ADC1_TRIGGER_INITIAL_DELAY", trigger.initial_delays[1]),
+        ("ADC0_TRIGGER_EFFECTIVE_DELAY", trigger.effective_delays[0]),
+        ("ADC1_TRIGGER_EFFECTIVE_DELAY", trigger.effective_delays[1]),
+        ("ADC_TRIGGER_PHASE_IPG_CYCLES", trigger.phase_ipg_cycles),
+        ("ADC0_TRIGGER_XBAR_SEL_CONFIGURED", trigger.xbar_sel_configured[0]),
+        ("ADC1_TRIGGER_XBAR_SEL_CONFIGURED", trigger.xbar_sel_configured[1]),
+    ):
+        u16(field, value)
+    for field, value in (
+        ("ADC_TRIGGER_CCM_CSCMR1_CONFIGURED", trigger.ccm_cscmr1_configured),
+        ("ADC_TRIGGER_CCM_CCGR1_CONFIGURED", trigger.ccm_ccgr1_configured),
+        ("ADC_TRIGGER_CCM_CCGR2_CONFIGURED", trigger.ccm_ccgr2_configured),
+        ("ADC_TRIGGER_PIT_MCR_CONFIGURED", trigger.pit_mcr_configured),
+        (
+            "ADC_TRIGGER_GPIO_MASTER_TCTRL_CONFIGURED",
+            trigger.gpio_master_tctrl_configured,
+        ),
+        ("ADC_TRIGGER_PAIR_TCTRL_CONFIGURED", trigger.pair_tctrl_configured),
+        ("ADC_ETC_CTRL_CONFIGURED", trigger.adc_etc_ctrl_configured),
+        ("ADC0_ETC_TRIGGER_CTRL_CONFIGURED", trigger.trigger_ctrl_configured[0]),
+        ("ADC1_ETC_TRIGGER_CTRL_CONFIGURED", trigger.trigger_ctrl_configured[1]),
+        (
+            "ADC0_ETC_TRIGGER_COUNTER_CONFIGURED",
+            trigger.trigger_counter_configured[0],
+        ),
+        (
+            "ADC1_ETC_TRIGGER_COUNTER_CONFIGURED",
+            trigger.trigger_counter_configured[1],
+        ),
+        ("ADC0_ETC_CHAIN_CONFIGURED", trigger.chain_configured[0]),
+        ("ADC1_ETC_CHAIN_CONFIGURED", trigger.chain_configured[1]),
+        ("ADC_ETC_DONE0_1_IRQ_FINAL", trigger.done0_1_irq_final),
+        ("ADC_ETC_DONE2_ERR_IRQ_FINAL", trigger.done2_err_irq_final),
+        ("ADC0_COMPLETION_COUNT", trigger.completion_counts[0]),
+        ("ADC1_COMPLETION_COUNT", trigger.completion_counts[1]),
+        ("ADC_COMPLETION_DELTA_CYCLES", trigger.completion_delta_cycles),
+        (
+            "ADC_COMPLETION_EXPECTED_DELTA_CYCLES",
+            trigger.completion_expected_delta_cycles,
+        ),
+        ("ADC_COMPLETION_TOLERANCE_CYCLES", trigger.completion_tolerance_cycles),
+        (
+            "ADC_COMPLETION_DIAGNOSTIC_ELAPSED_CYCLES",
+            trigger.diagnostic_elapsed_cycles,
+        ),
+        ("ADC_TRIGGER_ERROR_COUNT", trigger.trigger_error_count),
+    ):
+        u32(field, value)
+
+
+def _unpack_adc_trigger_metadata(payload: bytes, prefix: str) -> AdcTriggerMetadata:
+    def u8(field: str) -> int:
+        return payload[_trigger_offset(prefix, field)]
+
+    def u16(field: str) -> int:
+        return int(struct.unpack_from("<H", payload, _trigger_offset(prefix, field))[0])
+
+    def u32(field: str) -> int:
+        return int(struct.unpack_from("<I", payload, _trigger_offset(prefix, field))[0])
+
+    return AdcTriggerMetadata(
+        configuration_flags=constants.AdcTriggerConfigurationFlag(
+            u16("ADC_TRIGGER_CONFIGURATION_FLAGS")
+        ),
+        error_flags=constants.AdcTriggerError(u32("ADC_TRIGGER_ERROR_FLAGS")),
+        pit_clock_hz=u32("ADC_TRIGGER_PIT_CLOCK_HZ"),
+        dwt_clock_hz=u32("ADC_TRIGGER_DWT_CLOCK_HZ"),
+        gpio_master_rate_hz=u32("ADC_TRIGGER_GPIO_MASTER_RATE_HZ"),
+        pair_rate_hz=u32("ADC_TRIGGER_PAIR_RATE_HZ"),
+        ipg_clock_hz=u32("ADC_TRIGGER_IPG_CLOCK_HZ"),
+        gpio_master_pit_channel=u8("ADC_TRIGGER_GPIO_MASTER_PIT_CHANNEL"),
+        pair_pit_channel=u8("ADC_TRIGGER_PAIR_PIT_CHANNEL"),
+        gpio_master_pit_load=u8("ADC_TRIGGER_GPIO_MASTER_PIT_LOAD"),
+        pair_pit_load=u8("ADC_TRIGGER_PAIR_PIT_LOAD"),
+        predivider=u8("ADC_TRIGGER_PREDIVIDER"),
+        chain_length=u8("ADC_TRIGGER_CHAIN_LENGTH"),
+        xbar_inputs=(u8("ADC0_TRIGGER_XBAR_INPUT"), u8("ADC1_TRIGGER_XBAR_INPUT")),
+        xbar_outputs=(
+            u8("ADC0_TRIGGER_XBAR_OUTPUT"),
+            u8("ADC1_TRIGGER_XBAR_OUTPUT"),
+        ),
+        trigger_queues=(
+            u8("ADC0_ETC_TRIGGER_QUEUE"),
+            u8("ADC1_ETC_TRIGGER_QUEUE"),
+        ),
+        initial_delays=(
+            u16("ADC0_TRIGGER_INITIAL_DELAY"),
+            u16("ADC1_TRIGGER_INITIAL_DELAY"),
+        ),
+        effective_delays=(
+            u16("ADC0_TRIGGER_EFFECTIVE_DELAY"),
+            u16("ADC1_TRIGGER_EFFECTIVE_DELAY"),
+        ),
+        phase_ipg_cycles=u16("ADC_TRIGGER_PHASE_IPG_CYCLES"),
+        ccm_cscmr1_configured=u32("ADC_TRIGGER_CCM_CSCMR1_CONFIGURED"),
+        ccm_ccgr1_configured=u32("ADC_TRIGGER_CCM_CCGR1_CONFIGURED"),
+        ccm_ccgr2_configured=u32("ADC_TRIGGER_CCM_CCGR2_CONFIGURED"),
+        pit_mcr_configured=u32("ADC_TRIGGER_PIT_MCR_CONFIGURED"),
+        gpio_master_tctrl_configured=u32("ADC_TRIGGER_GPIO_MASTER_TCTRL_CONFIGURED"),
+        pair_tctrl_configured=u32("ADC_TRIGGER_PAIR_TCTRL_CONFIGURED"),
+        adc_etc_ctrl_configured=u32("ADC_ETC_CTRL_CONFIGURED"),
+        trigger_ctrl_configured=(
+            u32("ADC0_ETC_TRIGGER_CTRL_CONFIGURED"),
+            u32("ADC1_ETC_TRIGGER_CTRL_CONFIGURED"),
+        ),
+        trigger_counter_configured=(
+            u32("ADC0_ETC_TRIGGER_COUNTER_CONFIGURED"),
+            u32("ADC1_ETC_TRIGGER_COUNTER_CONFIGURED"),
+        ),
+        chain_configured=(
+            u32("ADC0_ETC_CHAIN_CONFIGURED"),
+            u32("ADC1_ETC_CHAIN_CONFIGURED"),
+        ),
+        done0_1_irq_final=u32("ADC_ETC_DONE0_1_IRQ_FINAL"),
+        done2_err_irq_final=u32("ADC_ETC_DONE2_ERR_IRQ_FINAL"),
+        completion_counts=(
+            u32("ADC0_COMPLETION_COUNT"),
+            u32("ADC1_COMPLETION_COUNT"),
+        ),
+        completion_delta_cycles=u32("ADC_COMPLETION_DELTA_CYCLES"),
+        completion_expected_delta_cycles=u32("ADC_COMPLETION_EXPECTED_DELTA_CYCLES"),
+        completion_tolerance_cycles=u32("ADC_COMPLETION_TOLERANCE_CYCLES"),
+        diagnostic_elapsed_cycles=u32("ADC_COMPLETION_DIAGNOSTIC_ELAPSED_CYCLES"),
+        trigger_error_count=u32("ADC_TRIGGER_ERROR_COUNT"),
+        xbar_sel_configured=(
+            u16("ADC0_TRIGGER_XBAR_SEL_CONFIGURED"),
+            u16("ADC1_TRIGGER_XBAR_SEL_CONFIGURED"),
+        ),
+    )
+
+
 def _pack_adc_metadata(payload: bytearray, value: Any, prefix: str) -> None:
     payload[_adc_offset(prefix, "RESOLUTION_BITS")] = value.adc_resolution_bits
     payload[_adc_offset(prefix, "CONTAINER_BYTES")] = value.adc_container_bytes
@@ -247,6 +596,7 @@ def _pack_adc_metadata(payload: bytearray, value: Any, prefix: str) -> None:
         _adc_offset(prefix, "1_CALIBRATION_CYCLES"),
         calibration_cycles[1],
     )
+    _pack_adc_trigger_metadata(payload, value.adc_trigger, prefix)
 
 
 def _unpack_adc_metadata(payload: bytes, prefix: str) -> dict[str, Any]:
@@ -309,6 +659,7 @@ def _unpack_adc_metadata(payload: bytes, prefix: str) -> dict[str, Any]:
         "adc_initialization_error_flags": constants.AdcInitializationError(
             u32("INITIALIZATION_ERROR_FLAGS")
         ),
+        "adc_trigger": _unpack_adc_trigger_metadata(payload, prefix),
     }
 
 
@@ -1412,6 +1763,7 @@ class DeviceCapabilities:
     adc_initialization_error_flags: constants.AdcInitializationError = (
         constants.AdcInitializationError.NONE
     )
+    adc_trigger: AdcTriggerMetadata = AdcTriggerMetadata()
     gpio_pin_map: tuple[int, ...] = constants.GPIO_PINS_BY_BIT
     gpio_packed_width_bits: int = constants.GPIO_PACKED_WIDTH_BITS
     gpio_raw_ring_depth: int = constants.GPIO_RAW_RING_DEPTH
@@ -1657,6 +2009,7 @@ class DeviceInfo:
     adc_initialization_error_flags: constants.AdcInitializationError = (
         constants.AdcInitializationError.NONE
     )
+    adc_trigger: AdcTriggerMetadata = AdcTriggerMetadata()
     gpio_pin_map: tuple[int, ...] = constants.GPIO_PINS_BY_BIT
     gpio_packed_width_bits: int = constants.GPIO_PACKED_WIDTH_BITS
     gpio_raw_ring_depth: int = constants.GPIO_RAW_RING_DEPTH
@@ -1780,6 +2133,7 @@ class DeviceInfo:
             adc_calibration_deadline_us=self.adc_calibration_deadline_us,
             adc_calibration_cycles=self.adc_calibration_cycles,
             adc_initialization_error_flags=(self.adc_initialization_error_flags),
+            adc_trigger=self.adc_trigger,
             gpio_pin_map=self.gpio_pin_map,
             gpio_packed_width_bits=self.gpio_packed_width_bits,
             gpio_raw_ring_depth=self.gpio_raw_ring_depth,
@@ -2162,6 +2516,7 @@ class Status:
     adc_initialization_error_flags: constants.AdcInitializationError = (
         constants.AdcInitializationError.NONE
     )
+    adc_trigger: AdcTriggerMetadata = AdcTriggerMetadata()
 
     def __post_init__(self) -> None:
         if any(

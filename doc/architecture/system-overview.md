@@ -38,12 +38,14 @@ authorities:
 | Authority | Responsibility |
 | --- | --- |
 | `firmware/src/firmware_identity.h` | Product, board, MCU, CPU, core, compiler, USB/menu, semantic firmware, protocol, source, build, and timestamp identity |
-| `firmware/src/board_config.h` | The single pin, timer, XBAR, ADC_ETC, eDMA, queue, DMA-memory, alignment, and future-owner registry |
+| `firmware/src/board_config.h` | The single pin, timer, XBAR, ADC_ETC, eDMA, queue, DMA-memory, alignment, and owner registry |
 | `firmware/src/firmware_capabilities.h` | The exact INFO metadata projected from generated protocol constants and the resource registry |
 | `firmware/src/gpio_clock_diagnostic.{h,cpp}` | Portable exact-rate planning, duration bounds, and dead/duplicate/count-error classification |
 | `firmware/src/gpio_clock_diagnostic_teensy.{h,cpp}` | The guarded PIT0/XBARA1/eDMA register adapter and isolated OCRAM sentinel transfer |
 | `firmware/src/gpio_capture_diagnostic.{h,cpp}` | Fail-closed fixture-policy selection and capture/safety/validation-coverage classification |
 | `firmware/src/gpio_capture_diagnostic_teensy.{h,cpp}` | The guarded input-only production-ring diagnostic for the documentation-only Port 15 fixture |
+| `firmware/src/adc_initializer{,_teensy}.{h,cpp}` | Portable bounded dual-converter calibration policy and the guarded A0/ADC1 plus A1/ADC2 register adapter |
+| `firmware/src/adc_trigger{,_teensy}.{h,cpp}` | Portable exact 1 MHz/500 ns schedule and bounded completion diagnostic plus the guarded PIT/XBAR/ADC_ETC adapter |
 | `firmware/src/synthetic_source.{h,cpp}` | Deterministic ADC/GPIO formulas, shared epoch, real-time and unpaced-diagnostic scheduling, and bounded source telemetry |
 | `firmware/src/packet_buffer_pipeline.{h,cpp}` | Fixed aligned complete-frame storage, explicit ownership transitions, per-source sequences/counters, bounded ready/transmit index queues, and high-water telemetry |
 | `firmware/src/usb_transport.{h,cpp}` | Portable bounded CDC receive/transmit scheduling, complete command/response queues, frame ownership, and transport diagnostics |

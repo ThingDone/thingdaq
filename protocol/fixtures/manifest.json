@@ -204,21 +204,20 @@
       "total_length": 48
     },
     {
-      "checksum": "0x0e341bd0",
+      "checksum": "0xd98f22bd",
       "checksum_algorithm": "ADLER32",
       "file": "info-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde019000002c000100e4000000b400000000000000000000000100000000000000000000000000000000000000010103030e000000ff01000000127a00001000000004000040420f0000093d000800040002000c020801060708090a0b0c0d78563412000000000000000073796e7468657469632d676f6c64656e2d763100000000000000000000000000080404000300d00f000000fd0000803f0000c8000000003800021e0201000000ff0f01010400e40c0000e40c03028e0000000e0f01020708000080d1f00860343c0210270000000000000000000000000000d01b340e",
-      "frame_sha256": "7a3c821798cf86460d5e20b961d62623ad60f6fb3fcb48b7e761283edec1959c",
+      "frame_sha256": "d74a928f8517fa9814a3f78ffcd6f3cc07e85bd38ccf1a40d5e233a2e1b95fb5",
       "item_count": 0,
       "kind": "INFO_RESPONSE",
-      "payload_length": 180,
-      "payload_sha256": "49ec8b4b8499c14ba24437d67e0a381f9dfc99a5e3aeb754dc5646e637ab3885",
+      "payload_length": 324,
+      "payload_sha256": "e19bec3e3ca1c432b156ea0274987433d5745f2ef4f0a2cd6a868a48e80c7845",
       "request_id": 1,
       "run_id": 0,
       "sequence": 0,
-      "total_length": 228
+      "total_length": 372
     },
     {
       "checksum": "0xe2080457",
@@ -255,20 +254,20 @@
       "total_length": 60
     },
     {
-      "checksum": "0x55a10cfe",
+      "checksum": "0x32cb14ea",
       "checksum_algorithm": "ADLER32",
       "file": "get-status-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_sha256": "84913e62d0d364d6b91d85c039f262e5ffc1541f3daf408e9892e2328be1765d",
+      "frame_sha256": "ed28d09dd95541b24c99893ed75eca09ba51904bf243c61bfd62da6899624aa3",
       "item_count": 0,
       "kind": "GET_STATUS_RESPONSE",
-      "payload_length": 224,
-      "payload_sha256": "e151796d7257a88547de6dd108ce543674d304a10ded3f868d1a83cab276937c",
+      "payload_length": 368,
+      "payload_sha256": "0bcae63c866f99a3dea95a097e5aad7b72d33c61f5d62700ccffb78d7968fd71",
       "request_id": 4,
       "run_id": 7,
       "sequence": 0,
-      "total_length": 272
+      "total_length": 416
     },
     {
       "checksum": "0xd1340448",
@@ -393,5 +392,5 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 1,
   "source": "protocol/protocol-v1.json",
-  "source_sha256": "ee4d21e1c8f34d263f0395ec5e05d240f677fc91a5e7aec8c3716ef245c02a43"
+  "source_sha256": "071a210cfc9359a9f8002ce96aff246e4255a2317977ee91cbe7a97ed74d44cc"
 }

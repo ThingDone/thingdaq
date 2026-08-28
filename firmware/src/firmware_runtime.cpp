@@ -11,12 +11,19 @@ namespace teensy_daq::runtime {
 
 TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.begin")
 bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
-  if (adc_initializer_ == nullptr) {
-    return control_.completeBoot(hardware_serial);
+  protocol::AdcInitializationMetadata metadata{};
+  bool converters_ready = false;
+  if (adc_initializer_ != nullptr) {
+    const adc::Snapshot &snapshot = adc_initializer_->initialize();
+    metadata = adc::protocolMetadata(snapshot);
+    converters_ready = snapshot.ready();
   }
-  const adc::Snapshot &snapshot = adc_initializer_->initialize();
-  return control_.completeBoot(hardware_serial,
-                               adc::protocolMetadata(snapshot));
+  if (adc_trigger_scheduler_ != nullptr) {
+    const adc_trigger::Snapshot &trigger_snapshot =
+        adc_trigger_scheduler_->initialize(converters_ready);
+    metadata.trigger = adc_trigger::protocolMetadata(trigger_snapshot);
+  }
+  return control_.completeBoot(hardware_serial, metadata);
 }
 
 LoopReport FirmwareRuntime::service() {

@@ -1,5 +1,5 @@
 /*
- * Teensy DAQ Phase 06 physical GPIO acquisition runtime.
+ * Teensy DAQ Phase 07 synchronized GPIO and dual-ADC runtime.
  *
  * Native USB and its chip-derived serial descriptor are initialized by the
  * pinned Teensy core before global C++ construction and setup(). The portable
@@ -7,6 +7,7 @@
  */
 #include "src/firmware_runtime.h"
 #include "src/adc_initializer_teensy.h"
+#include "src/adc_trigger_teensy.h"
 #include "src/checksum_benchmark_teensy.h"
 #include "src/gpio_clock_diagnostic_teensy.h"
 #include "src/gpio_capture_diagnostic_teensy.h"
@@ -16,7 +17,6 @@
 #include "src/teensy_usb.h"
 
 namespace {
-
 // Packet banks stay CPU-owned; the CDC core copies into its own DMA TX ring.
 teensy_daq::usb::TeensyCdcByteStream cdc_stream{};
 teensy_daq::packet::PacketBufferPrimaryStorage packet_storage_primary{};
@@ -36,7 +36,8 @@ teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream,
                                                        &teensy_daq::gpio_capture::teensyRawCapture(),
                                                        &gpio_packer,
                                                        &teensy_daq::gpio_diagnostic::teensyRunner(),
-                                                       &teensy_daq::adc::teensyInitializer()};
+                                                       &teensy_daq::adc::teensyInitializer(),
+                                                       &teensy_daq::adc_trigger::teensyScheduler()};
 
 }  // namespace
 
@@ -48,8 +49,7 @@ void setup() {
 }
 
 void loop() {
-  // One call performs bounded RX, at most one command dispatch, event
-  // acknowledgement, packet promotion, and bounded TX. Teensy's main() calls
-  // yield afterward.
+  // Service one bounded cooperative control/data-path iteration. Teensy's
+  // main() calls yield afterward.
   (void)firmware_runtime.service();
 }

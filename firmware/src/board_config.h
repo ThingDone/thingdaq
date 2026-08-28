@@ -726,6 +726,26 @@ static_assert(kGpioXbarActiveEdge == protocol_v1::kGpioXbarActiveEdge);
 static_assert(kGpioEdmaChannel == protocol_v1::kGpioEdmaChannel);
 static_assert(kGpioDmamuxSource == protocol_v1::kGpioDmamuxSource);
 static_assert(kGpioEdmaPriority == protocol_v1::kGpioEdmaPriority);
+static_assert(kGpioPitChannel ==
+              protocol_v1::kAdcTriggerGpioMasterPitChannel);
+static_assert(kPitAllocations[1].channel ==
+              protocol_v1::kAdcTriggerPairPitChannel);
+static_assert(kAdcConverterConfigurations[0].input_channel ==
+              protocol_v1::kAdcChannels[0]);
+static_assert(kAdcConverterConfigurations[1].input_channel ==
+              protocol_v1::kAdcChannels[1]);
+static_assert(kAdcConverterConfigurations[0].adc_etc_trigger ==
+              protocol_v1::kAdcTriggerQueues[0]);
+static_assert(kAdcConverterConfigurations[1].adc_etc_trigger ==
+              protocol_v1::kAdcTriggerQueues[1]);
+static_assert(kAdcConverterConfigurations[0].xbar_input ==
+              protocol_v1::kAdcTriggerXbarInputs[0]);
+static_assert(kAdcConverterConfigurations[1].xbar_input ==
+              protocol_v1::kAdcTriggerXbarInputs[1]);
+static_assert(kAdcConverterConfigurations[0].xbar_output ==
+              protocol_v1::kAdcTriggerXbarOutputs[0]);
+static_assert(kAdcConverterConfigurations[1].xbar_output ==
+              protocol_v1::kAdcTriggerXbarOutputs[1]);
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
 static_assert(kTeensy40DigitalPinCount == CORE_NUM_DIGITAL);

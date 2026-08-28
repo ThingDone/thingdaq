@@ -28,10 +28,11 @@ D6-D13 remapping and rotating `GPIO2_PSR` capture, but the physical GPIO source
 remains disabled until the later packing, integration, and streaming gates
 pass. The existing synthetic generators and packetizer remain cooperative and
 do not claim physical acquisition resources. Phase 07 now fixes the complete
-logical-converter routes in [[ADR-004-ADC-Trigger-DMA]], but no low-level ADC
-code or physical ADC capability is enabled yet. See [[System-Overview]] for
-that boundary and [[Protocol-V1]] with [[ADR-001-Wire-Protocol]] for the wire
-metadata.
+logical-converter routes and implements their PIT/XBAR/ADC_ETC schedule,
+stopped arm/teardown, and bounded completion-timing diagnostic in
+[[ADR-004-ADC-Trigger-DMA]]. ADC DMA and physical ADC capability are not
+enabled yet. See [[System-Overview]] for that boundary and [[Protocol-V1]]
+with [[ADR-001-Wire-Protocol]] for the wire metadata.
 
 ## Fixed platform
 
@@ -114,14 +115,18 @@ integration review.
 OctoWS2811 also owns XBARA1 outputs 0-2 and DMAMUX sources 30/31/94 when used;
 it is a reviewed pattern source and cannot coexist with this acquisition map.
 
-[[ADR-004-ADC-Trigger-DMA]] records the selected but unverified ADC schedule.
+[[ADR-004-ADC-Trigger-DMA]] records the implemented but not yet
+silicon-verified ADC schedule.
 Chained PIT1 divides the verified 4 MHz PIT0 event by four. In the 150 MHz
 ADC_ETC/IPG domain with predivider zero, raw initial delays 0 and 75 become
 effective delays of 1 and 76 cycles; their difference is exactly 75 cycles, or
 500 ns. This four-tick phase is digital trigger/timestamp metadata, not a
-physical aperture claim. Future hardware work must prove the trigger path and
-label any completion timing separately from analog aperture before enabling
-physical ADC capability.
+physical aperture claim. The BOOT diagnostic records first ADC_ETC
+conversion-completion interrupts against DWT, accepts an explicit 300 ± 120
+cycle completion delta, and exposes configured registers, counts, and errors
+in INFO/STATUS. Later hardware work must still prove the trigger path on
+silicon and keep completion timing separate from analog aperture before
+enabling physical ADC capability.
 
 ## eDMA reservations
 

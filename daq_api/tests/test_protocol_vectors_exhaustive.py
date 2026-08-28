@@ -69,8 +69,26 @@ class _GoldenVector:
     item_count: int = 0
 
 
+def _pack_adc_trigger_reference(payload: bytearray, base: int) -> None:
+    """Pack the independent default trigger-plan image used by fixtures."""
+
+    struct.pack_into(
+        "<IIIII",
+        payload,
+        base + 8,
+        24_000_000,
+        600_000_000,
+        4_000_000,
+        1_000_000,
+        150_000_000,
+    )
+    payload[base + 28 : base + 40] = bytes((0, 1, 5, 3, 0, 1, 57, 57, 103, 107, 0, 4))
+    struct.pack_into("<HHHHH", payload, base + 40, 0, 75, 1, 76, 75)
+    struct.pack_into("<II", payload, base + 124, 300, 120)
+
+
 def _info_payload() -> bytes:
-    payload = bytearray(180)
+    payload = bytearray(324)
     struct.pack_into("<BBHBBBB", payload, 0, 0, 0, 0, 1, 1, 3, 3)
     struct.pack_into(
         "<IIIIIII",
@@ -111,11 +129,12 @@ def _info_payload() -> bytes:
     )
     struct.pack_into("<BBBBBBBBH", payload, 146, 0, 0, 14, 15, 1, 2, 7, 8, 0)
     struct.pack_into("<IIIIII", payload, 156, 150_000_000, 37_500_000, 10_000, 0, 0, 0)
+    _pack_adc_trigger_reference(payload, 180)
     return bytes(payload)
 
 
 def _status_payload() -> bytes:
-    payload = bytearray(224)
+    payload = bytearray(368)
     struct.pack_into(
         "<BBHBBBBIQQQQIII",
         payload,
@@ -157,6 +176,7 @@ def _status_payload() -> bytes:
     )
     struct.pack_into("<BBBBBB", payload, 194, 14, 15, 1, 2, 7, 8)
     struct.pack_into("<IIIIII", payload, 200, 150_000_000, 37_500_000, 10_000, 0, 0, 0)
+    _pack_adc_trigger_reference(payload, 224)
     return bytes(payload)
 
 

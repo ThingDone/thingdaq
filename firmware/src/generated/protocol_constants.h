@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: ee4d21e1c8f34d263f0395ec5e05d240f677fc91a5e7aec8c3716ef245c02a43
+// Source SHA-256: 071a210cfc9359a9f8002ce96aff246e4255a2317977ee91cbe7a97ed74d44cc
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "ee4d21e1c8f34d263f0395ec5e05d240f677fc91a5e7aec8c3716ef245c02a43";
+inline constexpr char kSourceSha256[] = "071a210cfc9359a9f8002ce96aff246e4255a2317977ee91cbe7a97ed74d44cc";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -78,6 +78,28 @@ inline constexpr std::uint32_t kAdcCalibrationPollLimit = 8000000U;
 inline constexpr std::uint8_t kAdcPins[] = {14U, 15U};
 inline constexpr std::uint8_t kAdcPeripherals[] = {1U, 2U};
 inline constexpr std::uint8_t kAdcChannels[] = {7U, 8U};
+inline constexpr std::uint32_t kAdcTriggerPitClockHz = 24000000U;
+inline constexpr std::uint32_t kAdcTriggerDwtClockHz = 600000000U;
+inline constexpr std::uint32_t kAdcTriggerGpioMasterRateHz = 4000000U;
+inline constexpr std::uint32_t kAdcTriggerPairRateHz = 1000000U;
+inline constexpr std::uint32_t kAdcTriggerIpgClockHz = 150000000U;
+inline constexpr std::uint8_t kAdcTriggerGpioMasterPitChannel = 0U;
+inline constexpr std::uint8_t kAdcTriggerPairPitChannel = 1U;
+inline constexpr std::uint8_t kAdcTriggerGpioMasterPitLoad = 5U;
+inline constexpr std::uint8_t kAdcTriggerPairPitLoad = 3U;
+inline constexpr std::uint8_t kAdcTriggerPredivider = 0U;
+inline constexpr std::uint8_t kAdcTriggerChainLength = 1U;
+inline constexpr std::uint8_t kAdcTriggerXbarInputs[] = {57U, 57U};
+inline constexpr std::uint8_t kAdcTriggerXbarOutputs[] = {103U, 107U};
+inline constexpr std::uint8_t kAdcTriggerQueues[] = {0U, 4U};
+inline constexpr std::uint16_t kAdcTriggerInitialDelays[] = {0U, 75U};
+inline constexpr std::uint16_t kAdcTriggerEffectiveDelays[] = {1U, 76U};
+inline constexpr std::uint16_t kAdcTriggerPhaseIpgCycles = 75U;
+inline constexpr std::uint32_t kAdcCompletionExpectedDwtCycles = 300U;
+inline constexpr std::uint32_t kAdcCompletionToleranceDwtCycles = 120U;
+inline constexpr std::uint32_t kAdcTriggerDiagnosticDeadlineUs = 2000U;
+inline constexpr std::uint32_t kAdcTriggerDiagnosticPollLimit = 2000000U;
+inline constexpr std::uint8_t kAdcTriggerIrqPriority = 32U;
 inline constexpr std::size_t kAdcBytesPerPair = 4U;
 inline constexpr std::size_t kAdcPairsPerFrame = 1012U;
 inline constexpr std::uint8_t kAdcResolutionBits = 12U;
@@ -333,6 +355,35 @@ enum class AdcInitializationError : std::uint32_t {
   kAdc1ReadbackInvalid = 1024U,
 };
 
+enum class AdcTriggerConfigurationFlag : std::uint16_t {
+  kConfiguredStopped = 1U,
+  kClocksValid = 2U,
+  kXbarRoutesValid = 4U,
+  kQueuesValid = 8U,
+  kAdcHardwareTriggerValid = 16U,
+  kArmSequenceExercised = 32U,
+  kCompletionTimingValid = 64U,
+  kStoppedAfterDiagnostic = 128U,
+};
+
+enum class AdcTriggerError : std::uint32_t {
+  kConvertersNotReady = 1U,
+  kResourceBusy = 2U,
+  kPerclkMismatch = 4U,
+  kIpgClockMismatch = 8U,
+  kDwtUnavailable = 16U,
+  kPitConfigMismatch = 32U,
+  kXbarConfigMismatch = 64U,
+  kAdcEtcConfigMismatch = 128U,
+  kAdcHardwareTriggerMismatch = 256U,
+  kArmFailed = 512U,
+  kDiagnosticTimeout = 1024U,
+  kAdcEtcTriggerError = 2048U,
+  kCompletionCountMismatch = 4096U,
+  kCompletionTimingOutOfTolerance = 8192U,
+  kCleanupFailed = 16384U,
+};
+
 inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
@@ -345,6 +396,8 @@ inline constexpr std::uint32_t kKnownGpioCaptureDiagnosticFlagMask = 511U;
 inline constexpr std::uint32_t kKnownGpioCaptureErrorMask = 65535U;
 inline constexpr std::uint16_t kKnownAdcConfigurationFlagMask = 511U;
 inline constexpr std::uint32_t kKnownAdcInitializationErrorMask = 2047U;
+inline constexpr std::uint16_t kKnownAdcTriggerConfigurationFlagMask = 255U;
+inline constexpr std::uint32_t kKnownAdcTriggerErrorMask = 32767U;
 
 inline constexpr std::size_t kEmptyPayloadSize = 0U;
 inline constexpr std::size_t kAdcDataPayloadSize = 4048U;
@@ -363,7 +416,7 @@ inline constexpr std::size_t kResponsePrefixPayloadSize = 4U;
 inline constexpr std::size_t kResponsePrefixResponseStatusOffset = 0U;
 inline constexpr std::size_t kResponsePrefixReservedOffset = 1U;
 inline constexpr std::size_t kResponsePrefixErrorCodeOffset = 2U;
-inline constexpr std::size_t kInfoResponsePayloadSize = 180U;
+inline constexpr std::size_t kInfoResponsePayloadSize = 324U;
 inline constexpr std::size_t kInfoResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kInfoResponseReserved0Offset = 1U;
 inline constexpr std::size_t kInfoResponseErrorCodeOffset = 2U;
@@ -441,6 +494,56 @@ inline constexpr std::size_t kInfoResponseAdcCalibrationDeadlineUsOffset = 164U;
 inline constexpr std::size_t kInfoResponseAdc0CalibrationCyclesOffset = 168U;
 inline constexpr std::size_t kInfoResponseAdc1CalibrationCyclesOffset = 172U;
 inline constexpr std::size_t kInfoResponseAdcInitializationErrorFlagsOffset = 176U;
+inline constexpr std::size_t kInfoResponseAdcTriggerConfigurationFlagsOffset = 180U;
+inline constexpr std::size_t kInfoResponseReserved6Offset = 182U;
+inline constexpr std::size_t kInfoResponseAdcTriggerErrorFlagsOffset = 184U;
+inline constexpr std::size_t kInfoResponseAdcTriggerPitClockHzOffset = 188U;
+inline constexpr std::size_t kInfoResponseAdcTriggerDwtClockHzOffset = 192U;
+inline constexpr std::size_t kInfoResponseAdcTriggerGpioMasterRateHzOffset = 196U;
+inline constexpr std::size_t kInfoResponseAdcTriggerPairRateHzOffset = 200U;
+inline constexpr std::size_t kInfoResponseAdcTriggerIpgClockHzOffset = 204U;
+inline constexpr std::size_t kInfoResponseAdcTriggerGpioMasterPitChannelOffset = 208U;
+inline constexpr std::size_t kInfoResponseAdcTriggerPairPitChannelOffset = 209U;
+inline constexpr std::size_t kInfoResponseAdcTriggerGpioMasterPitLoadOffset = 210U;
+inline constexpr std::size_t kInfoResponseAdcTriggerPairPitLoadOffset = 211U;
+inline constexpr std::size_t kInfoResponseAdcTriggerPredividerOffset = 212U;
+inline constexpr std::size_t kInfoResponseAdcTriggerChainLengthOffset = 213U;
+inline constexpr std::size_t kInfoResponseAdc0TriggerXbarInputOffset = 214U;
+inline constexpr std::size_t kInfoResponseAdc1TriggerXbarInputOffset = 215U;
+inline constexpr std::size_t kInfoResponseAdc0TriggerXbarOutputOffset = 216U;
+inline constexpr std::size_t kInfoResponseAdc1TriggerXbarOutputOffset = 217U;
+inline constexpr std::size_t kInfoResponseAdc0EtcTriggerQueueOffset = 218U;
+inline constexpr std::size_t kInfoResponseAdc1EtcTriggerQueueOffset = 219U;
+inline constexpr std::size_t kInfoResponseAdc0TriggerInitialDelayOffset = 220U;
+inline constexpr std::size_t kInfoResponseAdc1TriggerInitialDelayOffset = 222U;
+inline constexpr std::size_t kInfoResponseAdc0TriggerEffectiveDelayOffset = 224U;
+inline constexpr std::size_t kInfoResponseAdc1TriggerEffectiveDelayOffset = 226U;
+inline constexpr std::size_t kInfoResponseAdcTriggerPhaseIpgCyclesOffset = 228U;
+inline constexpr std::size_t kInfoResponseReserved7Offset = 230U;
+inline constexpr std::size_t kInfoResponseAdcTriggerCcmCscmr1ConfiguredOffset = 232U;
+inline constexpr std::size_t kInfoResponseAdcTriggerCcmCcgr1ConfiguredOffset = 236U;
+inline constexpr std::size_t kInfoResponseAdcTriggerCcmCcgr2ConfiguredOffset = 240U;
+inline constexpr std::size_t kInfoResponseAdcTriggerPitMcrConfiguredOffset = 244U;
+inline constexpr std::size_t kInfoResponseAdcTriggerGpioMasterTctrlConfiguredOffset = 248U;
+inline constexpr std::size_t kInfoResponseAdcTriggerPairTctrlConfiguredOffset = 252U;
+inline constexpr std::size_t kInfoResponseAdcEtcCtrlConfiguredOffset = 256U;
+inline constexpr std::size_t kInfoResponseAdc0EtcTriggerCtrlConfiguredOffset = 260U;
+inline constexpr std::size_t kInfoResponseAdc1EtcTriggerCtrlConfiguredOffset = 264U;
+inline constexpr std::size_t kInfoResponseAdc0EtcTriggerCounterConfiguredOffset = 268U;
+inline constexpr std::size_t kInfoResponseAdc1EtcTriggerCounterConfiguredOffset = 272U;
+inline constexpr std::size_t kInfoResponseAdc0EtcChainConfiguredOffset = 276U;
+inline constexpr std::size_t kInfoResponseAdc1EtcChainConfiguredOffset = 280U;
+inline constexpr std::size_t kInfoResponseAdcEtcDone01IrqFinalOffset = 284U;
+inline constexpr std::size_t kInfoResponseAdcEtcDone2ErrIrqFinalOffset = 288U;
+inline constexpr std::size_t kInfoResponseAdc0CompletionCountOffset = 292U;
+inline constexpr std::size_t kInfoResponseAdc1CompletionCountOffset = 296U;
+inline constexpr std::size_t kInfoResponseAdcCompletionDeltaCyclesOffset = 300U;
+inline constexpr std::size_t kInfoResponseAdcCompletionExpectedDeltaCyclesOffset = 304U;
+inline constexpr std::size_t kInfoResponseAdcCompletionToleranceCyclesOffset = 308U;
+inline constexpr std::size_t kInfoResponseAdcCompletionDiagnosticElapsedCyclesOffset = 312U;
+inline constexpr std::size_t kInfoResponseAdcTriggerErrorCountOffset = 316U;
+inline constexpr std::size_t kInfoResponseAdc0TriggerXbarSelConfiguredOffset = 320U;
+inline constexpr std::size_t kInfoResponseAdc1TriggerXbarSelConfiguredOffset = 322U;
 inline constexpr std::size_t kConfigureResponsePayloadSize = 12U;
 inline constexpr std::size_t kConfigureResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kConfigureResponseReserved0Offset = 1U;
@@ -450,7 +553,7 @@ inline constexpr std::size_t kConfigureResponseSourceOffset = 5U;
 inline constexpr std::size_t kConfigureResponseDataChecksumAlgorithmOffset = 6U;
 inline constexpr std::size_t kConfigureResponseReserved1Offset = 7U;
 inline constexpr std::size_t kConfigureResponseDataFrameBytesOffset = 8U;
-inline constexpr std::size_t kStatusResponsePayloadSize = 224U;
+inline constexpr std::size_t kStatusResponsePayloadSize = 368U;
 inline constexpr std::size_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::size_t kStatusResponseErrorCodeOffset = 2U;
@@ -519,6 +622,56 @@ inline constexpr std::size_t kStatusResponseAdcCalibrationDeadlineUsOffset = 208
 inline constexpr std::size_t kStatusResponseAdc0CalibrationCyclesOffset = 212U;
 inline constexpr std::size_t kStatusResponseAdc1CalibrationCyclesOffset = 216U;
 inline constexpr std::size_t kStatusResponseAdcInitializationErrorFlagsOffset = 220U;
+inline constexpr std::size_t kStatusResponseAdcTriggerConfigurationFlagsOffset = 224U;
+inline constexpr std::size_t kStatusResponseReserved2Offset = 226U;
+inline constexpr std::size_t kStatusResponseAdcTriggerErrorFlagsOffset = 228U;
+inline constexpr std::size_t kStatusResponseAdcTriggerPitClockHzOffset = 232U;
+inline constexpr std::size_t kStatusResponseAdcTriggerDwtClockHzOffset = 236U;
+inline constexpr std::size_t kStatusResponseAdcTriggerGpioMasterRateHzOffset = 240U;
+inline constexpr std::size_t kStatusResponseAdcTriggerPairRateHzOffset = 244U;
+inline constexpr std::size_t kStatusResponseAdcTriggerIpgClockHzOffset = 248U;
+inline constexpr std::size_t kStatusResponseAdcTriggerGpioMasterPitChannelOffset = 252U;
+inline constexpr std::size_t kStatusResponseAdcTriggerPairPitChannelOffset = 253U;
+inline constexpr std::size_t kStatusResponseAdcTriggerGpioMasterPitLoadOffset = 254U;
+inline constexpr std::size_t kStatusResponseAdcTriggerPairPitLoadOffset = 255U;
+inline constexpr std::size_t kStatusResponseAdcTriggerPredividerOffset = 256U;
+inline constexpr std::size_t kStatusResponseAdcTriggerChainLengthOffset = 257U;
+inline constexpr std::size_t kStatusResponseAdc0TriggerXbarInputOffset = 258U;
+inline constexpr std::size_t kStatusResponseAdc1TriggerXbarInputOffset = 259U;
+inline constexpr std::size_t kStatusResponseAdc0TriggerXbarOutputOffset = 260U;
+inline constexpr std::size_t kStatusResponseAdc1TriggerXbarOutputOffset = 261U;
+inline constexpr std::size_t kStatusResponseAdc0EtcTriggerQueueOffset = 262U;
+inline constexpr std::size_t kStatusResponseAdc1EtcTriggerQueueOffset = 263U;
+inline constexpr std::size_t kStatusResponseAdc0TriggerInitialDelayOffset = 264U;
+inline constexpr std::size_t kStatusResponseAdc1TriggerInitialDelayOffset = 266U;
+inline constexpr std::size_t kStatusResponseAdc0TriggerEffectiveDelayOffset = 268U;
+inline constexpr std::size_t kStatusResponseAdc1TriggerEffectiveDelayOffset = 270U;
+inline constexpr std::size_t kStatusResponseAdcTriggerPhaseIpgCyclesOffset = 272U;
+inline constexpr std::size_t kStatusResponseReserved3Offset = 274U;
+inline constexpr std::size_t kStatusResponseAdcTriggerCcmCscmr1ConfiguredOffset = 276U;
+inline constexpr std::size_t kStatusResponseAdcTriggerCcmCcgr1ConfiguredOffset = 280U;
+inline constexpr std::size_t kStatusResponseAdcTriggerCcmCcgr2ConfiguredOffset = 284U;
+inline constexpr std::size_t kStatusResponseAdcTriggerPitMcrConfiguredOffset = 288U;
+inline constexpr std::size_t kStatusResponseAdcTriggerGpioMasterTctrlConfiguredOffset = 292U;
+inline constexpr std::size_t kStatusResponseAdcTriggerPairTctrlConfiguredOffset = 296U;
+inline constexpr std::size_t kStatusResponseAdcEtcCtrlConfiguredOffset = 300U;
+inline constexpr std::size_t kStatusResponseAdc0EtcTriggerCtrlConfiguredOffset = 304U;
+inline constexpr std::size_t kStatusResponseAdc1EtcTriggerCtrlConfiguredOffset = 308U;
+inline constexpr std::size_t kStatusResponseAdc0EtcTriggerCounterConfiguredOffset = 312U;
+inline constexpr std::size_t kStatusResponseAdc1EtcTriggerCounterConfiguredOffset = 316U;
+inline constexpr std::size_t kStatusResponseAdc0EtcChainConfiguredOffset = 320U;
+inline constexpr std::size_t kStatusResponseAdc1EtcChainConfiguredOffset = 324U;
+inline constexpr std::size_t kStatusResponseAdcEtcDone01IrqFinalOffset = 328U;
+inline constexpr std::size_t kStatusResponseAdcEtcDone2ErrIrqFinalOffset = 332U;
+inline constexpr std::size_t kStatusResponseAdc0CompletionCountOffset = 336U;
+inline constexpr std::size_t kStatusResponseAdc1CompletionCountOffset = 340U;
+inline constexpr std::size_t kStatusResponseAdcCompletionDeltaCyclesOffset = 344U;
+inline constexpr std::size_t kStatusResponseAdcCompletionExpectedDeltaCyclesOffset = 348U;
+inline constexpr std::size_t kStatusResponseAdcCompletionToleranceCyclesOffset = 352U;
+inline constexpr std::size_t kStatusResponseAdcCompletionDiagnosticElapsedCyclesOffset = 356U;
+inline constexpr std::size_t kStatusResponseAdcTriggerErrorCountOffset = 360U;
+inline constexpr std::size_t kStatusResponseAdc0TriggerXbarSelConfiguredOffset = 364U;
+inline constexpr std::size_t kStatusResponseAdc1TriggerXbarSelConfiguredOffset = 366U;
 inline constexpr std::size_t kStopResponsePayloadSize = 8U;
 inline constexpr std::size_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStopResponseReserved0Offset = 1U;

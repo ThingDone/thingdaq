@@ -673,6 +673,231 @@ Result validateAdcMetadata(ByteView payload,
   return Result::success();
 }
 
+namespace adc_trigger_wire {
+inline constexpr std::size_t kBytes = 144U;
+inline constexpr std::size_t kConfigurationFlags = 0U;
+inline constexpr std::size_t kReserved0 = 2U;
+inline constexpr std::size_t kErrorFlags = 4U;
+inline constexpr std::size_t kPitClockHz = 8U;
+inline constexpr std::size_t kDwtClockHz = 12U;
+inline constexpr std::size_t kGpioMasterRateHz = 16U;
+inline constexpr std::size_t kPairRateHz = 20U;
+inline constexpr std::size_t kIpgClockHz = 24U;
+inline constexpr std::size_t kGpioMasterPitChannel = 28U;
+inline constexpr std::size_t kPairPitChannel = 29U;
+inline constexpr std::size_t kGpioMasterPitLoad = 30U;
+inline constexpr std::size_t kPairPitLoad = 31U;
+inline constexpr std::size_t kPredivider = 32U;
+inline constexpr std::size_t kChainLength = 33U;
+inline constexpr std::size_t kXbarInputs = 34U;
+inline constexpr std::size_t kXbarOutputs = 36U;
+inline constexpr std::size_t kTriggerQueues = 38U;
+inline constexpr std::size_t kInitialDelays = 40U;
+inline constexpr std::size_t kEffectiveDelays = 44U;
+inline constexpr std::size_t kPhaseIpgCycles = 48U;
+inline constexpr std::size_t kReserved1 = 50U;
+inline constexpr std::size_t kCcmCscmr1 = 52U;
+inline constexpr std::size_t kCcmCcgr1 = 56U;
+inline constexpr std::size_t kCcmCcgr2 = 60U;
+inline constexpr std::size_t kPitMcr = 64U;
+inline constexpr std::size_t kMasterTctrl = 68U;
+inline constexpr std::size_t kPairTctrl = 72U;
+inline constexpr std::size_t kAdcEtcCtrl = 76U;
+inline constexpr std::size_t kTriggerCtrl = 80U;
+inline constexpr std::size_t kTriggerCounter = 88U;
+inline constexpr std::size_t kChain = 96U;
+inline constexpr std::size_t kDone0_1Irq = 104U;
+inline constexpr std::size_t kDone2ErrIrq = 108U;
+inline constexpr std::size_t kCompletionCounts = 112U;
+inline constexpr std::size_t kCompletionDelta = 120U;
+inline constexpr std::size_t kCompletionExpected = 124U;
+inline constexpr std::size_t kCompletionTolerance = 128U;
+inline constexpr std::size_t kDiagnosticElapsed = 132U;
+inline constexpr std::size_t kTriggerErrorCount = 136U;
+inline constexpr std::size_t kXbarSelections = 140U;
+}  // namespace adc_trigger_wire
+
+TEENSY_DAQ_PROTOCOL_COLD_CODE(
+    ".flashmem.protocol.adc_trigger_metadata_validation")
+Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
+  using namespace adc_trigger_wire;
+  if (!hasRange(payload.size, base, kBytes)) {
+    return badLength();
+  }
+
+  std::uint16_t flags = 0U;
+  std::uint16_t value16 = 0U;
+  std::uint32_t errors = 0U;
+  if (!loadU16(payload, base + kConfigurationFlags, flags) ||
+      (flags & ~protocol_v1::kKnownAdcTriggerConfigurationFlagMask) != 0U ||
+      !loadU16(payload, base + kReserved0, value16) || value16 != 0U ||
+      !loadU32(payload, base + kErrorFlags, errors) ||
+      (errors & ~protocol_v1::kKnownAdcTriggerErrorMask) != 0U ||
+      !loadU16(payload, base + kReserved1, value16) || value16 != 0U) {
+    return badPayload();
+  }
+
+  const std::size_t fixed32_offsets[] = {
+      kPitClockHz, kDwtClockHz, kGpioMasterRateHz, kPairRateHz,
+      kIpgClockHz, kCompletionExpected, kCompletionTolerance};
+  const std::uint32_t fixed32_expected[] = {
+      protocol_v1::kAdcTriggerPitClockHz,
+      protocol_v1::kAdcTriggerDwtClockHz,
+      protocol_v1::kAdcTriggerGpioMasterRateHz,
+      protocol_v1::kAdcTriggerPairRateHz,
+      protocol_v1::kAdcTriggerIpgClockHz,
+      protocol_v1::kAdcCompletionExpectedDwtCycles,
+      protocol_v1::kAdcCompletionToleranceDwtCycles};
+  std::uint32_t value32 = 0U;
+  for (std::size_t index = 0U;
+       index < sizeof(fixed32_offsets) / sizeof(fixed32_offsets[0]); ++index) {
+    if (!loadU32(payload, base + fixed32_offsets[index], value32) ||
+        value32 != fixed32_expected[index]) {
+      return badPayload();
+    }
+  }
+
+  const std::uint8_t fixed8_expected[] = {
+      protocol_v1::kAdcTriggerGpioMasterPitChannel,
+      protocol_v1::kAdcTriggerPairPitChannel,
+      protocol_v1::kAdcTriggerGpioMasterPitLoad,
+      protocol_v1::kAdcTriggerPairPitLoad,
+      protocol_v1::kAdcTriggerPredivider,
+      protocol_v1::kAdcTriggerChainLength,
+      protocol_v1::kAdcTriggerXbarInputs[0],
+      protocol_v1::kAdcTriggerXbarInputs[1],
+      protocol_v1::kAdcTriggerXbarOutputs[0],
+      protocol_v1::kAdcTriggerXbarOutputs[1],
+      protocol_v1::kAdcTriggerQueues[0],
+      protocol_v1::kAdcTriggerQueues[1]};
+  for (std::size_t index = 0U;
+       index < sizeof(fixed8_expected) / sizeof(fixed8_expected[0]); ++index) {
+    if (payload.data[base + kGpioMasterPitChannel + index] !=
+        fixed8_expected[index]) {
+      return badPayload();
+    }
+  }
+
+  const std::size_t fixed16_offsets[] = {
+      kInitialDelays, kInitialDelays + 2U, kEffectiveDelays,
+      kEffectiveDelays + 2U, kPhaseIpgCycles};
+  const std::uint16_t fixed16_expected[] = {
+      protocol_v1::kAdcTriggerInitialDelays[0],
+      protocol_v1::kAdcTriggerInitialDelays[1],
+      protocol_v1::kAdcTriggerEffectiveDelays[0],
+      protocol_v1::kAdcTriggerEffectiveDelays[1],
+      protocol_v1::kAdcTriggerPhaseIpgCycles};
+  for (std::size_t index = 0U;
+       index < sizeof(fixed16_offsets) / sizeof(fixed16_offsets[0]); ++index) {
+    if (!loadU16(payload, base + fixed16_offsets[index], value16) ||
+        value16 != fixed16_expected[index]) {
+      return badPayload();
+    }
+  }
+
+  std::uint32_t completion0 = 0U;
+  std::uint32_t completion1 = 0U;
+  std::uint32_t completion_delta = 0U;
+  std::uint32_t diagnostic_elapsed = 0U;
+  // The wait loop itself has independent cycle and poll ceilings. Preserve a
+  // small observed deadline overshoot here so failure telemetry remains
+  // encodable after interrupt/preemption or the terminal DWT read.
+  if (!loadU32(payload, base + kCompletionCounts, completion0) ||
+      !loadU32(payload, base + kCompletionCounts + 4U, completion1) ||
+      !loadU32(payload, base + kCompletionDelta, completion_delta) ||
+      !loadU32(payload, base + kDiagnosticElapsed, diagnostic_elapsed)) {
+    return badPayload();
+  }
+  (void)diagnostic_elapsed;
+  const std::uint16_t timing_valid = static_cast<std::uint16_t>(
+      protocol_v1::AdcTriggerConfigurationFlag::kCompletionTimingValid);
+  const std::uint16_t arm_exercised = static_cast<std::uint16_t>(
+      protocol_v1::AdcTriggerConfigurationFlag::kArmSequenceExercised);
+  const std::uint16_t stopped = static_cast<std::uint16_t>(
+      protocol_v1::AdcTriggerConfigurationFlag::kStoppedAfterDiagnostic);
+  if ((flags & timing_valid) != 0U &&
+      (errors != 0U || completion0 == 0U || completion1 == 0U ||
+       (flags & arm_exercised) == 0U || (flags & stopped) == 0U ||
+       absoluteDifference(completion_delta,
+                          protocol_v1::kAdcCompletionExpectedDwtCycles) >
+           protocol_v1::kAdcCompletionToleranceDwtCycles)) {
+    return badPayload();
+  }
+  return Result::success();
+}
+
+TEENSY_DAQ_PROTOCOL_COLD_CODE(
+    ".flashmem.protocol.adc_trigger_metadata_encoding")
+void encodeAdcTriggerMetadata(MutableByteView payload, std::size_t base,
+                              const AdcTriggerMetadata &trigger) {
+  using namespace adc_trigger_wire;
+  storeU16(payload, base + kConfigurationFlags,
+           trigger.configuration_flags);
+  storeU32(payload, base + kErrorFlags, trigger.error_flags);
+  storeU32(payload, base + kPitClockHz, trigger.pit_clock_hz);
+  storeU32(payload, base + kDwtClockHz, trigger.dwt_clock_hz);
+  storeU32(payload, base + kGpioMasterRateHz,
+           trigger.gpio_master_rate_hz);
+  storeU32(payload, base + kPairRateHz, trigger.pair_rate_hz);
+  storeU32(payload, base + kIpgClockHz, trigger.ipg_clock_hz);
+  payload.data[base + kGpioMasterPitChannel] =
+      trigger.gpio_master_pit_channel;
+  payload.data[base + kPairPitChannel] = trigger.pair_pit_channel;
+  payload.data[base + kGpioMasterPitLoad] = trigger.gpio_master_pit_load;
+  payload.data[base + kPairPitLoad] = trigger.pair_pit_load;
+  payload.data[base + kPredivider] = trigger.predivider;
+  payload.data[base + kChainLength] = trigger.chain_length;
+  for (std::size_t index = 0U; index < 2U; ++index) {
+    payload.data[base + kXbarInputs + index] = trigger.xbar_inputs[index];
+    payload.data[base + kXbarOutputs + index] = trigger.xbar_outputs[index];
+    payload.data[base + kTriggerQueues + index] =
+        trigger.trigger_queues[index];
+    storeU16(payload, base + kInitialDelays + index * 2U,
+             trigger.initial_delays[index]);
+    storeU16(payload, base + kEffectiveDelays + index * 2U,
+             trigger.effective_delays[index]);
+    storeU32(payload, base + kTriggerCtrl + index * 4U,
+             trigger.evidence.trigger_ctrl_configured[index]);
+    storeU32(payload, base + kTriggerCounter + index * 4U,
+             trigger.evidence.trigger_counter_configured[index]);
+    storeU32(payload, base + kChain + index * 4U,
+             trigger.evidence.chain_configured[index]);
+    storeU32(payload, base + kCompletionCounts + index * 4U,
+             trigger.completion_counts[index]);
+    storeU16(payload, base + kXbarSelections + index * 2U,
+             trigger.evidence.xbar_sel_configured[index]);
+  }
+  storeU16(payload, base + kPhaseIpgCycles, trigger.phase_ipg_cycles);
+  storeU32(payload, base + kCcmCscmr1,
+           trigger.evidence.ccm_cscmr1_configured);
+  storeU32(payload, base + kCcmCcgr1,
+           trigger.evidence.ccm_ccgr1_configured);
+  storeU32(payload, base + kCcmCcgr2,
+           trigger.evidence.ccm_ccgr2_configured);
+  storeU32(payload, base + kPitMcr,
+           trigger.evidence.pit_mcr_configured);
+  storeU32(payload, base + kMasterTctrl,
+           trigger.evidence.gpio_master_tctrl_configured);
+  storeU32(payload, base + kPairTctrl,
+           trigger.evidence.pair_tctrl_configured);
+  storeU32(payload, base + kAdcEtcCtrl,
+           trigger.evidence.adc_etc_ctrl_configured);
+  storeU32(payload, base + kDone0_1Irq,
+           trigger.evidence.done0_1_irq_final);
+  storeU32(payload, base + kDone2ErrIrq,
+           trigger.evidence.done2_err_irq_final);
+  storeU32(payload, base + kCompletionDelta,
+           trigger.completion_delta_cycles);
+  storeU32(payload, base + kCompletionExpected,
+           trigger.completion_expected_delta_cycles);
+  storeU32(payload, base + kCompletionTolerance,
+           trigger.completion_tolerance_cycles);
+  storeU32(payload, base + kDiagnosticElapsed,
+           trigger.diagnostic_elapsed_cycles);
+  storeU32(payload, base + kTriggerErrorCount,
+           trigger.trigger_error_count);
+}
+
 Result validateInfo(ByteView payload) {
   if (payload.data[protocol_v1::kInfoResponseReserved0Offset] != 0U ||
       payload.data[protocol_v1::kInfoResponseReserved2Offset] != 0U ||
@@ -826,7 +1051,7 @@ Result validateInfo(ByteView payload) {
       value16 != 0U) {
     return badPayload();
   }
-  return validateAdcMetadata(
+  const Result adc_result = validateAdcMetadata(
       payload,
       {protocol_v1::kInfoResponseAdcResolutionBitsOffset,
        protocol_v1::kInfoResponseAdcContainerBytesOffset,
@@ -856,6 +1081,11 @@ Result validateInfo(ByteView payload) {
        protocol_v1::kInfoResponseAdc0CalibrationCyclesOffset,
        protocol_v1::kInfoResponseAdc1CalibrationCyclesOffset,
        protocol_v1::kInfoResponseAdcInitializationErrorFlagsOffset});
+  if (!adc_result.ok()) {
+    return adc_result;
+  }
+  return validateAdcTriggerMetadata(
+      payload, protocol_v1::kInfoResponseAdcTriggerConfigurationFlagsOffset);
 }
 
 Result validateStatus(ByteView payload) {
@@ -924,7 +1154,7 @@ Result validateStatus(ByteView payload) {
       depth > protocol_v1::kGpioPacketBufferCount) {
     return badPayload();
   }
-  return validateAdcMetadata(
+  const Result adc_result = validateAdcMetadata(
       payload,
       {protocol_v1::kStatusResponseAdcResolutionBitsOffset,
        protocol_v1::kStatusResponseAdcContainerBytesOffset,
@@ -954,6 +1184,12 @@ Result validateStatus(ByteView payload) {
        protocol_v1::kStatusResponseAdc0CalibrationCyclesOffset,
        protocol_v1::kStatusResponseAdc1CalibrationCyclesOffset,
        protocol_v1::kStatusResponseAdcInitializationErrorFlagsOffset});
+  if (!adc_result.ok()) {
+    return adc_result;
+  }
+  return validateAdcTriggerMetadata(
+      payload,
+      protocol_v1::kStatusResponseAdcTriggerConfigurationFlagsOffset);
 }
 
 Result decodeChecksumBenchmarkRequest(ByteView payload,
@@ -2111,6 +2347,9 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   storeU32(bytes,
            protocol_v1::kInfoResponseAdcInitializationErrorFlagsOffset,
            response.adc.initialization_error_flags);
+  encodeAdcTriggerMetadata(
+      bytes, protocol_v1::kInfoResponseAdcTriggerConfigurationFlagsOffset,
+      response.adc.trigger);
   return encodeFrame(
       responseFields(protocol_v1::FrameKind::kInfoResponse, request, run_id),
       view(payload), output);
@@ -2282,6 +2521,9 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
   storeU32(bytes,
            protocol_v1::kStatusResponseAdcInitializationErrorFlagsOffset,
            response.adc.initialization_error_flags);
+  encodeAdcTriggerMetadata(
+      bytes, protocol_v1::kStatusResponseAdcTriggerConfigurationFlagsOffset,
+      response.adc.trigger);
   return encodeFrame(responseFields(protocol_v1::FrameKind::kGetStatusResponse,
                                     request, run_id),
                      view(payload), output);

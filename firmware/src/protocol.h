@@ -224,6 +224,73 @@ struct ParsedCommand {
 
 Result decodeRequest(ByteView input, Request &request);
 
+// Raw register evidence captured while the exact ADC_ETC schedule is
+// configured but stopped. The final IRQ words are captured after the bounded
+// completion-timing diagnostic has been stopped and acknowledged.
+struct AdcTriggerHardwareEvidence {
+  std::uint32_t ccm_cscmr1_configured = 0U;
+  std::uint32_t ccm_ccgr1_configured = 0U;
+  std::uint32_t ccm_ccgr2_configured = 0U;
+  std::uint32_t pit_mcr_configured = 0U;
+  std::uint32_t gpio_master_tctrl_configured = 0U;
+  std::uint32_t pair_tctrl_configured = 0U;
+  std::uint32_t adc_etc_ctrl_configured = 0U;
+  std::array<std::uint32_t, 2U> trigger_ctrl_configured{};
+  std::array<std::uint32_t, 2U> trigger_counter_configured{};
+  std::array<std::uint32_t, 2U> chain_configured{};
+  std::uint32_t done0_1_irq_final = 0U;
+  std::uint32_t done2_err_irq_final = 0U;
+  std::array<std::uint16_t, 2U> xbar_sel_configured{};
+};
+
+// The measured delta below is conversion-completion interrupt timing. It
+// cross-checks the programmed digital phase but does not claim to measure the
+// analog aperture at either ADC input.
+struct AdcTriggerMetadata {
+  std::uint16_t configuration_flags = 0U;
+  std::uint32_t error_flags = 0U;
+  std::uint32_t pit_clock_hz = protocol_v1::kAdcTriggerPitClockHz;
+  std::uint32_t dwt_clock_hz = protocol_v1::kAdcTriggerDwtClockHz;
+  std::uint32_t gpio_master_rate_hz =
+      protocol_v1::kAdcTriggerGpioMasterRateHz;
+  std::uint32_t pair_rate_hz = protocol_v1::kAdcTriggerPairRateHz;
+  std::uint32_t ipg_clock_hz = protocol_v1::kAdcTriggerIpgClockHz;
+  std::uint8_t gpio_master_pit_channel =
+      protocol_v1::kAdcTriggerGpioMasterPitChannel;
+  std::uint8_t pair_pit_channel =
+      protocol_v1::kAdcTriggerPairPitChannel;
+  std::uint8_t gpio_master_pit_load =
+      protocol_v1::kAdcTriggerGpioMasterPitLoad;
+  std::uint8_t pair_pit_load = protocol_v1::kAdcTriggerPairPitLoad;
+  std::uint8_t predivider = protocol_v1::kAdcTriggerPredivider;
+  std::uint8_t chain_length = protocol_v1::kAdcTriggerChainLength;
+  std::array<std::uint8_t, 2U> xbar_inputs{
+      protocol_v1::kAdcTriggerXbarInputs[0],
+      protocol_v1::kAdcTriggerXbarInputs[1]};
+  std::array<std::uint8_t, 2U> xbar_outputs{
+      protocol_v1::kAdcTriggerXbarOutputs[0],
+      protocol_v1::kAdcTriggerXbarOutputs[1]};
+  std::array<std::uint8_t, 2U> trigger_queues{
+      protocol_v1::kAdcTriggerQueues[0],
+      protocol_v1::kAdcTriggerQueues[1]};
+  std::array<std::uint16_t, 2U> initial_delays{
+      protocol_v1::kAdcTriggerInitialDelays[0],
+      protocol_v1::kAdcTriggerInitialDelays[1]};
+  std::array<std::uint16_t, 2U> effective_delays{
+      protocol_v1::kAdcTriggerEffectiveDelays[0],
+      protocol_v1::kAdcTriggerEffectiveDelays[1]};
+  std::uint16_t phase_ipg_cycles = protocol_v1::kAdcTriggerPhaseIpgCycles;
+  AdcTriggerHardwareEvidence evidence{};
+  std::array<std::uint32_t, 2U> completion_counts{};
+  std::uint32_t completion_delta_cycles = 0U;
+  std::uint32_t completion_expected_delta_cycles =
+      protocol_v1::kAdcCompletionExpectedDwtCycles;
+  std::uint32_t completion_tolerance_cycles =
+      protocol_v1::kAdcCompletionToleranceDwtCycles;
+  std::uint32_t diagnostic_elapsed_cycles = 0U;
+  std::uint32_t trigger_error_count = 0U;
+};
+
 // Shared INFO/STATUS view of the configuration actually written to the two
 // ADC modules and the terminal result of each independently bounded
 // calibration. Defaults describe the primary policy before initialization;
@@ -273,6 +340,7 @@ struct AdcInitializationMetadata {
       protocol_v1::kAdcCalibrationDeadlineUs;
   std::array<std::uint32_t, 2U> calibration_cycles{};
   std::uint32_t initialization_error_flags = 0U;
+  AdcTriggerMetadata trigger{};
 };
 
 struct InfoResponse {

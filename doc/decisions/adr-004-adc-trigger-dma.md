@@ -28,10 +28,12 @@ Accepted as the Phase 07 converter and resource contract. Logical ADC0 is
 permanently bound to Teensy A0 through NXP ADC1 channel 7; logical ADC1 is
 permanently bound to Teensy A1 through NXP ADC2 channel 8. The register-level
 initializer and independently bounded calibration are implemented and pass
-host and pinned-target build gates. The trigger schedule, DMA ring, physical
-capability, and on-silicon calibration evidence remain future Phase 07 work
-and must pass their separate local and rig gates before this decision can be
-described as silicon-verified.
+host and pinned-target build gates. The exact trigger schedule, stopped arm/
+teardown order, bounded conversion-completion diagnostic, and INFO/STATUS
+evidence are also implemented and pass host and pinned-target build gates.
+The DMA ring, physical capability, and on-silicon trigger/calibration evidence
+remain future Phase 07 work and must pass their separate local and rig gates
+before this decision can be described as silicon-verified.
 
 ## Context
 
@@ -62,9 +64,9 @@ sources were reinspected on 2026-08-28:
 | `cores/teensy4/analog.c` | `pin_to_channel` confirms A0/D14 is `GPIO_AD_B1_02`, channel 7, and A1/D15 is `GPIO_AD_B1_03`, channel 8. Its generic module selection, cooperative unbounded calibration wait, default averaging, and single-read polling are not suitable for the production path. |
 | `cores/teensy4/core_pins.h` and `pins_arduino.h` | `A0 == 14`, `A1 == 15`, and their pad-control identities are fixed for Teensy 4.0. Target compilation continues to assert the pin aliases. |
 | `cores/teensy4/imxrt.h` | Confirms XBAR input/output numbers, ADC/ADC_ETC registers, DMAMUX sources 24/88, 32 eDMA channels, and 32-byte TCD alignment used by the registry and later register adapter. |
-| `cores/teensy4/clockspeed.c` | At the pinned 600 MHz CPU menu, the core selects a 150 MHz IPG/bus clock. The decision does not infer that clock at runtime; the future adapter must read back and validate the configured roots. |
+| `cores/teensy4/clockspeed.c` | At the pinned 600 MHz CPU menu, the core selects a 150 MHz IPG/bus clock. The trigger adapter checks `F_BUS_ACTUAL`, the configured 24 MHz PERCLK root, and the relevant PIT/XBAR/ADC gates before arming. |
 | `firmware/src/board_config.h` | Existing fixed pin, PIT, XBAR, ADC_ETC, eDMA, and OCRAM reservations are composed into one `AdcConverterConfiguration` table instead of duplicated in a new module. Compile-time validators reject incomplete, crossed-queue, duplicate-channel, range, and ownership errors. |
-| `firmware/src/gpio_dma_route_teensy.h` and `gpio_raw_capture{,_teensy}.{h,cpp}` | Reuse the stopped-before-route arm order, fixed register ownership, explicit TCD construction, generation-aware bounded rings, cache-maintenance interface, diagnostic snapshots, and fail-safe teardown patterns. ADC will receive a separate adapter because its two-channel completion barrier differs from GPIO. |
+| `firmware/src/gpio_dma_route_teensy.h` and `gpio_raw_capture{,_teensy}.{h,cpp}` | Reuse the stopped-before-route arm order, fixed register ownership, diagnostic snapshots, and fail-safe teardown patterns. `adc_trigger_teensy.cpp` is separate because its two ADC_ETC queues and completion interrupts differ from GPIO; the later ADC DMA adapter will reuse the TCD/ring/cache patterns. |
 | Packet/control modules | Reuse the fixed packet pool, alternating source promotion, START epoch, run/sequence accounting, common statistics, and bounded USB service. No ADC-specific allocation or second transport queue is introduced by this decision. |
 
 The independent primary references are the NXP
@@ -127,8 +129,36 @@ values account for that unavoidable minimum:
 The difference is exactly `76 - 1 = 75` IPG cycles, and
 `75 / 150 MHz = 500 ns`. Using 74 for the second raw field would be one cycle
 short. These values describe digital trigger timing, not analog aperture.
-Future diagnostics may measure conversion completion relative to DWT or
-another conflict-free hardware counter, but must retain that distinction.
+
+### Implemented stopped arm and completion diagnostic
+
+`adc_trigger_teensy.cpp` owns the exact clock/trigger register sequence. It
+first verifies both calibrated converters and rejects an already-running PIT,
+enabled ADC_ETC trigger, or active ADC. While stopped, it selects the same
+verified 24 MHz PERCLK root used by GPIO, writes PIT0 `LDVAL=5`, writes chained
+PIT1 `LDVAL=3`, fans XBARA1 input 57 to outputs 103/107, configures asynchronous
+one-segment queues 0/4, clears `TSC_BYPASS`, writes raw initial delays 0/75,
+and switches ADC1/ADC2 command slot zero to hardware-trigger mode. Every clock,
+route, queue, delay, and hardware-trigger setting is read back before arming.
+
+The BOOT diagnostic clears ADC_ETC/NVIC state, enables queues 0/4, enables
+chained PIT1, and enables the 4 MHz PIT0 master last. Separate ITCM completion
+ISRs timestamp the first queue-0 Done0 and queue-4 Done1 interrupts with the
+free-running 600 MHz DWT counter; the error ISR retains ADC_ETC trigger-error
+state and a saturating count. The portable scheduler waits for both
+completions with independent 2,000 us and 2,000,000-poll ceilings. Teardown
+stops PIT0 first, disables both queues, waits boundedly for both ADCs to become
+idle, disables and acknowledges the interrupts, and verifies the stopped
+state.
+
+Identically configured conversions should complete 300 DWT cycles apart. The
+cross-check accepts ±120 DWT cycles to cover interrupt-entry variation and
+publishes the observed delta, expected delta, tolerance, elapsed cycles,
+completion counts, trigger-error count, final IRQ words, and configured
+CCM/PIT/XBAR/ADC_ETC register evidence through INFO and STATUS. This is
+conversion-completion timing only. It does not observe either ADC's analog
+sample-and-hold aperture and must never be presented as aperture or phase
+accuracy evidence. The later target rig task owns that physical distinction.
 
 ### Implemented initialization and conversion setting
 
@@ -174,10 +204,11 @@ pin/peripheral/channel identities, deadline, per-converter calibration state
 and cycles, configuration flags, and initialization errors. An uninitialized
 or failed snapshot never carries the `INITIALIZED` flag.
 
-The arithmetic remains a configuration-selection assumption rather than
-full-rate acceptance evidence. ADC_ETC error flags, completion matching, and
-full-rate target capture must still prove it. The shortest sample setting also
-places an explicit low-source-impedance requirement on any accuracy fixture.
+The arithmetic plus bounded completion matching now verifies the programmed
+digital path, but remains configuration evidence rather than full-rate analog
+acceptance evidence. Full-rate target capture must still prove it. The
+shortest sample setting also places an explicit low-source-impedance
+requirement on any accuracy fixture.
 Unstimulated or high-impedance A0/A1 data can prove routing and code range but
 cannot prove 12-bit accuracy, analog bandwidth, aperture, phase, or settling.
 
@@ -216,8 +247,8 @@ ADC capability remains unavailable rather than weakening metadata.
 - The initial 12-bit timing calculation fits one microsecond but has narrow
   headroom. Physical gating, not this arithmetic, determines whether it is
   accepted.
-- Bounded low-level initialization and calibration now run before BOOT enters
-  IDLE, and their exact snapshot is visible in INFO/STATUS. This does not
-  enable physical ADC streaming. Later tasks still own exact trigger
-  arming/teardown, interleaved DMA, packet integration, host data decoding, and
-  target evidence.
+- Bounded low-level initialization, calibration, trigger arm/teardown, and
+  completion matching now run before BOOT enters IDLE, and their exact
+  snapshots are visible in INFO/STATUS. This does not enable physical ADC
+  streaming. Later tasks still own interleaved DMA, packet integration, host
+  data decoding, and on-silicon target evidence.

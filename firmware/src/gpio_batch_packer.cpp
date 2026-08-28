@@ -350,6 +350,10 @@ bool GpioBatchPacker::consume(const gpio_capture::BufferHandle &handle,
   return true;
 }
 
+// Raw-gap recovery is an exceptional path. Keep it in program Flash so the
+// dual-ADC completion ISRs retain deterministic ITCM residency without
+// crossing the linker allocator's next 32 KiB RAM1 code block.
+TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.raw_gap")
 void GpioBatchPacker::accountRawGap(std::uint64_t sample_count,
                                     ServiceReport &report) {
   if (sample_count == 0U) {
