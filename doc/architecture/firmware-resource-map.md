@@ -111,9 +111,9 @@ use an unconstrained first-free allocator.
 | ADC DMA ring | 4 buffers | ADC capture |
 | Raw GPIO DMA ring | 4 buffers | GPIO capture |
 | Packed GPIO ring | 4 buffers | GPIO packer |
-| Aligned complete-frame packet pool | 32 × 4,096-byte buffers | Packetizer |
-| Per-source ready queues | 32 ADC + 32 GPIO indexes; shared pool limits actual ownership to 32 | Packetizer |
-| Complete-frame transmit queue | 32 indexes | Packetizer / USB transport |
+| Aligned complete-frame packet pool | 64 × 4,096-byte buffers | Packetizer |
+| Per-source ready queues | 64 ADC + 64 GPIO indexes; shared pool limits actual ownership to 64 | Packetizer |
+| Complete-frame transmit queue | 64 indexes | Packetizer / USB transport |
 | Synthetic generation per loop | 4 complete frame attempts | Synthetic source |
 | Ready-to-transmit promotions per loop | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
@@ -137,10 +137,10 @@ unexpected prefixes remain owned for continuation. These values are capacities,
 never heap-growth hints.
 
 At the nominal combined framed rate, one 4,096-byte application buffer covers
-about 0.506 ms. The 32-frame pool therefore retains about 16.2 ms of complete
+about 0.506 ms. The 64-frame pool therefore retains about 32.4 ms of complete
 frames, and the pinned core's 8,192-byte TX ring contributes about 1.0 ms more.
-The pool holds two 64 KiB host-read batches, leaving one batch of bounded
-margin while the prior batch is parsed and a control response is serviced;
+The pool holds four 64 KiB host-read batches, leaving three batches of bounded
+margin while prior data is parsed and a control response is serviced;
 neither queue can grow at runtime.
 Normal real-time mode admits only coverage intervals elapsed on the shared
 8 MHz epoch. The explicitly selected unpaced diagnostic remains bounded to four
@@ -154,12 +154,12 @@ frames per service call and waits when no packet buffer is free.
 | USB RX scratch | DTCM / RAM1 | fixed | 128 | 4 | USB transport |
 | Command queue | DTCM / RAM1 | `4 × 56` | 224 | 4 | Control plane |
 | Response queue | DTCM / RAM1 | `4 × 1,024` | 4,096 | 4 | USB transport |
-| Complete packet buffers | DTCM / RAM1 | `32 × 4,096` | 131,072 | 32 | Packetizer |
-| Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 2,048 | 32 | Packetizer |
+| Complete packet buffers | DTCM / RAM1 | `64 × 4,096` | 262,144 | 32 | Packetizer |
+| Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 3,072 | 32 | Packetizer |
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
-| **RAM1 subtotal** |  |  | **137,632** |  |  |
+| **RAM1 subtotal** |  |  | **269,728** |  |  |
 | **RAM2 subtotal** |  |  | **97,280** |  |  |
 
 The application packet pool is instantiated now as aligned ordinary global
@@ -169,7 +169,7 @@ DMA, so the project must not flush or invalidate packet buffers. Actual
 DMA-visible acquisition rings remain future `DMAMEM` OCRAM/RAM2 allocations:
 they begin on 32-byte cache boundaries, occupy whole cache lines, and require
 explicit cache maintenance at ownership transitions. Compile-time checks bind
-the packet storage type to 131,072 bytes, cap pipeline metadata at 2,048 bytes,
+the packet storage type to 262,144 bytes, cap pipeline metadata at 3,072 bytes,
 and reject zero-sized, non-power-of-two, misaligned, or over-budget registry
 entries.
 
