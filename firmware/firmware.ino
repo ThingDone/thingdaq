@@ -7,6 +7,7 @@
  */
 
 #include "src/firmware_runtime.h"
+#include "src/teensy_clock.h"
 #include "src/teensy_usb.h"
 
 namespace {
@@ -16,8 +17,11 @@ namespace {
 // into its own DMA-visible OCRAM ring before transmission.
 teensy_daq::usb::TeensyCdcByteStream cdc_stream{};
 teensy_daq::packet::PacketBufferStorage packet_storage{};
+teensy_daq::clock::TeensyTickClock tick_clock{};
 teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream,
-                                                       packet_storage};
+                                                       packet_storage,
+                                                       tick_clock,
+                                                       teensy_daq::synthetic::Mode::kRealtime};
 
 }  // namespace
 

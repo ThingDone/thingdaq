@@ -118,23 +118,28 @@ static_assert(teensy_daq::board::kReservedRam1Bytes <=
               teensy_daq::board::kRam1BudgetBytes);
 static_assert(teensy_daq::board::kReservedRam2Bytes <=
               teensy_daq::board::kRam2BudgetBytes);
-static_assert(teensy_daq::control::kControlOnlyConfiguration.stream_mask ==
+static_assert(teensy_daq::control::kIdleConfiguration.stream_mask ==
               0U);
-static_assert(teensy_daq::control::kControlOnlyConfiguration.source ==
+static_assert(teensy_daq::control::kIdleConfiguration.source ==
               teensy_daq::protocol_v1::Source::kHardware);
 static_assert(
-    teensy_daq::control::kControlOnlyConfiguration.data_frame_bytes ==
+    teensy_daq::control::kIdleConfiguration.data_frame_bytes ==
     teensy_daq::protocol_v1::kDataFrameBytes);
+static_assert(teensy_daq::control::kSyntheticConfiguration.stream_mask ==
+              3U);
+static_assert(teensy_daq::control::kSyntheticConfiguration.source ==
+              teensy_daq::protocol_v1::Source::kSynthetic);
 static_assert(teensy_daq::identity::kFirmwareVersion.major == 0U);
-static_assert(teensy_daq::identity::kFirmwareVersion.minor == 3U);
+static_assert(teensy_daq::identity::kFirmwareVersion.minor == 4U);
 static_assert(teensy_daq::identity::kFirmwareVersion.patch == 0U);
 static_assert(teensy_daq::board::kAdc0Pin == 14U);
 static_assert(teensy_daq::board::kAdc1Pin == 15U);
 static_assert(teensy_daq::board::kReservedRam1Bytes == 72096U);
 static_assert(teensy_daq::board::kReservedRam2Bytes == 97280U);
-static_assert(teensy_daq::capabilities::kMetadata.supported_stream_mask == 0U);
+static_assert(teensy_daq::capabilities::kMetadata.supported_stream_mask == 3U);
 static_assert((teensy_daq::capabilities::kMetadata.capability_bits &
-               teensy_daq::capabilities::kDataCapabilityMask) == 0U);
+               teensy_daq::capabilities::kDataCapabilityMask) ==
+              teensy_daq::capabilities::kDataCapabilityMask);
 static_assert(teensy_daq::capabilities::kMetadata.gpio_pin_count == 8U);
 static_assert(teensy_daq::identity::usbProductNameMatchesIdentity());
 

@@ -110,6 +110,8 @@ struct SourceCounters {
   std::uint64_t items_produced = 0U;
   std::uint64_t frames_framed = 0U;
   std::uint64_t items_framed = 0U;
+  std::uint64_t frames_emitted = 0U;
+  std::uint64_t items_emitted = 0U;
   std::uint64_t frames_transmitted = 0U;
   std::uint64_t items_transmitted = 0U;
   std::uint64_t frames_dropped = 0U;
@@ -185,6 +187,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::size_t queuedFrames() const override;
 
   std::size_t readyFrames() const;
+  std::size_t freeBuffers() const;
   bool quiescent() const;
   PipelineSnapshot snapshot() const;
 

@@ -9,13 +9,19 @@
 
 namespace teensy_daq::control {
 
-// Phase 03 deliberately exercises the complete control lifecycle without
-// claiming that an acquisition source exists. The data framing fields remain
-// populated and echoed so later stream implementations do not need a second
-// control schema.
-inline constexpr protocol::Configuration kControlOnlyConfiguration{
+// IDLE has no applied acquisition profile. Protocol v1 represents that state
+// with the original zero-stream hardware-shaped placeholder; CONFIGURE no
+// longer accepts this placeholder after synthetic stream support is enabled.
+inline constexpr protocol::Configuration kIdleConfiguration{
     0U,
     protocol_v1::Source::kHardware,
+    protocol_v1::ChecksumAlgorithm::kAdler32,
+    static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes),
+};
+
+inline constexpr protocol::Configuration kSyntheticConfiguration{
+    capabilities::kSupportedStreamMask,
+    protocol_v1::Source::kSynthetic,
     protocol_v1::ChecksumAlgorithm::kAdler32,
     static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes),
 };
@@ -82,7 +88,7 @@ class ControlState {
   constexpr std::uint32_t hardwareSerial() const { return hardware_serial_; }
   constexpr bool hasConfiguration() const { return has_configuration_; }
   constexpr protocol::Configuration appliedConfiguration() const {
-    return has_configuration_ ? configuration_ : kControlOnlyConfiguration;
+    return has_configuration_ ? configuration_ : kIdleConfiguration;
   }
 
   constexpr const stats::Statistics &statistics() const { return statistics_; }
@@ -128,7 +134,7 @@ class ControlState {
   protocol::InfoResponse infoResponse() const;
 
   protocol_v1::DeviceState state_ = protocol_v1::DeviceState::kBoot;
-  protocol::Configuration configuration_ = kControlOnlyConfiguration;
+  protocol::Configuration configuration_ = kIdleConfiguration;
   bool has_configuration_ = false;
   std::uint32_t run_id_ = 0U;
   std::uint32_t hardware_serial_ = 0U;
@@ -136,10 +142,13 @@ class ControlState {
   stats::Statistics statistics_{};
 };
 
-static_assert(kControlOnlyConfiguration.stream_mask == 0U);
-static_assert(kControlOnlyConfiguration.source ==
+static_assert(kIdleConfiguration.stream_mask == 0U);
+static_assert(kIdleConfiguration.source ==
               protocol_v1::Source::kHardware);
-static_assert(capabilities::kSupportedStreamMask == 0U);
+static_assert(kSyntheticConfiguration.stream_mask == 3U);
+static_assert(kSyntheticConfiguration.source ==
+              protocol_v1::Source::kSynthetic);
+static_assert(capabilities::kSupportedStreamMask == 3U);
 static_assert(ControlState::nextRunId(0U) == 1U);
 static_assert(ControlState::nextRunId(0xFFFFFFFFU) == 1U);
 static_assert(ControlState::isLegalTransition(

@@ -19,6 +19,7 @@ namespace constants = teensy_daq::protocol_v1;
 namespace control = teensy_daq::control;
 namespace identity = teensy_daq::identity;
 namespace packet = teensy_daq::packet;
+namespace synthetic = teensy_daq::synthetic;
 namespace usb = teensy_daq::usb;
 namespace wire = teensy_daq::protocol;
 
@@ -54,16 +55,18 @@ wire::CommandFrame emptyRequest(constants::FrameKind kind,
 
 wire::CommandFrame configureRequest(std::uint32_t request_id) {
   std::array<std::uint8_t, constants::kConfigureRequestPayloadSize> payload{};
-  payload[constants::kConfigureRequestStreamMaskOffset] = 0U;
+  payload[constants::kConfigureRequestStreamMaskOffset] =
+      static_cast<std::uint8_t>(constants::StreamMask::kAdc) |
+      static_cast<std::uint8_t>(constants::StreamMask::kGpio);
   payload[constants::kConfigureRequestSourceOffset] =
-      static_cast<std::uint8_t>(constants::Source::kHardware);
+      static_cast<std::uint8_t>(constants::Source::kSynthetic);
   payload[constants::kConfigureRequestDataChecksumAlgorithmOffset] =
       static_cast<std::uint8_t>(constants::ChecksumAlgorithm::kAdler32);
   expect(wire::storeU32(
              {payload.data(), payload.size()},
              constants::kConfigureRequestDataFrameBytesOffset,
              static_cast<std::uint32_t>(constants::kDataFrameBytes)),
-         "encode control-only configuration");
+         "encode dual-stream synthetic configuration");
   wire::FrameFields fields{};
   fields.kind = constants::FrameKind::kConfigureRequest;
   fields.request_id = request_id;
@@ -133,6 +136,13 @@ class FakeCdcStream final : public usb::CdcByteStream {
  private:
   std::vector<std::uint8_t> input_{};
   std::size_t input_offset_ = 0U;
+};
+
+class FakeTickClock final : public synthetic::TickClock {
+ public:
+  std::uint64_t nowTicks() override { return ticks; }
+
+  std::uint64_t ticks = 0U;
 };
 
 struct DrainResult {
@@ -223,7 +233,8 @@ std::string buildId(const wire::DecodedFrame &info) {
 void testCompleteControlPlane() {
   FakeCdcStream stream{};
   packet::PacketBufferStorage packet_storage{};
-  app::FirmwareRuntime firmware{stream, packet_storage};
+  FakeTickClock clock{};
+  app::FirmwareRuntime firmware{stream, packet_storage, clock};
   constexpr std::uint32_t hardware_serial = 167772150U;
   constexpr std::uint64_t nonce = 0x0123456789ABCDEFULL;
 
@@ -246,8 +257,10 @@ void testCompleteControlPlane() {
              firmware.state() == constants::DeviceState::kRunning &&
              firmware.runId() == 1U &&
              firmware.packetSnapshot().run_id == 1U &&
-             firmware.packetSnapshot().accepting_frames,
-         "INFO-CONFIGURE-START arms the packet run in cooperative context");
+             firmware.packetSnapshot().accepting_frames &&
+             firmware.syntheticSnapshot().running &&
+             firmware.syntheticSnapshot().mode == synthetic::Mode::kRealtime,
+         "INFO-CONFIGURE-START arms the paced synthetic run cooperatively");
 
   wire::CommandFrame corrupt = pingRequest(90U, 90U);
   corrupt.mutableData()[corrupt.size() - 1U] ^= 0x80U;
@@ -264,8 +277,9 @@ void testCompleteControlPlane() {
              !stopped.packet_started && stopped.packet_stopped &&
              firmware.state() == constants::DeviceState::kIdle &&
              firmware.runId() == 1U &&
-             !firmware.packetSnapshot().accepting_frames,
-         "STATUS-PING-STOP-RESET-INFO stops packet production in clean IDLE");
+             !firmware.packetSnapshot().accepting_frames &&
+             !firmware.syntheticSnapshot().running,
+         "STATUS-PING-STOP-RESET-INFO stops synthetic production in clean IDLE");
 
   const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
   expect(frames.size() == 8U,
@@ -320,27 +334,33 @@ void testCompleteControlPlane() {
          "INFO exposes the source-derived stale-image build key");
   expect(info.payload
                  .data[constants::kInfoResponseSupportedStreamMaskOffset] ==
-             0U &&
+             3U &&
              wire::loadU32(info.payload,
                            constants::kInfoResponseCapabilityBitsOffset,
                            value32) &&
              (value32 & static_cast<std::uint32_t>(
-                            constants::Capability::kAdcStream)) == 0U &&
+                            constants::Capability::kAdcStream)) != 0U &&
              (value32 & static_cast<std::uint32_t>(
-                            constants::Capability::kGpioStream)) == 0U,
-         "INFO capability metadata cannot claim unimplemented streams");
+                            constants::Capability::kGpioStream)) != 0U &&
+             (value32 & static_cast<std::uint32_t>(
+                            constants::Capability::kSyntheticSource)) != 0U &&
+             info.payload.data[constants::kInfoResponseSupportedSourceMaskOffset] ==
+                 2U,
+         "INFO advertises both layouts and only the implemented synthetic source");
 
   const wire::DecodedFrame &status = frames[3];
   expect(status.header.run_id == 1U &&
              status.payload.data[constants::kStatusResponseDeviceStateOffset] ==
                  static_cast<std::uint8_t>(constants::DeviceState::kRunning) &&
              status.payload.data[constants::kStatusResponseStreamMaskOffset] ==
-                 0U &&
+                 3U &&
+             status.payload.data[constants::kStatusResponseSourceOffset] ==
+                 static_cast<std::uint8_t>(constants::Source::kSynthetic) &&
              wire::loadU32(status.payload,
                            constants::kStatusResponseParserErrorsOffset,
                            value32) &&
              value32 == 1U,
-         "RUNNING STATUS projects the applied profile and parser recovery");
+         "RUNNING STATUS projects the synthetic profile and parser recovery");
   std::uint64_t echoed_nonce = 0U;
   expect(wire::loadU64(frames[4].payload,
                        constants::kPingResponseNonceOffset, echoed_nonce) &&
@@ -366,10 +386,90 @@ void testCompleteControlPlane() {
          "transport lifetime diagnostics account for parser recovery and I/O");
 }
 
+void testSyntheticDataCountersReachStatus() {
+  FakeCdcStream stream{};
+  stream.max_write_size = constants::kDataFrameBytes;
+  packet::PacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  app::FirmwareRuntime firmware{stream, packet_storage, clock};
+  expect(firmware.begin(1234U), "counter test completes BOOT");
+
+  stream.appendInput(configureRequest(101U));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 102U));
+  expect(drain(firmware, stream).quiescent,
+         "counter test reaches a paced RUNNING epoch");
+  stream.output.clear();
+
+  clock.ticks = synthetic::kFrameCoverageTicks;
+  expect(drain(firmware, stream).quiescent,
+         "one elapsed interval transmits both complete data frames");
+  const packet::PipelineSnapshot packet_counters = firmware.packetSnapshot();
+  const teensy_daq::stats::Snapshot native_counters =
+      firmware.statistics().snapshot();
+  expect(packet_counters.sources[0].frames_transmitted == 1U &&
+             packet_counters.sources[1].frames_transmitted == 1U &&
+             native_counters.data_path.adc.items_generated ==
+                 constants::kAdcPairsPerFrame &&
+             native_counters.data_path.adc.items_framed ==
+                 constants::kAdcPairsPerFrame &&
+             native_counters.data_path.adc.items_emitted ==
+                 constants::kAdcPairsPerFrame &&
+             native_counters.data_path.adc.items_transmitted ==
+                 constants::kAdcPairsPerFrame &&
+             native_counters.data_path.gpio.items_generated ==
+                 constants::kGpioSamplesPerFrame &&
+             native_counters.data_path.gpio.items_emitted ==
+                 constants::kGpioSamplesPerFrame &&
+             native_counters.data_path.gpio.items_transmitted ==
+                 constants::kGpioSamplesPerFrame,
+         "native STATUS diagnostics retain every exact data ownership stage");
+
+  stream.output.clear();
+  stream.appendInput(
+      emptyRequest(constants::FrameKind::kGetStatusRequest, 103U));
+  expect(drain(firmware, stream).quiescent,
+         "STATUS is serviced while the paced source waits for its deadline");
+  const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
+  expect(frames.size() == 1U &&
+             frames[0].header.kind ==
+                 constants::FrameKind::kGetStatusResponse,
+         "counter query emits one typed STATUS response");
+  if (frames.size() == 1U) {
+    std::uint64_t adc_emitted = 0U;
+    std::uint64_t gpio_emitted = 0U;
+    std::uint64_t adc_dropped = 1U;
+    std::uint64_t gpio_dropped = 1U;
+    expect(wire::loadU64(
+               frames[0].payload,
+               constants::kStatusResponseAdcFramesEmittedOffset,
+               adc_emitted) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseGpioFramesEmittedOffset,
+                   gpio_emitted) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdcItemsDroppedOffset,
+                   adc_dropped) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseGpioItemsDroppedOffset,
+                   gpio_dropped) &&
+               adc_emitted == 1U && gpio_emitted == 1U &&
+               adc_dropped == 0U && gpio_dropped == 0U &&
+               frames[0]
+                       .payload.data[constants::kStatusResponseSourceOffset] ==
+                   static_cast<std::uint8_t>(
+                       constants::Source::kSynthetic),
+           "wire STATUS reports emitted frames, drops, and synthetic source");
+  }
+}
+
 }  // namespace
 
 int main() {
   testCompleteControlPlane();
+  testSyntheticDataCountersReachStatus();
   if (failures != 0) {
     std::cerr << failures << " firmware runtime assertion(s) failed\n";
     return 1;

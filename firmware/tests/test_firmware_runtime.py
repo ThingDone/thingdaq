@@ -17,6 +17,8 @@ PORTABLE_SOURCES = (
     FIRMWARE_SOURCE / "firmware_runtime.cpp",
     FIRMWARE_SOURCE / "packet_buffer_pipeline.h",
     FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp",
+    FIRMWARE_SOURCE / "synthetic_source.h",
+    FIRMWARE_SOURCE / "synthetic_source.cpp",
 )
 
 
@@ -44,6 +46,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "firmware_runtime.cpp"),
                     str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
+                    str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
                     str(FIRMWARE_SOURCE / "control_state.cpp"),
                     str(FIRMWARE_SOURCE / "usb_transport.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
@@ -89,19 +92,22 @@ class FirmwareRuntimeTests(unittest.TestCase):
             "delay(",
             "yield(",
             "Serial.",
+            "attachInterrupt",
+            "IntervalTimer",
         )
         for token in forbidden:
             with self.subTest(token=token):
                 self.assertNotIn(token, runtime_source)
 
         self.assertIn('include "src/firmware_runtime.h"', sketch)
+        self.assertIn('include "src/teensy_clock.h"', sketch)
         self.assertIn('include "src/teensy_usb.h"', sketch)
         self.assertIn("TeensyCdcByteStream", sketch)
         self.assertIn("FirmwareRuntime", sketch)
         self.assertIn("hardwareSerialNumber()", sketch)
         self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("Serial.", sketch)
-        self.assertLessEqual(len(sketch.splitlines()), 36)
+        self.assertLessEqual(len(sketch.splitlines()), 42)
 
 
 if __name__ == "__main__":

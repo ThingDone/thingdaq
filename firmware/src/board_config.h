@@ -115,7 +115,7 @@ inline constexpr PinAllocation kPinAllocations[] = {
 
 // PIT0 is the proposed exact 4 MHz GPIO master. PIT1 is chained down to the
 // proposed 1 MHz ADC-pair event. These are reservations, not a claim that the
-// Phase 03 control-only firmware enables either timer.
+// Phase 04 CPU-generated synthetic source enables either timer.
 inline constexpr PitAllocation kPitAllocations[] = {
     {0U, ResourceOwner::kGpioCapture},
     {1U, ResourceOwner::kAcquisitionClock},
@@ -167,6 +167,7 @@ inline constexpr std::size_t kPacketBufferCount = 16U;
 inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketTransmitQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
+inline constexpr std::size_t kSyntheticFramesPerLoop = 4U;
 inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 2048U;
 // Pinned Teensy 1.62 cores/teensy4/usb_serial.c constants. The core owns this
 // aligned DMAMEM ring; it is documented here but is not project allocation.

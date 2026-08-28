@@ -29,20 +29,22 @@ use the generated little-endian contract in [[Protocol-V1]], whose framing
 decision is recorded in [[ADR-001-Wire-Protocol]]. USB packet boundaries are
 never application frame boundaries.
 
-## Firmware control-plane foundation
+## Firmware streaming foundation
 
-The Phase 03 control plane and Phase 04 packet foundation centralize these
-portable authorities:
+The Phase 03 control plane and Phase 04 synthetic packet path centralize these
+authorities:
 
 | Authority | Responsibility |
 | --- | --- |
 | `firmware/src/firmware_identity.h` | Product, board, MCU, CPU, core, compiler, USB/menu, semantic firmware, protocol, source, build, and timestamp identity |
 | `firmware/src/board_config.h` | The single pin, timer, XBAR, ADC_ETC, eDMA, queue, DMA-memory, alignment, and future-owner registry |
 | `firmware/src/firmware_capabilities.h` | The exact INFO metadata projected from generated protocol constants and the resource registry |
+| `firmware/src/synthetic_source.{h,cpp}` | Deterministic ADC/GPIO formulas, shared epoch, real-time and unpaced-diagnostic scheduling, and bounded source telemetry |
 | `firmware/src/packet_buffer_pipeline.{h,cpp}` | Fixed aligned complete-frame storage, explicit ownership transitions, per-source sequences/counters, bounded ready/transmit index queues, and high-water telemetry |
 | `firmware/src/usb_transport.{h,cpp}` | Portable bounded CDC receive/transmit scheduling, complete command/response queues, frame ownership, and transport diagnostics |
 | `firmware/src/teensy_usb.{h,cpp}` | The narrow Teensy-core byte-stream adapter, product descriptor override, and bridge to the core-generated chip serial number |
-| `firmware/src/firmware_runtime.{h,cpp}` | Portable cooperative integration of receive, one-command dispatch, control events, fail-safe recovery, and transmit |
+| `firmware/src/teensy_clock.{h,cpp}` | The narrow polled Teensy `micros()` to unsigned 64-bit 8 MHz adapter |
+| `firmware/src/firmware_runtime.{h,cpp}` | Portable cooperative integration of receive, one-command dispatch, control events, paced generation, counters, and transmit |
 
 `firmware/firmware.ino` consumes these authorities and owns only the Arduino
 startup boundary. `firmware/src/firmware_runtime.{h,cpp}` owns the cooperative
@@ -115,12 +117,13 @@ a fabricated transport failure.
 
 ## Complete-frame packet pipeline
 
-Phase 04 adds a 16-entry pool of aligned 4,096-byte frames without enabling a
-synthetic or physical source yet. The pool is fixed storage with no steady-path
+Phase 04 connects the deterministic synthetic source to a 16-entry pool of
+aligned 4,096-byte frames. The pool is fixed storage with no steady-path
 allocation. `beginFill()` assigns the next independent ADC or GPIO sequence and
 records source production before asking for a free buffer, so pool exhaustion
 remains visible as both a drop counter and a later sequence gap. Only a valid
-fill lease can access the 4,048-byte payload region.
+fill lease can access the 4,048-byte payload region; the source does not bypass
+framing or transport in either pacing mode.
 
 Finalization rejects a short payload, validates the source-specific wire
 layout, and constructs the fixed header and Adler-32 trailer in place. Only
@@ -146,10 +149,10 @@ source audit and compile-time budget.
 ## Cooperative runtime integration
 
 Static initialization order is explicit at both ownership levels. The sketch
-declares the concrete Teensy CDC byte stream and aligned packet storage before
-`FirmwareRuntime`. The runtime declares `ControlState` (which owns
-`Statistics`) and `PacketBufferPipeline` before `CdcTransport` stores
-references to them. The pinned Teensy core initializes USB and its chip-derived
+declares the concrete Teensy CDC byte stream, aligned packet storage, and tick
+clock before `FirmwareRuntime`. The runtime declares `ControlState` (which owns
+`Statistics`), `PacketBufferPipeline`, and `SyntheticSource` before
+`CdcTransport` stores references. The pinned Teensy core initializes USB and its chip-derived
 serial descriptor before global C++ construction. `setup()` then passes that
 numeric serial to the one BOOT → IDLE transition; it never opens a serial
 facade, waits for DTR, or emits an unframed byte.
@@ -160,8 +163,9 @@ Every `loop()` calls one portable runtime service step in this fixed order:
 2. dequeue and dispatch at most one complete command when a response slot is
    reserved;
 3. consume the bounded START-epoch/STOP event mask in main-loop context;
-4. promote at most four complete ready frames into transport ownership; and
-5. transmit at most 2,048 bytes and eight core write calls.
+4. poll one 8 MHz clock value and generate at most four due synthetic frames;
+5. promote at most four complete ready frames into transport ownership; and
+6. transmit at most 2,048 bytes and eight core write calls.
 
 Valid typed rejections such as INVALID_STATE or UNSUPPORTED_CONFIGURATION are
 normal protocol outcomes and leave the prior state atomic. A response encoding
@@ -198,40 +202,41 @@ source input list in the build manifest. Rebuilding the same source with the
 same epoch therefore produces identical application build metadata. The
 source ID, rather than wall-clock time, is the stale-image compatibility key.
 
-## Truthful Phase 03 capabilities
+## Truthful Phase 04 synthetic capabilities
 
-Phase 03 is control-only. Its capability metadata deliberately reports:
+Phase 04 advertises both `ADC_STREAM` and `GPIO_STREAM`, but only with
+`SYNTHETIC_SOURCE`. It does not advertise `HARDWARE_SOURCE`; physical ADC and
+GPIO acquisition remain later milestones. CONFIGURE accepts any nonempty
+ADC/GPIO subset with source `synthetic`, Adler-32, and a 4,096-byte data-frame
+size. The former Phase 03 zero-stream hardware profile remains only the IDLE
+wire placeholder and is now rejected by CONFIGURE.
 
-- supported stream mask `0`: neither ADC nor GPIO data exists yet;
-- hardware source mask `1` and `HARDWARE_SOURCE`: hardware is the selected
-  identity for the milestone's zero-stream configuration;
-- `RESET_STATS` and `PING`, which are control-plane features in this phase;
-- no `ADC_STREAM`, `GPIO_STREAM`, `SYNTHETIC_SOURCE`, or synthetic data claim;
-- Adler-32 support and the generated protocol/frame/command limits;
-- the intended 8 MHz timestamp scale, 1 MHz ADC-pair rate, ADC0-at-zero and
-  ADC1-at-four-ticks phase convention, 4 MHz GPIO rate, 12-bit samples in
-  16-bit containers, and D6-through-D13 bit map as future-layout metadata.
+One successful START allocates the next nonzero run ID and captures one shared
+clock reading. Data timestamps are unsigned 64-bit 8 MHz ticks relative to that
+epoch: each stream begins at zero and every frame covers 8,096 ticks. ADC frames
+contain 1,012 little-endian `(ADC0, ADC1)` pairs where `ADC0[n] = 2n` and
+`ADC1[n] = 2n + 1` modulo 12 bits. ADC0 is at each pair timestamp and ADC1 has
+the advertised four-tick phase. GPIO frames contain 4,048 samples where
+`GPIO[m] = m mod 256`; bits zero through seven correspond to D6 through D13.
+Independent stream sequences, formula indexes, and timestamps continue across
+every frame boundary and reset only at the next START.
 
-Publishing intended physical layout does not imply stream availability. Host
-code must gate configuration on the stream and capability masks, not infer
-support from a nonzero rate or a published pin map.
-
-The milestone's sole applied configuration is `{streams=0, source=hardware,
-checksum=Adler-32, data_frame_bytes=4096}`. This explicit control-only profile
-allows the real firmware to prove CONFIGURE → START → STATUS → STOP without
-emitting data or setting ADC/GPIO capability bits. START allocates the next
-nonzero run ID, resets the statistics generation and acquisition epoch, and
-signals bounded main-loop work. STOP retains the run ID, discards the applied
-configuration, and idempotently returns to IDLE.
+The normal `realtime` source waits until a full frame's logical samples are due
+at the advertised rates. `unpaced-diagnostic` is a separate explicit mode for
+throughput headroom work; it removes only the deadline and waits on fixed-buffer
+backpressure instead of fabricating unscheduled drops. Both modes execute the
+same payload builder, in-place frame/checksum encoder, ownership queues, and
+CDC transport. No pacing ISR is installed: the narrow Teensy clock adapter
+extends cooperative `micros()` deltas and the portable source polls it once per
+loop.
 
 The detailed statistics snapshot distinguishes successful and rejected
-commands, checksum/length/type/version parser failures, invalid-state errors,
-transport timeouts, and partial USB writes. Data/parser/transport aggregates
-are projected into the fixed v1 GET_STATUS payload; the detailed fields remain
-available to tests and later status-schema extensions. Every counter saturates,
-and successful START or RESET_STATS clears the snapshot, advances the nonzero
-generation, then records that successful command as the first event in the new
-generation.
+commands, parser/transport failures, and exact per-stream generated, framed,
+emitted, transmitted, and dropped frame/item totals. Fixed protocol-v1 GET_STATUS
+projects transport-admitted frame totals, dropped items, and the applied synthetic
+configuration; the additional ownership-stage totals remain native diagnostics
+for tests and later status-schema extensions. Every counter saturates, and a
+successful START or RESET_STATS advances the nonzero statistics generation.
 
 ## Host architecture
 
@@ -255,9 +260,10 @@ retries remain explicitly bounded, and a hot-reused path or changed image
 fails closed before any state-changing operation.
 
 `DAQConfiguration.control_only()` and
-`TeensyDAQ.configure_control_only()` represent the milestone's zero-stream
-hardware profile without weakening ordinary acquisition validation.
-`TeensyDAQ.simulated(control_only=True)` exercises the identical schemas. The
+`TeensyDAQ.configure_control_only()` remain available for probing Phase 03
+images; Phase 04 firmware rejects that legacy profile in favor of nonempty
+synthetic acquisition. `TeensyDAQ.simulated(control_only=True)` continues to
+exercise the older schema. The
 `teensy-daq` command-line entry point lists candidates, probes identity, prints
 status, configures, starts, stops, and resets safe counters. Its one-shot
 configure/start commands deliberately close the PySerial handle without STOP
@@ -271,19 +277,18 @@ drops remain distinct from firmware GET_STATUS counters. Production iterators
 emit a visible gap before continuing; strict mode raises with the gap and
 current block attached.
 
-The simulator remains the runnable acquisition model until physical streaming
-is implemented. It has bounded BOOT-to-IDLE startup, explicit states,
-monotonic run IDs, independent stream sequences, 8 MHz epoch timestamps, and
-deterministic synthetic payloads. Its broader simulated capabilities must not
-be copied into the Phase 03 physical firmware's capability mask.
+The simulator and firmware now share the deterministic acquisition formulas,
+run/sequence semantics, and 8 MHz epoch timestamps. The simulator may still
+offer different buffering and demand-generation behavior; firmware acceptance
+must exercise the real fixed packet and CDC path.
 
 ## Runtime ownership rule
 
-The cooperative main loop owns command parsing, response encoding, state
-mutation, checksums, and USB writes. `ControlState` exposes only compact
-START-epoch and STOP event bits for integration with acquisition. Future ISRs
-may only acknowledge hardware, rotate explicitly owned buffers, update bounded
-counters, and signal work.
-They must not parse, checksum, write USB, wait, or perform broad state changes.
-This keeps the control plane responsive when the reserved acquisition
-resources in [[Firmware-Resource-Map]] are eventually enabled.
+The cooperative main loop owns synthetic pattern construction, command parsing,
+response encoding, state mutation, checksums, queue ownership, and USB writes.
+`ControlState` exposes only compact START-epoch and STOP event bits. Future
+physical-acquisition ISRs may only acknowledge hardware, rotate explicitly
+owned buffers, update bounded counters, and signal work. They must not build
+patterns, parse, checksum, write USB, wait, or perform broad state changes.
+This keeps the control plane responsive when the reserved resources in
+[[Firmware-Resource-Map]] are eventually enabled.

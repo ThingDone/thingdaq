@@ -1,4 +1,4 @@
-"""Host-compiled tests for firmware control state and statistics."""
+"""Host-compiled checks for deterministic paced firmware sources."""
 
 from __future__ import annotations
 
@@ -10,23 +10,21 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIRMWARE_SOURCE = REPOSITORY_ROOT / "firmware/src"
-CPP_TEST = REPOSITORY_ROOT / "firmware/tests/control_state_test.cpp"
-PRODUCTION_FILES = (
-    FIRMWARE_SOURCE / "control_state.h",
-    FIRMWARE_SOURCE / "control_state.cpp",
-    FIRMWARE_SOURCE / "statistics.h",
-    FIRMWARE_SOURCE / "statistics.cpp",
+CPP_TEST = REPOSITORY_ROOT / "firmware/tests/synthetic_source_test.cpp"
+PRODUCTION_SOURCES = (
+    FIRMWARE_SOURCE / "synthetic_source.h",
+    FIRMWARE_SOURCE / "synthetic_source.cpp",
 )
 
 
-class FirmwareControlStateTests(unittest.TestCase):
-    def test_control_state_and_statistics_are_bounded_and_deterministic(self) -> None:
+class SyntheticSourceTests(unittest.TestCase):
+    def test_realtime_and_unpaced_sources_use_the_packet_pipeline(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-control-") as directory:
-            executable = Path(directory) / "control-state-test"
+        with tempfile.TemporaryDirectory(prefix="teensy-daq-synthetic-") as directory:
+            executable = Path(directory) / "synthetic-source-test"
             compile_result = subprocess.run(
                 [
                     compiler,
@@ -41,8 +39,8 @@ class FirmwareControlStateTests(unittest.TestCase):
                     "-fno-rtti",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
-                    str(FIRMWARE_SOURCE / "control_state.cpp"),
-                    str(FIRMWARE_SOURCE / "statistics.cpp"),
+                    str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
+                    str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
                     "-o",
                     str(executable),
@@ -68,30 +66,32 @@ class FirmwareControlStateTests(unittest.TestCase):
                 run_result.stdout + run_result.stderr,
             )
 
-    def test_portable_control_modules_have_no_arduino_or_heap_dependency(self) -> None:
-        production_source = "\n".join(
-            path.read_text(encoding="utf-8") for path in PRODUCTION_FILES
+    def test_source_is_fixed_capacity_cooperative_and_isr_free(self) -> None:
+        source = "\n".join(
+            path.read_text(encoding="utf-8") for path in PRODUCTION_SOURCES
         )
-        forbidden = (
-            "#include <Arduino",
+        for token in (
             "std::vector",
-            "std::string",
+            "std::deque",
             "malloc(",
             "calloc(",
             "realloc(",
-            "free(",
             "operator new",
+            "attachInterrupt",
+            "IntervalTimer",
+            "ISR(",
+            "Serial.",
             "delay(",
             "yield(",
-            "Serial.",
-        )
-        for token in forbidden:
+        ):
             with self.subTest(token=token):
-                self.assertNotIn(token, production_source)
+                self.assertNotIn(token, source)
 
-        self.assertIn("kSyntheticConfiguration", production_source)
-        self.assertIn("kStartEpoch", production_source)
-        self.assertIn("partial_usb_writes", production_source)
+        self.assertIn("Mode::kRealtime", source)
+        self.assertIn("Mode::kUnpacedDiagnostic", source)
+        self.assertIn("pipeline.beginFill", source)
+        self.assertIn("pipeline.finishFill", source)
+        self.assertIn("std::array", source)
 
 
 if __name__ == "__main__":

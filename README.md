@@ -107,10 +107,9 @@ python3 tools/generate_protocol.py --check
 
 The portable firmware control module implements bounded BOOT → IDLE,
 CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
-STOP, RESET_STATS, and PING. Phase 03 uses an explicit zero-stream hardware
-configuration to exercise that lifecycle without advertising or emitting ADC
-or GPIO data; acquisition remains unavailable until later phases enable its
-capability bits.
+STOP, RESET_STATS, and PING. Phase 04 accepts nonempty ADC/GPIO subsets only
+for the implemented synthetic source; INFO and STATUS distinguish that source
+from the still-unavailable physical path.
 
 The Teensy USB layer retains PJRC's USB Serial VID/PID and chip-derived serial
 number while overriding only the weak product string with `Teensy DAQ`. Boot
@@ -119,15 +118,24 @@ uses fixed command/response queues, bounded byte and call budgets, exact
 partial-write continuation, response-first frame scheduling, and exposed
 queue/stall diagnostics.
 
-Phase 04 now supplies the streaming transport's allocation-free packet
-foundation while deliberately leaving source capabilities disabled until the
-synthetic generators are implemented. Sixteen aligned 4,096-byte DTCM frames
-move through explicit `FREE -> FILLING -> READY -> TRANSMITTING -> FREE`
-ownership. ADC and GPIO retain independent production/sequence/counter state,
-per-source ready FIFOs feed one bounded transmit FIFO, and every queue exposes
-current and high-water depth. Frames are validated and checksummed in place
-before transport admission; a partial USB write keeps immutable ownership
-until the final byte succeeds.
+Phase 04 supplies deterministic ADC-pair and GPIO-byte sources through the
+same allocation-free packet path used by later physical acquisition. ADC0 and
+ADC1 retain pair identity as `2n` and `2n + 1` modulo 12 bits; GPIO is `m`
+modulo 256 with D6-through-D13 in bits 0-through-7. Both streams share one
+START epoch, use independent sequences, and cover the same 8,096 ticks per
+frame. Normal mode waits for each frame's real-time 8 MHz deadline. The
+explicitly selected `unpaced-diagnostic` mode removes only that wait and still
+uses the generator, framing, checksum, queues, and USB transport unchanged.
+
+Sixteen aligned 4,096-byte DTCM frames move through explicit
+`FREE -> FILLING -> READY -> TRANSMITTING -> FREE` ownership. Per-source ready
+FIFOs feed one bounded transmit FIFO, and every queue exposes current and
+high-water depth. Frames are validated and checksummed in place before
+transport admission; a partial USB write keeps immutable ownership until the
+final byte succeeds. Native diagnostics retain exact generated, framed,
+emitted, transmitted, and dropped frame/item counts. Fixed protocol-v1 STATUS
+projects transport-admitted frames and dropped items alongside the applied
+synthetic source.
 
 The DTCM placement follows a reinspection of pinned Teensy core 1.62.0: USB
 Serial copies writes into its own four 2,048-byte aligned `DMAMEM` buffers and
@@ -138,13 +146,15 @@ bytes of future RAM2 acquisition storage; see
 `doc/architecture/firmware-resource-map.md` and
 `doc/reference/Foundation-Reuse-Inventory.md`.
 
-`FirmwareRuntime` connects that transport to the portable control dispatcher
-and packet pipeline. The thin sketch constructs the Teensy CDC adapter and
-aligned packet storage before the runtime, binds INFO to the core-derived
-hardware serial during bounded BOOT, and makes one cooperative service call per
-loop. Each call performs bounded receive work, dispatches at most one command,
-consumes compact START/STOP events, promotes bounded ready frames, and performs
-bounded transmit work. Expected typed command errors are
+`FirmwareRuntime` connects that transport to the portable control dispatcher,
+polled 8 MHz clock, deterministic source, and packet pipeline. The thin sketch
+constructs the Teensy CDC/clock adapters and aligned packet storage before the
+runtime, binds INFO to the core-derived hardware serial during bounded BOOT,
+and makes one cooperative service call per loop. Each call performs bounded
+receive work, dispatches at most one command, consumes compact START/STOP
+events, generates at most four due synthetic frames, promotes bounded ready
+frames, and performs bounded transmit work. No pacing ISR is installed.
+Expected typed command errors are
 state-atomic; an internal response-path failure emits an INTERNAL_ERROR when
 possible, releases its queue reservation, and fails safe to IDLE. INFO exposes
 the protocol version, semantic firmware version, board/MCU IDs, hardware
@@ -154,7 +164,7 @@ a stale or incompatible image before control changes.
 ## Portable firmware tests
 
 The firmware test suite host-compiles the production protocol, control,
-statistics, packet-pipeline, transport, and runtime sources with
+statistics, synthetic-source, packet-pipeline, transport, and runtime sources with
 allocation-free C++17 flags.
 It exercises every split and truncation point for every command, corrupt-stream
 recovery, the complete state-transition matrix, idempotency, counters, and

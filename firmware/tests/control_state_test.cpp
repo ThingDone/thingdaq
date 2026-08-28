@@ -32,7 +32,7 @@ wire::Request request(constants::CommandKind kind, std::uint32_t request_id) {
 
 wire::Request configureRequest(std::uint32_t request_id,
                                wire::Configuration configuration =
-                                   control::kControlOnlyConfiguration) {
+                                   control::kSyntheticConfiguration) {
   wire::Request value = request(constants::CommandKind::kConfigure, request_id);
   value.configuration = configuration;
   return value;
@@ -132,11 +132,11 @@ void testBootAndInfo() {
              static_cast<std::uint8_t>(constants::DeviceState::kIdle),
          "INFO reports IDLE");
   expect(decoded.payload
-             .data[constants::kInfoResponseSupportedStreamMaskOffset] == 0U,
-         "INFO advertises no implemented streams");
+             .data[constants::kInfoResponseSupportedStreamMaskOffset] == 3U,
+         "INFO advertises both implemented stream layouts");
   expect(decoded.payload
-             .data[constants::kInfoResponseSupportedSourceMaskOffset] == 1U,
-         "INFO advertises the hardware source identity");
+             .data[constants::kInfoResponseSupportedSourceMaskOffset] == 2U,
+         "INFO advertises only the implemented synthetic source");
 
   std::uint32_t value = 0U;
   expect(wire::loadU32(decoded.payload,
@@ -146,14 +146,18 @@ void testBootAndInfo() {
   expect(wire::loadU32(decoded.payload,
                        constants::kInfoResponseCapabilityBitsOffset, value) &&
              (value & static_cast<std::uint32_t>(
-                          constants::Capability::kAdcStream)) == 0U &&
+                          constants::Capability::kAdcStream)) != 0U &&
              (value & static_cast<std::uint32_t>(
-                          constants::Capability::kGpioStream)) == 0U &&
+                          constants::Capability::kGpioStream)) != 0U &&
+             (value & static_cast<std::uint32_t>(
+                          constants::Capability::kSyntheticSource)) != 0U &&
+             (value & static_cast<std::uint32_t>(
+                          constants::Capability::kHardwareSource)) == 0U &&
              (value & static_cast<std::uint32_t>(
                           constants::Capability::kResetStats)) != 0U &&
              (value & static_cast<std::uint32_t>(
                           constants::Capability::kPing)) != 0U,
-         "INFO capability bits are control-only and truthful");
+         "INFO capability bits distinguish synthetic from physical data");
 
   const std::size_t build_offset = constants::kInfoResponseBuildIdOffset;
   expect(decoded.payload.data[build_offset] == 't' &&
@@ -172,20 +176,22 @@ void testBootAndInfo() {
          "repeated INFO is state-idempotent");
 }
 
-void testControlOnlyLifecycle() {
+void testSyntheticLifecycle() {
   control::ControlState state{};
   wire::ControlFrame response{};
   expect(state.completeBoot(17U), "lifecycle boot completion");
 
   const wire::Request configure = configureRequest(10U);
   expect(state.dispatch(configure, response).commandAccepted(),
-         "control-only CONFIGURE succeeds");
+         "synthetic CONFIGURE succeeds");
   expectTypedResponse(response, constants::FrameKind::kConfigureResponse, 10U,
                       constants::ErrorCode::kOk, "CONFIGURE");
   wire::DecodedFrame decoded = decodeResponse(response, "CONFIGURE echo");
   expect(decoded.payload.data[constants::kConfigureResponseStreamMaskOffset] ==
-             0U,
-         "CONFIGURE echoes zero streams");
+             3U &&
+             decoded.payload.data[constants::kConfigureResponseSourceOffset] ==
+                 static_cast<std::uint8_t>(constants::Source::kSynthetic),
+         "CONFIGURE echoes both streams and the synthetic source");
   expect(state.state() == constants::DeviceState::kConfigured &&
              state.hasConfiguration(),
          "CONFIGURE enters CONFIGURED atomically");
@@ -198,8 +204,10 @@ void testControlOnlyLifecycle() {
   expect(decoded.payload.data[constants::kStatusResponseDeviceStateOffset] ==
              static_cast<std::uint8_t>(constants::DeviceState::kConfigured) &&
              decoded.payload.data[constants::kStatusResponseStreamMaskOffset] ==
-                 0U,
-         "STATUS represents CONFIGURED control-only mode");
+                 3U &&
+             decoded.payload.data[constants::kStatusResponseSourceOffset] ==
+                 static_cast<std::uint8_t>(constants::Source::kSynthetic),
+         "STATUS represents the CONFIGURED synthetic profile");
 
   expect(state.dispatch(request(constants::CommandKind::kStart, 12U), response)
              .commandAccepted(),
@@ -228,14 +236,16 @@ void testControlOnlyLifecycle() {
   expect(state.dispatch(request(constants::CommandKind::kGetStatus, 13U),
                         response)
              .commandAccepted(),
-         "STATUS succeeds while RUNNING control-only");
+         "STATUS succeeds while RUNNING synthetic");
   decoded = decodeResponse(response, "RUNNING STATUS");
   expect(decoded.header.run_id == 1U &&
              decoded.payload.data[constants::kStatusResponseDeviceStateOffset] ==
                  static_cast<std::uint8_t>(constants::DeviceState::kRunning) &&
              decoded.payload.data[constants::kStatusResponseStreamMaskOffset] ==
-                 0U,
-         "RUNNING STATUS keeps zero streams and the current run ID");
+                 3U &&
+             decoded.payload.data[constants::kStatusResponseSourceOffset] ==
+                 static_cast<std::uint8_t>(constants::Source::kSynthetic),
+         "RUNNING STATUS keeps the synthetic profile and current run ID");
 
   const control::DispatchResult repeated_start =
       state.dispatch(request(constants::CommandKind::kStart, 14U), response);
@@ -399,26 +409,29 @@ void testConfigurationValidationAndAtomicity() {
     const char *name;
   };
 
-  wire::Configuration adc = control::kControlOnlyConfiguration;
+  wire::Configuration adc = control::kSyntheticConfiguration;
   adc.stream_mask = static_cast<std::uint8_t>(constants::StreamMask::kAdc);
-  wire::Configuration synthetic = control::kControlOnlyConfiguration;
-  synthetic.source = constants::Source::kSynthetic;
-  wire::Configuration crc = control::kControlOnlyConfiguration;
+  wire::Configuration hardware = control::kSyntheticConfiguration;
+  hardware.source = constants::Source::kHardware;
+  wire::Configuration zero_stream = control::kSyntheticConfiguration;
+  zero_stream.stream_mask = 0U;
+  wire::Configuration crc = control::kSyntheticConfiguration;
   crc.data_checksum_algorithm = constants::ChecksumAlgorithm::kCrc32c;
-  wire::Configuration bad_size = control::kControlOnlyConfiguration;
+  wire::Configuration bad_size = control::kSyntheticConfiguration;
   bad_size.data_frame_bytes = 2048U;
-  wire::Configuration unknown_stream = control::kControlOnlyConfiguration;
+  wire::Configuration unknown_stream = control::kSyntheticConfiguration;
   unknown_stream.stream_mask = 0x80U;
-  wire::Configuration unknown_source = control::kControlOnlyConfiguration;
+  wire::Configuration unknown_source = control::kSyntheticConfiguration;
   unknown_source.source = static_cast<constants::Source>(0xFFU);
-  wire::Configuration no_checksum = control::kControlOnlyConfiguration;
+  wire::Configuration no_checksum = control::kSyntheticConfiguration;
   no_checksum.data_checksum_algorithm =
       constants::ChecksumAlgorithm::kNoneReserved;
 
   const std::array<Case, 7U> cases{{
-      {adc, constants::ErrorCode::kUnsupportedConfiguration, "ADC stream"},
-      {synthetic, constants::ErrorCode::kUnsupportedConfiguration,
-       "synthetic source"},
+      {hardware, constants::ErrorCode::kUnsupportedConfiguration,
+       "physical source"},
+      {zero_stream, constants::ErrorCode::kUnsupportedConfiguration,
+       "zero-stream profile"},
       {crc, constants::ErrorCode::kUnsupportedChecksum, "disabled checksum"},
       {bad_size, constants::ErrorCode::kInvalidPayload, "wrong frame size"},
       {unknown_stream, constants::ErrorCode::kInvalidPayload,
@@ -447,11 +460,21 @@ void testConfigurationValidationAndAtomicity() {
              .commandAccepted(),
          "valid configuration applies after rejections");
   expect(state.state() == constants::DeviceState::kConfigured &&
-             state.appliedConfiguration().stream_mask == 0U,
-         "valid control-only configuration is retained");
-  state.dispatch(configureRequest(request_id, adc), response);
+             state.appliedConfiguration().stream_mask == 3U &&
+             state.appliedConfiguration().source ==
+                 constants::Source::kSynthetic,
+         "valid dual-stream synthetic configuration is retained");
+  expect(state.dispatch(configureRequest(request_id++, adc), response)
+             .commandAccepted() &&
+             state.appliedConfiguration().stream_mask ==
+                 static_cast<std::uint8_t>(constants::StreamMask::kAdc),
+         "a supported single synthetic stream can be selected atomically");
+  state.dispatch(configureRequest(request_id, hardware), response);
   expect(state.state() == constants::DeviceState::kConfigured &&
-             state.appliedConfiguration().stream_mask == 0U,
+             state.appliedConfiguration().stream_mask ==
+                 static_cast<std::uint8_t>(constants::StreamMask::kAdc) &&
+             state.appliedConfiguration().source ==
+                 constants::Source::kSynthetic,
          "invalid reconfiguration leaves the prior configuration intact");
 
   std::array<std::uint8_t, constants::kConfigureRequestPayloadSize> payload{};
@@ -464,7 +487,7 @@ void testConfigurationValidationAndAtomicity() {
                         constants::kConfigureRequestDataFrameBytesOffset,
                         static_cast<std::uint32_t>(
                             constants::kDataFrameBytes)),
-         "write control-only request payload");
+         "write legacy zero-stream request payload");
 
   wire::FrameFields fields{};
   fields.kind = constants::FrameKind::kConfigureRequest;
@@ -473,11 +496,11 @@ void testConfigurationValidationAndAtomicity() {
   expect(wire::encodeFrame(
              fields, {payload.data(), payload.size()}, frame)
              .ok(),
-         "wire codec accepts the documented zero-stream request");
+         "wire codec accepts the structurally valid zero-stream request");
   wire::Request decoded_request{};
   expect(wire::decodeRequest(frame.view(), decoded_request).ok() &&
              decoded_request.configuration.stream_mask == 0U,
-         "wire codec decodes the control-only request");
+         "wire codec decodes the legacy zero-stream request for typed rejection");
 
   payload[constants::kConfigureRequestReservedOffset] = 1U;
   const wire::Result unknown_field = wire::encodeFrame(
@@ -568,8 +591,9 @@ void testStatisticsDetailAndSaturation() {
 
   const wire::StatusResponse status = statistics.wireStatus(
       constants::DeviceState::kRunning,
-      control::kControlOnlyConfiguration);
-  expect(status.configuration.stream_mask == 0U &&
+      control::kSyntheticConfiguration);
+  expect(status.configuration.stream_mask == 3U &&
+             status.configuration.source == constants::Source::kSynthetic &&
              status.adc_frames_emitted == maximum64 &&
              status.gpio_frames_emitted == 7U &&
              status.parser_errors == 7U && status.transport_errors == 3U &&
@@ -608,7 +632,7 @@ void testStatisticsDetailAndSaturation() {
 int main() {
   testLegalTransitionMatrix();
   testBootAndInfo();
-  testControlOnlyLifecycle();
+  testSyntheticLifecycle();
   testIdempotencyRequestIdsAndCounters();
   testConfigurationValidationAndAtomicity();
   testRecoverableFaultReturnsIdle();

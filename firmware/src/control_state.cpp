@@ -47,7 +47,7 @@ bool ControlState::recoverToIdle() {
     return false;
   }
 
-  configuration_ = kControlOnlyConfiguration;
+  configuration_ = kIdleConfiguration;
   has_configuration_ = false;
   pending_event_mask_ = static_cast<std::uint8_t>(
       pending_event_mask_ &
@@ -163,7 +163,7 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
                                       protocol::ValidationIssue::kBadPayload),
             response);
       }
-      configuration_ = kControlOnlyConfiguration;
+      configuration_ = kIdleConfiguration;
       has_configuration_ = false;
       if (needs_stop_signal) {
         pending_event_mask_ = static_cast<std::uint8_t>(
@@ -251,14 +251,11 @@ protocol_v1::ErrorCode ControlState::validateConfiguration(
     return protocol_v1::ErrorCode::kUnsupportedConfiguration;
   }
 
-  return configuration.stream_mask == kControlOnlyConfiguration.stream_mask &&
-                 configuration.source == kControlOnlyConfiguration.source &&
-                 configuration.data_checksum_algorithm ==
-                     kControlOnlyConfiguration.data_checksum_algorithm &&
-                 configuration.data_frame_bytes ==
-                     kControlOnlyConfiguration.data_frame_bytes
-             ? protocol_v1::ErrorCode::kOk
-             : protocol_v1::ErrorCode::kUnsupportedConfiguration;
+  if (configuration.stream_mask == 0U ||
+      configuration.source != protocol_v1::Source::kSynthetic) {
+    return protocol_v1::ErrorCode::kUnsupportedConfiguration;
+  }
+  return protocol_v1::ErrorCode::kOk;
 }
 
 bool ControlState::transitionTo(protocol_v1::DeviceState next) {

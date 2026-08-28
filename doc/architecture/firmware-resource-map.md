@@ -18,10 +18,11 @@ related:
 
 This is the human-readable projection of the compile-time registry in
 `firmware/src/board_config.h`. Numeric allocations are reserved now so future
-acquisition modules cannot silently compete. Phase 03 does not enable the PIT,
-XBAR, ADC_ETC, or eDMA acquisition path and does not advertise ADC/GPIO stream
-support. Phase 04 now instantiates the CPU-owned packet pipeline without yet
-enabling a source capability. See [[System-Overview]] for that boundary and
+acquisition modules cannot silently compete. Phase 04 does not enable the PIT,
+XBAR, ADC_ETC, or eDMA acquisition path, but it advertises both data layouts
+for the CPU-generated synthetic source. The generators and packetizer remain
+cooperative and do not claim physical acquisition resources. See
+[[System-Overview]] for that boundary and
 [[Protocol-V1]] with [[ADR-001-Wire-Protocol]] for the wire metadata.
 
 ## Fixed platform
@@ -82,9 +83,9 @@ not claim PIT0/PIT1 while acquisition is active; an external library conflict
 cannot be discovered by a C++ constant alone and must be rejected during
 integration review.
 
-The 500 ns ADC phase is metadata, not a hardware claim in this phase. Future
-hardware work must prove trigger and aperture timing before enabling either
-stream capability.
+The four-tick (500 ns) ADC1 phase is exact synthetic timestamp metadata, not a
+physical aperture claim. Future hardware work must prove trigger and aperture
+timing before enabling the physical source capability.
 
 ## eDMA reservations
 
@@ -113,6 +114,7 @@ use an unconstrained first-free allocator.
 | Aligned complete-frame packet pool | 16 × 4,096-byte buffers | Packetizer |
 | Per-source ready queues | 16 ADC + 16 GPIO indexes; shared pool limits actual ownership to 16 | Packetizer |
 | Complete-frame transmit queue | 16 indexes | Packetizer / USB transport |
+| Synthetic generation per loop | 4 complete frame attempts | Synthetic source |
 | Ready-to-transmit promotions per loop | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
 | USB transmit work per loop | 2,048 bytes | USB transport |
@@ -134,6 +136,9 @@ about 0.506 ms. The 16-frame pool therefore retains about 8.1 ms of complete
 frames, and the pinned core's 8,192-byte TX ring contributes about 1.0 ms more.
 The later throughput gate is responsible for measuring and tuning this
 compile-time choice under synthetic load; neither queue can grow at runtime.
+Normal real-time mode admits only coverage intervals elapsed on the shared
+8 MHz epoch. The explicitly selected unpaced diagnostic remains bounded to four
+frames per service call and waits when no packet buffer is free.
 
 ## Memory reservations
 
@@ -185,5 +190,5 @@ completions. GPIO raw storage will become ready after its eDMA major loop, then
 move to a distinct packed buffer. Those future acquisition transitions do not
 change the packet-pool contract. No project ISR fills or frames packets,
 calculates checksums, mutates queues, writes USB, waits, or performs broad
-control-state mutation; a future pacing ISR may only advance compact event/time
-state for cooperative source service.
+control-state mutation. Synthetic pacing installs no ISR at all: the narrow
+Teensy adapter polls and extends `micros()` once per cooperative service step.

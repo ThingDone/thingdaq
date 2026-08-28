@@ -40,13 +40,18 @@ constexpr std::uint8_t sourceBit(protocol_v1::Source source) {
       1U << static_cast<std::uint8_t>(source));
 }
 
-// Phase 03 implements a control-only hardware-source configuration. It reports
-// the future physical layout but advertises no ADC or GPIO stream support.
-inline constexpr std::uint8_t kSupportedStreamMask = 0U;
+// Phase 04 implements both deterministic stream layouts through the synthetic
+// source. Physical ownership stays unadvertised until the peripheral phases
+// replace these generators.
+inline constexpr std::uint8_t kSupportedStreamMask =
+    static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc) |
+    static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
 inline constexpr std::uint8_t kSupportedSourceMask =
-    sourceBit(protocol_v1::Source::kHardware);
+    sourceBit(protocol_v1::Source::kSynthetic);
 inline constexpr std::uint32_t kCapabilityBits =
-    capabilityBit(protocol_v1::Capability::kHardwareSource) |
+    capabilityBit(protocol_v1::Capability::kAdcStream) |
+    capabilityBit(protocol_v1::Capability::kGpioStream) |
+    capabilityBit(protocol_v1::Capability::kSyntheticSource) |
     capabilityBit(protocol_v1::Capability::kResetStats) |
     capabilityBit(protocol_v1::Capability::kPing);
 inline constexpr std::uint32_t kAdc0PhaseTicks = 0U;
@@ -80,14 +85,13 @@ inline constexpr std::uint32_t kDataCapabilityMask =
     capabilityBit(protocol_v1::Capability::kGpioStream) |
     capabilityBit(protocol_v1::Capability::kSyntheticSource);
 
-static_assert(kMetadata.supported_stream_mask == 0U,
-              "Phase 03 must not advertise data streams");
-static_assert((kMetadata.capability_bits & kDataCapabilityMask) == 0U,
-              "Phase 03 must not advertise acquisition or synthetic data");
-static_assert((kMetadata.capability_bits &
-               capabilityBit(protocol_v1::Capability::kHardwareSource)) != 0U);
+static_assert(kMetadata.supported_stream_mask == 3U);
+static_assert((kMetadata.capability_bits & kDataCapabilityMask) ==
+              kDataCapabilityMask);
+static_assert((kMetadata.capability_bits & capabilityBit(
+               protocol_v1::Capability::kHardwareSource)) == 0U);
 static_assert(kMetadata.supported_source_mask ==
-              sourceBit(protocol_v1::Source::kHardware));
+              sourceBit(protocol_v1::Source::kSynthetic));
 static_assert(kMetadata.supported_checksum_mask ==
               (1U << static_cast<std::uint8_t>(
                          protocol_v1::ChecksumAlgorithm::kAdler32)));

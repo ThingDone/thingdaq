@@ -246,6 +246,9 @@ PromotionReport PacketBufferPipeline::serviceReadyFrames(std::size_t limit) {
     record.state = BufferState::kTransmitting;
     ++transmit_depth_by_source_[selected_source];
     SourceCounters &source = source_counters_[selected_source];
+    saturatingIncrement(source.frames_emitted);
+    saturatingAdd(source.items_emitted,
+                  static_cast<std::uint64_t>(record.item_count));
     if (transmit_depth_by_source_[selected_source] >
         source.transmit_queue_high_water) {
       source.transmit_queue_high_water =
@@ -310,6 +313,16 @@ std::size_t PacketBufferPipeline::readyFrames() const {
   std::size_t total = 0U;
   for (const ReadyQueue &queue : ready_queues_) {
     total += queue.size();
+  }
+  return total;
+}
+
+std::size_t PacketBufferPipeline::freeBuffers() const {
+  std::size_t total = 0U;
+  for (const BufferRecord &record : records_) {
+    if (record.state == BufferState::kFree) {
+      ++total;
+    }
   }
   return total;
 }

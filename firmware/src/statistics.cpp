@@ -69,6 +69,14 @@ void Statistics::recordGpioItemsDropped(std::uint64_t count) {
   saturatingAdd(counters_.gpio_items_dropped, count);
 }
 
+void Statistics::publishDataPath(const DataPathProgress &progress) {
+  counters_.data_path = progress;
+  counters_.adc_frames_emitted = progress.adc.frames_emitted;
+  counters_.gpio_frames_emitted = progress.gpio.frames_emitted;
+  counters_.adc_items_dropped = progress.adc.items_dropped;
+  counters_.gpio_items_dropped = progress.gpio.items_dropped;
+}
+
 protocol::StatusResponse Statistics::wireStatus(
     protocol_v1::DeviceState state,
     const protocol::Configuration &configuration) const {

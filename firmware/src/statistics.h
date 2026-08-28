@@ -6,6 +6,24 @@
 
 namespace teensy_daq::stats {
 
+struct StreamProgress {
+  std::uint64_t frames_generated = 0U;
+  std::uint64_t items_generated = 0U;
+  std::uint64_t frames_framed = 0U;
+  std::uint64_t items_framed = 0U;
+  std::uint64_t frames_emitted = 0U;
+  std::uint64_t items_emitted = 0U;
+  std::uint64_t frames_transmitted = 0U;
+  std::uint64_t items_transmitted = 0U;
+  std::uint64_t frames_dropped = 0U;
+  std::uint64_t items_dropped = 0U;
+};
+
+struct DataPathProgress {
+  StreamProgress adc{};
+  StreamProgress gpio{};
+};
+
 // Detailed firmware diagnostics remain available to firmware tests and future
 // transport/status extensions. Protocol v1 currently projects only the data,
 // parser, transport, and generation fields into GET_STATUS.
@@ -26,6 +44,7 @@ struct Snapshot {
   std::uint32_t parser_errors = 0U;
   std::uint32_t transport_errors = 0U;
   std::uint32_t generation = 1U;
+  DataPathProgress data_path{};
 };
 
 class Statistics {
@@ -59,6 +78,11 @@ class Statistics {
   void recordGpioFrameEmitted(std::uint64_t count = 1U);
   void recordAdcItemsDropped(std::uint64_t count);
   void recordGpioItemsDropped(std::uint64_t count);
+
+  // Replace the current generation's cooperative pipeline projection. The
+  // native snapshot retains every ownership stage exactly; protocol v1 STATUS
+  // projects completed frames and dropped logical items into its fixed fields.
+  void publishDataPath(const DataPathProgress &progress);
 
   protocol::StatusResponse wireStatus(
       protocol_v1::DeviceState state,
