@@ -27,8 +27,10 @@ is 24 MHz PERCLK through PIT0, XBARA1 input 56/output 0 with **rising-edge-only*
 DMA request generation, DMAMUX source 30, and eDMA channel 2. The optional
 IDLE-only clock diagnostic is advertised. The pad remap and raw capture ring
 are implemented behind an unadvertised target facade, and the cooperative batch
-packer now feeds the fixed packet queues with the normal packed GPIO layout.
-Control-plane/physical-mode integration remains later Phase 06 work.
+packer now feeds the fixed packet queues with the normal packed GPIO layout. A
+second unadvertised, fail-closed capture diagnostic reuses that production path
+without driving D6-D13. Control-plane/physical-mode integration remains later
+Phase 06 work.
 
 ## Context
 
@@ -202,6 +204,45 @@ buffer for internal troubleshooting and has no frame or transport encoder. The
 normal capabilities and GPIO wire contract continue to advertise only one
 packed byte per 4 MHz sample, never the 16 MB/s internal word stream.
 
+### Autonomous fixture policy and diagnostic coverage
+
+The registered remote-firmware fixture material was inspected before adding a
+pad diagnostic. The public platform catalog identifies Port 15 as a Teensy 4.0
+and points to `HOWTO.md`,
+`docs/validation/incoming-board-bringup-2026-08-16.md`, and
+`lab/reference_firmware/arduino_serial_ping/README.md`. Those documents record
+the board, USB serial, hub port, loader, and serial-test path. They do **not**
+state that D6-D13 are unconnected or safe to drive, and they contain no
+machine-readable loopback or stimulus declaration. That absence is not treated
+as permission.
+
+`gpio_capture_diagnostic.{h,cpp}` therefore makes fixture authorization a
+build-time policy rather than a host-selected request. Absent or prose-only
+metadata always selects `kNonDrivingCapture`. A future machine-readable
+declaration is accepted only when it has a schema and fixture identity and
+names exactly the D6-D13 pin mask. An output sweep additionally requires the
+explicit `kExplicitlySafe` value; a declared stimulus has its own nonzero
+identity and selects an input-only stimulus mode. Invalid or partial metadata
+falls back to non-driving capture and retains an error flag.
+
+The current Teensy adapter implements only the selected non-driving path. It
+clears the exact GDIR/GPR27 mask to inputs, starts the production 4 MHz
+`GPIO2_PSR` raw ring, waits at most 6,000,000 DWT cycles for one complete
+4,048-word DMA buffer, stops the timer/request/channel, analyzes only a bounded
+256-word lease with the production pack primitive, drains every ready lease,
+and verifies the ring is quiescent and the pins remain standard GPIO2 inputs.
+Its snapshot separates capture evidence (counts, TCD/route registers, raw and
+packed AND/OR values, and observed transitions) from validation coverage. It
+always reports output drive and external-transition validation as not
+exercised on this fixture. A transition on an undriven input is merely an
+observation and cannot become electrical or mapping evidence.
+
+The target path contains no GPIO data-register, `pinMode`, or `digitalWrite`
+operation. Exhaustive PSR-to-packed mapping remains independently proven for
+all 256 values by the optimized host-C++ packer test. The capture diagnostic is
+intentionally not yet a wire command or capability; the later physical-mode
+integration owns its atomic IDLE command exposure and INFO metadata.
+
 ## Reused patterns and boundaries
 
 - Reuse the narrow OctoWS2811 GPR-mask technique, XBAR edge/DMA-enable
@@ -260,6 +301,10 @@ capability metadata.
 - The exact PIT divisor and rising-edge PIT/XBARA/eDMA event path are proven on
   the target; the physical adapter now uses it for `GPIO2_PSR`, but external
   pad transitions and sustained streaming remain unproven.
+- The registered fixture does not authorize D6-D13 output drive and supplies no
+  loopback or stimulus identity. The autonomous capture diagnostic therefore
+  remains input-only; external transition, pad-electrical, and self-driven
+  stable-window validation are explicitly unexercised.
 - Packed GPIO order and standard-port bit identities can no longer drift from
   the pinned core without a target compile failure.
 - Host compilation validates duplicate, range, order, and exact-mask errors
@@ -270,6 +315,8 @@ capability metadata.
   pressure sink, 160 bytes of TCDs, and 16,256 bytes of packed storage in
   OCRAM. The overflow policies trade retention—not live sampling or buffer
   safety—when downstream work falls behind.
-- The optional diagnostic is bounded to IDLE, never remaps D6-D13, and reports
-  raw register/count evidence. Physical GPIO capability remains disabled until
-  later Phase 06 integration and streaming gates pass.
+- The advertised GPIO clock diagnostic remains bounded to IDLE, never remaps
+  D6-D13, and reports isolated clock/register/count evidence. The new capture
+  diagnostic is still an unadvertised facade that reuses the raw ring and
+  restores safe inputs. Physical GPIO capability remains disabled until later
+  Phase 06 integration and streaming gates pass.

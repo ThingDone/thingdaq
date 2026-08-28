@@ -161,6 +161,17 @@ available only through an explicitly bounded 256-sample internal diagnostic;
 there is no raw-word wire encoder or capability. Hardware-source CONFIGURE
 remains disabled until the physical-mode integration task completes.
 
+The registered Port 15 fixture documentation does not establish that D6-D13
+are unconnected or safe to drive and declares no machine-readable loopback or
+stimulus. The autonomous GPIO capture diagnostic therefore fails closed to an
+input-only mode: it reuses one bounded 4 MHz production-ring capture, reports
+raw/packed observations plus before/during/after register and count evidence,
+drains all leases, and restores GPIO2 inputs. It never writes a GPIO data
+register, and it explicitly leaves external transition, pad-electrical, and
+self-driven 256-value stable-window validation unexercised. The existing
+host-C++ packer test independently covers all 256 logical GPIO bytes. This
+facade remains unadvertised until physical control-plane integration.
+
 The Python codec uses exact standard-library C implementations for Adler-32
 and CRC-32/ISO-HDLC and a bounded table-driven fallback for CRC-32C. Its
 machine-readable benchmark measures full 4,096-byte ADC and GPIO encode and
@@ -250,8 +261,8 @@ a stale or incompatible image before control changes.
 
 The firmware test suite host-compiles the production protocol, control,
 statistics, checksum benchmark, GPIO clock diagnostic, synthetic-source,
-packet-pipeline, transport, and runtime sources with allocation-free C++17
-flags.
+safe GPIO capture diagnostic, packet-pipeline, transport, and runtime sources
+with allocation-free C++17 flags.
 It exercises every split and truncation point for every command, corrupt-stream
 recovery, the complete state-transition matrix, idempotency, counters, and
 fixed frame/queue boundaries. A bidirectional interoperability test sends

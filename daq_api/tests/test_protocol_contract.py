@@ -197,9 +197,7 @@ class ProtocolContractTests(unittest.TestCase):
         self.assertEqual(8, constants.CHECKSUM_BENCHMARK_REQUEST_PAYLOAD_SIZE)
         self.assertEqual(96, constants.CHECKSUM_BENCHMARK_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(8, constants.GPIO_CLOCK_DIAGNOSTIC_REQUEST_PAYLOAD_SIZE)
-        self.assertEqual(
-            140, constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE
-        )
+        self.assertEqual(140, constants.GPIO_CLOCK_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(24_000_000, constants.GPIO_CLOCK_PIT_HZ)
         self.assertEqual(600_000_000, constants.GPIO_CLOCK_DWT_HZ)
         self.assertEqual(4_000_000, constants.GPIO_CLOCK_PRODUCTION_RATE_HZ)

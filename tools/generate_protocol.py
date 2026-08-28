@@ -220,27 +220,18 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     )
     if any(int(gpio_clock[name]) <= 0 for name in positive_gpio_clock_fields):
         raise ContractError("GPIO clock diagnostic bounds must all be positive")
-    if int(gpio_clock["production_rate_hz"]) != int(
-        timing["gpio_sample_rate_hz"]
-    ):
+    if int(gpio_clock["production_rate_hz"]) != int(timing["gpio_sample_rate_hz"]):
         raise ContractError(
             "GPIO clock production rate must equal advertised GPIO timing"
         )
-    if int(gpio_clock["pit_clock_hz"]) % int(
-        gpio_clock["production_rate_hz"]
-    ):
+    if int(gpio_clock["pit_clock_hz"]) % int(gpio_clock["production_rate_hz"]):
         raise ContractError("GPIO production rate must divide the PIT clock exactly")
-    if int(gpio_clock["minimum_rate_hz"]) > int(
-        gpio_clock["production_rate_hz"]
-    ):
+    if int(gpio_clock["minimum_rate_hz"]) > int(gpio_clock["production_rate_hz"]):
         raise ContractError("GPIO diagnostic minimum exceeds production rate")
-    if int(gpio_clock["minimum_event_count"]) > int(
-        gpio_clock["maximum_event_count"]
-    ):
+    if int(gpio_clock["minimum_event_count"]) > int(gpio_clock["maximum_event_count"]):
         raise ContractError("GPIO diagnostic event-count bounds are inverted")
-    maximum_major_count = (
-        2 * int(gpio_clock["maximum_event_count"])
-        + int(gpio_clock["duplicate_guard_events"])
+    maximum_major_count = 2 * int(gpio_clock["maximum_event_count"]) + int(
+        gpio_clock["duplicate_guard_events"]
     )
     if maximum_major_count > 0x7FFF:
         raise ContractError("GPIO diagnostic eDMA major count exceeds ELINKNO width")
@@ -254,12 +245,9 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     if any(value == 0 or value & (value - 1) for value in capability_values.values()):
         raise ContractError("every named capability must be one nonzero bit")
     gpio_clock_error_values = enum_map(contract["enums"]["gpio_clock_error"])
-    validate_enum_width(
-        "gpio_clock_error", contract["enums"]["gpio_clock_error"], 32
-    )
+    validate_enum_width("gpio_clock_error", contract["enums"]["gpio_clock_error"], 32)
     if any(
-        value == 0 or value & (value - 1)
-        for value in gpio_clock_error_values.values()
+        value == 0 or value & (value - 1) for value in gpio_clock_error_values.values()
     ):
         raise ContractError("every GPIO clock error must be one nonzero bit")
 
@@ -602,10 +590,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.append(
         "KNOWN_GPIO_CLOCK_ERROR_MASK = "
         + str(
-            sum(
-                int(entry["value"])
-                for entry in contract["enums"]["gpio_clock_error"]
-            )
+            sum(int(entry["value"]) for entry in contract["enums"]["gpio_clock_error"])
         )
     )
     lines.extend(["", ""])

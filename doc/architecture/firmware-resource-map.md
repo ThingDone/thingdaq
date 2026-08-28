@@ -224,6 +224,16 @@ word, so each event proves the trigger/count path without touching a pad or
 the raw GPIO ring. The diagnostic disables PIT, eDMA requests, DMAMUX,
 and XBAR DMA generation before returning its read-only snapshot.
 
+The unadvertised autonomous GPIO capture diagnostic adds no DMA buffer or
+peripheral reservation. It runs only when the same raw-capture owner is
+quiescent, reuses the production PIT0/XBARA1/eDMA channel 2 route and raw ring,
+and leases at most 256 words from one complete buffer for observation. The
+registered Port 15 fixture supplies documentation only—not an output-safety,
+loopback, or stimulus declaration—so this adapter has no output-register path.
+It snapshots GPR27/GDIR/PSR and DMA state before, during, and after capture;
+stops and drains the ring; and verifies D6-D13 remain standard GPIO2 inputs
+before IDLE.
+
 ## Ownership transitions
 
 The implemented packet pipeline uses explicit complete-buffer states:
@@ -288,6 +298,9 @@ and packet-drop stages. Projection markers subtract raw/packer losses already
 represented by a packet sequence slot, so STATUS never counts one loss twice.
 The only raw-word consumer outside the packer is the explicitly named bounded
 diagnostic, limited to 256 samples and intentionally lacking a wire encoder.
+The fail-closed autonomous runner uses this lease only after stopping one
+bounded production-ring capture; it does not add an ownership state or retain
+the lease across command dispatch.
 
 ADC interleaved DMA storage will become ready only after both ADC eDMA
 completions. GPIO acquisition and packed-frame transitions do not change the

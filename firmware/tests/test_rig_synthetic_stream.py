@@ -206,9 +206,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             "reset-stats-request.bin": rig.RESET_STATS_REQUEST,
             "ping-request.bin": rig.PING_REQUEST,
             "checksum-benchmark-request.bin": rig.CHECKSUM_BENCHMARK_REQUEST,
-            "gpio-clock-diagnostic-request.bin": (
-                rig.GPIO_CLOCK_DIAGNOSTIC_REQUEST
-            ),
+            "gpio-clock-diagnostic-request.bin": (rig.GPIO_CLOCK_DIAGNOSTIC_REQUEST),
         }
         for name, kind in request_kind_by_name.items():
             expected = (FIXTURES / name).read_bytes()

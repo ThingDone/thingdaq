@@ -43,6 +43,10 @@ EXPECTED_HARDWARE_INCLUDE_OWNERS = {
         "core_pins.h",
         "imxrt.h",
     },
+    FIRMWARE_SOURCE / "gpio_capture_diagnostic_teensy.cpp": {
+        "core_pins.h",
+        "imxrt.h",
+    },
     FIRMWARE_SOURCE / "gpio_raw_capture_teensy.cpp": {
         "core_pins.h",
         "imxrt.h",
