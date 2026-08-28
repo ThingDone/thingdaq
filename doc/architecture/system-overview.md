@@ -31,8 +31,7 @@ never application frame boundaries.
 
 ## Firmware control-plane foundation
 
-Phase 03 introduces three portable, header-only authorities before parser or
-control-state implementation:
+Phase 03 centralizes three portable identity/resource authorities:
 
 | Authority | Responsibility |
 | --- | --- |
@@ -41,9 +40,13 @@ control-state implementation:
 | `firmware/src/firmware_capabilities.h` | The exact INFO metadata projected from generated protocol constants and the resource registry |
 
 `firmware/firmware.ino` consumes these authorities and owns only the Arduino
-startup boundary. Portable protocol and state code must not grow board or build
-constants of its own. [[Firmware-Resource-Map]] records every reservation and
-the distinction between present control support and future acquisition work.
+startup boundary. `firmware/src/protocol.{h,cpp}` owns bounded frame parsing and
+encoding, `firmware/src/control_state.{h,cpp}` owns legal post-boot command
+dispatch and state transitions, and `firmware/src/statistics.{h,cpp}` owns
+saturating diagnostics and statistics generations. Portable protocol and state
+code must not grow board or build constants of its own. [[Firmware-Resource-Map]]
+records every reservation and the distinction between present control support
+and future acquisition work.
 
 The required target is exact:
 
@@ -96,6 +99,23 @@ Publishing intended physical layout does not imply stream availability. Host
 code must gate configuration on the stream and capability masks, not infer
 support from a nonzero rate or a published pin map.
 
+The milestone's sole applied configuration is `{streams=0, source=hardware,
+checksum=Adler-32, data_frame_bytes=4096}`. This explicit control-only profile
+allows the real firmware to prove CONFIGURE → START → STATUS → STOP without
+emitting data or setting ADC/GPIO capability bits. START allocates the next
+nonzero run ID, resets the statistics generation and acquisition epoch, and
+signals bounded main-loop work. STOP retains the run ID, discards the applied
+configuration, and idempotently returns to IDLE.
+
+The detailed statistics snapshot distinguishes successful and rejected
+commands, checksum/length/type/version parser failures, invalid-state errors,
+transport timeouts, and partial USB writes. Data/parser/transport aggregates
+are projected into the fixed v1 GET_STATUS payload; the detailed fields remain
+available to tests and later status-schema extensions. Every counter saturates,
+and successful START or RESET_STATS clears the snapshot, advances the nonzero
+generation, then records that successful command as the first event in the new
+generation.
+
 ## Host architecture
 
 The Python package exposes one synchronous `TeensyDAQ` facade over a minimal
@@ -129,8 +149,10 @@ be copied into the Phase 03 physical firmware's capability mask.
 ## Runtime ownership rule
 
 The cooperative main loop will own command parsing, response encoding, state
-mutation, checksums, and USB writes. Future ISRs may only acknowledge hardware,
-rotate explicitly owned buffers, update bounded counters, and signal work.
+mutation, checksums, and USB writes. `ControlState` exposes only compact
+START-epoch and STOP event bits for integration with acquisition. Future ISRs
+may only acknowledge hardware, rotate explicitly owned buffers, update bounded
+counters, and signal work.
 They must not parse, checksum, write USB, wait, or perform broad state changes.
 This keeps the control plane responsive when the reserved acquisition
 resources in [[Firmware-Resource-Map]] are eventually enabled.

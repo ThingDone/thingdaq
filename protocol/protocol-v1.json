@@ -62,6 +62,31 @@
     "parser_errors": "rejected inbound frame candidates",
     "transport_errors": "bounded USB read/write failure events"
   },
+  "configuration_semantics": {
+    "stream_mask": "a subset of ADC/GPIO; zero is reserved for the control-only profile and otherwise at least one advertised stream is required",
+    "control_only_profile": {
+      "availability": "only on milestone firmware whose INFO supported_stream_mask is zero",
+      "stream_mask": 0,
+      "source": "HARDWARE",
+      "data_checksum_algorithm": "ADLER32",
+      "data_frame_bytes": 4096,
+      "emits_data": false,
+      "purpose": "exercise CONFIGURE, START, GET_STATUS, RESET_STATS, PING, and STOP before acquisition is implemented"
+    }
+  },
+  "firmware_diagnostic_semantics": {
+    "commands_accepted": "semantically successful bounded command dispatches",
+    "commands_rejected": "parser candidate rejections plus typed command errors",
+    "bad_checksums": "parser candidates rejected for an Adler-32 mismatch",
+    "bad_lengths": "parser candidates rejected for magic, size, or length invariants",
+    "bad_types": "parser candidates rejected for an unknown or non-request frame kind",
+    "bad_versions": "parser candidates rejected for an unsupported protocol version",
+    "timeouts": "bounded firmware transport operations that reached their deadline",
+    "partial_usb_writes": "USB writes that accepted fewer bytes than requested without implying a framing error",
+    "state_errors": "typed command rejections with INVALID_STATE",
+    "reset_events": ["successful START", "successful RESET_STATS"],
+    "overflow": "all firmware diagnostic counters saturate at their native unsigned maximum"
+  },
   "timing": {
     "timestamp_hz": 8000000,
     "adc_pair_rate_hz": 1000000,

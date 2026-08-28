@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "board_config.h"
 #include "firmware_identity.h"
 #include "generated/protocol_constants.h"
 
@@ -71,8 +70,9 @@ inline constexpr CapabilityMetadata kMetadata{
     protocol_v1::kGpioSamplePeriodTicks,
     protocol_v1::kAdcResolutionBits,
     static_cast<std::uint8_t>(protocol_v1::kAdcContainerBits / 8U),
-    board::kGpioPinsByBit,
-    board::countOf(board::kGpioPinsByBit),
+    protocol_v1::kGpioPinsByBit,
+    sizeof(protocol_v1::kGpioPinsByBit) /
+        sizeof(protocol_v1::kGpioPinsByBit[0]),
 };
 
 inline constexpr std::uint32_t kDataCapabilityMask =

@@ -103,6 +103,13 @@ python3 tools/generate_protocol.py
 python3 tools/generate_protocol.py --check
 ```
 
+The portable firmware control module implements bounded BOOT → IDLE,
+CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
+STOP, RESET_STATS, and PING. Phase 03 uses an explicit zero-stream hardware
+configuration to exercise that lifecycle without advertising or emitting ADC
+or GPIO data; acquisition remains unavailable until later phases enable its
+capability bits.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→RESET_STATS→STOP

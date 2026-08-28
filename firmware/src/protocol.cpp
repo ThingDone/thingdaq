@@ -400,8 +400,7 @@ Result validateConfiguration(ByteView payload, std::size_t offset,
   const std::uint8_t streams = payload.data[offset];
   const std::uint8_t source = payload.data[offset + 1U];
   const std::uint8_t checksum = payload.data[offset + 2U];
-  if (streams == 0U || (streams & static_cast<std::uint8_t>(~kValidStreamMask)) !=
-                            0U ||
+  if ((streams & static_cast<std::uint8_t>(~kValidStreamMask)) != 0U ||
       !isKnownSource(source) || payload.data[offset + 3U] != 0U) {
     return badPayload();
   }
@@ -563,8 +562,8 @@ Result validateStatus(ByteView payload) {
   if (!isKnownState(state) ||
       state == static_cast<std::uint8_t>(protocol_v1::DeviceState::kBoot) ||
       (streams & static_cast<std::uint8_t>(~kValidStreamMask)) != 0U ||
-      ((state == static_cast<std::uint8_t>(protocol_v1::DeviceState::kIdle)) !=
-       (streams == 0U)) ||
+      (state == static_cast<std::uint8_t>(protocol_v1::DeviceState::kIdle) &&
+       streams != 0U) ||
       !isKnownSource(source) ||
       checksum != static_cast<std::uint8_t>(
                       protocol_v1::ChecksumAlgorithm::kAdler32)) {

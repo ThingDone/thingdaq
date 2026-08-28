@@ -327,7 +327,7 @@ eight-byte request is:
 
 | Offset | Type | Field | v1 constraint |
 | ---: | --- | --- | --- |
-| 0 | `u8` | stream mask | Nonempty subset of ADC/GPIO |
+| 0 | `u8` | stream mask | Subset of ADC/GPIO; zero only for the control-only profile below |
 | 1 | `u8` | source | Hardware (0) or synthetic (1) |
 | 2 | `u8` | data checksum | An advertised enabled algorithm; initially 1 |
 | 3 | `u8` | reserved | Zero |
@@ -336,6 +336,17 @@ eight-byte request is:
 Success moves the device to CONFIGURED and returns the common prefix followed
 by the exact eight-byte applied configuration. Unsupported values are rejected
 atomically; no partial configuration is applied.
+
+Phase 03 physical firmware defines one deliberately narrow control-only
+profile: stream mask zero, hardware source, Adler-32, and `data_frame_bytes =
+4096`. It is available only when INFO reports a zero supported-stream mask.
+The checksum and frame-size fields remain populated and are echoed so the
+control schema does not change when acquisition arrives. CONFIGURE and START
+succeed for this profile, RUNNING emits no ADC/GPIO frames, GET_STATUS reports
+RUNNING with stream mask zero, and STOP returns to IDLE. A zero stream mask on
+a device that advertises acquisition streams is not an implicit request to
+disable data; it must be rejected unless that firmware explicitly documents
+support for the control-only profile.
 
 ### START
 
@@ -358,7 +369,7 @@ statistics generation. The header carries the current or most recent run ID.
 | ---: | --- | --- |
 | 0 | 4 / response prefix | status, reserved zero, error code |
 | 4 | 1 / `u8` | device state |
-| 5 | 1 / `u8` | active stream mask; zero exactly in IDLE |
+| 5 | 1 / `u8` | active stream mask; zero in IDLE and in the Phase 03 control-only profile |
 | 6 | 1 / `u8` | source mode |
 | 7 | 1 / `u8` | data checksum algorithm |
 | 8 | 4 / `u32` | data-frame bytes, exactly 4,096 |
