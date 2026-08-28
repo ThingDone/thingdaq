@@ -128,12 +128,12 @@ class SyntheticPipelineTests(unittest.TestCase):
         self.assertIn("encodeDataFrameInPlace", combined)
         self.assertIn("transport_.serviceTransmit()", runtime)
         self.assertLess(
+            runtime.index("synthetic_source_.service("),
             runtime.index("packet_pipeline_.serviceReadyFrames()"),
-            runtime.index("transport_.serviceTransmit()"),
         )
         self.assertLess(
+            runtime.index("packet_pipeline_.serviceReadyFrames()"),
             runtime.index("transport_.serviceTransmit()"),
-            runtime.index("synthetic_source_.service("),
         )
         self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("attachInterrupt", sketch)

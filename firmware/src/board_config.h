@@ -172,7 +172,10 @@ inline constexpr std::size_t kPacketBufferCount = 106U;
 inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketTransmitQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
-inline constexpr std::size_t kSyntheticFramesPerLoop = 4U;
+// One elapsed coverage interval makes one ADC/GPIO pair due. Limiting a visit
+// to that pair halves the longest checksum burst while retaining same-visit
+// promotion/transmission and fast bounded catch-up on the next loop.
+inline constexpr std::size_t kSyntheticFramesPerLoop = 2U;
 inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 4160U;
 inline constexpr std::size_t kChecksumBenchmarkBufferBytes =
     protocol_v1::kDataFrameBytes;

@@ -746,12 +746,15 @@ void testSequenceWrapAndPacingBoundaries() {
       pipeline, packet::Stream::kAdc, near_wrap);
   packet::PacketBufferPipelineTestAccess::setNextSequence(
       pipeline, packet::Stream::kGpio, near_wrap);
-  expect(source.service(epoch + 4U * synthetic::kFrameCoverageTicks, pipeline)
-                 .frames_generated == board::kSyntheticFramesPerLoop &&
-             source.service(epoch + 4U * synthetic::kFrameCoverageTicks,
-                            pipeline)
-                     .frames_generated == 2U,
-         "real-time catch-up remains bounded across an unequal three-frame deadline");
+  bool bounded_catch_up = true;
+  for (std::size_t visit = 0U; visit < 3U; ++visit) {
+    bounded_catch_up =
+        bounded_catch_up &&
+        source.service(epoch + 4U * synthetic::kFrameCoverageTicks, pipeline)
+                .frames_generated == board::kSyntheticFramesPerLoop;
+  }
+  expect(bounded_catch_up,
+         "real-time catch-up remains bounded across a three-frame deadline");
   expect(pipeline.serviceReadyFrames(6U).frames_promoted == 6U,
          "promote all sequence-wrap frames fairly");
   const std::array<std::uint32_t, 3U> expected_sequences{

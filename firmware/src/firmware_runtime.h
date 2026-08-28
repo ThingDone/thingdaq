@@ -74,8 +74,7 @@ class FirmwareRuntime {
     return synthetic_source_.snapshot();
   }
   bool hasPendingTransmission() const {
-    return packet_pipeline_.readyFrames() != 0U ||
-           transport_.hasPendingTransmission();
+    return transport_.hasPendingTransmission();
   }
 
  private:
