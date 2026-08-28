@@ -255,6 +255,18 @@ def _adc_wire(run_id: int, sequence: int) -> bytes:
 
 
 class SerialTransportTests(unittest.TestCase):
+    def test_readinto_falls_back_when_serial_factory_only_exposes_read(self) -> None:
+        fake = FakeSerial(b"abcdef")
+        transport = SerialTransport(
+            "read-only-factory",
+            serial_factory=lambda **options: fake,
+        )
+        storage = bytearray(4)
+
+        self.assertEqual(4, transport.readinto(storage))
+        self.assertEqual(b"abcd", storage)
+        transport.close()
+
     def test_large_reads_partial_writes_flush_and_close_are_bounded(self) -> None:
         fake = FakeSerial(b"x" * 70_000, write_limit=3)
         captured: dict[str, object] = {}

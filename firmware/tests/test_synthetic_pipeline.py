@@ -82,9 +82,7 @@ class SyntheticPipelineTests(unittest.TestCase):
             )
 
     def test_heavy_pipeline_work_is_fixed_capacity_and_isr_free(self) -> None:
-        sources = {
-            path: path.read_text(encoding="utf-8") for path in PIPELINE_SOURCES
-        }
+        sources = {path: path.read_text(encoding="utf-8") for path in PIPELINE_SOURCES}
         combined = "\n".join(sources.values())
         for token in (
             "std::vector",

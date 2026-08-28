@@ -185,9 +185,7 @@ def _status_wire(
 @lru_cache(maxsize=1)
 def _multirun_wire_corpus() -> _WireCorpus:
     coverage_count = math.ceil(
-        CORPUS_SECONDS_PER_RUN
-        * constants.TIMESTAMP_HZ
-        / constants.FRAME_COVERAGE_TICKS
+        CORPUS_SECONDS_PER_RUN * constants.TIMESTAMP_HZ / constants.FRAME_COVERAGE_TICKS
     )
     runs = (
         _RunSpec(0xDA04_0001, coverage_count, 101),
@@ -206,9 +204,7 @@ def _multirun_wire_corpus() -> _WireCorpus:
             wire.extend(
                 encode_frame(
                     constants.FrameKind.ADC_DATA,
-                    synthetic_adc_payload(
-                        sequence * constants.ADC_PAIRS_PER_FRAME
-                    ),
+                    synthetic_adc_payload(sequence * constants.ADC_PAIRS_PER_FRAME),
                     flags=flags,
                     run_id=run.run_id,
                     sequence=sequence,
@@ -219,9 +215,7 @@ def _multirun_wire_corpus() -> _WireCorpus:
             wire.extend(
                 encode_frame(
                     constants.FrameKind.GPIO_DATA,
-                    synthetic_gpio_payload(
-                        sequence * constants.GPIO_SAMPLES_PER_FRAME
-                    ),
+                    synthetic_gpio_payload(sequence * constants.GPIO_SAMPLES_PER_FRAME),
                     flags=flags,
                     run_id=run.run_id,
                     sequence=sequence,
@@ -534,8 +528,7 @@ class SustainedSyntheticCorrectnessTests(unittest.TestCase):
                         self.assertTrue(second_epoch.reconciliation.ok)
 
                 observed_ratio = (
-                    metrics.framed_bytes_per_second
-                    / TARGET_FRAMED_BYTES_PER_SECOND
+                    metrics.framed_bytes_per_second / TARGET_FRAMED_BYTES_PER_SECOND
                 )
                 self.assertGreaterEqual(observed_ratio, minimum_ratio)
                 if name == "target":
@@ -557,7 +550,9 @@ class SustainedSyntheticCorrectnessTests(unittest.TestCase):
                 self.assertEqual(0, metrics.parser_counters.corruption_events)
                 self.assertGreater(transport.nonempty_reads, 1_000)
                 self.assertGreater(transport.partial_frame_reads, 0)
-                self.assertLess(transport.minimum_read_bytes, constants.DATA_FRAME_BYTES)
+                self.assertLess(
+                    transport.minimum_read_bytes, constants.DATA_FRAME_BYTES
+                )
                 self.assertGreater(transport.maximum_read_bytes, constants.HEADER_SIZE)
 
         self.assertIsNotNone(first_target_run_id)

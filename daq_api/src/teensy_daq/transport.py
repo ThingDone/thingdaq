@@ -91,14 +91,17 @@ Transport = ByteTransport
 
 
 class _SerialPort(Protocol):
-    """Subset of PySerial used by :class:`SerialTransport`."""
+    """Required PySerial subset used by :class:`SerialTransport`.
+
+    ``readinto`` is intentionally optional: the transport discovers it at
+    runtime and falls back to ``read`` for compatible serial factories that do
+    not expose the zero-copy extension.
+    """
 
     @property
     def is_open(self) -> bool: ...
 
     def read(self, size: int = 1) -> bytes: ...
-
-    def readinto(self, buffer: bytearray | memoryview) -> int | None: ...
 
     def write(self, data: BytesLike) -> int | None: ...
 
