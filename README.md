@@ -189,6 +189,14 @@ fixtures byte for byte. Dependency checks keep Arduino and Teensy core APIs in
 the guarded board/USB adapters rather than the portable protocol/control
 closure.
 
+The separate synthetic-pipeline stress executable exercises every packet
+ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source
+fairness, 32-bit sequence rollover, STOP/reset cleanup, and stale-run rejection.
+It also sends long real-time and unpaced ADC/GPIO runs through deterministic
+full, partial, zero, and recovered fake-CDC writes while incrementally received
+PING commands arrive behind active data frames; every resulting frame checksum,
+timestamp, sequence, formula, and ownership-stage counter is reconciled.
+
 After installing the development environment above, run the focused gate from
 the repository root:
 

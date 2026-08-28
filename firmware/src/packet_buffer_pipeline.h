@@ -10,6 +10,10 @@
 
 namespace teensy_daq::packet {
 
+#if defined(TEENSY_DAQ_TESTING)
+struct PacketBufferPipelineTestAccess;
+#endif
+
 // These values describe ownership, not merely progress. Only FILLING exposes
 // mutable payload bytes. READY is owned by a bounded per-source ready queue,
 // and TRANSMITTING is immutable until CdcTransport releases the complete
@@ -203,6 +207,10 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   PipelineSnapshot snapshot() const;
 
  private:
+#if defined(TEENSY_DAQ_TESTING)
+  friend struct PacketBufferPipelineTestAccess;
+#endif
+
   struct BufferRecord {
     BufferState state = BufferState::kFree;
     Stream stream = Stream::kAdc;
