@@ -168,11 +168,12 @@ Every `loop()` calls one portable runtime service step in this fixed order:
 3. preflight START ownership, consume the bounded START-epoch/STOP event mask
    in main-loop context, and admit a successful lifecycle response only after
    the corresponding resources accept it;
-4. poll one 8 MHz clock value and generate at most four due synthetic frames;
-5. promote at most four complete ready frames into transport ownership; and
-6. transmit at most 2,048 bytes and eight core write calls, requesting at most
+4. promote at most four previously completed frames into transport ownership;
+5. transmit at most 2,048 bytes and eight core write calls, requesting at most
    one 2,048-byte core buffer per call and avoiding intentional sub-512-byte
-   data chunks except exact frame tails.
+   data chunks except exact frame tails; and
+6. poll one 8 MHz clock value and generate at most four due synthetic frames
+   for the next service visit.
 
 Valid typed rejections such as INVALID_STATE or UNSUPPORTED_CONFIGURATION are
 normal protocol outcomes and leave the prior state atomic. A response encoding

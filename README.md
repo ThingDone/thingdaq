@@ -201,9 +201,9 @@ constructs the Teensy CDC/clock adapters and aligned packet storage before the
 runtime, binds INFO to the core-derived hardware serial during bounded BOOT,
 and makes one cooperative service call per loop. Each call performs bounded
 receive work, dispatches at most one command, applies compact START/STOP events
-before admitting their successful responses, generates at most four due
-synthetic frames, promotes bounded ready frames, and performs bounded transmit
-work. No pacing ISR is installed.
+before admitting their successful responses, promotes and transmits previously
+owned work, then generates at most four due synthetic frames for the next
+bounded service visit. No pacing ISR is installed.
 Expected typed command errors are
 state-atomic; an internal response-path failure emits an INTERNAL_ERROR when
 possible, releases its queue reservation, and fails safe to IDLE. INFO exposes

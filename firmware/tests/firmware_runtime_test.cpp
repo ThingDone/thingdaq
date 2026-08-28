@@ -647,11 +647,13 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
   stream.output.clear();
 
   clock.ticks = synthetic::kFrameCoverageTicks;
+  const app::LoopReport produced = firmware.service();
   const app::LoopReport partial = firmware.service();
-  expect(partial.synthetic.frames_framed == 2U &&
+  expect(produced.synthetic.frames_framed == 2U &&
+             produced.transmit.bytes_written == 0U &&
              partial.transmit.bytes_written > 0U &&
              firmware.transportSnapshot().active_frame_bytes_sent > 0U,
-         "full-size run-one data is partially active before STOP");
+         "consumer-first service partially transmits run-one data before STOP");
 
   stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 203U));
   stream.appendInput(

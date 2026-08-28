@@ -70,12 +70,15 @@ LoopReport FirmwareRuntime::service() {
   // pass. Consume it now so a failed START cannot generate data for one loop.
   applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
 
-  // Pattern construction, framing/checksum work, queue ownership, and USB all
-  // stay in this bounded cooperative path. The production clock is polled;
-  // no pacing ISR is installed.
-  report.synthetic = synthetic_source_.service(now_ticks, packet_pipeline_);
+  // Drain previously owned work before admitting newly due production. This
+  // consumer-first ordering lets a completed USB frame return its packet slot
+  // before the real-time producer tests pool capacity, avoiding a false drop
+  // at the full-pool boundary. Newly framed work is promoted here and becomes
+  // eligible for the next bounded service visit. The production clock remains
+  // polled; no pacing ISR is installed.
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
+  report.synthetic = synthetic_source_.service(now_ticks, packet_pipeline_);
   publishPacketStatistics();
   return report;
 }
