@@ -207,14 +207,28 @@ that exact byte boundary, including partial reads and writes. `SerialTransport`
 implements bounded PySerial I/O, while `BackgroundReader` owns incremental
 parsing, concurrent request-ID correlation, and bounded decoded block/event
 queues. The public facade uses the same reader for INFO, CONFIGURE, START,
-GET_STATUS, RESET_STATS, STOP, and streaming; simulator operation has no
+GET_STATUS, STOP, RESET_STATS, and streaming; simulator operation has no
 parallel decoder or synchronous parsing shortcut.
 
 Metadata-first discovery filters PySerial enumeration for the legitimate
 Teensy USB Serial VID/PID before opening anything, then validates plausible
 devices with bounded INFO. Discovery identity comes from the chip-derived
 hardware serial, not the transient COM or `/dev` endpoint. Reopening a result
-repeats INFO and checks that identity so a hot-reused path fails closed.
+uses a throwaway INFO followed by an authoritative identity-equal INFO and
+checks the protocol, Phase 03-or-newer semantic firmware, source-derived build
+ID, board/MCU pair, and hardware serial. Reset noise plus timeout/BOOT/BUSY
+retries remain explicitly bounded, and a hot-reused path or changed image
+fails closed before any state-changing operation.
+
+`DAQConfiguration.control_only()` and
+`TeensyDAQ.configure_control_only()` represent the milestone's zero-stream
+hardware profile without weakening ordinary acquisition validation.
+`TeensyDAQ.simulated(control_only=True)` exercises the identical schemas. The
+`teensy-daq` command-line entry point lists candidates, probes identity, prints
+status, configures, starts, stops, and resets safe counters. Its one-shot
+configure/start commands deliberately close the PySerial handle without STOP
+so state persists across invocations; normal context-manager cleanup retains
+the safe STOP-on-close policy.
 
 The typed surface consists of `DeviceInfo` with nested `DeviceCapabilities`,
 `DAQConfiguration`, `Status`, `ADCBlock`, `GPIOBlock`, and `StreamGap`, plus

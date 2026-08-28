@@ -107,12 +107,14 @@ class DisconnectingProbeTransport(InfoProbeTransport):
         raise TransportDisconnectedError("candidate disconnected during INFO")
 
 
-def _physical_info(hardware_serial: int, build_id: str = "physical-v1") -> Info:
+def _physical_info(
+    hardware_serial: int, build_id: str = "tdaq-0123456789abcdef"
+) -> Info:
     return Info(
         device_state=DeviceState.IDLE,
         build_id=build_id,
         hardware_serial=hardware_serial,
-        firmware_version=(1, 2, 3),
+        firmware_version=(0, 3, 0),
         board_id=BoardId.TEENSY_40,
         mcu_id=McuId.IMXRT1062,
     )

@@ -43,6 +43,12 @@ class PackageConfigurationTests(unittest.TestCase):
                     f"development extra is missing {tool}",
                 )
 
+    def test_control_and_demo_console_entry_points_are_installed(self) -> None:
+        scripts = self.pyproject["project"]["scripts"]
+
+        self.assertEqual("teensy_daq.cli:main", scripts["teensy-daq"])
+        self.assertEqual("teensy_daq.demo:main", scripts["teensy-daq-demo"])
+
 
 if __name__ == "__main__":
     unittest.main()

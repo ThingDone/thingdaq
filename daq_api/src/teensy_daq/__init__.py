@@ -23,6 +23,7 @@ from .client import (
     DeviceCapabilityError,
     DeviceCommandError,
     DeviceIdentityMismatchError,
+    DeviceSynchronizationError,
     HostBufferFullError,
     MultipleDevicesFoundError,
     StreamItem,
@@ -47,6 +48,13 @@ from .discovery import (
     enumerate_candidates,
     probe_candidate,
     select_device,
+)
+from .identity import (
+    PHASE03_MINIMUM_FIRMWARE_VERSION,
+    DeviceIdentitySnapshot,
+    ExpectedDeviceIdentity,
+    IdentityValidationError,
+    validate_device_identity,
 )
 from .models import (
     ADCBlock,
@@ -116,6 +124,7 @@ from .transport import (
     ByteTransport,
     InMemoryTransport,
     MemoryTransport,
+    SerialPortBusyError,
     SerialTransport,
     Transport,
     TransportBufferError,
@@ -130,6 +139,7 @@ __version__ = "0.0.0"
 
 __all__ = [
     "DEFAULT_DISCOVERY_TIMEOUT",
+    "PHASE03_MINIMUM_FIRMWARE_VERSION",
     "TEENSY_DAQ_PRODUCT",
     "TEENSY_USB_SERIAL_PID",
     "TEENSY_USB_SERIAL_VID",
@@ -159,13 +169,16 @@ __all__ = [
     "DeviceDisconnectedError",
     "DeviceIdentity",
     "DeviceIdentityMismatchError",
+    "DeviceIdentitySnapshot",
     "DeviceInfo",
     "DeviceNotFoundError",
     "DeviceState",
+    "DeviceSynchronizationError",
     "DiscoveredDevice",
     "DiscoveryError",
     "DiscoveryProbeError",
     "ErrorCode",
+    "ExpectedDeviceIdentity",
     "FirmwareCounters",
     "Frame",
     "FrameFlag",
@@ -179,6 +192,7 @@ __all__ = [
     "HardwareSerial",
     "HostBufferFullError",
     "HostCounters",
+    "IdentityValidationError",
     "InMemoryTransport",
     "IncrementalFrameParser",
     "Info",
@@ -200,6 +214,7 @@ __all__ = [
     "ReaderShutdownError",
     "RequestTimeoutError",
     "ResponseStatus",
+    "SerialPortBusyError",
     "SerialPortCandidate",
     "SerialTransport",
     "SimulatedDevice",
@@ -240,4 +255,5 @@ __all__ = [
     "synthetic_adc_payload",
     "synthetic_gpio_byte",
     "synthetic_gpio_payload",
+    "validate_device_identity",
 ]

@@ -10,6 +10,7 @@ from serial.tools import list_ports
 from serial.tools.list_ports_common import ListPortInfo
 
 from ._generated import protocol_constants as constants
+from .identity import IdentityValidationError, validate_device_identity
 from .models import Info
 from .reader import BackgroundReader
 from .transport import ByteTransport, SerialTransport
@@ -272,13 +273,20 @@ def _usb_serial_as_int(serial_number: str | None) -> int | None:
 
 
 def _validate_physical_info(candidate: SerialPortCandidate, info: Info) -> None:
+    try:
+        validate_device_identity(info)
+    except IdentityValidationError as error:
+        raise DiscoveryProbeError(
+            candidate,
+            f"INFO identity is incompatible: {error}",
+            error,
+        ) from error
     if (
         info.board_id is not constants.BoardId.TEENSY_40
         or info.mcu_id is not constants.McuId.IMXRT1062
     ):
         raise DiscoveryProbeError(
-            candidate,
-            "INFO did not identify a Teensy 4.0 / i.MX RT1062 device",
+            candidate, "INFO did not identify a Teensy 4.0 / i.MX RT1062 device"
         )
 
     enumerated_serial = _usb_serial_as_int(candidate.serial_number)

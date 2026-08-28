@@ -38,6 +38,7 @@ class SimulatedDevice:
         self,
         *,
         auto_boot: bool = True,
+        control_only: bool = False,
         build_id: str = "teensy-daq-simulator-v1",
         max_receive_bytes: int = constants.MAX_CONTROL_FRAME_BYTES,
         max_requests_per_receive: int = 8,
@@ -46,10 +47,13 @@ class SimulatedDevice:
             raise ValueError("max_receive_bytes must hold at least one frame")
         if max_requests_per_receive <= 0:
             raise ValueError("max_requests_per_receive must be positive")
+        if not isinstance(control_only, bool):
+            raise TypeError("control_only must be a boolean")
         # Validate build identity through the public model once at construction.
         Info(device_state=constants.DeviceState.IDLE, build_id=build_id)
 
         self._build_id = build_id
+        self._control_only = control_only
         self._max_receive_bytes = max_receive_bytes
         self._max_requests_per_receive = max_requests_per_receive
         self._request_parser = IncrementalFrameParser()
@@ -143,6 +147,8 @@ class SimulatedDevice:
             streams.append(constants.FrameKind.ADC_DATA)
         if configuration.stream_mask & constants.StreamMask.GPIO:
             streams.append(constants.FrameKind.GPIO_DATA)
+        if not streams:
+            return None
         kind = streams[self._next_stream_index % len(streams)]
         self._next_stream_index = (self._next_stream_index + 1) % len(streams)
 
@@ -164,7 +170,11 @@ class SimulatedDevice:
             source=(
                 configuration.source
                 if configuration is not None
-                else constants.Source.SYNTHETIC
+                else (
+                    constants.Source.HARDWARE
+                    if self._control_only
+                    else constants.Source.SYNTHETIC
+                )
             ),
             data_checksum_algorithm=(
                 configuration.data_checksum_algorithm
@@ -204,18 +214,33 @@ class SimulatedDevice:
         return handlers[request.header.kind](request)
 
     def _handle_info(self, request: Frame) -> bytes:
-        info = Info(
-            device_state=self._state,
-            build_id=self._build_id,
-            firmware_version=(0, 1, 0),
-            supported_source_mask=1 << int(constants.Source.SYNTHETIC),
-            capability_bits=(
+        if self._control_only:
+            supported_stream_mask = constants.StreamMask.NONE
+            supported_source_mask = 1 << int(constants.Source.HARDWARE)
+            capability_bits = (
+                constants.Capability.HARDWARE_SOURCE
+                | constants.Capability.RESET_STATS
+                | constants.Capability.PING
+            )
+            firmware_version = (0, 3, 0)
+        else:
+            supported_stream_mask = constants.StreamMask.ADC | constants.StreamMask.GPIO
+            supported_source_mask = 1 << int(constants.Source.SYNTHETIC)
+            capability_bits = (
                 constants.Capability.ADC_STREAM
                 | constants.Capability.GPIO_STREAM
                 | constants.Capability.SYNTHETIC_SOURCE
                 | constants.Capability.RESET_STATS
                 | constants.Capability.PING
-            ),
+            )
+            firmware_version = (0, 1, 0)
+        info = Info(
+            device_state=self._state,
+            build_id=self._build_id,
+            firmware_version=firmware_version,
+            supported_stream_mask=supported_stream_mask,
+            supported_source_mask=supported_source_mask,
+            capability_bits=capability_bits,
         )
         return self._success_response(request, info.to_payload())
 
@@ -227,7 +252,14 @@ class SimulatedDevice:
             return self._typed_error(request, constants.ErrorCode.INVALID_STATE)
 
         configuration = Configuration.from_payload(request.payload)
-        if configuration.source is not constants.Source.SYNTHETIC:
+        if self._control_only:
+            supported_configuration = configuration.is_control_only
+        else:
+            supported_configuration = (
+                configuration.source is constants.Source.SYNTHETIC
+                and configuration.stream_mask != constants.StreamMask.NONE
+            )
+        if not supported_configuration:
             return self._typed_error(
                 request,
                 constants.ErrorCode.UNSUPPORTED_CONFIGURATION,

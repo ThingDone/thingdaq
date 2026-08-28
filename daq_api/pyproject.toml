@@ -19,6 +19,7 @@ classifiers = [
 ]
 
 [project.scripts]
+teensy-daq = "teensy_daq.cli:main"
 teensy-daq-demo = "teensy_daq.demo:main"
 
 [project.optional-dependencies]

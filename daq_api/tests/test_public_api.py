@@ -51,9 +51,9 @@ class PhysicalInfoDevice(SimulatedDevice):
     def _handle_info(self, request: Frame) -> bytes:
         info = DeviceInfo(
             device_state=self.state,
-            build_id="physical-api-test-v1",
+            build_id="tdaq-0123456789abcdef",
             hardware_serial=self.hardware_serial,
-            firmware_version=(1, 2, 3),
+            firmware_version=(0, 3, 0),
             board_id=BoardId.TEENSY_40,
             mcu_id=McuId.IMXRT1062,
             capability_bits=(
@@ -198,9 +198,9 @@ class PublicOpenTests(unittest.TestCase):
             candidate=candidate,
             info=DeviceInfo(
                 device_state=DeviceState.IDLE,
-                build_id="physical-api-test-v1",
+                build_id="tdaq-0123456789abcdef",
                 hardware_serial=hardware_serial,
-                firmware_version=(1, 2, 3),
+                firmware_version=(0, 3, 0),
                 board_id=BoardId.TEENSY_40,
                 mcu_id=McuId.IMXRT1062,
                 capability_bits=(

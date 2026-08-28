@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable, Iterator
+from dataclasses import replace
 from threading import RLock
+from time import sleep
 from types import TracebackType
 from typing import Literal, TypeAlias
 
@@ -19,6 +21,12 @@ from .discovery import (
 )
 from .discovery import (
     discover as discover_devices,
+)
+from .identity import (
+    DeviceIdentitySnapshot,
+    ExpectedDeviceIdentity,
+    IdentityValidationError,
+    validate_device_identity,
 )
 from .models import (
     ADCBlock,
@@ -45,11 +53,19 @@ from .reader import (
     RequestTimeoutError,
     StreamStoppedError,
 )
+from .simulator import SimulatedDevice
 from .transport import ByteTransport, InMemoryTransport, SerialTransport
 
 DataBlock: TypeAlias = ADCBlock | GPIOBlock
 StreamItem: TypeAlias = DataBlock | StreamGap
 SerialTransportFactory: TypeAlias = Callable[[str], ByteTransport]
+
+
+def _decimal_hardware_serial(value: str | None) -> int | None:
+    if value is None or not value.isascii() or not value.isdecimal():
+        return None
+    parsed = int(value, 10)
+    return parsed if parsed <= constants.UINT32_MAX else None
 
 
 class TeensyDAQError(RuntimeError):
@@ -144,7 +160,11 @@ class MultipleDevicesFoundError(TeensyDAQError):
 
 
 class DeviceIdentityMismatchError(TeensyDAQError):
-    """A reopened port no longer contains the selected physical DAQ."""
+    """INFO does not match the selected target or expected firmware image."""
+
+
+class DeviceSynchronizationError(TeensyDAQError):
+    """A bounded open did not produce two stable INFO responses."""
 
 
 class UnexpectedMessageError(TeensyDAQError):
@@ -192,6 +212,8 @@ class TeensyDAQ:
         shutdown_timeout: float = 1.0,
         idle_sleep: float = 0.001,
         operation_byte_budget: int | None = None,
+        expected_identity: ExpectedDeviceIdentity | None = None,
+        reopened_identity: DeviceIdentitySnapshot | None = None,
     ) -> None:
         if not isinstance(strict, bool):
             raise TypeError("strict must be a boolean")
@@ -201,12 +223,23 @@ class TeensyDAQ:
             or operation_byte_budget < constants.DATA_FRAME_BYTES
         ):
             raise ValueError("operation_byte_budget must hold a complete data frame")
+        if expected_identity is not None and not isinstance(
+            expected_identity, ExpectedDeviceIdentity
+        ):
+            raise TypeError("expected_identity must be ExpectedDeviceIdentity")
+        if reopened_identity is not None and not isinstance(
+            reopened_identity, DeviceIdentitySnapshot
+        ):
+            raise TypeError("reopened_identity must be DeviceIdentitySnapshot")
 
         self._transport = transport
         self._strict = strict
         self._max_buffered_blocks = max_buffered_blocks
         self._command_timeout = float(command_timeout)
         self._block_timeout = float(block_timeout)
+        self._expected_identity = expected_identity
+        self._reopened_identity = reopened_identity
+        self._verified_identity: DeviceIdentitySnapshot | None = None
         self._reader = BackgroundReader(
             transport,
             read_size=read_size,
@@ -260,6 +293,9 @@ class TeensyDAQ:
         shutdown_timeout: float = 1.0,
         idle_sleep: float = 0.001,
         operation_byte_budget: int | None = None,
+        expected_identity: ExpectedDeviceIdentity | None = None,
+        synchronization_attempts: int = 4,
+        synchronization_retry_delay: float = 0.05,
     ) -> TeensyDAQ:
         """Open a transport, discovered device, port, or selected serial number.
 
@@ -274,6 +310,7 @@ class TeensyDAQ:
 
         selected: DiscoveredDevice | SerialPortCandidate | str | None = None
         expected_serial: int | None = None
+        reopened_identity: DeviceIdentitySnapshot | None = None
         if device is None:
             devices = discover_devices(timeout=discovery_timeout)
             if hardware_serial is not None:
@@ -288,10 +325,15 @@ class TeensyDAQ:
                 chosen = devices[0]
             selected = chosen
             expected_serial = chosen.hardware_serial
+            reopened_identity = DeviceIdentitySnapshot.from_info(chosen.info)
         elif isinstance(device, DiscoveredDevice):
             selected = device
             expected_serial = device.hardware_serial
-        elif isinstance(device, (SerialPortCandidate, str)):
+            reopened_identity = DeviceIdentitySnapshot.from_info(device.info)
+        elif isinstance(device, SerialPortCandidate):
+            selected = device
+            expected_serial = _decimal_hardware_serial(device.serial_number)
+        elif isinstance(device, str):
             selected = device
         elif isinstance(device, ByteTransport):
             transport = device
@@ -315,6 +357,20 @@ class TeensyDAQ:
             else:
                 transport = serial_transport_factory(port)
 
+        if expected_serial is not None:
+            if (
+                expected_identity is not None
+                and expected_identity.hardware_serial is not None
+                and expected_identity.hardware_serial != expected_serial
+            ):
+                raise DeviceIdentityMismatchError(
+                    "selected hardware serial conflicts with expected_identity"
+                )
+            expected_identity = replace(
+                expected_identity or ExpectedDeviceIdentity(),
+                hardware_serial=expected_serial,
+            )
+
         daq = cls(
             transport,
             strict=strict,
@@ -327,18 +383,18 @@ class TeensyDAQ:
             shutdown_timeout=shutdown_timeout,
             idle_sleep=idle_sleep,
             operation_byte_budget=operation_byte_budget,
+            expected_identity=expected_identity,
+            reopened_identity=reopened_identity,
         )
         try:
-            info = daq.info()
-            if expected_serial is not None and info.hardware_serial != expected_serial:
-                raise DeviceIdentityMismatchError(
-                    f"selected hardware serial {expected_serial} reopened as "
-                    f"{info.hardware_serial}"
-                )
+            daq.synchronize(
+                attempts=synchronization_attempts,
+                retry_delay=synchronization_retry_delay,
+            )
             return daq
         except BaseException:
             try:
-                daq.close()
+                daq.close(stop=False)
             except Exception:  # noqa: BLE001, S110 - preserve opening failure
                 pass
             raise
@@ -347,6 +403,7 @@ class TeensyDAQ:
     def simulated(
         cls,
         *,
+        control_only: bool = False,
         read_chunk_size: int | None = None,
         write_chunk_size: int | None = None,
         stream_interval: float | None = None,
@@ -359,10 +416,14 @@ class TeensyDAQ:
         block_timeout: float = 1.0,
         shutdown_timeout: float = 1.0,
         idle_sleep: float = 0.001,
+        expected_identity: ExpectedDeviceIdentity | None = None,
+        synchronization_attempts: int = 4,
+        synchronization_retry_delay: float = 0.05,
     ) -> TeensyDAQ:
         """Open the public API over the deterministic protocol simulator."""
 
         transport = InMemoryTransport(
+            device=SimulatedDevice(control_only=control_only),
             read_chunk_size=read_chunk_size,
             write_chunk_size=write_chunk_size,
             stream_interval=stream_interval,
@@ -378,6 +439,9 @@ class TeensyDAQ:
             block_timeout=block_timeout,
             shutdown_timeout=shutdown_timeout,
             idle_sleep=idle_sleep,
+            expected_identity=expected_identity,
+            synchronization_attempts=synchronization_attempts,
+            synchronization_retry_delay=synchronization_retry_delay,
         )
 
     @property
@@ -407,6 +471,12 @@ class TeensyDAQ:
     @property
     def device_info(self) -> DeviceInfo | None:
         return self._device_info
+
+    @property
+    def verified_identity(self) -> DeviceIdentitySnapshot | None:
+        """Stable identity established by two valid synchronized INFO replies."""
+
+        return self._verified_identity
 
     @property
     def capabilities(self) -> DeviceCapabilities | None:
@@ -442,19 +512,70 @@ class TeensyDAQ:
             disconnects=reader.disconnects,
         )
 
-    def info(self) -> DeviceInfo:
-        """Return identity and capabilities; valid in every post-boot state."""
+    def synchronize(
+        self,
+        *,
+        attempts: int = 4,
+        retry_delay: float = 0.05,
+    ) -> DeviceInfo:
+        """Discard one valid INFO, then require a stable authoritative INFO.
+
+        Reset/startup noise is handled by the incremental parser. A timeout,
+        BOOT-state rejection, or BUSY response may be retried only within the
+        explicit attempt count. Two identity-equal successes are required so a
+        late response or hot re-enumeration cannot authorize device mutation.
+        """
+
+        if not isinstance(attempts, int) or isinstance(attempts, bool) or attempts < 2:
+            raise ValueError("synchronization attempts must be an integer at least two")
+        if (
+            not isinstance(retry_delay, (int, float))
+            or isinstance(retry_delay, bool)
+            or retry_delay < 0
+        ):
+            raise ValueError("synchronization retry delay must be nonnegative")
 
         with self._lock:
-            response = self._command(constants.FrameKind.INFO_REQUEST)
-            if not isinstance(response.value, DeviceInfo):
-                raise UnexpectedMessageError("INFO response has no DeviceInfo value")
-            info = response.value
-            self._device_info = info
-            self._state = info.device_state
-            self._run_id = response.run_id
-            if info.device_state is constants.DeviceState.IDLE:
-                self._configuration = None
+            first_identity: DeviceIdentitySnapshot | None = None
+            last_retryable: TeensyDAQError | None = None
+            for attempt in range(attempts):
+                try:
+                    info, identity = self._read_info()
+                except CommandTimeoutError as error:
+                    last_retryable = error
+                except DeviceCommandError as error:
+                    if error.error_code not in {
+                        constants.ErrorCode.BUSY,
+                        constants.ErrorCode.INVALID_STATE,
+                    }:
+                        raise
+                    last_retryable = error
+                else:
+                    if first_identity is None:
+                        first_identity = identity
+                        last_retryable = None
+                    elif identity != first_identity:
+                        raise DeviceIdentityMismatchError(
+                            "firmware identity changed between synchronization probes"
+                        )
+                    else:
+                        self._verified_identity = identity
+                        return info
+
+                if attempt + 1 < attempts and retry_delay:
+                    sleep(float(retry_delay))
+
+            if last_retryable is not None:
+                raise last_retryable
+            raise DeviceSynchronizationError(
+                f"only one valid INFO response arrived in {attempts} attempts"
+            )
+
+    def info(self) -> DeviceInfo:
+        """Return validated identity/capabilities in every post-boot state."""
+
+        with self._lock:
+            info, _ = self._read_info()
             return info
 
     def configure(
@@ -470,6 +591,7 @@ class TeensyDAQ:
         """Apply an atomic configuration without starting acquisition."""
 
         with self._lock:
+            self._require_verified_identity()
             self._require_state(
                 "configure",
                 constants.DeviceState.IDLE,
@@ -516,10 +638,16 @@ class TeensyDAQ:
             self._last_status = None
             return response.value
 
+    def configure_control_only(self) -> DAQConfiguration:
+        """Apply the exact zero-stream profile advertised by Phase 03 firmware."""
+
+        return self.configure(DAQConfiguration.control_only())
+
     def start(self) -> int:
         """Start a configured acquisition and return its nonzero run ID."""
 
         with self._lock:
+            self._require_verified_identity()
             self._require_state("start", constants.DeviceState.CONFIGURED)
             host_drop_baseline = self._reader.counters.host_block_queue_drops
             response = self._command(constants.FrameKind.START_REQUEST)
@@ -566,6 +694,7 @@ class TeensyDAQ:
         """Reset firmware counters in IDLE/CONFIGURED and return the generation."""
 
         with self._lock:
+            self._require_verified_identity()
             self._require_state(
                 "reset_stats",
                 constants.DeviceState.IDLE,
@@ -595,6 +724,7 @@ class TeensyDAQ:
         """Idempotently stop acquisition/configuration and enter IDLE."""
 
         with self._lock:
+            self._require_verified_identity()
             self._require_state(
                 "stop",
                 constants.DeviceState.IDLE,
@@ -684,17 +814,31 @@ class TeensyDAQ:
             observed_stream_gaps=self._observed_stream_gaps,
         )
 
-    def close(self) -> None:
-        """STOP when needed, then close the reader and transport idempotently."""
+    def close(self, *, stop: bool = True) -> None:
+        """Close idempotently, normally STOPping configured/running firmware.
+
+        ``stop=False`` is intended for one-shot control-plane tools that must
+        release the serial handle while deliberately preserving device state.
+        Context-manager cleanup retains the safe default and always requests
+        STOP before closing.
+        """
+
+        if not isinstance(stop, bool):
+            raise TypeError("stop must be a boolean")
 
         with self._lock:
             if self._closed:
                 return
             stop_error: BaseException | None = None
-            if self._reader.is_running and self._state in {
-                constants.DeviceState.CONFIGURED,
-                constants.DeviceState.RUNNING,
-            }:
+            if (
+                stop
+                and self._reader.is_running
+                and self._state
+                in {
+                    constants.DeviceState.CONFIGURED,
+                    constants.DeviceState.RUNNING,
+                }
+            ):
                 try:
                     self.stop()
                 except BaseException as error:  # noqa: BLE001 - close regardless
@@ -732,13 +876,15 @@ class TeensyDAQ:
         self,
         kind: constants.FrameKind,
         payload: bytes = b"",
+        *,
+        timeout: float | None = None,
     ) -> CommandResponse[ResponseValue]:
         self._ensure_open()
         try:
             response = self._reader.request(
                 kind,
                 payload,
-                timeout=self._command_timeout,
+                timeout=self._command_timeout if timeout is None else timeout,
             )
         except RequestTimeoutError as error:
             raise CommandTimeoutError(error) from error
@@ -752,6 +898,35 @@ class TeensyDAQ:
                 f"expected {expected_kind.name}, received {response.kind.name}"
             )
         return response
+
+    def _read_info(self) -> tuple[DeviceInfo, DeviceIdentitySnapshot]:
+        response = self._command(constants.FrameKind.INFO_REQUEST)
+        if not isinstance(response.value, DeviceInfo):
+            raise UnexpectedMessageError("INFO response has no DeviceInfo value")
+        info = response.value
+        try:
+            identity = validate_device_identity(info, self._expected_identity)
+        except IdentityValidationError as error:
+            raise DeviceIdentityMismatchError(str(error)) from error
+        if self._reopened_identity is not None and identity != self._reopened_identity:
+            raise DeviceIdentityMismatchError(
+                "reopened firmware identity differs from the discovery probe"
+            )
+        if self._verified_identity is not None and identity != self._verified_identity:
+            raise DeviceIdentityMismatchError(
+                "firmware identity changed during the open session"
+            )
+
+        self._device_info = info
+        self._state = info.device_state
+        self._run_id = response.run_id
+        if info.device_state is constants.DeviceState.IDLE:
+            self._configuration = None
+        return info, identity
+
+    def _require_verified_identity(self) -> None:
+        if self._verified_identity is None:
+            self.synchronize()
 
     def _require_state(
         self,
@@ -772,6 +947,13 @@ class TeensyDAQ:
         capabilities = self.capabilities
         if capabilities is None:
             return
+        if configuration.is_control_only and (
+            capabilities.supported_stream_mask != constants.StreamMask.NONE
+            or not capabilities.supports_source(constants.Source.HARDWARE)
+        ):
+            raise DeviceCapabilityError(
+                "device does not advertise the Phase 03 control-only profile"
+            )
         unsupported_streams = int(configuration.stream_mask) & ~int(
             capabilities.supported_stream_mask
         )
@@ -882,6 +1064,7 @@ __all__ = [
     "DeviceCapabilityError",
     "DeviceCommandError",
     "DeviceIdentityMismatchError",
+    "DeviceSynchronizationError",
     "HostBufferFullError",
     "MultipleDevicesFoundError",
     "StreamItem",

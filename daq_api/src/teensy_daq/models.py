@@ -91,10 +91,15 @@ class DAQConfiguration:
         object.__setattr__(self, "source", source)
         object.__setattr__(self, "data_checksum_algorithm", checksum)
         valid_streams = constants.StreamMask.ADC | constants.StreamMask.GPIO
-        if stream_mask == constants.StreamMask.NONE or int(stream_mask) & ~int(
-            valid_streams
+        if int(stream_mask) & ~int(valid_streams):
+            raise ValueError("configuration stream mask contains unknown bits")
+        if (
+            stream_mask == constants.StreamMask.NONE
+            and source is not constants.Source.HARDWARE
         ):
-            raise ValueError("configuration requires a nonempty ADC/GPIO stream mask")
+            raise ValueError(
+                "the zero-stream control profile requires the hardware source"
+            )
         if checksum is constants.ChecksumAlgorithm.NONE_RESERVED:
             raise ValueError("configuration cannot select checksum ID zero")
         if (
@@ -103,6 +108,26 @@ class DAQConfiguration:
             or self.data_frame_bytes != constants.DATA_FRAME_BYTES
         ):
             raise ValueError("protocol v1 data frames are exactly 4096 bytes")
+
+    @property
+    def is_control_only(self) -> bool:
+        """Whether this is the Phase 03 zero-stream hardware profile."""
+
+        return (
+            self.stream_mask == constants.StreamMask.NONE
+            and self.source is constants.Source.HARDWARE
+        )
+
+    @classmethod
+    def control_only(cls) -> DAQConfiguration:
+        """Construct the exact Phase 03 zero-stream hardware configuration."""
+
+        return cls(
+            stream_mask=constants.StreamMask.NONE,
+            source=constants.Source.HARDWARE,
+            data_checksum_algorithm=constants.DEFAULT_CHECKSUM_ALGORITHM,
+            data_frame_bytes=constants.DATA_FRAME_BYTES,
+        )
 
     def to_payload(self) -> bytes:
         """Encode the eight configuration fields that follow any response prefix."""
@@ -588,8 +613,14 @@ class Status:
             raise ValueError("status stream mask contains unknown bits")
         if state is constants.DeviceState.IDLE and stream_mask:
             raise ValueError("IDLE status requires an empty stream mask")
-        if state is not constants.DeviceState.IDLE and not stream_mask:
-            raise ValueError("CONFIGURED/RUNNING status requires active streams")
+        if (
+            state is not constants.DeviceState.IDLE
+            and not stream_mask
+            and source is not constants.Source.HARDWARE
+        ):
+            raise ValueError(
+                "zero-stream CONFIGURED/RUNNING status requires hardware source"
+            )
         if checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
             raise ValueError("status checksum algorithm is not enabled")
         if (

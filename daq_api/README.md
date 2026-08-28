@@ -75,15 +75,69 @@ selected port is INFO-probed again so hot re-enumeration cannot silently open a
 different unit:
 
 ```python
-from teensy_daq import TeensyDAQ, discover
+from teensy_daq import ExpectedDeviceIdentity, TeensyDAQ, discover
 
 devices = discover(timeout=0.2)
 with TeensyDAQ.open(devices[0]) as daq:
     print(daq.device_info.hardware_serial)
 
-with TeensyDAQ.open(hardware_serial=12345670) as daq:
+expected = ExpectedDeviceIdentity(
+    hardware_serial=12345670,
+    firmware_version=(0, 3, 0),
+    build_id="tdaq-39300273210c1c89",
+)
+with TeensyDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
     print(daq.device_info.build_id)
 ```
+
+Every open consumes a throwaway valid INFO and then requires a second response
+with the same protocol, semantic firmware version, source-derived build ID,
+board/MCU pair, and hardware serial. INFO timeouts plus typed BOOT/BUSY replies
+are retried only within the configured attempt bound; unframed CDC reset noise
+is discarded by the incremental parser. Physical targets must be Teensy
+4.0/i.MX RT1062 firmware version 0.3.0 or newer with a nonzero serial and a
+`tdaq-` source build ID. `ExpectedDeviceIdentity` adds exact firmware, build,
+and serial pins when a particular artifact is required.
+
+## Phase 03 control-only API and CLI
+
+Phase 03 firmware advertises no ADC/GPIO streams yet. Its exact configuration
+is `stream_mask=NONE`, `source=HARDWARE`, and `checksum=ADLER32`; use the
+explicit method so this milestone profile cannot be confused with a disabled
+or unsupported acquisition request:
+
+```python
+with TeensyDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
+    applied = daq.configure_control_only()
+    run_id = daq.start()
+    running = daq.status()
+    daq.stop()
+    generation = daq.reset_stats()
+```
+
+`TeensyDAQ.simulated(control_only=True)` exercises the identical zero-stream
+CONFIGURE/START/STATUS/STOP/RESET_STATS schemas without serial hardware. The
+default simulator retains its synthetic ADC/GPIO behavior.
+
+The installed `teensy-daq` command exposes bounded one-shot hardware controls:
+
+```bash
+teensy-daq list
+teensy-daq probe --hardware-serial 12345670 --expect-build-id tdaq-39300273210c1c89
+teensy-daq status --hardware-serial 12345670
+teensy-daq configure --hardware-serial 12345670
+teensy-daq start --hardware-serial 12345670
+teensy-daq stop --hardware-serial 12345670
+teensy-daq reset-stats --hardware-serial 12345670
+```
+
+`list` uses VID/PID metadata and opens nothing. Every other command performs
+the synchronized identity check before its operation. `configure` and `start`
+release the port without undoing their new device state so the next invocation
+can continue the lifecycle; normal Python context-manager cleanup still STOPs
+by default. Diagnostics are typed and machine-visible: no device (exit 3),
+timeout (4), busy/denied port (5), wrong identity (6), unsupported capability
+(7), disconnect (8), invalid state (9), and other device errors (10).
 
 The simulator advertises only the deterministic synthetic source. Each
 successful START allocates a new run ID, resets both stream epochs and
@@ -116,7 +170,9 @@ two domains together.
 ## Production transport and background reader
 
 `SerialTransport` configures finite PySerial read and write timeouts and adds
-bounded open, flush, and close behavior. A write may report partial progress;
+bounded open, flush, and close behavior. Busy, locked, and access-denied opens
+raise `SerialPortBusyError`; disconnects and timeouts retain separate types. A
+write may report partial progress;
 `BackgroundReader` serializes concurrent command writes and retries each
 unwritten suffix within the command's overall deadline. Its default 64 KiB
 reads are deliberately larger than USB packets because USB CDC is one byte
@@ -164,6 +220,11 @@ devices = discover(timeout=0.2)
 daq_port = select_device(devices, hardware_serial=12345670)
 print(daq_port.port, daq_port.info.firmware_version)
 ```
+
+Opening a returned `DiscoveredDevice` then performs the two-probe session
+synchronization and requires the complete firmware identity to remain equal to
+the discovery result, catching an image change or hot re-enumeration before a
+state-changing command can be issued.
 
 ## Executable offline demo
 

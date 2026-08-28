@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from threading import Event, Lock, RLock, Thread
@@ -31,6 +32,10 @@ class TransportTimeoutError(TransportError):
 
 class TransportOpenError(TransportError):
     """A serial port could not be opened."""
+
+
+class SerialPortBusyError(TransportOpenError):
+    """A serial port is locked, busy, or denied to the current process."""
 
 
 class TransportDisconnectedError(TransportError):
@@ -139,12 +144,41 @@ def _default_serial_factory(
     )
 
 
+def _serial_port_is_busy(error: BaseException) -> bool:
+    busy_errnos = {errno.EACCES, errno.EBUSY, errno.EPERM}
+    busy_phrases = (
+        "access denied",
+        "permission denied",
+        "resource busy",
+        "device or resource busy",
+        "could not exclusively lock",
+        "port is busy",
+    )
+    pending: list[BaseException] = [error]
+    visited: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in visited:
+            continue
+        visited.add(id(current))
+        if getattr(current, "errno", None) in busy_errnos:
+            return True
+        if any(phrase in str(current).casefold() for phrase in busy_phrases):
+            return True
+        for linked in (current.__cause__, current.__context__):
+            if linked is not None:
+                pending.append(linked)
+    return False
+
+
 def _mapped_serial_error(operation: str, error: BaseException) -> TransportError:
     if isinstance(error, TransportError):
         return error
     if isinstance(error, serial.SerialTimeoutException):
         return TransportTimeoutError(f"serial {operation} timed out")
     if operation == "open":
+        if _serial_port_is_busy(error):
+            return SerialPortBusyError(f"serial port is busy or denied: {error}")
         return TransportOpenError(f"could not open serial port: {error}")
     return TransportDisconnectedError(f"serial {operation} failed: {error}")
 
@@ -600,6 +634,7 @@ __all__ = [
     "ByteTransport",
     "InMemoryTransport",
     "MemoryTransport",
+    "SerialPortBusyError",
     "SerialTransport",
     "Transport",
     "TransportBufferError",

@@ -536,6 +536,7 @@ class PublicSerialSimulatorParityTests(unittest.TestCase):
             [
                 FrameKind.INFO_REQUEST,
                 FrameKind.INFO_REQUEST,
+                FrameKind.INFO_REQUEST,
                 FrameKind.CONFIGURE_REQUEST,
                 FrameKind.START_REQUEST,
                 FrameKind.GET_STATUS_REQUEST,

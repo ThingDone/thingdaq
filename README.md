@@ -131,12 +131,25 @@ a stale or incompatible image before control changes.
 
 ## Synchronous Python API and offline simulator
 
-The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→RESET_STATS→STOP
+The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS
 through the same background reader for serial hardware and the in-memory
 simulator. Its typed models preserve raw ADC converter identity and packed GPIO
 data; production iterators emit visible `StreamGap` events, strict mode raises
 on any gap, and firmware versus host queue-loss counters remain separate.
 NumPy is not required.
+
+Phase 03's zero-stream hardware profile is available through
+`TeensyDAQ.configure_control_only()` and
+`TeensyDAQ.simulated(control_only=True)`. Serial opens discard one valid INFO
+probe, require a second identity-equal response, retry reset/BOOT noise within
+an explicit bound, and validate the protocol, Teensy target, minimum firmware,
+source-derived build ID, and hardware serial before mutation. The installed
+`teensy-daq` CLI lists filtered USB candidates and provides `probe`, `status`,
+`configure`, `start`, `stop`, and `reset-stats` commands with typed nonzero exit
+codes for timeout, busy port, wrong device, unsupported capability, disconnect,
+and illegal state. Exact artifact pins can be supplied with
+`--expect-build-id`, `--expect-firmware`, and `--hardware-serial`; see
+`daq_api/README.md` for the full command reference.
 
 After installing `daq_api`, run the complete synthetic flow without a Teensy,
 serial port, or credentials. The demo validates every ADC/GPIO sample, stream

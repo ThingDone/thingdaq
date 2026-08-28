@@ -24,6 +24,7 @@ from teensy_daq import (
     ReaderClosedError,
     ReaderProtocolError,
     RequestTimeoutError,
+    SerialPortBusyError,
     SerialTransport,
     SimulatedDevice,
     Source,
@@ -31,7 +32,6 @@ from teensy_daq import (
     StreamStoppedError,
     TransportClosedError,
     TransportDisconnectedError,
-    TransportOpenError,
     TransportTimeoutError,
     encode_frame,
     synthetic_adc_payload,
@@ -346,7 +346,7 @@ class SerialTransportTests(unittest.TestCase):
         def rejected_factory(**options: object) -> FakeSerial:
             raise serial.SerialException("access denied")
 
-        with self.assertRaises(TransportOpenError):
+        with self.assertRaises(SerialPortBusyError):
             SerialTransport("denied", serial_factory=rejected_factory)
 
         transport = SerialTransport(

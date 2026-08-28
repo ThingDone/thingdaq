@@ -405,15 +405,19 @@ def _validate_configuration(payload: bytes, offset: int, *, applied: bool) -> No
         _CONFIGURATION.unpack_from(payload, offset)
     )
     valid_stream_bits = int(constants.StreamMask.ADC | constants.StreamMask.GPIO)
-    if raw_streams == 0 or raw_streams & ~valid_stream_bits:
+    if raw_streams & ~valid_stream_bits:
         raise FrameValidationError("configuration stream mask is invalid")
     try:
-        constants.Source(raw_source)
+        source = constants.Source(raw_source)
         checksum = constants.ChecksumAlgorithm(raw_checksum)
     except ValueError as exc:
         raise FrameValidationError(
             "configuration contains an unknown enum value"
         ) from exc
+    if raw_streams == 0 and source is not constants.Source.HARDWARE:
+        raise FrameValidationError(
+            "zero-stream configuration requires the hardware source"
+        )
     if checksum is constants.ChecksumAlgorithm.NONE_RESERVED:
         raise FrameValidationError("configuration cannot select checksum ID zero")
     if applied and checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
@@ -550,7 +554,7 @@ def _validate_status_payload(payload: bytes) -> None:
         device_state = constants.DeviceState(
             payload[constants.STATUS_RESPONSE_DEVICE_STATE_OFFSET]
         )
-        constants.Source(payload[constants.STATUS_RESPONSE_SOURCE_OFFSET])
+        source = constants.Source(payload[constants.STATUS_RESPONSE_SOURCE_OFFSET])
         checksum = constants.ChecksumAlgorithm(
             payload[constants.STATUS_RESPONSE_DATA_CHECKSUM_ALGORITHM_OFFSET]
         )
@@ -562,10 +566,19 @@ def _validate_status_payload(payload: bytes) -> None:
         raise FrameValidationError("STATUS stream mask is invalid")
     if device_state is constants.DeviceState.BOOT:
         raise FrameValidationError("STATUS is unavailable while the device is in BOOT")
-    if (device_state is constants.DeviceState.IDLE) != (
-        streams == constants.StreamMask.NONE
+    if (
+        device_state is constants.DeviceState.IDLE
+        and streams != constants.StreamMask.NONE
     ):
         raise FrameValidationError("STATUS state and active stream mask disagree")
+    if (
+        device_state is not constants.DeviceState.IDLE
+        and streams == constants.StreamMask.NONE
+        and source is not constants.Source.HARDWARE
+    ):
+        raise FrameValidationError(
+            "zero-stream CONFIGURED/RUNNING status requires hardware source"
+        )
     if checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
         raise FrameValidationError("STATUS checksum is not enabled")
     if (
