@@ -18,6 +18,9 @@ classifiers = [
     "Private :: Do Not Upload",
 ]
 
+[project.scripts]
+teensy-daq-demo = "teensy_daq.demo:main"
+
 [project.optional-dependencies]
 numpy = [
     "numpy>=1.24",

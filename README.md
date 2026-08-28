@@ -100,3 +100,16 @@ check that tracked output has not drifted—with:
 python3 tools/generate_protocol.py
 python3 tools/generate_protocol.py --check
 ```
+
+## Offline synthetic prototype
+
+After installing `daq_api`, run the complete INFO→CONFIGURE→START→STATUS→STOP
+flow without a Teensy, serial port, or credentials. The demo validates every
+ADC/GPIO sample, stream timestamp, sequence, and counter before printing
+`PASS`; any mismatch exits nonzero. Frame count is per stream, and parser chunk
+size deliberately exercises arbitrary byte boundaries:
+
+```bash
+.venv/bin/python -m teensy_daq.demo --frame-count 2 --parser-chunk-size 17
+.venv/bin/teensy-daq-demo --frame-count 2 --parser-chunk-size 17
+```

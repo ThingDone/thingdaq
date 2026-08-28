@@ -60,3 +60,15 @@ successful START allocates a new run ID, resets both stream epochs and
 counters, and produces ADC then GPIO frames in a repeatable round-robin order
 when both streams are enabled. INFO and STOP are idempotent; closing the facade
 stops an active run before closing its transport.
+
+## Executable offline demo
+
+Both entry points below run the same bounded synthetic acquisition. They print
+the discovered capabilities, ADC and GPIO ramps (including frame joins), final
+counters, and the clean IDLE landing. Every sample is checked and a mismatch
+returns a nonzero exit status:
+
+```bash
+python -m teensy_daq.demo --frame-count 2 --parser-chunk-size 17
+teensy-daq-demo --frame-count 2 --parser-chunk-size 17
+```
