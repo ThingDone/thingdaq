@@ -188,7 +188,7 @@ void testColdOcramSeparatesCacheSetup() {
   expect(result.response.net_checksum_cycles == 200U &&
              result.response.cache_setup_cycles == 80U,
          "checksum and recurring cache setup cycles remain separate");
-  expect(result.response.table_bytes == 1024U,
+  expect(result.response.table_bytes == 4096U,
          "CRC benchmark reports its flash lookup table");
   const std::uint64_t total_cycles =
       result.response.net_checksum_cycles +

@@ -1,6 +1,7 @@
 #include "checksum.h"
 
 #include <array>
+#include <cstring>
 
 namespace teensy_daq::checksum {
 namespace detail {
@@ -10,40 +11,65 @@ namespace detail {
   __attribute__((section(section_name), used))
 #define TEENSY_DAQ_CHECKSUM_CODE_STORAGE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
+#define TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE __attribute__((optimize("Os")))
 #else
 #define TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(section_name)
 #define TEENSY_DAQ_CHECKSUM_CODE_STORAGE(section_name) \
   __attribute__((noinline))
+#define TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE
 #endif
 
-constexpr std::array<std::uint32_t, kCrcTableEntries> makeReflectedCrcTable(
-    std::uint32_t polynomial) {
-  std::array<std::uint32_t, kCrcTableEntries> table{};
-  for (std::size_t index = 0U; index < table.size(); ++index) {
+using ReflectedCrcTable =
+    std::array<std::array<std::uint32_t, kCrcTableEntries>, kCrcTableSlices>;
+
+constexpr ReflectedCrcTable makeReflectedCrcTable(std::uint32_t polynomial) {
+  ReflectedCrcTable table{};
+  for (std::size_t index = 0U; index < table[0].size(); ++index) {
     std::uint32_t remainder = static_cast<std::uint32_t>(index);
     for (std::uint8_t bit = 0U; bit < 8U; ++bit) {
       const std::uint32_t low_bit_mask = 0U - (remainder & 1U);
       remainder = (remainder >> 1U) ^ (polynomial & low_bit_mask);
     }
-    table[index] = remainder;
+    table[0][index] = remainder;
+  }
+  for (std::size_t slice = 1U; slice < table.size(); ++slice) {
+    for (std::size_t index = 0U; index < table[slice].size(); ++index) {
+      const std::uint32_t previous = table[slice - 1U][index];
+      table[slice][index] =
+          (previous >> 8U) ^ table[0][previous & 0xFFU];
+    }
   }
   return table;
 }
 
-extern const std::array<std::uint32_t, kCrcTableEntries> kCrc32cTable
+extern const ReflectedCrcTable kCrc32cTable
     TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(".progmem.checksum.crc32c") =
         makeReflectedCrcTable(kCrc32cReflectedPolynomial);
-extern const std::array<std::uint32_t, kCrcTableEntries> kCrc32IsoHdlcTable
+extern const ReflectedCrcTable kCrc32IsoHdlcTable
     TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(".progmem.checksum.crc32_iso_hdlc") =
         makeReflectedCrcTable(kCrc32IsoHdlcReflectedPolynomial);
 
-template <const std::array<std::uint32_t, kCrcTableEntries> &Table>
+template <const ReflectedCrcTable &Table>
+__attribute__((always_inline)) inline
 std::uint32_t reflectedCrc32(const std::uint8_t *data, std::size_t size) {
   std::uint32_t remainder = kCrc32Initial;
-  for (std::size_t offset = 0U; offset < size; ++offset) {
+  while (size >= sizeof(std::uint32_t)) {
+    std::uint32_t word = 0U;
+    std::memcpy(&word, data, sizeof(word));
+    remainder ^= word;
+    remainder = Table[3][remainder & 0xFFU] ^
+                Table[2][(remainder >> 8U) & 0xFFU] ^
+                Table[1][(remainder >> 16U) & 0xFFU] ^
+                Table[0][remainder >> 24U];
+    data += sizeof(word);
+    size -= sizeof(word);
+  }
+  while (size != 0U) {
     const std::uint8_t table_index = static_cast<std::uint8_t>(
-        (remainder ^ static_cast<std::uint32_t>(data[offset])) & 0xFFU);
-    remainder = (remainder >> 8U) ^ Table[table_index];
+        (remainder ^ static_cast<std::uint32_t>(*data)) & 0xFFU);
+    remainder = (remainder >> 8U) ^ Table[0][table_index];
+    ++data;
+    --size;
   }
   return remainder ^ kCrc32FinalXor;
 }
@@ -76,11 +102,13 @@ std::uint32_t adler32(const std::uint8_t *data, std::size_t size) {
 }
 
 TEENSY_DAQ_CHECKSUM_CODE_STORAGE(".text.checksum.crc32c")
+TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE
 std::uint32_t crc32c(const std::uint8_t *data, std::size_t size) {
   return detail::reflectedCrc32<detail::kCrc32cTable>(data, size);
 }
 
 TEENSY_DAQ_CHECKSUM_CODE_STORAGE(".text.checksum.crc32_iso_hdlc")
+TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE
 std::uint32_t crc32IsoHdlc(const std::uint8_t *data, std::size_t size) {
   return detail::reflectedCrc32<detail::kCrc32IsoHdlcTable>(data, size);
 }
@@ -108,4 +136,5 @@ bool compute(Algorithm algorithm, const std::uint8_t *data, std::size_t size,
 }  // namespace teensy_daq::checksum
 
 #undef TEENSY_DAQ_CHECKSUM_CODE_STORAGE
+#undef TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE
 #undef TEENSY_DAQ_CHECKSUM_TABLE_STORAGE

@@ -60,11 +60,11 @@ errors; none provides authentication or other security.
 
 The Adler implementation reduces both accumulators after at most 5,552 input
 bytes, the RFC/zlib bound that keeps unsigned 32-bit intermediate values safe
-while avoiding division per byte. Both CRC implementations use one generated
-256-entry table and therefore claim 1,024 bytes of constant table storage each.
-Both CRC tables are explicitly linked into memory-mapped program flash. Build
-manifest schema 4 records each linked symbol and reports 1,024 flash bytes and
-zero RAM bytes per CRC (2,048/0 bytes total); Adler-32 uses no table.
+while avoiding division per byte. Both CRC implementations use four generated
+256-entry slices and therefore claim 4,096 bytes of constant table storage
+each. Both CRC tables are explicitly linked into memory-mapped program flash.
+Build manifest schema 5 records each linked symbol and reports 4,096 flash
+bytes and zero RAM bytes per CRC (8,192/0 bytes total); Adler-32 uses no table.
 
 ## Inspected implementation baseline
 
@@ -99,10 +99,11 @@ CRC-32C. Its update interface stores mutable seed state in an object, accepts a
 
 CRC-32/ISO-HDLC is therefore retained as a meaningful comparison, but the
 production candidates do not directly depend on FastCRC. The local interface
-is stateless, accepts `size_t`, has defined byte access for every alignment, and
-uses a 1 KiB table for each CRC. A slicing-by-four/eight alternative is not yet
-included: only actual DWT measurements on the target can justify its extra
-3-7 KiB per polynomial. See the pinned upstream
+is stateless, accepts `size_t`, has defined byte access for every alignment,
+and uses its own generated 4 KiB slicing-by-four table for each CRC. The
+additional 3 KiB per polynomial was included only after the target DWT
+measurement below demonstrated that the original bytewise 1 KiB table missed
+the fixed throughput and CPU gates. See the pinned upstream
 [FastCRC software implementation](https://github.com/FrankBoesing/FastCRC/blob/c669a8915dcec9d16fa60ee7772b7b2200f0cdc5/src/FastCRCsw.cpp)
 and
 [hardware selection](https://github.com/FrankBoesing/FastCRC/blob/c669a8915dcec9d16fa60ee7772b7b2200f0cdc5/src/FastCRChw.cpp).
@@ -165,7 +166,8 @@ The three candidates:
 - read input bytes without alignment assumptions;
 - claim no interrupt, DCP channel, eDMA channel, DMAMUX source, timer, XBAR
   route, ADC, USB controller, ENET controller, or cache-maintenance ownership;
-- use no table for Adler-32 and one 1,024-byte constant table for each CRC;
+- use no table for Adler-32 and one 4,096-byte constant slicing table for each
+  CRC;
 - return only an unsigned 32-bit value, leaving the shared codec as the single
   owner of coverage and little-endian serialization;
 - reject unknown IDs, control frames that do not use bootstrap Adler-32, and
@@ -180,12 +182,26 @@ separately in `firmware/tests/checksum_candidates_test.cpp`; the expanded
 cross-language, corruption, negotiation, parser-recovery, and benchmark guard
 results are recorded in [[Phase-05-Checksum-Correctness]].
 
-## Deferred measurement decisions
+## Target-triggered slicing decision
 
-This survey establishes implementability, not the production choice. Local
-host parity and deterministic corruption testing are now complete in
-[[Phase-05-Checksum-Correctness]]. DWT measurements, hot/cold cache and OCRAM
-results, full hardware streaming behavior, linked table cost, and the fixed
-autonomous selection policy remain inputs to [[ADR-002-Checksum-Selection]].
-Negotiation exposes all three deployable candidates, while the production
-default remains Adler-32 until those gates select a winner.
+The first physical campaign job,
+`05694247-0dc3-4a8e-9f19-e1efc24aba72`, measured the original bytewise-table
+CRC-32C at 8.018 cycles/byte, 74.831 MB/s, and 10.824% projected CPU on the
+representative hot DTCM frame. That missed both predeclared qualification
+bounds: at least 81 MB/s and no more than 10% of the 600 MHz core. The same job
+then observed a genuine ADC gap flag at sequence 110 during the CRC-32C stream;
+it was retained as failed evidence and not relabeled as an accepted campaign.
+
+Those target measurements justified the previously deferred slicing-by-four
+variant. The replacement consumes 4,096 flash bytes and zero RAM bytes per
+polynomial, uses alignment-safe `memcpy` loads rather than FastCRC's typed
+pointer casts, retains the bytewise tail for every length, and passes the
+separately compiled bitwise references, 32 input alignments, length edges, and
+cross-language corpus in [[Phase-05-Checksum-Correctness]]. The exact linked
+CRC bodies are 116 bytes each. Size optimization keeps total ITCM code below
+the next 32 KiB RAM1 allocation boundary, preserving 79,808 bytes for
+locals/stack.
+
+The production choice remains intentionally open until the repaired target
+campaign supplies hot/cold DWT measurements and three lossless 60-second
+streams to the fixed policy in [[ADR-002-Checksum-Selection]].

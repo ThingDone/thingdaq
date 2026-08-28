@@ -554,7 +554,7 @@ also requires
 and verifies processed bytes, batch bounds, code/table/RAM claims, and every
 derived field before exposing the result. Code bytes describe the selected
 algorithm body; the shared narrow dispatch is recorded separately in build
-provenance. CRC table bytes are 1,024 and Adler table bytes are zero.
+provenance. CRC table bytes are 4,096 and Adler table bytes are zero.
 
 ## Error codes
 

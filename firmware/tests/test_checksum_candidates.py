@@ -84,6 +84,7 @@ class ChecksumCandidateTests(unittest.TestCase):
 
         self.assertIn("kCrc32cReflectedPolynomial = 0x82F63B78U", source)
         self.assertIn("kCrc32IsoHdlcReflectedPolynomial", source)
+        self.assertIn("kCrcTableSlices = 4U", source)
         self.assertIn("kCrcTableBytes", source)
         self.assertIn("enum class Algorithm", source)
 

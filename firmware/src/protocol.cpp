@@ -755,7 +755,7 @@ Result validateChecksumBenchmarkResponse(ByteView payload) {
       break;
     case protocol_v1::ChecksumAlgorithm::kCrc32c:
     case protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc:
-      expected_table_bytes = 1024U;
+      expected_table_bytes = 4096U;
       break;
     case protocol_v1::ChecksumAlgorithm::kNoneReserved:
       return badPayload();

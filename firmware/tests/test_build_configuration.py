@@ -96,25 +96,25 @@ class BuildConfigurationTests(unittest.TestCase):
         symbols = (
             "00000304 00000078 T "
             "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)\n"
-            "0000037c 00000030 T "
+            "0000037c 00000074 T "
             "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)\n"
-            "000003ac 00000030 T "
+            "000003f0 00000074 T "
             "teensy_daq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)\n"
-            "000003dc 00000054 T "
+            "00000464 00000054 T "
             "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, "
             "unsigned char const*, unsigned int, unsigned long&)\n"
-            "60002000 00000400 u "
+            "60002000 00001000 u "
             "teensy_daq::checksum::detail::kCrc32cTable\n"
-            "60002400 00000400 u "
+            "60003000 00001000 u "
             "teensy_daq::checksum::detail::kCrc32IsoHdlcTable"
         )
         resources = build_firmware.checksum_resource_usage(symbols)
 
-        self.assertEqual(2_048, resources["total_table_flash_bytes"])
-        self.assertEqual(216, resources["total_implementation_code_bytes"])
+        self.assertEqual(8_192, resources["total_table_flash_bytes"])
+        self.assertEqual(352, resources["total_implementation_code_bytes"])
         self.assertEqual(0, resources["total_table_ram_bytes"])
         self.assertEqual(
-            1_024,
+            4_096,
             resources["algorithms"]["CRC32C"]["table_flash_bytes"],
         )
         with self.assertRaisesRegex(build_firmware.BuildError, "not resident"):
