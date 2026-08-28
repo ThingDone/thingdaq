@@ -87,10 +87,15 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertEqual(4_040, summary["flash"]["data_bytes"])
         self.assertEqual(10_080, summary["ram1"]["variables_bytes"])
         self.assertEqual(12_416, summary["ram2"]["variables_bytes"])
+        build_firmware.validate_memory_headroom(summary)
         with self.assertRaisesRegex(build_firmware.BuildError, "missing ram2"):
             build_firmware.parse_memory_usage(
                 "FLASH: code:1, data:2, headers:3 free for files:4\nRAM1: variables:5, code:6, padding:7 free for local variables:8"
             )
+
+        summary["ram1"]["free_for_locals_bytes"] = 32_767
+        with self.assertRaisesRegex(build_firmware.BuildError, "locals/stack"):
+            build_firmware.validate_memory_headroom(summary)
 
     def test_checksum_table_provenance_requires_flash_residency(self) -> None:
         symbols = (

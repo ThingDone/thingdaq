@@ -2051,7 +2051,7 @@ def run_candidate_stream(
         "maximum_receive_gap_seconds": validator.maximum_receive_gap_seconds,
         "queue": {
             "firmware_internal_depth_available_in_protocol_v1": False,
-            "firmware_packet_capacity_frames": 96,
+            "firmware_packet_capacity_frames": 106,
             "firmware_queue_exhaustion_observed": False,
             "host_parser_buffered_bytes_final": len(link.parser.buffer),
             "host_parser_high_water_bytes": link.parser.high_water_bytes,

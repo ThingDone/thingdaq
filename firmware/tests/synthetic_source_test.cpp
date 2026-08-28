@@ -188,7 +188,8 @@ void testUnpacedDiagnosticIsExplicitAndBounded() {
              pipeline.readyFrames() == board::kSyntheticFramesPerLoop,
          "unpaced mode ignores deadlines but retains a per-loop work bound");
   for (std::size_t call = 1U;
-       call < board::kPacketBufferCount / board::kSyntheticFramesPerLoop;
+       call < (board::kPacketBufferCount + board::kSyntheticFramesPerLoop - 1U) /
+                  board::kSyntheticFramesPerLoop;
        ++call) {
     (void)source.service(500U, pipeline);
   }

@@ -117,7 +117,7 @@ a fabricated transport failure.
 
 ## Complete-frame packet pipeline
 
-Phase 04 connects the deterministic synthetic source to a 96-entry pool of
+The deterministic synthetic source uses a 106-entry pool of
 aligned 4,096-byte frames. The pool is fixed storage with no steady-path
 allocation. `beginFill()` assigns the next independent ADC or GPIO sequence and
 records source production before asking for a free buffer, so pool exhaustion
@@ -141,10 +141,11 @@ copies application bytes into a core-owned four-by-2,048-byte aligned OCRAM
 ring and flushes that destination before USB DMA. The project's 2,048-byte TX
 visit bound matches one core buffer and uses its conservative
 `availableForWrite()` signal; a zero or prefix return retains the application
-frame and offset. The 96 project buffers cover about 48.6 ms at the target
-framed rate, with about another 1.0 ms in the core ring. This absorbs six
-complete 64 KiB host-read batches: five cover the 39.8 ms pause measured by
-the rig and one remains as bounded parsing/control scheduling margin. See
+frame and offset. The 106 project buffers cover 53.636 ms at the target framed
+rate, with another 1.012 ms in the core ring. The original 96-entry Phase 04
+pool was expanded after Phase 05 clean host receive intervals reached 53.293 ms
+and repeated campaign jobs exposed its loss boundary. The exact linker gate
+preserves at least 32 KiB of DTCM for locals/stack. See
 [[Foundation-Reuse-Inventory]] and [[Firmware-Resource-Map]] for the pinned
 source audit and compile-time budget.
 

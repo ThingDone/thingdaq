@@ -80,6 +80,7 @@ BENCHMARK_BUFFER_SYMBOLS = {
 }
 BENCHMARK_BUFFER_BYTES = 4096
 BENCHMARK_BUFFER_ALIGNMENT = 32
+MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES = 32 * 1024
 
 
 class BuildError(RuntimeError):
@@ -408,6 +409,18 @@ def parse_memory_usage(output: str) -> dict[str, dict[str, int]]:
     }
 
 
+def validate_memory_headroom(memory_usage: dict[str, dict[str, int]]) -> None:
+    """Reject a linked image that leaves too little DTCM for locals/stack."""
+
+    available = memory_usage["ram1"]["free_for_locals_bytes"]
+    if available < MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES:
+        raise BuildError(
+            "RAM1 leaves only "
+            f"{available} bytes for locals/stack; requires at least "
+            f"{MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES}"
+        )
+
+
 def parse_nm_symbols(output: str) -> dict[str, tuple[int, int, str]]:
     """Parse ``nm --print-size`` output keyed by demangled symbol name."""
 
@@ -655,6 +668,7 @@ def build(arduino_cli_name: str) -> Path:
     memory_usage = parse_memory_usage(
         f"{compile_result.stdout}\n{compile_result.stderr}"
     )
+    validate_memory_headroom(memory_usage)
 
     artifacts = sorted(
         path

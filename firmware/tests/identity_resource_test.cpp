@@ -108,8 +108,8 @@ static_assert(teensy_daq::board::kUsbRxScratchBytes >=
               teensy_daq::protocol_v1::kMaxCommandFrameBytes);
 static_assert(teensy_daq::board::kCommandQueueDepth == 4U);
 static_assert(teensy_daq::board::kResponseQueueDepth == 4U);
-static_assert(teensy_daq::board::kPacketBufferCount == 96U);
-static_assert(teensy_daq::board::kPacketBufferStorageBytes == 393216U);
+static_assert(teensy_daq::board::kPacketBufferCount == 106U);
+static_assert(teensy_daq::board::kPacketBufferStorageBytes == 434176U);
 static_assert(teensy_daq::board::kPacketReadyQueueDepth ==
               teensy_daq::board::kPacketBufferCount);
 static_assert(teensy_daq::board::kPacketTransmitQueueDepth ==
@@ -134,7 +134,7 @@ static_assert(teensy_daq::identity::kFirmwareVersion.minor == 5U);
 static_assert(teensy_daq::identity::kFirmwareVersion.patch == 0U);
 static_assert(teensy_daq::board::kAdc0Pin == 14U);
 static_assert(teensy_daq::board::kAdc1Pin == 15U);
-static_assert(teensy_daq::board::kReservedRam1Bytes == 405920U);
+static_assert(teensy_daq::board::kReservedRam1Bytes == 446944U);
 static_assert(teensy_daq::board::kReservedRam2Bytes == 101376U);
 static_assert(teensy_daq::board::kChecksumBenchmarkBufferBytes == 4096U);
 static_assert(teensy_daq::capabilities::kMetadata.supported_stream_mask == 3U);

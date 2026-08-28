@@ -161,19 +161,19 @@ inline constexpr std::size_t kResponseQueueDepth = 4U;
 inline constexpr std::size_t kAdcDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioPackedRingDepth = 4U;
-// At the nominal combined framed rate, each 4096-byte buffer represents about
-// 0.506 ms. Ninety-six application buffers retain about 48.6 ms of complete
-// frames; the pinned core contributes another four 2048-byte TX buffers. The
-// pool absorbs six complete 64 KiB host-read batches: five cover the measured
-// 39.8 ms rig scheduling pause and one remains as bounded margin. It stays in
-// cacheless DTCM because USB Serial copies into the core's own DMA-visible
-// OCRAM buffers rather than DMA-reading our storage.
-inline constexpr std::size_t kPacketBufferCount = 96U;
+// At the nominal combined framed rate, each 4096-byte buffer represents 0.506
+// ms. The original 96 buffers exposed loss under Phase 05 service scheduling;
+// the three clean Adler runs included a 53.293 ms host receive interval. The
+// repaired 106-buffer pool retains 53.636 ms of complete frames and the pinned
+// core contributes another 1.012 ms in four 2048-byte TX buffers. This remains
+// fixed cacheless DTCM storage and the exact target build must retain at least
+// 32 KiB for locals/stack.
+inline constexpr std::size_t kPacketBufferCount = 106U;
 inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketTransmitQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
 inline constexpr std::size_t kSyntheticFramesPerLoop = 4U;
-inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 4096U;
+inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 4160U;
 inline constexpr std::size_t kChecksumBenchmarkBufferBytes =
     protocol_v1::kDataFrameBytes;
 // Pinned Teensy 1.62 cores/teensy4/usb_serial.c constants. The core owns this

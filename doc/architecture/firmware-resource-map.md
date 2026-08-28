@@ -111,9 +111,9 @@ use an unconstrained first-free allocator.
 | ADC DMA ring | 4 buffers | ADC capture |
 | Raw GPIO DMA ring | 4 buffers | GPIO capture |
 | Packed GPIO ring | 4 buffers | GPIO packer |
-| Aligned complete-frame packet pool | 96 × 4,096-byte buffers | Packetizer |
-| Per-source ready queues | 96 ADC + 96 GPIO indexes; shared pool limits actual ownership to 96 | Packetizer |
-| Complete-frame transmit queue | 96 indexes | Packetizer / USB transport |
+| Aligned complete-frame packet pool | 106 × 4,096-byte buffers | Packetizer |
+| Per-source ready queues | 106 ADC + 106 GPIO indexes; shared pool limits actual ownership to 106 | Packetizer |
+| Complete-frame transmit queue | 106 indexes | Packetizer / USB transport |
 | Synthetic generation per loop | 4 complete frame attempts | Synthetic source |
 | Ready-to-transmit promotions per loop | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
@@ -137,11 +137,11 @@ unexpected prefixes remain owned for continuation. These values are capacities,
 never heap-growth hints.
 
 At the nominal combined framed rate, one 4,096-byte application buffer covers
-about 0.506 ms. The 96-frame pool therefore retains about 48.6 ms of complete
-frames, and the pinned core's 8,192-byte TX ring contributes about 1.0 ms more.
-The pool holds six 64 KiB host-read batches: five cover the 39.8 ms pause
-measured on the rig and one remains as bounded margin while prior data is
-parsed and a control response is serviced; neither queue can grow at runtime.
+0.506 ms. The 106-frame pool therefore retains 53.636 ms of complete frames,
+and the pinned core's 8,192-byte TX ring contributes 1.012 ms more. The
+original 96-frame pool exposed loss after Phase 05 clean host receive intervals
+reached 53.293 ms. The ten-frame repair remains fixed and linker verification
+requires at least 32 KiB of DTCM for locals/stack; no queue can grow at runtime.
 Normal real-time mode admits only coverage intervals elapsed on the shared
 8 MHz epoch. The explicitly selected unpaced diagnostic remains bounded to four
 frames per service call and waits when no packet buffer is free.
@@ -154,14 +154,14 @@ frames per service call and waits when no packet buffer is free.
 | USB RX scratch | DTCM / RAM1 | fixed | 128 | 4 | USB transport |
 | Command queue | DTCM / RAM1 | `4 × 56` | 224 | 4 | Control plane |
 | Response queue | DTCM / RAM1 | `4 × 1,024` | 4,096 | 4 | USB transport |
-| Complete packet buffers | DTCM / RAM1 | `96 × 4,096` | 393,216 | 32 | Packetizer |
-| Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 4,096 | 32 | Packetizer |
+| Complete packet buffers | DTCM / RAM1 | `106 × 4,096` | 434,176 | 32 | Packetizer |
+| Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 4,160 | 32 | Packetizer |
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
 | Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
-| **RAM1 subtotal** |  |  | **405,920** |  |  |
+| **RAM1 subtotal** |  |  | **446,944** |  |  |
 | **RAM2 subtotal** |  |  | **101,376** |  |  |
 
 The application packet pool is instantiated now as aligned ordinary global
@@ -171,7 +171,7 @@ DMA, so the project must not flush or invalidate packet buffers. Actual
 DMA-visible acquisition rings remain future `DMAMEM` OCRAM/RAM2 allocations:
 they begin on 32-byte cache boundaries, occupy whole cache lines, and require
 explicit cache maintenance at ownership transitions. Compile-time checks bind
-the packet storage type to 393,216 bytes, cap pipeline metadata at 4,096 bytes,
+the packet storage type to 434,176 bytes, cap pipeline metadata at 4,160 bytes,
 and reject zero-sized, non-power-of-two, misaligned, or over-budget registry
 entries.
 
