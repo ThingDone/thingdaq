@@ -10,6 +10,7 @@ namespace {
 
 using teensy_daq::board::AdcEtcAllocation;
 using teensy_daq::board::EdmaAllocation;
+using teensy_daq::board::GpioPinMapping;
 using teensy_daq::board::MemoryAllocation;
 using teensy_daq::board::MemoryRegion;
 using teensy_daq::board::MemoryUse;
@@ -25,6 +26,23 @@ constexpr PinAllocation kConflictingPins[] = {
 constexpr PinAllocation kOutOfRangePin[] = {
     {teensy_daq::board::kTeensy40DigitalPinCount,
      ResourceOwner::kGpioCapture},
+};
+constexpr GpioPinMapping kDuplicateGpioBit[] = {
+    {6U, 10U},
+    {7U, 10U},
+};
+constexpr GpioPinMapping kOutOfRangeGpioBit[] = {
+    {6U, teensy_daq::board::kGpioPortBitCount},
+};
+constexpr GpioPinMapping kWrongGpioPinOrder[] = {
+    {7U, 17U},
+    {6U, 10U},
+    {8U, 16U},
+    {9U, 11U},
+    {10U, 0U},
+    {11U, 2U},
+    {12U, 1U},
+    {13U, 3U},
 };
 constexpr PitAllocation kConflictingPit[] = {
     {1U, ResourceOwner::kAcquisitionClock},
@@ -75,6 +93,11 @@ constexpr MemoryAllocation kInvalidAlignment[] = {
 
 static_assert(teensy_daq::board::validPins(
     teensy_daq::board::kPinAllocations));
+static_assert(teensy_daq::board::validGpioPinMappings(
+    teensy_daq::board::kGpioMappingsByPackedBit));
+static_assert(teensy_daq::board::gpioPinOrderMatches(
+    teensy_daq::board::kGpioMappingsByPackedBit,
+    teensy_daq::board::kGpioPinsByBit));
 static_assert(teensy_daq::board::validPitAllocations(
     teensy_daq::board::kPitAllocations));
 static_assert(teensy_daq::board::validXbarRoutes(
@@ -87,6 +110,12 @@ static_assert(teensy_daq::board::validMemoryAllocations(
     teensy_daq::board::kMemoryAllocations));
 static_assert(!teensy_daq::board::validPins(kConflictingPins));
 static_assert(!teensy_daq::board::validPins(kOutOfRangePin));
+static_assert(!teensy_daq::board::validGpioPinMappings(
+    kDuplicateGpioBit));
+static_assert(!teensy_daq::board::validGpioPinMappings(
+    kOutOfRangeGpioBit));
+static_assert(!teensy_daq::board::gpioPinOrderMatches(
+    kWrongGpioPinOrder, teensy_daq::board::kGpioPinsByBit));
 static_assert(!teensy_daq::board::validPitAllocations(kConflictingPit));
 static_assert(!teensy_daq::board::validPitAllocations(kOutOfRangePit));
 static_assert(!teensy_daq::board::validXbarRoutes(kConflictingXbar));
@@ -138,6 +167,43 @@ static_assert(teensy_daq::identity::kFirmwareVersion.minor == 5U);
 static_assert(teensy_daq::identity::kFirmwareVersion.patch == 0U);
 static_assert(teensy_daq::board::kAdc0Pin == 14U);
 static_assert(teensy_daq::board::kAdc1Pin == 15U);
+static_assert(teensy_daq::board::countOf(
+                  teensy_daq::board::kGpioMappingsByPackedBit) == 8U);
+static_assert(teensy_daq::board::kGpioMappingsByPackedBit[0].teensy_pin ==
+                  6U &&
+              teensy_daq::board::kGpioMappingsByPackedBit[0].gpio2_bit ==
+                  10U);
+static_assert(teensy_daq::board::kGpioMappingsByPackedBit[1].teensy_pin ==
+                  7U &&
+              teensy_daq::board::kGpioMappingsByPackedBit[1].gpio2_bit ==
+                  17U);
+static_assert(teensy_daq::board::kGpioMappingsByPackedBit[2].teensy_pin ==
+                  8U &&
+              teensy_daq::board::kGpioMappingsByPackedBit[2].gpio2_bit ==
+                  16U);
+static_assert(teensy_daq::board::kGpioMappingsByPackedBit[3].teensy_pin ==
+                  9U &&
+              teensy_daq::board::kGpioMappingsByPackedBit[3].gpio2_bit ==
+                  11U);
+static_assert(teensy_daq::board::kGpioMappingsByPackedBit[4].teensy_pin ==
+                  10U &&
+              teensy_daq::board::kGpioMappingsByPackedBit[4].gpio2_bit ==
+                  0U);
+static_assert(teensy_daq::board::kGpioMappingsByPackedBit[5].teensy_pin ==
+                  11U &&
+              teensy_daq::board::kGpioMappingsByPackedBit[5].gpio2_bit ==
+                  2U);
+static_assert(teensy_daq::board::kGpioMappingsByPackedBit[6].teensy_pin ==
+                  12U &&
+              teensy_daq::board::kGpioMappingsByPackedBit[6].gpio2_bit ==
+                  1U);
+static_assert(teensy_daq::board::kGpioMappingsByPackedBit[7].teensy_pin ==
+                  13U &&
+              teensy_daq::board::kGpioMappingsByPackedBit[7].gpio2_bit ==
+                  3U);
+static_assert(teensy_daq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
+static_assert(teensy_daq::board::kGpio7ToGpio2Gpr27ClearMask ==
+              teensy_daq::board::kGpio2PsrCaptureMask);
 static_assert(teensy_daq::board::kReservedRam1Bytes == 450976U);
 static_assert(teensy_daq::board::kReservedRam2Bytes == 486400U);
 static_assert(teensy_daq::board::kChecksumBenchmarkBufferBytes == 4096U);

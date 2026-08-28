@@ -12,6 +12,7 @@ related:
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
+  - '[[ADR-003-GPIO-Clock-DMA]]'
 ---
 
 # Firmware resource map
@@ -21,8 +22,10 @@ This is the human-readable projection of the compile-time registry in
 acquisition modules cannot silently compete. Phase 05 does not enable the PIT,
 XBAR, ADC_ETC, or eDMA acquisition path, but it advertises both data layouts
 for the CPU-generated synthetic source. The generators and packetizer remain
-cooperative and do not claim physical acquisition resources. See
-[[System-Overview]] for that boundary and
+cooperative and do not claim physical acquisition resources. Phase 06 has now
+accepted the deterministic pin, PIT, XBAR, and eDMA assignment in
+[[ADR-003-GPIO-Clock-DMA]], but physical GPIO remains disabled until its
+isolated hardware spike passes. See [[System-Overview]] for that boundary and
 [[Protocol-V1]] with [[ADR-001-Wire-Protocol]] for the wire metadata.
 
 ## Fixed platform
@@ -48,18 +51,22 @@ can observe. The installed core itself remains unmodified.
 | --- | ---: | --- | --- |
 | ADC0 input | A0 / D14 | NXP ADC1 | ADC0 capture |
 | ADC1 input | A1 / D15 | NXP ADC2 | ADC1 capture |
-| GPIO bit 0 | D6 | GPIO7 fast alias; selectively remap to GPIO2 for DMA | GPIO capture |
-| GPIO bit 1 | D7 | Same | GPIO capture |
-| GPIO bit 2 | D8 | Same | GPIO capture |
-| GPIO bit 3 | D9 | Same | GPIO capture |
-| GPIO bit 4 | D10 | Same | GPIO capture |
-| GPIO bit 5 | D11 | Same | GPIO capture |
-| GPIO bit 6 | D12 | Same | GPIO capture |
-| GPIO bit 7 | D13 | Same | GPIO capture |
+| GPIO bit 0 | D6 | GPIO7 bit 10; selectively remap to GPIO2 bit 10 | GPIO capture |
+| GPIO bit 1 | D7 | GPIO7 bit 17; selectively remap to GPIO2 bit 17 | GPIO capture |
+| GPIO bit 2 | D8 | GPIO7 bit 16; selectively remap to GPIO2 bit 16 | GPIO capture |
+| GPIO bit 3 | D9 | GPIO7 bit 11; selectively remap to GPIO2 bit 11 | GPIO capture |
+| GPIO bit 4 | D10 | GPIO7 bit 0; selectively remap to GPIO2 bit 0 | GPIO capture |
+| GPIO bit 5 | D11 | GPIO7 bit 2; selectively remap to GPIO2 bit 2 | GPIO capture |
+| GPIO bit 6 | D12 | GPIO7 bit 1; selectively remap to GPIO2 bit 1 | GPIO capture |
+| GPIO bit 7 | D13 | GPIO7 bit 3; selectively remap to GPIO2 bit 3 | GPIO capture |
 
 All ten pin IDs are compile-time range checked against the Teensy 4.0's 40
 digital pin IDs and checked for duplicates. The D6-through-D13 array is also
-compared byte-for-byte with the generated [[Protocol-V1]] GPIO pin map.
+compared byte-for-byte with the generated [[Protocol-V1]] GPIO pin map. The
+standard-port bits are independently range/duplicate checked, compile-time
+matched to the pinned `CORE_PIN*_BIT` values, and combined into the exact
+GPIO2/GPR27 mask `0x00030C0F`. Arduino target builds fail closed unless they
+identify a Teensy 4.0 with an i.MX RT1062.
 
 ## Timer and trigger reservations
 
@@ -75,6 +82,11 @@ compared byte-for-byte with the generated [[Protocol-V1]] GPIO pin map.
 | ADC_ETC trigger queue | 0 | NXP ADC1 / logical ADC0 | ADC0 capture |
 | ADC_ETC trigger queue | 4 | NXP ADC2 / logical ADC1, planned relative delay | ADC1 capture |
 
+The accepted primary GPIO route is 24 MHz PERCLK to PIT0 with `LDVAL=5`, then
+XBARA1 input 56 to output 0 and DMAMUX source 30. Six timer clocks give the
+candidate exact 4 MHz event; [[ADR-003-GPIO-Clock-DMA]] records the required
+on-silicon proof and ordered fallbacks.
+
 PIT channels, XBAR outputs, ADC_ETC queues, and ADC peripheral ownership must
 be unique. Repeated XBAR input 57 is legal because one event intentionally
 fans out to two distinct outputs. Core macro assertions guarantee the pinned
@@ -82,6 +94,9 @@ numeric XBAR identities have not drifted. `IntervalTimer` or another owner may
 not claim PIT0/PIT1 while acquisition is active; an external library conflict
 cannot be discovered by a C++ constant alone and must be rejected during
 integration review.
+
+OctoWS2811 also owns XBARA1 outputs 0-2 and DMAMUX sources 30/31/94 when used;
+it is a reviewed pattern source and cannot coexist with this acquisition map.
 
 The four-tick (500 ns) ADC1 phase is exact synthetic timestamp metadata, not a
 physical aperture claim. Future hardware work must prove trigger and aperture

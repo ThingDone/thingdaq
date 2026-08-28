@@ -3,6 +3,11 @@
 #include <cstddef>
 #include <cstdint>
 
+#if defined(ARDUINO) &&                                                   \
+    (!defined(ARDUINO_TEENSY40) || !defined(__IMXRT1062__))
+#error "Teensy DAQ board resources require Teensy 4.0 / i.MX RT1062"
+#endif
+
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
 #include <core_pins.h>
 #include <imxrt.h>
@@ -51,6 +56,11 @@ struct PinAllocation {
   ResourceOwner owner;
 };
 
+struct GpioPinMapping {
+  std::uint8_t teensy_pin;
+  std::uint8_t gpio2_bit;
+};
+
 struct PitAllocation {
   std::uint8_t channel;
   ResourceOwner owner;
@@ -90,6 +100,7 @@ inline constexpr std::uint8_t kAdcEtcTriggerCount = 8U;
 inline constexpr std::uint8_t kAdcPeripheralCount = 2U;
 inline constexpr std::uint8_t kEdmaChannelCount = 32U;
 inline constexpr std::uint8_t kDmamuxSourceCount = 128U;
+inline constexpr std::uint8_t kGpioPortBitCount = 32U;
 inline constexpr std::size_t kCacheLineBytes = 32U;
 inline constexpr std::size_t kRam1BudgetBytes = 512U * 1024U;
 inline constexpr std::size_t kRam2BudgetBytes = 512U * 1024U;
@@ -103,6 +114,20 @@ inline constexpr std::uint8_t kAdc0Peripheral = 1U;
 inline constexpr std::uint8_t kAdc1Peripheral = 2U;
 inline constexpr std::uint8_t kGpioPinsByBit[] = {6U, 7U, 8U, 9U,
                                                   10U, 11U, 12U, 13U};
+// Array order is the packed wire bit. Teensy startup selects the GPIO7 fast
+// aliases for these pads; clearing the same-numbered GPR27 bits selects the
+// DMA-visible GPIO2 aliases without changing any unrelated pin.
+inline constexpr GpioPinMapping kGpioMappingsByPackedBit[] = {
+    {6U, 10U}, {7U, 17U}, {8U, 16U}, {9U, 11U},
+    {10U, 0U}, {11U, 2U}, {12U, 1U}, {13U, 3U},
+};
+inline constexpr std::uint32_t kGpio2PsrCaptureMask =
+    (std::uint32_t{1U} << 10U) | (std::uint32_t{1U} << 17U) |
+    (std::uint32_t{1U} << 16U) | (std::uint32_t{1U} << 11U) |
+    (std::uint32_t{1U} << 0U) | (std::uint32_t{1U} << 2U) |
+    (std::uint32_t{1U} << 1U) | (std::uint32_t{1U} << 3U);
+inline constexpr std::uint32_t kGpio7ToGpio2Gpr27ClearMask =
+    kGpio2PsrCaptureMask;
 
 inline constexpr PinAllocation kPinAllocations[] = {
     {kAdc0Pin, ResourceOwner::kAdc0Capture},
@@ -275,6 +300,39 @@ constexpr bool validPins(const PinAllocation (&allocations)[N]) {
 }
 
 template <std::size_t N>
+constexpr bool validGpioPinMappings(
+    const GpioPinMapping (&mappings)[N]) {
+  for (std::size_t left = 0; left < N; ++left) {
+    if (mappings[left].teensy_pin >= kTeensy40DigitalPinCount ||
+        mappings[left].gpio2_bit >= kGpioPortBitCount) {
+      return false;
+    }
+    for (std::size_t right = left + 1U; right < N; ++right) {
+      if (mappings[left].teensy_pin == mappings[right].teensy_pin ||
+          mappings[left].gpio2_bit == mappings[right].gpio2_bit) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+template <std::size_t MappingN, std::size_t PinN>
+constexpr bool gpioPinOrderMatches(
+    const GpioPinMapping (&mappings)[MappingN],
+    const std::uint8_t (&pins)[PinN]) {
+  if (MappingN != PinN) {
+    return false;
+  }
+  for (std::size_t index = 0; index < MappingN; ++index) {
+    if (mappings[index].teensy_pin != pins[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <std::size_t N>
 constexpr bool validPitAllocations(const PitAllocation (&allocations)[N]) {
   for (std::size_t left = 0; left < N; ++left) {
     if (allocations[left].channel >= kPitChannelCount) {
@@ -398,6 +456,14 @@ inline constexpr std::size_t kReservedRam2Bytes =
 
 static_assert(validPins(kPinAllocations),
               "pin allocation is unsupported or conflicts");
+static_assert(validGpioPinMappings(kGpioMappingsByPackedBit),
+              "GPIO map is unsupported or contains duplicate pins/bits");
+static_assert(gpioPinOrderMatches(kGpioMappingsByPackedBit, kGpioPinsByBit),
+              "GPIO resource map and packed pin order disagree");
+static_assert(kGpio2PsrCaptureMask == 0x00030C0FU,
+              "GPIO2 capture and GPR27 masks must cover only D6-D13");
+static_assert(kGpio7ToGpio2Gpr27ClearMask == kGpio2PsrCaptureMask,
+              "GPIO2 direction/read and GPR27 selection masks disagree");
 static_assert(validPitAllocations(kPitAllocations),
               "PIT channel allocation is unsupported or conflicts");
 static_assert(validXbarRoutes(kXbarRoutes),
@@ -445,6 +511,20 @@ static_assert(sameBytes(kGpioPinsByBit, protocol_v1::kGpioPinsByBit),
 static_assert(kTeensy40DigitalPinCount == CORE_NUM_DIGITAL);
 static_assert(kAdc0Pin == A0);
 static_assert(kAdc1Pin == A1);
+static_assert(kGpioMappingsByPackedBit[0].gpio2_bit == CORE_PIN6_BIT);
+static_assert(kGpioMappingsByPackedBit[1].gpio2_bit == CORE_PIN7_BIT);
+static_assert(kGpioMappingsByPackedBit[2].gpio2_bit == CORE_PIN8_BIT);
+static_assert(kGpioMappingsByPackedBit[3].gpio2_bit == CORE_PIN9_BIT);
+static_assert(kGpioMappingsByPackedBit[4].gpio2_bit == CORE_PIN10_BIT);
+static_assert(kGpioMappingsByPackedBit[5].gpio2_bit == CORE_PIN11_BIT);
+static_assert(kGpioMappingsByPackedBit[6].gpio2_bit == CORE_PIN12_BIT);
+static_assert(kGpioMappingsByPackedBit[7].gpio2_bit == CORE_PIN13_BIT);
+static_assert(kGpio2PsrCaptureMask ==
+              static_cast<std::uint32_t>(
+                  CORE_PIN6_BITMASK | CORE_PIN7_BITMASK |
+                  CORE_PIN8_BITMASK | CORE_PIN9_BITMASK |
+                  CORE_PIN10_BITMASK | CORE_PIN11_BITMASK |
+                  CORE_PIN12_BITMASK | CORE_PIN13_BITMASK));
 static_assert(kXbarPitTrigger0Input == XBARA1_IN_PIT_TRIGGER0);
 static_assert(kXbarPitTrigger1Input == XBARA1_IN_PIT_TRIGGER1);
 static_assert(kXbarDmaRequest30Output == XBARA1_OUT_DMA_CH_MUX_REQ30);

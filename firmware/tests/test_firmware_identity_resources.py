@@ -14,6 +14,40 @@ CPP_TEST = REPOSITORY_ROOT / "firmware/tests/identity_resource_test.cpp"
 
 
 class FirmwareIdentityResourceTests(unittest.TestCase):
+    def test_board_registry_rejects_unsupported_arduino_targets(self) -> None:
+        compiler = shutil.which("g++")
+        if compiler is None:
+            self.skipTest("g++ is required for portable firmware tests")
+
+        unsupported_definitions = (
+            ("-DARDUINO=10819",),
+            ("-DARDUINO=10819", "-DARDUINO_TEENSY41", "-D__IMXRT1062__"),
+            ("-DARDUINO=10819", "-DARDUINO_TEENSY40"),
+        )
+        for definitions in unsupported_definitions:
+            with self.subTest(definitions=definitions):
+                compile_result = subprocess.run(
+                    [
+                        compiler,
+                        "-std=c++17",
+                        "-fsyntax-only",
+                        f"-I{FIRMWARE_SOURCE}",
+                        *definitions,
+                        "-x",
+                        "c++",
+                        "-",
+                    ],
+                    input='#include "board_config.h"\n',
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                )
+                self.assertNotEqual(0, compile_result.returncode)
+                self.assertIn(
+                    "require Teensy 4.0 / i.MX RT1062",
+                    compile_result.stderr,
+                )
+
     def test_portable_headers_compile_and_validate_the_production_registry(
         self,
     ) -> None:
