@@ -304,10 +304,14 @@ hardware selection campaign sets `CHECKSUM_CAPTURE_SECONDS=60`; optional
 `CHECKSUM_CAMPAIGN_ALGORITHM` to an advertised name or numeric ID to run one
 candidate in an isolated job; omitting it retains the all-candidates sequential
 campaign. As with the other rig programs, `EXPECTED_BUILD_ID` and
-`EXPECTED_HARDWARE_SERIAL` can pin the exact artifact and board. Its
-dependency-free CRC-32C trailer validator uses a bounded slicing-by-four path
-so the network-disabled rig retains enough host-side headroom for the full
-framed rate.
+`EXPECTED_HARDWARE_SERIAL` can pin the exact artifact and board. The
+network-disabled rig retains a bounded slicing-by-four CRC-32C implementation
+for arbitrary data and all independent vectors. During the fixed synthetic
+campaign it additionally proves each payload against the complete source
+formula, combines the actual 44-byte header CRC with one of 528 precomputed
+payload CRCs, and reports how many trailers used that equivalent bounded path.
+This validates every received byte and trailer without retaining stream frames
+or making the service host's Python speed part of the device result.
 
 ## Synchronous Python API and offline simulator
 

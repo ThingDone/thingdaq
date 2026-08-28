@@ -329,6 +329,25 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
                     for selection in selections
                 )
             )
+        self.assertEqual(528, len(rig.SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS))
+
+        body = rig.benchmark_vector_bytes(
+            rig.VECTOR_FRAME_COVERAGE,
+            rig.CHECKSUM_CRC32C,
+        )
+        header_checksum = rig._table_crc32(body[: rig.HEADER_SIZE], rig.CRC32C_TABLE)
+        payload_checksum = rig._table_crc32(
+            body[rig.HEADER_SIZE :],
+            rig.CRC32C_TABLE,
+        )
+        combined = (
+            rig._gf2_matrix_times(
+                rig.CRC32C_PAYLOAD_SHIFT_OPERATOR,
+                header_checksum,
+            )
+            ^ payload_checksum
+        )
+        self.assertEqual(rig._table_crc32(body, rig.CRC32C_TABLE), combined)
 
     def test_independent_codec_matches_fixtures_and_recovers_bad_trailer(self) -> None:
         for path in sorted(FIXTURES.glob("*-request.bin")):
@@ -459,6 +478,8 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
             fake.device.configured_checksums,
         )
         self.assertEqual(42, len(fake.device.benchmark_requests))
+        self.assertIn('"crc32c_full_data_checks":0', report)
+        self.assertIn('"crc32c_synthetic_combined_checks":', report)
         self.assertFalse(fake.is_open)
         self.assertIn(0, fake.write_counts)
         self.assertLessEqual(max(fake.read_counts), max(fake.read_pattern))
@@ -494,6 +515,14 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         self.assertEqual(1, summary["candidate_count"])
         self.assertEqual([rig.CHECKSUM_CRC32C], fake.device.configured_checksums)
         self.assertEqual(14, len(fake.device.benchmark_requests))
+        validation = summary["candidates"][0]["stream"]["checksum_validation"]
+        expected_data_frames = sum(
+            summary["candidates"][0]["stream"]["frames"][key] for key in ("adc", "gpio")
+        )
+        self.assertEqual(
+            expected_data_frames, validation["crc32c_synthetic_combined_checks"]
+        )
+        self.assertEqual(0, validation["crc32c_full_data_checks"])
         self.assertEqual(1, output.getvalue().count("CANDIDATE "))
         self.assertEqual(constants.DeviceState.IDLE, fake.device.state)
 

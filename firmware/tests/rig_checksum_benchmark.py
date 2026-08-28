@@ -639,6 +639,8 @@ class FrameParser:
         self.payload_errors = 0
         self.bytes_discarded = 0
         self.high_water_bytes = 0
+        self.synthetic_crc32c_combined_checks = 0
+        self.full_crc32c_data_checks = 0
 
     @property
     def errors(self) -> int:
@@ -671,9 +673,21 @@ class FrameParser:
             payload_length = fields[8]
             payload_end = HEADER_SIZE + payload_length
             try:
-                expected = compute_checksum(
-                    memoryview(self.buffer)[:payload_end], fields[5]
-                )
+                expected: int | None = None
+                if fields[2] in DATA_KINDS and fields[5] == CHECKSUM_CRC32C:
+                    expected = _synthetic_crc32c_data_checksum(
+                        self.buffer,
+                        fields,
+                        payload_end,
+                    )
+                    if expected is None:
+                        self.full_crc32c_data_checks += 1
+                    else:
+                        self.synthetic_crc32c_combined_checks += 1
+                if expected is None:
+                    expected = compute_checksum(
+                        memoryview(self.buffer)[:payload_end], fields[5]
+                    )
             except ProtocolFailure:
                 self.header_errors += 1
                 self._discard(1)
@@ -1454,6 +1468,112 @@ ADC_PATTERN_DOUBLE = ADC_PATTERN + ADC_PATTERN
 GPIO_PATTERN_EXPANDED = bytes(range(256)) * 17
 
 
+def _gf2_matrix_times(matrix: tuple[int, ...], value: int) -> int:
+    result = 0
+    index = 0
+    while value:
+        if value & 1:
+            result ^= matrix[index]
+        value >>= 1
+        index += 1
+    return result
+
+
+def _gf2_matrix_square(matrix: tuple[int, ...]) -> tuple[int, ...]:
+    return tuple(_gf2_matrix_times(matrix, value) for value in matrix)
+
+
+def _shift_reflected_crc32(
+    value: int,
+    byte_count: int,
+    polynomial: int,
+) -> int:
+    """Apply ``byte_count`` zero bytes to a finalized reflected CRC."""
+
+    if byte_count <= 0:
+        return value
+    odd = [polynomial]
+    row = 1
+    for _ in range(1, 32):
+        odd.append(row)
+        row <<= 1
+    odd_matrix = tuple(odd)
+    even_matrix = _gf2_matrix_square(odd_matrix)
+    odd_matrix = _gf2_matrix_square(even_matrix)
+    while True:
+        even_matrix = _gf2_matrix_square(odd_matrix)
+        if byte_count & 1:
+            value = _gf2_matrix_times(even_matrix, value)
+        byte_count >>= 1
+        if not byte_count:
+            return value
+        odd_matrix = _gf2_matrix_square(even_matrix)
+        if byte_count & 1:
+            value = _gf2_matrix_times(odd_matrix, value)
+        byte_count >>= 1
+        if not byte_count:
+            return value
+
+
+CRC32C_PAYLOAD_SHIFT_OPERATOR = tuple(
+    _shift_reflected_crc32(1 << bit, DATA_PAYLOAD_BYTES, 0x82F63B78)
+    for bit in range(32)
+)
+
+
+def _build_synthetic_crc32c_payload_checksums() -> dict[tuple[int, int], int]:
+    checksums: dict[tuple[int, int], int] = {}
+    for kind, cycle in (
+        (ADC_DATA, ADC_PATTERN),
+        (GPIO_DATA, bytes(range(256))),
+    ):
+        offset = 0
+        expanded = cycle + cycle * math.ceil(DATA_PAYLOAD_BYTES / len(cycle))
+        while (kind, offset) not in checksums:
+            expected = expanded[offset : offset + DATA_PAYLOAD_BYTES]
+            checksums[(kind, offset)] = _table_crc32(expected, CRC32C_TABLE)
+            offset = (offset + DATA_PAYLOAD_BYTES) % len(cycle)
+    return checksums
+
+
+SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS = _build_synthetic_crc32c_payload_checksums()
+
+
+def _synthetic_crc32c_data_checksum(
+    buffer: bytearray,
+    fields: tuple[int, ...],
+    payload_end: int,
+) -> int | None:
+    """Combine the actual header with a proven-exact synthetic payload CRC."""
+
+    kind = fields[2]
+    flags = fields[3]
+    first_sample_ticks = fields[12]
+    if not flags & FLAG_SYNTHETIC:
+        return None
+    if kind == ADC_DATA:
+        start_pair = first_sample_ticks // ADC_PAIR_PERIOD_TICKS
+        offset = (start_pair * ADC_BYTES_PER_PAIR) % len(ADC_PATTERN)
+        expected_payload = ADC_PATTERN_DOUBLE[offset : offset + DATA_PAYLOAD_BYTES]
+    elif kind == GPIO_DATA:
+        start_sample = first_sample_ticks // GPIO_SAMPLE_PERIOD_TICKS
+        offset = start_sample & 0xFF
+        expected_payload = GPIO_PATTERN_EXPANDED[offset : offset + DATA_PAYLOAD_BYTES]
+    else:
+        return None
+    payload_checksum = SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS.get((kind, offset))
+    if payload_checksum is None or buffer[HEADER_SIZE:payload_end] != expected_payload:
+        return None
+    header_checksum = _table_crc32(
+        memoryview(buffer)[:HEADER_SIZE],
+        CRC32C_TABLE,
+    )
+    return (
+        _gf2_matrix_times(CRC32C_PAYLOAD_SHIFT_OPERATOR, header_checksum)
+        ^ payload_checksum
+    )
+
+
 class SyntheticValidator:
     """Continuously validate formulas, flags, sequences, and common epoch."""
 
@@ -1660,6 +1780,8 @@ def run_candidate_stream(
     parser_frames_baseline = link.parser.frames_decoded
     parser_discard_baseline = link.parser.bytes_discarded
     stale_baseline = link.stale_responses
+    crc32c_combined_baseline = link.parser.synthetic_crc32c_combined_checks
+    crc32c_full_baseline = link.parser.full_crc32c_data_checks
     link.parser.high_water_bytes = len(link.parser.buffer)
     control_latencies: dict[str, float] = {}
 
@@ -1875,6 +1997,10 @@ def run_candidate_stream(
     parser_discarded = link.parser.bytes_discarded - parser_discard_baseline
     stale_responses = link.stale_responses - stale_baseline
     data_frames = validator.adc.frames + validator.gpio.frames
+    crc32c_combined_checks = (
+        link.parser.synthetic_crc32c_combined_checks - crc32c_combined_baseline
+    )
+    crc32c_full_checks = link.parser.full_crc32c_data_checks - crc32c_full_baseline
     _require(parser_errors == 0, "host parser reported an error during stream")
     _require(parser_discarded == 0, "host parser discarded bytes during stream")
     _require(stale_responses == 0, "host observed a stale response during stream")
@@ -1883,6 +2009,11 @@ def run_candidate_stream(
         parser_frames >= data_frames,
         "not every received data trailer was validated",
     )
+    if checksum_algorithm == CHECKSUM_CRC32C:
+        _require(
+            crc32c_combined_checks == data_frames and crc32c_full_checks == 0,
+            "not every CRC-32C data trailer used the bounded synthetic validator",
+        )
 
     return {
         "capture_elapsed_seconds": capture_elapsed,
@@ -1905,6 +2036,13 @@ def run_candidate_stream(
         "items": {
             "adc_pairs": validator.adc.items,
             "gpio_samples": validator.gpio.items,
+        },
+        "checksum_validation": {
+            "crc32c_full_data_checks": crc32c_full_checks,
+            "crc32c_synthetic_combined_checks": crc32c_combined_checks,
+            "synthetic_crc32c_payload_cache_entries": len(
+                SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS
+            ),
         },
         "latency_seconds": {
             "commands": control_latencies,
