@@ -1,4 +1,4 @@
-"""Protocol and data-model foundation for the Teensy DAQ project."""
+"""Synchronous API, simulator, protocol, and models for the Teensy DAQ project."""
 
 from ._generated.protocol_constants import (
     BoardId,
@@ -11,6 +11,16 @@ from ._generated.protocol_constants import (
     ResponseStatus,
     Source,
     StreamMask,
+)
+from .client import (
+    CommandTimeoutError,
+    DAQClosedError,
+    DataBlock,
+    DeviceCommandError,
+    HostBufferFullError,
+    TeensyDAQ,
+    TeensyDAQError,
+    UnexpectedMessageError,
 )
 from .models import (
     ADCBlock,
@@ -45,6 +55,7 @@ from .protocol import (
     decode_frame,
     encode_frame,
 )
+from .simulator import SimulatedDevice, SimulatorError, SimulatorInputError
 from .synthetic import (
     synthetic_adc0_code,
     synthetic_adc1_code,
@@ -52,6 +63,15 @@ from .synthetic import (
     synthetic_adc_payload,
     synthetic_gpio_byte,
     synthetic_gpio_payload,
+)
+from .transport import (
+    ByteTransport,
+    InMemoryTransport,
+    MemoryTransport,
+    Transport,
+    TransportBufferError,
+    TransportClosedError,
+    TransportError,
 )
 
 __version__ = "0.0.0"
@@ -63,10 +83,15 @@ __all__ = [
     "AdcConverter",
     "AdcSample",
     "BoardId",
+    "ByteTransport",
     "ChecksumAlgorithm",
     "ChecksumMismatchError",
     "CommandResponse",
+    "CommandTimeoutError",
     "Configuration",
+    "DAQClosedError",
+    "DataBlock",
+    "DeviceCommandError",
     "DeviceInfo",
     "DeviceState",
     "ErrorCode",
@@ -79,15 +104,28 @@ __all__ = [
     "GPIOBlock",
     "GpioBlock",
     "GpioChannelView",
+    "HostBufferFullError",
+    "InMemoryTransport",
     "IncrementalFrameParser",
     "Info",
     "McuId",
+    "MemoryTransport",
     "ProtocolError",
     "ResponseStatus",
+    "SimulatedDevice",
+    "SimulatorError",
+    "SimulatorInputError",
     "Source",
     "Status",
     "StreamGap",
     "StreamMask",
+    "TeensyDAQ",
+    "TeensyDAQError",
+    "Transport",
+    "TransportBufferError",
+    "TransportClosedError",
+    "TransportError",
+    "UnexpectedMessageError",
     "UnsupportedChecksumError",
     "compute_checksum",
     "decode_frame",

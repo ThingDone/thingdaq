@@ -23,14 +23,19 @@ Teensy DAQ is split into three independently testable areas:
   result artifacts.
 
 The intended runtime boundary is a versioned binary protocol carried over the
-Teensy 4.0 native USB CDC byte stream. The host API must also support an
-in-memory simulator so protocol and public-API behavior can be validated
-without hardware. Wire constants are generated from
-`protocol/protocol-v1.json` rather than maintained independently in C++ and
-Python. See [[Protocol-V1]] for the wire contract and
-[[ADR-001-Protocol-Wire-Contract]] for its framing decisions.
+Teensy 4.0 native USB CDC byte stream. The Python package exposes one
+synchronous `TeensyDAQ` facade over a minimal `ByteTransport` interface.
+`InMemoryTransport` and `SimulatedDevice` exercise that exact byte boundary,
+including partial reads and writes, so a later serial transport can be swapped
+in without changing INFO, CONFIGURE, START, STATUS, STOP, or block-streaming
+calls.
 
-This foundation does not yet claim acquisition, command, or streaming support.
-Those capabilities are added behind the boundaries above in later tasks. See
-[[Foundation-Reuse-Inventory]] for the source and pattern audit that informed
-the scaffold.
+The simulator provides the runnable host-side acquisition model: bounded
+BOOT-to-IDLE startup; IDLE, CONFIGURED, and RUNNING transitions; monotonically
+allocated run IDs; independent ADC/GPIO sequences; 8 MHz epoch timestamps; and
+deterministic synthetic payloads. Wire constants are generated from
+`protocol/protocol-v1.json` rather than maintained independently in C++ and
+Python. See [[Protocol-V1]] for the wire contract,
+[[ADR-001-Protocol-Wire-Contract]] for its framing decisions, and
+[[Foundation-Reuse-Inventory]] for the source and pattern audit. Physical ADC,
+GPIO, and USB acquisition remain future firmware work.
