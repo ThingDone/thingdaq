@@ -44,7 +44,7 @@ class PythonChecksumBackendTests(unittest.TestCase):
         )
         self.assertTrue(checksum_backend(ChecksumAlgorithm.ADLER32).accelerated)
         self.assertEqual(
-            "python.table.crc32c",
+            "python.slicing_by_four.crc32c",
             checksum_backend(ChecksumAlgorithm.CRC32C).implementation,
         )
         self.assertFalse(checksum_backend(ChecksumAlgorithm.CRC32C).accelerated)

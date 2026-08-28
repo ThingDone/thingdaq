@@ -302,7 +302,9 @@ hardware selection campaign sets `CHECKSUM_CAPTURE_SECONDS=60`; optional
 `CHECKSUM_STATUS_INTERVAL_SECONDS`, `CHECKSUM_BENCHMARK_BATCH_COUNT`, and
 `CHECKSUM_BENCHMARK_ITERATIONS_PER_BATCH` remain strictly bounded. As with the
 other rig programs, `EXPECTED_BUILD_ID` and `EXPECTED_HARDWARE_SERIAL` can pin
-the exact artifact and board.
+the exact artifact and board. Its dependency-free CRC-32C trailer validator
+uses a bounded slicing-by-four path so the network-disabled rig retains enough
+host-side headroom for the full framed rate.
 
 ## Synchronous Python API and offline simulator
 

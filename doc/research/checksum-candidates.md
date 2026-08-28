@@ -202,6 +202,18 @@ CRC bodies are 116 bytes each. Size optimization keeps total ITCM code below
 the next 32 KiB RAM1 allocation boundary, preserving 79,808 bytes for
 locals/stack.
 
+Repaired job `073dfc2d-0857-42fc-b36f-708c0ea91679` then measured CRC-32C at
+4.521 cycles/byte, 132.720 MB/s, and 6.103% projected CPU, proving the target
+repair met both bounds. Its stream still exposed a gap at sequence 131 because
+the independent rig's byte-at-a-time pure-Python CRC-32C validator had only
+modest headroom over the incoming 8.1 MB/s wire rate and backpressured the USB
+path. The package and both self-contained rigs now use their own bounded
+slicing-by-four pure-Python fallback. A local five-batch check increased
+CRC-32C ADC encode/validation medians from the earlier 9.82/9.72 MB/s to
+14.02/14.05 MB/s and GPIO medians from 12.18/12.13 MB/s to 18.66/18.70 MB/s;
+these host-specific rates diagnose rig capacity and are not wire-selection
+evidence. Both failed job logs remain raw evidence rather than accepted runs.
+
 The production choice remains intentionally open until the repaired target
 campaign supplies hot/cold DWT measurements and three lossless 60-second
 streams to the fixed policy in [[ADR-002-Checksum-Selection]].

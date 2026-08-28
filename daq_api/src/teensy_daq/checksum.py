@@ -8,6 +8,7 @@ for CRC-32C in a stock Python installation.
 
 from __future__ import annotations
 
+import sys
 import zlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -59,26 +60,59 @@ def _pure_adler32(data: BytesLike) -> int:
         view.release()
 
 
-def _make_reflected_crc_table(polynomial: int) -> tuple[int, ...]:
-    table: list[int] = []
+def _make_reflected_crc_table(polynomial: int) -> tuple[tuple[int, ...], ...]:
+    first_slice: list[int] = []
     for index in range(256):
         remainder = index
         for _ in range(8):
             remainder = (remainder >> 1) ^ (polynomial if remainder & 1 else 0)
-        table.append(remainder)
-    return tuple(table)
+        first_slice.append(remainder)
+    slices = [tuple(first_slice)]
+    for _ in range(3):
+        previous = slices[-1]
+        slices.append(
+            tuple((value >> 8) ^ slices[0][value & 0xFF] for value in previous)
+        )
+    return tuple(slices)
 
 
 _CRC32C_TABLE = _make_reflected_crc_table(0x82F63B78)
 _CRC32_ISO_HDLC_TABLE = _make_reflected_crc_table(0xEDB88320)
 
 
-def _pure_reflected_crc32(data: BytesLike, table: tuple[int, ...]) -> int:
+def _pure_reflected_crc32(
+    data: BytesLike,
+    table: tuple[tuple[int, ...], ...],
+) -> int:
     view = _byte_view(data)
     try:
         remainder = constants.UINT32_MAX
-        for value in view:
-            remainder = (remainder >> 8) ^ table[(remainder ^ value) & 0xFF]
+        word_bytes = len(view) & ~3
+        slice_0, slice_1, slice_2, slice_3 = table
+        if sys.byteorder == "little":
+            words = view[:word_bytes].cast("I")
+            try:
+                for word in words:
+                    remainder ^= word
+                    remainder = (
+                        slice_3[remainder & 0xFF]
+                        ^ slice_2[(remainder >> 8) & 0xFF]
+                        ^ slice_1[(remainder >> 16) & 0xFF]
+                        ^ slice_0[remainder >> 24]
+                    )
+            finally:
+                words.release()
+        else:
+            for offset in range(0, word_bytes, 4):
+                remainder ^= int.from_bytes(view[offset : offset + 4], "little")
+                remainder = (
+                    slice_3[remainder & 0xFF]
+                    ^ slice_2[(remainder >> 8) & 0xFF]
+                    ^ slice_1[(remainder >> 16) & 0xFF]
+                    ^ slice_0[remainder >> 24]
+                )
+        for value in view[word_bytes:]:
+            remainder = (remainder >> 8) ^ slice_0[(remainder ^ value) & 0xFF]
         return remainder ^ constants.UINT32_MAX
     finally:
         view.release()
@@ -137,15 +171,15 @@ _CHECKSUM_BACKENDS: Mapping[constants.ChecksumAlgorithm, ChecksumBackend] = (
             ),
             constants.ChecksumAlgorithm.CRC32C: ChecksumBackend(
                 algorithm=constants.ChecksumAlgorithm.CRC32C,
-                implementation="python.table.crc32c",
+                implementation="python.slicing_by_four.crc32c",
                 accelerated=False,
-                fallback_implementation="python.table.crc32c",
+                fallback_implementation="python.slicing_by_four.crc32c",
             ),
             constants.ChecksumAlgorithm.CRC32_ISO_HDLC: ChecksumBackend(
                 algorithm=constants.ChecksumAlgorithm.CRC32_ISO_HDLC,
                 implementation="zlib.crc32",
                 accelerated=True,
-                fallback_implementation="python.table.crc32_iso_hdlc",
+                fallback_implementation="python.slicing_by_four.crc32_iso_hdlc",
             ),
         }
     )

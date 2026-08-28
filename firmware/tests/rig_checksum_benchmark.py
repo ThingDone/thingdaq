@@ -266,14 +266,20 @@ class DeadlineExpired(ProtocolFailure):
     """A finite serial operation did not complete by its deadline."""
 
 
-def _make_reflected_crc_table(polynomial: int) -> tuple[int, ...]:
-    table: list[int] = []
+def _make_reflected_crc_table(polynomial: int) -> tuple[tuple[int, ...], ...]:
+    first_slice: list[int] = []
     for index in range(256):
         remainder = index
         for _ in range(8):
             remainder = (remainder >> 1) ^ (polynomial if remainder & 1 else 0)
-        table.append(remainder)
-    return tuple(table)
+        first_slice.append(remainder)
+    slices = [tuple(first_slice)]
+    for _ in range(3):
+        previous = slices[-1]
+        slices.append(
+            tuple((value >> 8) ^ slices[0][value & 0xFF] for value in previous)
+        )
+    return tuple(slices)
 
 
 CRC32C_TABLE = _make_reflected_crc_table(0x82F63B78)
@@ -318,13 +324,37 @@ def reference_checksum(data: bytes, algorithm: int) -> int:
 
 def _table_crc32(
     data: bytes | bytearray | memoryview,
-    table: tuple[int, ...],
+    table: tuple[tuple[int, ...], ...],
 ) -> int:
     view = memoryview(data).cast("B")
     try:
         remainder = 0xFFFFFFFF
-        for value in view:
-            remainder = (remainder >> 8) ^ table[(remainder ^ value) & 0xFF]
+        word_bytes = len(view) & ~3
+        slice_0, slice_1, slice_2, slice_3 = table
+        if sys.byteorder == "little":
+            words = view[:word_bytes].cast("I")
+            try:
+                for word in words:
+                    remainder ^= word
+                    remainder = (
+                        slice_3[remainder & 0xFF]
+                        ^ slice_2[(remainder >> 8) & 0xFF]
+                        ^ slice_1[(remainder >> 16) & 0xFF]
+                        ^ slice_0[remainder >> 24]
+                    )
+            finally:
+                words.release()
+        else:
+            for offset in range(0, word_bytes, 4):
+                remainder ^= int.from_bytes(view[offset : offset + 4], "little")
+                remainder = (
+                    slice_3[remainder & 0xFF]
+                    ^ slice_2[(remainder >> 8) & 0xFF]
+                    ^ slice_1[(remainder >> 16) & 0xFF]
+                    ^ slice_0[remainder >> 24]
+                )
+        for value in view[word_bytes:]:
+            remainder = (remainder >> 8) ^ slice_0[(remainder ^ value) & 0xFF]
         return remainder ^ 0xFFFFFFFF
     finally:
         view.release()
