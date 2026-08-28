@@ -468,14 +468,18 @@ void validateWireOutput(const std::vector<std::uint8_t> &output,
 }
 
 void testOwnershipTransitionsStopAndStaleHandles() {
-  static_assert(sizeof(packet::PacketBufferStorage) ==
-                board::kPacketBufferStorageBytes);
-  static_assert(alignof(packet::PacketBufferStorage) ==
+  static_assert(sizeof(packet::PacketBufferPrimaryStorage) ==
+                board::kPacketBufferPrimaryStorageBytes);
+  static_assert(sizeof(packet::PacketBufferReserveStorage) ==
+                board::kPacketBufferReserveStorageBytes);
+  static_assert(alignof(packet::PacketBufferPrimaryStorage) ==
+                board::kCacheLineBytes);
+  static_assert(alignof(packet::PacketBufferReserveStorage) ==
                 board::kCacheLineBytes);
   static_assert(sizeof(packet::PacketBufferPipeline) <=
                 board::kPacketPipelineStateBudgetBytes);
 
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   packet::PipelineSnapshot snapshot = pipeline.snapshot();
   expect(snapshot.buffers_by_state[stateIndex(packet::BufferState::kFree)] ==
@@ -602,7 +606,7 @@ void testFixedQueueAndPipelineWraparound() {
              !queue.popFront(),
          "fixed queue preserves FIFO order through tail/head wraparound");
 
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   expect(pipeline.frontFrame().size == 0U && pipeline.readyFrames() == 0U &&
              pipeline.queuedFrames() == 0U &&
@@ -675,7 +679,7 @@ void testFixedQueueAndPipelineWraparound() {
 }
 
 void testFairSchedulingWithUnequalArrivals() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   expect(pipeline.startRun(21U) == packet::OperationStatus::kOk,
          "start an unequal-arrival scheduling run");
@@ -718,7 +722,7 @@ void testFairSchedulingWithUnequalArrivals() {
 }
 
 void testSequenceWrapAndPacingBoundaries() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   synthetic::SyntheticSource source{};
   constexpr std::uint32_t run_id = 31U;
@@ -785,7 +789,7 @@ void runLongModeTest(synthetic::Mode mode, std::uint32_t run_id,
                      const std::string &mode_name) {
   constexpr std::uint64_t kFramesPerStream = 24U;
   constexpr std::uint64_t epoch = 5000000000ULL;
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   synthetic::SyntheticSource source{mode};
   AlternatingFakeUsb stream{};

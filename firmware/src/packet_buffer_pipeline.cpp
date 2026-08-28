@@ -135,7 +135,7 @@ protocol::MutableByteView PacketBufferPipeline::writablePayload(
     saturatingIncrement(invalid_operations_);
     return {};
   }
-  return {storage_.frames[handle.buffer_index].data() +
+  return {storage_.frame(handle.buffer_index).data() +
               protocol_v1::kHeaderSize,
           protocol_v1::kDataPayloadBytes};
 }
@@ -183,8 +183,8 @@ FinishFillResult PacketBufferPipeline::finishFill(
   fields.item_count = record.item_count;
   result.encoding = protocol::encodeDataFrameInPlace(
       fields,
-      {storage_.frames[handle.buffer_index].data(),
-       storage_.frames[handle.buffer_index].size()},
+      {storage_.frame(handle.buffer_index).data(),
+       storage_.frame(handle.buffer_index).size()},
       completion.payload_bytes_written);
   if (!result.encoding.ok()) {
     saturatingIncrement(encoding_rejections_);
@@ -308,7 +308,7 @@ protocol::ByteView PacketBufferPipeline::frontFrame() const {
       record.frame_size != protocol_v1::kDataFrameBytes) {
     return {};
   }
-  return {storage_.frames[*buffer_index].data(), record.frame_size};
+  return {storage_.frame(*buffer_index).data(), record.frame_size};
 }
 
 void PacketBufferPipeline::releaseFrontFrame() {

@@ -37,6 +37,7 @@ enum class MemoryUse : std::uint8_t {
   kCommandQueue,
   kResponseQueue,
   kPacketBufferStorage,
+  kPacketBufferReserveStorage,
   kPacketPipelineState,
   kAdcDmaRing,
   kGpioRawDmaRing,
@@ -162,13 +163,15 @@ inline constexpr std::size_t kAdcDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioPackedRingDepth = 4U;
 // At the nominal combined framed rate, each 4096-byte buffer represents 0.506
-// ms. The original 96 buffers exposed loss under Phase 05 service scheduling;
-// the three clean Adler runs included a 53.293 ms host receive interval. The
-// repaired 106-buffer pool retains 53.636 ms of complete frames and the pinned
-// core contributes another 1.012 ms in four 2048-byte TX buffers. This remains
-// fixed cacheless DTCM storage and the exact target build must retain at least
-// 32 KiB for locals/stack.
-inline constexpr std::size_t kPacketBufferCount = 106U;
+// ms. Keep the proven 106-frame primary bank in cacheless DTCM, then add a
+// fixed 94-frame CPU-owned OCRAM reserve. The complete 200-frame pool retains
+// 101.200 ms and the pinned core contributes another 1.012 ms in four 2048-byte
+// TX buffers. This covers the 60.715 ms Phase 05 service gap while retaining at
+// least 32 KiB of target RAM1 for locals/stack and every future DMA-ring budget.
+inline constexpr std::size_t kPacketBufferPrimaryCount = 106U;
+inline constexpr std::size_t kPacketBufferReserveCount = 94U;
+inline constexpr std::size_t kPacketBufferCount =
+    kPacketBufferPrimaryCount + kPacketBufferReserveCount;
 inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketTransmitQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
@@ -176,7 +179,7 @@ inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
 // to that pair halves the longest checksum burst while retaining same-visit
 // promotion/transmission and fast bounded catch-up on the next loop.
 inline constexpr std::size_t kSyntheticFramesPerLoop = 2U;
-inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 4160U;
+inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 8192U;
 inline constexpr std::size_t kChecksumBenchmarkBufferBytes =
     protocol_v1::kDataFrameBytes;
 // Pinned Teensy 1.62 cores/teensy4/usb_serial.c constants. The core owns this
@@ -209,6 +212,10 @@ inline constexpr std::size_t kGpioPackedBufferStrideBytes =
     alignUp(protocol_v1::kDataPayloadBytes, kCacheLineBytes);
 inline constexpr std::size_t kPacketBufferStorageBytes =
     kPacketBufferCount * protocol_v1::kDataFrameBytes;
+inline constexpr std::size_t kPacketBufferPrimaryStorageBytes =
+    kPacketBufferPrimaryCount * protocol_v1::kDataFrameBytes;
+inline constexpr std::size_t kPacketBufferReserveStorageBytes =
+    kPacketBufferReserveCount * protocol_v1::kDataFrameBytes;
 
 inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kCommandParser, MemoryRegion::kDtcmRam1,
@@ -222,8 +229,11 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
      kResponseQueueDepth * protocol_v1::kMaxControlFrameBytes, 4U,
      ResourceOwner::kUsbTransport},
     {MemoryUse::kPacketBufferStorage, MemoryRegion::kDtcmRam1,
-     kPacketBufferStorageBytes, kCacheLineBytes,
+     kPacketBufferPrimaryStorageBytes, kCacheLineBytes,
      ResourceOwner::kPacketizer},
+    {MemoryUse::kPacketBufferReserveStorage,
+     MemoryRegion::kOcramRam2Dma, kPacketBufferReserveStorageBytes,
+     kCacheLineBytes, ResourceOwner::kPacketizer},
     {MemoryUse::kPacketPipelineState, MemoryRegion::kDtcmRam1,
      kPacketPipelineStateBudgetBytes, kCacheLineBytes,
      ResourceOwner::kPacketizer},
@@ -416,6 +426,10 @@ static_assert(kUsbTxBudgetBytesPerLoop <= kPinnedUsbCdcTxBufferBytes,
               "one cooperative TX visit must not outrun a core TX buffer");
 static_assert(kPacketBufferStorageBytes % kCacheLineBytes == 0U,
               "packet storage must occupy complete alignment units");
+static_assert(kPacketBufferPrimaryStorageBytes +
+                      kPacketBufferReserveStorageBytes ==
+                  kPacketBufferStorageBytes,
+              "packet storage banks must cover the complete pool");
 static_assert(kChecksumBenchmarkBufferBytes % kCacheLineBytes == 0U,
               "benchmark buffers must occupy complete cache lines");
 static_assert(kPacketReadyQueueDepth >= kPacketBufferCount &&

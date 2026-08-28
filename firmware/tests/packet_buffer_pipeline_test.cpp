@@ -90,7 +90,7 @@ packet::FinishFillResult fillAndFinish(packet::PacketBufferPipeline &pipeline,
 }
 
 void testRunChecksumIsImmutableUntilTheQueueIsQuiescent() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   expect(pipeline.startRun(
              30U, constants::ChecksumAlgorithm::kNoneReserved) ==
@@ -137,9 +137,10 @@ void testRunChecksumIsImmutableUntilTheQueueIsQuiescent() {
 }
 
 void testAlignedFixedPoolAndFailureAccounting() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
-  for (const auto &frame : storage.frames) {
+  for (std::size_t index = 0U; index < board::kPacketBufferCount; ++index) {
+    const packet::PacketFrame &frame = storage.frame(index);
     const auto address = reinterpret_cast<std::uintptr_t>(frame.data());
     expect(address % board::kCacheLineBytes == 0U,
            "every packet buffer begins at a 32-byte boundary");
@@ -217,7 +218,7 @@ void testAlignedFixedPoolAndFailureAccounting() {
 }
 
 void testTransportOwnershipSurvivesPartialWrites() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   expect(pipeline.startRun(11U) == packet::OperationStatus::kOk,
          "start transport-ownership run");
@@ -288,7 +289,7 @@ void testTransportOwnershipSurvivesPartialWrites() {
 }
 
 void testFairPromotionKeepsNominalCoverageAligned() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   expect(pipeline.startRun(17U) == packet::OperationStatus::kOk,
          "start fair-promotion run");
@@ -338,7 +339,7 @@ void testFairPromotionKeepsNominalCoverageAligned() {
 }
 
 void testPoolExhaustionIsBoundedAndSequenceVisible() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   expect(pipeline.startRun(21U) == packet::OperationStatus::kOk,
          "start pool-bound run");

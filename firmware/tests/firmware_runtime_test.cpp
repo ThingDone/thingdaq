@@ -327,7 +327,7 @@ std::string buildId(const wire::DecodedFrame &info) {
 
 void testCompleteControlPlane() {
   FakeCdcStream stream{};
-  packet::PacketBufferStorage packet_storage{};
+  packet::OwnedPacketBufferStorage packet_storage{};
   FakeTickClock clock{};
   app::FirmwareRuntime firmware{stream, packet_storage, clock};
   constexpr std::uint32_t hardware_serial = 167772150U;
@@ -484,7 +484,7 @@ void testCompleteControlPlane() {
 void testSyntheticDataCountersReachStatus() {
   FakeCdcStream stream{};
   stream.max_write_size = constants::kDataFrameBytes;
-  packet::PacketBufferStorage packet_storage{};
+  packet::OwnedPacketBufferStorage packet_storage{};
   FakeTickClock clock{};
   app::FirmwareRuntime firmware{stream, packet_storage, clock};
   expect(firmware.begin(1234U), "counter test completes BOOT");
@@ -565,7 +565,7 @@ void testStartupSchedulingJitterFitsPacketPool() {
   stream.max_read_size = 128U;
   stream.available_write_size = board::kUsbTxMaxWriteBytes;
   stream.max_write_size = constants::kDataFrameBytes;
-  packet::PacketBufferStorage packet_storage{};
+  packet::OwnedPacketBufferStorage packet_storage{};
   FakeTickClock clock{};
   app::FirmwareRuntime firmware{stream, packet_storage, clock};
   expect(firmware.begin(6060U), "jitter test completes BOOT");
@@ -635,7 +635,7 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
   stream.max_read_size = 128U;
   stream.available_write_size = board::kUsbTxMaxWriteBytes;
   stream.max_write_size = 37U;
-  packet::PacketBufferStorage packet_storage{};
+  packet::OwnedPacketBufferStorage packet_storage{};
   FakeTickClock clock{};
   app::FirmwareRuntime firmware{stream, packet_storage, clock};
   expect(firmware.begin(8080U), "drain-gate test completes BOOT");
@@ -744,7 +744,7 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
 
 void testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState() {
   FakeCdcStream stream{};
-  packet::PacketBufferStorage packet_storage{};
+  packet::OwnedPacketBufferStorage packet_storage{};
   FakeTickClock clock{};
   FakeBenchmarkPlatform platform{};
   benchmark::Buffer dtcm{};

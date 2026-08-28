@@ -34,7 +34,7 @@ OUTPUT_DIRECTORY = (
     SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 5
+MANIFEST_SCHEMA_VERSION = 6
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
@@ -80,6 +80,21 @@ BENCHMARK_BUFFER_SYMBOLS = {
 }
 BENCHMARK_BUFFER_BYTES = 4096
 BENCHMARK_BUFFER_ALIGNMENT = 32
+PACKET_BUFFER_SYMBOLS = {
+    "DTCM_PRIMARY": (
+        "(anonymous namespace)::packet_storage_primary",
+        106 * 4096,
+        0x20000000,
+        0x20200000,
+    ),
+    "OCRAM_RESERVE": (
+        "(anonymous namespace)::packet_storage_reserve",
+        94 * 4096,
+        0x20200000,
+        0x20280000,
+    ),
+}
+PACKET_BUFFER_ALIGNMENT = 32
 MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES = 32 * 1024
 
 
@@ -562,6 +577,50 @@ def benchmark_buffer_usage(nm_output: str) -> dict[str, Any]:
     }
 
 
+def packet_buffer_usage(nm_output: str) -> dict[str, Any]:
+    """Verify both fixed packet banks occupy their claimed memory regions."""
+
+    symbols = parse_nm_symbols(nm_output)
+    banks: dict[str, dict[str, Any]] = {}
+    for bank, (
+        symbol,
+        expected_size,
+        region_start,
+        region_end,
+    ) in PACKET_BUFFER_SYMBOLS.items():
+        record = symbols.get(symbol)
+        if record is None:
+            raise BuildError(f"firmware ELF is missing packet buffer bank {symbol}")
+        address, size, symbol_type = record
+        if size != expected_size:
+            raise BuildError(
+                f"{symbol} occupies {size} bytes, expected {expected_size}"
+            )
+        if address % PACKET_BUFFER_ALIGNMENT != 0:
+            raise BuildError(f"{symbol} is not cache-line aligned")
+        if not region_start <= address or address + size > region_end:
+            raise BuildError(
+                f"{symbol} is outside its claimed {bank} range: 0x{address:08x}"
+            )
+        if symbol_type.upper() != "B":
+            raise BuildError(f"{symbol} is not writable packet storage")
+        banks[bank] = {
+            "symbol": symbol,
+            "symbol_type": symbol_type,
+            "address": f"0x{address:08x}",
+            "bytes": size,
+            "frames": size // BENCHMARK_BUFFER_BYTES,
+            "alignment_bytes": PACKET_BUFFER_ALIGNMENT,
+            "range_start": f"0x{region_start:08x}",
+            "range_end_exclusive": f"0x{region_end:08x}",
+        }
+    return {
+        "total_bytes": sum(item["bytes"] for item in banks.values()),
+        "total_frames": sum(item["frames"] for item in banks.values()),
+        "banks": banks,
+    }
+
+
 def git_source_state() -> dict[str, Any]:
     """Record the Git commit and dirtiness of the exact firmware inputs."""
 
@@ -686,6 +745,7 @@ def build(arduino_cli_name: str) -> Path:
     )
     checksum_resources = checksum_resource_usage(nm_result.stdout)
     benchmark_buffers = benchmark_buffer_usage(nm_result.stdout)
+    packet_buffers = packet_buffer_usage(nm_result.stdout)
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -710,6 +770,7 @@ def build(arduino_cli_name: str) -> Path:
             "nm_path": str(nm),
             "checksum_resources": checksum_resources,
             "checksum_benchmark_buffers": benchmark_buffers,
+            "packet_buffers": packet_buffers,
         },
         "source": {
             "source_id": identity.source_id,

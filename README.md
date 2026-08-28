@@ -183,15 +183,15 @@ acknowledged new START. The STOP response itself still wins at the next frame
 boundary, so remaining old-run complete frames may follow STOP, but they are
 always serialized before any later successful START response.
 
-The DTCM placement follows a reinspection of pinned Teensy core 1.62.0: USB
-Serial copies writes into its own four 2,048-byte aligned `DMAMEM` buffers and
-flushes those buffers before DMA. The 106 application frames cover 53.636 ms
-at the nominal combined framed rate, plus 1.012 ms in the core ring. This
-repairs the loss exposed when Phase 05 clean host receive intervals reached
-53.293 ms, while the exact linker gate retains at least 32 KiB for locals and
-stack. The compile-time registry reserves 446,944 bytes of RAM1 project data
-and 101,376 bytes of RAM2 storage, including one isolated benchmark buffer in
-each region; see
+The split packet placement follows a reinspection of pinned Teensy core 1.62.0:
+USB Serial copies writes into its own four 2,048-byte aligned `DMAMEM` buffers
+and flushes those buffers before DMA. A 106-frame cacheless DTCM primary bank
+and 94-frame CPU-owned OCRAM reserve cover 101.200 ms at the nominal combined
+framed rate, plus 1.012 ms in the core ring. This absorbs the 60.715 ms service
+gap observed by the Phase 05 CRC campaign while the exact linker gate retains
+at least 32 KiB for locals and stack. The compile-time registry reserves
+450,976 bytes of RAM1 project data and 486,400 bytes of RAM2 storage, including
+the future acquisition rings and isolated benchmark buffers; see
 `doc/architecture/firmware-resource-map.md` and
 `doc/reference/Foundation-Reuse-Inventory.md`.
 

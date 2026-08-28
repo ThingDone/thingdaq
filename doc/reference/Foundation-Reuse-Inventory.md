@@ -121,16 +121,15 @@ The exact installed Teensy 1.62.0 sources were then reread at
 | `usb_serial.h` | `availableForWrite()` and the returned count from block `write()` are the only public capacity/progress signals; `flush()` is not a completion fence for host receipt. |
 
 This copy boundary determines the memory rule in [[Firmware-Resource-Map]].
-Application packet frames are aligned CPU-owned DTCM/RAM1, because the core
-copies them into its own DMA-visible storage. Marking the project pool
-`DMAMEM` would consume OCRAM and introduce a cache-ownership story without
-enabling zero-copy USB. Future ADC/GPIO rings that are actually read or written
-by eDMA remain aligned `DMAMEM` OCRAM/RAM2 and require explicit cache
-maintenance. The repaired 106-frame application pool covers 53.636 ms at the
-nominal combined framed rate; the core's 8,192-byte TX ring adds 1.012 ms. The
-original 96-frame pool exposed loss when Phase 05 clean host receive intervals
-reached 53.293 ms. The fixed repair remains in DTCM and the exact build gate
-requires at least 32 KiB for locals/stack.
+Application packet frames are CPU-owned because the core copies them into its
+own DMA-visible storage. The 106-frame primary bank remains aligned cacheless
+DTCM/RAM1; a 94-frame aligned `DMAMEM` OCRAM reserve is safe because it is read
+by the CPU, not submitted directly to USB DMA. Future ADC/GPIO rings that are
+actually read or written by eDMA remain distinct aligned OCRAM/RAM2 allocations
+with explicit cache maintenance. The complete 200-frame application pool covers
+101.200 ms at the nominal combined framed rate; the core's 8,192-byte TX ring
+adds 1.012 ms. This covers the 60.715 ms Phase 05 CRC service gap, and the exact
+build gate still requires at least 32 KiB for locals/stack.
 
 The final scheduler therefore caps each request at one 2,048-byte core buffer
 and waits for at least 512 bytes of reported capacity (or an exact shorter

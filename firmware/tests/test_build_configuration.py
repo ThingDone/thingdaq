@@ -36,7 +36,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(5, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(6, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -147,6 +147,24 @@ class BuildConfigurationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.benchmark_buffer_usage(symbols.splitlines()[0])
+
+    def test_packet_buffer_provenance_requires_split_target_regions(self) -> None:
+        symbols = (
+            "200022c0 0006a000 b (anonymous namespace)::packet_storage_primary\n"
+            "20200000 0005e000 b (anonymous namespace)::packet_storage_reserve"
+        )
+        resources = build_firmware.packet_buffer_usage(symbols)
+
+        self.assertEqual(200, resources["total_frames"])
+        self.assertEqual(819_200, resources["total_bytes"])
+        self.assertEqual("0x200022c0", resources["banks"]["DTCM_PRIMARY"]["address"])
+        self.assertEqual("0x20200000", resources["banks"]["OCRAM_RESERVE"]["address"])
+        with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
+            build_firmware.packet_buffer_usage(
+                symbols.replace("20200000 0005e000", "2006c4c0 0005e000")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
+            build_firmware.packet_buffer_usage(symbols.splitlines()[0])
 
     def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
         responses = [

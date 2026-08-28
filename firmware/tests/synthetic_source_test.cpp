@@ -55,7 +55,7 @@ std::uint16_t sampleCode(wire::ByteView payload, std::size_t offset) {
 }
 
 void testRealtimePacingAndExactLayouts() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   synthetic::SyntheticSource source{};
   constexpr std::uint32_t run_id = 17U;
@@ -170,7 +170,7 @@ void testRealtimePacingAndExactLayouts() {
 }
 
 void testUnpacedDiagnosticIsExplicitAndBounded() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   synthetic::SyntheticSource source{
       synthetic::Mode::kUnpacedDiagnostic};
@@ -209,7 +209,7 @@ void testUnpacedDiagnosticIsExplicitAndBounded() {
 }
 
 void testNewRunResetsIndependentEpochState() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   synthetic::SyntheticSource source{};
   const wire::Configuration configuration = bothStreams();
@@ -243,7 +243,7 @@ void testNewRunResetsIndependentEpochState() {
 }
 
 void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
-  packet::PacketBufferStorage storage{};
+  packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   synthetic::SyntheticSource source{};
   constexpr std::uint64_t epoch = 700U;

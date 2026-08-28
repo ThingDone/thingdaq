@@ -53,15 +53,65 @@ constexpr std::uint32_t itemsPerFrame(Stream stream) {
                    protocol_v1::kGpioSamplesPerFrame);
 }
 
-// The application packet buffers are deliberately ordinary aligned DTCM
-// storage. The pinned Teensy 1.62 USB Serial core memcpy()s writes into its
-// own four aligned 2048-byte DMAMEM buffers and performs the cache flush there;
-// application frames are never handed to USB DMA directly.
-struct alignas(board::kCacheLineBytes) PacketBufferStorage {
-  std::array<std::array<std::uint8_t, protocol_v1::kDataFrameBytes>,
-             board::kPacketBufferCount>
-      frames{};
+using PacketFrame =
+    std::array<std::uint8_t, protocol_v1::kDataFrameBytes>;
+
+// Packet bytes stay CPU-owned: the pinned Teensy 1.62 USB Serial core memcpy()s
+// each write into its own aligned DMAMEM TX ring and flushes that destination.
+// The primary bank remains cacheless DTCM; the aligned reserve bank is cached
+// OCRAM but is likewise never handed to USB DMA directly.
+struct alignas(board::kCacheLineBytes) PacketBufferPrimaryStorage {
+  std::array<PacketFrame, board::kPacketBufferPrimaryCount> frames{};
 };
+
+struct alignas(board::kCacheLineBytes) PacketBufferReserveStorage {
+  std::array<PacketFrame, board::kPacketBufferReserveCount> frames{};
+};
+
+class PacketBufferStorage final {
+ public:
+  PacketBufferStorage(PacketBufferPrimaryStorage &primary,
+                      PacketBufferReserveStorage &reserve)
+      : primary_(primary), reserve_(reserve) {}
+  PacketBufferStorage(const PacketBufferStorage &) = delete;
+  PacketBufferStorage &operator=(const PacketBufferStorage &) = delete;
+
+  PacketFrame &frame(std::size_t index) {
+    return index < board::kPacketBufferPrimaryCount
+               ? primary_.frames[index]
+               : reserve_.frames[index - board::kPacketBufferPrimaryCount];
+  }
+
+  const PacketFrame &frame(std::size_t index) const {
+    return index < board::kPacketBufferPrimaryCount
+               ? primary_.frames[index]
+               : reserve_.frames[index - board::kPacketBufferPrimaryCount];
+  }
+
+ private:
+  PacketBufferPrimaryStorage &primary_;
+  PacketBufferReserveStorage &reserve_;
+};
+
+#if !defined(ARDUINO_TEENSY40) || !defined(__IMXRT1062__)
+// Portable tests own both banks contiguously on the host while exercising the
+// same indexed view used by the split target placement.
+class OwnedPacketBufferStorage final {
+ public:
+  OwnedPacketBufferStorage() : storage_(primary_, reserve_) {}
+
+  operator PacketBufferStorage &() { return storage_; }
+  PacketFrame &frame(std::size_t index) { return storage_.frame(index); }
+  const PacketFrame &frame(std::size_t index) const {
+    return storage_.frame(index);
+  }
+
+ private:
+  PacketBufferPrimaryStorage primary_{};
+  PacketBufferReserveStorage reserve_{};
+  PacketBufferStorage storage_;
+};
+#endif
 
 struct FillHandle {
   std::uint8_t buffer_index = kInvalidBufferIndex;
@@ -269,8 +319,15 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
 
 static_assert(kStreamCount == 2U);
 static_assert(board::kPacketBufferCount < kInvalidBufferIndex);
-static_assert(alignof(PacketBufferStorage) == board::kCacheLineBytes);
-static_assert(sizeof(PacketBufferStorage) == board::kPacketBufferStorageBytes);
+static_assert(alignof(PacketBufferPrimaryStorage) == board::kCacheLineBytes);
+static_assert(alignof(PacketBufferReserveStorage) == board::kCacheLineBytes);
+static_assert(sizeof(PacketBufferPrimaryStorage) ==
+              board::kPacketBufferPrimaryStorageBytes);
+static_assert(sizeof(PacketBufferReserveStorage) ==
+              board::kPacketBufferReserveStorageBytes);
+static_assert(sizeof(PacketBufferPrimaryStorage) +
+                      sizeof(PacketBufferReserveStorage) ==
+                  board::kPacketBufferStorageBytes);
 static_assert(protocol_v1::kDataFrameBytes % board::kCacheLineBytes == 0U);
 static_assert(sizeof(PacketBufferPipeline) <=
               board::kPacketPipelineStateBudgetBytes);

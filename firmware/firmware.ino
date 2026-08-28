@@ -13,11 +13,12 @@
 
 namespace {
 
-// Same-translation-unit declaration order is intentional. Packet storage is
-// cacheless aligned DTCM, not DMAMEM: the pinned CDC core copies each write
-// into its own DMA-visible OCRAM ring before transmission.
+// The primary packet bank is cacheless DTCM; the CPU-owned reserve is OCRAM.
+// The CDC core copies both into its own DMA-visible TX ring.
 teensy_daq::usb::TeensyCdcByteStream cdc_stream{};
-teensy_daq::packet::PacketBufferStorage packet_storage{};
+teensy_daq::packet::PacketBufferPrimaryStorage packet_storage_primary{};
+DMAMEM teensy_daq::packet::PacketBufferReserveStorage packet_storage_reserve{};
+teensy_daq::packet::PacketBufferStorage packet_storage{packet_storage_primary, packet_storage_reserve};
 teensy_daq::clock::TeensyTickClock tick_clock{};
 teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream,
                                                        packet_storage,

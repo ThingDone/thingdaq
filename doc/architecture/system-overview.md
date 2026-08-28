@@ -117,9 +117,10 @@ a fabricated transport failure.
 
 ## Complete-frame packet pipeline
 
-The deterministic synthetic source uses a 106-entry pool of
-aligned 4,096-byte frames. The pool is fixed storage with no steady-path
-allocation. `beginFill()` assigns the next independent ADC or GPIO sequence and
+The deterministic synthetic source uses a 200-entry pool of aligned 4,096-byte
+frames: 106 in a primary DTCM bank and 94 in an OCRAM reserve bank. The pool is
+fixed storage with no steady-path allocation. `beginFill()` assigns the next
+independent ADC or GPIO sequence and
 records source production before asking for a free buffer, so pool exhaustion
 remains visible as both a drop counter and a later sequence gap. Only a valid
 fill lease can access the 4,048-byte payload region; the source does not bypass
@@ -135,17 +136,18 @@ only after all 4,096 bytes succeed. A new response may overtake unsent data at
 a boundary, but never an active frame. Starting another run is rejected while
 transport owns any frame.
 
-The packet bytes live in aligned DTCM/RAM1, not `DMAMEM`. Inspection of the
-pinned Teensy 1.62 `usb_serial.c` confirms that its public block-write path
-copies application bytes into a core-owned four-by-2,048-byte aligned OCRAM
-ring and flushes that destination before USB DMA. The project's 2,048-byte TX
-visit bound matches one core buffer and uses its conservative
+The primary packet bytes live in aligned DTCM/RAM1; the fixed reserve is an
+aligned, CPU-owned `DMAMEM` OCRAM/RAM2 bank. Inspection of the pinned Teensy
+1.62 `usb_serial.c` confirms that its public block-write path copies application
+bytes from either bank into a separate core-owned four-by-2,048-byte OCRAM ring
+and flushes that destination before USB DMA. The project's 2,048-byte TX visit
+bound matches one core buffer and uses its conservative
 `availableForWrite()` signal; a zero or prefix return retains the application
-frame and offset. The 106 project buffers cover 53.636 ms at the target framed
-rate, with another 1.012 ms in the core ring. The original 96-entry Phase 04
-pool was expanded after Phase 05 clean host receive intervals reached 53.293 ms
-and repeated campaign jobs exposed its loss boundary. The exact linker gate
-preserves at least 32 KiB of DTCM for locals/stack. See
+frame and offset. The 200 project buffers cover 101.200 ms at the target framed
+rate, with another 1.012 ms in the core ring. The OCRAM reserve was added after
+the CRC campaign measured a 60.715 ms service gap beyond the 54.648 ms combined
+primary/core coverage. The exact linker gate preserves at least 32 KiB of DTCM
+for locals/stack. See
 [[Foundation-Reuse-Inventory]] and [[Firmware-Resource-Map]] for the pinned
 source audit and compile-time budget.
 
