@@ -18,7 +18,7 @@ This directory contains the private, local-development Python distribution for
 the Teensy DAQ host API. Its installable distribution name is
 `teensy-daq-local`, while its stable import package is `teensy_daq`.
 
-The base installation includes PySerial for the eventual hardware transport.
+The base installation includes PySerial for the bounded hardware transport.
 NumPy remains optional, and test, lint, type-check, and package-build tools are
 available through development extras:
 
@@ -36,8 +36,8 @@ See [[System-Overview]] for the package boundary and
 The synchronous `TeensyDAQ` facade operates on a small `ByteTransport`
 interface. `InMemoryTransport` connects that facade to `SimulatedDevice`
 through encoded protocol-v1 bytes, including arbitrary partial read/write
-boundaries. A future serial transport can implement the same interface without
-changing command or streaming calls:
+boundaries. `SerialTransport` implements the same interface over PySerial, so
+command and streaming code does not depend on the concrete byte source:
 
 ```python
 from teensy_daq import AdcBlock, TeensyDAQ
@@ -60,6 +60,31 @@ successful START allocates a new run ID, resets both stream epochs and
 counters, and produces ADC then GPIO frames in a repeatable round-robin order
 when both streams are enabled. INFO and STOP are idempotent; closing the facade
 stops an active run before closing its transport.
+
+## Production transport and background reader
+
+`SerialTransport` configures finite PySerial read and write timeouts and adds
+bounded open, flush, and close behavior. A write may report partial progress;
+`BackgroundReader` serializes concurrent command writes and retries each
+unwritten suffix within the command's overall deadline. Its default 64 KiB
+reads are deliberately larger than USB packets because USB CDC is one byte
+stream, not a packet-preserving message API.
+
+`BackgroundReader` owns exactly one `IncrementalFrameParser`. One non-daemon
+thread continuously feeds arbitrary read chunks into it, matches concurrent
+responses by echoed request ID, and separates decoded ADC/GPIO blocks from
+other non-response frames. Pending requests, block queues, and event queues are
+all bounded. Request timeout removes the pending entry; an eventual unmatched
+reply increments `late_responses`. STOP, close, parser failure, and disconnect
+wake blocked callers and cancel outstanding requests with typed exceptions.
+
+Both decoded queues use a **drop-oldest complete item** policy when full. The
+newest data therefore remains visible during consumer stalls. The
+`host_block_queue_drops` and `host_event_queue_drops` reader counters describe
+only those local Python queue evictions: they never include firmware sequence
+gaps, `GAP_BEFORE`/`OVERRUN_BEFORE` flags, or the firmware counters returned by
+GET_STATUS. `stale_blocks_discarded` separately records blocks rejected because
+their run ID is not the active START epoch.
 
 ## Executable offline demo
 

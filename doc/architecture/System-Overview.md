@@ -26,9 +26,12 @@ The intended runtime boundary is a versioned binary protocol carried over the
 Teensy 4.0 native USB CDC byte stream. The Python package exposes one
 synchronous `TeensyDAQ` facade over a minimal `ByteTransport` interface.
 `InMemoryTransport` and `SimulatedDevice` exercise that exact byte boundary,
-including partial reads and writes, so a later serial transport can be swapped
-in without changing INFO, CONFIGURE, START, GET_STATUS, STOP, RESET_STATS,
-optional PING, or block-streaming calls.
+including partial reads and writes. `SerialTransport` implements bounded
+PySerial I/O at the same boundary, while `BackgroundReader` owns incremental
+parsing, concurrent request-ID correlation, and bounded decoded block/event
+queues. Its host queue-drop counters remain distinct from firmware loss. These
+layers can be swapped without changing INFO, CONFIGURE, START, GET_STATUS,
+STOP, RESET_STATS, optional PING, or block-streaming calls.
 
 The simulator provides the runnable host-side acquisition model: bounded
 BOOT-to-IDLE startup; IDLE, CONFIGURED, and RUNNING transitions; monotonically
