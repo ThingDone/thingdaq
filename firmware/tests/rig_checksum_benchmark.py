@@ -1850,7 +1850,13 @@ def validate_running_status(
         or status.parser_errors
         or status.transport_errors
     ):
-        raise ProtocolFailure("running STATUS reports a drop/parser/transport error")
+        raise ProtocolFailure(
+            "running STATUS reports errors: "
+            f"adc_items_dropped={status.adc_items_dropped}, "
+            f"gpio_items_dropped={status.gpio_items_dropped}, "
+            f"parser_errors={status.parser_errors}, "
+            f"transport_errors={status.transport_errors}"
+        )
     adc_before, gpio_before = received_frames_before_request
     if status.adc_frames_emitted < adc_before:
         raise ProtocolFailure("firmware ADC counter trails received frames")
@@ -2418,6 +2424,18 @@ def run_campaign(
         }
     finally:
         if not completed:
+            emit_event(
+                "campaign_failure_diagnostics",
+                crc32c_full_data_checks=link.parser.full_crc32c_data_checks,
+                crc32c_synthetic_combined_checks=(
+                    link.parser.synthetic_crc32c_combined_checks
+                ),
+                maximum_serial_read_bytes=link.maximum_read_bytes,
+                parser_buffered_bytes=len(link.parser.buffer),
+                parser_errors=link.parser.errors,
+                parser_frames_decoded=link.parser.frames_decoded,
+                reader_queue=link.reader_queue_metrics(),
+            )
             try:
                 cleanup, cleanup_latency = link.exchange(
                     STOP_REQUEST,
