@@ -30,9 +30,10 @@ import serial
 BAUD_RATE = 115_200
 SERIAL_READ_TIMEOUT_SECONDS = 0.02
 SERIAL_WRITE_TIMEOUT_SECONDS = 0.5
-SERIAL_READ_BYTES = 64 * 1024
-SERIAL_READER_QUEUE_CHUNKS = 8
+SERIAL_READ_BYTES = 16 * 1024
+SERIAL_READER_QUEUE_CHUNKS = 32
 SERIAL_READER_QUEUE_BYTES = SERIAL_READ_BYTES * SERIAL_READER_QUEUE_CHUNKS
+SERIAL_READER_SWITCH_INTERVAL_SECONDS = 0.001
 FIRMWARE_PACKET_CAPACITY_FRAMES = 106
 STARTUP_DRAIN_SECONDS = 0.25
 SYNC_ATTEMPTS = 4
@@ -486,6 +487,10 @@ class BufferedSerialPort:
         self._queued_bytes = 0
         self._high_water_bytes = 0
         self._high_water_chunks = 0
+        self._maximum_read_call_seconds = 0.0
+        self._maximum_successful_read_gap_seconds = 0.0
+        self._last_successful_read_at: float | None = None
+        self._read_calls = 0
         self._error: Exception | None = None
         self._stopped = False
         self._condition = threading.Condition()
@@ -532,7 +537,7 @@ class BufferedSerialPort:
         if self._thread.is_alive():
             raise RuntimeError("bounded serial reader did not stop")
 
-    def reader_queue_metrics(self) -> dict[str, int | bool]:
+    def reader_queue_metrics(self) -> dict[str, int | float | bool]:
         with self._condition:
             return {
                 "enabled": True,
@@ -542,6 +547,11 @@ class BufferedSerialPort:
                 "final_chunks": len(self._chunks),
                 "high_water_bytes": self._high_water_bytes,
                 "high_water_chunks": self._high_water_chunks,
+                "maximum_read_call_seconds": self._maximum_read_call_seconds,
+                "maximum_successful_read_gap_seconds": (
+                    self._maximum_successful_read_gap_seconds
+                ),
+                "read_calls": self._read_calls,
             }
 
     def _reader_loop(self) -> None:
@@ -555,17 +565,36 @@ class BufferedSerialPort:
                 if self._stopped:
                     return
             try:
+                read_started = time.monotonic()
                 chunk = bytes(self._port.read(SERIAL_READ_BYTES))
+                read_finished = time.monotonic()
             except Exception as error:  # noqa: BLE001 - relay reader failures
                 with self._condition:
                     self._error = error
                     self._condition.notify_all()
                 return
             if not chunk:
+                with self._condition:
+                    self._read_calls += 1
+                    self._maximum_read_call_seconds = max(
+                        self._maximum_read_call_seconds,
+                        read_finished - read_started,
+                    )
                 continue
             with self._condition:
                 if self._stopped:
                     return
+                self._read_calls += 1
+                self._maximum_read_call_seconds = max(
+                    self._maximum_read_call_seconds,
+                    read_finished - read_started,
+                )
+                if self._last_successful_read_at is not None:
+                    self._maximum_successful_read_gap_seconds = max(
+                        self._maximum_successful_read_gap_seconds,
+                        read_finished - self._last_successful_read_at,
+                    )
+                self._last_successful_read_at = read_finished
                 self._chunks.append(chunk)
                 self._queued_bytes += len(chunk)
                 self._high_water_bytes = max(
@@ -975,7 +1004,7 @@ class SerialLink:
         self.discarded_data_frames = 0
         self.maximum_read_bytes = 0
 
-    def reader_queue_metrics(self) -> dict[str, int | bool]:
+    def reader_queue_metrics(self) -> dict[str, int | float | bool]:
         if isinstance(self.port, BufferedSerialPort):
             return self.port.reader_queue_metrics()
         return {
@@ -986,6 +1015,9 @@ class SerialLink:
             "final_chunks": 0,
             "high_water_bytes": 0,
             "high_water_chunks": 0,
+            "maximum_read_call_seconds": 0.0,
+            "maximum_successful_read_gap_seconds": 0.0,
+            "read_calls": 0,
         }
 
     def drain_startup(self, duration: float) -> None:
@@ -2796,7 +2828,10 @@ def main() -> int:
         protocol=PROTOCOL_VERSION,
         status_interval_seconds=status_interval_seconds,
         cyclic_gc_disabled_during_campaign=True,
+        serial_reader_chunk_bytes=SERIAL_READ_BYTES,
+        serial_reader_queue_chunks=SERIAL_READER_QUEUE_CHUNKS,
         serial_reader_queue_bytes=SERIAL_READER_QUEUE_BYTES,
+        serial_reader_switch_interval_seconds=(SERIAL_READER_SWITCH_INTERVAL_SECONDS),
     )
     try:
         port = serial.Serial(
@@ -2809,6 +2844,8 @@ def main() -> int:
         emit_event("open_failed", error=f"{type(error).__name__}: {error}")
         return 2
 
+    previous_switch_interval = sys.getswitchinterval()
+    sys.setswitchinterval(SERIAL_READER_SWITCH_INTERVAL_SECONDS)
     buffered_port = BufferedSerialPort(port)
     cyclic_gc_was_enabled = gc.isenabled()
     if cyclic_gc_was_enabled:
@@ -2832,8 +2869,11 @@ def main() -> int:
     finally:
         if cyclic_gc_was_enabled:
             gc.enable()
-        buffered_port.close()
-        port.close()
+        try:
+            buffered_port.close()
+        finally:
+            port.close()
+            sys.setswitchinterval(previous_switch_interval)
     print("SUMMARY " + json.dumps(summary, sort_keys=True, separators=(",", ":")))
     return 0 if summary["result"] == "PASS" else 1
 

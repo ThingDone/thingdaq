@@ -505,6 +505,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
     def test_full_campaign_benchmarks_and_streams_all_candidates(self) -> None:
         fake = PacedRigSerial()
         output = io.StringIO()
+        original_switch_interval = sys.getswitchinterval()
         environment = {
             "SERIAL_PORT": "fake-rig-port",
             "CHECKSUM_CAPTURE_SECONDS": "0.12",
@@ -555,12 +556,13 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         self.assertIn('"crc32c_synthetic_combined_checks":', report)
         self.assertIn(
             '"host_serial_reader":{"capacity_bytes":524288,'
-            '"capacity_chunks":8,"enabled":true',
+            '"capacity_chunks":32,"enabled":true',
             report,
         )
         self.assertFalse(fake.is_open)
         self.assertIn(0, fake.write_counts)
-        self.assertLessEqual(max(fake.read_counts), max(fake.read_pattern))
+        self.assertLessEqual(max(fake.read_counts), rig.SERIAL_READ_BYTES)
+        self.assertEqual(original_switch_interval, sys.getswitchinterval())
         self.assertEqual(constants.DeviceState.IDLE, fake.device.state)
 
     def test_selected_campaign_benchmarks_and_streams_only_one_candidate(self) -> None:
