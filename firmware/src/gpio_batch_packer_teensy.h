@@ -8,5 +8,6 @@ namespace teensy_daq::gpio_packer {
 // storage is CPU-owned and remains cached;
 // it is separated from both DMA raw buffers and packet/USB ownership.
 PackedBufferStorage &teensyPackedBufferStorage();
+CycleCounter &teensyCycleCounter();
 
 }  // namespace teensy_daq::gpio_packer

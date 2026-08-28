@@ -285,7 +285,9 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
                 0,
                 2,
             )
-            + bytes(116),
+            + bytes(78)
+            + struct.pack("<H", 1234)
+            + bytes(36),
             run_id=7,
             request_id=4,
         ),

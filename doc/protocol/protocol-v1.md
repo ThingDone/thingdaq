@@ -457,7 +457,7 @@ they remain responsive during GPIO-only streaming.
 | 128 | 2 / `u16` | packet-ready depth |
 | 130 | 2 / `u16` | packet-transmit depth |
 | 132 | 2 / `u16` | packet-owned high-water count |
-| 134 | 2 / `u16` | reserved, zero |
+| 134 | 2 / `u16` | cumulative GPIO pack/copy/checksum/framing CPU utilization in basis points (0-10,000) |
 | 136 | 4 / `u32` | GPIO hardware error flags/count |
 | 140 | 4 / `u32` | raw-capture invariant errors |
 | 144 | 4 / `u32` | packer source errors |
@@ -479,6 +479,7 @@ they remain responsive during GPIO-only streaming.
 | `gpio_samples_captured` through `gpio_samples_transmitted` | `u64` | Monotonic sample accounting across DMA, packing, framing, and transmission stages |
 | GPIO loss/overrun counters | `u64` | Stage-specific samples or major-loop capacity lost before transmission |
 | GPIO queue depth/high-water fields | `u16` | Current bounded backlog and maximum ownership observed in this statistics generation |
+| `gpio_processing_cpu_basis_points` | `u16` | Cumulative DWT active/elapsed ratio for the cooperative GPIO pack/copy/checksum/framing service; 100 basis points = 1% of one 600 MHz core |
 | GPIO error/resource/lifecycle counters | `u32` | Hardware flags, invariant failures, resource conflicts, failed START/STOP operations, and rejected stale completions |
 
 These are firmware counters only. They saturate at their type maximum and

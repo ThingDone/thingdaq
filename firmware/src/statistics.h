@@ -69,6 +69,7 @@ struct GpioPackerProgress {
   std::uint64_t packer_drop_samples_projected = 0U;
   std::size_t ready_depth = 0U;
   std::size_t ready_high_water = 0U;
+  std::uint16_t processing_cpu_basis_points = 0U;
   std::uint32_t source_errors = 0U;
   std::uint32_t pipeline_errors = 0U;
   std::uint32_t chronology_errors = 0U;

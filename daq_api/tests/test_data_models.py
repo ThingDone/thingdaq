@@ -78,6 +78,7 @@ class TypedControlModelTests(unittest.TestCase):
         self.assertEqual(1, status_response.value.adc_frames_emitted)
         self.assertEqual(1, status_response.value.gpio_frames_emitted)
         self.assertEqual(0, status_response.value.adc_items_dropped)
+        self.assertEqual(1234, status_response.value.gpio_processing_cpu_basis_points)
 
     def test_typed_payload_models_round_trip_the_golden_payloads(self) -> None:
         info_frame = decode_frame(

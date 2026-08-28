@@ -1019,12 +1019,14 @@ def _validate_status_payload(payload: bytes) -> None:
     ):
         raise FrameValidationError("STATUS stats generation must be nonzero")
     if (
-        struct.unpack_from("<H", payload, constants.STATUS_RESPONSE_RESERVED_1_OFFSET)[
-            0
-        ]
-        != 0
+        struct.unpack_from(
+            "<H",
+            payload,
+            constants.STATUS_RESPONSE_GPIO_PROCESSING_CPU_BASIS_POINTS_OFFSET,
+        )[0]
+        > 10_000
     ):
-        raise FrameValidationError("STATUS GPIO reserved field must be zero")
+        raise FrameValidationError("STATUS GPIO processing CPU exceeds 100%")
     depth_limits = {
         constants.STATUS_RESPONSE_GPIO_RAW_READY_DEPTH_OFFSET: (
             constants.GPIO_RAW_RING_DEPTH

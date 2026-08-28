@@ -1782,6 +1782,7 @@ class Status:
     packet_ready_depth: int = 0
     packet_transmit_depth: int = 0
     packet_owned_high_water: int = 0
+    gpio_processing_cpu_basis_points: int = 0
     gpio_hardware_errors: int = 0
     gpio_raw_invariant_errors: int = 0
     gpio_packer_source_errors: int = 0
@@ -1883,6 +1884,13 @@ class Status:
             _unsigned(name, getattr(self, name), 16)
             if getattr(self, name) > maximum:
                 raise ValueError(f"{name} exceeds its advertised ring capacity")
+        _unsigned(
+            "gpio_processing_cpu_basis_points",
+            self.gpio_processing_cpu_basis_points,
+            16,
+        )
+        if self.gpio_processing_cpu_basis_points > 10_000:
+            raise ValueError("GPIO processing CPU percentage exceeds 100%")
         _unsigned("stats_generation", self.stats_generation, 32)
         if self.stats_generation == 0:
             raise ValueError("stats_generation must be nonzero")
@@ -1907,6 +1915,7 @@ class Status:
             gpio_packer_samples_dropped=self.gpio_packer_samples_dropped,
             gpio_raw_ring_overruns=self.gpio_raw_ring_overruns,
             gpio_dma_major_loops=self.gpio_dma_major_loops,
+            gpio_processing_cpu_basis_points=(self.gpio_processing_cpu_basis_points),
             gpio_hardware_errors=self.gpio_hardware_errors,
             gpio_raw_invariant_errors=self.gpio_raw_invariant_errors,
             gpio_packer_source_errors=self.gpio_packer_source_errors,
@@ -1983,6 +1992,12 @@ class Status:
             self.packet_ready_depth,
             self.packet_transmit_depth,
             self.packet_owned_high_water,
+        )
+        struct.pack_into(
+            "<H",
+            payload,
+            constants.STATUS_RESPONSE_GPIO_PROCESSING_CPU_BASIS_POINTS_OFFSET,
+            self.gpio_processing_cpu_basis_points,
         )
         struct.pack_into(
             "<IIIIIIIII",
@@ -2068,6 +2083,11 @@ class Status:
             packet_ready_depth=depths[4],
             packet_transmit_depth=depths[5],
             packet_owned_high_water=depths[6],
+            gpio_processing_cpu_basis_points=struct.unpack_from(
+                "<H",
+                payload_bytes,
+                constants.STATUS_RESPONSE_GPIO_PROCESSING_CPU_BASIS_POINTS_OFFSET,
+            )[0],
             gpio_hardware_errors=errors[0],
             gpio_raw_invariant_errors=errors[1],
             gpio_packer_source_errors=errors[2],
@@ -2099,6 +2119,7 @@ class FirmwareCounters:
     gpio_packer_samples_dropped: int = 0
     gpio_raw_ring_overruns: int = 0
     gpio_dma_major_loops: int = 0
+    gpio_processing_cpu_basis_points: int = 0
     gpio_hardware_errors: int = 0
     gpio_raw_invariant_errors: int = 0
     gpio_packer_source_errors: int = 0
@@ -2139,6 +2160,13 @@ class FirmwareCounters:
             "gpio_stale_dma_completions",
         ):
             _unsigned(name, getattr(self, name), 32)
+        _unsigned(
+            "gpio_processing_cpu_basis_points",
+            self.gpio_processing_cpu_basis_points,
+            16,
+        )
+        if self.gpio_processing_cpu_basis_points > 10_000:
+            raise ValueError("GPIO processing CPU percentage exceeds 100%")
         _unsigned("stats_generation", self.stats_generation, 32)
         if self.stats_generation == 0:
             raise ValueError("stats_generation must be nonzero")

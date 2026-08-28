@@ -108,6 +108,26 @@ class FakeRawSource final : public capture::RawWordSource {
   bool outstanding_ = false;
 };
 
+class FakeCycleCounter final : public packer::CycleCounter {
+ public:
+  bool begin() override {
+    began = true;
+    return true;
+  }
+
+  std::uint32_t read() override {
+    if (next >= values.size()) {
+      return values.back();
+    }
+    return values[next++];
+  }
+
+  std::array<std::uint32_t, 3U> values{
+      0xFFFFFFF0U, 0x00000010U, 0x00000030U};
+  std::size_t next = 0U;
+  bool began = false;
+};
+
 struct PipelineFixture {
   packet::OwnedPacketBufferStorage packet_storage{};
   packet::PacketBufferPipeline pipeline{packet_storage};
@@ -439,6 +459,31 @@ void testRawWordDiagnosticIsExplicitAndBounded() {
          "bounded diagnostic releases the complete underlying DMA lease");
 }
 
+void testTargetProcessingProfileHandlesCounterWrap() {
+  FakeRawSource source{};
+  FakeCycleCounter counter{};
+  PipelineFixture fixture{};
+  expect(fixture.pipeline.startRun(81U) == packet::OperationStatus::kOk,
+         "start packet epoch for processing profile");
+  packer::GpioBatchPacker gpio{source, fixture.packed_storage, &counter};
+  expect(gpio.startRun(81U, constants::kDefaultChecksumAlgorithm,
+                       fixture.pipeline) == packer::OperationStatus::kOk &&
+             counter.began,
+         "start DWT processing profile with the GPIO epoch");
+  const packer::ServiceReport report = gpio.service(fixture.pipeline, 1U, 1U);
+  const packer::Snapshot snapshot = gpio.snapshot(fixture.pipeline);
+  expect(report.waiting_for_raw_buffer && !report.source_error &&
+             !report.pipeline_error,
+         "profiled empty service retains normal bounded behavior");
+  expect(snapshot.processing_elapsed_cycles == 64U &&
+             snapshot.processing_active_cycles == 32U &&
+             snapshot.processing_cpu_basis_points == 5000U &&
+             snapshot.progress.processing_cpu_basis_points == 5000U,
+         "processing profile computes a wrap-safe 50 percent DWT ratio");
+  gpio.stopProduction();
+  fixture.pipeline.stopProduction();
+}
+
 }  // namespace
 
 int main() {
@@ -448,6 +493,7 @@ int main() {
   testPackedRingPressureStaysBoundedAndVisible();
   testStopDrainsReadyFrameAndDiscardsOnlyPartialTail();
   testRawWordDiagnosticIsExplicitAndBounded();
+  testTargetProcessingProfileHandlesCounterWrap();
   if (failures != 0) {
     std::cerr << failures << " GPIO batch packer assertion(s) failed\n";
     return 1;

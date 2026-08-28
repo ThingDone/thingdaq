@@ -394,6 +394,7 @@ void testGoldenEncode(const std::string &fixture_directory,
   status.adc_frames_emitted = 1U;
   status.gpio_frames_emitted = 1U;
   status.stats_generation = 2U;
+  status.gpio_processing_cpu_basis_points = 1234U;
   expect(wire::encodeStatusResponse(
              request(constants::CommandKind::kGetStatus, 4U), 7U, status,
              response)

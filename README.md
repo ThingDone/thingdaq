@@ -163,7 +163,8 @@ arms buffers/DMA before enabling PIT; STOP disables the trigger and DMA route
 in reverse order, then drains complete old-run work before another START.
 INFO and STATUS expose pin order, rate/period, packed width, ring/resource
 capacities, stage counts, queue depths, resource conflicts, lifecycle errors,
-and rejected stale DMA completions.
+rejected stale DMA completions, and a cumulative DWT active/elapsed percentage
+for the GPIO pack/copy/checksum/framing service.
 
 The registered Port 15 fixture documentation does not establish that D6-D13
 are unconnected or safe to drive and declares no machine-readable loopback or
@@ -418,7 +419,8 @@ stimulus was not exercised`.
 The physical capture defaults to 10 seconds and interleaves STATUS requests
 while independently checking every GPIO frame checksum, run ID, sequence,
 timestamp, flags, item count, and fixed 4,096-byte shape. It requires 4 MHz
-sample/payload throughput within 1%, responsive STATUS, zero firmware DMA/
+sample/payload throughput within 1%, responsive STATUS, no more than 50% of
+one 600 MHz core in the measured GPIO processing service, zero firmware DMA/
 cache/packer/frame/transport losses or errors, bounded host parser/RSS state,
 empty queues after STOP, and exact final firmware-to-wire reconciliation.
 Use `GPIO_CAPTURE_SECONDS=60` for the soak. Optional controls are

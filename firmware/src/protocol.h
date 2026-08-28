@@ -303,6 +303,7 @@ struct StatusResponse {
   std::uint16_t packet_ready_depth = 0U;
   std::uint16_t packet_transmit_depth = 0U;
   std::uint16_t packet_owned_high_water = 0U;
+  std::uint16_t gpio_processing_cpu_basis_points = 0U;
   std::uint32_t gpio_hardware_errors = 0U;
   std::uint32_t gpio_raw_invariant_errors = 0U;
   std::uint32_t gpio_packer_source_errors = 0U;

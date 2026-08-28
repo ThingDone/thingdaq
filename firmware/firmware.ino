@@ -23,7 +23,8 @@ DMAMEM teensy_daq::packet::PacketBufferReserveStorage packet_storage_reserve{};
 teensy_daq::packet::PacketBufferStorage packet_storage{packet_storage_primary, packet_storage_reserve};
 teensy_daq::gpio_packer::GpioBatchPacker gpio_packer{
     teensy_daq::gpio_capture::teensyRawCapture(),
-    teensy_daq::gpio_packer::teensyPackedBufferStorage()};
+    teensy_daq::gpio_packer::teensyPackedBufferStorage(),
+    &teensy_daq::gpio_packer::teensyCycleCounter()};
 teensy_daq::clock::TeensyTickClock tick_clock{};
 teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream,
                                                        packet_storage,

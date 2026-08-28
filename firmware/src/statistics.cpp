@@ -203,6 +203,8 @@ protocol::StatusResponse Statistics::wireStatus(
       narrowDepth(counters_.packet_queue.transmit_depth);
   response.packet_owned_high_water =
       narrowDepth(counters_.packet_queue.owned_high_water);
+  response.gpio_processing_cpu_basis_points =
+      counters_.gpio_packer.processing_cpu_basis_points;
   response.gpio_hardware_errors =
       counters_.gpio_raw_capture.hardware_errors;
   response.gpio_raw_invariant_errors =

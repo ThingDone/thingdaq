@@ -98,6 +98,8 @@ OperationStatus GpioBatchPacker::startRun(
   raw_buffers_acquired_ = 0U;
   raw_buffers_released_ = 0U;
   duplicate_samples_ignored_ = 0U;
+  processing_elapsed_cycles_ = 0U;
+  processing_active_cycles_ = 0U;
   current_raw_drop_samples_ = 0U;
   current_packer_drop_samples_ = 0U;
   current_frame_samples_ = 0U;
@@ -112,6 +114,11 @@ OperationStatus GpioBatchPacker::startRun(
   current_frame_invalid_ = false;
   input_gap_pending_ = false;
   packet_gap_pending_ = false;
+  processing_profile_active_ =
+      cycle_counter_ != nullptr && cycle_counter_->begin();
+  if (processing_profile_active_) {
+    profile_last_cycle_ = cycle_counter_->read();
+  }
   running_ = true;
   return OperationStatus::kOk;
 }
@@ -136,11 +143,13 @@ StopReport GpioBatchPacker::stopProduction() {
 ServiceReport GpioBatchPacker::service(
     packet::PacketBufferPipeline &pipeline, std::size_t raw_buffer_limit,
     std::size_t frame_limit) {
+  const std::uint32_t profile_started_at = beginProfile();
   ServiceReport report{};
   saturatingIncrement(service_calls_);
   if (!pipelineMatches(pipeline)) {
     saturatingIncrement(pipeline_errors_);
     report.pipeline_error = true;
+    finishProfile(profile_started_at);
     return report;
   }
 
@@ -203,6 +212,7 @@ ServiceReport GpioBatchPacker::service(
     saturatingIncrement(pipeline_errors_);
     report.pipeline_error = true;
   }
+  finishProfile(profile_started_at);
   return report;
 }
 
@@ -226,6 +236,9 @@ Snapshot GpioBatchPacker::snapshot(
   result.raw_buffers_acquired = raw_buffers_acquired_;
   result.raw_buffers_released = raw_buffers_released_;
   result.duplicate_samples_ignored = duplicate_samples_ignored_;
+  result.processing_elapsed_cycles = processing_elapsed_cycles_;
+  result.processing_active_cycles = processing_active_cycles_;
+  result.processing_cpu_basis_points = processingCpuBasisPoints();
   result.source_errors = source_errors_;
   result.pipeline_errors = pipeline_errors_;
   result.chronology_errors = chronology_errors_;
@@ -247,6 +260,54 @@ bool GpioBatchPacker::quiescent() const {
 
 TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.ready")
 bool GpioBatchPacker::readyForStart() const { return quiescent(); }
+
+std::uint32_t GpioBatchPacker::beginProfile() {
+  if (!processing_profile_active_) {
+    return 0U;
+  }
+  const std::uint32_t started_at = cycle_counter_->read();
+  saturatingAdd(
+      processing_elapsed_cycles_,
+      static_cast<std::uint64_t>(started_at - profile_last_cycle_));
+  profile_last_cycle_ = started_at;
+  return started_at;
+}
+
+void GpioBatchPacker::finishProfile(std::uint32_t started_at) {
+  if (!processing_profile_active_) {
+    return;
+  }
+  const std::uint32_t finished_at = cycle_counter_->read();
+  const std::uint64_t active =
+      static_cast<std::uint64_t>(finished_at - started_at);
+  saturatingAdd(processing_active_cycles_, active);
+  saturatingAdd(processing_elapsed_cycles_, active);
+  profile_last_cycle_ = finished_at;
+}
+
+TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.profile")
+std::uint16_t GpioBatchPacker::processingCpuBasisPoints() const {
+  if (!processing_profile_active_ || processing_elapsed_cycles_ == 0U) {
+    return 0U;
+  }
+  if (processing_active_cycles_ >= processing_elapsed_cycles_) {
+    return kCpuBasisPointsFullScale;
+  }
+  constexpr std::uint64_t scale = kCpuBasisPointsFullScale;
+  std::uint64_t scaled = 0U;
+  if (processing_active_cycles_ <=
+      std::numeric_limits<std::uint64_t>::max() / scale) {
+    scaled = (processing_active_cycles_ * scale +
+              processing_elapsed_cycles_ / 2U) /
+             processing_elapsed_cycles_;
+  } else {
+    const std::uint64_t divisor =
+        processing_elapsed_cycles_ / scale + 1U;
+    scaled = processing_active_cycles_ / divisor;
+  }
+  return static_cast<std::uint16_t>(
+      scaled > scale ? scale : scaled);
+}
 
 bool GpioBatchPacker::pipelineMatches(
     const packet::PacketBufferPipeline &pipeline) const {
@@ -639,6 +700,7 @@ stats::GpioPackerProgress GpioBatchPacker::progress(
       unprojected_packer);
   result.ready_depth = ready_queue_.size();
   result.ready_high_water = ready_high_water_;
+  result.processing_cpu_basis_points = processingCpuBasisPoints();
   result.source_errors = source_errors_;
   result.pipeline_errors = pipeline_errors_;
   result.chronology_errors = chronology_errors_;

@@ -45,6 +45,7 @@ RATE_TOLERANCE_FRACTION = 0.01
 STATUS_P99_LIMIT_SECONDS = 0.100
 STATUS_MAXIMUM_LIMIT_SECONDS = 0.250
 MAX_RSS_GROWTH_BYTES = 32 * 1024 * 1024
+GPIO_PROCESSING_CPU_MAX_BASIS_POINTS = 5_000
 
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
@@ -409,6 +410,7 @@ class StatusSnapshot:
     packet_ready_depth: int
     packet_transmit_depth: int
     packet_owned_high_water: int
+    gpio_processing_cpu_basis_points: int
     gpio_hardware_errors: int
     gpio_raw_invariant_errors: int
     gpio_packer_source_errors: int
@@ -683,8 +685,10 @@ class FrameParser:
                     "configuration response reserved field is nonzero"
                 )
         elif frame.kind == GET_STATUS_RESPONSE:
-            if payload[1] or any(payload[134:136]):
-                raise ProtocolFailure("STATUS reserved fields are nonzero")
+            if payload[1]:
+                raise ProtocolFailure("STATUS reserved field is nonzero")
+            if _u16(payload, 134) > 10_000:
+                raise ProtocolFailure("STATUS GPIO CPU measurement exceeds 100%")
         elif frame.kind == STOP_RESPONSE:
             if payload[1] or any(payload[5:]):
                 raise ProtocolFailure("STOP reserved fields are nonzero")
@@ -1000,6 +1004,7 @@ def decode_status(frame: Frame) -> StatusSnapshot:
         packet_ready_depth=_u16(payload, 128),
         packet_transmit_depth=_u16(payload, 130),
         packet_owned_high_water=_u16(payload, 132),
+        gpio_processing_cpu_basis_points=_u16(payload, 134),
         gpio_hardware_errors=_u32(payload, 136),
         gpio_raw_invariant_errors=_u32(payload, 140),
         gpio_packer_source_errors=_u32(payload, 144),
@@ -1896,6 +1901,8 @@ def validate_status_accounting(
         value = getattr(status, name)
         if value > limit:
             raise ProtocolFailure(f"STATUS {name}={value} exceeds capacity {limit}")
+    if status.gpio_processing_cpu_basis_points > 10_000:
+        raise ProtocolFailure("GPIO processing CPU measurement exceeds 100%")
     if status.gpio_raw_ready_depth > status.gpio_raw_ready_high_water:
         raise ProtocolFailure("raw ready depth exceeds its high-water mark")
     if status.gpio_packed_ready_depth > status.gpio_packed_ready_high_water:
@@ -2083,6 +2090,18 @@ def grade_final_metrics(
     }
     for name, value in final_depths.items():
         evidence.equal(f"final.{name}", 0, value)
+    evidence.check(
+        "cpu.gpio_processing_basis_points",
+        {
+            "minimum": 1,
+            "maximum": GPIO_PROCESSING_CPU_MAX_BASIS_POINTS,
+            "measured_scope": "pack/copy/checksum/framing service",
+        },
+        final_status.gpio_processing_cpu_basis_points,
+        1
+        <= final_status.gpio_processing_cpu_basis_points
+        <= GPIO_PROCESSING_CPU_MAX_BASIS_POINTS,
+    )
     try:
         validate_status_accounting(final_status, info)
     except ProtocolFailure as error:

@@ -199,6 +199,7 @@ class PhysicalGpioDevice(SimulatedDevice):
             gpio_raw_ready_high_water=1 if samples else 0,
             gpio_packed_ready_high_water=1 if samples else 0,
             packet_owned_high_water=1 if samples else 0,
+            gpio_processing_cpu_basis_points=500 if samples else 0,
         )
 
     def _next_gpio_frame(self, configuration: Configuration) -> bytes:

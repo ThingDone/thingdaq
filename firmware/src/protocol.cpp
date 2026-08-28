@@ -709,8 +709,11 @@ Result validateStatus(ByteView payload) {
     return badPayload();
   }
   std::uint16_t depth = 0U;
-  if (!loadU16(payload, protocol_v1::kStatusResponseReserved1Offset, depth) ||
-      depth != 0U ||
+  if (!loadU16(
+          payload,
+          protocol_v1::kStatusResponseGpioProcessingCpuBasisPointsOffset,
+          depth) ||
+      depth > 10000U ||
       !loadU16(payload, protocol_v1::kStatusResponseGpioRawReadyDepthOffset,
                depth) ||
       depth > protocol_v1::kGpioRawRingDepth ||
@@ -1948,6 +1951,8 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
   STORE_STATUS_U16(PacketReadyDepth, packet_ready_depth);
   STORE_STATUS_U16(PacketTransmitDepth, packet_transmit_depth);
   STORE_STATUS_U16(PacketOwnedHighWater, packet_owned_high_water);
+  STORE_STATUS_U16(GpioProcessingCpuBasisPoints,
+                   gpio_processing_cpu_basis_points);
   STORE_STATUS_U32(GpioHardwareErrors, gpio_hardware_errors);
   STORE_STATUS_U32(GpioRawInvariantErrors, gpio_raw_invariant_errors);
   STORE_STATUS_U32(GpioPackerSourceErrors, gpio_packer_source_errors);

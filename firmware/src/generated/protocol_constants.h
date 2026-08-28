@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 2662258599d7ac0686e646a006b0894a272e3809b705c3a6fbbef17b4e40279c
+// Source SHA-256: 622d444f6c333db1af94f2a83c51ae64c4921067178274d8ffea0a7f056f8b6d
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "2662258599d7ac0686e646a006b0894a272e3809b705c3a6fbbef17b4e40279c";
+inline constexpr char kSourceSha256[] = "622d444f6c333db1af94f2a83c51ae64c4921067178274d8ffea0a7f056f8b6d";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -389,7 +389,7 @@ inline constexpr std::size_t kStatusResponseGpioPackedReadyHighWaterOffset = 126
 inline constexpr std::size_t kStatusResponsePacketReadyDepthOffset = 128U;
 inline constexpr std::size_t kStatusResponsePacketTransmitDepthOffset = 130U;
 inline constexpr std::size_t kStatusResponsePacketOwnedHighWaterOffset = 132U;
-inline constexpr std::size_t kStatusResponseReserved1Offset = 134U;
+inline constexpr std::size_t kStatusResponseGpioProcessingCpuBasisPointsOffset = 134U;
 inline constexpr std::size_t kStatusResponseGpioHardwareErrorsOffset = 136U;
 inline constexpr std::size_t kStatusResponseGpioRawInvariantErrorsOffset = 140U;
 inline constexpr std::size_t kStatusResponseGpioPackerSourceErrorsOffset = 144U;

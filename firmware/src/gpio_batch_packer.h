@@ -14,6 +14,7 @@ namespace teensy_daq::gpio_packer {
 inline constexpr const char kBatchAlgorithmName[] =
     "shift-mask-unrolled-4";
 inline constexpr std::size_t kPackedWireBytesPerSample = 1U;
+inline constexpr std::uint16_t kCpuBasisPointsFullScale = 10000U;
 
 // Hot scalar primitive selected for the batch loop. The source identities are
 // compile-time bound to board::kGpioMappingsByPackedBit; unrelated GPIO2 bits
@@ -78,6 +79,16 @@ struct StopReport {
   std::uint64_t dropped_frames_to_publish = 0U;
 };
 
+// Optional target timing source. The ratio of cycles spent inside service()
+// to elapsed cycles is independent of the counter frequency, so the portable
+// packer needs only a wrapping 32-bit counter and an availability probe.
+class CycleCounter {
+ public:
+  virtual ~CycleCounter() = default;
+  virtual bool begin() = 0;
+  virtual std::uint32_t read() = 0;
+};
+
 struct Snapshot {
   stats::GpioPackerProgress progress{};
   std::array<BufferState, board::kGpioPackedRingDepth> buffer_states{};
@@ -94,6 +105,9 @@ struct Snapshot {
   std::uint64_t raw_buffers_acquired = 0U;
   std::uint64_t raw_buffers_released = 0U;
   std::uint64_t duplicate_samples_ignored = 0U;
+  std::uint64_t processing_elapsed_cycles = 0U;
+  std::uint64_t processing_active_cycles = 0U;
+  std::uint16_t processing_cpu_basis_points = 0U;
   std::uint32_t source_errors = 0U;
   std::uint32_t pipeline_errors = 0U;
   std::uint32_t chronology_errors = 0U;
@@ -109,8 +123,9 @@ struct Snapshot {
 class GpioBatchPacker final {
  public:
   GpioBatchPacker(gpio_capture::RawWordSource &source,
-                  PackedBufferStorage &storage)
-      : source_(source), storage_(storage) {}
+                  PackedBufferStorage &storage,
+                  CycleCounter *cycle_counter = nullptr)
+      : source_(source), storage_(storage), cycle_counter_(cycle_counter) {}
   GpioBatchPacker(const GpioBatchPacker &) = delete;
   GpioBatchPacker &operator=(const GpioBatchPacker &) = delete;
 
@@ -169,9 +184,13 @@ class GpioBatchPacker final {
   std::size_t countState(BufferState state) const;
   stats::GpioPackerProgress progress(
       const packet::PacketBufferPipeline &pipeline) const;
+  std::uint32_t beginProfile();
+  void finishProfile(std::uint32_t started_at);
+  std::uint16_t processingCpuBasisPoints() const;
 
   gpio_capture::RawWordSource &source_;
   PackedBufferStorage &storage_;
+  CycleCounter *cycle_counter_ = nullptr;
   std::array<BufferRecord, board::kGpioPackedRingDepth> records_{};
   ReadyQueue ready_queue_{};
   stats::GpioPackerProgress progress_{};
@@ -186,6 +205,8 @@ class GpioBatchPacker final {
   std::uint64_t raw_buffers_acquired_ = 0U;
   std::uint64_t raw_buffers_released_ = 0U;
   std::uint64_t duplicate_samples_ignored_ = 0U;
+  std::uint64_t processing_elapsed_cycles_ = 0U;
+  std::uint64_t processing_active_cycles_ = 0U;
   std::uint64_t current_raw_drop_samples_ = 0U;
   std::uint64_t current_packer_drop_samples_ = 0U;
   std::uint32_t run_id_ = 0U;
@@ -193,6 +214,7 @@ class GpioBatchPacker final {
   std::uint32_t source_errors_ = 0U;
   std::uint32_t pipeline_errors_ = 0U;
   std::uint32_t chronology_errors_ = 0U;
+  std::uint32_t profile_last_cycle_ = 0U;
   std::size_t next_free_search_ = 0U;
   std::size_t ready_high_water_ = 0U;
   std::uint8_t filling_buffer_ = kInvalidBuffer;
@@ -201,10 +223,12 @@ class GpioBatchPacker final {
   bool current_frame_invalid_ = false;
   bool input_gap_pending_ = false;
   bool packet_gap_pending_ = false;
+  bool processing_profile_active_ = false;
   bool running_ = false;
 };
 
 static_assert(kPackedWireBytesPerSample == 1U);
+static_assert(kCpuBasisPointsFullScale == 10000U);
 static_assert(sizeof(PackedBuffer) == board::kGpioPackedBufferStrideBytes);
 static_assert(alignof(PackedBuffer) == board::kCacheLineBytes);
 static_assert(sizeof(PackedBufferStorage) ==

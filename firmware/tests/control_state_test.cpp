@@ -822,6 +822,9 @@ void testStatisticsDetailAndSaturation() {
              snapshot.transport_errors == 3U,
          "state and USB transport diagnostics are retained");
 
+  stats::GpioPackerProgress processing{};
+  processing.processing_cpu_basis_points = 1234U;
+  statistics.publishGpioPacker(processing);
   const wire::StatusResponse status = statistics.wireStatus(
       constants::DeviceState::kRunning,
       control::kSyntheticConfiguration);
@@ -830,7 +833,8 @@ void testStatisticsDetailAndSaturation() {
              status.adc_frames_emitted == maximum64 &&
              status.gpio_frames_emitted == 7U &&
              status.parser_errors == 7U && status.transport_errors == 3U &&
-             status.stats_generation == 1U,
+             status.stats_generation == 1U &&
+             status.gpio_processing_cpu_basis_points == 1234U,
          "GET_STATUS projection uses the protocol-defined aggregates");
 
   wire::ParserCounters saturating_parser{};
