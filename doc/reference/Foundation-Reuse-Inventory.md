@@ -115,7 +115,7 @@ The exact installed Teensy 1.62.0 sources were then reread at
 | Pinned source | Finding used by Phase 04 |
 | --- | --- |
 | `usb_serial.c` | USB Serial owns four 2,048-byte TX buffers (`TX_NUM=4`, `TX_SIZE=2048`) and four transfer descriptors. The byte-copy destination is 32-byte-aligned `DMAMEM`; the core calls `arm_dcache_flush_delete()` immediately before `usb_transmit()`. |
-| `usb_serial.c` | `usb_serial_write_buffer_free()` deliberately excludes the current TX head and reports only idle non-head buffers. With the project TX visit capped at 2,048 bytes, a positive result is the core's conservative pattern for avoiding its 120 ms fallback wait; zero capacity returns to the cooperative loop. |
+| `usb_serial.c` | `usb_serial_write_buffer_free()` deliberately excludes the current TX head and reports only idle non-head buffers. The project rechecks this conservative signal before each of at most two 2,048-byte descriptor writes per TX visit, avoiding the core's 120 ms fallback wait; zero capacity returns to the cooperative loop. |
 | `usb_serial.c` | `usb_serial_write()` may still return zero or a prefix on disconnect/timeout. Therefore the application must retain its frame and byte offset and retry later; it must never infer atomic acceptance from the 4,096-byte application-frame size. |
 | `usb_serial.c` / `usb_desc.h` | High-speed CDC packets are 512 bytes, but the core coalesces them in 2,048-byte buffers and its 75 us one-shot flush handles short writes. Application framing remains independent of both sizes. |
 | `usb_serial.h` | `availableForWrite()` and the returned count from block `write()` are the only public capacity/progress signals; `flush()` is not a completion fence for host receipt. |
@@ -133,7 +133,8 @@ reached 53.293 ms. The fixed repair remains in DTCM and the exact build gate
 requires at least 32 KiB for locals/stack.
 
 The final scheduler therefore caps each request at one 2,048-byte core buffer
-and waits for at least 512 bytes of reported capacity (or an exact shorter
+and each cooperative visit at two such requests (4,096 bytes total), then
+waits for at least 512 bytes of reported capacity (or an exact shorter
 control frame/data tail) rather than intentionally issuing byte-at-a-time
 writes. Backend-returned prefixes and zero writes retain active-frame ownership.
 STOP drains complete work, and the control plane returns BUSY without mutation

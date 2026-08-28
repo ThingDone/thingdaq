@@ -97,7 +97,7 @@ being consumed and then losing its response to queue pressure. Parser
 rejection deltas are projected into the shared firmware statistics exactly
 once.
 
-Receive and transmit service calls process at most 1,024 and 2,048 bytes,
+Receive and transmit service calls process at most 1,024 and 4,096 bytes,
 respectively, and each performs at most eight core read or write calls. A zero
 read/write or unavailable endpoint returns control to the cooperative loop
 without spinning. Partial writes retain the frame and offset at the queue
@@ -138,14 +138,15 @@ transport owns any frame.
 The packet bytes live in aligned DTCM/RAM1, not `DMAMEM`. Inspection of the
 pinned Teensy 1.62 `usb_serial.c` confirms that its public block-write path
 copies application bytes into a core-owned four-by-2,048-byte aligned OCRAM
-ring and flushes that destination before USB DMA. The project's 2,048-byte TX
-visit bound matches one core buffer and uses its conservative
-`availableForWrite()` signal; a zero or prefix return retains the application
-frame and offset. The 106 project buffers cover 53.636 ms at the target framed
-rate, with another 1.012 ms in the core ring. The original 96-entry Phase 04
-pool was expanded after Phase 05 clean host receive intervals reached 53.293 ms
-and repeated campaign jobs exposed its loss boundary. The exact linker gate
-preserves at least 32 KiB of DTCM for locals/stack. See
+ring and flushes that destination before USB DMA. The project's 4,096-byte TX
+visit bound can fill at most two core buffers using separate 2,048-byte requests
+and the core's conservative `availableForWrite()` signal; a zero or prefix
+return retains the application frame and offset. The 106 project buffers cover
+53.636 ms at the target framed rate, with another 1.012 ms in the core ring. The
+original 96-entry Phase 04 pool was expanded after Phase 05 clean host receive
+intervals reached 53.293 ms and repeated campaign jobs exposed its loss
+boundary. The exact linker gate preserves at least 32 KiB of DTCM for
+locals/stack. See
 [[Foundation-Reuse-Inventory]] and [[Firmware-Resource-Map]] for the pinned
 source audit and compile-time budget.
 
@@ -170,7 +171,7 @@ Every `loop()` calls one portable runtime service step in this fixed order:
    the corresponding resources accept it;
 4. poll one 8 MHz clock value and generate at most four due synthetic frames;
 5. promote at most four complete ready frames into transport ownership; and
-6. transmit at most 2,048 bytes and eight core write calls, requesting at most
+6. transmit at most 4,096 bytes and eight core write calls, requesting at most
    one 2,048-byte core buffer per call and avoiding intentional sub-512-byte
    data chunks except exact frame tails.
 
