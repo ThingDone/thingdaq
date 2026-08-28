@@ -105,6 +105,8 @@ class GpioRawCaptureTests(unittest.TestCase):
             "gpio_dma_route::clearEdmaChannelState()",
             "gpio_dma_route::enableEdmaRequest()",
             "gpio_dma_route::disableEdmaRequest()",
+            "tcd.CSR | DMA_TCD_CSR_DREQ",
+            "waitForCompleteStopBoundary()",
             "onMajorLoopComplete",
             "selectStandardGpioInputs(IOMUXC_GPR_GPR27, GPIO2_GDIR)",
             "arm_dcache_flush_delete(&g_gpio_raw_dma_descriptors",
@@ -114,7 +116,6 @@ class GpioRawCaptureTests(unittest.TestCase):
 
         for token in (
             "DMA_TCD_CSR_INTHALF",
-            "DMA_TCD_CSR_DREQ",
             "IntervalTimer",
             "DMAChannel",
             "digitalRead(",

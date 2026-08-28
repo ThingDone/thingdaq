@@ -495,9 +495,15 @@ returns to IDLE. Its eight-byte success payload is the common prefix followed
 by state `IDLE` and three reserved zero bytes. The response header retains the
 stopped/most recent run ID (or zero if no run has started).
 
-Physical GPIO STOP disables the PIT trigger first, then removes the eDMA
-request, DMAMUX route, and XBAR DMA output before canceling incomplete raw
-ownership. This is the deterministic reverse of START's arm order. Complete
+Physical GPIO STOP first adds `DREQ` to the active TCD and waits for at most
+10 ms for the next complete 4,048-sample major-loop boundary. A healthy
+boundary clears the channel request in hardware, after which STOP disables the
+PIT trigger, eDMA request, DMAMUX route, and XBAR DMA output before canceling
+incomplete raw ownership. This is the deterministic reverse of START's arm
+order and preserves the final complete raw buffer without manufacturing a
+normal shutdown drop. Timeout or unexpected partial progress falls back to the
+same immediate safe-input shutdown, accounts the exact partial loss, and
+increments the STOP error counter. Complete
 raw and packed buffers are drained with bounded work; already complete packet
 or transport-owned frames retain their frame boundary. CONFIGURE and START
 return `BUSY` until that finite drain is quiescent. STOP_RESPONSE retains
@@ -766,6 +772,12 @@ packing observation, declared stimulus, and electrical cleanup:
 | 132 | 6 / three `u16` | configured TCD CITER, BITER, and CSR |
 | 138 | 2 / two `u8` | configured eDMA priority and reserved zero |
 | 140 | 4 / `u32` | analysis sample limit, exactly 256 in non-driving mode |
+
+The configured-register snapshot is taken after the first complete raw buffer
+is observed while PIT/eDMA acquisition is still active. `BITER` is therefore
+the exact configured major-loop length, while `CITER` is a live remaining-count
+sample in the inclusive range zero through `BITER`; DMA progress means it need
+not still equal `BITER` when the snapshot is read.
 
 Diagnostic flag bits are `AVAILABLE` (1), `DECLARATION_VALID` (2),
 `OUTPUT_DRIVE_PERMITTED` (4), `EXTERNAL_STIMULUS_DECLARED` (8),

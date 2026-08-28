@@ -149,6 +149,24 @@ class PortableSourceBoundaryTests(unittest.TestCase):
         self.assertIn("TeensyCdcByteStream::read", usb_adapter)
         self.assertIn("TeensyCdcByteStream::write", usb_adapter)
 
+    def test_gpio_stop_requests_a_complete_dma_boundary_before_shutdown(self) -> None:
+        adapter = _source(FIRMWARE_SOURCE / "gpio_raw_capture_teensy.cpp")
+        boundary = adapter.index("bool waitForCompleteStopBoundary()")
+        dreq = adapter.index("DMA_TCD_CSR_DREQ", boundary)
+        wait = adapter.index("DMA_ERQ & gpio_dma_route::kEdmaChannelMask", dreq)
+        stop = adapter.index("StopReport stopHardware()", wait)
+        request = adapter.index("waitForCompleteStopBoundary()", stop)
+        disable = adapter.index("disableHardware();", request)
+        partial = adapter.index("activeSamples()", disable)
+
+        self.assertLess(boundary, dreq)
+        self.assertLess(dreq, wait)
+        self.assertLess(stop, request)
+        self.assertLess(request, disable)
+        self.assertLess(disable, partial)
+        self.assertIn("kStopBoundaryTimeoutCycles", adapter[boundary:stop])
+        self.assertIn("partial_samples != 0U", adapter[stop:])
+
     def test_host_dependency_output_excludes_teensy_core_and_adapters(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:

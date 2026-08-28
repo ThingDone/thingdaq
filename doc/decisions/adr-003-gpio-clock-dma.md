@@ -156,9 +156,13 @@ destination. A completed consumer buffer becomes `READY`; only a `FREE` buffer
 may become the later `DMA_QUEUED` destination. If none is free, the look-ahead
 link selects the DMA-only sink, so capture continues without overwriting a
 `READY`, `PACKING`, or `RELEASING` buffer. Every completed sink major loop is
-exactly 4,048 lost samples; a stopped partial sink loop is accounted from
-`BITER-CITER`. These cumulative overrun and lost-sample values feed the common
-statistics model and contribute to its GPIO-drop projection.
+exactly 4,048 lost samples. Normal STOP sets the active TCD's `DREQ` bit and
+waits at most 10 ms for its next complete major-loop boundary, so a healthy
+shutdown retains the last complete buffer and creates no partial-tail loss. A
+timed-out or otherwise abnormal stop still fails safe immediately, accounts a
+partial sink or consumer loop from `BITER-CITER`, and increments the STOP error
+counter. Cumulative pressure/abnormal-stop loss feeds the common statistics
+model and contributes to its GPIO-drop projection.
 
 Cache maintenance is part of ownership, not an incidental call in packing.
 All consumer buffers and the sink are deleted before DMA ownership, a completed

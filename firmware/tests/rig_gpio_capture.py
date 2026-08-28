@@ -1647,10 +1647,11 @@ def grade_capture_diagnostic(
         0,
         snapshot["dma_err_final"] & EDMA_CHANNEL_MASK,
     )
-    evidence.equal(
-        "mapping.tcd_initial_count",
-        snapshot["tcd_biter_configured"],
+    evidence.check(
+        "mapping.tcd_active_count",
+        {"minimum": 0, "maximum": snapshot["tcd_biter_configured"]},
         snapshot["tcd_citer_configured"],
+        0 <= snapshot["tcd_citer_configured"] <= snapshot["tcd_biter_configured"],
     )
     evidence.equal(
         "mapping.tcd_major_link_interrupt",
@@ -2102,6 +2103,27 @@ def grade_final_metrics(
         <= final_status.gpio_processing_cpu_basis_points
         <= GPIO_PROCESSING_CPU_MAX_BASIS_POINTS,
     )
+    queue_high_waters = {
+        "gpio_raw_ready_high_water": (
+            final_status.gpio_raw_ready_high_water,
+            info_integer(info, "gpio_raw_ring_depth"),
+        ),
+        "gpio_packed_ready_high_water": (
+            final_status.gpio_packed_ready_high_water,
+            info_integer(info, "gpio_packed_ring_depth"),
+        ),
+        "packet_owned_high_water": (
+            final_status.packet_owned_high_water,
+            info_integer(info, "gpio_packet_buffer_count"),
+        ),
+    }
+    for name, (value, capacity) in queue_high_waters.items():
+        evidence.check(
+            f"queue.{name}",
+            {"minimum": 0, "maximum": capacity},
+            value,
+            0 <= value <= capacity,
+        )
     try:
         validate_status_accounting(final_status, info)
     except ProtocolFailure as error:

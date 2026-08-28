@@ -53,6 +53,8 @@ constexpr std::uint32_t kProductionPitLoad =
     protocol_v1::kGpioClockPitHz /
         protocol_v1::kGpioClockProductionRateHz -
     1U;
+constexpr std::uint32_t kStopBoundaryTimeoutCycles =
+    protocol_v1::kGpioClockDwtHz / 100U;
 
 std::uint32_t readPrimask() {
   std::uint32_t value = 0U;
@@ -252,6 +254,23 @@ std::uint32_t activeSamples() {
   return static_cast<std::uint32_t>(biter - citer);
 }
 
+bool waitForCompleteStopBoundary() {
+  if (!g_hardware_running || g_faulted) {
+    return false;
+  }
+  ARM_DEMCR |= ARM_DEMCR_TRCENA;
+  ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
+  IMXRT_DMA_TCD_t &tcd = gpio_dma_route::edmaTcd();
+  tcd.CSR = static_cast<std::uint16_t>(tcd.CSR | DMA_TCD_CSR_DREQ);
+  gpio_dma_route::barrier();
+
+  const std::uint32_t started = ARM_DWT_CYCCNT;
+  while ((DMA_ERQ & gpio_dma_route::kEdmaChannelMask) != 0U &&
+         ARM_DWT_CYCCNT - started < kStopBoundaryTimeoutCycles) {
+  }
+  return (DMA_ERQ & gpio_dma_route::kEdmaChannelMask) == 0U;
+}
+
 TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
 StartStatus inspectHardwareStart() {
   if (g_hardware_running) {
@@ -312,6 +331,9 @@ StartStatus startHardware() {
 
 TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_stop")
 StopReport stopHardware() {
+  const bool boundary_stop_requested = g_hardware_running && !g_faulted;
+  const bool boundary_stop_completed =
+      boundary_stop_requested && waitForCompleteStopBoundary();
   const std::uint32_t primask = readPrimask();
   __disable_irq();
   disableHardware();
@@ -328,6 +350,10 @@ StopReport stopHardware() {
   }
   const std::uint32_t partial_samples =
       g_ring.snapshot().running ? activeSamples() : 0U;
+  if (boundary_stop_requested &&
+      (!boundary_stop_completed || partial_samples != 0U)) {
+    saturatingIncrement(g_stop_errors);
+  }
   DMA_CINT = board::kGpioEdmaChannel;
   DMA_CERR = board::kGpioEdmaChannel;
   DMA_CDNE = board::kGpioEdmaChannel;
@@ -424,6 +450,7 @@ static_assert(sizeof(g_gpio_raw_dma_overflow_sink) ==
 static_assert(protocol_v1::kGpioSamplesPerFrame <=
               std::numeric_limits<std::int16_t>::max());
 static_assert(kProductionPitLoad == 5U);
+static_assert(kStopBoundaryTimeoutCycles == 6000000U);
 static_assert(board::kGpioEdmaChannel == 2U);
 static_assert(board::kGpioEdmaPriority == 2U);
 

@@ -441,6 +441,21 @@ class RigScriptIndependenceTests(unittest.TestCase):
         self.assertFalse(exercised)
         self.assertEqual("NON_DRIVING_CAPTURE", mode)
 
+        in_flight_capture = dict(capture)
+        in_flight_capture["tcd_citer_configured"] -= 8
+        with redirect_stdout(io.StringIO()):
+            rig.grade_capture_diagnostic(rig.Evidence(), in_flight_capture, info)
+
+        invalid_citer_capture = dict(capture)
+        invalid_citer_capture["tcd_citer_configured"] = (
+            invalid_citer_capture["tcd_biter_configured"] + 1
+        )
+        with (
+            redirect_stdout(io.StringIO()),
+            self.assertRaisesRegex(rig.ProtocolFailure, "capture/mapping diagnostic"),
+        ):
+            rig.grade_capture_diagnostic(rig.Evidence(), invalid_citer_capture, info)
+
         bad_capture = dict(capture)
         bad_capture["diagnostic_flags"] |= rig.GPIO_DIAGNOSTIC_OUTPUT_DRIVE_EXERCISED
         with (
@@ -537,6 +552,9 @@ class RigScriptIndependenceTests(unittest.TestCase):
         self.assertIn('"event":"mapping_diagnostic_complete"', report)
         self.assertIn("external electrical stimulus was not exercised", report)
         self.assertIn('"event":"capture_complete"', report)
+        self.assertIn('"name":"queue.gpio_raw_ready_high_water","pass":true', report)
+        self.assertIn('"name":"queue.gpio_packed_ready_high_water","pass":true', report)
+        self.assertIn('"name":"queue.packet_owned_high_water","pass":true', report)
         self.assertIn('"result":"PASS"', report)
         self.assertFalse(fake.is_open)
         self.assertIn(0, fake.write_counts)
