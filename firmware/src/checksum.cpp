@@ -11,7 +11,7 @@ namespace detail {
   __attribute__((section(section_name), used))
 #define TEENSY_DAQ_CHECKSUM_CODE_STORAGE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
-#define TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE __attribute__((optimize("Os")))
+#define TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE __attribute__((optimize("O3")))
 #else
 #define TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(section_name)
 #define TEENSY_DAQ_CHECKSUM_CODE_STORAGE(section_name) \

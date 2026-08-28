@@ -124,7 +124,7 @@ class HardwareBenchmarkDevice(SimulatedDevice):
             12: selection.buffer_bytes,
             16: rig.BENCHMARK_CYCLE_COUNTER_HZ,
             20: overhead_cycles,
-            24: 120 if selection.checksum_algorithm == rig.CHECKSUM_ADLER32 else 260,
+            24: 120 if selection.checksum_algorithm == rig.CHECKSUM_ADLER32 else 308,
             28: (0 if selection.checksum_algorithm == rig.CHECKSUM_ADLER32 else 8_192),
             32: rig.BENCHMARK_WORKING_RAM_BYTES,
             36: rig.expected_benchmark_digest(
@@ -469,7 +469,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
             '"firmware_internal_depth_available_in_protocol_v1":false', report
         )
         self.assertIn('"total_reported_flash_bytes":120', report)
-        self.assertIn('"total_reported_flash_bytes":8452', report)
+        self.assertIn('"total_reported_flash_bytes":8500', report)
         self.assertIn('"result":"PASS"', report)
         self.assertEqual(
             [

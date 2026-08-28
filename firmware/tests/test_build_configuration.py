@@ -101,11 +101,11 @@ class BuildConfigurationTests(unittest.TestCase):
         symbols = (
             "00000304 00000078 T "
             "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)\n"
-            "0000037c 00000104 T "
+            "0000037c 00000134 T "
             "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)\n"
-            "00000480 00000104 T "
+            "000004b0 00000134 T "
             "teensy_daq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)\n"
-            "00000584 00000054 T "
+            "000005e4 00000054 T "
             "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, "
             "unsigned char const*, unsigned int, unsigned long&)\n"
             "60002000 00002000 u "
@@ -116,7 +116,7 @@ class BuildConfigurationTests(unittest.TestCase):
         resources = build_firmware.checksum_resource_usage(symbols)
 
         self.assertEqual(16_384, resources["total_table_flash_bytes"])
-        self.assertEqual(640, resources["total_implementation_code_bytes"])
+        self.assertEqual(736, resources["total_implementation_code_bytes"])
         self.assertEqual(0, resources["total_table_ram_bytes"])
         self.assertEqual(
             8_192,

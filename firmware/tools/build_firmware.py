@@ -59,8 +59,8 @@ CHECKSUM_CODE_SYMBOLS = {
 }
 CHECKSUM_CODE_BYTES = {
     "ADLER32": 120,
-    "CRC32C": 260,
-    "CRC32_ISO_HDLC": 260,
+    "CRC32C": 308,
+    "CRC32_ISO_HDLC": 308,
 }
 CHECKSUM_DISPATCH_SYMBOL = (
     "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, "

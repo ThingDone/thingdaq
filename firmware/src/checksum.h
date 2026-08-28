@@ -31,8 +31,8 @@ inline constexpr std::size_t kCrcTableBytes =
 // They deliberately exclude the shared narrow dispatch body and the separately
 // reported lookup table so a benchmark result never conflates code and data.
 inline constexpr std::size_t kAdler32CodeBytes = 120U;
-inline constexpr std::size_t kCrc32cCodeBytes = 260U;
-inline constexpr std::size_t kCrc32IsoHdlcCodeBytes = 260U;
+inline constexpr std::size_t kCrc32cCodeBytes = 308U;
+inline constexpr std::size_t kCrc32IsoHdlcCodeBytes = 308U;
 
 // Callers must pass a non-null pointer for nonempty input. A null pointer is
 // valid for the canonical empty input.
