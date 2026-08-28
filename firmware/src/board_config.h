@@ -23,6 +23,7 @@ enum class ResourceOwner : std::uint8_t {
   kGpioPacker,
   kPacketizer,
   kUsbTransport,
+  kChecksumBenchmark,
 };
 
 enum class MemoryRegion : std::uint8_t {
@@ -40,6 +41,8 @@ enum class MemoryUse : std::uint8_t {
   kAdcDmaRing,
   kGpioRawDmaRing,
   kGpioPackedRing,
+  kChecksumBenchmarkDtcmBuffer,
+  kChecksumBenchmarkOcramBuffer,
 };
 
 struct PinAllocation {
@@ -171,6 +174,8 @@ inline constexpr std::size_t kPacketTransmitQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
 inline constexpr std::size_t kSyntheticFramesPerLoop = 4U;
 inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 4096U;
+inline constexpr std::size_t kChecksumBenchmarkBufferBytes =
+    protocol_v1::kDataFrameBytes;
 // Pinned Teensy 1.62 cores/teensy4/usb_serial.c constants. The core owns this
 // aligned DMAMEM ring; it is documented here but is not project allocation.
 inline constexpr std::size_t kPinnedUsbCdcTxBufferCount = 4U;
@@ -219,6 +224,9 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kPacketPipelineState, MemoryRegion::kDtcmRam1,
      kPacketPipelineStateBudgetBytes, kCacheLineBytes,
      ResourceOwner::kPacketizer},
+    {MemoryUse::kChecksumBenchmarkDtcmBuffer, MemoryRegion::kDtcmRam1,
+     kChecksumBenchmarkBufferBytes, kCacheLineBytes,
+     ResourceOwner::kChecksumBenchmark},
     {MemoryUse::kAdcDmaRing, MemoryRegion::kOcramRam2Dma,
      kAdcDmaRingDepth * kAdcDmaBufferStrideBytes, kCacheLineBytes,
      ResourceOwner::kAdcCapture},
@@ -228,6 +236,9 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kGpioPackedRing, MemoryRegion::kOcramRam2Dma,
      kGpioPackedRingDepth * kGpioPackedBufferStrideBytes, kCacheLineBytes,
      ResourceOwner::kGpioPacker},
+    {MemoryUse::kChecksumBenchmarkOcramBuffer,
+     MemoryRegion::kOcramRam2Dma, kChecksumBenchmarkBufferBytes,
+     kCacheLineBytes, ResourceOwner::kChecksumBenchmark},
 };
 
 template <typename T, std::size_t N>
@@ -402,6 +413,8 @@ static_assert(kUsbTxBudgetBytesPerLoop <= kPinnedUsbCdcTxBufferBytes,
               "one cooperative TX visit must not outrun a core TX buffer");
 static_assert(kPacketBufferStorageBytes % kCacheLineBytes == 0U,
               "packet storage must occupy complete alignment units");
+static_assert(kChecksumBenchmarkBufferBytes % kCacheLineBytes == 0U,
+              "benchmark buffers must occupy complete cache lines");
 static_assert(kPacketReadyQueueDepth >= kPacketBufferCount &&
                   kPacketTransmitQueueDepth >= kPacketBufferCount,
               "packet index queues must be able to represent the whole pool");

@@ -43,6 +43,7 @@ class PacketBufferPipelineTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "usb_transport.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
+                    str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",
                     str(executable),
                 ],

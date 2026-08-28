@@ -56,7 +56,7 @@ class HardwareSyntheticDevice(SimulatedDevice):
             device_state=self.state,
             build_id="tdaq-0123456789abcdef",
             hardware_serial=12_345_670,
-            firmware_version=(0, 4, 0),
+            firmware_version=(0, 5, 0),
             board_id=BoardId.TEENSY_40,
             mcu_id=McuId.IMXRT1062,
             supported_stream_mask=StreamMask.ADC | StreamMask.GPIO,
@@ -67,6 +67,7 @@ class HardwareSyntheticDevice(SimulatedDevice):
                 | Capability.SYNTHETIC_SOURCE
                 | Capability.RESET_STATS
                 | Capability.PING
+                | Capability.CHECKSUM_BENCHMARK
             ),
         )
         return self._success_response(request, info.to_payload())
@@ -191,6 +192,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             "stop-request.bin": rig.STOP_REQUEST,
             "reset-stats-request.bin": rig.RESET_STATS_REQUEST,
             "ping-request.bin": rig.PING_REQUEST,
+            "checksum-benchmark-request.bin": rig.CHECKSUM_BENCHMARK_REQUEST,
         }
         for name, kind in request_kind_by_name.items():
             expected = (FIXTURES / name).read_bytes()
@@ -217,7 +219,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             offset += count
             chunk_index += 1
 
-        self.assertEqual(10, len(decoded))
+        self.assertEqual(11, len(decoded))
         self.assertEqual(0, parser.errors)
         self.assertGreaterEqual(parser.bytes_discarded, len(b"reset noise\xef\xbe"))
         self.assertEqual(

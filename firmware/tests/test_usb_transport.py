@@ -44,6 +44,7 @@ class FirmwareUsbTransportTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "teensy_usb.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
+                    str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",
                     str(executable),
                 ],

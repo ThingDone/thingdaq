@@ -115,9 +115,20 @@ FastCRC, and hardware-accelerator findings are recorded in
 `doc/research/checksum-candidates.md`; notably, the general-memory DCP computes
 CRC-32/MPEG-2 rather than either evaluated CRC and is not used.
 
+The optional IDLE-only `CHECKSUM_BENCHMARK` command measures those same narrow
+firmware implementations with the verified 600 MHz DWT counter. It calibrates
+and subtracts read overhead, excludes interrupts from each timed interval,
+publishes an optimization-proof digest, and reports raw/net cycles, processed
+bytes, Q16.16 cycles/byte, decimal MB/s, projected CPU at 8.1 MB/s, recurring
+cache setup, and code/table/RAM cost. Vectors cover empty input, canonical
+`123456789`, aligned 64/512-byte buffers, and an actual 4,092-byte framed
+header-plus-payload. Separate 4,096-byte buffers exercise native DTCM and
+DMA-visible OCRAM in hot and meaningful cold-invalidated states. The protocol
+and method are specified in `doc/protocol/protocol-v1.md`.
+
 The portable firmware control module implements bounded BOOT → IDLE,
 CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
-STOP, RESET_STATS, and PING. Phase 04 accepts nonempty ADC/GPIO subsets only
+STOP, RESET_STATS, PING, and optional CHECKSUM_BENCHMARK. Phase 04 accepts nonempty ADC/GPIO subsets only
 for the implemented synthetic source; INFO and STATUS distinguish that source
 from the still-unavailable physical path.
 
@@ -166,8 +177,8 @@ flushes those buffers before DMA. The 96 application frames cover about 48.6 ms
 at the nominal combined framed rate, plus about 1.0 ms in the core ring. This
 retains six complete 64 KiB host-read batches: five cover the measured 39.8 ms
 rig scheduling pause and one remains as bounded margin. The compile-time
-registry reserves 401,824 bytes of RAM1 project data and 97,280 bytes of future
-RAM2 acquisition storage; see
+registry reserves 405,920 bytes of RAM1 project data and 101,376 bytes of RAM2
+storage, including one isolated benchmark buffer in each region; see
 `doc/architecture/firmware-resource-map.md` and
 `doc/reference/Foundation-Reuse-Inventory.md`.
 
@@ -190,7 +201,7 @@ a stale or incompatible image before control changes.
 ## Portable firmware tests
 
 The firmware test suite host-compiles the production protocol, control,
-statistics, synthetic-source, packet-pipeline, transport, and runtime sources with
+statistics, checksum benchmark, synthetic-source, packet-pipeline, transport, and runtime sources with
 allocation-free C++17 flags.
 It exercises every split and truncation point for every command, corrupt-stream
 recovery, the complete state-transition matrix, idempotency, counters, and
@@ -200,6 +211,13 @@ through the Python decoder; both directions must match the tracked golden
 fixtures byte for byte. Dependency checks keep Arduino and Teensy core APIs in
 the guarded board/USB adapters rather than the portable protocol/control
 closure.
+
+The benchmark tests inject a deterministic wrapping cycle counter and verify
+overhead subtraction, interrupt-mask restoration, warm-up exclusion, hot DTCM,
+cold OCRAM cache costs, real production-frame coverage, duration bounds, and
+unchanged acquisition state/counters. The pinned build additionally inspects
+ELF symbols for exact checksum-body sizes, lookup-table Flash residency, and
+the two benchmark-buffer addresses and alignments.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source

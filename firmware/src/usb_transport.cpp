@@ -33,6 +33,7 @@ bool responseKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kStopResponse:
     case protocol_v1::FrameKind::kResetStatsResponse:
     case protocol_v1::FrameKind::kPingResponse:
+    case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
     case protocol_v1::FrameKind::kErrorResponse:
       return true;
     case protocol_v1::FrameKind::kAdcData:
@@ -44,6 +45,7 @@ bool responseKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kStopRequest:
     case protocol_v1::FrameKind::kResetStatsRequest:
     case protocol_v1::FrameKind::kPingRequest:
+    case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
       return false;
   }
   return false;

@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 930f3144ae6a27d4a0ba1bd84e5a2570c4c510b8bc5b366f58768c2d2a3c5b97
+// Source SHA-256: e890012559dbe4934f61c69554dc7214a41b49108c765c89ba1923ff9a1354d9
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "930f3144ae6a27d4a0ba1bd84e5a2570c4c510b8bc5b366f58768c2d2a3c5b97";
+inline constexpr char kSourceSha256[] = "e890012559dbe4934f61c69554dc7214a41b49108c765c89ba1923ff9a1354d9";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -29,6 +29,14 @@ inline constexpr std::uint32_t kAdc1PhaseTicks = 4U;
 inline constexpr std::uint32_t kGpioSampleRateHz = 4000000U;
 inline constexpr std::uint32_t kGpioSamplePeriodTicks = 2U;
 inline constexpr std::uint32_t kFrameCoverageTicks = 8096U;
+inline constexpr std::uint32_t kChecksumBenchmarkCycleCounterHz = 600000000U;
+inline constexpr std::uint32_t kChecksumBenchmarkTargetFramedBytesPerSecond = 8100000U;
+inline constexpr std::uint16_t kChecksumBenchmarkMaxBatchCount = 8U;
+inline constexpr std::uint16_t kChecksumBenchmarkMaxIterationsPerBatch = 4096U;
+inline constexpr std::uint32_t kChecksumBenchmarkMaxOperations = 32768U;
+inline constexpr std::uint32_t kChecksumBenchmarkMaxProcessedBytes = 8388608U;
+inline constexpr std::uint16_t kChecksumBenchmarkTimerCalibrationSamples = 32U;
+inline constexpr std::uint16_t kChecksumBenchmarkWarmupOperations = 4U;
 inline constexpr std::size_t kAdcBytesPerPair = 4U;
 inline constexpr std::size_t kAdcPairsPerFrame = 1012U;
 inline constexpr std::uint8_t kAdcResolutionBits = 12U;
@@ -61,6 +69,7 @@ enum class FrameKind : std::uint8_t {
   kStopRequest = 20U,
   kResetStatsRequest = 21U,
   kPingRequest = 22U,
+  kChecksumBenchmarkRequest = 23U,
   kInfoResponse = 144U,
   kConfigureResponse = 145U,
   kStartResponse = 146U,
@@ -68,6 +77,7 @@ enum class FrameKind : std::uint8_t {
   kStopResponse = 148U,
   kResetStatsResponse = 149U,
   kPingResponse = 150U,
+  kChecksumBenchmarkResponse = 151U,
   kErrorResponse = 159U,
 };
 
@@ -79,6 +89,7 @@ enum class CommandKind : std::uint8_t {
   kStop = 20U,
   kResetStats = 21U,
   kPing = 22U,
+  kChecksumBenchmark = 23U,
 };
 
 enum class FrameFlag : std::uint16_t {
@@ -136,6 +147,7 @@ enum class Capability : std::uint32_t {
   kSyntheticSource = 8U,
   kResetStats = 16U,
   kPing = 32U,
+  kChecksumBenchmark = 64U,
 };
 
 enum class Source : std::uint8_t {
@@ -153,13 +165,31 @@ enum class McuId : std::uint16_t {
   kImxrt1062 = 1U,
 };
 
+enum class BenchmarkVector : std::uint8_t {
+  kEmpty = 0U,
+  kCanonical123456789 = 1U,
+  kBuffer64 = 2U,
+  kBuffer512 = 3U,
+  kFrameCoverage = 4U,
+};
+
+enum class BenchmarkMemoryRegion : std::uint8_t {
+  kDtcmPacket = 0U,
+  kOcramDma = 1U,
+};
+
+enum class BenchmarkCacheState : std::uint8_t {
+  kHotOrNative = 0U,
+  kColdInvalidated = 1U,
+};
+
 inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr std::uint32_t kSupportedChecksumMask = 14U;
 inline constexpr std::uint16_t kKnownFrameFlagMask = 32783U;
-inline constexpr std::uint32_t kKnownCapabilityMask = 63U;
+inline constexpr std::uint32_t kKnownCapabilityMask = 127U;
 
 inline constexpr std::size_t kEmptyPayloadSize = 0U;
 inline constexpr std::size_t kAdcDataPayloadSize = 4048U;
@@ -255,6 +285,40 @@ inline constexpr std::size_t kPingResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kPingResponseReservedOffset = 1U;
 inline constexpr std::size_t kPingResponseErrorCodeOffset = 2U;
 inline constexpr std::size_t kPingResponseNonceOffset = 4U;
+inline constexpr std::size_t kChecksumBenchmarkRequestPayloadSize = 8U;
+inline constexpr std::size_t kChecksumBenchmarkRequestChecksumAlgorithmOffset = 0U;
+inline constexpr std::size_t kChecksumBenchmarkRequestVectorOffset = 1U;
+inline constexpr std::size_t kChecksumBenchmarkRequestMemoryRegionOffset = 2U;
+inline constexpr std::size_t kChecksumBenchmarkRequestCacheStateOffset = 3U;
+inline constexpr std::size_t kChecksumBenchmarkRequestBatchCountOffset = 4U;
+inline constexpr std::size_t kChecksumBenchmarkRequestIterationsPerBatchOffset = 6U;
+inline constexpr std::size_t kChecksumBenchmarkResponsePayloadSize = 96U;
+inline constexpr std::size_t kChecksumBenchmarkResponseResponseStatusOffset = 0U;
+inline constexpr std::size_t kChecksumBenchmarkResponseReservedOffset = 1U;
+inline constexpr std::size_t kChecksumBenchmarkResponseErrorCodeOffset = 2U;
+inline constexpr std::size_t kChecksumBenchmarkResponseChecksumAlgorithmOffset = 4U;
+inline constexpr std::size_t kChecksumBenchmarkResponseVectorOffset = 5U;
+inline constexpr std::size_t kChecksumBenchmarkResponseMemoryRegionOffset = 6U;
+inline constexpr std::size_t kChecksumBenchmarkResponseCacheStateOffset = 7U;
+inline constexpr std::size_t kChecksumBenchmarkResponseBatchCountOffset = 8U;
+inline constexpr std::size_t kChecksumBenchmarkResponseIterationsPerBatchOffset = 10U;
+inline constexpr std::size_t kChecksumBenchmarkResponseBufferBytesOffset = 12U;
+inline constexpr std::size_t kChecksumBenchmarkResponseCycleCounterHzOffset = 16U;
+inline constexpr std::size_t kChecksumBenchmarkResponseTimerOverheadCyclesOffset = 20U;
+inline constexpr std::size_t kChecksumBenchmarkResponseImplementationCodeBytesOffset = 24U;
+inline constexpr std::size_t kChecksumBenchmarkResponseTableBytesOffset = 28U;
+inline constexpr std::size_t kChecksumBenchmarkResponseWorkingRamBytesOffset = 32U;
+inline constexpr std::size_t kChecksumBenchmarkResponseDeterministicDigestOffset = 36U;
+inline constexpr std::size_t kChecksumBenchmarkResponseProcessedBytesOffset = 40U;
+inline constexpr std::size_t kChecksumBenchmarkResponseRawChecksumCyclesOffset = 48U;
+inline constexpr std::size_t kChecksumBenchmarkResponseNetChecksumCyclesOffset = 56U;
+inline constexpr std::size_t kChecksumBenchmarkResponseCacheSetupCyclesOffset = 64U;
+inline constexpr std::size_t kChecksumBenchmarkResponseMinBatchCyclesOffset = 72U;
+inline constexpr std::size_t kChecksumBenchmarkResponseMaxBatchCyclesOffset = 76U;
+inline constexpr std::size_t kChecksumBenchmarkResponseCyclesPerByteQ16Offset = 80U;
+inline constexpr std::size_t kChecksumBenchmarkResponseMbPerSecondQ16Offset = 84U;
+inline constexpr std::size_t kChecksumBenchmarkResponseProjectedCpuPercentQ16Offset = 88U;
+inline constexpr std::size_t kChecksumBenchmarkResponseTargetFramedBytesPerSecondOffset = 92U;
 inline constexpr std::size_t kErrorResponsePayloadSize = 8U;
 inline constexpr std::size_t kErrorResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kErrorResponseReserved0Offset = 1U;
@@ -283,6 +347,8 @@ constexpr std::uint16_t allowedFlags(FrameKind kind) {
       return 0U;
     case FrameKind::kPingRequest:
       return 0U;
+    case FrameKind::kChecksumBenchmarkRequest:
+      return 0U;
     case FrameKind::kInfoResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kConfigureResponse:
@@ -296,6 +362,8 @@ constexpr std::uint16_t allowedFlags(FrameKind kind) {
     case FrameKind::kResetStatsResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kPingResponse:
+      return static_cast<std::uint16_t>(FrameFlag::kResponseError);
+    case FrameKind::kChecksumBenchmarkResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kErrorResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
@@ -319,6 +387,8 @@ constexpr FrameKind requestFrameKind(CommandKind command) {
       return FrameKind::kResetStatsRequest;
     case CommandKind::kPing:
       return FrameKind::kPingRequest;
+    case CommandKind::kChecksumBenchmark:
+      return FrameKind::kChecksumBenchmarkRequest;
   }
   return FrameKind::kInfoRequest;
 }
@@ -339,6 +409,8 @@ constexpr FrameKind responseFrameKind(CommandKind command) {
       return FrameKind::kResetStatsResponse;
     case CommandKind::kPing:
       return FrameKind::kPingResponse;
+    case CommandKind::kChecksumBenchmark:
+      return FrameKind::kChecksumBenchmarkResponse;
   }
   return FrameKind::kInfoResponse;
 }

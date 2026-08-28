@@ -51,6 +51,8 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "usb_transport.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
+                    str(FIRMWARE_SOURCE / "checksum.cpp"),
+                    str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
                     "-o",
                     str(executable),
                 ],

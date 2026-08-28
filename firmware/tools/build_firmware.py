@@ -34,7 +34,7 @@ OUTPUT_DIRECTORY = (
     SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 4
+MANIFEST_SCHEMA_VERSION = 5
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
@@ -50,6 +50,36 @@ CHECKSUM_TABLE_SYMBOLS = {
     "CRC32_ISO_HDLC": "teensy_daq::checksum::detail::kCrc32IsoHdlcTable",
 }
 CHECKSUM_TABLE_BYTES = 256 * 4
+CHECKSUM_CODE_SYMBOLS = {
+    "ADLER32": "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)",
+    "CRC32C": "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)",
+    "CRC32_ISO_HDLC": (
+        "teensy_daq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)"
+    ),
+}
+CHECKSUM_CODE_BYTES = {
+    "ADLER32": 120,
+    "CRC32C": 48,
+    "CRC32_ISO_HDLC": 48,
+}
+CHECKSUM_DISPATCH_SYMBOL = (
+    "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, "
+    "unsigned char const*, unsigned int, unsigned long&)"
+)
+BENCHMARK_BUFFER_SYMBOLS = {
+    "DTCM_PACKET": (
+        "teensy_daq::benchmark::g_checksum_benchmark_dtcm_buffer",
+        0x20000000,
+        0x20200000,
+    ),
+    "OCRAM_DMA": (
+        "teensy_daq::benchmark::g_checksum_benchmark_ocram_buffer",
+        0x20200000,
+        0x20280000,
+    ),
+}
+BENCHMARK_BUFFER_BYTES = 4096
+BENCHMARK_BUFFER_ALIGNMENT = 32
 
 
 class BuildError(RuntimeError):
@@ -407,6 +437,29 @@ def checksum_resource_usage(nm_output: str) -> dict[str, Any]:
             "table_ram_bytes": 0,
         }
     }
+    for algorithm, symbol in CHECKSUM_CODE_SYMBOLS.items():
+        record = symbols.get(symbol)
+        if record is None:
+            raise BuildError(
+                f"firmware ELF is missing checksum implementation symbol {symbol}"
+            )
+        address, size, symbol_type = record
+        expected_size = CHECKSUM_CODE_BYTES[algorithm]
+        if size != expected_size:
+            raise BuildError(
+                f"{symbol} occupies {size} code bytes, expected {expected_size}"
+            )
+        if symbol_type.upper() != "T":
+            raise BuildError(f"{symbol} is not an executable text symbol")
+        algorithms.setdefault(algorithm, {})
+        algorithms[algorithm].update(
+            {
+                "code_symbol": symbol,
+                "code_symbol_type": symbol_type,
+                "code_address": f"0x{address:08x}",
+                "implementation_code_bytes": size,
+            }
+        )
     for algorithm, symbol in CHECKSUM_TABLE_SYMBOLS.items():
         record = symbols.get(symbol)
         if record is None:
@@ -421,6 +474,7 @@ def checksum_resource_usage(nm_output: str) -> dict[str, Any]:
                 f"{symbol} is not resident in program flash: 0x{address:08x}"
             )
         algorithms[algorithm] = {
+            **algorithms[algorithm],
             "implementation": "256-entry uint32 lookup table",
             "symbol": symbol,
             "symbol_type": symbol_type,
@@ -428,15 +482,70 @@ def checksum_resource_usage(nm_output: str) -> dict[str, Any]:
             "table_flash_bytes": size,
             "table_ram_bytes": 0,
         }
+    dispatch = symbols.get(CHECKSUM_DISPATCH_SYMBOL)
+    if dispatch is None:
+        raise BuildError(
+            "firmware ELF is missing shared checksum dispatch symbol "
+            f"{CHECKSUM_DISPATCH_SYMBOL}"
+        )
+    dispatch_address, dispatch_size, dispatch_type = dispatch
+    if dispatch_type.upper() != "T":
+        raise BuildError("shared checksum dispatch is not executable text")
     return {
         "placement": "memory-mapped program flash (.progmem.checksum.*)",
         "algorithms": algorithms,
+        "shared_dispatch": {
+            "symbol": CHECKSUM_DISPATCH_SYMBOL,
+            "symbol_type": dispatch_type,
+            "address": f"0x{dispatch_address:08x}",
+            "code_bytes": dispatch_size,
+        },
+        "total_implementation_code_bytes": sum(
+            item["implementation_code_bytes"] for item in algorithms.values()
+        ),
         "total_table_flash_bytes": sum(
             item["table_flash_bytes"] for item in algorithms.values()
         ),
         "total_table_ram_bytes": sum(
             item["table_ram_bytes"] for item in algorithms.values()
         ),
+    }
+
+
+def benchmark_buffer_usage(nm_output: str) -> dict[str, Any]:
+    """Verify benchmark working buffers occupy their claimed memory regions."""
+
+    symbols = parse_nm_symbols(nm_output)
+    regions: dict[str, dict[str, Any]] = {}
+    for region, (symbol, region_start, region_end) in BENCHMARK_BUFFER_SYMBOLS.items():
+        record = symbols.get(symbol)
+        if record is None:
+            raise BuildError(f"firmware ELF is missing benchmark buffer {symbol}")
+        address, size, symbol_type = record
+        if size != BENCHMARK_BUFFER_BYTES:
+            raise BuildError(
+                f"{symbol} occupies {size} bytes, expected {BENCHMARK_BUFFER_BYTES}"
+            )
+        if address % BENCHMARK_BUFFER_ALIGNMENT != 0:
+            raise BuildError(f"{symbol} is not cache-line aligned")
+        if not region_start <= address or address + size > region_end:
+            raise BuildError(
+                f"{symbol} is outside its claimed {region} range: 0x{address:08x}"
+            )
+        if symbol_type.upper() != "B":
+            raise BuildError(f"{symbol} is not zero-initialized writable storage")
+        regions[region] = {
+            "symbol": symbol,
+            "symbol_type": symbol_type,
+            "address": f"0x{address:08x}",
+            "bytes": size,
+            "alignment_bytes": BENCHMARK_BUFFER_ALIGNMENT,
+            "range_start": f"0x{region_start:08x}",
+            "range_end_exclusive": f"0x{region_end:08x}",
+        }
+    return {
+        "working_ram_bytes": sum(item["bytes"] for item in regions.values()),
+        "regions": regions,
     }
 
 
@@ -562,6 +671,7 @@ def build(arduino_cli_name: str) -> Path:
         [str(nm), "--print-size", "--size-sort", "--demangle", str(elf)]
     )
     checksum_resources = checksum_resource_usage(nm_result.stdout)
+    benchmark_buffers = benchmark_buffer_usage(nm_result.stdout)
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -585,6 +695,7 @@ def build(arduino_cli_name: str) -> Path:
         "binary_inspection": {
             "nm_path": str(nm),
             "checksum_resources": checksum_resources,
+            "checksum_benchmark_buffers": benchmark_buffers,
         },
         "source": {
             "source_id": identity.source_id,

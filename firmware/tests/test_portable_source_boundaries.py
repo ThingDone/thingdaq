@@ -35,6 +35,10 @@ HARDWARE_API_HEADERS = {
 }
 EXPECTED_HARDWARE_INCLUDE_OWNERS = {
     FIRMWARE_SOURCE / "board_config.h": {"core_pins.h", "imxrt.h"},
+    FIRMWARE_SOURCE / "checksum_benchmark_teensy.cpp": {
+        "core_pins.h",
+        "imxrt.h",
+    },
     FIRMWARE_SOURCE / "teensy_usb.cpp": {
         "Arduino.h",
         "usb_desc.h",

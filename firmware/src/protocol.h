@@ -168,10 +168,44 @@ struct Configuration {
       static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes);
 };
 
+struct ChecksumBenchmarkRequest {
+  protocol_v1::ChecksumAlgorithm checksum_algorithm =
+      protocol_v1::kDefaultChecksumAlgorithm;
+  protocol_v1::BenchmarkVector vector =
+      protocol_v1::BenchmarkVector::kEmpty;
+  protocol_v1::BenchmarkMemoryRegion memory_region =
+      protocol_v1::BenchmarkMemoryRegion::kDtcmPacket;
+  protocol_v1::BenchmarkCacheState cache_state =
+      protocol_v1::BenchmarkCacheState::kHotOrNative;
+  std::uint16_t batch_count = 1U;
+  std::uint16_t iterations_per_batch = 1U;
+};
+
+constexpr std::uint32_t benchmarkVectorBytes(
+    protocol_v1::BenchmarkVector vector) {
+  switch (vector) {
+    case protocol_v1::BenchmarkVector::kEmpty:
+      return 0U;
+    case protocol_v1::BenchmarkVector::kCanonical123456789:
+      return 9U;
+    case protocol_v1::BenchmarkVector::kBuffer64:
+      return 64U;
+    case protocol_v1::BenchmarkVector::kBuffer512:
+      return 512U;
+    case protocol_v1::BenchmarkVector::kFrameCoverage:
+      return static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes -
+                                        protocol_v1::kTrailerSize);
+  }
+  return 0U;
+}
+
+bool validChecksumBenchmarkRequest(const ChecksumBenchmarkRequest &request);
+
 struct Request {
   protocol_v1::CommandKind kind = protocol_v1::CommandKind::kInfo;
   std::uint32_t request_id = 0U;
   Configuration configuration{};
+  ChecksumBenchmarkRequest checksum_benchmark{};
   std::uint64_t nonce = 0U;
 };
 
@@ -227,6 +261,32 @@ struct StatusResponse {
   std::uint32_t stats_generation = 1U;
 };
 
+struct ChecksumBenchmarkResponse {
+  ChecksumBenchmarkRequest request{};
+  std::uint32_t buffer_bytes = 0U;
+  std::uint32_t cycle_counter_hz = 0U;
+  std::uint32_t timer_overhead_cycles = 0U;
+  std::uint32_t implementation_code_bytes = 0U;
+  std::uint32_t table_bytes = 0U;
+  std::uint32_t working_ram_bytes = 0U;
+  std::uint32_t deterministic_digest = 0U;
+  std::uint64_t processed_bytes = 0U;
+  std::uint64_t raw_checksum_cycles = 0U;
+  std::uint64_t net_checksum_cycles = 0U;
+  std::uint64_t cache_setup_cycles = 0U;
+  std::uint32_t min_batch_cycles = 0U;
+  std::uint32_t max_batch_cycles = 0U;
+  std::uint32_t cycles_per_byte_q16 = 0U;
+  std::uint32_t mb_per_second_q16 = 0U;
+  std::uint32_t projected_cpu_percent_q16 = 0U;
+  std::uint32_t target_framed_bytes_per_second =
+      protocol_v1::kChecksumBenchmarkTargetFramedBytesPerSecond;
+};
+
+// Fill processed-byte and fixed-point derived fields from the raw measurement.
+// Returns false on an invalid request, zero nonempty work, or integer overflow.
+bool populateChecksumBenchmarkMetrics(ChecksumBenchmarkResponse &response);
+
 Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                           const InfoResponse &response, ControlFrame &output);
 Result encodeConfigureResponse(const Request &request, std::uint32_t run_id,
@@ -245,6 +305,9 @@ Result encodeResetStatsResponse(const Request &request, std::uint32_t run_id,
                                 ControlFrame &output);
 Result encodePingResponse(const Request &request, std::uint32_t run_id,
                           ControlFrame &output);
+Result encodeChecksumBenchmarkResponse(
+    const Request &request, std::uint32_t run_id,
+    const ChecksumBenchmarkResponse &response, ControlFrame &output);
 Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
                                 protocol_v1::ErrorCode error,
                                 ControlFrame &output);

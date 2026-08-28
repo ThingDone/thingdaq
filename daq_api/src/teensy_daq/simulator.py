@@ -210,6 +210,9 @@ class SimulatedDevice:
             constants.FrameKind.STOP_REQUEST: self._handle_stop,
             constants.FrameKind.RESET_STATS_REQUEST: self._handle_reset_stats,
             constants.FrameKind.PING_REQUEST: self._handle_ping,
+            constants.FrameKind.CHECKSUM_BENCHMARK_REQUEST: (
+                self._handle_checksum_benchmark
+            ),
         }
         return handlers[request.header.kind](request)
 
@@ -333,6 +336,11 @@ class SimulatedDevice:
         payload[: len(_SUCCESS_PREFIX)] = _SUCCESS_PREFIX
         payload[constants.PING_RESPONSE_NONCE_OFFSET :] = request.payload
         return self._success_response(request, payload)
+
+    def _handle_checksum_benchmark(self, request: Frame) -> bytes:
+        # The offline simulator has no 600 MHz DWT or Teensy memory regions and
+        # therefore deliberately does not advertise or fabricate this result.
+        return self._typed_error(request, constants.ErrorCode.UNSUPPORTED_CONFIGURATION)
 
     def _reset_epoch(self) -> None:
         self._adc_sequence = 0

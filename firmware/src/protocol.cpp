@@ -80,6 +80,7 @@ constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kStopRequest:
     case protocol_v1::FrameKind::kResetStatsRequest:
     case protocol_v1::FrameKind::kPingRequest:
+    case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
     case protocol_v1::FrameKind::kInfoResponse:
     case protocol_v1::FrameKind::kConfigureResponse:
     case protocol_v1::FrameKind::kStartResponse:
@@ -87,6 +88,7 @@ constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kStopResponse:
     case protocol_v1::FrameKind::kResetStatsResponse:
     case protocol_v1::FrameKind::kPingResponse:
+    case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
     case protocol_v1::FrameKind::kErrorResponse:
       return true;
   }
@@ -102,6 +104,7 @@ constexpr bool isRequestKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kStopRequest:
     case protocol_v1::FrameKind::kResetStatsRequest:
     case protocol_v1::FrameKind::kPingRequest:
+    case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
       return true;
     default:
       return false;
@@ -141,6 +144,7 @@ constexpr bool isTypedResponseKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kStopResponse:
     case protocol_v1::FrameKind::kResetStatsResponse:
     case protocol_v1::FrameKind::kPingResponse:
+    case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
       return true;
     default:
       return false;
@@ -203,6 +207,9 @@ bool commandForKind(protocol_v1::FrameKind kind,
     case protocol_v1::FrameKind::kPingRequest:
       command = protocol_v1::CommandKind::kPing;
       return true;
+    case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
+      command = protocol_v1::CommandKind::kChecksumBenchmark;
+      return true;
     default:
       return false;
   }
@@ -234,6 +241,9 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
     case protocol_v1::FrameKind::kPingRequest:
       size = protocol_v1::kPingRequestPayloadSize;
       return true;
+    case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
+      size = protocol_v1::kChecksumBenchmarkRequestPayloadSize;
+      return true;
     case protocol_v1::FrameKind::kInfoResponse:
       size = protocol_v1::kInfoResponsePayloadSize;
       return true;
@@ -252,6 +262,9 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
       return true;
     case protocol_v1::FrameKind::kPingResponse:
       size = protocol_v1::kPingResponsePayloadSize;
+      return true;
+    case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
+      size = protocol_v1::kChecksumBenchmarkResponsePayloadSize;
       return true;
     case protocol_v1::FrameKind::kErrorResponse:
       size = protocol_v1::kErrorResponsePayloadSize;
@@ -602,6 +615,191 @@ Result validateStatus(ByteView payload) {
   return Result::success();
 }
 
+Result decodeChecksumBenchmarkRequest(ByteView payload,
+                                      ChecksumBenchmarkRequest &request) {
+  if (payload.size != protocol_v1::kChecksumBenchmarkRequestPayloadSize) {
+    return badLength();
+  }
+  ChecksumBenchmarkRequest decoded{};
+  decoded.checksum_algorithm =
+      static_cast<protocol_v1::ChecksumAlgorithm>(payload.data[
+          protocol_v1::kChecksumBenchmarkRequestChecksumAlgorithmOffset]);
+  decoded.vector = static_cast<protocol_v1::BenchmarkVector>(
+      payload.data[protocol_v1::kChecksumBenchmarkRequestVectorOffset]);
+  decoded.memory_region = static_cast<protocol_v1::BenchmarkMemoryRegion>(
+      payload.data[protocol_v1::kChecksumBenchmarkRequestMemoryRegionOffset]);
+  decoded.cache_state = static_cast<protocol_v1::BenchmarkCacheState>(
+      payload.data[protocol_v1::kChecksumBenchmarkRequestCacheStateOffset]);
+  if (!loadU16(payload, protocol_v1::kChecksumBenchmarkRequestBatchCountOffset,
+               decoded.batch_count) ||
+      !loadU16(
+          payload,
+          protocol_v1::kChecksumBenchmarkRequestIterationsPerBatchOffset,
+          decoded.iterations_per_batch)) {
+    return badLength();
+  }
+  if (!isKnownChecksum(decoded.checksum_algorithm) ||
+      !isSupportedChecksum(decoded.checksum_algorithm)) {
+    return unsupportedChecksum();
+  }
+  if (!validChecksumBenchmarkRequest(decoded)) {
+    return badPayload();
+  }
+  request = decoded;
+  return Result::success();
+}
+
+Result validateChecksumBenchmarkResponse(ByteView payload) {
+  ChecksumBenchmarkResponse decoded{};
+  decoded.request.checksum_algorithm =
+      static_cast<protocol_v1::ChecksumAlgorithm>(payload.data[
+          protocol_v1::kChecksumBenchmarkResponseChecksumAlgorithmOffset]);
+  decoded.request.vector = static_cast<protocol_v1::BenchmarkVector>(
+      payload.data[protocol_v1::kChecksumBenchmarkResponseVectorOffset]);
+  decoded.request.memory_region =
+      static_cast<protocol_v1::BenchmarkMemoryRegion>(payload.data[
+          protocol_v1::kChecksumBenchmarkResponseMemoryRegionOffset]);
+  decoded.request.cache_state =
+      static_cast<protocol_v1::BenchmarkCacheState>(payload.data[
+          protocol_v1::kChecksumBenchmarkResponseCacheStateOffset]);
+  if (payload.data[protocol_v1::kChecksumBenchmarkResponseReservedOffset] != 0U ||
+      !loadU16(payload,
+               protocol_v1::kChecksumBenchmarkResponseBatchCountOffset,
+               decoded.request.batch_count) ||
+      !loadU16(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseIterationsPerBatchOffset,
+          decoded.request.iterations_per_batch) ||
+      !loadU32(payload, protocol_v1::kChecksumBenchmarkResponseBufferBytesOffset,
+               decoded.buffer_bytes) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseCycleCounterHzOffset,
+          decoded.cycle_counter_hz) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseTimerOverheadCyclesOffset,
+          decoded.timer_overhead_cycles) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseImplementationCodeBytesOffset,
+          decoded.implementation_code_bytes) ||
+      !loadU32(payload, protocol_v1::kChecksumBenchmarkResponseTableBytesOffset,
+               decoded.table_bytes) ||
+      !loadU32(
+          payload, protocol_v1::kChecksumBenchmarkResponseWorkingRamBytesOffset,
+          decoded.working_ram_bytes) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseDeterministicDigestOffset,
+          decoded.deterministic_digest) ||
+      !loadU64(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseProcessedBytesOffset,
+          decoded.processed_bytes) ||
+      !loadU64(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseRawChecksumCyclesOffset,
+          decoded.raw_checksum_cycles) ||
+      !loadU64(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseNetChecksumCyclesOffset,
+          decoded.net_checksum_cycles) ||
+      !loadU64(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseCacheSetupCyclesOffset,
+          decoded.cache_setup_cycles) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseMinBatchCyclesOffset,
+          decoded.min_batch_cycles) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseMaxBatchCyclesOffset,
+          decoded.max_batch_cycles) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseCyclesPerByteQ16Offset,
+          decoded.cycles_per_byte_q16) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseMbPerSecondQ16Offset,
+          decoded.mb_per_second_q16) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseProjectedCpuPercentQ16Offset,
+          decoded.projected_cpu_percent_q16) ||
+      !loadU32(
+          payload,
+          protocol_v1::kChecksumBenchmarkResponseTargetFramedBytesPerSecondOffset,
+          decoded.target_framed_bytes_per_second)) {
+    return badLength();
+  }
+
+  const std::uint32_t observed_buffer_bytes = decoded.buffer_bytes;
+  const std::uint32_t observed_cycles_per_byte = decoded.cycles_per_byte_q16;
+  const std::uint32_t observed_mb_per_second = decoded.mb_per_second_q16;
+  const std::uint32_t observed_projected_cpu =
+      decoded.projected_cpu_percent_q16;
+  const std::uint64_t observed_processed = decoded.processed_bytes;
+  const std::uint32_t observed_target_rate =
+      decoded.target_framed_bytes_per_second;
+  std::uint32_t expected_table_bytes = 0U;
+  switch (decoded.request.checksum_algorithm) {
+    case protocol_v1::ChecksumAlgorithm::kAdler32:
+      expected_table_bytes = 0U;
+      break;
+    case protocol_v1::ChecksumAlgorithm::kCrc32c:
+    case protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc:
+      expected_table_bytes = 1024U;
+      break;
+    case protocol_v1::ChecksumAlgorithm::kNoneReserved:
+      return badPayload();
+  }
+  const std::uint64_t operations =
+      static_cast<std::uint64_t>(decoded.request.batch_count) *
+      decoded.request.iterations_per_batch;
+  const std::uint64_t calibrated_overhead =
+      operations * decoded.timer_overhead_cycles;
+  const std::uint64_t minimum_total =
+      static_cast<std::uint64_t>(decoded.min_batch_cycles) *
+      decoded.request.batch_count;
+  const std::uint64_t maximum_total =
+      static_cast<std::uint64_t>(decoded.max_batch_cycles) *
+      decoded.request.batch_count;
+  if (!isKnownChecksum(decoded.request.checksum_algorithm) ||
+      !isSupportedChecksum(decoded.request.checksum_algorithm) ||
+      decoded.cycle_counter_hz !=
+          protocol_v1::kChecksumBenchmarkCycleCounterHz ||
+      decoded.target_framed_bytes_per_second !=
+          protocol_v1::kChecksumBenchmarkTargetFramedBytesPerSecond ||
+      decoded.implementation_code_bytes == 0U ||
+      decoded.table_bytes != expected_table_bytes ||
+      decoded.working_ram_bytes != 2U * protocol_v1::kDataFrameBytes ||
+      decoded.raw_checksum_cycles < calibrated_overhead ||
+      decoded.raw_checksum_cycles - calibrated_overhead !=
+          decoded.net_checksum_cycles ||
+      decoded.net_checksum_cycles > decoded.raw_checksum_cycles ||
+      decoded.min_batch_cycles > decoded.max_batch_cycles ||
+      decoded.net_checksum_cycles < minimum_total ||
+      decoded.net_checksum_cycles > maximum_total ||
+      (decoded.request.cache_state !=
+           protocol_v1::BenchmarkCacheState::kColdInvalidated &&
+       decoded.cache_setup_cycles != 0U)) {
+    return badPayload();
+  }
+  if (!populateChecksumBenchmarkMetrics(decoded) ||
+      decoded.buffer_bytes != observed_buffer_bytes ||
+      decoded.processed_bytes != observed_processed ||
+      decoded.cycles_per_byte_q16 != observed_cycles_per_byte ||
+      decoded.mb_per_second_q16 != observed_mb_per_second ||
+      decoded.projected_cpu_percent_q16 != observed_projected_cpu ||
+      decoded.target_framed_bytes_per_second != observed_target_rate) {
+    return badPayload();
+  }
+  return Result::success();
+}
+
 Result validatePayload(const FrameHeader &header, ByteView payload) {
   if (!payload.valid() || payload.size != header.payload_length) {
     return badLength();
@@ -621,6 +819,10 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
   }
   if (header.kind == protocol_v1::FrameKind::kConfigureRequest) {
     return validateConfiguration(payload, 0U, false);
+  }
+  if (header.kind == protocol_v1::FrameKind::kChecksumBenchmarkRequest) {
+    ChecksumBenchmarkRequest request{};
+    return decodeChecksumBenchmarkRequest(payload, request);
   }
   if (isRequestKind(header.kind)) {
     return Result::success();
@@ -678,6 +880,8 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
       return payload.data[protocol_v1::kPingResponseReservedOffset] == 0U
                  ? Result::success()
                  : badPayload();
+    case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
+      return validateChecksumBenchmarkResponse(payload);
     default:
       return badPayload();
   }
@@ -856,6 +1060,118 @@ std::uint32_t adler32(ByteView input) {
     return 0U;
   }
   return checksum::adler32(input.data, input.size);
+}
+
+bool validChecksumBenchmarkRequest(const ChecksumBenchmarkRequest &request) {
+  if (!isSupportedChecksum(request.checksum_algorithm) ||
+      request.batch_count == 0U ||
+      request.batch_count > protocol_v1::kChecksumBenchmarkMaxBatchCount ||
+      request.iterations_per_batch == 0U ||
+      request.iterations_per_batch >
+          protocol_v1::kChecksumBenchmarkMaxIterationsPerBatch) {
+    return false;
+  }
+  switch (request.vector) {
+    case protocol_v1::BenchmarkVector::kEmpty:
+    case protocol_v1::BenchmarkVector::kCanonical123456789:
+    case protocol_v1::BenchmarkVector::kBuffer64:
+    case protocol_v1::BenchmarkVector::kBuffer512:
+    case protocol_v1::BenchmarkVector::kFrameCoverage:
+      break;
+    default:
+      return false;
+  }
+  switch (request.memory_region) {
+    case protocol_v1::BenchmarkMemoryRegion::kDtcmPacket:
+    case protocol_v1::BenchmarkMemoryRegion::kOcramDma:
+      break;
+    default:
+      return false;
+  }
+  switch (request.cache_state) {
+    case protocol_v1::BenchmarkCacheState::kHotOrNative:
+      break;
+    case protocol_v1::BenchmarkCacheState::kColdInvalidated:
+      if (request.memory_region !=
+              protocol_v1::BenchmarkMemoryRegion::kOcramDma ||
+          request.vector == protocol_v1::BenchmarkVector::kEmpty) {
+        return false;
+      }
+      break;
+    default:
+      return false;
+  }
+
+  const std::uint64_t operations =
+      static_cast<std::uint64_t>(request.batch_count) *
+      request.iterations_per_batch;
+  const std::uint64_t processed =
+      operations * static_cast<std::uint64_t>(benchmarkVectorBytes(request.vector));
+  return operations <= protocol_v1::kChecksumBenchmarkMaxOperations &&
+         processed <= protocol_v1::kChecksumBenchmarkMaxProcessedBytes;
+}
+
+bool populateChecksumBenchmarkMetrics(ChecksumBenchmarkResponse &response) {
+  if (!validChecksumBenchmarkRequest(response.request) ||
+      response.net_checksum_cycles > response.raw_checksum_cycles ||
+      response.net_checksum_cycles >
+          std::numeric_limits<std::uint64_t>::max() -
+              response.cache_setup_cycles) {
+    return false;
+  }
+  const std::uint64_t operations =
+      static_cast<std::uint64_t>(response.request.batch_count) *
+      response.request.iterations_per_batch;
+  response.buffer_bytes = benchmarkVectorBytes(response.request.vector);
+  response.processed_bytes = operations * response.buffer_bytes;
+  response.target_framed_bytes_per_second =
+      protocol_v1::kChecksumBenchmarkTargetFramedBytesPerSecond;
+  const std::uint64_t total_cycles =
+      response.net_checksum_cycles + response.cache_setup_cycles;
+  if (response.processed_bytes == 0U) {
+    response.cycles_per_byte_q16 = 0U;
+    response.mb_per_second_q16 = 0U;
+    response.projected_cpu_percent_q16 = 0U;
+    return true;
+  }
+  if (total_cycles == 0U || response.cycle_counter_hz == 0U ||
+      total_cycles >
+          std::numeric_limits<std::uint64_t>::max() / 65536ULL) {
+    return false;
+  }
+  const std::uint64_t cycles_per_byte_q16 =
+      (total_cycles * 65536ULL) / response.processed_bytes;
+  if (cycles_per_byte_q16 > std::numeric_limits<std::uint32_t>::max() ||
+      response.processed_bytes >
+          std::numeric_limits<std::uint64_t>::max() /
+              response.cycle_counter_hz) {
+    return false;
+  }
+  const std::uint64_t bytes_per_second =
+      (static_cast<std::uint64_t>(response.cycle_counter_hz) *
+       response.processed_bytes) /
+      total_cycles;
+  // Split the decimal-MB scaling around its divisor. This is exactly
+  // floor(bytes_per_second * 65536 / 1,000,000) without permitting the
+  // intermediate multiplication to wrap for an untrusted response.
+  const std::uint64_t mb_per_second_q16 =
+      (bytes_per_second / 1000000ULL) * 65536ULL +
+      ((bytes_per_second % 1000000ULL) * 65536ULL) / 1000000ULL;
+  const std::uint64_t projected_cpu_percent_q16 =
+      (cycles_per_byte_q16 * response.target_framed_bytes_per_second * 100ULL) /
+      response.cycle_counter_hz;
+  if (mb_per_second_q16 > std::numeric_limits<std::uint32_t>::max() ||
+      projected_cpu_percent_q16 >
+          std::numeric_limits<std::uint32_t>::max()) {
+    return false;
+  }
+  response.cycles_per_byte_q16 =
+      static_cast<std::uint32_t>(cycles_per_byte_q16);
+  response.mb_per_second_q16 =
+      static_cast<std::uint32_t>(mb_per_second_q16);
+  response.projected_cpu_percent_q16 =
+      static_cast<std::uint32_t>(projected_cpu_percent_q16);
+  return true;
 }
 
 Result computeChecksum(protocol_v1::ChecksumAlgorithm algorithm, ByteView input,
@@ -1058,6 +1374,12 @@ Result decodeRequest(ByteView input, Request &request) {
              !loadU64(frame.payload, protocol_v1::kPingRequestNonceOffset,
                       decoded.nonce)) {
     return badPayload();
+  } else if (command == protocol_v1::CommandKind::kChecksumBenchmark) {
+    result = decodeChecksumBenchmarkRequest(frame.payload,
+                                            decoded.checksum_benchmark);
+    if (!result.ok()) {
+      return result;
+    }
   }
   request = decoded;
   return Result::success();
@@ -1250,6 +1572,110 @@ Result encodePingResponse(const Request &request, std::uint32_t run_id,
   storeU64(bytes, protocol_v1::kPingResponseNonceOffset, request.nonce);
   return encodeFrame(
       responseFields(protocol_v1::FrameKind::kPingResponse, request, run_id),
+      view(payload), output);
+}
+
+Result encodeChecksumBenchmarkResponse(
+    const Request &request, std::uint32_t run_id,
+    const ChecksumBenchmarkResponse &response, ControlFrame &output) {
+  Result result =
+      verifyRequestKind(request, protocol_v1::CommandKind::kChecksumBenchmark);
+  if (!result.ok() ||
+      response.request.checksum_algorithm !=
+          request.checksum_benchmark.checksum_algorithm ||
+      response.request.vector != request.checksum_benchmark.vector ||
+      response.request.memory_region !=
+          request.checksum_benchmark.memory_region ||
+      response.request.cache_state != request.checksum_benchmark.cache_state ||
+      response.request.batch_count != request.checksum_benchmark.batch_count ||
+      response.request.iterations_per_batch !=
+          request.checksum_benchmark.iterations_per_batch) {
+    return result.ok() ? badPayload() : result;
+  }
+  ChecksumBenchmarkResponse checked = response;
+  if (!populateChecksumBenchmarkMetrics(checked) ||
+      checked.buffer_bytes != response.buffer_bytes ||
+      checked.processed_bytes != response.processed_bytes ||
+      checked.cycles_per_byte_q16 != response.cycles_per_byte_q16 ||
+      checked.mb_per_second_q16 != response.mb_per_second_q16 ||
+      checked.projected_cpu_percent_q16 !=
+          response.projected_cpu_percent_q16) {
+    return badPayload();
+  }
+
+  std::array<std::uint8_t,
+             protocol_v1::kChecksumBenchmarkResponsePayloadSize>
+      payload{};
+  MutableByteView bytes = mutableView(payload);
+  writeSuccessPrefix(bytes);
+  payload[protocol_v1::kChecksumBenchmarkResponseChecksumAlgorithmOffset] =
+      static_cast<std::uint8_t>(response.request.checksum_algorithm);
+  payload[protocol_v1::kChecksumBenchmarkResponseVectorOffset] =
+      static_cast<std::uint8_t>(response.request.vector);
+  payload[protocol_v1::kChecksumBenchmarkResponseMemoryRegionOffset] =
+      static_cast<std::uint8_t>(response.request.memory_region);
+  payload[protocol_v1::kChecksumBenchmarkResponseCacheStateOffset] =
+      static_cast<std::uint8_t>(response.request.cache_state);
+  storeU16(bytes, protocol_v1::kChecksumBenchmarkResponseBatchCountOffset,
+           response.request.batch_count);
+  storeU16(
+      bytes,
+      protocol_v1::kChecksumBenchmarkResponseIterationsPerBatchOffset,
+      response.request.iterations_per_batch);
+  storeU32(bytes, protocol_v1::kChecksumBenchmarkResponseBufferBytesOffset,
+           response.buffer_bytes);
+  storeU32(bytes,
+           protocol_v1::kChecksumBenchmarkResponseCycleCounterHzOffset,
+           response.cycle_counter_hz);
+  storeU32(bytes,
+           protocol_v1::kChecksumBenchmarkResponseTimerOverheadCyclesOffset,
+           response.timer_overhead_cycles);
+  storeU32(
+      bytes,
+      protocol_v1::kChecksumBenchmarkResponseImplementationCodeBytesOffset,
+      response.implementation_code_bytes);
+  storeU32(bytes, protocol_v1::kChecksumBenchmarkResponseTableBytesOffset,
+           response.table_bytes);
+  storeU32(bytes, protocol_v1::kChecksumBenchmarkResponseWorkingRamBytesOffset,
+           response.working_ram_bytes);
+  storeU32(
+      bytes,
+      protocol_v1::kChecksumBenchmarkResponseDeterministicDigestOffset,
+      response.deterministic_digest);
+  storeU64(bytes, protocol_v1::kChecksumBenchmarkResponseProcessedBytesOffset,
+           response.processed_bytes);
+  storeU64(
+      bytes,
+      protocol_v1::kChecksumBenchmarkResponseRawChecksumCyclesOffset,
+      response.raw_checksum_cycles);
+  storeU64(
+      bytes,
+      protocol_v1::kChecksumBenchmarkResponseNetChecksumCyclesOffset,
+      response.net_checksum_cycles);
+  storeU64(bytes,
+           protocol_v1::kChecksumBenchmarkResponseCacheSetupCyclesOffset,
+           response.cache_setup_cycles);
+  storeU32(bytes, protocol_v1::kChecksumBenchmarkResponseMinBatchCyclesOffset,
+           response.min_batch_cycles);
+  storeU32(bytes, protocol_v1::kChecksumBenchmarkResponseMaxBatchCyclesOffset,
+           response.max_batch_cycles);
+  storeU32(bytes,
+           protocol_v1::kChecksumBenchmarkResponseCyclesPerByteQ16Offset,
+           response.cycles_per_byte_q16);
+  storeU32(bytes,
+           protocol_v1::kChecksumBenchmarkResponseMbPerSecondQ16Offset,
+           response.mb_per_second_q16);
+  storeU32(
+      bytes,
+      protocol_v1::kChecksumBenchmarkResponseProjectedCpuPercentQ16Offset,
+      response.projected_cpu_percent_q16);
+  storeU32(
+      bytes,
+      protocol_v1::kChecksumBenchmarkResponseTargetFramedBytesPerSecondOffset,
+      response.target_framed_bytes_per_second);
+  return encodeFrame(
+      responseFields(protocol_v1::FrameKind::kChecksumBenchmarkResponse,
+                     request, run_id),
       view(payload), output);
 }
 

@@ -1,4 +1,4 @@
-"""Host-compiled checks for deterministic paced firmware sources."""
+"""Host-compiled tests for the portable checksum microbenchmark runner."""
 
 from __future__ import annotations
 
@@ -10,21 +10,17 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIRMWARE_SOURCE = REPOSITORY_ROOT / "firmware/src"
-CPP_TEST = REPOSITORY_ROOT / "firmware/tests/synthetic_source_test.cpp"
-PRODUCTION_SOURCES = (
-    FIRMWARE_SOURCE / "synthetic_source.h",
-    FIRMWARE_SOURCE / "synthetic_source.cpp",
-)
+CPP_TEST = REPOSITORY_ROOT / "firmware/tests/checksum_benchmark_test.cpp"
 
 
-class SyntheticSourceTests(unittest.TestCase):
-    def test_realtime_and_unpaced_sources_use_the_packet_pipeline(self) -> None:
+class ChecksumBenchmarkTests(unittest.TestCase):
+    def test_counter_cache_vector_and_duration_semantics(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-synthetic-") as directory:
-            executable = Path(directory) / "synthetic-source-test"
+        with tempfile.TemporaryDirectory(prefix="teensy-daq-benchmark-") as directory:
+            executable = Path(directory) / "checksum-benchmark-test"
             compile_result = subprocess.run(
                 [
                     compiler,
@@ -39,8 +35,7 @@ class SyntheticSourceTests(unittest.TestCase):
                     "-fno-rtti",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
-                    str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
-                    str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
+                    str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
                     str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",
@@ -66,33 +61,6 @@ class SyntheticSourceTests(unittest.TestCase):
                 run_result.returncode,
                 run_result.stdout + run_result.stderr,
             )
-
-    def test_source_is_fixed_capacity_cooperative_and_isr_free(self) -> None:
-        source = "\n".join(
-            path.read_text(encoding="utf-8") for path in PRODUCTION_SOURCES
-        )
-        for token in (
-            "std::vector",
-            "std::deque",
-            "malloc(",
-            "calloc(",
-            "realloc(",
-            "operator new",
-            "attachInterrupt",
-            "IntervalTimer",
-            "ISR(",
-            "Serial.",
-            "delay(",
-            "yield(",
-        ):
-            with self.subTest(token=token):
-                self.assertNotIn(token, source)
-
-        self.assertIn("Mode::kRealtime", source)
-        self.assertIn("Mode::kUnpacedDiagnostic", source)
-        self.assertIn("pipeline.beginFill", source)
-        self.assertIn("pipeline.finishFill", source)
-        self.assertIn("std::array", source)
 
 
 if __name__ == "__main__":

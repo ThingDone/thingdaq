@@ -12,6 +12,7 @@ from ._generated import protocol_constants as constants
 from .protocol import Frame, FrameValidationError
 
 _CONFIGURATION = struct.Struct("<BBBBI")
+_CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
 _RESPONSE_PREFIX = struct.Struct("<BBH")
 _STATUS_COUNTERS = struct.Struct("<QQQQII")
 _ResponseValue = TypeVar("_ResponseValue")
@@ -166,6 +167,310 @@ class DAQConfiguration:
 # ``Configuration`` was the Phase 01 public name. Keep it as a source-compatible
 # alias while making the more explicit API name canonical.
 Configuration = DAQConfiguration
+
+
+def _benchmark_vector_bytes(vector: constants.BenchmarkVector) -> int:
+    return {
+        constants.BenchmarkVector.EMPTY: 0,
+        constants.BenchmarkVector.CANONICAL_123456789: 9,
+        constants.BenchmarkVector.BUFFER_64: 64,
+        constants.BenchmarkVector.BUFFER_512: 512,
+        constants.BenchmarkVector.FRAME_COVERAGE: (
+            constants.DATA_FRAME_BYTES - constants.TRAILER_SIZE
+        ),
+    }[vector]
+
+
+@dataclass(frozen=True, slots=True)
+class ChecksumBenchmarkRequest:
+    """One bounded on-device checksum measurement selection."""
+
+    checksum_algorithm: constants.ChecksumAlgorithm
+    vector: constants.BenchmarkVector
+    memory_region: constants.BenchmarkMemoryRegion
+    cache_state: constants.BenchmarkCacheState
+    batch_count: int
+    iterations_per_batch: int
+
+    def __post_init__(self) -> None:
+        if any(
+            isinstance(value, bool)
+            for value in (
+                self.checksum_algorithm,
+                self.vector,
+                self.memory_region,
+                self.cache_state,
+            )
+        ):
+            raise ValueError("checksum benchmark contains an unknown enum value")
+        try:
+            checksum = constants.ChecksumAlgorithm(self.checksum_algorithm)
+            vector = constants.BenchmarkVector(self.vector)
+            region = constants.BenchmarkMemoryRegion(self.memory_region)
+            cache_state = constants.BenchmarkCacheState(self.cache_state)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "checksum benchmark contains an unknown enum value"
+            ) from exc
+        object.__setattr__(self, "checksum_algorithm", checksum)
+        object.__setattr__(self, "vector", vector)
+        object.__setattr__(self, "memory_region", region)
+        object.__setattr__(self, "cache_state", cache_state)
+        if checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ValueError("checksum benchmark algorithm is not enabled")
+        _unsigned("batch_count", self.batch_count, 16)
+        _unsigned("iterations_per_batch", self.iterations_per_batch, 16)
+        if (
+            not 1 <= self.batch_count <= constants.CHECKSUM_BENCHMARK_MAX_BATCH_COUNT
+            or not 1
+            <= self.iterations_per_batch
+            <= constants.CHECKSUM_BENCHMARK_MAX_ITERATIONS_PER_BATCH
+        ):
+            raise ValueError("checksum benchmark repetition count is invalid")
+        if cache_state is constants.BenchmarkCacheState.COLD_INVALIDATED and (
+            region is not constants.BenchmarkMemoryRegion.OCRAM_DMA
+            or vector is constants.BenchmarkVector.EMPTY
+        ):
+            raise ValueError("cold-cache benchmark requires nonempty DMA-visible OCRAM")
+        if (
+            self.operations > constants.CHECKSUM_BENCHMARK_MAX_OPERATIONS
+            or self.processed_bytes > constants.CHECKSUM_BENCHMARK_MAX_PROCESSED_BYTES
+        ):
+            raise ValueError("checksum benchmark exceeds its duration bound")
+
+    @property
+    def buffer_bytes(self) -> int:
+        return _benchmark_vector_bytes(self.vector)
+
+    @property
+    def operations(self) -> int:
+        return self.batch_count * self.iterations_per_batch
+
+    @property
+    def processed_bytes(self) -> int:
+        return self.operations * self.buffer_bytes
+
+    def to_payload(self) -> bytes:
+        """Encode the exact eight-byte benchmark request payload."""
+
+        return _CHECKSUM_BENCHMARK_REQUEST.pack(
+            int(self.checksum_algorithm),
+            int(self.vector),
+            int(self.memory_region),
+            int(self.cache_state),
+            self.batch_count,
+            self.iterations_per_batch,
+        )
+
+    @classmethod
+    def from_payload(
+        cls, payload: bytes | bytearray | memoryview
+    ) -> ChecksumBenchmarkRequest:
+        payload_bytes = bytes(payload)
+        if len(payload_bytes) != constants.CHECKSUM_BENCHMARK_REQUEST_PAYLOAD_SIZE:
+            raise FrameValidationError(
+                "checksum benchmark request body must be eight bytes"
+            )
+        checksum, vector, region, cache_state, batches, iterations = (
+            _CHECKSUM_BENCHMARK_REQUEST.unpack(payload_bytes)
+        )
+        try:
+            return cls(
+                checksum_algorithm=constants.ChecksumAlgorithm(checksum),
+                vector=constants.BenchmarkVector(vector),
+                memory_region=constants.BenchmarkMemoryRegion(region),
+                cache_state=constants.BenchmarkCacheState(cache_state),
+                batch_count=batches,
+                iterations_per_batch=iterations,
+            )
+        except ValueError as exc:
+            raise FrameValidationError(str(exc)) from exc
+
+
+@dataclass(frozen=True, slots=True)
+class ChecksumBenchmarkResult:
+    """Measured device cycles, resource cost, and fixed-point projections."""
+
+    request: ChecksumBenchmarkRequest
+    buffer_bytes: int
+    cycle_counter_hz: int
+    timer_overhead_cycles: int
+    implementation_code_bytes: int
+    table_bytes: int
+    working_ram_bytes: int
+    deterministic_digest: int
+    processed_bytes: int
+    raw_checksum_cycles: int
+    net_checksum_cycles: int
+    cache_setup_cycles: int
+    min_batch_cycles: int
+    max_batch_cycles: int
+    cycles_per_byte_q16: int
+    mb_per_second_q16: int
+    projected_cpu_percent_q16: int
+    target_framed_bytes_per_second: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.request, ChecksumBenchmarkRequest):
+            raise TypeError("request must be a ChecksumBenchmarkRequest")
+        for name in (
+            "buffer_bytes",
+            "cycle_counter_hz",
+            "timer_overhead_cycles",
+            "implementation_code_bytes",
+            "table_bytes",
+            "working_ram_bytes",
+            "deterministic_digest",
+            "min_batch_cycles",
+            "max_batch_cycles",
+            "cycles_per_byte_q16",
+            "mb_per_second_q16",
+            "projected_cpu_percent_q16",
+            "target_framed_bytes_per_second",
+        ):
+            _unsigned(name, getattr(self, name), 32)
+        for name in (
+            "processed_bytes",
+            "raw_checksum_cycles",
+            "net_checksum_cycles",
+            "cache_setup_cycles",
+        ):
+            _unsigned(name, getattr(self, name), 64)
+        expected_table_bytes = (
+            0
+            if self.request.checksum_algorithm is constants.ChecksumAlgorithm.ADLER32
+            else 1024
+        )
+        calibrated_overhead = self.request.operations * self.timer_overhead_cycles
+        if (
+            self.buffer_bytes != self.request.buffer_bytes
+            or self.cycle_counter_hz != constants.CHECKSUM_BENCHMARK_CYCLE_COUNTER_HZ
+            or self.implementation_code_bytes == 0
+            or self.table_bytes != expected_table_bytes
+            or self.working_ram_bytes != 2 * constants.DATA_FRAME_BYTES
+            or self.processed_bytes != self.request.processed_bytes
+            or self.raw_checksum_cycles < calibrated_overhead
+            or self.raw_checksum_cycles - calibrated_overhead
+            != self.net_checksum_cycles
+            or self.min_batch_cycles > self.max_batch_cycles
+            or self.net_checksum_cycles
+            < self.min_batch_cycles * self.request.batch_count
+            or self.net_checksum_cycles
+            > self.max_batch_cycles * self.request.batch_count
+            or (
+                self.request.cache_state
+                is not constants.BenchmarkCacheState.COLD_INVALIDATED
+                and self.cache_setup_cycles != 0
+            )
+            or self.target_framed_bytes_per_second
+            != constants.CHECKSUM_BENCHMARK_TARGET_FRAMED_BYTES_PER_SECOND
+        ):
+            raise ValueError("checksum benchmark measurements are inconsistent")
+        total_cycles = self.net_checksum_cycles + self.cache_setup_cycles
+        if self.processed_bytes == 0:
+            expected_metrics = (0, 0, 0)
+        else:
+            if total_cycles == 0:
+                raise ValueError("nonempty benchmark requires measured cycles")
+            expected_cpb = (total_cycles * 65536) // self.processed_bytes
+            bytes_per_second = (
+                self.cycle_counter_hz * self.processed_bytes
+            ) // total_cycles
+            expected_metrics = (
+                expected_cpb,
+                (bytes_per_second * 65536) // 1_000_000,
+                (expected_cpb * self.target_framed_bytes_per_second * 100)
+                // self.cycle_counter_hz,
+            )
+        observed_metrics = (
+            self.cycles_per_byte_q16,
+            self.mb_per_second_q16,
+            self.projected_cpu_percent_q16,
+        )
+        if observed_metrics != expected_metrics:
+            raise ValueError("checksum benchmark derived metrics disagree")
+
+    @property
+    def cycles_per_byte(self) -> float:
+        return self.cycles_per_byte_q16 / 65536.0
+
+    @property
+    def mb_per_second(self) -> float:
+        return self.mb_per_second_q16 / 65536.0
+
+    @property
+    def projected_cpu_percent(self) -> float:
+        return self.projected_cpu_percent_q16 / 65536.0
+
+    @classmethod
+    def from_payload(
+        cls, payload: bytes | bytearray | memoryview
+    ) -> ChecksumBenchmarkResult:
+        payload_bytes = bytes(payload)
+        _success_prefix(
+            payload_bytes, constants.CHECKSUM_BENCHMARK_RESPONSE_PAYLOAD_SIZE
+        )
+
+        def u32(offset: int) -> int:
+            return struct.unpack_from("<I", payload_bytes, offset)[0]
+
+        def u64(offset: int) -> int:
+            return struct.unpack_from("<Q", payload_bytes, offset)[0]
+
+        request_start = constants.CHECKSUM_BENCHMARK_RESPONSE_CHECKSUM_ALGORITHM_OFFSET
+        request_end = request_start + constants.CHECKSUM_BENCHMARK_REQUEST_PAYLOAD_SIZE
+        return cls(
+            request=ChecksumBenchmarkRequest.from_payload(
+                payload_bytes[request_start:request_end]
+            ),
+            buffer_bytes=u32(constants.CHECKSUM_BENCHMARK_RESPONSE_BUFFER_BYTES_OFFSET),
+            cycle_counter_hz=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_CYCLE_COUNTER_HZ_OFFSET
+            ),
+            timer_overhead_cycles=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_TIMER_OVERHEAD_CYCLES_OFFSET
+            ),
+            implementation_code_bytes=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_IMPLEMENTATION_CODE_BYTES_OFFSET
+            ),
+            table_bytes=u32(constants.CHECKSUM_BENCHMARK_RESPONSE_TABLE_BYTES_OFFSET),
+            working_ram_bytes=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_WORKING_RAM_BYTES_OFFSET
+            ),
+            deterministic_digest=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_DETERMINISTIC_DIGEST_OFFSET
+            ),
+            processed_bytes=u64(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_PROCESSED_BYTES_OFFSET
+            ),
+            raw_checksum_cycles=u64(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_RAW_CHECKSUM_CYCLES_OFFSET
+            ),
+            net_checksum_cycles=u64(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_NET_CHECKSUM_CYCLES_OFFSET
+            ),
+            cache_setup_cycles=u64(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_CACHE_SETUP_CYCLES_OFFSET
+            ),
+            min_batch_cycles=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_MIN_BATCH_CYCLES_OFFSET
+            ),
+            max_batch_cycles=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_MAX_BATCH_CYCLES_OFFSET
+            ),
+            cycles_per_byte_q16=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_CYCLES_PER_BYTE_Q16_OFFSET
+            ),
+            mb_per_second_q16=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_MB_PER_SECOND_Q16_OFFSET
+            ),
+            projected_cpu_percent_q16=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_PROJECTED_CPU_PERCENT_Q16_OFFSET
+            ),
+            target_framed_bytes_per_second=u32(
+                constants.CHECKSUM_BENCHMARK_RESPONSE_TARGET_FRAMED_BYTES_PER_SECOND_OFFSET
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1334,7 +1639,14 @@ class StreamGap:
         )
 
 
-ResponseValue = Info | Configuration | Status | constants.DeviceState | int
+ResponseValue = (
+    Info
+    | Configuration
+    | Status
+    | ChecksumBenchmarkResult
+    | constants.DeviceState
+    | int
+)
 DecodedMessage = AdcBlock | GpioBlock | CommandResponse[ResponseValue] | Frame
 
 
@@ -1376,6 +1688,8 @@ def decode_response(frame: Frame) -> CommandResponse[ResponseValue]:
             value = struct.unpack_from(
                 "<Q", frame.payload, constants.PING_RESPONSE_NONCE_OFFSET
             )[0]
+        elif frame.header.kind is constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE:
+            value = ChecksumBenchmarkResult.from_payload(frame.payload)
     elif frame.header.kind is constants.FrameKind.ERROR_RESPONSE:
         rejected_kind = frame.payload[constants.ERROR_RESPONSE_REJECTED_KIND_OFFSET]
         rejected_version = frame.payload[
@@ -1413,6 +1727,8 @@ __all__ = [
     "AdcChannelView",
     "AdcConverter",
     "AdcSample",
+    "ChecksumBenchmarkRequest",
+    "ChecksumBenchmarkResult",
     "CommandResponse",
     "Configuration",
     "DAQConfiguration",

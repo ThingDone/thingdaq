@@ -15,14 +15,14 @@ namespace constants = teensy_daq::protocol_v1;
 
 int failures = 0;
 
-constexpr std::array<const char *, 7U> kRequestFixtures{
+constexpr std::array<const char *, 8U> kRequestFixtures{
     "info-request.bin",       "configure-request.bin",
     "start-request.bin",      "get-status-request.bin",
     "stop-request.bin",       "reset-stats-request.bin",
-    "ping-request.bin",
+    "ping-request.bin",       "checksum-benchmark-request.bin",
 };
 
-constexpr std::array<constants::CommandKind, 7U> kRequestKinds{
+constexpr std::array<constants::CommandKind, 8U> kRequestKinds{
     constants::CommandKind::kInfo,
     constants::CommandKind::kConfigure,
     constants::CommandKind::kStart,
@@ -30,6 +30,7 @@ constexpr std::array<constants::CommandKind, 7U> kRequestKinds{
     constants::CommandKind::kStop,
     constants::CommandKind::kResetStats,
     constants::CommandKind::kPing,
+    constants::CommandKind::kChecksumBenchmark,
 };
 
 void expect(bool condition, const std::string &message) {
@@ -175,7 +176,7 @@ void testEndianAndChecksum() {
 }
 
 void testGoldenDecode(const std::string &fixture_directory) {
-  const std::array<const char *, 17U> fixtures{
+  const std::array<const char *, 19U> fixtures{
       "adc-data.bin",
       "gpio-data.bin",
       "info-request.bin",
@@ -185,6 +186,7 @@ void testGoldenDecode(const std::string &fixture_directory) {
       "stop-request.bin",
       "reset-stats-request.bin",
       "ping-request.bin",
+      "checksum-benchmark-request.bin",
       "info-response.bin",
       "configure-response.bin",
       "start-response.bin",
@@ -192,6 +194,7 @@ void testGoldenDecode(const std::string &fixture_directory) {
       "stop-response.bin",
       "reset-stats-response.bin",
       "ping-response.bin",
+      "checksum-benchmark-response.bin",
       "error-response.bin",
   };
   for (const char *name : fixtures) {
@@ -240,6 +243,23 @@ void testGoldenDecode(const std::string &fixture_directory) {
   expect(wire::decodeRequest(view(ping_bytes), ping).ok(),
          "decode PING values");
   expect(ping.nonce == 0x0123456789ABCDEFULL, "typed PING nonce");
+
+  wire::Request benchmark{};
+  const std::vector<std::uint8_t> benchmark_bytes =
+      readFixture(fixture_directory, "checksum-benchmark-request.bin");
+  expect(wire::decodeRequest(view(benchmark_bytes), benchmark).ok(),
+         "decode CHECKSUM_BENCHMARK values");
+  expect(benchmark.checksum_benchmark.checksum_algorithm ==
+                 constants::ChecksumAlgorithm::kAdler32 &&
+             benchmark.checksum_benchmark.vector ==
+                 constants::BenchmarkVector::kCanonical123456789 &&
+             benchmark.checksum_benchmark.memory_region ==
+                 constants::BenchmarkMemoryRegion::kDtcmPacket &&
+             benchmark.checksum_benchmark.cache_state ==
+                 constants::BenchmarkCacheState::kHotOrNative &&
+             benchmark.checksum_benchmark.batch_count == 4U &&
+             benchmark.checksum_benchmark.iterations_per_batch == 64U,
+         "typed CHECKSUM_BENCHMARK values");
 }
 
 void testPythonGeneratedCommands(const std::string &fixture_directory,
@@ -316,7 +336,7 @@ void testGoldenEncode(const std::string &fixture_directory,
   info.device_state = constants::DeviceState::kIdle;
   info.supported_stream_mask = 3U;
   info.supported_source_mask = 3U;
-  info.capability_bits = 63U;
+  info.capability_bits = 127U;
   info.gpio_pin_map = {6U, 7U, 8U, 9U, 10U, 11U, 12U, 13U};
   info.hardware_serial = 0x12345678U;
   const std::string build_id = "synthetic-golden-v1";
@@ -388,8 +408,46 @@ void testGoldenEncode(const std::string &fixture_directory,
   expectFrame(response, readFixture(fixture_directory, "ping-response.bin"),
               "PING response golden");
   writeFrame(response_directory, "ping-response.bin", response);
+
+  wire::Request benchmark =
+      request(constants::CommandKind::kChecksumBenchmark, 8U);
+  benchmark.checksum_benchmark.checksum_algorithm =
+      constants::ChecksumAlgorithm::kAdler32;
+  benchmark.checksum_benchmark.vector =
+      constants::BenchmarkVector::kCanonical123456789;
+  benchmark.checksum_benchmark.memory_region =
+      constants::BenchmarkMemoryRegion::kDtcmPacket;
+  benchmark.checksum_benchmark.cache_state =
+      constants::BenchmarkCacheState::kHotOrNative;
+  benchmark.checksum_benchmark.batch_count = 4U;
+  benchmark.checksum_benchmark.iterations_per_batch = 64U;
+  wire::ChecksumBenchmarkResponse benchmark_response{};
+  benchmark_response.request = benchmark.checksum_benchmark;
+  benchmark_response.cycle_counter_hz = 600000000U;
+  benchmark_response.timer_overhead_cycles = 4U;
+  benchmark_response.implementation_code_bytes = 120U;
+  benchmark_response.table_bytes = 0U;
+  benchmark_response.working_ram_bytes = 8192U;
+  benchmark_response.deterministic_digest = 0x12345678U;
+  benchmark_response.raw_checksum_cycles = 10240U;
+  benchmark_response.net_checksum_cycles = 9216U;
+  benchmark_response.cache_setup_cycles = 0U;
+  benchmark_response.min_batch_cycles = 2304U;
+  benchmark_response.max_batch_cycles = 2304U;
+  expect(wire::populateChecksumBenchmarkMetrics(benchmark_response),
+         "derive CHECKSUM_BENCHMARK metrics");
+  expect(wire::encodeChecksumBenchmarkResponse(
+             benchmark, 0U, benchmark_response, response)
+             .ok(),
+         "encode CHECKSUM_BENCHMARK response");
+  expectFrame(response,
+              readFixture(fixture_directory,
+                          "checksum-benchmark-response.bin"),
+              "CHECKSUM_BENCHMARK response golden");
+  writeFrame(response_directory, "checksum-benchmark-response.bin", response);
+
   expect(wire::encodeRejectedFrameResponse(
-             8U, 0xFEU, 1U, constants::ErrorCode::kUnknownFrameKind, response)
+             9U, 0xFEU, 1U, constants::ErrorCode::kUnknownFrameKind, response)
              .ok(),
          "encode generic error response");
   expectFrame(response, readFixture(fixture_directory, "error-response.bin"),

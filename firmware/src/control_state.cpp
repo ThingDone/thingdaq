@@ -204,6 +204,27 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
       return encoded(request, protocol_v1::ErrorCode::kOk,
                      protocol::encodePingResponse(request, run_id_, response),
                      response);
+
+    case protocol_v1::CommandKind::kChecksumBenchmark:
+      if (!capabilityEnabled(
+              protocol_v1::Capability::kChecksumBenchmark)) {
+        return reject(request,
+                      protocol_v1::ErrorCode::kUnsupportedConfiguration,
+                      response);
+      }
+      if (state_ != protocol_v1::DeviceState::kIdle) {
+        return reject(request, protocol_v1::ErrorCode::kInvalidState,
+                      response);
+      }
+      if (readiness.checksum_benchmark_response == nullptr) {
+        return reject(request, readiness.checksum_benchmark_error, response);
+      }
+      return encoded(
+          request, protocol_v1::ErrorCode::kOk,
+          protocol::encodeChecksumBenchmarkResponse(
+              request, run_id_, *readiness.checksum_benchmark_response,
+              response),
+          response);
   }
 
   statistics_.recordCommandRejected(

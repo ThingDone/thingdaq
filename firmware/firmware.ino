@@ -1,5 +1,5 @@
 /*
- * Teensy DAQ Phase 04 synthetic-streaming foundation.
+ * Teensy DAQ Phase 05 checksum-benchmark foundation.
  *
  * Native USB and its chip-derived serial descriptor are initialized by the
  * pinned Teensy core before global C++ construction and setup(). The portable
@@ -7,6 +7,7 @@
  */
 
 #include "src/firmware_runtime.h"
+#include "src/checksum_benchmark_teensy.h"
 #include "src/teensy_clock.h"
 #include "src/teensy_usb.h"
 
@@ -21,7 +22,8 @@ teensy_daq::clock::TeensyTickClock tick_clock{};
 teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream,
                                                        packet_storage,
                                                        tick_clock,
-                                                       teensy_daq::synthetic::Mode::kRealtime};
+                                                       teensy_daq::synthetic::Mode::kRealtime,
+                                                       &teensy_daq::benchmark::teensyRunner()};
 
 }  // namespace
 

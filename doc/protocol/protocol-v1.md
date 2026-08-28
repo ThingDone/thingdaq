@@ -89,6 +89,7 @@ applying a request.
 | `0x14` | `STOP_REQUEST` | Empty |
 | `0x15` | `RESET_STATS_REQUEST` | Empty |
 | `0x16` | `PING_REQUEST` | 8-byte nonce |
+| `0x17` | `CHECKSUM_BENCHMARK_REQUEST` | 8-byte bounded benchmark selection |
 | `0x90` | `INFO_RESPONSE` | Typed identity and capabilities |
 | `0x91` | `CONFIGURE_RESPONSE` | Typed applied configuration |
 | `0x92` | `START_RESPONSE` | Typed applied configuration; new run ID in header |
@@ -96,13 +97,15 @@ applying a request.
 | `0x94` | `STOP_RESPONSE` | Typed final state |
 | `0x95` | `RESET_STATS_RESPONSE` | New statistics generation |
 | `0x96` | `PING_RESPONSE` | Echoed nonce |
+| `0x97` | `CHECKSUM_BENCHMARK_RESPONSE` | 96-byte cycle/resource result |
 | `0x9F` | `ERROR_RESPONSE` | Error for a structurally valid but unknown kind |
 
 The numeric command kind is the request frame-kind byte: INFO is `0x10`,
 CONFIGURE is `0x11`, START is `0x12`, GET_STATUS is `0x13`, STOP is `0x14`,
-RESET_STATS is `0x15`, and PING is `0x16`. A successful or typed-error response
-kind is the command kind ORed with `0x80`; generated mappings enforce this
-relationship. A device copies the request ID into its response, allowing
+RESET_STATS is `0x15`, PING is `0x16`, and CHECKSUM_BENCHMARK is `0x17`. A
+successful or typed-error response kind is the command kind ORed with `0x80`;
+generated mappings enforce this relationship. A device copies the request ID
+into its response, allowing
 control traffic to be matched while ADC and GPIO frames are interspersed.
 Request ID zero is
 reserved for non-control frames; clients increment IDs modulo \(2^{32}\) and
@@ -270,6 +273,7 @@ version, and two reserved zero bytes.
 | STOP | No response | Valid | Valid | Valid |
 | RESET_STATS | No response | Valid | Valid | `INVALID_STATE` |
 | PING | No response | Valid if advertised | Valid if advertised | Valid if advertised |
+| CHECKSUM_BENCHMARK | No response | Valid if advertised | `INVALID_STATE` | `INVALID_STATE` |
 
 ### INFO
 
@@ -330,12 +334,13 @@ Capability bits are independent, one-bit values:
 | `0x00000008` | `SYNTHETIC_SOURCE` | Source mode 1 is supported |
 | `0x00000010` | `RESET_STATS` | RESET_STATS is implemented |
 | `0x00000020` | `PING` | Optional PING is implemented |
+| `0x00000040` | `CHECKSUM_BENCHMARK` | Optional on-device checksum benchmark is implemented |
 
 The first four capability bits must agree with the stream/source masks. Bits
-outside `0x0000003F` are reserved and rejected in protocol v1. PING callers
-must check its capability bit; all other commands in the initial set are
-mandatory. Device states are BOOT = 0, IDLE = 1, CONFIGURED = 2, and RUNNING =
-3. BOOT does not answer commands.
+outside `0x0000007F` are reserved and rejected in protocol v1. PING and
+CHECKSUM_BENCHMARK callers must check their capability bits; all other commands
+in the initial set are mandatory. Device states are BOOT = 0, IDLE = 1,
+CONFIGURED = 2, and RUNNING = 3. BOOT does not answer commands.
 
 ### CONFIGURE
 
@@ -447,6 +452,106 @@ success response is the common prefix followed by the exact nonce. PING changes
 no state or counters. INFO remains the preferred discovery probe because it
 also proves identity and compatibility.
 
+### CHECKSUM_BENCHMARK
+
+CHECKSUM_BENCHMARK is an optional, bounded, on-device measurement command. It
+is valid only in IDLE and never allocates a run ID, changes configuration,
+starts a source, emits data, advances the statistics generation, or changes
+acquisition counters. Command-path diagnostics may account for the accepted
+request normally. CONFIGURED and RUNNING requests return `INVALID_STATE`; an
+implementation that does not advertise capability bit `0x00000040` returns
+`UNSUPPORTED_CONFIGURATION`.
+
+The eight-byte request is:
+
+| Offset | Type | Field | Constraint |
+| ---: | --- | --- | --- |
+| 0 | `u8` | checksum algorithm | Enabled ID 1, 2, or 3 |
+| 1 | `u8` | vector | One ID from the vector table below |
+| 2 | `u8` | memory region | DTCM packet storage (0) or OCRAM DMA storage (1) |
+| 3 | `u8` | cache state | Hot/native (0) or cold-invalidated (1) |
+| 4 | `u16` | batch count | 1 through 8 |
+| 6 | `u16` | iterations per batch | 1 through 4,096 |
+
+| Vector ID | Name | Checksum input bytes | Meaning |
+| ---: | --- | ---: | --- |
+| 0 | `EMPTY` | 0 | Canonical empty input |
+| 1 | `CANONICAL_123456789` | 9 | ASCII `123456789` |
+| 2 | `BUFFER_64` | 64 | Aligned deterministic representative buffer |
+| 3 | `BUFFER_512` | 512 | Aligned deterministic representative buffer |
+| 4 | `FRAME_COVERAGE` | 4,092 | Actual production-encoded GPIO header plus payload, excluding its four-byte trailer |
+
+The operation count is `batch_count * iterations_per_batch`, at most 32,768.
+Processed input is additionally capped at 8,388,608 bytes, so not every pair
+of individually legal repetition counts is legal for every vector. Cold cache
+is meaningful only for a nonempty OCRAM buffer and is rejected for DTCM or the
+empty vector. Both backing allocations are 32-byte aligned, isolated 4,096-byte
+buffers. DTCM represents the packetizer's cacheless CPU storage. OCRAM is in
+the target's DMA-visible `.dmabuffers` region; hot mode reads it through cache,
+while cold mode flushes initial contents and invalidates the complete aligned
+coverage before every measured checksum.
+
+The 96-byte successful result is:
+
+| Offset | Width/type | Field |
+| ---: | --- | --- |
+| 0 | 4 / response prefix | status, reserved zero, error code |
+| 4 | 4 / four `u8` | algorithm, vector, memory region, cache state |
+| 8 | 2 / `u16` | batch count |
+| 10 | 2 / `u16` | iterations per batch |
+| 12 | 4 / `u32` | checksum input bytes per operation |
+| 16 | 4 / `u32` | verified cycle-counter frequency, exactly 600,000,000 Hz |
+| 20 | 4 / `u32` | calibrated timer/read overhead cycles per checksum interval |
+| 24 | 4 / `u32` | selected checksum-body code bytes in the pinned build |
+| 28 | 4 / `u32` | selected lookup-table Flash bytes |
+| 32 | 4 / `u32` | benchmark working RAM bytes, exactly 8,192 |
+| 36 | 4 / `u32` | deterministic digest mixed from every measured checksum result |
+| 40 | 8 / `u64` | processed input bytes across all measured operations |
+| 48 | 8 / `u64` | raw checksum interval cycles |
+| 56 | 8 / `u64` | net checksum cycles after per-operation timer subtraction |
+| 64 | 8 / `u64` | recurring cold-cache setup cycles after timer subtraction |
+| 72 | 4 / `u32` | minimum net checksum cycles in one batch |
+| 76 | 4 / `u32` | maximum net checksum cycles in one batch |
+| 80 | 4 / Q16.16 `u32` | cycles per processed byte, including recurring cache setup |
+| 84 | 4 / Q16.16 `u32` | effective decimal MB/s, including recurring cache setup |
+| 88 | 4 / Q16.16 `u32` | projected CPU percent at the target framed byte rate |
+| 92 | 4 / `u32` | target framed rate, exactly 8,100,000 bytes/s |
+
+The i.MX RT1062 DWT cycle counter is enabled without resetting the shared
+counter and is accepted only when the runtime CPU frequency is exactly 600
+MHz and the counter is observed advancing. The minimum of 32 empty timed
+intervals calibrates read/barrier overhead. Four checksum warm-ups are
+excluded. Interrupts are disabled only from the start counter read through the
+end read for each checksum, and separately for each measured invalidation, so
+USB servicing cannot inflate a sample. The prior interrupt mask is restored
+after every interval. Each interval is shorter than one 32-bit wrap; unsigned
+subtraction handles a single wrap, while all aggregates use `u64`. Out-of-line
+non-IPA checksum bodies, compiler memory barriers, a deterministic mixer, and
+a volatile published digest prevent dead-code elimination or loop hoisting.
+
+For \(N\) processed bytes and
+\(C = \text{net_checksum_cycles} + \text{cache_setup_cycles}\), nonempty
+fixed-point fields are integer floors of:
+
+$$
+\begin{aligned}
+\text{cycles_per_byte_q16} &= \frac{C \cdot 65536}{N}, \\
+\text{bytes_per_second} &= \frac{600000000 \cdot N}{C}, \\
+\text{mb_per_second_q16} &= \frac{\text{bytes_per_second} \cdot 65536}{1000000}, \\
+\text{projected_cpu_percent_q16} &=
+  \frac{\text{cycles_per_byte_q16} \cdot 8100000 \cdot 100}{600000000}.
+\end{aligned}
+$$
+
+For the empty vector these three byte-derived fields are zero, while raw/net
+cycles and the deterministic digest remain meaningful. The wire validator
+also requires
+`raw_checksum_cycles - operations * timer_overhead_cycles == net_checksum_cycles`
+and verifies processed bytes, batch bounds, code/table/RAM claims, and every
+derived field before exposing the result. Code bytes describe the selected
+algorithm body; the shared narrow dispatch is recorded separately in build
+provenance. CRC table bytes are 1,024 and Adler table bytes are zero.
+
 ## Error codes
 
 | Value | Name | Meaning |
@@ -507,8 +612,8 @@ and discard leading garbage as it scans.
 
 ## Golden fixtures and drift
 
-`protocol/fixtures/` contains one complete Adler-32 frame for all 17 v1 frame
-kinds (two data, seven requests, seven typed responses, and one generic error)
+`protocol/fixtures/` contains one complete Adler-32 frame for all 19 v1 frame
+kinds (two data, eight requests, eight typed responses, and one generic error)
 plus a deterministic `manifest.json` with decoded header values, payload
 and frame SHA-256 hashes, checksums, and inline hex for small control frames.
 The ADC vector is the little-endian pair ramp `(0, 1), (2, 3), ...`; the GPIO

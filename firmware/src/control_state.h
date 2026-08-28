@@ -73,6 +73,10 @@ struct DispatchResult {
 struct DispatchReadiness {
   bool start_ready = true;
   bool configuration_ready = true;
+  const protocol::ChecksumBenchmarkResponse *checksum_benchmark_response =
+      nullptr;
+  protocol_v1::ErrorCode checksum_benchmark_error =
+      protocol_v1::ErrorCode::kUnsupportedConfiguration;
 };
 
 class ControlState {

@@ -68,7 +68,7 @@ class ProtocolGenerationDriftTests(unittest.TestCase):
         second = generate_protocol.expected_outputs(self.contract, self.source_bytes)
 
         self.assertEqual(first, second)
-        self.assertEqual(20, len(first))
+        self.assertEqual(22, len(first))
         for path, expected in first.items():
             with self.subTest(path=path.relative_to(REPOSITORY_ROOT)):
                 self.assertTrue(path.is_file())
@@ -282,6 +282,27 @@ class ProtocolGenerationDriftTests(unittest.TestCase):
                 constants.McuId,
                 "McuId",
                 16,
+            ),
+            (
+                "benchmark_vector",
+                self.contract["enums"]["benchmark_vector"],
+                constants.BenchmarkVector,
+                "BenchmarkVector",
+                8,
+            ),
+            (
+                "benchmark_memory_region",
+                self.contract["enums"]["benchmark_memory_region"],
+                constants.BenchmarkMemoryRegion,
+                "BenchmarkMemoryRegion",
+                8,
+            ),
+            (
+                "benchmark_cache_state",
+                self.contract["enums"]["benchmark_cache_state"],
+                constants.BenchmarkCacheState,
+                "BenchmarkCacheState",
+                8,
             ),
         )
 

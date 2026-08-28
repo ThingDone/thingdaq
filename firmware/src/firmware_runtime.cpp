@@ -18,12 +18,30 @@ LoopReport FirmwareRuntime::service() {
   if (transport_.takeCommand(command)) {
     report.command_dispatched = true;
     control::DispatchReadiness readiness{};
+    benchmark::RunResult benchmark_result{};
     if (command.request.kind == protocol_v1::CommandKind::kConfigure) {
       readiness.configuration_ready =
           packet_pipeline_.quiescent() && !synthetic_source_.running();
     } else if (command.request.kind == protocol_v1::CommandKind::kStart) {
       readiness.start_ready =
           packet_pipeline_.readyForStart() && !synthetic_source_.running();
+    } else if (command.request.kind ==
+                   protocol_v1::CommandKind::kChecksumBenchmark &&
+               control_.state() == protocol_v1::DeviceState::kIdle &&
+               checksum_benchmark_ != nullptr) {
+      benchmark_result =
+          checksum_benchmark_->run(command.request.checksum_benchmark);
+      if (benchmark_result.ok()) {
+        readiness.checksum_benchmark_response = &benchmark_result.response;
+        readiness.checksum_benchmark_error = protocol_v1::ErrorCode::kOk;
+      } else if (benchmark_result.status ==
+                 benchmark::RunStatus::kInvalidRequest) {
+        readiness.checksum_benchmark_error =
+            protocol_v1::ErrorCode::kInvalidPayload;
+      } else {
+        readiness.checksum_benchmark_error =
+            protocol_v1::ErrorCode::kInternalError;
+      }
     }
     const control::DispatchResult dispatched =
         control_.dispatch(command.request, response, readiness);

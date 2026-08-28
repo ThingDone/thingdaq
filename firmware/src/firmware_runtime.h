@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "checksum_benchmark.h"
 #include "control_state.h"
 #include "packet_buffer_pipeline.h"
 #include "synthetic_source.h"
@@ -41,12 +42,14 @@ class FirmwareRuntime {
   FirmwareRuntime(usb::CdcByteStream &stream,
                   packet::PacketBufferStorage &packet_storage,
                   synthetic::TickClock &clock,
-                  synthetic::Mode source_mode = synthetic::Mode::kRealtime)
+                  synthetic::Mode source_mode = synthetic::Mode::kRealtime,
+                  benchmark::Runner *checksum_benchmark = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
         clock_(clock),
-        transport_{stream, control_.statistics(), &packet_pipeline_} {}
+        transport_{stream, control_.statistics(), &packet_pipeline_},
+        checksum_benchmark_(checksum_benchmark) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -88,6 +91,7 @@ class FirmwareRuntime {
   synthetic::SyntheticSource synthetic_source_;
   synthetic::TickClock &clock_;
   usb::CdcTransport transport_;
+  benchmark::Runner *checksum_benchmark_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
 };
 

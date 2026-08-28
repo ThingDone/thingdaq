@@ -36,6 +36,7 @@ class ChecksumCandidateTests(unittest.TestCase):
                     "-fno-rtti",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
+                    str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",
                     str(executable),
                 ],

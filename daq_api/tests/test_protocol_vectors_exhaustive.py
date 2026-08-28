@@ -28,6 +28,7 @@ _KIND_NAMES = {
     0x14: "STOP_REQUEST",
     0x15: "RESET_STATS_REQUEST",
     0x16: "PING_REQUEST",
+    0x17: "CHECKSUM_BENCHMARK_REQUEST",
     0x90: "INFO_RESPONSE",
     0x91: "CONFIGURE_RESPONSE",
     0x92: "START_RESPONSE",
@@ -35,6 +36,7 @@ _KIND_NAMES = {
     0x94: "STOP_RESPONSE",
     0x95: "RESET_STATS_RESPONSE",
     0x96: "PING_RESPONSE",
+    0x97: "CHECKSUM_BENCHMARK_RESPONSE",
     0x9F: "ERROR_RESPONSE",
 }
 
@@ -71,7 +73,7 @@ def _info_payload() -> bytes:
         payload,
         8,
         14,
-        0x3F,
+        0x7F,
         8_000_000,
         4_096,
         1_024,
@@ -128,6 +130,12 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
             0x16,
             struct.pack("<Q", 0x0123456789ABCDEF),
             request_id=7,
+        ),
+        _GoldenVector(
+            "checksum-benchmark-request",
+            0x17,
+            struct.pack("<BBBBHH", 1, 1, 0, 0, 4, 64),
+            request_id=8,
         ),
         _GoldenVector("info-response", 0x90, _info_payload(), request_id=1),
         _GoldenVector(
@@ -189,11 +197,45 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
             request_id=7,
         ),
         _GoldenVector(
+            "checksum-benchmark-response",
+            0x97,
+            struct.pack(
+                "<BBHBBBBHHIIIIIIIQQQQIIIIII",
+                0,
+                0,
+                0,
+                1,
+                1,
+                0,
+                0,
+                4,
+                64,
+                9,
+                600_000_000,
+                4,
+                120,
+                0,
+                8_192,
+                0x12345678,
+                2_304,
+                10_240,
+                9_216,
+                0,
+                2_304,
+                2_304,
+                262_144,
+                9_830_400,
+                353_894,
+                8_100_000,
+            ),
+            request_id=8,
+        ),
+        _GoldenVector(
             "error-response",
             0x9F,
             struct.pack("<BBHBBH", 1, 0, 2, 0xFE, 1, 0),
             flags=0x8000,
-            request_id=8,
+            request_id=9,
         ),
     )
 
@@ -238,8 +280,8 @@ class ExhaustiveProtocolVectorTests(unittest.TestCase):
 
     def test_every_frame_kind_matches_an_independent_wire_image(self) -> None:
         vectors = _golden_vectors()
-        self.assertEqual(17, len(vectors))
-        self.assertEqual(17, len({vector.kind for vector in vectors}))
+        self.assertEqual(19, len(vectors))
+        self.assertEqual(19, len({vector.kind for vector in vectors}))
         self.assertEqual(
             {f"{vector.name}.bin" for vector in vectors},
             {path.name for path in FIXTURE_DIRECTORY.glob("*.bin")},

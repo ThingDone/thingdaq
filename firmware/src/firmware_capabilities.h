@@ -40,7 +40,7 @@ constexpr std::uint8_t sourceBit(protocol_v1::Source source) {
       1U << static_cast<std::uint8_t>(source));
 }
 
-// Phase 04 implements both deterministic stream layouts through the synthetic
+// Phase 05 implements both deterministic stream layouts through the synthetic
 // source. Physical ownership stays unadvertised until the peripheral phases
 // replace these generators.
 inline constexpr std::uint8_t kSupportedStreamMask =
@@ -53,7 +53,8 @@ inline constexpr std::uint32_t kCapabilityBits =
     capabilityBit(protocol_v1::Capability::kGpioStream) |
     capabilityBit(protocol_v1::Capability::kSyntheticSource) |
     capabilityBit(protocol_v1::Capability::kResetStats) |
-    capabilityBit(protocol_v1::Capability::kPing);
+    capabilityBit(protocol_v1::Capability::kPing) |
+    capabilityBit(protocol_v1::Capability::kChecksumBenchmark);
 inline constexpr std::uint32_t kAdc0PhaseTicks = 0U;
 
 inline constexpr CapabilityMetadata kMetadata{

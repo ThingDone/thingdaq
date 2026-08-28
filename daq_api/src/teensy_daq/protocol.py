@@ -15,6 +15,7 @@ BytesLike = bytes | bytearray | memoryview
 _HEADER = struct.Struct(constants.HEADER_STRUCT_FORMAT)
 _TRAILER = struct.Struct("<I")
 _CONFIGURATION = struct.Struct("<BBBBI")
+_CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
 _RESPONSE_PREFIX = struct.Struct("<BBH")
 _DATA_KINDS = frozenset({constants.FrameKind.ADC_DATA, constants.FrameKind.GPIO_DATA})
 _REQUEST_KINDS = frozenset(constants.REQUEST_RESPONSE_KIND)
@@ -486,6 +487,168 @@ def _validate_configuration(payload: bytes, offset: int, *, applied: bool) -> No
         raise FrameValidationError("configuration data frame size must be 4096")
 
 
+def _benchmark_vector_bytes(vector: constants.BenchmarkVector) -> int:
+    return {
+        constants.BenchmarkVector.EMPTY: 0,
+        constants.BenchmarkVector.CANONICAL_123456789: 9,
+        constants.BenchmarkVector.BUFFER_64: 64,
+        constants.BenchmarkVector.BUFFER_512: 512,
+        constants.BenchmarkVector.FRAME_COVERAGE: (
+            constants.DATA_FRAME_BYTES - constants.TRAILER_SIZE
+        ),
+    }[vector]
+
+
+def _validate_checksum_benchmark_request(payload: bytes, offset: int = 0) -> None:
+    (
+        raw_checksum,
+        raw_vector,
+        raw_region,
+        raw_cache_state,
+        batch_count,
+        iterations_per_batch,
+    ) = _CHECKSUM_BENCHMARK_REQUEST.unpack_from(payload, offset)
+    try:
+        checksum = constants.ChecksumAlgorithm(raw_checksum)
+        vector = constants.BenchmarkVector(raw_vector)
+        region = constants.BenchmarkMemoryRegion(raw_region)
+        cache_state = constants.BenchmarkCacheState(raw_cache_state)
+    except ValueError as exc:
+        raise FrameValidationError(
+            "checksum benchmark contains an unknown enum value"
+        ) from exc
+    if checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
+        raise FrameValidationError("checksum benchmark algorithm is not enabled")
+    if (
+        not 1 <= batch_count <= constants.CHECKSUM_BENCHMARK_MAX_BATCH_COUNT
+        or not 1
+        <= iterations_per_batch
+        <= constants.CHECKSUM_BENCHMARK_MAX_ITERATIONS_PER_BATCH
+    ):
+        raise FrameValidationError("checksum benchmark repetition count is invalid")
+    if cache_state is constants.BenchmarkCacheState.COLD_INVALIDATED and (
+        region is not constants.BenchmarkMemoryRegion.OCRAM_DMA
+        or vector is constants.BenchmarkVector.EMPTY
+    ):
+        raise FrameValidationError(
+            "cold-cache benchmark requires nonempty DMA-visible OCRAM"
+        )
+    operations = batch_count * iterations_per_batch
+    processed_bytes = operations * _benchmark_vector_bytes(vector)
+    if (
+        operations > constants.CHECKSUM_BENCHMARK_MAX_OPERATIONS
+        or processed_bytes > constants.CHECKSUM_BENCHMARK_MAX_PROCESSED_BYTES
+    ):
+        raise FrameValidationError("checksum benchmark exceeds its duration bound")
+
+
+def _validate_checksum_benchmark_response(payload: bytes) -> None:
+    _validate_checksum_benchmark_request(
+        payload, constants.CHECKSUM_BENCHMARK_RESPONSE_CHECKSUM_ALGORITHM_OFFSET
+    )
+    vector = constants.BenchmarkVector(
+        payload[constants.CHECKSUM_BENCHMARK_RESPONSE_VECTOR_OFFSET]
+    )
+    checksum = constants.ChecksumAlgorithm(
+        payload[constants.CHECKSUM_BENCHMARK_RESPONSE_CHECKSUM_ALGORITHM_OFFSET]
+    )
+    cache_state = constants.BenchmarkCacheState(
+        payload[constants.CHECKSUM_BENCHMARK_RESPONSE_CACHE_STATE_OFFSET]
+    )
+    batch_count, iterations_per_batch = struct.unpack_from(
+        "<HH", payload, constants.CHECKSUM_BENCHMARK_RESPONSE_BATCH_COUNT_OFFSET
+    )
+    operations = batch_count * iterations_per_batch
+
+    def u32(offset: int) -> int:
+        return struct.unpack_from("<I", payload, offset)[0]
+
+    def u64(offset: int) -> int:
+        return struct.unpack_from("<Q", payload, offset)[0]
+
+    buffer_bytes = u32(constants.CHECKSUM_BENCHMARK_RESPONSE_BUFFER_BYTES_OFFSET)
+    counter_hz = u32(constants.CHECKSUM_BENCHMARK_RESPONSE_CYCLE_COUNTER_HZ_OFFSET)
+    overhead_cycles = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_TIMER_OVERHEAD_CYCLES_OFFSET
+    )
+    code_bytes = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_IMPLEMENTATION_CODE_BYTES_OFFSET
+    )
+    table_bytes = u32(constants.CHECKSUM_BENCHMARK_RESPONSE_TABLE_BYTES_OFFSET)
+    working_ram_bytes = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_WORKING_RAM_BYTES_OFFSET
+    )
+    processed_bytes = u64(constants.CHECKSUM_BENCHMARK_RESPONSE_PROCESSED_BYTES_OFFSET)
+    raw_cycles = u64(constants.CHECKSUM_BENCHMARK_RESPONSE_RAW_CHECKSUM_CYCLES_OFFSET)
+    net_cycles = u64(constants.CHECKSUM_BENCHMARK_RESPONSE_NET_CHECKSUM_CYCLES_OFFSET)
+    cache_setup_cycles = u64(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_CACHE_SETUP_CYCLES_OFFSET
+    )
+    min_batch_cycles = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_MIN_BATCH_CYCLES_OFFSET
+    )
+    max_batch_cycles = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_MAX_BATCH_CYCLES_OFFSET
+    )
+    expected_table_bytes = (
+        0 if checksum is constants.ChecksumAlgorithm.ADLER32 else 1024
+    )
+    expected_buffer_bytes = _benchmark_vector_bytes(vector)
+    expected_processed_bytes = operations * expected_buffer_bytes
+    calibrated_overhead = operations * overhead_cycles
+    if (
+        payload[constants.CHECKSUM_BENCHMARK_RESPONSE_RESERVED_OFFSET] != 0
+        or counter_hz != constants.CHECKSUM_BENCHMARK_CYCLE_COUNTER_HZ
+        or code_bytes == 0
+        or table_bytes != expected_table_bytes
+        or working_ram_bytes != 2 * constants.DATA_FRAME_BYTES
+        or buffer_bytes != expected_buffer_bytes
+        or processed_bytes != expected_processed_bytes
+        or raw_cycles < calibrated_overhead
+        or raw_cycles - calibrated_overhead != net_cycles
+        or min_batch_cycles > max_batch_cycles
+        or net_cycles < min_batch_cycles * batch_count
+        or net_cycles > max_batch_cycles * batch_count
+        or (
+            cache_state is not constants.BenchmarkCacheState.COLD_INVALIDATED
+            and cache_setup_cycles != 0
+        )
+    ):
+        raise FrameValidationError("checksum benchmark measurements are inconsistent")
+
+    target_rate = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_TARGET_FRAMED_BYTES_PER_SECOND_OFFSET
+    )
+    cycles_per_byte_q16 = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_CYCLES_PER_BYTE_Q16_OFFSET
+    )
+    mb_per_second_q16 = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_MB_PER_SECOND_Q16_OFFSET
+    )
+    projected_cpu_q16 = u32(
+        constants.CHECKSUM_BENCHMARK_RESPONSE_PROJECTED_CPU_PERCENT_Q16_OFFSET
+    )
+    if target_rate != constants.CHECKSUM_BENCHMARK_TARGET_FRAMED_BYTES_PER_SECOND:
+        raise FrameValidationError("checksum benchmark target rate is incompatible")
+    total_cycles = net_cycles + cache_setup_cycles
+    if processed_bytes == 0:
+        expected_metrics = (0, 0, 0)
+    else:
+        if total_cycles == 0:
+            raise FrameValidationError("nonempty benchmark requires measured cycles")
+        expected_cpb = (total_cycles * 65536) // processed_bytes
+        bytes_per_second = (counter_hz * processed_bytes) // total_cycles
+        expected_mb_per_second = (bytes_per_second * 65536) // 1_000_000
+        expected_cpu = (expected_cpb * target_rate * 100) // counter_hz
+        expected_metrics = (expected_cpb, expected_mb_per_second, expected_cpu)
+    if (
+        cycles_per_byte_q16,
+        mb_per_second_q16,
+        projected_cpu_q16,
+    ) != expected_metrics:
+        raise FrameValidationError("checksum benchmark derived metrics disagree")
+
+
 def _validate_info_payload(payload: bytes) -> None:
     if payload[constants.INFO_RESPONSE_RESERVED_0_OFFSET] != 0:
         raise FrameValidationError("INFO reserved_0 must be zero")
@@ -671,6 +834,9 @@ def _validate_payload(header: FrameHeader, payload: bytes) -> None:
     if header.kind is constants.FrameKind.CONFIGURE_REQUEST:
         _validate_configuration(payload, 0, applied=False)
         return
+    if header.kind is constants.FrameKind.CHECKSUM_BENCHMARK_REQUEST:
+        _validate_checksum_benchmark_request(payload)
+        return
     if header.kind in _REQUEST_KINDS:
         return
 
@@ -719,6 +885,8 @@ def _validate_payload(header: FrameHeader, payload: bytes) -> None:
         and payload[constants.PING_RESPONSE_RESERVED_OFFSET] != 0
     ):
         raise FrameValidationError("PING response reserved byte must be zero")
+    elif header.kind is constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE:
+        _validate_checksum_benchmark_response(payload)
 
 
 def encode_frame(

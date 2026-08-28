@@ -43,6 +43,7 @@ class ProtocolPrimitiveTests(unittest.TestCase):
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
                     str(PROTOCOL_SOURCE),
+                    str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",
                     str(executable),
                 ],
@@ -107,6 +108,20 @@ class ProtocolPrimitiveTests(unittest.TestCase):
                     struct.pack("<Q", 0x0123456789ABCDEF),
                     7,
                 ),
+                (
+                    "checksum-benchmark-request.bin",
+                    constants.FrameKind.CHECKSUM_BENCHMARK_REQUEST,
+                    struct.pack(
+                        "<BBBBHH",
+                        constants.ChecksumAlgorithm.ADLER32,
+                        constants.BenchmarkVector.CANONICAL_123456789,
+                        constants.BenchmarkMemoryRegion.DTCM_PACKET,
+                        constants.BenchmarkCacheState.HOT_OR_NATIVE,
+                        4,
+                        64,
+                    ),
+                    8,
+                ),
             )
             for name, kind, payload, request_id in request_specs:
                 python_wire = encode_frame(
@@ -154,7 +169,12 @@ class ProtocolPrimitiveTests(unittest.TestCase):
                     6,
                 ),
                 ("ping-response.bin", constants.FrameKind.PING_RESPONSE, 7),
-                ("error-response.bin", constants.FrameKind.ERROR_RESPONSE, 8),
+                (
+                    "checksum-benchmark-response.bin",
+                    constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE,
+                    8,
+                ),
+                ("error-response.bin", constants.FrameKind.ERROR_RESPONSE, 9),
             )
             for name, kind, request_id in response_specs:
                 cpp_wire = (cpp_responses / name).read_bytes()

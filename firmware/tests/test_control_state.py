@@ -44,6 +44,7 @@ class FirmwareControlStateTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "control_state.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
+                    str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",
                     str(executable),
                 ],

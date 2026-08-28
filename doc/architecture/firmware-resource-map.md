@@ -18,7 +18,7 @@ related:
 
 This is the human-readable projection of the compile-time registry in
 `firmware/src/board_config.h`. Numeric allocations are reserved now so future
-acquisition modules cannot silently compete. Phase 04 does not enable the PIT,
+acquisition modules cannot silently compete. Phase 05 does not enable the PIT,
 XBAR, ADC_ETC, or eDMA acquisition path, but it advertises both data layouts
 for the CPU-generated synthetic source. The generators and packetizer remain
 cooperative and do not claim physical acquisition resources. See
@@ -159,8 +159,10 @@ frames per service call and waits when no packet buffer is free.
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
-| **RAM1 subtotal** |  |  | **401,824** |  |  |
-| **RAM2 subtotal** |  |  | **97,280** |  |  |
+| Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
+| Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
+| **RAM1 subtotal** |  |  | **405,920** |  |  |
+| **RAM2 subtotal** |  |  | **101,376** |  |  |
 
 The application packet pool is instantiated now as aligned ordinary global
 storage in cacheless DTCM/RAM1. Teensy USB Serial copies from it into the
@@ -172,6 +174,15 @@ explicit cache maintenance at ownership transitions. Compile-time checks bind
 the packet storage type to 393,216 bytes, cap pipeline metadata at 4,096 bytes,
 and reject zero-sized, non-power-of-two, misaligned, or over-budget registry
 entries.
+
+The optional IDLE-only checksum benchmark owns no PIT, XBAR, ADC_ETC, eDMA, or
+USB resource. Its ordinary global buffer is link-verified inside DTCM; its
+`.dmabuffers` global is link-verified inside DMA-visible OCRAM. Both are exact,
+isolated 4,096-byte allocations so a whole-line cache invalidation cannot harm
+another owner. The DWT counter is enabled without resetting it, each timed
+interval restores the prior interrupt mask, and no benchmark work overlaps an
+acquisition epoch. The build manifest records both addresses and the combined
+8,192-byte working set.
 
 ## Ownership transitions
 

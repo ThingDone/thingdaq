@@ -14,6 +14,7 @@
 namespace {
 
 namespace app = teensy_daq::runtime;
+namespace benchmark = teensy_daq::benchmark;
 namespace board = teensy_daq::board;
 namespace constants = teensy_daq::protocol_v1;
 namespace control = teensy_daq::control;
@@ -96,6 +97,38 @@ wire::CommandFrame pingRequest(std::uint32_t request_id,
   return frame;
 }
 
+wire::CommandFrame checksumBenchmarkRequest(std::uint32_t request_id) {
+  std::array<std::uint8_t,
+             constants::kChecksumBenchmarkRequestPayloadSize>
+      payload{};
+  payload[constants::kChecksumBenchmarkRequestChecksumAlgorithmOffset] =
+      static_cast<std::uint8_t>(constants::ChecksumAlgorithm::kAdler32);
+  payload[constants::kChecksumBenchmarkRequestVectorOffset] =
+      static_cast<std::uint8_t>(constants::BenchmarkVector::kBuffer64);
+  payload[constants::kChecksumBenchmarkRequestMemoryRegionOffset] =
+      static_cast<std::uint8_t>(
+          constants::BenchmarkMemoryRegion::kDtcmPacket);
+  payload[constants::kChecksumBenchmarkRequestCacheStateOffset] =
+      static_cast<std::uint8_t>(
+          constants::BenchmarkCacheState::kHotOrNative);
+  expect(wire::storeU16(
+             {payload.data(), payload.size()},
+             constants::kChecksumBenchmarkRequestBatchCountOffset, 1U) &&
+             wire::storeU16(
+                 {payload.data(), payload.size()},
+                 constants::kChecksumBenchmarkRequestIterationsPerBatchOffset,
+                 1U),
+         "encode benchmark repetition counts");
+  wire::FrameFields fields{};
+  fields.kind = constants::FrameKind::kChecksumBenchmarkRequest;
+  fields.request_id = request_id;
+  wire::CommandFrame frame{};
+  expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame)
+             .ok(),
+         "encode CHECKSUM_BENCHMARK request");
+  return frame;
+}
+
 class FakeCdcStream final : public usb::CdcByteStream {
  public:
   usb::IoCount available() override {
@@ -148,6 +181,46 @@ class FakeTickClock final : public synthetic::TickClock {
   std::uint64_t nowTicks() override { return ticks; }
 
   std::uint64_t ticks = 0U;
+};
+
+class FakeBenchmarkPlatform final : public benchmark::Platform {
+ public:
+  bool beginCycleCounter(std::uint32_t &frequency_hz) override {
+    frequency_hz = constants::kChecksumBenchmarkCycleCounterHz;
+    pair_count_ = 0U;
+    pair_open_ = false;
+    return true;
+  }
+
+  std::uint32_t readCycles() override {
+    if (!pair_open_) {
+      pair_open_ = true;
+      return cycles_;
+    }
+    cycles_ += pair_count_ <
+                       constants::kChecksumBenchmarkTimerCalibrationSamples
+                   ? 4U
+                   : 104U;
+    ++pair_count_;
+    pair_open_ = false;
+    return cycles_;
+  }
+
+  std::uint32_t enterCritical() override {
+    ++critical_entries;
+    return 0U;
+  }
+  void exitCritical(std::uint32_t) override { ++critical_exits; }
+  void flushDelete(void *, std::size_t) override {}
+  void invalidate(void *, std::size_t) override {}
+
+  std::uint32_t critical_entries = 0U;
+  std::uint32_t critical_exits = 0U;
+
+ private:
+  std::uint32_t cycles_ = 0U;
+  std::uint32_t pair_count_ = 0U;
+  bool pair_open_ = false;
 };
 
 struct DrainResult {
@@ -669,6 +742,61 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
          "interleaved lifecycle retained large-request and partial-write accounting");
 }
 
+void testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState() {
+  FakeCdcStream stream{};
+  packet::PacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  FakeBenchmarkPlatform platform{};
+  benchmark::Buffer dtcm{};
+  benchmark::Buffer ocram{};
+  benchmark::Runner checksum_benchmark{platform, dtcm, ocram};
+  app::FirmwareRuntime firmware{
+      stream, packet_storage, clock, synthetic::Mode::kRealtime,
+      &checksum_benchmark};
+  expect(firmware.begin(9876U), "benchmark runtime completes BOOT");
+  const teensy_daq::stats::Snapshot before =
+      firmware.statistics().snapshot();
+
+  stream.appendInput(checksumBenchmarkRequest(301U));
+  const DrainResult drained = drain(firmware, stream);
+  expect(drained.quiescent && firmware.state() == constants::DeviceState::kIdle,
+         "benchmark round trip returns with runtime in IDLE");
+  const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
+  expect(frames.size() == 1U &&
+             frames[0].header.kind ==
+                 constants::FrameKind::kChecksumBenchmarkResponse &&
+             responseError(frames[0]) == constants::ErrorCode::kOk,
+         "runtime emits one typed benchmark response");
+  if (frames.size() == 1U) {
+    std::uint64_t raw_cycles = 0U;
+    std::uint64_t net_cycles = 0U;
+    expect(wire::loadU64(
+               frames[0].payload,
+               constants::kChecksumBenchmarkResponseRawChecksumCyclesOffset,
+               raw_cycles) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kChecksumBenchmarkResponseNetChecksumCyclesOffset,
+                   net_cycles) &&
+               raw_cycles == 104U && net_cycles == 100U,
+           "runtime transports calibrated on-device cycle fields unchanged");
+  }
+  const teensy_daq::stats::Snapshot after =
+      firmware.statistics().snapshot();
+  expect(after.generation == before.generation &&
+             after.adc_frames_emitted == before.adc_frames_emitted &&
+             after.gpio_frames_emitted == before.gpio_frames_emitted &&
+             after.adc_items_dropped == before.adc_items_dropped &&
+             after.gpio_items_dropped == before.gpio_items_dropped &&
+             firmware.packetSnapshot().run_id == 0U &&
+             !firmware.syntheticSnapshot().running,
+         "benchmark leaves acquisition epoch, source, and counters untouched");
+  expect(platform.critical_entries == platform.critical_exits &&
+             platform.critical_entries ==
+                 constants::kChecksumBenchmarkTimerCalibrationSamples + 1U,
+         "runtime benchmark excludes interrupts only during timed intervals");
+}
+
 }  // namespace
 
 int main() {
@@ -676,6 +804,7 @@ int main() {
   testSyntheticDataCountersReachStatus();
   testStartupSchedulingJitterFitsPacketPool();
   testStopDrainGatesNextStartAndPreventsStaleRunData();
+  testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState();
   if (failures != 0) {
     std::cerr << failures << " firmware runtime assertion(s) failed\n";
     return 1;

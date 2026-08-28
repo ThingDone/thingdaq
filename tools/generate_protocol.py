@@ -186,6 +186,26 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     if adc_coverage != gpio_coverage:
         raise ContractError("ADC and GPIO frames must cover equal nominal time")
 
+    benchmark = contract["checksum_benchmark"]
+    positive_benchmark_fields = (
+        "cycle_counter_hz",
+        "target_framed_bytes_per_second",
+        "max_batch_count",
+        "max_iterations_per_batch",
+        "max_operations",
+        "max_processed_bytes",
+        "timer_calibration_samples",
+        "warmup_operations",
+    )
+    if any(int(benchmark[name]) <= 0 for name in positive_benchmark_fields):
+        raise ContractError("checksum benchmark bounds must all be positive")
+    if int(benchmark["cycle_counter_hz"]) != 600_000_000:
+        raise ContractError("checksum benchmark DWT frequency must be 600 MHz")
+    if int(benchmark["max_batch_count"]) * int(
+        benchmark["max_iterations_per_batch"]
+    ) > int(benchmark["max_operations"]):
+        raise ContractError("checksum benchmark batch bounds exceed operation bound")
+
     flag_values = enum_map(contract["flags"])
     validate_enum_width("flags", contract["flags"], 16)
     if any(value == 0 or value & (value - 1) for value in flag_values.values()):
@@ -296,6 +316,9 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         "source": 8,
         "board_id": 16,
         "mcu_id": 16,
+        "benchmark_vector": 8,
+        "benchmark_memory_region": 8,
+        "benchmark_cache_state": 8,
     }.items():
         enum_map(contract["enums"][enum_name])
         validate_enum_width(enum_name, contract["enums"][enum_name], bits)
@@ -353,6 +376,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     trailer = contract["trailer"]
     limits = contract["limits"]
     timing = contract["timing"]
+    benchmark = contract["checksum_benchmark"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -410,6 +434,26 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"GPIO_SAMPLE_RATE_HZ = {int(timing['gpio_sample_rate_hz'])}",
         f"GPIO_SAMPLE_PERIOD_TICKS = {int(timing['gpio_sample_period_ticks'])}",
         f"FRAME_COVERAGE_TICKS = {coverage_ticks}",
+        f"CHECKSUM_BENCHMARK_CYCLE_COUNTER_HZ = {int(benchmark['cycle_counter_hz'])}",
+        (
+            "CHECKSUM_BENCHMARK_TARGET_FRAMED_BYTES_PER_SECOND = "
+            f"{int(benchmark['target_framed_bytes_per_second'])}"
+        ),
+        f"CHECKSUM_BENCHMARK_MAX_BATCH_COUNT = {int(benchmark['max_batch_count'])}",
+        (
+            "CHECKSUM_BENCHMARK_MAX_ITERATIONS_PER_BATCH = "
+            f"{int(benchmark['max_iterations_per_batch'])}"
+        ),
+        f"CHECKSUM_BENCHMARK_MAX_OPERATIONS = {int(benchmark['max_operations'])}",
+        (
+            "CHECKSUM_BENCHMARK_MAX_PROCESSED_BYTES = "
+            f"{int(benchmark['max_processed_bytes'])}"
+        ),
+        (
+            "CHECKSUM_BENCHMARK_TIMER_CALIBRATION_SAMPLES = "
+            f"{int(benchmark['timer_calibration_samples'])}"
+        ),
+        f"CHECKSUM_BENCHMARK_WARMUP_OPERATIONS = {int(benchmark['warmup_operations'])}",
         f"ADC_BYTES_PER_PAIR = {int(layouts['adc']['bytes_per_item'])}",
         f"ADC_PAIRS_PER_FRAME = {int(layouts['adc']['items_per_frame'])}",
         f"ADC_RESOLUTION_BITS = {int(layouts['adc']['resolution_bits'])}",
@@ -452,6 +496,16 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.extend(python_enum("Source", contract["enums"]["source"]))
     lines.extend(python_enum("BoardId", contract["enums"]["board_id"]))
     lines.extend(python_enum("McuId", contract["enums"]["mcu_id"]))
+    lines.extend(python_enum("BenchmarkVector", contract["enums"]["benchmark_vector"]))
+    lines.extend(
+        python_enum(
+            "BenchmarkMemoryRegion",
+            contract["enums"]["benchmark_memory_region"],
+        )
+    )
+    lines.extend(
+        python_enum("BenchmarkCacheState", contract["enums"]["benchmark_cache_state"])
+    )
 
     lines.extend(
         [
@@ -585,6 +639,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     trailer = contract["trailer"]
     limits = contract["limits"]
     timing = contract["timing"]
+    benchmark = contract["checksum_benchmark"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -651,6 +706,43 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             f"{int(timing['gpio_sample_period_ticks'])}U;"
         ),
         f"inline constexpr std::uint32_t kFrameCoverageTicks = {coverage_ticks}U;",
+        (
+            "inline constexpr std::uint32_t kChecksumBenchmarkCycleCounterHz = "
+            f"{int(benchmark['cycle_counter_hz'])}U;"
+        ),
+        (
+            "inline constexpr std::uint32_t "
+            "kChecksumBenchmarkTargetFramedBytesPerSecond = "
+            f"{int(benchmark['target_framed_bytes_per_second'])}U;"
+        ),
+        (
+            "inline constexpr std::uint16_t kChecksumBenchmarkMaxBatchCount = "
+            f"{int(benchmark['max_batch_count'])}U;"
+        ),
+        (
+            "inline constexpr std::uint16_t "
+            "kChecksumBenchmarkMaxIterationsPerBatch = "
+            f"{int(benchmark['max_iterations_per_batch'])}U;"
+        ),
+        (
+            "inline constexpr std::uint32_t kChecksumBenchmarkMaxOperations = "
+            f"{int(benchmark['max_operations'])}U;"
+        ),
+        (
+            "inline constexpr std::uint32_t "
+            "kChecksumBenchmarkMaxProcessedBytes = "
+            f"{int(benchmark['max_processed_bytes'])}U;"
+        ),
+        (
+            "inline constexpr std::uint16_t "
+            "kChecksumBenchmarkTimerCalibrationSamples = "
+            f"{int(benchmark['timer_calibration_samples'])}U;"
+        ),
+        (
+            "inline constexpr std::uint16_t "
+            "kChecksumBenchmarkWarmupOperations = "
+            f"{int(benchmark['warmup_operations'])}U;"
+        ),
         f"inline constexpr std::size_t kAdcBytesPerPair = {int(layouts['adc']['bytes_per_item'])}U;",
         f"inline constexpr std::size_t kAdcPairsPerFrame = {int(layouts['adc']['items_per_frame'])}U;",
         f"inline constexpr std::uint8_t kAdcResolutionBits = {int(layouts['adc']['resolution_bits'])}U;",
@@ -689,6 +781,25 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.extend(cpp_enum("Source", "std::uint8_t", contract["enums"]["source"]))
     lines.extend(cpp_enum("BoardId", "std::uint16_t", contract["enums"]["board_id"]))
     lines.extend(cpp_enum("McuId", "std::uint16_t", contract["enums"]["mcu_id"]))
+    lines.extend(
+        cpp_enum(
+            "BenchmarkVector", "std::uint8_t", contract["enums"]["benchmark_vector"]
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "BenchmarkMemoryRegion",
+            "std::uint8_t",
+            contract["enums"]["benchmark_memory_region"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "BenchmarkCacheState",
+            "std::uint8_t",
+            contract["enums"]["benchmark_cache_state"],
+        )
+    )
 
     lines.extend(
         [

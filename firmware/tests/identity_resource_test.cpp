@@ -130,12 +130,13 @@ static_assert(teensy_daq::control::kSyntheticConfiguration.stream_mask ==
 static_assert(teensy_daq::control::kSyntheticConfiguration.source ==
               teensy_daq::protocol_v1::Source::kSynthetic);
 static_assert(teensy_daq::identity::kFirmwareVersion.major == 0U);
-static_assert(teensy_daq::identity::kFirmwareVersion.minor == 4U);
+static_assert(teensy_daq::identity::kFirmwareVersion.minor == 5U);
 static_assert(teensy_daq::identity::kFirmwareVersion.patch == 0U);
 static_assert(teensy_daq::board::kAdc0Pin == 14U);
 static_assert(teensy_daq::board::kAdc1Pin == 15U);
-static_assert(teensy_daq::board::kReservedRam1Bytes == 401824U);
-static_assert(teensy_daq::board::kReservedRam2Bytes == 97280U);
+static_assert(teensy_daq::board::kReservedRam1Bytes == 405920U);
+static_assert(teensy_daq::board::kReservedRam2Bytes == 101376U);
+static_assert(teensy_daq::board::kChecksumBenchmarkBufferBytes == 4096U);
 static_assert(teensy_daq::capabilities::kMetadata.supported_stream_mask == 3U);
 static_assert((teensy_daq::capabilities::kMetadata.capability_bits &
                teensy_daq::capabilities::kDataCapabilityMask) ==

@@ -156,7 +156,9 @@ void testBootAndInfo() {
              (value & static_cast<std::uint32_t>(
                           constants::Capability::kResetStats)) != 0U &&
              (value & static_cast<std::uint32_t>(
-                          constants::Capability::kPing)) != 0U,
+                          constants::Capability::kPing)) != 0U &&
+             (value & static_cast<std::uint32_t>(
+                          constants::Capability::kChecksumBenchmark)) != 0U,
          "INFO capability bits distinguish synthetic from physical data");
 
   const std::size_t build_offset = constants::kInfoResponseBuildIdOffset;
@@ -547,6 +549,80 @@ void testConfigurationValidationAndAtomicity() {
          "nonzero reserved configuration fields are rejected");
 }
 
+void testChecksumBenchmarkIsIdleAndAcquisitionAtomic() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(77U), "benchmark test completes BOOT");
+
+  wire::Request benchmark_request =
+      request(constants::CommandKind::kChecksumBenchmark, 61U);
+  benchmark_request.checksum_benchmark.checksum_algorithm =
+      constants::ChecksumAlgorithm::kAdler32;
+  benchmark_request.checksum_benchmark.vector =
+      constants::BenchmarkVector::kBuffer64;
+  benchmark_request.checksum_benchmark.memory_region =
+      constants::BenchmarkMemoryRegion::kDtcmPacket;
+  benchmark_request.checksum_benchmark.cache_state =
+      constants::BenchmarkCacheState::kHotOrNative;
+  benchmark_request.checksum_benchmark.batch_count = 1U;
+  benchmark_request.checksum_benchmark.iterations_per_batch = 1U;
+
+  wire::ChecksumBenchmarkResponse measurement{};
+  measurement.request = benchmark_request.checksum_benchmark;
+  measurement.cycle_counter_hz =
+      constants::kChecksumBenchmarkCycleCounterHz;
+  measurement.timer_overhead_cycles = 4U;
+  measurement.implementation_code_bytes = 64U;
+  measurement.table_bytes = 0U;
+  measurement.working_ram_bytes = 8192U;
+  measurement.deterministic_digest = 0xAABBCCDDU;
+  measurement.raw_checksum_cycles = 104U;
+  measurement.net_checksum_cycles = 100U;
+  measurement.min_batch_cycles = 100U;
+  measurement.max_batch_cycles = 100U;
+  expect(wire::populateChecksumBenchmarkMetrics(measurement),
+         "benchmark response metrics are internally consistent");
+
+  const stats::Snapshot before = state.statistics().snapshot();
+  control::DispatchReadiness readiness{};
+  readiness.checksum_benchmark_response = &measurement;
+  readiness.checksum_benchmark_error = constants::ErrorCode::kOk;
+  const control::DispatchResult accepted =
+      state.dispatch(benchmark_request, response, readiness);
+  expect(accepted.commandAccepted(), "benchmark succeeds in IDLE");
+  expectTypedResponse(response,
+                      constants::FrameKind::kChecksumBenchmarkResponse, 61U,
+                      constants::ErrorCode::kOk, "benchmark response");
+  const stats::Snapshot after = state.statistics().snapshot();
+  expect(state.state() == constants::DeviceState::kIdle &&
+             state.runId() == 0U && !state.hasConfiguration() &&
+             state.takePendingEvents().mask == 0U,
+         "benchmark remains in clean IDLE without lifecycle events");
+  expect(after.generation == before.generation &&
+             after.adc_frames_emitted == before.adc_frames_emitted &&
+             after.gpio_frames_emitted == before.gpio_frames_emitted &&
+             after.adc_items_dropped == before.adc_items_dropped &&
+             after.gpio_items_dropped == before.gpio_items_dropped &&
+             after.data_path.adc.frames_generated ==
+                 before.data_path.adc.frames_generated &&
+             after.data_path.gpio.frames_generated ==
+                 before.data_path.gpio.frames_generated,
+         "benchmark does not reset or mutate acquisition statistics");
+
+  expect(state.dispatch(configureRequest(62U), response).commandAccepted(),
+         "benchmark state test reaches CONFIGURED");
+  benchmark_request.request_id = 63U;
+  const control::DispatchResult configured =
+      state.dispatch(benchmark_request, response, readiness);
+  expect(!configured.commandAccepted() &&
+             state.state() == constants::DeviceState::kConfigured,
+         "benchmark is rejected atomically outside IDLE");
+  expectTypedResponse(response,
+                      constants::FrameKind::kChecksumBenchmarkResponse, 63U,
+                      constants::ErrorCode::kInvalidState,
+                      "configured benchmark rejection");
+}
+
 void testConfigurationReadinessBusyIsAtomic() {
   control::ControlState state{};
   wire::ControlFrame response{};
@@ -695,6 +771,7 @@ int main() {
   testIdempotencyRequestIdsAndCounters();
   testStartReadinessBusyIsAtomic();
   testConfigurationValidationAndAtomicity();
+  testChecksumBenchmarkIsIdleAndAcquisitionAtomic();
   testConfigurationReadinessBusyIsAtomic();
   testRecoverableFaultReturnsIdle();
   testStatisticsDetailAndSaturation();
