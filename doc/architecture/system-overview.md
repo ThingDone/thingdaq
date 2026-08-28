@@ -46,6 +46,8 @@ authorities:
 | `firmware/src/gpio_capture_diagnostic_teensy.{h,cpp}` | The guarded input-only production-ring diagnostic for the documentation-only Port 15 fixture |
 | `firmware/src/adc_initializer{,_teensy}.{h,cpp}` | Portable bounded dual-converter calibration policy and the guarded A0/ADC1 plus A1/ADC2 register adapter |
 | `firmware/src/adc_trigger{,_teensy}.{h,cpp}` | Portable exact 1 MHz/500 ns schedule and bounded completion diagnostic plus the guarded PIT/XBAR/ADC_ETC adapter |
+| `firmware/src/adc_dma_capture{,_teensy}.{h,cpp}` | Portable paired-generation/cache ownership and exact loss accounting plus fixed ADC1/ADC2 result eDMA channels 0/1 and aligned OCRAM storage |
+| `firmware/src/dma_buffer_ownership.h` | Shared portable cache-maintenance and critical-section boundaries used by the ADC and GPIO receive rings |
 | `firmware/src/synthetic_source.{h,cpp}` | Deterministic ADC/GPIO formulas, shared epoch, real-time and unpaced-diagnostic scheduling, and bounded source telemetry |
 | `firmware/src/packet_buffer_pipeline.{h,cpp}` | Fixed aligned complete-frame storage, explicit ownership transitions, per-source sequences/counters, bounded ready/transmit index queues, and high-water telemetry |
 | `firmware/src/usb_transport.{h,cpp}` | Portable bounded CDC receive/transmit scheduling, complete command/response queues, frame ownership, and transport diagnostics |
@@ -339,9 +341,11 @@ must exercise the real fixed packet and CDC path.
 
 The cooperative main loop owns synthetic pattern construction, command parsing,
 response encoding, state mutation, checksums, queue ownership, and USB writes.
-`ControlState` exposes only compact START-epoch and STOP event bits. Future
-physical-acquisition ISRs may only acknowledge hardware, rotate explicitly
-owned buffers, update bounded counters, and signal work. They must not build
-patterns, parse, checksum, write USB, wait, or perform broad state changes.
-This keeps the control plane responsive when the reserved resources in
-[[Firmware-Resource-Map]] are eventually enabled.
+`ControlState` exposes only compact START-epoch and STOP event bits. Physical
+acquisition ISRs only acknowledge hardware, advance generation-tagged DMA
+ownership, update bounded counters, and signal work. They do not invalidate
+cache lines, build patterns, parse, checksum, write USB, wait, or perform broad
+state changes. ADC cache invalidation occurs only after the two-channel
+generation barrier grants a CPU lease; corrupt buffers are reclaimed by the
+cooperative owner. This keeps the control plane responsive when the remaining
+ADC lifecycle and packetization integration is enabled.

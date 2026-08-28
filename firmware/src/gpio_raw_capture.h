@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "board_config.h"
+#include "dma_buffer_ownership.h"
 #include "statistics.h"
 
 namespace teensy_daq::gpio_capture {
@@ -49,22 +50,8 @@ struct alignas(board::kCacheLineBytes) RawOverflowSink {
       words{};
 };
 
-class CacheMaintenance {
- public:
-  virtual ~CacheMaintenance() = default;
-
-  // DMA receive ownership discards any CPU cache lines without writing stale
-  // data back. CPU ownership invalidates again after the completed transfer.
-  virtual void discardBeforeDmaWrite(void *address, std::size_t bytes) = 0;
-  virtual void invalidateBeforeCpuRead(void *address, std::size_t bytes) = 0;
-};
-
-class CriticalSection {
- public:
-  virtual ~CriticalSection() = default;
-  virtual std::uint32_t enter() = 0;
-  virtual void exit(std::uint32_t token) = 0;
-};
+using CacheMaintenance = dma::CacheMaintenance;
+using CriticalSection = dma::CriticalSection;
 
 struct PrimeResult {
   OperationStatus status = OperationStatus::kNotQuiescent;

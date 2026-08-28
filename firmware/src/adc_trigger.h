@@ -103,7 +103,10 @@ class Platform {
   virtual ConfigureResult configureStopped() = 0;
   virtual bool beginCycleCounter(std::uint32_t &frequency_hz) = 0;
   virtual std::uint32_t readCycles() = 0;
-  virtual bool armFromStopped() = 0;
+  // BOOT uses completion interrupts for the bounded timing diagnostic.
+  // Production leaves those vectors to the dual-DMA owner and enables only
+  // the stopped trigger schedule.
+  virtual bool armFromStopped(bool completion_diagnostic) = 0;
   virtual std::array<std::uint32_t, kConverterCount> completionCounts() = 0;
   virtual std::array<std::uint32_t, kConverterCount>
   firstCompletionCycles() = 0;

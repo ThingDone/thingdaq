@@ -43,6 +43,10 @@ EXPECTED_HARDWARE_INCLUDE_OWNERS = {
         "core_pins.h",
         "imxrt.h",
     },
+    FIRMWARE_SOURCE / "adc_dma_capture_teensy.cpp": {
+        "core_pins.h",
+        "imxrt.h",
+    },
     FIRMWARE_SOURCE / "checksum_benchmark_teensy.cpp": {
         "core_pins.h",
         "imxrt.h",

@@ -45,6 +45,8 @@ enum class MemoryUse : std::uint8_t {
   kPacketBufferReserveStorage,
   kPacketPipelineState,
   kAdcDmaRing,
+  kAdcDmaOverflowSink,
+  kAdcDmaDescriptors,
   kGpioRawDmaRing,
   kGpioRawDmaOverflowSink,
   kGpioRawDmaDescriptors,
@@ -197,6 +199,11 @@ inline constexpr std::uint8_t kGpioPitChannel = 0U;
 inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
 inline constexpr std::uint8_t kGpioEdmaPriority = 2U;
 inline constexpr std::uint8_t kGpioEdmaIrqPriority = 64U;
+// Preserve the reset-unique fixed-priority ordering for channels 0-2. ADC0 is
+// requested first and ADC1 500 ns later, so neither channel needs a priority
+// alias that could conflict with another (even disabled) eDMA channel.
+inline constexpr std::uint8_t kAdcEdmaPriorities[] = {0U, 1U};
+inline constexpr std::uint8_t kAdcEdmaIrqPriority = 48U;
 
 inline constexpr PinAllocation kPinAllocations[] = {
     {kAdc0Pin, ResourceOwner::kAdc0Capture},
@@ -260,6 +267,8 @@ inline constexpr std::size_t kUsbRxScratchBytes = 128U;
 inline constexpr std::size_t kCommandQueueDepth = 4U;
 inline constexpr std::size_t kResponseQueueDepth = 4U;
 inline constexpr std::size_t kAdcDmaRingDepth = 4U;
+inline constexpr std::size_t kAdcDmaDescriptorCount =
+    kAdcDmaRingDepth + 1U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaDescriptorCount =
     kGpioRawDmaRingDepth + 1U;
@@ -312,13 +321,18 @@ constexpr std::size_t alignUp(std::size_t value, std::size_t alignment) {
 
 inline constexpr std::size_t kAdcDmaBufferStrideBytes =
     alignUp(protocol_v1::kDataPayloadBytes, kCacheLineBytes);
+inline constexpr std::size_t kEdmaTcdBytes = 32U;
+inline constexpr std::size_t kAdcDmaRingBytes =
+    kAdcDmaRingDepth * kAdcDmaBufferStrideBytes;
+inline constexpr std::size_t kAdcDmaOverflowSinkBytes = kCacheLineBytes;
+inline constexpr std::size_t kAdcDmaDescriptorBytes =
+    kLogicalAdcCount * kAdcDmaDescriptorCount * kEdmaTcdBytes;
 inline constexpr std::size_t kGpioRawDmaBufferBytes =
     protocol_v1::kGpioSamplesPerFrame * sizeof(std::uint32_t);
 inline constexpr std::size_t kGpioRawDmaRingBytes =
     kGpioRawDmaRingDepth * kGpioRawDmaBufferBytes;
 inline constexpr std::size_t kGpioRawDmaOverflowSinkBytes =
     kCacheLineBytes;
-inline constexpr std::size_t kEdmaTcdBytes = 32U;
 inline constexpr std::size_t kGpioRawDmaDescriptorBytes =
     kGpioRawDmaDescriptorCount * kEdmaTcdBytes;
 inline constexpr std::size_t kGpioPackedBufferStrideBytes =
@@ -354,7 +368,13 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
      kChecksumBenchmarkBufferBytes, kCacheLineBytes,
      ResourceOwner::kChecksumBenchmark},
     {MemoryUse::kAdcDmaRing, MemoryRegion::kOcramRam2Dma,
-     kAdcDmaRingDepth * kAdcDmaBufferStrideBytes, kCacheLineBytes,
+     kAdcDmaRingBytes, kCacheLineBytes,
+     ResourceOwner::kAdcCapture},
+    {MemoryUse::kAdcDmaOverflowSink, MemoryRegion::kOcramRam2Dma,
+     kAdcDmaOverflowSinkBytes, kCacheLineBytes,
+     ResourceOwner::kAdcCapture},
+    {MemoryUse::kAdcDmaDescriptors, MemoryRegion::kOcramRam2Dma,
+     kAdcDmaDescriptorBytes, kCacheLineBytes,
      ResourceOwner::kAdcCapture},
     {MemoryUse::kGpioRawDmaRing, MemoryRegion::kOcramRam2Dma,
      kGpioRawDmaRingBytes, kCacheLineBytes,
@@ -685,6 +705,14 @@ static_assert(kUsbTxBudgetBytesPerLoop <= kPinnedUsbCdcTxBufferBytes,
               "one cooperative TX visit must not outrun a core TX buffer");
 static_assert(kPacketBufferStorageBytes % kCacheLineBytes == 0U,
               "packet storage must occupy complete alignment units");
+static_assert(kAdcDmaBufferStrideBytes % kCacheLineBytes == 0U,
+              "each ADC DMA buffer must occupy complete cache lines");
+static_assert(kAdcDmaRingDepth >= 2U,
+              "continuous paired ADC DMA needs two destinations");
+static_assert(kAdcDmaDescriptorBytes % kCacheLineBytes == 0U,
+              "ADC DMA descriptors must occupy complete cache lines");
+static_assert(countOf(kAdcEdmaPriorities) == kLogicalAdcCount);
+static_assert(kAdcEdmaPriorities[0] != kAdcEdmaPriorities[1]);
 static_assert(kGpioRawDmaBufferBytes % kCacheLineBytes == 0U,
               "each raw GPIO DMA buffer must occupy complete cache lines");
 static_assert(kGpioRawDmaRingDepth >= 2U,

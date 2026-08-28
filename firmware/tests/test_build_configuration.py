@@ -36,7 +36,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(9, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(10, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -209,6 +209,31 @@ class BuildConfigurationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.gpio_raw_dma_buffer_usage(symbols.splitlines()[0])
+
+    def test_adc_dma_buffers_require_exact_aligned_ocram_storage(self) -> None:
+        symbols = (
+            "2027a000 00003f80 B "
+            "teensy_daq::adc_capture::g_adc_dma_buffers\n"
+            "2027df80 00000020 B "
+            "teensy_daq::adc_capture::g_adc_dma_overflow_sink\n"
+            "2027dfa0 00000140 B "
+            "teensy_daq::adc_capture::g_adc_dma_descriptors"
+        )
+        resources = build_firmware.adc_dma_buffer_usage(symbols)
+
+        self.assertEqual(16_608, resources["total_bytes"])
+        self.assertEqual("0x2027a000", resources["allocations"]["RING"]["address"])
+        self.assertEqual(320, resources["allocations"]["DESCRIPTORS"]["bytes"])
+        with self.assertRaisesRegex(build_firmware.BuildError, "cache-line aligned"):
+            build_firmware.adc_dma_buffer_usage(
+                symbols.replace("2027dfa0 00000140", "2027dfa4 00000140")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
+            build_firmware.adc_dma_buffer_usage(
+                symbols.replace("2027a000 00003f80", "2007a000 00003f80")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
+            build_firmware.adc_dma_buffer_usage(symbols.splitlines()[0])
 
     def test_packed_gpio_ring_requires_exact_aligned_ocram_storage(self) -> None:
         symbols = "2026ede0 00003f80 B teensy_daq::gpio_packer::g_gpio_packed_buffers"

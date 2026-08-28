@@ -29,10 +29,12 @@ remains disabled until the later packing, integration, and streaming gates
 pass. The existing synthetic generators and packetizer remain cooperative and
 do not claim physical acquisition resources. Phase 07 now fixes the complete
 logical-converter routes and implements their PIT/XBAR/ADC_ETC schedule,
-stopped arm/teardown, and bounded completion-timing diagnostic in
-[[ADR-004-ADC-Trigger-DMA]]. ADC DMA and physical ADC capability are not
-enabled yet. See [[System-Overview]] for that boundary and [[Protocol-V1]]
-with [[ADR-001-Wire-Protocol]] for the wire metadata.
+stopped arm/teardown, bounded completion-timing diagnostic, fixed dual-eDMA
+TCDs, and cache-safe paired ring in [[ADR-004-ADC-Trigger-DMA]]. The DMA owner
+is compiled and link-verified but is not connected to START/STOP or the packet
+path yet, so physical ADC capability remains disabled. See [[System-Overview]]
+for that boundary and [[Protocol-V1]] with [[ADR-001-Wire-Protocol]] for the
+wire metadata.
 
 ## Fixed platform
 
@@ -139,8 +141,13 @@ enabling physical ADC capability.
 All eDMA channels must be below 32, all DMAMUX sources below 128, and neither
 set may contain duplicates. Pinned core macros are asserted against all three
 source numbers. Acquisition code must bind these exact channels rather than
-use an unconstrained first-free allocator. ADC channel priorities and rotating
-TCDs remain part of the later DMA task; this map fixes ownership only.
+use an unconstrained first-free allocator. ADC0/ADC1 retain the reset-unique
+fixed priority values 0/1, use NVIC priority 48, and each own five 32-byte
+scatter/gather TCDs. Channel 0 reads `ADC1_R0` and channel 1 reads `ADC2_R0`;
+both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012`, and
+`DOFF=4` for consumer buffers. Both completion IRQs and the production
+ADC_ETC error IRQ share priority 48 so their generation-state writes cannot
+preempt one another.
 
 ## Queue and per-loop bounds
 
@@ -151,6 +158,8 @@ TCDs remain part of the later DMA task; this map fixes ownership only.
 | Complete command queue | 4 frames | Control plane |
 | Complete response queue | 4 frames | USB transport |
 | ADC DMA ring | 4 buffers | ADC capture |
+| ADC DMA pressure sink | 1 isolated cache line shared at distinct halfwords | ADC capture |
+| ADC scatter/gather TCDs | 2 channels × 5 descriptors | ADC capture |
 | Raw GPIO DMA ring | 4 buffers | GPIO capture |
 | Raw GPIO pressure sink | 1 isolated cache line | GPIO capture |
 | Raw GPIO scatter/gather TCDs | 5 descriptors | GPIO capture |
@@ -204,6 +213,8 @@ to two frames per service call and waits when no packet buffer is free.
 | Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 8,192 | 32 | Packetizer |
 | GPIO packer state and telemetry | DTCM / RAM1 | compile-time ceiling | 2,048 | 32 | GPIO packer |
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
+| ADC DMA pressure sink | OCRAM / RAM2 | one isolated cache line | 32 | 32 | ADC capture |
+| ADC TCD banks | OCRAM / RAM2 | `2 × 5 × 32` | 320 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
 | Raw GPIO pressure sink | OCRAM / RAM2 | one isolated cache line | 32 | 32 | GPIO capture |
 | Raw GPIO TCD bank | OCRAM / RAM2 | `5 × 32` | 160 | 32 | GPIO capture |
@@ -213,21 +224,23 @@ to two frames per service call and waits when no packet buffer is free.
 | Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | **RAM1 subtotal** |  |  | **453,024** |  |  |
-| **RAM2 subtotal** |  |  | **486,624** |  |  |
+| **RAM2 subtotal** |  |  | **486,976** |  |  |
 
 The application packet pool is split between an aligned ordinary-global DTCM
 primary and an aligned `DMAMEM` OCRAM reserve. Both are CPU-owned; Teensy USB
 Serial copies from either bank into its separate core-owned TX ring and flushes
 that destination before USB DMA. The raw GPIO ring, pressure sink, TCD bank,
-and packed GPIO ring are now distinct `.dmabuffers` allocations. Raw ownership
-uses explicit cache maintenance; the packed ring remains CPU-owned and cached.
-Only the ADC ring remains a future reservation.
+and packed GPIO ring are distinct `.dmabuffers` allocations. The ADC pair
+ring, pressure sink, and two TCD banks are likewise concrete `.dmabuffers`
+allocations. Raw ownership uses explicit cache maintenance; the packed ring
+remains CPU-owned and cached.
 Compile-time checks bind the two packet banks to 819,200 total bytes, cap
 pipeline metadata at 8,192 bytes and GPIO packer state at 2,048 bytes, and
 reject zero-sized, non-power-of-two, misaligned, or over-budget registry
 entries. The build manifest additionally checks the linked addresses and sizes
 of both packet banks, the isolated GPIO clock diagnostic cache line, all three
-raw GPIO DMA allocations, and the four-buffer packed ring.
+ADC DMA allocations, all three raw GPIO DMA allocations, and the four-buffer
+packed ring.
 
 The optional IDLE-only checksum benchmark owns no PIT, XBAR, ADC_ETC, eDMA, or
 USB resource. Its ordinary global buffer is link-verified inside DTCM; its
@@ -323,9 +336,34 @@ The fail-closed autonomous runner uses this lease only after stopping one
 bounded production-ring capture; it does not add an ownership state or retain
 the lease across command dispatch.
 
-ADC interleaved DMA storage will become ready only after both ADC eDMA
-completions. GPIO acquisition and packed-frame transitions do not change the
-packet-pool contract. No project ISR packs or frames data, calculates checksums,
-mutates queues, writes USB, waits, or performs broad control-state mutation.
-Synthetic pacing installs no ISR at all: the narrow Teensy adapter polls and
-extends `micros()` once per cooperative service step.
+The implemented ADC ownership path is:
+
+```text
+FREE -> DMA_OWNED -> READY -> READING -> RELEASING -> FREE
+                       |
+                       +-> DISCARD_PENDING -> RELEASING -> FREE
+```
+
+Each scheduled generation assigns the same destination to eDMA channels 0
+and 1. Channel 0 writes halfwords at pair offset 0 and channel 1 at offset 2;
+both advance four bytes per conversion. One channel completion only sets its
+generation bit. The second matching completion atomically makes the buffer
+`READY`, unless ADC_ETC/eDMA/mismatch evidence tainted that generation. No
+cache operation occurs in either major-loop ISR. CPU acquisition invalidates
+the whole aligned buffer only after the dual barrier; release or cooperative
+discard deletes the cache lines before `FREE` becomes visible to the ISR.
+
+If all four consumer buffers are owned, both channels rotate to distinct
+halfwords in one isolated 32-byte sink with `DOFF=0`. Each paired sink major
+loop counts one overrun and exactly 1,012 lost pairs without touching
+`READY`/`READING` data. Epoch plus modulo-32-bit DMA generations reject stale
+and duplicate completions; a lead beyond one complete major loop taints the
+affected bounded schedule while later generations continue. ADC_ETC trigger
+errors count overwritten converter results and taint the active generation;
+STOP can account unequal partial TCD progress exactly before reclaiming it.
+
+GPIO acquisition and packed-frame transitions do not change the packet-pool
+contract. No project ISR packs or frames data, calculates checksums, mutates
+queues, writes USB, waits, or performs broad control-state mutation. Synthetic
+pacing installs no ISR at all: the narrow Teensy adapter polls and extends
+`micros()` once per cooperative service step.

@@ -69,8 +69,8 @@ identity, source-input Git state, reproducible UTC timestamp policy, Flash/RAM
 usage, command, and SHA-256 hashes in a gitignored build manifest. The exported
 artifacts include the HEX, ELF, and linker map needed for pre-upload review;
 ELF inspection also proves the packet banks, checksum buffers/tables, GPIO
-clock diagnostic cache line, raw GPIO ring/sink/TCD bank, and packed GPIO ring
-occupy their claimed regions:
+clock diagnostic cache line, paired ADC ring/sink/two-channel TCD bank, raw
+GPIO ring/sink/TCD bank, and packed GPIO ring occupy their claimed regions:
 
 ```bash
 python3 firmware/tools/build_firmware.py
@@ -164,8 +164,15 @@ queues 0/4, and writes raw delays 0/75 (effective 1/76 IPG cycles, exactly
 500 ns apart). A bounded stopped-to-armed-to-stopped diagnostic publishes
 first conversion-completion IRQ timing, trigger errors, completion counts, and
 clock/XBAR/queue/register readbacks in INFO/STATUS. That DWT delta is
-completion timing, not analog aperture evidence. Physical ADC capability
-remains disabled until the later DMA, integration, and rig gates pass.
+completion timing, not analog aperture evidence. The fixed eDMA 0/1 adapter
+now writes ADC1/ADC2 result halfwords directly to offsets 0/2 of four-byte
+sample pairs with equal 1,012-result major loops and deterministic
+scatter/gather rotation. A generation-and-epoch barrier publishes a buffer
+only after both channels complete; cache ownership, an isolated pressure sink,
+ADC_ETC overwrite evidence, mismatched completions, stale interrupts, ring
+overruns, and exact discarded-pair counts are centralized in the portable ADC
+DMA core. Physical ADC capability remains disabled until the later lifecycle,
+packetization, host-model, and rig gates pass.
 
 The advertised physical GPIO mode selectively returns only D6-D13 from
 GPIO7 to GPIO2, keeps them inputs on START/STOP/error, and uses channel 2 to

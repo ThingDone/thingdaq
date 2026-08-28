@@ -100,7 +100,7 @@ const Snapshot &Scheduler::initialize(bool converters_ready) {
   }
 
   const std::uint32_t started = platform_.readCycles();
-  if (!platform_.armFromStopped()) {
+  if (!platform_.armFromStopped(true)) {
     addError(snapshot_, protocol_v1::AdcTriggerError::kArmFailed);
     if (!platform_.stop()) {
       addError(snapshot_, protocol_v1::AdcTriggerError::kCleanupFailed);
@@ -174,7 +174,8 @@ const Snapshot &Scheduler::initialize(bool converters_ready) {
 
 TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.arm")
 bool Scheduler::arm() {
-  if (running_ || !snapshot_.ready() || !platform_.armFromStopped()) {
+  if (running_ || !snapshot_.ready() ||
+      !platform_.armFromStopped(false)) {
     return false;
   }
   running_ = true;

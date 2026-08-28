@@ -31,9 +31,11 @@ initializer and independently bounded calibration are implemented and pass
 host and pinned-target build gates. The exact trigger schedule, stopped arm/
 teardown order, bounded conversion-completion diagnostic, and INFO/STATUS
 evidence are also implemented and pass host and pinned-target build gates.
-The DMA ring, physical capability, and on-silicon trigger/calibration evidence
-remain future Phase 07 work and must pass their separate local and rig gates
-before this decision can be described as silicon-verified.
+The fixed dual-eDMA register adapter and cache-safe paired ring are implemented
+and pass host plus pinned-target build gates. Physical lifecycle/packet
+integration and on-silicon trigger/calibration/DMA evidence remain future
+Phase 07 work and must pass their separate local and rig gates before this
+decision can be described as silicon-verified.
 
 ## Context
 
@@ -66,7 +68,7 @@ sources were reinspected on 2026-08-28:
 | `cores/teensy4/imxrt.h` | Confirms XBAR input/output numbers, ADC/ADC_ETC registers, DMAMUX sources 24/88, 32 eDMA channels, and 32-byte TCD alignment used by the registry and later register adapter. |
 | `cores/teensy4/clockspeed.c` | At the pinned 600 MHz CPU menu, the core selects a 150 MHz IPG/bus clock. The trigger adapter checks `F_BUS_ACTUAL`, the configured 24 MHz PERCLK root, and the relevant PIT/XBAR/ADC gates before arming. |
 | `firmware/src/board_config.h` | Existing fixed pin, PIT, XBAR, ADC_ETC, eDMA, and OCRAM reservations are composed into one `AdcConverterConfiguration` table instead of duplicated in a new module. Compile-time validators reject incomplete, crossed-queue, duplicate-channel, range, and ownership errors. |
-| `firmware/src/gpio_dma_route_teensy.h` and `gpio_raw_capture{,_teensy}.{h,cpp}` | Reuse the stopped-before-route arm order, fixed register ownership, diagnostic snapshots, and fail-safe teardown patterns. `adc_trigger_teensy.cpp` is separate because its two ADC_ETC queues and completion interrupts differ from GPIO; the later ADC DMA adapter will reuse the TCD/ring/cache patterns. |
+| `firmware/src/gpio_dma_route_teensy.h` and `gpio_raw_capture{,_teensy}.{h,cpp}` | Reuse the stopped-before-route arm order, fixed register ownership, diagnostic snapshots, overflow sink, scatter/gather TCD shape, leases, and fail-safe teardown patterns. ADC adds a two-channel generation barrier and shared cache ownership rather than duplicating the GPIO state machine verbatim. |
 | Packet/control modules | Reuse the fixed packet pool, alternating source promotion, START epoch, run/sequence accounting, common statistics, and bounded USB service. No ADC-specific allocation or second transport queue is introduced by this decision. |
 
 The independent primary references are the NXP
@@ -97,11 +99,33 @@ and queue 4 are configured independently with `SYNC_MODE=0`; ADC_ETC sync mode
 would make trigger 0 own both initial delays and therefore cannot express the
 required relative phase. `TSC_BYPASS` must be clear so queue 4 controls ADC2.
 
-The later DMA adapter must write ADC0 halfwords at pair offset 0 and ADC1
-halfwords at pair offset 2, both with a four-byte destination stride. DMA
-priorities, rotating descriptors, cache ownership, and the dual-completion
-generation barrier are deliberately left to the dedicated DMA implementation
-task; this decision fixes channel/source ownership, not unverified TCD code.
+The implemented DMA adapter writes ADC0 halfwords at pair offset 0 and ADC1
+halfwords at pair offset 2, both with a four-byte destination stride. Channel
+0 reads `ADC1_R0` through DMAMUX source 24 and channel 1 reads `ADC2_R0`
+through source 88. Both use 16-bit source/destination attributes, two-byte
+minor transfers, equal 1,012-result major loops, fixed priorities 0/1, major
+completion interrupts, and five scatter/gather descriptors per channel.
+
+Four 4,064-byte cache-line-aligned OCRAM buffers each contain 1,012 native
+`{uint16_t adc0, uint16_t adc1}` pairs plus alignment padding. Both channel
+descriptors for a generation target the same buffer. The first completion can
+schedule future work but cannot publish data; only the second completion with
+the same nonzero run epoch and modulo-32-bit DMA generation crosses the shared
+barrier. A duplicate, stale-epoch, wrong-destination, or excessive channel-lead
+event cannot advance CPU ownership.
+
+Cache deletion precedes initial DMA ownership and every transition back to
+`FREE`. CPU acquisition invalidates the complete buffer only after the paired
+barrier. Tainted generations enter `DISCARD_PENDING` and are cache-cleaned by
+bounded cooperative service, never by an ISR. When all four consumer buffers
+are owned, both channels use separate halfwords of an isolated 32-byte sink
+with zero destination stride. Each completed sink generation advances one
+ring-overrun event and exactly 1,012 lost pairs while acquisition remains live.
+ADC_ETC trigger-error bits count overwritten converter results and taint the
+active generation; mismatched completions, unequal STOP progress, DMA faults,
+schedule exhaustion, and rejected stale interrupts have independent counters.
+Complete corrupt blocks and partial STOP work contribute exact discarded-pair
+counts.
 
 ### Shared clock and phase arithmetic
 
@@ -249,6 +273,7 @@ ADC capability remains unavailable rather than weakening metadata.
   accepted.
 - Bounded low-level initialization, calibration, trigger arm/teardown, and
   completion matching now run before BOOT enters IDLE, and their exact
-  snapshots are visible in INFO/STATUS. This does not enable physical ADC
-  streaming. Later tasks still own interleaved DMA, packet integration, host
-  data decoding, and on-silicon target evidence.
+  snapshots are visible in INFO/STATUS. Fixed interleaved DMA storage and its
+  internal diagnostics now compile into the target but are not armed by the
+  runtime. Later tasks still own lifecycle/packet integration, public STATUS
+  projection, host data decoding, and on-silicon target evidence.

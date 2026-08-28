@@ -40,6 +40,7 @@ class FakePlatform final : public adc_trigger::Platform {
   std::uint32_t trigger_error_count = 0U;
   adc_trigger::HardwareEvidence terminal_evidence{};
   std::vector<std::string> operations{};
+  std::vector<bool> diagnostic_arms{};
   std::uint32_t completion_polls = 0U;
 
   FakePlatform() {
@@ -66,8 +67,9 @@ class FakePlatform final : public adc_trigger::Platform {
     return result;
   }
 
-  bool armFromStopped() override {
+  bool armFromStopped(bool completion_diagnostic) override {
     operations.emplace_back("arm");
+    diagnostic_arms.push_back(completion_diagnostic);
     return arm_ok;
   }
 
@@ -116,6 +118,7 @@ void testExactScheduleAndSuccessfulDiagnostic() {
   assert(snapshot.evidence.done0_1_irq_final == 0xB0U);
   assert((platform.operations ==
           std::vector<std::string>{"configure", "counter", "arm", "stop"}));
+  assert((platform.diagnostic_arms == std::vector<bool>{true}));
 
   const teensy_daq::protocol::AdcTriggerMetadata metadata =
       adc_trigger::protocolMetadata(snapshot);
@@ -125,6 +128,7 @@ void testExactScheduleAndSuccessfulDiagnostic() {
   assert(metadata.evidence.done0_1_irq_final == 0xB0U);
 
   assert(scheduler.arm());
+  assert((platform.diagnostic_arms == std::vector<bool>{true, false}));
   assert(scheduler.running());
   assert(!scheduler.arm());
   assert(scheduler.stop());

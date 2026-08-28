@@ -360,27 +360,40 @@ class TeensyPlatform final : public Platform {
 
   TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_arm")
-  bool armFromStopped() override {
+  bool armFromStopped(bool completion_diagnostic) override {
     if (!queuesValid() || !xbarValid() || !convertersHardwareTriggered() ||
         (IMXRT_ADC1.GS & ADC_GS_ADACT) != 0U ||
         (IMXRT_ADC2.GS & ADC_GS_ADACT) != 0U) {
       return false;
     }
-    resetDiagnosticState();
     ADC_ETC_DONE0_1_IRQ = kDone0Mask | kDone1Mask;
     ADC_ETC_DONE2_ERR_IRQ = kTriggerErrorMask;
-    attachInterruptVector(IRQ_ADC_ETC0, adcEtcDone0Isr);
-    attachInterruptVector(IRQ_ADC_ETC1, adcEtcDone1Isr);
-    attachInterruptVector(IRQ_ADC_ETC_ERR, adcEtcErrorIsr);
-    NVIC_SET_PRIORITY(IRQ_ADC_ETC0, protocol_v1::kAdcTriggerIrqPriority);
-    NVIC_SET_PRIORITY(IRQ_ADC_ETC1, protocol_v1::kAdcTriggerIrqPriority);
-    NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR, protocol_v1::kAdcTriggerIrqPriority);
-    NVIC_CLEAR_PENDING(IRQ_ADC_ETC0);
-    NVIC_CLEAR_PENDING(IRQ_ADC_ETC1);
-    NVIC_CLEAR_PENDING(IRQ_ADC_ETC_ERR);
-    NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-    NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
-    NVIC_ENABLE_IRQ(IRQ_ADC_ETC_ERR);
+    if (completion_diagnostic) {
+      resetDiagnosticState();
+      attachInterruptVector(IRQ_ADC_ETC0, adcEtcDone0Isr);
+      attachInterruptVector(IRQ_ADC_ETC1, adcEtcDone1Isr);
+      attachInterruptVector(IRQ_ADC_ETC_ERR, adcEtcErrorIsr);
+      NVIC_SET_PRIORITY(IRQ_ADC_ETC0,
+                        protocol_v1::kAdcTriggerIrqPriority);
+      NVIC_SET_PRIORITY(IRQ_ADC_ETC1,
+                        protocol_v1::kAdcTriggerIrqPriority);
+      NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR,
+                        protocol_v1::kAdcTriggerIrqPriority);
+      NVIC_CLEAR_PENDING(IRQ_ADC_ETC0);
+      NVIC_CLEAR_PENDING(IRQ_ADC_ETC1);
+      NVIC_CLEAR_PENDING(IRQ_ADC_ETC_ERR);
+      NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
+      NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
+      NVIC_ENABLE_IRQ(IRQ_ADC_ETC_ERR);
+    } else {
+      // The production ADC DMA adapter already owns IRQ_ADC_ETC_ERR. The
+      // completion vectors are diagnostic-only and must not race DMA buffer
+      // generations or overwrite the production error observer.
+      NVIC_DISABLE_IRQ(IRQ_ADC_ETC0);
+      NVIC_DISABLE_IRQ(IRQ_ADC_ETC1);
+      NVIC_CLEAR_PENDING(IRQ_ADC_ETC0);
+      NVIC_CLEAR_PENDING(IRQ_ADC_ETC1);
+    }
     ADC_ETC_CTRL = kAdcEtcControlConfiguration |
                    ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask);
     barrier();
