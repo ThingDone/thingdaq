@@ -463,8 +463,11 @@ void testConfigurationValidationAndAtomicity() {
   wire::Configuration no_checksum = control::kSyntheticConfiguration;
   no_checksum.data_checksum_algorithm =
       constants::ChecksumAlgorithm::kNoneReserved;
+  wire::Configuration unknown_checksum = control::kSyntheticConfiguration;
+  unknown_checksum.data_checksum_algorithm =
+      static_cast<constants::ChecksumAlgorithm>(0xFFU);
 
-  const std::array<Case, 6U> cases{{
+  const std::array<Case, 7U> cases{{
       {hardware, constants::ErrorCode::kUnsupportedConfiguration,
        "physical source"},
       {zero_stream, constants::ErrorCode::kUnsupportedConfiguration,
@@ -476,6 +479,8 @@ void testConfigurationValidationAndAtomicity() {
        "unknown source field"},
       {no_checksum, constants::ErrorCode::kInvalidPayload,
        "reserved checksum field"},
+      {unknown_checksum, constants::ErrorCode::kUnsupportedChecksum,
+       "unknown checksum field"},
   }};
 
   std::uint32_t request_id = 30U;

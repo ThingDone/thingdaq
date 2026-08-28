@@ -227,9 +227,17 @@ closure.
 The benchmark tests inject a deterministic wrapping cycle counter and verify
 overhead subtraction, interrupt-mask restoration, warm-up exclusion, hot DTCM,
 cold OCRAM cache costs, real production-frame coverage, duration bounds, and
-unchanged acquisition state/counters. The pinned build additionally inspects
-ELF symbols for exact checksum-body sizes, lookup-table Flash residency, and
-the two benchmark-buffer addresses and alignments.
+unchanged acquisition state/counters. They also fail closed on aggregate cycle
+overflow and require repeatable metrics/digests under an `-O3 -flto` host
+build with explicit compiler barriers and observable publication. A separate
+correctness suite checks published values, independent bitwise references, 32
+input alignments, length/reduction edges, 97 seeded C++/Python buffers with
+byte-identical little-endian results, representative corruption classes,
+negotiation transitions, and parser recovery after every candidate's bad
+trailer. The finite corruption matrix and its non-security limitations are
+recorded in `doc/results/phase-05-checksum-correctness.md`. The pinned build
+additionally inspects ELF symbols for exact checksum-body sizes, lookup-table
+Flash residency, and the two benchmark-buffer addresses and alignments.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source

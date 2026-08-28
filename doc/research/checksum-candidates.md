@@ -12,6 +12,7 @@ related:
   - '[[Protocol-V1]]'
   - '[[ADR-002-Checksum-Selection]]'
   - '[[Firmware-Resource-Map]]'
+  - '[[Phase-05-Checksum-Correctness]]'
 ---
 
 # Checksum candidates
@@ -175,13 +176,16 @@ Published parameter references are
 for Adler-32 and
 [RFC 3720 appendix B](https://www.rfc-editor.org/rfc/rfc3720.html#appendix-B)
 for CRC-32C. Canonical vectors and independent bitwise references are compiled
-separately in `firmware/tests/checksum_candidates_test.cpp`.
+separately in `firmware/tests/checksum_candidates_test.cpp`; the expanded
+cross-language, corruption, negotiation, parser-recovery, and benchmark guard
+results are recorded in [[Phase-05-Checksum-Correctness]].
 
 ## Deferred measurement decisions
 
-This survey establishes implementability, not the production choice. DWT
-cycle measurements, hot/cold cache and OCRAM cases, full streaming behavior,
-linked table cost, host parity, corruption testing, and the fixed autonomous
-selection policy remain inputs to [[ADR-002-Checksum-Selection]]. Negotiation
-now exposes all three deployable candidates, while the production default
-remains Adler-32 until those gates select a winner.
+This survey establishes implementability, not the production choice. Local
+host parity and deterministic corruption testing are now complete in
+[[Phase-05-Checksum-Correctness]]. DWT measurements, hot/cold cache and OCRAM
+results, full hardware streaming behavior, linked table cost, and the fixed
+autonomous selection policy remain inputs to [[ADR-002-Checksum-Selection]].
+Negotiation exposes all three deployable candidates, while the production
+default remains Adler-32 until those gates select a winner.

@@ -27,6 +27,9 @@ class FakePlatform final : public benchmark::Platform {
   std::uint32_t counter_frequency =
       constants::kChecksumBenchmarkCycleCounterHz;
   std::uint32_t counter = std::numeric_limits<std::uint32_t>::max() - 50U;
+  std::uint32_t calibration_elapsed = 4U;
+  std::uint32_t checksum_elapsed = 104U;
+  std::uint32_t invalidation_elapsed = 44U;
   std::uint32_t critical_entries = 0U;
   std::uint32_t critical_exits = 0U;
   std::uint32_t flush_delete_calls = 0U;
@@ -52,8 +55,8 @@ class FakePlatform final : public benchmark::Platform {
             ? override_elapsed_
             : (read_pairs_ <
                        constants::kChecksumBenchmarkTimerCalibrationSamples
-                   ? 4U
-                   : 104U);
+                   ? calibration_elapsed
+                   : checksum_elapsed);
     counter += elapsed;
     ++read_pairs_;
     pair_open_ = false;
@@ -88,7 +91,7 @@ class FakePlatform final : public benchmark::Platform {
     ++invalidate_calls;
     last_cache_size = size;
     if (pair_open_) {
-      override_elapsed_ = 44U;
+      override_elapsed_ = invalidation_elapsed;
     }
   }
 
@@ -289,6 +292,47 @@ void testEmptyBoundsAndCounterFailure() {
          "full-frame repetition bound caps processed work near eight MiB");
 }
 
+void testRepeatabilityAndCheckedMeasurementOverflow() {
+  FakePlatform platform{};
+  benchmark::Buffer dtcm{};
+  benchmark::Buffer ocram{};
+  benchmark::Runner runner{platform, dtcm, ocram};
+  const protocol::ChecksumBenchmarkRequest repeated_request = request(
+      constants::ChecksumAlgorithm::kCrc32c,
+      constants::BenchmarkVector::kBuffer64,
+      constants::BenchmarkMemoryRegion::kDtcmPacket,
+      constants::BenchmarkCacheState::kHotOrNative, 2U, 3U);
+
+  const benchmark::RunResult first = runner.run(repeated_request);
+  const benchmark::RunResult second = runner.run(repeated_request);
+  expect(first.ok() && second.ok() &&
+             first.response.raw_checksum_cycles ==
+                 second.response.raw_checksum_cycles &&
+             first.response.net_checksum_cycles ==
+                 second.response.net_checksum_cycles &&
+             first.response.min_batch_cycles ==
+                 second.response.min_batch_cycles &&
+             first.response.max_batch_cycles ==
+                 second.response.max_batch_cycles &&
+             first.response.deterministic_digest ==
+                 second.response.deterministic_digest &&
+             benchmark::publishedDigest() ==
+                 second.response.deterministic_digest,
+         "identical inputs and cycle traces produce repeatable metrics/digest");
+
+  platform.checksum_elapsed = std::numeric_limits<std::uint32_t>::max();
+  const benchmark::RunResult overflow = runner.run(request(
+      constants::ChecksumAlgorithm::kAdler32,
+      constants::BenchmarkVector::kBuffer64,
+      constants::BenchmarkMemoryRegion::kDtcmPacket,
+      constants::BenchmarkCacheState::kHotOrNative, 1U, 2U));
+  expect(overflow.status == benchmark::RunStatus::kMeasurementOverflow,
+         "wrapped 32-bit intervals fail closed when one batch exceeds u32");
+  expect(platform.critical_entries == platform.critical_exits &&
+             !platform.in_critical,
+         "measurement-overflow handling still restores interrupt state");
+}
+
 }  // namespace
 
 int main() {
@@ -297,6 +341,7 @@ int main() {
   testFullFrameUsesProductionCoverage();
   testHotOcram512Vector();
   testEmptyBoundsAndCounterFailure();
+  testRepeatabilityAndCheckedMeasurementOverflow();
   if (failures != 0) {
     std::cerr << failures << " checksum benchmark assertion(s) failed\n";
     return 1;
