@@ -1,3 +1,4 @@
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -333,6 +334,48 @@ void testRepeatabilityAndCheckedMeasurementOverflow() {
          "measurement-overflow handling still restores interrupt state");
 }
 
+void testRigFixedVectorDigestsMatchProductionRunner() {
+  struct VectorChecks {
+    constants::BenchmarkVector vector;
+    std::array<std::uint32_t, 3U> checksum;
+  };
+  constexpr std::array<constants::ChecksumAlgorithm, 3U> algorithms{
+      constants::ChecksumAlgorithm::kAdler32,
+      constants::ChecksumAlgorithm::kCrc32c,
+      constants::ChecksumAlgorithm::kCrc32IsoHdlc,
+  };
+  constexpr std::array<VectorChecks, 5U> checks{{
+      {constants::BenchmarkVector::kEmpty,
+       {0x00000001U, 0x00000000U, 0x00000000U}},
+      {constants::BenchmarkVector::kCanonical123456789,
+       {0x091E01DEU, 0xE3069283U, 0xCBF43926U}},
+      {constants::BenchmarkVector::kBuffer64,
+       {0xF7ED2021U, 0x3D0F7D5DU, 0xFFBAE609U}},
+      {constants::BenchmarkVector::kBuffer512,
+       {0xC4E2FF01U, 0x724B2C2FU, 0xFF1346DBU}},
+      {constants::BenchmarkVector::kFrameCoverage,
+       {0x4F2DE54EU, 0xBFC9BB50U, 0xBEA7D1EDU}},
+  }};
+
+  FakePlatform platform{};
+  benchmark::Buffer dtcm{};
+  benchmark::Buffer ocram{};
+  benchmark::Runner runner{platform, dtcm, ocram};
+  for (const VectorChecks &vector : checks) {
+    for (std::size_t algorithm_index = 0U;
+         algorithm_index < algorithms.size(); ++algorithm_index) {
+      const benchmark::RunResult result = runner.run(request(
+          algorithms[algorithm_index], vector.vector,
+          constants::BenchmarkMemoryRegion::kDtcmPacket,
+          constants::BenchmarkCacheState::kHotOrNative, 1U, 2U));
+      expect(result.ok() &&
+                 result.response.deterministic_digest ==
+                     expectedDigest(vector.checksum[algorithm_index], 2U),
+             "rig fixed vector checksum/digest matches production runner");
+    }
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -342,6 +385,7 @@ int main() {
   testHotOcram512Vector();
   testEmptyBoundsAndCounterFailure();
   testRepeatabilityAndCheckedMeasurementOverflow();
+  testRigFixedVectorDigestsMatchProductionRunner();
   if (failures != 0) {
     std::cerr << failures << " checksum benchmark assertion(s) failed\n";
     return 1;

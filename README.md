@@ -279,6 +279,28 @@ The program enforces the 1% per-source and combined payload/framed rate bounds,
 drop errors, bounded process RSS, a finite post-STOP drain, and exact final
 firmware-to-host frame reconciliation before returning success in IDLE.
 
+`firmware/tests/rig_checksum_benchmark.py` is the standalone Phase 05 checksum
+campaign. Before opening the serial port it checks all 15 algorithm/vector
+combinations against embedded values through separate bitwise and streaming
+implementations. It then discovers the device-advertised candidates and, for
+each one in sequence, runs the meaningful 14-profile DTCM/OCRAM hot/cold
+microbenchmark matrix followed by a full-rate synthetic ADC/GPIO capture. Every
+frame trailer, payload formula, sequence, timestamp, STATUS snapshot, and final
+counter is checked without importing `daq_api` or retaining bulk captures.
+Machine-readable `EVENT`, per-algorithm `CANDIDATE`, and final `SUMMARY` JSON
+records include cycles/byte, projected CPU, throughput, implementation/table
+Flash, benchmark RAM, command latency, parser queue high water, and all exposed
+drop/error counters. Protocol v1 does not expose firmware queue depth, so the
+record says so explicitly and reports its fixed capacity plus the observable
+gap/drop/counter exhaustion evidence.
+
+The campaign defaults to 10 seconds per advertised candidate. The later
+hardware selection campaign sets `CHECKSUM_CAPTURE_SECONDS=60`; optional
+`CHECKSUM_STATUS_INTERVAL_SECONDS`, `CHECKSUM_BENCHMARK_BATCH_COUNT`, and
+`CHECKSUM_BENCHMARK_ITERATIONS_PER_BATCH` remain strictly bounded. As with the
+other rig programs, `EXPECTED_BUILD_ID` and `EXPECTED_HARDWARE_SERIAL` can pin
+the exact artifact and board.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS
