@@ -15,6 +15,7 @@ related:
   - '[[Phase-02-Protocol-Python-Gate]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
   - '[[Phase-03-Control-Plane]]'
+  - '[[Phase-04-Synthetic-Streaming]]'
 ---
 
 # Teensy DAQ documentation
@@ -37,7 +38,8 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   including [[Phase-01-Synthetic-Prototype-Gate]] and
   [[Phase-02-Protocol-Python-Gate]], followed by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical
-  [[Phase-03-Control-Plane]] rig acceptance.
+  [[Phase-03-Control-Plane]] control acceptance and
+  [[Phase-04-Synthetic-Streaming]] full-rate synthetic-stream acceptance.
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`
