@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import struct
 import unittest
 from collections.abc import Sequence
 from pathlib import Path
@@ -142,6 +143,47 @@ class DataBlockModelTests(unittest.TestCase):
         self.assertEqual(constants.FRAME_COVERAGE_TICKS, block.end_tick_exclusive)
         self.assertEqual(bytes(range(8)), bytes(block.samples[:8]))
 
+    def test_interleave_endpoints_and_every_gpio_bit_keep_timing_and_identity(
+        self,
+    ) -> None:
+        adc = _message("adc-data.bin")
+        self.assertIsInstance(adc, AdcBlock)
+        assert isinstance(adc, AdcBlock)
+        last_pair = adc.item_count - 1
+        tail = list(
+            itertools.islice(interleave_adc(adc), 2 * last_pair, 2 * adc.item_count)
+        )
+
+        self.assertEqual(
+            [AdcConverter.ADC0, AdcConverter.ADC1],
+            [sample.converter for sample in tail],
+        )
+        self.assertEqual(["A0", "A1"], [sample.pin for sample in tail])
+        self.assertEqual(
+            [
+                last_pair * constants.ADC_PAIR_PERIOD_TICKS,
+                last_pair * constants.ADC_PAIR_PERIOD_TICKS
+                + constants.ADC1_PHASE_TICKS,
+            ],
+            [sample.timestamp_ticks for sample in tail],
+        )
+        self.assertEqual([2022, 2023], [sample.code for sample in tail])
+
+        packed = bytearray(constants.GPIO_DATA_PAYLOAD_SIZE)
+        for bit in range(len(constants.GPIO_PINS_BY_BIT)):
+            packed[bit] = 1 << bit
+        gpio = GpioBlock(1, 0, 0, bytes(packed), FrameFlag.EPOCH_START)
+        for bit, pin in enumerate(constants.GPIO_PINS_BY_BIT):
+            with self.subTest(pin=pin, bit=bit):
+                channel = extract_gpio_channel(gpio, pin)
+                self.assertEqual(bit, channel.bit)
+                self.assertTrue(channel[bit])
+                self.assertEqual(1, sum(channel[: len(constants.GPIO_PINS_BY_BIT)]))
+                self.assertEqual(
+                    constants.GPIO_SAMPLE_PERIOD_TICKS * bit,
+                    gpio.sample_ticks(bit),
+                )
+
     def test_stream_gap_counts_logical_items_and_handles_sequence_wrap(self) -> None:
         payload = synthetic_adc_payload(0)
         previous = AdcBlock(7, 0, 0, payload, FrameFlag.EPOCH_START)
@@ -188,6 +230,33 @@ class SyntheticPatternTests(unittest.TestCase):
         self.assertEqual(gpio_frame.payload, synthetic_gpio_payload(0))
         self.assertEqual(
             [254, 255, 0, 1], [synthetic_gpio_byte(n) for n in range(254, 258)]
+        )
+
+    def test_payload_builders_apply_the_formulas_at_every_offset(self) -> None:
+        first_pair = 2046
+        adc_payload = synthetic_adc_payload(first_pair)
+        adc_pairs = tuple(struct.iter_unpack("<HH", adc_payload))
+        self.assertEqual(constants.ADC_PAIRS_PER_FRAME, len(adc_pairs))
+        self.assertEqual(
+            tuple(
+                (
+                    synthetic_adc0_code(first_pair + offset),
+                    synthetic_adc1_code(first_pair + offset),
+                )
+                for offset in range(constants.ADC_PAIRS_PER_FRAME)
+            ),
+            adc_pairs,
+        )
+
+        first_gpio_sample = 254
+        gpio_payload = synthetic_gpio_payload(first_gpio_sample)
+        self.assertEqual(constants.GPIO_SAMPLES_PER_FRAME, len(gpio_payload))
+        self.assertEqual(
+            bytes(
+                synthetic_gpio_byte(first_gpio_sample + offset)
+                for offset in range(constants.GPIO_SAMPLES_PER_FRAME)
+            ),
+            gpio_payload,
         )
 
 

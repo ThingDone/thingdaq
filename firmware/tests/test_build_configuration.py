@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BUILD_HELPER_PATH = REPOSITORY_ROOT / "firmware/tools/build_firmware.py"
@@ -30,6 +32,50 @@ class BuildConfigurationTests(unittest.TestCase):
             str(build_firmware.OUTPUT_DIRECTORY),
             command[command.index("--output-dir") + 1],
         )
+        self.assertEqual("compile", command[1])
+        self.assertNotIn("upload", command)
+
+    def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
+        responses = [
+            subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout="arduino-cli Version: 1.4.1\n",
+                stderr="",
+            ),
+            subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=(
+                    '{"platforms": [{"id": "teensy:avr", '
+                    '"installed_version": "1.61.0"}]}\n'
+                ),
+                stderr="",
+            ),
+        ]
+
+        with (
+            patch.object(
+                build_firmware.shutil,
+                "which",
+                return_value="/tools/arduino-cli",
+            ),
+            patch.object(
+                build_firmware,
+                "run_command",
+                side_effect=responses,
+            ) as run_command,
+            self.assertRaisesRegex(
+                build_firmware.BuildError,
+                "requires teensy:avr 1.62.0",
+            ),
+        ):
+            build_firmware.build("arduino-cli")
+
+        commands = [call.args[0] for call in run_command.call_args_list]
+        self.assertEqual(2, len(commands))
+        self.assertFalse(any("compile" in command for command in commands))
+        self.assertFalse(any("upload" in command for command in commands))
 
     def test_core_inventory_must_report_the_pinned_version(self) -> None:
         inventory = {

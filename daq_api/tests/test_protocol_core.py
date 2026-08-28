@@ -57,6 +57,39 @@ class ProtocolCoreTests(unittest.TestCase):
                 self.assertEqual(wire, frame.to_bytes())
                 self.assertEqual(wire, encoded)
 
+    def test_every_golden_checksum_covers_header_and_payload(self) -> None:
+        for entry in MANIFEST["fixtures"]:
+            wire = (FIXTURE_DIRECTORY / entry["file"]).read_bytes()
+            body = wire[: -constants.TRAILER_SIZE]
+            trailer_checksum = struct.unpack_from("<I", wire, len(body))[0]
+            offsets = {
+                0,
+                constants.HEADER_SIZE - 1,
+            }
+            if entry["payload_length"]:
+                offsets.update({constants.HEADER_SIZE, len(body) - 1})
+
+            with self.subTest(kind=entry["kind"], region="complete body"):
+                self.assertEqual(trailer_checksum, compute_checksum(body))
+            for offset in sorted(offsets):
+                with self.subTest(kind=entry["kind"], mutated_offset=offset):
+                    mutated = bytearray(body)
+                    mutated[offset] ^= 0x01
+                    self.assertNotEqual(trailer_checksum, compute_checksum(mutated))
+
+    def test_every_golden_frame_accepts_every_two_chunk_split(self) -> None:
+        for entry in MANIFEST["fixtures"]:
+            wire = (FIXTURE_DIRECTORY / entry["file"]).read_bytes()
+            for split_point in range(len(wire) + 1):
+                with self.subTest(kind=entry["kind"], split_point=split_point):
+                    parser = IncrementalFrameParser()
+                    decoded = parser.feed(wire[:split_point])
+                    decoded.extend(parser.feed(wire[split_point:]))
+
+                    self.assertEqual([wire], [frame.to_bytes() for frame in decoded])
+                    self.assertEqual(1, parser.frames_decoded)
+                    self.assertEqual(0, parser.buffered_bytes)
+
     def test_incremental_parser_accepts_arbitrary_read_sizes_and_many_frames(
         self,
     ) -> None:
@@ -83,22 +116,33 @@ class ProtocolCoreTests(unittest.TestCase):
         status = (FIXTURE_DIRECTORY / "status-request.bin").read_bytes()
         corrupt = bytearray(info)
         corrupt[-1] ^= 0x80
-        parser = IncrementalFrameParser()
 
-        self.assertEqual([], parser.feed(b"garbage" + constants.MAGIC_BYTES[:3]))
-        frames = parser.feed(bytes(corrupt) + status)
+        for partial_length in range(1, len(constants.MAGIC_BYTES)):
+            with self.subTest(partial_magic_bytes=partial_length):
+                parser = IncrementalFrameParser()
+                self.assertEqual(
+                    [],
+                    parser.feed(b"garbage" + constants.MAGIC_BYTES[:partial_length]),
+                )
+                frames = parser.feed(bytes(corrupt) + status)
 
-        self.assertEqual([status], [frame.to_bytes() for frame in frames])
-        self.assertGreaterEqual(parser.errors, 1)
-        self.assertGreaterEqual(parser.bytes_discarded, len(b"garbage"))
+                self.assertEqual([status], [frame.to_bytes() for frame in frames])
+                self.assertGreaterEqual(parser.errors, 1)
+                self.assertGreaterEqual(parser.bytes_discarded, len(b"garbage"))
 
     def test_parser_storage_is_bounded_even_for_large_garbage_chunks(self) -> None:
         parser = IncrementalFrameParser()
+        info = (FIXTURE_DIRECTORY / "info-request.bin").read_bytes()
 
         self.assertEqual([], parser.feed(b"x" * 100_000 + constants.MAGIC_BYTES[:2]))
 
         self.assertEqual(2, parser.buffered_bytes)
         self.assertLessEqual(parser.high_water_mark, parser.max_buffered_bytes)
+        frames = parser.feed(
+            constants.MAGIC_BYTES[2:] + info[len(constants.MAGIC_BYTES) :]
+        )
+        self.assertEqual([info], [frame.to_bytes() for frame in frames])
+        self.assertEqual(0, parser.buffered_bytes)
 
     def test_decode_rejects_checksum_and_typed_reserved_field_corruption(self) -> None:
         wire = bytearray((FIXTURE_DIRECTORY / "configure-request.bin").read_bytes())
@@ -114,15 +158,17 @@ class ProtocolCoreTests(unittest.TestCase):
 
     def test_parser_rejects_implausible_length_before_waiting_for_body(self) -> None:
         invalid = bytearray((FIXTURE_DIRECTORY / "info-request.bin").read_bytes())
+        valid = (FIXTURE_DIRECTORY / "status-request.bin").read_bytes()
         struct.pack_into(
             "<I", invalid, constants.HEADER_TOTAL_LENGTH_OFFSET, 0xFFFFFFFF
         )
         parser = IncrementalFrameParser()
 
-        self.assertEqual([], parser.feed(invalid))
+        frames = parser.feed(invalid + valid)
 
+        self.assertEqual([valid], [frame.to_bytes() for frame in frames])
         self.assertGreaterEqual(parser.errors, 1)
-        self.assertLess(parser.buffered_bytes, constants.HEADER_SIZE)
+        self.assertEqual(0, parser.buffered_bytes)
 
 
 if __name__ == "__main__":

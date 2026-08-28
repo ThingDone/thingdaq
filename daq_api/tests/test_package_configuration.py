@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from typing import Any, ClassVar
 
 import tomllib
 
@@ -11,6 +12,8 @@ PYPROJECT_PATH = Path(__file__).resolve().parents[1] / "pyproject.toml"
 
 
 class PackageConfigurationTests(unittest.TestCase):
+    pyproject: ClassVar[dict[str, Any]]
+
     @classmethod
     def setUpClass(cls) -> None:
         with PYPROJECT_PATH.open("rb") as pyproject_file:

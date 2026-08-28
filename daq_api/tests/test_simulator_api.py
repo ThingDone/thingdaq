@@ -139,6 +139,40 @@ class TeensyDAQControlTests(unittest.TestCase):
 
             self.assertEqual(first_run + 1, second_run)
 
+    def test_state_transitions_and_queries_are_stable_in_every_state(self) -> None:
+        with TeensyDAQ.simulated(read_chunk_size=7, write_chunk_size=3) as daq:
+            idle_info = daq.info()
+            self.assertEqual(DeviceState.IDLE, idle_info.device_state)
+            self.assertEqual(daq.status(), daq.status())
+
+            first_configuration = daq.configure(adc=True, gpio=False)
+            second_configuration = daq.configure(adc=False, gpio=True)
+            self.assertEqual(StreamMask.ADC, first_configuration.stream_mask)
+            self.assertEqual(StreamMask.GPIO, second_configuration.stream_mask)
+            self.assertEqual(DeviceState.CONFIGURED, daq.info().device_state)
+            self.assertEqual(daq.status(), daq.status())
+
+            run_id = daq.start()
+            first_running_info = daq.info()
+            second_running_info = daq.info()
+            self.assertEqual(first_running_info, second_running_info)
+            self.assertEqual(DeviceState.RUNNING, first_running_info.device_state)
+            self.assertEqual(run_id, daq.run_id)
+
+            with self.assertRaises(DeviceCommandError) as raised:
+                daq.configure(adc=True, gpio=True)
+            self.assertEqual(ErrorCode.INVALID_STATE, raised.exception.error_code)
+            self.assertEqual(DeviceState.RUNNING, daq.status().device_state)
+            active_configuration = daq.configuration
+            self.assertIsNotNone(active_configuration)
+            assert active_configuration is not None
+            self.assertEqual(StreamMask.GPIO, active_configuration.stream_mask)
+
+            self.assertEqual(DeviceState.IDLE, daq.stop())
+            self.assertEqual(DeviceState.IDLE, daq.stop())
+            self.assertEqual(DeviceState.IDLE, daq.info().device_state)
+            self.assertIsNone(daq.configuration)
+
 
 class TeensyDAQStreamingTests(unittest.TestCase):
     def test_both_streams_have_independent_sequences_timestamps_and_patterns(
@@ -234,6 +268,19 @@ class TeensyDAQStreamingTests(unittest.TestCase):
         self.assertFalse(transport.is_open)
         with self.assertRaises(TransportClosedError):
             transport.read(1)
+
+    def test_context_manager_stops_and_closes_after_success(self) -> None:
+        transport = InMemoryTransport(read_chunk_size=13, write_chunk_size=5)
+
+        with TeensyDAQ.open(transport, read_size=17) as daq:
+            daq.configure()
+            daq.start()
+            self.assertIsInstance(daq.read_block(), AdcBlock)
+
+        self.assertEqual(DeviceState.IDLE, transport.device.state)
+        self.assertFalse(transport.is_open)
+        with self.assertRaises(TransportClosedError):
+            transport.write(b"request")
 
 
 class TransportBoundaryTests(unittest.TestCase):

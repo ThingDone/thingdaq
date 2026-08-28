@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import socket
 import subprocess
 import sys
 import unittest
@@ -11,7 +12,9 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+import serial
 import tomllib
+from teensy_daq import DeviceState, InMemoryTransport, TeensyDAQ
 from teensy_daq.demo import main, run_demo
 from teensy_daq.models import AdcChannelView
 
@@ -21,8 +24,11 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 class OfflineDemoTests(unittest.TestCase):
     def test_demo_validates_both_streams_with_tiny_parser_chunks(self) -> None:
         output = io.StringIO()
+        transport = InMemoryTransport(read_chunk_size=7)
+        daq = TeensyDAQ.open(transport, read_size=7)
 
-        run_demo(frame_count=2, parser_chunk_size=7, output=output)
+        with patch.object(TeensyDAQ, "simulated", return_value=daq):
+            run_demo(frame_count=2, parser_chunk_size=7, output=output)
 
         transcript = output.getvalue()
         self.assertIn("streams=ADC+GPIO source=SYNTHETIC", transcript)
@@ -38,12 +44,17 @@ class OfflineDemoTests(unittest.TestCase):
         )
         self.assertIn("CLEANUP   transport=CLOSED", transcript)
         self.assertIn("PASS      validated 2 ADC + 2 GPIO frames", transcript)
+        self.assertEqual(DeviceState.IDLE, transport.device.state)
+        self.assertFalse(transport.is_open)
 
     def test_main_returns_nonzero_when_a_sample_mismatches(self) -> None:
         stdout = io.StringIO()
         stderr = io.StringIO()
+        transport = InMemoryTransport(read_chunk_size=13)
+        daq = TeensyDAQ.open(transport, read_size=13)
 
         with (
+            patch.object(TeensyDAQ, "simulated", return_value=daq),
             patch.object(AdcChannelView, "__getitem__", return_value=4095),
             redirect_stdout(stdout),
             redirect_stderr(stderr),
@@ -53,6 +64,40 @@ class OfflineDemoTests(unittest.TestCase):
         self.assertEqual(1, result)
         self.assertNotIn("PASS", stdout.getvalue())
         self.assertIn("FAIL      ADC synthetic sample", stderr.getvalue())
+        self.assertEqual(DeviceState.IDLE, transport.device.state)
+        self.assertFalse(transport.is_open)
+
+    def test_cli_needs_no_serial_hardware_network_or_credentials(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(
+                serial,
+                "Serial",
+                side_effect=AssertionError("serial hardware access attempted"),
+            ) as serial_open,
+            patch.object(
+                serial,
+                "serial_for_url",
+                side_effect=AssertionError("serial URL access attempted"),
+            ) as serial_url_open,
+            patch.object(
+                socket,
+                "create_connection",
+                side_effect=AssertionError("rig network access attempted"),
+            ) as rig_connection,
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+        ):
+            result = main(["--frame-count", "1", "--parser-chunk-size", "5"])
+
+        self.assertEqual(0, result, stderr.getvalue())
+        self.assertIn("PASS      validated 1 ADC + 1 GPIO frames", stdout.getvalue())
+        serial_open.assert_not_called()
+        serial_url_open.assert_not_called()
+        rig_connection.assert_not_called()
 
     def test_module_and_console_entry_points_match(self) -> None:
         environment = os.environ.copy()
