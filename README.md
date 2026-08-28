@@ -57,3 +57,29 @@ fixtures remain tracked under the firmware or Python test trees.
 Every Markdown artifact under `doc/` must begin with YAML front matter
 containing `type`, `title`, `created`, `tags`, and `related`, and must use
 `[[Wiki-Links]]` for related project documents.
+
+## Reproducible local setup
+
+The firmware build is intentionally fixed to Teensy 4.0, USB Serial, 600 MHz,
+standard `-O2`, and Teensy core 1.62.0. The helper refuses a different installed
+core, compiles with the complete
+`teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` FQBN, and records the
+Arduino CLI, compiler, command, hashes, and sizes in a gitignored build
+manifest:
+
+```bash
+python3 firmware/tools/build_firmware.py
+```
+
+For Python API development, install the private local distribution and its
+development tools from the repository root. NumPy remains an explicit optional
+feature rather than a runtime requirement:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install --editable './daq_api[dev,numpy]'
+```
+
+The `teensy-daq-local` distribution name and `Private :: Do Not Upload`
+classifier are deliberate publication guards. Rename and review the
+distribution metadata before any future package-index release.

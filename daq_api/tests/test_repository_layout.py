@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import tomllib
 import unittest
 from pathlib import Path
 
+import tomllib
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 REQUIRED_DIRECTORIES = (
