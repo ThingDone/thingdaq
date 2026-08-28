@@ -19,6 +19,7 @@ related:
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
+  - '[[ADR-004-ADC-Trigger-DMA]]'
   - '[[Phase-01-Synthetic-Prototype-Gate]]'
   - '[[Phase-02-Protocol-Python-Gate]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -40,7 +41,8 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   [[Protocol-V1]].
 - `decisions/` contains architecture decision records, including
   [[ADR-001-Wire-Protocol]], [[ADR-002-Checksum-Selection]], and
-  [[ADR-003-GPIO-Clock-DMA]].
+  [[ADR-003-GPIO-Clock-DMA]], followed by the permanent converter, trigger,
+  and DMA resource contract in [[ADR-004-ADC-Trigger-DMA]].
 - `reference/` records durable inventories and implementation references,
   beginning with [[Foundation-Reuse-Inventory]].
 - `research/` records evidence gathered before implementation or selection,

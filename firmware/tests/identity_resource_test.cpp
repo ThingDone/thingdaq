@@ -8,7 +8,9 @@
 
 namespace {
 
+using teensy_daq::board::AdcConverterConfiguration;
 using teensy_daq::board::AdcEtcAllocation;
+using teensy_daq::board::AdcInputPad;
 using teensy_daq::board::EdmaAllocation;
 using teensy_daq::board::GpioPinMapping;
 using teensy_daq::board::MemoryAllocation;
@@ -43,6 +45,22 @@ constexpr GpioPinMapping kWrongGpioPinOrder[] = {
     {11U, 2U},
     {12U, 1U},
     {13U, 3U},
+};
+constexpr AdcConverterConfiguration kIncompleteAdcConfiguration[] = {
+    {0U, 0U, 14U, AdcInputPad::kGpioAdB1_02, 1U, 7U, 0U, 57U,
+     103U, 0U, 24U, ResourceOwner::kAdc0Capture},
+};
+constexpr AdcConverterConfiguration kWrongAdcQueue[] = {
+    {0U, 0U, 14U, AdcInputPad::kGpioAdB1_02, 1U, 7U, 4U, 57U,
+     103U, 0U, 24U, ResourceOwner::kAdc0Capture},
+    {1U, 1U, 15U, AdcInputPad::kGpioAdB1_03, 2U, 8U, 0U, 57U,
+     107U, 1U, 88U, ResourceOwner::kAdc1Capture},
+};
+constexpr AdcConverterConfiguration kConflictingAdcDma[] = {
+    {0U, 0U, 14U, AdcInputPad::kGpioAdB1_02, 1U, 7U, 0U, 57U,
+     103U, 0U, 24U, ResourceOwner::kAdc0Capture},
+    {1U, 1U, 15U, AdcInputPad::kGpioAdB1_03, 2U, 8U, 4U, 57U,
+     107U, 0U, 88U, ResourceOwner::kAdc1Capture},
 };
 constexpr PitAllocation kConflictingPit[] = {
     {1U, ResourceOwner::kAcquisitionClock},
@@ -98,6 +116,8 @@ static_assert(teensy_daq::board::validGpioPinMappings(
 static_assert(teensy_daq::board::gpioPinOrderMatches(
     teensy_daq::board::kGpioMappingsByPackedBit,
     teensy_daq::board::kGpioPinsByBit));
+static_assert(teensy_daq::board::validAdcConverterConfigurations(
+    teensy_daq::board::kAdcConverterConfigurations));
 static_assert(teensy_daq::board::validPitAllocations(
     teensy_daq::board::kPitAllocations));
 static_assert(teensy_daq::board::validXbarRoutes(
@@ -116,6 +136,12 @@ static_assert(!teensy_daq::board::validGpioPinMappings(
     kOutOfRangeGpioBit));
 static_assert(!teensy_daq::board::gpioPinOrderMatches(
     kWrongGpioPinOrder, teensy_daq::board::kGpioPinsByBit));
+static_assert(!teensy_daq::board::validAdcConverterConfigurations(
+    kIncompleteAdcConfiguration));
+static_assert(!teensy_daq::board::validAdcConverterConfigurations(
+    kWrongAdcQueue));
+static_assert(!teensy_daq::board::validAdcConverterConfigurations(
+    kConflictingAdcDma));
 static_assert(!teensy_daq::board::validPitAllocations(kConflictingPit));
 static_assert(!teensy_daq::board::validPitAllocations(kOutOfRangePit));
 static_assert(!teensy_daq::board::validXbarRoutes(kConflictingXbar));
@@ -167,6 +193,42 @@ static_assert(teensy_daq::identity::kFirmwareVersion.minor == 7U);
 static_assert(teensy_daq::identity::kFirmwareVersion.patch == 0U);
 static_assert(teensy_daq::board::kAdc0Pin == 14U);
 static_assert(teensy_daq::board::kAdc1Pin == 15U);
+static_assert(teensy_daq::board::countOf(
+                  teensy_daq::board::kAdcConverterConfigurations) == 2U);
+static_assert(
+    teensy_daq::board::kAdcConverterConfigurations[0].logical_converter ==
+        0U &&
+    teensy_daq::board::kAdcConverterConfigurations[0]
+            .teensy_adc_library_module == 0U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].teensy_pin == 14U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].input_pad ==
+        AdcInputPad::kGpioAdB1_02 &&
+    teensy_daq::board::kAdcConverterConfigurations[0].adc_peripheral == 1U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].input_channel == 7U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].adc_etc_trigger == 0U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].xbar_input == 57U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].xbar_output == 103U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].edma_channel == 0U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].dmamux_source == 24U &&
+    teensy_daq::board::kAdcConverterConfigurations[0].owner ==
+        ResourceOwner::kAdc0Capture);
+static_assert(
+    teensy_daq::board::kAdcConverterConfigurations[1].logical_converter ==
+        1U &&
+    teensy_daq::board::kAdcConverterConfigurations[1]
+            .teensy_adc_library_module == 1U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].teensy_pin == 15U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].input_pad ==
+        AdcInputPad::kGpioAdB1_03 &&
+    teensy_daq::board::kAdcConverterConfigurations[1].adc_peripheral == 2U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].input_channel == 8U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].adc_etc_trigger == 4U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].xbar_input == 57U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].xbar_output == 107U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].edma_channel == 1U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].dmamux_source == 88U &&
+    teensy_daq::board::kAdcConverterConfigurations[1].owner ==
+        ResourceOwner::kAdc1Capture);
 static_assert(teensy_daq::board::countOf(
                   teensy_daq::board::kGpioMappingsByPackedBit) == 8U);
 static_assert(teensy_daq::board::kGpioMappingsByPackedBit[0].teensy_pin ==

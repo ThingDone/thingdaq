@@ -144,6 +144,15 @@ scheduled/sample counts, route IDs, and typed hardware errors. The accepted
 route and rejected dual-edge alternatives are recorded in
 `doc/decisions/adr-003-gpio-clock-dma.md`.
 
+Phase 07 fixes one compile-time ADC route table before adding register code:
+logical ADC0 is A0 through NXP ADC1 channel 7, and logical ADC1 is A1 through
+NXP ADC2 channel 8. The same tuples own ADC_ETC queues 0/4, XBAR outputs
+103/107, and eDMA channels 0/1 with DMAMUX sources 24/88. The selected clock,
+500 ns trigger-delay arithmetic, initial 12-bit conversion budget, and explicit
+10-bit fallback gate are recorded in
+`doc/decisions/adr-004-adc-trigger-dma.md`; physical ADC capability remains
+disabled until the later initialization, DMA, integration, and rig gates pass.
+
 The advertised physical GPIO mode selectively returns only D6-D13 from
 GPIO7 to GPIO2, keeps them inputs on START/STOP/error, and uses channel 2 to
 copy fixed 32-bit `GPIO2_PSR` samples into four aligned 4,048-word OCRAM

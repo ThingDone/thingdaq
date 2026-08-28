@@ -65,6 +65,29 @@ struct GpioPinMapping {
   std::uint8_t gpio2_bit;
 };
 
+enum class AdcInputPad : std::uint8_t {
+  kGpioAdB1_02 = 2U,
+  kGpioAdB1_03 = 3U,
+};
+
+// The complete route for one logical converter. The Teensy ADC library calls
+// NXP ADC1 "adc0" and NXP ADC2 "adc1"; keeping every identity in one tuple
+// prevents a library call or first-free allocator from silently swapping them.
+struct AdcConverterConfiguration {
+  std::uint8_t logical_converter;
+  std::uint8_t teensy_adc_library_module;
+  std::uint8_t teensy_pin;
+  AdcInputPad input_pad;
+  std::uint8_t adc_peripheral;
+  std::uint8_t input_channel;
+  std::uint8_t adc_etc_trigger;
+  std::uint8_t xbar_input;
+  std::uint8_t xbar_output;
+  std::uint8_t edma_channel;
+  std::uint8_t dmamux_source;
+  ResourceOwner owner;
+};
+
 struct PitAllocation {
   std::uint8_t channel;
   ResourceOwner owner;
@@ -102,6 +125,8 @@ inline constexpr std::uint8_t kXbarInputCount = 132U;
 inline constexpr std::uint8_t kXbarOutputCount = 132U;
 inline constexpr std::uint8_t kAdcEtcTriggerCount = 8U;
 inline constexpr std::uint8_t kAdcPeripheralCount = 2U;
+inline constexpr std::uint8_t kLogicalAdcCount = 2U;
+inline constexpr std::uint8_t kAdcInputChannelCount = 16U;
 inline constexpr std::uint8_t kEdmaChannelCount = 32U;
 inline constexpr std::uint8_t kDmamuxSourceCount = 128U;
 inline constexpr std::uint8_t kGpioPortBitCount = 32U;
@@ -109,13 +134,49 @@ inline constexpr std::size_t kCacheLineBytes = 32U;
 inline constexpr std::size_t kRam1BudgetBytes = 512U * 1024U;
 inline constexpr std::size_t kRam2BudgetBytes = 512U * 1024U;
 
-// Teensy 4.0 A0/A1 are digital pins 14/15. Logical ADC0 is NXP ADC1 and
-// logical ADC1 is NXP ADC2; keeping both names here avoids future off-by-one
-// mistakes at the register boundary.
-inline constexpr std::uint8_t kAdc0Pin = 14U;
-inline constexpr std::uint8_t kAdc1Pin = 15U;
-inline constexpr std::uint8_t kAdc0Peripheral = 1U;
-inline constexpr std::uint8_t kAdc1Peripheral = 2U;
+// Numeric identities come from the pinned core's imxrt.h. PIT1 fans out to
+// both ADC_ETC outputs by design; XBAR outputs, rather than inputs, are unique.
+inline constexpr std::uint8_t kXbarPitTrigger0Input = 56U;
+inline constexpr std::uint8_t kXbarPitTrigger1Input = 57U;
+inline constexpr std::uint8_t kXbarPitTrigger2Input = 58U;
+inline constexpr std::uint8_t kXbarPitTrigger3Input = 59U;
+inline constexpr std::uint8_t kXbarDmaRequest30Output = 0U;
+inline constexpr std::uint8_t kXbarDmaRequest31Output = 1U;
+inline constexpr std::uint8_t kXbarDmaRequest94Output = 2U;
+inline constexpr std::uint8_t kXbarDmaRequest95Output = 3U;
+inline constexpr std::uint8_t kXbarAdcEtcTrigger0Output = 103U;
+inline constexpr std::uint8_t kXbarAdcEtcTrigger4Output = 107U;
+inline constexpr std::uint8_t kDmamuxAdc1Source = 24U;
+inline constexpr std::uint8_t kDmamuxXbar1Request0Source = 30U;
+inline constexpr std::uint8_t kDmamuxXbar1Request1Source = 31U;
+inline constexpr std::uint8_t kDmamuxXbar1Request2Source = 94U;
+inline constexpr std::uint8_t kDmamuxXbar1Request3Source = 95U;
+inline constexpr std::uint8_t kDmamuxAdc2Source = 88U;
+
+// This is the sole authoritative ADC route table. Although both NXP ADC
+// modules can sample both pads, logical ADC0 is permanently A0 through ADC1
+// channel 7 and logical ADC1 is permanently A1 through ADC2 channel 8.
+inline constexpr AdcConverterConfiguration kAdcConverterConfigurations[] = {
+    {0U, 0U, 14U, AdcInputPad::kGpioAdB1_02, 1U, 7U, 0U,
+     kXbarPitTrigger1Input, kXbarAdcEtcTrigger0Output, 0U,
+     kDmamuxAdc1Source, ResourceOwner::kAdc0Capture},
+    {1U, 1U, 15U, AdcInputPad::kGpioAdB1_03, 2U, 8U, 4U,
+     kXbarPitTrigger1Input, kXbarAdcEtcTrigger4Output, 1U,
+     kDmamuxAdc2Source, ResourceOwner::kAdc1Capture},
+};
+
+inline constexpr std::uint8_t kAdc0Pin =
+    kAdcConverterConfigurations[0].teensy_pin;
+inline constexpr std::uint8_t kAdc1Pin =
+    kAdcConverterConfigurations[1].teensy_pin;
+inline constexpr std::uint8_t kAdc0Peripheral =
+    kAdcConverterConfigurations[0].adc_peripheral;
+inline constexpr std::uint8_t kAdc1Peripheral =
+    kAdcConverterConfigurations[1].adc_peripheral;
+inline constexpr std::uint8_t kAdc0InputChannel =
+    kAdcConverterConfigurations[0].input_channel;
+inline constexpr std::uint8_t kAdc1InputChannel =
+    kAdcConverterConfigurations[1].input_channel;
 inline constexpr std::uint8_t kGpioPinsByBit[] = {6U, 7U, 8U, 9U,
                                                   10U, 11U, 12U, 13U};
 // Array order is the packed wire bit. Teensy startup selects the GPIO7 fast
@@ -158,18 +219,6 @@ inline constexpr PitAllocation kPitAllocations[] = {
     {1U, ResourceOwner::kAcquisitionClock},
 };
 
-// Numeric identities come from the pinned core's imxrt.h. PIT1 fans out to two
-// ADC_ETC outputs by design; XBAR outputs, rather than inputs, must be unique.
-inline constexpr std::uint8_t kXbarPitTrigger0Input = 56U;
-inline constexpr std::uint8_t kXbarPitTrigger1Input = 57U;
-inline constexpr std::uint8_t kXbarPitTrigger2Input = 58U;
-inline constexpr std::uint8_t kXbarPitTrigger3Input = 59U;
-inline constexpr std::uint8_t kXbarDmaRequest30Output = 0U;
-inline constexpr std::uint8_t kXbarDmaRequest31Output = 1U;
-inline constexpr std::uint8_t kXbarDmaRequest94Output = 2U;
-inline constexpr std::uint8_t kXbarDmaRequest95Output = 3U;
-inline constexpr std::uint8_t kXbarAdcEtcTrigger0Output = 103U;
-inline constexpr std::uint8_t kXbarAdcEtcTrigger4Output = 107U;
 // The PIT trigger is a periodic transition source. Detect one rising edge per
 // period; the inherited dual-edge setting over-counted at 4 MHz on silicon.
 inline constexpr std::uint8_t kGpioXbarInput = kXbarPitTrigger0Input;
@@ -177,28 +226,32 @@ inline constexpr std::uint8_t kGpioXbarOutput = kXbarDmaRequest30Output;
 inline constexpr std::uint8_t kGpioXbarActiveEdge = 1U;
 inline constexpr XbarRoute kXbarRoutes[] = {
     {kGpioXbarInput, kGpioXbarOutput, ResourceOwner::kGpioCapture},
-    {kXbarPitTrigger1Input, kXbarAdcEtcTrigger0Output,
-     ResourceOwner::kAdc0Capture},
-    {kXbarPitTrigger1Input, kXbarAdcEtcTrigger4Output,
-     ResourceOwner::kAdc1Capture},
+    {kAdcConverterConfigurations[0].xbar_input,
+     kAdcConverterConfigurations[0].xbar_output,
+     kAdcConverterConfigurations[0].owner},
+    {kAdcConverterConfigurations[1].xbar_input,
+     kAdcConverterConfigurations[1].xbar_output,
+     kAdcConverterConfigurations[1].owner},
 };
 
 inline constexpr AdcEtcAllocation kAdcEtcAllocations[] = {
-    {0U, kAdc0Peripheral, ResourceOwner::kAdc0Capture},
-    {4U, kAdc1Peripheral, ResourceOwner::kAdc1Capture},
+    {kAdcConverterConfigurations[0].adc_etc_trigger,
+     kAdcConverterConfigurations[0].adc_peripheral,
+     kAdcConverterConfigurations[0].owner},
+    {kAdcConverterConfigurations[1].adc_etc_trigger,
+     kAdcConverterConfigurations[1].adc_peripheral,
+     kAdcConverterConfigurations[1].owner},
 };
 
-inline constexpr std::uint8_t kDmamuxAdc1Source = 24U;
-inline constexpr std::uint8_t kDmamuxXbar1Request0Source = 30U;
-inline constexpr std::uint8_t kDmamuxXbar1Request1Source = 31U;
-inline constexpr std::uint8_t kDmamuxXbar1Request2Source = 94U;
-inline constexpr std::uint8_t kDmamuxXbar1Request3Source = 95U;
-inline constexpr std::uint8_t kDmamuxAdc2Source = 88U;
 inline constexpr std::uint8_t kGpioDmamuxSource =
     kDmamuxXbar1Request0Source;
 inline constexpr EdmaAllocation kEdmaAllocations[] = {
-    {0U, kDmamuxAdc1Source, ResourceOwner::kAdc0Capture},
-    {1U, kDmamuxAdc2Source, ResourceOwner::kAdc1Capture},
+    {kAdcConverterConfigurations[0].edma_channel,
+     kAdcConverterConfigurations[0].dmamux_source,
+     kAdcConverterConfigurations[0].owner},
+    {kAdcConverterConfigurations[1].edma_channel,
+     kAdcConverterConfigurations[1].dmamux_source,
+     kAdcConverterConfigurations[1].owner},
     {kGpioEdmaChannel, kGpioDmamuxSource, ResourceOwner::kGpioCapture},
 };
 
@@ -379,6 +432,64 @@ constexpr bool gpioPinOrderMatches(
   return true;
 }
 
+constexpr bool validAdcInputPad(AdcInputPad pad) {
+  return pad == AdcInputPad::kGpioAdB1_02 ||
+         pad == AdcInputPad::kGpioAdB1_03;
+}
+
+template <std::size_t N>
+constexpr bool validAdcConverterConfigurations(
+    const AdcConverterConfiguration (&configurations)[N]) {
+  if (N != kLogicalAdcCount) {
+    return false;
+  }
+  for (std::size_t left = 0; left < N; ++left) {
+    const AdcConverterConfiguration &configuration = configurations[left];
+    const ResourceOwner expected_owner =
+        configuration.logical_converter == 0U
+            ? ResourceOwner::kAdc0Capture
+            : ResourceOwner::kAdc1Capture;
+    if (configuration.logical_converter >= kLogicalAdcCount ||
+        configuration.teensy_adc_library_module >= kLogicalAdcCount ||
+        configuration.teensy_pin >= kTeensy40DigitalPinCount ||
+        !validAdcInputPad(configuration.input_pad) ||
+        configuration.adc_peripheral == 0U ||
+        configuration.adc_peripheral > kAdcPeripheralCount ||
+        configuration.input_channel >= kAdcInputChannelCount ||
+        configuration.adc_etc_trigger >= kAdcEtcTriggerCount ||
+        configuration.xbar_input >= kXbarInputCount ||
+        configuration.xbar_output >= kXbarOutputCount ||
+        configuration.edma_channel >= kEdmaChannelCount ||
+        configuration.dmamux_source >= kDmamuxSourceCount ||
+        configuration.logical_converter + 1U !=
+            configuration.adc_peripheral ||
+        configuration.teensy_adc_library_module + 1U !=
+            configuration.adc_peripheral ||
+        configuration.adc_etc_trigger / 4U + 1U !=
+            configuration.adc_peripheral ||
+        configuration.owner != expected_owner) {
+      return false;
+    }
+    for (std::size_t right = left + 1U; right < N; ++right) {
+      const AdcConverterConfiguration &later = configurations[right];
+      if (configuration.logical_converter == later.logical_converter ||
+          configuration.teensy_adc_library_module ==
+              later.teensy_adc_library_module ||
+          configuration.teensy_pin == later.teensy_pin ||
+          configuration.input_pad == later.input_pad ||
+          configuration.adc_peripheral == later.adc_peripheral ||
+          configuration.adc_etc_trigger == later.adc_etc_trigger ||
+          configuration.xbar_output == later.xbar_output ||
+          configuration.edma_channel == later.edma_channel ||
+          configuration.dmamux_source == later.dmamux_source ||
+          configuration.owner == later.owner) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 template <std::size_t N>
 constexpr bool validPitAllocations(const PitAllocation (&allocations)[N]) {
   for (std::size_t left = 0; left < N; ++left) {
@@ -507,6 +618,41 @@ static_assert(validGpioPinMappings(kGpioMappingsByPackedBit),
               "GPIO map is unsupported or contains duplicate pins/bits");
 static_assert(gpioPinOrderMatches(kGpioMappingsByPackedBit, kGpioPinsByBit),
               "GPIO resource map and packed pin order disagree");
+static_assert(validAdcConverterConfigurations(kAdcConverterConfigurations),
+              "ADC converter route is unsupported or conflicts");
+static_assert(countOf(kAdcConverterConfigurations) == kLogicalAdcCount);
+static_assert(kAdcConverterConfigurations[0].logical_converter == 0U);
+static_assert(
+    kAdcConverterConfigurations[0].teensy_adc_library_module == 0U);
+static_assert(kAdcConverterConfigurations[0].teensy_pin == 14U);
+static_assert(kAdcConverterConfigurations[0].input_pad ==
+              AdcInputPad::kGpioAdB1_02);
+static_assert(kAdcConverterConfigurations[0].adc_peripheral == 1U);
+static_assert(kAdcConverterConfigurations[0].input_channel == 7U);
+static_assert(kAdcConverterConfigurations[0].adc_etc_trigger == 0U);
+static_assert(kAdcConverterConfigurations[0].xbar_input ==
+              kXbarPitTrigger1Input);
+static_assert(kAdcConverterConfigurations[0].xbar_output ==
+              kXbarAdcEtcTrigger0Output);
+static_assert(kAdcConverterConfigurations[0].edma_channel == 0U);
+static_assert(kAdcConverterConfigurations[0].dmamux_source ==
+              kDmamuxAdc1Source);
+static_assert(kAdcConverterConfigurations[1].logical_converter == 1U);
+static_assert(
+    kAdcConverterConfigurations[1].teensy_adc_library_module == 1U);
+static_assert(kAdcConverterConfigurations[1].teensy_pin == 15U);
+static_assert(kAdcConverterConfigurations[1].input_pad ==
+              AdcInputPad::kGpioAdB1_03);
+static_assert(kAdcConverterConfigurations[1].adc_peripheral == 2U);
+static_assert(kAdcConverterConfigurations[1].input_channel == 8U);
+static_assert(kAdcConverterConfigurations[1].adc_etc_trigger == 4U);
+static_assert(kAdcConverterConfigurations[1].xbar_input ==
+              kXbarPitTrigger1Input);
+static_assert(kAdcConverterConfigurations[1].xbar_output ==
+              kXbarAdcEtcTrigger4Output);
+static_assert(kAdcConverterConfigurations[1].edma_channel == 1U);
+static_assert(kAdcConverterConfigurations[1].dmamux_source ==
+              kDmamuxAdc2Source);
 static_assert(kGpio2PsrCaptureMask == 0x00030C0FU,
               "GPIO2 capture and GPR27 masks must cover only D6-D13");
 static_assert(kGpio7ToGpio2Gpr27ClearMask == kGpio2PsrCaptureMask,

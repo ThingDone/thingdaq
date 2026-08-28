@@ -14,6 +14,7 @@ related:
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
+  - '[[ADR-004-ADC-Trigger-DMA]]'
 ---
 
 # Firmware resource map
@@ -25,10 +26,12 @@ PIT/XBAR/eDMA clock path in [[ADR-003-GPIO-Clock-DMA]] and advertises its
 IDLE-only diagnostic. The separate raw adapter now implements selective
 D6-D13 remapping and rotating `GPIO2_PSR` capture, but the physical GPIO source
 remains disabled until the later packing, integration, and streaming gates
-pass. The existing synthetic generators and
-packetizer remain cooperative and do not claim physical acquisition
-resources. See [[System-Overview]] for that boundary and [[Protocol-V1]] with
-[[ADR-001-Wire-Protocol]] for the wire metadata.
+pass. The existing synthetic generators and packetizer remain cooperative and
+do not claim physical acquisition resources. Phase 07 now fixes the complete
+logical-converter routes in [[ADR-004-ADC-Trigger-DMA]], but no low-level ADC
+code or physical ADC capability is enabled yet. See [[System-Overview]] for
+that boundary and [[Protocol-V1]] with [[ADR-001-Wire-Protocol]] for the wire
+metadata.
 
 ## Fixed platform
 
@@ -51,8 +54,8 @@ can observe. The installed core itself remains unmodified.
 
 | Logical use | Teensy pin | Peripheral interpretation | Future owner |
 | --- | ---: | --- | --- |
-| ADC0 input | A0 / D14 | NXP ADC1 | ADC0 capture |
-| ADC1 input | A1 / D15 | NXP ADC2 | ADC1 capture |
+| ADC0 input | A0 / D14 | `GPIO_AD_B1_02`, NXP ADC1 channel 7 | ADC0 capture |
+| ADC1 input | A1 / D15 | `GPIO_AD_B1_03`, NXP ADC2 channel 8 | ADC1 capture |
 | GPIO bit 0 | D6 | GPIO7 bit 10; selectively remap to GPIO2 bit 10 | GPIO capture |
 | GPIO bit 1 | D7 | GPIO7 bit 17; selectively remap to GPIO2 bit 17 | GPIO capture |
 | GPIO bit 2 | D8 | GPIO7 bit 16; selectively remap to GPIO2 bit 16 | GPIO capture |
@@ -70,19 +73,26 @@ matched to the pinned `CORE_PIN*_BIT` values, and combined into the exact
 GPIO2/GPR27 mask `0x00030C0F`. Arduino target builds fail closed unless they
 identify a Teensy 4.0 with an i.MX RT1062.
 
+Both NXP ADC modules can see A0 and A1, so pin validity cannot select a
+converter. The compile-time `AdcConverterConfiguration` table additionally
+locks logical ID, Teensy ADC-library module, pad, NXP peripheral/input channel,
+ADC_ETC queue, XBAR route, eDMA channel/source, and owner in one tuple. Host
+tests reject missing tuples, crossed ADC_ETC queues, and duplicate DMA owners;
+exact-value assertions prevent a legal-but-wrong A0/A1 swap.
+
 ## Timer and trigger reservations
 
 | Resource | Numeric ID | Planned route | Future owner |
 | --- | ---: | --- | --- |
 | PIT channel | 0 | 24 MHz / 6, verified exact 4 MHz GPIO event | GPIO capture |
-| PIT channel | 1 | Chained / 4 candidate for exact 1 MHz ADC-pair event | Acquisition clock |
+| PIT channel | 1 | Chained from PIT0 with `LDVAL=3`; selected exact 1 MHz ADC-pair event | Acquisition clock |
 | XBAR input | 56 | `XBARA1_IN_PIT_TRIGGER0` | GPIO capture |
 | XBAR input | 57 | `XBARA1_IN_PIT_TRIGGER1`, deliberate fan-out | ADC0 and ADC1 capture |
 | XBAR output | 0 | `XBARA1_OUT_DMA_CH_MUX_REQ30`, rising-edge DMA | GPIO capture |
 | XBAR output | 103 | `XBARA1_OUT_ADC_ETC_TRIG00` | ADC0 capture |
 | XBAR output | 107 | `XBARA1_OUT_ADC_ETC_TRIG10` | ADC1 capture |
-| ADC_ETC trigger queue | 0 | NXP ADC1 / logical ADC0 | ADC0 capture |
-| ADC_ETC trigger queue | 4 | NXP ADC2 / logical ADC1, planned relative delay | ADC1 capture |
+| ADC_ETC trigger queue | 0 | NXP ADC1 / logical ADC0, async raw initial delay 0 | ADC0 capture |
+| ADC_ETC trigger queue | 4 | NXP ADC2 / logical ADC1, async raw initial delay 75 | ADC1 capture |
 
 The accepted GPIO route is 24 MHz PERCLK to PIT0 with `LDVAL=5`, then XBARA1
 input 56 to rising-edge-only output 0 and DMAMUX source 30. Six timer clocks
@@ -104,9 +114,14 @@ integration review.
 OctoWS2811 also owns XBARA1 outputs 0-2 and DMAMUX sources 30/31/94 when used;
 it is a reviewed pattern source and cannot coexist with this acquisition map.
 
-The four-tick (500 ns) ADC1 phase is exact synthetic timestamp metadata, not a
-physical aperture claim. Future hardware work must prove trigger and aperture
-timing before enabling the physical source capability.
+[[ADR-004-ADC-Trigger-DMA]] records the selected but unverified ADC schedule.
+Chained PIT1 divides the verified 4 MHz PIT0 event by four. In the 150 MHz
+ADC_ETC/IPG domain with predivider zero, raw initial delays 0 and 75 become
+effective delays of 1 and 76 cycles; their difference is exactly 75 cycles, or
+500 ns. This four-tick phase is digital trigger/timestamp metadata, not a
+physical aperture claim. Future hardware work must prove the trigger path and
+label any completion timing separately from analog aperture before enabling
+physical ADC capability.
 
 ## eDMA reservations
 
@@ -119,7 +134,8 @@ timing before enabling the physical source capability.
 All eDMA channels must be below 32, all DMAMUX sources below 128, and neither
 set may contain duplicates. Pinned core macros are asserted against all three
 source numbers. Acquisition code must bind these exact channels rather than
-use an unconstrained first-free allocator.
+use an unconstrained first-free allocator. ADC channel priorities and rotating
+TCDs remain part of the later DMA task; this map fixes ownership only.
 
 ## Queue and per-loop bounds
 
