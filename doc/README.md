@@ -9,6 +9,7 @@ related:
   - '[[System-Overview]]'
   - '[[Firmware-Resource-Map]]'
   - '[[Foundation-Reuse-Inventory]]'
+  - '[[Checksum-Candidates]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[Phase-01-Synthetic-Prototype-Gate]]'
@@ -34,6 +35,8 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   [[ADR-001-Wire-Protocol]].
 - `reference/` records durable inventories and implementation references,
   beginning with [[Foundation-Reuse-Inventory]].
+- `research/` records evidence gathered before implementation or selection,
+  beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
   including [[Phase-01-Synthetic-Prototype-Gate]] and
   [[Phase-02-Protocol-Python-Gate]], followed by the compile-only

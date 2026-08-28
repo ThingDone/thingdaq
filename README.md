@@ -105,6 +105,14 @@ python3 tools/generate_protocol.py
 python3 tools/generate_protocol.py --check
 ```
 
+Phase 05 adds stateless firmware candidates for Adler-32, CRC-32C, and
+CRC-32/ISO-HDLC behind one allocation-free checksum interface. The wire codec
+still accepts and advertises only bootstrap Adler-32 until negotiation and
+on-device measurements are completed. The pinned-core, Cortex-M7, i.MX RT1062,
+FastCRC, and hardware-accelerator findings are recorded in
+`doc/research/checksum-candidates.md`; notably, the general-memory DCP computes
+CRC-32/MPEG-2 rather than either evaluated CRC and is not used.
+
 The portable firmware control module implements bounded BOOT → IDLE,
 CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
 STOP, RESET_STATS, and PING. Phase 04 accepts nonempty ADC/GPIO subsets only
