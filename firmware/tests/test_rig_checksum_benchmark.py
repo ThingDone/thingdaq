@@ -241,6 +241,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
                 "__future__",
                 "collections",
                 "dataclasses",
+                "gc",
                 "json",
                 "math",
                 "os",
@@ -248,6 +249,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
                 "serial",
                 "struct",
                 "sys",
+                "threading",
                 "time",
                 "typing",
                 "zlib",
@@ -480,6 +482,11 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         self.assertEqual(42, len(fake.device.benchmark_requests))
         self.assertIn('"crc32c_full_data_checks":0', report)
         self.assertIn('"crc32c_synthetic_combined_checks":', report)
+        self.assertIn(
+            '"host_serial_reader":{"capacity_bytes":524288,'
+            '"capacity_chunks":8,"enabled":true',
+            report,
+        )
         self.assertFalse(fake.is_open)
         self.assertIn(0, fake.write_counts)
         self.assertLessEqual(max(fake.read_counts), max(fake.read_pattern))

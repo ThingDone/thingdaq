@@ -9,14 +9,17 @@ generated constants.
 
 from __future__ import annotations
 
+import gc
 import json
 import math
 import os
 import re
 import struct
 import sys
+import threading
 import time
 import zlib
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
@@ -27,6 +30,8 @@ BAUD_RATE = 115_200
 SERIAL_READ_TIMEOUT_SECONDS = 0.02
 SERIAL_WRITE_TIMEOUT_SECONDS = 0.5
 SERIAL_READ_BYTES = 64 * 1024
+SERIAL_READER_QUEUE_CHUNKS = 8
+SERIAL_READER_QUEUE_BYTES = SERIAL_READ_BYTES * SERIAL_READER_QUEUE_CHUNKS
 STARTUP_DRAIN_SECONDS = 0.25
 SYNC_ATTEMPTS = 4
 SYNC_DEADLINE_SECONDS = 0.75
@@ -465,6 +470,108 @@ class SerialPort(Protocol):
     def close(self) -> None: ...
 
 
+class BufferedSerialPort:
+    """Drain the OS TTY continuously into one fixed-size in-memory queue."""
+
+    def __init__(self, port: SerialPort) -> None:
+        self._port = port
+        self._chunks: deque[bytes] = deque()
+        self._queued_bytes = 0
+        self._high_water_bytes = 0
+        self._high_water_chunks = 0
+        self._error: Exception | None = None
+        self._stopped = False
+        self._condition = threading.Condition()
+        self._thread = threading.Thread(
+            target=self._reader_loop,
+            name="checksum-rig-serial-reader",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def read(self, size: int = 1) -> bytes:
+        if size <= 0:
+            return b""
+        deadline = time.monotonic() + SERIAL_READ_TIMEOUT_SECONDS
+        with self._condition:
+            while not self._chunks:
+                if self._error is not None:
+                    raise self._error
+                if self._stopped:
+                    return b""
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return b""
+                self._condition.wait(remaining)
+            chunk = self._chunks.popleft()
+            if len(chunk) > size:
+                result = chunk[:size]
+                self._chunks.appendleft(chunk[size:])
+                self._queued_bytes -= len(result)
+            else:
+                result = chunk
+                self._queued_bytes -= len(chunk)
+            self._condition.notify_all()
+            return result
+
+    def write(self, data: bytes) -> int | None:
+        return self._port.write(data)
+
+    def close(self) -> None:
+        with self._condition:
+            self._stopped = True
+            self._condition.notify_all()
+        self._thread.join(timeout=1.0)
+        if self._thread.is_alive():
+            raise RuntimeError("bounded serial reader did not stop")
+
+    def reader_queue_metrics(self) -> dict[str, int | bool]:
+        with self._condition:
+            return {
+                "enabled": True,
+                "capacity_bytes": SERIAL_READER_QUEUE_BYTES,
+                "capacity_chunks": SERIAL_READER_QUEUE_CHUNKS,
+                "final_bytes": self._queued_bytes,
+                "final_chunks": len(self._chunks),
+                "high_water_bytes": self._high_water_bytes,
+                "high_water_chunks": self._high_water_chunks,
+            }
+
+    def _reader_loop(self) -> None:
+        while True:
+            with self._condition:
+                while (
+                    len(self._chunks) >= SERIAL_READER_QUEUE_CHUNKS
+                    and not self._stopped
+                ):
+                    self._condition.wait()
+                if self._stopped:
+                    return
+            try:
+                chunk = bytes(self._port.read(SERIAL_READ_BYTES))
+            except Exception as error:  # noqa: BLE001 - relay reader failures
+                with self._condition:
+                    self._error = error
+                    self._condition.notify_all()
+                return
+            if not chunk:
+                continue
+            with self._condition:
+                if self._stopped:
+                    return
+                self._chunks.append(chunk)
+                self._queued_bytes += len(chunk)
+                self._high_water_bytes = max(
+                    self._high_water_bytes,
+                    self._queued_bytes,
+                )
+                self._high_water_chunks = max(
+                    self._high_water_chunks,
+                    len(self._chunks),
+                )
+                self._condition.notify_all()
+
+
 @dataclass(frozen=True)
 class Frame:
     """One independently validated wire frame."""
@@ -854,6 +961,19 @@ class SerialLink:
         self.stale_responses = 0
         self.discarded_data_frames = 0
         self.maximum_read_bytes = 0
+
+    def reader_queue_metrics(self) -> dict[str, int | bool]:
+        if isinstance(self.port, BufferedSerialPort):
+            return self.port.reader_queue_metrics()
+        return {
+            "enabled": False,
+            "capacity_bytes": 0,
+            "capacity_chunks": 0,
+            "final_bytes": 0,
+            "final_chunks": 0,
+            "high_water_bytes": 0,
+            "high_water_chunks": 0,
+        }
 
     def drain_startup(self, duration: float) -> None:
         deadline = time.monotonic() + duration
@@ -2001,6 +2121,7 @@ def run_candidate_stream(
         link.parser.synthetic_crc32c_combined_checks - crc32c_combined_baseline
     )
     crc32c_full_checks = link.parser.full_crc32c_data_checks - crc32c_full_baseline
+    reader_queue = link.reader_queue_metrics()
     _require(parser_errors == 0, "host parser reported an error during stream")
     _require(parser_discarded == 0, "host parser discarded bytes during stream")
     _require(stale_responses == 0, "host observed a stale response during stream")
@@ -2013,6 +2134,16 @@ def run_candidate_stream(
         _require(
             crc32c_combined_checks == data_frames and crc32c_full_checks == 0,
             "not every CRC-32C data trailer used the bounded synthetic validator",
+        )
+    if reader_queue["enabled"]:
+        _require(
+            int(reader_queue["high_water_bytes"])
+            <= int(reader_queue["capacity_bytes"]),
+            "host serial reader exceeded its fixed byte capacity",
+        )
+        _require(
+            int(reader_queue["final_bytes"]) == 0,
+            "host serial reader retained bytes after stream",
         )
 
     return {
@@ -2055,6 +2186,7 @@ def run_candidate_stream(
             "firmware_queue_exhaustion_observed": False,
             "host_parser_buffered_bytes_final": len(link.parser.buffer),
             "host_parser_high_water_bytes": link.parser.high_water_bytes,
+            "host_serial_reader": reader_queue,
             "maximum_start_boundary_deferred_frames": len(deferred_data),
         },
         "run_id": validator.run_id,
@@ -2416,6 +2548,8 @@ def main() -> int:
         port=port_name,
         protocol=PROTOCOL_VERSION,
         status_interval_seconds=status_interval_seconds,
+        cyclic_gc_disabled_during_campaign=True,
+        serial_reader_queue_bytes=SERIAL_READER_QUEUE_BYTES,
     )
     try:
         port = serial.Serial(
@@ -2428,10 +2562,14 @@ def main() -> int:
         emit_event("open_failed", error=f"{type(error).__name__}: {error}")
         return 2
 
+    buffered_port = BufferedSerialPort(port)
+    cyclic_gc_was_enabled = gc.isenabled()
+    if cyclic_gc_was_enabled:
+        gc.disable()
     try:
         try:
             summary = run_campaign(
-                port,
+                buffered_port,
                 capture_seconds=capture_seconds,
                 status_interval_seconds=status_interval_seconds,
                 benchmark_batch_count=benchmark_batch_count,
@@ -2445,6 +2583,9 @@ def main() -> int:
             emit_event("fatal", error=message)
             summary = {"failures": [message], "result": "FAIL"}
     finally:
+        if cyclic_gc_was_enabled:
+            gc.enable()
+        buffered_port.close()
         port.close()
     print("SUMMARY " + json.dumps(summary, sort_keys=True, separators=(",", ":")))
     return 0 if summary["result"] == "PASS" else 1

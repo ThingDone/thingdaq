@@ -312,7 +312,11 @@ campaign it additionally proves each payload against the complete source
 formula, combines the actual 44-byte header CRC with one of 528 precomputed
 payload CRCs, and reports how many trailers used that equivalent bounded path.
 This validates every received byte and trailer without retaining stream frames
-or making the service host's Python speed part of the device result.
+or making the service host's Python speed part of the device result. A dedicated
+reader drains the TTY into at most eight 64 KiB chunks while validation runs;
+the campaign disables cyclic garbage collection, reports that queue's exact
+capacity/high water/final occupancy, and still fails on any target-side gap or
+drop instead of hiding sustained backpressure.
 
 ## Synchronous Python API and offline simulator
 
