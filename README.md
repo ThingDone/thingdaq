@@ -212,6 +212,18 @@ tests compare the independent codec with every control fixture and exercise the
 full lifecycle through reset noise and partial serial I/O before any rig time
 is used.
 
+`firmware/tests/rig_synthetic_stream.py` is the corresponding Phase 04
+full-rate acceptance program. It remains independent of `daq_api`, parses and
+checks every ADC/GPIO frame as it arrives, interleaves bounded STATUS requests,
+and prints JSON `EVENT`, expected-versus-actual `METRIC`, and final `SUMMARY`
+records. It defaults to a 10-second capture; set
+`SYNTHETIC_CAPTURE_SECONDS=60` for the soak. Optional `EXPECTED_BUILD_ID` and
+`EXPECTED_HARDWARE_SERIAL` pins reject a flashed artifact or board mismatch.
+The program enforces the 1% per-source and combined payload/framed rate bounds,
+100 ms STATUS p99 and 250 ms maximum response latency, zero parser/formula/gap/
+drop errors, bounded process RSS, a finite post-STOP drain, and exact final
+firmware-to-host frame reconciliation before returning success in IDLE.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS
