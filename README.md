@@ -150,10 +150,9 @@ does not wait for a host or emit an unframed banner. Its portable CDC transport
 uses fixed command/response queues, bounded byte and call budgets, 2,048-byte
 maximum write requests, 512-byte minimum capacity admission, exact
 partial/zero-write continuation, response-first frame scheduling, and exposed
-request/queue/stall diagnostics. Each cooperative visit can fill at most two
-of the core's four TX buffers (4,096 bytes total). Short data tails and complete
-control frames remain atomic admission units; an unexpectedly short backend
-result is retained and resumed rather than abandoned.
+request/queue/stall diagnostics. Short data tails and complete control frames
+remain atomic admission units; an unexpectedly short backend result is retained
+and resumed rather than abandoned.
 
 Phase 04 supplies deterministic ADC-pair and GPIO-byte sources through the
 same allocation-free packet path used by later physical acquisition. ADC0 and

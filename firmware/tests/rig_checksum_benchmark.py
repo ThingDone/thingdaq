@@ -785,7 +785,6 @@ class FrameParser:
                     expected = _synthetic_crc32c_data_checksum(
                         self.buffer,
                         fields,
-                        payload_end,
                     )
                     if expected is None:
                         self.full_crc32c_data_checks += 1
@@ -1641,6 +1640,25 @@ CRC32C_PAYLOAD_SHIFT_OPERATOR = tuple(
 )
 
 
+def _build_crc32_shift_byte_tables(
+    operator: tuple[int, ...],
+) -> tuple[tuple[int, ...], ...]:
+    """Collapse a fixed 32-bit GF(2) transform into four byte lookups."""
+
+    return tuple(
+        tuple(
+            _gf2_matrix_times(operator, value << (byte_index * 8))
+            for value in range(256)
+        )
+        for byte_index in range(4)
+    )
+
+
+CRC32C_PAYLOAD_SHIFT_BYTE_TABLES = _build_crc32_shift_byte_tables(
+    CRC32C_PAYLOAD_SHIFT_OPERATOR
+)
+
+
 def _build_synthetic_crc32c_payload_checksums() -> dict[tuple[int, int], int]:
     checksums: dict[tuple[int, int], int] = {}
     for kind, cycle in (
@@ -1662,9 +1680,14 @@ SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS = _build_synthetic_crc32c_payload_checksums()
 def _synthetic_crc32c_data_checksum(
     buffer: bytearray,
     fields: tuple[int, ...],
-    payload_end: int,
 ) -> int | None:
-    """Combine the actual header with a proven-exact synthetic payload CRC."""
+    """Combine the actual header with the required synthetic payload CRC.
+
+    ``SyntheticValidator.accept`` checks every payload byte against the source
+    formula immediately after parsing. Avoiding a duplicate 4 KiB slice here
+    keeps the serial-reader thread schedulable while the trailer and formula
+    remain independently enforced for every accepted frame.
+    """
 
     kind = fields[2]
     flags = fields[3]
@@ -1674,24 +1697,26 @@ def _synthetic_crc32c_data_checksum(
     if kind == ADC_DATA:
         start_pair = first_sample_ticks // ADC_PAIR_PERIOD_TICKS
         offset = (start_pair * ADC_BYTES_PER_PAIR) % len(ADC_PATTERN)
-        expected_payload = ADC_PATTERN_DOUBLE[offset : offset + DATA_PAYLOAD_BYTES]
     elif kind == GPIO_DATA:
         start_sample = first_sample_ticks // GPIO_SAMPLE_PERIOD_TICKS
         offset = start_sample & 0xFF
-        expected_payload = GPIO_PATTERN_EXPANDED[offset : offset + DATA_PAYLOAD_BYTES]
     else:
         return None
     payload_checksum = SYNTHETIC_CRC32C_PAYLOAD_CHECKSUMS.get((kind, offset))
-    if payload_checksum is None or buffer[HEADER_SIZE:payload_end] != expected_payload:
+    if payload_checksum is None:
         return None
     header_checksum = _table_crc32(
         memoryview(buffer)[:HEADER_SIZE],
         CRC32C_TABLE,
     )
-    return (
-        _gf2_matrix_times(CRC32C_PAYLOAD_SHIFT_OPERATOR, header_checksum)
-        ^ payload_checksum
+    shift_0, shift_1, shift_2, shift_3 = CRC32C_PAYLOAD_SHIFT_BYTE_TABLES
+    shifted_header = (
+        shift_0[header_checksum & 0xFF]
+        ^ shift_1[(header_checksum >> 8) & 0xFF]
+        ^ shift_2[(header_checksum >> 16) & 0xFF]
+        ^ shift_3[header_checksum >> 24]
     )
+    return shifted_header ^ payload_checksum
 
 
 class SyntheticValidator:

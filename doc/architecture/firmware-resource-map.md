@@ -117,7 +117,7 @@ use an unconstrained first-free allocator.
 | Synthetic generation per loop | 4 complete frame attempts | Synthetic source |
 | Ready-to-transmit promotions per loop | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
-| USB transmit work per loop | 4,096 bytes / two pinned core buffers | USB transport |
+| USB transmit work per loop | 2,048 bytes | USB transport |
 | Maximum USB write request | 2,048 bytes | USB transport / one pinned core TX buffer |
 | Minimum admitted write capacity | 512 bytes, or the exact shorter frame tail/control frame | USB transport |
 | USB read calls per loop | 8 | USB transport |
@@ -131,9 +131,8 @@ fills. Control responses reserve the generated 1,024-byte defensive maximum
 even though current typed responses are smaller. The byte and call limits both
 bound each cooperative-loop visit, including a backend that repeatedly returns
 short or zero-length operations. Data writes wait for one 512-byte high-speed
-USB packet of reported capacity and are offered in blocks up to each core
-2,048-byte TX buffer; a cooperative visit may make two such requests. Exact
-smaller control frames/tails are allowed, while
+USB packet of reported capacity and are offered in blocks up to the core's
+2,048-byte TX buffer; exact smaller control frames/tails are allowed, while
 unexpected prefixes remain owned for continuation. These values are capacities,
 never heap-growth hints.
 

@@ -350,6 +350,20 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
             ^ payload_checksum
         )
         self.assertEqual(rig._table_crc32(body, rig.CRC32C_TABLE), combined)
+        shift_0, shift_1, shift_2, shift_3 = rig.CRC32C_PAYLOAD_SHIFT_BYTE_TABLES
+        table_shifted = (
+            shift_0[header_checksum & 0xFF]
+            ^ shift_1[(header_checksum >> 8) & 0xFF]
+            ^ shift_2[(header_checksum >> 16) & 0xFF]
+            ^ shift_3[header_checksum >> 24]
+        )
+        self.assertEqual(
+            rig._gf2_matrix_times(
+                rig.CRC32C_PAYLOAD_SHIFT_OPERATOR,
+                header_checksum,
+            ),
+            table_shifted,
+        )
 
     def test_independent_codec_matches_fixtures_and_recovers_bad_trailer(self) -> None:
         for path in sorted(FIXTURES.glob("*-request.bin")):
@@ -381,6 +395,49 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         recovered = rig.FrameParser()
         self.assertEqual(1, len(recovered.feed(bytes(damaged) + valid)))
         self.assertEqual(1, recovered.checksum_errors)
+
+    def test_synthetic_crc32c_parser_and_formula_checks_are_independent(self) -> None:
+        payload = rig.ADC_PATTERN_DOUBLE[: rig.DATA_PAYLOAD_BYTES]
+        header = rig.HEADER.pack(
+            rig.MAGIC,
+            rig.PROTOCOL_VERSION,
+            rig.ADC_DATA,
+            rig.FLAG_SYNTHETIC | rig.FLAG_EPOCH_START,
+            rig.HEADER_SIZE,
+            rig.CHECKSUM_CRC32C,
+            0,
+            rig.DATA_FRAME_BYTES,
+            rig.DATA_PAYLOAD_BYTES,
+            7,
+            0,
+            0,
+            0,
+            rig.ADC_PAIRS_PER_FRAME,
+        )
+        body = header + payload
+        valid = body + rig.TRAILER.pack(rig.compute_checksum(body, rig.CHECKSUM_CRC32C))
+        parser = rig.FrameParser()
+        frames = parser.feed(valid)
+        self.assertEqual(1, len(frames))
+        self.assertEqual(1, parser.synthetic_crc32c_combined_checks)
+        self.assertEqual(0, parser.full_crc32c_data_checks)
+        rig.SyntheticValidator(7, rig.CHECKSUM_CRC32C).accept(frames[0])
+
+        changed_payload = bytearray(payload)
+        changed_payload[0] ^= 1
+        changed_body = header + bytes(changed_payload)
+        changed_wire = changed_body + rig.TRAILER.pack(
+            rig.compute_checksum(changed_body, rig.CHECKSUM_CRC32C)
+        )
+        checksum_guard = rig.FrameParser()
+        self.assertEqual([], checksum_guard.feed(changed_wire))
+        self.assertEqual(1, checksum_guard.checksum_errors)
+
+        formula_guard = rig.FrameParser()
+        formula_frames = formula_guard.feed(bytes(changed_body) + valid[-4:])
+        self.assertEqual(1, len(formula_frames))
+        with self.assertRaisesRegex(rig.ProtocolFailure, "ADC pair"):
+            rig.SyntheticValidator(7, rig.CHECKSUM_CRC32C).accept(formula_frames[0])
 
     def test_benchmark_decoder_rejects_a_wrong_target_digest(self) -> None:
         device = HardwareBenchmarkDevice()

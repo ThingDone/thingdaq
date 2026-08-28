@@ -183,15 +183,9 @@ inline constexpr std::size_t kPinnedUsbCdcTxBufferBytes = 2048U;
 inline constexpr std::size_t kPinnedUsbCdcTxStorageBytes =
     kPinnedUsbCdcTxBufferCount * kPinnedUsbCdcTxBufferBytes;
 inline constexpr std::size_t kUsbRxBudgetBytesPerLoop = 1024U;
-// One visit may fill two of the pinned core's four descriptors. Keeping each
-// request descriptor-sized avoids the steady 2,048-byte-per-loop throughput
-// ceiling while the remaining descriptors and availableForWrite() keep the
-// cooperative service nonblocking.
-inline constexpr std::size_t kUsbTxCoreBuffersPerLoop = 2U;
-inline constexpr std::size_t kUsbTxBudgetBytesPerLoop =
-    kUsbTxCoreBuffersPerLoop * kPinnedUsbCdcTxBufferBytes;
-// Data is offered to the pinned core in one core-buffer-sized request whenever
-// possible. A request waits for at least one high-speed USB packet of capacity
+inline constexpr std::size_t kUsbTxBudgetBytesPerLoop = 2048U;
+// Data is offered to the pinned core in one core-buffer-sized block whenever
+// possible. A visit waits for at least one high-speed USB packet of capacity
 // instead of deliberately degrading into byte-at-a-time calls. Unexpected
 // backend prefixes are still retained and resumed exactly.
 inline constexpr std::size_t kUsbTxMaxWriteBytes =
@@ -415,15 +409,8 @@ static_assert(kUsbRxCallsPerLoop * kUsbRxScratchBytes >=
               "USB read-call bound must be able to reach its byte budget");
 static_assert(kUsbTxCallsPerLoop > 0U && kUsbRxCallsPerLoop > 0U,
               "USB per-loop call budgets must be nonzero");
-static_assert(kUsbTxCoreBuffersPerLoop > 0U &&
-                  kUsbTxCoreBuffersPerLoop < kPinnedUsbCdcTxBufferCount,
-              "a TX visit must leave at least one pinned descriptor outside "
-              "its bounded fill set");
-static_assert(kUsbTxCallsPerLoop >= kUsbTxCoreBuffersPerLoop,
-              "the TX call budget must be able to fill its descriptor bound");
-static_assert(kUsbTxBudgetBytesPerLoop ==
-                  kUsbTxCoreBuffersPerLoop * kUsbTxMaxWriteBytes,
-              "the TX byte budget must match its bounded descriptor writes");
+static_assert(kUsbTxBudgetBytesPerLoop <= kPinnedUsbCdcTxBufferBytes,
+              "one cooperative TX visit must not outrun a core TX buffer");
 static_assert(kPacketBufferStorageBytes % kCacheLineBytes == 0U,
               "packet storage must occupy complete alignment units");
 static_assert(kChecksumBenchmarkBufferBytes % kCacheLineBytes == 0U,
