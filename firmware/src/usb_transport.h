@@ -65,6 +65,7 @@ struct TransportSnapshot {
   std::uint32_t responses_completed = 0U;
   std::uint32_t lower_priority_frames_completed = 0U;
   std::uint32_t response_queue_rejections = 0U;
+  std::uint32_t response_reservations_abandoned = 0U;
   std::uint32_t partial_write_events = 0U;
   std::uint32_t zero_length_read_events = 0U;
   std::uint32_t zero_length_write_events = 0U;
@@ -162,6 +163,10 @@ class CdcTransport {
   // response before taking another command.
   bool takeCommand(protocol::ParsedCommand &command);
   bool queueResponse(const protocol::ControlFrame &response);
+
+  // Last-resort recovery when the caller cannot construct any valid response
+  // for a command it already took. Normal dispatch must always queue one.
+  bool abandonResponseReservation();
 
   constexpr std::size_t commandQueueDepth() const {
     return command_queue_.size();

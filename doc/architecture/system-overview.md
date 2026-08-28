@@ -40,10 +40,12 @@ Phase 03 centralizes three portable identity/resource authorities:
 | `firmware/src/firmware_capabilities.h` | The exact INFO metadata projected from generated protocol constants and the resource registry |
 | `firmware/src/usb_transport.{h,cpp}` | Portable bounded CDC receive/transmit scheduling, complete command/response queues, frame ownership, and transport diagnostics |
 | `firmware/src/teensy_usb.{h,cpp}` | The narrow Teensy-core byte-stream adapter, product descriptor override, and bridge to the core-generated chip serial number |
+| `firmware/src/firmware_runtime.{h,cpp}` | Portable cooperative integration of receive, one-command dispatch, control events, fail-safe recovery, and transmit |
 
 `firmware/firmware.ino` consumes these authorities and owns only the Arduino
-startup boundary. `firmware/src/protocol.{h,cpp}` owns bounded frame parsing and
-encoding, `firmware/src/control_state.{h,cpp}` owns legal post-boot command
+startup boundary. `firmware/src/firmware_runtime.{h,cpp}` owns the cooperative
+main-loop sequence. `firmware/src/protocol.{h,cpp}` owns bounded frame parsing
+and encoding, `firmware/src/control_state.{h,cpp}` owns legal post-boot command
 dispatch and state transitions, and `firmware/src/statistics.{h,cpp}` owns
 saturating diagnostics and statistics generations. Portable protocol and state
 code must not grow board or build constants of its own. [[Firmware-Resource-Map]]
@@ -103,8 +105,45 @@ response, preserving byte-stream framing.
 The transport snapshot exposes current/high-water command and response queue
 depths, optional lower-priority depth, pending RX and active TX offsets, byte
 and call totals, partial/zero operations, I/O errors, budget exhaustion, and
-current/consecutive/maximum stall counts. Normal no-host backpressure is a
-stall, not a blocking wait or a fabricated transport failure.
+current/consecutive/maximum stall counts. It also counts the last-resort
+abandonment of a reserved response slot, which releases command backpressure
+only after the runtime cannot encode either the requested response or a typed
+INTERNAL_ERROR. Normal no-host backpressure is a stall, not a blocking wait or
+a fabricated transport failure.
+
+## Cooperative runtime integration
+
+Static initialization order is explicit at both ownership levels. The sketch
+declares the concrete Teensy CDC byte stream before `FirmwareRuntime`, and the
+runtime declares `ControlState` (which owns `Statistics`) before `CdcTransport`
+stores references to them. The pinned Teensy core initializes USB and its
+chip-derived serial descriptor before global C++ construction. `setup()` then
+passes that numeric serial to the one BOOT → IDLE transition; it never opens a
+serial facade, waits for DTR, or emits an unframed byte.
+
+Every `loop()` calls one portable runtime service step in this fixed order:
+
+1. receive at most 1,024 bytes and eight core read calls;
+2. dequeue and dispatch at most one complete command when a response slot is
+   reserved;
+3. consume the bounded START-epoch/STOP event mask in main-loop context; and
+4. transmit at most 2,048 bytes and eight core write calls.
+
+Valid typed rejections such as INVALID_STATE or UNSUPPORTED_CONFIGURATION are
+normal protocol outcomes and leave the prior state atomic. A response encoding
+or queue-invariant failure is an internal fault: the runtime clears an
+unconsumed START event, signals STOP if work could exist, drops the applied
+configuration, and returns to IDLE while retaining run/build/statistics
+provenance. It attempts a typed INTERNAL_ERROR response before abandoning the
+reserved slot, so a recoverable firmware fault cannot wedge all later command
+processing.
+
+The end-to-end INFO response carries the protocol version, semantic firmware
+version, exact Teensy 4.0 and i.MX RT1062 IDs, core-derived hardware serial,
+source-derived build ID, and truthful support masks. A host can therefore
+reject a wrong target, incompatible protocol/firmware, unexpected physical
+device, stale build, or unsupported operation before sending state-changing
+commands.
 
 ## Reproducible build identity
 
@@ -192,7 +231,7 @@ be copied into the Phase 03 physical firmware's capability mask.
 
 ## Runtime ownership rule
 
-The cooperative main loop will own command parsing, response encoding, state
+The cooperative main loop owns command parsing, response encoding, state
 mutation, checksums, and USB writes. `ControlState` exposes only compact
 START-epoch and STOP event bits for integration with acquisition. Future ISRs
 may only acknowledge hardware, rotate explicitly owned buffers, update bounded

@@ -287,12 +287,17 @@ void testZeroReadAndResponseReservation() {
   wire::ControlFrame invalid{};
   expect(!transport.queueResponse(invalid),
          "only a complete checksummed response can enter the queue");
+  expect(transport.abandonResponseReservation() &&
+             !transport.snapshot().command_awaiting_response &&
+             !transport.abandonResponseReservation(),
+         "an unrecoverable response failure releases exactly one reservation");
   const usb::TransportSnapshot snapshot = transport.snapshot();
   expect(snapshot.zero_length_read_events == 1U &&
              snapshot.rx_stall_events == 1U &&
              snapshot.response_queue_high_water ==
                  teensy_daq::board::kResponseQueueDepth &&
-             snapshot.response_queue_rejections == 2U,
+             snapshot.response_queue_rejections == 2U &&
+             snapshot.response_reservations_abandoned == 1U,
          "queue depth and receive-stall diagnostics are exposed");
 }
 

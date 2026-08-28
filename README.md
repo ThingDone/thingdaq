@@ -115,8 +115,19 @@ number while overriding only the weak product string with `Teensy DAQ`. Boot
 does not wait for a host or emit an unframed banner. Its portable CDC transport
 uses fixed command/response queues, bounded byte and call budgets, exact
 partial-write continuation, response-first frame scheduling, and exposed
-queue/stall diagnostics. The next Phase 03 integration step connects that
-transport to the portable control dispatcher in the cooperative sketch loop.
+queue/stall diagnostics.
+
+`FirmwareRuntime` now connects that transport to the portable control
+dispatcher. The thin sketch constructs the Teensy CDC adapter before the
+runtime, binds INFO to the core-derived hardware serial during bounded BOOT,
+and makes one cooperative service call per loop. Each call performs bounded
+receive work, dispatches at most one command, consumes compact START/STOP
+events, and performs bounded transmit work. Expected typed command errors are
+state-atomic; an internal response-path failure emits an INTERNAL_ERROR when
+possible, releases its queue reservation, and fails safe to IDLE. INFO exposes
+the protocol version, semantic firmware version, board/MCU IDs, hardware
+serial, source-derived build ID, and truthful capability masks needed to reject
+a stale or incompatible image before control changes.
 
 ## Synchronous Python API and offline simulator
 

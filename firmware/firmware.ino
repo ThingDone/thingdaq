@@ -1,28 +1,32 @@
 /*
- * Teensy DAQ control-plane foundation firmware.
+ * Teensy DAQ Phase 03 control-plane firmware.
  *
- * Native USB is initialized by the Teensy core before setup(). The project
- * descriptor and bounded CDC adapter live under src/; the following Phase 03
- * integration task will connect them to the portable parser/control modules.
+ * Native USB and its chip-derived serial descriptor are initialized by the
+ * pinned Teensy core before global C++ construction and setup(). The portable
+ * runtime owns all bounded parser, state, statistics, and transport work.
  */
 
-#include "src/generated/protocol_constants.h"
+#include "src/firmware_runtime.h"
+#include "src/teensy_usb.h"
 
-namespace teensy_daq {
+namespace {
 
-protocol_v1::DeviceState device_state = protocol_v1::DeviceState::kBoot;
+// Same-translation-unit declaration order is intentional: the concrete USB
+// adapter exists before the runtime stores its byte-stream reference, while
+// FirmwareRuntime constructs ControlState/Statistics before CdcTransport.
+teensy_daq::usb::TeensyCdcByteStream cdc_stream{};
+teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream};
 
-}  // namespace teensy_daq
+}  // namespace
 
 void setup() {
-  // Do not call Serial.begin(), test Serial as a boolean, wait for DTR, or
-  // emit a banner into the framed byte stream. Native USB is already live,
-  // and BOOT completion is independent of host enumeration or port opening.
-  teensy_daq::device_state = teensy_daq::protocol_v1::DeviceState::kIdle;
+  // Do not initialize the Arduino serial facade, wait for DTR, or emit a
+  // banner. BOOT completion is bounded and independent of host presence.
+  (void)firmware_runtime.begin(teensy_daq::usb::hardwareSerialNumber());
 }
 
 void loop() {
-  // The foundation build remains IDLE. Later control-plane work will replace
-  // this with bounded frame handling without changing the boot contract.
-  yield();
+  // One call performs bounded RX, at most one command dispatch, event
+  // acknowledgement, and bounded TX. Teensy's main() calls yield afterward.
+  (void)firmware_runtime.service();
 }

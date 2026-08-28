@@ -35,6 +35,30 @@ bool ControlState::completeBoot(std::uint32_t hardware_serial) {
   return transitionTo(protocol_v1::DeviceState::kIdle);
 }
 
+bool ControlState::recoverToIdle() {
+  if (state_ == protocol_v1::DeviceState::kBoot) {
+    return false;
+  }
+
+  const bool needs_stop_signal =
+      state_ != protocol_v1::DeviceState::kIdle ||
+      (pending_event_mask_ & eventBit(Event::kStartEpoch)) != 0U;
+  if (!transitionTo(protocol_v1::DeviceState::kIdle)) {
+    return false;
+  }
+
+  configuration_ = kControlOnlyConfiguration;
+  has_configuration_ = false;
+  pending_event_mask_ = static_cast<std::uint8_t>(
+      pending_event_mask_ &
+      static_cast<std::uint8_t>(~eventBit(Event::kStartEpoch)));
+  if (needs_stop_signal) {
+    pending_event_mask_ = static_cast<std::uint8_t>(
+        pending_event_mask_ | eventBit(Event::kStop));
+  }
+  return true;
+}
+
 DispatchResult ControlState::dispatch(const protocol::Request &request,
                                       protocol::ControlFrame &response) {
   response.clear();

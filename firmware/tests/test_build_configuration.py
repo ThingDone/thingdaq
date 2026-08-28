@@ -1,4 +1,4 @@
-"""Tests for the pinned firmware build boundary and boot skeleton."""
+"""Tests for the pinned firmware build boundary and cooperative sketch."""
 
 from __future__ import annotations
 
@@ -156,11 +156,14 @@ class BuildConfigurationTests(unittest.TestCase):
         )
 
         self.assertNotIn("kBuildId[] =", sketch)
-        self.assertIn("DeviceState::kIdle", sketch)
+        self.assertIn('include "src/firmware_runtime.h"', sketch)
+        self.assertIn('include "src/teensy_usb.h"', sketch)
+        self.assertIn("firmware_runtime.begin", sketch)
+        self.assertIn("hardwareSerialNumber()", sketch)
+        self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("while (!Serial", sketch)
         self.assertNotIn("Serial.begin(115200)", sketch)
         self.assertNotIn("Serial.print", sketch)
-        self.assertIn("src/generated/protocol_constants.h", sketch)
         self.assertIn('include "firmware_identity.h"', usb_header)
         self.assertIn("usb_string_product_name =", usb_adapter)
         self.assertNotIn("usb_string_serial_number =", usb_adapter)

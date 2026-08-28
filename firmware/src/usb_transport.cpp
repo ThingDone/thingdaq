@@ -320,6 +320,16 @@ bool CdcTransport::queueResponse(const protocol::ControlFrame &response) {
   return true;
 }
 
+bool CdcTransport::abandonResponseReservation() {
+  if (!command_awaiting_response_) {
+    return false;
+  }
+  command_awaiting_response_ = false;
+  saturatingIncrement(counters_.response_reservations_abandoned);
+  recordIoError();
+  return true;
+}
+
 bool CdcTransport::hasPendingTransmission() const {
   if (active_frame_ != ActiveFrame::kNone || !response_queue_.empty()) {
     return true;

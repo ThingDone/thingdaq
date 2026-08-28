@@ -68,6 +68,12 @@ class ControlState {
   // chip-derived USB serial before command polling begins.
   bool completeBoot(std::uint32_t hardware_serial);
 
+  // Fail safe after an internal main-loop or response-path fault. Expected
+  // typed command rejections do not use this path and remain state-atomic.
+  // Recovery preserves the current run ID/statistics, clears configuration,
+  // cancels an unconsumed START event, and signals STOP when work may exist.
+  bool recoverToIdle();
+
   DispatchResult dispatch(const protocol::Request &request,
                           protocol::ControlFrame &response);
 

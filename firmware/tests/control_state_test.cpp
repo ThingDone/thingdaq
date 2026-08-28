@@ -394,6 +394,36 @@ void testConfigurationValidationAndAtomicity() {
          "nonzero reserved configuration fields are rejected");
 }
 
+void testRecoverableFaultReturnsIdle() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(!state.recoverToIdle() &&
+             state.state() == constants::DeviceState::kBoot,
+         "recovery cannot bypass BOOT identity initialization");
+  expect(state.completeBoot(23U), "recovery test boot completion");
+  expect(state.dispatch(configureRequest(70U), response).commandAccepted() &&
+             state.dispatch(request(constants::CommandKind::kStart, 71U),
+                            response)
+                 .commandAccepted(),
+         "recovery test reaches RUNNING");
+
+  const std::uint32_t run_id = state.runId();
+  const std::uint32_t generation = state.statistics().generation();
+  expect(state.recoverToIdle(), "recoverable internal fault reaches IDLE");
+  expect(state.state() == constants::DeviceState::kIdle &&
+             !state.hasConfiguration() && state.runId() == run_id &&
+             state.statistics().generation() == generation,
+         "fault recovery clears configuration but preserves provenance");
+  const control::PendingEvents events = state.takePendingEvents();
+  expect(events.has(control::Event::kStop) &&
+             !events.has(control::Event::kStartEpoch),
+         "fault recovery cancels an unconsumed START and signals STOP");
+  expect(state.recoverToIdle() && state.takePendingEvents().mask == 0U,
+         "IDLE recovery is idempotent and emits no duplicate STOP");
+  expect(state.dispatch(configureRequest(72U), response).commandAccepted(),
+         "normal control resumes after recoverable fault handling");
+}
+
 void testStatisticsDetailAndSaturation() {
   stats::Statistics statistics{};
   const std::uint64_t maximum64 =
@@ -486,6 +516,7 @@ int main() {
   testBootAndInfo();
   testControlOnlyLifecycle();
   testConfigurationValidationAndAtomicity();
+  testRecoverableFaultReturnsIdle();
   testStatisticsDetailAndSaturation();
 
   if (failures != 0) {
