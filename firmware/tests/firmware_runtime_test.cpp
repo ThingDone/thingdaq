@@ -500,10 +500,10 @@ void testStartupSchedulingJitterFitsPacketPool() {
          "jitter test reaches a paced RUNNING epoch");
   stream.output.clear();
 
-  // One 64 KiB host read contains sixteen data frames. Retain three batches
-  // while the host validates prior data and an interleaved STATUS response
-  // waits at a frame boundary, leaving one further bounded batch of margin.
-  constexpr std::uint64_t kJitterIntervals = 24U;
+  // One 64 KiB host read contains sixteen data frames. Retain the five batches
+  // measured during a 39.8 ms rig scheduling pause while an interleaved STATUS
+  // response waits at a frame boundary, leaving one further batch of margin.
+  constexpr std::uint64_t kJitterIntervals = 40U;
   stream.available_write_size = 0U;
   stream.appendInput(
       emptyRequest(constants::FrameKind::kGetStatusRequest, 153U));
@@ -524,7 +524,7 @@ void testStartupSchedulingJitterFitsPacketPool() {
              buffered.sources[1].frames_dropped == 0U &&
              buffered.pool_exhaustions == 0U &&
              buffered.buffers_owned_high_water == 2U * kJitterIntervals,
-         "packet pool absorbs a 48-frame startup scheduling excursion");
+         "packet pool absorbs an 80-frame host scheduling excursion");
 
   stream.available_write_size = board::kUsbTxMaxWriteBytes;
   expect(drain(firmware, stream).quiescent,

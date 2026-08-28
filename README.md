@@ -130,7 +130,7 @@ frame. Normal mode waits for each frame's real-time 8 MHz deadline. The
 explicitly selected `unpaced-diagnostic` mode removes only that wait and still
 uses the generator, framing, checksum, queues, and USB transport unchanged.
 
-Sixty-four aligned 4,096-byte DTCM frames move through explicit
+Ninety-six aligned 4,096-byte DTCM frames move through explicit
 `FREE -> FILLING -> READY -> TRANSMITTING -> FREE` ownership. Per-source ready
 FIFOs feed one bounded transmit FIFO, and every queue exposes current and
 high-water depth. Frames are validated and checksummed in place before
@@ -152,11 +152,12 @@ always serialized before any later successful START response.
 
 The DTCM placement follows a reinspection of pinned Teensy core 1.62.0: USB
 Serial copies writes into its own four 2,048-byte aligned `DMAMEM` buffers and
-flushes those buffers before DMA. The 64 application frames cover about 32.4 ms
+flushes those buffers before DMA. The 96 application frames cover about 48.6 ms
 at the nominal combined framed rate, plus about 1.0 ms in the core ring. This
-retains four complete 64 KiB host-read batches, including three batches of
-bounded scheduling margin. The compile-time registry reserves 269,728 bytes of
-RAM1 project data and 97,280 bytes of future RAM2 acquisition storage; see
+retains six complete 64 KiB host-read batches: five cover the measured 39.8 ms
+rig scheduling pause and one remains as bounded margin. The compile-time
+registry reserves 401,824 bytes of RAM1 project data and 97,280 bytes of future
+RAM2 acquisition storage; see
 `doc/architecture/firmware-resource-map.md` and
 `doc/reference/Foundation-Reuse-Inventory.md`.
 
