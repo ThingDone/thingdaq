@@ -14,6 +14,7 @@ from teensy_daq import (
     BackgroundReader,
     ByteTransport,
     CommandResponse,
+    CommandTimeoutError,
     DAQConfiguration,
     DeviceDisconnectedError,
     DeviceInfo,
@@ -63,8 +64,8 @@ def _adc_wire(run_id: int, sequence: int) -> bytes:
 class RecordingSimulatedDevice(SimulatedDevice):
     """Simulator peer that records complete wire traffic without decoding it."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, *, control_only: bool = False) -> None:
+        super().__init__(control_only=control_only)
         self.host_chunks: list[bytes] = []
         self.response_frames: list[bytes] = []
         self.data_frames: list[bytes] = []
@@ -97,6 +98,8 @@ class ScriptedSerialPeer:
         write_pattern: tuple[int, ...] = (1, 0, 3, 2, 11),
         hold_responses: bool = False,
         one_shot_stream: bool = False,
+        initial_input: bytes = b"",
+        responses_to_drop: int = 0,
         empty_read_wait: float = 0.002,
     ) -> None:
         if not read_pattern or any(limit <= 0 for limit in read_pattern):
@@ -107,6 +110,8 @@ class ScriptedSerialPeer:
             or not any(write_pattern)
         ):
             raise ValueError("write pattern must contain a positive limit")
+        if responses_to_drop < 0:
+            raise ValueError("responses_to_drop must be nonnegative")
         self.device = device if device is not None else RecordingSimulatedDevice()
         self._read_pattern = read_pattern
         self._write_pattern = write_pattern
@@ -116,8 +121,9 @@ class ScriptedSerialPeer:
         self._condition = threading.Condition()
         self._request_parser = IncrementalFrameParser()
         self._request_frames: list[Frame] = []
-        self._pending = bytearray()
+        self._pending = bytearray(initial_input)
         self._held_responses: list[bytes] = []
+        self._responses_to_drop = responses_to_drop
         self._read_index = 0
         self._write_index = 0
         self._stream_frame_sent = False
@@ -128,6 +134,7 @@ class ScriptedSerialPeer:
         self.flush_calls = 0
         self.cancel_read_calls = 0
         self.cancel_write_calls = 0
+        self.responses_dropped = 0
 
     @property
     def is_open(self) -> bool:
@@ -161,10 +168,13 @@ class ScriptedSerialPeer:
                 chunk = bytes(view[:accepted])
                 self._request_frames.extend(self._request_parser.feed(chunk))
                 responses = self.device.receive(chunk)
-                if self._hold_responses:
-                    self._held_responses.extend(responses)
-                else:
-                    for response in responses:
+                for response in responses:
+                    if self._responses_to_drop:
+                        self._responses_to_drop -= 1
+                        self.responses_dropped += 1
+                    elif self._hold_responses:
+                        self._held_responses.append(response)
+                    else:
                         self._pending.extend(response)
                 self._condition.notify_all()
                 return accepted
@@ -458,6 +468,109 @@ class AdversarialSerialReaderTests(unittest.TestCase):
                 for thread in threading.enumerate()
             )
         )
+
+
+class Phase03ControlSerialIntegrationTests(unittest.TestCase):
+    def test_reset_noise_partial_io_and_close_reopen_lifecycle(self) -> None:
+        device = RecordingSimulatedDevice(control_only=True)
+        first_peer = ScriptedSerialPeer(
+            device,
+            read_pattern=(1, 3, 2, 11),
+            write_pattern=(1, 0, 2, 5, 13),
+            initial_input=b"late boot text\r\n\xef\xbe",
+            responses_to_drop=1,
+        )
+
+        configured = TeensyDAQ.open(
+            _serial_transport(first_peer),
+            read_size=17,
+            command_timeout=0.04,
+            synchronization_attempts=3,
+            synchronization_retry_delay=0,
+        )
+        self.assertEqual(1, first_peer.responses_dropped)
+        self.assertEqual(
+            3,
+            sum(
+                frame.header.kind is FrameKind.INFO_REQUEST
+                for frame in first_peer.request_frames
+            ),
+        )
+        self.assertEqual(1, configured.reader_counters.request_timeouts)
+        self.assertGreaterEqual(configured.parser_counters.resynchronizations, 1)
+        self.assertGreater(configured.parser_counters.bytes_discarded, 0)
+        self.assertTrue(configured.configure_control_only().is_control_only)
+        configured.close(stop=False)
+        self.assertFalse(first_peer.is_open)
+        self.assertEqual(DeviceState.CONFIGURED, device.state)
+
+        second_peer = ScriptedSerialPeer(
+            device,
+            read_pattern=(5, 1, 7),
+            write_pattern=(0, 3, 1, 9),
+        )
+        running = TeensyDAQ.open(
+            _serial_transport(second_peer),
+            read_size=19,
+            command_timeout=0.1,
+            synchronization_attempts=2,
+            synchronization_retry_delay=0,
+        )
+        run_id = running.start()
+        running.close(stop=False)
+        self.assertFalse(second_peer.is_open)
+        self.assertGreater(run_id, 0)
+        self.assertEqual(DeviceState.RUNNING, device.state)
+
+        third_peer = ScriptedSerialPeer(
+            device,
+            read_pattern=(2, 13, 1),
+            write_pattern=(2, 0, 7),
+        )
+        reopened = TeensyDAQ.open(
+            _serial_transport(third_peer),
+            read_size=23,
+            command_timeout=0.1,
+            synchronization_attempts=2,
+            synchronization_retry_delay=0,
+        )
+        self.assertEqual(DeviceState.RUNNING, reopened.status().device_state)
+        self.assertEqual(DeviceState.IDLE, reopened.stop())
+        self.assertEqual(DeviceState.IDLE, reopened.stop())
+        reopened.close(stop=False)
+        self.assertFalse(third_peer.is_open)
+        self.assertEqual(DeviceState.IDLE, device.state)
+        self.assertTrue(
+            all(
+                0 in peer.write_counts and max(peer.read_counts, default=0) <= 13
+                for peer in (first_peer, second_peer, third_peer)
+            )
+        )
+
+    def test_synchronization_retry_count_is_a_hard_bound(self) -> None:
+        peer = ScriptedSerialPeer(
+            RecordingSimulatedDevice(control_only=True),
+            responses_to_drop=10,
+            write_pattern=(1, 0, 4, 9),
+        )
+
+        with self.assertRaises(CommandTimeoutError):
+            TeensyDAQ.open(
+                _serial_transport(peer),
+                command_timeout=0.02,
+                synchronization_attempts=3,
+                synchronization_retry_delay=0,
+            )
+
+        self.assertEqual(3, peer.responses_dropped)
+        self.assertEqual(3, len(peer.request_frames))
+        self.assertTrue(
+            all(
+                frame.header.kind is FrameKind.INFO_REQUEST
+                for frame in peer.request_frames
+            )
+        )
+        self.assertFalse(peer.is_open)
 
 
 @dataclass(frozen=True, slots=True)

@@ -149,6 +149,14 @@ the repository root:
 .venv/bin/python -m pytest -q firmware/tests
 ```
 
+`firmware/tests/rig_control_smoke.py` is the separately graded hardware test.
+It is a single-file Python 3.13 script that depends only on the standard
+library and PySerial, reads the rig-provided `SERIAL_PORT`, independently
+encodes and validates protocol v1, and leaves the board in IDLE. Its offline
+tests compare the independent codec with every control fixture and exercise the
+full lifecycle through reset noise and partial serial I/O before any rig time
+is used.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS
