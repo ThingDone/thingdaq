@@ -55,6 +55,7 @@ struct TransportSnapshot {
   std::uint64_t rx_bytes = 0U;
   std::uint64_t rx_bytes_processed = 0U;
   std::uint64_t tx_bytes = 0U;
+  std::uint64_t tx_bytes_requested = 0U;
   std::uint32_t rx_available_calls = 0U;
   std::uint32_t rx_read_calls = 0U;
   std::uint32_t tx_available_calls = 0U;
@@ -67,6 +68,7 @@ struct TransportSnapshot {
   std::uint32_t response_queue_rejections = 0U;
   std::uint32_t response_reservations_abandoned = 0U;
   std::uint32_t partial_write_events = 0U;
+  std::uint32_t short_capacity_deferrals = 0U;
   std::uint32_t zero_length_read_events = 0U;
   std::uint32_t zero_length_write_events = 0U;
   std::uint32_t rx_stall_events = 0U;
@@ -88,6 +90,7 @@ struct TransportSnapshot {
   std::size_t pending_rx_bytes = 0U;
   std::size_t active_frame_bytes_sent = 0U;
   std::size_t active_frame_size = 0U;
+  std::size_t max_write_request_bytes = 0U;
   bool active_frame_is_response = false;
   bool command_awaiting_response = false;
   protocol::ParserCounters parser{};
@@ -234,5 +237,10 @@ static_assert(board::kUsbRxScratchBytes >=
               protocol_v1::kMaxCommandFrameBytes);
 static_assert(board::kUsbRxBudgetBytesPerLoop > 0U);
 static_assert(board::kUsbTxBudgetBytesPerLoop > 0U);
+static_assert(board::kUsbTxMinimumWriteBytes > 1U);
+static_assert(board::kUsbTxMinimumWriteBytes <=
+              board::kUsbTxMaxWriteBytes);
+static_assert(board::kUsbTxMaxWriteBytes <=
+              board::kUsbTxBudgetBytesPerLoop);
 
 }  // namespace teensy_daq::usb

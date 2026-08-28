@@ -128,3 +128,11 @@ enabling zero-copy USB. Future ADC/GPIO rings that are actually read or written
 by eDMA remain aligned `DMAMEM` OCRAM/RAM2 and require explicit cache
 maintenance. The 16-frame application pool covers about 8.1 ms at the nominal
 combined framed rate; the core's 8,192-byte TX ring adds about another 1.0 ms.
+
+The final scheduler therefore caps each request at one 2,048-byte core buffer
+and waits for at least 512 bytes of reported capacity (or an exact shorter
+control frame/data tail) rather than intentionally issuing byte-at-a-time
+writes. Backend-returned prefixes and zero writes retain active-frame ownership.
+STOP drains complete work, and the control plane returns BUSY without mutation
+until the prior packet run is quiescent; successful START admission occurs only
+after the next packet/source epoch is armed.

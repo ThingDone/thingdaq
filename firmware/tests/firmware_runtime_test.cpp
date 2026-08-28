@@ -114,7 +114,7 @@ class FakeCdcStream final : public usb::CdcByteStream {
   }
 
   usb::IoCount availableForWrite() override {
-    return static_cast<usb::IoCount>(max_write_size);
+    return static_cast<usb::IoCount>(available_write_size);
   }
 
   usb::IoCount write(const std::uint8_t *source, std::size_t size) override {
@@ -130,6 +130,8 @@ class FakeCdcStream final : public usb::CdcByteStream {
   bool inputEmpty() const { return input_offset_ == input_.size(); }
 
   std::size_t max_read_size = 13U;
+  std::size_t available_write_size =
+      static_cast<std::size_t>(std::numeric_limits<usb::IoCount>::max());
   std::size_t max_write_size = 11U;
   std::vector<std::uint8_t> output{};
 
@@ -151,6 +153,8 @@ struct DrainResult {
   bool saw_stop = false;
   bool packet_started = false;
   bool packet_stopped = false;
+  std::size_t stop_ready_frames = 0U;
+  std::size_t stop_transmitting_frames = 0U;
 };
 
 DrainResult drain(app::FirmwareRuntime &firmware, FakeCdcStream &stream) {
@@ -178,6 +182,12 @@ DrainResult drain(app::FirmwareRuntime &firmware, FakeCdcStream &stream) {
         result.packet_started || report.packet_run_started;
     result.packet_stopped =
         result.packet_stopped || report.packet_production_stopped;
+    result.stop_ready_frames =
+        std::max(result.stop_ready_frames,
+                 report.packet_stop.ready_frames_to_drain);
+    result.stop_transmitting_frames =
+        std::max(result.stop_transmitting_frames,
+                 report.packet_stop.transmitting_frames_to_drain);
 
     if (stream.inputEmpty() && after.pending_rx_bytes == 0U &&
         after.command_queue_depth == 0U &&
@@ -217,6 +227,15 @@ std::vector<wire::DecodedFrame> decodeOutput(
   }
   expect(offset == output.size(), "response stream has no trailing bytes");
   return frames;
+}
+
+constants::ErrorCode responseError(const wire::DecodedFrame &frame) {
+  std::uint16_t raw = static_cast<std::uint16_t>(
+      constants::ErrorCode::kInternalError);
+  expect(wire::loadU16(frame.payload,
+                       constants::kResponsePrefixErrorCodeOffset, raw),
+         "typed response exposes its error code");
+  return static_cast<constants::ErrorCode>(raw);
 }
 
 std::string buildId(const wire::DecodedFrame &info) {
@@ -465,11 +484,103 @@ void testSyntheticDataCountersReachStatus() {
   }
 }
 
+void testStopDrainGatesNextStartAndPreventsStaleRunData() {
+  FakeCdcStream stream{};
+  stream.max_read_size = 128U;
+  stream.available_write_size = board::kUsbTxMaxWriteBytes;
+  stream.max_write_size = 37U;
+  packet::PacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  app::FirmwareRuntime firmware{stream, packet_storage, clock};
+  expect(firmware.begin(8080U), "drain-gate test completes BOOT");
+
+  stream.appendInput(configureRequest(201U));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 202U));
+  expect(drain(firmware, stream).quiescent && firmware.runId() == 1U,
+         "first synthetic run starts before the drain race");
+  stream.output.clear();
+
+  clock.ticks = synthetic::kFrameCoverageTicks;
+  const app::LoopReport partial = firmware.service();
+  expect(partial.synthetic.frames_framed == 2U &&
+             partial.transmit.bytes_written > 0U &&
+             firmware.transportSnapshot().active_frame_bytes_sent > 0U,
+         "full-size run-one data is partially active before STOP");
+
+  stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 203U));
+  stream.appendInput(configureRequest(204U));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 205U));
+  const DrainResult stopped = drain(firmware, stream);
+  expect(stopped.quiescent && stopped.saw_stop && stopped.packet_stopped &&
+             stopped.stop_transmitting_frames == 2U &&
+             firmware.state() == constants::DeviceState::kConfigured &&
+             firmware.runId() == 1U &&
+             firmware.packetSnapshot().ready_for_start,
+         "STOP drains both transport-owned frames while rapid START stays gated");
+
+  const std::vector<wire::DecodedFrame> first_run =
+      decodeOutput(stream.output);
+  std::size_t old_data_frames = 0U;
+  bool saw_busy_start = false;
+  for (const wire::DecodedFrame &frame : first_run) {
+    if (frame.header.kind == constants::FrameKind::kAdcData ||
+        frame.header.kind == constants::FrameKind::kGpioData) {
+      ++old_data_frames;
+      expect(frame.header.run_id == 1U,
+             "every drained data frame retains the stopped run ID");
+    }
+    if (frame.header.kind == constants::FrameKind::kStartResponse &&
+        frame.header.request_id == 205U) {
+      saw_busy_start = responseError(frame) == constants::ErrorCode::kBusy;
+    }
+  }
+  expect(old_data_frames == 2U && saw_busy_start,
+         "rapid START returns BUSY without allocating run two");
+
+  const std::size_t next_run_offset = stream.output.size();
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 206U));
+  expect(drain(firmware, stream).quiescent && firmware.runId() == 2U &&
+             firmware.state() == constants::DeviceState::kRunning,
+         "retry START arms run two after the prior drain completes");
+  clock.ticks += synthetic::kFrameCoverageTicks;
+  expect(drain(firmware, stream).quiescent,
+         "run two transmits one aligned frame from each source");
+  stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 207U));
+  expect(drain(firmware, stream).quiescent,
+         "run two STOP drains cleanly");
+
+  const std::vector<std::uint8_t> next_run_bytes(
+      stream.output.begin() + static_cast<std::ptrdiff_t>(next_run_offset),
+      stream.output.end());
+  const std::vector<wire::DecodedFrame> next_run =
+      decodeOutput(next_run_bytes);
+  expect(next_run.size() == 4U &&
+             next_run[0].header.kind ==
+                 constants::FrameKind::kStartResponse &&
+             next_run[0].header.request_id == 206U &&
+             responseError(next_run[0]) == constants::ErrorCode::kOk &&
+             next_run[0].header.run_id == 2U &&
+             next_run[1].header.kind == constants::FrameKind::kAdcData &&
+             next_run[2].header.kind == constants::FrameKind::kGpioData &&
+             next_run[1].header.run_id == 2U &&
+             next_run[2].header.run_id == 2U &&
+             next_run[3].header.kind ==
+                 constants::FrameKind::kStopResponse,
+         "successful run-two START is followed only by run-two data");
+  const usb::TransportSnapshot transport = firmware.transportSnapshot();
+  expect(transport.partial_write_events > 0U &&
+             transport.zero_length_write_events == 0U &&
+             transport.max_write_request_bytes ==
+                 board::kUsbTxMaxWriteBytes,
+         "interleaved lifecycle retained large-request and partial-write accounting");
+}
+
 }  // namespace
 
 int main() {
   testCompleteControlPlane();
   testSyntheticDataCountersReachStatus();
+  testStopDrainGatesNextStartAndPreventsStaleRunData();
   if (failures != 0) {
     std::cerr << failures << " firmware runtime assertion(s) failed\n";
     return 1;

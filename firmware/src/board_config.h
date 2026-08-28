@@ -177,6 +177,13 @@ inline constexpr std::size_t kPinnedUsbCdcTxStorageBytes =
     kPinnedUsbCdcTxBufferCount * kPinnedUsbCdcTxBufferBytes;
 inline constexpr std::size_t kUsbRxBudgetBytesPerLoop = 1024U;
 inline constexpr std::size_t kUsbTxBudgetBytesPerLoop = 2048U;
+// Data is offered to the pinned core in one core-buffer-sized block whenever
+// possible. A visit waits for at least one high-speed USB packet of capacity
+// instead of deliberately degrading into byte-at-a-time calls. Unexpected
+// backend prefixes are still retained and resumed exactly.
+inline constexpr std::size_t kUsbTxMaxWriteBytes =
+    kPinnedUsbCdcTxBufferBytes;
+inline constexpr std::size_t kUsbTxMinimumWriteBytes = 512U;
 inline constexpr std::size_t kUsbRxCallsPerLoop = 8U;
 inline constexpr std::size_t kUsbTxCallsPerLoop = 8U;
 

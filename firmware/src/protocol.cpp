@@ -835,11 +835,24 @@ std::uint32_t adler32(ByteView input) {
     return 0U;
   }
   constexpr std::uint32_t modulus = 65521U;
+  // RFC 1950/zlib's NMAX bound keeps both sums inside uint32_t while moving
+  // division out of the per-byte high-rate framing loop.
+  constexpr std::size_t reduction_block_bytes = 5552U;
   std::uint32_t first = 1U;
   std::uint32_t second = 0U;
-  for (std::size_t index = 0U; index < input.size; ++index) {
-    first = (first + input.data[index]) % modulus;
-    second = (second + first) % modulus;
+  std::size_t offset = 0U;
+  while (offset < input.size) {
+    const std::size_t remaining = input.size - offset;
+    const std::size_t block =
+        remaining < reduction_block_bytes ? remaining : reduction_block_bytes;
+    const std::size_t end = offset + block;
+    while (offset < end) {
+      first += input.data[offset];
+      second += first;
+      ++offset;
+    }
+    first %= modulus;
+    second %= modulus;
   }
   return (second << 16U) | first;
 }

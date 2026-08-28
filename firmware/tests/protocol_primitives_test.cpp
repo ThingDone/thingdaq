@@ -62,6 +62,17 @@ wire::ByteView view(const std::vector<std::uint8_t> &bytes) {
   return {bytes.data(), bytes.size()};
 }
 
+std::uint32_t referenceAdler32(wire::ByteView input) {
+  constexpr std::uint32_t modulus = 65521U;
+  std::uint32_t first = 1U;
+  std::uint32_t second = 0U;
+  for (std::size_t index = 0U; index < input.size; ++index) {
+    first = (first + input.data[index]) % modulus;
+    second = (second + first) % modulus;
+  }
+  return (second << 16U) | first;
+}
+
 template <std::size_t Capacity>
 void expectFrame(const wire::FixedFrame<Capacity> &actual,
                  const std::vector<std::uint8_t> &expected,
@@ -134,6 +145,18 @@ void testEndianAndChecksum() {
       '1', '2', '3', '4', '5', '6', '7', '8', '9'};
   expect(wire::adler32({digits.data(), digits.size()}) == 0x091E01DEU,
          "RFC Adler-32 vector");
+  std::array<std::uint8_t, 12000U> long_input{};
+  for (std::size_t index = 0U; index < long_input.size(); ++index) {
+    long_input[index] =
+        static_cast<std::uint8_t>((index * 37U + 11U) & 0xFFU);
+  }
+  const std::array<std::size_t, 4U> reduction_lengths{
+      5551U, 5552U, 5553U, long_input.size()};
+  for (std::size_t length : reduction_lengths) {
+    const wire::ByteView long_view{long_input.data(), length};
+    expect(wire::adler32(long_view) == referenceAdler32(long_view),
+           "block-reduced Adler-32 matches the bytewise reference");
+  }
   std::uint32_t checksum = 0U;
   const wire::Result unsupported = wire::computeChecksum(
       constants::ChecksumAlgorithm::kCrc32c, {digits.data(), digits.size()},

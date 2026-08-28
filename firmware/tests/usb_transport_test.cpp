@@ -68,6 +68,35 @@ wire::ControlFrame pingResponse(std::uint32_t request_id,
   return frame;
 }
 
+std::vector<std::uint8_t> dataFrame(constants::FrameKind kind,
+                                    std::uint32_t run_id,
+                                    std::uint32_t sequence,
+                                    std::uint64_t first_ticks) {
+  std::array<std::uint8_t, constants::kDataPayloadBytes> payload{};
+  if (kind == constants::FrameKind::kGpioData) {
+    for (std::size_t index = 0U; index < payload.size(); ++index) {
+      payload[index] = static_cast<std::uint8_t>(index & 0xFFU);
+    }
+  }
+  wire::FrameFields fields{};
+  fields.kind = kind;
+  fields.run_id = run_id;
+  fields.sequence = sequence;
+  fields.first_sample_ticks = first_ticks;
+  fields.item_count =
+      kind == constants::FrameKind::kAdcData
+          ? static_cast<std::uint32_t>(constants::kAdcPairsPerFrame)
+          : static_cast<std::uint32_t>(constants::kGpioSamplesPerFrame);
+  if (sequence == 0U && first_ticks == 0U) {
+    fields.flags =
+        static_cast<std::uint16_t>(constants::FrameFlag::kEpochStart);
+  }
+  wire::DataFrame frame{};
+  expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame).ok(),
+         "encode complete lower-priority data frame");
+  return bytes(frame);
+}
+
 class FakeCdcStream final : public usb::CdcByteStream {
  public:
   explicit FakeCdcStream(std::vector<std::uint8_t> input = {})
@@ -111,6 +140,7 @@ class FakeCdcStream final : public usb::CdcByteStream {
   }
 
   usb::IoCount write(const std::uint8_t *source, std::size_t size) override {
+    write_requests.push_back(size);
     if (!write_plan.empty()) {
       const usb::IoCount planned = write_plan.front();
       write_plan.pop_front();
@@ -131,6 +161,7 @@ class FakeCdcStream final : public usb::CdcByteStream {
   std::deque<usb::IoCount> read_plan{};
   std::deque<usb::IoCount> writable_plan{};
   std::deque<usb::IoCount> write_plan{};
+  std::vector<std::size_t> write_requests{};
   std::vector<std::uint8_t> output{};
 
  private:
@@ -157,6 +188,16 @@ class FakeLowerPrioritySource final : public usb::LowerPriorityFrameSource {
 
   std::deque<std::vector<std::uint8_t>> frames{};
 };
+
+void drainTransmit(usb::CdcTransport &transport,
+                   std::size_t maximum_visits = 32U) {
+  for (std::size_t visit = 0U;
+       visit < maximum_visits && transport.hasPendingTransmission(); ++visit) {
+    (void)transport.serviceTransmit();
+  }
+  expect(!transport.hasPendingTransmission(),
+         "bounded transmit visits drain every queued frame");
+}
 
 void testFixedQueueBoundaries() {
   usb::detail::FixedQueue<std::uint32_t, 3U> queue{};
@@ -358,8 +399,10 @@ void testPartialAndZeroWritesPreserveFrames() {
 }
 
 void testResponsePriorityAndActiveFrameOwnership() {
-  const std::vector<std::uint8_t> low_one = bytes(pingResponse(70U, 70U));
-  const std::vector<std::uint8_t> low_two = bytes(pingResponse(71U, 71U));
+  const std::vector<std::uint8_t> low_one =
+      dataFrame(constants::FrameKind::kAdcData, 7U, 0U, 0U);
+  const std::vector<std::uint8_t> low_two =
+      dataFrame(constants::FrameKind::kGpioData, 7U, 0U, 0U);
   const wire::ControlFrame high = pingResponse(1U, 1U);
 
   FakeLowerPrioritySource lower{};
@@ -368,7 +411,7 @@ void testResponsePriorityAndActiveFrameOwnership() {
   stats::Statistics statistics{};
   usb::CdcTransport transport(stream, statistics, &lower);
   expect(transport.queueResponse(high), "queue high-priority response");
-  transport.serviceTransmit();
+  drainTransmit(transport);
   std::vector<std::uint8_t> expected = bytes(high);
   append(expected, low_one);
   append(expected, low_two);
@@ -387,7 +430,7 @@ void testResponsePriorityAndActiveFrameOwnership() {
          "lower-priority frame becomes active only after bytes are accepted");
   expect(active_transport.queueResponse(high),
          "response can queue behind an active frame");
-  active_transport.serviceTransmit();
+  drainTransmit(active_transport);
   expected = low_one;
   append(expected, bytes(high));
   expect(active_stream.output == expected,
@@ -405,7 +448,7 @@ void testResponsePriorityAndActiveFrameOwnership() {
          "a zero write does not lock an unsent lower-priority frame");
   expect(unsent_transport.queueResponse(high),
          "queue response after lower-priority zero write");
-  unsent_transport.serviceTransmit();
+  drainTransmit(unsent_transport);
   expected = bytes(high);
   append(expected, low_one);
   expect(unsent_stream.output == expected,
@@ -414,7 +457,8 @@ void testResponsePriorityAndActiveFrameOwnership() {
 
 void testTransmitBudgets() {
   FakeLowerPrioritySource lower{};
-  lower.frames.emplace_back(constants::kDataFrameBytes, 0xA5U);
+  lower.frames.push_back(
+      dataFrame(constants::FrameKind::kAdcData, 9U, 0U, 0U));
   FakeCdcStream stream{};
   stats::Statistics statistics{};
   usb::CdcTransport transport(stream, statistics, &lower);
@@ -422,27 +466,56 @@ void testTransmitBudgets() {
   const usb::ServiceReport first = transport.serviceTransmit();
   expect(first.bytes_written == teensy_daq::board::kUsbTxBudgetBytesPerLoop &&
              first.byte_budget_exhausted &&
-             first.io_calls <= teensy_daq::board::kUsbTxCallsPerLoop,
-         "one loop cannot exceed the transmit byte/call budgets");
+             first.io_calls == 1U && stream.write_requests.size() == 1U &&
+             stream.write_requests[0] ==
+                 teensy_daq::board::kUsbTxMaxWriteBytes,
+         "one loop offers one large write within byte/call budgets");
   expect(transport.snapshot().active_frame_bytes_sent ==
              teensy_daq::board::kUsbTxBudgetBytesPerLoop,
          "budget boundary retains the active frame offset");
   transport.serviceTransmit();
   expect(stream.output.size() == constants::kDataFrameBytes && lower.frames.empty(),
          "the next bounded loop completes the same large frame");
+  const usb::TransportSnapshot large_snapshot = transport.snapshot();
+  expect(large_snapshot.max_write_request_bytes ==
+             teensy_daq::board::kUsbTxMaxWriteBytes &&
+             large_snapshot.tx_bytes_requested == constants::kDataFrameBytes,
+         "transport exposes exact large-write request telemetry");
 
   FakeLowerPrioritySource call_limited_lower{};
-  call_limited_lower.frames.emplace_back(100U, 0x5AU);
+  call_limited_lower.frames.push_back(
+      dataFrame(constants::FrameKind::kGpioData, 10U, 0U, 0U));
   FakeCdcStream call_limited_stream{};
   call_limited_stream.writable_limit = 1;
   stats::Statistics call_limited_statistics{};
   usb::CdcTransport call_limited_transport(
       call_limited_stream, call_limited_statistics, &call_limited_lower);
   const usb::ServiceReport calls = call_limited_transport.serviceTransmit();
-  expect(calls.io_calls == teensy_daq::board::kUsbTxCallsPerLoop &&
-             calls.bytes_written == teensy_daq::board::kUsbTxCallsPerLoop &&
-             calls.call_budget_exhausted,
-         "short successful writes stop at the per-loop retry bound");
+  expect(calls.stalled && calls.io_calls == 0U && calls.bytes_written == 0U &&
+             call_limited_stream.write_requests.empty() &&
+             call_limited_transport.snapshot().short_capacity_deferrals == 1U,
+         "one-byte capacity is deferred instead of requested byte by byte");
+  call_limited_stream.writable_limit = static_cast<usb::IoCount>(
+      teensy_daq::board::kUsbTxMinimumWriteBytes);
+  const usb::ServiceReport recovered =
+      call_limited_transport.serviceTransmit();
+  expect(recovered.bytes_written ==
+             teensy_daq::board::kUsbTxBudgetBytesPerLoop &&
+             !call_limited_stream.write_requests.empty() &&
+             call_limited_stream.write_requests.front() ==
+                 teensy_daq::board::kUsbTxMinimumWriteBytes,
+         "recovered capacity resumes with USB-packet-sized block requests");
+
+  FakeLowerPrioritySource malformed_lower{};
+  malformed_lower.frames.emplace_back(100U, 0x5AU);
+  FakeCdcStream malformed_stream{};
+  stats::Statistics malformed_statistics{};
+  usb::CdcTransport malformed_transport(
+      malformed_stream, malformed_statistics, &malformed_lower);
+  (void)malformed_transport.serviceTransmit();
+  expect(malformed_lower.frames.empty() && malformed_stream.output.empty() &&
+             malformed_transport.snapshot().io_errors == 1U,
+         "lower-priority admission rejects every non-4096-byte data frame");
 }
 
 }  // namespace

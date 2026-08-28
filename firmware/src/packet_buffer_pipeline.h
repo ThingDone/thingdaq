@@ -82,6 +82,7 @@ struct FrameCompletion {
 enum class OperationStatus : std::uint8_t {
   kOk,
   kInvalidRunId,
+  kRunActive,
   kNotRunning,
   kPoolExhausted,
   kInvalidHandle,
@@ -141,12 +142,20 @@ struct PipelineSnapshot {
   std::size_t transmit_queue_high_water = 0U;
   std::size_t buffers_owned_high_water = 0U;
   bool accepting_frames = false;
+  bool drain_pending = false;
+  bool ready_for_start = true;
 };
 
 struct PromotionReport {
   std::size_t frames_promoted = 0U;
   bool transmit_queue_full = false;
   bool invariant_error = false;
+};
+
+struct StopReport {
+  std::size_t filling_frames_canceled = 0U;
+  std::size_t ready_frames_to_drain = 0U;
+  std::size_t transmitting_frames_to_drain = 0U;
 };
 
 // Main-loop-only packet ownership pipeline. A future pacing ISR may publish a
@@ -162,11 +171,12 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   PacketBufferPipeline(PacketBufferPipeline &&) = delete;
   PacketBufferPipeline &operator=(PacketBufferPipeline &&) = delete;
 
-  // A distinct nonzero run may recycle FILLING/READY work from an older run,
-  // but never a frame owned by transport. This conservative rule makes
-  // abandoning a partially written frame impossible.
+  // START is admitted only after STOP has made the prior run quiescent. This
+  // prevents resetting READY work or abandoning a partially written frame.
   OperationStatus startRun(std::uint32_t run_id);
-  void stopProduction();
+  // STOP cancels any producer-owned partial construction, then drains every
+  // already complete READY/TRANSMITTING frame through normal USB ownership.
+  StopReport stopProduction();
 
   // Calling beginFill represents production of one complete source frame.
   // Sequence and production counts advance before pool admission so a pool
@@ -189,6 +199,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::size_t readyFrames() const;
   std::size_t freeBuffers() const;
   bool quiescent() const;
+  bool readyForStart() const;
   PipelineSnapshot snapshot() const;
 
  private:

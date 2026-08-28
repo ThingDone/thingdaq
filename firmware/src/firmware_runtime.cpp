@@ -10,51 +10,44 @@ LoopReport FirmwareRuntime::service() {
   LoopReport report{};
   report.receive = transport_.serviceReceive();
   publishPacketStatistics();
+  const std::uint64_t now_ticks = clock_.nowTicks();
 
   protocol::ParsedCommand command{};
+  protocol::ControlFrame response{};
+  bool response_ready = false;
   if (transport_.takeCommand(command)) {
     report.command_dispatched = true;
-    protocol::ControlFrame response{};
+    control::DispatchReadiness readiness{};
+    if (command.request.kind == protocol_v1::CommandKind::kStart) {
+      readiness.start_ready =
+          packet_pipeline_.readyForStart() && !synthetic_source_.running();
+    }
     const control::DispatchResult dispatched =
-        control_.dispatch(command.request, response);
+        control_.dispatch(command.request, response, readiness);
     if (dispatched.responseReady()) {
-      report.response_queued = transport_.queueResponse(response);
-      if (!report.response_queued) {
-        recoverResponsePath(command.request, response, true, report);
-      }
+      response_ready = true;
     } else {
       recoverResponsePath(command.request, response, false, report);
     }
   }
 
-  report.events = control_.takePendingEvents();
-  const std::uint64_t now_ticks = clock_.nowTicks();
-  if (report.events.has(control::Event::kStop)) {
-    synthetic_source_.stop();
-    report.synthetic_production_stopped = true;
-    packet_pipeline_.stopProduction();
-    report.packet_production_stopped = true;
+  // Arm or stop the data path before admitting the corresponding successful
+  // response. A START can therefore never be acknowledged until all resources
+  // have accepted the new epoch.
+  applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
+  if (report.internal_error && response_ready) {
+    recoverResponsePath(command.request, response, false, report);
+    response_ready = false;
   }
-  if (report.events.has(control::Event::kStartEpoch)) {
-    report.packet_start_status =
-        packet_pipeline_.startRun(report.events.run_id);
-    report.packet_run_started =
-        report.packet_start_status == packet::OperationStatus::kOk;
-    if (report.packet_run_started) {
-      report.synthetic_start_status = synthetic_source_.startRun(
-          report.events.run_id, control_.appliedConfiguration(), now_ticks,
-          packet_pipeline_);
-      report.synthetic_run_started =
-          report.synthetic_start_status == synthetic::OperationStatus::kOk;
-      if (report.synthetic_run_started) {
-        packet_stats_generation_ = report.events.stats_generation;
-      } else {
-        packet_pipeline_.stopProduction();
-        report.packet_production_stopped = true;
-        report.internal_error = true;
-      }
+  if (response_ready) {
+    report.response_queued = transport_.queueResponse(response);
+    if (!report.response_queued) {
+      recoverResponsePath(command.request, response, true, report);
     }
   }
+  // Response-path recovery can create one STOP event after the first event
+  // pass. Consume it now so a failed START cannot generate data for one loop.
+  applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
 
   // Pattern construction, framing/checksum work, queue ownership, and USB all
   // stay in this bounded cooperative path. The production clock is polled;
@@ -64,6 +57,46 @@ LoopReport FirmwareRuntime::service() {
   report.transmit = transport_.serviceTransmit();
   publishPacketStatistics();
   return report;
+}
+
+void FirmwareRuntime::applyPendingEvents(
+    const control::PendingEvents &events, std::uint64_t now_ticks,
+    LoopReport &report) {
+  if (events.mask == 0U) {
+    return;
+  }
+  report.events.mask = static_cast<std::uint8_t>(report.events.mask | events.mask);
+  report.events.run_id = events.run_id;
+  report.events.stats_generation = events.stats_generation;
+
+  if (events.has(control::Event::kStop)) {
+    synthetic_source_.stop();
+    report.synthetic_production_stopped = true;
+    report.packet_stop = packet_pipeline_.stopProduction();
+    report.packet_production_stopped = true;
+  }
+  if (events.has(control::Event::kStartEpoch)) {
+    report.packet_start_status =
+        packet_pipeline_.startRun(events.run_id);
+    report.packet_run_started =
+        report.packet_start_status == packet::OperationStatus::kOk;
+    if (!report.packet_run_started) {
+      report.internal_error = true;
+      return;
+    }
+    report.synthetic_start_status = synthetic_source_.startRun(
+        events.run_id, control_.appliedConfiguration(), now_ticks,
+        packet_pipeline_);
+    report.synthetic_run_started =
+        report.synthetic_start_status == synthetic::OperationStatus::kOk;
+    if (report.synthetic_run_started) {
+      packet_stats_generation_ = events.stats_generation;
+      return;
+    }
+    report.packet_stop = packet_pipeline_.stopProduction();
+    report.packet_production_stopped = true;
+    report.internal_error = true;
+  }
 }
 
 void FirmwareRuntime::publishPacketStatistics() {

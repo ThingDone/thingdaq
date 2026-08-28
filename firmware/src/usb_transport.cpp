@@ -227,14 +227,32 @@ ServiceReport CdcTransport::serviceTransmit() {
     const std::size_t frame_remaining = selection.bytes.size - tx_offset_;
     const std::size_t budget_remaining =
         board::kUsbTxBudgetBytesPerLoop - report.bytes_written;
+    const std::size_t minimum_write =
+        minimum(frame_remaining, board::kUsbTxMinimumWriteBytes);
+    if (budget_remaining < minimum_write) {
+      report.byte_budget_exhausted = true;
+      saturatingIncrement(counters_.tx_byte_budget_exhaustions);
+      break;
+    }
+    if (static_cast<std::size_t>(writable) < minimum_write) {
+      saturatingIncrement(counters_.short_capacity_deferrals);
+      stalled = true;
+      break;
+    }
     const std::size_t requested =
-        minimum(minimum(frame_remaining, budget_remaining),
-                static_cast<std::size_t>(writable));
+        minimum(minimum(minimum(frame_remaining, budget_remaining),
+                        static_cast<std::size_t>(writable)),
+                board::kUsbTxMaxWriteBytes);
     if (requested == 0U) {
       stalled = true;
       break;
     }
 
+    saturatingAdd(counters_.tx_bytes_requested,
+                  static_cast<std::uint64_t>(requested));
+    if (requested > counters_.max_write_request_bytes) {
+      counters_.max_write_request_bytes = requested;
+    }
     saturatingIncrement(counters_.tx_write_calls);
     ++report.io_calls;
     const IoCount written =
@@ -399,8 +417,7 @@ CdcTransport::FrameSelection CdcTransport::selectTransmitFrame() {
   if (lower.size == 0U) {
     return {};
   }
-  if (!lower.valid() || lower.size > protocol_v1::kMaxDataFrameBytes ||
-      lower.size < protocol_v1::kHeaderSize + protocol_v1::kTrailerSize) {
+  if (!lower.valid() || lower.size != protocol_v1::kDataFrameBytes) {
     recordIoError();
     lower_priority_->releaseFrontFrame();
     return {};

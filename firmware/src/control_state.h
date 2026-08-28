@@ -66,6 +66,14 @@ struct DispatchResult {
   }
 };
 
+// Runtime-owned resources may need a bounded drain after STOP even though the
+// protocol state is already CONFIGURED again. Keeping this readiness input
+// explicit lets START return BUSY without allocating a run ID or mutating the
+// control state until every prior-run data buffer is safe to reset.
+struct DispatchReadiness {
+  bool start_ready = true;
+};
+
 class ControlState {
  public:
   constexpr ControlState() = default;
@@ -80,8 +88,9 @@ class ControlState {
   // cancels an unconsumed START event, and signals STOP when work may exist.
   bool recoverToIdle();
 
-  DispatchResult dispatch(const protocol::Request &request,
-                          protocol::ControlFrame &response);
+  DispatchResult dispatch(
+      const protocol::Request &request, protocol::ControlFrame &response,
+      DispatchReadiness readiness = DispatchReadiness{});
 
   constexpr protocol_v1::DeviceState state() const { return state_; }
   constexpr std::uint32_t runId() const { return run_id_; }

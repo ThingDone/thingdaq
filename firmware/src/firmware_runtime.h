@@ -14,6 +14,7 @@ struct LoopReport {
   usb::ServiceReport transmit{};
   control::PendingEvents events{};
   packet::PromotionReport packet_promotion{};
+  packet::StopReport packet_stop{};
   packet::OperationStatus packet_start_status =
       packet::OperationStatus::kNotRunning;
   synthetic::OperationStatus synthetic_start_status =
@@ -74,6 +75,8 @@ class FirmwareRuntime {
   }
 
  private:
+  void applyPendingEvents(const control::PendingEvents &events,
+                          std::uint64_t now_ticks, LoopReport &report);
   void recoverResponsePath(const protocol::Request &request,
                            protocol::ControlFrame &response,
                            bool transport_already_recorded,

@@ -128,6 +128,12 @@ void testAlignedFixedPoolAndFailureAccounting() {
                      .next_sequence == 1U,
          "failed construction preserves production, drop, and sequence facts");
 
+  expect(!pipeline.readyForStart() &&
+             pipeline.startRun(8U) == packet::OperationStatus::kRunActive,
+         "a quiescent active run still requires an explicit STOP");
+  const packet::StopReport stopped = pipeline.stopProduction();
+  expect(stopped.filling_frames_canceled == 0U && pipeline.readyForStart(),
+         "STOP makes an ownership-free run eligible for deterministic reset");
   expect(pipeline.startRun(8U) == packet::OperationStatus::kOk,
          "a new run resets source sequences after complete recycling");
   packet::FillHandle adc{};
@@ -146,6 +152,18 @@ void testAlignedFixedPoolAndFailureAccounting() {
              ready.sources[0].next_sequence == 1U &&
              ready.sources[1].next_sequence == 1U,
          "independent source sequences and ready-queue telemetry are exact");
+  const packet::StopReport ready_stop = pipeline.stopProduction();
+  expect(ready_stop.ready_frames_to_drain == 2U &&
+             ready_stop.transmitting_frames_to_drain == 0U &&
+             pipeline.startRun(9U) ==
+                 packet::OperationStatus::kTransmissionPending,
+         "a new epoch cannot silently recycle complete READY frames");
+  expect(pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+         "STOP preserves complete READY work for normal transport drain");
+  pipeline.releaseFrontFrame();
+  pipeline.releaseFrontFrame();
+  expect(pipeline.readyForStart(),
+         "the next START becomes eligible only after the READY drain");
 }
 
 void testTransportOwnershipSurvivesPartialWrites() {
@@ -182,6 +200,11 @@ void testTransportOwnershipSurvivesPartialWrites() {
              pipeline.queuedFrames() == 2U &&
              pipeline.snapshot().sources[0].frames_transmitted == 0U,
          "partial then zero USB writes retain the immutable front frame");
+  const packet::StopReport stopping = pipeline.stopProduction();
+  expect(stopping.ready_frames_to_drain == 0U &&
+             stopping.transmitting_frames_to_drain == 2U &&
+             pipeline.snapshot().drain_pending,
+         "STOP explicitly drains complete transport-owned frames");
   expect(pipeline.startRun(12U) ==
              packet::OperationStatus::kTransmissionPending,
          "a new run cannot recycle any transport-owned frame");
@@ -192,6 +215,7 @@ void testTransportOwnershipSurvivesPartialWrites() {
   }
   const packet::PipelineSnapshot drained = pipeline.snapshot();
   expect(!transport.hasPendingTransmission() && pipeline.quiescent() &&
+             pipeline.readyForStart() &&
              stream.output.size() == 2U * constants::kDataFrameBytes &&
              drained.sources[0].frames_transmitted == 1U &&
              drained.sources[1].frames_transmitted == 1U &&
@@ -211,6 +235,56 @@ void testTransportOwnershipSurvivesPartialWrites() {
            "partial writes preserve complete ordered wire frames");
     offset += constants::kDataFrameBytes;
   }
+}
+
+void testFairPromotionKeepsNominalCoverageAligned() {
+  packet::PacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  expect(pipeline.startRun(17U) == packet::OperationStatus::kOk,
+         "start fair-promotion run");
+  constexpr std::uint64_t coverage_ticks =
+      static_cast<std::uint64_t>(constants::kAdcPairsPerFrame) *
+      constants::kAdcPairPeriodTicks;
+  constexpr std::uint16_t epoch =
+      static_cast<std::uint16_t>(constants::FrameFlag::kEpochStart);
+
+  for (packet::Stream stream : {packet::Stream::kAdc,
+                                packet::Stream::kGpio}) {
+    for (std::uint32_t sequence = 0U; sequence < 3U; ++sequence) {
+      packet::FillHandle handle{};
+      expect(fillAndFinish(pipeline, stream,
+                           static_cast<std::uint64_t>(sequence) * coverage_ticks,
+                           sequence == 0U ? epoch : 0U, handle)
+                 .ok(),
+             "queue an unequal-arrival fair-scheduling frame");
+    }
+  }
+
+  const packet::PromotionReport promoted = pipeline.serviceReadyFrames(6U);
+  expect(promoted.frames_promoted == 6U && !promoted.invariant_error,
+         "bounded promotion admits the complete dual-stream backlog");
+  for (std::uint32_t sequence = 0U; sequence < 3U; ++sequence) {
+    for (packet::Stream stream : {packet::Stream::kAdc,
+                                  packet::Stream::kGpio}) {
+      wire::DecodedFrame frame{};
+      const wire::ByteView bytes = pipeline.frontFrame();
+      expect(bytes.size == constants::kDataFrameBytes &&
+                 wire::decodeFrame(bytes, frame).ok() &&
+                 frame.header.kind == packet::frameKind(stream) &&
+                 frame.header.sequence == sequence &&
+                 frame.header.first_sample_ticks ==
+                     static_cast<std::uint64_t>(sequence) * coverage_ticks &&
+                 frame.header.checksum_algorithm ==
+                     constants::ChecksumAlgorithm::kAdler32 &&
+                 frame.header.item_count == packet::itemsPerFrame(stream),
+             "alternating transport order preserves aligned coverage and invariants");
+      pipeline.releaseFrontFrame();
+    }
+  }
+  expect(pipeline.quiescent() &&
+             pipeline.snapshot().sources[0].frames_transmitted == 3U &&
+             pipeline.snapshot().sources[1].frames_transmitted == 3U,
+         "neither source starves under an unequal ready-arrival backlog");
 }
 
 void testPoolExhaustionIsBoundedAndSequenceVisible() {
@@ -238,14 +312,16 @@ void testPoolExhaustionIsBoundedAndSequenceVisible() {
              gpio.frames_dropped == 1U &&
              gpio.next_sequence == board::kPacketBufferCount + 1U,
          "pool pressure exposes exact high-water, drop, and sequence telemetry");
-  for (const packet::FillHandle &handle : handles) {
-    expect(pipeline.cancelFill(handle),
-           "every producer-owned buffer can be explicitly recycled");
+  for (std::size_t index = 0U; index + 1U < handles.size(); ++index) {
+    expect(pipeline.cancelFill(handles[index]),
+           "producer-owned buffers can be explicitly recycled");
   }
-  pipeline.stopProduction();
+  const packet::StopReport stopped = pipeline.stopProduction();
   expect(pipeline.quiescent() &&
+             stopped.filling_frames_canceled == 1U &&
+             pipeline.readyForStart() &&
              !pipeline.beginFill(packet::Stream::kGpio).ok(),
-         "STOP prevents new work after all ownership returns to FREE");
+         "STOP cancels the final partial fill and prevents new production");
 }
 
 }  // namespace
@@ -253,6 +329,7 @@ void testPoolExhaustionIsBoundedAndSequenceVisible() {
 int main() {
   testAlignedFixedPoolAndFailureAccounting();
   testTransportOwnershipSurvivesPartialWrites();
+  testFairPromotionKeepsNominalCoverageAligned();
   testPoolExhaustionIsBoundedAndSequenceVisible();
   if (failures != 0) {
     std::cerr << failures << " packet pipeline assertion(s) failed\n";

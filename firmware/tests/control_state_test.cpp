@@ -398,6 +398,34 @@ void testIdempotencyRequestIdsAndCounters() {
          "accepted, rejected, and state-error counters remain exact");
 }
 
+void testStartReadinessBusyIsAtomic() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(55U) &&
+             state.dispatch(configureRequest(23U), response).commandAccepted(),
+         "START-readiness test reaches CONFIGURED");
+  const std::uint32_t generation = state.statistics().generation();
+  const control::DispatchResult busy = state.dispatch(
+      request(constants::CommandKind::kStart, 24U), response,
+      control::DispatchReadiness{false});
+  expect(busy.responseReady() && !busy.commandAccepted(),
+         "resource drain returns one typed START rejection");
+  expectTypedResponse(response, constants::FrameKind::kStartResponse, 24U,
+                      constants::ErrorCode::kBusy, "busy START");
+  expect(state.state() == constants::DeviceState::kConfigured &&
+             state.runId() == 0U &&
+             state.statistics().generation() == generation &&
+             state.takePendingEvents().mask == 0U,
+         "busy START allocates no run, generation, state, or event");
+
+  expect(state.dispatch(request(constants::CommandKind::kStart, 25U), response,
+                        control::DispatchReadiness{true})
+             .commandAccepted() &&
+             state.runId() == 1U &&
+             state.takePendingEvents().has(control::Event::kStartEpoch),
+         "the same configuration starts after resources become ready");
+}
+
 void testConfigurationValidationAndAtomicity() {
   control::ControlState state{};
   wire::ControlFrame response{};
@@ -634,6 +662,7 @@ int main() {
   testBootAndInfo();
   testSyntheticLifecycle();
   testIdempotencyRequestIdsAndCounters();
+  testStartReadinessBusyIsAtomic();
   testConfigurationValidationAndAtomicity();
   testRecoverableFaultReturnsIdle();
   testStatisticsDetailAndSaturation();

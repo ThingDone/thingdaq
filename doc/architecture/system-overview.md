@@ -162,10 +162,14 @@ Every `loop()` calls one portable runtime service step in this fixed order:
 1. receive at most 1,024 bytes and eight core read calls;
 2. dequeue and dispatch at most one complete command when a response slot is
    reserved;
-3. consume the bounded START-epoch/STOP event mask in main-loop context;
+3. preflight START ownership, consume the bounded START-epoch/STOP event mask
+   in main-loop context, and admit a successful lifecycle response only after
+   the corresponding resources accept it;
 4. poll one 8 MHz clock value and generate at most four due synthetic frames;
 5. promote at most four complete ready frames into transport ownership; and
-6. transmit at most 2,048 bytes and eight core write calls.
+6. transmit at most 2,048 bytes and eight core write calls, requesting at most
+   one 2,048-byte core buffer per call and avoiding intentional sub-512-byte
+   data chunks except exact frame tails.
 
 Valid typed rejections such as INVALID_STATE or UNSUPPORTED_CONFIGURATION are
 normal protocol outcomes and leave the prior state atomic. A response encoding
@@ -175,6 +179,14 @@ configuration, and returns to IDLE while retaining run/build/statistics
 provenance. It attempts a typed INTERNAL_ERROR response before abandoning the
 reserved slot, so a recoverable firmware fault cannot wedge all later command
 processing.
+
+STOP halts source admission before the response is queued, cancels only an
+incomplete producer-owned fill, and drains complete ready/transport-owned data.
+CONFIGURE may proceed during that bounded drain, but START receives typed
+`BUSY` until packet ownership is quiescent. BUSY leaves state, run ID,
+statistics generation, and epoch untouched. A successful retry first resets
+the queues, arms the packet/source epoch, and then queues START success, which
+prevents prior-run data from appearing after the acknowledged new epoch.
 
 The end-to-end INFO response carries the protocol version, semantic firmware
 version, exact Teensy 4.0 and i.MX RT1062 IDs, core-derived hardware serial,

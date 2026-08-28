@@ -23,9 +23,13 @@ OperationStatus PacketBufferPipeline::startRun(std::uint32_t run_id) {
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kInvalidRunId;
   }
-  if (!transmit_queue_.empty()) {
+  if (!quiescent()) {
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kTransmissionPending;
+  }
+  if (accepting_frames_) {
+    saturatingIncrement(run_start_rejections_);
+    return OperationStatus::kRunActive;
   }
 
   for (ReadyQueue &queue : ready_queues_) {
@@ -54,8 +58,21 @@ OperationStatus PacketBufferPipeline::startRun(std::uint32_t run_id) {
   return OperationStatus::kOk;
 }
 
-void PacketBufferPipeline::stopProduction() {
+StopReport PacketBufferPipeline::stopProduction() {
+  StopReport report{};
   accepting_frames_ = false;
+  for (std::size_t index = 0U; index < records_.size(); ++index) {
+    const BufferRecord &record = records_[index];
+    if (record.state != BufferState::kFilling) {
+      continue;
+    }
+    recordDrop(record.stream, record.item_count);
+    recycle(static_cast<BufferIndex>(index));
+    ++report.filling_frames_canceled;
+  }
+  report.ready_frames_to_drain = readyFrames();
+  report.transmitting_frames_to_drain = transmit_queue_.size();
+  return report;
 }
 
 BeginFillResult PacketBufferPipeline::beginFill(Stream stream) {
@@ -332,6 +349,10 @@ bool PacketBufferPipeline::quiescent() const {
          transmit_queue_.empty();
 }
 
+bool PacketBufferPipeline::readyForStart() const {
+  return !accepting_frames_ && quiescent();
+}
+
 PipelineSnapshot PacketBufferPipeline::snapshot() const {
   PipelineSnapshot result{};
   result.sources = source_counters_;
@@ -361,6 +382,8 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.transmit_queue_high_water = transmit_queue_high_water_;
   result.buffers_owned_high_water = buffers_owned_high_water_;
   result.accepting_frames = accepting_frames_;
+  result.drain_pending = !quiescent();
+  result.ready_for_start = readyForStart();
   return result;
 }
 

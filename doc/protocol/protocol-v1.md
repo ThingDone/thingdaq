@@ -174,6 +174,12 @@ START is an epoch boundary: sequence zero from an older run is never accepted
 as sequence zero of the new run. The current Python facade enforces this rule
 when queuing active-run blocks; the background reader must preserve it.
 
+Firmware may continue draining complete frames from a stopped run before a new
+epoch is armed. A START received during that bounded drain returns `BUSY` and
+does not allocate a run ID, reset statistics, or change CONFIGURED state. A
+successful START response is emitted only after the prior drain is quiescent
+and the new packet/source epoch has been armed; no old-run data may follow it.
+
 ADC and GPIO have independent unsigned 32-bit frame sequences. A sequence is
 assigned when a source frame is produced, before it can be dropped by the
 transmit queue. The receiver computes the next value modulo \(2^{32}\), so
@@ -402,6 +408,14 @@ It disables acquisition if necessary, discards pending configuration, and
 returns to IDLE. Its eight-byte success payload is the common prefix followed
 by state `IDLE` and three reserved zero bytes. The response header retains the
 stopped/most recent run ID (or zero if no run has started).
+
+Disabling acquisition prevents new frame production immediately. Incomplete
+producer-owned work is canceled; already complete ready or transport-owned
+frames drain without interleaving or abandoning a partial frame. A caller may
+CONFIGURE while this finite drain completes, but START is subject to the BUSY
+rule above. STOP_RESPONSE retains normal response priority at the next frame
+boundary, so drained old-run data may follow STOP_RESPONSE; it must precede any
+later successful START_RESPONSE on the CDC byte stream.
 
 ### RESET_STATS
 

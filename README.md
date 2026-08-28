@@ -114,9 +114,12 @@ from the still-unavailable physical path.
 The Teensy USB layer retains PJRC's USB Serial VID/PID and chip-derived serial
 number while overriding only the weak product string with `Teensy DAQ`. Boot
 does not wait for a host or emit an unframed banner. Its portable CDC transport
-uses fixed command/response queues, bounded byte and call budgets, exact
-partial-write continuation, response-first frame scheduling, and exposed
-queue/stall diagnostics.
+uses fixed command/response queues, bounded byte and call budgets, 2,048-byte
+maximum write requests, 512-byte minimum capacity admission, exact
+partial/zero-write continuation, response-first frame scheduling, and exposed
+request/queue/stall diagnostics. Short data tails and complete control frames
+remain atomic admission units; an unexpectedly short backend result is retained
+and resumed rather than abandoned.
 
 Phase 04 supplies deterministic ADC-pair and GPIO-byte sources through the
 same allocation-free packet path used by later physical acquisition. ADC0 and
@@ -137,6 +140,16 @@ emitted, transmitted, and dropped frame/item counts. Fixed protocol-v1 STATUS
 projects transport-admitted frames and dropped items alongside the applied
 synthetic source.
 
+STOP disables production immediately, cancels only an incomplete producer-owned
+fill, and drains every already complete ready or transport-owned frame. A new
+START returns typed `BUSY` while that bounded drain remains, without allocating
+a run ID or resetting an epoch. Once quiescent, the runtime resets every queue
+deterministically, arms the packet/source epoch, and only then admits the
+successful START response. Consequently no prior-run data can follow an
+acknowledged new START. The STOP response itself still wins at the next frame
+boundary, so remaining old-run complete frames may follow STOP, but they are
+always serialized before any later successful START response.
+
 The DTCM placement follows a reinspection of pinned Teensy core 1.62.0: USB
 Serial copies writes into its own four 2,048-byte aligned `DMAMEM` buffers and
 flushes those buffers before DMA. The 16 application frames cover about 8.1 ms
@@ -151,9 +164,10 @@ polled 8 MHz clock, deterministic source, and packet pipeline. The thin sketch
 constructs the Teensy CDC/clock adapters and aligned packet storage before the
 runtime, binds INFO to the core-derived hardware serial during bounded BOOT,
 and makes one cooperative service call per loop. Each call performs bounded
-receive work, dispatches at most one command, consumes compact START/STOP
-events, generates at most four due synthetic frames, promotes bounded ready
-frames, and performs bounded transmit work. No pacing ISR is installed.
+receive work, dispatches at most one command, applies compact START/STOP events
+before admitting their successful responses, generates at most four due
+synthetic frames, promotes bounded ready frames, and performs bounded transmit
+work. No pacing ISR is installed.
 Expected typed command errors are
 state-atomic; an internal response-path failure emits an INTERNAL_ERROR when
 possible, releases its queue reservation, and fails safe to IDLE. INFO exposes

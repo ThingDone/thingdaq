@@ -60,7 +60,8 @@ bool ControlState::recoverToIdle() {
 }
 
 DispatchResult ControlState::dispatch(const protocol::Request &request,
-                                      protocol::ControlFrame &response) {
+                                      protocol::ControlFrame &response,
+                                      DispatchReadiness readiness) {
   response.clear();
   if (state_ == protocol_v1::DeviceState::kBoot) {
     return {DispatchStatus::kNoResponse,
@@ -112,6 +113,9 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
           !has_configuration_) {
         return reject(request, protocol_v1::ErrorCode::kInvalidState,
                       response);
+      }
+      if (!readiness.start_ready) {
+        return reject(request, protocol_v1::ErrorCode::kBusy, response);
       }
       const std::uint32_t next_run = nextRunId(run_id_);
       const protocol::Result encoding = protocol::encodeStartResponse(

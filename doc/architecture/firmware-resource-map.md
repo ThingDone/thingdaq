@@ -118,6 +118,8 @@ use an unconstrained first-free allocator.
 | Ready-to-transmit promotions per loop | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
 | USB transmit work per loop | 2,048 bytes | USB transport |
+| Maximum USB write request | 2,048 bytes | USB transport / one pinned core TX buffer |
+| Minimum admitted write capacity | 512 bytes, or the exact shorter frame tail/control frame | USB transport |
 | USB read calls per loop | 8 | USB transport |
 | USB write calls per loop | 8 | USB transport |
 | Pinned core TX ring (core-owned) | 4 × 2,048 bytes | Teensy USB Serial |
@@ -128,8 +130,11 @@ three possible bytes of the next magic and alignment slack. The separate
 fills. Control responses reserve the generated 1,024-byte defensive maximum
 even though current typed responses are smaller. The byte and call limits both
 bound each cooperative-loop visit, including a backend that repeatedly returns
-short or zero-length operations. These values are capacities, never
-heap-growth hints.
+short or zero-length operations. Data writes wait for one 512-byte high-speed
+USB packet of reported capacity and are offered in blocks up to the core's
+2,048-byte TX buffer; exact smaller control frames/tails are allowed, while
+unexpected prefixes remain owned for continuation. These values are capacities,
+never heap-growth hints.
 
 At the nominal combined framed rate, one 4,096-byte application buffer covers
 about 0.506 ms. The 16-frame pool therefore retains about 8.1 ms of complete
@@ -179,11 +184,13 @@ Only `FILLING` exposes the 4,048-byte payload as mutable. Finalization validates
 the exact payload count and writes the header plus checksum in place before a
 buffer can enter its source's bounded `READY` queue. Bounded alternating
 promotion transfers ownership to the transmit-index queue and makes the frame
-immutable. A new run may recycle stale `FILLING`/`READY` work but is rejected
-while any `TRANSMITTING` frame remains, so a partially emitted frame cannot be
-abandoned. Command responses are selected before unsent data at each frame
-boundary; an active data frame finishes first. Partial and zero writes retain
-both frame ownership and the byte offset for a later bounded loop visit.
+immutable. STOP cancels incomplete `FILLING` work and drains complete `READY`
+and `TRANSMITTING` frames. START returns `BUSY` until every prior-run owner is
+`FREE`; only then are queues and sequences reset, so a partially emitted frame
+cannot be abandoned and stale data cannot cross an acknowledged epoch.
+Command responses are selected before unsent data at each frame boundary; an
+active data frame finishes first. Partial and zero writes retain both frame
+ownership and the byte offset for a later bounded loop visit.
 
 ADC interleaved DMA storage will become ready only after both ADC eDMA
 completions. GPIO raw storage will become ready after its eDMA major loop, then
