@@ -242,6 +242,10 @@ Flash residency, and the two benchmark-buffer addresses and alignments.
 The complete pre-rig correctness, generated-table, package-build, pinned-image,
 resource-delta, and repeated host-timing gate is recorded in
 `doc/results/phase-05-checksum-local-gate.md`.
+The accepted candidate-isolated on-device microbenchmarks and sequential
+60-second Adler-32, CRC-32C, and CRC-32/ISO-HDLC streams are recorded in
+`doc/results/phase-05-checksum-physical-campaign.md`; checksum selection remains
+a separate fixed-policy step.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source
@@ -298,8 +302,8 @@ drop/error counters. Protocol v1 does not expose firmware queue depth, so the
 record says so explicitly and reports its fixed capacity plus the observable
 gap/drop/counter exhaustion evidence.
 
-The campaign defaults to 10 seconds per advertised candidate. The later
-hardware selection campaign sets `CHECKSUM_CAPTURE_SECONDS=60`; optional
+The campaign defaults to 10 seconds per advertised candidate. Physical
+acceptance sets `CHECKSUM_CAPTURE_SECONDS=60`; optional
 `CHECKSUM_STATUS_INTERVAL_SECONDS`, `CHECKSUM_BENCHMARK_BATCH_COUNT`, and
 `CHECKSUM_BENCHMARK_ITERATIONS_PER_BATCH` remain strictly bounded. Set
 `CHECKSUM_CAMPAIGN_ALGORITHM` to an advertised name or numeric ID to run one
@@ -313,7 +317,7 @@ formula, combines the actual 44-byte header CRC with one of 528 precomputed
 payload CRCs, and reports how many trailers used that equivalent bounded path.
 This validates every received byte and trailer without retaining stream frames
 or making the service host's Python speed part of the device result. A dedicated
-reader drains the TTY into at most eight 64 KiB chunks while validation runs;
+reader drains the TTY into at most 32 16 KiB chunks while validation runs;
 the campaign disables cyclic garbage collection, reports that queue's exact
 capacity/high water/final occupancy, and still fails on any target-side gap or
 drop instead of hiding sustained backpressure.
