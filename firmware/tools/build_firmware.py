@@ -49,7 +49,7 @@ CHECKSUM_TABLE_SYMBOLS = {
     "CRC32C": "teensy_daq::checksum::detail::kCrc32cTable",
     "CRC32_ISO_HDLC": "teensy_daq::checksum::detail::kCrc32IsoHdlcTable",
 }
-CHECKSUM_TABLE_BYTES = 4 * 256 * 4
+CHECKSUM_TABLE_BYTES = 8 * 256 * 4
 CHECKSUM_CODE_SYMBOLS = {
     "ADLER32": "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)",
     "CRC32C": "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)",
@@ -59,8 +59,8 @@ CHECKSUM_CODE_SYMBOLS = {
 }
 CHECKSUM_CODE_BYTES = {
     "ADLER32": 120,
-    "CRC32C": 116,
-    "CRC32_ISO_HDLC": 116,
+    "CRC32C": 260,
+    "CRC32_ISO_HDLC": 260,
 }
 CHECKSUM_DISPATCH_SYMBOL = (
     "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, "
@@ -488,7 +488,7 @@ def checksum_resource_usage(nm_output: str) -> dict[str, Any]:
             )
         algorithms[algorithm] = {
             **algorithms[algorithm],
-            "implementation": "four-slice, 4 x 256-entry uint32 lookup table",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
             "symbol": symbol,
             "symbol_type": symbol_type,
             "address": f"0x{address:08x}",

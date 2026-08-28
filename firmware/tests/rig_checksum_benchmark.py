@@ -1344,7 +1344,7 @@ def decode_benchmark_measurement(
     )
     operations = selection.operations
     expected_table_bytes = (
-        0 if selection.checksum_algorithm == CHECKSUM_ADLER32 else 4_096
+        0 if selection.checksum_algorithm == CHECKSUM_ADLER32 else 8_192
     )
     calibrated_overhead = operations * measurement.timer_overhead_cycles
     expected_digest = expected_benchmark_digest(

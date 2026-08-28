@@ -348,7 +348,7 @@ class ChecksumBenchmarkResult:
         expected_table_bytes = (
             0
             if self.request.checksum_algorithm is constants.ChecksumAlgorithm.ADLER32
-            else 4096
+            else 8192
         )
         calibrated_overhead = self.request.operations * self.timer_overhead_cycles
         if (

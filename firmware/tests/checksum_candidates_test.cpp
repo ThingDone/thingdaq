@@ -44,13 +44,13 @@ void testParametersAndCanonicalVectors() {
                 0xEDB88320U);
   static_assert(candidate::kCrc32Initial == 0xFFFFFFFFU);
   static_assert(candidate::kCrc32FinalXor == 0xFFFFFFFFU);
-  static_assert(candidate::kCrcTableSlices == 4U);
-  static_assert(candidate::kCrcTableBytes == 4096U);
+  static_assert(candidate::kCrcTableSlices == 8U);
+  static_assert(candidate::kCrcTableBytes == 8192U);
   static_assert(candidate::tableBytes(candidate::Algorithm::kAdler32) == 0U);
   static_assert(candidate::tableBytes(candidate::Algorithm::kCrc32c) ==
-                4096U);
+                8192U);
   static_assert(
-      candidate::tableBytes(candidate::Algorithm::kCrc32IsoHdlc) == 4096U);
+      candidate::tableBytes(candidate::Algorithm::kCrc32IsoHdlc) == 8192U);
 
   expect(candidate::adler32(nullptr, 0U) == 0x00000001U,
          "empty Adler-32");

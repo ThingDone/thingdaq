@@ -22,7 +22,7 @@ inline constexpr std::uint32_t kCrc32cReflectedPolynomial = 0x82F63B78U;
 inline constexpr std::uint32_t kCrc32IsoHdlcPolynomial = 0x04C11DB7U;
 inline constexpr std::uint32_t kCrc32IsoHdlcReflectedPolynomial =
     0xEDB88320U;
-inline constexpr std::size_t kCrcTableSlices = 4U;
+inline constexpr std::size_t kCrcTableSlices = 8U;
 inline constexpr std::size_t kCrcTableEntries = 256U;
 inline constexpr std::size_t kCrcTableBytes =
     kCrcTableSlices * kCrcTableEntries * sizeof(std::uint32_t);
@@ -31,8 +31,8 @@ inline constexpr std::size_t kCrcTableBytes =
 // They deliberately exclude the shared narrow dispatch body and the separately
 // reported lookup table so a benchmark result never conflates code and data.
 inline constexpr std::size_t kAdler32CodeBytes = 120U;
-inline constexpr std::size_t kCrc32cCodeBytes = 116U;
-inline constexpr std::size_t kCrc32IsoHdlcCodeBytes = 116U;
+inline constexpr std::size_t kCrc32cCodeBytes = 260U;
+inline constexpr std::size_t kCrc32IsoHdlcCodeBytes = 260U;
 
 // Callers must pass a non-null pointer for nonempty input. A null pointer is
 // valid for the canonical empty input.

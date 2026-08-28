@@ -4,6 +4,13 @@
 
 #include "checksum.h"
 
+#if defined(__IMXRT1062__)
+#define TEENSY_DAQ_PROTOCOL_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define TEENSY_DAQ_PROTOCOL_COLD_CODE(section_name)
+#endif
+
 namespace teensy_daq::protocol {
 namespace {
 
@@ -755,7 +762,8 @@ Result validateChecksumBenchmarkResponse(ByteView payload) {
       break;
     case protocol_v1::ChecksumAlgorithm::kCrc32c:
     case protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc:
-      expected_table_bytes = 4096U;
+      expected_table_bytes =
+          static_cast<std::uint32_t>(checksum::kCrcTableBytes);
       break;
     case protocol_v1::ChecksumAlgorithm::kNoneReserved:
       return badPayload();
@@ -1581,6 +1589,10 @@ Result encodePingResponse(const Request &request, std::uint32_t run_id,
       view(payload), output);
 }
 
+// Encoding this diagnostics-only response is not part of the measured loop or
+// the streaming hot path. Keep it in program Flash so adding a faster CRC does
+// not force another 32 KiB ITCM allocation block out of RAM1.
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.checksum_benchmark_response")
 Result encodeChecksumBenchmarkResponse(
     const Request &request, std::uint32_t run_id,
     const ChecksumBenchmarkResponse &response, ControlFrame &output) {
@@ -1912,3 +1924,5 @@ void IncrementalCommandParser::updateHighWater() {
 }
 
 }  // namespace teensy_daq::protocol
+
+#undef TEENSY_DAQ_PROTOCOL_COLD_CODE

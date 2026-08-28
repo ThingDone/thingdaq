@@ -307,7 +307,7 @@ hardware selection campaign sets `CHECKSUM_CAPTURE_SECONDS=60`; optional
 candidate in an isolated job; omitting it retains the all-candidates sequential
 campaign. As with the other rig programs, `EXPECTED_BUILD_ID` and
 `EXPECTED_HARDWARE_SERIAL` can pin the exact artifact and board. The
-network-disabled rig retains a bounded slicing-by-four CRC-32C implementation
+network-disabled rig retains a bounded slicing-by-eight CRC-32C implementation
 for arbitrary data and all independent vectors. During the fixed synthetic
 campaign it additionally proves each payload against the complete source
 formula, combines the actual 44-byte header CRC with one of 528 precomputed

@@ -53,6 +53,23 @@ template <const ReflectedCrcTable &Table>
 __attribute__((always_inline)) inline
 std::uint32_t reflectedCrc32(const std::uint8_t *data, std::size_t size) {
   std::uint32_t remainder = kCrc32Initial;
+  while (size >= 2U * sizeof(std::uint32_t)) {
+    std::uint32_t first_word = 0U;
+    std::uint32_t second_word = 0U;
+    std::memcpy(&first_word, data, sizeof(first_word));
+    std::memcpy(&second_word, data + sizeof(first_word), sizeof(second_word));
+    remainder ^= first_word;
+    remainder = Table[7][remainder & 0xFFU] ^
+                Table[6][(remainder >> 8U) & 0xFFU] ^
+                Table[5][(remainder >> 16U) & 0xFFU] ^
+                Table[4][remainder >> 24U] ^
+                Table[3][second_word & 0xFFU] ^
+                Table[2][(second_word >> 8U) & 0xFFU] ^
+                Table[1][(second_word >> 16U) & 0xFFU] ^
+                Table[0][second_word >> 24U];
+    data += 2U * sizeof(std::uint32_t);
+    size -= 2U * sizeof(std::uint32_t);
+  }
   while (size >= sizeof(std::uint32_t)) {
     std::uint32_t word = 0U;
     std::memcpy(&word, data, sizeof(word));
