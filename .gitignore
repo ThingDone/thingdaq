@@ -1,0 +1,61 @@
+# Local Python environments
+.venv/
+venv/
+.tox/
+.nox/
+
+# Python caches, reports, and package builds
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Arduino CLI exports and compiler artifacts
+firmware/build/
+firmware/.build/
+firmware/*.elf
+firmware/*.hex
+firmware/*.eep
+firmware/*.map
+firmware/*.lst
+firmware/*.sym
+
+# Generated captures and benchmark scratch data
+captures/
+daq_api/captures/
+benchmark-scratch/
+.benchmarks/
+doc/results/raw/
+doc/results/scratch/
+
+# Credentials and local environment configuration
+.env
+.env.*
+!.env.example
+.fw_api_key
+credentials/
+secrets/
+
+# Small deterministic test fixtures are source, even when their suffix is
+# shared with generated firmware or captures.
+!firmware/tests/fixtures/**
+!daq_api/tests/fixtures/**
+
+# Maestro playbooks and run scratch space are local operator state.
+.maestro/
+
+# Editors and operating-system metadata
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
