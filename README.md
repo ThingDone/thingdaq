@@ -238,6 +238,9 @@ trailer. The finite corruption matrix and its non-security limitations are
 recorded in `doc/results/phase-05-checksum-correctness.md`. The pinned build
 additionally inspects ELF symbols for exact checksum-body sizes, lookup-table
 Flash residency, and the two benchmark-buffer addresses and alignments.
+The complete pre-rig correctness, generated-table, package-build, pinned-image,
+resource-delta, and repeated host-timing gate is recorded in
+`doc/results/phase-05-checksum-local-gate.md`.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source

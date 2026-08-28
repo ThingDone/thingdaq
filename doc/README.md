@@ -11,6 +11,7 @@ related:
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Checksum-Candidates]]'
   - '[[Phase-05-Checksum-Correctness]]'
+  - '[[Phase-05-Checksum-Local-Gate]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[Phase-01-Synthetic-Prototype-Gate]]'
@@ -45,7 +46,9 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   [[Phase-03-Control-Plane]] control acceptance and
   [[Phase-04-Synthetic-Streaming]] full-rate synthetic-stream acceptance,
   followed by the independent [[Phase-05-Checksum-Correctness]] vector,
-  corruption, negotiation, parser-recovery, and benchmark-arithmetic evidence.
+  corruption, negotiation, parser-recovery, and benchmark-arithmetic evidence
+  and the pre-rig [[Phase-05-Checksum-Local-Gate]] correctness, build-resource,
+  and repeated host-timing result.
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`
