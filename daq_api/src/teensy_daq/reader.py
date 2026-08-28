@@ -393,6 +393,20 @@ class BackgroundReader:
         deadline = monotonic() + selected_timeout
         with self._condition:
             self._require_live_locked()
+            if not self._blocks and self._stream_active:
+                request_stream_frame = getattr(
+                    self._transport,
+                    "request_stream_frame",
+                    None,
+                )
+                if callable(request_stream_frame):
+                    try:
+                        request_stream_frame()
+                    except TransportError as error:
+                        raise DeviceDisconnectedError(
+                            "simulated stream request failed",
+                            error,
+                        ) from error
             while not self._blocks:
                 if self._terminal_error is not None:
                     raise self._terminal_error

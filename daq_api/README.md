@@ -10,6 +10,8 @@ tags:
 related:
   - '[[System-Overview]]'
   - '[[Foundation-Reuse-Inventory]]'
+  - '[[Protocol-V1]]'
+  - '[[ADR-001-Wire-Protocol]]'
 ---
 
 # Teensy DAQ Python package
@@ -31,35 +33,85 @@ Choose and review public distribution metadata before publishing anything.
 See [[System-Overview]] for the package boundary and
 [[Foundation-Reuse-Inventory]] for the implementation-pattern audit.
 
-## Offline simulator API
+## Synchronous public and simulator API
 
 The synchronous `TeensyDAQ` facade operates on a small `ByteTransport`
 interface. `InMemoryTransport` connects that facade to `SimulatedDevice`
 through encoded protocol-v1 bytes, including arbitrary partial read/write
 boundaries. `SerialTransport` implements the same interface over PySerial, so
-command and streaming code does not depend on the concrete byte source:
+command and streaming code does not depend on the concrete byte source. The
+facade itself always starts one `BackgroundReader`; the simulator does not use
+a second command decoder or direct-read shortcut:
 
 ```python
-from teensy_daq import AdcBlock, TeensyDAQ
+from teensy_daq import ADCBlock, StreamGap, TeensyDAQ
 
 with TeensyDAQ.simulated(read_chunk_size=47) as daq:
     info = daq.info()
     applied = daq.configure(adc=True, gpio=True)
     run_id = daq.start()
 
-    for block in daq.blocks(4):
-        if isinstance(block, AdcBlock):
-            print(run_id, block.sequence, block.pair(0))
+    for item in daq.blocks(4):  # four data blocks, plus any gap events
+        if isinstance(item, StreamGap):
+            print("loss", item.origin, item.missing_items)
+        elif isinstance(item, ADCBlock):
+            print(run_id, item.sequence, item.pair(0))
 
     final = daq.status()
     daq.stop()
+    generation = daq.reset_stats()  # valid after STOP, or while CONFIGURED
+```
+
+`DeviceInfo`, `DeviceCapabilities`, `DAQConfiguration`, `Status`, `ADCBlock`,
+`GPIOBlock`, `StreamGap`, `FirmwareCounters`, `HostCounters`, and
+`LossCounters` validate their values when constructed. The Phase 01 names
+`Info`, `Configuration`, `AdcBlock`, and `GpioBlock` remain aliases. INFO,
+GET_STATUS, and STOP are legal in every post-boot state; CONFIGURE and
+RESET_STATS are limited to IDLE/CONFIGURED; START requires CONFIGURED; and
+block reads require the RUNNING epoch established by this facade.
+
+For hardware, pass a discovery result or select a stable serial directly. A
+selected port is INFO-probed again so hot re-enumeration cannot silently open a
+different unit:
+
+```python
+from teensy_daq import TeensyDAQ, discover
+
+devices = discover(timeout=0.2)
+with TeensyDAQ.open(devices[0]) as daq:
+    print(daq.device_info.hardware_serial)
+
+with TeensyDAQ.open(hardware_serial=12345670) as daq:
+    print(daq.device_info.build_id)
 ```
 
 The simulator advertises only the deterministic synthetic source. Each
 successful START allocates a new run ID, resets both stream epochs and
 counters, and produces ADC then GPIO frames in a repeatable round-robin order
 when both streams are enabled. INFO and STOP are idempotent; closing the facade
-stops an active run before closing its transport.
+stops an active run before closing its transport. Simulator data production is
+demand-driven so offline frame counts remain deterministic under a background
+thread; every command, response, and data frame still crosses the shared wire,
+parser, decoder, and reader path.
+
+## Stream data and loss policy
+
+ADC blocks always retain separate `adc0`/A0 and `adc1`/A1 lazy channel views.
+`interleave_adc(block)` is the explicit operation that emits timestamped
+samples in ADC0, ADC1 order while retaining each sample's converter identity.
+GPIO payloads remain packed, and `block.channel(pin)` lazily extracts D6-D13
+without an eager eightfold Boolean expansion. Neither operation requires
+NumPy.
+
+Production mode is the default. A sequence, timestamp, or firmware-flagged
+discontinuity causes `blocks()` to emit `StreamGap` immediately before the
+current data block and then continue. `strict=True` instead raises
+`UnexpectedStreamGapError`, with both the gap and current block attached.
+`StreamGap.origin` never infers firmware loss from a host queue eviction:
+firmware `GAP_BEFORE`/`OVERRUN_BEFORE`, host queue-drop attribution, and an
+otherwise observed discontinuity remain separate. `loss_counters()` combines
+an explicit `FirmwareCounters` and `HostCounters` snapshot without adding the
+two domains together.
 
 ## Production transport and background reader
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from threading import Event, Lock, RLock, Thread
+from time import monotonic
 from types import TracebackType
 from typing import Literal, Protocol, cast, runtime_checkable
 
@@ -456,6 +457,8 @@ class InMemoryTransport:
         read_chunk_size: int | None = None,
         write_chunk_size: int | None = None,
         max_pending_bytes: int = 64 * 1024,
+        stream_interval: float | None = None,
+        demand_driven: bool = True,
     ) -> None:
         if read_chunk_size is not None and read_chunk_size <= 0:
             raise ValueError("read_chunk_size must be positive")
@@ -464,11 +467,25 @@ class InMemoryTransport:
         minimum_pending = constants.DATA_FRAME_BYTES + constants.MAX_CONTROL_FRAME_BYTES
         if max_pending_bytes < minimum_pending:
             raise ValueError(f"max_pending_bytes must be at least {minimum_pending}")
+        if stream_interval is not None and (
+            not isinstance(stream_interval, (int, float))
+            or isinstance(stream_interval, bool)
+            or stream_interval <= 0
+        ):
+            raise ValueError("stream_interval must be positive or None")
+        if not isinstance(demand_driven, bool):
+            raise TypeError("demand_driven must be a boolean")
 
         self.device = device if device is not None else SimulatedDevice()
         self._read_chunk_size = read_chunk_size
         self._write_chunk_size = write_chunk_size
         self._max_pending_bytes = max_pending_bytes
+        self._stream_interval = (
+            None if stream_interval is None else float(stream_interval)
+        )
+        self._demand_driven = demand_driven
+        self._stream_credits = 0
+        self._next_stream_at = monotonic()
         self._pending = bytearray()
         self._is_open = True
         self._lock = RLock()
@@ -497,7 +514,11 @@ class InMemoryTransport:
                 accepted = min(len(view), self.device.max_receive_bytes)
                 if self._write_chunk_size is not None:
                     accepted = min(accepted, self._write_chunk_size)
+                previous_state = self.device.state
                 responses = self.device.receive(view[:accepted])
+                if self.device.state is not previous_state:
+                    self._stream_credits = 0
+                    self._next_stream_at = monotonic()
                 response_bytes = sum(len(response) for response in responses)
                 if len(self._pending) + response_bytes > self._max_pending_bytes:
                     self.device.record_transport_error()
@@ -516,9 +537,18 @@ class InMemoryTransport:
             if size <= 0:
                 raise ValueError("read size must be positive")
             if not self._pending:
+                if self._demand_driven and self._stream_credits == 0:
+                    return b""
+                now = monotonic()
+                if self._stream_interval is not None and now < self._next_stream_at:
+                    return b""
                 data_frame = self.device.next_data_frame()
                 if data_frame is not None:
                     self._pending.extend(data_frame)
+                    if self._demand_driven:
+                        self._stream_credits -= 1
+                    if self._stream_interval is not None:
+                        self._next_stream_at = now + self._stream_interval
             if not self._pending:
                 return b""
 
@@ -528,6 +558,20 @@ class InMemoryTransport:
             chunk = bytes(self._pending[:returned])
             del self._pending[:returned]
             return chunk
+
+    def request_stream_frame(self) -> None:
+        """Grant one simulator frame credit to a waiting public consumer.
+
+        Real serial devices stream independently. The deterministic simulator
+        instead produces one frame per host block request so background
+        prefetch cannot make offline assertions depend on thread scheduling.
+        Command and response bytes still traverse the exact same reader path.
+        """
+
+        with self._lock:
+            self._require_open()
+            if self._demand_driven:
+                self._stream_credits += 1
 
     def flush(self) -> None:
         """Complete immediately because writes synchronously reach the simulator."""
@@ -542,6 +586,7 @@ class InMemoryTransport:
             if self._is_open:
                 self._is_open = False
                 self._pending.clear()
+                self._stream_credits = 0
 
     def _require_open(self) -> None:
         if not self._is_open:

@@ -103,13 +103,20 @@ python3 tools/generate_protocol.py
 python3 tools/generate_protocol.py --check
 ```
 
-## Offline synthetic prototype
+## Synchronous Python API and offline simulator
 
-After installing `daq_api`, run the complete INFO→CONFIGURE→START→STATUS→STOP
-flow without a Teensy, serial port, or credentials. The demo validates every
-ADC/GPIO sample, stream timestamp, sequence, and counter before printing
-`PASS`; any mismatch exits nonzero. Frame count is per stream, and parser chunk
-size deliberately exercises arbitrary byte boundaries:
+The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→RESET_STATS→STOP
+through the same background reader for serial hardware and the in-memory
+simulator. Its typed models preserve raw ADC converter identity and packed GPIO
+data; production iterators emit visible `StreamGap` events, strict mode raises
+on any gap, and firmware versus host queue-loss counters remain separate.
+NumPy is not required.
+
+After installing `daq_api`, run the complete synthetic flow without a Teensy,
+serial port, or credentials. The demo validates every ADC/GPIO sample, stream
+timestamp, sequence, and counter before printing `PASS`; any mismatch exits
+nonzero. Frame count is per stream, and parser chunk size deliberately
+exercises arbitrary byte boundaries:
 
 ```bash
 .venv/bin/python -m teensy_daq.demo --frame-count 2 --parser-chunk-size 17
