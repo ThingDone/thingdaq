@@ -86,6 +86,33 @@ gaps, `GAP_BEFORE`/`OVERRUN_BEFORE` flags, or the firmware counters returned by
 GET_STATUS. `stale_blocks_discarded` separately records blocks rejected because
 their run ID is not the active START epoch.
 
+## Metadata-first device discovery
+
+Discovery never opens unrelated serial ports. `enumerate_candidates()` uses
+PySerial metadata only, filters for the Teensy USB Serial VID/PID
+`0x16C0:0x0483`, preserves the port path, USB serial, product, manufacturer,
+location, interface, and description, and orders the exact `Teensy DAQ`
+product string first. Matching VID/PID entries with missing, default, or cached
+product strings remain candidates so platform metadata quirks do not hide a
+DAQ.
+
+`discover(timeout=0.2)` opens only those candidates and performs one bounded,
+state-preserving INFO request through `SerialTransport` and
+`BackgroundReader`. Busy, access-denied, disconnected, timed-out, stale, and
+incompatible candidates are omitted independently; every valid device is
+returned with both its USB metadata and decoded `Info`. Each call enumerates
+again, and `DeviceIdentity` plus `select_device()` use the hardware serial
+rather than treating a COM number or `/dev` path as persistent identity:
+
+```python
+from teensy_daq import discover, enumerate_candidates, select_device
+
+candidates = enumerate_candidates()  # metadata only; opens nothing
+devices = discover(timeout=0.2)
+daq_port = select_device(devices, hardware_serial=12345670)
+print(daq_port.port, daq_port.info.firmware_version)
+```
+
 ## Executable offline demo
 
 Both entry points below run the same bounded synthetic acquisition. They print

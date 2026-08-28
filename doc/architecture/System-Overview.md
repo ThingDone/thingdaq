@@ -29,9 +29,13 @@ synchronous `TeensyDAQ` facade over a minimal `ByteTransport` interface.
 including partial reads and writes. `SerialTransport` implements bounded
 PySerial I/O at the same boundary, while `BackgroundReader` owns incremental
 parsing, concurrent request-ID correlation, and bounded decoded block/event
-queues. Its host queue-drop counters remain distinct from firmware loss. These
-layers can be swapped without changing INFO, CONFIGURE, START, GET_STATUS,
-STOP, RESET_STATS, optional PING, or block-streaming calls.
+queues. Metadata-first discovery filters PySerial enumeration for the Teensy
+USB Serial VID/PID before opening anything, then validates plausible devices
+with a bounded INFO request. Discovery identity comes from the hardware serial,
+not the transient COM or `/dev` endpoint, and one inaccessible candidate cannot
+abort the rest of a scan. Reader host queue-drop counters remain distinct from
+firmware loss. These layers can be swapped without changing INFO, CONFIGURE,
+START, GET_STATUS, STOP, RESET_STATS, optional PING, or block-streaming calls.
 
 The simulator provides the runnable host-side acquisition model: bounded
 BOOT-to-IDLE startup; IDLE, CONFIGURED, and RUNNING transitions; monotonically
