@@ -14,6 +14,7 @@ related:
   - '[[Phase-01-Synthetic-Prototype-Gate]]'
   - '[[Phase-02-Protocol-Python-Gate]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
+  - '[[Phase-03-Control-Plane]]'
 ---
 
 # Teensy DAQ documentation
@@ -35,7 +36,8 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
   including [[Phase-01-Synthetic-Prototype-Gate]] and
   [[Phase-02-Protocol-Python-Gate]], followed by the compile-only
-  [[Phase-03-Firmware-Local-Gate]].
+  [[Phase-03-Firmware-Local-Gate]] and physical
+  [[Phase-03-Control-Plane]] rig acceptance.
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`
