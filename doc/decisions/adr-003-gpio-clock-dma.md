@@ -26,8 +26,9 @@ Accepted and verified on the Teensy 4.0 rig. The fixed production clock route
 is 24 MHz PERCLK through PIT0, XBARA1 input 56/output 0 with **rising-edge-only**
 DMA request generation, DMAMUX source 30, and eDMA channel 2. The optional
 IDLE-only clock diagnostic is advertised. The pad remap and raw capture ring
-are now implemented behind an unadvertised target facade; batch packing and
-control-plane integration remain later Phase 06 work.
+are implemented behind an unadvertised target facade, and the cooperative batch
+packer now feeds the fixed packet queues with the normal packed GPIO layout.
+Control-plane/physical-mode integration remains later Phase 06 work.
 
 ## Context
 
@@ -35,8 +36,8 @@ Protocol v1 presents GPIO samples as one byte in D6-through-D13 order at an
 immutable production rate of 4 MHz. The i.MX RT1062 eDMA engine cannot read the
 Teensy core's fast GPIO7 alias, so acquisition must selectively return only
 those pads to the standard GPIO2 alias and copy fixed-width `GPIO2_PSR` words
-into DMA-visible storage. The later CPU packer will extract the eight sparse
-bits into the wire order defined by [[Protocol-V1]].
+into DMA-visible storage. The CPU packer extracts the eight sparse bits into the
+wire order defined by [[Protocol-V1]].
 
 The registry in `firmware/src/board_config.h` already reserved PIT0, XBAR1
 request 0, eDMA channel 2, and four raw GPIO DMA buffers. This review checked
@@ -166,6 +167,41 @@ operation, packing, framing, checksum, allocation, or USB work. A stale lease
 cannot release a reused buffer, and STOP retains complete `READY` buffers and
 valid `PACKING` leases for deterministic draining before another epoch.
 
+### Batch packing, framing, and raw diagnostics
+
+The selected hot primitive is the allocation-free
+`shift-mask-unrolled-4` batch loop. It gathers GPIO2 source bits
+`10,17,16,11,0,2,1,3` into output bits `0..7`, so every sample occupies exactly
+one wire payload byte in D6-through-D13 order. One source acquire/release
+dispatch occurs per raw batch; there is no virtual pin call, `digitalRead`, or
+per-sample interrupt. A repeatable host `-O3 -flto` microbenchmark measured
+2,481.196 MB/s of packed payload on the implementation host against the 4 MB/s
+requirement. That number selects and guards the batch implementation locally;
+the later full GPIO gate remains responsible for target DWT/CPU headroom.
+
+Four 4,064-byte-stride packed buffers in OCRAM separate short raw-lease
+ownership from packet/checksum work. They use
+`FREE -> FILLING -> READY -> FRAMING -> FREE`; complete buffers then enter the
+existing fixed packet `READY` and `TRANSMITTING` queues. The assembler follows
+canonical 4,048-sample boundaries even when raw batches split them. Each record
+stores its first absolute sample, which becomes `first_sample * 2` at the 8 MHz
+wire timebase. The packet epoch supplies run ID, independent GPIO sequence, and
+selected checksum. Raw or packed drops are inserted before the next retained
+frame, producing an exact sequence skip plus `GAP_BEFORE | OVERRUN_BEFORE` and
+timestamp evidence.
+
+Native progress exposes produced, packed, framed, transmitted, and dropped
+frames/samples plus raw-gap and packer-pressure components. Projection markers
+identify pre-packet loss already charged to a packet sequence slot; the common
+statistics model subtracts those markers from raw/packer additions so one loss
+cannot be reported twice.
+
+Raw GPIO2 words remain available only through
+`BoundedRawWordDiagnostic`, which exposes at most 256 samples from one leased
+buffer for internal troubleshooting and has no frame or transport encoder. The
+normal capabilities and GPIO wire contract continue to advertise only one
+packed byte per 4 MHz sample, never the 16 MB/s internal word stream.
+
 ## Reused patterns and boundaries
 
 - Reuse the narrow OctoWS2811 GPR-mask technique, XBAR edge/DMA-enable
@@ -231,9 +267,9 @@ capability metadata.
 - The resource assignment is deterministic and reviewable; acquisition code
   cannot silently use a first-free timer, XBAR output, or DMA channel.
 - The linked image contains 64,768 bytes of raw consumer storage, a 32-byte
-  pressure sink, and 160 bytes of TCDs in OCRAM. The overflow policy trades
-  retention—not live sampling or CPU-buffer safety—when downstream work falls
-  behind.
+  pressure sink, 160 bytes of TCDs, and 16,256 bytes of packed storage in
+  OCRAM. The overflow policies trade retention—not live sampling or buffer
+  safety—when downstream work falls behind.
 - The optional diagnostic is bounded to IDLE, never remaps D6-D13, and reports
   raw register/count evidence. Physical GPIO capability remains disabled until
-  later Phase 06 packing, integration, and streaming gates pass.
+  later Phase 06 integration and streaming gates pass.

@@ -49,6 +49,7 @@ enum class MemoryUse : std::uint8_t {
   kGpioRawDmaOverflowSink,
   kGpioRawDmaDescriptors,
   kGpioPackedRing,
+  kGpioPackerState,
   kGpioClockDiagnosticSink,
   kChecksumBenchmarkDtcmBuffer,
   kChecksumBenchmarkOcramBuffer,
@@ -210,6 +211,9 @@ inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaDescriptorCount =
     kGpioRawDmaRingDepth + 1U;
 inline constexpr std::size_t kGpioPackedRingDepth = 4U;
+inline constexpr std::size_t kGpioRawBuffersPerLoop = 2U;
+inline constexpr std::size_t kGpioPackedFramesPerLoop = 2U;
+inline constexpr std::size_t kGpioPackerStateBudgetBytes = 2048U;
 // At the nominal combined framed rate, each 4096-byte buffer represents 0.506
 // ms. Keep the proven 106-frame primary bank in cacheless DTCM, then add a
 // fixed 94-frame CPU-owned OCRAM reserve. The complete 200-frame pool retains
@@ -310,6 +314,9 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
      ResourceOwner::kGpioCapture},
     {MemoryUse::kGpioPackedRing, MemoryRegion::kOcramRam2Dma,
      kGpioPackedRingDepth * kGpioPackedBufferStrideBytes, kCacheLineBytes,
+     ResourceOwner::kGpioPacker},
+    {MemoryUse::kGpioPackerState, MemoryRegion::kDtcmRam1,
+     kGpioPackerStateBudgetBytes, kCacheLineBytes,
      ResourceOwner::kGpioPacker},
     {MemoryUse::kGpioClockDiagnosticSink, MemoryRegion::kOcramRam2Dma,
      kGpioClockDiagnosticSinkBytes, kCacheLineBytes,
@@ -538,6 +545,14 @@ static_assert(kGpioRawDmaRingDepth >= 2U,
               "continuous GPIO DMA needs active and queued destinations");
 static_assert(kGpioRawDmaDescriptorBytes % kCacheLineBytes == 0U,
               "GPIO DMA descriptors must occupy complete cache lines");
+static_assert(kGpioPackedBufferStrideBytes % kCacheLineBytes == 0U,
+              "packed GPIO buffers must occupy complete cache lines");
+static_assert(kGpioRawBuffersPerLoop > 0U &&
+                  kGpioRawBuffersPerLoop <= kGpioRawDmaRingDepth,
+              "GPIO packer input work must be nonzero and ring-bounded");
+static_assert(kGpioPackedFramesPerLoop > 0U &&
+                  kGpioPackedFramesPerLoop <= kGpioPackedRingDepth,
+              "GPIO framing work must be nonzero and ring-bounded");
 static_assert(kPacketBufferPrimaryStorageBytes +
                       kPacketBufferReserveStorageBytes ==
                   kPacketBufferStorageBytes,

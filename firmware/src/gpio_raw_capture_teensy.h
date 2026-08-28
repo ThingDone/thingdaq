@@ -33,12 +33,12 @@ struct HardwareSnapshot {
 // Thin singleton facade over the fixed Teensy 4.0 register adapter. It is
 // deliberately not connected to CONFIGURE/START until the later physical-mode
 // integration task can coordinate the packer and packet epoch atomically.
-class TeensyRawCapture final {
+class TeensyRawCapture final : public RawWordSource {
  public:
   StartStatus start();
   StopReport stop();
-  AcquireResult acquireReady();
-  OperationStatus release(const BufferHandle &handle);
+  AcquireResult acquireReady() override;
+  OperationStatus release(const BufferHandle &handle) override;
   HardwareSnapshot snapshot();
 };
 

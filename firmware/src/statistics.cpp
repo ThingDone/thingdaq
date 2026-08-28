@@ -2,6 +2,13 @@
 
 #include <limits>
 
+#if defined(__IMXRT1062__)
+#define TEENSY_DAQ_STATISTICS_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define TEENSY_DAQ_STATISTICS_COLD_CODE(section_name)
+#endif
+
 namespace teensy_daq::stats {
 namespace {
 
@@ -15,6 +22,11 @@ template <typename Integer>
 Integer saturatingSum(Integer left, Integer right) {
   const Integer maximum = std::numeric_limits<Integer>::max();
   return right > maximum - left ? maximum : left + right;
+}
+
+template <typename Integer>
+Integer subtractFloor(Integer value, Integer amount) {
+  return amount >= value ? Integer{0U} : value - amount;
 }
 
 }  // namespace
@@ -89,12 +101,25 @@ void Statistics::publishGpioRawCapture(
   refreshDataProjection();
 }
 
-void Statistics::refreshDataProjection() {
-  counters_.gpio_items_dropped = saturatingSum(
-      counters_.data_path.gpio.items_dropped,
-      counters_.gpio_raw_capture.samples_lost);
+void Statistics::publishGpioPacker(const GpioPackerProgress &progress) {
+  counters_.gpio_packer = progress;
+  refreshDataProjection();
 }
 
+void Statistics::refreshDataProjection() {
+  const std::uint64_t unprojected_raw_loss = subtractFloor(
+      counters_.gpio_raw_capture.samples_lost,
+      counters_.gpio_packer.raw_drop_samples_projected);
+  const std::uint64_t unprojected_packer_loss = subtractFloor(
+      counters_.gpio_packer.packer_drop_samples,
+      counters_.gpio_packer.packer_drop_samples_projected);
+  counters_.gpio_items_dropped = saturatingSum(
+      saturatingSum(counters_.data_path.gpio.items_dropped,
+                    unprojected_raw_loss),
+      unprojected_packer_loss);
+}
+
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.wire_status")
 protocol::StatusResponse Statistics::wireStatus(
     protocol_v1::DeviceState state,
     const protocol::Configuration &configuration) const {
@@ -112,3 +137,5 @@ protocol::StatusResponse Statistics::wireStatus(
 }
 
 }  // namespace teensy_daq::stats
+
+#undef TEENSY_DAQ_STATISTICS_COLD_CODE

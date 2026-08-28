@@ -69,8 +69,8 @@ identity, source-input Git state, reproducible UTC timestamp policy, Flash/RAM
 usage, command, and SHA-256 hashes in a gitignored build manifest. The exported
 artifacts include the HEX, ELF, and linker map needed for pre-upload review;
 ELF inspection also proves the packet banks, checksum buffers/tables, GPIO
-clock diagnostic cache line, and raw GPIO ring/sink/TCD bank occupy their
-claimed regions:
+clock diagnostic cache line, raw GPIO ring/sink/TCD bank, and packed GPIO ring
+occupy their claimed regions:
 
 ```bash
 python3 firmware/tools/build_firmware.py
@@ -150,10 +150,16 @@ copy fixed 32-bit `GPIO2_PSR` samples into four aligned 4,048-word OCRAM
 buffers. Scatter/gather completion interrupts occur once per buffer, not at
 4 MHz. Explicit `FREE → DMA_QUEUED → DMA_ACTIVE → READY → PACKING →
 RELEASING` ownership and centralized cache deletion/invalidation prevent DMA
-from touching CPU-owned data. When downstream work fills the ring, eDMA keeps
-sampling into a one-cache-line sink and reports each lost sample through the
-shared statistics model. Hardware-source CONFIGURE remains disabled until the
-packer and physical-mode integration tasks complete.
+from touching CPU-owned data. The cooperative batch packer gathers GPIO2 bits
+10, 17, 16, 11, 0, 2, 1, and 3 into wire bits 0-7, assembles arbitrary raw
+boundaries into 4,048-byte frames, releases raw leases promptly, and stages
+four complete packed buffers before the existing fixed packet ready/transmit
+queues apply run, sequence, first-sample timestamp, gap flags, and the selected
+checksum. When either raw or packed storage fills, acquisition remains live and
+the exact loss is projected once into shared statistics. Raw 32-bit words are
+available only through an explicitly bounded 256-sample internal diagnostic;
+there is no raw-word wire encoder or capability. Hardware-source CONFIGURE
+remains disabled until the physical-mode integration task completes.
 
 The Python codec uses exact standard-library C implementations for Adler-32
 and CRC-32/ISO-HDLC and a bounded table-driven fallback for CRC-32C. Its
@@ -295,6 +301,16 @@ boundaries, exact raw losses combine with later packet drops without overflow,
 and the selective GPR27/GDIR helper cannot modify unrelated bits. The pinned
 build separately verifies the four-buffer ring, one-line sink, and five TCDs
 are exact, 32-byte-aligned OCRAM allocations.
+
+The GPIO batch-packer test exhausts all 256 packed values, unrelated GPIO2-bit
+noise, raw batches split across frame boundaries, exact two-tick timestamps,
+selected checksums, sequence/gap projection, packed-ring pressure, and
+produced/packed/framed/transmitted/dropped reconciliation. Its repeatable host
+microbenchmark measures the selected allocation-free, four-sample-unrolled
+shift/mask loop; one local run sustained 2,481.196 MB/s of packed payload versus
+the 4 MB/s production requirement. This host observation is not a substitute
+for the later target CPU/queue gate. The pinned build link-verifies the four
+4,064-byte-stride packed buffers in OCRAM.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source

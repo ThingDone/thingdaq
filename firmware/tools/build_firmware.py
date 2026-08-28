@@ -34,7 +34,7 @@ OUTPUT_DIRECTORY = (
     SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 8
+MANIFEST_SCHEMA_VERSION = 9
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
@@ -115,6 +115,9 @@ GPIO_RAW_DMA_BUFFER_SYMBOLS = {
     ),
 }
 GPIO_RAW_DMA_BUFFER_ALIGNMENT = 32
+GPIO_PACKED_BUFFER_SYMBOL = "teensy_daq::gpio_packer::g_gpio_packed_buffers"
+GPIO_PACKED_BUFFER_BYTES = 4 * 4064
+GPIO_PACKED_BUFFER_ALIGNMENT = 32
 OCRAM_START = 0x20200000
 OCRAM_END = 0x20280000
 MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES = 32 * 1024
@@ -716,6 +719,41 @@ def gpio_raw_dma_buffer_usage(nm_output: str) -> dict[str, Any]:
     }
 
 
+def gpio_packed_buffer_usage(nm_output: str) -> dict[str, Any]:
+    """Verify the fixed CPU-owned packed GPIO ring is aligned in OCRAM."""
+
+    symbols = parse_nm_symbols(nm_output)
+    record = symbols.get(GPIO_PACKED_BUFFER_SYMBOL)
+    if record is None:
+        raise BuildError(
+            f"firmware ELF is missing packed GPIO ring {GPIO_PACKED_BUFFER_SYMBOL}"
+        )
+    address, size, symbol_type = record
+    if size != GPIO_PACKED_BUFFER_BYTES:
+        raise BuildError(
+            f"{GPIO_PACKED_BUFFER_SYMBOL} occupies {size} bytes, "
+            f"expected {GPIO_PACKED_BUFFER_BYTES}"
+        )
+    if address % GPIO_PACKED_BUFFER_ALIGNMENT != 0:
+        raise BuildError("packed GPIO ring is not cache-line aligned")
+    if not OCRAM_START <= address or address + size > OCRAM_END:
+        raise BuildError(f"packed GPIO ring is outside OCRAM: 0x{address:08x}")
+    if symbol_type.upper() != "B":
+        raise BuildError("packed GPIO ring is not zero-initialized writable storage")
+    return {
+        "symbol": GPIO_PACKED_BUFFER_SYMBOL,
+        "symbol_type": symbol_type,
+        "address": f"0x{address:08x}",
+        "bytes": size,
+        "buffers": 4,
+        "stride_bytes": 4064,
+        "payload_bytes_per_buffer": 4048,
+        "alignment_bytes": GPIO_PACKED_BUFFER_ALIGNMENT,
+        "range_start": f"0x{OCRAM_START:08x}",
+        "range_end_exclusive": f"0x{OCRAM_END:08x}",
+    }
+
+
 def git_source_state() -> dict[str, Any]:
     """Record the Git commit and dirtiness of the exact firmware inputs."""
 
@@ -843,6 +881,7 @@ def build(arduino_cli_name: str) -> Path:
     packet_buffers = packet_buffer_usage(nm_result.stdout)
     gpio_clock_diagnostic_buffer = gpio_clock_diagnostic_buffer_usage(nm_result.stdout)
     gpio_raw_dma_buffers = gpio_raw_dma_buffer_usage(nm_result.stdout)
+    gpio_packed_buffers = gpio_packed_buffer_usage(nm_result.stdout)
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -870,6 +909,7 @@ def build(arduino_cli_name: str) -> Path:
             "packet_buffers": packet_buffers,
             "gpio_clock_diagnostic_buffer": gpio_clock_diagnostic_buffer,
             "gpio_raw_dma_buffers": gpio_raw_dma_buffers,
+            "gpio_packed_buffers": gpio_packed_buffers,
         },
         "source": {
             "source_id": identity.source_id,

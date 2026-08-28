@@ -243,6 +243,12 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   // Sequence and production counts advance before pool admission so a pool
   // drop remains visible as a sequence gap, as required by protocol v1.
   BeginFillResult beginFill(Stream stream);
+  // Acquisition owners can lose complete canonical frames before packet
+  // storage exists (for example, a GPIO raw-ring or packer overrun). Record
+  // those frames in chronological cooperative context before beginning the
+  // next retained frame so sequence and source counters preserve the gap.
+  OperationStatus recordSourceFrameDrops(Stream stream,
+                                         std::uint64_t frame_count);
   protocol::MutableByteView writablePayload(const FillHandle &handle);
   FinishFillResult finishFill(const FillHandle &handle,
                               const FrameCompletion &completion);

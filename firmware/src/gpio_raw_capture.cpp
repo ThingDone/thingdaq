@@ -29,6 +29,45 @@ constexpr bool isBufferDestination(std::uint8_t destination) {
 
 }  // namespace
 
+TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.diagnostic_acquire")
+RawWordDiagnosticAcquireResult BoundedRawWordDiagnostic::acquire(
+    std::uint32_t sample_limit) {
+  RawWordDiagnosticAcquireResult result{};
+  if (sample_limit == 0U || sample_limit > kRawWordDiagnosticMaxSamples) {
+    result.status = OperationStatus::kInvalidDiagnosticLimit;
+    return result;
+  }
+
+  const AcquireResult acquired = source_.acquireReady();
+  result.status = acquired.status;
+  if (!acquired.ok()) {
+    return result;
+  }
+  if (!acquired.handle.valid()) {
+    (void)source_.release(acquired.handle);
+    result.status = OperationStatus::kInvalidHandle;
+    return result;
+  }
+
+  result.lease.owner = acquired.handle;
+  result.lease.words = acquired.handle.words;
+  result.lease.sample_count =
+      sample_limit < acquired.handle.sample_count
+          ? sample_limit
+          : acquired.handle.sample_count;
+  result.status = OperationStatus::kOk;
+  return result;
+}
+
+TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.diagnostic_release")
+OperationStatus BoundedRawWordDiagnostic::release(
+    const RawWordDiagnosticLease &lease) {
+  if (!lease.valid()) {
+    return OperationStatus::kInvalidHandle;
+  }
+  return source_.release(lease.owner);
+}
+
 TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.prime")
 PrimeResult RawCaptureRing::prime() {
   PrimeResult result{};

@@ -30,6 +30,7 @@ enum class OperationStatus : std::uint8_t {
   kInvalidCompletion,
   kNoReadyBuffer,
   kInvalidHandle,
+  kInvalidDiagnosticLimit,
 };
 
 struct alignas(board::kCacheLineBytes) RawBuffer {
@@ -93,7 +94,8 @@ struct BufferHandle {
   constexpr bool valid() const {
     return words != nullptr &&
            buffer_index < board::kGpioRawDmaRingDepth && lease != 0U &&
-           sample_count == protocol_v1::kGpioSamplesPerFrame;
+           sample_count != 0U &&
+           sample_count <= protocol_v1::kGpioSamplesPerFrame;
   }
 };
 
@@ -102,6 +104,55 @@ struct AcquireResult {
   BufferHandle handle{};
 
   constexpr bool ok() const { return status == OperationStatus::kOk; }
+};
+
+// One virtual acquisition and release pair is permitted per completed DMA
+// batch. The GPIO packer never dispatches through this boundary per sample or
+// per pin; its hot mapping loop receives plain contiguous pointers.
+class RawWordSource {
+ public:
+  virtual ~RawWordSource() = default;
+  virtual AcquireResult acquireReady() = 0;
+  virtual OperationStatus release(const BufferHandle &handle) = 0;
+};
+
+inline constexpr std::uint32_t kRawWordDiagnosticMaxSamples = 256U;
+inline constexpr std::size_t kRawWordDiagnosticBytesPerSample =
+    sizeof(std::uint32_t);
+
+struct RawWordDiagnosticLease {
+  BufferHandle owner{};
+  const std::uint32_t *words = nullptr;
+  std::uint32_t sample_count = 0U;
+
+  constexpr bool valid() const {
+    return owner.valid() && words == owner.words && sample_count != 0U &&
+           sample_count <= owner.sample_count &&
+           sample_count <= kRawWordDiagnosticMaxSamples;
+  }
+};
+
+struct RawWordDiagnosticAcquireResult {
+  OperationStatus status = OperationStatus::kNoReadyBuffer;
+  RawWordDiagnosticLease lease{};
+
+  constexpr bool ok() const { return status == OperationStatus::kOk; }
+};
+
+// Explicitly bounded internal troubleshooting access to GPIO2_PSR words. This
+// class intentionally has no frame encoder or transport capability: the normal
+// GPIO wire layout remains one packed byte per sample, never the 16 MB/s raw
+// 32-bit format.
+class BoundedRawWordDiagnostic final {
+ public:
+  explicit constexpr BoundedRawWordDiagnostic(RawWordSource &source)
+      : source_(source) {}
+
+  RawWordDiagnosticAcquireResult acquire(std::uint32_t sample_limit);
+  OperationStatus release(const RawWordDiagnosticLease &lease);
+
+ private:
+  RawWordSource &source_;
 };
 
 struct StopReport {
@@ -129,7 +180,7 @@ struct Snapshot {
 // packer. Exactly one destination is active and one is queued ahead. When no
 // consumer buffer is FREE, future major loops use the DMA-only overflow sink;
 // READY/PACKING buffers are never selected for DMA.
-class RawCaptureRing final {
+class RawCaptureRing final : public RawWordSource {
  public:
   constexpr RawCaptureRing(RawBufferStorage &storage,
                            RawOverflowSink &overflow_sink,
@@ -145,8 +196,8 @@ class RawCaptureRing final {
 
   PrimeResult prime();
   MajorLoopResult onMajorLoopComplete();
-  AcquireResult acquireReady();
-  OperationStatus release(const BufferHandle &handle);
+  AcquireResult acquireReady() override;
+  OperationStatus release(const BufferHandle &handle) override;
 
   // The caller must first stop the hardware trigger and eDMA request. A
   // partially filled active destination is then accounted exactly; complete
@@ -211,5 +262,8 @@ static_assert(alignof(RawBufferStorage) == board::kCacheLineBytes);
 static_assert(sizeof(RawOverflowSink) ==
               board::kGpioRawDmaOverflowSinkBytes);
 static_assert(alignof(RawOverflowSink) == board::kCacheLineBytes);
+static_assert(kRawWordDiagnosticMaxSamples <
+              protocol_v1::kGpioSamplesPerFrame);
+static_assert(kRawWordDiagnosticBytesPerSample == 4U);
 
 }  // namespace teensy_daq::gpio_capture

@@ -36,7 +36,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(8, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(9, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -209,6 +209,25 @@ class BuildConfigurationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.gpio_raw_dma_buffer_usage(symbols.splitlines()[0])
+
+    def test_packed_gpio_ring_requires_exact_aligned_ocram_storage(self) -> None:
+        symbols = "2026ede0 00003f80 B teensy_daq::gpio_packer::g_gpio_packed_buffers"
+        resource = build_firmware.gpio_packed_buffer_usage(symbols)
+
+        self.assertEqual(16_256, resource["bytes"])
+        self.assertEqual(4, resource["buffers"])
+        self.assertEqual(4_064, resource["stride_bytes"])
+        self.assertEqual("0x2026ede0", resource["address"])
+        with self.assertRaisesRegex(build_firmware.BuildError, "cache-line aligned"):
+            build_firmware.gpio_packed_buffer_usage(
+                symbols.replace("2026ede0", "2026ede4")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
+            build_firmware.gpio_packed_buffer_usage(
+                symbols.replace("2026ede0", "2006ede0")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
+            build_firmware.gpio_packed_buffer_usage("")
 
     def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
         responses = [

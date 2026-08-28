@@ -42,6 +42,27 @@ struct GpioRawCaptureProgress {
   std::uint32_t hardware_errors = 0U;
 };
 
+// GPIO packing bridges raw acquisition and the common packet pipeline. The
+// projection fields identify pre-packet losses that have already consumed a
+// packet sequence/drop slot, preventing STATUS from counting the same samples
+// once as raw loss and again as a framed-source drop.
+struct GpioPackerProgress {
+  std::uint64_t frames_produced = 0U;
+  std::uint64_t samples_produced = 0U;
+  std::uint64_t frames_packed = 0U;
+  std::uint64_t samples_packed = 0U;
+  std::uint64_t frames_framed = 0U;
+  std::uint64_t samples_framed = 0U;
+  std::uint64_t frames_transmitted = 0U;
+  std::uint64_t samples_transmitted = 0U;
+  std::uint64_t frames_dropped = 0U;
+  std::uint64_t samples_dropped = 0U;
+  std::uint64_t raw_gap_samples = 0U;
+  std::uint64_t packer_drop_samples = 0U;
+  std::uint64_t raw_drop_samples_projected = 0U;
+  std::uint64_t packer_drop_samples_projected = 0U;
+};
+
 // Detailed firmware diagnostics remain available to firmware tests and future
 // transport/status extensions. Protocol v1 currently projects only the data,
 // parser, transport, and generation fields into GET_STATUS.
@@ -64,6 +85,7 @@ struct Snapshot {
   std::uint32_t generation = 1U;
   DataPathProgress data_path{};
   GpioRawCaptureProgress gpio_raw_capture{};
+  GpioPackerProgress gpio_packer{};
 };
 
 class Statistics {
@@ -103,6 +125,7 @@ class Statistics {
   // projects completed frames and dropped logical items into its fixed fields.
   void publishDataPath(const DataPathProgress &progress);
   void publishGpioRawCapture(const GpioRawCaptureProgress &progress);
+  void publishGpioPacker(const GpioPackerProgress &progress);
 
   protocol::StatusResponse wireStatus(
       protocol_v1::DeviceState state,

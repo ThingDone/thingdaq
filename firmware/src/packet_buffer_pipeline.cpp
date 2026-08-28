@@ -16,6 +16,15 @@ void saturatingIncrement(Integer &value) {
   saturatingAdd(value, Integer{1U});
 }
 
+template <typename Integer>
+Integer saturatingMultiply(Integer left, Integer right) {
+  if (left == 0U || right == 0U) {
+    return 0U;
+  }
+  const Integer maximum = std::numeric_limits<Integer>::max();
+  return left > maximum / right ? maximum : left * right;
+}
+
 }  // namespace
 
 OperationStatus PacketBufferPipeline::startRun(
@@ -127,6 +136,27 @@ BeginFillResult PacketBufferPipeline::beginFill(Stream stream) {
   result.status = OperationStatus::kOk;
   updateOwnedHighWater();
   return result;
+}
+
+OperationStatus PacketBufferPipeline::recordSourceFrameDrops(
+    Stream stream, std::uint64_t frame_count) {
+  if (!accepting_frames_ || run_id_ == 0U || !validStream(stream)) {
+    saturatingIncrement(invalid_operations_);
+    return OperationStatus::kNotRunning;
+  }
+  if (frame_count == 0U) {
+    return OperationStatus::kOk;
+  }
+
+  SourceCounters &source = source_counters_[streamIndex(stream)];
+  const std::uint64_t items = saturatingMultiply(
+      frame_count, static_cast<std::uint64_t>(itemsPerFrame(stream)));
+  saturatingAdd(source.frames_produced, frame_count);
+  saturatingAdd(source.items_produced, items);
+  saturatingAdd(source.frames_dropped, frame_count);
+  saturatingAdd(source.items_dropped, items);
+  source.next_sequence += static_cast<std::uint32_t>(frame_count);
+  return OperationStatus::kOk;
 }
 
 protocol::MutableByteView PacketBufferPipeline::writablePayload(

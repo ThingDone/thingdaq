@@ -204,12 +204,15 @@ static_assert(teensy_daq::board::kGpioMappingsByPackedBit[7].teensy_pin ==
 static_assert(teensy_daq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
 static_assert(teensy_daq::board::kGpio7ToGpio2Gpr27ClearMask ==
               teensy_daq::board::kGpio2PsrCaptureMask);
-static_assert(teensy_daq::board::kReservedRam1Bytes == 450976U);
+static_assert(teensy_daq::board::kReservedRam1Bytes == 453024U);
 static_assert(teensy_daq::board::kGpioRawDmaBufferBytes == 16192U);
 static_assert(teensy_daq::board::kGpioRawDmaRingBytes == 64768U);
 static_assert(teensy_daq::board::kGpioRawDmaOverflowSinkBytes == 32U);
 static_assert(teensy_daq::board::kGpioRawDmaDescriptorCount == 5U);
 static_assert(teensy_daq::board::kGpioRawDmaDescriptorBytes == 160U);
+static_assert(teensy_daq::board::kGpioPackedRingDepth == 4U);
+static_assert(teensy_daq::board::kGpioPackedBufferStrideBytes == 4064U);
+static_assert(teensy_daq::board::kGpioPackerStateBudgetBytes == 2048U);
 static_assert(teensy_daq::board::kReservedRam2Bytes == 486624U);
 static_assert(teensy_daq::board::kChecksumBenchmarkBufferBytes == 4096U);
 static_assert(teensy_daq::board::kGpioClockDiagnosticSinkBytes == 32U);
