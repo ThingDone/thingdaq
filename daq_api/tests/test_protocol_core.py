@@ -14,6 +14,7 @@ from teensy_daq import (
     ErrorCode,
     FrameValidationError,
     IncrementalFrameParser,
+    ParserCounters,
     compute_checksum,
     decode_frame,
     decode_message,
@@ -112,6 +113,200 @@ class ProtocolCoreTests(unittest.TestCase):
                 self.assertEqual(len(expected), parser.frames_decoded)
                 self.assertLessEqual(parser.high_water_mark, parser.max_buffered_bytes)
                 self.assertEqual(0, parser.buffered_bytes)
+
+    def test_parser_accepts_zero_and_contiguous_or_strided_bytes_like_chunks(
+        self,
+    ) -> None:
+        wire = (FIXTURE_DIRECTORY / "info-request.bin").read_bytes()
+        chunks = (wire, bytearray(wire), memoryview(wire))
+
+        for chunk in chunks:
+            with self.subTest(chunk_type=type(chunk).__name__):
+                parser = IncrementalFrameParser()
+                self.assertEqual([], parser.feed(b""))
+                decoded = parser.feed(chunk)
+
+                self.assertEqual([wire], [frame.to_bytes() for frame in decoded])
+                self.assertIsInstance(decoded[0].payload, bytes)
+                self.assertEqual(len(wire), parser.bytes_received)
+
+        interleaved = bytearray(len(wire) * 2)
+        interleaved[::2] = wire
+        strided = memoryview(interleaved)[::2]
+        try:
+            parser = IncrementalFrameParser()
+            decoded = parser.feed(strided)
+        finally:
+            strided.release()
+        self.assertEqual([wire], [frame.to_bytes() for frame in decoded])
+
+    def test_returned_payload_owns_immutable_bytes(self) -> None:
+        wire = (FIXTURE_DIRECTORY / "gpio-data.bin").read_bytes()
+        mutable_chunk = bytearray(wire)
+        parser = IncrementalFrameParser()
+
+        decoded = parser.feed(mutable_chunk)
+        mutable_chunk[:] = b"\x00" * len(mutable_chunk)
+
+        self.assertEqual([wire], [frame.to_bytes() for frame in decoded])
+        self.assertIsInstance(decoded[0].payload, bytes)
+
+    def test_magic_inside_payload_is_data_until_the_frame_checksum_fails(self) -> None:
+        embedded_at = constants.HEADER_SIZE + 257
+        wire = bytearray((FIXTURE_DIRECTORY / "gpio-data.bin").read_bytes())
+        wire[embedded_at : embedded_at + len(constants.MAGIC_BYTES)] = (
+            constants.MAGIC_BYTES
+        )
+        valid_with_embedded_magic = _with_adler32(wire)
+        parser = IncrementalFrameParser()
+
+        decoded = parser.feed(valid_with_embedded_magic[: embedded_at + 2])
+        decoded.extend(parser.feed(valid_with_embedded_magic[embedded_at + 2 :]))
+
+        self.assertEqual(
+            [valid_with_embedded_magic],
+            [frame.to_bytes() for frame in decoded],
+        )
+        self.assertEqual(0, parser.errors)
+
+        corrupt = bytearray(valid_with_embedded_magic)
+        corrupt[-1] ^= 0x01
+        following = (FIXTURE_DIRECTORY / "get-status-request.bin").read_bytes()
+        parser = IncrementalFrameParser()
+
+        decoded = parser.feed(b"leading noise" + corrupt + following)
+
+        self.assertEqual([following], [frame.to_bytes() for frame in decoded])
+        self.assertEqual(1, parser.checksum_errors)
+        self.assertGreaterEqual(parser.header_errors, 1)
+        self.assertEqual(
+            parser.corruption_events,
+            parser.header_errors + parser.checksum_errors + parser.payload_errors,
+        )
+        self.assertEqual(1, parser.resynchronizations)
+        self.assertFalse(parser.is_resynchronizing)
+
+    def test_structural_inconsistencies_are_rejected_before_body_or_checksum(
+        self,
+    ) -> None:
+        request = (FIXTURE_DIRECTORY / "info-request.bin").read_bytes()
+        adc = (FIXTURE_DIRECTORY / "adc-data.bin").read_bytes()
+        following = (FIXTURE_DIRECTORY / "get-status-request.bin").read_bytes()
+
+        def changed(
+            wire: bytes,
+            field_format: str,
+            offset: int,
+            value: int,
+        ) -> bytes:
+            candidate = bytearray(wire)
+            struct.pack_into(field_format, candidate, offset, value)
+            return bytes(candidate[: constants.HEADER_SIZE])
+
+        invalid_headers = {
+            "version": changed(
+                request,
+                "<B",
+                constants.HEADER_VERSION_OFFSET,
+                constants.PROTOCOL_VERSION + 1,
+            ),
+            "kind": changed(request, "<B", constants.HEADER_KIND_OFFSET, 0x7F),
+            "flags": changed(request, "<H", constants.HEADER_FLAGS_OFFSET, 0x4000),
+            "checksum": changed(
+                request,
+                "<B",
+                constants.HEADER_CHECKSUM_ALGORITHM_OFFSET,
+                constants.ChecksumAlgorithm.CRC32C,
+            ),
+            "declared size": changed(
+                request,
+                "<I",
+                constants.HEADER_TOTAL_LENGTH_OFFSET,
+                constants.UINT32_MAX,
+            ),
+            "length arithmetic": changed(
+                request,
+                "<I",
+                constants.HEADER_PAYLOAD_LENGTH_OFFSET,
+                1,
+            ),
+            "data count": changed(
+                adc,
+                "<I",
+                constants.HEADER_ITEM_COUNT_OFFSET,
+                constants.ADC_PAIRS_PER_FRAME - 1,
+            ),
+        }
+
+        for name, invalid_header in invalid_headers.items():
+            with self.subTest(field=name):
+                parser = IncrementalFrameParser()
+                decoded = parser.feed(invalid_header + following)
+
+                self.assertEqual([following], [frame.to_bytes() for frame in decoded])
+                self.assertEqual(1, parser.header_errors)
+                self.assertEqual(0, parser.checksum_errors)
+                self.assertEqual(0, parser.payload_errors)
+                self.assertEqual(0, parser.buffered_bytes)
+
+    def test_checksum_and_typed_payload_validation_wait_for_complete_frame(
+        self,
+    ) -> None:
+        following = (FIXTURE_DIRECTORY / "get-status-request.bin").read_bytes()
+        bad_checksum = bytearray((FIXTURE_DIRECTORY / "info-request.bin").read_bytes())
+        bad_checksum[-1] ^= 0x01
+        parser = IncrementalFrameParser()
+
+        self.assertEqual([], parser.feed(bad_checksum[:-1]))
+        self.assertEqual(0, parser.checksum_errors)
+        self.assertEqual(len(bad_checksum) - 1, parser.buffered_bytes)
+        decoded = parser.feed(bad_checksum[-1:] + following)
+
+        self.assertEqual([following], [frame.to_bytes() for frame in decoded])
+        self.assertEqual(1, parser.checksum_errors)
+
+        invalid_payload = bytearray(
+            (FIXTURE_DIRECTORY / "configure-request.bin").read_bytes()
+        )
+        invalid_payload[
+            constants.HEADER_SIZE + constants.CONFIGURE_REQUEST_RESERVED_OFFSET
+        ] = 1
+        invalid_payload = bytearray(_with_adler32(invalid_payload))
+        parser = IncrementalFrameParser()
+
+        self.assertEqual([], parser.feed(invalid_payload[:-1]))
+        self.assertEqual(0, parser.payload_errors)
+        decoded = parser.feed(invalid_payload[-1:] + following)
+
+        self.assertEqual([following], [frame.to_bytes() for frame in decoded])
+        self.assertEqual(1, parser.payload_errors)
+        self.assertEqual(0, parser.checksum_errors)
+
+    def test_dense_false_magic_stream_stays_bounded_and_reports_counters(
+        self,
+    ) -> None:
+        hostile = constants.MAGIC_BYTES * 25_000
+        following = (FIXTURE_DIRECTORY / "info-request.bin").read_bytes()
+        parser = IncrementalFrameParser()
+
+        self.assertEqual([], parser.feed(hostile))
+        decoded = parser.feed(following)
+        counters = parser.counters
+
+        self.assertEqual([following], [frame.to_bytes() for frame in decoded])
+        self.assertIsInstance(counters, ParserCounters)
+        self.assertEqual(len(hostile) + len(following), counters.bytes_received)
+        self.assertEqual(1, counters.frames_decoded)
+        self.assertEqual(counters.corruption_events, counters.header_errors)
+        self.assertGreater(counters.header_errors, 20_000)
+        self.assertEqual(1, counters.resynchronizations)
+        self.assertEqual(len(hostile), counters.bytes_discarded)
+        self.assertLessEqual(counters.high_water_mark, parser.max_buffered_bytes)
+        self.assertEqual(0, counters.buffered_bytes)
+        self.assertEqual(counters.corruption_events, parser.errors)
+
+        parser.reset()
+        self.assertEqual(ParserCounters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0), parser.counters)
 
     def test_parser_recovers_from_garbage_partial_magic_and_bad_checksum(self) -> None:
         info = (FIXTURE_DIRECTORY / "info-request.bin").read_bytes()

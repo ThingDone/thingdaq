@@ -18,7 +18,11 @@ _RESPONSE_PREFIX = struct.Struct("<BBH")
 _DATA_KINDS = frozenset({constants.FrameKind.ADC_DATA, constants.FrameKind.GPIO_DATA})
 _REQUEST_KINDS = frozenset(constants.REQUEST_RESPONSE_KIND)
 _TYPED_RESPONSE_KINDS = frozenset(constants.REQUEST_RESPONSE_KIND.values())
-MAX_BUFFERED_BYTES = constants.DATA_FRAME_BYTES + len(constants.MAGIC_BYTES) - 1
+_MAX_FRAME_BYTES = max(
+    constants.MAX_DATA_FRAME_BYTES,
+    constants.MAX_CONTROL_FRAME_BYTES,
+)
+MAX_BUFFERED_BYTES = _MAX_FRAME_BYTES + len(constants.MAGIC_BYTES) - 1
 
 
 class ProtocolError(ValueError):
@@ -112,6 +116,28 @@ class Frame:
         return self.header.to_bytes() + self.payload + _TRAILER.pack(self.checksum)
 
 
+@dataclass(frozen=True, slots=True)
+class ParserCounters:
+    """Immutable snapshot of incremental-parser health and bounded state.
+
+    ``corruption_events`` is the sum of rejected header, checksum, and typed
+    payload candidates. ``resynchronizations`` counts distinct loss-of-alignment
+    episodes, including leading noise; one episode can reject several false
+    magic candidates before the parser accepts another frame.
+    """
+
+    bytes_received: int
+    frames_decoded: int
+    corruption_events: int
+    header_errors: int
+    checksum_errors: int
+    payload_errors: int
+    resynchronizations: int
+    bytes_discarded: int
+    buffered_bytes: int
+    high_water_mark: int
+
+
 def _adler32(data: BytesLike) -> int:
     return zlib.adler32(data) & constants.UINT32_MAX
 
@@ -149,10 +175,12 @@ def _uint(name: str, value: int, bits: int) -> int:
     return value
 
 
-def _decode_header(data: BytesLike) -> FrameHeader:
-    if len(data) < constants.HEADER_SIZE:
+def _decode_header(data: BytesLike, offset: int = 0) -> FrameHeader:
+    available = len(data) - offset
+    if offset < 0 or available < constants.HEADER_SIZE:
         raise FrameValidationError(
-            f"frame has {len(data)} bytes; a header needs {constants.HEADER_SIZE}",
+            f"frame has {max(available, 0)} bytes; "
+            f"a header needs {constants.HEADER_SIZE}",
             constants.ErrorCode.INVALID_LENGTH,
         )
     (
@@ -170,7 +198,7 @@ def _decode_header(data: BytesLike) -> FrameHeader:
         request_id,
         first_sample_ticks,
         item_count,
-    ) = _HEADER.unpack_from(data)
+    ) = _HEADER.unpack_from(data, offset)
 
     if magic != constants.MAGIC:
         raise FrameValidationError(
@@ -691,23 +719,76 @@ def decode_frame(data: BytesLike) -> Frame:
     return Frame(header=header, payload=payload, checksum=observed_checksum)
 
 
-def _partial_magic_suffix_length(data: bytearray) -> int:
-    maximum = min(len(data), len(constants.MAGIC_BYTES) - 1)
+def _partial_magic_suffix_length(data: bytearray, start: int = 0) -> int:
+    maximum = min(len(data) - start, len(constants.MAGIC_BYTES) - 1)
     for length in range(maximum, 0, -1):
-        if data[-length:] == constants.MAGIC_BYTES[:length]:
+        if data.endswith(constants.MAGIC_BYTES[:length], start):
             return length
     return 0
 
 
+def _byte_view(chunk: BytesLike) -> memoryview:
+    """Return a one-dimensional byte view, copying only non-contiguous inputs."""
+
+    try:
+        return memoryview(chunk).cast("B")
+    except TypeError:
+        return memoryview(bytes(chunk))
+
+
+def _decode_buffered_frame(
+    buffer: bytearray,
+    offset: int,
+    header: FrameHeader,
+) -> Frame:
+    """Decode a complete plausible frame without copying its full wire image."""
+
+    payload_start = offset + constants.HEADER_SIZE
+    payload_end = payload_start + header.payload_length
+    observed_checksum = _TRAILER.unpack_from(buffer, payload_end)[0]
+
+    checksum_view = memoryview(buffer)[offset:payload_end]
+    try:
+        expected_checksum = compute_checksum(
+            checksum_view,
+            header.checksum_algorithm,
+        )
+    finally:
+        checksum_view.release()
+    if observed_checksum != expected_checksum:
+        raise ChecksumMismatchError(expected_checksum, observed_checksum)
+
+    payload_view = memoryview(buffer)[payload_start:payload_end]
+    try:
+        payload = payload_view.tobytes()
+    finally:
+        payload_view.release()
+    _validate_payload(header, payload)
+    return Frame(header=header, payload=payload, checksum=observed_checksum)
+
+
 class IncrementalFrameParser:
-    """Bounded parser for arbitrary USB CDC byte-stream chunk boundaries."""
+    """Bounded parser for arbitrary USB CDC byte-stream chunk boundaries.
+
+    The parser owns its pending input and every returned :class:`Frame` owns an
+    immutable ``bytes`` payload, so caller-owned mutable chunks can be reused as
+    soon as :meth:`feed` returns. Recovery scans use a cursor and compact once
+    per drain rather than deleting or copying one byte at a time.
+    """
 
     max_buffered_bytes = MAX_BUFFERED_BYTES
 
     def __init__(self) -> None:
         self._buffer = bytearray()
+        self._scan_start = 0
+        self._resynchronizing = False
+        self.bytes_received = 0
         self.frames_decoded = 0
-        self.errors = 0
+        self.corruption_events = 0
+        self.header_errors = 0
+        self.checksum_errors = 0
+        self.payload_errors = 0
+        self.resynchronizations = 0
         self.bytes_discarded = 0
         self.high_water_mark = 0
 
@@ -715,71 +796,146 @@ class IncrementalFrameParser:
     def buffered_bytes(self) -> int:
         """Number of bytes retained while awaiting a plausible complete frame."""
 
-        return len(self._buffer)
+        return len(self._buffer) - self._scan_start
+
+    @property
+    def errors(self) -> int:
+        """Backward-compatible total of all rejected frame candidates."""
+
+        return self.corruption_events
+
+    @property
+    def counters(self) -> ParserCounters:
+        """Return an immutable snapshot suitable for monitoring or logging."""
+
+        return ParserCounters(
+            bytes_received=self.bytes_received,
+            frames_decoded=self.frames_decoded,
+            corruption_events=self.corruption_events,
+            header_errors=self.header_errors,
+            checksum_errors=self.checksum_errors,
+            payload_errors=self.payload_errors,
+            resynchronizations=self.resynchronizations,
+            bytes_discarded=self.bytes_discarded,
+            buffered_bytes=self.buffered_bytes,
+            high_water_mark=self.high_water_mark,
+        )
+
+    @property
+    def is_resynchronizing(self) -> bool:
+        """Whether bytes have been discarded since the last accepted frame."""
+
+        return self._resynchronizing
 
     def reset(self) -> None:
         """Discard pending bytes and reset parser counters."""
 
         self._buffer.clear()
+        self._scan_start = 0
+        self._resynchronizing = False
+        self.bytes_received = 0
         self.frames_decoded = 0
-        self.errors = 0
+        self.corruption_events = 0
+        self.header_errors = 0
+        self.checksum_errors = 0
+        self.payload_errors = 0
+        self.resynchronizations = 0
         self.bytes_discarded = 0
         self.high_water_mark = 0
 
     def feed(self, chunk: BytesLike) -> list[Frame]:
         """Consume a chunk and return every complete valid frame it contains."""
 
-        incoming = memoryview(chunk).cast("B")
-        frames: list[Frame] = []
-        position = 0
-        while position < len(incoming):
+        incoming = _byte_view(chunk)
+        try:
+            self.bytes_received += len(incoming)
+            frames: list[Frame] = []
+            position = 0
+            while position < len(incoming):
+                frames.extend(self._drain())
+                capacity = self.max_buffered_bytes - self.buffered_bytes
+                if capacity <= 0:
+                    raise RuntimeError(
+                        "incremental parser could not make bounded progress"
+                    )
+                take = min(capacity, len(incoming) - position)
+                self._buffer.extend(incoming[position : position + take])
+                position += take
+                self.high_water_mark = max(
+                    self.high_water_mark,
+                    self.buffered_bytes,
+                )
             frames.extend(self._drain())
-            capacity = self.max_buffered_bytes - len(self._buffer)
-            if capacity <= 0:
-                raise RuntimeError("incremental parser could not make bounded progress")
-            take = min(capacity, len(incoming) - position)
-            self._buffer.extend(incoming[position : position + take])
-            position += take
-            self.high_water_mark = max(self.high_water_mark, len(self._buffer))
-        frames.extend(self._drain())
-        return frames
+            return frames
+        finally:
+            incoming.release()
 
     def _drain(self) -> list[Frame]:
         frames: list[Frame] = []
         while True:
-            magic_at = self._buffer.find(constants.MAGIC_BYTES)
+            magic_at = self._buffer.find(constants.MAGIC_BYTES, self._scan_start)
             if magic_at < 0:
-                retained = _partial_magic_suffix_length(self._buffer)
-                discarded = len(self._buffer) - retained
-                if discarded:
-                    del self._buffer[:discarded]
-                    self.bytes_discarded += discarded
-                return frames
-            if magic_at:
-                del self._buffer[:magic_at]
-                self.bytes_discarded += magic_at
-            if len(self._buffer) < constants.HEADER_SIZE:
-                return frames
+                retained = _partial_magic_suffix_length(
+                    self._buffer,
+                    self._scan_start,
+                )
+                self._discard(self.buffered_bytes - retained)
+                break
+            if magic_at > self._scan_start:
+                self._discard(magic_at - self._scan_start)
+            if self.buffered_bytes < constants.HEADER_SIZE:
+                break
             try:
-                header = _decode_header(self._buffer)
+                header = _decode_header(self._buffer, self._scan_start)
             except FrameValidationError:
-                del self._buffer[0]
-                self.errors += 1
-                self.bytes_discarded += 1
+                self._record_corruption("header")
+                self._discard(1)
                 continue
-            if len(self._buffer) < header.total_length:
-                return frames
-            candidate = bytes(self._buffer[: header.total_length])
+            if self.buffered_bytes < header.total_length:
+                break
             try:
-                frame = decode_frame(candidate)
-            except FrameValidationError:
-                del self._buffer[0]
-                self.errors += 1
-                self.bytes_discarded += 1
+                frame = _decode_buffered_frame(
+                    self._buffer,
+                    self._scan_start,
+                    header,
+                )
+            except ChecksumMismatchError:
+                self._record_corruption("checksum")
+                self._discard(1)
                 continue
-            del self._buffer[: header.total_length]
+            except FrameValidationError:
+                self._record_corruption("payload")
+                self._discard(1)
+                continue
+            self._scan_start += header.total_length
             self.frames_decoded += 1
+            self._resynchronizing = False
             frames.append(frame)
+        self._compact()
+        return frames
+
+    def _discard(self, count: int) -> None:
+        if count <= 0:
+            return
+        if not self._resynchronizing:
+            self._resynchronizing = True
+            self.resynchronizations += 1
+        self._scan_start += count
+        self.bytes_discarded += count
+
+    def _record_corruption(self, category: str) -> None:
+        self.corruption_events += 1
+        if category == "header":
+            self.header_errors += 1
+        elif category == "checksum":
+            self.checksum_errors += 1
+        else:
+            self.payload_errors += 1
+
+    def _compact(self) -> None:
+        if self._scan_start:
+            del self._buffer[: self._scan_start]
+            self._scan_start = 0
 
 
 FrameParser = IncrementalFrameParser
@@ -794,6 +950,7 @@ __all__ = [
     "FrameParser",
     "FrameValidationError",
     "IncrementalFrameParser",
+    "ParserCounters",
     "ProtocolError",
     "UnsupportedChecksumError",
     "compute_checksum",
