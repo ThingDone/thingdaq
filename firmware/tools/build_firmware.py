@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -33,6 +34,8 @@ OUTPUT_DIRECTORY = (
     SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
+MANIFEST_SCHEMA_VERSION = 3
+LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
     SKETCH_DIRECTORY / "firmware.ino",
@@ -290,21 +293,104 @@ def compile_command(
     arduino_cli: Path,
     identity: BuildIdentity,
     base_definitions: str,
+    base_linker_flags: str,
 ) -> list[str]:
     """Return the immutable command used for every supported firmware build."""
 
+    linker_map = OUTPUT_DIRECTORY / LINKER_MAP_NAME
     return [
         str(arduino_cli),
         "compile",
         "--fqbn",
         FQBN,
+        "--clean",
+        "--warnings",
+        "all",
         "--build-property",
         f"build.flags.defs={identity_definitions(base_definitions, identity)}",
+        "--build-property",
+        f"build.flags.ld={base_linker_flags} -Wl,-Map={linker_map},--cref",
         "--export-binaries",
         "--output-dir",
         str(OUTPUT_DIRECTORY),
         str(SKETCH_DIRECTORY),
     ]
+
+
+def parse_memory_usage(output: str) -> dict[str, dict[str, int]]:
+    """Parse the Teensy size summary into stable byte counts."""
+
+    patterns = {
+        "flash": re.compile(
+            r"FLASH:\s+code:(\d+),\s+data:(\d+),\s+headers:(\d+)"
+            r"\s+free for files:(\d+)"
+        ),
+        "ram1": re.compile(
+            r"RAM1:\s+variables:(\d+),\s+code:(\d+),\s+padding:(\d+)"
+            r"\s+free for local variables:(\d+)"
+        ),
+        "ram2": re.compile(r"RAM2:\s+variables:(\d+)\s+free for malloc/new:(\d+)"),
+    }
+    matches = {name: pattern.search(output) for name, pattern in patterns.items()}
+    missing = [name for name, match in matches.items() if match is None]
+    if missing:
+        raise BuildError(
+            "Teensy memory summary is missing " + ", ".join(sorted(missing))
+        )
+
+    flash_match = matches["flash"]
+    ram1_match = matches["ram1"]
+    ram2_match = matches["ram2"]
+    assert flash_match is not None and ram1_match is not None and ram2_match is not None
+    return {
+        "flash": {
+            "code_bytes": int(flash_match.group(1)),
+            "data_bytes": int(flash_match.group(2)),
+            "headers_bytes": int(flash_match.group(3)),
+            "free_for_files_bytes": int(flash_match.group(4)),
+        },
+        "ram1": {
+            "variables_bytes": int(ram1_match.group(1)),
+            "code_bytes": int(ram1_match.group(2)),
+            "padding_bytes": int(ram1_match.group(3)),
+            "free_for_locals_bytes": int(ram1_match.group(4)),
+        },
+        "ram2": {
+            "variables_bytes": int(ram2_match.group(1)),
+            "free_for_heap_bytes": int(ram2_match.group(2)),
+        },
+    }
+
+
+def git_source_state() -> dict[str, Any]:
+    """Record the Git commit and dirtiness of the exact firmware inputs."""
+
+    commit = run_command(
+        ["git", "-C", str(REPOSITORY_ROOT), "rev-parse", "HEAD"]
+    ).stdout.strip()
+    if len(commit) != 40 or any(
+        character not in "0123456789abcdef" for character in commit
+    ):
+        raise BuildError("Git did not report a full lowercase commit identity")
+
+    relative_inputs = [str(path.relative_to(REPOSITORY_ROOT)) for path in SOURCE_INPUTS]
+    status = run_command(
+        [
+            "git",
+            "-C",
+            str(REPOSITORY_ROOT),
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--",
+            *relative_inputs,
+        ]
+    ).stdout.splitlines()
+    return {
+        "git_commit": commit,
+        "firmware_inputs_clean": not status,
+        "firmware_input_changes": status,
+    }
 
 
 def sha256(path: Path) -> str:
@@ -363,10 +449,12 @@ def build(arduino_cli_name: str) -> Path:
     identity = build_identity()
 
     OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    (OUTPUT_DIRECTORY / LINKER_MAP_NAME).unlink(missing_ok=True)
     command = compile_command(
         arduino_cli,
         identity,
         properties["build.flags.defs"],
+        properties["build.flags.ld"],
     )
     compile_environment = dict(os.environ)
     compile_environment["SOURCE_DATE_EPOCH"] = str(identity.timestamp_epoch)
@@ -376,21 +464,31 @@ def build(arduino_cli_name: str) -> Path:
         print(compile_result.stdout, end="")
     if compile_result.stderr:
         print(compile_result.stderr, end="", file=sys.stderr)
+    memory_usage = parse_memory_usage(
+        f"{compile_result.stdout}\n{compile_result.stderr}"
+    )
 
     artifacts = sorted(
         path
         for path in OUTPUT_DIRECTORY.rglob("*")
         if path.is_file() and path.suffix.lower() in ARTIFACT_SUFFIXES
     )
-    if not any(path.suffix.lower() == ".hex" for path in artifacts):
-        raise BuildError(f"compile produced no HEX artifact in {OUTPUT_DIRECTORY}")
+    artifact_suffixes = {path.suffix.lower() for path in artifacts}
+    missing_artifacts = {".hex", ".map"} - artifact_suffixes
+    if missing_artifacts:
+        names = ", ".join(sorted(missing_artifacts))
+        raise BuildError(f"compile produced no {names} artifact in {OUTPUT_DIRECTORY}")
 
     manifest = {
-        "schema_version": 2,
+        "schema_version": MANIFEST_SCHEMA_VERSION,
         "target": {
             "fqbn": FQBN,
             "core_id": CORE_ID,
             "core_version": installed_version,
+            "warnings": "all",
+            "resolved_build_properties": {
+                name: properties[name] for name in EXPECTED_BUILD_PROPERTIES
+            },
         },
         "arduino_cli": {
             "path": str(arduino_cli),
@@ -413,7 +511,9 @@ def build(arduino_cli_name: str) -> Path:
                 str(path.relative_to(REPOSITORY_ROOT))
                 for path in collect_source_files()
             ],
+            **git_source_state(),
         },
+        "memory_usage": memory_usage,
         "command": command,
         "sketch_directory": str(SKETCH_DIRECTORY.relative_to(REPOSITORY_ROOT)),
         "output_directory": str(OUTPUT_DIRECTORY.relative_to(REPOSITORY_ROOT)),

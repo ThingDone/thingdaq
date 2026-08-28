@@ -62,10 +62,12 @@ containing `type`, `title`, `created`, `tags`, and `related`, and must use
 
 The firmware build is intentionally fixed to Teensy 4.0, USB Serial, 600 MHz,
 standard `-O2`, and Teensy core 1.62.0. The helper refuses a different installed
-core, compiles with the complete
+core, performs a clean all-warnings compile with the complete
 `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` FQBN, and records the
-Arduino CLI, compiler, deterministic source/build identity, reproducible UTC
-timestamp policy, command, hashes, and sizes in a gitignored build manifest:
+Arduino CLI, compiler, resolved menu properties, deterministic source/build
+identity, source-input Git state, reproducible UTC timestamp policy, Flash/RAM
+usage, command, and SHA-256 hashes in a gitignored build manifest. The exported
+artifacts include the HEX, ELF, and linker map needed for pre-upload review:
 
 ```bash
 python3 firmware/tools/build_firmware.py

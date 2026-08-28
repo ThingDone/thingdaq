@@ -31,10 +31,12 @@ class BuildConfigurationTests(unittest.TestCase):
             Path("/tools/arduino-cli"),
             identity,
             "-D__IMXRT1062__ -DTEENSYDUINO=160",
+            "-Wl,--gc-sections -T/imxrt1062.ld",
         )
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
+        self.assertEqual(3, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -47,13 +49,48 @@ class BuildConfigurationTests(unittest.TestCase):
         )
         self.assertEqual("compile", command[1])
         self.assertNotIn("upload", command)
-        definitions = command[command.index("--build-property") + 1]
+        self.assertIn("--clean", command)
+        self.assertEqual("all", command[command.index("--warnings") + 1])
+        build_properties = [
+            command[index + 1]
+            for index, value in enumerate(command)
+            if value == "--build-property"
+        ]
+        definitions = next(
+            value for value in build_properties if value.startswith("build.flags.defs=")
+        )
         self.assertIn("-DTEENSY_DAQ_SOURCE_ID_WORD0=0x" + "a" * 16 + "ULL", definitions)
         self.assertIn("-DTEENSY_DAQ_SOURCE_ID_WORD3=0x" + "a" * 16 + "ULL", definitions)
         self.assertIn("-DTEENSY_DAQ_BUILD_EPOCH=1700000000ULL", definitions)
         self.assertIn("-DTEENSY_DAQ_BUILD_YEAR=2023U", definitions)
         self.assertIn("-DTEENSY_DAQ_BUILD_SECOND=20U", definitions)
         self.assertIn("-DTEENSY_DAQ_OPTIMIZATION_O2STD=1", definitions)
+        linker_flags = next(
+            value for value in build_properties if value.startswith("build.flags.ld=")
+        )
+        self.assertIn("-Wl,--gc-sections -T/imxrt1062.ld", linker_flags)
+        self.assertIn(
+            f"-Wl,-Map={build_firmware.OUTPUT_DIRECTORY / build_firmware.LINKER_MAP_NAME},--cref",
+            linker_flags,
+        )
+
+    def test_memory_summary_is_recorded_exactly(self) -> None:
+        summary = build_firmware.parse_memory_usage(
+            """Memory Usage on Teensy 4.0:
+  FLASH: code:22368, data:4040, headers:8404   free for files:1996804
+   RAM1: variables:10080, code:20648, padding:12120   free for local variables:481440
+   RAM2: variables:12416  free for malloc/new:511872
+"""
+        )
+
+        self.assertEqual(22_368, summary["flash"]["code_bytes"])
+        self.assertEqual(4_040, summary["flash"]["data_bytes"])
+        self.assertEqual(10_080, summary["ram1"]["variables_bytes"])
+        self.assertEqual(12_416, summary["ram2"]["variables_bytes"])
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing ram2"):
+            build_firmware.parse_memory_usage(
+                "FLASH: code:1, data:2, headers:3 free for files:4\nRAM1: variables:5, code:6, padding:7 free for local variables:8"
+            )
 
     def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
         responses = [
