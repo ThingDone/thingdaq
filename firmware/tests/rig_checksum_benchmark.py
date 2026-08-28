@@ -2017,8 +2017,9 @@ def run_campaign(
     benchmark_iterations_per_batch: int = (DEFAULT_BENCHMARK_ITERATIONS_PER_BATCH),
     expected_build_id: str | None = None,
     expected_hardware_serial: int | None = None,
+    selected_checksum_algorithm: int | None = None,
 ) -> dict[str, object]:
-    """Benchmark and stream every advertised candidate, strictly sequentially."""
+    """Benchmark and stream the selected advertised candidates sequentially."""
 
     if (
         not math.isfinite(capture_seconds)
@@ -2064,6 +2065,18 @@ def run_campaign(
             expected_build_id=expected_build_id,
             expected_hardware_serial=expected_hardware_serial,
         )
+        if (
+            selected_checksum_algorithm is not None
+            and selected_checksum_algorithm not in candidates
+        ):
+            raise ProtocolFailure(
+                "selected checksum algorithm is not advertised by the target"
+            )
+        campaign_candidates = (
+            candidates
+            if selected_checksum_algorithm is None
+            else (selected_checksum_algorithm,)
+        )
         if info_latency > COMMAND_DEADLINE_SECONDS:
             raise ProtocolFailure("INFO command latency exceeded its deadline")
         emit_event(
@@ -2071,13 +2084,17 @@ def run_campaign(
             advertised_candidates=[CHECKSUM_NAMES[value] for value in candidates],
             advertised_candidate_ids=list(candidates),
             build_id=info["build_id"],
+            campaign_candidates=[
+                CHECKSUM_NAMES[value] for value in campaign_candidates
+            ],
+            campaign_candidate_ids=list(campaign_candidates),
             firmware_version=info["firmware_version"],
             hardware_serial=info["hardware_serial"],
             info_latency_seconds=info_latency,
             protocol_version=info["protocol_version"],
         )
 
-        for checksum_algorithm in candidates:
+        for checksum_algorithm in campaign_candidates:
             emit_event(
                 "candidate_start",
                 checksum_algorithm=CHECKSUM_NAMES[checksum_algorithm],
@@ -2120,6 +2137,7 @@ def run_campaign(
             "advertised_candidate_ids": list(candidates),
             "benchmark_profile_count": total_benchmark_profiles,
             "build_id": info["build_id"],
+            "campaign_candidate_ids": list(campaign_candidates),
             "candidate_count": len(candidate_results),
             "candidates": candidate_results,
             "final_state": final_status.device_state,
@@ -2191,6 +2209,26 @@ def _optional_uint32_environment(name: str) -> int | None:
     return value
 
 
+def _optional_checksum_environment(name: str) -> int | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    normalized = raw.strip().upper().replace("-", "_")
+    by_name = {value: key for key, value in CHECKSUM_NAMES.items()}
+    if normalized in by_name:
+        return by_name[normalized]
+    try:
+        value = int(normalized, 0)
+    except ValueError as error:
+        choices = ", ".join(CHECKSUM_NAMES.values())
+        raise ValueError(
+            f"{name} must be an algorithm ID or one of {choices}"
+        ) from error
+    if value not in SUPPORTED_CHECKSUMS:
+        raise ValueError(f"{name} identifies an unsupported checksum algorithm")
+    return value
+
+
 def main() -> int:
     port_name = os.environ.get("SERIAL_PORT")
     if not port_name:
@@ -2218,6 +2256,9 @@ def main() -> int:
         expected_hardware_serial = _optional_uint32_environment(
             "EXPECTED_HARDWARE_SERIAL"
         )
+        selected_checksum_algorithm = _optional_checksum_environment(
+            "CHECKSUM_CAMPAIGN_ALGORITHM"
+        )
     except ValueError as error:
         emit_event("configuration_error", error=str(error))
         return 2
@@ -2229,6 +2270,11 @@ def main() -> int:
         benchmark_batch_count=benchmark_batch_count,
         benchmark_iterations_per_batch=benchmark_iterations_per_batch,
         capture_seconds_per_candidate=capture_seconds,
+        checksum_campaign_algorithm=(
+            CHECKSUM_NAMES[selected_checksum_algorithm]
+            if selected_checksum_algorithm is not None
+            else "ALL"
+        ),
         port=port_name,
         protocol=PROTOCOL_VERSION,
         status_interval_seconds=status_interval_seconds,
@@ -2254,6 +2300,7 @@ def main() -> int:
                 benchmark_iterations_per_batch=benchmark_iterations_per_batch,
                 expected_build_id=expected_build_id,
                 expected_hardware_serial=expected_hardware_serial,
+                selected_checksum_algorithm=selected_checksum_algorithm,
             )
         except Exception as error:  # noqa: BLE001 - stdout is remote diagnosis
             message = f"{type(error).__name__}: {error}"

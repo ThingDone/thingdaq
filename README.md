@@ -300,11 +300,14 @@ gap/drop/counter exhaustion evidence.
 The campaign defaults to 10 seconds per advertised candidate. The later
 hardware selection campaign sets `CHECKSUM_CAPTURE_SECONDS=60`; optional
 `CHECKSUM_STATUS_INTERVAL_SECONDS`, `CHECKSUM_BENCHMARK_BATCH_COUNT`, and
-`CHECKSUM_BENCHMARK_ITERATIONS_PER_BATCH` remain strictly bounded. As with the
-other rig programs, `EXPECTED_BUILD_ID` and `EXPECTED_HARDWARE_SERIAL` can pin
-the exact artifact and board. Its dependency-free CRC-32C trailer validator
-uses a bounded slicing-by-four path so the network-disabled rig retains enough
-host-side headroom for the full framed rate.
+`CHECKSUM_BENCHMARK_ITERATIONS_PER_BATCH` remain strictly bounded. Set
+`CHECKSUM_CAMPAIGN_ALGORITHM` to an advertised name or numeric ID to run one
+candidate in an isolated job; omitting it retains the all-candidates sequential
+campaign. As with the other rig programs, `EXPECTED_BUILD_ID` and
+`EXPECTED_HARDWARE_SERIAL` can pin the exact artifact and board. Its
+dependency-free CRC-32C trailer validator uses a bounded slicing-by-four path
+so the network-disabled rig retains enough host-side headroom for the full
+framed rate.
 
 ## Synchronous Python API and offline simulator
 

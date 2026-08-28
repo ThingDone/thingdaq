@@ -259,7 +259,43 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
         self.assertIn('"CHECKSUM_CAPTURE_SECONDS"', source)
         self.assertIn('"CHECKSUM_BENCHMARK_BATCH_COUNT"', source)
+        self.assertIn('"CHECKSUM_CAMPAIGN_ALGORITHM"', source)
         self.assertTrue(RIG_SCRIPT.stat().st_mode & stat.S_IXUSR)
+
+    def test_optional_campaign_selector_accepts_names_and_ids(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(
+                rig._optional_checksum_environment("CHECKSUM_CAMPAIGN_ALGORITHM")
+            )
+        for raw, expected in (
+            ("ADLER32", rig.CHECKSUM_ADLER32),
+            ("crc32c", rig.CHECKSUM_CRC32C),
+            ("CRC32-ISO-HDLC", rig.CHECKSUM_CRC32_ISO_HDLC),
+            ("0x2", rig.CHECKSUM_CRC32C),
+        ):
+            with (
+                self.subTest(raw=raw),
+                patch.dict(
+                    os.environ,
+                    {"CHECKSUM_CAMPAIGN_ALGORITHM": raw},
+                    clear=True,
+                ),
+            ):
+                self.assertEqual(
+                    expected,
+                    rig._optional_checksum_environment("CHECKSUM_CAMPAIGN_ALGORITHM"),
+                )
+        for raw in ("", "CRC64", "99"):
+            with (
+                self.subTest(raw=raw),
+                patch.dict(
+                    os.environ,
+                    {"CHECKSUM_CAMPAIGN_ALGORITHM": raw},
+                    clear=True,
+                ),
+                self.assertRaises(ValueError),
+            ):
+                rig._optional_checksum_environment("CHECKSUM_CAMPAIGN_ALGORITHM")
 
     def test_vectors_and_profile_matrix_are_fixed_and_bounded(self) -> None:
         records = rig.validate_independent_vectors()
@@ -426,6 +462,39 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         self.assertFalse(fake.is_open)
         self.assertIn(0, fake.write_counts)
         self.assertLessEqual(max(fake.read_counts), max(fake.read_pattern))
+        self.assertEqual(constants.DeviceState.IDLE, fake.device.state)
+
+    def test_selected_campaign_benchmarks_and_streams_only_one_candidate(self) -> None:
+        fake = PacedRigSerial()
+        output = io.StringIO()
+        with (
+            patch.object(rig, "STARTUP_DRAIN_SECONDS", 0.002),
+            patch.object(rig, "SYNC_DEADLINE_SECONDS", 0.1),
+            patch.object(rig, "COMMAND_DEADLINE_SECONDS", 0.1),
+            patch.object(rig, "BENCHMARK_DEADLINE_SECONDS", 0.1),
+            patch.object(rig, "STOP_DRAIN_DEADLINE_SECONDS", 0.2),
+            patch.object(rig, "STOP_DRAIN_QUIET_SECONDS", 0.002),
+            patch.object(rig, "RATE_TOLERANCE_FRACTION", 0.50),
+            redirect_stdout(output),
+        ):
+            summary = rig.run_campaign(
+                fake,
+                capture_seconds=0.12,
+                status_interval_seconds=0.02,
+                benchmark_batch_count=1,
+                benchmark_iterations_per_batch=2,
+                expected_build_id="tdaq-0123456789abcdef",
+                expected_hardware_serial=12_345_670,
+                selected_checksum_algorithm=rig.CHECKSUM_CRC32C,
+            )
+
+        self.assertEqual("PASS", summary["result"])
+        self.assertEqual(3, summary["advertised_candidate_count"])
+        self.assertEqual([rig.CHECKSUM_CRC32C], summary["campaign_candidate_ids"])
+        self.assertEqual(1, summary["candidate_count"])
+        self.assertEqual([rig.CHECKSUM_CRC32C], fake.device.configured_checksums)
+        self.assertEqual(14, len(fake.device.benchmark_requests))
+        self.assertEqual(1, output.getvalue().count("CANDIDATE "))
         self.assertEqual(constants.DeviceState.IDLE, fake.device.state)
 
 
