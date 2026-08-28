@@ -17,6 +17,7 @@ from teensy_daq import (
     McuId,
     SerialPortCandidate,
     TransportClosedError,
+    TransportDisconnectedError,
     TransportOpenError,
     decode_frame,
     discover,
@@ -97,6 +98,13 @@ class InfoProbeTransport:
             self._is_open = False
             self._pending.clear()
             self.closed.set()
+
+
+class DisconnectingProbeTransport(InfoProbeTransport):
+    """Accept one INFO request, then disappear before returning a response."""
+
+    def read(self, size: int) -> bytes:
+        raise TransportDisconnectedError("candidate disconnected during INFO")
 
 
 def _physical_info(hardware_serial: int, build_id: str = "physical-v1") -> Info:
@@ -223,6 +231,69 @@ class DiscoveryTests(unittest.TestCase):
         )
 
         self.assertEqual(["COM4"], [device.port for device in devices])
+        self.assertTrue(
+            all(transport.closed.is_set() for transport in transports.values())
+        )
+
+    def test_product_fallback_is_bounded_and_all_candidate_failures_are_isolated(
+        self,
+    ) -> None:
+        ports = [
+            FakePortMetadata(
+                "COM0",
+                0x9999,
+                0x0001,
+                serial_number="0",
+                product="Teensy DAQ",
+            ),
+            _candidate("COM1", 101),
+            _candidate("COM2", 102),
+            _candidate("COM3", 103, product=None),
+            _candidate("COM4", 104, product=None),
+            _candidate("COM5", 105, product="USB Serial"),
+            _candidate("COM6", 106, product="USB Serial"),
+        ]
+        opened: list[str] = []
+        transports: dict[str, InfoProbeTransport] = {}
+
+        def transport_factory(candidate: SerialPortCandidate) -> ByteTransport:
+            opened.append(candidate.port)
+            if candidate.port == "COM2":
+                raise TransportOpenError("access denied")
+            if candidate.port == "COM3":
+                transport: InfoProbeTransport = InfoProbeTransport(None)
+            elif candidate.port == "COM5":
+                transport = DisconnectingProbeTransport(_physical_info(105))
+            else:
+                transport = InfoProbeTransport(
+                    _physical_info(int(candidate.serial_number or "0")),
+                    fragment_size=3,
+                )
+            transports[candidate.port] = transport
+            return transport
+
+        devices = discover(
+            0.03,
+            port_enumerator=lambda: ports,
+            transport_factory=transport_factory,
+        )
+
+        self.assertEqual(
+            ["COM1", "COM2", "COM3", "COM4", "COM5", "COM6"],
+            opened,
+        )
+        self.assertNotIn("COM0", opened)
+        self.assertEqual(
+            [101, 104, 106], [device.hardware_serial for device in devices]
+        )
+        self.assertEqual(
+            ["Teensy DAQ", None, "USB Serial"],
+            [device.product for device in devices],
+        )
+        self.assertEqual(1, len(transports["COM3"].writes))
+        self.assertTrue(
+            all(len(transport.writes) <= 1 for transport in transports.values())
+        )
         self.assertTrue(
             all(transport.closed.is_set() for transport in transports.values())
         )

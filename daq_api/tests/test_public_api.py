@@ -11,6 +11,7 @@ from teensy_daq import (
     AdcConverter,
     BoardId,
     Capability,
+    ChecksumAlgorithm,
     DAQConfiguration,
     DAQStateError,
     DeviceCapabilities,
@@ -37,6 +38,7 @@ from teensy_daq import (
     decode_frame,
     encode_frame,
 )
+from teensy_daq._generated import protocol_constants as constants
 
 
 class PhysicalInfoDevice(SimulatedDevice):
@@ -84,6 +86,7 @@ class FirmwareGapDevice(SimulatedDevice):
             and frame.header.sequence == 1
         ):
             self._gap_injected = True
+            self._adc_items_dropped += constants.ADC_PAIRS_PER_FRAME
             replacement = super().next_data_frame()
             assert replacement is not None
             frame = decode_frame(replacement)
@@ -161,7 +164,7 @@ class PublicModelTests(unittest.TestCase):
                 DeviceState.IDLE,
                 StreamMask.ADC,
                 Source.SYNTHETIC,
-                1,
+                ChecksumAlgorithm.ADLER32,
             )
         with self.assertRaises(ValueError):
             HostCounters(host_block_queue_drops=-1)
@@ -227,7 +230,10 @@ class PublicOpenTests(unittest.TestCase):
             ) as daq,
         ):
             self.assertEqual(["COM19"], opened)
-            self.assertEqual(hardware_serial, daq.device_info.hardware_serial)
+            device_info = daq.device_info
+            self.assertIsNotNone(device_info)
+            assert device_info is not None
+            self.assertEqual(hardware_serial, device_info.hardware_serial)
             applied = daq.configure(
                 adc=True,
                 gpio=False,
@@ -258,7 +264,13 @@ class PublicGapPolicyTests(unittest.TestCase):
             self.assertTrue(gap.firmware_overrun)
             self.assertEqual(0, gap.host_queue_drops)
             self.assertEqual(1, gap.missing_frames)
-            self.assertEqual(1, daq.loss_counters().observed_stream_gaps)
+            counters = daq.loss_counters()
+            self.assertEqual(1, counters.observed_stream_gaps)
+            self.assertEqual(
+                constants.ADC_PAIRS_PER_FRAME,
+                counters.firmware.adc_items_dropped,
+            )
+            self.assertEqual(0, counters.host.host_block_queue_drops)
 
     def test_strict_mode_raises_with_gap_and_current_block_attached(self) -> None:
         transport = InMemoryTransport(FirmwareGapDevice())
@@ -271,6 +283,12 @@ class PublicGapPolicyTests(unittest.TestCase):
 
             self.assertEqual(LossOrigin.FIRMWARE, raised.exception.gap.origin)
             self.assertEqual(2, raised.exception.block.sequence)
+            counters = daq.loss_counters()
+            self.assertEqual(
+                constants.ADC_PAIRS_PER_FRAME,
+                counters.firmware.adc_items_dropped,
+            )
+            self.assertEqual(0, counters.host.host_block_queue_drops)
 
     def test_host_queue_loss_is_never_reported_as_firmware_loss(self) -> None:
         transport = StartBurstTransport()
@@ -293,7 +311,39 @@ class PublicGapPolicyTests(unittest.TestCase):
             self.assertFalse(gap.firmware_overrun)
             self.assertEqual(2, gap.host_queue_drops)
             self.assertEqual(2, daq.host_counters.host_block_queue_drops)
-            self.assertEqual(0, daq.loss_counters().firmware.items_dropped)
+            counters = daq.loss_counters()
+            self.assertEqual(0, counters.firmware.items_dropped)
+            self.assertEqual(2, counters.host.host_block_queue_drops)
+
+    def test_strict_host_queue_loss_raises_without_firmware_attribution(self) -> None:
+        transport = StartBurstTransport()
+        with TeensyDAQ.open(
+            transport,
+            strict=True,
+            max_buffered_blocks=1,
+        ) as daq:
+            daq.configure(adc=True, gpio=False)
+            daq.start()
+            for _ in range(1_000):
+                if daq.reader_counters.host_block_queue_drops == 2:
+                    break
+                time.sleep(0.001)
+            else:
+                self.fail("reader did not account for the injected queue evictions")
+
+            with self.assertRaises(UnexpectedStreamGapError) as raised:
+                daq.read_block()
+
+            gap = raised.exception.gap
+            self.assertEqual(LossOrigin.HOST_QUEUE, gap.origin)
+            self.assertFalse(gap.firmware_reported)
+            self.assertFalse(gap.firmware_overrun)
+            self.assertEqual(2, gap.host_queue_drops)
+            self.assertEqual(2, raised.exception.block.sequence)
+            counters = daq.loss_counters()
+            self.assertEqual(0, counters.firmware.items_dropped)
+            self.assertEqual(2, counters.host.host_block_queue_drops)
+            self.assertEqual(1, counters.observed_stream_gaps)
 
 
 if __name__ == "__main__":
