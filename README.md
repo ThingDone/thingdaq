@@ -430,6 +430,11 @@ Use `GPIO_CAPTURE_SECONDS=60` for the soak. Optional controls are
 `EXPECTED_HARDWARE_SERIAL` pin the artifact and board as in the earlier rig
 programs.
 
+The accepted clean artifact, local throughput/resource gate, repaired
+frame-boundary STOP behavior, and sequential diagnostic, 10-second smoke, and
+60-second physical stream evidence are consolidated in
+`doc/results/phase-06-gpio-dma.md`.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS and

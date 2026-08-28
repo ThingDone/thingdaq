@@ -14,6 +14,7 @@ related:
   - '[[Phase-05-Checksum-Local-Gate]]'
   - '[[Phase-05-Checksum-Physical-Campaign]]'
   - '[[Phase-05-Checksum-Benchmark]]'
+  - '[[Phase-06-GPIO-DMA]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
@@ -57,7 +58,9 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   in [[Phase-05-Checksum-Physical-Campaign]], the fixed production choice is
   recorded in [[ADR-002-Checksum-Selection]], and the clean selected-image
   rebuild plus three-run acceptance is consolidated in
-  [[Phase-05-Checksum-Benchmark]].
+  [[Phase-05-Checksum-Benchmark]]. The exact-rate physical GPIO gate, target
+  CPU/queue evidence, and sequential diagnostic/smoke/soak results are recorded
+  in [[Phase-06-GPIO-DMA]].
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`
