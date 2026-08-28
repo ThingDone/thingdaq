@@ -988,6 +988,7 @@ def validate_running_status(
     frame: Frame,
     validator: SyntheticValidator,
     stats_generation: int,
+    received_frames_before_request: tuple[int, int],
 ) -> None:
     if frame.run_id != validator.run_id:
         raise ProtocolFailure(
@@ -1029,10 +1030,15 @@ def validate_running_status(
             f"gpio_drop={status.gpio_items_dropped} "
             f"parser={status.parser_errors} transport={status.transport_errors}"
         )
-    if status.adc_frames_emitted < validator.adc.frames:
-        raise ProtocolFailure("firmware ADC counter trails received frames")
-    if status.gpio_frames_emitted < validator.gpio.frames:
-        raise ProtocolFailure("firmware GPIO counter trails received frames")
+    adc_received_before, gpio_received_before = received_frames_before_request
+    if status.adc_frames_emitted < adc_received_before:
+        raise ProtocolFailure(
+            "firmware ADC counter trails frames received before STATUS request"
+        )
+    if status.gpio_frames_emitted < gpio_received_before:
+        raise ProtocolFailure(
+            "firmware GPIO counter trails frames received before STATUS request"
+        )
 
 
 def _relative_error(actual: float, expected: float) -> float:
@@ -1362,6 +1368,12 @@ def run_acceptance(
         while time.monotonic() < capture_deadline:
             now = time.monotonic()
             if now >= next_status_at:
+                # One serial read may contain the STATUS response followed by
+                # newer data, so grade its snapshot against the pre-request floor.
+                received_frames_before_request = (
+                    validator.adc.frames,
+                    validator.gpio.frames,
+                )
                 status_frame, latency = link.exchange(
                     GET_STATUS_REQUEST,
                     on_data=validator.accept,
@@ -1383,6 +1395,7 @@ def run_acceptance(
                     status_frame,
                     validator,
                     stats_generation,
+                    received_frames_before_request,
                 )
                 status_latencies.append(latency)
                 status_count += 1

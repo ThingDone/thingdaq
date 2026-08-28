@@ -254,6 +254,43 @@ class RigScriptIndependenceTests(unittest.TestCase):
         with self.assertRaisesRegex(rig.ProtocolFailure, "ADC pair"):
             validator.accept(bad_frame)
 
+    def test_running_status_uses_the_pre_request_receive_floor(self) -> None:
+        validator = rig.SyntheticValidator(7)
+        validator.adc.frames = 15
+        validator.gpio.frames = 16
+        status = rig.StatusSnapshot(
+            device_state=rig.STATE_RUNNING,
+            stream_mask=rig.STREAM_BOTH,
+            source=rig.SOURCE_SYNTHETIC,
+            checksum=rig.CHECKSUM_ADLER32,
+            data_frame_bytes=rig.DATA_FRAME_BYTES,
+            adc_frames_emitted=10,
+            gpio_frames_emitted=10,
+            adc_items_dropped=0,
+            gpio_items_dropped=0,
+            parser_errors=0,
+            transport_errors=0,
+            stats_generation=3,
+        )
+        frame = rig.Frame(
+            kind=rig.GET_STATUS_RESPONSE,
+            flags=0,
+            run_id=7,
+            sequence=0,
+            request_id=1,
+            first_sample_ticks=0,
+            item_count=0,
+            payload=b"",
+            checksum=0,
+        )
+
+        rig.validate_running_status(status, frame, validator, 3, (8, 9))
+        with self.assertRaisesRegex(
+            rig.ProtocolFailure,
+            "ADC counter trails frames received before STATUS request",
+        ):
+            rig.validate_running_status(status, frame, validator, 3, (11, 9))
+
     def test_full_program_streams_statuses_stops_and_reconciles(self) -> None:
         fake = PacedRigSerial()
         output = io.StringIO()
