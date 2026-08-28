@@ -126,8 +126,9 @@ copies them into its own DMA-visible storage. Marking the project pool
 `DMAMEM` would consume OCRAM and introduce a cache-ownership story without
 enabling zero-copy USB. Future ADC/GPIO rings that are actually read or written
 by eDMA remain aligned `DMAMEM` OCRAM/RAM2 and require explicit cache
-maintenance. The 16-frame application pool covers about 8.1 ms at the nominal
-combined framed rate; the core's 8,192-byte TX ring adds about another 1.0 ms.
+maintenance. The 32-frame application pool covers about 16.2 ms at the nominal
+combined framed rate and retains two 64 KiB host-read batches; the core's
+8,192-byte TX ring adds about another 1.0 ms.
 
 The final scheduler therefore caps each request at one 2,048-byte core buffer
 and waits for at least 512 bytes of reported capacity (or an exact shorter

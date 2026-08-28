@@ -484,6 +484,76 @@ void testSyntheticDataCountersReachStatus() {
   }
 }
 
+void testStartupSchedulingJitterFitsPacketPool() {
+  FakeCdcStream stream{};
+  stream.max_read_size = 128U;
+  stream.available_write_size = board::kUsbTxMaxWriteBytes;
+  stream.max_write_size = constants::kDataFrameBytes;
+  packet::PacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  app::FirmwareRuntime firmware{stream, packet_storage, clock};
+  expect(firmware.begin(6060U), "jitter test completes BOOT");
+
+  stream.appendInput(configureRequest(151U));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 152U));
+  expect(drain(firmware, stream).quiescent && firmware.runId() == 1U,
+         "jitter test reaches a paced RUNNING epoch");
+  stream.output.clear();
+
+  // One 64 KiB host read contains sixteen data frames. Retain another half
+  // batch of scheduling margin while the host validates the prior batch and
+  // an interleaved STATUS response waits at a frame boundary.
+  constexpr std::uint64_t kJitterIntervals = 12U;
+  stream.available_write_size = 0U;
+  stream.appendInput(
+      emptyRequest(constants::FrameKind::kGetStatusRequest, 153U));
+  for (std::uint64_t interval = 1U; interval <= kJitterIntervals;
+       ++interval) {
+    clock.ticks = interval * synthetic::kFrameCoverageTicks;
+    const app::LoopReport report = firmware.service();
+    expect(report.synthetic.frames_framed == 2U &&
+               report.synthetic.frames_dropped == 0U &&
+               !report.synthetic.invariant_error,
+           "bounded startup USB jitter retains both due source frames");
+  }
+
+  const packet::PipelineSnapshot buffered = firmware.packetSnapshot();
+  expect(buffered.sources[0].frames_framed == kJitterIntervals &&
+             buffered.sources[1].frames_framed == kJitterIntervals &&
+             buffered.sources[0].frames_dropped == 0U &&
+             buffered.sources[1].frames_dropped == 0U &&
+             buffered.pool_exhaustions == 0U &&
+             buffered.buffers_owned_high_water == 2U * kJitterIntervals,
+         "packet pool absorbs a 24-frame startup scheduling excursion");
+
+  stream.available_write_size = board::kUsbTxMaxWriteBytes;
+  expect(drain(firmware, stream).quiescent,
+         "recovered USB drains the complete jitter backlog");
+  const packet::PipelineSnapshot drained = firmware.packetSnapshot();
+  expect(drained.sources[0].frames_transmitted == kJitterIntervals &&
+             drained.sources[1].frames_transmitted == kJitterIntervals &&
+             drained.sources[0].frames_dropped == 0U &&
+             drained.sources[1].frames_dropped == 0U,
+         "jitter recovery transmits every buffered frame without loss");
+
+  const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
+  std::array<std::size_t, packet::kStreamCount> data_frames{};
+  std::size_t status_responses = 0U;
+  for (const wire::DecodedFrame &frame : frames) {
+    if (frame.header.kind == constants::FrameKind::kAdcData) {
+      ++data_frames[packet::streamIndex(packet::Stream::kAdc)];
+    } else if (frame.header.kind == constants::FrameKind::kGpioData) {
+      ++data_frames[packet::streamIndex(packet::Stream::kGpio)];
+    } else if (frame.header.kind ==
+               constants::FrameKind::kGetStatusResponse) {
+      ++status_responses;
+    }
+  }
+  expect(data_frames[0] == kJitterIntervals &&
+             data_frames[1] == kJitterIntervals && status_responses == 1U,
+         "jitter recovery preserves both streams and interleaved STATUS");
+}
+
 void testStopDrainGatesNextStartAndPreventsStaleRunData() {
   FakeCdcStream stream{};
   stream.max_read_size = 128U;
@@ -580,6 +650,7 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
 int main() {
   testCompleteControlPlane();
   testSyntheticDataCountersReachStatus();
+  testStartupSchedulingJitterFitsPacketPool();
   testStopDrainGatesNextStartAndPreventsStaleRunData();
   if (failures != 0) {
     std::cerr << failures << " firmware runtime assertion(s) failed\n";

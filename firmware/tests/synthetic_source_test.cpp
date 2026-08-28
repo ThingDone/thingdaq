@@ -251,8 +251,16 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
                  synthetic::OperationStatus::kOk,
          "loss test starts a real-time dual-stream epoch");
 
-  constexpr std::uint64_t elapsed_frames = 20U;
-  for (std::size_t call = 0U; call < 12U; ++call) {
+  constexpr std::uint64_t dropped_frames_per_stream = 12U;
+  constexpr std::uint64_t retained_frames_per_stream =
+      board::kPacketBufferCount / packet::kStreamCount;
+  constexpr std::uint64_t elapsed_frames =
+      retained_frames_per_stream + dropped_frames_per_stream;
+  constexpr std::size_t service_calls = static_cast<std::size_t>(
+      (packet::kStreamCount * elapsed_frames +
+       board::kSyntheticFramesPerLoop - 1U) /
+      board::kSyntheticFramesPerLoop);
+  for (std::size_t call = 0U; call < service_calls; ++call) {
     const synthetic::ServiceReport report = source.service(
         epoch + elapsed_frames * synthetic::kFrameCoverageTicks, pipeline);
     expect(!report.invariant_error,
@@ -261,10 +269,14 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
   const packet::PipelineSnapshot pressure = pipeline.snapshot();
   expect(pressure.sources[0].frames_produced == elapsed_frames &&
              pressure.sources[1].frames_produced == elapsed_frames &&
-             pressure.sources[0].frames_framed == 8U &&
-             pressure.sources[1].frames_framed == 8U &&
-             pressure.sources[0].frames_dropped == 12U &&
-             pressure.sources[1].frames_dropped == 12U,
+             pressure.sources[0].frames_framed ==
+                 retained_frames_per_stream &&
+             pressure.sources[1].frames_framed ==
+                 retained_frames_per_stream &&
+             pressure.sources[0].frames_dropped ==
+                 dropped_frames_per_stream &&
+             pressure.sources[1].frames_dropped ==
+                 dropped_frames_per_stream,
          "elapsed real-time frames split exactly into framed and dropped totals");
 
   expect(pipeline.serviceReadyFrames(board::kPacketBufferCount)
@@ -318,15 +330,19 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
   expect(final.sources[0].items_produced ==
                  (elapsed_frames + 1U) * constants::kAdcPairsPerFrame &&
              final.sources[0].items_framed ==
-                 9U * constants::kAdcPairsPerFrame &&
+                 (retained_frames_per_stream + 1U) *
+                     constants::kAdcPairsPerFrame &&
              final.sources[0].items_transmitted ==
-                 9U * constants::kAdcPairsPerFrame &&
+                 (retained_frames_per_stream + 1U) *
+                     constants::kAdcPairsPerFrame &&
              final.sources[0].items_dropped ==
-                 12U * constants::kAdcPairsPerFrame &&
+                 dropped_frames_per_stream *
+                     constants::kAdcPairsPerFrame &&
              final.sources[1].items_produced ==
                  (elapsed_frames + 1U) * constants::kGpioSamplesPerFrame &&
              final.sources[1].items_dropped ==
-                 12U * constants::kGpioSamplesPerFrame,
+                 dropped_frames_per_stream *
+                     constants::kGpioSamplesPerFrame,
          "post-recovery item-stage conservation remains exact per stream");
 }
 

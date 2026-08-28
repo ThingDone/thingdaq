@@ -159,11 +159,13 @@ inline constexpr std::size_t kAdcDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioPackedRingDepth = 4U;
 // At the nominal combined framed rate, each 4096-byte buffer represents about
-// 0.506 ms. Sixteen application buffers retain about 8.1 ms of complete
+// 0.506 ms. Thirty-two application buffers retain about 16.2 ms of complete
 // frames; the pinned core contributes another four 2048-byte TX buffers. The
-// application pool stays in cacheless DTCM because USB Serial copies into the
-// core's own DMA-visible OCRAM buffers rather than DMA-reading our storage.
-inline constexpr std::size_t kPacketBufferCount = 16U;
+// doubled pool absorbs a complete 64 KiB host-read batch plus validation and
+// control-response scheduling margin. It stays in cacheless DTCM because USB
+// Serial copies into the core's own DMA-visible OCRAM buffers rather than
+// DMA-reading our storage.
+inline constexpr std::size_t kPacketBufferCount = 32U;
 inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketTransmitQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
