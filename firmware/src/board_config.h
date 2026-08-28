@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "generated/protocol_constants.h"
+#include "protocol.h"
 
 namespace teensy_daq::board {
 
@@ -346,7 +347,7 @@ static_assert(kReservedRam1Bytes <= kRam1BudgetBytes,
 static_assert(kReservedRam2Bytes <= kRam2BudgetBytes,
               "future DMA queues exceed the RAM2 budget");
 static_assert(kCommandParserCapacityBytes >=
-                  protocol_v1::kMaxCommandFrameBytes + 3U,
+                  protocol::kCommandParserStorageBytes,
               "parser must retain a full command and partial next magic");
 static_assert(sameBytes(kGpioPinsByBit, protocol_v1::kGpioPinsByBit),
               "resource registry and protocol GPIO maps disagree");
