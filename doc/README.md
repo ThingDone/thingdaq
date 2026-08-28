@@ -7,6 +7,7 @@ tags:
   - documentation
 related:
   - '[[System-Overview]]'
+  - '[[Firmware-Resource-Map]]'
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
@@ -23,7 +24,7 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
 ## Organization
 
 - `architecture/` describes system boundaries and component relationships,
-  beginning with [[System-Overview]].
+  beginning with [[System-Overview]] and [[Firmware-Resource-Map]].
 - `protocol/` contains versioned wire-contract specifications, beginning with
   [[Protocol-V1]].
 - `decisions/` contains architecture decision records, beginning with

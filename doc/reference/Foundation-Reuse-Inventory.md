@@ -9,6 +9,7 @@ tags:
   - foundation
 related:
   - '[[System-Overview]]'
+  - '[[Firmware-Resource-Map]]'
   - '[[Protocol-V1]]'
 ---
 
@@ -65,5 +66,33 @@ wire contract and implement an incremental bounded parser in a later task.
   USB Serial, 600 MHz, and `-O2` respectively.
 - Arduino CLI observed during the audit: 1.4.1.
 
-These values are recorded here for orientation. The reproducible build helper
-and its executable version checks belong to the next build-configuration task.
+These values are enforced by the reproducible build helper and compile-time
+identity checks described in [[System-Overview]].
+
+## Phase 03 reinspection
+
+Before the firmware identity and registry modules were added, the complete
+Phase 01-02 repository was reinspected: the sketch and build helper, generated
+C++ constants, protocol generator and source contract, Python codec/models,
+simulator, transport/reader/client/discovery layers, every Python and firmware
+test module, and the structured documentation. No portable C++ protocol or
+resource module existed to extend; the reusable authority remains the
+generated `protocol_constants.h` rather than copied numeric protocol values.
+
+The pinned and nearby implementation sources were also reinspected on
+2026-08-28:
+
+| Source | Reconfirmed implementation constraint |
+| --- | --- |
+| Teensy 1.62.0 `boards.txt` and `platform.txt` | Teensy 4.0 resolves `ARDUINO_TEENSY40`, `__IMXRT1062__`, `TEENSYDUINO=160`, 600 MHz, USB Serial, GNU C++17, and `-O2`; the build helper must verify the installed package version separately. |
+| Teensy 1.62.0 `cores/teensy4/usb_desc.c` / `.h` | USB Serial retains PJRC's `0x16C0:0x0483`; only the weak product descriptor should later be overridden. The core derives the serial string from `HW_OCOTP_MAC0`, so firmware must not replace it. |
+| Teensy 1.62.0 `cores/teensy4/usb_serial.c` / `.h` | High-speed CDC packets are 512 bytes; the core uses four 2,048-byte TX buffers and eight RX transfers. Writes can return zero/partial after bounded core waits, so future transport must inspect `availableForWrite()` and returned counts. |
+| Teensy 1.62.0 `ADC_Module.cpp` | Its two timer paths use QuadTimer4 channels 0/3, XBAR ADC_ETC outputs 103/107, and trigger queues 0/4, but start independently. Reuse the identities, not its unsynchronized phase behavior. |
+| Teensy 1.62.0 `AnalogBufferDMA.cpp` and DMA examples | ADC1/ADC2 DMAMUX sources are 24/88. DMA buffers use `DMAMEM`, 32-byte alignment, and cache invalidation; fixed ownership must replace unconstrained first-free channel allocation. |
+| Teensy 1.62.0 `OctoWS2811_imxrt.cpp` | Selective fast-to-standard GPIO remapping and XBAR-triggered DMA remain the proven pattern for future D6-D13 capture. |
+| Nearby `exp000-hello-serial` firmware, portable parser, and rig test | Preserve bounded native-USB startup, portable host compilation, finite synchronization/drain windows, and independent graded requests. |
+
+The resulting fixed reservations and compile-time invariants are documented in
+[[Firmware-Resource-Map]]. Their presence is not evidence that acquisition is
+implemented; [[System-Overview]] defines the Phase 03 control-only capability
+mask.

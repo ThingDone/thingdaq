@@ -1,36 +1,32 @@
 /*
- * Teensy DAQ foundation firmware.
+ * Teensy DAQ control-plane foundation firmware.
  *
- * This build only proves bounded startup and an IDLE control state. Protocol
- * commands and acquisition are intentionally unsupported until their shared,
- * generated wire constants and portable control modules are added.
+ * This build centralizes exact target identity, truthful Phase 03 capability
+ * metadata, and future hardware resource ownership. Command handling and
+ * acquisition remain deliberately unsupported in this task.
  */
 
-#if __has_include("src/generated/protocol_constants.h")
+#include "src/board_config.h"
+#include "src/firmware_capabilities.h"
+#include "src/firmware_identity.h"
 #include "src/generated/protocol_constants.h"
-#define TEENSY_DAQ_PROTOCOL_CONSTANTS_PRESENT 1
-#else
-#define TEENSY_DAQ_PROTOCOL_CONSTANTS_PRESENT 0
-#endif
 
 namespace teensy_daq {
 
-constexpr char kBuildId[] = "teensy-daq-foundation-0.0.0";
-constexpr uint32_t kSerialWaitMilliseconds = 1500;
+constexpr uint32_t kSerialWaitMilliseconds = 1500U;
 
-enum class DeviceState : uint8_t {
-  kBoot,
-  kIdle,
-};
+protocol_v1::DeviceState device_state = protocol_v1::DeviceState::kBoot;
 
-DeviceState device_state = DeviceState::kBoot;
-
-const char *stateName(DeviceState state) {
+const char *stateName(protocol_v1::DeviceState state) {
   switch (state) {
-    case DeviceState::kBoot:
+    case protocol_v1::DeviceState::kBoot:
       return "BOOT";
-    case DeviceState::kIdle:
+    case protocol_v1::DeviceState::kIdle:
       return "IDLE";
+    case protocol_v1::DeviceState::kConfigured:
+      return "CONFIGURED";
+    case protocol_v1::DeviceState::kRunning:
+      return "RUNNING";
   }
   return "UNKNOWN";
 }
@@ -48,16 +44,22 @@ void setup() {
     yield();
   }
 
-  teensy_daq::device_state = teensy_daq::DeviceState::kIdle;
+  teensy_daq::device_state = teensy_daq::protocol_v1::DeviceState::kIdle;
 
   if (Serial) {
     Serial.print("TEENSY_DAQ build=");
-    Serial.print(teensy_daq::kBuildId);
+    Serial.print(teensy_daq::identity::kBuildId.data());
+    Serial.print(" source=");
+    Serial.print(teensy_daq::identity::kSourceId.data());
+    Serial.print(" built=");
+    Serial.print(teensy_daq::identity::kBuildTimestampUtc.data());
     Serial.print(" state=");
     Serial.print(teensy_daq::stateName(teensy_daq::device_state));
-    Serial.print(" protocol_constants=");
-    Serial.print(TEENSY_DAQ_PROTOCOL_CONSTANTS_PRESENT ? "present" : "absent");
-    Serial.println(" acquisition=unsupported");
+    Serial.print(" protocol=");
+    Serial.print(teensy_daq::identity::kProtocolVersion);
+    Serial.print(" streams=");
+    Serial.print(teensy_daq::capabilities::kSupportedStreamMask);
+    Serial.println(" acquisition=unsupported control_only=yes");
   }
 }
 

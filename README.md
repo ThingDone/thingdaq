@@ -48,7 +48,7 @@ We want to evaluate the following:
   `src/` layout and its test suite.
 - `doc/` contains structured architecture, protocol, decision, reference, and
   result artifacts. Start with `doc/README.md` and
-  `doc/architecture/System-Overview.md`.
+  `doc/architecture/system-overview.md`.
 
 Generated builds, captures, virtual environments, benchmark scratch data,
 credentials, and language-tool caches are ignored. Small deterministic test
@@ -64,8 +64,8 @@ The firmware build is intentionally fixed to Teensy 4.0, USB Serial, 600 MHz,
 standard `-O2`, and Teensy core 1.62.0. The helper refuses a different installed
 core, compiles with the complete
 `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` FQBN, and records the
-Arduino CLI, compiler, command, hashes, and sizes in a gitignored build
-manifest:
+Arduino CLI, compiler, deterministic source/build identity, reproducible UTC
+timestamp policy, command, hashes, and sizes in a gitignored build manifest:
 
 ```bash
 python3 firmware/tools/build_firmware.py
