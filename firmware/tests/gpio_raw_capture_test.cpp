@@ -117,11 +117,15 @@ void testOwnershipCacheAndContinuousOverflow() {
        index < board::kGpioRawDmaRingDepth; ++index) {
     expect(fixture.cache.events[index].kind ==
                    CacheEvent::Kind::kDmaDiscard &&
+               fixture.cache.events[index].address ==
+                   fixture.storage.buffers[index].words.data() &&
                fixture.cache.events[index].bytes == sizeof(capture::RawBuffer),
            "initial cache operations prepare full aligned DMA buffers");
   }
-  expect(fixture.cache.events[board::kGpioRawDmaRingDepth].bytes ==
-             sizeof(capture::RawOverflowSink),
+  expect(fixture.cache.events[board::kGpioRawDmaRingDepth].address ==
+                 fixture.overflow.words.data() &&
+             fixture.cache.events[board::kGpioRawDmaRingDepth].bytes ==
+                 sizeof(capture::RawOverflowSink),
          "the DMA-only overflow destination occupies one isolated cache line");
 
   const std::size_t cache_calls_before_completion = fixture.cache.count;
@@ -141,7 +145,11 @@ void testOwnershipCacheAndContinuousOverflow() {
              first.handle.words == fixture.storage.buffers[0].words.data(),
          "CPU acquires the oldest complete raw buffer with exact provenance");
   expect(fixture.cache.events[fixture.cache.count - 1U].kind ==
-                 CacheEvent::Kind::kCpuInvalidate,
+                 CacheEvent::Kind::kCpuInvalidate &&
+             fixture.cache.events[fixture.cache.count - 1U].address ==
+                 first.handle.words &&
+             fixture.cache.events[fixture.cache.count - 1U].bytes ==
+                 sizeof(capture::RawBuffer),
          "CPU ownership invalidates the completed DMA buffer");
 
   completed = fixture.ring.onMajorLoopComplete();
@@ -178,7 +186,11 @@ void testOwnershipCacheAndContinuousOverflow() {
   expect(fixture.ring.release(first.handle) == capture::OperationStatus::kOk,
          "packer releases its cache-cleaned buffer explicitly");
   expect(fixture.cache.events[fixture.cache.count - 1U].kind ==
-                 CacheEvent::Kind::kDmaDiscard,
+                 CacheEvent::Kind::kDmaDiscard &&
+             fixture.cache.events[fixture.cache.count - 1U].address ==
+                 first.handle.words &&
+             fixture.cache.events[fixture.cache.count - 1U].bytes ==
+                 sizeof(capture::RawBuffer),
          "release discards CPU cache before the buffer becomes FREE");
   expect(fixture.ring.release(first.handle) ==
              capture::OperationStatus::kInvalidHandle,
@@ -271,6 +283,38 @@ void testStopCountsPartialOverflowAndPreservesReadyOrder() {
          "draining stopped ready buffers returns every owner to FREE");
 }
 
+void testLateCompletionAfterStopCannotReopenOwnership() {
+  Fixture fixture{};
+  expect(fixture.ring.prime().ok(), "late-completion fixture primes");
+  expect(fixture.ring.onMajorLoopComplete().ok(),
+         "late-completion fixture retains one ready buffer");
+  const capture::StopReport stopped = fixture.ring.stop(0U);
+  const capture::Snapshot before_late = fixture.ring.snapshot();
+  const std::size_t cache_calls_before_late = fixture.cache.count;
+
+  const capture::MajorLoopResult late =
+      fixture.ring.onMajorLoopComplete();
+  const capture::Snapshot after_late = fixture.ring.snapshot();
+  expect(stopped.ok() && late.status == capture::OperationStatus::kNotRunning,
+         "a completion racing after STOP is rejected as stale");
+  expect(!after_late.running && after_late.ready_depth == 1U &&
+             after_late.progress.major_loops_completed ==
+                 before_late.progress.major_loops_completed &&
+             after_late.progress.samples_captured ==
+                 before_late.progress.samples_captured &&
+             after_late.progress.samples_lost ==
+                 before_late.progress.samples_lost &&
+             fixture.cache.count == cache_calls_before_late,
+         "a stale completion changes no owner, counter, or cache boundary");
+
+  const capture::AcquireResult retained = fixture.ring.acquireReady();
+  expect(retained.ok() && retained.handle.first_sample == 0U &&
+             fixture.ring.release(retained.handle) ==
+                 capture::OperationStatus::kOk &&
+             fixture.ring.quiescent(),
+         "the pre-STOP complete buffer remains drainable after the race");
+}
+
 void testCommonStatisticsProjectionAndSaturation() {
   stats::Statistics statistics{};
   stats::DataPathProgress packets{};
@@ -306,6 +350,7 @@ int main() {
   testOwnershipCacheAndContinuousOverflow();
   testStopDrainsCompleteBuffersAndCountsPartialLoss();
   testStopCountsPartialOverflowAndPreservesReadyOrder();
+  testLateCompletionAfterStopCannotReopenOwnership();
   testCommonStatisticsProjectionAndSaturation();
   if (failures != 0) {
     std::cerr << failures << " raw GPIO capture assertion(s) failed\n";

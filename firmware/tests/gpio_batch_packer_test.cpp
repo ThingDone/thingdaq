@@ -351,6 +351,70 @@ void testPackedRingPressureStaysBoundedAndVisible() {
   fixture.pipeline.stopProduction();
 }
 
+void testStopDrainsReadyFrameAndDiscardsOnlyPartialTail() {
+  FakeRawSource source{};
+  expect(source.add(0U, constants::kGpioSamplesPerFrame) &&
+             source.add(constants::kGpioSamplesPerFrame, 37U),
+         "prepare one complete frame followed by a partial STOP tail");
+  PipelineFixture fixture{};
+  expect(fixture.pipeline.startRun(71U) == packet::OperationStatus::kOk,
+         "start STOP-race packet epoch");
+  packer::GpioBatchPacker gpio{source, fixture.packed_storage};
+  expect(gpio.startRun(71U, constants::kDefaultChecksumAlgorithm,
+                       fixture.pipeline) == packer::OperationStatus::kOk,
+         "start STOP-race packer epoch");
+
+  const packer::ServiceReport filled =
+      gpio.service(fixture.pipeline, 2U, 0U);
+  const packer::Snapshot before_stop = gpio.snapshot(fixture.pipeline);
+  expect(filled.raw_buffers_consumed == 2U &&
+             filled.samples_consumed ==
+                 constants::kGpioSamplesPerFrame + 37U &&
+             filled.frames_packed == 1U &&
+             before_stop.ready_depth == 1U &&
+             before_stop.current_frame_samples == 37U &&
+             before_stop.buffer_states[0] == packer::BufferState::kReady &&
+             before_stop.buffer_states[1] == packer::BufferState::kFilling,
+         "queue ownership separates a ready frame from its partial successor");
+
+  const packer::StopReport stopped = gpio.stopProduction();
+  const packer::Snapshot after_stop = gpio.snapshot(fixture.pipeline);
+  expect(stopped.partial_samples_discarded == 37U &&
+             stopped.packed_frames_to_drain == 1U &&
+             after_stop.ready_depth == 1U &&
+             after_stop.current_frame_samples == 0U &&
+             after_stop.buffer_states[0] == packer::BufferState::kReady &&
+             after_stop.buffer_states[1] == packer::BufferState::kFree &&
+             !after_stop.running && !after_stop.quiescent,
+         "STOP recycles only the partial tail while retaining the ready frame");
+  expect(gpio.startRun(72U, constants::kDefaultChecksumAlgorithm,
+                       fixture.pipeline) ==
+             packer::OperationStatus::kNotQuiescent,
+         "a new run cannot overtake the old run's ready frame");
+
+  const packer::ServiceReport drained =
+      gpio.service(fixture.pipeline, 8U, 1U);
+  expect(drained.raw_buffers_consumed == 0U &&
+             drained.frames_framed == 1U && gpio.quiescent(),
+         "post-STOP service drains old ready ownership without acquiring input");
+  expect(fixture.pipeline.serviceReadyFrames(1U).frames_promoted == 1U,
+         "the retained STOP-race frame reaches the transmit queue");
+  const wire::DecodedFrame frame =
+      decodeAndRelease(fixture.pipeline, "decode retained STOP-race frame");
+  expect(frame.header.run_id == 71U && frame.header.sequence == 0U &&
+             frame.header.first_sample_ticks == 0U,
+         "the drained frame retains its original run and timestamp epoch");
+
+  const packer::Snapshot final = gpio.snapshot(fixture.pipeline);
+  expect(final.raw_buffers_acquired == 2U &&
+             final.raw_buffers_released == 2U &&
+             final.progress.samples_produced ==
+                 constants::kGpioSamplesPerFrame + 37U &&
+             final.progress.packer_drop_samples == 37U,
+         "STOP counters account the exact partial tail and balanced leases");
+  fixture.pipeline.stopProduction();
+}
+
 void testRawWordDiagnosticIsExplicitAndBounded() {
   FakeRawSource source{};
   expect(source.add(0U, constants::kGpioSamplesPerFrame),
@@ -382,6 +446,7 @@ int main() {
   testRawBoundariesBecomeExactChecksummedFrames();
   testRawGapAdvancesSequenceWithoutDoubleCountingStatus();
   testPackedRingPressureStaysBoundedAndVisible();
+  testStopDrainsReadyFrameAndDiscardsOnlyPartialTail();
   testRawWordDiagnosticIsExplicitAndBounded();
   if (failures != 0) {
     std::cerr << failures << " GPIO batch packer assertion(s) failed\n";

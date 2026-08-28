@@ -87,9 +87,13 @@ class GpioRawCaptureTests(unittest.TestCase):
         self.assertIn("discardBeforeDmaWrite", source)
 
     def test_target_adapter_uses_fixed_gpio_psr_scatter_gather_route(self) -> None:
-        source = (FIRMWARE_SOURCE / "gpio_raw_capture_teensy.cpp").read_text(
+        raw_source = (FIRMWARE_SOURCE / "gpio_raw_capture_teensy.cpp").read_text(
             encoding="utf-8"
         )
+        route_source = (FIRMWARE_SOURCE / "gpio_dma_route_teensy.h").read_text(
+            encoding="utf-8"
+        )
+        source = raw_source + "\n" + route_source
 
         for token in (
             "&GPIO2_PSR",
@@ -98,6 +102,9 @@ class GpioRawCaptureTests(unittest.TestCase):
             "protocol_v1::kGpioSamplesPerFrame",
             "DMA_DCHPRI2",
             "board::kGpioEdmaPriority",
+            "gpio_dma_route::clearEdmaChannelState()",
+            "gpio_dma_route::enableEdmaRequest()",
+            "gpio_dma_route::disableEdmaRequest()",
             "onMajorLoopComplete",
             "selectStandardGpioInputs(IOMUXC_GPR_GPR27, GPIO2_GDIR)",
             "arm_dcache_flush_delete(&g_gpio_raw_dma_descriptors",

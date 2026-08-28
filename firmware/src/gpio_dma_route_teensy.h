@@ -39,6 +39,10 @@ inline constexpr std::uint16_t kXbarSelectionMask =
     kXbarUsesHighByte ? 0xFF00U : 0x00FFU;
 inline constexpr std::uint8_t kXbarSelectionShift =
     kXbarUsesHighByte ? 8U : 0U;
+inline constexpr std::uint32_t kEdmaChannelMask =
+    std::uint32_t{1U} << board::kGpioEdmaChannel;
+inline constexpr std::uint32_t kDmamuxConfiguration =
+    DMAMUX_CHCFG_ENBL | board::kGpioDmamuxSource;
 
 inline void barrier() {
   __asm__ volatile("dsb\n\tisb" : : : "memory");
@@ -52,10 +56,23 @@ inline volatile std::uint16_t *xbarControlRegister() {
   return &XBARA1_CTRL0 + board::kGpioXbarOutput / 2U;
 }
 
+inline volatile std::uint32_t *dmamuxChannelRegister() {
+  return &DMAMUX_CHCFG0 + board::kGpioEdmaChannel;
+}
+
+inline IMXRT_DMA_TCD_t &edmaTcd() {
+  return IMXRT_DMA_TCD[board::kGpioEdmaChannel];
+}
+
 inline bool selectedOutputBusy() {
   return (*xbarControlRegister() &
           (kXbarSelectedEdge | kXbarSelectedInterruptEnable |
            kXbarSelectedDmaEnable)) != 0U;
+}
+
+inline bool edmaRequestBusy() {
+  return (DMA_ERQ & kEdmaChannelMask) != 0U ||
+         (*dmamuxChannelRegister() & DMAMUX_CHCFG_ENBL) != 0U;
 }
 
 inline void enableClockGates() {
@@ -102,6 +119,39 @@ inline void disableXbarRequest() {
                                    kXbarPeerStatus)));
   *control_register =
       static_cast<std::uint16_t>(control | kXbarSelectedStatus);
+}
+
+// The eDMA command registers take a channel number, not a bit mask. Keeping
+// these writes beside the fixed route prevents target users from accidentally
+// mixing channel 2 with a neighboring DMAMUX, priority, or TCD register.
+inline void clearEdmaChannelState() {
+  *dmamuxChannelRegister() = 0U;
+  DMA_CERQ = board::kGpioEdmaChannel;
+  DMA_CERR = board::kGpioEdmaChannel;
+  DMA_CEEI = board::kGpioEdmaChannel;
+  DMA_CINT = board::kGpioEdmaChannel;
+  DMA_CDNE = board::kGpioEdmaChannel;
+}
+
+inline void configureEdmaPriority() {
+  static_assert(board::kGpioEdmaChannel == 2U);
+  DMA_DCHPRI2 = static_cast<std::uint8_t>(
+      DMA_DCHPRI_ECP | DMA_DCHPRI_CHPRI(board::kGpioEdmaPriority));
+}
+
+inline std::uint8_t edmaPriority() {
+  static_assert(board::kGpioEdmaChannel == 2U);
+  return static_cast<std::uint8_t>(DMA_DCHPRI2 & 0x0FU);
+}
+
+inline void enableEdmaRequest() {
+  *dmamuxChannelRegister() = kDmamuxConfiguration;
+  DMA_SERQ = board::kGpioEdmaChannel;
+}
+
+inline void disableEdmaRequest() {
+  DMA_CERQ = board::kGpioEdmaChannel;
+  *dmamuxChannelRegister() = 0U;
 }
 
 }  // namespace teensy_daq::gpio_dma_route

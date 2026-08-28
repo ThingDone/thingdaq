@@ -45,10 +45,6 @@ void *retainDmaAllocations() {
 
 void *volatile g_dma_allocation_link_anchor = retainDmaAllocations();
 
-constexpr std::uint32_t kChannelMask =
-    std::uint32_t{1U} << board::kGpioEdmaChannel;
-constexpr std::uint32_t kDmamuxConfiguration =
-    DMAMUX_CHCFG_ENBL | board::kGpioDmamuxSource;
 constexpr std::uint16_t kTcdAttributes =
     DMA_TCD_ATTR_SSIZE(2U) | DMA_TCD_ATTR_DSIZE(2U);
 constexpr std::uint16_t kTcdControl =
@@ -112,14 +108,6 @@ void saturatingIncrement(std::uint32_t &value) {
   }
 }
 
-volatile std::uint32_t *dmamuxRegister() {
-  return &DMAMUX_CHCFG0 + board::kGpioEdmaChannel;
-}
-
-IMXRT_DMA_TCD_t &hardwareTcd() {
-  return IMXRT_DMA_TCD[board::kGpioEdmaChannel];
-}
-
 std::uint32_t address32(const volatile void *address) {
   return static_cast<std::uint32_t>(
       reinterpret_cast<std::uintptr_t>(address));
@@ -141,8 +129,7 @@ void forceSafeInputs() {
 bool resourcesBusy() {
   const IMXRT_PIT_CHANNEL_t &pit =
       IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
-  return pit.TCTRL != 0U || (DMA_ERQ & kChannelMask) != 0U ||
-         (*dmamuxRegister() & DMAMUX_CHCFG_ENBL) != 0U ||
+  return pit.TCTRL != 0U || gpio_dma_route::edmaRequestBusy() ||
          gpio_dma_route::selectedOutputBusy();
 }
 
@@ -168,7 +155,7 @@ void configureDescriptor(IMXRT_DMA_TCD_t &descriptor,
 
 void copyDescriptorToHardware(const IMXRT_DMA_TCD_t &source,
                               std::int32_t next_descriptor) {
-  IMXRT_DMA_TCD_t &destination = hardwareTcd();
+  IMXRT_DMA_TCD_t &destination = gpio_dma_route::edmaTcd();
   destination.SADDR = source.SADDR;
   destination.SOFF = source.SOFF;
   destination.ATTR = source.ATTR;
@@ -201,7 +188,7 @@ bool hardwareDestinationMatches(std::uint8_t destination) {
     return false;
   }
   const std::uintptr_t current =
-      reinterpret_cast<std::uintptr_t>(hardwareTcd().DADDR);
+      reinterpret_cast<std::uintptr_t>(gpio_dma_route::edmaTcd().DADDR);
   const std::uintptr_t first = reinterpret_cast<std::uintptr_t>(begin);
   const std::uintptr_t end =
       first + (destination == kOverflowDestination
@@ -214,8 +201,7 @@ void disableHardware() {
   IMXRT_PIT_CHANNEL_t &pit =
       IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
   pit.TCTRL = 0U;
-  DMA_CERQ = board::kGpioEdmaChannel;
-  *dmamuxRegister() = 0U;
+  gpio_dma_route::disableEdmaRequest();
   gpio_dma_route::disableXbarRequest();
   gpio_dma_route::barrier();
 }
@@ -234,7 +220,7 @@ void dmaMajorLoopIsr() {
     saturatingIncrement(g_stale_dma_completions);
     return;
   }
-  if ((DMA_ERR & kChannelMask) != 0U) {
+  if ((DMA_ERR & gpio_dma_route::kEdmaChannelMask) != 0U) {
     faultFromIsr();
     return;
   }
@@ -251,12 +237,12 @@ void dmaMajorLoopIsr() {
     faultFromIsr();
     return;
   }
-  hardwareTcd().DLASTSGA = next;
+  gpio_dma_route::edmaTcd().DLASTSGA = next;
   gpio_dma_route::barrier();
 }
 
 std::uint32_t activeSamples() {
-  const IMXRT_DMA_TCD_t &tcd = hardwareTcd();
+  const IMXRT_DMA_TCD_t &tcd = gpio_dma_route::edmaTcd();
   const std::uint16_t biter = tcd.BITER_ELINKNO;
   const std::uint16_t citer = tcd.CITER_ELINKNO;
   if (biter != protocol_v1::kGpioSamplesPerFrame || citer > biter) {
@@ -300,16 +286,9 @@ StartStatus startHardware() {
                : StartStatus::kNotQuiescent;
   }
 
-  volatile std::uint32_t *const dmamux = dmamuxRegister();
-  *dmamux = 0U;
-  DMA_CERQ = board::kGpioEdmaChannel;
-  DMA_CERR = board::kGpioEdmaChannel;
-  DMA_CEEI = board::kGpioEdmaChannel;
-  DMA_CINT = board::kGpioEdmaChannel;
-  DMA_CDNE = board::kGpioEdmaChannel;
+  gpio_dma_route::clearEdmaChannelState();
   configureDescriptors(prime);
-  DMA_DCHPRI2 = static_cast<std::uint8_t>(
-      DMA_DCHPRI_ECP | DMA_DCHPRI_CHPRI(board::kGpioEdmaPriority));
+  gpio_dma_route::configureEdmaPriority();
 
   gpio_dma_route::configureStoppedPit(kProductionPitLoad);
   gpio_dma_route::configureXbarRequest();
@@ -319,8 +298,7 @@ StartStatus startHardware() {
   NVIC_SET_PRIORITY(IRQ_DMA_CH2, board::kGpioEdmaIrqPriority);
   NVIC_CLEAR_PENDING(IRQ_DMA_CH2);
   NVIC_ENABLE_IRQ(IRQ_DMA_CH2);
-  *dmamux = kDmamuxConfiguration;
-  DMA_SERQ = board::kGpioEdmaChannel;
+  gpio_dma_route::enableEdmaRequest();
   g_resource_conflicts = 0U;
   g_start_errors = 0U;
   g_stop_errors = 0U;
@@ -340,7 +318,8 @@ StopReport stopHardware() {
   NVIC_DISABLE_IRQ(IRQ_DMA_CH2);
 
   Snapshot before = g_ring.snapshot();
-  if (before.running && (DMA_INT & kChannelMask) != 0U) {
+  if (before.running &&
+      (DMA_INT & gpio_dma_route::kEdmaChannelMask) != 0U) {
     DMA_CINT = board::kGpioEdmaChannel;
     const MajorLoopResult pending = g_ring.onMajorLoopComplete();
     if (!pending.ok()) {
@@ -385,14 +364,14 @@ HardwareSnapshot hardwareSnapshot() {
       IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
   value.pit_ldval = pit.LDVAL;
   value.pit_tctrl = pit.TCTRL;
-  value.dmamux_chcfg = *dmamuxRegister();
+  value.dmamux_chcfg = *gpio_dma_route::dmamuxChannelRegister();
   value.dma_erq = DMA_ERQ;
   value.dma_err = DMA_ERR;
-  const IMXRT_DMA_TCD_t &tcd = hardwareTcd();
+  const IMXRT_DMA_TCD_t &tcd = gpio_dma_route::edmaTcd();
   value.tcd_citer = tcd.CITER_ELINKNO;
   value.tcd_biter = tcd.BITER_ELINKNO;
   value.tcd_csr = tcd.CSR;
-  value.edma_priority = static_cast<std::uint8_t>(DMA_DCHPRI2 & 0x0FU);
+  value.edma_priority = gpio_dma_route::edmaPriority();
   value.resource_conflicts = g_resource_conflicts;
   value.start_errors = g_start_errors;
   value.stop_errors = g_stop_errors;

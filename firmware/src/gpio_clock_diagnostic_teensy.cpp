@@ -30,8 +30,6 @@ namespace {
 
 constexpr std::uint32_t kSourceWord = 0xA5C35A7EU;
 constexpr std::uint32_t kDestinationPoison = 0x5A3CA581U;
-constexpr std::uint32_t kDmamuxConfiguration =
-    DMAMUX_CHCFG_ENBL | board::kGpioDmamuxSource;
 constexpr std::uint16_t kTcdAttributes =
     DMA_TCD_ATTR_SSIZE(2U) | DMA_TCD_ATTR_DSIZE(2U);
 constexpr std::uint16_t kTcdCsr = DMA_TCD_CSR_DREQ;
@@ -63,12 +61,9 @@ class TeensyPlatform final : public Platform {
     gpio_dma_route::enableClockGates();
 
     volatile std::uint32_t *const dmamux =
-        &DMAMUX_CHCFG0 + board::kGpioEdmaChannel;
-    IMXRT_DMA_TCD_t &tcd = IMXRT_DMA_TCD[board::kGpioEdmaChannel];
-    const std::uint32_t channel_mask =
-        std::uint32_t{1U} << board::kGpioEdmaChannel;
-    if (pit.TCTRL != 0U || (DMA_ERQ & channel_mask) != 0U ||
-        (*dmamux & DMAMUX_CHCFG_ENBL) != 0U ||
+        gpio_dma_route::dmamuxChannelRegister();
+    IMXRT_DMA_TCD_t &tcd = gpio_dma_route::edmaTcd();
+    if (pit.TCTRL != 0U || gpio_dma_route::edmaRequestBusy() ||
         gpio_dma_route::selectedOutputBusy()) {
       addError(snapshot, protocol_v1::GpioClockError::kResourceBusy);
       captureUnarmed(snapshot, *dmamux, tcd);
@@ -95,12 +90,7 @@ class TeensyPlatform final : public Platform {
     volatile std::uint16_t *const xbar_control_register =
         gpio_dma_route::xbarControlRegister();
 
-    *dmamux = 0U;
-    DMA_CERQ = board::kGpioEdmaChannel;
-    DMA_CERR = board::kGpioEdmaChannel;
-    DMA_CEEI = board::kGpioEdmaChannel;
-    DMA_CINT = board::kGpioEdmaChannel;
-    DMA_CDNE = board::kGpioEdmaChannel;
+    gpio_dma_route::clearEdmaChannelState();
 
     g_gpio_clock_diagnostic_buffer.words[0] = kSourceWord;
     g_gpio_clock_diagnostic_buffer.words[1] = kDestinationPoison;
@@ -117,10 +107,8 @@ class TeensyPlatform final : public Platform {
     tcd.DLASTSGA = 0;
     tcd.BITER_ELINKNO = plan.tcd_major_count;
     tcd.CSR = kTcdCsr;
-    DMA_DCHPRI2 = static_cast<std::uint8_t>(
-        DMA_DCHPRI_ECP | DMA_DCHPRI_CHPRI(board::kGpioEdmaPriority));
-    *dmamux = kDmamuxConfiguration;
-    DMA_SERQ = board::kGpioEdmaChannel;
+    gpio_dma_route::configureEdmaPriority();
+    gpio_dma_route::enableEdmaRequest();
 
     snapshot.ccm_cscmr1_configured = CCM_CSCMR1;
     snapshot.ccm_ccgr1_configured = CCM_CCGR1;
@@ -139,8 +127,7 @@ class TeensyPlatform final : public Platform {
     snapshot.tcd_biter = tcd.BITER_ELINKNO;
     snapshot.tcd_attr = tcd.ATTR;
     snapshot.tcd_soff = static_cast<std::uint16_t>(tcd.SOFF);
-    snapshot.edma_priority =
-        static_cast<std::uint8_t>(DMA_DCHPRI2 & 0x0FU);
+    snapshot.edma_priority = gpio_dma_route::edmaPriority();
     validateArmed(plan, snapshot);
 
     gpio_dma_route::barrier();
@@ -157,8 +144,7 @@ class TeensyPlatform final : public Platform {
     pit.TCTRL = 0U;
     gpio_dma_route::barrier();
     const std::uint32_t measurement_end = ARM_DWT_CYCCNT;
-    DMA_CERQ = board::kGpioEdmaChannel;
-    *dmamux = 0U;
+    gpio_dma_route::disableEdmaRequest();
     gpio_dma_route::disableXbarRequest();
     gpio_dma_route::barrier();
 
@@ -179,7 +165,7 @@ class TeensyPlatform final : public Platform {
                       sizeof(g_gpio_clock_diagnostic_buffer));
     snapshot.last_sample_word = g_gpio_clock_diagnostic_buffer.words[1];
 
-    if ((snapshot.dma_err_final & channel_mask) != 0U ||
+    if ((snapshot.dma_err_final & gpio_dma_route::kEdmaChannelMask) != 0U ||
         snapshot.dma_es_final != 0U) {
       addError(snapshot, protocol_v1::GpioClockError::kEdmaChannelError);
     }
@@ -226,8 +212,7 @@ class TeensyPlatform final : public Platform {
     snapshot.tcd_csr_final = tcd.CSR;
     snapshot.tcd_attr = tcd.ATTR;
     snapshot.tcd_soff = static_cast<std::uint16_t>(tcd.SOFF);
-    snapshot.edma_priority =
-        static_cast<std::uint8_t>(DMA_DCHPRI2 & 0x0FU);
+    snapshot.edma_priority = gpio_dma_route::edmaPriority();
   }
 
   static void validateArmed(
@@ -263,7 +248,8 @@ class TeensyPlatform final : public Platform {
              gpio_dma_route::kXbarSelectedDmaEnable)) {
       addError(snapshot, protocol_v1::GpioClockError::kXbarConfigMismatch);
     }
-    if (snapshot.dmamux_chcfg_configured != kDmamuxConfiguration) {
+    if (snapshot.dmamux_chcfg_configured !=
+        gpio_dma_route::kDmamuxConfiguration) {
       addError(snapshot, protocol_v1::GpioClockError::kDmamuxConfigMismatch);
     }
     if (snapshot.tcd_nbytes != sizeof(std::uint32_t) ||
