@@ -26,10 +26,22 @@ LoopReport FirmwareRuntime::service() {
     }
   }
 
-  // Phase 03 has no acquisition engine. Consuming these compact signals here
-  // proves their main-loop ownership; later phases will route the same report
-  // to bounded clock/source operations without moving work into an ISR.
   report.events = control_.takePendingEvents();
+  if (report.events.has(control::Event::kStop)) {
+    packet_pipeline_.stopProduction();
+    report.packet_production_stopped = true;
+  }
+  if (report.events.has(control::Event::kStartEpoch)) {
+    report.packet_start_status =
+        packet_pipeline_.startRun(report.events.run_id);
+    report.packet_run_started =
+        report.packet_start_status == packet::OperationStatus::kOk;
+  }
+
+  // All frame construction and queue ownership changes stay in this bounded
+  // cooperative path. A future pacing ISR may only publish compact event/time
+  // state for source code serviced before this promotion step.
+  report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
   return report;
 }

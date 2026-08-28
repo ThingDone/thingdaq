@@ -31,13 +31,15 @@ never application frame boundaries.
 
 ## Firmware control-plane foundation
 
-Phase 03 centralizes three portable identity/resource authorities:
+The Phase 03 control plane and Phase 04 packet foundation centralize these
+portable authorities:
 
 | Authority | Responsibility |
 | --- | --- |
 | `firmware/src/firmware_identity.h` | Product, board, MCU, CPU, core, compiler, USB/menu, semantic firmware, protocol, source, build, and timestamp identity |
 | `firmware/src/board_config.h` | The single pin, timer, XBAR, ADC_ETC, eDMA, queue, DMA-memory, alignment, and future-owner registry |
 | `firmware/src/firmware_capabilities.h` | The exact INFO metadata projected from generated protocol constants and the resource registry |
+| `firmware/src/packet_buffer_pipeline.{h,cpp}` | Fixed aligned complete-frame storage, explicit ownership transitions, per-source sequences/counters, bounded ready/transmit index queues, and high-water telemetry |
 | `firmware/src/usb_transport.{h,cpp}` | Portable bounded CDC receive/transmit scheduling, complete command/response queues, frame ownership, and transport diagnostics |
 | `firmware/src/teensy_usb.{h,cpp}` | The narrow Teensy-core byte-stream adapter, product descriptor override, and bridge to the core-generated chip serial number |
 | `firmware/src/firmware_runtime.{h,cpp}` | Portable cooperative integration of receive, one-command dispatch, control events, fail-safe recovery, and transmit |
@@ -111,23 +113,55 @@ only after the runtime cannot encode either the requested response or a typed
 INTERNAL_ERROR. Normal no-host backpressure is a stall, not a blocking wait or
 a fabricated transport failure.
 
+## Complete-frame packet pipeline
+
+Phase 04 adds a 16-entry pool of aligned 4,096-byte frames without enabling a
+synthetic or physical source yet. The pool is fixed storage with no steady-path
+allocation. `beginFill()` assigns the next independent ADC or GPIO sequence and
+records source production before asking for a free buffer, so pool exhaustion
+remains visible as both a drop counter and a later sequence gap. Only a valid
+fill lease can access the 4,048-byte payload region.
+
+Finalization rejects a short payload, validates the source-specific wire
+layout, and constructs the fixed header and Adler-32 trailer in place. Only
+then does ownership move from `FILLING` to a bounded per-source `READY` queue.
+A bounded alternating service moves complete frames into the transmit-index
+queue as immutable `TRANSMITTING` buffers. `CdcTransport` consumes that queue
+through the existing lower-priority interface and releases the front buffer
+only after all 4,096 bytes succeed. A new response may overtake unsent data at
+a boundary, but never an active frame. Starting another run is rejected while
+transport owns any frame.
+
+The packet bytes live in aligned DTCM/RAM1, not `DMAMEM`. Inspection of the
+pinned Teensy 1.62 `usb_serial.c` confirms that its public block-write path
+copies application bytes into a core-owned four-by-2,048-byte aligned OCRAM
+ring and flushes that destination before USB DMA. The project's 2,048-byte TX
+visit bound matches one core buffer and uses its conservative
+`availableForWrite()` signal; a zero or prefix return retains the application
+frame and offset. The 16 project buffers cover about 8.1 ms at the target
+framed rate, with about another 1.0 ms in the core ring. See
+[[Foundation-Reuse-Inventory]] and [[Firmware-Resource-Map]] for the pinned
+source audit and compile-time budget.
+
 ## Cooperative runtime integration
 
 Static initialization order is explicit at both ownership levels. The sketch
-declares the concrete Teensy CDC byte stream before `FirmwareRuntime`, and the
-runtime declares `ControlState` (which owns `Statistics`) before `CdcTransport`
-stores references to them. The pinned Teensy core initializes USB and its
-chip-derived serial descriptor before global C++ construction. `setup()` then
-passes that numeric serial to the one BOOT → IDLE transition; it never opens a
-serial facade, waits for DTR, or emits an unframed byte.
+declares the concrete Teensy CDC byte stream and aligned packet storage before
+`FirmwareRuntime`. The runtime declares `ControlState` (which owns
+`Statistics`) and `PacketBufferPipeline` before `CdcTransport` stores
+references to them. The pinned Teensy core initializes USB and its chip-derived
+serial descriptor before global C++ construction. `setup()` then passes that
+numeric serial to the one BOOT → IDLE transition; it never opens a serial
+facade, waits for DTR, or emits an unframed byte.
 
 Every `loop()` calls one portable runtime service step in this fixed order:
 
 1. receive at most 1,024 bytes and eight core read calls;
 2. dequeue and dispatch at most one complete command when a response slot is
    reserved;
-3. consume the bounded START-epoch/STOP event mask in main-loop context; and
-4. transmit at most 2,048 bytes and eight core write calls.
+3. consume the bounded START-epoch/STOP event mask in main-loop context;
+4. promote at most four complete ready frames into transport ownership; and
+5. transmit at most 2,048 bytes and eight core write calls.
 
 Valid typed rejections such as INVALID_STATE or UNSUPPORTED_CONFIGURATION are
 normal protocol outcomes and leave the prior state atomic. A response encoding

@@ -119,12 +119,32 @@ uses fixed command/response queues, bounded byte and call budgets, exact
 partial-write continuation, response-first frame scheduling, and exposed
 queue/stall diagnostics.
 
-`FirmwareRuntime` now connects that transport to the portable control
-dispatcher. The thin sketch constructs the Teensy CDC adapter before the
-runtime, binds INFO to the core-derived hardware serial during bounded BOOT,
-and makes one cooperative service call per loop. Each call performs bounded
-receive work, dispatches at most one command, consumes compact START/STOP
-events, and performs bounded transmit work. Expected typed command errors are
+Phase 04 now supplies the streaming transport's allocation-free packet
+foundation while deliberately leaving source capabilities disabled until the
+synthetic generators are implemented. Sixteen aligned 4,096-byte DTCM frames
+move through explicit `FREE -> FILLING -> READY -> TRANSMITTING -> FREE`
+ownership. ADC and GPIO retain independent production/sequence/counter state,
+per-source ready FIFOs feed one bounded transmit FIFO, and every queue exposes
+current and high-water depth. Frames are validated and checksummed in place
+before transport admission; a partial USB write keeps immutable ownership
+until the final byte succeeds.
+
+The DTCM placement follows a reinspection of pinned Teensy core 1.62.0: USB
+Serial copies writes into its own four 2,048-byte aligned `DMAMEM` buffers and
+flushes those buffers before DMA. The 16 application frames cover about 8.1 ms
+at the nominal combined framed rate, plus about 1.0 ms in the core ring. The
+compile-time registry reserves 72,096 bytes of RAM1 project data and 97,280
+bytes of future RAM2 acquisition storage; see
+`doc/architecture/firmware-resource-map.md` and
+`doc/reference/Foundation-Reuse-Inventory.md`.
+
+`FirmwareRuntime` connects that transport to the portable control dispatcher
+and packet pipeline. The thin sketch constructs the Teensy CDC adapter and
+aligned packet storage before the runtime, binds INFO to the core-derived
+hardware serial during bounded BOOT, and makes one cooperative service call per
+loop. Each call performs bounded receive work, dispatches at most one command,
+consumes compact START/STOP events, promotes bounded ready frames, and performs
+bounded transmit work. Expected typed command errors are
 state-atomic; an internal response-path failure emits an INTERNAL_ERROR when
 possible, releases its queue reservation, and fails safe to IDLE. INFO exposes
 the protocol version, semantic firmware version, board/MCU IDs, hardware
@@ -134,7 +154,8 @@ a stale or incompatible image before control changes.
 ## Portable firmware tests
 
 The firmware test suite host-compiles the production protocol, control,
-statistics, transport, and runtime sources with allocation-free C++17 flags.
+statistics, packet-pipeline, transport, and runtime sources with
+allocation-free C++17 flags.
 It exercises every split and truncation point for every command, corrupt-stream
 recovery, the complete state-transition matrix, idempotency, counters, and
 fixed frame/queue boundaries. A bidirectional interoperability test sends

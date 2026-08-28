@@ -130,6 +130,13 @@ Result decodeFrame(ByteView input, DecodedFrame &frame);
 Result encodeFrameTo(FrameFields fields, ByteView payload,
                      MutableByteView output, std::size_t &written);
 
+// Finalize a fixed data frame around payload bytes already written directly
+// into [kHeaderSize, kHeaderSize + kDataPayloadBytes). This avoids a second
+// 4048-byte staging allocation/copy while still validating the payload and
+// constructing the complete header/checksum before queue admission.
+Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
+                              std::size_t payload_bytes_written);
+
 template <std::size_t Capacity>
 Result encodeFrame(FrameFields fields, ByteView payload,
                    FixedFrame<Capacity> &output) {

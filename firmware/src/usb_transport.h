@@ -138,6 +138,12 @@ class FixedQueue {
     return true;
   }
 
+  constexpr void clear() {
+    head_ = 0U;
+    tail_ = 0U;
+    size_ = 0U;
+  }
+
  private:
   std::array<Item, Capacity> storage_{};
   std::size_t head_ = 0U;

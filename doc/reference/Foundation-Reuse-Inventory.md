@@ -96,3 +96,35 @@ The resulting fixed reservations and compile-time invariants are documented in
 [[Firmware-Resource-Map]]. Their presence is not evidence that acquisition is
 implemented; [[System-Overview]] defines the Phase 03 control-only capability
 mask.
+
+## Phase 04 packet and USB reinspection
+
+Before adding packet storage, the complete Phase 03 firmware closure was
+reinspected: `board_config.h`, the portable protocol encoder/decoder,
+`CdcTransport`, `FirmwareRuntime`, control events/statistics, the thin sketch,
+all host-C++ wrappers, and the Phase 03 local/rig evidence. The existing
+`LowerPriorityFrameSource` seam and active-frame byte offset are reused. In
+particular, `CdcTransport` already gives a partially written lower-priority
+frame immutable ownership until the final byte succeeds, and response priority
+applies only at a frame boundary. No second USB scheduler or queue utility was
+introduced; the packet pipeline reuses the existing fixed FIFO template.
+
+The exact installed Teensy 1.62.0 sources were then reread at
+`/home/bill/.arduino15/packages/teensy/hardware/avr/1.62.0/cores/teensy4`:
+
+| Pinned source | Finding used by Phase 04 |
+| --- | --- |
+| `usb_serial.c` | USB Serial owns four 2,048-byte TX buffers (`TX_NUM=4`, `TX_SIZE=2048`) and four transfer descriptors. The byte-copy destination is 32-byte-aligned `DMAMEM`; the core calls `arm_dcache_flush_delete()` immediately before `usb_transmit()`. |
+| `usb_serial.c` | `usb_serial_write_buffer_free()` deliberately excludes the current TX head and reports only idle non-head buffers. With the project TX visit capped at 2,048 bytes, a positive result is the core's conservative pattern for avoiding its 120 ms fallback wait; zero capacity returns to the cooperative loop. |
+| `usb_serial.c` | `usb_serial_write()` may still return zero or a prefix on disconnect/timeout. Therefore the application must retain its frame and byte offset and retry later; it must never infer atomic acceptance from the 4,096-byte application-frame size. |
+| `usb_serial.c` / `usb_desc.h` | High-speed CDC packets are 512 bytes, but the core coalesces them in 2,048-byte buffers and its 75 us one-shot flush handles short writes. Application framing remains independent of both sizes. |
+| `usb_serial.h` | `availableForWrite()` and the returned count from block `write()` are the only public capacity/progress signals; `flush()` is not a completion fence for host receipt. |
+
+This copy boundary determines the memory rule in [[Firmware-Resource-Map]].
+Application packet frames are aligned CPU-owned DTCM/RAM1, because the core
+copies them into its own DMA-visible storage. Marking the project pool
+`DMAMEM` would consume OCRAM and introduce a cache-ownership story without
+enabling zero-copy USB. Future ADC/GPIO rings that are actually read or written
+by eDMA remain aligned `DMAMEM` OCRAM/RAM2 and require explicit cache
+maintenance. The 16-frame application pool covers about 8.1 ms at the nominal
+combined framed rate; the core's 8,192-byte TX ring adds about another 1.0 ms.

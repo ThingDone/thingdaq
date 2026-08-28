@@ -18,6 +18,7 @@ namespace board = teensy_daq::board;
 namespace constants = teensy_daq::protocol_v1;
 namespace control = teensy_daq::control;
 namespace identity = teensy_daq::identity;
+namespace packet = teensy_daq::packet;
 namespace usb = teensy_daq::usb;
 namespace wire = teensy_daq::protocol;
 
@@ -138,6 +139,8 @@ struct DrainResult {
   bool quiescent = false;
   bool saw_start = false;
   bool saw_stop = false;
+  bool packet_started = false;
+  bool packet_stopped = false;
 };
 
 DrainResult drain(app::FirmwareRuntime &firmware, FakeCdcStream &stream) {
@@ -161,6 +164,10 @@ DrainResult drain(app::FirmwareRuntime &firmware, FakeCdcStream &stream) {
         result.saw_start || report.events.has(control::Event::kStartEpoch);
     result.saw_stop =
         result.saw_stop || report.events.has(control::Event::kStop);
+    result.packet_started =
+        result.packet_started || report.packet_run_started;
+    result.packet_stopped =
+        result.packet_stopped || report.packet_production_stopped;
 
     if (stream.inputEmpty() && after.pending_rx_bytes == 0U &&
         after.command_queue_depth == 0U &&
@@ -215,7 +222,8 @@ std::string buildId(const wire::DecodedFrame &info) {
 
 void testCompleteControlPlane() {
   FakeCdcStream stream{};
-  app::FirmwareRuntime firmware{stream};
+  packet::PacketBufferStorage packet_storage{};
+  app::FirmwareRuntime firmware{stream, packet_storage};
   constexpr std::uint32_t hardware_serial = 167772150U;
   constexpr std::uint64_t nonce = 0x0123456789ABCDEFULL;
 
@@ -234,9 +242,12 @@ void testCompleteControlPlane() {
   stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 3U));
   const DrainResult started = drain(firmware, stream);
   expect(started.quiescent && started.saw_start && !started.saw_stop &&
+             started.packet_started && !started.packet_stopped &&
              firmware.state() == constants::DeviceState::kRunning &&
-             firmware.runId() == 1U,
-         "INFO-CONFIGURE-START completes through the byte-stream runtime");
+             firmware.runId() == 1U &&
+             firmware.packetSnapshot().run_id == 1U &&
+             firmware.packetSnapshot().accepting_frames,
+         "INFO-CONFIGURE-START arms the packet run in cooperative context");
 
   wire::CommandFrame corrupt = pingRequest(90U, 90U);
   corrupt.mutableData()[corrupt.size() - 1U] ^= 0x80U;
@@ -250,9 +261,11 @@ void testCompleteControlPlane() {
   stream.appendInput(emptyRequest(constants::FrameKind::kInfoRequest, 8U));
   const DrainResult stopped = drain(firmware, stream);
   expect(stopped.quiescent && !stopped.saw_start && stopped.saw_stop &&
+             !stopped.packet_started && stopped.packet_stopped &&
              firmware.state() == constants::DeviceState::kIdle &&
-             firmware.runId() == 1U,
-         "STATUS-PING-STOP-RESET-INFO finishes in clean IDLE");
+             firmware.runId() == 1U &&
+             !firmware.packetSnapshot().accepting_frames,
+         "STATUS-PING-STOP-RESET-INFO stops packet production in clean IDLE");
 
   const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
   expect(frames.size() == 8U,

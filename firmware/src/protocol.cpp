@@ -680,6 +680,38 @@ FrameFields responseFields(protocol_v1::FrameKind kind, const Request &request,
   return fields;
 }
 
+bool writeHeader(const FrameHeader &header, MutableByteView output) {
+  if (!output.valid() || output.size < protocol_v1::kHeaderSize) {
+    return false;
+  }
+  for (std::size_t index = 0U; index < protocol_v1::kHeaderSize; ++index) {
+    output.data[index] = 0U;
+  }
+  output.data[protocol_v1::kHeaderVersionOffset] = header.version;
+  output.data[protocol_v1::kHeaderKindOffset] =
+      static_cast<std::uint8_t>(header.kind);
+  output.data[protocol_v1::kHeaderChecksumAlgorithmOffset] =
+      static_cast<std::uint8_t>(header.checksum_algorithm);
+  return storeU32(output, protocol_v1::kHeaderMagicOffset,
+                  protocol_v1::kMagic) &&
+         storeU16(output, protocol_v1::kHeaderFlagsOffset, header.flags) &&
+         storeU16(output, protocol_v1::kHeaderHeaderLengthOffset,
+                  header.header_length) &&
+         storeU32(output, protocol_v1::kHeaderTotalLengthOffset,
+                  header.total_length) &&
+         storeU32(output, protocol_v1::kHeaderPayloadLengthOffset,
+                  header.payload_length) &&
+         storeU32(output, protocol_v1::kHeaderRunIdOffset, header.run_id) &&
+         storeU32(output, protocol_v1::kHeaderSequenceOffset,
+                  header.sequence) &&
+         storeU32(output, protocol_v1::kHeaderRequestIdOffset,
+                  header.request_id) &&
+         storeU64(output, protocol_v1::kHeaderFirstSampleTicksOffset,
+                  header.first_sample_ticks) &&
+         storeU32(output, protocol_v1::kHeaderItemCountOffset,
+                  header.item_count);
+}
+
 void writeSuccessPrefix(MutableByteView payload) {
   payload.data[protocol_v1::kResponsePrefixResponseStatusOffset] =
       static_cast<std::uint8_t>(protocol_v1::ResponseStatus::kOk);
@@ -903,25 +935,9 @@ Result encodeFrameTo(FrameFields fields, ByteView payload,
   for (std::size_t index = 0U; index < total; ++index) {
     output.data[index] = 0U;
   }
-  storeU32(output, protocol_v1::kHeaderMagicOffset, protocol_v1::kMagic);
-  output.data[protocol_v1::kHeaderVersionOffset] = protocol_v1::kProtocolVersion;
-  output.data[protocol_v1::kHeaderKindOffset] =
-      static_cast<std::uint8_t>(header.kind);
-  storeU16(output, protocol_v1::kHeaderFlagsOffset, header.flags);
-  storeU16(output, protocol_v1::kHeaderHeaderLengthOffset,
-           static_cast<std::uint16_t>(protocol_v1::kHeaderSize));
-  output.data[protocol_v1::kHeaderChecksumAlgorithmOffset] =
-      static_cast<std::uint8_t>(header.checksum_algorithm);
-  storeU32(output, protocol_v1::kHeaderTotalLengthOffset,
-           header.total_length);
-  storeU32(output, protocol_v1::kHeaderPayloadLengthOffset,
-           header.payload_length);
-  storeU32(output, protocol_v1::kHeaderRunIdOffset, header.run_id);
-  storeU32(output, protocol_v1::kHeaderSequenceOffset, header.sequence);
-  storeU32(output, protocol_v1::kHeaderRequestIdOffset, header.request_id);
-  storeU64(output, protocol_v1::kHeaderFirstSampleTicksOffset,
-           header.first_sample_ticks);
-  storeU32(output, protocol_v1::kHeaderItemCountOffset, header.item_count);
+  if (!writeHeader(header, output)) {
+    return badLength();
+  }
   for (std::size_t index = 0U; index < payload.size; ++index) {
     output.data[protocol_v1::kHeaderSize + index] = payload.data[index];
   }
@@ -934,6 +950,56 @@ Result encodeFrameTo(FrameFields fields, ByteView payload,
     return result.ok() ? badLength() : result;
   }
   written = total;
+  return Result::success();
+}
+
+Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
+                              std::size_t payload_bytes_written) {
+  if (!frame.valid() || frame.size != protocol_v1::kDataFrameBytes ||
+      payload_bytes_written != protocol_v1::kDataPayloadBytes ||
+      !isDataKind(fields.kind)) {
+    return badLength();
+  }
+
+  FrameHeader header{};
+  header.kind = fields.kind;
+  header.flags = fields.flags;
+  header.checksum_algorithm = fields.checksum_algorithm;
+  header.total_length =
+      static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes);
+  header.payload_length =
+      static_cast<std::uint32_t>(protocol_v1::kDataPayloadBytes);
+  header.run_id = fields.run_id;
+  header.sequence = fields.sequence;
+  header.request_id = fields.request_id;
+  header.first_sample_ticks = fields.first_sample_ticks;
+  header.item_count = fields.item_count;
+  Result result = validateHeader(header, false);
+  if (!result.ok()) {
+    return result;
+  }
+
+  const ByteView payload{frame.data + protocol_v1::kHeaderSize,
+                         protocol_v1::kDataPayloadBytes};
+  result = validatePayload(header, payload);
+  if (!result.ok()) {
+    return result;
+  }
+  if (!writeHeader(header, frame)) {
+    return badLength();
+  }
+
+  std::uint32_t checksum = 0U;
+  result = computeChecksum(
+      header.checksum_algorithm,
+      {frame.data, protocol_v1::kHeaderSize + protocol_v1::kDataPayloadBytes},
+      checksum);
+  if (!result.ok() ||
+      !storeU32(frame,
+                protocol_v1::kHeaderSize + protocol_v1::kDataPayloadBytes,
+                checksum)) {
+    return result.ok() ? badLength() : result;
+  }
   return Result::success();
 }
 

@@ -20,7 +20,8 @@ This is the human-readable projection of the compile-time registry in
 `firmware/src/board_config.h`. Numeric allocations are reserved now so future
 acquisition modules cannot silently compete. Phase 03 does not enable the PIT,
 XBAR, ADC_ETC, or eDMA acquisition path and does not advertise ADC/GPIO stream
-support. See [[System-Overview]] for that capability boundary and
+support. Phase 04 now instantiates the CPU-owned packet pipeline without yet
+enabling a source capability. See [[System-Overview]] for that boundary and
 [[Protocol-V1]] with [[ADR-001-Wire-Protocol]] for the wire metadata.
 
 ## Fixed platform
@@ -109,11 +110,15 @@ use an unconstrained first-free allocator.
 | ADC DMA ring | 4 buffers | ADC capture |
 | Raw GPIO DMA ring | 4 buffers | GPIO capture |
 | Packed GPIO ring | 4 buffers | GPIO packer |
-| Complete data transmit queue | 4 frames | Packetizer |
+| Aligned complete-frame packet pool | 16 × 4,096-byte buffers | Packetizer |
+| Per-source ready queues | 16 ADC + 16 GPIO indexes; shared pool limits actual ownership to 16 | Packetizer |
+| Complete-frame transmit queue | 16 indexes | Packetizer / USB transport |
+| Ready-to-transmit promotions per loop | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
 | USB transmit work per loop | 2,048 bytes | USB transport |
 | USB read calls per loop | 8 | USB transport |
 | USB write calls per loop | 8 | USB transport |
+| Pinned core TX ring (core-owned) | 4 × 2,048 bytes | Teensy USB Serial |
 
 The 64-byte parser capacity covers the generated 56-byte maximum command plus
 three possible bytes of the next magic and alignment slack. The separate
@@ -124,6 +129,12 @@ bound each cooperative-loop visit, including a backend that repeatedly returns
 short or zero-length operations. These values are capacities, never
 heap-growth hints.
 
+At the nominal combined framed rate, one 4,096-byte application buffer covers
+about 0.506 ms. The 16-frame pool therefore retains about 8.1 ms of complete
+frames, and the pinned core's 8,192-byte TX ring contributes about 1.0 ms more.
+The later throughput gate is responsible for measuring and tuning this
+compile-time choice under synthetic load; neither queue can grow at runtime.
+
 ## Memory reservations
 
 | Use | Region | Calculation | Reserved bytes | Alignment | Future owner |
@@ -132,35 +143,47 @@ heap-growth hints.
 | USB RX scratch | DTCM / RAM1 | fixed | 128 | 4 | USB transport |
 | Command queue | DTCM / RAM1 | `4 × 56` | 224 | 4 | Control plane |
 | Response queue | DTCM / RAM1 | `4 × 1,024` | 4,096 | 4 | USB transport |
+| Complete packet buffers | DTCM / RAM1 | `16 × 4,096` | 65,536 | 32 | Packetizer |
+| Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 2,048 | 32 | Packetizer |
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
-| Data transmit queue | OCRAM / RAM2 | `4 × 4,096` | 16,384 | 32 | Packetizer |
-| **RAM1 subtotal** |  |  | **4,512** |  |  |
-| **RAM2 subtotal** |  |  | **113,664** |  |  |
+| **RAM1 subtotal** |  |  | **72,096** |  |  |
+| **RAM2 subtotal** |  |  | **97,280** |  |  |
 
-DMA-visible buffers belong in `DMAMEM` OCRAM/RAM2, begin on 32-byte cache
-boundaries, occupy whole cache lines, and require explicit cache maintenance at
-ownership transitions. The registry reserves bytes but does not instantiate
-these future rings. Compile-time checks reject zero-sized, non-power-of-two,
-misaligned, or over-budget allocations.
+The application packet pool is instantiated now as aligned ordinary global
+storage in cacheless DTCM/RAM1. Teensy USB Serial copies from it into the
+core-owned aligned `DMAMEM` TX ring and flushes that destination before USB
+DMA, so the project must not flush or invalidate packet buffers. Actual
+DMA-visible acquisition rings remain future `DMAMEM` OCRAM/RAM2 allocations:
+they begin on 32-byte cache boundaries, occupy whole cache lines, and require
+explicit cache maintenance at ownership transitions. Compile-time checks bind
+the packet storage type to 65,536 bytes, cap pipeline metadata at 2,048 bytes,
+and reject zero-sized, non-power-of-two, misaligned, or over-budget registry
+entries.
 
 ## Ownership transitions
 
-Future acquisition code must use explicit complete-buffer states:
+The implemented packet pipeline uses explicit complete-buffer states:
 
 ```text
-FREE -> DMA_FILLING -> READY -> PACKING/FRAMING -> QUEUED -> FREE
+FREE -> FILLING -> READY -> TRANSMITTING -> FREE
 ```
 
-ADC interleaved storage is READY only after both ADC eDMA completions. GPIO raw
-storage becomes READY after its eDMA major loop, then moves to a distinct
-packed buffer. A complete frame admitted to the USB queue cannot be abandoned
-after its first byte is transmitted. Command responses are selected before
-unsent data at each frame boundary; a data frame that has already emitted
-bytes finishes before a new response. Partial and zero writes retain both
-frame ownership and the byte offset for a later bounded loop visit. When an
-unsent data queue is full, loss policy operates on whole buffers and reports
-counters/gap flags defined by [[Protocol-V1]]. No ISR parses commands,
-calculates checksums, writes USB, waits, or performs broad control-state
-mutation.
+Only `FILLING` exposes the 4,048-byte payload as mutable. Finalization validates
+the exact payload count and writes the header plus checksum in place before a
+buffer can enter its source's bounded `READY` queue. Bounded alternating
+promotion transfers ownership to the transmit-index queue and makes the frame
+immutable. A new run may recycle stale `FILLING`/`READY` work but is rejected
+while any `TRANSMITTING` frame remains, so a partially emitted frame cannot be
+abandoned. Command responses are selected before unsent data at each frame
+boundary; an active data frame finishes first. Partial and zero writes retain
+both frame ownership and the byte offset for a later bounded loop visit.
+
+ADC interleaved DMA storage will become ready only after both ADC eDMA
+completions. GPIO raw storage will become ready after its eDMA major loop, then
+move to a distinct packed buffer. Those future acquisition transitions do not
+change the packet-pool contract. No project ISR fills or frames packets,
+calculates checksums, mutates queues, writes USB, waits, or performs broad
+control-state mutation; a future pacing ISR may only advance compact event/time
+state for cooperative source service.

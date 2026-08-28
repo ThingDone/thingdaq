@@ -1,4 +1,4 @@
-"""Host-compiled integration checks for the cooperative firmware runtime."""
+"""Host checks for the fixed packet-buffer ownership pipeline."""
 
 from __future__ import annotations
 
@@ -9,25 +9,22 @@ import unittest
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-FIRMWARE_DIRECTORY = REPOSITORY_ROOT / "firmware"
-FIRMWARE_SOURCE = FIRMWARE_DIRECTORY / "src"
-CPP_TEST = FIRMWARE_DIRECTORY / "tests/firmware_runtime_test.cpp"
-PORTABLE_SOURCES = (
-    FIRMWARE_SOURCE / "firmware_runtime.h",
-    FIRMWARE_SOURCE / "firmware_runtime.cpp",
+FIRMWARE_SOURCE = REPOSITORY_ROOT / "firmware/src"
+CPP_TEST = REPOSITORY_ROOT / "firmware/tests/packet_buffer_pipeline_test.cpp"
+PRODUCTION_SOURCES = (
     FIRMWARE_SOURCE / "packet_buffer_pipeline.h",
     FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp",
 )
 
 
-class FirmwareRuntimeTests(unittest.TestCase):
-    def test_runtime_integrates_the_complete_control_plane(self) -> None:
+class PacketBufferPipelineTests(unittest.TestCase):
+    def test_ownership_pipeline_is_fixed_and_transport_integrated(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-runtime-") as directory:
-            executable = Path(directory) / "firmware-runtime-test"
+        with tempfile.TemporaryDirectory(prefix="teensy-daq-packets-") as directory:
+            executable = Path(directory) / "packet-buffer-pipeline-test"
             compile_result = subprocess.run(
                 [
                     compiler,
@@ -42,9 +39,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     "-fno-rtti",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
-                    str(FIRMWARE_SOURCE / "firmware_runtime.cpp"),
                     str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
-                    str(FIRMWARE_SOURCE / "control_state.cpp"),
                     str(FIRMWARE_SOURCE / "usb_transport.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
@@ -72,36 +67,38 @@ class FirmwareRuntimeTests(unittest.TestCase):
                 run_result.stdout + run_result.stderr,
             )
 
-    def test_runtime_is_portable_and_sketch_stays_thin(self) -> None:
-        runtime_source = "\n".join(
-            path.read_text(encoding="utf-8") for path in PORTABLE_SOURCES
+    def test_pipeline_has_no_heap_hardware_or_isr_work(self) -> None:
+        source = "\n".join(
+            path.read_text(encoding="utf-8") for path in PRODUCTION_SOURCES
         )
-        sketch = (FIRMWARE_DIRECTORY / "firmware.ino").read_text(encoding="utf-8")
         forbidden = (
-            "#include <Arduino",
             "std::vector",
+            "std::deque",
             "std::string",
             "malloc(",
             "calloc(",
             "realloc(",
             "free(",
             "operator new",
-            "delay(",
-            "yield(",
+            "#include <Arduino",
+            "arm_dcache",
+            "attachInterrupt",
+            "IntervalTimer",
+            "usb_serial_",
             "Serial.",
+            "yield(",
+            "delay(",
         )
         for token in forbidden:
             with self.subTest(token=token):
-                self.assertNotIn(token, runtime_source)
+                self.assertNotIn(token, source)
 
-        self.assertIn('include "src/firmware_runtime.h"', sketch)
-        self.assertIn('include "src/teensy_usb.h"', sketch)
-        self.assertIn("TeensyCdcByteStream", sketch)
-        self.assertIn("FirmwareRuntime", sketch)
-        self.assertIn("hardwareSerialNumber()", sketch)
-        self.assertIn("firmware_runtime.service()", sketch)
-        self.assertNotIn("Serial.", sketch)
-        self.assertLessEqual(len(sketch.splitlines()), 36)
+        for state in ("kFree", "kFilling", "kReady", "kTransmitting"):
+            self.assertIn(state, source)
+        self.assertIn("std::array", source)
+        self.assertIn("FixedQueue", source)
+        self.assertIn("encodeDataFrameInPlace", source)
+        self.assertIn("kPacketPipelineStateBudgetBytes", source)
 
 
 if __name__ == "__main__":

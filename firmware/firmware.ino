@@ -1,5 +1,5 @@
 /*
- * Teensy DAQ Phase 03 control-plane firmware.
+ * Teensy DAQ Phase 04 synthetic-streaming foundation.
  *
  * Native USB and its chip-derived serial descriptor are initialized by the
  * pinned Teensy core before global C++ construction and setup(). The portable
@@ -11,11 +11,13 @@
 
 namespace {
 
-// Same-translation-unit declaration order is intentional: the concrete USB
-// adapter exists before the runtime stores its byte-stream reference, while
-// FirmwareRuntime constructs ControlState/Statistics before CdcTransport.
+// Same-translation-unit declaration order is intentional. Packet storage is
+// cacheless aligned DTCM, not DMAMEM: the pinned CDC core copies each write
+// into its own DMA-visible OCRAM ring before transmission.
 teensy_daq::usb::TeensyCdcByteStream cdc_stream{};
-teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream};
+teensy_daq::packet::PacketBufferStorage packet_storage{};
+teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream,
+                                                       packet_storage};
 
 }  // namespace
 
@@ -27,6 +29,7 @@ void setup() {
 
 void loop() {
   // One call performs bounded RX, at most one command dispatch, event
-  // acknowledgement, and bounded TX. Teensy's main() calls yield afterward.
+  // acknowledgement, packet promotion, and bounded TX. Teensy's main() calls
+  // yield afterward.
   (void)firmware_runtime.service();
 }

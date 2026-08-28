@@ -35,10 +35,11 @@ enum class MemoryUse : std::uint8_t {
   kUsbRxScratch,
   kCommandQueue,
   kResponseQueue,
+  kPacketBufferStorage,
+  kPacketPipelineState,
   kAdcDmaRing,
   kGpioRawDmaRing,
   kGpioPackedRing,
-  kDataTransmitQueue,
 };
 
 struct PinAllocation {
@@ -157,7 +158,22 @@ inline constexpr std::size_t kResponseQueueDepth = 4U;
 inline constexpr std::size_t kAdcDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioPackedRingDepth = 4U;
-inline constexpr std::size_t kDataTransmitQueueDepth = 4U;
+// At the nominal combined framed rate, each 4096-byte buffer represents about
+// 0.506 ms. Sixteen application buffers retain about 8.1 ms of complete
+// frames; the pinned core contributes another four 2048-byte TX buffers. The
+// application pool stays in cacheless DTCM because USB Serial copies into the
+// core's own DMA-visible OCRAM buffers rather than DMA-reading our storage.
+inline constexpr std::size_t kPacketBufferCount = 16U;
+inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
+inline constexpr std::size_t kPacketTransmitQueueDepth = kPacketBufferCount;
+inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
+inline constexpr std::size_t kPacketPipelineStateBudgetBytes = 2048U;
+// Pinned Teensy 1.62 cores/teensy4/usb_serial.c constants. The core owns this
+// aligned DMAMEM ring; it is documented here but is not project allocation.
+inline constexpr std::size_t kPinnedUsbCdcTxBufferCount = 4U;
+inline constexpr std::size_t kPinnedUsbCdcTxBufferBytes = 2048U;
+inline constexpr std::size_t kPinnedUsbCdcTxStorageBytes =
+    kPinnedUsbCdcTxBufferCount * kPinnedUsbCdcTxBufferBytes;
 inline constexpr std::size_t kUsbRxBudgetBytesPerLoop = 1024U;
 inline constexpr std::size_t kUsbTxBudgetBytesPerLoop = 2048U;
 inline constexpr std::size_t kUsbRxCallsPerLoop = 8U;
@@ -173,6 +189,8 @@ inline constexpr std::size_t kGpioRawDmaBufferBytes =
     protocol_v1::kGpioSamplesPerFrame * sizeof(std::uint32_t);
 inline constexpr std::size_t kGpioPackedBufferStrideBytes =
     alignUp(protocol_v1::kDataPayloadBytes, kCacheLineBytes);
+inline constexpr std::size_t kPacketBufferStorageBytes =
+    kPacketBufferCount * protocol_v1::kDataFrameBytes;
 
 inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kCommandParser, MemoryRegion::kDtcmRam1,
@@ -185,6 +203,12 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kResponseQueue, MemoryRegion::kDtcmRam1,
      kResponseQueueDepth * protocol_v1::kMaxControlFrameBytes, 4U,
      ResourceOwner::kUsbTransport},
+    {MemoryUse::kPacketBufferStorage, MemoryRegion::kDtcmRam1,
+     kPacketBufferStorageBytes, kCacheLineBytes,
+     ResourceOwner::kPacketizer},
+    {MemoryUse::kPacketPipelineState, MemoryRegion::kDtcmRam1,
+     kPacketPipelineStateBudgetBytes, kCacheLineBytes,
+     ResourceOwner::kPacketizer},
     {MemoryUse::kAdcDmaRing, MemoryRegion::kOcramRam2Dma,
      kAdcDmaRingDepth * kAdcDmaBufferStrideBytes, kCacheLineBytes,
      ResourceOwner::kAdcCapture},
@@ -194,9 +218,6 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kGpioPackedRing, MemoryRegion::kOcramRam2Dma,
      kGpioPackedRingDepth * kGpioPackedBufferStrideBytes, kCacheLineBytes,
      ResourceOwner::kGpioPacker},
-    {MemoryUse::kDataTransmitQueue, MemoryRegion::kOcramRam2Dma,
-     kDataTransmitQueueDepth * protocol_v1::kDataFrameBytes, kCacheLineBytes,
-     ResourceOwner::kPacketizer},
 };
 
 template <typename T, std::size_t N>
@@ -367,6 +388,16 @@ static_assert(kUsbRxCallsPerLoop * kUsbRxScratchBytes >=
               "USB read-call bound must be able to reach its byte budget");
 static_assert(kUsbTxCallsPerLoop > 0U && kUsbRxCallsPerLoop > 0U,
               "USB per-loop call budgets must be nonzero");
+static_assert(kUsbTxBudgetBytesPerLoop <= kPinnedUsbCdcTxBufferBytes,
+              "one cooperative TX visit must not outrun a core TX buffer");
+static_assert(kPacketBufferStorageBytes % kCacheLineBytes == 0U,
+              "packet storage must occupy complete alignment units");
+static_assert(kPacketReadyQueueDepth >= kPacketBufferCount &&
+                  kPacketTransmitQueueDepth >= kPacketBufferCount,
+              "packet index queues must be able to represent the whole pool");
+static_assert(kPacketPromotionsPerLoop > 0U &&
+                  kPacketPromotionsPerLoop <= kPacketBufferCount,
+              "packet promotion work must be nonzero and pool-bounded");
 static_assert(sameBytes(kGpioPinsByBit, protocol_v1::kGpioPinsByBit),
               "resource registry and protocol GPIO maps disagree");
 
