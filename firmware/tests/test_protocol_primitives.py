@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import shutil
+import struct
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+
+from teensy_daq import decode_frame, decode_response, encode_frame
+from teensy_daq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIRMWARE_SOURCE = REPOSITORY_ROOT / "firmware/src"
@@ -17,7 +21,7 @@ FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"
 
 
 class ProtocolPrimitiveTests(unittest.TestCase):
-    def test_portable_protocol_matches_golden_frames_and_recovers(self) -> None:
+    def test_portable_protocol_and_python_interop_match_golden_frames(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
@@ -62,6 +66,103 @@ class ProtocolPrimitiveTests(unittest.TestCase):
                 run_result.returncode,
                 run_result.stdout + run_result.stderr,
             )
+
+            python_commands = Path(directory) / "python-commands"
+            cpp_responses = Path(directory) / "cpp-responses"
+            python_commands.mkdir()
+            cpp_responses.mkdir()
+            configuration = struct.pack(
+                "<BBBBI",
+                3,
+                constants.Source.SYNTHETIC,
+                constants.ChecksumAlgorithm.ADLER32,
+                0,
+                constants.DATA_FRAME_BYTES,
+            )
+            request_specs = (
+                ("info-request.bin", constants.FrameKind.INFO_REQUEST, b"", 1),
+                (
+                    "configure-request.bin",
+                    constants.FrameKind.CONFIGURE_REQUEST,
+                    configuration,
+                    2,
+                ),
+                ("start-request.bin", constants.FrameKind.START_REQUEST, b"", 3),
+                (
+                    "get-status-request.bin",
+                    constants.FrameKind.GET_STATUS_REQUEST,
+                    b"",
+                    4,
+                ),
+                ("stop-request.bin", constants.FrameKind.STOP_REQUEST, b"", 5),
+                (
+                    "reset-stats-request.bin",
+                    constants.FrameKind.RESET_STATS_REQUEST,
+                    b"",
+                    6,
+                ),
+                (
+                    "ping-request.bin",
+                    constants.FrameKind.PING_REQUEST,
+                    struct.pack("<Q", 0x0123456789ABCDEF),
+                    7,
+                ),
+            )
+            for name, kind, payload, request_id in request_specs:
+                python_wire = encode_frame(
+                    kind,
+                    payload,
+                    request_id=request_id,
+                )
+                self.assertEqual((FIXTURE_DIRECTORY / name).read_bytes(), python_wire)
+                (python_commands / name).write_bytes(python_wire)
+
+            interop_result = subprocess.run(
+                [
+                    str(executable),
+                    str(FIXTURE_DIRECTORY),
+                    str(python_commands),
+                    str(cpp_responses),
+                ],
+                capture_output=True,
+                check=False,
+                text=True,
+            )
+            self.assertEqual(
+                0,
+                interop_result.returncode,
+                interop_result.stdout + interop_result.stderr,
+            )
+
+            response_specs = (
+                ("info-response.bin", constants.FrameKind.INFO_RESPONSE, 1),
+                (
+                    "configure-response.bin",
+                    constants.FrameKind.CONFIGURE_RESPONSE,
+                    2,
+                ),
+                ("start-response.bin", constants.FrameKind.START_RESPONSE, 3),
+                (
+                    "get-status-response.bin",
+                    constants.FrameKind.GET_STATUS_RESPONSE,
+                    4,
+                ),
+                ("stop-response.bin", constants.FrameKind.STOP_RESPONSE, 5),
+                (
+                    "reset-stats-response.bin",
+                    constants.FrameKind.RESET_STATS_RESPONSE,
+                    6,
+                ),
+                ("ping-response.bin", constants.FrameKind.PING_RESPONSE, 7),
+                ("error-response.bin", constants.FrameKind.ERROR_RESPONSE, 8),
+            )
+            for name, kind, request_id in response_specs:
+                cpp_wire = (cpp_responses / name).read_bytes()
+                self.assertEqual((FIXTURE_DIRECTORY / name).read_bytes(), cpp_wire)
+                frame = decode_frame(cpp_wire)
+                response = decode_response(frame)
+                self.assertEqual(kind, frame.header.kind)
+                self.assertEqual(request_id, response.request_id)
 
     def test_production_protocol_has_no_heap_or_packed_wire_access(self) -> None:
         production_source = "\n".join(

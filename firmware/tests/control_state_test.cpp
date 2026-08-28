@@ -74,6 +74,35 @@ void expectTypedResponse(const wire::ControlFrame &response,
          name + " error flag agrees with status");
 }
 
+void testLegalTransitionMatrix() {
+  constexpr std::array<constants::DeviceState, 4U> states{
+      constants::DeviceState::kBoot,
+      constants::DeviceState::kIdle,
+      constants::DeviceState::kConfigured,
+      constants::DeviceState::kRunning,
+  };
+  constexpr std::array<std::array<bool, 4U>, 4U> expected{{
+      {{false, true, false, false}},
+      {{false, true, true, false}},
+      {{false, true, true, true}},
+      {{false, true, false, false}},
+  }};
+
+  for (std::size_t from = 0U; from < states.size(); ++from) {
+    for (std::size_t to = 0U; to < states.size(); ++to) {
+      expect(control::ControlState::isLegalTransition(states[from],
+                                                       states[to]) ==
+                 expected[from][to],
+             "complete legal-transition matrix entry " +
+                 std::to_string(from) + "->" + std::to_string(to));
+    }
+  }
+  expect(control::ControlState::nextRunId(0U) == 1U &&
+             control::ControlState::nextRunId(
+                 std::numeric_limits<std::uint32_t>::max()) == 1U,
+         "run IDs remain nonzero at both allocation boundaries");
+}
+
 void testBootAndInfo() {
   control::ControlState state{};
   wire::ControlFrame response{};
@@ -295,6 +324,70 @@ void testControlOnlyLifecycle() {
          "RESET_STATS clears all diagnostics before counting itself");
 }
 
+void testIdempotencyRequestIdsAndCounters() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(44U), "idempotency test boot completion");
+
+  std::uint32_t request_id = std::numeric_limits<std::uint32_t>::max();
+  expect(state.dispatch(request(constants::CommandKind::kInfo, request_id),
+                        response)
+             .commandAccepted(),
+         "INFO accepts the maximum request ID");
+  expectTypedResponse(response, constants::FrameKind::kInfoResponse,
+                      request_id, constants::ErrorCode::kOk,
+                      "maximum-ID INFO");
+
+  --request_id;
+  expect(state.dispatch(configureRequest(request_id), response)
+             .commandAccepted(),
+         "idempotency test enters CONFIGURED");
+  --request_id;
+  expect(state.dispatch(request(constants::CommandKind::kInfo, request_id),
+                        response)
+             .commandAccepted() &&
+             state.state() == constants::DeviceState::kConfigured &&
+             state.hasConfiguration(),
+         "INFO is idempotent while CONFIGURED");
+  expectTypedResponse(response, constants::FrameKind::kInfoResponse,
+                      request_id, constants::ErrorCode::kOk,
+                      "CONFIGURED INFO");
+
+  --request_id;
+  expect(state.dispatch(request(constants::CommandKind::kStop, request_id),
+                        response)
+             .commandAccepted() &&
+             state.state() == constants::DeviceState::kIdle,
+         "STOP reaches IDLE from CONFIGURED");
+  expect(state.takePendingEvents().has(control::Event::kStop),
+         "first STOP emits the single required stop event");
+  --request_id;
+  expect(state.dispatch(request(constants::CommandKind::kStop, request_id),
+                        response)
+             .commandAccepted() &&
+             state.state() == constants::DeviceState::kIdle &&
+             state.takePendingEvents().mask == 0U,
+         "repeated STOP is state- and event-idempotent");
+  expectTypedResponse(response, constants::FrameKind::kStopResponse,
+                      request_id, constants::ErrorCode::kOk,
+                      "idempotent STOP");
+
+  --request_id;
+  expect(!state.dispatch(request(constants::CommandKind::kStart, request_id),
+                         response)
+              .commandAccepted(),
+         "START without configuration is rejected");
+  expectTypedResponse(response, constants::FrameKind::kStartResponse,
+                      request_id, constants::ErrorCode::kInvalidState,
+                      "rejected START request ID");
+
+  const stats::Snapshot snapshot = state.statistics().snapshot();
+  expect(snapshot.commands_accepted == 5U &&
+             snapshot.commands_rejected == 1U &&
+             snapshot.state_errors == 1U,
+         "accepted, rejected, and state-error counters remain exact");
+}
+
 void testConfigurationValidationAndAtomicity() {
   control::ControlState state{};
   wire::ControlFrame response{};
@@ -513,8 +606,10 @@ void testStatisticsDetailAndSaturation() {
 }  // namespace
 
 int main() {
+  testLegalTransitionMatrix();
   testBootAndInfo();
   testControlOnlyLifecycle();
+  testIdempotencyRequestIdsAndCounters();
   testConfigurationValidationAndAtomicity();
   testRecoverableFaultReturnsIdle();
   testStatisticsDetailAndSaturation();

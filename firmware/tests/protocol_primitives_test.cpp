@@ -15,6 +15,23 @@ namespace constants = teensy_daq::protocol_v1;
 
 int failures = 0;
 
+constexpr std::array<const char *, 7U> kRequestFixtures{
+    "info-request.bin",       "configure-request.bin",
+    "start-request.bin",      "get-status-request.bin",
+    "stop-request.bin",       "reset-stats-request.bin",
+    "ping-request.bin",
+};
+
+constexpr std::array<constants::CommandKind, 7U> kRequestKinds{
+    constants::CommandKind::kInfo,
+    constants::CommandKind::kConfigure,
+    constants::CommandKind::kStart,
+    constants::CommandKind::kGetStatus,
+    constants::CommandKind::kStop,
+    constants::CommandKind::kResetStats,
+    constants::CommandKind::kPing,
+};
+
 void expect(bool condition, const std::string &message) {
   if (!condition) {
     std::cerr << "FAIL: " << message << '\n';
@@ -61,6 +78,23 @@ void expectFrame(const wire::FixedFrame<Capacity> &actual,
   }
 }
 
+template <std::size_t Capacity>
+void writeFrame(const std::string &directory, const std::string &name,
+                const wire::FixedFrame<Capacity> &frame) {
+  if (directory.empty()) {
+    return;
+  }
+  std::ofstream output(directory + "/" + name,
+                       std::ios::binary | std::ios::trunc);
+  expect(static_cast<bool>(output), "could not create interop frame " + name);
+  if (!output) {
+    return;
+  }
+  output.write(reinterpret_cast<const char *>(frame.data()),
+               static_cast<std::streamsize>(frame.size()));
+  expect(static_cast<bool>(output), "could not write interop frame " + name);
+}
+
 void testEndianAndChecksum() {
   std::array<std::uint8_t, 16U> bytes{};
   wire::MutableByteView output{bytes.data(), bytes.size()};
@@ -89,6 +123,13 @@ void testEndianAndChecksum() {
 
   expect(wire::adler32({nullptr, 0U}) == 0x00000001U,
          "empty Adler-32 vector");
+  const std::array<std::uint8_t, 1U> letter_a{'a'};
+  expect(wire::adler32({letter_a.data(), letter_a.size()}) == 0x00620062U,
+         "single-byte Adler-32 vector");
+  const std::array<std::uint8_t, 9U> wikipedia{
+      'W', 'i', 'k', 'i', 'p', 'e', 'd', 'i', 'a'};
+  expect(wire::adler32({wikipedia.data(), wikipedia.size()}) == 0x11E60398U,
+         "Wikipedia Adler-32 vector");
   const std::array<std::uint8_t, 9U> digits{
       '1', '2', '3', '4', '5', '6', '7', '8', '9'};
   expect(wire::adler32({digits.data(), digits.size()}) == 0x091E01DEU,
@@ -135,20 +176,17 @@ void testGoldenDecode(const std::string &fixture_directory) {
     }
   }
 
-  const std::array<const char *, 7U> requests{
-      "info-request.bin",       "configure-request.bin",
-      "start-request.bin",      "get-status-request.bin",
-      "stop-request.bin",       "reset-stats-request.bin",
-      "ping-request.bin",
-  };
-  for (std::size_t index = 0U; index < requests.size(); ++index) {
+  for (std::size_t index = 0U; index < kRequestFixtures.size(); ++index) {
     const std::vector<std::uint8_t> bytes =
-        readFixture(fixture_directory, requests[index]);
+        readFixture(fixture_directory, kRequestFixtures[index]);
     wire::Request request{};
     const wire::Result result = wire::decodeRequest(view(bytes), request);
-    expect(result.ok(), std::string("typed decode ") + requests[index]);
+    expect(result.ok(),
+           std::string("typed decode ") + kRequestFixtures[index]);
     expect(request.request_id == index + 1U,
-           std::string("request ID ") + requests[index]);
+           std::string("request ID ") + kRequestFixtures[index]);
+    expect(request.kind == kRequestKinds[index],
+           std::string("request kind ") + kRequestFixtures[index]);
   }
 
   wire::Request configure{};
@@ -172,6 +210,29 @@ void testGoldenDecode(const std::string &fixture_directory) {
   expect(ping.nonce == 0x0123456789ABCDEFULL, "typed PING nonce");
 }
 
+void testPythonGeneratedCommands(const std::string &fixture_directory,
+                                 const std::string &python_directory) {
+  for (std::size_t index = 0U; index < kRequestFixtures.size(); ++index) {
+    const std::string name = kRequestFixtures[index];
+    const std::vector<std::uint8_t> python_bytes =
+        readFixture(python_directory, name);
+    const std::vector<std::uint8_t> golden_bytes =
+        readFixture(fixture_directory, name);
+    expect(python_bytes == golden_bytes,
+           "Python request is byte-identical to golden " + name);
+
+    wire::Request decoded{};
+    const wire::Result result = wire::decodeRequest(view(python_bytes), decoded);
+    expect(result.ok(), "C++ decodes Python request " + name);
+    if (result.ok()) {
+      expect(decoded.kind == kRequestKinds[index],
+             "C++ preserves Python command kind " + name);
+      expect(decoded.request_id == index + 1U,
+             "C++ preserves Python request ID " + name);
+    }
+  }
+}
+
 wire::Request request(constants::CommandKind kind, std::uint32_t request_id) {
   wire::Request value{};
   value.kind = kind;
@@ -188,7 +249,8 @@ wire::Configuration goldenConfiguration() {
   return configuration;
 }
 
-void testGoldenEncode(const std::string &fixture_directory) {
+void testGoldenEncode(const std::string &fixture_directory,
+                      const std::string &response_directory) {
   wire::CommandFrame command{};
   wire::FrameFields fields{};
   fields.kind = constants::FrameKind::kInfoRequest;
@@ -235,6 +297,7 @@ void testGoldenEncode(const std::string &fixture_directory) {
          "encode INFO response");
   expectFrame(response, readFixture(fixture_directory, "info-response.bin"),
               "INFO response golden");
+  writeFrame(response_directory, "info-response.bin", response);
 
   const wire::Configuration configuration = goldenConfiguration();
   expect(wire::encodeConfigureResponse(
@@ -245,6 +308,7 @@ void testGoldenEncode(const std::string &fixture_directory) {
   expectFrame(response,
               readFixture(fixture_directory, "configure-response.bin"),
               "CONFIGURE response golden");
+  writeFrame(response_directory, "configure-response.bin", response);
   expect(wire::encodeStartResponse(
              request(constants::CommandKind::kStart, 3U), 7U, configuration,
              response)
@@ -252,6 +316,7 @@ void testGoldenEncode(const std::string &fixture_directory) {
          "encode START response");
   expectFrame(response, readFixture(fixture_directory, "start-response.bin"),
               "START response golden");
+  writeFrame(response_directory, "start-response.bin", response);
 
   wire::StatusResponse status{};
   status.device_state = constants::DeviceState::kRunning;
@@ -267,12 +332,14 @@ void testGoldenEncode(const std::string &fixture_directory) {
   expectFrame(response,
               readFixture(fixture_directory, "get-status-response.bin"),
               "STATUS response golden");
+  writeFrame(response_directory, "get-status-response.bin", response);
   expect(wire::encodeStopResponse(
              request(constants::CommandKind::kStop, 5U), 7U, response)
              .ok(),
          "encode STOP response");
   expectFrame(response, readFixture(fixture_directory, "stop-response.bin"),
               "STOP response golden");
+  writeFrame(response_directory, "stop-response.bin", response);
   expect(wire::encodeResetStatsResponse(
              request(constants::CommandKind::kResetStats, 6U), 7U, 3U,
              response)
@@ -281,18 +348,21 @@ void testGoldenEncode(const std::string &fixture_directory) {
   expectFrame(response,
               readFixture(fixture_directory, "reset-stats-response.bin"),
               "RESET_STATS response golden");
+  writeFrame(response_directory, "reset-stats-response.bin", response);
   wire::Request ping = request(constants::CommandKind::kPing, 7U);
   ping.nonce = 0x0123456789ABCDEFULL;
   expect(wire::encodePingResponse(ping, 7U, response).ok(),
          "encode PING response");
   expectFrame(response, readFixture(fixture_directory, "ping-response.bin"),
               "PING response golden");
+  writeFrame(response_directory, "ping-response.bin", response);
   expect(wire::encodeRejectedFrameResponse(
              8U, 0xFEU, 1U, constants::ErrorCode::kUnknownFrameKind, response)
              .ok(),
          "encode generic error response");
   expectFrame(response, readFixture(fixture_directory, "error-response.bin"),
               "ERROR response golden");
+  writeFrame(response_directory, "error-response.bin", response);
 
   expect(wire::encodeTypedErrorResponse(
              request(constants::CommandKind::kStart, 42U), 7U,
@@ -306,15 +376,59 @@ void testGoldenEncode(const std::string &fixture_directory) {
              typed_error.header.request_id == 42U &&
              (typed_error.header.flags & 0x8000U) != 0U,
          "typed error echoes request identity");
+}
 
-  wire::FixedFrame<47U> too_small{};
+void testFixedCapacityBoundaries() {
+  static_assert(wire::CommandFrame::capacity() ==
+                constants::kMaxCommandFrameBytes);
+  static_assert(wire::ControlFrame::capacity() ==
+                constants::kMaxControlFrameBytes);
+  static_assert(wire::DataFrame::capacity() == constants::kMaxDataFrameBytes);
+
+  wire::FrameFields fields{};
   fields.kind = constants::FrameKind::kInfoRequest;
   fields.request_id = 1U;
-  const wire::Result bounded =
-      wire::encodeFrame(fields, {nullptr, 0U}, too_small);
-  expect(bounded.error == constants::ErrorCode::kInvalidLength &&
-             too_small.size() == 0U,
-         "frame construction refuses insufficient capacity");
+
+  wire::FixedFrame<constants::kMinFrameBytes> exact_minimum{};
+  expect(wire::encodeFrame(fields, {nullptr, 0U}, exact_minimum).ok() &&
+             exact_minimum.size() == constants::kMinFrameBytes,
+         "minimum command exactly fits its fixed frame");
+
+  wire::FixedFrame<constants::kMinFrameBytes - 1U> below_minimum{};
+  const wire::Result minimum_failure =
+      wire::encodeFrame(fields, {nullptr, 0U}, below_minimum);
+  expect(minimum_failure.error == constants::ErrorCode::kInvalidLength &&
+             below_minimum.size() == 0U,
+         "minimum command refuses one-byte-short capacity");
+
+  std::array<std::uint8_t, constants::kPingRequestPayloadSize> ping_payload{};
+  expect(wire::storeU64({ping_payload.data(), ping_payload.size()},
+                        constants::kPingRequestNonceOffset,
+                        0x0123456789ABCDEFULL),
+         "construct maximum-size PING request payload");
+  fields.kind = constants::FrameKind::kPingRequest;
+  fields.request_id = 7U;
+
+  wire::FixedFrame<constants::kMaxCommandFrameBytes> exact_maximum{};
+  expect(wire::encodeFrame(
+             fields, {ping_payload.data(), ping_payload.size()}, exact_maximum)
+             .ok() &&
+             exact_maximum.size() == constants::kMaxCommandFrameBytes,
+         "maximum command exactly fits its fixed frame");
+
+  wire::FixedFrame<constants::kMaxCommandFrameBytes - 1U> below_maximum{};
+  const wire::Result maximum_failure = wire::encodeFrame(
+      fields, {ping_payload.data(), ping_payload.size()}, below_maximum);
+  expect(maximum_failure.error == constants::ErrorCode::kInvalidLength &&
+             below_maximum.size() == 0U,
+         "maximum command refuses one-byte-short capacity");
+
+  wire::FixedFrame<8U> size_guard{};
+  expect(size_guard.setSize(size_guard.capacity()) && size_guard.size() == 8U,
+         "fixed frame accepts its exact capacity");
+  expect(!size_guard.setSize(size_guard.capacity() + 1U) &&
+             size_guard.size() == 0U,
+         "fixed frame clears itself after an oversized length");
 }
 
 std::vector<std::uint8_t> mutated(const std::vector<std::uint8_t> &source,
@@ -381,24 +495,47 @@ void feedAll(wire::IncrementalCommandParser &parser,
 }
 
 void testParser(const std::string &fixture_directory) {
-  const std::vector<std::uint8_t> configure =
-      readFixture(fixture_directory, "configure-request.bin");
-  for (std::size_t split = 0U; split <= configure.size(); ++split) {
-    wire::IncrementalCommandParser parser{};
-    wire::ParsedCommand command{};
-    const wire::FeedResult first =
-        parser.feed({configure.data(), split}, command);
-    expect(first.consumed == split, "parser consumes arbitrary first split");
-    expect(first.command_ready == (split == configure.size()),
-           "parser waits for a complete split frame");
-    if (!first.command_ready) {
-      const wire::FeedResult second = parser.feed(
-          {configure.data() + split, configure.size() - split}, command);
-      expect(second.command_ready, "parser completes every split point");
+  for (std::size_t fixture_index = 0U;
+       fixture_index < kRequestFixtures.size(); ++fixture_index) {
+    const std::string fixture_name = kRequestFixtures[fixture_index];
+    const std::vector<std::uint8_t> command_bytes =
+        readFixture(fixture_directory, fixture_name);
+    for (std::size_t split = 0U; split <= command_bytes.size(); ++split) {
+      wire::IncrementalCommandParser parser{};
+      wire::ParsedCommand command{};
+      const wire::FeedResult first =
+          parser.feed({command_bytes.data(), split}, command);
+      expect(first.consumed == split,
+             fixture_name + " consumes split " + std::to_string(split));
+      expect(first.command_ready == (split == command_bytes.size()),
+             fixture_name + " waits at split " + std::to_string(split));
+      if (!first.command_ready) {
+        const wire::FeedResult second = parser.feed(
+            {command_bytes.data() + split, command_bytes.size() - split},
+            command);
+        expect(second.command_ready,
+               fixture_name + " completes split " + std::to_string(split));
+      }
+      expect(command.request.kind == kRequestKinds[fixture_index] &&
+                 command.request.request_id == fixture_index + 1U,
+             fixture_name + " returns its typed request");
+      expectFrame(command.frame, command_bytes,
+                  fixture_name + " owns exact split bytes");
     }
-    expect(command.request.kind == constants::CommandKind::kConfigure &&
-               command.request.request_id == 2U,
-           "parser returns typed CONFIGURE command");
+
+    wire::IncrementalCommandParser byte_parser{};
+    wire::ParsedCommand byte_command{};
+    for (std::size_t offset = 0U; offset < command_bytes.size(); ++offset) {
+      const wire::FeedResult byte_result = byte_parser.feed(
+          {command_bytes.data() + offset, 1U}, byte_command);
+      expect(byte_result.consumed == 1U,
+             fixture_name + " consumes one-byte chunk");
+      expect(byte_result.command_ready ==
+                 (offset + 1U == command_bytes.size()),
+             fixture_name + " completes only on its final byte");
+    }
+    expect(byte_command.request.kind == kRequestKinds[fixture_index],
+           fixture_name + " survives all one-byte boundaries");
   }
 
   const std::vector<std::uint8_t> info =
@@ -457,18 +594,51 @@ void testParser(const std::string &fixture_directory) {
       {info.data() + 2U, info.size() - 2U}, command);
   expect(recovered.command_ready && command.request.request_id == 1U,
          "partial magic completes across USB reads");
+
+  for (const char *fixture_name : kRequestFixtures) {
+    const std::vector<std::uint8_t> candidate =
+        readFixture(fixture_directory, fixture_name);
+    for (std::size_t truncated = 0U; truncated < candidate.size();
+         ++truncated) {
+      wire::IncrementalCommandParser truncated_parser{};
+      wire::ParsedCommand truncated_command{};
+      const wire::FeedResult prefix = truncated_parser.feed(
+          {candidate.data(), truncated}, truncated_command);
+      expect(!prefix.command_ready,
+             std::string(fixture_name) + " rejects truncated prefix " +
+                 std::to_string(truncated));
+      expect(truncated_parser.counters().buffered_bytes <=
+                 wire::kCommandParserStorageBytes,
+             std::string(fixture_name) + " truncated prefix stays bounded");
+
+      std::vector<std::uint32_t> recovered_ids{};
+      feedAll(truncated_parser, info, recovered_ids);
+      expect(recovered_ids == std::vector<std::uint32_t>({1U}),
+             std::string(fixture_name) +
+                 " truncated prefix resynchronizes to the next command");
+      expect(truncated_parser.counters().buffered_bytes == 0U,
+             std::string(fixture_name) +
+                 " leaves no bytes after truncated recovery");
+    }
+  }
 }
 
 }  // namespace
 
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    std::cerr << "usage: protocol-primitives-test FIXTURE_DIRECTORY\n";
+  if (argc != 2 && argc != 4) {
+    std::cerr << "usage: protocol-primitives-test FIXTURE_DIRECTORY "
+                 "[PYTHON_COMMAND_DIRECTORY CPP_RESPONSE_DIRECTORY]\n";
     return 2;
   }
+  const std::string response_directory = argc == 4 ? argv[3] : "";
   testEndianAndChecksum();
   testGoldenDecode(argv[1]);
-  testGoldenEncode(argv[1]);
+  if (argc == 4) {
+    testPythonGeneratedCommands(argv[1], argv[2]);
+  }
+  testGoldenEncode(argv[1], response_directory);
+  testFixedCapacityBoundaries();
   testValidation(argv[1]);
   testParser(argv[1]);
   if (failures != 0) {

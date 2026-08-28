@@ -158,6 +158,28 @@ class FakeLowerPrioritySource final : public usb::LowerPriorityFrameSource {
   std::deque<std::vector<std::uint8_t>> frames{};
 };
 
+void testFixedQueueBoundaries() {
+  usb::detail::FixedQueue<std::uint32_t, 3U> queue{};
+  static_assert(decltype(queue)::capacity() == 3U);
+
+  std::uint32_t item = 99U;
+  expect(queue.empty() && !queue.full() && queue.size() == 0U &&
+             queue.front() == nullptr && !queue.pop(item) && item == 99U,
+         "fixed queue refuses underflow without mutating output");
+  expect(queue.push(1U) && queue.push(2U) && queue.push(3U) && queue.full() &&
+             queue.size() == queue.capacity(),
+         "fixed queue accepts exactly its declared capacity");
+  expect(!queue.push(4U) && queue.front() != nullptr && *queue.front() == 1U,
+         "fixed queue refuses overflow without replacing its front");
+  expect(queue.pop(item) && item == 1U && queue.push(4U),
+         "fixed queue reuses one slot after wraparound");
+  expect(queue.pop(item) && item == 2U && queue.pop(item) && item == 3U &&
+             queue.pop(item) && item == 4U && queue.empty(),
+         "fixed queue preserves FIFO order across wraparound");
+  expect(!queue.popFront() && queue.front() == nullptr,
+         "fixed queue refuses an empty front removal");
+}
+
 void testUsbIdentity() {
   static_assert(usb::kTeensyUsbSerialVendorId == 0x16C0U);
   static_assert(usb::kTeensyUsbSerialProductId == 0x0483U);
@@ -426,6 +448,7 @@ void testTransmitBudgets() {
 }  // namespace
 
 int main() {
+  testFixedQueueBoundaries();
   testUsbIdentity();
   testIncrementalReceiveAndBackpressure();
   testZeroReadAndResponseReservation();

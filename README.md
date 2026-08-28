@@ -129,6 +129,26 @@ the protocol version, semantic firmware version, board/MCU IDs, hardware
 serial, source-derived build ID, and truthful capability masks needed to reject
 a stale or incompatible image before control changes.
 
+## Portable firmware tests
+
+The firmware test suite host-compiles the production protocol, control,
+statistics, transport, and runtime sources with allocation-free C++17 flags.
+It exercises every split and truncation point for every command, corrupt-stream
+recovery, the complete state-transition matrix, idempotency, counters, and
+fixed frame/queue boundaries. A bidirectional interoperability test sends
+Python-encoded commands through the C++ decoder and sends C++-encoded responses
+through the Python decoder; both directions must match the tracked golden
+fixtures byte for byte. Dependency checks keep Arduino and Teensy core APIs in
+the guarded board/USB adapters rather than the portable protocol/control
+closure.
+
+After installing the development environment above, run the focused gate from
+the repository root:
+
+```bash
+.venv/bin/python -m pytest -q firmware/tests
+```
+
 ## Synchronous Python API and offline simulator
 
 The Python facade now runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS
