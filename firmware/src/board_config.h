@@ -567,6 +567,19 @@ static_assert(kPacketPromotionsPerLoop > 0U &&
               "packet promotion work must be nonzero and pool-bounded");
 static_assert(sameBytes(kGpioPinsByBit, protocol_v1::kGpioPinsByBit),
               "resource registry and protocol GPIO maps disagree");
+static_assert(kGpioRawDmaRingDepth == protocol_v1::kGpioRawRingDepth);
+static_assert(kGpioPackedRingDepth == protocol_v1::kGpioPackedRingDepth);
+static_assert(kGpioRawDmaRingBytes == protocol_v1::kGpioRawRingBytes);
+static_assert(kGpioPackedRingDepth * kGpioPackedBufferStrideBytes ==
+              protocol_v1::kGpioPackedRingBytes);
+static_assert(kPacketBufferCount == protocol_v1::kGpioPacketBufferCount);
+static_assert(kGpioPitChannel == protocol_v1::kGpioPitChannel);
+static_assert(kGpioXbarInput == protocol_v1::kGpioXbarInput);
+static_assert(kGpioXbarOutput == protocol_v1::kGpioXbarOutput);
+static_assert(kGpioXbarActiveEdge == protocol_v1::kGpioXbarActiveEdge);
+static_assert(kGpioEdmaChannel == protocol_v1::kGpioEdmaChannel);
+static_assert(kGpioDmamuxSource == protocol_v1::kGpioDmamuxSource);
+static_assert(kGpioEdmaPriority == protocol_v1::kGpioEdmaPriority);
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
 static_assert(kTeensy40DigitalPinCount == CORE_NUM_DIGITAL);

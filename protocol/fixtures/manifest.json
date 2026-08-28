@@ -187,21 +187,38 @@
       "total_length": 56
     },
     {
-      "checksum": "0x343d0fd2",
+      "checksum": "0x9a0303ba",
+      "checksum_algorithm": "ADLER32",
+      "file": "gpio-capture-diagnostic-request.bin",
+      "first_sample_ticks": 0,
+      "flags": 0,
+      "frame_hex": "efbeadde011900002c000100300000000000000000000000000000000a000000000000000000000000000000ba03039a",
+      "frame_sha256": "33e8b9e6395b4c0e9ef2f48bc6695b1fc06b79f15d899e1bcfec86629f61e8a6",
+      "item_count": 0,
+      "kind": "GPIO_CAPTURE_DIAGNOSTIC_REQUEST",
+      "payload_length": 0,
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "request_id": 10,
+      "run_id": 0,
+      "sequence": 0,
+      "total_length": 48
+    },
+    {
+      "checksum": "0xaf571460",
       "checksum_algorithm": "ADLER32",
       "file": "info-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde019000002c000100920000006200000000000000000000000100000000000000000000000000000000000000010103030e0000007f00000000127a00001000000004000040420f0000093d000800040002000c020801060708090a0b0c0d78563412000000000000000073796e7468657469632d676f6c64656e2d763100000000000000000000000000d20f3d34",
-      "frame_sha256": "a7904f0e720067277f8c74f797f83f2126248ceff1a569516c5107aa6f54cf96",
+      "frame_hex": "efbeadde019000002c000100b00000008000000000000000000000000100000000000000000000000000000000000000010103030e000000ff01000000127a00001000000004000040420f0000093d000800040002000c020801060708090a0b0c0d78563412000000000000000073796e7468657469632d676f6c64656e2d763100000000000000000000000000080404000300d00f000000fd0000803f0000c8000000003800021e020100601457af",
+      "frame_sha256": "a4da6b23a3ff2df8d0dc9c963c705571d2c6a7a315870dc0ac89bddcb2a9ba8a",
       "item_count": 0,
       "kind": "INFO_RESPONSE",
-      "payload_length": 98,
-      "payload_sha256": "98d659c2f8aed3bf3c75150d6804557b73492848aafb66f1049186ce36e83be0",
+      "payload_length": 128,
+      "payload_sha256": "ef41a7635de412c7b9f44b09752007d43cf790f457b0c7aea9636c658ee29128",
       "request_id": 1,
       "run_id": 0,
       "sequence": 0,
-      "total_length": 146
+      "total_length": 176
     },
     {
       "checksum": "0xe2080457",
@@ -238,21 +255,21 @@
       "total_length": 60
     },
     {
-      "checksum": "0xc30804c1",
+      "checksum": "0xa1b905a9",
       "checksum_algorithm": "ADLER32",
       "file": "get-status-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde019300002c00010068000000380000000700000000000000040000000000000000000000000000000000000003030101001000000100000000000000010000000000000000000000000000000000000000000000000000000000000002000000c10408c3",
-      "frame_sha256": "81fd9993d9be0fb7072d1155a3b95bddba2fd707bc9d40d72b8b6e87a08c7204",
+      "frame_hex": "efbeadde019300002c000100dc000000ac00000007000000000000000400000000000000000000000000000000000000030301010010000001000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a905b9a1",
+      "frame_sha256": "5866c903351d6a30c826f1b79a9749ebfef856aca933af45ee093d352a7a4fc8",
       "item_count": 0,
       "kind": "GET_STATUS_RESPONSE",
-      "payload_length": 56,
-      "payload_sha256": "8306e8d96c8398463b2db09b26ec03a1b05a25cd5d263c757b853d41afb772eb",
+      "payload_length": 172,
+      "payload_sha256": "8b59097ecc066264fc44960a6b44b05230a9c63e5a83711159771a794045345c",
       "request_id": 4,
       "run_id": 7,
       "sequence": 0,
-      "total_length": 104
+      "total_length": 220
     },
     {
       "checksum": "0xd1340448",
@@ -340,18 +357,35 @@
       "total_length": 188
     },
     {
-      "checksum": "0xed5c05d2",
+      "checksum": "0x767a0e57",
+      "checksum_algorithm": "ADLER32",
+      "file": "gpio-capture-diagnostic-response.bin",
+      "first_sample_ticks": 0,
+      "flags": 0,
+      "frame_hex": "efbeadde019900002c000100c00000009000000000000000000000000a0000000000000000000000000000000000000000010000000000000000000000000000330100000046c323e0430900d70f000000000000d00f00000001000007000000000000000f0c030000000000000000000000000000ff5a5a0f0c030000000000000000000f0c0300000000000000000003040200030402000304020005000000010000001e0000800400000000000000d00fd00f1200020000010000570e7a76",
+      "frame_sha256": "da417e2659e00a1a032d33b546a949e5d157f38286b6e6eb7d7d1d0438499bd2",
+      "item_count": 0,
+      "kind": "GPIO_CAPTURE_DIAGNOSTIC_RESPONSE",
+      "payload_length": 144,
+      "payload_sha256": "1b7ae84d5a3fc3829d8cf7ef8b9f34db1f8a5f1a0e6d901dc4458223d8a6b3c9",
+      "request_id": 10,
+      "run_id": 0,
+      "sequence": 0,
+      "total_length": 192
+    },
+    {
+      "checksum": "0xed7405d3",
       "checksum_algorithm": "ADLER32",
       "file": "error-response.bin",
       "first_sample_ticks": 0,
       "flags": 32768,
-      "frame_hex": "efbeadde019f00802c000100380000000800000000000000000000000a00000000000000000000000000000001000200fe010000d2055ced",
-      "frame_sha256": "5a0574846de8d095c861233863551d33098d3e7b7bd3df31e5cde0916c541413",
+      "frame_hex": "efbeadde019f00802c000100380000000800000000000000000000000b00000000000000000000000000000001000200fe010000d30574ed",
+      "frame_sha256": "d999ee9858397c7559bf937bb8c96e179e9cd7d158316f0ba4aac059c1efc47a",
       "item_count": 0,
       "kind": "ERROR_RESPONSE",
       "payload_length": 8,
       "payload_sha256": "1df9e085f4f65897f3abe4d1fc47f753951d7c2727dae86cfae54155412ea904",
-      "request_id": 10,
+      "request_id": 11,
       "run_id": 0,
       "sequence": 0,
       "total_length": 56
@@ -360,5 +394,5 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 1,
   "source": "protocol/protocol-v1.json",
-  "source_sha256": "a2da2fdd7617ec5ed496b1481620d457fa71ff3f3090089d49cb2bfab7dec8e3"
+  "source_sha256": "2662258599d7ac0686e646a006b0894a272e3809b705c3a6fbbef17b4e40279c"
 }

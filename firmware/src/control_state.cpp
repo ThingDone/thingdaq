@@ -2,6 +2,13 @@
 
 #include <cstddef>
 
+#if defined(__IMXRT1062__)
+#define TEENSY_DAQ_CONTROL_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define TEENSY_DAQ_CONTROL_COLD_CODE(section_name)
+#endif
+
 namespace teensy_daq::control {
 namespace {
 
@@ -53,6 +60,7 @@ bool ControlState::recoverToIdle() {
   return true;
 }
 
+TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.dispatch")
 DispatchResult ControlState::dispatch(const protocol::Request &request,
                                       protocol::ControlFrame &response,
                                       DispatchReadiness readiness) {
@@ -245,6 +253,26 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
           protocol::encodeGpioClockDiagnosticResponse(
               request, run_id_, *readiness.gpio_clock_response, response),
           response);
+
+    case protocol_v1::CommandKind::kGpioCaptureDiagnostic:
+      if (!capabilityEnabled(
+              protocol_v1::Capability::kGpioCaptureDiagnostic)) {
+        return reject(request,
+                      protocol_v1::ErrorCode::kUnsupportedConfiguration,
+                      response);
+      }
+      if (state_ != protocol_v1::DeviceState::kIdle) {
+        return reject(request, protocol_v1::ErrorCode::kInvalidState,
+                      response);
+      }
+      if (readiness.gpio_capture_response == nullptr) {
+        return reject(request, readiness.gpio_capture_error, response);
+      }
+      return encoded(
+          request, protocol_v1::ErrorCode::kOk,
+          protocol::encodeGpioCaptureDiagnosticResponse(
+              request, run_id_, *readiness.gpio_capture_response, response),
+          response);
   }
 
   statistics_.recordCommandRejected(
@@ -265,6 +293,7 @@ PendingEvents ControlState::takePendingEvents() {
   return events;
 }
 
+TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.configuration_validation")
 protocol_v1::ErrorCode ControlState::validateConfiguration(
     const protocol::Configuration &configuration) {
   if ((configuration.stream_mask &
@@ -290,8 +319,14 @@ protocol_v1::ErrorCode ControlState::validateConfiguration(
     return protocol_v1::ErrorCode::kUnsupportedConfiguration;
   }
 
-  if (configuration.stream_mask == 0U ||
-      configuration.source != protocol_v1::Source::kSynthetic) {
+  if (configuration.source == protocol_v1::Source::kSynthetic) {
+    return configuration.stream_mask == 0U
+               ? protocol_v1::ErrorCode::kUnsupportedConfiguration
+               : protocol_v1::ErrorCode::kOk;
+  }
+  if (configuration.source != protocol_v1::Source::kHardware ||
+      configuration.stream_mask !=
+          static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio)) {
     return protocol_v1::ErrorCode::kUnsupportedConfiguration;
   }
   return protocol_v1::ErrorCode::kOk;
@@ -338,6 +373,7 @@ DispatchResult ControlState::encoded(const protocol::Request &request,
   return {DispatchStatus::kResponseReady, command_error, encoding};
 }
 
+TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.info_response")
 protocol::InfoResponse ControlState::infoResponse() const {
   protocol::InfoResponse response{};
   response.device_state = state_;
@@ -381,7 +417,28 @@ protocol::InfoResponse ControlState::infoResponse() const {
     response.build_id[index] =
         static_cast<std::uint8_t>(identity::kBuildId[index]);
   }
+  response.gpio_packed_width_bits = protocol_v1::kGpioPackedWidthBits;
+  response.gpio_raw_ring_depth = protocol_v1::kGpioRawRingDepth;
+  response.gpio_packed_ring_depth = protocol_v1::kGpioPackedRingDepth;
+  response.gpio_capture_diagnostic_mode =
+      protocol_v1::GpioCaptureDiagnosticMode::kNonDrivingCapture;
+  response.gpio_capture_diagnostic_flags =
+      capabilities::kGpioCaptureDiagnosticInfoFlags;
+  response.gpio_raw_samples_per_buffer =
+      protocol_v1::kGpioRawSamplesPerBuffer;
+  response.gpio_raw_ring_bytes = protocol_v1::kGpioRawRingBytes;
+  response.gpio_packed_ring_bytes = protocol_v1::kGpioPackedRingBytes;
+  response.gpio_packet_buffer_count = protocol_v1::kGpioPacketBufferCount;
+  response.gpio_pit_channel = protocol_v1::kGpioPitChannel;
+  response.gpio_xbar_input = protocol_v1::kGpioXbarInput;
+  response.gpio_xbar_output = protocol_v1::kGpioXbarOutput;
+  response.gpio_edma_channel = protocol_v1::kGpioEdmaChannel;
+  response.gpio_dmamux_source = protocol_v1::kGpioDmamuxSource;
+  response.gpio_edma_priority = protocol_v1::kGpioEdmaPriority;
+  response.gpio_xbar_active_edge = protocol_v1::kGpioXbarActiveEdge;
   return response;
 }
+
+#undef TEENSY_DAQ_CONTROL_COLD_CODE
 
 }  // namespace teensy_daq::control

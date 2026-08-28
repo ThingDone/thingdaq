@@ -742,11 +742,63 @@ def _validate_gpio_clock_diagnostic_response(payload: bytes) -> None:
         raise FrameValidationError("GPIO clock diagnostic evidence is inconsistent")
 
 
+def _validate_gpio_capture_diagnostic_response(payload: bytes) -> None:
+    def u16(offset: int) -> int:
+        return struct.unpack_from("<H", payload, offset)[0]
+
+    def u32(offset: int) -> int:
+        return struct.unpack_from("<I", payload, offset)[0]
+
+    try:
+        constants.GpioCaptureDiagnosticMode(
+            payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_MODE_OFFSET]
+        )
+    except ValueError as exc:
+        raise FrameValidationError("GPIO capture diagnostic mode is unknown") from exc
+    flags = u32(constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_DIAGNOSTIC_FLAGS_OFFSET)
+    errors = u32(constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_HARDWARE_ERROR_FLAGS_OFFSET)
+    captured = struct.unpack_from(
+        "<Q",
+        payload,
+        constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_DMA_SAMPLES_CAPTURED_OFFSET,
+    )[0]
+    retained = u32(
+        constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_COMPLETE_SAMPLES_RETAINED_OFFSET
+    )
+    analyzed = u32(constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_SAMPLES_ANALYZED_OFFSET)
+    limit = u32(constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_ANALYSIS_SAMPLE_LIMIT_OFFSET)
+    output_permitted = int(constants.GpioCaptureDiagnosticFlag.OUTPUT_DRIVE_PERMITTED)
+    output_exercised = int(constants.GpioCaptureDiagnosticFlag.OUTPUT_DRIVE_EXERCISED)
+    if (
+        payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_METADATA_KIND_OFFSET] > 2
+        or payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_DRIVE_SAFETY_OFFSET] > 2
+        or payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_STIMULUS_KIND_OFFSET] > 2
+        or u16(constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_RESERVED_1_OFFSET) != 0
+        or payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_RESERVED_2_OFFSET] != 0
+        or errors & ~constants.KNOWN_GPIO_CAPTURE_ERROR_MASK
+        or flags & ~constants.KNOWN_GPIO_CAPTURE_DIAGNOSTIC_FLAG_MASK
+        or not flags & int(constants.GpioCaptureDiagnosticFlag.AVAILABLE)
+        or retained > captured
+        or analyzed > retained
+        or analyzed > limit
+        or not 0 < limit <= constants.GPIO_SAMPLES_PER_FRAME
+        or flags & output_exercised
+        and not flags & output_permitted
+    ):
+        raise FrameValidationError("GPIO capture diagnostic evidence is inconsistent")
+
+
 def _validate_info_payload(payload: bytes) -> None:
     if payload[constants.INFO_RESPONSE_RESERVED_0_OFFSET] != 0:
         raise FrameValidationError("INFO reserved_0 must be zero")
     if payload[constants.INFO_RESPONSE_RESERVED_2_OFFSET] != 0:
         raise FrameValidationError("INFO reserved_2 must be zero")
+    if (
+        struct.unpack_from("<H", payload, constants.INFO_RESPONSE_RESERVED_3_OFFSET)[0]
+        != 0
+        or payload[constants.INFO_RESPONSE_RESERVED_4_OFFSET] != 0
+    ):
+        raise FrameValidationError("INFO GPIO metadata reserved fields must be zero")
     try:
         device_state = constants.DeviceState(
             payload[constants.INFO_RESPONSE_DEVICE_STATE_OFFSET]
@@ -762,6 +814,9 @@ def _validate_info_payload(payload: bytes) -> None:
         data_checksum = constants.ChecksumAlgorithm(
             payload[constants.INFO_RESPONSE_DATA_CHECKSUM_ALGORITHM_OFFSET]
         )
+        constants.GpioCaptureDiagnosticMode(
+            payload[constants.INFO_RESPONSE_GPIO_CAPTURE_DIAGNOSTIC_MODE_OFFSET]
+        )
     except ValueError as exc:
         raise FrameValidationError("INFO contains an unknown enum value") from exc
     if device_state is constants.DeviceState.BOOT:
@@ -776,6 +831,28 @@ def _validate_info_payload(payload: bytes) -> None:
             constants.ADC_CONTAINER_BITS // 8
         ),
         constants.INFO_RESPONSE_GPIO_PIN_COUNT_OFFSET: len(constants.GPIO_PINS_BY_BIT),
+        constants.INFO_RESPONSE_GPIO_PACKED_WIDTH_BITS_OFFSET: (
+            constants.GPIO_PACKED_WIDTH_BITS
+        ),
+        constants.INFO_RESPONSE_GPIO_RAW_RING_DEPTH_OFFSET: (
+            constants.GPIO_RAW_RING_DEPTH
+        ),
+        constants.INFO_RESPONSE_GPIO_PACKED_RING_DEPTH_OFFSET: (
+            constants.GPIO_PACKED_RING_DEPTH
+        ),
+        constants.INFO_RESPONSE_GPIO_PIT_CHANNEL_OFFSET: constants.GPIO_PIT_CHANNEL,
+        constants.INFO_RESPONSE_GPIO_XBAR_INPUT_OFFSET: constants.GPIO_XBAR_INPUT,
+        constants.INFO_RESPONSE_GPIO_XBAR_OUTPUT_OFFSET: constants.GPIO_XBAR_OUTPUT,
+        constants.INFO_RESPONSE_GPIO_EDMA_CHANNEL_OFFSET: constants.GPIO_EDMA_CHANNEL,
+        constants.INFO_RESPONSE_GPIO_DMAMUX_SOURCE_OFFSET: (
+            constants.GPIO_DMAMUX_SOURCE
+        ),
+        constants.INFO_RESPONSE_GPIO_EDMA_PRIORITY_OFFSET: (
+            constants.GPIO_EDMA_PRIORITY
+        ),
+        constants.INFO_RESPONSE_GPIO_XBAR_ACTIVE_EDGE_OFFSET: (
+            constants.GPIO_XBAR_ACTIVE_EDGE
+        ),
     }
     for offset, expected in expected_scalars.items():
         if payload[offset] != expected:
@@ -820,6 +897,19 @@ def _validate_info_payload(payload: bytes) -> None:
         expected_stream_capabilities | expected_source_capabilities
     ):
         raise FrameValidationError("INFO capability bits disagree with source masks")
+    diagnostic_flags = struct.unpack_from(
+        "<H",
+        payload,
+        constants.INFO_RESPONSE_GPIO_CAPTURE_DIAGNOSTIC_FLAGS_OFFSET,
+    )[0]
+    if diagnostic_flags & ~constants.KNOWN_GPIO_CAPTURE_DIAGNOSTIC_FLAG_MASK:
+        raise FrameValidationError("INFO GPIO diagnostic flags contain reserved bits")
+    if bool(capability_bits & constants.Capability.GPIO_CAPTURE_DIAGNOSTIC) != bool(
+        diagnostic_flags & constants.GpioCaptureDiagnosticFlag.AVAILABLE
+    ):
+        raise FrameValidationError(
+            "INFO GPIO diagnostic metadata disagrees with capability bits"
+        )
 
     expected_u32 = {
         constants.INFO_RESPONSE_TIMESTAMP_HZ_OFFSET: constants.TIMESTAMP_HZ,
@@ -830,6 +920,15 @@ def _validate_info_payload(payload: bytes) -> None:
         constants.INFO_RESPONSE_ADC_PAIR_RATE_HZ_OFFSET: constants.ADC_PAIR_RATE_HZ,
         constants.INFO_RESPONSE_GPIO_SAMPLE_RATE_HZ_OFFSET: (
             constants.GPIO_SAMPLE_RATE_HZ
+        ),
+        constants.INFO_RESPONSE_GPIO_RAW_SAMPLES_PER_BUFFER_OFFSET: (
+            constants.GPIO_RAW_SAMPLES_PER_BUFFER
+        ),
+        constants.INFO_RESPONSE_GPIO_RAW_RING_BYTES_OFFSET: (
+            constants.GPIO_RAW_RING_BYTES
+        ),
+        constants.INFO_RESPONSE_GPIO_PACKED_RING_BYTES_OFFSET: (
+            constants.GPIO_PACKED_RING_BYTES
         ),
     }
     for offset, expected in expected_u32.items():
@@ -842,6 +941,9 @@ def _validate_info_payload(payload: bytes) -> None:
         constants.INFO_RESPONSE_ADC1_PHASE_TICKS_OFFSET: constants.ADC1_PHASE_TICKS,
         constants.INFO_RESPONSE_GPIO_SAMPLE_PERIOD_TICKS_OFFSET: (
             constants.GPIO_SAMPLE_PERIOD_TICKS
+        ),
+        constants.INFO_RESPONSE_GPIO_PACKET_BUFFER_COUNT_OFFSET: (
+            constants.GPIO_PACKET_BUFFER_COUNT
         ),
     }
     for offset, expected in expected_u16.items():
@@ -916,6 +1018,41 @@ def _validate_status_payload(payload: bytes) -> None:
         == 0
     ):
         raise FrameValidationError("STATUS stats generation must be nonzero")
+    if (
+        struct.unpack_from("<H", payload, constants.STATUS_RESPONSE_RESERVED_1_OFFSET)[
+            0
+        ]
+        != 0
+    ):
+        raise FrameValidationError("STATUS GPIO reserved field must be zero")
+    depth_limits = {
+        constants.STATUS_RESPONSE_GPIO_RAW_READY_DEPTH_OFFSET: (
+            constants.GPIO_RAW_RING_DEPTH
+        ),
+        constants.STATUS_RESPONSE_GPIO_RAW_READY_HIGH_WATER_OFFSET: (
+            constants.GPIO_RAW_RING_DEPTH
+        ),
+        constants.STATUS_RESPONSE_GPIO_PACKED_READY_DEPTH_OFFSET: (
+            constants.GPIO_PACKED_RING_DEPTH
+        ),
+        constants.STATUS_RESPONSE_GPIO_PACKED_READY_HIGH_WATER_OFFSET: (
+            constants.GPIO_PACKED_RING_DEPTH
+        ),
+        constants.STATUS_RESPONSE_PACKET_READY_DEPTH_OFFSET: (
+            constants.GPIO_PACKET_BUFFER_COUNT
+        ),
+        constants.STATUS_RESPONSE_PACKET_TRANSMIT_DEPTH_OFFSET: (
+            constants.GPIO_PACKET_BUFFER_COUNT
+        ),
+        constants.STATUS_RESPONSE_PACKET_OWNED_HIGH_WATER_OFFSET: (
+            constants.GPIO_PACKET_BUFFER_COUNT
+        ),
+    }
+    if any(
+        struct.unpack_from("<H", payload, offset)[0] > maximum
+        for offset, maximum in depth_limits.items()
+    ):
+        raise FrameValidationError("STATUS queue depth exceeds its advertised capacity")
 
 
 def _validate_payload(header: FrameHeader, payload: bytes) -> None:
@@ -992,6 +1129,8 @@ def _validate_payload(header: FrameHeader, payload: bytes) -> None:
         _validate_checksum_benchmark_response(payload)
     elif header.kind is constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_RESPONSE:
         _validate_gpio_clock_diagnostic_response(payload)
+    elif header.kind is constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE:
+        _validate_gpio_capture_diagnostic_response(payload)
 
 
 def encode_frame(

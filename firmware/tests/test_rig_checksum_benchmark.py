@@ -389,7 +389,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
         wire.extend((FIXTURES / "gpio-data.bin").read_bytes())
         for offset in range(0, len(wire), 509):
             decoded.extend(parser.feed(bytes(wire[offset : offset + 509])))
-        self.assertEqual(12, len(decoded))
+        self.assertEqual(13, len(decoded))
         self.assertEqual(0, parser.errors)
 
         valid = (FIXTURES / "gpio-data.bin").read_bytes()

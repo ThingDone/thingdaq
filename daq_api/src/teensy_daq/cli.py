@@ -139,8 +139,8 @@ def build_parser() -> argparse.ArgumentParser:
     command_help = {
         "probe": "synchronize and print validated INFO",
         "status": "print decoded GET_STATUS state and counters",
-        "configure": "apply the Phase 03 control-only profile",
-        "start": "start the previously configured control-only run",
+        "configure": "apply physical GPIO or a legacy control-only profile",
+        "start": "start the previously configured run",
         "stop": "idempotently return the device to IDLE",
         "reset-stats": "reset counters only in IDLE or CONFIGURED",
     }
@@ -249,6 +249,17 @@ def _print_info(info: DeviceInfo, output: TextIO) -> None:
     print(f"checksum_mask=0x{info.supported_checksum_mask:08x}", file=output)
     print(f"data_frame_bytes={info.data_frame_bytes}", file=output)
     print(f"max_control_frame_bytes={info.max_control_frame_bytes}", file=output)
+    print(f"gpio_sample_rate_hz={info.gpio_sample_rate_hz}", file=output)
+    print(f"gpio_sample_period_ticks={info.gpio_sample_period_ticks}", file=output)
+    print(f"gpio_packed_width_bits={info.gpio_packed_width_bits}", file=output)
+    print("gpio_pin_map=" + ",".join(map(str, info.gpio_pin_map)), file=output)
+    print(f"gpio_raw_ring_depth={info.gpio_raw_ring_depth}", file=output)
+    print(f"gpio_packed_ring_depth={info.gpio_packed_ring_depth}", file=output)
+    print(f"gpio_packet_buffer_count={info.gpio_packet_buffer_count}", file=output)
+    print(
+        f"gpio_capture_diagnostic_mode={info.gpio_capture_diagnostic_mode.name}",
+        file=output,
+    )
 
 
 def _print_status(status: Status, run_id: int, output: TextIO) -> None:
@@ -267,11 +278,24 @@ def _print_status(status: Status, run_id: int, output: TextIO) -> None:
     print(f"gpio_items_dropped={status.gpio_items_dropped}", file=output)
     print(f"parser_errors={status.parser_errors}", file=output)
     print(f"transport_errors={status.transport_errors}", file=output)
+    print(f"gpio_samples_captured={status.gpio_samples_captured}", file=output)
+    print(f"gpio_samples_packed={status.gpio_samples_packed}", file=output)
+    print(f"gpio_samples_framed={status.gpio_samples_framed}", file=output)
+    print(f"gpio_samples_transmitted={status.gpio_samples_transmitted}", file=output)
+    print(f"gpio_raw_ring_overruns={status.gpio_raw_ring_overruns}", file=output)
+    print(f"gpio_resource_conflicts={status.gpio_resource_conflicts}", file=output)
+    print(f"gpio_start_errors={status.gpio_start_errors}", file=output)
+    print(f"gpio_stop_errors={status.gpio_stop_errors}", file=output)
+    print(
+        f"gpio_stale_dma_completions={status.gpio_stale_dma_completions}",
+        file=output,
+    )
 
 
 def _print_configuration(configuration: DAQConfiguration, output: TextIO) -> None:
     print("state=CONFIGURED", file=output)
-    print("profile=control-only", file=output)
+    profile = "control-only" if configuration.is_control_only else "physical-gpio"
+    print(f"profile={profile}", file=output)
     print(
         f"streams={_flag_names(configuration.stream_mask, constants.StreamMask)}",
         file=output,
@@ -306,7 +330,20 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
         elif arguments.action == "status":
             _print_status(daq.status(), daq.run_id, output)
         elif arguments.action == "configure":
-            _print_configuration(daq.configure_control_only(), output)
+            capabilities = daq.capabilities
+            if (
+                capabilities is not None
+                and capabilities.supported_stream_mask & constants.StreamMask.GPIO
+                and capabilities.supports_source(constants.Source.HARDWARE)
+            ):
+                configuration = daq.configure(
+                    adc=False,
+                    gpio=True,
+                    source=constants.Source.HARDWARE,
+                )
+            else:
+                configuration = daq.configure_control_only()
+            _print_configuration(configuration, output)
         elif arguments.action == "start":
             run_id = daq.start()
             print("state=RUNNING", file=output)

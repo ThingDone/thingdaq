@@ -64,13 +64,16 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
 
 `DeviceInfo`, `DeviceCapabilities`, `DAQConfiguration`, `Status`, `ADCBlock`,
 `GPIOBlock`, `GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
-`StreamGap`, `FirmwareCounters`, `HostCounters`, and `LossCounters` validate
+`GpioCaptureDiagnosticResult`, `StreamGap`, `FirmwareCounters`, `HostCounters`,
+and `LossCounters` validate
 their values when constructed. The Phase 01 names
 `Info`, `Configuration`, `AdcBlock`, and `GpioBlock` remain aliases. INFO,
 GET_STATUS, and STOP are legal in every post-boot state; CONFIGURE and
 RESET_STATS are limited to IDLE/CONFIGURED; START requires CONFIGURED; and
 block reads require the RUNNING epoch established by this facade. The optional
-GPIO clock diagnostic requires IDLE and its advertised capability bit.
+GPIO clock diagnostic requires IDLE and its advertised capability bit. The
+capture diagnostic additionally requires a fully quiescent physical GPIO
+pipeline.
 
 `DeviceInfo.data_checksum_algorithm` reports the generated device default in
 IDLE and the applied selection otherwise. `Status.data_checksum_algorithm`
@@ -104,6 +107,30 @@ exactly and cannot exceed the immutable 4 MHz production rate. The simulator
 does not advertise this capability and raises `DeviceCapabilityError` instead
 of fabricating target register evidence. See [[Protocol-V1]] and
 [[ADR-003-GPIO-Clock-DMA]].
+
+Firmware 0.7.0 adds physical GPIO-only streaming and the fail-closed capture
+diagnostic. D6 through D13 map to bits 0 through 7 at 4 MHz. INFO exposes the
+fixed rings/resources, and STATUS exposes stage counts and resource/lifecycle
+errors:
+
+```python
+from teensy_daq import Source, TeensyDAQ
+
+with TeensyDAQ.open(hardware_serial=12345670) as daq:
+    evidence = daq.gpio_capture_diagnostic()
+    applied = daq.configure(adc=False, gpio=True, source=Source.HARDWARE)
+    run_id = daq.start()
+    block = daq.read_gpio_block()
+    final = daq.stop()
+    print(
+        run_id,
+        applied.stream_mask,
+        daq.device_info.gpio_pin_map,
+        block.item_count,
+        final,
+        evidence.healthy,
+    )
+```
 
 For hardware, pass a discovery result or select a stable serial directly. A
 selected port is INFO-probed again so hot re-enumeration cannot silently open a

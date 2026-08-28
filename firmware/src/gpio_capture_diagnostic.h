@@ -169,6 +169,7 @@ class Runner {
 
   RunResult run();
   Plan plan() const { return makePlan(declaration_); }
+  FixtureDeclaration declaration() const { return declaration_; }
 
  private:
   FixtureDeclaration declaration_{};

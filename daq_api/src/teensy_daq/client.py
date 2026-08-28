@@ -37,6 +37,7 @@ from .models import (
     DeviceInfo,
     FirmwareCounters,
     GPIOBlock,
+    GpioCaptureDiagnosticResult,
     GpioClockDiagnosticRequest,
     GpioClockDiagnosticResult,
     HostCounters,
@@ -135,6 +136,9 @@ class DAQStateError(DeviceCommandError):
             "configure": constants.FrameKind.CONFIGURE_REQUEST,
             "gpio_clock_diagnostic": (
                 constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST
+            ),
+            "gpio_capture_diagnostic": (
+                constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_REQUEST
             ),
             "start": constants.FrameKind.START_REQUEST,
             "reset_stats": constants.FrameKind.RESET_STATS_REQUEST,
@@ -629,6 +633,7 @@ class TeensyDAQ:
                         constants.Source.HARDWARE
                         if capabilities is not None
                         and capabilities.supports_source(constants.Source.HARDWARE)
+                        and stream_mask == constants.StreamMask.GPIO
                         else constants.Source.SYNTHETIC
                     )
                 configuration = DAQConfiguration(
@@ -773,6 +778,29 @@ class TeensyDAQ:
             if response.value.request != request:
                 raise UnexpectedMessageError(
                     "GPIO clock diagnostic response changed the requested window"
+                )
+            return response.value
+
+    def gpio_capture_diagnostic(self) -> GpioCaptureDiagnosticResult:
+        """Run the build-authorized, safe GPIO capture diagnostic while IDLE."""
+
+        with self._lock:
+            self._require_verified_identity()
+            self._require_state("gpio_capture_diagnostic", constants.DeviceState.IDLE)
+            capabilities = self.capabilities
+            if capabilities is not None and not capabilities.supports(
+                constants.Capability.GPIO_CAPTURE_DIAGNOSTIC
+            ):
+                raise DeviceCapabilityError(
+                    "device does not advertise GPIO capture diagnostics",
+                    command=constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_REQUEST,
+                )
+            response = self._command(
+                constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_REQUEST
+            )
+            if not isinstance(response.value, GpioCaptureDiagnosticResult):
+                raise UnexpectedMessageError(
+                    "GPIO capture diagnostic response has no snapshot value"
                 )
             return response.value
 
@@ -1063,6 +1091,14 @@ class TeensyDAQ:
         capabilities = self.capabilities
         if capabilities is None:
             return
+        if (
+            configuration.source is constants.Source.HARDWARE
+            and not configuration.is_control_only
+            and configuration.stream_mask != constants.StreamMask.GPIO
+        ):
+            raise DeviceCapabilityError(
+                "protocol-v1 physical acquisition supports GPIO-only streaming"
+            )
         if configuration.is_control_only and (
             capabilities.supported_stream_mask != constants.StreamMask.NONE
             or not capabilities.supports_source(constants.Source.HARDWARE)

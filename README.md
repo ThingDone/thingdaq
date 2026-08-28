@@ -144,7 +144,7 @@ scheduled/sample counts, route IDs, and typed hardware errors. The accepted
 route and rejected dual-edge alternatives are recorded in
 `doc/decisions/adr-003-gpio-clock-dma.md`.
 
-The unadvertised physical GPIO foundation selectively returns only D6-D13 from
+The advertised physical GPIO mode selectively returns only D6-D13 from
 GPIO7 to GPIO2, keeps them inputs on START/STOP/error, and uses channel 2 to
 copy fixed 32-bit `GPIO2_PSR` samples into four aligned 4,048-word OCRAM
 buffers. Scatter/gather completion interrupts occur once per buffer, not at
@@ -156,10 +156,14 @@ boundaries into 4,048-byte frames, releases raw leases promptly, and stages
 four complete packed buffers before the existing fixed packet ready/transmit
 queues apply run, sequence, first-sample timestamp, gap flags, and the selected
 checksum. When either raw or packed storage fills, acquisition remains live and
-the exact loss is projected once into shared statistics. Raw 32-bit words are
-available only through an explicitly bounded 256-sample internal diagnostic;
-there is no raw-word wire encoder or capability. Hardware-source CONFIGURE
-remains disabled until the physical-mode integration task completes.
+the exact loss is projected once into shared statistics. CONFIGURE accepts the
+GPIO-only hardware profile and rejects physical ADC or conflicting resource
+states before touching acquisition registers. START snapshots one epoch and
+arms buffers/DMA before enabling PIT; STOP disables the trigger and DMA route
+in reverse order, then drains complete old-run work before another START.
+INFO and STATUS expose pin order, rate/period, packed width, ring/resource
+capacities, stage counts, queue depths, resource conflicts, lifecycle errors,
+and rejected stale DMA completions.
 
 The registered Port 15 fixture documentation does not establish that D6-D13
 are unconnected or safe to drive and declares no machine-readable loopback or
@@ -169,8 +173,9 @@ raw/packed observations plus before/during/after register and count evidence,
 drains all leases, and restores GPIO2 inputs. It never writes a GPIO data
 register, and it explicitly leaves external transition, pad-electrical, and
 self-driven 256-value stable-window validation unexercised. The existing
-host-C++ packer test independently covers all 256 logical GPIO bytes. This
-facade remains unadvertised until physical control-plane integration.
+host-C++ packer test independently covers all 256 logical GPIO bytes. The
+optional `GPIO_CAPTURE_DIAGNOSTIC` command now advertises this fail-closed
+evidence path while keeping its fixture policy immutable from the host.
 
 The Python codec uses exact standard-library C implementations for Adler-32
 and CRC-32/ISO-HDLC and a bounded table-driven fallback for CRC-32C. Its
@@ -185,9 +190,10 @@ PYTHONPATH=daq_api/src .venv/bin/python -m teensy_daq.checksum_benchmark
 The portable firmware control module implements bounded BOOT → IDLE,
 CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
 STOP, RESET_STATS, PING, optional CHECKSUM_BENCHMARK, and optional
-GPIO_CLOCK_DIAGNOSTIC. Phase 04 accepts nonempty ADC/GPIO subsets only for the
-implemented synthetic source; INFO and STATUS distinguish that source from the
-still-unavailable physical path.
+GPIO_CLOCK_DIAGNOSTIC and GPIO_CAPTURE_DIAGNOSTIC. Synthetic mode accepts any
+nonempty ADC/GPIO subset; physical mode accepts GPIO only. INFO and STATUS
+distinguish source, publish the fixed GPIO hardware resources, and remain
+responsive while the physical stream is running.
 
 The Teensy USB layer retains PJRC's USB Serial VID/PID and chip-derived serial
 number while overriding only the weak product string with `Teensy DAQ`. Boot
@@ -435,9 +441,11 @@ record printed by the guard:
   daq_api/tests/test_streaming_correctness_performance.py
 ```
 
-Phase 03's zero-stream hardware profile is available through
-`TeensyDAQ.configure_control_only()` and
-`TeensyDAQ.simulated(control_only=True)`. Serial opens discard one valid INFO
+Physical GPIO is configured with
+`TeensyDAQ.configure(adc=False, gpio=True, source=Source.HARDWARE)`. Phase 03's
+zero-stream profile remains available through `TeensyDAQ.configure_control_only()`
+and `TeensyDAQ.simulated(control_only=True)` for legacy probing. Serial opens
+discard one valid INFO
 probe, require a second identity-equal response, retry reset/BOOT noise within
 an explicit bound, and validate the protocol, Teensy target, minimum firmware,
 source-derived build ID, and hardware serial before mutation. The installed

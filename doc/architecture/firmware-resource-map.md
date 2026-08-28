@@ -224,7 +224,7 @@ word, so each event proves the trigger/count path without touching a pad or
 the raw GPIO ring. The diagnostic disables PIT, eDMA requests, DMAMUX,
 and XBAR DMA generation before returning its read-only snapshot.
 
-The unadvertised autonomous GPIO capture diagnostic adds no DMA buffer or
+The advertised autonomous GPIO capture diagnostic adds no DMA buffer or
 peripheral reservation. It runs only when the same raw-capture owner is
 quiescent, reuses the production PIT0/XBARA1/eDMA channel 2 route and raw ring,
 and leases at most 256 words from one complete buffer for observation. The

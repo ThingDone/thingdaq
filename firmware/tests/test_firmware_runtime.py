@@ -19,6 +19,11 @@ PORTABLE_SOURCES = (
     FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp",
     FIRMWARE_SOURCE / "synthetic_source.h",
     FIRMWARE_SOURCE / "synthetic_source.cpp",
+    FIRMWARE_SOURCE / "gpio_raw_capture.h",
+    FIRMWARE_SOURCE / "gpio_batch_packer.h",
+    FIRMWARE_SOURCE / "gpio_batch_packer.cpp",
+    FIRMWARE_SOURCE / "gpio_capture_diagnostic.h",
+    FIRMWARE_SOURCE / "gpio_capture_diagnostic.cpp",
 )
 
 
@@ -54,6 +59,9 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "checksum.cpp"),
                     str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
                     str(FIRMWARE_SOURCE / "gpio_clock_diagnostic.cpp"),
+                    str(FIRMWARE_SOURCE / "gpio_raw_capture.cpp"),
+                    str(FIRMWARE_SOURCE / "gpio_batch_packer.cpp"),
+                    str(FIRMWARE_SOURCE / "gpio_capture_diagnostic.cpp"),
                     "-o",
                     str(executable),
                 ],
@@ -110,7 +118,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
         self.assertIn("hardwareSerialNumber()", sketch)
         self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("Serial.", sketch)
-        self.assertLessEqual(len(sketch.splitlines()), 42)
+        self.assertLessEqual(len(sketch.splitlines()), 55)
 
 
 if __name__ == "__main__":

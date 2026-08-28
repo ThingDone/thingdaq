@@ -30,6 +30,7 @@ _KIND_NAMES = {
     0x16: "PING_REQUEST",
     0x17: "CHECKSUM_BENCHMARK_REQUEST",
     0x18: "GPIO_CLOCK_DIAGNOSTIC_REQUEST",
+    0x19: "GPIO_CAPTURE_DIAGNOSTIC_REQUEST",
     0x90: "INFO_RESPONSE",
     0x91: "CONFIGURE_RESPONSE",
     0x92: "START_RESPONSE",
@@ -39,6 +40,7 @@ _KIND_NAMES = {
     0x96: "PING_RESPONSE",
     0x97: "CHECKSUM_BENCHMARK_RESPONSE",
     0x98: "GPIO_CLOCK_DIAGNOSTIC_RESPONSE",
+    0x99: "GPIO_CAPTURE_DIAGNOSTIC_RESPONSE",
     0x9F: "ERROR_RESPONSE",
 }
 
@@ -68,14 +70,14 @@ class _GoldenVector:
 
 
 def _info_payload() -> bytes:
-    payload = bytearray(98)
+    payload = bytearray(128)
     struct.pack_into("<BBHBBBB", payload, 0, 0, 0, 0, 1, 1, 3, 3)
     struct.pack_into(
         "<IIIIIII",
         payload,
         8,
         14,
-        0x7F,
+        0x1FF,
         8_000_000,
         4_096,
         1_024,
@@ -87,6 +89,9 @@ def _info_payload() -> bytes:
     struct.pack_into("<I4BHH", payload, 54, 0x12345678, 0, 0, 0, 0, 0, 0)
     build_id = b"synthetic-golden-v1"
     payload[66 : 66 + len(build_id)] = build_id
+    struct.pack_into("<BBBBH", payload, 98, 8, 4, 4, 0, 3)
+    struct.pack_into("<IIIH", payload, 104, 4048, 64768, 16256, 200)
+    struct.pack_into("<BBBBBBBB", payload, 120, 0, 56, 0, 2, 30, 2, 1, 0)
     return bytes(payload)
 
 
@@ -135,6 +140,57 @@ def _gpio_clock_diagnostic_payload() -> bytes:
         struct.pack_into("<I", payload, 84 + 4 * offset, value)
     struct.pack_into("<HHHH", payload, 124, 4112, 8208, 8, 0x0202)
     struct.pack_into("<BBBBBBH", payload, 132, 0, 56, 0, 2, 30, 2, 0)
+    return bytes(payload)
+
+
+def _gpio_capture_diagnostic_payload() -> bytes:
+    payload = bytearray(144)
+    struct.pack_into("<BBHBBBB", payload, 0, 0, 0, 0, 0, 1, 0, 0)
+    struct.pack_into("<IIIIIIQ", payload, 8, 0, 0, 0, 307, 600_000_000, 607_200, 4055)
+    struct.pack_into(
+        "<IIIIIIHHHHBBBB",
+        payload,
+        40,
+        4048,
+        256,
+        7,
+        0,
+        199695,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        255,
+        90,
+        90,
+    )
+    struct.pack_into(
+        "<IIIIIIIIIIIIIIHHHBBI",
+        payload,
+        76,
+        199695,
+        0,
+        0,
+        199695,
+        0,
+        0,
+        132099,
+        132099,
+        132099,
+        5,
+        1,
+        0x8000001E,
+        4,
+        0,
+        4048,
+        4048,
+        18,
+        2,
+        0,
+        256,
+    )
     return bytes(payload)
 
 
@@ -193,6 +249,7 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
             struct.pack("<IHH", 1_000_000, 4096, 0),
             request_id=9,
         ),
+        _GoldenVector("gpio-capture-diagnostic-request", 0x19, b"", request_id=10),
         _GoldenVector("info-response", 0x90, _info_payload(), request_id=1),
         _GoldenVector(
             "configure-response",
@@ -227,7 +284,8 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
                 0,
                 0,
                 2,
-            ),
+            )
+            + bytes(116),
             run_id=7,
             request_id=4,
         ),
@@ -293,11 +351,17 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
             request_id=9,
         ),
         _GoldenVector(
+            "gpio-capture-diagnostic-response",
+            0x99,
+            _gpio_capture_diagnostic_payload(),
+            request_id=10,
+        ),
+        _GoldenVector(
             "error-response",
             0x9F,
             struct.pack("<BBHBBH", 1, 0, 2, 0xFE, 1, 0),
             flags=0x8000,
-            request_id=10,
+            request_id=11,
         ),
     )
 
@@ -342,8 +406,8 @@ class ExhaustiveProtocolVectorTests(unittest.TestCase):
 
     def test_every_frame_kind_matches_an_independent_wire_image(self) -> None:
         vectors = _golden_vectors()
-        self.assertEqual(21, len(vectors))
-        self.assertEqual(21, len({vector.kind for vector in vectors}))
+        self.assertEqual(23, len(vectors))
+        self.assertEqual(23, len({vector.kind for vector in vectors}))
         self.assertEqual(
             {f"{vector.name}.bin" for vector in vectors},
             {path.name for path in FIXTURE_DIRECTORY.glob("*.bin")},

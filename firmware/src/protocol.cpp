@@ -94,6 +94,7 @@ constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kPingRequest:
     case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
     case protocol_v1::FrameKind::kGpioClockDiagnosticRequest:
+    case protocol_v1::FrameKind::kGpioCaptureDiagnosticRequest:
     case protocol_v1::FrameKind::kInfoResponse:
     case protocol_v1::FrameKind::kConfigureResponse:
     case protocol_v1::FrameKind::kStartResponse:
@@ -103,6 +104,7 @@ constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kPingResponse:
     case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
     case protocol_v1::FrameKind::kGpioClockDiagnosticResponse:
+    case protocol_v1::FrameKind::kGpioCaptureDiagnosticResponse:
     case protocol_v1::FrameKind::kErrorResponse:
       return true;
   }
@@ -120,6 +122,7 @@ constexpr bool isRequestKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kPingRequest:
     case protocol_v1::FrameKind::kChecksumBenchmarkRequest:
     case protocol_v1::FrameKind::kGpioClockDiagnosticRequest:
+    case protocol_v1::FrameKind::kGpioCaptureDiagnosticRequest:
       return true;
     default:
       return false;
@@ -161,6 +164,7 @@ constexpr bool isTypedResponseKind(protocol_v1::FrameKind kind) {
     case protocol_v1::FrameKind::kPingResponse:
     case protocol_v1::FrameKind::kChecksumBenchmarkResponse:
     case protocol_v1::FrameKind::kGpioClockDiagnosticResponse:
+    case protocol_v1::FrameKind::kGpioCaptureDiagnosticResponse:
       return true;
     default:
       return false;
@@ -229,6 +233,9 @@ bool commandForKind(protocol_v1::FrameKind kind,
     case protocol_v1::FrameKind::kGpioClockDiagnosticRequest:
       command = protocol_v1::CommandKind::kGpioClockDiagnostic;
       return true;
+    case protocol_v1::FrameKind::kGpioCaptureDiagnosticRequest:
+      command = protocol_v1::CommandKind::kGpioCaptureDiagnostic;
+      return true;
     default:
       return false;
   }
@@ -252,6 +259,7 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
     case protocol_v1::FrameKind::kGetStatusRequest:
     case protocol_v1::FrameKind::kStopRequest:
     case protocol_v1::FrameKind::kResetStatsRequest:
+    case protocol_v1::FrameKind::kGpioCaptureDiagnosticRequest:
       size = protocol_v1::kEmptyPayloadSize;
       return true;
     case protocol_v1::FrameKind::kConfigureRequest:
@@ -291,6 +299,9 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
     case protocol_v1::FrameKind::kGpioClockDiagnosticResponse:
       size = protocol_v1::kGpioClockDiagnosticResponsePayloadSize;
       return true;
+    case protocol_v1::FrameKind::kGpioCaptureDiagnosticResponse:
+      size = protocol_v1::kGpioCaptureDiagnosticResponsePayloadSize;
+      return true;
     case protocol_v1::FrameKind::kErrorResponse:
       size = protocol_v1::kErrorResponsePayloadSize;
       return response_error;
@@ -298,6 +309,7 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
   return false;
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.header_validation")
 Result validateHeader(const FrameHeader &header, bool commands_only) {
   if (header.version != protocol_v1::kProtocolVersion) {
     return badVersion();
@@ -393,6 +405,7 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
   return Result::success();
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.header_decode")
 Result decodeHeader(ByteView input, FrameHeader &header, bool commands_only) {
   if (!input.valid() || input.size < protocol_v1::kHeaderSize) {
     return badLength();
@@ -514,6 +527,7 @@ Result validateResponsePrefix(const FrameHeader &header, ByteView payload) {
 Result validateInfo(ByteView payload) {
   if (payload.data[protocol_v1::kInfoResponseReserved0Offset] != 0U ||
       payload.data[protocol_v1::kInfoResponseReserved2Offset] != 0U ||
+      payload.data[protocol_v1::kInfoResponseReserved4Offset] != 0U ||
       !isKnownState(payload.data[protocol_v1::kInfoResponseDeviceStateOffset]) ||
       payload.data[protocol_v1::kInfoResponseDeviceStateOffset] ==
           static_cast<std::uint8_t>(protocol_v1::DeviceState::kBoot) ||
@@ -528,7 +542,31 @@ Result validateInfo(ByteView payload) {
       payload.data[protocol_v1::kInfoResponseAdcContainerBytesOffset] !=
           protocol_v1::kAdcContainerBits / 8U ||
       payload.data[protocol_v1::kInfoResponseGpioPinCountOffset] !=
-          protocol_v1::kInfoResponseGpioPinMapCount) {
+          protocol_v1::kInfoResponseGpioPinMapCount ||
+      payload.data[protocol_v1::kInfoResponseGpioPackedWidthBitsOffset] !=
+          protocol_v1::kGpioPackedWidthBits ||
+      payload.data[protocol_v1::kInfoResponseGpioRawRingDepthOffset] !=
+          protocol_v1::kGpioRawRingDepth ||
+      payload.data[protocol_v1::kInfoResponseGpioPackedRingDepthOffset] !=
+          protocol_v1::kGpioPackedRingDepth ||
+      payload.data[
+          protocol_v1::kInfoResponseGpioCaptureDiagnosticModeOffset] >
+          static_cast<std::uint8_t>(
+              protocol_v1::GpioCaptureDiagnosticMode::kFixtureStimulus) ||
+      payload.data[protocol_v1::kInfoResponseGpioPitChannelOffset] !=
+          protocol_v1::kGpioPitChannel ||
+      payload.data[protocol_v1::kInfoResponseGpioXbarInputOffset] !=
+          protocol_v1::kGpioXbarInput ||
+      payload.data[protocol_v1::kInfoResponseGpioXbarOutputOffset] !=
+          protocol_v1::kGpioXbarOutput ||
+      payload.data[protocol_v1::kInfoResponseGpioEdmaChannelOffset] !=
+          protocol_v1::kGpioEdmaChannel ||
+      payload.data[protocol_v1::kInfoResponseGpioDmamuxSourceOffset] !=
+          protocol_v1::kGpioDmamuxSource ||
+      payload.data[protocol_v1::kInfoResponseGpioEdmaPriorityOffset] !=
+          protocol_v1::kGpioEdmaPriority ||
+      payload.data[protocol_v1::kInfoResponseGpioXbarActiveEdgeOffset] !=
+          protocol_v1::kGpioXbarActiveEdge) {
     return badPayload();
   }
   const auto data_checksum = static_cast<protocol_v1::ChecksumAlgorithm>(
@@ -566,6 +604,23 @@ Result validateInfo(ByteView payload) {
       (value32 & ~protocol_v1::kKnownCapabilityMask) != 0U) {
     return badPayload();
   }
+  const std::size_t gpio_offsets[] = {
+      protocol_v1::kInfoResponseGpioRawSamplesPerBufferOffset,
+      protocol_v1::kInfoResponseGpioRawRingBytesOffset,
+      protocol_v1::kInfoResponseGpioPackedRingBytesOffset,
+  };
+  const std::uint32_t gpio_expected[] = {
+      protocol_v1::kGpioRawSamplesPerBuffer,
+      protocol_v1::kGpioRawRingBytes,
+      protocol_v1::kGpioPackedRingBytes,
+  };
+  for (std::size_t index = 0U;
+       index < sizeof(gpio_offsets) / sizeof(gpio_offsets[0]); ++index) {
+    if (!loadU32(payload, gpio_offsets[index], value32) ||
+        value32 != gpio_expected[index]) {
+      return badPayload();
+    }
+  }
 
   std::uint16_t value16 = 0U;
   if (!loadU16(payload, protocol_v1::kInfoResponseAdcPairPeriodTicksOffset,
@@ -577,6 +632,18 @@ Result validateInfo(ByteView payload) {
       !loadU16(payload, protocol_v1::kInfoResponseGpioSamplePeriodTicksOffset,
                value16) ||
       value16 != protocol_v1::kGpioSamplePeriodTicks) {
+    return badPayload();
+  }
+  if (!loadU16(
+          payload,
+          protocol_v1::kInfoResponseGpioCaptureDiagnosticFlagsOffset,
+          value16) ||
+      (value16 & ~protocol_v1::kKnownGpioCaptureDiagnosticFlagMask) != 0U ||
+      !loadU16(payload, protocol_v1::kInfoResponseGpioPacketBufferCountOffset,
+               value16) ||
+      value16 != protocol_v1::kGpioPacketBufferCount ||
+      !loadU16(payload, protocol_v1::kInfoResponseReserved3Offset, value16) ||
+      value16 != 0U) {
     return badPayload();
   }
   for (std::size_t index = 0U;
@@ -639,6 +706,38 @@ Result validateStatus(ByteView payload) {
       !loadU32(payload, protocol_v1::kStatusResponseStatsGenerationOffset,
                value) ||
       value == 0U) {
+    return badPayload();
+  }
+  std::uint16_t depth = 0U;
+  if (!loadU16(payload, protocol_v1::kStatusResponseReserved1Offset, depth) ||
+      depth != 0U ||
+      !loadU16(payload, protocol_v1::kStatusResponseGpioRawReadyDepthOffset,
+               depth) ||
+      depth > protocol_v1::kGpioRawRingDepth ||
+      !loadU16(
+          payload,
+          protocol_v1::kStatusResponseGpioRawReadyHighWaterOffset, depth) ||
+      depth > protocol_v1::kGpioRawRingDepth ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponseGpioPackedReadyDepthOffset,
+               depth) ||
+      depth > protocol_v1::kGpioPackedRingDepth ||
+      !loadU16(
+          payload,
+          protocol_v1::kStatusResponseGpioPackedReadyHighWaterOffset,
+          depth) ||
+      depth > protocol_v1::kGpioPackedRingDepth ||
+      !loadU16(payload, protocol_v1::kStatusResponsePacketReadyDepthOffset,
+               depth) ||
+      depth > protocol_v1::kGpioPacketBufferCount ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponsePacketTransmitDepthOffset,
+               depth) ||
+      depth > protocol_v1::kGpioPacketBufferCount ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponsePacketOwnedHighWaterOffset,
+               depth) ||
+      depth > protocol_v1::kGpioPacketBufferCount) {
     return badPayload();
   }
   return Result::success();
@@ -951,6 +1050,79 @@ Result validateGpioClockDiagnosticResponse(ByteView payload) {
   return Result::success();
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(
+    ".flashmem.protocol.gpio_capture_diagnostic_validation")
+Result validateGpioCaptureDiagnosticResponse(ByteView payload) {
+  std::uint16_t reserved = 1U;
+  std::uint32_t errors = 0U;
+  std::uint32_t flags = 0U;
+  std::uint64_t captured = 0U;
+  std::uint32_t retained = 0U;
+  std::uint32_t analyzed = 0U;
+  std::uint32_t limit = 0U;
+  if (payload.data[
+          protocol_v1::kGpioCaptureDiagnosticResponseModeOffset] >
+          static_cast<std::uint8_t>(
+              protocol_v1::GpioCaptureDiagnosticMode::kFixtureStimulus) ||
+      payload.data[
+          protocol_v1::kGpioCaptureDiagnosticResponseMetadataKindOffset] >
+          2U ||
+      payload.data[
+          protocol_v1::kGpioCaptureDiagnosticResponseDriveSafetyOffset] >
+          2U ||
+      payload.data[
+          protocol_v1::kGpioCaptureDiagnosticResponseStimulusKindOffset] >
+          2U ||
+      payload.data[
+          protocol_v1::kGpioCaptureDiagnosticResponseReserved2Offset] != 0U ||
+      !loadU16(payload,
+               protocol_v1::kGpioCaptureDiagnosticResponseReserved1Offset,
+               reserved) ||
+      reserved != 0U ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioCaptureDiagnosticResponseHardwareErrorFlagsOffset,
+          errors) ||
+      (errors & ~protocol_v1::kKnownGpioCaptureErrorMask) != 0U ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioCaptureDiagnosticResponseDiagnosticFlagsOffset,
+          flags) ||
+      (flags & ~protocol_v1::kKnownGpioCaptureDiagnosticFlagMask) != 0U ||
+      (flags & static_cast<std::uint32_t>(
+                   protocol_v1::GpioCaptureDiagnosticFlag::kAvailable)) ==
+          0U ||
+      !loadU64(
+          payload,
+          protocol_v1::kGpioCaptureDiagnosticResponseDmaSamplesCapturedOffset,
+          captured) ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioCaptureDiagnosticResponseCompleteSamplesRetainedOffset,
+          retained) ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioCaptureDiagnosticResponseSamplesAnalyzedOffset,
+          analyzed) ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioCaptureDiagnosticResponseAnalysisSampleLimitOffset,
+          limit) ||
+      retained > captured || analyzed > retained || analyzed > limit ||
+      limit == 0U || limit > protocol_v1::kGpioSamplesPerFrame) {
+    return badPayload();
+  }
+  const std::uint32_t output_permitted = static_cast<std::uint32_t>(
+      protocol_v1::GpioCaptureDiagnosticFlag::kOutputDrivePermitted);
+  const std::uint32_t output_exercised = static_cast<std::uint32_t>(
+      protocol_v1::GpioCaptureDiagnosticFlag::kOutputDriveExercised);
+  return (flags & output_exercised) != 0U &&
+                 (flags & output_permitted) == 0U
+             ? badPayload()
+             : Result::success();
+}
+
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.payload_validation")
 Result validatePayload(const FrameHeader &header, ByteView payload) {
   if (!payload.valid() || payload.size != header.payload_length) {
     return badLength();
@@ -1040,6 +1212,8 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
       return validateChecksumBenchmarkResponse(payload);
     case protocol_v1::FrameKind::kGpioClockDiagnosticResponse:
       return validateGpioClockDiagnosticResponse(payload);
+    case protocol_v1::FrameKind::kGpioCaptureDiagnosticResponse:
+      return validateGpioCaptureDiagnosticResponse(payload);
     default:
       return badPayload();
   }
@@ -1381,6 +1555,7 @@ Result computeChecksum(protocol_v1::ChecksumAlgorithm algorithm, ByteView input,
              : unsupportedChecksum();
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.frame_decode")
 Result decodeFrame(ByteView input, DecodedFrame &frame) {
   FrameHeader header{};
   Result result = decodeHeader(input, header, false);
@@ -1524,6 +1699,7 @@ Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
   return Result::success();
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.request_decode")
 Result decodeRequest(ByteView input, Request &request) {
   DecodedFrame frame{};
   Result result = decodeFrame(input, frame);
@@ -1572,6 +1748,7 @@ Result decodeRequest(ByteView input, Request &request) {
   return Result::success();
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.info_response")
 Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                           const InfoResponse &response, ControlFrame &output) {
   Result result = verifyRequestKind(request, protocol_v1::CommandKind::kInfo);
@@ -1637,11 +1814,45 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
     payload[protocol_v1::kInfoResponseBuildIdOffset + index] =
         response.build_id[index];
   }
+  payload[protocol_v1::kInfoResponseGpioPackedWidthBitsOffset] =
+      response.gpio_packed_width_bits;
+  payload[protocol_v1::kInfoResponseGpioRawRingDepthOffset] =
+      response.gpio_raw_ring_depth;
+  payload[protocol_v1::kInfoResponseGpioPackedRingDepthOffset] =
+      response.gpio_packed_ring_depth;
+  payload[protocol_v1::kInfoResponseGpioCaptureDiagnosticModeOffset] =
+      static_cast<std::uint8_t>(response.gpio_capture_diagnostic_mode);
+  storeU16(bytes,
+           protocol_v1::kInfoResponseGpioCaptureDiagnosticFlagsOffset,
+           response.gpio_capture_diagnostic_flags);
+  storeU32(bytes, protocol_v1::kInfoResponseGpioRawSamplesPerBufferOffset,
+           response.gpio_raw_samples_per_buffer);
+  storeU32(bytes, protocol_v1::kInfoResponseGpioRawRingBytesOffset,
+           response.gpio_raw_ring_bytes);
+  storeU32(bytes, protocol_v1::kInfoResponseGpioPackedRingBytesOffset,
+           response.gpio_packed_ring_bytes);
+  storeU16(bytes, protocol_v1::kInfoResponseGpioPacketBufferCountOffset,
+           response.gpio_packet_buffer_count);
+  payload[protocol_v1::kInfoResponseGpioPitChannelOffset] =
+      response.gpio_pit_channel;
+  payload[protocol_v1::kInfoResponseGpioXbarInputOffset] =
+      response.gpio_xbar_input;
+  payload[protocol_v1::kInfoResponseGpioXbarOutputOffset] =
+      response.gpio_xbar_output;
+  payload[protocol_v1::kInfoResponseGpioEdmaChannelOffset] =
+      response.gpio_edma_channel;
+  payload[protocol_v1::kInfoResponseGpioDmamuxSourceOffset] =
+      response.gpio_dmamux_source;
+  payload[protocol_v1::kInfoResponseGpioEdmaPriorityOffset] =
+      response.gpio_edma_priority;
+  payload[protocol_v1::kInfoResponseGpioXbarActiveEdgeOffset] =
+      response.gpio_xbar_active_edge;
   return encodeFrame(
       responseFields(protocol_v1::FrameKind::kInfoResponse, request, run_id),
       view(payload), output);
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.configure_response")
 Result encodeConfigureResponse(const Request &request, std::uint32_t run_id,
                                const Configuration &configuration,
                                ControlFrame &output) {
@@ -1659,6 +1870,7 @@ Result encodeConfigureResponse(const Request &request, std::uint32_t run_id,
                      view(payload), output);
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.start_response")
 Result encodeStartResponse(const Request &request, std::uint32_t run_id,
                            const Configuration &configuration,
                            ControlFrame &output) {
@@ -1675,6 +1887,7 @@ Result encodeStartResponse(const Request &request, std::uint32_t run_id,
       view(payload), output);
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.status_response")
 Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
                             const StatusResponse &response,
                             ControlFrame &output) {
@@ -1711,11 +1924,49 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
            response.transport_errors);
   storeU32(bytes, protocol_v1::kStatusResponseStatsGenerationOffset,
            response.stats_generation);
+#define STORE_STATUS_U64(field, member)                                    \
+  storeU64(bytes, protocol_v1::kStatusResponse##field##Offset,             \
+           response.member)
+#define STORE_STATUS_U32(field, member)                                    \
+  storeU32(bytes, protocol_v1::kStatusResponse##field##Offset,             \
+           response.member)
+#define STORE_STATUS_U16(field, member)                                    \
+  storeU16(bytes, protocol_v1::kStatusResponse##field##Offset,             \
+           response.member)
+  STORE_STATUS_U64(GpioSamplesCaptured, gpio_samples_captured);
+  STORE_STATUS_U64(GpioSamplesPacked, gpio_samples_packed);
+  STORE_STATUS_U64(GpioSamplesFramed, gpio_samples_framed);
+  STORE_STATUS_U64(GpioSamplesTransmitted, gpio_samples_transmitted);
+  STORE_STATUS_U64(GpioRawSamplesLost, gpio_raw_samples_lost);
+  STORE_STATUS_U64(GpioPackerSamplesDropped, gpio_packer_samples_dropped);
+  STORE_STATUS_U64(GpioRawRingOverruns, gpio_raw_ring_overruns);
+  STORE_STATUS_U64(GpioDmaMajorLoops, gpio_dma_major_loops);
+  STORE_STATUS_U16(GpioRawReadyDepth, gpio_raw_ready_depth);
+  STORE_STATUS_U16(GpioRawReadyHighWater, gpio_raw_ready_high_water);
+  STORE_STATUS_U16(GpioPackedReadyDepth, gpio_packed_ready_depth);
+  STORE_STATUS_U16(GpioPackedReadyHighWater, gpio_packed_ready_high_water);
+  STORE_STATUS_U16(PacketReadyDepth, packet_ready_depth);
+  STORE_STATUS_U16(PacketTransmitDepth, packet_transmit_depth);
+  STORE_STATUS_U16(PacketOwnedHighWater, packet_owned_high_water);
+  STORE_STATUS_U32(GpioHardwareErrors, gpio_hardware_errors);
+  STORE_STATUS_U32(GpioRawInvariantErrors, gpio_raw_invariant_errors);
+  STORE_STATUS_U32(GpioPackerSourceErrors, gpio_packer_source_errors);
+  STORE_STATUS_U32(GpioPackerPipelineErrors, gpio_packer_pipeline_errors);
+  STORE_STATUS_U32(GpioPackerChronologyErrors,
+                   gpio_packer_chronology_errors);
+  STORE_STATUS_U32(GpioResourceConflicts, gpio_resource_conflicts);
+  STORE_STATUS_U32(GpioStartErrors, gpio_start_errors);
+  STORE_STATUS_U32(GpioStopErrors, gpio_stop_errors);
+  STORE_STATUS_U32(GpioStaleDmaCompletions, gpio_stale_dma_completions);
+#undef STORE_STATUS_U16
+#undef STORE_STATUS_U32
+#undef STORE_STATUS_U64
   return encodeFrame(responseFields(protocol_v1::FrameKind::kGetStatusResponse,
                                     request, run_id),
                      view(payload), output);
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.stop_response")
 Result encodeStopResponse(const Request &request, std::uint32_t run_id,
                           ControlFrame &output) {
   Result result = verifyRequestKind(request, protocol_v1::CommandKind::kStop);
@@ -1731,6 +1982,7 @@ Result encodeStopResponse(const Request &request, std::uint32_t run_id,
       view(payload), output);
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.reset_stats_response")
 Result encodeResetStatsResponse(const Request &request, std::uint32_t run_id,
                                 std::uint32_t stats_generation,
                                 ControlFrame &output) {
@@ -1749,6 +2001,7 @@ Result encodeResetStatsResponse(const Request &request, std::uint32_t run_id,
                      view(payload), output);
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.ping_response")
 Result encodePingResponse(const Request &request, std::uint32_t run_id,
                           ControlFrame &output) {
   Result result = verifyRequestKind(request, protocol_v1::CommandKind::kPing);
@@ -1966,6 +2219,96 @@ Result encodeGpioClockDiagnosticResponse(
       view(payload), output);
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(
+    ".flashmem.protocol.gpio_capture_diagnostic_response")
+Result encodeGpioCaptureDiagnosticResponse(
+    const Request &request, std::uint32_t run_id,
+    const GpioCaptureDiagnosticResponse &response, ControlFrame &output) {
+  Result result = verifyRequestKind(
+      request, protocol_v1::CommandKind::kGpioCaptureDiagnostic);
+  if (!result.ok()) {
+    return result;
+  }
+
+  std::array<std::uint8_t,
+             protocol_v1::kGpioCaptureDiagnosticResponsePayloadSize>
+      payload{};
+  MutableByteView bytes = mutableView(payload);
+  writeSuccessPrefix(bytes);
+  payload[protocol_v1::kGpioCaptureDiagnosticResponseModeOffset] =
+      static_cast<std::uint8_t>(response.mode);
+  payload[protocol_v1::kGpioCaptureDiagnosticResponseMetadataKindOffset] =
+      response.metadata_kind;
+  payload[protocol_v1::kGpioCaptureDiagnosticResponseDriveSafetyOffset] =
+      response.drive_safety;
+  payload[protocol_v1::kGpioCaptureDiagnosticResponseStimulusKindOffset] =
+      response.stimulus_kind;
+#define STORE_GPIO_CAPTURE_U32(field, member)                              \
+  storeU32(bytes,                                                          \
+           protocol_v1::kGpioCaptureDiagnosticResponse##field##Offset,     \
+           response.member)
+#define STORE_GPIO_CAPTURE_U16(field, member)                              \
+  storeU16(bytes,                                                          \
+           protocol_v1::kGpioCaptureDiagnosticResponse##field##Offset,     \
+           response.member)
+  STORE_GPIO_CAPTURE_U32(FixtureIdentity, fixture_identity);
+  STORE_GPIO_CAPTURE_U32(StimulusIdentity, stimulus_identity);
+  STORE_GPIO_CAPTURE_U32(HardwareErrorFlags, hardware_error_flags);
+  STORE_GPIO_CAPTURE_U32(DiagnosticFlags, diagnostic_flags);
+  STORE_GPIO_CAPTURE_U32(DwtCounterHz, dwt_counter_hz);
+  STORE_GPIO_CAPTURE_U32(DwtElapsedCycles, dwt_elapsed_cycles);
+  storeU64(bytes,
+           protocol_v1::kGpioCaptureDiagnosticResponseDmaSamplesCapturedOffset,
+           response.dma_samples_captured);
+  STORE_GPIO_CAPTURE_U32(CompleteSamplesRetained,
+                         complete_samples_retained);
+  STORE_GPIO_CAPTURE_U32(SamplesAnalyzed, samples_analyzed);
+  STORE_GPIO_CAPTURE_U32(StoppedPartialSamples, stopped_partial_samples);
+  STORE_GPIO_CAPTURE_U32(RawWordAnd, raw_word_and);
+  STORE_GPIO_CAPTURE_U32(RawWordOr, raw_word_or);
+  STORE_GPIO_CAPTURE_U32(ObservedTransitions, observed_transitions);
+  STORE_GPIO_CAPTURE_U16(MappingValuesChecked, mapping_values_checked);
+  STORE_GPIO_CAPTURE_U16(MappingFailures, mapping_failures);
+  STORE_GPIO_CAPTURE_U16(UnstableSamples, unstable_samples);
+  payload[protocol_v1::kGpioCaptureDiagnosticResponsePackedValueAndOffset] =
+      response.packed_value_and;
+  payload[protocol_v1::kGpioCaptureDiagnosticResponsePackedValueOrOffset] =
+      response.packed_value_or;
+  payload[protocol_v1::kGpioCaptureDiagnosticResponseFirstPackedValueOffset] =
+      response.first_packed_value;
+  payload[protocol_v1::kGpioCaptureDiagnosticResponseLastPackedValueOffset] =
+      response.last_packed_value;
+  STORE_GPIO_CAPTURE_U32(Gpr27Before, gpr27_before);
+  STORE_GPIO_CAPTURE_U32(Gpr27Configured, gpr27_configured);
+  STORE_GPIO_CAPTURE_U32(Gpr27After, gpr27_after);
+  STORE_GPIO_CAPTURE_U32(Gpio2GdirBefore, gpio2_gdir_before);
+  STORE_GPIO_CAPTURE_U32(Gpio2GdirConfigured, gpio2_gdir_configured);
+  STORE_GPIO_CAPTURE_U32(Gpio2GdirAfter, gpio2_gdir_after);
+  STORE_GPIO_CAPTURE_U32(Gpio2PsrBefore, gpio2_psr_before);
+  STORE_GPIO_CAPTURE_U32(Gpio2PsrConfigured, gpio2_psr_configured);
+  STORE_GPIO_CAPTURE_U32(Gpio2PsrAfter, gpio2_psr_after);
+  STORE_GPIO_CAPTURE_U32(PitLdvalConfigured, pit_ldval_configured);
+  STORE_GPIO_CAPTURE_U32(PitTctrlConfigured, pit_tctrl_configured);
+  STORE_GPIO_CAPTURE_U32(DmamuxChcfgConfigured, dmamux_chcfg_configured);
+  STORE_GPIO_CAPTURE_U32(DmaErqConfigured, dma_erq_configured);
+  STORE_GPIO_CAPTURE_U32(DmaErrFinal, dma_err_final);
+  STORE_GPIO_CAPTURE_U16(TcdCiterConfigured, tcd_citer_configured);
+  STORE_GPIO_CAPTURE_U16(TcdBiterConfigured, tcd_biter_configured);
+  STORE_GPIO_CAPTURE_U16(TcdCsrConfigured, tcd_csr_configured);
+  payload[
+      protocol_v1::kGpioCaptureDiagnosticResponseEdmaPriorityConfiguredOffset] =
+      response.edma_priority_configured;
+  STORE_GPIO_CAPTURE_U32(AnalysisSampleLimit, analysis_sample_limit);
+#undef STORE_GPIO_CAPTURE_U16
+#undef STORE_GPIO_CAPTURE_U32
+  return encodeFrame(
+      responseFields(
+          protocol_v1::FrameKind::kGpioCaptureDiagnosticResponse, request,
+          run_id),
+      view(payload), output);
+}
+
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.typed_error_response")
 Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
                                 protocol_v1::ErrorCode error,
                                 ControlFrame &output) {
@@ -1989,6 +2332,7 @@ Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
       view(payload), output);
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.rejected_frame_response")
 Result encodeRejectedFrameResponse(std::uint32_t request_id,
                                    std::uint8_t rejected_kind,
                                    std::uint8_t rejected_version,
@@ -2046,6 +2390,7 @@ ParserCounters IncrementalCommandParser::counters() const {
   return result;
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.command_parser_drain")
 bool IncrementalCommandParser::drain(ParsedCommand &command) {
   while (true) {
     const std::size_t magic_at = findMagic();

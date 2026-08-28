@@ -216,6 +216,9 @@ class SimulatedDevice:
             constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_REQUEST: (
                 self._handle_gpio_clock_diagnostic
             ),
+            constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_REQUEST: (
+                self._handle_gpio_capture_diagnostic
+            ),
         }
         return handlers[request.header.kind](request)
 
@@ -349,6 +352,10 @@ class SimulatedDevice:
     def _handle_gpio_clock_diagnostic(self, request: Frame) -> bytes:
         # The simulator has no PIT/XBARA/eDMA route and does not invent target
         # register snapshots or timing evidence.
+        return self._typed_error(request, constants.ErrorCode.UNSUPPORTED_CONFIGURATION)
+
+    def _handle_gpio_capture_diagnostic(self, request: Frame) -> bytes:
+        # The simulator intentionally does not claim physical capture evidence.
         return self._typed_error(request, constants.ErrorCode.UNSUPPORTED_CONFIGURATION)
 
     def _reset_epoch(self) -> None:

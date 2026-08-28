@@ -4,14 +4,6 @@
 
 namespace teensy_daq::gpio_capture {
 
-enum class StartStatus : std::uint8_t {
-  kOk,
-  kAlreadyRunning,
-  kNotQuiescent,
-  kResourceBusy,
-  kHardwareError,
-};
-
 struct HardwareSnapshot {
   Snapshot ring{};
   std::uint32_t gpr27 = 0U;
@@ -26,19 +18,25 @@ struct HardwareSnapshot {
   std::uint16_t tcd_biter = 0U;
   std::uint16_t tcd_csr = 0U;
   std::uint8_t edma_priority = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t stale_dma_completions = 0U;
   bool hardware_running = false;
   bool faulted = false;
 };
 
-// Thin singleton facade over the fixed Teensy 4.0 register adapter. It is
-// deliberately not connected to CONFIGURE/START until the later physical-mode
-// integration task can coordinate the packer and packet epoch atomically.
-class TeensyRawCapture final : public RawWordSource {
+// Thin singleton facade over the fixed Teensy 4.0 register adapter. Runtime
+// preflights it before START, then arms the packet/packer epoch before this
+// adapter enables the hardware trigger.
+class TeensyRawCapture final : public HardwareCapture {
  public:
-  StartStatus start();
-  StopReport stop();
+  StartStatus inspectStart() override;
+  StartStatus start() override;
+  StopReport stop() override;
   AcquireResult acquireReady() override;
   OperationStatus release(const BufferHandle &handle) override;
+  Snapshot rawSnapshot() override;
   HardwareSnapshot snapshot();
 };
 

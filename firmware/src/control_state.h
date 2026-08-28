@@ -26,6 +26,13 @@ inline constexpr protocol::Configuration kSyntheticConfiguration{
     static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes),
 };
 
+inline constexpr protocol::Configuration kPhysicalGpioConfiguration{
+    static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio),
+    protocol_v1::Source::kHardware,
+    protocol_v1::kDefaultChecksumAlgorithm,
+    static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes),
+};
+
 enum class Event : std::uint8_t {
   kNone = 0U,
   kStartEpoch = 1U,
@@ -79,6 +86,10 @@ struct DispatchReadiness {
       protocol_v1::ErrorCode::kUnsupportedConfiguration;
   const protocol::GpioClockDiagnosticResponse *gpio_clock_response = nullptr;
   protocol_v1::ErrorCode gpio_clock_error =
+      protocol_v1::ErrorCode::kUnsupportedConfiguration;
+  const protocol::GpioCaptureDiagnosticResponse *gpio_capture_response =
+      nullptr;
+  protocol_v1::ErrorCode gpio_capture_error =
       protocol_v1::ErrorCode::kUnsupportedConfiguration;
 };
 
@@ -165,6 +176,9 @@ static_assert(kIdleConfiguration.source ==
 static_assert(kSyntheticConfiguration.stream_mask == 3U);
 static_assert(kSyntheticConfiguration.source ==
               protocol_v1::Source::kSynthetic);
+static_assert(kPhysicalGpioConfiguration.stream_mask == 2U);
+static_assert(kPhysicalGpioConfiguration.source ==
+              protocol_v1::Source::kHardware);
 static_assert(capabilities::kSupportedStreamMask == 3U);
 static_assert(ControlState::nextRunId(0U) == 1U);
 static_assert(ControlState::nextRunId(0xFFFFFFFFU) == 1U);

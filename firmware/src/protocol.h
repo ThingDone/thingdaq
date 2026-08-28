@@ -257,6 +257,25 @@ struct InfoResponse {
   protocol_v1::BoardId board_id = protocol_v1::BoardId::kSimulator;
   protocol_v1::McuId mcu_id = protocol_v1::McuId::kSimulated;
   std::array<std::uint8_t, protocol_v1::kInfoResponseBuildIdCount> build_id{};
+  std::uint8_t gpio_packed_width_bits = protocol_v1::kGpioPackedWidthBits;
+  std::uint8_t gpio_raw_ring_depth = protocol_v1::kGpioRawRingDepth;
+  std::uint8_t gpio_packed_ring_depth = protocol_v1::kGpioPackedRingDepth;
+  protocol_v1::GpioCaptureDiagnosticMode gpio_capture_diagnostic_mode =
+      protocol_v1::GpioCaptureDiagnosticMode::kNonDrivingCapture;
+  std::uint16_t gpio_capture_diagnostic_flags = 0U;
+  std::uint32_t gpio_raw_samples_per_buffer =
+      protocol_v1::kGpioRawSamplesPerBuffer;
+  std::uint32_t gpio_raw_ring_bytes = protocol_v1::kGpioRawRingBytes;
+  std::uint32_t gpio_packed_ring_bytes = protocol_v1::kGpioPackedRingBytes;
+  std::uint16_t gpio_packet_buffer_count =
+      protocol_v1::kGpioPacketBufferCount;
+  std::uint8_t gpio_pit_channel = protocol_v1::kGpioPitChannel;
+  std::uint8_t gpio_xbar_input = protocol_v1::kGpioXbarInput;
+  std::uint8_t gpio_xbar_output = protocol_v1::kGpioXbarOutput;
+  std::uint8_t gpio_edma_channel = protocol_v1::kGpioEdmaChannel;
+  std::uint8_t gpio_dmamux_source = protocol_v1::kGpioDmamuxSource;
+  std::uint8_t gpio_edma_priority = protocol_v1::kGpioEdmaPriority;
+  std::uint8_t gpio_xbar_active_edge = protocol_v1::kGpioXbarActiveEdge;
 };
 
 struct StatusResponse {
@@ -269,6 +288,30 @@ struct StatusResponse {
   std::uint32_t parser_errors = 0U;
   std::uint32_t transport_errors = 0U;
   std::uint32_t stats_generation = 1U;
+  std::uint64_t gpio_samples_captured = 0U;
+  std::uint64_t gpio_samples_packed = 0U;
+  std::uint64_t gpio_samples_framed = 0U;
+  std::uint64_t gpio_samples_transmitted = 0U;
+  std::uint64_t gpio_raw_samples_lost = 0U;
+  std::uint64_t gpio_packer_samples_dropped = 0U;
+  std::uint64_t gpio_raw_ring_overruns = 0U;
+  std::uint64_t gpio_dma_major_loops = 0U;
+  std::uint16_t gpio_raw_ready_depth = 0U;
+  std::uint16_t gpio_raw_ready_high_water = 0U;
+  std::uint16_t gpio_packed_ready_depth = 0U;
+  std::uint16_t gpio_packed_ready_high_water = 0U;
+  std::uint16_t packet_ready_depth = 0U;
+  std::uint16_t packet_transmit_depth = 0U;
+  std::uint16_t packet_owned_high_water = 0U;
+  std::uint32_t gpio_hardware_errors = 0U;
+  std::uint32_t gpio_raw_invariant_errors = 0U;
+  std::uint32_t gpio_packer_source_errors = 0U;
+  std::uint32_t gpio_packer_pipeline_errors = 0U;
+  std::uint32_t gpio_packer_chronology_errors = 0U;
+  std::uint32_t gpio_resource_conflicts = 0U;
+  std::uint32_t gpio_start_errors = 0U;
+  std::uint32_t gpio_stop_errors = 0U;
+  std::uint32_t gpio_stale_dma_completions = 0U;
 };
 
 struct ChecksumBenchmarkResponse {
@@ -342,6 +385,57 @@ struct GpioClockDiagnosticResponse {
   std::uint16_t tcd_soff = 0U;
 };
 
+// Bounded evidence from the safe, IDLE-only GPIO capture diagnostic. Fixture
+// declaration fields are byte-for-byte policy metadata and never authorize a
+// host request to drive pins.
+struct GpioCaptureDiagnosticResponse {
+  protocol_v1::GpioCaptureDiagnosticMode mode =
+      protocol_v1::GpioCaptureDiagnosticMode::kNonDrivingCapture;
+  std::uint8_t metadata_kind = 0U;
+  std::uint8_t drive_safety = 0U;
+  std::uint8_t stimulus_kind = 0U;
+  std::uint32_t fixture_identity = 0U;
+  std::uint32_t stimulus_identity = 0U;
+  std::uint32_t hardware_error_flags = 0U;
+  std::uint32_t diagnostic_flags = 0U;
+  std::uint32_t dwt_counter_hz = 0U;
+  std::uint32_t dwt_elapsed_cycles = 0U;
+  std::uint64_t dma_samples_captured = 0U;
+  std::uint32_t complete_samples_retained = 0U;
+  std::uint32_t samples_analyzed = 0U;
+  std::uint32_t stopped_partial_samples = 0U;
+  std::uint32_t raw_word_and = 0U;
+  std::uint32_t raw_word_or = 0U;
+  std::uint32_t observed_transitions = 0U;
+  std::uint16_t mapping_values_checked = 0U;
+  std::uint16_t mapping_failures = 0U;
+  std::uint16_t unstable_samples = 0U;
+  std::uint8_t packed_value_and = 0U;
+  std::uint8_t packed_value_or = 0U;
+  std::uint8_t first_packed_value = 0U;
+  std::uint8_t last_packed_value = 0U;
+  std::uint32_t gpr27_before = 0U;
+  std::uint32_t gpr27_configured = 0U;
+  std::uint32_t gpr27_after = 0U;
+  std::uint32_t gpio2_gdir_before = 0U;
+  std::uint32_t gpio2_gdir_configured = 0U;
+  std::uint32_t gpio2_gdir_after = 0U;
+  std::uint32_t gpio2_psr_before = 0U;
+  std::uint32_t gpio2_psr_configured = 0U;
+  std::uint32_t gpio2_psr_after = 0U;
+  std::uint32_t pit_ldval_configured = 0U;
+  std::uint32_t pit_tctrl_configured = 0U;
+  std::uint32_t dmamux_chcfg_configured = 0U;
+  std::uint32_t dma_erq_configured = 0U;
+  std::uint32_t dma_err_final = 0U;
+  std::uint16_t tcd_citer_configured = 0U;
+  std::uint16_t tcd_biter_configured = 0U;
+  std::uint16_t tcd_csr_configured = 0U;
+  std::uint8_t edma_priority_configured = 0U;
+  std::uint32_t analysis_sample_limit =
+      protocol_v1::kGpioCaptureDiagnosticAnalysisSamples;
+};
+
 // Fill processed-byte and fixed-point derived fields from the raw measurement.
 // Returns false on an invalid request, zero nonempty work, or integer overflow.
 bool populateChecksumBenchmarkMetrics(ChecksumBenchmarkResponse &response);
@@ -370,6 +464,9 @@ Result encodeChecksumBenchmarkResponse(
 Result encodeGpioClockDiagnosticResponse(
     const Request &request, std::uint32_t run_id,
     const GpioClockDiagnosticResponse &response, ControlFrame &output);
+Result encodeGpioCaptureDiagnosticResponse(
+    const Request &request, std::uint32_t run_id,
+    const GpioCaptureDiagnosticResponse &response, ControlFrame &output);
 Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
                                 protocol_v1::ErrorCode error,
                                 ControlFrame &output);

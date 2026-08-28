@@ -39,7 +39,13 @@ struct GpioRawCaptureProgress {
   std::uint64_t samples_lost = 0U;
   std::uint64_t stop_discarded_samples = 0U;
   std::size_t ready_high_water = 0U;
+  std::size_t ready_depth = 0U;
   std::uint32_t hardware_errors = 0U;
+  std::uint32_t invariant_errors = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t stale_dma_completions = 0U;
 };
 
 // GPIO packing bridges raw acquisition and the common packet pipeline. The
@@ -61,6 +67,17 @@ struct GpioPackerProgress {
   std::uint64_t packer_drop_samples = 0U;
   std::uint64_t raw_drop_samples_projected = 0U;
   std::uint64_t packer_drop_samples_projected = 0U;
+  std::size_t ready_depth = 0U;
+  std::size_t ready_high_water = 0U;
+  std::uint32_t source_errors = 0U;
+  std::uint32_t pipeline_errors = 0U;
+  std::uint32_t chronology_errors = 0U;
+};
+
+struct PacketQueueProgress {
+  std::size_t ready_depth = 0U;
+  std::size_t transmit_depth = 0U;
+  std::size_t owned_high_water = 0U;
 };
 
 // Detailed firmware diagnostics remain available to firmware tests and future
@@ -86,6 +103,7 @@ struct Snapshot {
   DataPathProgress data_path{};
   GpioRawCaptureProgress gpio_raw_capture{};
   GpioPackerProgress gpio_packer{};
+  PacketQueueProgress packet_queue{};
 };
 
 class Statistics {
@@ -114,6 +132,9 @@ class Statistics {
   void recordTimeout();
   void recordPartialUsbWrite();
   void recordTransportError();
+  void recordGpioResourceConflict();
+  void recordGpioStartError();
+  void recordGpioStopError();
 
   void recordAdcFrameEmitted(std::uint64_t count = 1U);
   void recordGpioFrameEmitted(std::uint64_t count = 1U);
@@ -126,6 +147,7 @@ class Statistics {
   void publishDataPath(const DataPathProgress &progress);
   void publishGpioRawCapture(const GpioRawCaptureProgress &progress);
   void publishGpioPacker(const GpioPackerProgress &progress);
+  void publishPacketQueues(const PacketQueueProgress &progress);
 
   protocol::StatusResponse wireStatus(
       protocol_v1::DeviceState state,

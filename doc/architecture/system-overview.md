@@ -225,32 +225,30 @@ source input list in the build manifest. Rebuilding the same source with the
 same epoch therefore produces identical application build metadata. The
 source ID, rather than wall-clock time, is the stale-image compatibility key.
 
-## Truthful Phase 04 synthetic capabilities
+## Phase 06 physical GPIO capabilities
 
-Phase 04 advertises both `ADC_STREAM` and `GPIO_STREAM`, but only with
-`SYNTHETIC_SOURCE`. It does not advertise `HARDWARE_SOURCE`; physical ADC and
-GPIO acquisition remain later milestones. CONFIGURE accepts any nonempty
-ADC/GPIO subset with source `synthetic`, Adler-32, and a 4,096-byte data-frame
-size. The former Phase 03 zero-stream hardware profile remains only the IDLE
-wire placeholder and is now rejected by CONFIGURE.
+Firmware advertises both `SYNTHETIC_SOURCE` and `HARDWARE_SOURCE`. Synthetic
+CONFIGURE accepts every nonempty ADC/GPIO subset; hardware CONFIGURE accepts
+only the GPIO stream. Physical ADC, combined physical ADC/GPIO, zero-stream,
+and busy-resource requests fail before changing pin or peripheral registers.
 
-Phase 06 additionally advertises `GPIO_CLOCK_DIAGNOSTIC`. That capability is
-not `HARDWARE_SOURCE`: while IDLE, it performs one bounded sentinel transfer
-through the silicon-verified 24 MHz PIT0/XBARA1 rising-edge/eDMA route and
-returns raw register/count evidence. It never remaps or reads D6-D13, produces
-no data frame, allocates no run ID, and leaves acquisition statistics intact.
-[[ADR-003-GPIO-Clock-DMA]] records the accepted route and failed alternatives.
+Physical START performs a read-only resource/quiescence preflight, snapshots
+one 8 MHz epoch, then arms packet storage, the packed ring, raw DMA buffers,
+and eDMA descriptors before enabling PIT0 last. STOP disables PIT0, the eDMA
+request, DMAMUX, and XBAR DMA output in deterministic reverse order. Complete
+old-run work drains under bounded loop budgets, and CONFIGURE/START return
+`BUSY` until quiescent; stale DMA interrupts are counted and cannot cross into
+the next run.
 
-The separate GPIO capture diagnostic remains an unadvertised facade until the
-physical-mode control integration. Its fixture policy cannot be overridden by
-a host request: prose-only or absent metadata selects non-driving capture, and
-only an exact machine-readable declaration may identify a fixture stimulus or
-authorize an output sweep. The current Port 15 declaration is prose-only, so
-the target adapter acquires one production-rate raw buffer, analyzes a bounded
-256-word prefix, reports before/during/after register, count, and packed-value
-observations, drains every lease, and returns D6-D13 to safe GPIO2 inputs. It
-marks output drive and external transition/electrical validation as
-unexercised.
+The optional IDLE-only `GPIO_CLOCK_DIAGNOSTIC` retains its isolated sentinel
+transfer. `GPIO_CAPTURE_DIAGNOSTIC` now advertises the fail-closed capture
+facade. Its fixture policy cannot be overridden by a host request: prose-only
+or absent metadata selects non-driving capture, and only an exact machine-
+readable declaration may identify a fixture stimulus or authorize an output
+sweep. The current Port 15 declaration is prose-only, so the adapter captures
+one production-rate raw buffer, analyzes 256 words, reports register/count and
+packed-value evidence, drains every lease, and restores D6-D13 as GPIO2 inputs.
+[[ADR-003-GPIO-Clock-DMA]] records the fixed hardware route.
 
 One successful START allocates the next nonzero run ID and captures one shared
 clock reading. Data timestamps are unsigned 64-bit 8 MHz ticks relative to that
@@ -273,11 +271,12 @@ loop.
 
 The detailed statistics snapshot distinguishes successful and rejected
 commands, parser/transport failures, and exact per-stream generated, framed,
-emitted, transmitted, and dropped frame/item totals. Fixed protocol-v1 GET_STATUS
-projects transport-admitted frame totals, dropped items, and the applied synthetic
-configuration; the additional ownership-stage totals remain native diagnostics
-for tests and later status-schema extensions. Every counter saturates, and a
-successful START or RESET_STATS advances the nonzero statistics generation.
+emitted, transmitted, and dropped frame/item totals. Protocol-v1 GET_STATUS
+also publishes GPIO captured/packed/framed/transmitted sample counts, raw and
+packed losses, ring overruns, queue depths/high-water marks, resource
+conflicts, lifecycle errors, and stale DMA completions. Every counter
+saturates, and a successful START or RESET_STATS advances the nonzero
+statistics generation.
 
 ## Host architecture
 
@@ -306,11 +305,12 @@ fails closed before any state-changing operation.
 
 `DAQConfiguration.control_only()` and
 `TeensyDAQ.configure_control_only()` remain available for probing Phase 03
-images; Phase 04 firmware rejects that legacy profile in favor of nonempty
-synthetic acquisition. `TeensyDAQ.simulated(control_only=True)` continues to
+images; current firmware rejects that legacy profile in favor of nonempty
+synthetic or GPIO-only physical acquisition. `TeensyDAQ.simulated(control_only=True)` continues to
 exercise the older schema. The
 `teensy-daq` command-line entry point lists candidates, probes identity, prints
-status, configures, starts, stops, and resets safe counters. Its one-shot
+status, configures the advertised physical GPIO profile (with a legacy
+control-only fallback), starts, stops, and resets safe counters. Its one-shot
 configure/start commands deliberately close the PySerial handle without STOP
 so state persists across invocations; normal context-manager cleanup retains
 the safe STOP-on-close policy.

@@ -233,7 +233,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             offset += count
             chunk_index += 1
 
-        self.assertEqual(12, len(decoded))
+        self.assertEqual(13, len(decoded))
         self.assertEqual(0, parser.errors)
         self.assertGreaterEqual(parser.bytes_discarded, len(b"reset noise\xef\xbe"))
         self.assertEqual(

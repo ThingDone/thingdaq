@@ -887,6 +887,230 @@ class GpioClockDiagnosticResult:
 
 
 @dataclass(frozen=True, slots=True)
+class GpioCaptureDiagnosticResult:
+    """Safe IDLE-only GPIO capture, packing, and cleanup evidence."""
+
+    mode: constants.GpioCaptureDiagnosticMode
+    metadata_kind: int
+    drive_safety: int
+    stimulus_kind: int
+    fixture_identity: int
+    stimulus_identity: int
+    hardware_error_flags: constants.GpioCaptureError
+    diagnostic_flags: constants.GpioCaptureDiagnosticFlag
+    dwt_counter_hz: int
+    dwt_elapsed_cycles: int
+    dma_samples_captured: int
+    complete_samples_retained: int
+    samples_analyzed: int
+    stopped_partial_samples: int
+    raw_word_and: int
+    raw_word_or: int
+    observed_transitions: int
+    mapping_values_checked: int
+    mapping_failures: int
+    unstable_samples: int
+    packed_value_and: int
+    packed_value_or: int
+    first_packed_value: int
+    last_packed_value: int
+    gpr27_before: int
+    gpr27_configured: int
+    gpr27_after: int
+    gpio2_gdir_before: int
+    gpio2_gdir_configured: int
+    gpio2_gdir_after: int
+    gpio2_psr_before: int
+    gpio2_psr_configured: int
+    gpio2_psr_after: int
+    pit_ldval_configured: int
+    pit_tctrl_configured: int
+    dmamux_chcfg_configured: int
+    dma_erq_configured: int
+    dma_err_final: int
+    tcd_citer_configured: int
+    tcd_biter_configured: int
+    tcd_csr_configured: int
+    edma_priority_configured: int
+    analysis_sample_limit: int
+
+    def __post_init__(self) -> None:
+        try:
+            mode = constants.GpioCaptureDiagnosticMode(self.mode)
+            errors = constants.GpioCaptureError(self.hardware_error_flags)
+            flags = constants.GpioCaptureDiagnosticFlag(self.diagnostic_flags)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "GPIO capture diagnostic contains an unknown enum"
+            ) from exc
+        if int(errors) & ~constants.KNOWN_GPIO_CAPTURE_ERROR_MASK:
+            raise ValueError("GPIO capture diagnostic error mask has reserved bits")
+        if int(flags) & ~constants.KNOWN_GPIO_CAPTURE_DIAGNOSTIC_FLAG_MASK:
+            raise ValueError("GPIO capture diagnostic flag mask has reserved bits")
+        if not flags & constants.GpioCaptureDiagnosticFlag.AVAILABLE:
+            raise ValueError("GPIO capture diagnostic is not marked available")
+        object.__setattr__(self, "mode", mode)
+        object.__setattr__(self, "hardware_error_flags", errors)
+        object.__setattr__(self, "diagnostic_flags", flags)
+        for name in ("metadata_kind", "drive_safety", "stimulus_kind"):
+            _unsigned(name, getattr(self, name), 8)
+            if getattr(self, name) > 2:
+                raise ValueError(f"{name} is unknown")
+        for name in (
+            "fixture_identity",
+            "stimulus_identity",
+            "dwt_counter_hz",
+            "dwt_elapsed_cycles",
+            "complete_samples_retained",
+            "samples_analyzed",
+            "stopped_partial_samples",
+            "raw_word_and",
+            "raw_word_or",
+            "observed_transitions",
+            "gpr27_before",
+            "gpr27_configured",
+            "gpr27_after",
+            "gpio2_gdir_before",
+            "gpio2_gdir_configured",
+            "gpio2_gdir_after",
+            "gpio2_psr_before",
+            "gpio2_psr_configured",
+            "gpio2_psr_after",
+            "pit_ldval_configured",
+            "pit_tctrl_configured",
+            "dmamux_chcfg_configured",
+            "dma_erq_configured",
+            "dma_err_final",
+            "analysis_sample_limit",
+        ):
+            _unsigned(name, getattr(self, name), 32)
+        _unsigned("dma_samples_captured", self.dma_samples_captured, 64)
+        for name in (
+            "mapping_values_checked",
+            "mapping_failures",
+            "unstable_samples",
+            "tcd_citer_configured",
+            "tcd_biter_configured",
+            "tcd_csr_configured",
+        ):
+            _unsigned(name, getattr(self, name), 16)
+        for name in (
+            "packed_value_and",
+            "packed_value_or",
+            "first_packed_value",
+            "last_packed_value",
+            "edma_priority_configured",
+        ):
+            _unsigned(name, getattr(self, name), 8)
+        if (
+            self.complete_samples_retained > self.dma_samples_captured
+            or self.samples_analyzed > self.complete_samples_retained
+            or self.samples_analyzed > self.analysis_sample_limit
+            or not 0 < self.analysis_sample_limit <= constants.GPIO_SAMPLES_PER_FRAME
+            or flags & constants.GpioCaptureDiagnosticFlag.OUTPUT_DRIVE_EXERCISED
+            and not flags & constants.GpioCaptureDiagnosticFlag.OUTPUT_DRIVE_PERMITTED
+        ):
+            raise ValueError("GPIO capture diagnostic evidence is inconsistent")
+
+    @property
+    def healthy(self) -> bool:
+        return self.hardware_error_flags == constants.GpioCaptureError.NONE
+
+    @classmethod
+    def from_payload(
+        cls, payload: bytes | bytearray | memoryview
+    ) -> GpioCaptureDiagnosticResult:
+        data = bytes(payload)
+        _success_prefix(data, constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE)
+
+        def u8(name: str) -> int:
+            return data[
+                getattr(constants, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET")
+            ]
+
+        def u16(name: str) -> int:
+            return struct.unpack_from(
+                "<H",
+                data,
+                getattr(constants, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET"),
+            )[0]
+
+        def u32(name: str) -> int:
+            return struct.unpack_from(
+                "<I",
+                data,
+                getattr(constants, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET"),
+            )[0]
+
+        values: dict[str, int | constants.GpioCaptureDiagnosticMode] = {
+            "mode": constants.GpioCaptureDiagnosticMode(u8("MODE")),
+            "metadata_kind": u8("METADATA_KIND"),
+            "drive_safety": u8("DRIVE_SAFETY"),
+            "stimulus_kind": u8("STIMULUS_KIND"),
+            "hardware_error_flags": constants.GpioCaptureError(
+                u32("HARDWARE_ERROR_FLAGS")
+            ),
+            "diagnostic_flags": constants.GpioCaptureDiagnosticFlag(
+                u32("DIAGNOSTIC_FLAGS")
+            ),
+            "dma_samples_captured": struct.unpack_from(
+                "<Q",
+                data,
+                constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_DMA_SAMPLES_CAPTURED_OFFSET,
+            )[0],
+        }
+        for field in (
+            "fixture_identity",
+            "stimulus_identity",
+            "dwt_counter_hz",
+            "dwt_elapsed_cycles",
+            "complete_samples_retained",
+            "samples_analyzed",
+            "stopped_partial_samples",
+            "raw_word_and",
+            "raw_word_or",
+            "observed_transitions",
+            "gpr27_before",
+            "gpr27_configured",
+            "gpr27_after",
+            "gpio2_gdir_before",
+            "gpio2_gdir_configured",
+            "gpio2_gdir_after",
+            "gpio2_psr_before",
+            "gpio2_psr_configured",
+            "gpio2_psr_after",
+            "pit_ldval_configured",
+            "pit_tctrl_configured",
+            "dmamux_chcfg_configured",
+            "dma_erq_configured",
+            "dma_err_final",
+            "analysis_sample_limit",
+        ):
+            values[field] = u32(field.upper())
+        for field in (
+            "mapping_values_checked",
+            "mapping_failures",
+            "unstable_samples",
+            "tcd_citer_configured",
+            "tcd_biter_configured",
+            "tcd_csr_configured",
+        ):
+            values[field] = u16(field.upper())
+        for field in (
+            "packed_value_and",
+            "packed_value_or",
+            "first_packed_value",
+            "last_packed_value",
+            "edma_priority_configured",
+        ):
+            values[field] = u8(field.upper())
+        try:
+            return cls(**values)  # type: ignore[arg-type]
+        except (TypeError, ValueError) as exc:
+            raise FrameValidationError(str(exc)) from exc
+
+
+@dataclass(frozen=True, slots=True)
 class DeviceCapabilities:
     """Validated fixed and negotiated capabilities reported by INFO."""
 
@@ -906,6 +1130,26 @@ class DeviceCapabilities:
     adc_resolution_bits: int = constants.ADC_RESOLUTION_BITS
     adc_container_bytes: int = constants.ADC_CONTAINER_BITS // 8
     gpio_pin_map: tuple[int, ...] = constants.GPIO_PINS_BY_BIT
+    gpio_packed_width_bits: int = constants.GPIO_PACKED_WIDTH_BITS
+    gpio_raw_ring_depth: int = constants.GPIO_RAW_RING_DEPTH
+    gpio_packed_ring_depth: int = constants.GPIO_PACKED_RING_DEPTH
+    gpio_capture_diagnostic_mode: constants.GpioCaptureDiagnosticMode = (
+        constants.GpioCaptureDiagnosticMode.NON_DRIVING_CAPTURE
+    )
+    gpio_capture_diagnostic_flags: constants.GpioCaptureDiagnosticFlag = (
+        constants.GpioCaptureDiagnosticFlag.NONE
+    )
+    gpio_raw_samples_per_buffer: int = constants.GPIO_RAW_SAMPLES_PER_BUFFER
+    gpio_raw_ring_bytes: int = constants.GPIO_RAW_RING_BYTES
+    gpio_packed_ring_bytes: int = constants.GPIO_PACKED_RING_BYTES
+    gpio_packet_buffer_count: int = constants.GPIO_PACKET_BUFFER_COUNT
+    gpio_pit_channel: int = constants.GPIO_PIT_CHANNEL
+    gpio_xbar_input: int = constants.GPIO_XBAR_INPUT
+    gpio_xbar_output: int = constants.GPIO_XBAR_OUTPUT
+    gpio_edma_channel: int = constants.GPIO_EDMA_CHANNEL
+    gpio_dmamux_source: int = constants.GPIO_DMAMUX_SOURCE
+    gpio_edma_priority: int = constants.GPIO_EDMA_PRIORITY
+    gpio_xbar_active_edge: int = constants.GPIO_XBAR_ACTIVE_EDGE
 
     def __post_init__(self) -> None:
         if isinstance(self.supported_stream_mask, bool) or isinstance(
@@ -919,6 +1163,21 @@ class DeviceCapabilities:
             raise ValueError("capabilities contain an unknown enum value") from exc
         object.__setattr__(self, "supported_stream_mask", stream_mask)
         object.__setattr__(self, "capability_bits", capability_bits)
+        try:
+            diagnostic_mode = constants.GpioCaptureDiagnosticMode(
+                self.gpio_capture_diagnostic_mode
+            )
+            diagnostic_flags = constants.GpioCaptureDiagnosticFlag(
+                self.gpio_capture_diagnostic_flags
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "GPIO diagnostic metadata contains an unknown enum"
+            ) from exc
+        if int(diagnostic_flags) & ~constants.KNOWN_GPIO_CAPTURE_DIAGNOSTIC_FLAG_MASK:
+            raise ValueError("GPIO diagnostic metadata contains reserved flags")
+        object.__setattr__(self, "gpio_capture_diagnostic_mode", diagnostic_mode)
+        object.__setattr__(self, "gpio_capture_diagnostic_flags", diagnostic_flags)
         gpio_pin_map = tuple(self.gpio_pin_map)
         object.__setattr__(self, "gpio_pin_map", gpio_pin_map)
 
@@ -954,6 +1213,16 @@ class DeviceCapabilities:
             stream_capabilities | source_capabilities
         ):
             raise ValueError("capabilities disagree with stream/source masks")
+        diagnostic_advertised = bool(
+            capability_bits & constants.Capability.GPIO_CAPTURE_DIAGNOSTIC
+        )
+        diagnostic_available = bool(
+            diagnostic_flags & constants.GpioCaptureDiagnosticFlag.AVAILABLE
+        )
+        if diagnostic_advertised != diagnostic_available:
+            raise ValueError(
+                "GPIO capture diagnostic metadata disagrees with capability bits"
+            )
 
         fixed_values = (
             (self.protocol_version, constants.PROTOCOL_VERSION),
@@ -967,6 +1236,23 @@ class DeviceCapabilities:
             (self.gpio_sample_period_ticks, constants.GPIO_SAMPLE_PERIOD_TICKS),
             (self.adc_resolution_bits, constants.ADC_RESOLUTION_BITS),
             (self.adc_container_bytes, constants.ADC_CONTAINER_BITS // 8),
+            (self.gpio_packed_width_bits, constants.GPIO_PACKED_WIDTH_BITS),
+            (self.gpio_raw_ring_depth, constants.GPIO_RAW_RING_DEPTH),
+            (self.gpio_packed_ring_depth, constants.GPIO_PACKED_RING_DEPTH),
+            (
+                self.gpio_raw_samples_per_buffer,
+                constants.GPIO_RAW_SAMPLES_PER_BUFFER,
+            ),
+            (self.gpio_raw_ring_bytes, constants.GPIO_RAW_RING_BYTES),
+            (self.gpio_packed_ring_bytes, constants.GPIO_PACKED_RING_BYTES),
+            (self.gpio_packet_buffer_count, constants.GPIO_PACKET_BUFFER_COUNT),
+            (self.gpio_pit_channel, constants.GPIO_PIT_CHANNEL),
+            (self.gpio_xbar_input, constants.GPIO_XBAR_INPUT),
+            (self.gpio_xbar_output, constants.GPIO_XBAR_OUTPUT),
+            (self.gpio_edma_channel, constants.GPIO_EDMA_CHANNEL),
+            (self.gpio_dmamux_source, constants.GPIO_DMAMUX_SOURCE),
+            (self.gpio_edma_priority, constants.GPIO_EDMA_PRIORITY),
+            (self.gpio_xbar_active_edge, constants.GPIO_XBAR_ACTIVE_EDGE),
         )
         if any(
             not isinstance(actual, int)
@@ -1056,6 +1342,26 @@ class DeviceInfo:
     adc_resolution_bits: int = constants.ADC_RESOLUTION_BITS
     adc_container_bytes: int = constants.ADC_CONTAINER_BITS // 8
     gpio_pin_map: tuple[int, ...] = constants.GPIO_PINS_BY_BIT
+    gpio_packed_width_bits: int = constants.GPIO_PACKED_WIDTH_BITS
+    gpio_raw_ring_depth: int = constants.GPIO_RAW_RING_DEPTH
+    gpio_packed_ring_depth: int = constants.GPIO_PACKED_RING_DEPTH
+    gpio_capture_diagnostic_mode: constants.GpioCaptureDiagnosticMode = (
+        constants.GpioCaptureDiagnosticMode.NON_DRIVING_CAPTURE
+    )
+    gpio_capture_diagnostic_flags: constants.GpioCaptureDiagnosticFlag = (
+        constants.GpioCaptureDiagnosticFlag.NONE
+    )
+    gpio_raw_samples_per_buffer: int = constants.GPIO_RAW_SAMPLES_PER_BUFFER
+    gpio_raw_ring_bytes: int = constants.GPIO_RAW_RING_BYTES
+    gpio_packed_ring_bytes: int = constants.GPIO_PACKED_RING_BYTES
+    gpio_packet_buffer_count: int = constants.GPIO_PACKET_BUFFER_COUNT
+    gpio_pit_channel: int = constants.GPIO_PIT_CHANNEL
+    gpio_xbar_input: int = constants.GPIO_XBAR_INPUT
+    gpio_xbar_output: int = constants.GPIO_XBAR_OUTPUT
+    gpio_edma_channel: int = constants.GPIO_EDMA_CHANNEL
+    gpio_dmamux_source: int = constants.GPIO_DMAMUX_SOURCE
+    gpio_edma_priority: int = constants.GPIO_EDMA_PRIORITY
+    gpio_xbar_active_edge: int = constants.GPIO_XBAR_ACTIVE_EDGE
 
     def __post_init__(self) -> None:
         if not isinstance(self.device_state, constants.DeviceState):
@@ -1105,6 +1411,16 @@ class DeviceInfo:
         )
         object.__setattr__(self, "capability_bits", capabilities.capability_bits)
         object.__setattr__(self, "gpio_pin_map", capabilities.gpio_pin_map)
+        object.__setattr__(
+            self,
+            "gpio_capture_diagnostic_mode",
+            capabilities.gpio_capture_diagnostic_mode,
+        )
+        object.__setattr__(
+            self,
+            "gpio_capture_diagnostic_flags",
+            capabilities.gpio_capture_diagnostic_flags,
+        )
 
     @property
     def capabilities(self) -> DeviceCapabilities:
@@ -1127,6 +1443,22 @@ class DeviceInfo:
             adc_resolution_bits=self.adc_resolution_bits,
             adc_container_bytes=self.adc_container_bytes,
             gpio_pin_map=self.gpio_pin_map,
+            gpio_packed_width_bits=self.gpio_packed_width_bits,
+            gpio_raw_ring_depth=self.gpio_raw_ring_depth,
+            gpio_packed_ring_depth=self.gpio_packed_ring_depth,
+            gpio_capture_diagnostic_mode=self.gpio_capture_diagnostic_mode,
+            gpio_capture_diagnostic_flags=self.gpio_capture_diagnostic_flags,
+            gpio_raw_samples_per_buffer=self.gpio_raw_samples_per_buffer,
+            gpio_raw_ring_bytes=self.gpio_raw_ring_bytes,
+            gpio_packed_ring_bytes=self.gpio_packed_ring_bytes,
+            gpio_packet_buffer_count=self.gpio_packet_buffer_count,
+            gpio_pit_channel=self.gpio_pit_channel,
+            gpio_xbar_input=self.gpio_xbar_input,
+            gpio_xbar_output=self.gpio_xbar_output,
+            gpio_edma_channel=self.gpio_edma_channel,
+            gpio_dmamux_source=self.gpio_dmamux_source,
+            gpio_edma_priority=self.gpio_edma_priority,
+            gpio_xbar_active_edge=self.gpio_xbar_active_edge,
         )
 
     def supports_source(self, source: constants.Source | int) -> bool:
@@ -1145,7 +1477,7 @@ class DeviceInfo:
         return self.capabilities.supports(capability)
 
     def to_payload(self) -> bytes:
-        """Encode a successful 98-byte INFO response payload."""
+        """Encode a successful 128-byte INFO response payload."""
 
         payload = bytearray(constants.INFO_RESPONSE_PAYLOAD_SIZE)
         _RESPONSE_PREFIX.pack_into(
@@ -1211,6 +1543,40 @@ class DeviceInfo:
         build_bytes = self.build_id.encode("ascii")
         build_start = constants.INFO_RESPONSE_BUILD_ID_OFFSET
         payload[build_start : build_start + len(build_bytes)] = build_bytes
+        payload[constants.INFO_RESPONSE_GPIO_PACKED_WIDTH_BITS_OFFSET] = (
+            self.gpio_packed_width_bits
+        )
+        payload[constants.INFO_RESPONSE_GPIO_RAW_RING_DEPTH_OFFSET] = (
+            self.gpio_raw_ring_depth
+        )
+        payload[constants.INFO_RESPONSE_GPIO_PACKED_RING_DEPTH_OFFSET] = (
+            self.gpio_packed_ring_depth
+        )
+        payload[constants.INFO_RESPONSE_GPIO_CAPTURE_DIAGNOSTIC_MODE_OFFSET] = int(
+            self.gpio_capture_diagnostic_mode
+        )
+        struct.pack_into(
+            "<HIIIH",
+            payload,
+            constants.INFO_RESPONSE_GPIO_CAPTURE_DIAGNOSTIC_FLAGS_OFFSET,
+            int(self.gpio_capture_diagnostic_flags),
+            self.gpio_raw_samples_per_buffer,
+            self.gpio_raw_ring_bytes,
+            self.gpio_packed_ring_bytes,
+            self.gpio_packet_buffer_count,
+        )
+        resource_start = constants.INFO_RESPONSE_GPIO_PIT_CHANNEL_OFFSET
+        payload[resource_start : resource_start + 7] = bytes(
+            (
+                self.gpio_pit_channel,
+                self.gpio_xbar_input,
+                self.gpio_xbar_output,
+                self.gpio_edma_channel,
+                self.gpio_dmamux_source,
+                self.gpio_edma_priority,
+                self.gpio_xbar_active_edge,
+            )
+        )
         return bytes(payload)
 
     @classmethod
@@ -1318,6 +1684,66 @@ class DeviceInfo:
                     + constants.INFO_RESPONSE_GPIO_PIN_MAP_COUNT
                 ]
             ),
+            gpio_packed_width_bits=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_PACKED_WIDTH_BITS_OFFSET
+            ],
+            gpio_raw_ring_depth=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_RAW_RING_DEPTH_OFFSET
+            ],
+            gpio_packed_ring_depth=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_PACKED_RING_DEPTH_OFFSET
+            ],
+            gpio_capture_diagnostic_mode=constants.GpioCaptureDiagnosticMode(
+                payload_bytes[
+                    constants.INFO_RESPONSE_GPIO_CAPTURE_DIAGNOSTIC_MODE_OFFSET
+                ]
+            ),
+            gpio_capture_diagnostic_flags=constants.GpioCaptureDiagnosticFlag(
+                struct.unpack_from(
+                    "<H",
+                    payload_bytes,
+                    constants.INFO_RESPONSE_GPIO_CAPTURE_DIAGNOSTIC_FLAGS_OFFSET,
+                )[0]
+            ),
+            gpio_raw_samples_per_buffer=struct.unpack_from(
+                "<I",
+                payload_bytes,
+                constants.INFO_RESPONSE_GPIO_RAW_SAMPLES_PER_BUFFER_OFFSET,
+            )[0],
+            gpio_raw_ring_bytes=struct.unpack_from(
+                "<I", payload_bytes, constants.INFO_RESPONSE_GPIO_RAW_RING_BYTES_OFFSET
+            )[0],
+            gpio_packed_ring_bytes=struct.unpack_from(
+                "<I",
+                payload_bytes,
+                constants.INFO_RESPONSE_GPIO_PACKED_RING_BYTES_OFFSET,
+            )[0],
+            gpio_packet_buffer_count=struct.unpack_from(
+                "<H",
+                payload_bytes,
+                constants.INFO_RESPONSE_GPIO_PACKET_BUFFER_COUNT_OFFSET,
+            )[0],
+            gpio_pit_channel=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_PIT_CHANNEL_OFFSET
+            ],
+            gpio_xbar_input=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_XBAR_INPUT_OFFSET
+            ],
+            gpio_xbar_output=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_XBAR_OUTPUT_OFFSET
+            ],
+            gpio_edma_channel=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_EDMA_CHANNEL_OFFSET
+            ],
+            gpio_dmamux_source=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_DMAMUX_SOURCE_OFFSET
+            ],
+            gpio_edma_priority=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_EDMA_PRIORITY_OFFSET
+            ],
+            gpio_xbar_active_edge=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_XBAR_ACTIVE_EDGE_OFFSET
+            ],
         )
 
 
@@ -1341,6 +1767,30 @@ class Status:
     parser_errors: int = 0
     transport_errors: int = 0
     stats_generation: int = 1
+    gpio_samples_captured: int = 0
+    gpio_samples_packed: int = 0
+    gpio_samples_framed: int = 0
+    gpio_samples_transmitted: int = 0
+    gpio_raw_samples_lost: int = 0
+    gpio_packer_samples_dropped: int = 0
+    gpio_raw_ring_overruns: int = 0
+    gpio_dma_major_loops: int = 0
+    gpio_raw_ready_depth: int = 0
+    gpio_raw_ready_high_water: int = 0
+    gpio_packed_ready_depth: int = 0
+    gpio_packed_ready_high_water: int = 0
+    packet_ready_depth: int = 0
+    packet_transmit_depth: int = 0
+    packet_owned_high_water: int = 0
+    gpio_hardware_errors: int = 0
+    gpio_raw_invariant_errors: int = 0
+    gpio_packer_source_errors: int = 0
+    gpio_packer_pipeline_errors: int = 0
+    gpio_packer_chronology_errors: int = 0
+    gpio_resource_conflicts: int = 0
+    gpio_start_errors: int = 0
+    gpio_stop_errors: int = 0
+    gpio_stale_dma_completions: int = 0
 
     def __post_init__(self) -> None:
         if any(
@@ -1396,10 +1846,43 @@ class Status:
             "gpio_frames_emitted",
             "adc_items_dropped",
             "gpio_items_dropped",
+            "gpio_samples_captured",
+            "gpio_samples_packed",
+            "gpio_samples_framed",
+            "gpio_samples_transmitted",
+            "gpio_raw_samples_lost",
+            "gpio_packer_samples_dropped",
+            "gpio_raw_ring_overruns",
+            "gpio_dma_major_loops",
         ):
             _unsigned(name, getattr(self, name), 64)
-        _unsigned("parser_errors", self.parser_errors, 32)
-        _unsigned("transport_errors", self.transport_errors, 32)
+        for name in (
+            "parser_errors",
+            "transport_errors",
+            "gpio_hardware_errors",
+            "gpio_raw_invariant_errors",
+            "gpio_packer_source_errors",
+            "gpio_packer_pipeline_errors",
+            "gpio_packer_chronology_errors",
+            "gpio_resource_conflicts",
+            "gpio_start_errors",
+            "gpio_stop_errors",
+            "gpio_stale_dma_completions",
+        ):
+            _unsigned(name, getattr(self, name), 32)
+        depth_limits = {
+            "gpio_raw_ready_depth": constants.GPIO_RAW_RING_DEPTH,
+            "gpio_raw_ready_high_water": constants.GPIO_RAW_RING_DEPTH,
+            "gpio_packed_ready_depth": constants.GPIO_PACKED_RING_DEPTH,
+            "gpio_packed_ready_high_water": constants.GPIO_PACKED_RING_DEPTH,
+            "packet_ready_depth": constants.GPIO_PACKET_BUFFER_COUNT,
+            "packet_transmit_depth": constants.GPIO_PACKET_BUFFER_COUNT,
+            "packet_owned_high_water": constants.GPIO_PACKET_BUFFER_COUNT,
+        }
+        for name, maximum in depth_limits.items():
+            _unsigned(name, getattr(self, name), 16)
+            if getattr(self, name) > maximum:
+                raise ValueError(f"{name} exceeds its advertised ring capacity")
         _unsigned("stats_generation", self.stats_generation, 32)
         if self.stats_generation == 0:
             raise ValueError("stats_generation must be nonzero")
@@ -1416,6 +1899,23 @@ class Status:
             parser_errors=self.parser_errors,
             transport_errors=self.transport_errors,
             stats_generation=self.stats_generation,
+            gpio_samples_captured=self.gpio_samples_captured,
+            gpio_samples_packed=self.gpio_samples_packed,
+            gpio_samples_framed=self.gpio_samples_framed,
+            gpio_samples_transmitted=self.gpio_samples_transmitted,
+            gpio_raw_samples_lost=self.gpio_raw_samples_lost,
+            gpio_packer_samples_dropped=self.gpio_packer_samples_dropped,
+            gpio_raw_ring_overruns=self.gpio_raw_ring_overruns,
+            gpio_dma_major_loops=self.gpio_dma_major_loops,
+            gpio_hardware_errors=self.gpio_hardware_errors,
+            gpio_raw_invariant_errors=self.gpio_raw_invariant_errors,
+            gpio_packer_source_errors=self.gpio_packer_source_errors,
+            gpio_packer_pipeline_errors=self.gpio_packer_pipeline_errors,
+            gpio_packer_chronology_errors=self.gpio_packer_chronology_errors,
+            gpio_resource_conflicts=self.gpio_resource_conflicts,
+            gpio_start_errors=self.gpio_start_errors,
+            gpio_stop_errors=self.gpio_stop_errors,
+            gpio_stale_dma_completions=self.gpio_stale_dma_completions,
         )
 
     @property
@@ -1425,7 +1925,7 @@ class Status:
         return self.data_checksum_algorithm
 
     def to_payload(self) -> bytes:
-        """Encode a successful 56-byte GET_STATUS response payload."""
+        """Encode a successful 172-byte GET_STATUS response payload."""
 
         payload = bytearray(constants.STATUS_RESPONSE_PAYLOAD_SIZE)
         _RESPONSE_PREFIX.pack_into(
@@ -1459,6 +1959,45 @@ class Status:
             constants.STATUS_RESPONSE_STATS_GENERATION_OFFSET,
             self.stats_generation,
         )
+        struct.pack_into(
+            "<QQQQQQQQ",
+            payload,
+            constants.STATUS_RESPONSE_GPIO_SAMPLES_CAPTURED_OFFSET,
+            self.gpio_samples_captured,
+            self.gpio_samples_packed,
+            self.gpio_samples_framed,
+            self.gpio_samples_transmitted,
+            self.gpio_raw_samples_lost,
+            self.gpio_packer_samples_dropped,
+            self.gpio_raw_ring_overruns,
+            self.gpio_dma_major_loops,
+        )
+        struct.pack_into(
+            "<HHHHHHH",
+            payload,
+            constants.STATUS_RESPONSE_GPIO_RAW_READY_DEPTH_OFFSET,
+            self.gpio_raw_ready_depth,
+            self.gpio_raw_ready_high_water,
+            self.gpio_packed_ready_depth,
+            self.gpio_packed_ready_high_water,
+            self.packet_ready_depth,
+            self.packet_transmit_depth,
+            self.packet_owned_high_water,
+        )
+        struct.pack_into(
+            "<IIIIIIIII",
+            payload,
+            constants.STATUS_RESPONSE_GPIO_HARDWARE_ERRORS_OFFSET,
+            self.gpio_hardware_errors,
+            self.gpio_raw_invariant_errors,
+            self.gpio_packer_source_errors,
+            self.gpio_packer_pipeline_errors,
+            self.gpio_packer_chronology_errors,
+            self.gpio_resource_conflicts,
+            self.gpio_start_errors,
+            self.gpio_stop_errors,
+            self.gpio_stale_dma_completions,
+        )
         return bytes(payload)
 
     @classmethod
@@ -1469,6 +2008,21 @@ class Status:
         _success_prefix(payload_bytes, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
         counters = _STATUS_COUNTERS.unpack_from(
             payload_bytes, constants.STATUS_RESPONSE_ADC_FRAMES_EMITTED_OFFSET
+        )
+        gpio_counts = struct.unpack_from(
+            "<QQQQQQQQ",
+            payload_bytes,
+            constants.STATUS_RESPONSE_GPIO_SAMPLES_CAPTURED_OFFSET,
+        )
+        depths = struct.unpack_from(
+            "<HHHHHHH",
+            payload_bytes,
+            constants.STATUS_RESPONSE_GPIO_RAW_READY_DEPTH_OFFSET,
+        )
+        errors = struct.unpack_from(
+            "<IIIIIIIII",
+            payload_bytes,
+            constants.STATUS_RESPONSE_GPIO_HARDWARE_ERRORS_OFFSET,
         )
         return cls(
             device_state=constants.DeviceState(
@@ -1499,6 +2053,30 @@ class Status:
                 payload_bytes,
                 constants.STATUS_RESPONSE_STATS_GENERATION_OFFSET,
             )[0],
+            gpio_samples_captured=gpio_counts[0],
+            gpio_samples_packed=gpio_counts[1],
+            gpio_samples_framed=gpio_counts[2],
+            gpio_samples_transmitted=gpio_counts[3],
+            gpio_raw_samples_lost=gpio_counts[4],
+            gpio_packer_samples_dropped=gpio_counts[5],
+            gpio_raw_ring_overruns=gpio_counts[6],
+            gpio_dma_major_loops=gpio_counts[7],
+            gpio_raw_ready_depth=depths[0],
+            gpio_raw_ready_high_water=depths[1],
+            gpio_packed_ready_depth=depths[2],
+            gpio_packed_ready_high_water=depths[3],
+            packet_ready_depth=depths[4],
+            packet_transmit_depth=depths[5],
+            packet_owned_high_water=depths[6],
+            gpio_hardware_errors=errors[0],
+            gpio_raw_invariant_errors=errors[1],
+            gpio_packer_source_errors=errors[2],
+            gpio_packer_pipeline_errors=errors[3],
+            gpio_packer_chronology_errors=errors[4],
+            gpio_resource_conflicts=errors[5],
+            gpio_start_errors=errors[6],
+            gpio_stop_errors=errors[7],
+            gpio_stale_dma_completions=errors[8],
         )
 
 
@@ -1513,6 +2091,23 @@ class FirmwareCounters:
     parser_errors: int = 0
     transport_errors: int = 0
     stats_generation: int = 1
+    gpio_samples_captured: int = 0
+    gpio_samples_packed: int = 0
+    gpio_samples_framed: int = 0
+    gpio_samples_transmitted: int = 0
+    gpio_raw_samples_lost: int = 0
+    gpio_packer_samples_dropped: int = 0
+    gpio_raw_ring_overruns: int = 0
+    gpio_dma_major_loops: int = 0
+    gpio_hardware_errors: int = 0
+    gpio_raw_invariant_errors: int = 0
+    gpio_packer_source_errors: int = 0
+    gpio_packer_pipeline_errors: int = 0
+    gpio_packer_chronology_errors: int = 0
+    gpio_resource_conflicts: int = 0
+    gpio_start_errors: int = 0
+    gpio_stop_errors: int = 0
+    gpio_stale_dma_completions: int = 0
 
     def __post_init__(self) -> None:
         for name in (
@@ -1520,10 +2115,30 @@ class FirmwareCounters:
             "gpio_frames_emitted",
             "adc_items_dropped",
             "gpio_items_dropped",
+            "gpio_samples_captured",
+            "gpio_samples_packed",
+            "gpio_samples_framed",
+            "gpio_samples_transmitted",
+            "gpio_raw_samples_lost",
+            "gpio_packer_samples_dropped",
+            "gpio_raw_ring_overruns",
+            "gpio_dma_major_loops",
         ):
             _unsigned(name, getattr(self, name), 64)
-        _unsigned("parser_errors", self.parser_errors, 32)
-        _unsigned("transport_errors", self.transport_errors, 32)
+        for name in (
+            "parser_errors",
+            "transport_errors",
+            "gpio_hardware_errors",
+            "gpio_raw_invariant_errors",
+            "gpio_packer_source_errors",
+            "gpio_packer_pipeline_errors",
+            "gpio_packer_chronology_errors",
+            "gpio_resource_conflicts",
+            "gpio_start_errors",
+            "gpio_stop_errors",
+            "gpio_stale_dma_completions",
+        ):
+            _unsigned(name, getattr(self, name), 32)
         _unsigned("stats_generation", self.stats_generation, 32)
         if self.stats_generation == 0:
             raise ValueError("stats_generation must be nonzero")
@@ -2150,6 +2765,7 @@ ResponseValue = (
     | Status
     | ChecksumBenchmarkResult
     | GpioClockDiagnosticResult
+    | GpioCaptureDiagnosticResult
     | constants.DeviceState
     | int
 )
@@ -2198,6 +2814,8 @@ def decode_response(frame: Frame) -> CommandResponse[ResponseValue]:
             value = ChecksumBenchmarkResult.from_payload(frame.payload)
         elif frame.header.kind is constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_RESPONSE:
             value = GpioClockDiagnosticResult.from_payload(frame.payload)
+        elif frame.header.kind is constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE:
+            value = GpioCaptureDiagnosticResult.from_payload(frame.payload)
     elif frame.header.kind is constants.FrameKind.ERROR_RESPONSE:
         rejected_kind = frame.payload[constants.ERROR_RESPONSE_REJECTED_KIND_OFFSET]
         rejected_version = frame.payload[
@@ -2246,6 +2864,7 @@ __all__ = [
     "FirmwareCounters",
     "GPIOBlock",
     "GpioBlock",
+    "GpioCaptureDiagnosticResult",
     "GpioChannelView",
     "GpioClockDiagnosticRequest",
     "GpioClockDiagnosticResult",

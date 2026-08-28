@@ -95,6 +95,7 @@ applying a request.
 | `0x16` | `PING_REQUEST` | 8-byte nonce |
 | `0x17` | `CHECKSUM_BENCHMARK_REQUEST` | 8-byte bounded benchmark selection |
 | `0x18` | `GPIO_CLOCK_DIAGNOSTIC_REQUEST` | 8-byte exact-rate diagnostic selection |
+| `0x19` | `GPIO_CAPTURE_DIAGNOSTIC_REQUEST` | Empty; uses build-time fixture policy |
 | `0x90` | `INFO_RESPONSE` | Typed identity and capabilities |
 | `0x91` | `CONFIGURE_RESPONSE` | Typed applied configuration |
 | `0x92` | `START_RESPONSE` | Typed applied configuration; new run ID in header |
@@ -104,13 +105,14 @@ applying a request.
 | `0x96` | `PING_RESPONSE` | Echoed nonce |
 | `0x97` | `CHECKSUM_BENCHMARK_RESPONSE` | 96-byte cycle/resource result |
 | `0x98` | `GPIO_CLOCK_DIAGNOSTIC_RESPONSE` | 140-byte register/count snapshot |
+| `0x99` | `GPIO_CAPTURE_DIAGNOSTIC_RESPONSE` | 144-byte capture/mapping evidence snapshot |
 | `0x9F` | `ERROR_RESPONSE` | Error for a structurally valid but unknown kind |
 
 The numeric command kind is the request frame-kind byte: INFO is `0x10`,
 CONFIGURE is `0x11`, START is `0x12`, GET_STATUS is `0x13`, STOP is `0x14`,
-RESET_STATS is `0x15`, PING is `0x16`, CHECKSUM_BENCHMARK is `0x17`, and
-GPIO_CLOCK_DIAGNOSTIC is `0x18`. A successful or typed-error response kind is
-the command kind ORed with `0x80`;
+RESET_STATS is `0x15`, PING is `0x16`, CHECKSUM_BENCHMARK is `0x17`,
+GPIO_CLOCK_DIAGNOSTIC is `0x18`, and GPIO_CAPTURE_DIAGNOSTIC is `0x19`. A
+successful or typed-error response kind is the command kind ORed with `0x80`;
 generated mappings enforce this relationship. A device copies the request ID
 into its response, allowing
 control traffic to be matched while ADC and GPIO frames are interspersed.
@@ -282,11 +284,12 @@ version, and two reserved zero bytes.
 | PING | No response | Valid if advertised | Valid if advertised | Valid if advertised |
 | CHECKSUM_BENCHMARK | No response | Valid if advertised | `INVALID_STATE` | `INVALID_STATE` |
 | GPIO_CLOCK_DIAGNOSTIC | No response | Valid if advertised | `INVALID_STATE` | `INVALID_STATE` |
+| GPIO_CAPTURE_DIAGNOSTIC | No response | Valid if advertised and quiescent | `INVALID_STATE` | `INVALID_STATE` |
 
 ### INFO
 
 INFO is idempotent and valid in IDLE, CONFIGURED, and RUNNING. Its request is
-empty. Its 98-byte success payload reports:
+empty. Its 128-byte success payload reports:
 
 - state and protocol version;
 - supported stream and source masks;
@@ -296,7 +299,10 @@ empty. Its 98-byte success payload reports:
 - ADC/GPIO rates, periods, ADC phase, resolution, and container width;
 - GPIO count and the eight-byte D6-through-D13 pin map;
 - 32-bit hardware serial, three-byte firmware semantic version, board/MCU IDs;
-- a 32-byte NUL-terminated, NUL-padded ASCII build ID (31 characters maximum).
+- a 32-byte NUL-terminated, NUL-padded ASCII build ID (31 characters maximum);
+- packed GPIO width, raw/packed/packet ring capacities, optional capture-
+  diagnostic mode and availability flags, and the exact PIT/XBAR/eDMA resource
+  IDs reserved by physical GPIO acquisition.
 
 | Offset | Width/type | Field |
 | ---: | --- | --- |
@@ -326,6 +332,18 @@ empty. Its 98-byte success payload reports:
 | 62 | 2 / `u16` | board ID |
 | 64 | 2 / `u16` | MCU ID |
 | 66 | 32 / ASCII | NUL-terminated and NUL-padded build ID |
+| 98 | 1 / `u8` | packed GPIO sample width in bits, exactly 8 |
+| 99 | 1 / `u8` | raw DMA ring depth, exactly 4 |
+| 100 | 1 / `u8` | packed CPU ring depth, exactly 4 |
+| 101 | 1 / `u8` | compiled GPIO capture diagnostic mode |
+| 102 | 2 / `u16` | GPIO capture diagnostic availability/declaration flags |
+| 104 | 4 / `u32` | raw samples per DMA buffer, exactly 4,048 |
+| 108 | 4 / `u32` | total raw DMA ring bytes, exactly 64,768 |
+| 112 | 4 / `u32` | total packed ring bytes, exactly 16,256 |
+| 116 | 2 / `u16` | packet buffer count, exactly 200 |
+| 118 | 2 / `u16` | reserved, zero |
+| 120 | 7 / `u8[7]` | PIT channel, XBAR input/output, eDMA channel, DMAMUX source, eDMA priority, XBAR edge |
+| 127 | 1 / `u8` | reserved, zero |
 
 Stream-mask bits are ADC = 1 and GPIO = 2. Source IDs are hardware = 0 and
 synthetic = 1; the INFO supported-source mask uses `1 << source_id`. Board IDs
@@ -354,12 +372,13 @@ Capability bits are independent, one-bit values:
 | `0x00000020` | `PING` | Optional PING is implemented |
 | `0x00000040` | `CHECKSUM_BENCHMARK` | Optional on-device checksum benchmark is implemented |
 | `0x00000080` | `GPIO_CLOCK_DIAGNOSTIC` | Optional exact-rate PIT/XBARA/eDMA diagnostic is implemented |
+| `0x00000100` | `GPIO_CAPTURE_DIAGNOSTIC` | Optional physical GPIO capture/mapping diagnostic is implemented |
 
 The first four capability bits must agree with the stream/source masks. Bits
-outside `0x000000FF` are reserved and rejected in protocol v1. PING,
-CHECKSUM_BENCHMARK, and GPIO_CLOCK_DIAGNOSTIC callers must check their
-capability bits; all other commands in the initial set are mandatory. Device
-states are BOOT = 0, IDLE = 1,
+outside `0x000001FF` are reserved and rejected in protocol v1. PING,
+CHECKSUM_BENCHMARK, GPIO_CLOCK_DIAGNOSTIC, and GPIO_CAPTURE_DIAGNOSTIC callers
+must check their capability bits; all other commands in the initial set are
+mandatory. Device states are BOOT = 0, IDLE = 1,
 CONFIGURED = 2, and RUNNING = 3. BOOT does not answer commands.
 
 ### CONFIGURE
@@ -369,7 +388,7 @@ eight-byte request is:
 
 | Offset | Type | Field | v1 constraint |
 | ---: | --- | --- | --- |
-| 0 | `u8` | stream mask | Subset of ADC/GPIO; zero only for the control-only profile below |
+| 0 | `u8` | stream mask | Nonzero subset of ADC/GPIO; hardware accepts GPIO only |
 | 1 | `u8` | source | Hardware (0) or synthetic (1) |
 | 2 | `u8` | data checksum | An advertised enabled algorithm ID (1, 2, or 3) |
 | 3 | `u8` | reserved | Zero |
@@ -380,16 +399,12 @@ by the exact eight-byte applied configuration. Unsupported values are rejected
 atomically; no partial configuration is applied. If prior-run frames are still
 queued, CONFIGURE returns `BUSY` and preserves the prior configuration.
 
-Phase 03 physical firmware defines one deliberately narrow control-only
-profile: stream mask zero, hardware source, Adler-32, and `data_frame_bytes =
-4096`. It is available only when INFO reports a zero supported-stream mask.
-The checksum and frame-size fields remain populated and are echoed so the
-control schema does not change when acquisition arrives. CONFIGURE and START
-succeed for this profile, RUNNING emits no ADC/GPIO frames, GET_STATUS reports
-RUNNING with stream mask zero, and STOP returns to IDLE. A zero stream mask on
-a device that advertises acquisition streams is not an implicit request to
-disable data; it must be rejected unless that firmware explicitly documents
-support for the control-only profile.
+Physical protocol-v1 firmware accepts one deliberately narrow acquisition
+profile: stream mask GPIO, hardware source, any advertised checksum, and
+`data_frame_bytes = 4096`. Physical ADC-only, combined ADC/GPIO, and zero-stream
+requests are rejected atomically before any pin, PIT, XBAR, DMAMUX, or eDMA
+register changes. Synthetic mode retains ADC-only, GPIO-only, and combined
+stream profiles.
 
 ### START
 
@@ -397,22 +412,26 @@ START is valid only in CONFIGURED and has an empty request. Success allocates a
 new run, applies the epoch/reset rules above, moves to RUNNING, places the new
 run ID in the response header, and returns the same 12-byte success layout as
 CONFIGURE. A repeated START while RUNNING returns `INVALID_STATE` and does not
-create another run.
+create another run. Physical GPIO START first performs a read-only resource
+and quiescence inspection, snapshots one epoch, arms packet, packed-ring, raw
+DMA, and TCD state, and enables the PIT trigger last. A `BUSY` or failed
+preflight changes no acquisition registers and allocates no run ID.
 
 ### GET_STATUS
 
 GET_STATUS is idempotent in every post-boot state and has an empty request. Its
-56-byte success payload contains the common prefix followed by state, active
-stream mask, source, data checksum, data-frame size, 64-bit emitted-frame
-counters for ADC and GPIO, 64-bit dropped-item counters for ADC and GPIO, and
-32-bit parser and transport error counters, followed by a nonzero 32-bit
-statistics generation. The header carries the current or most recent run ID.
+172-byte success payload contains the common prefix, configuration and legacy
+stream counters, followed by physical GPIO stage counts, queue depths/high-
+water marks, resource conflicts, lifecycle failures, and stale-completion
+diagnostics. The header carries the current or most recent run ID. INFO,
+GET_STATUS, and STOP are dispatched before bounded GPIO pack/packet work so
+they remain responsive during GPIO-only streaming.
 
 | Offset | Width/type | Field |
 | ---: | --- | --- |
 | 0 | 4 / response prefix | status, reserved zero, error code |
 | 4 | 1 / `u8` | device state |
-| 5 | 1 / `u8` | active stream mask; zero in IDLE and in the Phase 03 control-only profile |
+| 5 | 1 / `u8` | active stream mask; zero in IDLE |
 | 6 | 1 / `u8` | source mode |
 | 7 | 1 / `u8` | data checksum algorithm |
 | 8 | 4 / `u32` | data-frame bytes, exactly 4,096 |
@@ -423,6 +442,31 @@ statistics generation. The header carries the current or most recent run ID.
 | 44 | 4 / `u32` | parser errors |
 | 48 | 4 / `u32` | transport errors |
 | 52 | 4 / `u32` | nonzero statistics generation |
+| 56 | 8 / `u64` | GPIO raw samples captured by DMA |
+| 64 | 8 / `u64` | GPIO samples packed into bytes |
+| 72 | 8 / `u64` | GPIO samples admitted to complete protocol frames |
+| 80 | 8 / `u64` | GPIO samples transmitted as complete frames |
+| 88 | 8 / `u64` | raw samples lost before packer acquisition |
+| 96 | 8 / `u64` | samples dropped by the GPIO packer/pipeline |
+| 104 | 8 / `u64` | raw DMA ring overruns |
+| 112 | 8 / `u64` | completed GPIO DMA major loops |
+| 120 | 2 / `u16` | current raw-ready depth |
+| 122 | 2 / `u16` | raw-ready high-water depth |
+| 124 | 2 / `u16` | current packed-ready depth |
+| 126 | 2 / `u16` | packed-ready high-water depth |
+| 128 | 2 / `u16` | packet-ready depth |
+| 130 | 2 / `u16` | packet-transmit depth |
+| 132 | 2 / `u16` | packet-owned high-water count |
+| 134 | 2 / `u16` | reserved, zero |
+| 136 | 4 / `u32` | GPIO hardware error flags/count |
+| 140 | 4 / `u32` | raw-capture invariant errors |
+| 144 | 4 / `u32` | packer source errors |
+| 148 | 4 / `u32` | packer pipeline errors |
+| 152 | 4 / `u32` | packer chronology errors |
+| 156 | 4 / `u32` | GPIO resource conflicts |
+| 160 | 4 / `u32` | GPIO START failures |
+| 164 | 4 / `u32` | GPIO STOP/cleanup failures |
+| 168 | 4 / `u32` | stale DMA completions rejected outside the active run |
 
 | Counter | Wire type | Unit |
 | --- | --- | --- |
@@ -432,6 +476,10 @@ statistics generation. The header carries the current or most recent run ID.
 | `gpio_items_dropped` | `u64` | Packed eight-pin GPIO sample instants not emitted |
 | `parser_errors` | `u32` | Rejected inbound frame candidates |
 | `transport_errors` | `u32` | Bounded USB read/write failure events |
+| `gpio_samples_captured` through `gpio_samples_transmitted` | `u64` | Monotonic sample accounting across DMA, packing, framing, and transmission stages |
+| GPIO loss/overrun counters | `u64` | Stage-specific samples or major-loop capacity lost before transmission |
+| GPIO queue depth/high-water fields | `u16` | Current bounded backlog and maximum ownership observed in this statistics generation |
+| GPIO error/resource/lifecycle counters | `u32` | Hardware flags, invariant failures, resource conflicts, failed START/STOP operations, and rejected stale completions |
 
 These are firmware counters only. They saturate at their type maximum and
 reset on successful START or RESET_STATS. Host parser corruption, decoded-
@@ -446,13 +494,16 @@ returns to IDLE. Its eight-byte success payload is the common prefix followed
 by state `IDLE` and three reserved zero bytes. The response header retains the
 stopped/most recent run ID (or zero if no run has started).
 
-Disabling acquisition prevents new frame production immediately. Incomplete
-producer-owned work is canceled; already complete ready or transport-owned
-frames drain without interleaving or abandoning a partial frame. A caller may
-CONFIGURE while this finite drain completes, but START is subject to the BUSY
-rule above. STOP_RESPONSE retains normal response priority at the next frame
-boundary, so drained old-run data may follow STOP_RESPONSE; it must precede any
-later successful START_RESPONSE on the CDC byte stream.
+Physical GPIO STOP disables the PIT trigger first, then removes the eDMA
+request, DMAMUX route, and XBAR DMA output before canceling incomplete raw
+ownership. This is the deterministic reverse of START's arm order. Complete
+raw and packed buffers are drained with bounded work; already complete packet
+or transport-owned frames retain their frame boundary. CONFIGURE and START
+return `BUSY` until that finite drain is quiescent. STOP_RESPONSE retains
+normal response priority at the next frame boundary, so drained old-run data
+may follow STOP_RESPONSE, but it must precede any later successful
+START_RESPONSE. DMA completions observed after the run is disarmed increment
+the stale-completion counter and are never published into a later epoch.
 
 ### RESET_STATS
 
@@ -681,6 +732,49 @@ responses must prove `dma_sample_count == BITER - CITER`, and a zero-error
 response must include a nonzero 600 MHz DWT interval. Unknown flag bits and
 inconsistent derived fields are rejected as `INVALID_PAYLOAD`.
 
+### GPIO_CAPTURE_DIAGNOSTIC
+
+GPIO_CAPTURE_DIAGNOSTIC is an optional, empty-request, fully quiescent
+IDLE-only exercise of the same GPIO2 raw DMA path used by physical streaming.
+It does not allocate a run ID or accept host-selected electrical policy. The
+fixture declaration is compiled into the firmware: absent or documentation-
+only metadata selects non-driving capture; output drive is possible only for a
+machine-readable declaration that explicitly marks the exact D6-through-D13
+pin set safe. The registered Teensy fixture is documentation-only, so the
+advertised mode is `NON_DRIVING_CAPTURE` (0). Modes 1 and 2 respectively mean
+`SELF_DRIVEN_SWEEP` and `FIXTURE_STIMULUS`.
+
+The 144-byte response records enough evidence to distinguish DMA capture,
+packing observation, declared stimulus, and electrical cleanup:
+
+| Offset | Width/type | Field group |
+| ---: | --- | --- |
+| 0 | 4 / response prefix | status, reserved zero, error code |
+| 4 | 4 / four `u8` | mode, metadata kind, drive-safety declaration, stimulus kind |
+| 8 | 8 / two `u32` | fixture and stimulus identities |
+| 16 | 4 / `u32` | capture hardware-error flags |
+| 20 | 4 / `u32` | diagnostic evidence flags |
+| 24 | 8 / two `u32` | DWT frequency and elapsed cycles |
+| 32 | 8 / `u64` | DMA samples captured |
+| 40 | 12 / three `u32` | complete retained, analyzed, and stopped-partial sample counts |
+| 52 | 12 / three `u32` | raw-word AND/OR and observed-transition evidence |
+| 64 | 8 / four `u16` | mapping values checked, failures, unstable samples, reserved zero |
+| 72 | 4 / four `u8` | packed AND/OR and first/last packed values |
+| 76 | 36 / nine `u32` | GPR27, GPIO2_GDIR, and GPIO2_PSR before/configured/after snapshots |
+| 112 | 20 / five `u32` | PIT, DMAMUX, eDMA request, and final eDMA error snapshots |
+| 132 | 6 / three `u16` | configured TCD CITER, BITER, and CSR |
+| 138 | 2 / two `u8` | configured eDMA priority and reserved zero |
+| 140 | 4 / `u32` | analysis sample limit, exactly 256 in non-driving mode |
+
+Diagnostic flag bits are `AVAILABLE` (1), `DECLARATION_VALID` (2),
+`OUTPUT_DRIVE_PERMITTED` (4), `EXTERNAL_STIMULUS_DECLARED` (8),
+`DMA_CAPTURE_EXERCISED` (16), `PACKED_OBSERVATION_EXERCISED` (32),
+`OUTPUT_DRIVE_EXERCISED` (64),
+`EXTERNAL_TRANSITION_VALIDATION_EXERCISED` (128), and `FINAL_INPUT_SAFE`
+(256). The implementation always attempts cleanup and reports final input
+safety; resource contention or failed cleanup is evidence, never permission
+to claim that external transitions or driven mapping were validated.
+
 ## Error codes
 
 | Value | Name | Meaning |
@@ -741,8 +835,8 @@ and discard leading garbage as it scans.
 
 ## Golden fixtures and drift
 
-`protocol/fixtures/` contains one complete Adler-32 frame for all 21 v1 frame
-kinds (two data, nine requests, nine typed responses, and one generic error)
+`protocol/fixtures/` contains one complete Adler-32 frame for all 23 v1 frame
+kinds (two data, ten requests, ten typed responses, and one generic error)
 plus a deterministic `manifest.json` with decoded header values, payload
 and frame SHA-256 hashes, checksums, and inline hex for small control frames.
 The ADC vector is the little-endian pair ramp `(0, 1), (2, 3), ...`; the GPIO

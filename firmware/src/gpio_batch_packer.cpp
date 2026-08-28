@@ -69,7 +69,8 @@ TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.start")
 OperationStatus GpioBatchPacker::startRun(
     std::uint32_t run_id,
     protocol_v1::ChecksumAlgorithm checksum_algorithm,
-    const packet::PacketBufferPipeline &pipeline) {
+    const packet::PacketBufferPipeline &pipeline,
+    std::uint64_t start_epoch_ticks) {
   if (run_id == 0U || run_id == run_id_) {
     return OperationStatus::kInvalidRunId;
   }
@@ -92,6 +93,7 @@ OperationStatus GpioBatchPacker::startRun(
   prepacket_frames_dropped_ = 0U;
   prepacket_frames_projected_ = 0U;
   next_source_sample_ = 0U;
+  start_epoch_ticks_ = start_epoch_ticks;
   service_calls_ = 0U;
   raw_buffers_acquired_ = 0U;
   raw_buffers_released_ = 0U;
@@ -215,6 +217,7 @@ Snapshot GpioBatchPacker::snapshot(
   result.run_id = run_id_;
   result.checksum_algorithm = checksum_algorithm_;
   result.next_source_sample = next_source_sample_;
+  result.start_epoch_ticks = start_epoch_ticks_;
   result.pending_dropped_frames = pending_dropped_frames_;
   result.current_frame_samples = current_frame_samples_;
   result.ready_depth = ready_queue_.size();
@@ -634,6 +637,11 @@ stats::GpioPackerProgress GpioBatchPacker::progress(
   result.samples_dropped = saturatingSum(
       saturatingSum(gpio.items_dropped, unprojected_raw),
       unprojected_packer);
+  result.ready_depth = ready_queue_.size();
+  result.ready_high_water = ready_high_water_;
+  result.source_errors = source_errors_;
+  result.pipeline_errors = pipeline_errors_;
+  result.chronology_errors = chronology_errors_;
   return result;
 }
 

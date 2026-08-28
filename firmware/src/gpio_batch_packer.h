@@ -85,6 +85,7 @@ struct Snapshot {
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
       protocol_v1::kDefaultChecksumAlgorithm;
   std::uint64_t next_source_sample = 0U;
+  std::uint64_t start_epoch_ticks = 0U;
   std::uint64_t pending_dropped_frames = 0U;
   std::uint32_t current_frame_samples = 0U;
   std::size_t ready_depth = 0U;
@@ -116,7 +117,8 @@ class GpioBatchPacker final {
   OperationStatus startRun(
       std::uint32_t run_id,
       protocol_v1::ChecksumAlgorithm checksum_algorithm,
-      const packet::PacketBufferPipeline &pipeline);
+      const packet::PacketBufferPipeline &pipeline,
+      std::uint64_t start_epoch_ticks = 0U);
   StopReport stopProduction();
 
   ServiceReport service(
@@ -179,6 +181,7 @@ class GpioBatchPacker final {
   std::uint64_t prepacket_frames_dropped_ = 0U;
   std::uint64_t prepacket_frames_projected_ = 0U;
   std::uint64_t next_source_sample_ = 0U;
+  std::uint64_t start_epoch_ticks_ = 0U;
   std::uint64_t service_calls_ = 0U;
   std::uint64_t raw_buffers_acquired_ = 0U;
   std::uint64_t raw_buffers_released_ = 0U;

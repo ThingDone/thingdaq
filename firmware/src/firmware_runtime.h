@@ -4,7 +4,10 @@
 
 #include "checksum_benchmark.h"
 #include "control_state.h"
+#include "gpio_batch_packer.h"
+#include "gpio_capture_diagnostic.h"
 #include "gpio_clock_diagnostic.h"
+#include "gpio_raw_capture.h"
 #include "packet_buffer_pipeline.h"
 #include "synthetic_source.h"
 #include "usb_transport.h"
@@ -22,6 +25,13 @@ struct LoopReport {
   synthetic::OperationStatus synthetic_start_status =
       synthetic::OperationStatus::kNotRunning;
   synthetic::ServiceReport synthetic{};
+  gpio_packer::ServiceReport gpio_packer{};
+  gpio_capture::StopReport gpio_capture_stop{};
+  gpio_packer::StopReport gpio_packer_stop{};
+  gpio_capture::StartStatus gpio_capture_start_status =
+      gpio_capture::StartStatus::kNotQuiescent;
+  gpio_packer::OperationStatus gpio_packer_start_status =
+      gpio_packer::OperationStatus::kNotRunning;
   bool command_dispatched = false;
   bool response_queued = false;
   bool internal_error = false;
@@ -31,6 +41,11 @@ struct LoopReport {
   bool synthetic_run_started = false;
   bool packet_production_stopped = false;
   bool synthetic_production_stopped = false;
+  bool gpio_capture_started = false;
+  bool gpio_capture_stopped = false;
+  bool gpio_packer_started = false;
+  bool gpio_packer_stopped = false;
+  bool physical_drain_pending = false;
 };
 
 // Portable cooperative owner for the control plane, deterministic source, and
@@ -45,14 +60,20 @@ class FirmwareRuntime {
                   synthetic::TickClock &clock,
                   synthetic::Mode source_mode = synthetic::Mode::kRealtime,
                   benchmark::Runner *checksum_benchmark = nullptr,
-                  gpio_clock::Runner *gpio_clock_diagnostic = nullptr)
+                  gpio_clock::Runner *gpio_clock_diagnostic = nullptr,
+                  gpio_capture::HardwareCapture *gpio_capture = nullptr,
+                  gpio_packer::GpioBatchPacker *gpio_packer = nullptr,
+                  gpio_diagnostic::Runner *gpio_capture_diagnostic = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
         clock_(clock),
         transport_{stream, control_.statistics(), &packet_pipeline_},
         checksum_benchmark_(checksum_benchmark),
-        gpio_clock_diagnostic_(gpio_clock_diagnostic) {}
+        gpio_clock_diagnostic_(gpio_clock_diagnostic),
+        gpio_capture_(gpio_capture),
+        gpio_packer_(gpio_packer),
+        gpio_capture_diagnostic_(gpio_capture_diagnostic) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -76,6 +97,7 @@ class FirmwareRuntime {
   synthetic::Snapshot syntheticSnapshot() const {
     return synthetic_source_.snapshot();
   }
+  bool physicalDrainPending() const { return physical_drain_pending_; }
   bool hasPendingTransmission() const {
     return transport_.hasPendingTransmission();
   }
@@ -88,6 +110,13 @@ class FirmwareRuntime {
                            bool transport_already_recorded,
                            LoopReport &report);
   void publishPacketStatistics();
+  bool dataPathQuiescent() const;
+  bool physicalConfiguration(const protocol::Configuration &configuration)
+      const;
+  void servicePhysicalPath(LoopReport &report);
+  static protocol::GpioCaptureDiagnosticResponse gpioDiagnosticResponse(
+      const gpio_diagnostic::Runner &runner,
+      const gpio_diagnostic::Snapshot &snapshot);
 
   control::ControlState control_{};
   packet::PacketBufferPipeline packet_pipeline_;
@@ -96,7 +125,12 @@ class FirmwareRuntime {
   usb::CdcTransport transport_;
   benchmark::Runner *checksum_benchmark_ = nullptr;
   gpio_clock::Runner *gpio_clock_diagnostic_ = nullptr;
+  gpio_capture::HardwareCapture *gpio_capture_ = nullptr;
+  gpio_packer::GpioBatchPacker *gpio_packer_ = nullptr;
+  gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
+  bool physical_run_active_ = false;
+  bool physical_drain_pending_ = false;
 };
 
 }  // namespace teensy_daq::runtime

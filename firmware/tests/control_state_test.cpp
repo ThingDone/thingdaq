@@ -135,8 +135,8 @@ void testBootAndInfo() {
              .data[constants::kInfoResponseSupportedStreamMaskOffset] == 3U,
          "INFO advertises both implemented stream layouts");
   expect(decoded.payload
-             .data[constants::kInfoResponseSupportedSourceMaskOffset] == 2U,
-         "INFO advertises only the implemented synthetic source");
+             .data[constants::kInfoResponseSupportedSourceMaskOffset] == 3U,
+         "INFO advertises physical GPIO and retained synthetic sources");
   expect(decoded.payload
              .data[constants::kInfoResponseDataChecksumAlgorithmOffset] ==
              static_cast<std::uint8_t>(constants::kDefaultChecksumAlgorithm),
@@ -156,7 +156,7 @@ void testBootAndInfo() {
              (value & static_cast<std::uint32_t>(
                           constants::Capability::kSyntheticSource)) != 0U &&
              (value & static_cast<std::uint32_t>(
-                          constants::Capability::kHardwareSource)) == 0U &&
+                          constants::Capability::kHardwareSource)) != 0U &&
              (value & static_cast<std::uint32_t>(
                           constants::Capability::kResetStats)) != 0U &&
              (value & static_cast<std::uint32_t>(
@@ -164,8 +164,17 @@ void testBootAndInfo() {
              (value & static_cast<std::uint32_t>(
                           constants::Capability::kChecksumBenchmark)) != 0U &&
              (value & static_cast<std::uint32_t>(
-                          constants::Capability::kGpioClockDiagnostic)) != 0U,
-         "INFO capability bits distinguish synthetic from physical data");
+                          constants::Capability::kGpioClockDiagnostic)) != 0U &&
+             (value & static_cast<std::uint32_t>(
+                          constants::Capability::kGpioCaptureDiagnostic)) != 0U,
+         "INFO capability bits advertise physical GPIO and diagnostics");
+  expect(decoded.payload.data[
+             constants::kInfoResponseGpioPackedWidthBitsOffset] == 8U &&
+             decoded.payload.data[
+                 constants::kInfoResponseGpioRawRingDepthOffset] == 4U &&
+             decoded.payload.data[
+                 constants::kInfoResponseGpioPackedRingDepthOffset] == 4U,
+         "INFO publishes the physical GPIO packing and ring layout");
 
   const std::size_t build_offset = constants::kInfoResponseBuildIdOffset;
   expect(decoded.payload.data[build_offset] == 't' &&
@@ -449,6 +458,7 @@ void testConfigurationValidationAndAtomicity() {
   adc.stream_mask = static_cast<std::uint8_t>(constants::StreamMask::kAdc);
   wire::Configuration hardware = control::kSyntheticConfiguration;
   hardware.source = constants::Source::kHardware;
+  wire::Configuration physical_gpio = control::kPhysicalGpioConfiguration;
   wire::Configuration zero_stream = control::kSyntheticConfiguration;
   zero_stream.stream_mask = 0U;
   wire::Configuration crc = control::kSyntheticConfiguration;
@@ -509,6 +519,13 @@ void testConfigurationValidationAndAtomicity() {
              state.appliedConfiguration().data_checksum_algorithm ==
                  constants::ChecksumAlgorithm::kCrc32c,
          "negotiated CRC-32C configuration is retained");
+  expect(state.dispatch(configureRequest(request_id++, physical_gpio), response)
+             .commandAccepted() &&
+             state.appliedConfiguration().stream_mask ==
+                 static_cast<std::uint8_t>(constants::StreamMask::kGpio) &&
+             state.appliedConfiguration().source ==
+                 constants::Source::kHardware,
+         "physical GPIO-only configuration is accepted atomically");
   expect(state.dispatch(configureRequest(request_id++, crc_iso), response)
              .commandAccepted() &&
              state.appliedConfiguration().data_checksum_algorithm ==

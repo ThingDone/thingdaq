@@ -415,6 +415,8 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     timing = contract["timing"]
     benchmark = contract["checksum_benchmark"]
     gpio_clock = contract["gpio_clock_diagnostic"]
+    gpio_capture = contract["gpio_capture"]
+    gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -501,6 +503,27 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"GPIO_CLOCK_MAX_ELAPSED_CYCLES = {int(gpio_clock['maximum_elapsed_cycles'])}",
         f"GPIO_CLOCK_DUPLICATE_GUARD_EVENTS = {int(gpio_clock['duplicate_guard_events'])}",
         f"GPIO_CLOCK_COUNT_TOLERANCE = {int(gpio_clock['count_tolerance'])}",
+        f"GPIO_PACKED_WIDTH_BITS = {int(gpio_capture['packed_width_bits'])}",
+        f"GPIO_RAW_RING_DEPTH = {int(gpio_capture['raw_ring_depth'])}",
+        (
+            "GPIO_RAW_SAMPLES_PER_BUFFER = "
+            f"{int(gpio_capture['raw_samples_per_buffer'])}"
+        ),
+        f"GPIO_RAW_RING_BYTES = {int(gpio_capture['raw_ring_bytes'])}",
+        f"GPIO_PACKED_RING_DEPTH = {int(gpio_capture['packed_ring_depth'])}",
+        f"GPIO_PACKED_RING_BYTES = {int(gpio_capture['packed_ring_bytes'])}",
+        f"GPIO_PACKET_BUFFER_COUNT = {int(gpio_capture['packet_buffer_count'])}",
+        f"GPIO_PIT_CHANNEL = {int(gpio_capture['pit_channel'])}",
+        f"GPIO_XBAR_INPUT = {int(gpio_capture['xbar_input'])}",
+        f"GPIO_XBAR_OUTPUT = {int(gpio_capture['xbar_output'])}",
+        f"GPIO_XBAR_ACTIVE_EDGE = {int(gpio_capture['xbar_active_edge'])}",
+        f"GPIO_EDMA_CHANNEL = {int(gpio_capture['edma_channel'])}",
+        f"GPIO_DMAMUX_SOURCE = {int(gpio_capture['dmamux_source'])}",
+        f"GPIO_EDMA_PRIORITY = {int(gpio_capture['edma_priority'])}",
+        (
+            "GPIO_CAPTURE_DIAGNOSTIC_ANALYSIS_SAMPLES = "
+            f"{int(gpio_capture_diagnostic['analysis_samples'])}"
+        ),
         f"ADC_BYTES_PER_PAIR = {int(layouts['adc']['bytes_per_item'])}",
         f"ADC_PAIRS_PER_FRAME = {int(layouts['adc']['items_per_frame'])}",
         f"ADC_RESOLUTION_BITS = {int(layouts['adc']['resolution_bits'])}",
@@ -561,6 +584,28 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             include_none=True,
         )
     )
+    lines.extend(
+        python_enum(
+            "GpioCaptureDiagnosticMode",
+            contract["enums"]["gpio_capture_diagnostic_mode"],
+        )
+    )
+    lines.extend(
+        python_enum(
+            "GpioCaptureDiagnosticFlag",
+            contract["enums"]["gpio_capture_diagnostic_flag"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
+    lines.extend(
+        python_enum(
+            "GpioCaptureError",
+            contract["enums"]["gpio_capture_error"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
 
     lines.extend(
         [
@@ -591,6 +636,23 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         "KNOWN_GPIO_CLOCK_ERROR_MASK = "
         + str(
             sum(int(entry["value"]) for entry in contract["enums"]["gpio_clock_error"])
+        )
+    )
+    lines.append(
+        "KNOWN_GPIO_CAPTURE_DIAGNOSTIC_FLAG_MASK = "
+        + str(
+            sum(
+                int(entry["value"])
+                for entry in contract["enums"]["gpio_capture_diagnostic_flag"]
+            )
+        )
+    )
+    lines.append(
+        "KNOWN_GPIO_CAPTURE_ERROR_MASK = "
+        + str(
+            sum(
+                int(entry["value"]) for entry in contract["enums"]["gpio_capture_error"]
+            )
         )
     )
     lines.extend(["", ""])
@@ -702,6 +764,8 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     timing = contract["timing"]
     benchmark = contract["checksum_benchmark"]
     gpio_clock = contract["gpio_clock_diagnostic"]
+    gpio_capture = contract["gpio_capture"]
+    gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -832,6 +896,28 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             "inline constexpr std::uint32_t kGpioClockCountTolerance = "
             f"{int(gpio_clock['count_tolerance'])}U;"
         ),
+        f"inline constexpr std::uint8_t kGpioPackedWidthBits = {int(gpio_capture['packed_width_bits'])}U;",
+        f"inline constexpr std::uint8_t kGpioRawRingDepth = {int(gpio_capture['raw_ring_depth'])}U;",
+        (
+            "inline constexpr std::uint32_t kGpioRawSamplesPerBuffer = "
+            f"{int(gpio_capture['raw_samples_per_buffer'])}U;"
+        ),
+        f"inline constexpr std::uint32_t kGpioRawRingBytes = {int(gpio_capture['raw_ring_bytes'])}U;",
+        f"inline constexpr std::uint8_t kGpioPackedRingDepth = {int(gpio_capture['packed_ring_depth'])}U;",
+        f"inline constexpr std::uint32_t kGpioPackedRingBytes = {int(gpio_capture['packed_ring_bytes'])}U;",
+        f"inline constexpr std::uint16_t kGpioPacketBufferCount = {int(gpio_capture['packet_buffer_count'])}U;",
+        f"inline constexpr std::uint8_t kGpioPitChannel = {int(gpio_capture['pit_channel'])}U;",
+        f"inline constexpr std::uint8_t kGpioXbarInput = {int(gpio_capture['xbar_input'])}U;",
+        f"inline constexpr std::uint8_t kGpioXbarOutput = {int(gpio_capture['xbar_output'])}U;",
+        f"inline constexpr std::uint8_t kGpioXbarActiveEdge = {int(gpio_capture['xbar_active_edge'])}U;",
+        f"inline constexpr std::uint8_t kGpioEdmaChannel = {int(gpio_capture['edma_channel'])}U;",
+        f"inline constexpr std::uint8_t kGpioDmamuxSource = {int(gpio_capture['dmamux_source'])}U;",
+        f"inline constexpr std::uint8_t kGpioEdmaPriority = {int(gpio_capture['edma_priority'])}U;",
+        (
+            "inline constexpr std::uint32_t "
+            "kGpioCaptureDiagnosticAnalysisSamples = "
+            f"{int(gpio_capture_diagnostic['analysis_samples'])}U;"
+        ),
         f"inline constexpr std::size_t kAdcBytesPerPair = {int(layouts['adc']['bytes_per_item'])}U;",
         f"inline constexpr std::size_t kAdcPairsPerFrame = {int(layouts['adc']['items_per_frame'])}U;",
         f"inline constexpr std::uint8_t kAdcResolutionBits = {int(layouts['adc']['resolution_bits'])}U;",
@@ -896,6 +982,27 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             contract["enums"]["gpio_clock_error"],
         )
     )
+    lines.extend(
+        cpp_enum(
+            "GpioCaptureDiagnosticMode",
+            "std::uint8_t",
+            contract["enums"]["gpio_capture_diagnostic_mode"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "GpioCaptureDiagnosticFlag",
+            "std::uint32_t",
+            contract["enums"]["gpio_capture_diagnostic_flag"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "GpioCaptureError",
+            "std::uint32_t",
+            contract["enums"]["gpio_capture_error"],
+        )
+    )
 
     lines.extend(
         [
@@ -923,6 +1030,23 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
                 sum(
                     int(entry["value"])
                     for entry in contract["enums"]["gpio_clock_error"]
+                )
+            )
+            + "U;",
+            "inline constexpr std::uint32_t "
+            "kKnownGpioCaptureDiagnosticFlagMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["gpio_capture_diagnostic_flag"]
+                )
+            )
+            + "U;",
+            "inline constexpr std::uint32_t kKnownGpioCaptureErrorMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["gpio_capture_error"]
                 )
             )
             + "U;",

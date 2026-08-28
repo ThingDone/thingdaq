@@ -40,22 +40,30 @@ constexpr std::uint8_t sourceBit(protocol_v1::Source source) {
       1U << static_cast<std::uint8_t>(source));
 }
 
-// Phase 05 implements both deterministic stream layouts through the synthetic
-// source. Physical ownership stays unadvertised until the peripheral phases
-// replace these generators.
+// Synthetic mode retains both deterministic stream layouts. Physical mode is
+// deliberately narrower: the fixed GPIO-only pipeline owns the advertised
+// PIT/XBAR/eDMA resources, while physical ADC remains unavailable.
 inline constexpr std::uint8_t kSupportedStreamMask =
     static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc) |
     static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
 inline constexpr std::uint8_t kSupportedSourceMask =
+    sourceBit(protocol_v1::Source::kHardware) |
     sourceBit(protocol_v1::Source::kSynthetic);
 inline constexpr std::uint32_t kCapabilityBits =
     capabilityBit(protocol_v1::Capability::kAdcStream) |
     capabilityBit(protocol_v1::Capability::kGpioStream) |
+    capabilityBit(protocol_v1::Capability::kHardwareSource) |
     capabilityBit(protocol_v1::Capability::kSyntheticSource) |
     capabilityBit(protocol_v1::Capability::kResetStats) |
     capabilityBit(protocol_v1::Capability::kPing) |
     capabilityBit(protocol_v1::Capability::kChecksumBenchmark) |
-    capabilityBit(protocol_v1::Capability::kGpioClockDiagnostic);
+    capabilityBit(protocol_v1::Capability::kGpioClockDiagnostic) |
+    capabilityBit(protocol_v1::Capability::kGpioCaptureDiagnostic);
+inline constexpr std::uint16_t kGpioCaptureDiagnosticInfoFlags =
+    static_cast<std::uint16_t>(
+        protocol_v1::GpioCaptureDiagnosticFlag::kAvailable) |
+    static_cast<std::uint16_t>(
+        protocol_v1::GpioCaptureDiagnosticFlag::kDeclarationValid);
 inline constexpr std::uint32_t kAdc0PhaseTicks = 0U;
 
 inline constexpr CapabilityMetadata kMetadata{
@@ -85,15 +93,15 @@ inline constexpr CapabilityMetadata kMetadata{
 inline constexpr std::uint32_t kDataCapabilityMask =
     capabilityBit(protocol_v1::Capability::kAdcStream) |
     capabilityBit(protocol_v1::Capability::kGpioStream) |
-    capabilityBit(protocol_v1::Capability::kSyntheticSource);
+    capabilityBit(protocol_v1::Capability::kSyntheticSource) |
+    capabilityBit(protocol_v1::Capability::kHardwareSource);
 
 static_assert(kMetadata.supported_stream_mask == 3U);
 static_assert((kMetadata.capability_bits & kDataCapabilityMask) ==
               kDataCapabilityMask);
-static_assert((kMetadata.capability_bits & capabilityBit(
-               protocol_v1::Capability::kHardwareSource)) == 0U);
 static_assert(kMetadata.supported_source_mask ==
-              sourceBit(protocol_v1::Source::kSynthetic));
+              (sourceBit(protocol_v1::Source::kHardware) |
+               sourceBit(protocol_v1::Source::kSynthetic)));
 static_assert(kMetadata.supported_checksum_mask ==
               ((1U << static_cast<std::uint8_t>(
                           protocol_v1::ChecksumAlgorithm::kAdler32)) |
@@ -113,5 +121,4 @@ static_assert(kMetadata.max_command_frame_bytes <=
 static_assert(kMetadata.gpio_sample_rate_hz ==
               protocol_v1::kGpioClockProductionRateHz,
               "diagnostic rates must not weaken the production GPIO rate");
-
 }  // namespace teensy_daq::capabilities

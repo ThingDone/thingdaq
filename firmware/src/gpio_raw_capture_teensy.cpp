@@ -101,6 +101,16 @@ RawCaptureRing g_ring{g_gpio_raw_dma_buffers, g_gpio_raw_dma_overflow_sink,
 TeensyRawCapture g_facade{};
 bool g_hardware_running = false;
 bool g_faulted = false;
+std::uint32_t g_resource_conflicts = 0U;
+std::uint32_t g_start_errors = 0U;
+std::uint32_t g_stop_errors = 0U;
+std::uint32_t g_stale_dma_completions = 0U;
+
+void saturatingIncrement(std::uint32_t &value) {
+  if (value != std::numeric_limits<std::uint32_t>::max()) {
+    ++value;
+  }
+}
 
 volatile std::uint32_t *dmamuxRegister() {
   return &DMAMUX_CHCFG0 + board::kGpioEdmaChannel;
@@ -204,9 +214,9 @@ void disableHardware() {
   IMXRT_PIT_CHANNEL_t &pit =
       IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
   pit.TCTRL = 0U;
-  gpio_dma_route::disableXbarRequest();
-  *dmamuxRegister() = 0U;
   DMA_CERQ = board::kGpioEdmaChannel;
+  *dmamuxRegister() = 0U;
+  gpio_dma_route::disableXbarRequest();
   gpio_dma_route::barrier();
 }
 
@@ -221,6 +231,7 @@ void faultFromIsr() {
 void dmaMajorLoopIsr() {
   DMA_CINT = board::kGpioEdmaChannel;
   if (!g_hardware_running) {
+    saturatingIncrement(g_stale_dma_completions);
     return;
   }
   if ((DMA_ERR & kChannelMask) != 0U) {
@@ -256,19 +267,34 @@ std::uint32_t activeSamples() {
 }
 
 TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
-StartStatus startHardware() {
+StartStatus inspectHardwareStart() {
   if (g_hardware_running) {
     return StartStatus::kAlreadyRunning;
   }
-  gpio_dma_route::enableClockGates();
   if (resourcesBusy()) {
-    forceSafeInputs();
     return StartStatus::kResourceBusy;
   }
+  return g_ring.snapshot().quiescent ? StartStatus::kOk
+                                     : StartStatus::kNotQuiescent;
+}
+
+TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
+StartStatus startHardware() {
+  const StartStatus readiness = inspectHardwareStart();
+  if (readiness != StartStatus::kOk) {
+    if (readiness == StartStatus::kResourceBusy) {
+      saturatingIncrement(g_resource_conflicts);
+    } else {
+      saturatingIncrement(g_start_errors);
+    }
+    return readiness;
+  }
+  gpio_dma_route::enableClockGates();
 
   const PrimeResult prime = g_ring.prime();
   if (!prime.ok()) {
     forceSafeInputs();
+    saturatingIncrement(g_start_errors);
     return prime.status == OperationStatus::kAlreadyRunning
                ? StartStatus::kAlreadyRunning
                : StartStatus::kNotQuiescent;
@@ -295,6 +321,10 @@ StartStatus startHardware() {
   NVIC_ENABLE_IRQ(IRQ_DMA_CH2);
   *dmamux = kDmamuxConfiguration;
   DMA_SERQ = board::kGpioEdmaChannel;
+  g_resource_conflicts = 0U;
+  g_start_errors = 0U;
+  g_stop_errors = 0U;
+  g_stale_dma_completions = 0U;
   g_faulted = false;
   g_hardware_running = true;
   gpio_dma_route::barrier();
@@ -333,6 +363,10 @@ StopReport stopHardware() {
     report.ready_buffers_to_drain = before.ready_depth;
     report.packing_buffers_to_release = before.packing_depth;
   }
+  if (report.status != OperationStatus::kOk &&
+      report.status != OperationStatus::kNotRunning) {
+    saturatingIncrement(g_stop_errors);
+  }
   return report;
 }
 
@@ -340,6 +374,10 @@ TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_snapshot")
 HardwareSnapshot hardwareSnapshot() {
   HardwareSnapshot value{};
   value.ring = g_ring.snapshot();
+  value.ring.resource_conflicts = g_resource_conflicts;
+  value.ring.start_errors = g_start_errors;
+  value.ring.stop_errors = g_stop_errors;
+  value.ring.stale_dma_completions = g_stale_dma_completions;
   value.gpr27 = IOMUXC_GPR_GPR27;
   value.gpio2_gdir = GPIO2_GDIR;
   value.gpio2_psr = GPIO2_PSR;
@@ -355,12 +393,18 @@ HardwareSnapshot hardwareSnapshot() {
   value.tcd_biter = tcd.BITER_ELINKNO;
   value.tcd_csr = tcd.CSR;
   value.edma_priority = static_cast<std::uint8_t>(DMA_DCHPRI2 & 0x0FU);
+  value.resource_conflicts = g_resource_conflicts;
+  value.start_errors = g_start_errors;
+  value.stop_errors = g_stop_errors;
+  value.stale_dma_completions = g_stale_dma_completions;
   value.hardware_running = g_hardware_running;
   value.faulted = g_faulted;
   return value;
 }
 
 }  // namespace
+
+StartStatus TeensyRawCapture::inspectStart() { return inspectHardwareStart(); }
 
 StartStatus TeensyRawCapture::start() { return startHardware(); }
 
@@ -372,6 +416,15 @@ AcquireResult TeensyRawCapture::acquireReady() {
 
 OperationStatus TeensyRawCapture::release(const BufferHandle &handle) {
   return g_ring.release(handle);
+}
+
+Snapshot TeensyRawCapture::rawSnapshot() {
+  Snapshot value = g_ring.snapshot();
+  value.resource_conflicts = g_resource_conflicts;
+  value.start_errors = g_start_errors;
+  value.stop_errors = g_stop_errors;
+  value.stale_dma_completions = g_stale_dma_completions;
+  return value;
 }
 
 HardwareSnapshot TeensyRawCapture::snapshot() {

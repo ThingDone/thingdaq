@@ -490,9 +490,14 @@ void testCompleteControlPlane() {
                             constants::Capability::kGpioStream)) != 0U &&
              (value32 & static_cast<std::uint32_t>(
                             constants::Capability::kSyntheticSource)) != 0U &&
+             (value32 & static_cast<std::uint32_t>(
+                            constants::Capability::kHardwareSource)) != 0U &&
+             (value32 & static_cast<std::uint32_t>(
+                            constants::Capability::kGpioCaptureDiagnostic)) !=
+                 0U &&
              info.payload.data[constants::kInfoResponseSupportedSourceMaskOffset] ==
-                 2U,
-         "INFO advertises both layouts and only the implemented synthetic source");
+                 3U,
+         "INFO advertises physical GPIO, diagnostics, and synthetic mode");
 
   const wire::DecodedFrame &status = frames[3];
   expect(status.header.run_id == 1U &&

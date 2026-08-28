@@ -172,8 +172,31 @@ struct Snapshot {
   std::size_t ready_depth = 0U;
   std::size_t packing_depth = 0U;
   std::uint32_t invariant_errors = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t stale_dma_completions = 0U;
   bool running = false;
   bool quiescent = true;
+};
+
+enum class StartStatus : std::uint8_t {
+  kOk,
+  kAlreadyRunning,
+  kNotQuiescent,
+  kResourceBusy,
+  kHardwareError,
+};
+
+// Runtime-facing ownership boundary for the target capture engine. START
+// readiness is deliberately read-only so CONFIGURE/START can reject resource
+// conflicts before touching clock gates, pin muxes, DMA, or trigger registers.
+class HardwareCapture : public RawWordSource {
+ public:
+  virtual StartStatus inspectStart() = 0;
+  virtual StartStatus start() = 0;
+  virtual StopReport stop() = 0;
+  virtual Snapshot rawSnapshot() = 0;
 };
 
 // Portable ownership core shared by the target ISR and the future batch

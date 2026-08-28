@@ -26,11 +26,10 @@ Accepted and verified on the Teensy 4.0 rig. The fixed production clock route
 is 24 MHz PERCLK through PIT0, XBARA1 input 56/output 0 with **rising-edge-only**
 DMA request generation, DMAMUX source 30, and eDMA channel 2. The optional
 IDLE-only clock diagnostic is advertised. The pad remap and raw capture ring
-are implemented behind an unadvertised target facade, and the cooperative batch
-packer now feeds the fixed packet queues with the normal packed GPIO layout. A
-second unadvertised, fail-closed capture diagnostic reuses that production path
-without driving D6-D13. Control-plane/physical-mode integration remains later
-Phase 06 work.
+are integrated as the advertised GPIO-only hardware source, and the
+cooperative batch packer feeds the fixed packet queues with the normal packed
+GPIO layout. The advertised fail-closed capture diagnostic reuses that
+production path without driving D6-D13.
 
 ## Context
 
@@ -316,7 +315,7 @@ capability metadata.
   OCRAM. The overflow policies trade retention—not live sampling or buffer
   safety—when downstream work falls behind.
 - The advertised GPIO clock diagnostic remains bounded to IDLE, never remaps
-  D6-D13, and reports isolated clock/register/count evidence. The new capture
-  diagnostic is still an unadvertised facade that reuses the raw ring and
-  restores safe inputs. Physical GPIO capability remains disabled until later
-  Phase 06 integration and streaming gates pass.
+  D6-D13, and reports isolated clock/register/count evidence. The advertised
+  capture diagnostic reuses the raw ring and restores safe inputs. Physical
+  GPIO CONFIGURE/START/STOP now owns the same declared route, rejects conflicts
+  before mutation, and exposes stage/resource/error evidence in INFO/STATUS.

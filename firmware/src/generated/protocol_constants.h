@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: a2da2fdd7617ec5ed496b1481620d457fa71ff3f3090089d49cb2bfab7dec8e3
+// Source SHA-256: 2662258599d7ac0686e646a006b0894a272e3809b705c3a6fbbef17b4e40279c
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "a2da2fdd7617ec5ed496b1481620d457fa71ff3f3090089d49cb2bfab7dec8e3";
+inline constexpr char kSourceSha256[] = "2662258599d7ac0686e646a006b0894a272e3809b705c3a6fbbef17b4e40279c";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -46,6 +46,21 @@ inline constexpr std::uint16_t kGpioClockMaxEventCount = 8192U;
 inline constexpr std::uint32_t kGpioClockMaxElapsedCycles = 60000000U;
 inline constexpr std::uint16_t kGpioClockDuplicateGuardEvents = 16U;
 inline constexpr std::uint32_t kGpioClockCountTolerance = 1U;
+inline constexpr std::uint8_t kGpioPackedWidthBits = 8U;
+inline constexpr std::uint8_t kGpioRawRingDepth = 4U;
+inline constexpr std::uint32_t kGpioRawSamplesPerBuffer = 4048U;
+inline constexpr std::uint32_t kGpioRawRingBytes = 64768U;
+inline constexpr std::uint8_t kGpioPackedRingDepth = 4U;
+inline constexpr std::uint32_t kGpioPackedRingBytes = 16256U;
+inline constexpr std::uint16_t kGpioPacketBufferCount = 200U;
+inline constexpr std::uint8_t kGpioPitChannel = 0U;
+inline constexpr std::uint8_t kGpioXbarInput = 56U;
+inline constexpr std::uint8_t kGpioXbarOutput = 0U;
+inline constexpr std::uint8_t kGpioXbarActiveEdge = 1U;
+inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
+inline constexpr std::uint8_t kGpioDmamuxSource = 30U;
+inline constexpr std::uint8_t kGpioEdmaPriority = 2U;
+inline constexpr std::uint32_t kGpioCaptureDiagnosticAnalysisSamples = 256U;
 inline constexpr std::size_t kAdcBytesPerPair = 4U;
 inline constexpr std::size_t kAdcPairsPerFrame = 1012U;
 inline constexpr std::uint8_t kAdcResolutionBits = 12U;
@@ -80,6 +95,7 @@ enum class FrameKind : std::uint8_t {
   kPingRequest = 22U,
   kChecksumBenchmarkRequest = 23U,
   kGpioClockDiagnosticRequest = 24U,
+  kGpioCaptureDiagnosticRequest = 25U,
   kInfoResponse = 144U,
   kConfigureResponse = 145U,
   kStartResponse = 146U,
@@ -89,6 +105,7 @@ enum class FrameKind : std::uint8_t {
   kPingResponse = 150U,
   kChecksumBenchmarkResponse = 151U,
   kGpioClockDiagnosticResponse = 152U,
+  kGpioCaptureDiagnosticResponse = 153U,
   kErrorResponse = 159U,
 };
 
@@ -102,6 +119,7 @@ enum class CommandKind : std::uint8_t {
   kPing = 22U,
   kChecksumBenchmark = 23U,
   kGpioClockDiagnostic = 24U,
+  kGpioCaptureDiagnostic = 25U,
 };
 
 enum class FrameFlag : std::uint16_t {
@@ -161,6 +179,7 @@ enum class Capability : std::uint32_t {
   kPing = 32U,
   kChecksumBenchmark = 64U,
   kGpioClockDiagnostic = 128U,
+  kGpioCaptureDiagnostic = 256U,
 };
 
 enum class Source : std::uint8_t {
@@ -214,14 +233,53 @@ enum class GpioClockError : std::uint32_t {
   kMeasurementOverflow = 16384U,
 };
 
+enum class GpioCaptureDiagnosticMode : std::uint8_t {
+  kNonDrivingCapture = 0U,
+  kSelfDrivenSweep = 1U,
+  kFixtureStimulus = 2U,
+};
+
+enum class GpioCaptureDiagnosticFlag : std::uint32_t {
+  kAvailable = 1U,
+  kDeclarationValid = 2U,
+  kOutputDrivePermitted = 4U,
+  kExternalStimulusDeclared = 8U,
+  kDmaCaptureExercised = 16U,
+  kPackedObservationExercised = 32U,
+  kOutputDriveExercised = 64U,
+  kExternalTransitionValidationExercised = 128U,
+  kFinalInputSafe = 256U,
+};
+
+enum class GpioCaptureError : std::uint32_t {
+  kFixtureDeclarationInvalid = 1U,
+  kUnsupportedFixtureMode = 2U,
+  kDwtUnavailable = 4U,
+  kResourceBusy = 8U,
+  kCaptureTimeout = 16U,
+  kCaptureFault = 32U,
+  kNoCompleteBuffer = 64U,
+  kDiagnosticLeaseError = 128U,
+  kCountMismatch = 256U,
+  kUnsafeConfiguredDirection = 512U,
+  kUnsafeInputRestore = 1024U,
+  kMappingMismatch = 2048U,
+  kUnexpectedOutputDrive = 4096U,
+  kExternalValidationMissing = 8192U,
+  kUnexpectedElectricalClaim = 16384U,
+  kCleanupFailed = 32768U,
+};
+
 inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr std::uint32_t kSupportedChecksumMask = 14U;
 inline constexpr std::uint16_t kKnownFrameFlagMask = 32783U;
-inline constexpr std::uint32_t kKnownCapabilityMask = 255U;
+inline constexpr std::uint32_t kKnownCapabilityMask = 511U;
 inline constexpr std::uint32_t kKnownGpioClockErrorMask = 32767U;
+inline constexpr std::uint32_t kKnownGpioCaptureDiagnosticFlagMask = 511U;
+inline constexpr std::uint32_t kKnownGpioCaptureErrorMask = 65535U;
 
 inline constexpr std::size_t kEmptyPayloadSize = 0U;
 inline constexpr std::size_t kAdcDataPayloadSize = 4048U;
@@ -240,7 +298,7 @@ inline constexpr std::size_t kResponsePrefixPayloadSize = 4U;
 inline constexpr std::size_t kResponsePrefixResponseStatusOffset = 0U;
 inline constexpr std::size_t kResponsePrefixReservedOffset = 1U;
 inline constexpr std::size_t kResponsePrefixErrorCodeOffset = 2U;
-inline constexpr std::size_t kInfoResponsePayloadSize = 98U;
+inline constexpr std::size_t kInfoResponsePayloadSize = 128U;
 inline constexpr std::size_t kInfoResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kInfoResponseReserved0Offset = 1U;
 inline constexpr std::size_t kInfoResponseErrorCodeOffset = 2U;
@@ -273,6 +331,24 @@ inline constexpr std::size_t kInfoResponseBoardIdOffset = 62U;
 inline constexpr std::size_t kInfoResponseMcuIdOffset = 64U;
 inline constexpr std::size_t kInfoResponseBuildIdOffset = 66U;
 inline constexpr std::size_t kInfoResponseBuildIdCount = 32U;
+inline constexpr std::size_t kInfoResponseGpioPackedWidthBitsOffset = 98U;
+inline constexpr std::size_t kInfoResponseGpioRawRingDepthOffset = 99U;
+inline constexpr std::size_t kInfoResponseGpioPackedRingDepthOffset = 100U;
+inline constexpr std::size_t kInfoResponseGpioCaptureDiagnosticModeOffset = 101U;
+inline constexpr std::size_t kInfoResponseGpioCaptureDiagnosticFlagsOffset = 102U;
+inline constexpr std::size_t kInfoResponseGpioRawSamplesPerBufferOffset = 104U;
+inline constexpr std::size_t kInfoResponseGpioRawRingBytesOffset = 108U;
+inline constexpr std::size_t kInfoResponseGpioPackedRingBytesOffset = 112U;
+inline constexpr std::size_t kInfoResponseGpioPacketBufferCountOffset = 116U;
+inline constexpr std::size_t kInfoResponseReserved3Offset = 118U;
+inline constexpr std::size_t kInfoResponseGpioPitChannelOffset = 120U;
+inline constexpr std::size_t kInfoResponseGpioXbarInputOffset = 121U;
+inline constexpr std::size_t kInfoResponseGpioXbarOutputOffset = 122U;
+inline constexpr std::size_t kInfoResponseGpioEdmaChannelOffset = 123U;
+inline constexpr std::size_t kInfoResponseGpioDmamuxSourceOffset = 124U;
+inline constexpr std::size_t kInfoResponseGpioEdmaPriorityOffset = 125U;
+inline constexpr std::size_t kInfoResponseGpioXbarActiveEdgeOffset = 126U;
+inline constexpr std::size_t kInfoResponseReserved4Offset = 127U;
 inline constexpr std::size_t kConfigureResponsePayloadSize = 12U;
 inline constexpr std::size_t kConfigureResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kConfigureResponseReserved0Offset = 1U;
@@ -282,7 +358,7 @@ inline constexpr std::size_t kConfigureResponseSourceOffset = 5U;
 inline constexpr std::size_t kConfigureResponseDataChecksumAlgorithmOffset = 6U;
 inline constexpr std::size_t kConfigureResponseReserved1Offset = 7U;
 inline constexpr std::size_t kConfigureResponseDataFrameBytesOffset = 8U;
-inline constexpr std::size_t kStatusResponsePayloadSize = 56U;
+inline constexpr std::size_t kStatusResponsePayloadSize = 172U;
 inline constexpr std::size_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::size_t kStatusResponseErrorCodeOffset = 2U;
@@ -298,6 +374,31 @@ inline constexpr std::size_t kStatusResponseGpioItemsDroppedOffset = 36U;
 inline constexpr std::size_t kStatusResponseParserErrorsOffset = 44U;
 inline constexpr std::size_t kStatusResponseTransportErrorsOffset = 48U;
 inline constexpr std::size_t kStatusResponseStatsGenerationOffset = 52U;
+inline constexpr std::size_t kStatusResponseGpioSamplesCapturedOffset = 56U;
+inline constexpr std::size_t kStatusResponseGpioSamplesPackedOffset = 64U;
+inline constexpr std::size_t kStatusResponseGpioSamplesFramedOffset = 72U;
+inline constexpr std::size_t kStatusResponseGpioSamplesTransmittedOffset = 80U;
+inline constexpr std::size_t kStatusResponseGpioRawSamplesLostOffset = 88U;
+inline constexpr std::size_t kStatusResponseGpioPackerSamplesDroppedOffset = 96U;
+inline constexpr std::size_t kStatusResponseGpioRawRingOverrunsOffset = 104U;
+inline constexpr std::size_t kStatusResponseGpioDmaMajorLoopsOffset = 112U;
+inline constexpr std::size_t kStatusResponseGpioRawReadyDepthOffset = 120U;
+inline constexpr std::size_t kStatusResponseGpioRawReadyHighWaterOffset = 122U;
+inline constexpr std::size_t kStatusResponseGpioPackedReadyDepthOffset = 124U;
+inline constexpr std::size_t kStatusResponseGpioPackedReadyHighWaterOffset = 126U;
+inline constexpr std::size_t kStatusResponsePacketReadyDepthOffset = 128U;
+inline constexpr std::size_t kStatusResponsePacketTransmitDepthOffset = 130U;
+inline constexpr std::size_t kStatusResponsePacketOwnedHighWaterOffset = 132U;
+inline constexpr std::size_t kStatusResponseReserved1Offset = 134U;
+inline constexpr std::size_t kStatusResponseGpioHardwareErrorsOffset = 136U;
+inline constexpr std::size_t kStatusResponseGpioRawInvariantErrorsOffset = 140U;
+inline constexpr std::size_t kStatusResponseGpioPackerSourceErrorsOffset = 144U;
+inline constexpr std::size_t kStatusResponseGpioPackerPipelineErrorsOffset = 148U;
+inline constexpr std::size_t kStatusResponseGpioPackerChronologyErrorsOffset = 152U;
+inline constexpr std::size_t kStatusResponseGpioResourceConflictsOffset = 156U;
+inline constexpr std::size_t kStatusResponseGpioStartErrorsOffset = 160U;
+inline constexpr std::size_t kStatusResponseGpioStopErrorsOffset = 164U;
+inline constexpr std::size_t kStatusResponseGpioStaleDmaCompletionsOffset = 168U;
 inline constexpr std::size_t kStopResponsePayloadSize = 8U;
 inline constexpr std::size_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStopResponseReserved0Offset = 1U;
@@ -401,6 +502,55 @@ inline constexpr std::size_t kGpioClockDiagnosticResponseEdmaChannelOffset = 135
 inline constexpr std::size_t kGpioClockDiagnosticResponseDmamuxSourceOffset = 136U;
 inline constexpr std::size_t kGpioClockDiagnosticResponseEdmaPriorityOffset = 137U;
 inline constexpr std::size_t kGpioClockDiagnosticResponseTcdSoffOffset = 138U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponsePayloadSize = 144U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseResponseStatusOffset = 0U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseReserved0Offset = 1U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseErrorCodeOffset = 2U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseModeOffset = 4U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseMetadataKindOffset = 5U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseDriveSafetyOffset = 6U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseStimulusKindOffset = 7U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseFixtureIdentityOffset = 8U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseStimulusIdentityOffset = 12U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseHardwareErrorFlagsOffset = 16U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseDiagnosticFlagsOffset = 20U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseDwtCounterHzOffset = 24U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseDwtElapsedCyclesOffset = 28U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseDmaSamplesCapturedOffset = 32U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseCompleteSamplesRetainedOffset = 40U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseSamplesAnalyzedOffset = 44U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseStoppedPartialSamplesOffset = 48U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseRawWordAndOffset = 52U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseRawWordOrOffset = 56U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseObservedTransitionsOffset = 60U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseMappingValuesCheckedOffset = 64U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseMappingFailuresOffset = 66U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseUnstableSamplesOffset = 68U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseReserved1Offset = 70U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponsePackedValueAndOffset = 72U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponsePackedValueOrOffset = 73U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseFirstPackedValueOffset = 74U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseLastPackedValueOffset = 75U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpr27BeforeOffset = 76U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpr27ConfiguredOffset = 80U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpr27AfterOffset = 84U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpio2GdirBeforeOffset = 88U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpio2GdirConfiguredOffset = 92U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpio2GdirAfterOffset = 96U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpio2PsrBeforeOffset = 100U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpio2PsrConfiguredOffset = 104U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseGpio2PsrAfterOffset = 108U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponsePitLdvalConfiguredOffset = 112U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponsePitTctrlConfiguredOffset = 116U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseDmamuxChcfgConfiguredOffset = 120U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseDmaErqConfiguredOffset = 124U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseDmaErrFinalOffset = 128U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseTcdCiterConfiguredOffset = 132U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseTcdBiterConfiguredOffset = 134U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseTcdCsrConfiguredOffset = 136U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseEdmaPriorityConfiguredOffset = 138U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseReserved2Offset = 139U;
+inline constexpr std::size_t kGpioCaptureDiagnosticResponseAnalysisSampleLimitOffset = 140U;
 inline constexpr std::size_t kErrorResponsePayloadSize = 8U;
 inline constexpr std::size_t kErrorResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kErrorResponseReserved0Offset = 1U;
@@ -433,6 +583,8 @@ constexpr std::uint16_t allowedFlags(FrameKind kind) {
       return 0U;
     case FrameKind::kGpioClockDiagnosticRequest:
       return 0U;
+    case FrameKind::kGpioCaptureDiagnosticRequest:
+      return 0U;
     case FrameKind::kInfoResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kConfigureResponse:
@@ -450,6 +602,8 @@ constexpr std::uint16_t allowedFlags(FrameKind kind) {
     case FrameKind::kChecksumBenchmarkResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kGpioClockDiagnosticResponse:
+      return static_cast<std::uint16_t>(FrameFlag::kResponseError);
+    case FrameKind::kGpioCaptureDiagnosticResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kErrorResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
@@ -477,6 +631,8 @@ constexpr FrameKind requestFrameKind(CommandKind command) {
       return FrameKind::kChecksumBenchmarkRequest;
     case CommandKind::kGpioClockDiagnostic:
       return FrameKind::kGpioClockDiagnosticRequest;
+    case CommandKind::kGpioCaptureDiagnostic:
+      return FrameKind::kGpioCaptureDiagnosticRequest;
   }
   return FrameKind::kInfoRequest;
 }
@@ -501,6 +657,8 @@ constexpr FrameKind responseFrameKind(CommandKind command) {
       return FrameKind::kChecksumBenchmarkResponse;
     case CommandKind::kGpioClockDiagnostic:
       return FrameKind::kGpioClockDiagnosticResponse;
+    case CommandKind::kGpioCaptureDiagnostic:
+      return FrameKind::kGpioCaptureDiagnosticResponse;
   }
   return FrameKind::kInfoResponse;
 }
