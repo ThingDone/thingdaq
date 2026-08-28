@@ -488,7 +488,6 @@ Result validateResponsePrefix(const FrameHeader &header, ByteView payload) {
 
 Result validateInfo(ByteView payload) {
   if (payload.data[protocol_v1::kInfoResponseReserved0Offset] != 0U ||
-      payload.data[protocol_v1::kInfoResponseReserved1Offset] != 0U ||
       payload.data[protocol_v1::kInfoResponseReserved2Offset] != 0U ||
       !isKnownState(payload.data[protocol_v1::kInfoResponseDeviceStateOffset]) ||
       payload.data[protocol_v1::kInfoResponseDeviceStateOffset] ==
@@ -505,6 +504,11 @@ Result validateInfo(ByteView payload) {
           protocol_v1::kAdcContainerBits / 8U ||
       payload.data[protocol_v1::kInfoResponseGpioPinCountOffset] !=
           protocol_v1::kInfoResponseGpioPinMapCount) {
+    return badPayload();
+  }
+  const auto data_checksum = static_cast<protocol_v1::ChecksumAlgorithm>(
+      payload.data[protocol_v1::kInfoResponseDataChecksumAlgorithmOffset]);
+  if (!isSupportedChecksum(data_checksum)) {
     return badPayload();
   }
 
@@ -1428,6 +1432,8 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
       response.adc_container_bytes;
   payload[protocol_v1::kInfoResponseGpioPinCountOffset] =
       static_cast<std::uint8_t>(response.gpio_pin_map.size());
+  payload[protocol_v1::kInfoResponseDataChecksumAlgorithmOffset] =
+      static_cast<std::uint8_t>(response.data_checksum_algorithm);
   for (std::size_t index = 0U; index < response.gpio_pin_map.size(); ++index) {
     payload[protocol_v1::kInfoResponseGpioPinMapOffset + index] =
         response.gpio_pin_map[index];

@@ -137,6 +137,10 @@ void testBootAndInfo() {
   expect(decoded.payload
              .data[constants::kInfoResponseSupportedSourceMaskOffset] == 2U,
          "INFO advertises only the implemented synthetic source");
+  expect(decoded.payload
+             .data[constants::kInfoResponseDataChecksumAlgorithmOffset] ==
+             static_cast<std::uint8_t>(constants::kDefaultChecksumAlgorithm),
+         "IDLE INFO reports the generated default data checksum");
 
   std::uint32_t value = 0U;
   expect(wire::loadU32(decoded.payload,
@@ -503,6 +507,17 @@ void testConfigurationValidationAndAtomicity() {
              state.appliedConfiguration().data_checksum_algorithm ==
                  constants::ChecksumAlgorithm::kCrc32IsoHdlc,
          "CRC-32/ISO-HDLC can replace a configured checksum atomically");
+  expect(state.dispatch(request(constants::CommandKind::kInfo, request_id++),
+                        response)
+             .commandAccepted(),
+         "INFO succeeds after selecting CRC-32/ISO-HDLC");
+  const wire::DecodedFrame crc_info =
+      decodeResponse(response, "configured checksum INFO");
+  expect(crc_info.payload
+             .data[constants::kInfoResponseDataChecksumAlgorithmOffset] ==
+             static_cast<std::uint8_t>(
+                 constants::ChecksumAlgorithm::kCrc32IsoHdlc),
+         "CONFIGURED INFO exposes the selected data checksum");
   expect(state.dispatch(configureRequest(request_id++, adc), response)
              .commandAccepted() &&
              state.appliedConfiguration().stream_mask ==

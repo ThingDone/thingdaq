@@ -655,10 +655,7 @@ class BackgroundReader:
                     if isinstance(message, CommandResponse):
                         self._dispatch_response(message)
                     elif isinstance(message, (AdcBlock, GpioBlock)):
-                        self._dispatch_block(
-                            message,
-                            frame.header.checksum_algorithm,
-                        )
+                        self._dispatch_block(message)
                     else:
                         self._dispatch_event(message)
                 except ReaderProtocolError as error:
@@ -722,7 +719,6 @@ class BackgroundReader:
     def _dispatch_block(
         self,
         block: DataBlock,
-        checksum_algorithm: constants.ChecksumAlgorithm,
     ) -> None:
         with self._condition:
             if isinstance(block, AdcBlock):
@@ -736,9 +732,10 @@ class BackgroundReader:
                 else:
                     self._gpio_stale_blocks_discarded += 1
                 return
-            if checksum_algorithm != self._active_checksum_algorithm:
+            if block.checksum_algorithm != self._active_checksum_algorithm:
                 raise ReaderProtocolError(
-                    f"run {block.run_id} data used {checksum_algorithm.name}; "
+                    f"run {block.run_id} data used "
+                    f"{block.checksum_algorithm.name}; "
                     f"configured algorithm is {self._active_checksum_algorithm.name}"
                 )
             if len(self._blocks) >= self._max_queued_blocks:

@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: e890012559dbe4934f61c69554dc7214a41b49108c765c89ba1923ff9a1354d9
+// Source SHA-256: 72da74093b5bd775381bb63b1a501da2fc1242ae9d2ec2cbbb6ef01aea771ac4
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "e890012559dbe4934f61c69554dc7214a41b49108c765c89ba1923ff9a1354d9";
+inline constexpr char kSourceSha256[] = "72da74093b5bd775381bb63b1a501da2fc1242ae9d2ec2cbbb6ef01aea771ac4";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -229,7 +229,7 @@ inline constexpr std::size_t kInfoResponseGpioSamplePeriodTicksOffset = 40U;
 inline constexpr std::size_t kInfoResponseAdcResolutionBitsOffset = 42U;
 inline constexpr std::size_t kInfoResponseAdcContainerBytesOffset = 43U;
 inline constexpr std::size_t kInfoResponseGpioPinCountOffset = 44U;
-inline constexpr std::size_t kInfoResponseReserved1Offset = 45U;
+inline constexpr std::size_t kInfoResponseDataChecksumAlgorithmOffset = 45U;
 inline constexpr std::size_t kInfoResponseGpioPinMapOffset = 46U;
 inline constexpr std::size_t kInfoResponseGpioPinMapCount = 8U;
 inline constexpr std::size_t kInfoResponseHardwareSerialOffset = 54U;

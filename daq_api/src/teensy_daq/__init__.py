@@ -17,6 +17,11 @@ from ._generated.protocol_constants import (
     Source,
     StreamMask,
 )
+from .checksum import (
+    HOST_SUPPORTED_CHECKSUM_ALGORITHMS,
+    HOST_SUPPORTED_CHECKSUM_MASK,
+    ChecksumBackend,
+)
 from .client import (
     BlockTimeoutError,
     CommandTimeoutError,
@@ -99,6 +104,7 @@ from .protocol import (
     ParserCounters,
     ProtocolError,
     UnsupportedChecksumError,
+    checksum_backend,
     compute_checksum,
     decode_frame,
     encode_frame,
@@ -162,6 +168,8 @@ __version__ = "0.0.0"
 __all__ = [
     "DEFAULT_DISCOVERY_TIMEOUT",
     "DEFAULT_MAX_QUEUED_BLOCKS",
+    "HOST_SUPPORTED_CHECKSUM_ALGORITHMS",
+    "HOST_SUPPORTED_CHECKSUM_MASK",
     "PHASE03_MINIMUM_FIRMWARE_VERSION",
     "TEENSY_DAQ_PRODUCT",
     "TEENSY_USB_SERIAL_PID",
@@ -181,6 +189,7 @@ __all__ = [
     "Capability",
     "ChecksumAlgorithm",
     "ChecksumAlgorithmMismatchError",
+    "ChecksumBackend",
     "ChecksumBenchmarkRequest",
     "ChecksumBenchmarkResult",
     "ChecksumMismatchError",
@@ -276,6 +285,7 @@ __all__ = [
     "UnexpectedStreamGapError",
     "UnexpectedStreamValidationError",
     "UnsupportedChecksumError",
+    "checksum_backend",
     "compute_checksum",
     "decode_frame",
     "decode_message",

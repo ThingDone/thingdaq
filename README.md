@@ -108,7 +108,9 @@ python3 tools/generate_protocol.py --check
 Phase 05 adds stateless firmware candidates for Adler-32, CRC-32C, and
 CRC-32/ISO-HDLC behind one allocation-free checksum interface. INFO advertises
 all three for data frames, CONFIGURE selects one, and each data header carries
-the selected ID; every command and response remains unambiguously protected by
+the selected ID. INFO exposes the generated default in IDLE and the applied
+selection in CONFIGURED/RUNNING; STATUS and Python ADC/GPIO block metadata
+repeat it. Every command and response remains unambiguously protected by
 bootstrap Adler-32. Reconfiguration returns `BUSY` until prior-run frames have
 drained. The pinned-core, Cortex-M7, i.MX RT1062,
 FastCRC, and hardware-accelerator findings are recorded in
@@ -125,6 +127,16 @@ cache setup, and code/table/RAM cost. Vectors cover empty input, canonical
 header-plus-payload. Separate 4,096-byte buffers exercise native DTCM and
 DMA-visible OCRAM in hot and meaningful cold-invalidated states. The protocol
 and method are specified in `doc/protocol/protocol-v1.md`.
+
+The Python codec uses exact standard-library C implementations for Adler-32
+and CRC-32/ISO-HDLC and a bounded table-driven fallback for CRC-32C. Its
+machine-readable benchmark measures full 4,096-byte ADC and GPIO encode and
+validation paths separately; it records backend/platform provenance but never
+uses host-specific timing to redefine wire compatibility:
+
+```bash
+PYTHONPATH=daq_api/src .venv/bin/python -m teensy_daq.checksum_benchmark
+```
 
 The portable firmware control module implements bounded BOOT → IDLE,
 CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
@@ -248,7 +260,12 @@ checks every ADC/GPIO frame as it arrives, interleaves bounded STATUS requests,
 and prints JSON `EVENT`, expected-versus-actual `METRIC`, and final `SUMMARY`
 records. It defaults to a 10-second capture; set
 `SYNTHETIC_CAPTURE_SECONDS=60` for the soak. Optional `EXPECTED_BUILD_ID` and
-`EXPECTED_HARDWARE_SERIAL` pins reject a flashed artifact or board mismatch.
+`EXPECTED_HARDWARE_SERIAL` pins reject a flashed artifact or board mismatch;
+`SYNTHETIC_CHECKSUM_ALGORITHM` accepts `ADLER32`, `CRC32C`, or
+`CRC32_ISO_HDLC` and currently defaults to production Adler-32. The rig
+uses zlib only for exact matching variants, retains its own bounded pure-Python
+fallbacks, and emits separate non-grading host encode/validation benchmark
+events before acquisition.
 The program enforces the 1% per-source and combined payload/framed rate bounds,
 100 ms STATUS p99 and 250 ms maximum response latency, zero parser/formula/gap/
 drop errors, bounded process RSS, a finite post-STOP drain, and exact final

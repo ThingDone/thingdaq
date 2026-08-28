@@ -9,6 +9,7 @@ from enum import Enum, IntEnum
 from typing import Generic, TypeVar, overload
 
 from ._generated import protocol_constants as constants
+from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .protocol import Frame, FrameValidationError
 
 _CONFIGURATION = struct.Struct("<BBBBI")
@@ -103,6 +104,10 @@ class DAQConfiguration:
             )
         if checksum is constants.ChecksumAlgorithm.NONE_RESERVED:
             raise ValueError("configuration cannot select checksum ID zero")
+        if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ValueError(
+                f"host has no implementation for checksum algorithm {checksum.name}"
+            )
         if (
             not isinstance(self.data_frame_bytes, int)
             or isinstance(self.data_frame_bytes, bool)
@@ -218,6 +223,10 @@ class ChecksumBenchmarkRequest:
         object.__setattr__(self, "cache_state", cache_state)
         if checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
             raise ValueError("checksum benchmark algorithm is not enabled")
+        if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ValueError(
+                f"host has no implementation for checksum algorithm {checksum.name}"
+            )
         _unsigned("batch_count", self.batch_count, 16)
         _unsigned("iterations_per_batch", self.iterations_per_batch, 16)
         if (
@@ -583,6 +592,18 @@ class DeviceCapabilities:
             raise ValueError("checksum is not a protocol-v1 algorithm") from exc
         return bool(self.supported_checksum_mask & (1 << int(selected)))
 
+    @property
+    def supported_checksum_algorithms(
+        self,
+    ) -> tuple[constants.ChecksumAlgorithm, ...]:
+        """Return advertised checksum IDs in stable numeric order."""
+
+        return tuple(
+            algorithm
+            for algorithm in sorted(constants.SUPPORTED_CHECKSUM_ALGORITHMS, key=int)
+            if self.supports_checksum(algorithm)
+        )
+
     def supports(self, capability: constants.Capability | int) -> bool:
         """Return whether every requested capability bit is advertised."""
 
@@ -610,6 +631,9 @@ class DeviceInfo:
     )
     supported_source_mask: int = 0x03
     supported_checksum_mask: int = constants.SUPPORTED_CHECKSUM_MASK
+    data_checksum_algorithm: constants.ChecksumAlgorithm = (
+        constants.DEFAULT_CHECKSUM_ALGORITHM
+    )
     capability_bits: constants.Capability = (
         constants.Capability.ADC_STREAM
         | constants.Capability.GPIO_STREAM
@@ -656,6 +680,20 @@ class DeviceInfo:
         # Constructing the nested view validates and normalizes every
         # capability/layout field at this outer model boundary too.
         capabilities = self.capabilities
+        if isinstance(self.data_checksum_algorithm, bool):
+            raise TypeError("INFO checksum algorithm is not supported by this host")
+        try:
+            data_checksum = constants.ChecksumAlgorithm(self.data_checksum_algorithm)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("INFO checksum algorithm is unknown") from exc
+        if data_checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ValueError(
+                "host has no implementation for checksum algorithm "
+                f"{data_checksum.name}"
+            )
+        if not capabilities.supports_checksum(data_checksum):
+            raise ValueError("INFO selected checksum is not advertised")
+        object.__setattr__(self, "data_checksum_algorithm", data_checksum)
         object.__setattr__(
             self,
             "supported_stream_mask",
@@ -691,6 +729,11 @@ class DeviceInfo:
         """Return whether INFO advertises the requested source ID."""
 
         return self.capabilities.supports_source(source)
+
+    def supports_checksum(self, algorithm: constants.ChecksumAlgorithm | int) -> bool:
+        """Return whether INFO advertises the requested checksum ID."""
+
+        return self.capabilities.supports_checksum(algorithm)
 
     def supports_capability(self, capability: constants.Capability | int) -> bool:
         """Return whether INFO advertises every bit in ``capability``."""
@@ -739,6 +782,9 @@ class DeviceInfo:
             self.adc_container_bytes
         )
         payload[constants.INFO_RESPONSE_GPIO_PIN_COUNT_OFFSET] = len(self.gpio_pin_map)
+        payload[constants.INFO_RESPONSE_DATA_CHECKSUM_ALGORITHM_OFFSET] = int(
+            self.data_checksum_algorithm
+        )
         pin_start = constants.INFO_RESPONSE_GPIO_PIN_MAP_OFFSET
         payload[pin_start : pin_start + len(self.gpio_pin_map)] = bytes(
             self.gpio_pin_map
@@ -811,6 +857,9 @@ class DeviceInfo:
                 payload_bytes,
                 constants.INFO_RESPONSE_SUPPORTED_CHECKSUM_MASK_OFFSET,
             )[0],
+            data_checksum_algorithm=constants.ChecksumAlgorithm(
+                payload_bytes[constants.INFO_RESPONSE_DATA_CHECKSUM_ALGORITHM_OFFSET]
+            ),
             capability_bits=constants.Capability(
                 struct.unpack_from(
                     "<I",
@@ -928,6 +977,10 @@ class Status:
             )
         if checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
             raise ValueError("status checksum algorithm is not enabled")
+        if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ValueError(
+                f"host has no implementation for checksum algorithm {checksum.name}"
+            )
         if (
             not isinstance(self.data_frame_bytes, int)
             or isinstance(self.data_frame_bytes, bool)
@@ -960,6 +1013,12 @@ class Status:
             transport_errors=self.transport_errors,
             stats_generation=self.stats_generation,
         )
+
+    @property
+    def checksum_algorithm(self) -> constants.ChecksumAlgorithm:
+        """Alias matching the checksum metadata carried by each data block."""
+
+        return self.data_checksum_algorithm
 
     def to_payload(self) -> bytes:
         """Encode a successful 56-byte GET_STATUS response payload."""
@@ -1234,6 +1293,9 @@ class ADCBlock:
     first_sample_ticks: int
     payload: bytes
     flags: constants.FrameFlag = constants.FrameFlag.NONE
+    checksum_algorithm: constants.ChecksumAlgorithm = (
+        constants.DEFAULT_CHECKSUM_ALGORITHM
+    )
 
     def __post_init__(self) -> None:
         _unsigned("run_id", self.run_id, 32)
@@ -1249,6 +1311,17 @@ class ADCBlock:
             raise ValueError("ADC payload must be bytes-like") from exc
         object.__setattr__(self, "payload", payload)
         object.__setattr__(self, "flags", _validated_data_flags(self.flags))
+        if isinstance(self.checksum_algorithm, bool):
+            raise TypeError("ADC block checksum algorithm is unsupported")
+        try:
+            checksum = constants.ChecksumAlgorithm(self.checksum_algorithm)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("ADC block checksum algorithm is unknown") from exc
+        if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ValueError(
+                f"host has no implementation for checksum algorithm {checksum.name}"
+            )
+        object.__setattr__(self, "checksum_algorithm", checksum)
         if len(payload) != constants.ADC_DATA_PAYLOAD_SIZE:
             raise ValueError("ADC blocks require exactly 1012 sample pairs")
         code_mask = (1 << constants.ADC_RESOLUTION_BITS) - 1
@@ -1268,7 +1341,14 @@ class ADCBlock:
             first_sample_ticks=frame.header.first_sample_ticks,
             payload=frame.payload,
             flags=frame.header.flags,
+            checksum_algorithm=frame.header.checksum_algorithm,
         )
+
+    @property
+    def data_checksum_algorithm(self) -> constants.ChecksumAlgorithm:
+        """The exact algorithm that validated this frame's trailer."""
+
+        return self.checksum_algorithm
 
     @property
     def item_count(self) -> int:
@@ -1389,6 +1469,9 @@ class GPIOBlock:
     first_sample_ticks: int
     payload: bytes
     flags: constants.FrameFlag = constants.FrameFlag.NONE
+    checksum_algorithm: constants.ChecksumAlgorithm = (
+        constants.DEFAULT_CHECKSUM_ALGORITHM
+    )
 
     def __post_init__(self) -> None:
         _unsigned("run_id", self.run_id, 32)
@@ -1404,6 +1487,17 @@ class GPIOBlock:
             raise ValueError("GPIO payload must be bytes-like") from exc
         object.__setattr__(self, "payload", payload)
         object.__setattr__(self, "flags", _validated_data_flags(self.flags))
+        if isinstance(self.checksum_algorithm, bool):
+            raise TypeError("GPIO block checksum algorithm is unsupported")
+        try:
+            checksum = constants.ChecksumAlgorithm(self.checksum_algorithm)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("GPIO block checksum algorithm is unknown") from exc
+        if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ValueError(
+                f"host has no implementation for checksum algorithm {checksum.name}"
+            )
+        object.__setattr__(self, "checksum_algorithm", checksum)
         if len(payload) != constants.GPIO_DATA_PAYLOAD_SIZE:
             raise ValueError("GPIO blocks require exactly 4048 packed samples")
 
@@ -1417,7 +1511,14 @@ class GPIOBlock:
             first_sample_ticks=frame.header.first_sample_ticks,
             payload=frame.payload,
             flags=frame.header.flags,
+            checksum_algorithm=frame.header.checksum_algorithm,
         )
+
+    @property
+    def data_checksum_algorithm(self) -> constants.ChecksumAlgorithm:
+        """The exact algorithm that validated this frame's trailer."""
+
+        return self.checksum_algorithm
 
     @property
     def item_count(self) -> int:

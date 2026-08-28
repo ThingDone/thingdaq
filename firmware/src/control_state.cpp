@@ -343,6 +343,8 @@ protocol::InfoResponse ControlState::infoResponse() const {
       capabilities::kMetadata.gpio_sample_period_ticks);
   response.adc_resolution_bits = capabilities::kMetadata.adc_resolution_bits;
   response.adc_container_bytes = capabilities::kMetadata.adc_container_bytes;
+  response.data_checksum_algorithm =
+      appliedConfiguration().data_checksum_algorithm;
   for (std::size_t index = 0U; index < response.gpio_pin_map.size(); ++index) {
     response.gpio_pin_map[index] =
         capabilities::kMetadata.gpio_pins_by_bit[index];

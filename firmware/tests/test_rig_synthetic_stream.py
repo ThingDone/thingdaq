@@ -244,6 +244,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
         bad_frame = rig.Frame(
             kind=frame.kind,
             flags=frame.flags,
+            checksum_algorithm=frame.checksum_algorithm,
             run_id=frame.run_id,
             sequence=frame.sequence,
             request_id=frame.request_id,
@@ -252,12 +253,12 @@ class RigScriptIndependenceTests(unittest.TestCase):
             payload=bytes(bad_payload),
             checksum=frame.checksum,
         )
-        validator = rig.SyntheticValidator(frame.run_id)
+        validator = rig.SyntheticValidator(frame.run_id, frame.checksum_algorithm)
         with self.assertRaisesRegex(rig.ProtocolFailure, "ADC pair"):
             validator.accept(bad_frame)
 
     def test_running_status_uses_the_pre_request_receive_floor(self) -> None:
-        validator = rig.SyntheticValidator(7)
+        validator = rig.SyntheticValidator(7, rig.CHECKSUM_ADLER32)
         validator.adc.frames = 15
         validator.gpio.frames = 16
         status = rig.StatusSnapshot(
@@ -277,6 +278,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
         frame = rig.Frame(
             kind=rig.GET_STATUS_RESPONSE,
             flags=0,
+            checksum_algorithm=rig.BOOTSTRAP_CHECKSUM,
             run_id=7,
             sequence=0,
             request_id=1,
@@ -295,13 +297,66 @@ class RigScriptIndependenceTests(unittest.TestCase):
 
     def test_validator_tracks_largest_receive_gap(self) -> None:
         frame = rig.FrameParser().feed((FIXTURES / "adc-data.bin").read_bytes())[0]
-        validator = rig.SyntheticValidator(frame.run_id)
+        validator = rig.SyntheticValidator(frame.run_id, frame.checksum_algorithm)
         validator.last_receive_time = 10.0
 
         with patch.object(rig.time, "monotonic", return_value=10.125):
             validator.accept(frame)
 
         self.assertEqual(0.125, validator.maximum_receive_gap_seconds)
+
+    def test_independent_dispatch_and_host_benchmark_cover_every_algorithm(
+        self,
+    ) -> None:
+        for algorithm in sorted(rig.SUPPORTED_CHECKSUMS):
+            with self.subTest(algorithm=rig.CHECKSUM_NAMES[algorithm]):
+                self.assertEqual(
+                    rig.compute_checksum_fallback(b"123456789", algorithm),
+                    rig.compute_checksum(b"123456789", algorithm),
+                )
+                wire = rig._encode_representative_data_frame(
+                    rig.GPIO_DATA,
+                    algorithm,
+                )
+                decoded = rig.FrameParser().feed(wire)
+                self.assertEqual(1, len(decoded))
+                self.assertEqual(algorithm, decoded[0].checksum_algorithm)
+
+                benchmark = rig.benchmark_host_checksum_paths(
+                    algorithm,
+                    batch_count=1,
+                    iterations_per_batch=1,
+                    warmup_operations=0,
+                )
+                self.assertEqual(2, len(benchmark))
+                self.assertTrue(
+                    all(
+                        not item["performance_is_wire_compatibility"]
+                        for item in benchmark
+                    )
+                )
+                self.assertTrue(
+                    all(
+                        item["encode"]["minimum_bytes_per_second"] > 0
+                        for item in benchmark
+                    )
+                )
+                self.assertTrue(
+                    all(
+                        item["validation"]["minimum_bytes_per_second"] > 0
+                        for item in benchmark
+                    )
+                )
+
+        with self.assertRaisesRegex(ValueError, "processed-byte bound"):
+            rig.benchmark_host_checksum_paths(
+                rig.CHECKSUM_ADLER32,
+                batch_count=32,
+                iterations_per_batch=4_096,
+                warmup_operations=4_096,
+            )
+        with self.assertRaisesRegex(rig.ProtocolFailure, "host lacks"):
+            rig.compute_checksum(b"payload", 0xFF)
 
     def test_full_program_streams_statuses_stops_and_reconciles(self) -> None:
         fake = PacedRigSerial()
@@ -332,6 +387,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
         self.assertIn('"name":"latency.status_p99_seconds","pass":true', report)
         self.assertIn('"name":"memory.peak_rss_growth_bytes","pass":true', report)
         self.assertIn('"event":"capture_complete"', report)
+        self.assertIn('"event":"host_checksum_benchmark"', report)
         self.assertIn('"result":"PASS"', report)
         self.assertFalse(fake.is_open)
         self.assertIn(0, fake.write_counts)

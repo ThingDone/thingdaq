@@ -80,7 +80,7 @@ def _info_payload() -> bytes:
         1_000_000,
         4_000_000,
     )
-    struct.pack_into("<HHHBBBB", payload, 36, 8, 4, 2, 12, 2, 8, 0)
+    struct.pack_into("<HHHBBBB", payload, 36, 8, 4, 2, 12, 2, 8, 1)
     payload[46:54] = bytes(range(6, 14))
     struct.pack_into("<I4BHH", payload, 54, 0x12345678, 0, 0, 0, 0, 0, 0)
     build_id = b"synthetic-golden-v1"

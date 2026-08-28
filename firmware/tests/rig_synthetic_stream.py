@@ -54,6 +54,26 @@ DATA_PAYLOAD_BYTES = 4048
 MAX_CONTROL_FRAME_BYTES = 1024
 MAX_FRAME_BYTES = DATA_FRAME_BYTES
 CHECKSUM_ADLER32 = 1
+CHECKSUM_CRC32C = 2
+CHECKSUM_CRC32_ISO_HDLC = 3
+BOOTSTRAP_CHECKSUM = CHECKSUM_ADLER32
+DEFAULT_DATA_CHECKSUM = CHECKSUM_ADLER32
+SUPPORTED_CHECKSUMS = frozenset(
+    {CHECKSUM_ADLER32, CHECKSUM_CRC32C, CHECKSUM_CRC32_ISO_HDLC}
+)
+CHECKSUM_NAMES = {
+    CHECKSUM_ADLER32: "ADLER32",
+    CHECKSUM_CRC32C: "CRC32C",
+    CHECKSUM_CRC32_ISO_HDLC: "CRC32_ISO_HDLC",
+}
+CHECKSUM_BACKENDS = {
+    CHECKSUM_ADLER32: ("zlib.adler32", True),
+    CHECKSUM_CRC32C: ("python.table.crc32c", False),
+    CHECKSUM_CRC32_ISO_HDLC: ("zlib.crc32", True),
+}
+HOST_BENCHMARK_BATCH_COUNT = 3
+HOST_BENCHMARK_ITERATIONS_PER_BATCH = 4
+HOST_BENCHMARK_WARMUP_OPERATIONS = 2
 
 TIMESTAMP_HZ = 8_000_000
 ADC_PAIR_RATE_HZ = 1_000_000
@@ -179,6 +199,83 @@ class DeadlineExpired(ProtocolFailure):
     """A finite serial operation did not complete by its deadline."""
 
 
+def _make_reflected_crc_table(polynomial: int) -> tuple[int, ...]:
+    table: list[int] = []
+    for index in range(256):
+        remainder = index
+        for _ in range(8):
+            remainder = (remainder >> 1) ^ (polynomial if remainder & 1 else 0)
+        table.append(remainder)
+    return tuple(table)
+
+
+CRC32C_TABLE = _make_reflected_crc_table(0x82F63B78)
+CRC32_ISO_HDLC_TABLE = _make_reflected_crc_table(0xEDB88320)
+
+
+def _pure_adler32(data: bytes | bytearray | memoryview) -> int:
+    view = memoryview(data).cast("B")
+    try:
+        sum_1 = 1
+        sum_2 = 0
+        offset = 0
+        while offset < len(view):
+            end = min(offset + 5_552, len(view))
+            for value in view[offset:end]:
+                sum_1 += value
+                sum_2 += sum_1
+            sum_1 %= 65_521
+            sum_2 %= 65_521
+            offset = end
+        return (sum_2 << 16) | sum_1
+    finally:
+        view.release()
+
+
+def _pure_reflected_crc32(
+    data: bytes | bytearray | memoryview,
+    table: tuple[int, ...],
+) -> int:
+    view = memoryview(data).cast("B")
+    try:
+        remainder = 0xFFFFFFFF
+        for value in view:
+            remainder = (remainder >> 8) ^ table[(remainder ^ value) & 0xFF]
+        return remainder ^ 0xFFFFFFFF
+    finally:
+        view.release()
+
+
+def compute_checksum_fallback(
+    data: bytes | bytearray | memoryview,
+    algorithm: int,
+) -> int:
+    """Bounded dependency-free reference path for every advertised algorithm."""
+
+    if algorithm == CHECKSUM_ADLER32:
+        return _pure_adler32(data)
+    if algorithm == CHECKSUM_CRC32C:
+        return _pure_reflected_crc32(data, CRC32C_TABLE)
+    if algorithm == CHECKSUM_CRC32_ISO_HDLC:
+        return _pure_reflected_crc32(data, CRC32_ISO_HDLC_TABLE)
+    raise ProtocolFailure(f"host lacks checksum support for algorithm {algorithm}")
+
+
+def compute_checksum(
+    data: bytes | bytearray | memoryview,
+    algorithm: int,
+) -> int:
+    """Compute exactly the named wire variant without polynomial substitution."""
+
+    if algorithm == CHECKSUM_ADLER32:
+        return zlib.adler32(data, 1) & 0xFFFFFFFF
+    if algorithm == CHECKSUM_CRC32C:
+        return compute_checksum_fallback(data, algorithm)
+    if algorithm == CHECKSUM_CRC32_ISO_HDLC:
+        return zlib.crc32(data, 0) & 0xFFFFFFFF
+    raise ProtocolFailure(f"host lacks checksum support for algorithm {algorithm}")
+
+
 class SerialPort(Protocol):
     """The narrow pyserial surface used by this self-contained program."""
 
@@ -195,6 +292,7 @@ class Frame:
 
     kind: int
     flags: int
+    checksum_algorithm: int
     run_id: int
     sequence: int
     request_id: int
@@ -252,7 +350,7 @@ def encode_request(kind: int, request_id: int, payload: bytes = b"") -> bytes:
         kind,
         0,
         HEADER_SIZE,
-        CHECKSUM_ADLER32,
+        BOOTSTRAP_CHECKSUM,
         0,
         total_length,
         len(payload),
@@ -263,7 +361,7 @@ def encode_request(kind: int, request_id: int, payload: bytes = b"") -> bytes:
         0,
     )
     body = header + payload
-    return body + TRAILER.pack(zlib.adler32(body) & 0xFFFFFFFF)
+    return body + TRAILER.pack(compute_checksum(body, BOOTSTRAP_CHECKSUM))
 
 
 class FrameParser:
@@ -309,7 +407,14 @@ class FrameParser:
                 break
             payload_length = fields[8]
             payload_end = HEADER_SIZE + payload_length
-            expected = zlib.adler32(self.buffer[:payload_end]) & 0xFFFFFFFF
+            try:
+                expected = compute_checksum(
+                    memoryview(self.buffer)[:payload_end], fields[5]
+                )
+            except ProtocolFailure:
+                self.header_errors += 1
+                self._discard(1)
+                continue
             actual = TRAILER.unpack_from(self.buffer, payload_end)[0]
             if actual != expected:
                 self.checksum_errors += 1
@@ -318,6 +423,7 @@ class FrameParser:
             frame = Frame(
                 kind=fields[2],
                 flags=fields[3],
+                checksum_algorithm=fields[5],
                 run_id=fields[9],
                 sequence=fields[10],
                 request_id=fields[11],
@@ -369,12 +475,16 @@ class FrameParser:
         ) = fields
         if magic != MAGIC or version != PROTOCOL_VERSION:
             raise ProtocolFailure("invalid magic or protocol version")
-        if header_length != HEADER_SIZE or checksum != CHECKSUM_ADLER32 or reserved:
+        if header_length != HEADER_SIZE or reserved:
             raise ProtocolFailure("invalid fixed header fields")
         if total_length != HEADER_SIZE + payload_length + TRAILER_SIZE:
             raise ProtocolFailure("inconsistent total and payload lengths")
 
         if kind in DATA_KINDS:
+            if checksum not in SUPPORTED_CHECKSUMS:
+                raise ProtocolFailure(
+                    f"host lacks checksum support for algorithm {checksum}"
+                )
             expected_items = (
                 ADC_PAIRS_PER_FRAME if kind == ADC_DATA else GPIO_SAMPLES_PER_FRAME
             )
@@ -400,6 +510,11 @@ class FrameParser:
 
         if kind not in RESPONSE_KINDS:
             raise ProtocolFailure(f"unexpected device frame kind 0x{kind:02x}")
+        if checksum != BOOTSTRAP_CHECKSUM:
+            raise ProtocolFailure(
+                f"control response checksum algorithm is {checksum}; "
+                f"expected bootstrap algorithm {BOOTSTRAP_CHECKSUM}"
+            )
         if flags not in {0, FLAG_RESPONSE_ERROR}:
             raise ProtocolFailure("control response carries invalid flags")
         if kind == ERROR_RESPONSE and flags != FLAG_RESPONSE_ERROR:
@@ -433,8 +548,16 @@ class FrameParser:
         if is_error and frame.kind != ERROR_RESPONSE:
             return
         if frame.kind == INFO_RESPONSE:
-            if payload[1] or payload[45] or payload[61]:
+            if payload[1] or payload[61]:
                 raise ProtocolFailure("INFO reserved fields are nonzero")
+            supported_checksum_mask = struct.unpack_from("<I", payload, 8)[0]
+            selected_checksum = payload[45]
+            if selected_checksum not in SUPPORTED_CHECKSUMS:
+                raise ProtocolFailure(
+                    f"host lacks checksum support for algorithm {selected_checksum}"
+                )
+            if not supported_checksum_mask & (1 << selected_checksum):
+                raise ProtocolFailure("INFO selected checksum is not advertised")
         elif frame.kind in {CONFIGURE_RESPONSE, START_RESPONSE}:
             if payload[1] or payload[7]:
                 raise ProtocolFailure("configuration response reserved byte is nonzero")
@@ -672,6 +795,7 @@ def decode_info(frame: Frame) -> dict[str, object]:
         "adc_resolution_bits": payload[42],
         "adc_container_bytes": payload[43],
         "gpio_pin_count": payload[44],
+        "data_checksum_algorithm": payload[45],
         "gpio_pin_map": tuple(payload[46:54]),
         "hardware_serial": struct.unpack_from("<I", payload, 54)[0],
         "firmware_version": tuple(payload[58:61]),
@@ -777,6 +901,7 @@ def grade_info(
         "adc_resolution_bits": ADC_RESOLUTION_BITS,
         "adc_container_bytes": ADC_CONTAINER_BYTES,
         "gpio_pin_count": len(GPIO_PINS_BY_BIT),
+        "data_checksum_algorithm": DEFAULT_DATA_CHECKSUM,
         "gpio_pin_map": GPIO_PINS_BY_BIT,
         "firmware_version": (0, 5, 0),
         "board_id": 1,
@@ -834,13 +959,169 @@ GPIO_PATTERN = bytes(range(256))
 GPIO_PATTERN_EXPANDED = GPIO_PATTERN * 17
 
 
+def _encode_representative_data_frame(kind: int, checksum_algorithm: int) -> bytes:
+    if checksum_algorithm not in SUPPORTED_CHECKSUMS:
+        raise ProtocolFailure(
+            f"host lacks checksum support for algorithm {checksum_algorithm}"
+        )
+    if kind == ADC_DATA:
+        payload = ADC_PATTERN[:DATA_PAYLOAD_BYTES]
+        item_count = ADC_PAIRS_PER_FRAME
+    elif kind == GPIO_DATA:
+        payload = GPIO_PATTERN_EXPANDED[:DATA_PAYLOAD_BYTES]
+        item_count = GPIO_SAMPLES_PER_FRAME
+    else:
+        raise ValueError("representative frame kind must be ADC_DATA or GPIO_DATA")
+    header = HEADER.pack(
+        MAGIC,
+        PROTOCOL_VERSION,
+        kind,
+        FLAG_SYNTHETIC | FLAG_EPOCH_START,
+        HEADER_SIZE,
+        checksum_algorithm,
+        0,
+        DATA_FRAME_BYTES,
+        DATA_PAYLOAD_BYTES,
+        1,
+        0,
+        0,
+        0,
+        item_count,
+    )
+    body = header + payload
+    return body + TRAILER.pack(compute_checksum(body, checksum_algorithm))
+
+
+def _benchmark_rate_summary(
+    batch_seconds: list[float],
+    iterations_per_batch: int,
+) -> dict[str, object]:
+    batch_bytes = iterations_per_batch * DATA_FRAME_BYTES
+    rates = [batch_bytes / seconds for seconds in batch_seconds]
+    ordered = sorted(rates)
+    return {
+        "batch_seconds": batch_seconds,
+        "minimum_bytes_per_second": ordered[0],
+        "median_bytes_per_second": ordered[len(ordered) // 2],
+        "maximum_bytes_per_second": ordered[-1],
+    }
+
+
+def benchmark_host_checksum_paths(
+    checksum_algorithm: int,
+    *,
+    batch_count: int = HOST_BENCHMARK_BATCH_COUNT,
+    iterations_per_batch: int = HOST_BENCHMARK_ITERATIONS_PER_BATCH,
+    warmup_operations: int = HOST_BENCHMARK_WARMUP_OPERATIONS,
+) -> tuple[dict[str, object], ...]:
+    """Measure full encode and checksum validation separately, without grading."""
+
+    if checksum_algorithm not in SUPPORTED_CHECKSUMS:
+        raise ProtocolFailure(
+            f"host lacks checksum support for algorithm {checksum_algorithm}"
+        )
+    counts = (batch_count, iterations_per_batch, warmup_operations)
+    if any(not isinstance(value, int) or isinstance(value, bool) for value in counts):
+        raise TypeError("host benchmark repetition counts must be integers")
+    if not 1 <= batch_count <= 32:
+        raise ValueError("host benchmark batch_count must be between 1 and 32")
+    if not 1 <= iterations_per_batch <= 4_096:
+        raise ValueError(
+            "host benchmark iterations_per_batch must be between 1 and 4096"
+        )
+    if not 0 <= warmup_operations <= 4_096:
+        raise ValueError("host benchmark warmup_operations must be between 0 and 4096")
+    processed = (
+        (batch_count * iterations_per_batch + warmup_operations)
+        * DATA_FRAME_BYTES
+        * 2  # ADC and GPIO layouts.
+        * 2  # Encode and validation paths.
+    )
+    if processed > 512 * 1024 * 1024:
+        raise ValueError("host benchmark exceeds its processed-byte bound")
+
+    backend, accelerated = CHECKSUM_BACKENDS[checksum_algorithm]
+    results: list[dict[str, object]] = []
+    for kind in (ADC_DATA, GPIO_DATA):
+        wire = _encode_representative_data_frame(kind, checksum_algorithm)
+        for _ in range(warmup_operations):
+            if _encode_representative_data_frame(kind, checksum_algorithm) != wire:
+                raise ProtocolFailure(
+                    "host benchmark encode warm-up is nondeterministic"
+                )
+            warmed = FrameParser().feed(wire)
+            if len(warmed) != 1 or warmed[0].checksum_algorithm != checksum_algorithm:
+                raise ProtocolFailure("host benchmark validation warm-up failed")
+
+        encode_seconds: list[float] = []
+        encode_digest = 0
+        for _ in range(batch_count):
+            started = time.perf_counter()
+            for _ in range(iterations_per_batch):
+                encoded = _encode_representative_data_frame(kind, checksum_algorithm)
+                encoded_checksum = TRAILER.unpack_from(
+                    encoded, len(encoded) - TRAILER_SIZE
+                )[0]
+                encode_digest = ((encode_digest * 31) + encoded_checksum) & 0xFFFFFFFF
+            encode_seconds.append(max(time.perf_counter() - started, 1e-12))
+
+        validation_seconds: list[float] = []
+        validation_digest = 0
+        for _ in range(batch_count):
+            parser = FrameParser()
+            started = time.perf_counter()
+            for _ in range(iterations_per_batch):
+                decoded = parser.feed(wire)
+                if len(decoded) != 1:
+                    raise ProtocolFailure("host benchmark validation lost a frame")
+                validation_digest = (
+                    (validation_digest * 31)
+                    + decoded[0].checksum
+                    + decoded[0].checksum_algorithm
+                ) & 0xFFFFFFFF
+            validation_seconds.append(max(time.perf_counter() - started, 1e-12))
+
+        results.append(
+            {
+                "checksum_algorithm": CHECKSUM_NAMES[checksum_algorithm],
+                "checksum_algorithm_id": checksum_algorithm,
+                "backend_implementation": backend,
+                "backend_accelerated": accelerated,
+                "frame_kind": "ADC_DATA" if kind == ADC_DATA else "GPIO_DATA",
+                "frame_bytes": len(wire),
+                "checksum_coverage_bytes": len(wire) - TRAILER_SIZE,
+                "batch_count": batch_count,
+                "iterations_per_batch": iterations_per_batch,
+                "warmup_operations": warmup_operations,
+                "processed_frame_bytes": (
+                    batch_count * iterations_per_batch * len(wire)
+                ),
+                "performance_is_wire_compatibility": False,
+                "encode": {
+                    **_benchmark_rate_summary(encode_seconds, iterations_per_batch),
+                    "deterministic_digest": encode_digest,
+                },
+                "validation": {
+                    **_benchmark_rate_summary(validation_seconds, iterations_per_batch),
+                    "deterministic_digest": validation_digest,
+                },
+            }
+        )
+    return tuple(results)
+
+
 class SyntheticValidator:
     """Continuously validate both formulas and all epoch continuity fields."""
 
-    def __init__(self, run_id: int) -> None:
+    def __init__(self, run_id: int, checksum_algorithm: int) -> None:
         if not 1 <= run_id <= 0xFFFFFFFF:
             raise ValueError("run ID must be a nonzero uint32")
+        if checksum_algorithm not in SUPPORTED_CHECKSUMS:
+            raise ProtocolFailure(
+                f"host lacks checksum support for algorithm {checksum_algorithm}"
+            )
         self.run_id = run_id
+        self.checksum_algorithm = checksum_algorithm
         self.adc = StreamTotals()
         self.gpio = StreamTotals()
         self.first_receive_time: float | None = None
@@ -860,6 +1141,11 @@ class SyntheticValidator:
         if frame.run_id != self.run_id:
             raise ProtocolFailure(
                 f"data run ID is {frame.run_id}; expected {self.run_id}"
+            )
+        if frame.checksum_algorithm != self.checksum_algorithm:
+            raise ProtocolFailure(
+                f"data checksum is {frame.checksum_algorithm}; configured "
+                f"algorithm is {self.checksum_algorithm}"
             )
         if not frame.flags & FLAG_SYNTHETIC:
             raise ProtocolFailure("data frame lacks the SYNTHETIC flag")
@@ -1011,7 +1297,7 @@ def validate_running_status(
         STATE_RUNNING,
         STREAM_BOTH,
         SOURCE_SYNTHETIC,
-        CHECKSUM_ADLER32,
+        validator.checksum_algorithm,
         DATA_FRAME_BYTES,
     )
     actual_configuration = (
@@ -1244,6 +1530,7 @@ def run_acceptance(
     *,
     capture_seconds: float = DEFAULT_CAPTURE_SECONDS,
     status_interval_seconds: float = DEFAULT_STATUS_INTERVAL_SECONDS,
+    checksum_algorithm: int = DEFAULT_DATA_CHECKSUM,
     expected_build_id: str | None = None,
     expected_hardware_serial: int | None = None,
 ) -> Evidence:
@@ -1267,6 +1554,10 @@ def run_acceptance(
     if math.ceil(capture_seconds / status_interval_seconds) > MAX_STATUS_SAMPLES:
         raise ValueError(
             f"capture requests more than {MAX_STATUS_SAMPLES} STATUS samples"
+        )
+    if checksum_algorithm not in SUPPORTED_CHECKSUMS:
+        raise ProtocolFailure(
+            f"host lacks checksum support for algorithm {checksum_algorithm}"
         )
     evidence = Evidence()
     link = SerialLink(port)
@@ -1297,12 +1588,24 @@ def run_acceptance(
         )
         if evidence.failures:
             raise ProtocolFailure("identity/capability grading failed")
+        raw_checksum_mask = info["supported_checksum_mask"]
+        if not isinstance(raw_checksum_mask, int) or isinstance(
+            raw_checksum_mask, bool
+        ):
+            raise ProtocolFailure("INFO checksum mask is not an integer")
+        supported_checksum_mask = raw_checksum_mask
+        if not supported_checksum_mask & (1 << checksum_algorithm):
+            raise ProtocolFailure(
+                f"device does not advertise checksum algorithm {checksum_algorithm}"
+            )
+        for host_benchmark in benchmark_host_checksum_paths(checksum_algorithm):
+            emit_event("host_checksum_benchmark", **host_benchmark)
 
         parser_errors_at_start = link.parser.errors
         requested_configuration = CONFIGURATION.pack(
             STREAM_BOTH,
             SOURCE_SYNTHETIC,
-            CHECKSUM_ADLER32,
+            checksum_algorithm,
             0,
             DATA_FRAME_BYTES,
         )
@@ -1318,7 +1621,7 @@ def run_acceptance(
         )
         evidence.equal(
             "configure.applied",
-            (STREAM_BOTH, SOURCE_SYNTHETIC, CHECKSUM_ADLER32, DATA_FRAME_BYTES),
+            (STREAM_BOTH, SOURCE_SYNTHETIC, checksum_algorithm, DATA_FRAME_BYTES),
             decode_configuration(configured_frame, CONFIGURE_RESPONSE),
         )
 
@@ -1327,11 +1630,28 @@ def run_acceptance(
         evidence.equal(
             "configure.state", STATE_CONFIGURED, configured_status.device_state
         )
+        evidence.equal(
+            "configure.status_checksum",
+            checksum_algorithm,
+            configured_status.checksum,
+        )
         evidence.check(
             "configure.stats_generation",
             "nonzero uint32",
             configured_status.stats_generation,
             1 <= configured_status.stats_generation <= 0xFFFFFFFF,
+        )
+        configured_info_frame, _latency = link.exchange(INFO_REQUEST)
+        configured_info = decode_info(configured_info_frame)
+        evidence.equal(
+            "configure.info_state",
+            STATE_CONFIGURED,
+            configured_info["device_state"],
+        )
+        evidence.equal(
+            "configure.info_checksum",
+            checksum_algorithm,
+            configured_info["data_checksum_algorithm"],
         )
 
         deferred_data: list[Frame] = []
@@ -1363,10 +1683,10 @@ def run_acceptance(
         )
         evidence.equal(
             "start.applied",
-            (STREAM_BOTH, SOURCE_SYNTHETIC, CHECKSUM_ADLER32, DATA_FRAME_BYTES),
+            (STREAM_BOTH, SOURCE_SYNTHETIC, checksum_algorithm, DATA_FRAME_BYTES),
             decode_configuration(start_frame, START_RESPONSE),
         )
-        validator = SyntheticValidator(start_frame.run_id)
+        validator = SyntheticValidator(start_frame.run_id, checksum_algorithm)
         for frame in deferred_data:
             validator.accept(frame)
 
@@ -1473,6 +1793,8 @@ def run_acceptance(
         emit_event(
             "capture_complete",
             capture_elapsed_seconds=capture_elapsed,
+            checksum_algorithm=CHECKSUM_NAMES[checksum_algorithm],
+            checksum_algorithm_id=checksum_algorithm,
             status_requests=status_count,
             adc_frames=validator.adc.frames,
             gpio_frames=validator.gpio.frames,
@@ -1564,6 +1886,33 @@ def _optional_uint32_environment(name: str) -> int | None:
     return value
 
 
+def _checksum_environment(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().upper().replace("-", "_").replace("/", "_")
+    aliases = {
+        "ADLER32": CHECKSUM_ADLER32,
+        "ADLER_32": CHECKSUM_ADLER32,
+        "CRC32C": CHECKSUM_CRC32C,
+        "CRC_32C": CHECKSUM_CRC32C,
+        "CRC32_ISO_HDLC": CHECKSUM_CRC32_ISO_HDLC,
+        "CRC_32_ISO_HDLC": CHECKSUM_CRC32_ISO_HDLC,
+    }
+    selected = aliases.get(normalized)
+    if selected is None:
+        try:
+            selected = int(raw, 0)
+        except ValueError:
+            selected = -1
+    if selected not in SUPPORTED_CHECKSUMS:
+        choices = ", ".join(
+            CHECKSUM_NAMES[algorithm] for algorithm in sorted(SUPPORTED_CHECKSUMS)
+        )
+        raise ValueError(f"{name} must be one of {choices} or its numeric ID")
+    return selected
+
+
 def main() -> int:
     port_name = os.environ.get("SERIAL_PORT")
     if not port_name:
@@ -1578,6 +1927,10 @@ def main() -> int:
             "SYNTHETIC_STATUS_INTERVAL_SECONDS",
             DEFAULT_STATUS_INTERVAL_SECONDS,
         )
+        checksum_algorithm = _checksum_environment(
+            "SYNTHETIC_CHECKSUM_ALGORITHM",
+            DEFAULT_DATA_CHECKSUM,
+        )
         expected_hardware_serial = _optional_uint32_environment(
             "EXPECTED_HARDWARE_SERIAL"
         )
@@ -1589,6 +1942,8 @@ def main() -> int:
         "program_start",
         baud=BAUD_RATE,
         capture_seconds=capture_seconds,
+        checksum_algorithm=CHECKSUM_NAMES[checksum_algorithm],
+        checksum_algorithm_id=checksum_algorithm,
         port=port_name,
         protocol=PROTOCOL_VERSION,
         status_interval_seconds=status_interval_seconds,
@@ -1611,6 +1966,7 @@ def main() -> int:
             port,
             capture_seconds=capture_seconds,
             status_interval_seconds=status_interval_seconds,
+            checksum_algorithm=checksum_algorithm,
             expected_build_id=expected_build_id,
             expected_hardware_serial=expected_hardware_serial,
         )

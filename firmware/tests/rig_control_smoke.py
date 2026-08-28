@@ -270,8 +270,11 @@ class FrameParser:
             raise ProtocolFailure("response reports an unknown error code")
         payload = frame.payload
         if not is_error and frame.kind == INFO_RESPONSE:
-            if payload[1] or payload[45] or payload[61]:
+            if payload[1] or payload[61]:
                 raise ProtocolFailure("INFO reserved fields are nonzero")
+            checksum_mask = struct.unpack_from("<I", payload, 8)[0]
+            if not checksum_mask & (1 << payload[45]):
+                raise ProtocolFailure("INFO selected checksum is not advertised")
         elif not is_error and frame.kind in {CONFIGURE_RESPONSE, START_RESPONSE}:
             if payload[1] or payload[7]:
                 raise ProtocolFailure(
@@ -468,6 +471,7 @@ def decode_info(frame: Frame) -> dict[str, object]:
         "adc_resolution_bits": payload[42],
         "adc_container_bytes": payload[43],
         "gpio_pin_count": payload[44],
+        "data_checksum_algorithm": payload[45],
         "gpio_pin_map": tuple(payload[46:54]),
         "hardware_serial": struct.unpack_from("<I", payload, 54)[0],
         "firmware_version": tuple(payload[58:61]),
@@ -580,6 +584,7 @@ def grade_info(evidence: Evidence, info: dict[str, object]) -> None:
         "adc_resolution_bits": 12,
         "adc_container_bytes": 2,
         "gpio_pin_count": 8,
+        "data_checksum_algorithm": CHECKSUM_ADLER32,
         "gpio_pin_map": tuple(range(6, 14)),
         "firmware_version": (0, 3, 0),
         "board_id": 1,

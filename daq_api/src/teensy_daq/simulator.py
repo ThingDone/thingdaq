@@ -243,6 +243,7 @@ class SimulatedDevice:
             firmware_version=firmware_version,
             supported_stream_mask=supported_stream_mask,
             supported_source_mask=supported_source_mask,
+            data_checksum_algorithm=self.status().data_checksum_algorithm,
             capability_bits=capability_bits,
         )
         return self._success_response(request, info.to_payload())

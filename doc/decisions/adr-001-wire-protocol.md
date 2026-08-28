@@ -64,8 +64,9 @@ responses are defensively bounded at 1,024 bytes.
 Request frame-kind IDs are also command-kind IDs. INFO through PING occupy
 `0x10` through `0x16`; each typed response is its request ID ORed with `0x80`.
 Every request carries a nonzero request ID, and every response copies it.
-INFO advertises independent stream, source, checksum, and capability masks.
-PING remains optional and must be advertised.
+INFO advertises independent stream, source, checksum, and capability masks and
+reports the selected data checksum (the generated default in IDLE or applied
+configuration otherwise). PING remains optional and must be advertised.
 
 Each successful START allocates a new nonzero run ID and resets sequence,
 timestamp, and counter epochs. The host accepts data only for the run ID
@@ -82,8 +83,9 @@ is the only bootstrap algorithm for commands and responses. Algorithms 2 and
 3 are CRC-32C and CRC-32/ISO-HDLC; INFO advertises all three and CONFIGURE
 selects the algorithm used by data frames. The packet epoch snapshots that
 selection, and reconfiguration is rejected as `BUSY` until prior frames drain.
-This stable field lets the later evidence-based checksum decision change the
-data default without redesigning the envelope or bootstrapping control traffic.
+INFO, STATUS, and decoded block metadata expose the exact selection. This
+stable field lets the later evidence-based checksum decision change the data
+default without redesigning the envelope or bootstrapping control traffic.
 
 The authoritative contract is `protocol/protocol-v1.json`. The deterministic
 `tools/generate_protocol.py` generator validates cross-field invariants and

@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import struct
-import zlib
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from types import MappingProxyType
 
 from ._generated import protocol_constants as constants
+from .checksum import (
+    HOST_SUPPORTED_CHECKSUM_ALGORITHMS,
+    ChecksumBackend,
+    compute_checksum_value,
+)
+from .checksum import (
+    checksum_backend as _checksum_backend,
+)
 
 BytesLike = bytes | bytearray | memoryview
 
@@ -159,45 +164,6 @@ class ParserCounters:
     high_water_mark: int
 
 
-def _adler32(data: BytesLike) -> int:
-    return zlib.adler32(data) & constants.UINT32_MAX
-
-
-def _make_reflected_crc_table(polynomial: int) -> tuple[int, ...]:
-    table: list[int] = []
-    for index in range(256):
-        remainder = index
-        for _ in range(8):
-            remainder = (remainder >> 1) ^ (polynomial if remainder & 1 else 0)
-        table.append(remainder)
-    return tuple(table)
-
-
-_CRC32C_TABLE = _make_reflected_crc_table(0x82F63B78)
-
-
-def _crc32c(data: BytesLike) -> int:
-    remainder = constants.UINT32_MAX
-    for value in data:
-        remainder = (remainder >> 8) ^ _CRC32C_TABLE[(remainder ^ value) & 0xFF]
-    return remainder ^ constants.UINT32_MAX
-
-
-def _crc32_iso_hdlc(data: BytesLike) -> int:
-    return zlib.crc32(data) & constants.UINT32_MAX
-
-
-_CHECKSUM_DISPATCH: Mapping[constants.ChecksumAlgorithm, Callable[[BytesLike], int]] = (
-    MappingProxyType(
-        {
-            constants.ChecksumAlgorithm.ADLER32: _adler32,
-            constants.ChecksumAlgorithm.CRC32C: _crc32c,
-            constants.ChecksumAlgorithm.CRC32_ISO_HDLC: _crc32_iso_hdlc,
-        }
-    )
-)
-
-
 def compute_checksum(
     data: BytesLike,
     algorithm: constants.ChecksumAlgorithm | int = (
@@ -210,10 +176,25 @@ def compute_checksum(
         selected = constants.ChecksumAlgorithm(algorithm)
     except ValueError as exc:
         raise UnsupportedChecksumError(int(algorithm)) from exc
-    implementation = _CHECKSUM_DISPATCH.get(selected)
-    if implementation is None:
+    result = compute_checksum_value(data, selected)
+    if result is None:
         raise UnsupportedChecksumError(int(selected))
-    return implementation(data)
+    return result
+
+
+def checksum_backend(
+    algorithm: constants.ChecksumAlgorithm | int,
+) -> ChecksumBackend:
+    """Describe the exact host implementation for a protocol algorithm."""
+
+    try:
+        selected = constants.ChecksumAlgorithm(algorithm)
+    except ValueError as exc:
+        raise UnsupportedChecksumError(int(algorithm)) from exc
+    backend = _checksum_backend(selected)
+    if backend is None:
+        raise UnsupportedChecksumError(int(selected))
+    return backend
 
 
 def _uint(name: str, value: int, bits: int) -> int:
@@ -301,7 +282,7 @@ def _validate_header(header: FrameHeader, reserved: int = 0) -> None:
             "header reserved byte must be zero",
             constants.ErrorCode.INVALID_PAYLOAD,
         )
-    if header.checksum_algorithm not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
+    if header.checksum_algorithm not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
         raise UnsupportedChecksumError(int(header.checksum_algorithm))
     if (
         header.kind not in _DATA_KINDS
@@ -481,6 +462,8 @@ def _validate_configuration(payload: bytes, offset: int, *, applied: bool) -> No
         raise FrameValidationError("configuration cannot select checksum ID zero")
     if applied and checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
         raise FrameValidationError("applied configuration checksum is not enabled")
+    if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+        raise UnsupportedChecksumError(int(checksum))
     if reserved != 0:
         raise FrameValidationError("configuration reserved byte must be zero")
     if frame_bytes != constants.DATA_FRAME_BYTES:
@@ -652,8 +635,6 @@ def _validate_checksum_benchmark_response(payload: bytes) -> None:
 def _validate_info_payload(payload: bytes) -> None:
     if payload[constants.INFO_RESPONSE_RESERVED_0_OFFSET] != 0:
         raise FrameValidationError("INFO reserved_0 must be zero")
-    if payload[constants.INFO_RESPONSE_RESERVED_1_OFFSET] != 0:
-        raise FrameValidationError("INFO reserved_1 must be zero")
     if payload[constants.INFO_RESPONSE_RESERVED_2_OFFSET] != 0:
         raise FrameValidationError("INFO reserved_2 must be zero")
     try:
@@ -667,6 +648,9 @@ def _validate_info_payload(payload: bytes) -> None:
         )
         constants.McuId(
             struct.unpack_from("<H", payload, constants.INFO_RESPONSE_MCU_ID_OFFSET)[0]
+        )
+        data_checksum = constants.ChecksumAlgorithm(
+            payload[constants.INFO_RESPONSE_DATA_CHECKSUM_ALGORITHM_OFFSET]
         )
     except ValueError as exc:
         raise FrameValidationError("INFO contains an unknown enum value") from exc
@@ -697,6 +681,10 @@ def _validate_info_payload(payload: bytes) -> None:
     )[0]
     if checksum_mask != constants.SUPPORTED_CHECKSUM_MASK:
         raise FrameValidationError("INFO checksum mask disagrees with protocol v1")
+    if not checksum_mask & (1 << int(data_checksum)):
+        raise FrameValidationError("INFO selected checksum is not advertised")
+    if data_checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+        raise UnsupportedChecksumError(int(data_checksum))
     capability_bits = struct.unpack_from(
         "<I", payload, constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET
     )[0]
@@ -802,6 +790,8 @@ def _validate_status_payload(payload: bytes) -> None:
         )
     if checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
         raise FrameValidationError("STATUS checksum is not enabled")
+    if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
+        raise UnsupportedChecksumError(int(checksum))
     if (
         struct.unpack_from(
             "<I", payload, constants.STATUS_RESPONSE_DATA_FRAME_BYTES_OFFSET

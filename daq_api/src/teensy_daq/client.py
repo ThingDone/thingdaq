@@ -11,6 +11,7 @@ from types import TracebackType
 from typing import Literal, TypeAlias
 
 from ._generated import protocol_constants as constants
+from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .discovery import (
     DEFAULT_DISCOVERY_TIMEOUT,
     DeviceNotFoundError,
@@ -1011,6 +1012,15 @@ class TeensyDAQ:
         self,
         configuration: DAQConfiguration,
     ) -> None:
+        if (
+            configuration.data_checksum_algorithm
+            not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS
+        ):
+            raise DeviceCapabilityError(
+                "host has no implementation for requested checksum "
+                f"{configuration.data_checksum_algorithm.name}",
+                error_code=constants.ErrorCode.UNSUPPORTED_CHECKSUM,
+            )
         capabilities = self.capabilities
         if capabilities is None:
             return

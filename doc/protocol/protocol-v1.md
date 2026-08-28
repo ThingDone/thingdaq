@@ -283,7 +283,7 @@ empty. Its 98-byte success payload reports:
 - state and protocol version;
 - supported stream and source masks;
 - a checksum mask whose bit number equals the checksum algorithm ID and a
-  separate capability-bit mask;
+  separate capability-bit mask, plus the currently selected data checksum;
 - timestamp frequency and data/control frame limits;
 - ADC/GPIO rates, periods, ADC phase, resolution, and container width;
 - GPIO count and the eight-byte D6-through-D13 pin map;
@@ -310,7 +310,7 @@ empty. Its 98-byte success payload reports:
 | 42 | 1 / `u8` | ADC resolution bits |
 | 43 | 1 / `u8` | ADC container bytes |
 | 44 | 1 / `u8` | GPIO pin count |
-| 45 | 1 / `u8` | reserved, zero |
+| 45 | 1 / `u8` | selected data checksum algorithm |
 | 46 | 8 / `u8[8]` | GPIO pin map in bit order |
 | 54 | 4 / `u32` | hardware serial |
 | 58 | 3 / `u8[3]` | firmware major, minor, patch |
@@ -323,6 +323,10 @@ Stream-mask bits are ADC = 1 and GPIO = 2. Source IDs are hardware = 0 and
 synthetic = 1; the INFO supported-source mask uses `1 << source_id`. Board IDs
 are simulator = 0 and Teensy 4.0 = 1. MCU IDs are simulated = 0 and
 i.MX RT1062 = 1. Exact offsets live in the machine-readable payload schema.
+The selected checksum is the generated production default in IDLE and the
+applied configuration in CONFIGURED or RUNNING. It must be present in the
+supported checksum mask. STATUS and each ADC/GPIO frame repeat the same
+selection so a host never infers a polynomial from context.
 
 Capability bits are independent, one-bit values:
 

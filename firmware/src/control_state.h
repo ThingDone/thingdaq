@@ -15,14 +15,14 @@ namespace teensy_daq::control {
 inline constexpr protocol::Configuration kIdleConfiguration{
     0U,
     protocol_v1::Source::kHardware,
-    protocol_v1::ChecksumAlgorithm::kAdler32,
+    protocol_v1::kDefaultChecksumAlgorithm,
     static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes),
 };
 
 inline constexpr protocol::Configuration kSyntheticConfiguration{
     capabilities::kSupportedStreamMask,
     protocol_v1::Source::kSynthetic,
-    protocol_v1::ChecksumAlgorithm::kAdler32,
+    protocol_v1::kDefaultChecksumAlgorithm,
     static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes),
 };
 

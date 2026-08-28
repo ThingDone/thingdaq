@@ -238,6 +238,8 @@ struct InfoResponse {
       static_cast<std::uint16_t>(protocol_v1::kGpioSamplePeriodTicks);
   std::uint8_t adc_resolution_bits = protocol_v1::kAdcResolutionBits;
   std::uint8_t adc_container_bytes = protocol_v1::kAdcContainerBits / 8U;
+  protocol_v1::ChecksumAlgorithm data_checksum_algorithm =
+      protocol_v1::kDefaultChecksumAlgorithm;
   std::array<std::uint8_t, protocol_v1::kInfoResponseGpioPinMapCount>
       gpio_pin_map{};
   std::uint32_t hardware_serial = 0U;

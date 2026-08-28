@@ -70,6 +70,21 @@ GET_STATUS, and STOP are legal in every post-boot state; CONFIGURE and
 RESET_STATS are limited to IDLE/CONFIGURED; START requires CONFIGURED; and
 block reads require the RUNNING epoch established by this facade.
 
+`DeviceInfo.data_checksum_algorithm` reports the generated device default in
+IDLE and the applied selection otherwise. `Status.data_checksum_algorithm`
+and each `ADCBlock`/`GPIOBlock.checksum_algorithm` preserve the same wire ID.
+The host dispatch never substitutes a different polynomial: unsupported IDs or
+a missing local backend raise an explicit checksum-support error.
+
+Run the bounded host benchmark without hardware to measure encode and
+validation separately for both production data layouts. The JSON report has
+no pass/fail speed field because host-specific performance is not a wire
+compatibility decision:
+
+```bash
+python -m teensy_daq.checksum_benchmark --algorithms all
+```
+
 For hardware, pass a discovery result or select a stable serial directly. A
 selected port is INFO-probed again so hot re-enumeration cannot silently open a
 different unit:
