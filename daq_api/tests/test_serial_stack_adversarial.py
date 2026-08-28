@@ -9,7 +9,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import serial
-
 from teensy_daq import (
     ADCBlock,
     BackgroundReader,

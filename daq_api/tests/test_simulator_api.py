@@ -235,7 +235,8 @@ class TeensyDAQStreamingTests(unittest.TestCase):
             assert isinstance(second_adc, AdcBlock)
             assert isinstance(second_gpio, GpioBlock)
 
-            self.assertEqual([0, 0, 1, 1], [block.sequence for block in blocks])
+            data_blocks = (first_adc, first_gpio, second_adc, second_gpio)
+            self.assertEqual([0, 0, 1, 1], [block.sequence for block in data_blocks])
             self.assertEqual(
                 [
                     0,
@@ -243,14 +244,14 @@ class TeensyDAQStreamingTests(unittest.TestCase):
                     constants.FRAME_COVERAGE_TICKS,
                     constants.FRAME_COVERAGE_TICKS,
                 ],
-                [block.first_sample_ticks for block in blocks],
+                [block.first_sample_ticks for block in data_blocks],
             )
             self.assertTrue(first_adc.flags & FrameFlag.SYNTHETIC)
             self.assertTrue(first_adc.flags & FrameFlag.EPOCH_START)
             self.assertTrue(first_gpio.flags & FrameFlag.EPOCH_START)
             self.assertEqual(FrameFlag.SYNTHETIC, second_adc.flags)
             self.assertEqual(FrameFlag.SYNTHETIC, second_gpio.flags)
-            self.assertTrue(all(block.run_id == run_id for block in blocks))
+            self.assertTrue(all(block.run_id == run_id for block in data_blocks))
 
             self.assertEqual((0, 1), first_adc.pair(0))
             adc_index = constants.ADC_PAIRS_PER_FRAME
@@ -287,6 +288,7 @@ class TeensyDAQStreamingTests(unittest.TestCase):
             self.assertEqual(run_id + 1, daq.start())
             restarted = daq.read_block()
             self.assertIsInstance(restarted, AdcBlock)
+            assert isinstance(restarted, AdcBlock)
             self.assertEqual(0, restarted.sequence)
             self.assertEqual(0, restarted.first_sample_ticks)
             self.assertTrue(restarted.flags & FrameFlag.EPOCH_START)

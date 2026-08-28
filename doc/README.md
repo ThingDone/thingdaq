@@ -11,6 +11,7 @@ related:
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[Phase-01-Synthetic-Prototype-Gate]]'
+  - '[[Phase-02-Protocol-Python-Gate]]'
 ---
 
 # Teensy DAQ documentation
@@ -30,7 +31,8 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
 - `reference/` records durable inventories and implementation references,
   beginning with [[Foundation-Reuse-Inventory]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
-  beginning with [[Phase-01-Synthetic-Prototype-Gate]].
+  including [[Phase-01-Synthetic-Prototype-Gate]] and
+  [[Phase-02-Protocol-Python-Gate]].
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`
