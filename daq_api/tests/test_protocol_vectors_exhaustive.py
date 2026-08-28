@@ -70,7 +70,7 @@ class _GoldenVector:
 
 
 def _info_payload() -> bytes:
-    payload = bytearray(128)
+    payload = bytearray(180)
     struct.pack_into("<BBHBBBB", payload, 0, 0, 0, 0, 1, 1, 3, 3)
     struct.pack_into(
         "<IIIIIII",
@@ -92,6 +92,71 @@ def _info_payload() -> bytes:
     struct.pack_into("<BBBBH", payload, 98, 8, 4, 4, 0, 3)
     struct.pack_into("<IIIH", payload, 104, 4048, 64768, 16256, 200)
     struct.pack_into("<BBBBBBBB", payload, 120, 0, 56, 0, 2, 30, 2, 1, 0)
+    struct.pack_into(
+        "<HHBBBBHHHBBH",
+        payload,
+        128,
+        0,
+        4095,
+        1,
+        1,
+        4,
+        0,
+        3300,
+        0,
+        3300,
+        3,
+        2,
+        142,
+    )
+    struct.pack_into("<BBBBBBBBH", payload, 146, 0, 0, 14, 15, 1, 2, 7, 8, 0)
+    struct.pack_into("<IIIIII", payload, 156, 150_000_000, 37_500_000, 10_000, 0, 0, 0)
+    return bytes(payload)
+
+
+def _status_payload() -> bytes:
+    payload = bytearray(224)
+    struct.pack_into(
+        "<BBHBBBBIQQQQIII",
+        payload,
+        0,
+        0,
+        0,
+        0,
+        3,
+        3,
+        1,
+        1,
+        4_096,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        2,
+    )
+    struct.pack_into("<H", payload, 134, 1234)
+    struct.pack_into("<BBBB", payload, 172, 12, 2, 0, 0)
+    struct.pack_into(
+        "<HHBBBBHHHBBH",
+        payload,
+        176,
+        0,
+        4095,
+        1,
+        1,
+        4,
+        0,
+        3300,
+        0,
+        3300,
+        3,
+        2,
+        142,
+    )
+    struct.pack_into("<BBBBBB", payload, 194, 14, 15, 1, 2, 7, 8)
+    struct.pack_into("<IIIIII", payload, 200, 150_000_000, 37_500_000, 10_000, 0, 0, 0)
     return bytes(payload)
 
 
@@ -267,27 +332,7 @@ def _golden_vectors() -> tuple[_GoldenVector, ...]:
         _GoldenVector(
             "get-status-response",
             0x93,
-            struct.pack(
-                "<BBHBBBBIQQQQIII",
-                0,
-                0,
-                0,
-                3,
-                3,
-                1,
-                1,
-                4_096,
-                1,
-                1,
-                0,
-                0,
-                0,
-                0,
-                2,
-            )
-            + bytes(78)
-            + struct.pack("<H", 1234)
-            + bytes(36),
+            _status_payload(),
             run_id=7,
             request_id=4,
         ),

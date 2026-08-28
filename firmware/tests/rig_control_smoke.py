@@ -102,10 +102,10 @@ REQUEST_PAYLOAD_SIZE = {
     GPIO_CAPTURE_DIAGNOSTIC_REQUEST: 0,
 }
 SUCCESS_PAYLOAD_SIZE = {
-    INFO_RESPONSE: 128,
+    INFO_RESPONSE: 180,
     CONFIGURE_RESPONSE: 12,
     START_RESPONSE: 12,
-    GET_STATUS_RESPONSE: 172,
+    GET_STATUS_RESPONSE: 224,
     STOP_RESPONSE: 8,
     RESET_STATS_RESPONSE: 8,
     PING_RESPONSE: 12,
@@ -280,7 +280,13 @@ class FrameParser:
             raise ProtocolFailure("response reports an unknown error code")
         payload = frame.payload
         if not is_error and frame.kind == INFO_RESPONSE:
-            if payload[1] or payload[61]:
+            if (
+                payload[1]
+                or payload[61]
+                or any(payload[118:120])
+                or payload[127]
+                or any(payload[154:156])
+            ):
                 raise ProtocolFailure("INFO reserved fields are nonzero")
             checksum_mask = struct.unpack_from("<I", payload, 8)[0]
             if not checksum_mask & (1 << payload[45]):

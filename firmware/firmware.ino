@@ -6,6 +6,7 @@
  * runtime owns all bounded parser, state, statistics, and transport work.
  */
 #include "src/firmware_runtime.h"
+#include "src/adc_initializer_teensy.h"
 #include "src/checksum_benchmark_teensy.h"
 #include "src/gpio_clock_diagnostic_teensy.h"
 #include "src/gpio_capture_diagnostic_teensy.h"
@@ -34,13 +35,15 @@ teensy_daq::runtime::FirmwareRuntime firmware_runtime{cdc_stream,
                                                        &teensy_daq::gpio_clock::teensyRunner(),
                                                        &teensy_daq::gpio_capture::teensyRawCapture(),
                                                        &gpio_packer,
-                                                       &teensy_daq::gpio_diagnostic::teensyRunner()};
+                                                       &teensy_daq::gpio_diagnostic::teensyRunner(),
+                                                       &teensy_daq::adc::teensyInitializer()};
 
 }  // namespace
 
 void setup() {
   // Do not initialize the Arduino serial facade, wait for DTR, or emit a
-  // banner. BOOT completion is bounded and independent of host presence.
+  // banner. Both ADC modules are explicitly reconfigured and independently
+  // calibrated under a DWT deadline before the bounded BOOT completion.
   (void)firmware_runtime.begin(teensy_daq::usb::hardwareSerialNumber());
 }
 

@@ -224,10 +224,10 @@ REQUEST_PAYLOAD_SIZE = {
     GPIO_CAPTURE_DIAGNOSTIC_REQUEST: 0,
 }
 SUCCESS_PAYLOAD_SIZE = {
-    INFO_RESPONSE: 128,
+    INFO_RESPONSE: 180,
     CONFIGURE_RESPONSE: 12,
     START_RESPONSE: 12,
-    GET_STATUS_RESPONSE: 172,
+    GET_STATUS_RESPONSE: 224,
     STOP_RESPONSE: 8,
     RESET_STATS_RESPONSE: 8,
     GPIO_CLOCK_DIAGNOSTIC_RESPONSE: 140,
@@ -677,7 +677,13 @@ class FrameParser:
             return
         payload = frame.payload
         if frame.kind == INFO_RESPONSE:
-            if payload[1] or payload[61] or any(payload[118:120]) or payload[127]:
+            if (
+                payload[1]
+                or payload[61]
+                or any(payload[118:120])
+                or payload[127]
+                or any(payload[154:156])
+            ):
                 raise ProtocolFailure("INFO reserved fields are nonzero")
         elif frame.kind in {CONFIGURE_RESPONSE, START_RESPONSE}:
             if payload[1] or payload[7]:

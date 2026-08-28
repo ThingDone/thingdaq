@@ -149,6 +149,27 @@
     "analysis_samples": 256,
     "semantics": "The optional empty-request command is valid only in fully quiescent IDLE. Fixture policy is compiled into the artifact and cannot be changed by the request. The response identifies whether non-driving capture, an explicitly safe self-driven sweep, or declared fixture stimulus was selected and reports exact register/count/electrical-claim evidence."
   },
+  "adc_initialization": {
+    "primary_resolution_bits": 12,
+    "fallback_resolution_bits": 10,
+    "container_bits": 16,
+    "code_min": 0,
+    "reference_mv_nominal": 3300,
+    "input_min_mv_nominal": 0,
+    "input_max_mv_nominal": 3300,
+    "ipg_clock_hz": 150000000,
+    "adc_clock_hz": 37500000,
+    "clock_divider": 4,
+    "hardware_average_count": 0,
+    "sample_time_adck": 3,
+    "calibration_cycle_counter_hz": 600000000,
+    "calibration_deadline_us": 10000,
+    "calibration_poll_limit": 8000000,
+    "pins": [14, 15],
+    "peripherals": [1, 2],
+    "channels": [7, 8],
+    "semantics": "Both ADC modules are configured independently for synchronous 37.5 MHz high-speed conversion, no hardware averaging, and the shortest three-ADCK sample setting. Calibration starts only after route/configuration validation and is bounded independently per converter by both the 600 MHz DWT deadline and a finite poll limit. VREFH/VREFL range values are nominal board metadata, not calibrated voltage claims. Twelve bits remains primary; ten bits may be selected only by the explicit completed timing/error fallback gate."
+  },
   "data_layouts": {
     "adc": {
       "bytes_per_item": 4,
@@ -533,6 +554,47 @@
       {"name": "EXTERNAL_VALIDATION_MISSING", "value": 8192},
       {"name": "UNEXPECTED_ELECTRICAL_CLAIM", "value": 16384},
       {"name": "CLEANUP_FAILED", "value": 32768}
+    ],
+    "adc_reference": [
+      {"name": "UNSPECIFIED", "value": 0},
+      {"name": "VREFH_VREFL_NOMINAL_3V3", "value": 1}
+    ],
+    "adc_clock_source": [
+      {"name": "UNSPECIFIED", "value": 0},
+      {"name": "SYNCHRONOUS_IPG", "value": 1}
+    ],
+    "adc_calibration_state": [
+      {"name": "NOT_RUN", "value": 0},
+      {"name": "SUCCEEDED", "value": 1},
+      {"name": "FAILED", "value": 2},
+      {"name": "TIMED_OUT", "value": 3},
+      {"name": "ROUTE_INVALID", "value": 4},
+      {"name": "CONFIGURATION_INVALID", "value": 5},
+      {"name": "CLOCK_UNAVAILABLE", "value": 6}
+    ],
+    "adc_configuration_flag": [
+      {"name": "INITIALIZED", "value": 1},
+      {"name": "NO_HARDWARE_AVERAGING", "value": 2},
+      {"name": "HIGH_SPEED", "value": 4},
+      {"name": "SHORTEST_SAMPLE", "value": 8},
+      {"name": "ROUTES_VALIDATED", "value": 16},
+      {"name": "CONFIGURATION_READBACK_VALID", "value": 32},
+      {"name": "CALIBRATION_COMPLETE", "value": 64},
+      {"name": "PRIMARY_12_BIT", "value": 128},
+      {"name": "FALLBACK_10_BIT", "value": 256}
+    ],
+    "adc_initialization_error": [
+      {"name": "DWT_UNAVAILABLE", "value": 1},
+      {"name": "ADC0_ROUTE_INVALID", "value": 2},
+      {"name": "ADC1_ROUTE_INVALID", "value": 4},
+      {"name": "ADC0_CONFIGURATION_INVALID", "value": 8},
+      {"name": "ADC1_CONFIGURATION_INVALID", "value": 16},
+      {"name": "ADC0_CALIBRATION_FAILED", "value": 32},
+      {"name": "ADC1_CALIBRATION_FAILED", "value": 64},
+      {"name": "ADC0_CALIBRATION_TIMEOUT", "value": 128},
+      {"name": "ADC1_CALIBRATION_TIMEOUT", "value": 256},
+      {"name": "ADC0_READBACK_INVALID", "value": 512},
+      {"name": "ADC1_READBACK_INVALID", "value": 1024}
     ]
   },
   "payload_schemas": {
@@ -574,7 +636,7 @@
       ]
     },
     "info_response": {
-      "size": 128,
+      "size": 180,
       "fields": [
         {"name": "response_status", "offset": 0, "type": "u8"},
         {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
@@ -623,7 +685,34 @@
         {"name": "gpio_dmamux_source", "offset": 124, "type": "u8"},
         {"name": "gpio_edma_priority", "offset": 125, "type": "u8"},
         {"name": "gpio_xbar_active_edge", "offset": 126, "type": "u8"},
-        {"name": "reserved_4", "offset": 127, "type": "u8", "required": 0}
+        {"name": "reserved_4", "offset": 127, "type": "u8", "required": 0},
+        {"name": "adc_code_min", "offset": 128, "type": "u16"},
+        {"name": "adc_code_max", "offset": 130, "type": "u16"},
+        {"name": "adc_reference", "offset": 132, "type": "u8"},
+        {"name": "adc_clock_source", "offset": 133, "type": "u8"},
+        {"name": "adc_clock_divider", "offset": 134, "type": "u8"},
+        {"name": "adc_hardware_average_count", "offset": 135, "type": "u8"},
+        {"name": "adc_reference_mv_nominal", "offset": 136, "type": "u16"},
+        {"name": "adc_input_min_mv_nominal", "offset": 138, "type": "u16"},
+        {"name": "adc_input_max_mv_nominal", "offset": 140, "type": "u16"},
+        {"name": "adc_sample_time_adck", "offset": 142, "type": "u8"},
+        {"name": "adc_conversion_mode", "offset": 143, "type": "u8"},
+        {"name": "adc_configuration_flags", "offset": 144, "type": "u16"},
+        {"name": "adc0_calibration_state", "offset": 146, "type": "u8"},
+        {"name": "adc1_calibration_state", "offset": 147, "type": "u8"},
+        {"name": "adc0_pin", "offset": 148, "type": "u8"},
+        {"name": "adc1_pin", "offset": 149, "type": "u8"},
+        {"name": "adc0_peripheral", "offset": 150, "type": "u8"},
+        {"name": "adc1_peripheral", "offset": 151, "type": "u8"},
+        {"name": "adc0_channel", "offset": 152, "type": "u8"},
+        {"name": "adc1_channel", "offset": 153, "type": "u8"},
+        {"name": "reserved_5", "offset": 154, "type": "u16", "required": 0},
+        {"name": "adc_ipg_clock_hz", "offset": 156, "type": "u32"},
+        {"name": "adc_clock_hz", "offset": 160, "type": "u32"},
+        {"name": "adc_calibration_deadline_us", "offset": 164, "type": "u32"},
+        {"name": "adc0_calibration_cycles", "offset": 168, "type": "u32"},
+        {"name": "adc1_calibration_cycles", "offset": 172, "type": "u32"},
+        {"name": "adc_initialization_error_flags", "offset": 176, "type": "u32"}
       ]
     },
     "configure_response": {
@@ -640,7 +729,7 @@
       ]
     },
     "status_response": {
-      "size": 172,
+      "size": 224,
       "fields": [
         {"name": "response_status", "offset": 0, "type": "u8"},
         {"name": "reserved", "offset": 1, "type": "u8", "required": 0},
@@ -681,7 +770,35 @@
         {"name": "gpio_resource_conflicts", "offset": 156, "type": "u32"},
         {"name": "gpio_start_errors", "offset": 160, "type": "u32"},
         {"name": "gpio_stop_errors", "offset": 164, "type": "u32"},
-        {"name": "gpio_stale_dma_completions", "offset": 168, "type": "u32"}
+        {"name": "gpio_stale_dma_completions", "offset": 168, "type": "u32"},
+        {"name": "adc_resolution_bits", "offset": 172, "type": "u8"},
+        {"name": "adc_container_bytes", "offset": 173, "type": "u8"},
+        {"name": "adc0_calibration_state", "offset": 174, "type": "u8"},
+        {"name": "adc1_calibration_state", "offset": 175, "type": "u8"},
+        {"name": "adc_code_min", "offset": 176, "type": "u16"},
+        {"name": "adc_code_max", "offset": 178, "type": "u16"},
+        {"name": "adc_reference", "offset": 180, "type": "u8"},
+        {"name": "adc_clock_source", "offset": 181, "type": "u8"},
+        {"name": "adc_clock_divider", "offset": 182, "type": "u8"},
+        {"name": "adc_hardware_average_count", "offset": 183, "type": "u8"},
+        {"name": "adc_reference_mv_nominal", "offset": 184, "type": "u16"},
+        {"name": "adc_input_min_mv_nominal", "offset": 186, "type": "u16"},
+        {"name": "adc_input_max_mv_nominal", "offset": 188, "type": "u16"},
+        {"name": "adc_sample_time_adck", "offset": 190, "type": "u8"},
+        {"name": "adc_conversion_mode", "offset": 191, "type": "u8"},
+        {"name": "adc_configuration_flags", "offset": 192, "type": "u16"},
+        {"name": "adc0_pin", "offset": 194, "type": "u8"},
+        {"name": "adc1_pin", "offset": 195, "type": "u8"},
+        {"name": "adc0_peripheral", "offset": 196, "type": "u8"},
+        {"name": "adc1_peripheral", "offset": 197, "type": "u8"},
+        {"name": "adc0_channel", "offset": 198, "type": "u8"},
+        {"name": "adc1_channel", "offset": 199, "type": "u8"},
+        {"name": "adc_ipg_clock_hz", "offset": 200, "type": "u32"},
+        {"name": "adc_clock_hz", "offset": 204, "type": "u32"},
+        {"name": "adc_calibration_deadline_us", "offset": 208, "type": "u32"},
+        {"name": "adc0_calibration_cycles", "offset": 212, "type": "u32"},
+        {"name": "adc1_calibration_cycles", "offset": 216, "type": "u32"},
+        {"name": "adc_initialization_error_flags", "offset": 220, "type": "u32"}
       ]
     },
     "stop_response": {
@@ -1044,7 +1161,33 @@
           "gpio_edma_channel": 2,
           "gpio_dmamux_source": 30,
           "gpio_edma_priority": 2,
-          "gpio_xbar_active_edge": 1
+          "gpio_xbar_active_edge": 1,
+          "adc_code_min": 0,
+          "adc_code_max": 4095,
+          "adc_reference": 1,
+          "adc_clock_source": 1,
+          "adc_clock_divider": 4,
+          "adc_hardware_average_count": 0,
+          "adc_reference_mv_nominal": 3300,
+          "adc_input_min_mv_nominal": 0,
+          "adc_input_max_mv_nominal": 3300,
+          "adc_sample_time_adck": 3,
+          "adc_conversion_mode": 2,
+          "adc_configuration_flags": 142,
+          "adc0_calibration_state": 0,
+          "adc1_calibration_state": 0,
+          "adc0_pin": 14,
+          "adc1_pin": 15,
+          "adc0_peripheral": 1,
+          "adc1_peripheral": 2,
+          "adc0_channel": 7,
+          "adc1_channel": 8,
+          "adc_ipg_clock_hz": 150000000,
+          "adc_clock_hz": 37500000,
+          "adc_calibration_deadline_us": 10000,
+          "adc0_calibration_cycles": 0,
+          "adc1_calibration_cycles": 0,
+          "adc_initialization_error_flags": 0
         }
       }
     },
@@ -1127,7 +1270,35 @@
           "gpio_resource_conflicts": 0,
           "gpio_start_errors": 0,
           "gpio_stop_errors": 0,
-          "gpio_stale_dma_completions": 0
+          "gpio_stale_dma_completions": 0,
+          "adc_resolution_bits": 12,
+          "adc_container_bytes": 2,
+          "adc0_calibration_state": 0,
+          "adc1_calibration_state": 0,
+          "adc_code_min": 0,
+          "adc_code_max": 4095,
+          "adc_reference": 1,
+          "adc_clock_source": 1,
+          "adc_clock_divider": 4,
+          "adc_hardware_average_count": 0,
+          "adc_reference_mv_nominal": 3300,
+          "adc_input_min_mv_nominal": 0,
+          "adc_input_max_mv_nominal": 3300,
+          "adc_sample_time_adck": 3,
+          "adc_conversion_mode": 2,
+          "adc_configuration_flags": 142,
+          "adc0_pin": 14,
+          "adc1_pin": 15,
+          "adc0_peripheral": 1,
+          "adc1_peripheral": 2,
+          "adc0_channel": 7,
+          "adc1_channel": 8,
+          "adc_ipg_clock_hz": 150000000,
+          "adc_clock_hz": 37500000,
+          "adc_calibration_deadline_us": 10000,
+          "adc0_calibration_cycles": 0,
+          "adc1_calibration_cycles": 0,
+          "adc_initialization_error_flags": 0
         }
       }
     },

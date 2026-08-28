@@ -13,6 +13,7 @@ related:
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
+  - '[[ADR-004-ADC-Trigger-DMA]]'
 ---
 
 # Protocol v1
@@ -289,7 +290,7 @@ version, and two reserved zero bytes.
 ### INFO
 
 INFO is idempotent and valid in IDLE, CONFIGURED, and RUNNING. Its request is
-empty. Its 128-byte success payload reports:
+empty. Its 180-byte success payload reports:
 
 - state and protocol version;
 - supported stream and source masks;
@@ -302,7 +303,10 @@ empty. Its 128-byte success payload reports:
 - a 32-byte NUL-terminated, NUL-padded ASCII build ID (31 characters maximum);
 - packed GPIO width, raw/packed/packet ring capacities, optional capture-
   diagnostic mode and availability flags, and the exact PIT/XBAR/eDMA resource
-  IDs reserved by physical GPIO acquisition.
+  IDs reserved by physical GPIO acquisition;
+- the actual ADC resolution/code range, reference/range and clock/sample
+  configuration, fixed converter routes, per-converter calibration outcome and
+  cycle count, and typed initialization flags/errors.
 
 | Offset | Width/type | Field |
 | ---: | --- | --- |
@@ -344,6 +348,48 @@ empty. Its 128-byte success payload reports:
 | 118 | 2 / `u16` | reserved, zero |
 | 120 | 7 / `u8[7]` | PIT channel, XBAR input/output, eDMA channel, DMAMUX source, eDMA priority, XBAR edge |
 | 127 | 1 / `u8` | reserved, zero |
+| 128 | 2 / `u16` | ADC minimum code, zero |
+| 130 | 2 / `u16` | ADC maximum code, 4,095 at 12-bit or 1,023 at gated 10-bit |
+| 132 | 1 / `u8` | ADC reference ID |
+| 133 | 1 / `u8` | ADC clock-source ID |
+| 134 | 1 / `u8` | total ADC clock divider, exactly 4 |
+| 135 | 1 / `u8` | hardware averaging count, exactly zero |
+| 136 | 2 / `u16` | nominal reference in mV, 3,300 |
+| 138 | 2 / `u16` | nominal input minimum in mV, zero |
+| 140 | 2 / `u16` | nominal input maximum in mV, 3,300 |
+| 142 | 1 / `u8` | sample duration in ADCK cycles, exactly 3 |
+| 143 | 1 / `u8` | i.MX RT1062 CFG mode, 2 for 12-bit or 1 for 10-bit |
+| 144 | 2 / `u16` | ADC configuration flags |
+| 146 | 2 / `u8[2]` | ADC0 and ADC1 calibration states |
+| 148 | 2 / `u8[2]` | logical ADC pins, exactly A0/D14 then A1/D15 |
+| 150 | 2 / `u8[2]` | NXP ADC peripherals, exactly ADC1 then ADC2 |
+| 152 | 2 / `u8[2]` | ADC input channels, exactly 7 then 8 |
+| 154 | 2 / `u16` | reserved, zero |
+| 156 | 4 / `u32` | IPG clock in Hz, exactly 150,000,000 |
+| 160 | 4 / `u32` | ADC clock in Hz, exactly 37,500,000 |
+| 164 | 4 / `u32` | per-converter calibration deadline in us, 10,000 |
+| 168 | 8 / `u32[2]` | ADC0 and ADC1 calibration elapsed DWT cycles |
+| 176 | 4 / `u32` | ADC initialization error flags |
+
+ADC reference ID 1 means VREFH/VREFL with a nominal 3.3 V board reference;
+clock-source ID 1 means synchronous IPG. Calibration states are `NOT_RUN` (0),
+`SUCCEEDED` (1), `FAILED` (2), `TIMED_OUT` (3), `ROUTE_INVALID` (4),
+`CONFIGURATION_INVALID` (5), and `CLOCK_UNAVAILABLE` (6).
+
+ADC configuration flags are `INITIALIZED` (1), `NO_HARDWARE_AVERAGING` (2),
+`HIGH_SPEED` (4), `SHORTEST_SAMPLE` (8), `ROUTES_VALIDATED` (16),
+`CONFIGURATION_READBACK_VALID` (32), `CALIBRATION_COMPLETE` (64),
+`PRIMARY_12_BIT` (128), and `FALLBACK_10_BIT` (256). Exactly one resolution
+flag must agree with the advertised resolution/code range. `INITIALIZED`
+requires both calibration states to be `SUCCEEDED`, zero initialization
+errors, and all route/readback/calibration flags.
+
+ADC initialization error bits distinguish DWT unavailability (1), ADC0/ADC1
+route errors (2/4), configuration errors (8/16), calibration failures (32/64),
+calibration timeouts (128/256), and post-calibration readback errors
+(512/1,024). This metadata reports nominal board/reference limits; it is not a
+per-unit voltage calibration or an analog-accuracy claim. See
+[[ADR-004-ADC-Trigger-DMA]].
 
 Stream-mask bits are ADC = 1 and GPIO = 2. Source IDs are hardware = 0 and
 synthetic = 1; the INFO supported-source mask uses `1 << source_id`. Board IDs
@@ -420,10 +466,11 @@ preflight changes no acquisition registers and allocates no run ID.
 ### GET_STATUS
 
 GET_STATUS is idempotent in every post-boot state and has an empty request. Its
-172-byte success payload contains the common prefix, configuration and legacy
+224-byte success payload contains the common prefix, configuration and legacy
 stream counters, followed by physical GPIO stage counts, queue depths/high-
-water marks, resource conflicts, lifecycle failures, and stale-completion
-diagnostics. The header carries the current or most recent run ID. INFO,
+water marks, resource conflicts, lifecycle failures, stale-completion
+diagnostics, and the same immutable ADC initialization snapshot reported by
+INFO. The header carries the current or most recent run ID. INFO,
 GET_STATUS, and STOP are dispatched before bounded GPIO pack/packet work so
 they remain responsive during GPIO-only streaming.
 
@@ -467,6 +514,19 @@ they remain responsive during GPIO-only streaming.
 | 160 | 4 / `u32` | GPIO START failures |
 | 164 | 4 / `u32` | GPIO STOP/cleanup failures |
 | 168 | 4 / `u32` | stale DMA completions rejected outside the active run |
+| 172 | 2 / `u8[2]` | ADC resolution bits and container bytes |
+| 174 | 2 / `u8[2]` | ADC0 and ADC1 calibration states |
+| 176 | 4 / `u16[2]` | ADC minimum and maximum code |
+| 180 | 4 / `u8[4]` | reference ID, clock-source ID, divider, averaging count |
+| 184 | 6 / `u16[3]` | nominal reference/input-min/input-max in mV |
+| 190 | 2 / `u8[2]` | sample ADCK cycles and CFG conversion mode |
+| 192 | 2 / `u16` | ADC configuration flags |
+| 194 | 6 / `u8[6]` | pins, peripherals, and channels for ADC0/ADC1 |
+| 200 | 4 / `u32` | IPG clock in Hz |
+| 204 | 4 / `u32` | ADC clock in Hz |
+| 208 | 4 / `u32` | per-converter calibration deadline in us |
+| 212 | 8 / `u32[2]` | ADC0 and ADC1 calibration elapsed DWT cycles |
+| 220 | 4 / `u32` | ADC initialization error flags |
 
 | Counter | Wire type | Unit |
 | --- | --- | --- |

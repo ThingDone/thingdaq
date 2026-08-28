@@ -27,9 +27,11 @@ related:
 Accepted as the Phase 07 converter and resource contract. Logical ADC0 is
 permanently bound to Teensy A0 through NXP ADC1 channel 7; logical ADC1 is
 permanently bound to Teensy A1 through NXP ADC2 channel 8. The register-level
-initializer, bounded calibration, trigger schedule, DMA ring, and physical
-capability remain future Phase 07 work and must pass their separate local and
-rig gates before this decision can be described as silicon-verified.
+initializer and independently bounded calibration are implemented and pass
+host and pinned-target build gates. The trigger schedule, DMA ring, physical
+capability, and on-silicon calibration evidence remain future Phase 07 work
+and must pass their separate local and rig gates before this decision can be
+described as silicon-verified.
 
 ## Context
 
@@ -128,9 +130,9 @@ short. These values describe digital trigger timing, not analog aperture.
 Future diagnostics may measure conversion completion relative to DWT or
 another conflict-free hardware counter, but must retain that distinction.
 
-### Initial conversion-time assumption
+### Implemented initialization and conversion setting
 
-The primary configuration to be implemented is 12-bit, one `uint16_t` result,
+The implemented primary configuration is 12-bit, one `uint16_t` result,
 no hardware averaging, high-speed mode, short sample mode, and the shortest
 `ADSTS=00` setting. Select synchronous IPG as the ADC clock source and divide
 150 MHz by four, yielding `fADCK = 37.5 MHz`, below the data sheet's 40 MHz
@@ -147,8 +149,33 @@ total = 32 / 37.5 MHz + 2 / 150 MHz
 headroom before the same module's next 1 us trigger = 133.333 ns
 ```
 
-This is a configuration-selection assumption, not acceptance evidence. Clock
-readback, bounded calibration, ADC_ETC error flags, completion matching, and
+Teensy core startup normally calls its `analog_init()` implementation before
+C++ construction; that implementation calibrates both ADCs with unbounded
+busy loops. `adc_initializer_teensy.cpp` resolves that archive hook to a no-op
+that touches no project object, then overwrites the generic ADC configuration
+at the application BOOT boundary. It configures A0/A1 as non-driving analog
+inputs, disables all command slots, binds the modules through the fixed route
+table, checks the live `F_BUS_ACTUAL` IPG rate, and reads the mux, pad,
+clock-gate, CFG, GC, GS, and HC registers back.
+It does not depend on ADC library object or call order. Both calibrations start
+independently and are polled together against wrap-safe 600 MHz DWT elapsed
+cycles. Each has a 10,000 us deadline, and an independent 8,000,000-iteration
+poll ceiling remains a second hard bound if the cycle counter stops advancing.
+A route, configuration, clock, calibration, timeout, or post-calibration
+readback fault is retained separately for each converter and leaves physical
+ADC acquisition unavailable. Any future attempt to link the core `analogRead`
+path will surface a duplicate initialization-hook link failure rather than
+silently reintroducing the unbounded calibration path.
+
+INFO and STATUS report the actual resolution, two-byte container, code range,
+nominal VREFH/VREFL 3.3 V reference and 0-3.3 V input range, synchronous IPG
+clock/divider, ADCK rate, averaging count, sample clocks, CFG mode, fixed
+pin/peripheral/channel identities, deadline, per-converter calibration state
+and cycles, configuration flags, and initialization errors. An uninitialized
+or failed snapshot never carries the `INITIALIZED` flag.
+
+The arithmetic remains a configuration-selection assumption rather than
+full-rate acceptance evidence. ADC_ETC error flags, completion matching, and
 full-rate target capture must still prove it. The shortest sample setting also
 places an explicit low-source-impedance requirement on any accuracy fixture.
 Unstimulated or high-impedance A0/A1 data can prove routing and code range but
@@ -156,8 +183,13 @@ cannot prove 12-bit accuracy, analog bandwidth, aperture, phase, or settling.
 
 ### Fallback policy
 
-The implementation must first correct and test the 12-bit configuration above.
-It may select 10-bit only when a defined 12-bit timing/error gate still fails
+The initializer defaults to the 12-bit configuration above. Its resolution
+selector can choose 10-bit only when a completed gate records corrected
+configuration, exact-rate and calibration verification, and then a remaining
+timing-budget or conversion-error failure. An incomplete gate, route error, or
+calibration error cannot authorize fallback. The forthcoming full-rate target
+gate owns those inputs; because it has not yet run, the committed build remains
+explicitly 12-bit. It may select 10-bit only when that defined gate still fails
 at the exact 1 MHz-per-converter rate after clocks, calibration, trigger
 queues, and DMA ownership have been verified. A 10-bit fallback keeps the
 `uint16_t` container and the permanent ADC0/A0 and ADC1/A1 routes, but must
@@ -184,6 +216,8 @@ ADC capability remains unavailable rather than weakening metadata.
 - The initial 12-bit timing calculation fits one microsecond but has narrow
   headroom. Physical gating, not this arithmetic, determines whether it is
   accepted.
-- No new low-level ADC code or capability is enabled by this decision. Later
-  tasks own bounded calibration, register snapshots, exact arming/teardown,
-  interleaved DMA, packet integration, host decoding, and target evidence.
+- Bounded low-level initialization and calibration now run before BOOT enters
+  IDLE, and their exact snapshot is visible in INFO/STATUS. This does not
+  enable physical ADC streaming. Later tasks still own exact trigger
+  arming/teardown, interleaved DMA, packet integration, host data decoding, and
+  target evidence.

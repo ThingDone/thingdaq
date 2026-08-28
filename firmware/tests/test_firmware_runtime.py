@@ -15,6 +15,8 @@ CPP_TEST = FIRMWARE_DIRECTORY / "tests/firmware_runtime_test.cpp"
 PORTABLE_SOURCES = (
     FIRMWARE_SOURCE / "firmware_runtime.h",
     FIRMWARE_SOURCE / "firmware_runtime.cpp",
+    FIRMWARE_SOURCE / "adc_initializer.h",
+    FIRMWARE_SOURCE / "adc_initializer.cpp",
     FIRMWARE_SOURCE / "packet_buffer_pipeline.h",
     FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp",
     FIRMWARE_SOURCE / "synthetic_source.h",
@@ -50,6 +52,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "firmware_runtime.cpp"),
+                    str(FIRMWARE_SOURCE / "adc_initializer.cpp"),
                     str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
                     str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
                     str(FIRMWARE_SOURCE / "control_state.cpp"),

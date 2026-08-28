@@ -99,7 +99,9 @@ class ControlState {
 
   // Constant-time, idempotent BOOT completion. The future sketch supplies the
   // chip-derived USB serial before command polling begins.
-  bool completeBoot(std::uint32_t hardware_serial);
+  bool completeBoot(
+      std::uint32_t hardware_serial,
+      const protocol::AdcInitializationMetadata &adc_metadata = {});
 
   // Fail safe after an internal main-loop or response-path fault. Expected
   // typed command rejections do not use this path and remain state-atomic.
@@ -166,6 +168,7 @@ class ControlState {
   bool has_configuration_ = false;
   std::uint32_t run_id_ = 0U;
   std::uint32_t hardware_serial_ = 0U;
+  protocol::AdcInitializationMetadata adc_metadata_{};
   std::uint8_t pending_event_mask_ = 0U;
   stats::Statistics statistics_{};
 };

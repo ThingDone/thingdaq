@@ -6,7 +6,7 @@ import struct
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import Generic, TypeVar, overload
+from typing import Any, Generic, TypeVar, overload
 
 from ._generated import protocol_constants as constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
@@ -18,6 +18,12 @@ _GPIO_CLOCK_DIAGNOSTIC_REQUEST = struct.Struct("<IHH")
 _RESPONSE_PREFIX = struct.Struct("<BBH")
 _STATUS_COUNTERS = struct.Struct("<QQQQII")
 _ResponseValue = TypeVar("_ResponseValue")
+_DEFAULT_ADC_CONFIGURATION_FLAGS = (
+    constants.AdcConfigurationFlag.NO_HARDWARE_AVERAGING
+    | constants.AdcConfigurationFlag.HIGH_SPEED
+    | constants.AdcConfigurationFlag.SHORTEST_SAMPLE
+    | constants.AdcConfigurationFlag.PRIMARY_12_BIT
+)
 
 
 def _unsigned(name: str, value: int, bits: int) -> None:
@@ -61,6 +67,249 @@ def _success_prefix(payload: bytes, expected_size: int) -> None:
         or error != constants.ErrorCode.OK
     ):
         raise FrameValidationError("payload does not contain a successful response")
+
+
+def _normalize_adc_metadata(value: Any) -> None:
+    """Validate and normalize the common INFO/STATUS ADC metadata fields."""
+
+    resolution = value.adc_resolution_bits
+    if resolution not in (
+        constants.ADC_PRIMARY_RESOLUTION_BITS,
+        constants.ADC_FALLBACK_RESOLUTION_BITS,
+    ) or isinstance(resolution, bool):
+        raise ValueError("ADC resolution must be the primary 12 or gated 10 bits")
+    expected_max = (1 << resolution) - 1
+    expected_mode = 2 if resolution == constants.ADC_PRIMARY_RESOLUTION_BITS else 1
+
+    try:
+        reference = constants.AdcReference(value.adc_reference)
+        clock_source = constants.AdcClockSource(value.adc_clock_source)
+        calibration_states = tuple(
+            constants.AdcCalibrationState(state)
+            for state in value.adc_calibration_states
+        )
+        flags = constants.AdcConfigurationFlag(value.adc_configuration_flags)
+        errors = constants.AdcInitializationError(value.adc_initialization_error_flags)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("ADC metadata contains an unknown enum value") from exc
+    if len(calibration_states) != 2:
+        raise ValueError("ADC metadata requires two calibration states")
+    if int(flags) & ~constants.KNOWN_ADC_CONFIGURATION_FLAG_MASK:
+        raise ValueError("ADC configuration contains reserved flags")
+    if int(errors) & ~constants.KNOWN_ADC_INITIALIZATION_ERROR_MASK:
+        raise ValueError("ADC initialization contains reserved error flags")
+
+    pins = tuple(value.adc_pins)
+    peripherals = tuple(value.adc_peripherals)
+    channels = tuple(value.adc_channels)
+    calibration_cycles = tuple(value.adc_calibration_cycles)
+    if pins != constants.ADC_PINS:
+        raise ValueError("ADC pins must remain logical ADC0=A0 and ADC1=A1")
+    if peripherals != constants.ADC_PERIPHERALS:
+        raise ValueError("ADC peripherals must remain ADC1 then ADC2")
+    if channels != constants.ADC_CHANNELS:
+        raise ValueError("ADC mux channels must remain 7 then 8")
+    if len(calibration_cycles) != 2:
+        raise ValueError("ADC metadata requires two calibration cycle counts")
+    for cycles in calibration_cycles:
+        _unsigned("ADC calibration cycles", cycles, 32)
+
+    fixed_values = (
+        ("adc_container_bytes", constants.ADC_CONTAINER_BITS // 8),
+        ("adc_code_min", constants.ADC_CODE_MIN),
+        ("adc_code_max", expected_max),
+        ("adc_clock_divider", constants.ADC_CLOCK_DIVIDER),
+        ("adc_hardware_average_count", constants.ADC_HARDWARE_AVERAGE_COUNT),
+        ("adc_reference_mv_nominal", constants.ADC_REFERENCE_MV_NOMINAL),
+        ("adc_input_min_mv_nominal", constants.ADC_INPUT_MIN_MV_NOMINAL),
+        ("adc_input_max_mv_nominal", constants.ADC_INPUT_MAX_MV_NOMINAL),
+        ("adc_sample_time_adck", constants.ADC_SAMPLE_TIME_ADCK),
+        ("adc_conversion_mode", expected_mode),
+        ("adc_ipg_clock_hz", constants.ADC_IPG_CLOCK_HZ),
+        ("adc_clock_hz", constants.ADC_CLOCK_HZ),
+        ("adc_calibration_deadline_us", constants.ADC_CALIBRATION_DEADLINE_US),
+    )
+    if any(
+        not isinstance(getattr(value, name), int)
+        or isinstance(getattr(value, name), bool)
+        or getattr(value, name) != expected
+        for name, expected in fixed_values
+    ):
+        raise ValueError("ADC metadata is incompatible with protocol v1")
+    if reference is not constants.AdcReference.VREFH_VREFL_NOMINAL_3V3:
+        raise ValueError("ADC reference must report nominal VREFH/VREFL 3.3 V")
+    if clock_source is not constants.AdcClockSource.SYNCHRONOUS_IPG:
+        raise ValueError("ADC clock source must report synchronous IPG")
+
+    required = (
+        constants.AdcConfigurationFlag.NO_HARDWARE_AVERAGING
+        | constants.AdcConfigurationFlag.HIGH_SPEED
+        | constants.AdcConfigurationFlag.SHORTEST_SAMPLE
+    )
+    selected_resolution_flag = (
+        constants.AdcConfigurationFlag.PRIMARY_12_BIT
+        if resolution == constants.ADC_PRIMARY_RESOLUTION_BITS
+        else constants.AdcConfigurationFlag.FALLBACK_10_BIT
+    )
+    other_resolution_flag = (
+        constants.AdcConfigurationFlag.FALLBACK_10_BIT
+        if resolution == constants.ADC_PRIMARY_RESOLUTION_BITS
+        else constants.AdcConfigurationFlag.PRIMARY_12_BIT
+    )
+    if flags & required != required or not flags & selected_resolution_flag:
+        raise ValueError("ADC configuration flags do not describe actual settings")
+    if flags & other_resolution_flag:
+        raise ValueError("ADC configuration advertises conflicting resolutions")
+    if flags & constants.AdcConfigurationFlag.INITIALIZED:
+        required_ready = (
+            constants.AdcConfigurationFlag.ROUTES_VALIDATED
+            | constants.AdcConfigurationFlag.CONFIGURATION_READBACK_VALID
+            | constants.AdcConfigurationFlag.CALIBRATION_COMPLETE
+        )
+        if (
+            errors
+            or flags & required_ready != required_ready
+            or calibration_states
+            != (
+                constants.AdcCalibrationState.SUCCEEDED,
+                constants.AdcCalibrationState.SUCCEEDED,
+            )
+        ):
+            raise ValueError("initialized ADC metadata is not internally consistent")
+
+    object.__setattr__(value, "adc_reference", reference)
+    object.__setattr__(value, "adc_clock_source", clock_source)
+    object.__setattr__(value, "adc_calibration_states", calibration_states)
+    object.__setattr__(value, "adc_configuration_flags", flags)
+    object.__setattr__(value, "adc_initialization_error_flags", errors)
+    object.__setattr__(value, "adc_pins", pins)
+    object.__setattr__(value, "adc_peripherals", peripherals)
+    object.__setattr__(value, "adc_channels", channels)
+    object.__setattr__(value, "adc_calibration_cycles", calibration_cycles)
+
+
+def _adc_offset(prefix: str, field: str) -> int:
+    separator = "" if field[:1] in {"0", "1"} else "_"
+    return int(getattr(constants, f"{prefix}_ADC{separator}{field}_OFFSET"))
+
+
+def _pack_adc_metadata(payload: bytearray, value: Any, prefix: str) -> None:
+    payload[_adc_offset(prefix, "RESOLUTION_BITS")] = value.adc_resolution_bits
+    payload[_adc_offset(prefix, "CONTAINER_BYTES")] = value.adc_container_bytes
+    payload[_adc_offset(prefix, "REFERENCE")] = int(value.adc_reference)
+    payload[_adc_offset(prefix, "CLOCK_SOURCE")] = int(value.adc_clock_source)
+    payload[_adc_offset(prefix, "CLOCK_DIVIDER")] = value.adc_clock_divider
+    payload[_adc_offset(prefix, "HARDWARE_AVERAGE_COUNT")] = (
+        value.adc_hardware_average_count
+    )
+    payload[_adc_offset(prefix, "SAMPLE_TIME_ADCK")] = value.adc_sample_time_adck
+    payload[_adc_offset(prefix, "CONVERSION_MODE")] = value.adc_conversion_mode
+    calibration_states = value.adc_calibration_states
+    payload[_adc_offset(prefix, "0_CALIBRATION_STATE")] = int(calibration_states[0])
+    payload[_adc_offset(prefix, "1_CALIBRATION_STATE")] = int(calibration_states[1])
+    for field, values in (
+        ("PIN", value.adc_pins),
+        ("PERIPHERAL", value.adc_peripherals),
+        ("CHANNEL", value.adc_channels),
+    ):
+        payload[_adc_offset(prefix, f"0_{field}")] = values[0]
+        payload[_adc_offset(prefix, f"1_{field}")] = values[1]
+    for field, attribute in (
+        ("CODE_MIN", "adc_code_min"),
+        ("CODE_MAX", "adc_code_max"),
+        ("REFERENCE_MV_NOMINAL", "adc_reference_mv_nominal"),
+        ("INPUT_MIN_MV_NOMINAL", "adc_input_min_mv_nominal"),
+        ("INPUT_MAX_MV_NOMINAL", "adc_input_max_mv_nominal"),
+        ("CONFIGURATION_FLAGS", "adc_configuration_flags"),
+    ):
+        struct.pack_into(
+            "<H", payload, _adc_offset(prefix, field), int(getattr(value, attribute))
+        )
+    for field, attribute in (
+        ("IPG_CLOCK_HZ", "adc_ipg_clock_hz"),
+        ("CLOCK_HZ", "adc_clock_hz"),
+        ("CALIBRATION_DEADLINE_US", "adc_calibration_deadline_us"),
+        ("INITIALIZATION_ERROR_FLAGS", "adc_initialization_error_flags"),
+    ):
+        struct.pack_into(
+            "<I", payload, _adc_offset(prefix, field), int(getattr(value, attribute))
+        )
+    calibration_cycles = value.adc_calibration_cycles
+    struct.pack_into(
+        "<I",
+        payload,
+        _adc_offset(prefix, "0_CALIBRATION_CYCLES"),
+        calibration_cycles[0],
+    )
+    struct.pack_into(
+        "<I",
+        payload,
+        _adc_offset(prefix, "1_CALIBRATION_CYCLES"),
+        calibration_cycles[1],
+    )
+
+
+def _unpack_adc_metadata(payload: bytes, prefix: str) -> dict[str, Any]:
+    def u16(field: str) -> int:
+        return int(struct.unpack_from("<H", payload, _adc_offset(prefix, field))[0])
+
+    def u32(field: str) -> int:
+        return int(struct.unpack_from("<I", payload, _adc_offset(prefix, field))[0])
+
+    return {
+        "adc_resolution_bits": payload[_adc_offset(prefix, "RESOLUTION_BITS")],
+        "adc_container_bytes": payload[_adc_offset(prefix, "CONTAINER_BYTES")],
+        "adc_code_min": u16("CODE_MIN"),
+        "adc_code_max": u16("CODE_MAX"),
+        "adc_reference": constants.AdcReference(
+            payload[_adc_offset(prefix, "REFERENCE")]
+        ),
+        "adc_clock_source": constants.AdcClockSource(
+            payload[_adc_offset(prefix, "CLOCK_SOURCE")]
+        ),
+        "adc_clock_divider": payload[_adc_offset(prefix, "CLOCK_DIVIDER")],
+        "adc_hardware_average_count": payload[
+            _adc_offset(prefix, "HARDWARE_AVERAGE_COUNT")
+        ],
+        "adc_reference_mv_nominal": u16("REFERENCE_MV_NOMINAL"),
+        "adc_input_min_mv_nominal": u16("INPUT_MIN_MV_NOMINAL"),
+        "adc_input_max_mv_nominal": u16("INPUT_MAX_MV_NOMINAL"),
+        "adc_sample_time_adck": payload[_adc_offset(prefix, "SAMPLE_TIME_ADCK")],
+        "adc_conversion_mode": payload[_adc_offset(prefix, "CONVERSION_MODE")],
+        "adc_configuration_flags": constants.AdcConfigurationFlag(
+            u16("CONFIGURATION_FLAGS")
+        ),
+        "adc_calibration_states": (
+            constants.AdcCalibrationState(
+                payload[_adc_offset(prefix, "0_CALIBRATION_STATE")]
+            ),
+            constants.AdcCalibrationState(
+                payload[_adc_offset(prefix, "1_CALIBRATION_STATE")]
+            ),
+        ),
+        "adc_pins": (
+            payload[_adc_offset(prefix, "0_PIN")],
+            payload[_adc_offset(prefix, "1_PIN")],
+        ),
+        "adc_peripherals": (
+            payload[_adc_offset(prefix, "0_PERIPHERAL")],
+            payload[_adc_offset(prefix, "1_PERIPHERAL")],
+        ),
+        "adc_channels": (
+            payload[_adc_offset(prefix, "0_CHANNEL")],
+            payload[_adc_offset(prefix, "1_CHANNEL")],
+        ),
+        "adc_ipg_clock_hz": u32("IPG_CLOCK_HZ"),
+        "adc_clock_hz": u32("CLOCK_HZ"),
+        "adc_calibration_deadline_us": u32("CALIBRATION_DEADLINE_US"),
+        "adc_calibration_cycles": (
+            u32("0_CALIBRATION_CYCLES"),
+            u32("1_CALIBRATION_CYCLES"),
+        ),
+        "adc_initialization_error_flags": constants.AdcInitializationError(
+            u32("INITIALIZATION_ERROR_FLAGS")
+        ),
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -1129,6 +1378,40 @@ class DeviceCapabilities:
     gpio_sample_period_ticks: int = constants.GPIO_SAMPLE_PERIOD_TICKS
     adc_resolution_bits: int = constants.ADC_RESOLUTION_BITS
     adc_container_bytes: int = constants.ADC_CONTAINER_BITS // 8
+    adc_code_min: int = constants.ADC_CODE_MIN
+    adc_code_max: int = (1 << constants.ADC_PRIMARY_RESOLUTION_BITS) - 1
+    adc_reference: constants.AdcReference = (
+        constants.AdcReference.VREFH_VREFL_NOMINAL_3V3
+    )
+    adc_clock_source: constants.AdcClockSource = (
+        constants.AdcClockSource.SYNCHRONOUS_IPG
+    )
+    adc_clock_divider: int = constants.ADC_CLOCK_DIVIDER
+    adc_hardware_average_count: int = constants.ADC_HARDWARE_AVERAGE_COUNT
+    adc_reference_mv_nominal: int = constants.ADC_REFERENCE_MV_NOMINAL
+    adc_input_min_mv_nominal: int = constants.ADC_INPUT_MIN_MV_NOMINAL
+    adc_input_max_mv_nominal: int = constants.ADC_INPUT_MAX_MV_NOMINAL
+    adc_sample_time_adck: int = constants.ADC_SAMPLE_TIME_ADCK
+    adc_conversion_mode: int = 2
+    adc_configuration_flags: constants.AdcConfigurationFlag = (
+        _DEFAULT_ADC_CONFIGURATION_FLAGS
+    )
+    adc_calibration_states: tuple[
+        constants.AdcCalibrationState, constants.AdcCalibrationState
+    ] = (
+        constants.AdcCalibrationState.NOT_RUN,
+        constants.AdcCalibrationState.NOT_RUN,
+    )
+    adc_pins: tuple[int, int] = constants.ADC_PINS
+    adc_peripherals: tuple[int, int] = constants.ADC_PERIPHERALS
+    adc_channels: tuple[int, int] = constants.ADC_CHANNELS
+    adc_ipg_clock_hz: int = constants.ADC_IPG_CLOCK_HZ
+    adc_clock_hz: int = constants.ADC_CLOCK_HZ
+    adc_calibration_deadline_us: int = constants.ADC_CALIBRATION_DEADLINE_US
+    adc_calibration_cycles: tuple[int, int] = (0, 0)
+    adc_initialization_error_flags: constants.AdcInitializationError = (
+        constants.AdcInitializationError.NONE
+    )
     gpio_pin_map: tuple[int, ...] = constants.GPIO_PINS_BY_BIT
     gpio_packed_width_bits: int = constants.GPIO_PACKED_WIDTH_BITS
     gpio_raw_ring_depth: int = constants.GPIO_RAW_RING_DEPTH
@@ -1180,6 +1463,7 @@ class DeviceCapabilities:
         object.__setattr__(self, "gpio_capture_diagnostic_flags", diagnostic_flags)
         gpio_pin_map = tuple(self.gpio_pin_map)
         object.__setattr__(self, "gpio_pin_map", gpio_pin_map)
+        _normalize_adc_metadata(self)
 
         valid_streams = int(constants.StreamMask.ADC | constants.StreamMask.GPIO)
         if int(stream_mask) & ~valid_streams:
@@ -1234,8 +1518,6 @@ class DeviceCapabilities:
             (self.adc_pair_period_ticks, constants.ADC_PAIR_PERIOD_TICKS),
             (self.adc1_phase_ticks, constants.ADC1_PHASE_TICKS),
             (self.gpio_sample_period_ticks, constants.GPIO_SAMPLE_PERIOD_TICKS),
-            (self.adc_resolution_bits, constants.ADC_RESOLUTION_BITS),
-            (self.adc_container_bytes, constants.ADC_CONTAINER_BITS // 8),
             (self.gpio_packed_width_bits, constants.GPIO_PACKED_WIDTH_BITS),
             (self.gpio_raw_ring_depth, constants.GPIO_RAW_RING_DEPTH),
             (self.gpio_packed_ring_depth, constants.GPIO_PACKED_RING_DEPTH),
@@ -1341,6 +1623,40 @@ class DeviceInfo:
     gpio_sample_period_ticks: int = constants.GPIO_SAMPLE_PERIOD_TICKS
     adc_resolution_bits: int = constants.ADC_RESOLUTION_BITS
     adc_container_bytes: int = constants.ADC_CONTAINER_BITS // 8
+    adc_code_min: int = constants.ADC_CODE_MIN
+    adc_code_max: int = (1 << constants.ADC_PRIMARY_RESOLUTION_BITS) - 1
+    adc_reference: constants.AdcReference = (
+        constants.AdcReference.VREFH_VREFL_NOMINAL_3V3
+    )
+    adc_clock_source: constants.AdcClockSource = (
+        constants.AdcClockSource.SYNCHRONOUS_IPG
+    )
+    adc_clock_divider: int = constants.ADC_CLOCK_DIVIDER
+    adc_hardware_average_count: int = constants.ADC_HARDWARE_AVERAGE_COUNT
+    adc_reference_mv_nominal: int = constants.ADC_REFERENCE_MV_NOMINAL
+    adc_input_min_mv_nominal: int = constants.ADC_INPUT_MIN_MV_NOMINAL
+    adc_input_max_mv_nominal: int = constants.ADC_INPUT_MAX_MV_NOMINAL
+    adc_sample_time_adck: int = constants.ADC_SAMPLE_TIME_ADCK
+    adc_conversion_mode: int = 2
+    adc_configuration_flags: constants.AdcConfigurationFlag = (
+        _DEFAULT_ADC_CONFIGURATION_FLAGS
+    )
+    adc_calibration_states: tuple[
+        constants.AdcCalibrationState, constants.AdcCalibrationState
+    ] = (
+        constants.AdcCalibrationState.NOT_RUN,
+        constants.AdcCalibrationState.NOT_RUN,
+    )
+    adc_pins: tuple[int, int] = constants.ADC_PINS
+    adc_peripherals: tuple[int, int] = constants.ADC_PERIPHERALS
+    adc_channels: tuple[int, int] = constants.ADC_CHANNELS
+    adc_ipg_clock_hz: int = constants.ADC_IPG_CLOCK_HZ
+    adc_clock_hz: int = constants.ADC_CLOCK_HZ
+    adc_calibration_deadline_us: int = constants.ADC_CALIBRATION_DEADLINE_US
+    adc_calibration_cycles: tuple[int, int] = (0, 0)
+    adc_initialization_error_flags: constants.AdcInitializationError = (
+        constants.AdcInitializationError.NONE
+    )
     gpio_pin_map: tuple[int, ...] = constants.GPIO_PINS_BY_BIT
     gpio_packed_width_bits: int = constants.GPIO_PACKED_WIDTH_BITS
     gpio_raw_ring_depth: int = constants.GPIO_RAW_RING_DEPTH
@@ -1387,6 +1703,7 @@ class DeviceInfo:
             constants.INFO_RESPONSE_BUILD_ID_COUNT
         ):
             raise ValueError("build_id must fit 31 ASCII bytes without embedded NUL")
+        _normalize_adc_metadata(self)
         # Constructing the nested view validates and normalizes every
         # capability/layout field at this outer model boundary too.
         capabilities = self.capabilities
@@ -1442,6 +1759,27 @@ class DeviceInfo:
             gpio_sample_period_ticks=self.gpio_sample_period_ticks,
             adc_resolution_bits=self.adc_resolution_bits,
             adc_container_bytes=self.adc_container_bytes,
+            adc_code_min=self.adc_code_min,
+            adc_code_max=self.adc_code_max,
+            adc_reference=self.adc_reference,
+            adc_clock_source=self.adc_clock_source,
+            adc_clock_divider=self.adc_clock_divider,
+            adc_hardware_average_count=self.adc_hardware_average_count,
+            adc_reference_mv_nominal=self.adc_reference_mv_nominal,
+            adc_input_min_mv_nominal=self.adc_input_min_mv_nominal,
+            adc_input_max_mv_nominal=self.adc_input_max_mv_nominal,
+            adc_sample_time_adck=self.adc_sample_time_adck,
+            adc_conversion_mode=self.adc_conversion_mode,
+            adc_configuration_flags=self.adc_configuration_flags,
+            adc_calibration_states=self.adc_calibration_states,
+            adc_pins=self.adc_pins,
+            adc_peripherals=self.adc_peripherals,
+            adc_channels=self.adc_channels,
+            adc_ipg_clock_hz=self.adc_ipg_clock_hz,
+            adc_clock_hz=self.adc_clock_hz,
+            adc_calibration_deadline_us=self.adc_calibration_deadline_us,
+            adc_calibration_cycles=self.adc_calibration_cycles,
+            adc_initialization_error_flags=(self.adc_initialization_error_flags),
             gpio_pin_map=self.gpio_pin_map,
             gpio_packed_width_bits=self.gpio_packed_width_bits,
             gpio_raw_ring_depth=self.gpio_raw_ring_depth,
@@ -1477,7 +1815,7 @@ class DeviceInfo:
         return self.capabilities.supports(capability)
 
     def to_payload(self) -> bytes:
-        """Encode a successful 128-byte INFO response payload."""
+        """Encode a successful INFO response with actual ADC settings."""
 
         payload = bytearray(constants.INFO_RESPONSE_PAYLOAD_SIZE)
         _RESPONSE_PREFIX.pack_into(
@@ -1577,6 +1915,7 @@ class DeviceInfo:
                 self.gpio_xbar_active_edge,
             )
         )
+        _pack_adc_metadata(payload, self, "INFO_RESPONSE")
         return bytes(payload)
 
     @classmethod
@@ -1672,12 +2011,6 @@ class DeviceInfo:
                 payload_bytes,
                 constants.INFO_RESPONSE_GPIO_SAMPLE_PERIOD_TICKS_OFFSET,
             )[0],
-            adc_resolution_bits=payload_bytes[
-                constants.INFO_RESPONSE_ADC_RESOLUTION_BITS_OFFSET
-            ],
-            adc_container_bytes=payload_bytes[
-                constants.INFO_RESPONSE_ADC_CONTAINER_BYTES_OFFSET
-            ],
             gpio_pin_map=tuple(
                 payload_bytes[
                     constants.INFO_RESPONSE_GPIO_PIN_MAP_OFFSET : constants.INFO_RESPONSE_GPIO_PIN_MAP_OFFSET
@@ -1744,6 +2077,7 @@ class DeviceInfo:
             gpio_xbar_active_edge=payload_bytes[
                 constants.INFO_RESPONSE_GPIO_XBAR_ACTIVE_EDGE_OFFSET
             ],
+            **_unpack_adc_metadata(payload_bytes, "INFO_RESPONSE"),
         )
 
 
@@ -1792,6 +2126,42 @@ class Status:
     gpio_start_errors: int = 0
     gpio_stop_errors: int = 0
     gpio_stale_dma_completions: int = 0
+    adc_resolution_bits: int = constants.ADC_RESOLUTION_BITS
+    adc_container_bytes: int = constants.ADC_CONTAINER_BITS // 8
+    adc_code_min: int = constants.ADC_CODE_MIN
+    adc_code_max: int = (1 << constants.ADC_PRIMARY_RESOLUTION_BITS) - 1
+    adc_reference: constants.AdcReference = (
+        constants.AdcReference.VREFH_VREFL_NOMINAL_3V3
+    )
+    adc_clock_source: constants.AdcClockSource = (
+        constants.AdcClockSource.SYNCHRONOUS_IPG
+    )
+    adc_clock_divider: int = constants.ADC_CLOCK_DIVIDER
+    adc_hardware_average_count: int = constants.ADC_HARDWARE_AVERAGE_COUNT
+    adc_reference_mv_nominal: int = constants.ADC_REFERENCE_MV_NOMINAL
+    adc_input_min_mv_nominal: int = constants.ADC_INPUT_MIN_MV_NOMINAL
+    adc_input_max_mv_nominal: int = constants.ADC_INPUT_MAX_MV_NOMINAL
+    adc_sample_time_adck: int = constants.ADC_SAMPLE_TIME_ADCK
+    adc_conversion_mode: int = 2
+    adc_configuration_flags: constants.AdcConfigurationFlag = (
+        _DEFAULT_ADC_CONFIGURATION_FLAGS
+    )
+    adc_calibration_states: tuple[
+        constants.AdcCalibrationState, constants.AdcCalibrationState
+    ] = (
+        constants.AdcCalibrationState.NOT_RUN,
+        constants.AdcCalibrationState.NOT_RUN,
+    )
+    adc_pins: tuple[int, int] = constants.ADC_PINS
+    adc_peripherals: tuple[int, int] = constants.ADC_PERIPHERALS
+    adc_channels: tuple[int, int] = constants.ADC_CHANNELS
+    adc_ipg_clock_hz: int = constants.ADC_IPG_CLOCK_HZ
+    adc_clock_hz: int = constants.ADC_CLOCK_HZ
+    adc_calibration_deadline_us: int = constants.ADC_CALIBRATION_DEADLINE_US
+    adc_calibration_cycles: tuple[int, int] = (0, 0)
+    adc_initialization_error_flags: constants.AdcInitializationError = (
+        constants.AdcInitializationError.NONE
+    )
 
     def __post_init__(self) -> None:
         if any(
@@ -1894,6 +2264,7 @@ class Status:
         _unsigned("stats_generation", self.stats_generation, 32)
         if self.stats_generation == 0:
             raise ValueError("stats_generation must be nonzero")
+        _normalize_adc_metadata(self)
 
     @property
     def counters(self) -> FirmwareCounters:
@@ -1934,7 +2305,7 @@ class Status:
         return self.data_checksum_algorithm
 
     def to_payload(self) -> bytes:
-        """Encode a successful 172-byte GET_STATUS response payload."""
+        """Encode a successful STATUS response with ADC initialization state."""
 
         payload = bytearray(constants.STATUS_RESPONSE_PAYLOAD_SIZE)
         _RESPONSE_PREFIX.pack_into(
@@ -2013,6 +2384,7 @@ class Status:
             self.gpio_stop_errors,
             self.gpio_stale_dma_completions,
         )
+        _pack_adc_metadata(payload, self, "STATUS_RESPONSE")
         return bytes(payload)
 
     @classmethod
@@ -2097,6 +2469,7 @@ class Status:
             gpio_start_errors=errors[6],
             gpio_stop_errors=errors[7],
             gpio_stale_dma_completions=errors[8],
+            **_unpack_adc_metadata(payload_bytes, "STATUS_RESPONSE"),
         )
 
 

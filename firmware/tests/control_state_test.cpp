@@ -103,6 +103,82 @@ void testLegalTransitionMatrix() {
          "run IDs remain nonzero at both allocation boundaries");
 }
 
+void testAdcInitializationTelemetry() {
+  wire::AdcInitializationMetadata adc{};
+  adc.configuration_flags = static_cast<std::uint16_t>(
+      static_cast<std::uint16_t>(
+          constants::AdcConfigurationFlag::kInitialized) |
+      static_cast<std::uint16_t>(
+          constants::AdcConfigurationFlag::kNoHardwareAveraging) |
+      static_cast<std::uint16_t>(
+          constants::AdcConfigurationFlag::kHighSpeed) |
+      static_cast<std::uint16_t>(
+          constants::AdcConfigurationFlag::kShortestSample) |
+      static_cast<std::uint16_t>(
+          constants::AdcConfigurationFlag::kRoutesValidated) |
+      static_cast<std::uint16_t>(
+          constants::AdcConfigurationFlag::kConfigurationReadbackValid) |
+      static_cast<std::uint16_t>(
+          constants::AdcConfigurationFlag::kCalibrationComplete) |
+      static_cast<std::uint16_t>(
+          constants::AdcConfigurationFlag::kPrimary12Bit));
+  adc.calibration_states = {
+      constants::AdcCalibrationState::kSucceeded,
+      constants::AdcCalibrationState::kSucceeded,
+  };
+  adc.calibration_cycles = {111U, 222U};
+
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(99U, adc),
+         "ADC telemetry boot completion succeeds");
+  expect(state.dispatch(request(constants::CommandKind::kInfo, 91U), response)
+             .commandAccepted(),
+         "INFO accepts initialized ADC telemetry");
+  wire::DecodedFrame decoded = decodeResponse(response, "ADC INFO telemetry");
+  std::uint16_t flags = 0U;
+  std::uint32_t cycles = 0U;
+  expect(decoded.payload.data[
+             constants::kInfoResponseAdcResolutionBitsOffset] == 12U &&
+             decoded.payload.data[
+                 constants::kInfoResponseAdc0CalibrationStateOffset] ==
+                 static_cast<std::uint8_t>(
+                     constants::AdcCalibrationState::kSucceeded) &&
+             decoded.payload.data[constants::kInfoResponseAdc0PinOffset] ==
+                 14U &&
+             decoded.payload.data[
+                 constants::kInfoResponseAdc1PeripheralOffset] == 2U &&
+             wire::loadU16(
+                 decoded.payload,
+                 constants::kInfoResponseAdcConfigurationFlagsOffset,
+                 flags) &&
+             flags == adc.configuration_flags &&
+             wire::loadU32(
+                 decoded.payload,
+                 constants::kInfoResponseAdc1CalibrationCyclesOffset,
+                 cycles) &&
+             cycles == 222U,
+         "INFO exposes actual ADC settings, route, and calibration outcome");
+
+  expect(state.dispatch(request(constants::CommandKind::kGetStatus, 92U),
+                        response)
+             .commandAccepted(),
+         "STATUS accepts initialized ADC telemetry");
+  decoded = decodeResponse(response, "ADC STATUS telemetry");
+  expect(decoded.payload.data[
+             constants::kStatusResponseAdcResolutionBitsOffset] == 12U &&
+             decoded.payload.data[
+                 constants::kStatusResponseAdc1CalibrationStateOffset] ==
+                 static_cast<std::uint8_t>(
+                     constants::AdcCalibrationState::kSucceeded) &&
+             wire::loadU32(
+                 decoded.payload,
+                 constants::kStatusResponseAdc0CalibrationCyclesOffset,
+                 cycles) &&
+             cycles == 111U,
+         "STATUS repeats the boot ADC snapshot without silent defaults");
+}
+
 void testBootAndInfo() {
   control::ControlState state{};
   wire::ControlFrame response{};
@@ -868,6 +944,7 @@ void testStatisticsDetailAndSaturation() {
 
 int main() {
   testLegalTransitionMatrix();
+  testAdcInitializationTelemetry();
   testBootAndInfo();
   testSyntheticLifecycle();
   testIdempotencyRequestIdsAndCounters();

@@ -28,11 +28,15 @@ constexpr bool capabilityEnabled(protocol_v1::Capability capability) {
 
 }  // namespace
 
-bool ControlState::completeBoot(std::uint32_t hardware_serial) {
+TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.boot")
+bool ControlState::completeBoot(
+    std::uint32_t hardware_serial,
+    const protocol::AdcInitializationMetadata &adc_metadata) {
   if (state_ != protocol_v1::DeviceState::kBoot) {
     return false;
   }
   hardware_serial_ = hardware_serial;
+  adc_metadata_ = adc_metadata;
   return transitionTo(protocol_v1::DeviceState::kIdle);
 }
 
@@ -147,8 +151,9 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
     }
 
     case protocol_v1::CommandKind::kGetStatus: {
-      const protocol::StatusResponse status =
+      protocol::StatusResponse status =
           statistics_.wireStatus(state_, appliedConfiguration());
+      status.adc = adc_metadata_;
       return encoded(request, protocol_v1::ErrorCode::kOk,
                      protocol::encodeStatusResponse(request, run_id_, status,
                                                     response),
@@ -397,8 +402,7 @@ protocol::InfoResponse ControlState::infoResponse() const {
       capabilities::kMetadata.adc1_phase_ticks);
   response.gpio_sample_period_ticks = static_cast<std::uint16_t>(
       capabilities::kMetadata.gpio_sample_period_ticks);
-  response.adc_resolution_bits = capabilities::kMetadata.adc_resolution_bits;
-  response.adc_container_bytes = capabilities::kMetadata.adc_container_bytes;
+  response.adc = adc_metadata_;
   response.data_checksum_algorithm =
       appliedConfiguration().data_checksum_algorithm;
   for (std::size_t index = 0U; index < response.gpio_pin_map.size(); ++index) {

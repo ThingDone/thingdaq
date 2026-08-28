@@ -788,6 +788,123 @@ def _validate_gpio_capture_diagnostic_response(payload: bytes) -> None:
         raise FrameValidationError("GPIO capture diagnostic evidence is inconsistent")
 
 
+def _adc_offset(prefix: str, field: str) -> int:
+    separator = "" if field[:1] in {"0", "1"} else "_"
+    return int(getattr(constants, f"{prefix}_ADC{separator}{field}_OFFSET"))
+
+
+def _validate_adc_metadata_payload(payload: bytes, prefix: str) -> None:
+    def u16(field: str) -> int:
+        return int(struct.unpack_from("<H", payload, _adc_offset(prefix, field))[0])
+
+    def u32(field: str) -> int:
+        return int(struct.unpack_from("<I", payload, _adc_offset(prefix, field))[0])
+
+    resolution = payload[_adc_offset(prefix, "RESOLUTION_BITS")]
+    if resolution not in {
+        constants.ADC_PRIMARY_RESOLUTION_BITS,
+        constants.ADC_FALLBACK_RESOLUTION_BITS,
+    }:
+        raise FrameValidationError("ADC metadata reports an unsupported resolution")
+    expected_mode = 2 if resolution == constants.ADC_PRIMARY_RESOLUTION_BITS else 1
+    try:
+        reference = constants.AdcReference(payload[_adc_offset(prefix, "REFERENCE")])
+        clock_source = constants.AdcClockSource(
+            payload[_adc_offset(prefix, "CLOCK_SOURCE")]
+        )
+        calibration_states = (
+            constants.AdcCalibrationState(
+                payload[_adc_offset(prefix, "0_CALIBRATION_STATE")]
+            ),
+            constants.AdcCalibrationState(
+                payload[_adc_offset(prefix, "1_CALIBRATION_STATE")]
+            ),
+        )
+    except ValueError as exc:
+        raise FrameValidationError("ADC metadata contains an unknown enum") from exc
+    flags = constants.AdcConfigurationFlag(u16("CONFIGURATION_FLAGS"))
+    errors = constants.AdcInitializationError(u32("INITIALIZATION_ERROR_FLAGS"))
+    if (
+        int(flags) & ~constants.KNOWN_ADC_CONFIGURATION_FLAG_MASK
+        or int(errors) & ~constants.KNOWN_ADC_INITIALIZATION_ERROR_MASK
+    ):
+        raise FrameValidationError("ADC metadata contains reserved flags")
+
+    expected_bytes = {
+        "CONTAINER_BYTES": constants.ADC_CONTAINER_BITS // 8,
+        "CLOCK_DIVIDER": constants.ADC_CLOCK_DIVIDER,
+        "HARDWARE_AVERAGE_COUNT": constants.ADC_HARDWARE_AVERAGE_COUNT,
+        "SAMPLE_TIME_ADCK": constants.ADC_SAMPLE_TIME_ADCK,
+        "CONVERSION_MODE": expected_mode,
+        "0_PIN": constants.ADC_PINS[0],
+        "1_PIN": constants.ADC_PINS[1],
+        "0_PERIPHERAL": constants.ADC_PERIPHERALS[0],
+        "1_PERIPHERAL": constants.ADC_PERIPHERALS[1],
+        "0_CHANNEL": constants.ADC_CHANNELS[0],
+        "1_CHANNEL": constants.ADC_CHANNELS[1],
+    }
+    if any(
+        payload[_adc_offset(prefix, field)] != expected
+        for field, expected in expected_bytes.items()
+    ):
+        raise FrameValidationError("ADC metadata reports incompatible settings")
+    if (
+        reference is not constants.AdcReference.VREFH_VREFL_NOMINAL_3V3
+        or clock_source is not constants.AdcClockSource.SYNCHRONOUS_IPG
+        or u16("CODE_MIN") != constants.ADC_CODE_MIN
+        or u16("CODE_MAX") != (1 << resolution) - 1
+        or u16("REFERENCE_MV_NOMINAL") != constants.ADC_REFERENCE_MV_NOMINAL
+        or u16("INPUT_MIN_MV_NOMINAL") != constants.ADC_INPUT_MIN_MV_NOMINAL
+        or u16("INPUT_MAX_MV_NOMINAL") != constants.ADC_INPUT_MAX_MV_NOMINAL
+        or u32("IPG_CLOCK_HZ") != constants.ADC_IPG_CLOCK_HZ
+        or u32("CLOCK_HZ") != constants.ADC_CLOCK_HZ
+        or u32("CALIBRATION_DEADLINE_US") != constants.ADC_CALIBRATION_DEADLINE_US
+    ):
+        raise FrameValidationError("ADC metadata reports incompatible v1 values")
+    # Parse both cycle fields even when calibration did not run so truncated or
+    # misaligned schema edits cannot pass this validator accidentally.
+    u32("0_CALIBRATION_CYCLES")
+    u32("1_CALIBRATION_CYCLES")
+
+    required_settings = (
+        constants.AdcConfigurationFlag.NO_HARDWARE_AVERAGING
+        | constants.AdcConfigurationFlag.HIGH_SPEED
+        | constants.AdcConfigurationFlag.SHORTEST_SAMPLE
+    )
+    selected_resolution = (
+        constants.AdcConfigurationFlag.PRIMARY_12_BIT
+        if resolution == constants.ADC_PRIMARY_RESOLUTION_BITS
+        else constants.AdcConfigurationFlag.FALLBACK_10_BIT
+    )
+    other_resolution = (
+        constants.AdcConfigurationFlag.FALLBACK_10_BIT
+        if resolution == constants.ADC_PRIMARY_RESOLUTION_BITS
+        else constants.AdcConfigurationFlag.PRIMARY_12_BIT
+    )
+    if (
+        flags & required_settings != required_settings
+        or not flags & selected_resolution
+        or flags & other_resolution
+    ):
+        raise FrameValidationError("ADC flags disagree with actual configuration")
+    if flags & constants.AdcConfigurationFlag.INITIALIZED:
+        ready_flags = (
+            constants.AdcConfigurationFlag.ROUTES_VALIDATED
+            | constants.AdcConfigurationFlag.CONFIGURATION_READBACK_VALID
+            | constants.AdcConfigurationFlag.CALIBRATION_COMPLETE
+        )
+        if (
+            errors
+            or flags & ready_flags != ready_flags
+            or calibration_states
+            != (
+                constants.AdcCalibrationState.SUCCEEDED,
+                constants.AdcCalibrationState.SUCCEEDED,
+            )
+        ):
+            raise FrameValidationError("ADC initialized state is inconsistent")
+
+
 def _validate_info_payload(payload: bytes) -> None:
     if payload[constants.INFO_RESPONSE_RESERVED_0_OFFSET] != 0:
         raise FrameValidationError("INFO reserved_0 must be zero")
@@ -797,6 +914,10 @@ def _validate_info_payload(payload: bytes) -> None:
         struct.unpack_from("<H", payload, constants.INFO_RESPONSE_RESERVED_3_OFFSET)[0]
         != 0
         or payload[constants.INFO_RESPONSE_RESERVED_4_OFFSET] != 0
+        or struct.unpack_from("<H", payload, constants.INFO_RESPONSE_RESERVED_5_OFFSET)[
+            0
+        ]
+        != 0
     ):
         raise FrameValidationError("INFO GPIO metadata reserved fields must be zero")
     try:
@@ -824,12 +945,6 @@ def _validate_info_payload(payload: bytes) -> None:
 
     expected_scalars = {
         constants.INFO_RESPONSE_PROTOCOL_VERSION_OFFSET: constants.PROTOCOL_VERSION,
-        constants.INFO_RESPONSE_ADC_RESOLUTION_BITS_OFFSET: (
-            constants.ADC_RESOLUTION_BITS
-        ),
-        constants.INFO_RESPONSE_ADC_CONTAINER_BYTES_OFFSET: (
-            constants.ADC_CONTAINER_BITS // 8
-        ),
         constants.INFO_RESPONSE_GPIO_PIN_COUNT_OFFSET: len(constants.GPIO_PINS_BY_BIT),
         constants.INFO_RESPONSE_GPIO_PACKED_WIDTH_BITS_OFFSET: (
             constants.GPIO_PACKED_WIDTH_BITS
@@ -966,6 +1081,7 @@ def _validate_info_payload(payload: bytes) -> None:
         ) from exc
     if any(build_bytes[terminator + 1 :]):
         raise FrameValidationError("INFO build ID padding must be zero")
+    _validate_adc_metadata_payload(payload, "INFO_RESPONSE")
 
 
 def _validate_status_payload(payload: bytes) -> None:
@@ -1055,6 +1171,7 @@ def _validate_status_payload(payload: bytes) -> None:
         for offset, maximum in depth_limits.items()
     ):
         raise FrameValidationError("STATUS queue depth exceeds its advertised capacity")
+    _validate_adc_metadata_payload(payload, "STATUS_RESPONSE")
 
 
 def _validate_payload(header: FrameHeader, payload: bytes) -> None:

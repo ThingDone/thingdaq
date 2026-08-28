@@ -236,6 +236,52 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     if maximum_major_count > 0x7FFF:
         raise ContractError("GPIO diagnostic eDMA major count exceeds ELINKNO width")
 
+    adc_initialization = contract["adc_initialization"]
+    positive_adc_fields = (
+        "primary_resolution_bits",
+        "fallback_resolution_bits",
+        "container_bits",
+        "reference_mv_nominal",
+        "input_max_mv_nominal",
+        "ipg_clock_hz",
+        "adc_clock_hz",
+        "clock_divider",
+        "sample_time_adck",
+        "calibration_cycle_counter_hz",
+        "calibration_deadline_us",
+        "calibration_poll_limit",
+    )
+    if any(int(adc_initialization[name]) <= 0 for name in positive_adc_fields):
+        raise ContractError("ADC initialization bounds must be positive")
+    if (
+        int(adc_initialization["primary_resolution_bits"])
+        != int(adc["resolution_bits"])
+        or int(adc_initialization["fallback_resolution_bits"]) != 10
+        or int(adc_initialization["container_bits"]) != int(adc["container_bits"])
+        or int(adc_initialization["code_min"]) != 0
+        or int(adc_initialization["input_min_mv_nominal"]) != 0
+    ):
+        raise ContractError("ADC initialization resolution/range contract disagrees")
+    if int(adc_initialization["adc_clock_hz"]) * int(
+        adc_initialization["clock_divider"]
+    ) != int(adc_initialization["ipg_clock_hz"]):
+        raise ContractError("ADC clock and divisor do not reconstruct the IPG root")
+    if int(adc_initialization["hardware_average_count"]) != 0:
+        raise ContractError("ADC hardware averaging must remain disabled")
+    if (
+        list(adc_initialization["pins"]) != [14, 15]
+        or list(adc_initialization["peripherals"]) != [1, 2]
+        or list(adc_initialization["channels"]) != [7, 8]
+    ):
+        raise ContractError("ADC route metadata must remain A0/ADC1 and A1/ADC2")
+    deadline_cycles = (
+        int(adc_initialization["calibration_cycle_counter_hz"])
+        * int(adc_initialization["calibration_deadline_us"])
+        // 1_000_000
+    )
+    if not 0 < deadline_cycles <= 0xFFFFFFFF:
+        raise ContractError("ADC calibration deadline must fit one DWT interval")
+
     flag_values = enum_map(contract["flags"])
     validate_enum_width("flags", contract["flags"], 16)
     if any(value == 0 or value & (value - 1) for value in flag_values.values()):
@@ -250,6 +296,11 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         value == 0 or value & (value - 1) for value in gpio_clock_error_values.values()
     ):
         raise ContractError("every GPIO clock error must be one nonzero bit")
+    for enum_name in ("adc_configuration_flag", "adc_initialization_error"):
+        values = enum_map(contract["enums"][enum_name])
+        validate_enum_width(enum_name, contract["enums"][enum_name], 32)
+        if any(value == 0 or value & (value - 1) for value in values.values()):
+            raise ContractError(f"every {enum_name} value must be one nonzero bit")
 
     checksums = enum_map(contract["checksum_algorithms"])
     validate_enum_width("checksum_algorithms", contract["checksum_algorithms"], 8)
@@ -356,6 +407,11 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         "benchmark_memory_region": 8,
         "benchmark_cache_state": 8,
         "gpio_clock_error": 32,
+        "adc_reference": 8,
+        "adc_clock_source": 8,
+        "adc_calibration_state": 8,
+        "adc_configuration_flag": 16,
+        "adc_initialization_error": 32,
     }.items():
         enum_map(contract["enums"][enum_name])
         validate_enum_width(enum_name, contract["enums"][enum_name], bits)
@@ -417,6 +473,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     gpio_clock = contract["gpio_clock_diagnostic"]
     gpio_capture = contract["gpio_capture"]
     gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
+    adc_initialization = contract["adc_initialization"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -524,6 +581,23 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             "GPIO_CAPTURE_DIAGNOSTIC_ANALYSIS_SAMPLES = "
             f"{int(gpio_capture_diagnostic['analysis_samples'])}"
         ),
+        f"ADC_PRIMARY_RESOLUTION_BITS = {int(adc_initialization['primary_resolution_bits'])}",
+        f"ADC_FALLBACK_RESOLUTION_BITS = {int(adc_initialization['fallback_resolution_bits'])}",
+        f"ADC_CODE_MIN = {int(adc_initialization['code_min'])}",
+        f"ADC_REFERENCE_MV_NOMINAL = {int(adc_initialization['reference_mv_nominal'])}",
+        f"ADC_INPUT_MIN_MV_NOMINAL = {int(adc_initialization['input_min_mv_nominal'])}",
+        f"ADC_INPUT_MAX_MV_NOMINAL = {int(adc_initialization['input_max_mv_nominal'])}",
+        f"ADC_IPG_CLOCK_HZ = {int(adc_initialization['ipg_clock_hz'])}",
+        f"ADC_CLOCK_HZ = {int(adc_initialization['adc_clock_hz'])}",
+        f"ADC_CLOCK_DIVIDER = {int(adc_initialization['clock_divider'])}",
+        f"ADC_HARDWARE_AVERAGE_COUNT = {int(adc_initialization['hardware_average_count'])}",
+        f"ADC_SAMPLE_TIME_ADCK = {int(adc_initialization['sample_time_adck'])}",
+        f"ADC_CALIBRATION_CYCLE_COUNTER_HZ = {int(adc_initialization['calibration_cycle_counter_hz'])}",
+        f"ADC_CALIBRATION_DEADLINE_US = {int(adc_initialization['calibration_deadline_us'])}",
+        f"ADC_CALIBRATION_POLL_LIMIT = {int(adc_initialization['calibration_poll_limit'])}",
+        f"ADC_PINS = {tuple(adc_initialization['pins'])!r}",
+        f"ADC_PERIPHERALS = {tuple(adc_initialization['peripherals'])!r}",
+        f"ADC_CHANNELS = {tuple(adc_initialization['channels'])!r}",
         f"ADC_BYTES_PER_PAIR = {int(layouts['adc']['bytes_per_item'])}",
         f"ADC_PAIRS_PER_FRAME = {int(layouts['adc']['items_per_frame'])}",
         f"ADC_RESOLUTION_BITS = {int(layouts['adc']['resolution_bits'])}",
@@ -606,6 +680,27 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             include_none=True,
         )
     )
+    lines.extend(python_enum("AdcReference", contract["enums"]["adc_reference"]))
+    lines.extend(python_enum("AdcClockSource", contract["enums"]["adc_clock_source"]))
+    lines.extend(
+        python_enum("AdcCalibrationState", contract["enums"]["adc_calibration_state"])
+    )
+    lines.extend(
+        python_enum(
+            "AdcConfigurationFlag",
+            contract["enums"]["adc_configuration_flag"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
+    lines.extend(
+        python_enum(
+            "AdcInitializationError",
+            contract["enums"]["adc_initialization_error"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
 
     lines.extend(
         [
@@ -652,6 +747,24 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         + str(
             sum(
                 int(entry["value"]) for entry in contract["enums"]["gpio_capture_error"]
+            )
+        )
+    )
+    lines.append(
+        "KNOWN_ADC_CONFIGURATION_FLAG_MASK = "
+        + str(
+            sum(
+                int(entry["value"])
+                for entry in contract["enums"]["adc_configuration_flag"]
+            )
+        )
+    )
+    lines.append(
+        "KNOWN_ADC_INITIALIZATION_ERROR_MASK = "
+        + str(
+            sum(
+                int(entry["value"])
+                for entry in contract["enums"]["adc_initialization_error"]
             )
         )
     )
@@ -766,6 +879,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     gpio_clock = contract["gpio_clock_diagnostic"]
     gpio_capture = contract["gpio_capture"]
     gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
+    adc_initialization = contract["adc_initialization"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -918,6 +1032,29 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             "kGpioCaptureDiagnosticAnalysisSamples = "
             f"{int(gpio_capture_diagnostic['analysis_samples'])}U;"
         ),
+        f"inline constexpr std::uint8_t kAdcPrimaryResolutionBits = {int(adc_initialization['primary_resolution_bits'])}U;",
+        f"inline constexpr std::uint8_t kAdcFallbackResolutionBits = {int(adc_initialization['fallback_resolution_bits'])}U;",
+        f"inline constexpr std::uint16_t kAdcCodeMin = {int(adc_initialization['code_min'])}U;",
+        f"inline constexpr std::uint16_t kAdcReferenceMvNominal = {int(adc_initialization['reference_mv_nominal'])}U;",
+        f"inline constexpr std::uint16_t kAdcInputMinMvNominal = {int(adc_initialization['input_min_mv_nominal'])}U;",
+        f"inline constexpr std::uint16_t kAdcInputMaxMvNominal = {int(adc_initialization['input_max_mv_nominal'])}U;",
+        f"inline constexpr std::uint32_t kAdcIpgClockHz = {int(adc_initialization['ipg_clock_hz'])}U;",
+        f"inline constexpr std::uint32_t kAdcClockHz = {int(adc_initialization['adc_clock_hz'])}U;",
+        f"inline constexpr std::uint8_t kAdcClockDivider = {int(adc_initialization['clock_divider'])}U;",
+        f"inline constexpr std::uint8_t kAdcHardwareAverageCount = {int(adc_initialization['hardware_average_count'])}U;",
+        f"inline constexpr std::uint8_t kAdcSampleTimeAdck = {int(adc_initialization['sample_time_adck'])}U;",
+        f"inline constexpr std::uint32_t kAdcCalibrationCycleCounterHz = {int(adc_initialization['calibration_cycle_counter_hz'])}U;",
+        f"inline constexpr std::uint32_t kAdcCalibrationDeadlineUs = {int(adc_initialization['calibration_deadline_us'])}U;",
+        f"inline constexpr std::uint32_t kAdcCalibrationPollLimit = {int(adc_initialization['calibration_poll_limit'])}U;",
+        "inline constexpr std::uint8_t kAdcPins[] = {"
+        + ", ".join(f"{int(value)}U" for value in adc_initialization["pins"])
+        + "};",
+        "inline constexpr std::uint8_t kAdcPeripherals[] = {"
+        + ", ".join(f"{int(value)}U" for value in adc_initialization["peripherals"])
+        + "};",
+        "inline constexpr std::uint8_t kAdcChannels[] = {"
+        + ", ".join(f"{int(value)}U" for value in adc_initialization["channels"])
+        + "};",
         f"inline constexpr std::size_t kAdcBytesPerPair = {int(layouts['adc']['bytes_per_item'])}U;",
         f"inline constexpr std::size_t kAdcPairsPerFrame = {int(layouts['adc']['items_per_frame'])}U;",
         f"inline constexpr std::uint8_t kAdcResolutionBits = {int(layouts['adc']['resolution_bits'])}U;",
@@ -1003,6 +1140,37 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             contract["enums"]["gpio_capture_error"],
         )
     )
+    lines.extend(
+        cpp_enum("AdcReference", "std::uint8_t", contract["enums"]["adc_reference"])
+    )
+    lines.extend(
+        cpp_enum(
+            "AdcClockSource",
+            "std::uint8_t",
+            contract["enums"]["adc_clock_source"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "AdcCalibrationState",
+            "std::uint8_t",
+            contract["enums"]["adc_calibration_state"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "AdcConfigurationFlag",
+            "std::uint16_t",
+            contract["enums"]["adc_configuration_flag"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "AdcInitializationError",
+            "std::uint32_t",
+            contract["enums"]["adc_initialization_error"],
+        )
+    )
 
     lines.extend(
         [
@@ -1047,6 +1215,22 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
                 sum(
                     int(entry["value"])
                     for entry in contract["enums"]["gpio_capture_error"]
+                )
+            )
+            + "U;",
+            "inline constexpr std::uint16_t kKnownAdcConfigurationFlagMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["adc_configuration_flag"]
+                )
+            )
+            + "U;",
+            "inline constexpr std::uint32_t kKnownAdcInitializationErrorMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["adc_initialization_error"]
                 )
             )
             + "U;",

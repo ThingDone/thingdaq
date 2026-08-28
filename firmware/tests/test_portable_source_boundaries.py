@@ -35,6 +35,10 @@ HARDWARE_API_HEADERS = {
 }
 EXPECTED_HARDWARE_INCLUDE_OWNERS = {
     FIRMWARE_SOURCE / "board_config.h": {"core_pins.h", "imxrt.h"},
+    FIRMWARE_SOURCE / "adc_initializer_teensy.cpp": {
+        "core_pins.h",
+        "imxrt.h",
+    },
     FIRMWARE_SOURCE / "checksum_benchmark_teensy.cpp": {
         "core_pins.h",
         "imxrt.h",
@@ -166,6 +170,21 @@ class PortableSourceBoundaryTests(unittest.TestCase):
         self.assertLess(disable, partial)
         self.assertIn("kStopBoundaryTimeoutCycles", adapter[boundary:stop])
         self.assertIn("partial_samples != 0U", adapter[stop:])
+
+    def test_adc_target_owns_the_core_startup_hook_without_calibrating_early(
+        self,
+    ) -> None:
+        adapter = _source(FIRMWARE_SOURCE / "adc_initializer_teensy.cpp")
+
+        hook = adapter.index('extern "C" TEENSY_DAQ_ADC_TARGET_CODE')
+        initializer = adapter.index("namespace teensy_daq::adc", hook)
+        deferred_body = adapter[hook:initializer]
+        self.assertIn("void analog_init(void) {}", deferred_body)
+        self.assertNotIn("ADC1", deferred_body)
+        self.assertNotIn("ADC2", deferred_body)
+        self.assertNotIn("while", deferred_body)
+        self.assertIn("F_BUS_ACTUAL != settings.ipg_clock_hz", adapter)
+        self.assertIn("F_BUS_ACTUAL == settings.ipg_clock_hz", adapter)
 
     def test_host_dependency_output_excludes_teensy_core_and_adapters(self) -> None:
         compiler = shutil.which("g++")

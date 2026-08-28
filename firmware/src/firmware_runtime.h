@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "adc_initializer.h"
 #include "checksum_benchmark.h"
 #include "control_state.h"
 #include "gpio_batch_packer.h"
@@ -63,7 +64,8 @@ class FirmwareRuntime {
                   gpio_clock::Runner *gpio_clock_diagnostic = nullptr,
                   gpio_capture::HardwareCapture *gpio_capture = nullptr,
                   gpio_packer::GpioBatchPacker *gpio_packer = nullptr,
-                  gpio_diagnostic::Runner *gpio_capture_diagnostic = nullptr)
+                  gpio_diagnostic::Runner *gpio_capture_diagnostic = nullptr,
+                  adc::Initializer *adc_initializer = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
@@ -73,7 +75,8 @@ class FirmwareRuntime {
         gpio_clock_diagnostic_(gpio_clock_diagnostic),
         gpio_capture_(gpio_capture),
         gpio_packer_(gpio_packer),
-        gpio_capture_diagnostic_(gpio_capture_diagnostic) {}
+        gpio_capture_diagnostic_(gpio_capture_diagnostic),
+        adc_initializer_(adc_initializer) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -128,6 +131,7 @@ class FirmwareRuntime {
   gpio_capture::HardwareCapture *gpio_capture_ = nullptr;
   gpio_packer::GpioBatchPacker *gpio_packer_ = nullptr;
   gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
+  adc::Initializer *adc_initializer_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
   bool physical_run_active_ = false;
   bool physical_drain_pending_ = false;

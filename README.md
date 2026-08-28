@@ -144,14 +144,22 @@ scheduled/sample counts, route IDs, and typed hardware errors. The accepted
 route and rejected dual-edge alternatives are recorded in
 `doc/decisions/adr-003-gpio-clock-dma.md`.
 
-Phase 07 fixes one compile-time ADC route table before adding register code:
+Phase 07 fixes one compile-time ADC route table and now applies it during
+bounded BOOT initialization:
 logical ADC0 is A0 through NXP ADC1 channel 7, and logical ADC1 is A1 through
 NXP ADC2 channel 8. The same tuples own ADC_ETC queues 0/4, XBAR outputs
 103/107, and eDMA channels 0/1 with DMAMUX sources 24/88. The selected clock,
 500 ns trigger-delay arithmetic, initial 12-bit conversion budget, and explicit
 10-bit fallback gate are recorded in
-`doc/decisions/adr-004-adc-trigger-dma.md`; physical ADC capability remains
-disabled until the later initialization, DMA, integration, and rig gates pass.
+`doc/decisions/adr-004-adc-trigger-dma.md`. Both modules are explicitly set to
+12-bit `uint16_t`, synchronous 37.5 MHz high-speed conversion with the shortest
+three-ADCK sample and no hardware averaging, then calibrated independently
+under a 10 ms DWT deadline. The target adapter defers Teensy core's normally
+unbounded startup calibration so this is the sole ADC calibration path.
+INFO/STATUS publish the actual settings, fixed A0/ADC1/channel-7 and
+A1/ADC2/channel-8 routes, per-converter calibration states/cycles, and typed
+initialization faults. Physical ADC capability remains disabled until the later
+trigger, DMA, integration, and rig gates pass.
 
 The advertised physical GPIO mode selectively returns only D6-D13 from
 GPIO7 to GPIO2, keeps them inputs on START/STOP/error, and uses channel 2 to

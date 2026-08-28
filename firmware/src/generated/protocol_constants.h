@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 622d444f6c333db1af94f2a83c51ae64c4921067178274d8ffea0a7f056f8b6d
+// Source SHA-256: ee4d21e1c8f34d263f0395ec5e05d240f677fc91a5e7aec8c3716ef245c02a43
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "622d444f6c333db1af94f2a83c51ae64c4921067178274d8ffea0a7f056f8b6d";
+inline constexpr char kSourceSha256[] = "ee4d21e1c8f34d263f0395ec5e05d240f677fc91a5e7aec8c3716ef245c02a43";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -61,6 +61,23 @@ inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
 inline constexpr std::uint8_t kGpioDmamuxSource = 30U;
 inline constexpr std::uint8_t kGpioEdmaPriority = 2U;
 inline constexpr std::uint32_t kGpioCaptureDiagnosticAnalysisSamples = 256U;
+inline constexpr std::uint8_t kAdcPrimaryResolutionBits = 12U;
+inline constexpr std::uint8_t kAdcFallbackResolutionBits = 10U;
+inline constexpr std::uint16_t kAdcCodeMin = 0U;
+inline constexpr std::uint16_t kAdcReferenceMvNominal = 3300U;
+inline constexpr std::uint16_t kAdcInputMinMvNominal = 0U;
+inline constexpr std::uint16_t kAdcInputMaxMvNominal = 3300U;
+inline constexpr std::uint32_t kAdcIpgClockHz = 150000000U;
+inline constexpr std::uint32_t kAdcClockHz = 37500000U;
+inline constexpr std::uint8_t kAdcClockDivider = 4U;
+inline constexpr std::uint8_t kAdcHardwareAverageCount = 0U;
+inline constexpr std::uint8_t kAdcSampleTimeAdck = 3U;
+inline constexpr std::uint32_t kAdcCalibrationCycleCounterHz = 600000000U;
+inline constexpr std::uint32_t kAdcCalibrationDeadlineUs = 10000U;
+inline constexpr std::uint32_t kAdcCalibrationPollLimit = 8000000U;
+inline constexpr std::uint8_t kAdcPins[] = {14U, 15U};
+inline constexpr std::uint8_t kAdcPeripherals[] = {1U, 2U};
+inline constexpr std::uint8_t kAdcChannels[] = {7U, 8U};
 inline constexpr std::size_t kAdcBytesPerPair = 4U;
 inline constexpr std::size_t kAdcPairsPerFrame = 1012U;
 inline constexpr std::uint8_t kAdcResolutionBits = 12U;
@@ -270,6 +287,52 @@ enum class GpioCaptureError : std::uint32_t {
   kCleanupFailed = 32768U,
 };
 
+enum class AdcReference : std::uint8_t {
+  kUnspecified = 0U,
+  kVrefhVreflNominal3v3 = 1U,
+};
+
+enum class AdcClockSource : std::uint8_t {
+  kUnspecified = 0U,
+  kSynchronousIpg = 1U,
+};
+
+enum class AdcCalibrationState : std::uint8_t {
+  kNotRun = 0U,
+  kSucceeded = 1U,
+  kFailed = 2U,
+  kTimedOut = 3U,
+  kRouteInvalid = 4U,
+  kConfigurationInvalid = 5U,
+  kClockUnavailable = 6U,
+};
+
+enum class AdcConfigurationFlag : std::uint16_t {
+  kInitialized = 1U,
+  kNoHardwareAveraging = 2U,
+  kHighSpeed = 4U,
+  kShortestSample = 8U,
+  kRoutesValidated = 16U,
+  kConfigurationReadbackValid = 32U,
+  kCalibrationComplete = 64U,
+  kPrimary12Bit = 128U,
+  kFallback10Bit = 256U,
+};
+
+enum class AdcInitializationError : std::uint32_t {
+  kDwtUnavailable = 1U,
+  kAdc0RouteInvalid = 2U,
+  kAdc1RouteInvalid = 4U,
+  kAdc0ConfigurationInvalid = 8U,
+  kAdc1ConfigurationInvalid = 16U,
+  kAdc0CalibrationFailed = 32U,
+  kAdc1CalibrationFailed = 64U,
+  kAdc0CalibrationTimeout = 128U,
+  kAdc1CalibrationTimeout = 256U,
+  kAdc0ReadbackInvalid = 512U,
+  kAdc1ReadbackInvalid = 1024U,
+};
+
 inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
@@ -280,6 +343,8 @@ inline constexpr std::uint32_t kKnownCapabilityMask = 511U;
 inline constexpr std::uint32_t kKnownGpioClockErrorMask = 32767U;
 inline constexpr std::uint32_t kKnownGpioCaptureDiagnosticFlagMask = 511U;
 inline constexpr std::uint32_t kKnownGpioCaptureErrorMask = 65535U;
+inline constexpr std::uint16_t kKnownAdcConfigurationFlagMask = 511U;
+inline constexpr std::uint32_t kKnownAdcInitializationErrorMask = 2047U;
 
 inline constexpr std::size_t kEmptyPayloadSize = 0U;
 inline constexpr std::size_t kAdcDataPayloadSize = 4048U;
@@ -298,7 +363,7 @@ inline constexpr std::size_t kResponsePrefixPayloadSize = 4U;
 inline constexpr std::size_t kResponsePrefixResponseStatusOffset = 0U;
 inline constexpr std::size_t kResponsePrefixReservedOffset = 1U;
 inline constexpr std::size_t kResponsePrefixErrorCodeOffset = 2U;
-inline constexpr std::size_t kInfoResponsePayloadSize = 128U;
+inline constexpr std::size_t kInfoResponsePayloadSize = 180U;
 inline constexpr std::size_t kInfoResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kInfoResponseReserved0Offset = 1U;
 inline constexpr std::size_t kInfoResponseErrorCodeOffset = 2U;
@@ -349,6 +414,33 @@ inline constexpr std::size_t kInfoResponseGpioDmamuxSourceOffset = 124U;
 inline constexpr std::size_t kInfoResponseGpioEdmaPriorityOffset = 125U;
 inline constexpr std::size_t kInfoResponseGpioXbarActiveEdgeOffset = 126U;
 inline constexpr std::size_t kInfoResponseReserved4Offset = 127U;
+inline constexpr std::size_t kInfoResponseAdcCodeMinOffset = 128U;
+inline constexpr std::size_t kInfoResponseAdcCodeMaxOffset = 130U;
+inline constexpr std::size_t kInfoResponseAdcReferenceOffset = 132U;
+inline constexpr std::size_t kInfoResponseAdcClockSourceOffset = 133U;
+inline constexpr std::size_t kInfoResponseAdcClockDividerOffset = 134U;
+inline constexpr std::size_t kInfoResponseAdcHardwareAverageCountOffset = 135U;
+inline constexpr std::size_t kInfoResponseAdcReferenceMvNominalOffset = 136U;
+inline constexpr std::size_t kInfoResponseAdcInputMinMvNominalOffset = 138U;
+inline constexpr std::size_t kInfoResponseAdcInputMaxMvNominalOffset = 140U;
+inline constexpr std::size_t kInfoResponseAdcSampleTimeAdckOffset = 142U;
+inline constexpr std::size_t kInfoResponseAdcConversionModeOffset = 143U;
+inline constexpr std::size_t kInfoResponseAdcConfigurationFlagsOffset = 144U;
+inline constexpr std::size_t kInfoResponseAdc0CalibrationStateOffset = 146U;
+inline constexpr std::size_t kInfoResponseAdc1CalibrationStateOffset = 147U;
+inline constexpr std::size_t kInfoResponseAdc0PinOffset = 148U;
+inline constexpr std::size_t kInfoResponseAdc1PinOffset = 149U;
+inline constexpr std::size_t kInfoResponseAdc0PeripheralOffset = 150U;
+inline constexpr std::size_t kInfoResponseAdc1PeripheralOffset = 151U;
+inline constexpr std::size_t kInfoResponseAdc0ChannelOffset = 152U;
+inline constexpr std::size_t kInfoResponseAdc1ChannelOffset = 153U;
+inline constexpr std::size_t kInfoResponseReserved5Offset = 154U;
+inline constexpr std::size_t kInfoResponseAdcIpgClockHzOffset = 156U;
+inline constexpr std::size_t kInfoResponseAdcClockHzOffset = 160U;
+inline constexpr std::size_t kInfoResponseAdcCalibrationDeadlineUsOffset = 164U;
+inline constexpr std::size_t kInfoResponseAdc0CalibrationCyclesOffset = 168U;
+inline constexpr std::size_t kInfoResponseAdc1CalibrationCyclesOffset = 172U;
+inline constexpr std::size_t kInfoResponseAdcInitializationErrorFlagsOffset = 176U;
 inline constexpr std::size_t kConfigureResponsePayloadSize = 12U;
 inline constexpr std::size_t kConfigureResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kConfigureResponseReserved0Offset = 1U;
@@ -358,7 +450,7 @@ inline constexpr std::size_t kConfigureResponseSourceOffset = 5U;
 inline constexpr std::size_t kConfigureResponseDataChecksumAlgorithmOffset = 6U;
 inline constexpr std::size_t kConfigureResponseReserved1Offset = 7U;
 inline constexpr std::size_t kConfigureResponseDataFrameBytesOffset = 8U;
-inline constexpr std::size_t kStatusResponsePayloadSize = 172U;
+inline constexpr std::size_t kStatusResponsePayloadSize = 224U;
 inline constexpr std::size_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::size_t kStatusResponseErrorCodeOffset = 2U;
@@ -399,6 +491,34 @@ inline constexpr std::size_t kStatusResponseGpioResourceConflictsOffset = 156U;
 inline constexpr std::size_t kStatusResponseGpioStartErrorsOffset = 160U;
 inline constexpr std::size_t kStatusResponseGpioStopErrorsOffset = 164U;
 inline constexpr std::size_t kStatusResponseGpioStaleDmaCompletionsOffset = 168U;
+inline constexpr std::size_t kStatusResponseAdcResolutionBitsOffset = 172U;
+inline constexpr std::size_t kStatusResponseAdcContainerBytesOffset = 173U;
+inline constexpr std::size_t kStatusResponseAdc0CalibrationStateOffset = 174U;
+inline constexpr std::size_t kStatusResponseAdc1CalibrationStateOffset = 175U;
+inline constexpr std::size_t kStatusResponseAdcCodeMinOffset = 176U;
+inline constexpr std::size_t kStatusResponseAdcCodeMaxOffset = 178U;
+inline constexpr std::size_t kStatusResponseAdcReferenceOffset = 180U;
+inline constexpr std::size_t kStatusResponseAdcClockSourceOffset = 181U;
+inline constexpr std::size_t kStatusResponseAdcClockDividerOffset = 182U;
+inline constexpr std::size_t kStatusResponseAdcHardwareAverageCountOffset = 183U;
+inline constexpr std::size_t kStatusResponseAdcReferenceMvNominalOffset = 184U;
+inline constexpr std::size_t kStatusResponseAdcInputMinMvNominalOffset = 186U;
+inline constexpr std::size_t kStatusResponseAdcInputMaxMvNominalOffset = 188U;
+inline constexpr std::size_t kStatusResponseAdcSampleTimeAdckOffset = 190U;
+inline constexpr std::size_t kStatusResponseAdcConversionModeOffset = 191U;
+inline constexpr std::size_t kStatusResponseAdcConfigurationFlagsOffset = 192U;
+inline constexpr std::size_t kStatusResponseAdc0PinOffset = 194U;
+inline constexpr std::size_t kStatusResponseAdc1PinOffset = 195U;
+inline constexpr std::size_t kStatusResponseAdc0PeripheralOffset = 196U;
+inline constexpr std::size_t kStatusResponseAdc1PeripheralOffset = 197U;
+inline constexpr std::size_t kStatusResponseAdc0ChannelOffset = 198U;
+inline constexpr std::size_t kStatusResponseAdc1ChannelOffset = 199U;
+inline constexpr std::size_t kStatusResponseAdcIpgClockHzOffset = 200U;
+inline constexpr std::size_t kStatusResponseAdcClockHzOffset = 204U;
+inline constexpr std::size_t kStatusResponseAdcCalibrationDeadlineUsOffset = 208U;
+inline constexpr std::size_t kStatusResponseAdc0CalibrationCyclesOffset = 212U;
+inline constexpr std::size_t kStatusResponseAdc1CalibrationCyclesOffset = 216U;
+inline constexpr std::size_t kStatusResponseAdcInitializationErrorFlagsOffset = 220U;
 inline constexpr std::size_t kStopResponsePayloadSize = 8U;
 inline constexpr std::size_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStopResponseReserved0Offset = 1U;

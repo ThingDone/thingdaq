@@ -1,6 +1,11 @@
 """Synchronous API, simulator, protocol, and models for the Teensy DAQ project."""
 
 from ._generated.protocol_constants import (
+    AdcCalibrationState,
+    AdcClockSource,
+    AdcConfigurationFlag,
+    AdcInitializationError,
+    AdcReference,
     BenchmarkCacheState,
     BenchmarkMemoryRegion,
     BenchmarkVector,
@@ -183,8 +188,13 @@ __all__ = [
     "TEENSY_USB_SERIAL_VID",
     "ADCBlock",
     "AdcBlock",
+    "AdcCalibrationState",
     "AdcChannelView",
+    "AdcClockSource",
+    "AdcConfigurationFlag",
     "AdcConverter",
+    "AdcInitializationError",
+    "AdcReference",
     "AdcSample",
     "BackgroundReader",
     "BenchmarkCacheState",

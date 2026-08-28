@@ -524,6 +524,155 @@ Result validateResponsePrefix(const FrameHeader &header, ByteView payload) {
   return Result::success();
 }
 
+struct AdcMetadataOffsets {
+  std::size_t resolution_bits;
+  std::size_t container_bytes;
+  std::size_t calibration_state_0;
+  std::size_t calibration_state_1;
+  std::size_t code_min;
+  std::size_t code_max;
+  std::size_t reference;
+  std::size_t clock_source;
+  std::size_t clock_divider;
+  std::size_t hardware_average_count;
+  std::size_t reference_mv_nominal;
+  std::size_t input_min_mv_nominal;
+  std::size_t input_max_mv_nominal;
+  std::size_t sample_time_adck;
+  std::size_t conversion_mode;
+  std::size_t configuration_flags;
+  std::size_t pin_0;
+  std::size_t pin_1;
+  std::size_t peripheral_0;
+  std::size_t peripheral_1;
+  std::size_t channel_0;
+  std::size_t channel_1;
+  std::size_t ipg_clock_hz;
+  std::size_t adc_clock_hz;
+  std::size_t calibration_deadline_us;
+  std::size_t calibration_cycles_0;
+  std::size_t calibration_cycles_1;
+  std::size_t initialization_error_flags;
+};
+
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.adc_metadata_validation")
+Result validateAdcMetadata(ByteView payload,
+                           const AdcMetadataOffsets &offsets) {
+  const std::uint8_t resolution = payload.data[offsets.resolution_bits];
+  const bool primary = resolution == protocol_v1::kAdcPrimaryResolutionBits;
+  const bool fallback = resolution == protocol_v1::kAdcFallbackResolutionBits;
+  const std::uint8_t calibration_state_0 =
+      payload.data[offsets.calibration_state_0];
+  const std::uint8_t calibration_state_1 =
+      payload.data[offsets.calibration_state_1];
+  if ((!primary && !fallback) ||
+      payload.data[offsets.container_bytes] !=
+          protocol_v1::kAdcContainerBits / 8U ||
+      payload.data[offsets.reference] != static_cast<std::uint8_t>(
+          protocol_v1::AdcReference::kVrefhVreflNominal3v3) ||
+      payload.data[offsets.clock_source] != static_cast<std::uint8_t>(
+          protocol_v1::AdcClockSource::kSynchronousIpg) ||
+      payload.data[offsets.clock_divider] != protocol_v1::kAdcClockDivider ||
+      payload.data[offsets.hardware_average_count] !=
+          protocol_v1::kAdcHardwareAverageCount ||
+      payload.data[offsets.sample_time_adck] !=
+          protocol_v1::kAdcSampleTimeAdck ||
+      payload.data[offsets.conversion_mode] != (primary ? 2U : 1U) ||
+      calibration_state_0 > static_cast<std::uint8_t>(
+          protocol_v1::AdcCalibrationState::kClockUnavailable) ||
+      calibration_state_1 > static_cast<std::uint8_t>(
+          protocol_v1::AdcCalibrationState::kClockUnavailable) ||
+      payload.data[offsets.pin_0] != protocol_v1::kAdcPins[0] ||
+      payload.data[offsets.pin_1] != protocol_v1::kAdcPins[1] ||
+      payload.data[offsets.peripheral_0] != protocol_v1::kAdcPeripherals[0] ||
+      payload.data[offsets.peripheral_1] != protocol_v1::kAdcPeripherals[1] ||
+      payload.data[offsets.channel_0] != protocol_v1::kAdcChannels[0] ||
+      payload.data[offsets.channel_1] != protocol_v1::kAdcChannels[1]) {
+    return badPayload();
+  }
+
+  std::uint16_t value16 = 0U;
+  std::uint16_t flags = 0U;
+  if (!loadU16(payload, offsets.code_min, value16) ||
+      value16 != protocol_v1::kAdcCodeMin ||
+      !loadU16(payload, offsets.code_max, value16) ||
+      value16 != (primary ? 4095U : 1023U) ||
+      !loadU16(payload, offsets.reference_mv_nominal, value16) ||
+      value16 != protocol_v1::kAdcReferenceMvNominal ||
+      !loadU16(payload, offsets.input_min_mv_nominal, value16) ||
+      value16 != protocol_v1::kAdcInputMinMvNominal ||
+      !loadU16(payload, offsets.input_max_mv_nominal, value16) ||
+      value16 != protocol_v1::kAdcInputMaxMvNominal ||
+      !loadU16(payload, offsets.configuration_flags, flags) ||
+      (flags & ~protocol_v1::kKnownAdcConfigurationFlagMask) != 0U) {
+    return badPayload();
+  }
+  constexpr std::uint16_t kRequiredSettingFlags =
+      static_cast<std::uint16_t>(
+          protocol_v1::AdcConfigurationFlag::kNoHardwareAveraging) |
+      static_cast<std::uint16_t>(
+          protocol_v1::AdcConfigurationFlag::kHighSpeed) |
+      static_cast<std::uint16_t>(
+          protocol_v1::AdcConfigurationFlag::kShortestSample);
+  const std::uint16_t resolution_flag = static_cast<std::uint16_t>(
+      primary ? protocol_v1::AdcConfigurationFlag::kPrimary12Bit
+              : protocol_v1::AdcConfigurationFlag::kFallback10Bit);
+  const std::uint16_t other_resolution_flag = static_cast<std::uint16_t>(
+      primary ? protocol_v1::AdcConfigurationFlag::kFallback10Bit
+              : protocol_v1::AdcConfigurationFlag::kPrimary12Bit);
+  if ((flags & kRequiredSettingFlags) != kRequiredSettingFlags ||
+      (flags & resolution_flag) == 0U ||
+      (flags & other_resolution_flag) != 0U) {
+    return badPayload();
+  }
+
+  std::uint32_t value32 = 0U;
+  std::uint32_t errors = 0U;
+  const std::size_t clock_offsets[] = {
+      offsets.ipg_clock_hz,
+      offsets.adc_clock_hz,
+      offsets.calibration_deadline_us,
+  };
+  const std::uint32_t clock_expected[] = {
+      protocol_v1::kAdcIpgClockHz,
+      protocol_v1::kAdcClockHz,
+      protocol_v1::kAdcCalibrationDeadlineUs,
+  };
+  for (std::size_t index = 0U;
+       index < sizeof(clock_offsets) / sizeof(clock_offsets[0]); ++index) {
+    if (!loadU32(payload, clock_offsets[index], value32) ||
+        value32 != clock_expected[index]) {
+      return badPayload();
+    }
+  }
+  if (!loadU32(payload, offsets.calibration_cycles_0, value32) ||
+      !loadU32(payload, offsets.calibration_cycles_1, value32) ||
+      !loadU32(payload, offsets.initialization_error_flags, errors) ||
+      (errors & ~protocol_v1::kKnownAdcInitializationErrorMask) != 0U) {
+    return badPayload();
+  }
+
+  const std::uint16_t initialized = static_cast<std::uint16_t>(
+      protocol_v1::AdcConfigurationFlag::kInitialized);
+  const std::uint16_t routes_validated = static_cast<std::uint16_t>(
+      protocol_v1::AdcConfigurationFlag::kRoutesValidated);
+  const std::uint16_t readback_valid = static_cast<std::uint16_t>(
+      protocol_v1::AdcConfigurationFlag::kConfigurationReadbackValid);
+  const std::uint16_t calibration_complete = static_cast<std::uint16_t>(
+      protocol_v1::AdcConfigurationFlag::kCalibrationComplete);
+  if ((flags & initialized) != 0U &&
+      (errors != 0U || (flags & routes_validated) == 0U ||
+       (flags & readback_valid) == 0U ||
+       (flags & calibration_complete) == 0U ||
+       calibration_state_0 != static_cast<std::uint8_t>(
+           protocol_v1::AdcCalibrationState::kSucceeded) ||
+       calibration_state_1 != static_cast<std::uint8_t>(
+           protocol_v1::AdcCalibrationState::kSucceeded))) {
+    return badPayload();
+  }
+  return Result::success();
+}
+
 Result validateInfo(ByteView payload) {
   if (payload.data[protocol_v1::kInfoResponseReserved0Offset] != 0U ||
       payload.data[protocol_v1::kInfoResponseReserved2Offset] != 0U ||
@@ -537,10 +686,6 @@ Result validateInfo(ByteView payload) {
           static_cast<std::uint8_t>(~kValidStreamMask) ||
       payload.data[protocol_v1::kInfoResponseSupportedSourceMaskOffset] == 0U ||
       payload.data[protocol_v1::kInfoResponseSupportedSourceMaskOffset] & 0xFCU ||
-      payload.data[protocol_v1::kInfoResponseAdcResolutionBitsOffset] !=
-          protocol_v1::kAdcResolutionBits ||
-      payload.data[protocol_v1::kInfoResponseAdcContainerBytesOffset] !=
-          protocol_v1::kAdcContainerBits / 8U ||
       payload.data[protocol_v1::kInfoResponseGpioPinCountOffset] !=
           protocol_v1::kInfoResponseGpioPinMapCount ||
       payload.data[protocol_v1::kInfoResponseGpioPackedWidthBitsOffset] !=
@@ -674,7 +819,43 @@ Result validateInfo(ByteView payload) {
       return badPayload();
     }
   }
-  return terminated ? Result::success() : badPayload();
+  if (!terminated) {
+    return badPayload();
+  }
+  if (!loadU16(payload, protocol_v1::kInfoResponseReserved5Offset, value16) ||
+      value16 != 0U) {
+    return badPayload();
+  }
+  return validateAdcMetadata(
+      payload,
+      {protocol_v1::kInfoResponseAdcResolutionBitsOffset,
+       protocol_v1::kInfoResponseAdcContainerBytesOffset,
+       protocol_v1::kInfoResponseAdc0CalibrationStateOffset,
+       protocol_v1::kInfoResponseAdc1CalibrationStateOffset,
+       protocol_v1::kInfoResponseAdcCodeMinOffset,
+       protocol_v1::kInfoResponseAdcCodeMaxOffset,
+       protocol_v1::kInfoResponseAdcReferenceOffset,
+       protocol_v1::kInfoResponseAdcClockSourceOffset,
+       protocol_v1::kInfoResponseAdcClockDividerOffset,
+       protocol_v1::kInfoResponseAdcHardwareAverageCountOffset,
+       protocol_v1::kInfoResponseAdcReferenceMvNominalOffset,
+       protocol_v1::kInfoResponseAdcInputMinMvNominalOffset,
+       protocol_v1::kInfoResponseAdcInputMaxMvNominalOffset,
+       protocol_v1::kInfoResponseAdcSampleTimeAdckOffset,
+       protocol_v1::kInfoResponseAdcConversionModeOffset,
+       protocol_v1::kInfoResponseAdcConfigurationFlagsOffset,
+       protocol_v1::kInfoResponseAdc0PinOffset,
+       protocol_v1::kInfoResponseAdc1PinOffset,
+       protocol_v1::kInfoResponseAdc0PeripheralOffset,
+       protocol_v1::kInfoResponseAdc1PeripheralOffset,
+       protocol_v1::kInfoResponseAdc0ChannelOffset,
+       protocol_v1::kInfoResponseAdc1ChannelOffset,
+       protocol_v1::kInfoResponseAdcIpgClockHzOffset,
+       protocol_v1::kInfoResponseAdcClockHzOffset,
+       protocol_v1::kInfoResponseAdcCalibrationDeadlineUsOffset,
+       protocol_v1::kInfoResponseAdc0CalibrationCyclesOffset,
+       protocol_v1::kInfoResponseAdc1CalibrationCyclesOffset,
+       protocol_v1::kInfoResponseAdcInitializationErrorFlagsOffset});
 }
 
 Result validateStatus(ByteView payload) {
@@ -743,7 +924,36 @@ Result validateStatus(ByteView payload) {
       depth > protocol_v1::kGpioPacketBufferCount) {
     return badPayload();
   }
-  return Result::success();
+  return validateAdcMetadata(
+      payload,
+      {protocol_v1::kStatusResponseAdcResolutionBitsOffset,
+       protocol_v1::kStatusResponseAdcContainerBytesOffset,
+       protocol_v1::kStatusResponseAdc0CalibrationStateOffset,
+       protocol_v1::kStatusResponseAdc1CalibrationStateOffset,
+       protocol_v1::kStatusResponseAdcCodeMinOffset,
+       protocol_v1::kStatusResponseAdcCodeMaxOffset,
+       protocol_v1::kStatusResponseAdcReferenceOffset,
+       protocol_v1::kStatusResponseAdcClockSourceOffset,
+       protocol_v1::kStatusResponseAdcClockDividerOffset,
+       protocol_v1::kStatusResponseAdcHardwareAverageCountOffset,
+       protocol_v1::kStatusResponseAdcReferenceMvNominalOffset,
+       protocol_v1::kStatusResponseAdcInputMinMvNominalOffset,
+       protocol_v1::kStatusResponseAdcInputMaxMvNominalOffset,
+       protocol_v1::kStatusResponseAdcSampleTimeAdckOffset,
+       protocol_v1::kStatusResponseAdcConversionModeOffset,
+       protocol_v1::kStatusResponseAdcConfigurationFlagsOffset,
+       protocol_v1::kStatusResponseAdc0PinOffset,
+       protocol_v1::kStatusResponseAdc1PinOffset,
+       protocol_v1::kStatusResponseAdc0PeripheralOffset,
+       protocol_v1::kStatusResponseAdc1PeripheralOffset,
+       protocol_v1::kStatusResponseAdc0ChannelOffset,
+       protocol_v1::kStatusResponseAdc1ChannelOffset,
+       protocol_v1::kStatusResponseAdcIpgClockHzOffset,
+       protocol_v1::kStatusResponseAdcClockHzOffset,
+       protocol_v1::kStatusResponseAdcCalibrationDeadlineUsOffset,
+       protocol_v1::kStatusResponseAdc0CalibrationCyclesOffset,
+       protocol_v1::kStatusResponseAdc1CalibrationCyclesOffset,
+       protocol_v1::kStatusResponseAdcInitializationErrorFlagsOffset});
 }
 
 Result decodeChecksumBenchmarkRequest(ByteView payload,
@@ -1790,9 +2000,9 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   storeU16(bytes, protocol_v1::kInfoResponseGpioSamplePeriodTicksOffset,
            response.gpio_sample_period_ticks);
   payload[protocol_v1::kInfoResponseAdcResolutionBitsOffset] =
-      response.adc_resolution_bits;
+      response.adc.resolution_bits;
   payload[protocol_v1::kInfoResponseAdcContainerBytesOffset] =
-      response.adc_container_bytes;
+      response.adc.container_bytes;
   payload[protocol_v1::kInfoResponseGpioPinCountOffset] =
       static_cast<std::uint8_t>(response.gpio_pin_map.size());
   payload[protocol_v1::kInfoResponseDataChecksumAlgorithmOffset] =
@@ -1850,6 +2060,57 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
       response.gpio_edma_priority;
   payload[protocol_v1::kInfoResponseGpioXbarActiveEdgeOffset] =
       response.gpio_xbar_active_edge;
+  storeU16(bytes, protocol_v1::kInfoResponseAdcCodeMinOffset,
+           response.adc.code_min);
+  storeU16(bytes, protocol_v1::kInfoResponseAdcCodeMaxOffset,
+           response.adc.code_max);
+  payload[protocol_v1::kInfoResponseAdcReferenceOffset] =
+      static_cast<std::uint8_t>(response.adc.reference);
+  payload[protocol_v1::kInfoResponseAdcClockSourceOffset] =
+      static_cast<std::uint8_t>(response.adc.clock_source);
+  payload[protocol_v1::kInfoResponseAdcClockDividerOffset] =
+      response.adc.clock_divider;
+  payload[protocol_v1::kInfoResponseAdcHardwareAverageCountOffset] =
+      response.adc.hardware_average_count;
+  storeU16(bytes, protocol_v1::kInfoResponseAdcReferenceMvNominalOffset,
+           response.adc.reference_mv_nominal);
+  storeU16(bytes, protocol_v1::kInfoResponseAdcInputMinMvNominalOffset,
+           response.adc.input_min_mv_nominal);
+  storeU16(bytes, protocol_v1::kInfoResponseAdcInputMaxMvNominalOffset,
+           response.adc.input_max_mv_nominal);
+  payload[protocol_v1::kInfoResponseAdcSampleTimeAdckOffset] =
+      response.adc.sample_time_adck;
+  payload[protocol_v1::kInfoResponseAdcConversionModeOffset] =
+      response.adc.conversion_mode;
+  storeU16(bytes, protocol_v1::kInfoResponseAdcConfigurationFlagsOffset,
+           response.adc.configuration_flags);
+  payload[protocol_v1::kInfoResponseAdc0CalibrationStateOffset] =
+      static_cast<std::uint8_t>(response.adc.calibration_states[0]);
+  payload[protocol_v1::kInfoResponseAdc1CalibrationStateOffset] =
+      static_cast<std::uint8_t>(response.adc.calibration_states[1]);
+  payload[protocol_v1::kInfoResponseAdc0PinOffset] = response.adc.pins[0];
+  payload[protocol_v1::kInfoResponseAdc1PinOffset] = response.adc.pins[1];
+  payload[protocol_v1::kInfoResponseAdc0PeripheralOffset] =
+      response.adc.peripherals[0];
+  payload[protocol_v1::kInfoResponseAdc1PeripheralOffset] =
+      response.adc.peripherals[1];
+  payload[protocol_v1::kInfoResponseAdc0ChannelOffset] =
+      response.adc.channels[0];
+  payload[protocol_v1::kInfoResponseAdc1ChannelOffset] =
+      response.adc.channels[1];
+  storeU32(bytes, protocol_v1::kInfoResponseAdcIpgClockHzOffset,
+           response.adc.ipg_clock_hz);
+  storeU32(bytes, protocol_v1::kInfoResponseAdcClockHzOffset,
+           response.adc.adc_clock_hz);
+  storeU32(bytes, protocol_v1::kInfoResponseAdcCalibrationDeadlineUsOffset,
+           response.adc.calibration_deadline_us);
+  storeU32(bytes, protocol_v1::kInfoResponseAdc0CalibrationCyclesOffset,
+           response.adc.calibration_cycles[0]);
+  storeU32(bytes, protocol_v1::kInfoResponseAdc1CalibrationCyclesOffset,
+           response.adc.calibration_cycles[1]);
+  storeU32(bytes,
+           protocol_v1::kInfoResponseAdcInitializationErrorFlagsOffset,
+           response.adc.initialization_error_flags);
   return encodeFrame(
       responseFields(protocol_v1::FrameKind::kInfoResponse, request, run_id),
       view(payload), output);
@@ -1966,6 +2227,61 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
 #undef STORE_STATUS_U16
 #undef STORE_STATUS_U32
 #undef STORE_STATUS_U64
+  payload[protocol_v1::kStatusResponseAdcResolutionBitsOffset] =
+      response.adc.resolution_bits;
+  payload[protocol_v1::kStatusResponseAdcContainerBytesOffset] =
+      response.adc.container_bytes;
+  payload[protocol_v1::kStatusResponseAdc0CalibrationStateOffset] =
+      static_cast<std::uint8_t>(response.adc.calibration_states[0]);
+  payload[protocol_v1::kStatusResponseAdc1CalibrationStateOffset] =
+      static_cast<std::uint8_t>(response.adc.calibration_states[1]);
+  storeU16(bytes, protocol_v1::kStatusResponseAdcCodeMinOffset,
+           response.adc.code_min);
+  storeU16(bytes, protocol_v1::kStatusResponseAdcCodeMaxOffset,
+           response.adc.code_max);
+  payload[protocol_v1::kStatusResponseAdcReferenceOffset] =
+      static_cast<std::uint8_t>(response.adc.reference);
+  payload[protocol_v1::kStatusResponseAdcClockSourceOffset] =
+      static_cast<std::uint8_t>(response.adc.clock_source);
+  payload[protocol_v1::kStatusResponseAdcClockDividerOffset] =
+      response.adc.clock_divider;
+  payload[protocol_v1::kStatusResponseAdcHardwareAverageCountOffset] =
+      response.adc.hardware_average_count;
+  storeU16(bytes, protocol_v1::kStatusResponseAdcReferenceMvNominalOffset,
+           response.adc.reference_mv_nominal);
+  storeU16(bytes, protocol_v1::kStatusResponseAdcInputMinMvNominalOffset,
+           response.adc.input_min_mv_nominal);
+  storeU16(bytes, protocol_v1::kStatusResponseAdcInputMaxMvNominalOffset,
+           response.adc.input_max_mv_nominal);
+  payload[protocol_v1::kStatusResponseAdcSampleTimeAdckOffset] =
+      response.adc.sample_time_adck;
+  payload[protocol_v1::kStatusResponseAdcConversionModeOffset] =
+      response.adc.conversion_mode;
+  storeU16(bytes, protocol_v1::kStatusResponseAdcConfigurationFlagsOffset,
+           response.adc.configuration_flags);
+  payload[protocol_v1::kStatusResponseAdc0PinOffset] = response.adc.pins[0];
+  payload[protocol_v1::kStatusResponseAdc1PinOffset] = response.adc.pins[1];
+  payload[protocol_v1::kStatusResponseAdc0PeripheralOffset] =
+      response.adc.peripherals[0];
+  payload[protocol_v1::kStatusResponseAdc1PeripheralOffset] =
+      response.adc.peripherals[1];
+  payload[protocol_v1::kStatusResponseAdc0ChannelOffset] =
+      response.adc.channels[0];
+  payload[protocol_v1::kStatusResponseAdc1ChannelOffset] =
+      response.adc.channels[1];
+  storeU32(bytes, protocol_v1::kStatusResponseAdcIpgClockHzOffset,
+           response.adc.ipg_clock_hz);
+  storeU32(bytes, protocol_v1::kStatusResponseAdcClockHzOffset,
+           response.adc.adc_clock_hz);
+  storeU32(bytes, protocol_v1::kStatusResponseAdcCalibrationDeadlineUsOffset,
+           response.adc.calibration_deadline_us);
+  storeU32(bytes, protocol_v1::kStatusResponseAdc0CalibrationCyclesOffset,
+           response.adc.calibration_cycles[0]);
+  storeU32(bytes, protocol_v1::kStatusResponseAdc1CalibrationCyclesOffset,
+           response.adc.calibration_cycles[1]);
+  storeU32(bytes,
+           protocol_v1::kStatusResponseAdcInitializationErrorFlagsOffset,
+           response.adc.initialization_error_flags);
   return encodeFrame(responseFields(protocol_v1::FrameKind::kGetStatusResponse,
                                     request, run_id),
                      view(payload), output);

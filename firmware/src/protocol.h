@@ -224,6 +224,57 @@ struct ParsedCommand {
 
 Result decodeRequest(ByteView input, Request &request);
 
+// Shared INFO/STATUS view of the configuration actually written to the two
+// ADC modules and the terminal result of each independently bounded
+// calibration. Defaults describe the primary policy before initialization;
+// they never claim that calibration has run.
+struct AdcInitializationMetadata {
+  std::uint8_t resolution_bits = protocol_v1::kAdcPrimaryResolutionBits;
+  std::uint8_t container_bytes = protocol_v1::kAdcContainerBits / 8U;
+  std::uint16_t code_min = protocol_v1::kAdcCodeMin;
+  std::uint16_t code_max = 4095U;
+  protocol_v1::AdcReference reference =
+      protocol_v1::AdcReference::kVrefhVreflNominal3v3;
+  protocol_v1::AdcClockSource clock_source =
+      protocol_v1::AdcClockSource::kSynchronousIpg;
+  std::uint8_t clock_divider = protocol_v1::kAdcClockDivider;
+  std::uint8_t hardware_average_count =
+      protocol_v1::kAdcHardwareAverageCount;
+  std::uint16_t reference_mv_nominal =
+      protocol_v1::kAdcReferenceMvNominal;
+  std::uint16_t input_min_mv_nominal =
+      protocol_v1::kAdcInputMinMvNominal;
+  std::uint16_t input_max_mv_nominal =
+      protocol_v1::kAdcInputMaxMvNominal;
+  std::uint8_t sample_time_adck = protocol_v1::kAdcSampleTimeAdck;
+  std::uint8_t conversion_mode = 2U;
+  std::uint16_t configuration_flags =
+      static_cast<std::uint16_t>(
+          protocol_v1::AdcConfigurationFlag::kNoHardwareAveraging) |
+      static_cast<std::uint16_t>(
+          protocol_v1::AdcConfigurationFlag::kHighSpeed) |
+      static_cast<std::uint16_t>(
+          protocol_v1::AdcConfigurationFlag::kShortestSample) |
+      static_cast<std::uint16_t>(
+          protocol_v1::AdcConfigurationFlag::kPrimary12Bit);
+  std::array<protocol_v1::AdcCalibrationState, 2U> calibration_states{
+      protocol_v1::AdcCalibrationState::kNotRun,
+      protocol_v1::AdcCalibrationState::kNotRun,
+  };
+  std::array<std::uint8_t, 2U> pins{protocol_v1::kAdcPins[0],
+                                    protocol_v1::kAdcPins[1]};
+  std::array<std::uint8_t, 2U> peripherals{
+      protocol_v1::kAdcPeripherals[0], protocol_v1::kAdcPeripherals[1]};
+  std::array<std::uint8_t, 2U> channels{protocol_v1::kAdcChannels[0],
+                                        protocol_v1::kAdcChannels[1]};
+  std::uint32_t ipg_clock_hz = protocol_v1::kAdcIpgClockHz;
+  std::uint32_t adc_clock_hz = protocol_v1::kAdcClockHz;
+  std::uint32_t calibration_deadline_us =
+      protocol_v1::kAdcCalibrationDeadlineUs;
+  std::array<std::uint32_t, 2U> calibration_cycles{};
+  std::uint32_t initialization_error_flags = 0U;
+};
+
 struct InfoResponse {
   protocol_v1::DeviceState device_state = protocol_v1::DeviceState::kIdle;
   std::uint8_t supported_stream_mask = 0U;
@@ -244,8 +295,6 @@ struct InfoResponse {
       static_cast<std::uint16_t>(protocol_v1::kAdc1PhaseTicks);
   std::uint16_t gpio_sample_period_ticks =
       static_cast<std::uint16_t>(protocol_v1::kGpioSamplePeriodTicks);
-  std::uint8_t adc_resolution_bits = protocol_v1::kAdcResolutionBits;
-  std::uint8_t adc_container_bytes = protocol_v1::kAdcContainerBits / 8U;
   protocol_v1::ChecksumAlgorithm data_checksum_algorithm =
       protocol_v1::kDefaultChecksumAlgorithm;
   std::array<std::uint8_t, protocol_v1::kInfoResponseGpioPinMapCount>
@@ -276,6 +325,7 @@ struct InfoResponse {
   std::uint8_t gpio_dmamux_source = protocol_v1::kGpioDmamuxSource;
   std::uint8_t gpio_edma_priority = protocol_v1::kGpioEdmaPriority;
   std::uint8_t gpio_xbar_active_edge = protocol_v1::kGpioXbarActiveEdge;
+  AdcInitializationMetadata adc{};
 };
 
 struct StatusResponse {
@@ -313,6 +363,7 @@ struct StatusResponse {
   std::uint32_t gpio_start_errors = 0U;
   std::uint32_t gpio_stop_errors = 0U;
   std::uint32_t gpio_stale_dma_completions = 0U;
+  AdcInitializationMetadata adc{};
 };
 
 struct ChecksumBenchmarkResponse {
