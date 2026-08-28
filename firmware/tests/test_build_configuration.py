@@ -36,7 +36,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(7, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(8, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -168,8 +168,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_gpio_clock_diagnostic_buffer_requires_isolated_ocram_line(self) -> None:
         symbols = (
-            "2025f000 00000020 B "
-            "teensy_daq::gpio_clock::g_gpio_clock_diagnostic_buffer"
+            "2025f000 00000020 B teensy_daq::gpio_clock::g_gpio_clock_diagnostic_buffer"
         )
         resource = build_firmware.gpio_clock_diagnostic_buffer_usage(symbols)
 
@@ -185,6 +184,31 @@ class BuildConfigurationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.gpio_clock_diagnostic_buffer_usage("")
+
+    def test_raw_gpio_dma_buffers_require_exact_aligned_ocram_storage(self) -> None:
+        symbols = (
+            "2025f020 0000fd00 B "
+            "teensy_daq::gpio_capture::g_gpio_raw_dma_buffers\n"
+            "2026ed20 00000020 B "
+            "teensy_daq::gpio_capture::g_gpio_raw_dma_overflow_sink\n"
+            "2026ed40 000000a0 B "
+            "teensy_daq::gpio_capture::g_gpio_raw_dma_descriptors"
+        )
+        resources = build_firmware.gpio_raw_dma_buffer_usage(symbols)
+
+        self.assertEqual(64_960, resources["total_bytes"])
+        self.assertEqual("0x2025f020", resources["allocations"]["RING"]["address"])
+        self.assertEqual(160, resources["allocations"]["DESCRIPTORS"]["bytes"])
+        with self.assertRaisesRegex(build_firmware.BuildError, "cache-line aligned"):
+            build_firmware.gpio_raw_dma_buffer_usage(
+                symbols.replace("2026ed40 000000a0", "2026ed44 000000a0")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
+            build_firmware.gpio_raw_dma_buffer_usage(
+                symbols.replace("2025f020 0000fd00", "2005f020 0000fd00")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
+            build_firmware.gpio_raw_dma_buffer_usage(symbols.splitlines()[0])
 
     def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
         responses = [

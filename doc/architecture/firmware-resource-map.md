@@ -22,9 +22,10 @@ This is the human-readable projection of the compile-time registry in
 `firmware/src/board_config.h`. Numeric allocations are fixed so acquisition
 modules cannot silently compete. Phase 06 has silicon-verified the isolated
 PIT/XBAR/eDMA clock path in [[ADR-003-GPIO-Clock-DMA]] and advertises its
-IDLE-only diagnostic. That diagnostic does not remap or read D6-D13, and the
-physical GPIO source remains disabled until the later mapping, rotating-buffer,
-packing, and streaming gates pass. The existing synthetic generators and
+IDLE-only diagnostic. The separate raw adapter now implements selective
+D6-D13 remapping and rotating `GPIO2_PSR` capture, but the physical GPIO source
+remains disabled until the later packing, integration, and streaming gates
+pass. The existing synthetic generators and
 packetizer remain cooperative and do not claim physical acquisition
 resources. See [[System-Overview]] for that boundary and [[Protocol-V1]] with
 [[ADR-001-Wire-Protocol]] for the wire metadata.
@@ -130,6 +131,8 @@ use an unconstrained first-free allocator.
 | Complete response queue | 4 frames | USB transport |
 | ADC DMA ring | 4 buffers | ADC capture |
 | Raw GPIO DMA ring | 4 buffers | GPIO capture |
+| Raw GPIO pressure sink | 1 isolated cache line | GPIO capture |
+| Raw GPIO scatter/gather TCDs | 5 descriptors | GPIO capture |
 | Packed GPIO ring | 4 buffers | GPIO packer |
 | Aligned complete-frame packet pool | 106 DTCM + 94 OCRAM = 200 × 4,096-byte buffers | Packetizer |
 | Per-source ready queues | 200 ADC + 200 GPIO indexes; shared pool limits actual ownership to 200 | Packetizer |
@@ -178,24 +181,27 @@ to two frames per service call and waits when no packet buffer is free.
 | Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 8,192 | 32 | Packetizer |
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
+| Raw GPIO pressure sink | OCRAM / RAM2 | one isolated cache line | 32 | 32 | GPIO capture |
+| Raw GPIO TCD bank | OCRAM / RAM2 | `5 × 32` | 160 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
 | GPIO clock diagnostic sink | OCRAM / RAM2 `.dmabuffers` | one isolated cache line | 32 | 32 | GPIO capture |
 | Packet-buffer reserve | OCRAM / RAM2 `.dmabuffers` | `94 × 4,096` | 385,024 | 32 | Packetizer |
 | Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | **RAM1 subtotal** |  |  | **450,976** |  |  |
-| **RAM2 subtotal** |  |  | **486,432** |  |  |
+| **RAM2 subtotal** |  |  | **486,624** |  |  |
 
 The application packet pool is split between an aligned ordinary-global DTCM
 primary and an aligned `DMAMEM` OCRAM reserve. Both are CPU-owned; Teensy USB
 Serial copies from either bank into its separate core-owned TX ring and flushes
-that destination before USB DMA. Actual DMA-visible acquisition rings remain
-distinct future OCRAM allocations with explicit cache maintenance at ownership
-transitions. Compile-time checks bind the two banks to 819,200 total bytes, cap
+that destination before USB DMA. The raw GPIO ring, pressure sink, and TCD bank
+are now distinct `.dmabuffers` allocations with explicit cache maintenance at
+ownership transitions; the ADC and packed GPIO rings remain reservations.
+Compile-time checks bind the two packet banks to 819,200 total bytes, cap
 pipeline metadata at 8,192 bytes, and reject zero-sized, non-power-of-two,
 misaligned, or over-budget registry entries. The build manifest additionally
-checks the linked addresses and sizes of both packet banks and the isolated
-GPIO clock diagnostic cache line.
+checks the linked addresses and sizes of both packet banks, the isolated GPIO
+clock diagnostic cache line, and all three raw GPIO DMA allocations.
 
 The optional IDLE-only checksum benchmark owns no PIT, XBAR, ADC_ETC, eDMA, or
 USB resource. Its ordinary global buffer is link-verified inside DTCM; its
@@ -210,7 +216,7 @@ The optional GPIO clock diagnostic owns PIT0, XBARA1 input 56/output 0,
 DMAMUX source 30, and eDMA channel 2 only while IDLE. Its 32-byte aligned
 `.dmabuffers` cache line contains a fixed source sentinel and fixed destination
 word, so each event proves the trigger/count path without touching a pad or
-the future raw GPIO ring. The diagnostic disables PIT, eDMA requests, DMAMUX,
+the raw GPIO ring. The diagnostic disables PIT, eDMA requests, DMAMUX,
 and XBAR DMA generation before returning its read-only snapshot.
 
 ## Ownership transitions
@@ -233,10 +239,26 @@ Command responses are selected before unsent data at each frame boundary; an
 active data frame finishes first. Partial and zero writes retain both frame
 ownership and the byte offset for a later bounded loop visit.
 
+The implemented GPIO raw ownership path is:
+
+```text
+FREE -> DMA_QUEUED -> DMA_ACTIVE -> READY -> PACKING -> RELEASING -> FREE
+```
+
+One active and one look-ahead destination are always DMA-owned. If no consumer
+buffer is `FREE`, the future descriptor selects a separate 32-byte sink with
+`DOFF=0`; each 4,048-sample sink completion advances exact capture/loss/overrun
+counters while `READY`, `PACKING`, and `RELEASING` buffers remain untouched.
+Cache deletion occurs before a buffer becomes `FREE` or DMA-owned, and cache
+invalidation occurs after it atomically becomes `PACKING`; neither occurs in
+the roughly 988 Hz major-loop ISR. STOP disables the hardware first, accounts
+a partial active loop from its minor count, restores D6-D13 as GPIO2 inputs,
+and leaves complete CPU-owned buffers drainable before restart.
+
 ADC interleaved DMA storage will become ready only after both ADC eDMA
-completions. GPIO raw storage will become ready after its eDMA major loop, then
-move to a distinct packed buffer. Those future acquisition transitions do not
-change the packet-pool contract. No project ISR fills or frames packets,
-calculates checksums, mutates queues, writes USB, waits, or performs broad
-control-state mutation. Synthetic pacing installs no ISR at all: the narrow
-Teensy adapter polls and extends `micros()` once per cooperative service step.
+completions. GPIO raw storage will next move to a distinct packed buffer. Those
+acquisition transitions do not change the packet-pool contract. No project ISR
+fills or frames packets, calculates checksums, mutates queues, writes USB,
+waits, or performs broad control-state mutation. Synthetic pacing installs no
+ISR at all: the narrow Teensy adapter polls and extends `micros()` once per
+cooperative service step.

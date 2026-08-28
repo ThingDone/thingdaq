@@ -11,6 +11,12 @@ void saturatingAdd(Integer &value, Integer amount) {
   value = amount > maximum - value ? maximum : value + amount;
 }
 
+template <typename Integer>
+Integer saturatingSum(Integer left, Integer right) {
+  const Integer maximum = std::numeric_limits<Integer>::max();
+  return right > maximum - left ? maximum : left + right;
+}
+
 }  // namespace
 
 std::uint32_t Statistics::resetForNewGeneration() {
@@ -74,7 +80,19 @@ void Statistics::publishDataPath(const DataPathProgress &progress) {
   counters_.adc_frames_emitted = progress.adc.frames_emitted;
   counters_.gpio_frames_emitted = progress.gpio.frames_emitted;
   counters_.adc_items_dropped = progress.adc.items_dropped;
-  counters_.gpio_items_dropped = progress.gpio.items_dropped;
+  refreshDataProjection();
+}
+
+void Statistics::publishGpioRawCapture(
+    const GpioRawCaptureProgress &progress) {
+  counters_.gpio_raw_capture = progress;
+  refreshDataProjection();
+}
+
+void Statistics::refreshDataProjection() {
+  counters_.gpio_items_dropped = saturatingSum(
+      counters_.data_path.gpio.items_dropped,
+      counters_.gpio_raw_capture.samples_lost);
 }
 
 protocol::StatusResponse Statistics::wireStatus(

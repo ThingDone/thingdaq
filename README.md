@@ -68,8 +68,9 @@ Arduino CLI, compiler, resolved menu properties, deterministic source/build
 identity, source-input Git state, reproducible UTC timestamp policy, Flash/RAM
 usage, command, and SHA-256 hashes in a gitignored build manifest. The exported
 artifacts include the HEX, ELF, and linker map needed for pre-upload review;
-ELF inspection also proves the packet banks, checksum buffers/tables, and GPIO
-clock diagnostic cache line occupy their claimed regions:
+ELF inspection also proves the packet banks, checksum buffers/tables, GPIO
+clock diagnostic cache line, and raw GPIO ring/sink/TCD bank occupy their
+claimed regions:
 
 ```bash
 python3 firmware/tools/build_firmware.py
@@ -142,6 +143,17 @@ clock gates, timer, XBAR, DMAMUX, eDMA/TCD registers, 600 MHz DWT interval,
 scheduled/sample counts, route IDs, and typed hardware errors. The accepted
 route and rejected dual-edge alternatives are recorded in
 `doc/decisions/adr-003-gpio-clock-dma.md`.
+
+The unadvertised physical GPIO foundation selectively returns only D6-D13 from
+GPIO7 to GPIO2, keeps them inputs on START/STOP/error, and uses channel 2 to
+copy fixed 32-bit `GPIO2_PSR` samples into four aligned 4,048-word OCRAM
+buffers. Scatter/gather completion interrupts occur once per buffer, not at
+4 MHz. Explicit `FREE → DMA_QUEUED → DMA_ACTIVE → READY → PACKING →
+RELEASING` ownership and centralized cache deletion/invalidation prevent DMA
+from touching CPU-owned data. When downstream work fills the ring, eDMA keeps
+sampling into a one-cache-line sink and reports each lost sample through the
+shared statistics model. Hardware-source CONFIGURE remains disabled until the
+packer and physical-mode integration tasks complete.
 
 The Python codec uses exact standard-library C implementations for Adler-32
 and CRC-32/ISO-HDLC and a bounded table-driven fallback for CRC-32C. Its
@@ -275,6 +287,14 @@ and simulator refusal to fabricate target-only evidence. The pinned target
 build and hardware spike additionally validate the explicit register adapter;
 the accepted evidence is consolidated in
 `doc/decisions/adr-003-gpio-clock-dma.md`.
+
+The raw GPIO host test exhausts the ownership scheduler through normal
+rotation, CPU packing leases, stopped partial buffers, stale handles, and
+sustained sink pressure. It also proves cache calls occur only at ownership
+boundaries, exact raw losses combine with later packet drops without overflow,
+and the selective GPR27/GDIR helper cannot modify unrelated bits. The pinned
+build separately verifies the four-buffer ring, one-line sink, and five TCDs
+are exact, 32-byte-aligned OCRAM allocations.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source

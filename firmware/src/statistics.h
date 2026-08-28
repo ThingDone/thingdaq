@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "protocol.h"
@@ -24,6 +25,23 @@ struct DataPathProgress {
   StreamProgress gpio{};
 };
 
+// Raw acquisition precedes packing and packet ownership. Keeping this stage
+// in the common model makes a DMA-ring loss visible even when no packet was
+// ever available to carry the affected samples.
+struct GpioRawCaptureProgress {
+  std::uint64_t major_loops_completed = 0U;
+  std::uint64_t buffers_completed = 0U;
+  std::uint64_t buffers_acquired = 0U;
+  std::uint64_t buffers_released = 0U;
+  std::uint64_t samples_captured = 0U;
+  std::uint64_t samples_delivered = 0U;
+  std::uint64_t raw_ring_overruns = 0U;
+  std::uint64_t samples_lost = 0U;
+  std::uint64_t stop_discarded_samples = 0U;
+  std::size_t ready_high_water = 0U;
+  std::uint32_t hardware_errors = 0U;
+};
+
 // Detailed firmware diagnostics remain available to firmware tests and future
 // transport/status extensions. Protocol v1 currently projects only the data,
 // parser, transport, and generation fields into GET_STATUS.
@@ -45,6 +63,7 @@ struct Snapshot {
   std::uint32_t transport_errors = 0U;
   std::uint32_t generation = 1U;
   DataPathProgress data_path{};
+  GpioRawCaptureProgress gpio_raw_capture{};
 };
 
 class Statistics {
@@ -83,6 +102,7 @@ class Statistics {
   // native snapshot retains every ownership stage exactly; protocol v1 STATUS
   // projects completed frames and dropped logical items into its fixed fields.
   void publishDataPath(const DataPathProgress &progress);
+  void publishGpioRawCapture(const GpioRawCaptureProgress &progress);
 
   protocol::StatusResponse wireStatus(
       protocol_v1::DeviceState state,
@@ -94,6 +114,8 @@ class Statistics {
   }
 
  private:
+  void refreshDataProjection();
+
   Snapshot counters_{};
 };
 

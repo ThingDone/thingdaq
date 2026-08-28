@@ -205,7 +205,12 @@ static_assert(teensy_daq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
 static_assert(teensy_daq::board::kGpio7ToGpio2Gpr27ClearMask ==
               teensy_daq::board::kGpio2PsrCaptureMask);
 static_assert(teensy_daq::board::kReservedRam1Bytes == 450976U);
-static_assert(teensy_daq::board::kReservedRam2Bytes == 486432U);
+static_assert(teensy_daq::board::kGpioRawDmaBufferBytes == 16192U);
+static_assert(teensy_daq::board::kGpioRawDmaRingBytes == 64768U);
+static_assert(teensy_daq::board::kGpioRawDmaOverflowSinkBytes == 32U);
+static_assert(teensy_daq::board::kGpioRawDmaDescriptorCount == 5U);
+static_assert(teensy_daq::board::kGpioRawDmaDescriptorBytes == 160U);
+static_assert(teensy_daq::board::kReservedRam2Bytes == 486624U);
 static_assert(teensy_daq::board::kChecksumBenchmarkBufferBytes == 4096U);
 static_assert(teensy_daq::board::kGpioClockDiagnosticSinkBytes == 32U);
 static_assert(teensy_daq::board::kGpioPitChannel == 0U);
@@ -227,6 +232,7 @@ static_assert(teensy_daq::board::kDmamuxXbar1Request2Source == 94U);
 static_assert(teensy_daq::board::kDmamuxXbar1Request3Source == 95U);
 static_assert(teensy_daq::board::kGpioDmamuxSource == 30U);
 static_assert(teensy_daq::board::kGpioEdmaPriority == 2U);
+static_assert(teensy_daq::board::kGpioEdmaIrqPriority == 64U);
 static_assert(teensy_daq::capabilities::kMetadata.supported_stream_mask == 3U);
 static_assert((teensy_daq::capabilities::kMetadata.capability_bits &
                teensy_daq::capabilities::kDataCapabilityMask) ==

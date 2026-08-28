@@ -10,6 +10,7 @@
 #include <imxrt.h>
 
 #include "board_config.h"
+#include "gpio_dma_route_teensy.h"
 
 #define TEENSY_DAQ_GPIO_CLOCK_TARGET_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
@@ -29,32 +30,6 @@ namespace {
 
 constexpr std::uint32_t kSourceWord = 0xA5C35A7EU;
 constexpr std::uint32_t kDestinationPoison = 0x5A3CA581U;
-constexpr std::uint32_t kPerclkMask =
-    CCM_CSCMR1_PERCLK_CLK_SEL | CCM_CSCMR1_PERCLK_PODF(0x3FU);
-constexpr std::uint32_t kPerclk24M = CCM_CSCMR1_PERCLK_CLK_SEL;
-constexpr std::uint32_t kPitGateMask = CCM_CCGR1_PIT(CCM_CCGR_ON);
-constexpr std::uint32_t kXbarGateMask = CCM_CCGR2_XBAR1(CCM_CCGR_ON);
-constexpr std::uint32_t kDmaGateMask = CCM_CCGR5_DMA(CCM_CCGR_ON);
-constexpr bool kXbarUsesHighByte = (board::kGpioXbarOutput & 1U) != 0U;
-constexpr std::uint16_t kXbarSelectedStatus =
-    kXbarUsesHighByte ? XBARA_CTRL_STS1 : XBARA_CTRL_STS0;
-constexpr std::uint16_t kXbarSelectedEdge =
-    kXbarUsesHighByte ? XBARA_CTRL_EDGE1(board::kGpioXbarActiveEdge)
-                      : XBARA_CTRL_EDGE0(board::kGpioXbarActiveEdge);
-constexpr std::uint16_t kXbarSelectedInterruptEnable =
-    kXbarUsesHighByte ? XBARA_CTRL_IEN1 : XBARA_CTRL_IEN0;
-constexpr std::uint16_t kXbarSelectedDmaEnable =
-    kXbarUsesHighByte ? XBARA_CTRL_DEN1 : XBARA_CTRL_DEN0;
-constexpr std::uint16_t kXbarPeerStatus =
-    kXbarUsesHighByte ? XBARA_CTRL_STS0 : XBARA_CTRL_STS1;
-constexpr std::uint16_t kXbarSelectedConfigurationMask =
-    kXbarSelectedStatus | kXbarSelectedEdge |
-    kXbarSelectedInterruptEnable | kXbarSelectedDmaEnable;
-constexpr std::uint16_t kXbarSelectedConfiguration =
-    kXbarSelectedStatus | kXbarSelectedEdge | kXbarSelectedDmaEnable;
-constexpr std::uint16_t kXbarSelectionMask =
-    kXbarUsesHighByte ? 0xFF00U : 0x00FFU;
-constexpr std::uint8_t kXbarSelectionShift = kXbarUsesHighByte ? 8U : 0U;
 constexpr std::uint32_t kDmamuxConfiguration =
     DMAMUX_CHCFG_ENBL | board::kGpioDmamuxSource;
 constexpr std::uint16_t kTcdAttributes =
@@ -66,25 +41,9 @@ std::uint32_t address32(const volatile void *address) {
       reinterpret_cast<std::uintptr_t>(address));
 }
 
-void barrier() { __asm__ volatile("dsb\n\tisb" : : : "memory"); }
-
 void addError(protocol::GpioClockDiagnosticResponse &snapshot,
               protocol_v1::GpioClockError error) {
   snapshot.hardware_error_flags |= errorBit(error);
-}
-
-volatile std::uint16_t *xbarSelectRegister() {
-  return &XBARA1_SEL0 + board::kGpioXbarOutput / 2U;
-}
-
-volatile std::uint16_t *xbarControlRegister() {
-  return &XBARA1_CTRL0 + board::kGpioXbarOutput / 2U;
-}
-
-bool selectedOutputBusy() {
-  return (*xbarControlRegister() &
-          (kXbarSelectedEdge | kXbarSelectedInterruptEnable |
-           kXbarSelectedDmaEnable)) != 0U;
 }
 
 class TeensyPlatform final : public Platform {
@@ -101,9 +60,7 @@ class TeensyPlatform final : public Platform {
 
     // Clock gates are shared enable-only resources. Turn them on before the
     // first peripheral read; the later snapshot verifies each relevant gate.
-    CCM_CCGR1 |= kPitGateMask;
-    CCM_CCGR2 |= kXbarGateMask;
-    CCM_CCGR5 |= kDmaGateMask;
+    gpio_dma_route::enableClockGates();
 
     volatile std::uint32_t *const dmamux =
         &DMAMUX_CHCFG0 + board::kGpioEdmaChannel;
@@ -111,7 +68,8 @@ class TeensyPlatform final : public Platform {
     const std::uint32_t channel_mask =
         std::uint32_t{1U} << board::kGpioEdmaChannel;
     if (pit.TCTRL != 0U || (DMA_ERQ & channel_mask) != 0U ||
-        (*dmamux & DMAMUX_CHCFG_ENBL) != 0U || selectedOutputBusy()) {
+        (*dmamux & DMAMUX_CHCFG_ENBL) != 0U ||
+        gpio_dma_route::selectedOutputBusy()) {
       addError(snapshot, protocol_v1::GpioClockError::kResourceBusy);
       captureUnarmed(snapshot, *dmamux, tcd);
       return true;
@@ -119,7 +77,7 @@ class TeensyPlatform final : public Platform {
 
     ARM_DEMCR |= ARM_DEMCR_TRCENA;
     ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
-    barrier();
+    gpio_dma_route::barrier();
     const std::uint32_t counter_begin = ARM_DWT_CYCCNT;
     __asm__ volatile("nop\n\tnop\n\tnop\n\tnop" : : : "memory");
     if (ARM_DWT_CYCCNT == counter_begin ||
@@ -130,28 +88,12 @@ class TeensyPlatform final : public Platform {
     }
     snapshot.dwt_counter_hz = F_CPU_ACTUAL;
 
-    CCM_CSCMR1 = (CCM_CSCMR1 & ~kPerclkMask) | kPerclk24M;
-    PIT_MCR &= ~PIT_MCR_MDIS;
-    pit.TCTRL = 0U;
-    pit.TFLG = PIT_TFLG_TIF;
-    pit.LDVAL = plan.pit_load_value;
-
-    volatile std::uint16_t *const xbar_select = xbarSelectRegister();
-    std::uint16_t selection = *xbar_select;
-    selection = static_cast<std::uint16_t>(
-        (selection & static_cast<std::uint16_t>(~kXbarSelectionMask)) |
-        (static_cast<std::uint16_t>(board::kGpioXbarInput)
-         << kXbarSelectionShift));
-    *xbar_select = selection;
+    gpio_dma_route::configureStoppedPit(plan.pit_load_value);
+    gpio_dma_route::configureXbarRequest();
+    volatile std::uint16_t *const xbar_select =
+        gpio_dma_route::xbarSelectRegister();
     volatile std::uint16_t *const xbar_control_register =
-        xbarControlRegister();
-    std::uint16_t xbar_control = *xbar_control_register;
-    xbar_control = static_cast<std::uint16_t>(
-        xbar_control &
-        static_cast<std::uint16_t>(~(kXbarSelectedConfigurationMask |
-                                     kXbarPeerStatus)));
-    *xbar_control_register = static_cast<std::uint16_t>(
-        xbar_control | kXbarSelectedConfiguration);
+        gpio_dma_route::xbarControlRegister();
 
     *dmamux = 0U;
     DMA_CERQ = board::kGpioEdmaChannel;
@@ -201,7 +143,7 @@ class TeensyPlatform final : public Platform {
         static_cast<std::uint8_t>(DMA_DCHPRI2 & 0x0FU);
     validateArmed(plan, snapshot);
 
-    barrier();
+    gpio_dma_route::barrier();
     const std::uint32_t measurement_begin = ARM_DWT_CYCCNT;
     pit.TCTRL = PIT_TCTRL_TEN;
     snapshot.pit_tctrl_configured = pit.TCTRL;
@@ -213,12 +155,12 @@ class TeensyPlatform final : public Platform {
       }
     }
     pit.TCTRL = 0U;
-    barrier();
+    gpio_dma_route::barrier();
     const std::uint32_t measurement_end = ARM_DWT_CYCCNT;
     DMA_CERQ = board::kGpioEdmaChannel;
     *dmamux = 0U;
-    disableSelectedOutput();
-    barrier();
+    gpio_dma_route::disableXbarRequest();
+    gpio_dma_route::barrier();
 
     snapshot.dwt_elapsed_cycles = measurement_end - measurement_begin;
     snapshot.pit_cval_final = pit.CVAL;
@@ -254,17 +196,6 @@ class TeensyPlatform final : public Platform {
   }
 
  private:
-  static void disableSelectedOutput() {
-    volatile std::uint16_t *const control_register = xbarControlRegister();
-    std::uint16_t control = *control_register;
-    control = static_cast<std::uint16_t>(
-        control &
-        static_cast<std::uint16_t>(~(kXbarSelectedConfigurationMask |
-                                     kXbarPeerStatus)));
-    *control_register =
-        static_cast<std::uint16_t>(control | kXbarSelectedStatus);
-  }
-
   static void captureUnarmed(protocol::GpioClockDiagnosticResponse &snapshot,
                              std::uint32_t dmamux,
                              const IMXRT_DMA_TCD_t &tcd) {
@@ -279,8 +210,8 @@ class TeensyPlatform final : public Platform {
     snapshot.pit_cval_final = pit.CVAL;
     snapshot.pit_tctrl_configured = pit.TCTRL;
     snapshot.pit_tflg_final = pit.TFLG;
-    snapshot.xbar_sel_configured = *xbarSelectRegister();
-    snapshot.xbar_ctrl_configured = *xbarControlRegister();
+    snapshot.xbar_sel_configured = *gpio_dma_route::xbarSelectRegister();
+    snapshot.xbar_ctrl_configured = *gpio_dma_route::xbarControlRegister();
     snapshot.dmamux_chcfg_configured = dmamux;
     snapshot.dma_cr_configured = DMA_CR;
     snapshot.dma_es_final = DMA_ES;
@@ -301,28 +232,35 @@ class TeensyPlatform final : public Platform {
 
   static void validateArmed(
       const Plan &plan, protocol::GpioClockDiagnosticResponse &snapshot) {
-    if ((snapshot.ccm_cscmr1_configured & kPerclkMask) != kPerclk24M) {
+    if ((snapshot.ccm_cscmr1_configured & gpio_dma_route::kPerclkMask) !=
+        gpio_dma_route::kPerclk24M) {
       addError(snapshot, protocol_v1::GpioClockError::kPerclkMismatch);
     }
-    if ((snapshot.ccm_ccgr1_configured & kPitGateMask) != kPitGateMask) {
+    if ((snapshot.ccm_ccgr1_configured & gpio_dma_route::kPitGateMask) !=
+        gpio_dma_route::kPitGateMask) {
       addError(snapshot, protocol_v1::GpioClockError::kPitGateDisabled);
     }
-    if ((snapshot.ccm_ccgr2_configured & kXbarGateMask) != kXbarGateMask) {
+    if ((snapshot.ccm_ccgr2_configured & gpio_dma_route::kXbarGateMask) !=
+        gpio_dma_route::kXbarGateMask) {
       addError(snapshot, protocol_v1::GpioClockError::kXbarGateDisabled);
     }
-    if ((snapshot.ccm_ccgr5_configured & kDmaGateMask) != kDmaGateMask) {
+    if ((snapshot.ccm_ccgr5_configured & gpio_dma_route::kDmaGateMask) !=
+        gpio_dma_route::kDmaGateMask) {
       addError(snapshot, protocol_v1::GpioClockError::kDmaGateDisabled);
     }
     if ((snapshot.pit_mcr_configured & PIT_MCR_MDIS) != 0U ||
         snapshot.pit_ldval_configured != plan.pit_load_value) {
       addError(snapshot, protocol_v1::GpioClockError::kPitConfigMismatch);
     }
-    if ((snapshot.xbar_sel_configured & kXbarSelectionMask) !=
+    if ((snapshot.xbar_sel_configured &
+         gpio_dma_route::kXbarSelectionMask) !=
             (static_cast<std::uint16_t>(board::kGpioXbarInput)
-             << kXbarSelectionShift) ||
+             << gpio_dma_route::kXbarSelectionShift) ||
         (snapshot.xbar_ctrl_configured &
-         (kXbarSelectedEdge | kXbarSelectedDmaEnable)) !=
-            (kXbarSelectedEdge | kXbarSelectedDmaEnable)) {
+         (gpio_dma_route::kXbarSelectedEdge |
+          gpio_dma_route::kXbarSelectedDmaEnable)) !=
+            (gpio_dma_route::kXbarSelectedEdge |
+             gpio_dma_route::kXbarSelectedDmaEnable)) {
       addError(snapshot, protocol_v1::GpioClockError::kXbarConfigMismatch);
     }
     if (snapshot.dmamux_chcfg_configured != kDmamuxConfiguration) {

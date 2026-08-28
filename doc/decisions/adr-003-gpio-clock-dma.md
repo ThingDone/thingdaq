@@ -25,9 +25,9 @@ related:
 Accepted and verified on the Teensy 4.0 rig. The fixed production clock route
 is 24 MHz PERCLK through PIT0, XBARA1 input 56/output 0 with **rising-edge-only**
 DMA request generation, DMAMUX source 30, and eDMA channel 2. The optional
-IDLE-only clock diagnostic is advertised; this decision still does not enable
-or advertise the physical GPIO source, whose pad mapping and capture ring are
-later Phase 06 work.
+IDLE-only clock diagnostic is advertised. The pad remap and raw capture ring
+are now implemented behind an unadvertised target facade; batch packing and
+control-plane integration remain later Phase 06 work.
 
 ## Context
 
@@ -128,10 +128,43 @@ eDMA channels 0 and 1 remain reserved for ADC1 and ADC2 through DMAMUX sources
 24 and 88. GPIO owns fixed channel 2 at priority 2 and DMAMUX source 30. The
 isolated diagnostic transfers one fixed sentinel word into another word in a
 dedicated 32-byte-aligned OCRAM cache line; it does not remap or sample a pad.
-The later physical path will use the already budgeted four-buffer OCRAM ring
-and fixed-width `GPIO2_PSR` reads. Channel priority, TCD linkage, cache
+The physical adapter uses the budgeted four-buffer OCRAM ring and fixed-width
+`GPIO2_PSR` reads. Channel priority, TCD linkage, cache
 ownership, and major-loop interrupt policy may not change these owners
 silently.
+
+### Raw capture and pressure policy
+
+The physical adapter applies one narrow read-modify-write on START and every
+STOP/error path: it clears only `0x00030C0F` in `GPIO2_GDIR`, then clears only
+the same bits in `IOMUXC_GPR_GPR27`. Making GPIO2 inputs first guarantees that
+switching D6-D13 away from the startup GPIO7 aliases cannot expose an output;
+all unrelated direction and alias bits are preserved.
+
+At the production rate, channel 2 reads the fixed 32-bit `GPIO2_PSR` source
+with `SOFF=0` and writes 4,048 words into each cache-line-aligned OCRAM raw
+buffer. Five 32-byte TCDs provide scatter/gather descriptors for the four
+consumer buffers plus one overflow destination. Each consumer descriptor uses
+`DOFF=4`; the overflow descriptor uses `DOFF=0` and repeatedly overwrites one
+isolated 32-byte cache line. `INTMAJOR` fires once per 4,048 samples (about
+988 Hz), never once per 4 MHz sample, and channel priority remains fixed at 2.
+
+The ownership state machine always reserves both an active and one look-ahead
+destination. A completed consumer buffer becomes `READY`; only a `FREE` buffer
+may become the later `DMA_QUEUED` destination. If none is free, the look-ahead
+link selects the DMA-only sink, so capture continues without overwriting a
+`READY`, `PACKING`, or `RELEASING` buffer. Every completed sink major loop is
+exactly 4,048 lost samples; a stopped partial sink loop is accounted from
+`BITER-CITER`. These cumulative overrun and lost-sample values feed the common
+statistics model and contribute to its GPIO-drop projection.
+
+Cache maintenance is part of ownership, not an incidental call in packing.
+All consumer buffers and the sink are deleted before DMA ownership, a completed
+buffer is invalidated only after it atomically enters `PACKING`, and release
+deletes it before it becomes `FREE`. The major-loop ISR performs no cache
+operation, packing, framing, checksum, allocation, or USB work. A stale lease
+cannot release a reused buffer, and STOP retains complete `READY` buffers and
+valid `PACKING` leases for deterministic draining before another epoch.
 
 ## Reused patterns and boundaries
 
@@ -189,13 +222,18 @@ capability metadata.
 ## Consequences
 
 - The exact PIT divisor and rising-edge PIT/XBARA/eDMA event path are proven on
-  the target; external pad transitions and sustained capture remain unproven.
+  the target; the physical adapter now uses it for `GPIO2_PSR`, but external
+  pad transitions and sustained streaming remain unproven.
 - Packed GPIO order and standard-port bit identities can no longer drift from
   the pinned core without a target compile failure.
 - Host compilation validates duplicate, range, order, and exact-mask errors
   without depending on Teensy headers.
 - The resource assignment is deterministic and reviewable; acquisition code
   cannot silently use a first-free timer, XBAR output, or DMA channel.
+- The linked image contains 64,768 bytes of raw consumer storage, a 32-byte
+  pressure sink, and 160 bytes of TCDs in OCRAM. The overflow policy trades
+  retention—not live sampling or CPU-buffer safety—when downstream work falls
+  behind.
 - The optional diagnostic is bounded to IDLE, never remaps D6-D13, and reports
   raw register/count evidence. Physical GPIO capability remains disabled until
-  later Phase 06 mapping, rotating-buffer, packing, and streaming gates pass.
+  later Phase 06 packing, integration, and streaming gates pass.

@@ -46,6 +46,8 @@ enum class MemoryUse : std::uint8_t {
   kPacketPipelineState,
   kAdcDmaRing,
   kGpioRawDmaRing,
+  kGpioRawDmaOverflowSink,
+  kGpioRawDmaDescriptors,
   kGpioPackedRing,
   kGpioClockDiagnosticSink,
   kChecksumBenchmarkDtcmBuffer,
@@ -132,6 +134,7 @@ inline constexpr std::uint32_t kGpio7ToGpio2Gpr27ClearMask =
 inline constexpr std::uint8_t kGpioPitChannel = 0U;
 inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
 inline constexpr std::uint8_t kGpioEdmaPriority = 2U;
+inline constexpr std::uint8_t kGpioEdmaIrqPriority = 64U;
 
 inline constexpr PinAllocation kPinAllocations[] = {
     {kAdc0Pin, ResourceOwner::kAdc0Capture},
@@ -204,6 +207,8 @@ inline constexpr std::size_t kCommandQueueDepth = 4U;
 inline constexpr std::size_t kResponseQueueDepth = 4U;
 inline constexpr std::size_t kAdcDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
+inline constexpr std::size_t kGpioRawDmaDescriptorCount =
+    kGpioRawDmaRingDepth + 1U;
 inline constexpr std::size_t kGpioPackedRingDepth = 4U;
 // At the nominal combined framed rate, each 4096-byte buffer represents 0.506
 // ms. Keep the proven 106-frame primary bank in cacheless DTCM, then add a
@@ -252,6 +257,13 @@ inline constexpr std::size_t kAdcDmaBufferStrideBytes =
     alignUp(protocol_v1::kDataPayloadBytes, kCacheLineBytes);
 inline constexpr std::size_t kGpioRawDmaBufferBytes =
     protocol_v1::kGpioSamplesPerFrame * sizeof(std::uint32_t);
+inline constexpr std::size_t kGpioRawDmaRingBytes =
+    kGpioRawDmaRingDepth * kGpioRawDmaBufferBytes;
+inline constexpr std::size_t kGpioRawDmaOverflowSinkBytes =
+    kCacheLineBytes;
+inline constexpr std::size_t kEdmaTcdBytes = 32U;
+inline constexpr std::size_t kGpioRawDmaDescriptorBytes =
+    kGpioRawDmaDescriptorCount * kEdmaTcdBytes;
 inline constexpr std::size_t kGpioPackedBufferStrideBytes =
     alignUp(protocol_v1::kDataPayloadBytes, kCacheLineBytes);
 inline constexpr std::size_t kPacketBufferStorageBytes =
@@ -288,7 +300,13 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
      kAdcDmaRingDepth * kAdcDmaBufferStrideBytes, kCacheLineBytes,
      ResourceOwner::kAdcCapture},
     {MemoryUse::kGpioRawDmaRing, MemoryRegion::kOcramRam2Dma,
-     kGpioRawDmaRingDepth * kGpioRawDmaBufferBytes, kCacheLineBytes,
+     kGpioRawDmaRingBytes, kCacheLineBytes,
+     ResourceOwner::kGpioCapture},
+    {MemoryUse::kGpioRawDmaOverflowSink, MemoryRegion::kOcramRam2Dma,
+     kGpioRawDmaOverflowSinkBytes, kCacheLineBytes,
+     ResourceOwner::kGpioCapture},
+    {MemoryUse::kGpioRawDmaDescriptors, MemoryRegion::kOcramRam2Dma,
+     kGpioRawDmaDescriptorBytes, kCacheLineBytes,
      ResourceOwner::kGpioCapture},
     {MemoryUse::kGpioPackedRing, MemoryRegion::kOcramRam2Dma,
      kGpioPackedRingDepth * kGpioPackedBufferStrideBytes, kCacheLineBytes,
@@ -514,6 +532,12 @@ static_assert(kUsbTxBudgetBytesPerLoop <= kPinnedUsbCdcTxBufferBytes,
               "one cooperative TX visit must not outrun a core TX buffer");
 static_assert(kPacketBufferStorageBytes % kCacheLineBytes == 0U,
               "packet storage must occupy complete alignment units");
+static_assert(kGpioRawDmaBufferBytes % kCacheLineBytes == 0U,
+              "each raw GPIO DMA buffer must occupy complete cache lines");
+static_assert(kGpioRawDmaRingDepth >= 2U,
+              "continuous GPIO DMA needs active and queued destinations");
+static_assert(kGpioRawDmaDescriptorBytes % kCacheLineBytes == 0U,
+              "GPIO DMA descriptors must occupy complete cache lines");
 static_assert(kPacketBufferPrimaryStorageBytes +
                       kPacketBufferReserveStorageBytes ==
                   kPacketBufferStorageBytes,
