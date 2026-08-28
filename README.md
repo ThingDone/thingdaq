@@ -232,6 +232,20 @@ and framed throughput, bounded command-latency samples, queue/parser/Python
 memory high-water marks, graceful STOP, final STATUS, and exact
 firmware-to-wire-to-consumer reconciliation.
 
+The dedicated Phase 04 correctness/performance suite runs multi-second paced
+streams at the nominal and above-target schedules through seeded random read
+boundaries, validates a separate two-epoch wire corpus, and stress-tests the
+drop-oldest host queue. Its benchmark excludes corpus construction, measures
+incremental parsing plus full formula validation across three deterministic
+chunk distributions, and requires at least 1.25 times the approximately
+8.095 MB/s framed target. Use `-s` to retain the structured platform and timing
+record printed by the guard:
+
+```bash
+.venv/bin/python -m pytest -q -s \
+  daq_api/tests/test_streaming_correctness_performance.py
+```
+
 Phase 03's zero-stream hardware profile is available through
 `TeensyDAQ.configure_control_only()` and
 `TeensyDAQ.simulated(control_only=True)`. Serial opens discard one valid INFO
