@@ -137,17 +137,19 @@ class TeensyDAQControlTests(unittest.TestCase):
             self.assertEqual(StreamMask.ADC, status.stream_mask)
             self.assertEqual(Source.SYNTHETIC, status.source)
 
-            unsupported_checksum = Configuration(
-                stream_mask=StreamMask.ADC,
-                source=Source.SYNTHETIC,
-                data_checksum_algorithm=ChecksumAlgorithm.CRC32C,
-            )
-            with self.assertRaises(DeviceCommandError) as checksum_error:
-                daq.configure(unsupported_checksum)
-            self.assertEqual(
-                ErrorCode.UNSUPPORTED_CHECKSUM,
-                checksum_error.exception.error_code,
-            )
+            for checksum in (
+                ChecksumAlgorithm.CRC32C,
+                ChecksumAlgorithm.CRC32_ISO_HDLC,
+            ):
+                applied_checksum = daq.configure(
+                    Configuration(
+                        stream_mask=StreamMask.ADC,
+                        source=Source.SYNTHETIC,
+                        data_checksum_algorithm=checksum,
+                    )
+                )
+                self.assertEqual(checksum, applied_checksum.data_checksum_algorithm)
+                self.assertEqual(checksum, daq.status().data_checksum_algorithm)
 
     def test_start_rejects_reentry_and_allocates_monotonic_run_ids(self) -> None:
         with TeensyDAQ.simulated() as daq:
@@ -201,6 +203,25 @@ class TeensyDAQControlTests(unittest.TestCase):
 
 
 class TeensyDAQStreamingTests(unittest.TestCase):
+    def test_every_advertised_checksum_streams_through_the_shared_codec(self) -> None:
+        for checksum in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
+            with self.subTest(checksum=checksum.name), TeensyDAQ.simulated() as daq:
+                applied = daq.configure(
+                    Configuration(
+                        stream_mask=StreamMask.ADC,
+                        source=Source.SYNTHETIC,
+                        data_checksum_algorithm=checksum,
+                    )
+                )
+                run_id = daq.start()
+                block = daq.read_block(timeout=0.5)
+
+                self.assertIsInstance(block, AdcBlock)
+                self.assertEqual(run_id, block.run_id)
+                self.assertEqual(checksum, applied.data_checksum_algorithm)
+                self.assertEqual(checksum, daq.status().data_checksum_algorithm)
+                daq.stop()
+
     def test_active_run_identity_rejects_stale_data_blocks(self) -> None:
         with TeensyDAQ.simulated() as daq:
             daq.configure(adc=True, gpio=False)

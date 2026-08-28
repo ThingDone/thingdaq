@@ -133,8 +133,9 @@ trailer:
 | ID | Name | v1 state |
 | ---: | --- | --- |
 | 0 | `NONE_RESERVED` | Invalid; unchecksummed frames are never accepted |
-| 1 | `ADLER32` | Enabled and the bootstrap/default algorithm |
-| 2 | `CRC32C` | ID reserved; not accepted or advertised as supported yet |
+| 1 | `ADLER32` | Enabled; fixed bootstrap and initial data default |
+| 2 | `CRC32C` | Enabled for negotiated data frames |
+| 3 | `CRC32_ISO_HDLC` | Enabled for negotiated data frames |
 
 Adler-32 is the RFC 1950 algorithm with initial value 1 and modulus 65,521.
 It covers every byte from the first magic byte through the final payload byte,
@@ -144,10 +145,17 @@ endian. Standard checks include Adler-32 of an empty byte string =
 `0x00000001` and of ASCII `123456789` = `0x091E01DE`.
 
 The checksum detects accidental corruption and framing mistakes; it provides
-no authenticity or security. CRC-32C ID 2 is allocated so benchmarking can
-enable it later through INFO capabilities and CONFIGURE without changing the
-header. Until that happens, a receiver treats ID 2 as unsupported. Checked-in
-Adler-32 examples are listed in `protocol/fixtures/manifest.json`.
+no authenticity or security. All request and response frames use bootstrap
+Adler-32, including INFO and CONFIGURE traffic before a data algorithm has
+been selected. INFO advertises checksum-mask bits 1, 2, and 3; CONFIGURE and
+STATUS carry the selected data algorithm, and each ADC/GPIO header repeats it.
+A receiver rejects an unknown ID, a disabled ID, or a control frame labeled
+with a non-bootstrap ID before waiting for its body. CRC-32C uses reflected
+polynomial `0x82F63B78`; CRC-32/ISO-HDLC uses reflected polynomial
+`0xEDB88320`; both initialize and finally XOR with `0xFFFFFFFF`. Their standard
+ASCII `123456789` results are respectively `0xE3069283` and `0xCBF43926`.
+Checked-in bootstrap-Adler examples are listed in
+`protocol/fixtures/manifest.json`.
 
 ## Run epoch, timestamps, and sequence
 
@@ -175,10 +183,13 @@ as sequence zero of the new run. The current Python facade enforces this rule
 when queuing active-run blocks; the background reader must preserve it.
 
 Firmware may continue draining complete frames from a stopped run before a new
-epoch is armed. A START received during that bounded drain returns `BUSY` and
-does not allocate a run ID, reset statistics, or change CONFIGURED state. A
-successful START response is emitted only after the prior drain is quiescent
-and the new packet/source epoch has been armed; no old-run data may follow it.
+epoch is armed. CONFIGURE received during that bounded drain returns `BUSY`
+and makes no state or algorithm change; START remains invalid until a
+post-drain CONFIGURE succeeds. After configuration, START can also return
+`BUSY` if runtime resources are not ready, without allocating a run ID or
+resetting statistics. A successful START response is emitted only after the
+prior drain is quiescent and the new packet/source epoch has been armed; no
+old-run data may follow it.
 
 ADC and GPIO have independent unsigned 32-bit frame sequences. A sequence is
 assigned when a source frame is produced, before it can be dropped by the
@@ -335,13 +346,14 @@ eight-byte request is:
 | ---: | --- | --- | --- |
 | 0 | `u8` | stream mask | Subset of ADC/GPIO; zero only for the control-only profile below |
 | 1 | `u8` | source | Hardware (0) or synthetic (1) |
-| 2 | `u8` | data checksum | An advertised enabled algorithm; initially 1 |
+| 2 | `u8` | data checksum | An advertised enabled algorithm ID (1, 2, or 3) |
 | 3 | `u8` | reserved | Zero |
 | 4 | `u32` | data frame bytes | Exactly 4,096 |
 
 Success moves the device to CONFIGURED and returns the common prefix followed
 by the exact eight-byte applied configuration. Unsupported values are rejected
-atomically; no partial configuration is applied.
+atomically; no partial configuration is applied. If prior-run frames are still
+queued, CONFIGURE returns `BUSY` and preserves the prior configuration.
 
 Phase 03 physical firmware defines one deliberately narrow control-only
 profile: stream mask zero, hardware source, Adler-32, and `data_frame_bytes =

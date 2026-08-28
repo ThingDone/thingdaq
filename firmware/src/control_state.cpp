@@ -14,12 +14,6 @@ constexpr bool knownSource(protocol_v1::Source source) {
          source == protocol_v1::Source::kSynthetic;
 }
 
-constexpr bool knownDataChecksum(protocol_v1::ChecksumAlgorithm checksum) {
-  return checksum == protocol_v1::ChecksumAlgorithm::kNoneReserved ||
-         checksum == protocol_v1::ChecksumAlgorithm::kAdler32 ||
-         checksum == protocol_v1::ChecksumAlgorithm::kCrc32c;
-}
-
 constexpr bool capabilityEnabled(protocol_v1::Capability capability) {
   return (capabilities::kCapabilityBits &
           capabilities::capabilityBit(capability)) != 0U;
@@ -81,6 +75,9 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
           state_ != protocol_v1::DeviceState::kConfigured) {
         return reject(request, protocol_v1::ErrorCode::kInvalidState,
                       response);
+      }
+      if (!readiness.configuration_ready) {
+        return reject(request, protocol_v1::ErrorCode::kBusy, response);
       }
       const protocol_v1::ErrorCode validation =
           validateConfiguration(request.configuration);
@@ -232,17 +229,14 @@ protocol_v1::ErrorCode ControlState::validateConfiguration(
   if ((configuration.stream_mask &
        static_cast<std::uint8_t>(~kKnownStreamMask)) != 0U ||
       !knownSource(configuration.source) ||
-      !knownDataChecksum(configuration.data_checksum_algorithm) ||
       configuration.data_checksum_algorithm ==
           protocol_v1::ChecksumAlgorithm::kNoneReserved ||
       configuration.data_frame_bytes != protocol_v1::kDataFrameBytes) {
     return protocol_v1::ErrorCode::kInvalidPayload;
   }
 
-  const std::uint8_t checksum_id = static_cast<std::uint8_t>(
-      configuration.data_checksum_algorithm);
-  if ((capabilities::kMetadata.supported_checksum_mask &
-       (1UL << checksum_id)) == 0U) {
+  if (!protocol::isSupportedChecksum(
+          configuration.data_checksum_algorithm)) {
     return protocol_v1::ErrorCode::kUnsupportedChecksum;
   }
 

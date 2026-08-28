@@ -58,14 +58,20 @@ bool storeU32(MutableByteView output, std::size_t offset, std::uint32_t value);
 bool storeU64(MutableByteView output, std::size_t offset, std::uint64_t value);
 
 std::uint32_t adler32(ByteView input);
+constexpr bool isSupportedChecksum(
+    protocol_v1::ChecksumAlgorithm algorithm) {
+  const std::uint8_t identifier = static_cast<std::uint8_t>(algorithm);
+  return identifier < 32U &&
+         (protocol_v1::kSupportedChecksumMask & (1UL << identifier)) != 0U;
+}
 Result computeChecksum(protocol_v1::ChecksumAlgorithm algorithm, ByteView input,
-                       std::uint32_t &checksum);
+                       std::uint32_t &result_checksum);
 
 struct FrameHeader {
   protocol_v1::FrameKind kind = protocol_v1::FrameKind::kInfoRequest;
   std::uint16_t flags = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
-      protocol_v1::kDefaultChecksumAlgorithm;
+      protocol_v1::kBootstrapChecksumAlgorithm;
   std::uint32_t total_length = 0U;
   std::uint32_t payload_length = 0U;
   std::uint32_t run_id = 0U;
@@ -82,7 +88,7 @@ struct FrameFields {
   protocol_v1::FrameKind kind = protocol_v1::FrameKind::kInfoRequest;
   std::uint16_t flags = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
-      protocol_v1::kDefaultChecksumAlgorithm;
+      protocol_v1::kBootstrapChecksumAlgorithm;
   std::uint32_t run_id = 0U;
   std::uint32_t sequence = 0U;
   std::uint32_t request_id = 0U;

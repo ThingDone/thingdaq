@@ -560,7 +560,7 @@ def grade_info(evidence: Evidence, info: dict[str, object]) -> None:
         "protocol_version": PROTOCOL_VERSION,
         "supported_stream_mask": STREAM_NONE,
         "supported_source_mask": 1 << SOURCE_HARDWARE,
-        "supported_checksum_mask": 1 << CHECKSUM_ADLER32,
+        "supported_checksum_mask": 0b1110,
         "capability_bits": (
             CAPABILITY_HARDWARE_SOURCE | CAPABILITY_RESET_STATS | CAPABILITY_PING
         ),

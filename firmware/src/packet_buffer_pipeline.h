@@ -94,6 +94,8 @@ enum class OperationStatus : std::uint8_t {
   kEncodingRejected,
   kQueueFull,
   kTransmissionPending,
+  kUnsupportedChecksum,
+  kChecksumMismatch,
 };
 
 struct BeginFillResult {
@@ -132,6 +134,8 @@ struct PipelineSnapshot {
   std::array<std::size_t, kStreamCount> ready_depth_by_source{};
   std::array<std::size_t, kStreamCount> transmit_depth_by_source{};
   std::uint32_t run_id = 0U;
+  protocol_v1::ChecksumAlgorithm checksum_algorithm =
+      protocol_v1::kDefaultChecksumAlgorithm;
   std::uint32_t run_starts = 0U;
   std::uint32_t run_start_rejections = 0U;
   std::uint32_t pool_exhaustions = 0U;
@@ -177,7 +181,10 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
 
   // START is admitted only after STOP has made the prior run quiescent. This
   // prevents resetting READY work or abandoning a partially written frame.
-  OperationStatus startRun(std::uint32_t run_id);
+  OperationStatus startRun(
+      std::uint32_t run_id,
+      protocol_v1::ChecksumAlgorithm checksum_algorithm =
+          protocol_v1::kDefaultChecksumAlgorithm);
   // STOP cancels any producer-owned partial construction, then drains every
   // already complete READY/TRANSMITTING frame through normal USB ownership.
   StopReport stopProduction();
@@ -241,6 +248,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::array<SourceCounters, kStreamCount> source_counters_{};
   std::array<std::size_t, kStreamCount> transmit_depth_by_source_{};
   std::uint32_t run_id_ = 0U;
+  protocol_v1::ChecksumAlgorithm checksum_algorithm_ =
+      protocol_v1::kDefaultChecksumAlgorithm;
   std::uint32_t next_lease_ = 1U;
   std::uint32_t run_starts_ = 0U;
   std::uint32_t run_start_rejections_ = 0U;

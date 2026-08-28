@@ -757,7 +757,7 @@ def grade_info(
         "protocol_version": PROTOCOL_VERSION,
         "supported_stream_mask": STREAM_BOTH,
         "supported_source_mask": 1 << SOURCE_SYNTHETIC,
-        "supported_checksum_mask": 1 << CHECKSUM_ADLER32,
+        "supported_checksum_mask": 0b1110,
         "capability_bits": EXPECTED_CAPABILITIES,
         "timestamp_hz": TIMESTAMP_HZ,
         "data_frame_bytes": DATA_FRAME_BYTES,

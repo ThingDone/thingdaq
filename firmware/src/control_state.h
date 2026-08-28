@@ -67,11 +67,12 @@ struct DispatchResult {
 };
 
 // Runtime-owned resources may need a bounded drain after STOP even though the
-// protocol state is already CONFIGURED again. Keeping this readiness input
-// explicit lets START return BUSY without allocating a run ID or mutating the
-// control state until every prior-run data buffer is safe to reset.
+// protocol state is already IDLE. Keeping these readiness inputs explicit lets
+// CONFIGURE and START return BUSY without changing algorithms, allocating a
+// run ID, or mutating control state until every prior-run frame is gone.
 struct DispatchReadiness {
   bool start_ready = true;
+  bool configuration_ready = true;
 };
 
 class ControlState {

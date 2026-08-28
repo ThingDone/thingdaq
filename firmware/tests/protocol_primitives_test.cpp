@@ -158,11 +158,20 @@ void testEndianAndChecksum() {
            "block-reduced Adler-32 matches the bytewise reference");
   }
   std::uint32_t checksum = 0U;
-  const wire::Result unsupported = wire::computeChecksum(
+  expect(wire::computeChecksum(
       constants::ChecksumAlgorithm::kCrc32c, {digits.data(), digits.size()},
-      checksum);
+      checksum).ok() && checksum == 0xE3069283U,
+         "CRC-32C dispatch uses the canonical Castagnoli vector");
+  expect(wire::computeChecksum(
+      constants::ChecksumAlgorithm::kCrc32IsoHdlc,
+      {digits.data(), digits.size()}, checksum).ok() &&
+             checksum == 0xCBF43926U,
+         "CRC-32/ISO-HDLC dispatch uses the canonical vector");
+  const wire::Result unsupported = wire::computeChecksum(
+      static_cast<constants::ChecksumAlgorithm>(0xFFU),
+      {digits.data(), digits.size()}, checksum);
   expect(unsupported.error == constants::ErrorCode::kUnsupportedChecksum,
-         "checksum dispatch rejects disabled CRC32C");
+         "checksum dispatch rejects unknown IDs");
 }
 
 void testGoldenDecode(const std::string &fixture_directory) {

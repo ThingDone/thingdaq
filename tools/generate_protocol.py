@@ -206,8 +206,17 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         raise ContractError("checksum algorithm zero must remain invalid/reserved")
     if checksums.get("ADLER32") != 1 or "ADLER32" not in enabled_checksums:
         raise ContractError("Adler-32 must be the enabled bootstrap checksum")
-    if checksums.get("CRC32C") != 2 or "CRC32C" in enabled_checksums:
-        raise ContractError("CRC-32C ID 2 must remain reserved during bootstrap")
+    if checksums.get("CRC32C") != 2:
+        raise ContractError("CRC-32C must retain protocol checksum ID 2")
+    if checksums.get("CRC32_ISO_HDLC") != 3:
+        raise ContractError("CRC-32/ISO-HDLC must retain protocol checksum ID 3")
+    if any(checksums[name] >= 32 for name in enabled_checksums):
+        raise ContractError("enabled checksum IDs must fit the uint32 capability mask")
+    bootstrap_checksum = contract.get("bootstrap_checksum_algorithm")
+    if bootstrap_checksum != "ADLER32":
+        raise ContractError("protocol v1 bootstrap checksum must remain Adler-32")
+    if bootstrap_checksum not in enabled_checksums:
+        raise ContractError("bootstrap checksum must be enabled")
     if contract["default_checksum_algorithm"] not in enabled_checksums:
         raise ContractError("default checksum must be enabled")
 
@@ -361,6 +370,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         timing["adc_pair_period_ticks"]
     )
     checksum_values = enum_map(checksums)
+    bootstrap_checksum = str(contract["bootstrap_checksum_algorithm"])
     default_checksum = str(contract["default_checksum_algorithm"])
     magic_bytes_literal = "".join(
         f"\\x{byte:02x}" for byte in int(contract["magic"]).to_bytes(4, "little")
@@ -445,6 +455,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
 
     lines.extend(
         [
+            f"BOOTSTRAP_CHECKSUM_ALGORITHM = ChecksumAlgorithm.{bootstrap_checksum}",
             f"DEFAULT_CHECKSUM_ALGORITHM = ChecksumAlgorithm.{default_checksum}",
             "SUPPORTED_CHECKSUM_ALGORITHMS = frozenset(",
             "    {",
@@ -587,6 +598,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     coverage_ticks = int(layouts["adc"]["items_per_frame"]) * int(
         timing["adc_pair_period_ticks"]
     )
+    bootstrap_checksum = snake_to_pascal(str(contract["bootstrap_checksum_algorithm"]))
     default_checksum = snake_to_pascal(str(contract["default_checksum_algorithm"]))
 
     lines = [
@@ -680,6 +692,8 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
 
     lines.extend(
         [
+            "inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =",
+            f"    ChecksumAlgorithm::k{bootstrap_checksum};",
             "inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =",
             f"    ChecksumAlgorithm::k{default_checksum};",
             "inline constexpr std::uint32_t kSupportedChecksumMask = "
@@ -885,6 +899,23 @@ def encode_fixture_payload(
     return encode_schema_payload(contract, schema_name, payload_spec["values"])
 
 
+def compute_golden_checksum(data: bytes, algorithm_name: str) -> int:
+    """Compute a fixture checksum independently of either generated codec."""
+
+    if algorithm_name == "ADLER32":
+        return zlib.adler32(data) & 0xFFFFFFFF
+    if algorithm_name == "CRC32_ISO_HDLC":
+        return zlib.crc32(data) & 0xFFFFFFFF
+    if algorithm_name == "CRC32C":
+        remainder = 0xFFFFFFFF
+        for value in data:
+            remainder ^= value
+            for _ in range(8):
+                remainder = (remainder >> 1) ^ (0x82F63B78 if remainder & 1 else 0)
+        return remainder ^ 0xFFFFFFFF
+    raise ContractError(f"no golden checksum implementation for {algorithm_name}")
+
+
 def build_golden_frames(
     contract: Mapping[str, Any],
 ) -> tuple[dict[str, bytes], list[dict[str, Any]]]:
@@ -903,8 +934,8 @@ def build_golden_frames(
     kind_specs = {str(entry["name"]): entry for entry in contract["frame_kinds"]}
     flag_values = enum_map(contract["flags"])
     checksum_values = enum_map(contract["checksum_algorithms"])
-    checksum_name = str(contract["default_checksum_algorithm"])
-    checksum_id = checksum_values[checksum_name]
+    bootstrap_checksum_name = str(contract["bootstrap_checksum_algorithm"])
+    default_checksum_name = str(contract["default_checksum_algorithm"])
 
     outputs: dict[str, bytes] = {}
     manifest_entries: list[dict[str, Any]] = []
@@ -912,6 +943,12 @@ def build_golden_frames(
         fixture_name = str(fixture["name"])
         kind_name = str(fixture["kind"])
         kind_spec = kind_specs[kind_name]
+        checksum_name = (
+            default_checksum_name
+            if kind_spec["class"] == "data"
+            else bootstrap_checksum_name
+        )
+        checksum_id = checksum_values[checksum_name]
         payload = encode_fixture_payload(contract, fixture)
         payload_spec = fixture["payload"]
         if (
@@ -978,7 +1015,7 @@ def build_golden_frames(
             first_sample_ticks,
             item_count,
         )
-        checksum = zlib.adler32(header_bytes + payload) & 0xFFFFFFFF
+        checksum = compute_golden_checksum(header_bytes + payload, checksum_name)
         frame = header_bytes + payload + struct.pack("<I", checksum)
         output_name = f"{fixture_name}.bin"
         outputs[output_name] = frame

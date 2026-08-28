@@ -78,10 +78,12 @@ firmware caused that gap and therefore requires `GAP_BEFORE`. Host queue loss
 is accounted separately and never changes firmware flags or counters.
 
 Checksum algorithm zero is permanently invalid. Algorithm 1 is Adler-32 and
-is the only bootstrap algorithm. Algorithm 2 is allocated to CRC-32C but is
-not accepted until benchmarking and capability negotiation enable it. This
-stable field lets a later evidence-based checksum decision change configured
-data frames without redesigning the envelope.
+is the only bootstrap algorithm for commands and responses. Algorithms 2 and
+3 are CRC-32C and CRC-32/ISO-HDLC; INFO advertises all three and CONFIGURE
+selects the algorithm used by data frames. The packet epoch snapshots that
+selection, and reconfiguration is rejected as `BUSY` until prior frames drain.
+This stable field lets the later evidence-based checksum decision change the
+data default without redesigning the envelope or bootstrapping control traffic.
 
 The authoritative contract is `protocol/protocol-v1.json`. The deterministic
 `tools/generate_protocol.py` generator validates cross-field invariants and

@@ -238,7 +238,13 @@ class FailingParser(IncrementalFrameParser):
         raise RuntimeError("injected parser failure")
 
 
-def _adc_wire(run_id: int, sequence: int) -> bytes:
+def _adc_wire(
+    run_id: int,
+    sequence: int,
+    checksum_algorithm: constants.ChecksumAlgorithm = (
+        constants.DEFAULT_CHECKSUM_ALGORITHM
+    ),
+) -> bytes:
     flags = FrameFlag.SYNTHETIC
     if sequence == 0:
         flags |= FrameFlag.EPOCH_START
@@ -247,6 +253,7 @@ def _adc_wire(run_id: int, sequence: int) -> bytes:
         FrameKind.ADC_DATA,
         synthetic_adc_payload(sequence * constants.ADC_PAIRS_PER_FRAME),
         flags=flags,
+        checksum_algorithm=checksum_algorithm,
         run_id=run_id,
         sequence=sequence,
         first_sample_ticks=first_sample_ticks,
@@ -532,6 +539,21 @@ class BackgroundReaderTests(unittest.TestCase):
             transport.inject(_adc_wire(12, 0))
             _wait_until(lambda: reader.counters.stale_blocks_discarded == 1)
             self.assertEqual(1, reader.counters.host_block_queue_drops)
+
+    def test_active_run_rejects_a_valid_frame_with_the_wrong_algorithm(self) -> None:
+        transport = ControlledTransport()
+        with BackgroundReader(transport) as reader:
+            reader.activate_run(13, constants.ChecksumAlgorithm.CRC32C)
+            transport.inject(_adc_wire(13, 0, constants.ChecksumAlgorithm.CRC32C))
+            self.assertEqual(0, reader.get_block(timeout=0.5).sequence)
+
+            transport.inject(
+                _adc_wire(13, 1, constants.ChecksumAlgorithm.CRC32_ISO_HDLC)
+            )
+            _wait_until(lambda: not reader.is_running)
+            with self.assertRaisesRegex(ReaderProtocolError, "configured algorithm"):
+                reader.get_block(timeout=0.1)
+            self.assertEqual(1, reader.counters.protocol_failures)
 
     def test_stop_response_cancels_a_block_waiter(self) -> None:
         transport = ControlledTransport()

@@ -13,6 +13,7 @@ from ._generated import protocol_constants as constants
 from .models import (
     AdcBlock,
     CommandResponse,
+    DAQConfiguration,
     GpioBlock,
     ResponseValue,
     decode_message,
@@ -223,6 +224,7 @@ class BackgroundReader:
         self._events: deque[ReaderEvent] = deque()
         self._next_request_id = 1
         self._active_run_id = 0
+        self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
         self._stream_active = False
         self._thread: Thread | None = None
         self._started = False
@@ -489,14 +491,28 @@ class BackgroundReader:
                     raise ReaderClosedError("background reader is closed")
             return self._events.popleft()
 
-    def activate_run(self, run_id: int) -> None:
+    def activate_run(
+        self,
+        run_id: int,
+        checksum_algorithm: constants.ChecksumAlgorithm = (
+            constants.DEFAULT_CHECKSUM_ALGORITHM
+        ),
+    ) -> None:
         """Establish an externally learned run identity and clear old blocks."""
 
         if not isinstance(run_id, int) or not 0 < run_id <= constants.UINT32_MAX:
             raise ValueError("active run ID must be a nonzero uint32")
+        if isinstance(checksum_algorithm, bool):
+            raise TypeError("active checksum algorithm is not supported")
+        try:
+            selected_checksum = constants.ChecksumAlgorithm(checksum_algorithm)
+        except ValueError as exc:
+            raise ValueError("active checksum algorithm is not supported") from exc
+        if selected_checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ValueError("active checksum algorithm is not supported")
         with self._condition:
             self._require_live_locked()
-            self._activate_run_locked(run_id)
+            self._activate_run_locked(run_id, selected_checksum)
 
     def deactivate_stream(self) -> None:
         """Cancel block waiters and discard blocks at a deliberate boundary."""
@@ -639,7 +655,10 @@ class BackgroundReader:
                     if isinstance(message, CommandResponse):
                         self._dispatch_response(message)
                     elif isinstance(message, (AdcBlock, GpioBlock)):
-                        self._dispatch_block(message)
+                        self._dispatch_block(
+                            message,
+                            frame.header.checksum_algorithm,
+                        )
                     else:
                         self._dispatch_event(message)
                 except ReaderProtocolError as error:
@@ -682,7 +701,16 @@ class BackgroundReader:
                 pending.response = response
                 self._responses_matched += 1
                 if response.ok and response.kind is constants.FrameKind.START_RESPONSE:
-                    self._activate_run_locked(response.run_id)
+                    if not isinstance(response.value, DAQConfiguration):
+                        protocol_error = ReaderProtocolError(
+                            "successful START response omitted its configuration"
+                        )
+                        pending.error = protocol_error
+                    else:
+                        self._activate_run_locked(
+                            response.run_id,
+                            response.value.data_checksum_algorithm,
+                        )
                 elif response.ok and response.kind is constants.FrameKind.STOP_RESPONSE:
                     self._deactivate_stream_locked()
             pending.completed.set()
@@ -691,7 +719,11 @@ class BackgroundReader:
         if protocol_error is not None:
             raise protocol_error
 
-    def _dispatch_block(self, block: DataBlock) -> None:
+    def _dispatch_block(
+        self,
+        block: DataBlock,
+        checksum_algorithm: constants.ChecksumAlgorithm,
+    ) -> None:
         with self._condition:
             if isinstance(block, AdcBlock):
                 self._adc_frames_received += 1
@@ -704,6 +736,11 @@ class BackgroundReader:
                 else:
                     self._gpio_stale_blocks_discarded += 1
                 return
+            if checksum_algorithm != self._active_checksum_algorithm:
+                raise ReaderProtocolError(
+                    f"run {block.run_id} data used {checksum_algorithm.name}; "
+                    f"configured algorithm is {self._active_checksum_algorithm.name}"
+                )
             if len(self._blocks) >= self._max_queued_blocks:
                 dropped = self._blocks.popleft()
                 self._host_block_queue_drops += 1
@@ -832,12 +869,21 @@ class BackgroundReader:
                 pending.error = error
                 pending.completed.set()
 
-    def _activate_run_locked(self, run_id: int) -> None:
+    def _activate_run_locked(
+        self,
+        run_id: int,
+        checksum_algorithm: constants.ChecksumAlgorithm,
+    ) -> None:
         if run_id == 0:
             raise ReaderProtocolError("successful START established run ID zero")
+        if checksum_algorithm not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
+            raise ReaderProtocolError(
+                "successful START selected an unsupported checksum algorithm"
+            )
         self._record_boundary_blocks_locked()
         self._blocks.clear()
         self._active_run_id = run_id
+        self._active_checksum_algorithm = checksum_algorithm
         self._stream_active = True
         self._condition.notify_all()
 
@@ -845,6 +891,7 @@ class BackgroundReader:
         self._record_boundary_blocks_locked()
         self._blocks.clear()
         self._stream_active = False
+        self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
         self._condition.notify_all()
 
     def _record_boundary_blocks_locked(self) -> None:

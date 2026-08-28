@@ -61,7 +61,9 @@ packet::FinishFillResult fillAndFinish(packet::PacketBufferPipeline &pipeline,
                                        packet::Stream stream,
                                        std::uint64_t first_ticks,
                                        std::uint16_t flags,
-                                       packet::FillHandle &handle) {
+                                       packet::FillHandle &handle,
+                                       constants::ChecksumAlgorithm checksum =
+                                           constants::kDefaultChecksumAlgorithm) {
   const packet::BeginFillResult begun = pipeline.beginFill(stream);
   expect(begun.ok(), "reserve one source frame for filling");
   handle = begun.handle;
@@ -82,8 +84,56 @@ packet::FinishFillResult fillAndFinish(packet::PacketBufferPipeline &pipeline,
   packet::FrameCompletion completion{};
   completion.first_sample_ticks = first_ticks;
   completion.flags = flags;
+  completion.checksum_algorithm = checksum;
   completion.payload_bytes_written = payload.size;
   return pipeline.finishFill(handle, completion);
+}
+
+void testRunChecksumIsImmutableUntilTheQueueIsQuiescent() {
+  packet::PacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  expect(pipeline.startRun(
+             30U, constants::ChecksumAlgorithm::kNoneReserved) ==
+             packet::OperationStatus::kUnsupportedChecksum,
+         "a run cannot select the reserved checksum ID");
+  expect(pipeline.startRun(30U, constants::ChecksumAlgorithm::kCrc32c) ==
+             packet::OperationStatus::kOk &&
+             pipeline.snapshot().checksum_algorithm ==
+                 constants::ChecksumAlgorithm::kCrc32c,
+         "the packet epoch snapshots its negotiated checksum");
+
+  packet::FillHandle mismatched{};
+  const packet::FinishFillResult rejected = fillAndFinish(
+      pipeline, packet::Stream::kAdc, 0U,
+      static_cast<std::uint16_t>(constants::FrameFlag::kEpochStart),
+      mismatched, constants::ChecksumAlgorithm::kAdler32);
+  expect(rejected.status == packet::OperationStatus::kChecksumMismatch &&
+             rejected.encoding.error ==
+                 constants::ErrorCode::kUnsupportedChecksum &&
+             pipeline.readyFrames() == 0U &&
+             pipeline.freeBuffers() == board::kPacketBufferCount,
+         "a producer cannot label a frame with a different algorithm");
+
+  pipeline.stopProduction();
+  expect(pipeline.startRun(
+             31U, constants::ChecksumAlgorithm::kCrc32IsoHdlc) ==
+             packet::OperationStatus::kOk,
+         "a new algorithm applies only after the prior epoch is quiescent");
+  packet::FillHandle accepted{};
+  expect(fillAndFinish(
+             pipeline, packet::Stream::kGpio, 0U,
+             static_cast<std::uint16_t>(constants::FrameFlag::kEpochStart),
+             accepted, constants::ChecksumAlgorithm::kCrc32IsoHdlc)
+             .ok() &&
+             pipeline.serviceReadyFrames(1U).frames_promoted == 1U,
+         "the new epoch emits its negotiated algorithm");
+  wire::DecodedFrame decoded{};
+  expect(wire::decodeFrame(pipeline.frontFrame(), decoded).ok() &&
+             decoded.header.checksum_algorithm ==
+                 constants::ChecksumAlgorithm::kCrc32IsoHdlc,
+         "the immutable frame header and trailer use CRC-32/ISO-HDLC");
+  pipeline.releaseFrontFrame();
+  pipeline.stopProduction();
 }
 
 void testAlignedFixedPoolAndFailureAccounting() {
@@ -331,6 +381,7 @@ int main() {
   testTransportOwnershipSurvivesPartialWrites();
   testFairPromotionKeepsNominalCoverageAligned();
   testPoolExhaustionIsBoundedAndSequenceVisible();
+  testRunChecksumIsImmutableUntilTheQueueIsQuiescent();
   if (failures != 0) {
     std::cerr << failures << " packet pipeline assertion(s) failed\n";
     return 1;

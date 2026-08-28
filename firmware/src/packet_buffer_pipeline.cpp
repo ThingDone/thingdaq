@@ -18,7 +18,9 @@ void saturatingIncrement(Integer &value) {
 
 }  // namespace
 
-OperationStatus PacketBufferPipeline::startRun(std::uint32_t run_id) {
+OperationStatus PacketBufferPipeline::startRun(
+    std::uint32_t run_id,
+    protocol_v1::ChecksumAlgorithm checksum_algorithm) {
   if (run_id == 0U || run_id == run_id_) {
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kInvalidRunId;
@@ -31,6 +33,10 @@ OperationStatus PacketBufferPipeline::startRun(std::uint32_t run_id) {
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kRunActive;
   }
+  if (!protocol::isSupportedChecksum(checksum_algorithm)) {
+    saturatingIncrement(run_start_rejections_);
+    return OperationStatus::kUnsupportedChecksum;
+  }
 
   for (ReadyQueue &queue : ready_queues_) {
     queue.clear();
@@ -42,6 +48,7 @@ OperationStatus PacketBufferPipeline::startRun(std::uint32_t run_id) {
   source_counters_ = {};
   transmit_depth_by_source_ = {};
   run_id_ = run_id;
+  checksum_algorithm_ = checksum_algorithm;
   next_free_search_ = 0U;
   next_ready_source_ = 0U;
   ready_queue_high_water_ = 0U;
@@ -153,6 +160,16 @@ FinishFillResult PacketBufferPipeline::finishFill(
     recordDrop(record.stream, record.item_count);
     recycle(handle.buffer_index);
     result.status = OperationStatus::kIncompletePayload;
+    return result;
+  }
+  if (completion.checksum_algorithm != checksum_algorithm_) {
+    saturatingIncrement(encoding_rejections_);
+    recordDrop(record.stream, record.item_count);
+    recycle(handle.buffer_index);
+    result.status = OperationStatus::kChecksumMismatch;
+    result.encoding = protocol::Result::failure(
+        protocol_v1::ErrorCode::kUnsupportedChecksum,
+        protocol::ValidationIssue::kUnsupportedChecksum);
     return result;
   }
 
@@ -368,6 +385,7 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
         transmit_depth_by_source_[source];
   }
   result.run_id = run_id_;
+  result.checksum_algorithm = checksum_algorithm_;
   result.run_starts = run_starts_;
   result.run_start_rejections = run_start_rejections_;
   result.pool_exhaustions = pool_exhaustions_;

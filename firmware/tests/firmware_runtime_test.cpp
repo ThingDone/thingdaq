@@ -53,7 +53,10 @@ wire::CommandFrame emptyRequest(constants::FrameKind kind,
   return frame;
 }
 
-wire::CommandFrame configureRequest(std::uint32_t request_id) {
+wire::CommandFrame configureRequest(
+    std::uint32_t request_id,
+    constants::ChecksumAlgorithm checksum_algorithm =
+        constants::ChecksumAlgorithm::kAdler32) {
   std::array<std::uint8_t, constants::kConfigureRequestPayloadSize> payload{};
   payload[constants::kConfigureRequestStreamMaskOffset] =
       static_cast<std::uint8_t>(constants::StreamMask::kAdc) |
@@ -61,7 +64,7 @@ wire::CommandFrame configureRequest(std::uint32_t request_id) {
   payload[constants::kConfigureRequestSourceOffset] =
       static_cast<std::uint8_t>(constants::Source::kSynthetic);
   payload[constants::kConfigureRequestDataChecksumAlgorithmOffset] =
-      static_cast<std::uint8_t>(constants::ChecksumAlgorithm::kAdler32);
+      static_cast<std::uint8_t>(checksum_algorithm);
   expect(wire::storeU32(
              {payload.data(), payload.size()},
              constants::kConfigureRequestDataFrameBytesOffset,
@@ -578,20 +581,22 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
          "full-size run-one data is partially active before STOP");
 
   stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 203U));
-  stream.appendInput(configureRequest(204U));
+  stream.appendInput(
+      configureRequest(204U, constants::ChecksumAlgorithm::kCrc32c));
   stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 205U));
   const DrainResult stopped = drain(firmware, stream);
   expect(stopped.quiescent && stopped.saw_stop && stopped.packet_stopped &&
              stopped.stop_transmitting_frames == 2U &&
-             firmware.state() == constants::DeviceState::kConfigured &&
+             firmware.state() == constants::DeviceState::kIdle &&
              firmware.runId() == 1U &&
              firmware.packetSnapshot().ready_for_start,
-         "STOP drains both transport-owned frames while rapid START stays gated");
+         "STOP drains old frames while rapid reconfiguration remains unapplied");
 
   const std::vector<wire::DecodedFrame> first_run =
       decodeOutput(stream.output);
   std::size_t old_data_frames = 0U;
-  bool saw_busy_start = false;
+  bool saw_busy_configure = false;
+  bool saw_unconfigured_start = false;
   for (const wire::DecodedFrame &frame : first_run) {
     if (frame.header.kind == constants::FrameKind::kAdcData ||
         frame.header.kind == constants::FrameKind::kGpioData) {
@@ -599,23 +604,32 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
       expect(frame.header.run_id == 1U,
              "every drained data frame retains the stopped run ID");
     }
+    if (frame.header.kind == constants::FrameKind::kConfigureResponse &&
+        frame.header.request_id == 204U) {
+      saw_busy_configure =
+          responseError(frame) == constants::ErrorCode::kBusy;
+    }
     if (frame.header.kind == constants::FrameKind::kStartResponse &&
         frame.header.request_id == 205U) {
-      saw_busy_start = responseError(frame) == constants::ErrorCode::kBusy;
+      saw_unconfigured_start =
+          responseError(frame) == constants::ErrorCode::kInvalidState;
     }
   }
-  expect(old_data_frames == 2U && saw_busy_start,
-         "rapid START returns BUSY without allocating run two");
+  expect(old_data_frames == 2U && saw_busy_configure &&
+             saw_unconfigured_start,
+         "queued Adler-32 frames block a CRC-32C switch and its START");
 
   const std::size_t next_run_offset = stream.output.size();
-  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 206U));
+  stream.appendInput(
+      configureRequest(206U, constants::ChecksumAlgorithm::kCrc32c));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 207U));
   expect(drain(firmware, stream).quiescent && firmware.runId() == 2U &&
              firmware.state() == constants::DeviceState::kRunning,
-         "retry START arms run two after the prior drain completes");
+         "retry CONFIGURE and START arm CRC-32C after the drain completes");
   clock.ticks += synthetic::kFrameCoverageTicks;
   expect(drain(firmware, stream).quiescent,
          "run two transmits one aligned frame from each source");
-  stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 207U));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 208U));
   expect(drain(firmware, stream).quiescent,
          "run two STOP drains cleanly");
 
@@ -624,19 +638,29 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
       stream.output.end());
   const std::vector<wire::DecodedFrame> next_run =
       decodeOutput(next_run_bytes);
-  expect(next_run.size() == 4U &&
+  expect(next_run.size() == 5U &&
              next_run[0].header.kind ==
-                 constants::FrameKind::kStartResponse &&
+                 constants::FrameKind::kConfigureResponse &&
              next_run[0].header.request_id == 206U &&
+             next_run[0].header.checksum_algorithm ==
+                 constants::kBootstrapChecksumAlgorithm &&
              responseError(next_run[0]) == constants::ErrorCode::kOk &&
-             next_run[0].header.run_id == 2U &&
-             next_run[1].header.kind == constants::FrameKind::kAdcData &&
-             next_run[2].header.kind == constants::FrameKind::kGpioData &&
+             next_run[1].header.kind ==
+                 constants::FrameKind::kStartResponse &&
+             next_run[1].header.request_id == 207U &&
+             responseError(next_run[1]) == constants::ErrorCode::kOk &&
              next_run[1].header.run_id == 2U &&
+             next_run[2].header.kind == constants::FrameKind::kAdcData &&
+             next_run[3].header.kind == constants::FrameKind::kGpioData &&
              next_run[2].header.run_id == 2U &&
-             next_run[3].header.kind ==
+             next_run[3].header.run_id == 2U &&
+             next_run[2].header.checksum_algorithm ==
+                 constants::ChecksumAlgorithm::kCrc32c &&
+             next_run[3].header.checksum_algorithm ==
+                 constants::ChecksumAlgorithm::kCrc32c &&
+             next_run[4].header.kind ==
                  constants::FrameKind::kStopResponse,
-         "successful run-two START is followed only by run-two data");
+         "bootstrap control frames surround only CRC-32C run-two data");
   const usb::TransportSnapshot transport = firmware.transportSnapshot();
   expect(transport.partial_write_events > 0U &&
              transport.zero_length_write_events == 0U &&

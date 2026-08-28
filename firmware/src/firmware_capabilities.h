@@ -93,8 +93,12 @@ static_assert((kMetadata.capability_bits & capabilityBit(
 static_assert(kMetadata.supported_source_mask ==
               sourceBit(protocol_v1::Source::kSynthetic));
 static_assert(kMetadata.supported_checksum_mask ==
-              (1U << static_cast<std::uint8_t>(
-                         protocol_v1::ChecksumAlgorithm::kAdler32)));
+              ((1U << static_cast<std::uint8_t>(
+                          protocol_v1::ChecksumAlgorithm::kAdler32)) |
+               (1U << static_cast<std::uint8_t>(
+                          protocol_v1::ChecksumAlgorithm::kCrc32c)) |
+               (1U << static_cast<std::uint8_t>(
+                          protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc))));
 static_assert(kMetadata.adc0_phase_ticks == 0U &&
               kMetadata.adc1_phase_ticks * 2U ==
                   kMetadata.adc_pair_period_ticks);

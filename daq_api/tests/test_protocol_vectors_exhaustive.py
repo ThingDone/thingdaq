@@ -70,7 +70,7 @@ def _info_payload() -> bytes:
         "<IIIIIII",
         payload,
         8,
-        2,
+        14,
         0x3F,
         8_000_000,
         4_096,

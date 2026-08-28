@@ -18,7 +18,10 @@ LoopReport FirmwareRuntime::service() {
   if (transport_.takeCommand(command)) {
     report.command_dispatched = true;
     control::DispatchReadiness readiness{};
-    if (command.request.kind == protocol_v1::CommandKind::kStart) {
+    if (command.request.kind == protocol_v1::CommandKind::kConfigure) {
+      readiness.configuration_ready =
+          packet_pipeline_.quiescent() && !synthetic_source_.running();
+    } else if (command.request.kind == protocol_v1::CommandKind::kStart) {
       readiness.start_ready =
           packet_pipeline_.readyForStart() && !synthetic_source_.running();
     }
@@ -77,7 +80,9 @@ void FirmwareRuntime::applyPendingEvents(
   }
   if (events.has(control::Event::kStartEpoch)) {
     report.packet_start_status =
-        packet_pipeline_.startRun(events.run_id);
+        packet_pipeline_.startRun(
+            events.run_id,
+            control_.appliedConfiguration().data_checksum_algorithm);
     report.packet_run_started =
         report.packet_start_status == packet::OperationStatus::kOk;
     if (!report.packet_run_started) {

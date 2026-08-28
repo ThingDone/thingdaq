@@ -113,6 +113,25 @@ constexpr bool isDataKind(protocol_v1::FrameKind kind) {
          kind == protocol_v1::FrameKind::kGpioData;
 }
 
+constexpr bool isKnownChecksum(protocol_v1::ChecksumAlgorithm algorithm) {
+  switch (algorithm) {
+    case protocol_v1::ChecksumAlgorithm::kNoneReserved:
+    case protocol_v1::ChecksumAlgorithm::kAdler32:
+    case protocol_v1::ChecksumAlgorithm::kCrc32c:
+    case protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc:
+      return true;
+  }
+  return false;
+}
+
+constexpr bool checksumAllowedForKind(
+    protocol_v1::FrameKind kind,
+    protocol_v1::ChecksumAlgorithm algorithm) {
+  return isSupportedChecksum(algorithm) &&
+         (isDataKind(kind) ||
+          algorithm == protocol_v1::kBootstrapChecksumAlgorithm);
+}
+
 constexpr bool isTypedResponseKind(protocol_v1::FrameKind kind) {
   switch (kind) {
     case protocol_v1::FrameKind::kInfoResponse:
@@ -252,8 +271,7 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
   if (header.header_length != protocol_v1::kHeaderSize) {
     return badLength();
   }
-  if (header.checksum_algorithm !=
-      protocol_v1::ChecksumAlgorithm::kAdler32) {
+  if (!checksumAllowedForKind(header.kind, header.checksum_algorithm)) {
     return unsupportedChecksum();
   }
   const std::uint16_t allowed = protocol_v1::allowedFlags(header.kind);
@@ -357,8 +375,10 @@ Result decodeHeader(ByteView input, FrameHeader &header, bool commands_only) {
   }
   const std::uint8_t raw_checksum =
       input.data[protocol_v1::kHeaderChecksumAlgorithmOffset];
-  if (raw_checksum != static_cast<std::uint8_t>(
-                          protocol_v1::ChecksumAlgorithm::kAdler32)) {
+  const auto checksum_algorithm =
+      static_cast<protocol_v1::ChecksumAlgorithm>(raw_checksum);
+  if (!isKnownChecksum(checksum_algorithm) ||
+      !checksumAllowedForKind(kind, checksum_algorithm)) {
     return unsupportedChecksum();
   }
   if (input.data[protocol_v1::kHeaderReservedOffset] != 0U) {
@@ -368,7 +388,7 @@ Result decodeHeader(ByteView input, FrameHeader &header, bool commands_only) {
   FrameHeader candidate{};
   candidate.kind = kind;
   candidate.version = version;
-  candidate.checksum_algorithm = protocol_v1::ChecksumAlgorithm::kAdler32;
+  candidate.checksum_algorithm = checksum_algorithm;
   if (!loadU16(input, protocol_v1::kHeaderFlagsOffset, candidate.flags) ||
       !loadU16(input, protocol_v1::kHeaderHeaderLengthOffset,
                candidate.header_length) ||
@@ -406,14 +426,13 @@ Result validateConfiguration(ByteView payload, std::size_t offset,
       !isKnownSource(source) || payload.data[offset + 3U] != 0U) {
     return badPayload();
   }
-  if (checksum == static_cast<std::uint8_t>(
-                      protocol_v1::ChecksumAlgorithm::kNoneReserved) ||
-      checksum >
-          static_cast<std::uint8_t>(protocol_v1::ChecksumAlgorithm::kCrc32c)) {
+  const auto checksum_algorithm =
+      static_cast<protocol_v1::ChecksumAlgorithm>(checksum);
+  if (!isKnownChecksum(checksum_algorithm) ||
+      checksum_algorithm == protocol_v1::ChecksumAlgorithm::kNoneReserved) {
     return badPayload();
   }
-  if (applied && checksum != static_cast<std::uint8_t>(
-                                protocol_v1::ChecksumAlgorithm::kAdler32)) {
+  if (applied && !isSupportedChecksum(checksum_algorithm)) {
     return unsupportedChecksum();
   }
   std::uint32_t frame_bytes = 0U;
@@ -567,8 +586,8 @@ Result validateStatus(ByteView payload) {
       (state == static_cast<std::uint8_t>(protocol_v1::DeviceState::kIdle) &&
        streams != 0U) ||
       !isKnownSource(source) ||
-      checksum != static_cast<std::uint8_t>(
-                      protocol_v1::ChecksumAlgorithm::kAdler32)) {
+      !isSupportedChecksum(
+          static_cast<protocol_v1::ChecksumAlgorithm>(checksum))) {
     return badPayload();
   }
   std::uint32_t value = 0U;
@@ -840,19 +859,30 @@ std::uint32_t adler32(ByteView input) {
 }
 
 Result computeChecksum(protocol_v1::ChecksumAlgorithm algorithm, ByteView input,
-                       std::uint32_t &checksum) {
+                       std::uint32_t &result_checksum) {
   if (!input.valid()) {
     return badLength();
   }
+  checksum::Algorithm implementation{};
   switch (algorithm) {
     case protocol_v1::ChecksumAlgorithm::kAdler32:
-      checksum = adler32(input);
-      return Result::success();
-    case protocol_v1::ChecksumAlgorithm::kNoneReserved:
+      implementation = checksum::Algorithm::kAdler32;
+      break;
     case protocol_v1::ChecksumAlgorithm::kCrc32c:
+      implementation = checksum::Algorithm::kCrc32c;
+      break;
+    case protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc:
+      implementation = checksum::Algorithm::kCrc32IsoHdlc;
+      break;
+    case protocol_v1::ChecksumAlgorithm::kNoneReserved:
+      return unsupportedChecksum();
+    default:
       return unsupportedChecksum();
   }
-  return unsupportedChecksum();
+  return checksum::compute(implementation, input.data, input.size,
+                           result_checksum)
+             ? Result::success()
+             : unsupportedChecksum();
 }
 
 Result decodeFrame(ByteView input, DecodedFrame &frame) {

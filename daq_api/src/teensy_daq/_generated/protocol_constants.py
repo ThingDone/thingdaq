@@ -1,14 +1,14 @@
 """Generated protocol-v1 constants. Do not edit by hand.
 
 Source: protocol/protocol-v1.json
-Source SHA-256: 216b389103267b1d51e65c29ffc06405dbd7ac5e1fd069eb82af9e95a57fde16
+Source SHA-256: 930f3144ae6a27d4a0ba1bd84e5a2570c4c510b8bc5b366f58768c2d2a3c5b97
 """
 
 from __future__ import annotations
 
 from enum import IntEnum, IntFlag
 
-SOURCE_SHA256 = "216b389103267b1d51e65c29ffc06405dbd7ac5e1fd069eb82af9e95a57fde16"
+SOURCE_SHA256 = "930f3144ae6a27d4a0ba1bd84e5a2570c4c510b8bc5b366f58768c2d2a3c5b97"
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
 PROTOCOL_VERSION = 1
@@ -100,6 +100,7 @@ class ChecksumAlgorithm(IntEnum):
     NONE_RESERVED = 0
     ADLER32 = 1
     CRC32C = 2
+    CRC32_ISO_HDLC = 3
 
 
 class ResponseStatus(IntEnum):
@@ -161,14 +162,17 @@ class McuId(IntEnum):
     IMXRT1062 = 1
 
 
+BOOTSTRAP_CHECKSUM_ALGORITHM = ChecksumAlgorithm.ADLER32
 DEFAULT_CHECKSUM_ALGORITHM = ChecksumAlgorithm.ADLER32
 SUPPORTED_CHECKSUM_ALGORITHMS = frozenset(
     {
         ChecksumAlgorithm.ADLER32,
+        ChecksumAlgorithm.CRC32C,
+        ChecksumAlgorithm.CRC32_ISO_HDLC,
     }
 )
 
-SUPPORTED_CHECKSUM_MASK = 2
+SUPPORTED_CHECKSUM_MASK = 14
 KNOWN_FRAME_FLAG_MASK = 32783
 KNOWN_CAPABILITY_MASK = 63
 

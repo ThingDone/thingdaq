@@ -445,6 +445,9 @@ void testConfigurationValidationAndAtomicity() {
   zero_stream.stream_mask = 0U;
   wire::Configuration crc = control::kSyntheticConfiguration;
   crc.data_checksum_algorithm = constants::ChecksumAlgorithm::kCrc32c;
+  wire::Configuration crc_iso = control::kSyntheticConfiguration;
+  crc_iso.data_checksum_algorithm =
+      constants::ChecksumAlgorithm::kCrc32IsoHdlc;
   wire::Configuration bad_size = control::kSyntheticConfiguration;
   bad_size.data_frame_bytes = 2048U;
   wire::Configuration unknown_stream = control::kSyntheticConfiguration;
@@ -455,12 +458,11 @@ void testConfigurationValidationAndAtomicity() {
   no_checksum.data_checksum_algorithm =
       constants::ChecksumAlgorithm::kNoneReserved;
 
-  const std::array<Case, 7U> cases{{
+  const std::array<Case, 6U> cases{{
       {hardware, constants::ErrorCode::kUnsupportedConfiguration,
        "physical source"},
       {zero_stream, constants::ErrorCode::kUnsupportedConfiguration,
        "zero-stream profile"},
-      {crc, constants::ErrorCode::kUnsupportedChecksum, "disabled checksum"},
       {bad_size, constants::ErrorCode::kInvalidPayload, "wrong frame size"},
       {unknown_stream, constants::ErrorCode::kInvalidPayload,
        "unknown stream field"},
@@ -484,14 +486,21 @@ void testConfigurationValidationAndAtomicity() {
     ++request_id;
   }
 
-  expect(state.dispatch(configureRequest(request_id++), response)
+  expect(state.dispatch(configureRequest(request_id++, crc), response)
              .commandAccepted(),
-         "valid configuration applies after rejections");
+         "CRC-32C configuration applies after rejections");
   expect(state.state() == constants::DeviceState::kConfigured &&
              state.appliedConfiguration().stream_mask == 3U &&
              state.appliedConfiguration().source ==
-                 constants::Source::kSynthetic,
-         "valid dual-stream synthetic configuration is retained");
+                 constants::Source::kSynthetic &&
+             state.appliedConfiguration().data_checksum_algorithm ==
+                 constants::ChecksumAlgorithm::kCrc32c,
+         "negotiated CRC-32C configuration is retained");
+  expect(state.dispatch(configureRequest(request_id++, crc_iso), response)
+             .commandAccepted() &&
+             state.appliedConfiguration().data_checksum_algorithm ==
+                 constants::ChecksumAlgorithm::kCrc32IsoHdlc,
+         "CRC-32/ISO-HDLC can replace a configured checksum atomically");
   expect(state.dispatch(configureRequest(request_id++, adc), response)
              .commandAccepted() &&
              state.appliedConfiguration().stream_mask ==
@@ -536,6 +545,28 @@ void testConfigurationValidationAndAtomicity() {
   expect(unknown_field.error == constants::ErrorCode::kInvalidPayload &&
              frame.size() == 0U,
          "nonzero reserved configuration fields are rejected");
+}
+
+void testConfigurationReadinessBusyIsAtomic() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(66U), "CONFIGURE-readiness test completes BOOT");
+  control::DispatchReadiness draining{};
+  draining.configuration_ready = false;
+  const control::DispatchResult busy =
+      state.dispatch(configureRequest(50U), response, draining);
+  expect(busy.responseReady() && !busy.commandAccepted(),
+         "queued prior-run frames return one typed CONFIGURE rejection");
+  expectTypedResponse(response, constants::FrameKind::kConfigureResponse, 50U,
+                      constants::ErrorCode::kBusy, "busy CONFIGURE");
+  expect(state.state() == constants::DeviceState::kIdle &&
+             !state.hasConfiguration() && state.runId() == 0U &&
+             state.takePendingEvents().mask == 0U,
+         "busy CONFIGURE cannot switch the active checksum or state");
+
+  expect(state.dispatch(configureRequest(51U), response).commandAccepted() &&
+             state.state() == constants::DeviceState::kConfigured,
+         "CONFIGURE applies after the prior queue becomes quiescent");
 }
 
 void testRecoverableFaultReturnsIdle() {
@@ -664,6 +695,7 @@ int main() {
   testIdempotencyRequestIdsAndCounters();
   testStartReadinessBusyIsAtomic();
   testConfigurationValidationAndAtomicity();
+  testConfigurationReadinessBusyIsAtomic();
   testRecoverableFaultReturnsIdle();
   testStatisticsDetailAndSaturation();
 

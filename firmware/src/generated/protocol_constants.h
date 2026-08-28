@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 216b389103267b1d51e65c29ffc06405dbd7ac5e1fd069eb82af9e95a57fde16
+// Source SHA-256: 930f3144ae6a27d4a0ba1bd84e5a2570c4c510b8bc5b366f58768c2d2a3c5b97
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "216b389103267b1d51e65c29ffc06405dbd7ac5e1fd069eb82af9e95a57fde16";
+inline constexpr char kSourceSha256[] = "930f3144ae6a27d4a0ba1bd84e5a2570c4c510b8bc5b366f58768c2d2a3c5b97";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -93,6 +93,7 @@ enum class ChecksumAlgorithm : std::uint8_t {
   kNoneReserved = 0U,
   kAdler32 = 1U,
   kCrc32c = 2U,
+  kCrc32IsoHdlc = 3U,
 };
 
 enum class ResponseStatus : std::uint8_t {
@@ -152,9 +153,11 @@ enum class McuId : std::uint16_t {
   kImxrt1062 = 1U,
 };
 
+inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =
+    ChecksumAlgorithm::kAdler32;
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
-inline constexpr std::uint32_t kSupportedChecksumMask = 2U;
+inline constexpr std::uint32_t kSupportedChecksumMask = 14U;
 inline constexpr std::uint16_t kKnownFrameFlagMask = 32783U;
 inline constexpr std::uint32_t kKnownCapabilityMask = 63U;
 

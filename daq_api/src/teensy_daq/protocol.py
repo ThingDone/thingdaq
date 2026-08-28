@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import struct
 import zlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from ._generated import protocol_constants as constants
 
@@ -50,6 +51,19 @@ class UnsupportedChecksumError(FrameValidationError):
             constants.ErrorCode.UNSUPPORTED_CHECKSUM,
         )
         self.algorithm = algorithm
+
+
+class ChecksumAlgorithmMismatchError(FrameValidationError):
+    """A control frame did not use the fixed bootstrap checksum."""
+
+    def __init__(self, observed: int, expected: int) -> None:
+        super().__init__(
+            f"checksum algorithm {observed} is invalid for a control frame; "
+            f"expected bootstrap algorithm {expected}",
+            constants.ErrorCode.UNSUPPORTED_CHECKSUM,
+        )
+        self.observed = observed
+        self.expected = expected
 
 
 class ChecksumMismatchError(FrameValidationError):
@@ -148,9 +162,39 @@ def _adler32(data: BytesLike) -> int:
     return zlib.adler32(data) & constants.UINT32_MAX
 
 
-CHECKSUM_DISPATCH: dict[constants.ChecksumAlgorithm, Callable[[BytesLike], int]] = {
-    constants.ChecksumAlgorithm.ADLER32: _adler32,
-}
+def _make_reflected_crc_table(polynomial: int) -> tuple[int, ...]:
+    table: list[int] = []
+    for index in range(256):
+        remainder = index
+        for _ in range(8):
+            remainder = (remainder >> 1) ^ (polynomial if remainder & 1 else 0)
+        table.append(remainder)
+    return tuple(table)
+
+
+_CRC32C_TABLE = _make_reflected_crc_table(0x82F63B78)
+
+
+def _crc32c(data: BytesLike) -> int:
+    remainder = constants.UINT32_MAX
+    for value in data:
+        remainder = (remainder >> 8) ^ _CRC32C_TABLE[(remainder ^ value) & 0xFF]
+    return remainder ^ constants.UINT32_MAX
+
+
+def _crc32_iso_hdlc(data: BytesLike) -> int:
+    return zlib.crc32(data) & constants.UINT32_MAX
+
+
+_CHECKSUM_DISPATCH: Mapping[constants.ChecksumAlgorithm, Callable[[BytesLike], int]] = (
+    MappingProxyType(
+        {
+            constants.ChecksumAlgorithm.ADLER32: _adler32,
+            constants.ChecksumAlgorithm.CRC32C: _crc32c,
+            constants.ChecksumAlgorithm.CRC32_ISO_HDLC: _crc32_iso_hdlc,
+        }
+    )
+)
 
 
 def compute_checksum(
@@ -165,7 +209,7 @@ def compute_checksum(
         selected = constants.ChecksumAlgorithm(algorithm)
     except ValueError as exc:
         raise UnsupportedChecksumError(int(algorithm)) from exc
-    implementation = CHECKSUM_DISPATCH.get(selected)
+    implementation = _CHECKSUM_DISPATCH.get(selected)
     if implementation is None:
         raise UnsupportedChecksumError(int(selected))
     return implementation(data)
@@ -258,6 +302,14 @@ def _validate_header(header: FrameHeader, reserved: int = 0) -> None:
         )
     if header.checksum_algorithm not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
         raise UnsupportedChecksumError(int(header.checksum_algorithm))
+    if (
+        header.kind not in _DATA_KINDS
+        and header.checksum_algorithm != constants.BOOTSTRAP_CHECKSUM_ALGORITHM
+    ):
+        raise ChecksumAlgorithmMismatchError(
+            int(header.checksum_algorithm),
+            int(constants.BOOTSTRAP_CHECKSUM_ALGORITHM),
+        )
 
     allowed_flags = int(constants.ALLOWED_FLAGS_BY_KIND[header.kind])
     if int(header.flags) & (~allowed_flags & 0xFFFF):
@@ -674,9 +726,7 @@ def encode_frame(
     payload: BytesLike = b"",
     *,
     flags: constants.FrameFlag | int = constants.FrameFlag.NONE,
-    checksum_algorithm: constants.ChecksumAlgorithm | int = (
-        constants.DEFAULT_CHECKSUM_ALGORITHM
-    ),
+    checksum_algorithm: constants.ChecksumAlgorithm | int | None = None,
     run_id: int = 0,
     sequence: int = 0,
     request_id: int = 0,
@@ -691,10 +741,17 @@ def encode_frame(
         raise FrameValidationError(
             f"unknown frame kind {int(kind)}", constants.ErrorCode.UNKNOWN_FRAME_KIND
         ) from exc
-    try:
-        selected_checksum = constants.ChecksumAlgorithm(checksum_algorithm)
-    except ValueError as exc:
-        raise UnsupportedChecksumError(int(checksum_algorithm)) from exc
+    if checksum_algorithm is None:
+        selected_checksum = (
+            constants.DEFAULT_CHECKSUM_ALGORITHM
+            if selected_kind in _DATA_KINDS
+            else constants.BOOTSTRAP_CHECKSUM_ALGORITHM
+        )
+    else:
+        try:
+            selected_checksum = constants.ChecksumAlgorithm(checksum_algorithm)
+        except ValueError as exc:
+            raise UnsupportedChecksumError(int(checksum_algorithm)) from exc
     payload_bytes = bytes(payload)
     header = FrameHeader(
         kind=selected_kind,
@@ -961,8 +1018,8 @@ FrameParser = IncrementalFrameParser
 
 
 __all__ = [
-    "CHECKSUM_DISPATCH",
     "MAX_BUFFERED_BYTES",
+    "ChecksumAlgorithmMismatchError",
     "ChecksumMismatchError",
     "Frame",
     "FrameHeader",

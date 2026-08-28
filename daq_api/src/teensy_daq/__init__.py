@@ -84,6 +84,7 @@ from .models import (
     interleave_adc,
 )
 from .protocol import (
+    ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
     Frame,
     FrameHeader,
@@ -171,6 +172,7 @@ __all__ = [
     "ByteTransport",
     "Capability",
     "ChecksumAlgorithm",
+    "ChecksumAlgorithmMismatchError",
     "ChecksumMismatchError",
     "CommandKind",
     "CommandLatencyDistribution",

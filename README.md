@@ -106,9 +106,11 @@ python3 tools/generate_protocol.py --check
 ```
 
 Phase 05 adds stateless firmware candidates for Adler-32, CRC-32C, and
-CRC-32/ISO-HDLC behind one allocation-free checksum interface. The wire codec
-still accepts and advertises only bootstrap Adler-32 until negotiation and
-on-device measurements are completed. The pinned-core, Cortex-M7, i.MX RT1062,
+CRC-32/ISO-HDLC behind one allocation-free checksum interface. INFO advertises
+all three for data frames, CONFIGURE selects one, and each data header carries
+the selected ID; every command and response remains unambiguously protected by
+bootstrap Adler-32. Reconfiguration returns `BUSY` until prior-run frames have
+drained. The pinned-core, Cortex-M7, i.MX RT1062,
 FastCRC, and hardware-accelerator findings are recorded in
 `doc/research/checksum-candidates.md`; notably, the general-memory DCP computes
 CRC-32/MPEG-2 rather than either evaluated CRC and is not used.

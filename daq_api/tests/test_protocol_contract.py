@@ -66,17 +66,29 @@ class ProtocolContractTests(unittest.TestCase):
         self.assertEqual(adc_ticks, gpio_ticks)
         self.assertEqual(8096, adc_ticks)
 
-    def test_adler32_is_enabled_while_crc32c_keeps_a_stable_id(self) -> None:
+    def test_checksum_ids_and_bootstrap_algorithm_are_stable(self) -> None:
         self.assertEqual(1, constants.ChecksumAlgorithm.ADLER32)
         self.assertEqual(2, constants.ChecksumAlgorithm.CRC32C)
+        self.assertEqual(3, constants.ChecksumAlgorithm.CRC32_ISO_HDLC)
+        self.assertEqual(
+            constants.ChecksumAlgorithm.ADLER32,
+            constants.BOOTSTRAP_CHECKSUM_ALGORITHM,
+        )
         self.assertEqual(
             constants.ChecksumAlgorithm.ADLER32,
             constants.DEFAULT_CHECKSUM_ALGORITHM,
         )
         self.assertEqual(
-            frozenset({constants.ChecksumAlgorithm.ADLER32}),
+            frozenset(
+                {
+                    constants.ChecksumAlgorithm.ADLER32,
+                    constants.ChecksumAlgorithm.CRC32C,
+                    constants.ChecksumAlgorithm.CRC32_ISO_HDLC,
+                }
+            ),
             constants.SUPPORTED_CHECKSUM_ALGORITHMS,
         )
+        self.assertEqual(0b1110, constants.SUPPORTED_CHECKSUM_MASK)
 
     def test_request_kinds_have_typed_response_kinds_and_error_codes(self) -> None:
         expected_pairs = {

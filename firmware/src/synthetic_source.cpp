@@ -44,8 +44,8 @@ OperationStatus SyntheticSource::startRun(
       (configuration.stream_mask &
        static_cast<std::uint8_t>(~known_streams)) != 0U ||
       configuration.source != protocol_v1::Source::kSynthetic ||
-      configuration.data_checksum_algorithm !=
-          protocol_v1::ChecksumAlgorithm::kAdler32 ||
+      !protocol::isSupportedChecksum(
+          configuration.data_checksum_algorithm) ||
       configuration.data_frame_bytes != protocol_v1::kDataFrameBytes) {
     return OperationStatus::kInvalidConfiguration;
   }

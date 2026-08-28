@@ -6,6 +6,13 @@
 
 namespace teensy_daq::checksum {
 
+#if defined(__IMXRT1062__)
+#define TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(section_name) \
+  __attribute__((section(section_name), used))
+#else
+#define TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(section_name)
+#endif
+
 // Candidate identities are intentionally independent of protocol wire IDs.
 // Protocol negotiation maps enabled wire algorithms to this narrow interface.
 enum class Algorithm : std::uint8_t {
@@ -43,9 +50,11 @@ constexpr std::array<std::uint32_t, kCrcTableEntries> makeReflectedCrcTable(
   return table;
 }
 
-inline constexpr auto kCrc32cTable =
+inline constexpr auto kCrc32cTable
+    TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(".progmem.checksum.crc32c") =
     makeReflectedCrcTable(kCrc32cReflectedPolynomial);
-inline constexpr auto kCrc32IsoHdlcTable =
+inline constexpr auto kCrc32IsoHdlcTable
+    TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(".progmem.checksum.crc32_iso_hdlc") =
     makeReflectedCrcTable(kCrc32IsoHdlcReflectedPolynomial);
 
 inline std::uint32_t reflectedCrc32(
@@ -128,3 +137,5 @@ inline bool compute(Algorithm algorithm, const std::uint8_t *data,
 }
 
 }  // namespace teensy_daq::checksum
+
+#undef TEENSY_DAQ_CHECKSUM_TABLE_STORAGE

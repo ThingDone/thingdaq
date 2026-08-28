@@ -20,10 +20,10 @@ related:
 
 Three allocation-free, stateless software candidates are implemented in
 `firmware/src/checksum.h`: standard Adler-32, CRC-32C Castagnoli, and
-CRC-32/ISO-HDLC. The existing [[Protocol-V1]] codec now reuses that Adler-32
-implementation, but wire negotiation is intentionally unchanged: Adler-32
-remains the only accepted and advertised bootstrap algorithm until the
-separate negotiation task enables measured candidates.
+CRC-32/ISO-HDLC. The [[Protocol-V1]] codec maps checksum IDs 1, 2, and 3 through
+that one interface without changing framing or packetization. Adler-32 remains
+the fixed checksum for every request and response; CONFIGURE selects the data
+algorithm advertised by INFO, and each data-frame header repeats the ID.
 
 No hardware-assisted wire candidate was implemented. The i.MX RT1062 DCP is a
 real general-memory CRC engine with its own channels, but its fixed algorithm
@@ -61,8 +61,9 @@ The Adler implementation reduces both accumulators after at most 5,552 input
 bytes, the RFC/zlib bound that keeps unsigned 32-bit intermediate values safe
 while avoiding division per byte. Both CRC implementations use one generated
 256-entry table and therefore claim 1,024 bytes of constant table storage each.
-The exact Flash/RAM placement and linked cost remain map-file measurements for
-the later local checksum gate.
+Both CRC tables are explicitly linked into memory-mapped program flash. Build
+manifest schema 4 records each linked symbol and reports 1,024 flash bytes and
+zero RAM bytes per CRC (2,048/0 bytes total); Adler-32 uses no table.
 
 ## Inspected implementation baseline
 
@@ -166,8 +167,8 @@ The three candidates:
 - use no table for Adler-32 and one 1,024-byte constant table for each CRC;
 - return only an unsigned 32-bit value, leaving the shared codec as the single
   owner of coverage and little-endian serialization;
-- preserve unsupported-CRC rejection in the current wire codec until
-  negotiation is deliberately enabled.
+- reject unknown IDs, control frames that do not use bootstrap Adler-32, and
+  data completions whose ID disagrees with their active packet epoch.
 
 Published parameter references are
 [RFC 1950 section 8.2](https://www.rfc-editor.org/rfc/rfc1950.html#section-8.2)
@@ -181,5 +182,6 @@ separately in `firmware/tests/checksum_candidates_test.cpp`.
 This survey establishes implementability, not the production choice. DWT
 cycle measurements, hot/cold cache and OCRAM cases, full streaming behavior,
 linked table cost, host parity, corruption testing, and the fixed autonomous
-selection policy remain inputs to [[ADR-002-Checksum-Selection]]. Until those
-steps pass, [[Protocol-V1]] continues to advertise and accept only Adler-32.
+selection policy remain inputs to [[ADR-002-Checksum-Selection]]. Negotiation
+now exposes all three deployable candidates, while the production default
+remains Adler-32 until those gates select a winner.

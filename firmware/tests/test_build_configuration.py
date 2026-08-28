@@ -36,7 +36,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(3, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(4, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -91,6 +91,28 @@ class BuildConfigurationTests(unittest.TestCase):
             build_firmware.parse_memory_usage(
                 "FLASH: code:1, data:2, headers:3 free for files:4\nRAM1: variables:5, code:6, padding:7 free for local variables:8"
             )
+
+    def test_checksum_table_provenance_requires_flash_residency(self) -> None:
+        symbols = (
+            "60002000 00000400 u "
+            "teensy_daq::checksum::detail::kCrc32cTable\n"
+            "60002400 00000400 u "
+            "teensy_daq::checksum::detail::kCrc32IsoHdlcTable"
+        )
+        resources = build_firmware.checksum_resource_usage(symbols)
+
+        self.assertEqual(2_048, resources["total_table_flash_bytes"])
+        self.assertEqual(0, resources["total_table_ram_bytes"])
+        self.assertEqual(
+            1_024,
+            resources["algorithms"]["CRC32C"]["table_flash_bytes"],
+        )
+        with self.assertRaisesRegex(build_firmware.BuildError, "not resident"):
+            build_firmware.checksum_resource_usage(
+                symbols.replace("60002000", "20002000")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
+            build_firmware.checksum_resource_usage(symbols.splitlines()[0])
 
     def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
         responses = [

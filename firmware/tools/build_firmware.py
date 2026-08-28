@@ -34,7 +34,7 @@ OUTPUT_DIRECTORY = (
     SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 3
+MANIFEST_SCHEMA_VERSION = 4
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
@@ -43,6 +43,13 @@ SOURCE_INPUTS = (
     REPOSITORY_ROOT / "protocol/protocol-v1.json",
 )
 SOURCE_DATE_EPOCH_MAX = 253_402_300_799  # 9999-12-31T23:59:59Z
+PROGRAM_FLASH_START = 0x60000000
+PROGRAM_FLASH_END = 0x60200000
+CHECKSUM_TABLE_SYMBOLS = {
+    "CRC32C": "teensy_daq::checksum::detail::kCrc32cTable",
+    "CRC32_ISO_HDLC": "teensy_daq::checksum::detail::kCrc32IsoHdlcTable",
+}
+CHECKSUM_TABLE_BYTES = 256 * 4
 
 
 class BuildError(RuntimeError):
@@ -289,6 +296,15 @@ def resolve_compiler(properties: dict[str, str]) -> Path:
     raise BuildError("Arduino CLI did not resolve an executable C++ compiler")
 
 
+def resolve_nm(compiler: Path) -> Path:
+    """Resolve the symbol inspector adjacent to the pinned cross-compiler."""
+
+    nm = compiler.with_name("arm-none-eabi-nm")
+    if not nm.is_file():
+        raise BuildError(f"cross-toolchain symbol inspector does not exist: {nm}")
+    return nm.resolve()
+
+
 def compile_command(
     arduino_cli: Path,
     identity: BuildIdentity,
@@ -359,6 +375,68 @@ def parse_memory_usage(output: str) -> dict[str, dict[str, int]]:
             "variables_bytes": int(ram2_match.group(1)),
             "free_for_heap_bytes": int(ram2_match.group(2)),
         },
+    }
+
+
+def parse_nm_symbols(output: str) -> dict[str, tuple[int, int, str]]:
+    """Parse ``nm --print-size`` output keyed by demangled symbol name."""
+
+    symbols: dict[str, tuple[int, int, str]] = {}
+    for line in output.splitlines():
+        fields = line.split(maxsplit=3)
+        if len(fields) != 4:
+            continue
+        address_text, size_text, symbol_type, name = fields
+        try:
+            address = int(address_text, 16)
+            size = int(size_text, 16)
+        except ValueError:
+            continue
+        symbols[name] = (address, size, symbol_type)
+    return symbols
+
+
+def checksum_resource_usage(nm_output: str) -> dict[str, Any]:
+    """Prove negotiated lookup tables consume flash but no runtime RAM."""
+
+    symbols = parse_nm_symbols(nm_output)
+    algorithms: dict[str, dict[str, Any]] = {
+        "ADLER32": {
+            "implementation": "arithmetic (no lookup table)",
+            "table_flash_bytes": 0,
+            "table_ram_bytes": 0,
+        }
+    }
+    for algorithm, symbol in CHECKSUM_TABLE_SYMBOLS.items():
+        record = symbols.get(symbol)
+        if record is None:
+            raise BuildError(f"firmware ELF is missing checksum table symbol {symbol}")
+        address, size, symbol_type = record
+        if size != CHECKSUM_TABLE_BYTES:
+            raise BuildError(
+                f"{symbol} occupies {size} bytes, expected {CHECKSUM_TABLE_BYTES}"
+            )
+        if not PROGRAM_FLASH_START <= address < PROGRAM_FLASH_END:
+            raise BuildError(
+                f"{symbol} is not resident in program flash: 0x{address:08x}"
+            )
+        algorithms[algorithm] = {
+            "implementation": "256-entry uint32 lookup table",
+            "symbol": symbol,
+            "symbol_type": symbol_type,
+            "address": f"0x{address:08x}",
+            "table_flash_bytes": size,
+            "table_ram_bytes": 0,
+        }
+    return {
+        "placement": "memory-mapped program flash (.progmem.checksum.*)",
+        "algorithms": algorithms,
+        "total_table_flash_bytes": sum(
+            item["table_flash_bytes"] for item in algorithms.values()
+        ),
+        "total_table_ram_bytes": sum(
+            item["table_ram_bytes"] for item in algorithms.values()
+        ),
     }
 
 
@@ -439,6 +517,7 @@ def build(arduino_cli_name: str) -> Path:
     properties = parse_build_properties(properties_result.stdout)
     validate_build_properties(properties)
     compiler = resolve_compiler(properties)
+    nm = resolve_nm(compiler)
     compiler_identity = run_command([str(compiler), "--version"]).stdout.strip()
     compiler_first_line = compiler_identity.splitlines()[0]
     if COMPILER_VERSION not in compiler_first_line.split():
@@ -474,10 +553,15 @@ def build(arduino_cli_name: str) -> Path:
         if path.is_file() and path.suffix.lower() in ARTIFACT_SUFFIXES
     )
     artifact_suffixes = {path.suffix.lower() for path in artifacts}
-    missing_artifacts = {".hex", ".map"} - artifact_suffixes
+    missing_artifacts = {".elf", ".hex", ".map"} - artifact_suffixes
     if missing_artifacts:
         names = ", ".join(sorted(missing_artifacts))
         raise BuildError(f"compile produced no {names} artifact in {OUTPUT_DIRECTORY}")
+    elf = next(path for path in artifacts if path.suffix.lower() == ".elf")
+    nm_result = run_command(
+        [str(nm), "--print-size", "--size-sort", "--demangle", str(elf)]
+    )
+    checksum_resources = checksum_resource_usage(nm_result.stdout)
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -497,6 +581,10 @@ def build(arduino_cli_name: str) -> Path:
         "compiler": {
             "path": str(compiler),
             "identity": compiler_first_line,
+        },
+        "binary_inspection": {
+            "nm_path": str(nm),
+            "checksum_resources": checksum_resources,
         },
         "source": {
             "source_id": identity.source_id,

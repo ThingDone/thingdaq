@@ -9,6 +9,7 @@ import zlib
 from pathlib import Path
 
 from teensy_daq import (
+    ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
     CommandResponse,
     ErrorCode,
@@ -33,11 +34,25 @@ def _with_adler32(frame: bytearray) -> bytes:
 
 
 class ProtocolCoreTests(unittest.TestCase):
-    def test_checksum_dispatch_uses_rfc1950_adler32(self) -> None:
+    def test_checksum_dispatch_uses_canonical_32_bit_algorithms(self) -> None:
         self.assertEqual(0x00000001, compute_checksum(b""))
         self.assertEqual(0x091E01DE, compute_checksum(b"123456789"))
+        self.assertEqual(
+            0xE3069283,
+            compute_checksum(b"123456789", constants.ChecksumAlgorithm.CRC32C),
+        )
+        self.assertEqual(
+            0xCBF43926,
+            compute_checksum(b"123456789", constants.ChecksumAlgorithm.CRC32_ISO_HDLC),
+        )
         with self.assertRaisesRegex(FrameValidationError, "unsupported checksum"):
-            compute_checksum(b"data", constants.ChecksumAlgorithm.CRC32C)
+            compute_checksum(b"data", 0xFF)
+        with self.assertRaises(ChecksumAlgorithmMismatchError):
+            encode_frame(
+                constants.FrameKind.INFO_REQUEST,
+                request_id=1,
+                checksum_algorithm=constants.ChecksumAlgorithm.CRC32C,
+            )
 
     def test_every_golden_frame_decodes_and_reencodes_exactly(self) -> None:
         for entry in MANIFEST["fixtures"]:
