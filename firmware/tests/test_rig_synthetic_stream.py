@@ -147,6 +147,18 @@ class PacedRigSerial:
 
 
 class RigScriptIndependenceTests(unittest.TestCase):
+    def test_standalone_rig_tracks_the_selected_data_default(self) -> None:
+        self.assertEqual(rig.CHECKSUM_ADLER32, rig.BOOTSTRAP_CHECKSUM)
+        self.assertEqual(rig.CHECKSUM_ADLER32, rig.DEFAULT_DATA_CHECKSUM)
+        self.assertEqual(
+            {
+                rig.CHECKSUM_ADLER32,
+                rig.CHECKSUM_CRC32C,
+                rig.CHECKSUM_CRC32_ISO_HDLC,
+            },
+            set(rig.SUPPORTED_CHECKSUMS),
+        )
+
     def test_program_is_one_file_standard_library_plus_pyserial(self) -> None:
         source = RIG_SCRIPT.read_text(encoding="utf-8")
         tree = ast.parse(source)

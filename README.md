@@ -95,7 +95,8 @@ and optional PING command IDs, echoed request IDs, typed responses, explicit
 run identity, and capability bits over the same resynchronizable envelope. The
 normative specification is
 `doc/protocol/protocol-v1.md`, with rationale in
-`doc/decisions/adr-001-wire-protocol.md`.
+`doc/decisions/adr-001-wire-protocol.md` and the production checksum decision
+in `doc/decisions/adr-002-checksum-selection.md`.
 
 Regenerate the Python constants, C++ constants, and shared golden frames—or
 check that tracked output has not drifted—with:
@@ -111,8 +112,11 @@ all three for data frames, CONFIGURE selects one, and each data header carries
 the selected ID. INFO exposes the generated default in IDLE and the applied
 selection in CONFIGURED/RUNNING; STATUS and Python ADC/GPIO block metadata
 repeat it. Every command and response remains unambiguously protected by
-bootstrap Adler-32. Reconfiguration returns `BUSY` until prior-run frames have
-drained. The pinned-core, Cortex-M7, i.MX RT1062,
+bootstrap Adler-32. The fixed Phase 05 policy retained Adler-32 as the
+production data default because CRC-32C exceeded the relative STATUS-p99 gate
+and CRC-32/ISO-HDLC exceeded the relative STATUS-maximum gate; both CRCs remain
+advertised and decodable. Reconfiguration returns `BUSY` until prior-run frames
+have drained. The pinned-core, Cortex-M7, i.MX RT1062,
 FastCRC, and hardware-accelerator findings are recorded in
 `doc/research/checksum-candidates.md`; notably, the general-memory DCP computes
 CRC-32/MPEG-2 rather than either evaluated CRC and is not used.
@@ -244,8 +248,8 @@ resource-delta, and repeated host-timing gate is recorded in
 `doc/results/phase-05-checksum-local-gate.md`.
 The accepted candidate-isolated on-device microbenchmarks and sequential
 60-second Adler-32, CRC-32C, and CRC-32/ISO-HDLC streams are recorded in
-`doc/results/phase-05-checksum-physical-campaign.md`; checksum selection remains
-a separate fixed-policy step.
+`doc/results/phase-05-checksum-physical-campaign.md`; the fixed-policy checksum
+selection is documented in `doc/decisions/adr-002-checksum-selection.md`.
 
 The separate synthetic-pipeline stress executable exercises every packet
 ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source
@@ -278,7 +282,7 @@ records. It defaults to a 10-second capture; set
 `SYNTHETIC_CAPTURE_SECONDS=60` for the soak. Optional `EXPECTED_BUILD_ID` and
 `EXPECTED_HARDWARE_SERIAL` pins reject a flashed artifact or board mismatch;
 `SYNTHETIC_CHECKSUM_ALGORITHM` accepts `ADLER32`, `CRC32C`, or
-`CRC32_ISO_HDLC` and currently defaults to production Adler-32. The rig
+`CRC32_ISO_HDLC` and defaults to the selected production Adler-32. The rig
 uses zlib only for exact matching variants, retains its own bounded pure-Python
 fallbacks, and emits separate non-grading host encode/validation benchmark
 events before acquisition.

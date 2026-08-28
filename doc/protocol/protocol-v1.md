@@ -10,6 +10,7 @@ tags:
 related:
   - '[[System-Overview]]'
   - '[[ADR-001-Wire-Protocol]]'
+  - '[[ADR-002-Checksum-Selection]]'
 ---
 
 # Protocol v1
@@ -17,8 +18,9 @@ related:
 This document is the normative human-readable Teensy DAQ v1 wire contract.
 The authoritative machine-readable values live in
 `protocol/protocol-v1.json`; generated Python and C++ files must never be
-edited directly. The rationale is recorded in
-[[ADR-001-Wire-Protocol]], and the component boundary is described in
+edited directly. The framing rationale is recorded in
+[[ADR-001-Wire-Protocol]], the production checksum decision in
+[[ADR-002-Checksum-Selection]], and the component boundary in
 [[System-Overview]].
 
 Generate or verify all derived artifacts from the repository root:
@@ -136,7 +138,7 @@ trailer:
 | ID | Name | v1 state |
 | ---: | --- | --- |
 | 0 | `NONE_RESERVED` | Invalid; unchecksummed frames are never accepted |
-| 1 | `ADLER32` | Enabled; fixed bootstrap and initial data default |
+| 1 | `ADLER32` | Enabled; fixed bootstrap and production data default selected by [[ADR-002-Checksum-Selection]] |
 | 2 | `CRC32C` | Enabled for negotiated data frames |
 | 3 | `CRC32_ISO_HDLC` | Enabled for negotiated data frames |
 
@@ -327,6 +329,12 @@ The selected checksum is the generated production default in IDLE and the
 applied configuration in CONFIGURED or RUNNING. It must be present in the
 supported checksum mask. STATUS and each ADC/GPIO frame repeat the same
 selection so a host never infers a polynomial from context.
+
+The fixed Phase 05 qualification policy selected standard Adler-32 as the
+production data default. CRC-32C and CRC-32/ISO-HDLC remain enabled in the
+supported mask for explicit negotiation, validation of retained evidence, and
+compatibility with captured frames. Selection did not change the fixed frame
+boundary, trailer width, bootstrap rule, or per-frame algorithm identifier.
 
 Capability bits are independent, one-bit values:
 

@@ -12,8 +12,10 @@ related:
   - '[[Checksum-Candidates]]'
   - '[[Phase-05-Checksum-Correctness]]'
   - '[[Phase-05-Checksum-Local-Gate]]'
+  - '[[Phase-05-Checksum-Physical-Campaign]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
+  - '[[ADR-002-Checksum-Selection]]'
   - '[[Phase-01-Synthetic-Prototype-Gate]]'
   - '[[Phase-02-Protocol-Python-Gate]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -33,8 +35,8 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   beginning with [[System-Overview]] and [[Firmware-Resource-Map]].
 - `protocol/` contains versioned wire-contract specifications, beginning with
   [[Protocol-V1]].
-- `decisions/` contains architecture decision records, beginning with
-  [[ADR-001-Wire-Protocol]].
+- `decisions/` contains architecture decision records, including
+  [[ADR-001-Wire-Protocol]] and [[ADR-002-Checksum-Selection]].
 - `reference/` records durable inventories and implementation references,
   beginning with [[Foundation-Reuse-Inventory]].
 - `research/` records evidence gathered before implementation or selection,
@@ -48,7 +50,9 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   followed by the independent [[Phase-05-Checksum-Correctness]] vector,
   corruption, negotiation, parser-recovery, and benchmark-arithmetic evidence
   and the pre-rig [[Phase-05-Checksum-Local-Gate]] correctness, build-resource,
-  and repeated host-timing result.
+  and repeated host-timing result. The candidate-isolated target evidence is
+  in [[Phase-05-Checksum-Physical-Campaign]], and the fixed production choice
+  is recorded in [[ADR-002-Checksum-Selection]].
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`

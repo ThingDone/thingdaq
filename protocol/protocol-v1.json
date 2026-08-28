@@ -162,19 +162,19 @@
       "name": "ADLER32",
       "value": 1,
       "enabled_in_v1": true,
-      "description": "RFC 1950 Adler-32 with initial value 1 and modulus 65521."
+      "description": "RFC 1950 Adler-32 with initial value 1 and modulus 65521; fixed control bootstrap and the Phase 05 selected production data default."
     },
     {
       "name": "CRC32C",
       "value": 2,
       "enabled_in_v1": true,
-      "description": "CRC-32C (Castagnoli), reflected input/output, initial value 0xffffffff, and final XOR 0xffffffff."
+      "description": "CRC-32C (Castagnoli), reflected input/output, initial value 0xffffffff, and final XOR 0xffffffff; retained for negotiated data and captured benchmark evidence."
     },
     {
       "name": "CRC32_ISO_HDLC",
       "value": 3,
       "enabled_in_v1": true,
-      "description": "CRC-32/ISO-HDLC, reflected input/output, initial value 0xffffffff, and final XOR 0xffffffff."
+      "description": "CRC-32/ISO-HDLC, reflected input/output, initial value 0xffffffff, and final XOR 0xffffffff; retained for negotiated data and captured benchmark evidence."
     }
   ],
   "bootstrap_checksum_algorithm": "ADLER32",

@@ -10,14 +10,16 @@ tags:
 related:
   - '[[Protocol-V1]]'
   - '[[System-Overview]]'
+  - '[[ADR-002-Checksum-Selection]]'
 ---
 
 # ADR 001: Wire protocol
 
 ## Status
 
-Accepted for protocol v1. The checksum algorithm chosen for production data
-remains deliberately selectable behind stable identifiers and capabilities.
+Accepted for protocol v1. Stable checksum identifiers and capabilities remain
+negotiable; [[ADR-002-Checksum-Selection]] subsequently retained Adler-32 as
+the production data default under the fixed Phase 05 qualification policy.
 
 ## Context
 

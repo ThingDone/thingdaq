@@ -326,7 +326,7 @@ void testFairPromotionKeepsNominalCoverageAligned() {
                  frame.header.first_sample_ticks ==
                      static_cast<std::uint64_t>(sequence) * coverage_ticks &&
                  frame.header.checksum_algorithm ==
-                     constants::ChecksumAlgorithm::kAdler32 &&
+                     constants::kDefaultChecksumAlgorithm &&
                  frame.header.item_count == packet::itemsPerFrame(stream),
              "alternating transport order preserves aligned coverage and invariants");
       pipeline.releaseFrontFrame();

@@ -66,7 +66,9 @@ class ProtocolContractTests(unittest.TestCase):
         self.assertEqual(adc_ticks, gpio_ticks)
         self.assertEqual(8096, adc_ticks)
 
-    def test_checksum_ids_and_bootstrap_algorithm_are_stable(self) -> None:
+    def test_selected_default_bootstrap_and_retained_checksum_ids_are_stable(
+        self,
+    ) -> None:
         self.assertEqual(1, constants.ChecksumAlgorithm.ADLER32)
         self.assertEqual(2, constants.ChecksumAlgorithm.CRC32C)
         self.assertEqual(3, constants.ChecksumAlgorithm.CRC32_ISO_HDLC)
@@ -79,6 +81,10 @@ class ProtocolContractTests(unittest.TestCase):
             constants.DEFAULT_CHECKSUM_ALGORITHM,
         )
         self.assertEqual(
+            "ADLER32",
+            self.contract["default_checksum_algorithm"],
+        )
+        self.assertEqual(
             frozenset(
                 {
                     constants.ChecksumAlgorithm.ADLER32,
@@ -89,6 +95,10 @@ class ProtocolContractTests(unittest.TestCase):
             constants.SUPPORTED_CHECKSUM_ALGORITHMS,
         )
         self.assertEqual(0b1110, constants.SUPPORTED_CHECKSUM_MASK)
+        self.assertTrue(
+            constants.SUPPORTED_CHECKSUM_MASK
+            & (1 << int(constants.DEFAULT_CHECKSUM_ALGORITHM))
+        )
 
     def test_request_kinds_have_typed_response_kinds_and_error_codes(self) -> None:
         expected_pairs = {
@@ -262,9 +272,14 @@ class ProtocolContractTests(unittest.TestCase):
                 self.assertEqual(constants.FrameKind[entry["kind"]], kind)
                 self.assertEqual(entry["flags"], flags)
                 self.assertEqual(constants.HEADER_SIZE, header_length)
-                self.assertEqual(
-                    constants.ChecksumAlgorithm.ADLER32, checksum_algorithm
+                expected_checksum = (
+                    constants.DEFAULT_CHECKSUM_ALGORITHM
+                    if constants.FrameKind(kind)
+                    in {constants.FrameKind.ADC_DATA, constants.FrameKind.GPIO_DATA}
+                    else constants.BOOTSTRAP_CHECKSUM_ALGORITHM
                 )
+                self.assertEqual(expected_checksum, checksum_algorithm)
+                self.assertEqual(expected_checksum.name, entry["checksum_algorithm"])
                 self.assertEqual(0, reserved)
                 self.assertEqual(len(frame), total_length)
                 self.assertEqual(entry["total_length"], total_length)

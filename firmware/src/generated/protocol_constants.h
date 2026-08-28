@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 72da74093b5bd775381bb63b1a501da2fc1242ae9d2ec2cbbb6ef01aea771ac4
+// Source SHA-256: 8adde2428ca6058f658a2ddc8b6581dbe42e326e1cbb5320fb8daa406e44ad84
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "72da74093b5bd775381bb63b1a501da2fc1242ae9d2ec2cbbb6ef01aea771ac4";
+inline constexpr char kSourceSha256[] = "8adde2428ca6058f658a2ddc8b6581dbe42e326e1cbb5320fb8daa406e44ad84";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;

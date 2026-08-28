@@ -24,7 +24,8 @@ Three allocation-free, stateless software candidates are implemented in
 `firmware/src/checksum.h`: standard Adler-32, CRC-32C Castagnoli, and
 CRC-32/ISO-HDLC. The [[Protocol-V1]] codec maps checksum IDs 1, 2, and 3 through
 that one interface without changing framing or packetization. Adler-32 remains
-the fixed checksum for every request and response; CONFIGURE selects the data
+the fixed checksum for every request and response and is the production data
+default selected by [[ADR-002-Checksum-Selection]]; CONFIGURE selects any data
 algorithm advertised by INFO, and each data-frame header repeats the ID.
 
 No hardware-assisted wire candidate was implemented. The i.MX RT1062 DCP is a
@@ -226,6 +227,8 @@ tables, job IDs, artifact hashes, queue evidence, repair history, and raw-log
 inventory are recorded in [[Phase-05-Checksum-Physical-Campaign]].
 
 This result qualifies candidates for the next fixed-policy decision; it does
-not itself select or change the production checksum. The production default
-therefore remains Adler-32 until [[ADR-002-Checksum-Selection]] is created by
-the separate selection task.
+not itself select or change the production checksum. The subsequent
+[[ADR-002-Checksum-Selection]] applied the fixed policy and retained Adler-32:
+CRC-32C exceeded the relative STATUS-p99 gate and CRC-32/ISO-HDLC exceeded the
+relative STATUS-maximum gate. Both CRC implementations remain available for
+explicit negotiation and retained evidence.
