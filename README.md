@@ -404,6 +404,30 @@ the campaign disables cyclic garbage collection, reports that queue's exact
 capacity/high water/final occupancy, and still fails on any target-side gap or
 drop instead of hiding sustained backpressure.
 
+`firmware/tests/rig_gpio_capture.py` is the standalone Phase 06 physical-GPIO
+acceptance program. It verifies the exact Teensy 4.0 identity, D6-through-D13
+bit order, fixed ring/resource metadata, and selected checksum without
+importing `daq_api`. Before streaming, it runs bounded exact-divisor clock/DMA
+windows at 1 kHz and 4 MHz, checks the PIT/XBAR/DMAMUX/eDMA register snapshots
+and DWT/event/sample ratios, and invokes the build-time fixture-policy capture
+diagnostic. A declared self-driven sweep must prove all 256 values with stable
+windows; the registered documentation-only fixture instead remains input-only
+and produces the explicit line `ELECTRICAL_STIMULUS: external electrical
+stimulus was not exercised`.
+
+The physical capture defaults to 10 seconds and interleaves STATUS requests
+while independently checking every GPIO frame checksum, run ID, sequence,
+timestamp, flags, item count, and fixed 4,096-byte shape. It requires 4 MHz
+sample/payload throughput within 1%, responsive STATUS, zero firmware DMA/
+cache/packer/frame/transport losses or errors, bounded host parser/RSS state,
+empty queues after STOP, and exact final firmware-to-wire reconciliation.
+Use `GPIO_CAPTURE_SECONDS=60` for the soak. Optional controls are
+`GPIO_STATUS_INTERVAL_SECONDS`, `GPIO_LOW_RATE_HZ`,
+`GPIO_LOW_RATE_EVENT_COUNT`, `GPIO_PRODUCTION_EVENT_COUNT`, and
+`GPIO_CHECKSUM_ALGORITHM`; `EXPECTED_BUILD_ID` and
+`EXPECTED_HARDWARE_SERIAL` pin the artifact and board as in the earlier rig
+programs.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS and
