@@ -9,7 +9,7 @@ tags:
 related:
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
-  - '[[ADR-001-Protocol-Wire-Contract]]'
+  - '[[ADR-001-Wire-Protocol]]'
 ---
 
 # System overview
@@ -27,8 +27,8 @@ Teensy 4.0 native USB CDC byte stream. The Python package exposes one
 synchronous `TeensyDAQ` facade over a minimal `ByteTransport` interface.
 `InMemoryTransport` and `SimulatedDevice` exercise that exact byte boundary,
 including partial reads and writes, so a later serial transport can be swapped
-in without changing INFO, CONFIGURE, START, STATUS, STOP, or block-streaming
-calls.
+in without changing INFO, CONFIGURE, START, GET_STATUS, STOP, RESET_STATS,
+optional PING, or block-streaming calls.
 
 The simulator provides the runnable host-side acquisition model: bounded
 BOOT-to-IDLE startup; IDLE, CONFIGURED, and RUNNING transitions; monotonically
@@ -36,6 +36,6 @@ allocated run IDs; independent ADC/GPIO sequences; 8 MHz epoch timestamps; and
 deterministic synthetic payloads. Wire constants are generated from
 `protocol/protocol-v1.json` rather than maintained independently in C++ and
 Python. See [[Protocol-V1]] for the wire contract,
-[[ADR-001-Protocol-Wire-Contract]] for its framing decisions, and
+[[ADR-001-Wire-Protocol]] for its framing decisions, and
 [[Foundation-Reuse-Inventory]] for the source and pattern audit. Physical ADC,
 GPIO, and USB acquisition remain future firmware work.

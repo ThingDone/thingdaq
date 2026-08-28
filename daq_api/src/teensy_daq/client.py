@@ -210,12 +210,15 @@ class TeensyDAQ:
         self._state = constants.DeviceState.RUNNING
         self._configuration = response.value
         self._run_id = response.run_id
+        self._buffered_blocks = deque(
+            block for block in self._buffered_blocks if block.run_id == self._run_id
+        )
         return self._run_id
 
     def status(self) -> Status:
         """Return state, active configuration, and current run counters."""
 
-        response = self._command(constants.FrameKind.STATUS_REQUEST)
+        response = self._command(constants.FrameKind.GET_STATUS_REQUEST)
         if not isinstance(response.value, Status):
             raise UnexpectedMessageError("STATUS response has no Status value")
         status = response.value
@@ -389,6 +392,14 @@ class TeensyDAQ:
             raise CommandTimeoutError("request write did not make bounded progress")
 
     def _queue_block(self, block: DataBlock) -> None:
+        if (
+            self._state is constants.DeviceState.RUNNING
+            and self._run_id != 0
+            and block.run_id != self._run_id
+        ):
+            raise UnexpectedMessageError(
+                f"stale data run {block.run_id}; active run is {self._run_id}"
+            )
         if len(self._buffered_blocks) >= self._max_buffered_blocks:
             raise HostBufferFullError("deferred data-block queue is full")
         self._buffered_blocks.append(block)

@@ -2,7 +2,9 @@
 
 from ._generated.protocol_constants import (
     BoardId,
+    Capability,
     ChecksumAlgorithm,
+    CommandKind,
     DeviceState,
     ErrorCode,
     FrameFlag,
@@ -84,8 +86,10 @@ __all__ = [
     "AdcSample",
     "BoardId",
     "ByteTransport",
+    "Capability",
     "ChecksumAlgorithm",
     "ChecksumMismatchError",
+    "CommandKind",
     "CommandResponse",
     "CommandTimeoutError",
     "Configuration",

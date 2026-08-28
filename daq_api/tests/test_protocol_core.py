@@ -10,11 +10,13 @@ from pathlib import Path
 
 from teensy_daq import (
     ChecksumMismatchError,
+    CommandResponse,
     ErrorCode,
     FrameValidationError,
     IncrementalFrameParser,
     compute_checksum,
     decode_frame,
+    decode_message,
     encode_frame,
 )
 from teensy_daq._generated import protocol_constants as constants
@@ -113,7 +115,7 @@ class ProtocolCoreTests(unittest.TestCase):
 
     def test_parser_recovers_from_garbage_partial_magic_and_bad_checksum(self) -> None:
         info = (FIXTURE_DIRECTORY / "info-request.bin").read_bytes()
-        status = (FIXTURE_DIRECTORY / "status-request.bin").read_bytes()
+        status = (FIXTURE_DIRECTORY / "get-status-request.bin").read_bytes()
         corrupt = bytearray(info)
         corrupt[-1] ^= 0x80
 
@@ -156,9 +158,55 @@ class ProtocolCoreTests(unittest.TestCase):
             decode_frame(_with_adler32(wire))
         self.assertEqual(ErrorCode.INVALID_PAYLOAD, raised.exception.error_code)
 
+    def test_overrun_dependency_and_reserved_capability_bits_fail_closed(self) -> None:
+        adc = bytearray((FIXTURE_DIRECTORY / "adc-data.bin").read_bytes())
+        struct.pack_into(
+            "<H",
+            adc,
+            constants.HEADER_FLAGS_OFFSET,
+            int(
+                constants.FrameFlag.SYNTHETIC
+                | constants.FrameFlag.EPOCH_START
+                | constants.FrameFlag.OVERRUN_BEFORE
+            ),
+        )
+        with self.assertRaisesRegex(FrameValidationError, "requires GAP_BEFORE"):
+            decode_frame(_with_adler32(adc))
+
+        info = bytearray((FIXTURE_DIRECTORY / "info-response.bin").read_bytes())
+        struct.pack_into(
+            "<I",
+            info,
+            constants.HEADER_SIZE + constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET,
+            constants.KNOWN_CAPABILITY_MASK | 0x80000000,
+        )
+        with self.assertRaisesRegex(FrameValidationError, "reserved capability"):
+            decode_frame(_with_adler32(info))
+
+    def test_reset_stats_and_ping_vectors_preserve_generation_and_nonce(self) -> None:
+        reset = decode_frame(
+            (FIXTURE_DIRECTORY / "reset-stats-response.bin").read_bytes()
+        )
+        ping_request = decode_frame(
+            (FIXTURE_DIRECTORY / "ping-request.bin").read_bytes()
+        )
+        ping_response = decode_frame(
+            (FIXTURE_DIRECTORY / "ping-response.bin").read_bytes()
+        )
+
+        reset_message = decode_message(reset)
+        ping_message = decode_message(ping_response)
+        self.assertIsInstance(reset_message, CommandResponse)
+        self.assertIsInstance(ping_message, CommandResponse)
+        assert isinstance(reset_message, CommandResponse)
+        assert isinstance(ping_message, CommandResponse)
+        self.assertEqual(3, reset_message.value)
+        self.assertEqual(0x0123456789ABCDEF, ping_message.value)
+        self.assertEqual(ping_request.payload, ping_response.payload[4:])
+
     def test_parser_rejects_implausible_length_before_waiting_for_body(self) -> None:
         invalid = bytearray((FIXTURE_DIRECTORY / "info-request.bin").read_bytes())
-        valid = (FIXTURE_DIRECTORY / "status-request.bin").read_bytes()
+        valid = (FIXTURE_DIRECTORY / "get-status-request.bin").read_bytes()
         struct.pack_into(
             "<I", invalid, constants.HEADER_TOTAL_LENGTH_OFFSET, 0xFFFFFFFF
         )

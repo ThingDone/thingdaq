@@ -7,6 +7,7 @@ import unittest
 from teensy_daq import (
     AdcBlock,
     ByteTransport,
+    Capability,
     ChecksumAlgorithm,
     Configuration,
     DeviceCommandError,
@@ -15,6 +16,7 @@ from teensy_daq import (
     FrameFlag,
     FrameKind,
     GpioBlock,
+    Info,
     InMemoryTransport,
     SimulatedDevice,
     SimulatorInputError,
@@ -22,6 +24,7 @@ from teensy_daq import (
     StreamMask,
     TeensyDAQ,
     TransportClosedError,
+    UnexpectedMessageError,
     decode_frame,
     decode_response,
     encode_frame,
@@ -59,6 +62,29 @@ class SimulatedDeviceTests(unittest.TestCase):
         self.assertTrue(decoded[0].ok)
         self.assertFalse(decoded[1].ok)
         self.assertEqual(ErrorCode.BUSY, decoded[1].error_code)
+
+    def test_ping_echoes_nonce_and_reset_stats_advances_generation(self) -> None:
+        device = SimulatedDevice()
+        nonce = 0x0123456789ABCDEF
+        info_wire = encode_frame(FrameKind.INFO_REQUEST, request_id=1)
+        ping_wire = encode_frame(
+            FrameKind.PING_REQUEST,
+            nonce.to_bytes(8, "little"),
+            request_id=2,
+        )
+        reset_wire = encode_frame(FrameKind.RESET_STATS_REQUEST, request_id=3)
+
+        info = decode_response(decode_frame(device.receive(info_wire)[0]))
+        ping = decode_response(decode_frame(device.receive(ping_wire)[0]))
+        reset = decode_response(decode_frame(device.receive(reset_wire)[0]))
+
+        self.assertIsInstance(info.value, Info)
+        assert isinstance(info.value, Info)
+        self.assertEqual(nonce, ping.value)
+        self.assertEqual(2, reset.value)
+        self.assertEqual(2, device.status().stats_generation)
+        self.assertTrue(info.value.supports_capability(Capability.PING))
+        self.assertTrue(info.value.supports_capability(Capability.RESET_STATS))
 
 
 class TeensyDAQControlTests(unittest.TestCase):
@@ -175,6 +201,21 @@ class TeensyDAQControlTests(unittest.TestCase):
 
 
 class TeensyDAQStreamingTests(unittest.TestCase):
+    def test_active_run_identity_rejects_stale_data_blocks(self) -> None:
+        with TeensyDAQ.simulated() as daq:
+            daq.configure(adc=True, gpio=False)
+            active_run = daq.start()
+            stale = AdcBlock(
+                active_run + 1,
+                0,
+                0,
+                bytes(constants.ADC_DATA_PAYLOAD_SIZE),
+                FrameFlag.EPOCH_START,
+            )
+
+            with self.assertRaisesRegex(UnexpectedMessageError, "stale data run"):
+                daq._queue_block(stale)
+
     def test_both_streams_have_independent_sequences_timestamps_and_patterns(
         self,
     ) -> None:

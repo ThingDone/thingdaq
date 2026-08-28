@@ -18,13 +18,6 @@ _RESPONSE_PREFIX = struct.Struct("<BBH")
 _DATA_KINDS = frozenset({constants.FrameKind.ADC_DATA, constants.FrameKind.GPIO_DATA})
 _REQUEST_KINDS = frozenset(constants.REQUEST_RESPONSE_KIND)
 _TYPED_RESPONSE_KINDS = frozenset(constants.REQUEST_RESPONSE_KIND.values())
-_SUCCESS_PAYLOAD_SIZE = {
-    constants.FrameKind.INFO_RESPONSE: constants.INFO_RESPONSE_PAYLOAD_SIZE,
-    constants.FrameKind.CONFIGURE_RESPONSE: (constants.CONFIGURE_RESPONSE_PAYLOAD_SIZE),
-    constants.FrameKind.START_RESPONSE: constants.CONFIGURE_RESPONSE_PAYLOAD_SIZE,
-    constants.FrameKind.STATUS_RESPONSE: constants.STATUS_RESPONSE_PAYLOAD_SIZE,
-    constants.FrameKind.STOP_RESPONSE: constants.STOP_RESPONSE_PAYLOAD_SIZE,
-}
 MAX_BUFFERED_BYTES = constants.DATA_FRAME_BYTES + len(constants.MAGIC_BYTES) - 1
 
 
@@ -238,6 +231,13 @@ def _validate_header(header: FrameHeader, reserved: int = 0) -> None:
             f"flags 0x{int(header.flags):04x} are invalid for {header.kind.name}",
             constants.ErrorCode.INVALID_FLAGS,
         )
+    if header.flags & constants.FrameFlag.OVERRUN_BEFORE and not (
+        header.flags & constants.FrameFlag.GAP_BEFORE
+    ):
+        raise FrameValidationError(
+            "OVERRUN_BEFORE requires GAP_BEFORE",
+            constants.ErrorCode.INVALID_FLAGS,
+        )
     expected_total = (
         constants.HEADER_SIZE + header.payload_length + constants.TRAILER_SIZE
     )
@@ -313,14 +313,23 @@ def _validate_header(header: FrameHeader, reserved: int = 0) -> None:
         raise FrameValidationError(
             "request run ID must be zero", constants.ErrorCode.INVALID_PAYLOAD
         )
+    if (
+        header.kind in _REQUEST_KINDS
+        and header.total_length > constants.MAX_COMMAND_FRAME_BYTES
+    ):
+        raise FrameValidationError(
+            "command frame exceeds the protocol-v1 command bound",
+            constants.ErrorCode.INVALID_LENGTH,
+        )
 
     response_error = bool(header.flags & constants.FrameFlag.RESPONSE_ERROR)
     if header.kind in _TYPED_RESPONSE_KINDS:
-        expected_payload = (
-            constants.RESPONSE_PREFIX_PAYLOAD_SIZE
+        schema = (
+            constants.ERROR_PAYLOAD_SCHEMA_BY_KIND[header.kind]
             if response_error
-            else _SUCCESS_PAYLOAD_SIZE[header.kind]
+            else constants.PAYLOAD_SCHEMA_BY_KIND[header.kind]
         )
+        expected_payload = constants.PAYLOAD_SIZE_BY_SCHEMA[schema]
     elif header.kind is constants.FrameKind.ERROR_RESPONSE:
         if not response_error:
             raise FrameValidationError(
@@ -329,15 +338,8 @@ def _validate_header(header: FrameHeader, reserved: int = 0) -> None:
             )
         expected_payload = constants.ERROR_RESPONSE_PAYLOAD_SIZE
     else:
-        expected_payload = {
-            constants.FrameKind.INFO_REQUEST: constants.EMPTY_PAYLOAD_SIZE,
-            constants.FrameKind.CONFIGURE_REQUEST: (
-                constants.CONFIGURE_REQUEST_PAYLOAD_SIZE
-            ),
-            constants.FrameKind.START_REQUEST: constants.EMPTY_PAYLOAD_SIZE,
-            constants.FrameKind.STATUS_REQUEST: constants.EMPTY_PAYLOAD_SIZE,
-            constants.FrameKind.STOP_REQUEST: constants.EMPTY_PAYLOAD_SIZE,
-        }[header.kind]
+        schema = constants.PAYLOAD_SCHEMA_BY_KIND[header.kind]
+        expected_payload = constants.PAYLOAD_SIZE_BY_SCHEMA[schema]
     if header.payload_length != expected_payload:
         raise FrameValidationError(
             f"{header.kind.name} payload must be {expected_payload} bytes",
@@ -442,6 +444,31 @@ def _validate_info_payload(payload: bytes) -> None:
     )[0]
     if checksum_mask != constants.SUPPORTED_CHECKSUM_MASK:
         raise FrameValidationError("INFO checksum mask disagrees with protocol v1")
+    capability_bits = struct.unpack_from(
+        "<I", payload, constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET
+    )[0]
+    if capability_bits & ~constants.KNOWN_CAPABILITY_MASK:
+        raise FrameValidationError("INFO reports reserved capability bits")
+    expected_stream_capabilities = 0
+    if stream_mask & constants.StreamMask.ADC:
+        expected_stream_capabilities |= constants.Capability.ADC_STREAM
+    if stream_mask & constants.StreamMask.GPIO:
+        expected_stream_capabilities |= constants.Capability.GPIO_STREAM
+    expected_source_capabilities = 0
+    if source_mask & (1 << int(constants.Source.HARDWARE)):
+        expected_source_capabilities |= constants.Capability.HARDWARE_SOURCE
+    if source_mask & (1 << int(constants.Source.SYNTHETIC)):
+        expected_source_capabilities |= constants.Capability.SYNTHETIC_SOURCE
+    identity_capabilities = int(
+        constants.Capability.ADC_STREAM
+        | constants.Capability.GPIO_STREAM
+        | constants.Capability.HARDWARE_SOURCE
+        | constants.Capability.SYNTHETIC_SOURCE
+    )
+    if capability_bits & identity_capabilities != int(
+        expected_stream_capabilities | expected_source_capabilities
+    ):
+        raise FrameValidationError("INFO capability bits disagree with source masks")
 
     expected_u32 = {
         constants.INFO_RESPONSE_TIMESTAMP_HZ_OFFSET: constants.TIMESTAMP_HZ,
@@ -520,6 +547,13 @@ def _validate_status_payload(payload: bytes) -> None:
         != constants.DATA_FRAME_BYTES
     ):
         raise FrameValidationError("STATUS data frame size must be 4096")
+    if (
+        struct.unpack_from(
+            "<I", payload, constants.STATUS_RESPONSE_STATS_GENERATION_OFFSET
+        )[0]
+        == 0
+    ):
+        raise FrameValidationError("STATUS stats generation must be nonzero")
 
 
 def _validate_payload(header: FrameHeader, payload: bytes) -> None:
@@ -559,7 +593,7 @@ def _validate_payload(header: FrameHeader, payload: bytes) -> None:
         constants.FrameKind.START_RESPONSE,
     }:
         _validate_configuration(payload, 4, applied=True)
-    elif header.kind is constants.FrameKind.STATUS_RESPONSE:
+    elif header.kind is constants.FrameKind.GET_STATUS_RESPONSE:
         _validate_status_payload(payload)
     elif header.kind is constants.FrameKind.STOP_RESPONSE:
         if (
@@ -569,6 +603,23 @@ def _validate_payload(header: FrameHeader, payload: bytes) -> None:
             raise FrameValidationError("STOP response state must be IDLE")
         if any(payload[constants.STOP_RESPONSE_RESERVED_1_OFFSET :]):
             raise FrameValidationError("STOP response reserved bytes must be zero")
+    elif header.kind is constants.FrameKind.RESET_STATS_RESPONSE:
+        if payload[constants.RESET_STATS_RESPONSE_RESERVED_OFFSET] != 0:
+            raise FrameValidationError("RESET_STATS reserved byte must be zero")
+        if (
+            struct.unpack_from(
+                "<I",
+                payload,
+                constants.RESET_STATS_RESPONSE_STATS_GENERATION_OFFSET,
+            )[0]
+            == 0
+        ):
+            raise FrameValidationError("RESET_STATS stats generation must be nonzero")
+    elif (
+        header.kind is constants.FrameKind.PING_RESPONSE
+        and payload[constants.PING_RESPONSE_RESERVED_OFFSET] != 0
+    ):
+        raise FrameValidationError("PING response reserved byte must be zero")
 
 
 def encode_frame(

@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 08a7ac4ddb3b8d397b5f0ff87f4aac41c31c3b780fb3e25d2af4c68ba9b02ae6
+// Source SHA-256: ca99dcf8e21d76bd20a2ccb41122773a2c9f4f8d902cb4bfdb5c472331f47f01
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "08a7ac4ddb3b8d397b5f0ff87f4aac41c31c3b780fb3e25d2af4c68ba9b02ae6";
+inline constexpr char kSourceSha256[] = "ca99dcf8e21d76bd20a2ccb41122773a2c9f4f8d902cb4bfdb5c472331f47f01";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -15,10 +15,13 @@ inline constexpr std::size_t kHeaderSize = 44U;
 inline constexpr std::size_t kTrailerSize = 4U;
 inline constexpr std::size_t kMinFrameBytes = 48U;
 inline constexpr std::size_t kDataFrameBytes = 4096U;
+inline constexpr std::size_t kMaxDataFrameBytes = 4096U;
 inline constexpr std::size_t kDataPayloadBytes = 4048U;
 inline constexpr std::size_t kMaxControlFrameBytes = 1024U;
 inline constexpr std::size_t kMaxControlPayloadBytes =
     kMaxControlFrameBytes - kHeaderSize - kTrailerSize;
+inline constexpr std::size_t kMaxCommandFrameBytes = 56U;
+inline constexpr std::size_t kMaxCommandPayloadBytes = 8U;
 inline constexpr std::uint32_t kTimestampHz = 8000000U;
 inline constexpr std::uint32_t kAdcPairRateHz = 1000000U;
 inline constexpr std::uint32_t kAdcPairPeriodTicks = 8U;
@@ -54,20 +57,35 @@ enum class FrameKind : std::uint8_t {
   kInfoRequest = 16U,
   kConfigureRequest = 17U,
   kStartRequest = 18U,
-  kStatusRequest = 19U,
+  kGetStatusRequest = 19U,
   kStopRequest = 20U,
+  kResetStatsRequest = 21U,
+  kPingRequest = 22U,
   kInfoResponse = 144U,
   kConfigureResponse = 145U,
   kStartResponse = 146U,
-  kStatusResponse = 147U,
+  kGetStatusResponse = 147U,
   kStopResponse = 148U,
+  kResetStatsResponse = 149U,
+  kPingResponse = 150U,
   kErrorResponse = 159U,
+};
+
+enum class CommandKind : std::uint8_t {
+  kInfo = 16U,
+  kConfigure = 17U,
+  kStart = 18U,
+  kGetStatus = 19U,
+  kStop = 20U,
+  kResetStats = 21U,
+  kPing = 22U,
 };
 
 enum class FrameFlag : std::uint16_t {
   kSynthetic = 1U,
   kGapBefore = 2U,
   kEpochStart = 4U,
+  kOverrunBefore = 8U,
   kResponseError = 32768U,
 };
 
@@ -110,6 +128,15 @@ enum class StreamMask : std::uint8_t {
   kGpio = 2U,
 };
 
+enum class Capability : std::uint32_t {
+  kAdcStream = 1U,
+  kGpioStream = 2U,
+  kHardwareSource = 4U,
+  kSyntheticSource = 8U,
+  kResetStats = 16U,
+  kPing = 32U,
+};
+
 enum class Source : std::uint8_t {
   kHardware = 0U,
   kSynthetic = 1U,
@@ -128,6 +155,8 @@ enum class McuId : std::uint16_t {
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr std::uint32_t kSupportedChecksumMask = 2U;
+inline constexpr std::uint16_t kKnownFrameFlagMask = 32783U;
+inline constexpr std::uint32_t kKnownCapabilityMask = 63U;
 
 inline constexpr std::size_t kEmptyPayloadSize = 0U;
 inline constexpr std::size_t kAdcDataPayloadSize = 4048U;
@@ -146,7 +175,7 @@ inline constexpr std::size_t kResponsePrefixPayloadSize = 4U;
 inline constexpr std::size_t kResponsePrefixResponseStatusOffset = 0U;
 inline constexpr std::size_t kResponsePrefixReservedOffset = 1U;
 inline constexpr std::size_t kResponsePrefixErrorCodeOffset = 2U;
-inline constexpr std::size_t kInfoResponsePayloadSize = 94U;
+inline constexpr std::size_t kInfoResponsePayloadSize = 98U;
 inline constexpr std::size_t kInfoResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kInfoResponseReserved0Offset = 1U;
 inline constexpr std::size_t kInfoResponseErrorCodeOffset = 2U;
@@ -155,28 +184,29 @@ inline constexpr std::size_t kInfoResponseProtocolVersionOffset = 5U;
 inline constexpr std::size_t kInfoResponseSupportedStreamMaskOffset = 6U;
 inline constexpr std::size_t kInfoResponseSupportedSourceMaskOffset = 7U;
 inline constexpr std::size_t kInfoResponseSupportedChecksumMaskOffset = 8U;
-inline constexpr std::size_t kInfoResponseTimestampHzOffset = 12U;
-inline constexpr std::size_t kInfoResponseDataFrameBytesOffset = 16U;
-inline constexpr std::size_t kInfoResponseMaxControlFrameBytesOffset = 20U;
-inline constexpr std::size_t kInfoResponseAdcPairRateHzOffset = 24U;
-inline constexpr std::size_t kInfoResponseGpioSampleRateHzOffset = 28U;
-inline constexpr std::size_t kInfoResponseAdcPairPeriodTicksOffset = 32U;
-inline constexpr std::size_t kInfoResponseAdc1PhaseTicksOffset = 34U;
-inline constexpr std::size_t kInfoResponseGpioSamplePeriodTicksOffset = 36U;
-inline constexpr std::size_t kInfoResponseAdcResolutionBitsOffset = 38U;
-inline constexpr std::size_t kInfoResponseAdcContainerBytesOffset = 39U;
-inline constexpr std::size_t kInfoResponseGpioPinCountOffset = 40U;
-inline constexpr std::size_t kInfoResponseReserved1Offset = 41U;
-inline constexpr std::size_t kInfoResponseGpioPinMapOffset = 42U;
+inline constexpr std::size_t kInfoResponseCapabilityBitsOffset = 12U;
+inline constexpr std::size_t kInfoResponseTimestampHzOffset = 16U;
+inline constexpr std::size_t kInfoResponseDataFrameBytesOffset = 20U;
+inline constexpr std::size_t kInfoResponseMaxControlFrameBytesOffset = 24U;
+inline constexpr std::size_t kInfoResponseAdcPairRateHzOffset = 28U;
+inline constexpr std::size_t kInfoResponseGpioSampleRateHzOffset = 32U;
+inline constexpr std::size_t kInfoResponseAdcPairPeriodTicksOffset = 36U;
+inline constexpr std::size_t kInfoResponseAdc1PhaseTicksOffset = 38U;
+inline constexpr std::size_t kInfoResponseGpioSamplePeriodTicksOffset = 40U;
+inline constexpr std::size_t kInfoResponseAdcResolutionBitsOffset = 42U;
+inline constexpr std::size_t kInfoResponseAdcContainerBytesOffset = 43U;
+inline constexpr std::size_t kInfoResponseGpioPinCountOffset = 44U;
+inline constexpr std::size_t kInfoResponseReserved1Offset = 45U;
+inline constexpr std::size_t kInfoResponseGpioPinMapOffset = 46U;
 inline constexpr std::size_t kInfoResponseGpioPinMapCount = 8U;
-inline constexpr std::size_t kInfoResponseHardwareSerialOffset = 50U;
-inline constexpr std::size_t kInfoResponseFirmwareVersionMajorOffset = 54U;
-inline constexpr std::size_t kInfoResponseFirmwareVersionMinorOffset = 55U;
-inline constexpr std::size_t kInfoResponseFirmwareVersionPatchOffset = 56U;
-inline constexpr std::size_t kInfoResponseReserved2Offset = 57U;
-inline constexpr std::size_t kInfoResponseBoardIdOffset = 58U;
-inline constexpr std::size_t kInfoResponseMcuIdOffset = 60U;
-inline constexpr std::size_t kInfoResponseBuildIdOffset = 62U;
+inline constexpr std::size_t kInfoResponseHardwareSerialOffset = 54U;
+inline constexpr std::size_t kInfoResponseFirmwareVersionMajorOffset = 58U;
+inline constexpr std::size_t kInfoResponseFirmwareVersionMinorOffset = 59U;
+inline constexpr std::size_t kInfoResponseFirmwareVersionPatchOffset = 60U;
+inline constexpr std::size_t kInfoResponseReserved2Offset = 61U;
+inline constexpr std::size_t kInfoResponseBoardIdOffset = 62U;
+inline constexpr std::size_t kInfoResponseMcuIdOffset = 64U;
+inline constexpr std::size_t kInfoResponseBuildIdOffset = 66U;
 inline constexpr std::size_t kInfoResponseBuildIdCount = 32U;
 inline constexpr std::size_t kConfigureResponsePayloadSize = 12U;
 inline constexpr std::size_t kConfigureResponseResponseStatusOffset = 0U;
@@ -187,7 +217,7 @@ inline constexpr std::size_t kConfigureResponseSourceOffset = 5U;
 inline constexpr std::size_t kConfigureResponseDataChecksumAlgorithmOffset = 6U;
 inline constexpr std::size_t kConfigureResponseReserved1Offset = 7U;
 inline constexpr std::size_t kConfigureResponseDataFrameBytesOffset = 8U;
-inline constexpr std::size_t kStatusResponsePayloadSize = 52U;
+inline constexpr std::size_t kStatusResponsePayloadSize = 56U;
 inline constexpr std::size_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::size_t kStatusResponseErrorCodeOffset = 2U;
@@ -202,6 +232,7 @@ inline constexpr std::size_t kStatusResponseAdcItemsDroppedOffset = 28U;
 inline constexpr std::size_t kStatusResponseGpioItemsDroppedOffset = 36U;
 inline constexpr std::size_t kStatusResponseParserErrorsOffset = 44U;
 inline constexpr std::size_t kStatusResponseTransportErrorsOffset = 48U;
+inline constexpr std::size_t kStatusResponseStatsGenerationOffset = 52U;
 inline constexpr std::size_t kStopResponsePayloadSize = 8U;
 inline constexpr std::size_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStopResponseReserved0Offset = 1U;
@@ -209,6 +240,18 @@ inline constexpr std::size_t kStopResponseErrorCodeOffset = 2U;
 inline constexpr std::size_t kStopResponseDeviceStateOffset = 4U;
 inline constexpr std::size_t kStopResponseReserved1Offset = 5U;
 inline constexpr std::size_t kStopResponseReserved2Offset = 6U;
+inline constexpr std::size_t kResetStatsResponsePayloadSize = 8U;
+inline constexpr std::size_t kResetStatsResponseResponseStatusOffset = 0U;
+inline constexpr std::size_t kResetStatsResponseReservedOffset = 1U;
+inline constexpr std::size_t kResetStatsResponseErrorCodeOffset = 2U;
+inline constexpr std::size_t kResetStatsResponseStatsGenerationOffset = 4U;
+inline constexpr std::size_t kPingRequestPayloadSize = 8U;
+inline constexpr std::size_t kPingRequestNonceOffset = 0U;
+inline constexpr std::size_t kPingResponsePayloadSize = 12U;
+inline constexpr std::size_t kPingResponseResponseStatusOffset = 0U;
+inline constexpr std::size_t kPingResponseReservedOffset = 1U;
+inline constexpr std::size_t kPingResponseErrorCodeOffset = 2U;
+inline constexpr std::size_t kPingResponseNonceOffset = 4U;
 inline constexpr std::size_t kErrorResponsePayloadSize = 8U;
 inline constexpr std::size_t kErrorResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kErrorResponseReserved0Offset = 1U;
@@ -220,18 +263,22 @@ inline constexpr std::size_t kErrorResponseReserved1Offset = 6U;
 constexpr std::uint16_t allowedFlags(FrameKind kind) {
   switch (kind) {
     case FrameKind::kAdcData:
-      return static_cast<std::uint16_t>(FrameFlag::kSynthetic) | static_cast<std::uint16_t>(FrameFlag::kGapBefore) | static_cast<std::uint16_t>(FrameFlag::kEpochStart);
+      return static_cast<std::uint16_t>(FrameFlag::kSynthetic) | static_cast<std::uint16_t>(FrameFlag::kGapBefore) | static_cast<std::uint16_t>(FrameFlag::kEpochStart) | static_cast<std::uint16_t>(FrameFlag::kOverrunBefore);
     case FrameKind::kGpioData:
-      return static_cast<std::uint16_t>(FrameFlag::kSynthetic) | static_cast<std::uint16_t>(FrameFlag::kGapBefore) | static_cast<std::uint16_t>(FrameFlag::kEpochStart);
+      return static_cast<std::uint16_t>(FrameFlag::kSynthetic) | static_cast<std::uint16_t>(FrameFlag::kGapBefore) | static_cast<std::uint16_t>(FrameFlag::kEpochStart) | static_cast<std::uint16_t>(FrameFlag::kOverrunBefore);
     case FrameKind::kInfoRequest:
       return 0U;
     case FrameKind::kConfigureRequest:
       return 0U;
     case FrameKind::kStartRequest:
       return 0U;
-    case FrameKind::kStatusRequest:
+    case FrameKind::kGetStatusRequest:
       return 0U;
     case FrameKind::kStopRequest:
+      return 0U;
+    case FrameKind::kResetStatsRequest:
+      return 0U;
+    case FrameKind::kPingRequest:
       return 0U;
     case FrameKind::kInfoResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
@@ -239,14 +286,58 @@ constexpr std::uint16_t allowedFlags(FrameKind kind) {
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kStartResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
-    case FrameKind::kStatusResponse:
+    case FrameKind::kGetStatusResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kStopResponse:
+      return static_cast<std::uint16_t>(FrameFlag::kResponseError);
+    case FrameKind::kResetStatsResponse:
+      return static_cast<std::uint16_t>(FrameFlag::kResponseError);
+    case FrameKind::kPingResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
     case FrameKind::kErrorResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
   }
   return 0U;
+}
+
+constexpr FrameKind requestFrameKind(CommandKind command) {
+  switch (command) {
+    case CommandKind::kInfo:
+      return FrameKind::kInfoRequest;
+    case CommandKind::kConfigure:
+      return FrameKind::kConfigureRequest;
+    case CommandKind::kStart:
+      return FrameKind::kStartRequest;
+    case CommandKind::kGetStatus:
+      return FrameKind::kGetStatusRequest;
+    case CommandKind::kStop:
+      return FrameKind::kStopRequest;
+    case CommandKind::kResetStats:
+      return FrameKind::kResetStatsRequest;
+    case CommandKind::kPing:
+      return FrameKind::kPingRequest;
+  }
+  return FrameKind::kInfoRequest;
+}
+
+constexpr FrameKind responseFrameKind(CommandKind command) {
+  switch (command) {
+    case CommandKind::kInfo:
+      return FrameKind::kInfoResponse;
+    case CommandKind::kConfigure:
+      return FrameKind::kConfigureResponse;
+    case CommandKind::kStart:
+      return FrameKind::kStartResponse;
+    case CommandKind::kGetStatus:
+      return FrameKind::kGetStatusResponse;
+    case CommandKind::kStop:
+      return FrameKind::kStopResponse;
+    case CommandKind::kResetStats:
+      return FrameKind::kResetStatsResponse;
+    case CommandKind::kPing:
+      return FrameKind::kPingResponse;
+  }
+  return FrameKind::kInfoResponse;
 }
 
 static_assert(kHeaderSize + kDataPayloadBytes + kTrailerSize ==

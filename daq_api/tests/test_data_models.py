@@ -49,7 +49,7 @@ class TypedControlModelTests(unittest.TestCase):
     ) -> None:
         info_response = _message("info-response.bin")
         configure_response = _message("configure-response.bin")
-        status_response = _message("status-response.bin")
+        status_response = _message("get-status-response.bin")
 
         self.assertIsInstance(info_response, CommandResponse)
         self.assertIsInstance(configure_response, CommandResponse)
@@ -87,7 +87,7 @@ class TypedControlModelTests(unittest.TestCase):
             (FIXTURE_DIRECTORY / "configure-response.bin").read_bytes()
         )
         status_frame = decode_frame(
-            (FIXTURE_DIRECTORY / "status-response.bin").read_bytes()
+            (FIXTURE_DIRECTORY / "get-status-response.bin").read_bytes()
         )
 
         self.assertEqual(

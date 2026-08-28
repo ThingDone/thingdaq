@@ -107,6 +107,12 @@ class Info:
     )
     supported_source_mask: int = 0x03
     supported_checksum_mask: int = constants.SUPPORTED_CHECKSUM_MASK
+    capability_bits: constants.Capability = (
+        constants.Capability.ADC_STREAM
+        | constants.Capability.GPIO_STREAM
+        | constants.Capability.HARDWARE_SOURCE
+        | constants.Capability.SYNTHETIC_SOURCE
+    )
     protocol_version: int = constants.PROTOCOL_VERSION
     timestamp_hz: int = constants.TIMESTAMP_HZ
     data_frame_bytes: int = constants.DATA_FRAME_BYTES
@@ -139,6 +145,28 @@ class Info:
             raise ValueError("supported stream mask contains unknown bits")
         if self.supported_source_mask == 0 or self.supported_source_mask & ~0x03:
             raise ValueError("supported source mask contains unknown bits")
+        if int(self.capability_bits) & ~constants.KNOWN_CAPABILITY_MASK:
+            raise ValueError("capability mask contains reserved protocol-v1 bits")
+        stream_capabilities = constants.Capability.NONE
+        if self.supported_stream_mask & constants.StreamMask.ADC:
+            stream_capabilities |= constants.Capability.ADC_STREAM
+        if self.supported_stream_mask & constants.StreamMask.GPIO:
+            stream_capabilities |= constants.Capability.GPIO_STREAM
+        source_capabilities = constants.Capability.NONE
+        if self.supported_source_mask & (1 << int(constants.Source.HARDWARE)):
+            source_capabilities |= constants.Capability.HARDWARE_SOURCE
+        if self.supported_source_mask & (1 << int(constants.Source.SYNTHETIC)):
+            source_capabilities |= constants.Capability.SYNTHETIC_SOURCE
+        identity_capabilities = (
+            constants.Capability.ADC_STREAM
+            | constants.Capability.GPIO_STREAM
+            | constants.Capability.HARDWARE_SOURCE
+            | constants.Capability.SYNTHETIC_SOURCE
+        )
+        if self.capability_bits & identity_capabilities != (
+            stream_capabilities | source_capabilities
+        ):
+            raise ValueError("capabilities disagree with stream/source masks")
         fixed_values = (
             (self.protocol_version, constants.PROTOCOL_VERSION),
             (self.supported_checksum_mask, constants.SUPPORTED_CHECKSUM_MASK),
@@ -163,8 +191,13 @@ class Info:
 
         return bool(self.supported_source_mask & (1 << int(source)))
 
+    def supports_capability(self, capability: constants.Capability) -> bool:
+        """Return whether INFO advertises every bit in ``capability``."""
+
+        return self.capability_bits & capability == capability
+
     def to_payload(self) -> bytes:
-        """Encode a successful 94-byte INFO response payload."""
+        """Encode a successful 98-byte INFO response payload."""
 
         payload = bytearray(constants.INFO_RESPONSE_PAYLOAD_SIZE)
         _RESPONSE_PREFIX.pack_into(
@@ -179,10 +212,11 @@ class Info:
             self.supported_source_mask
         )
         struct.pack_into(
-            "<IIIII",
+            "<IIIIII",
             payload,
             constants.INFO_RESPONSE_SUPPORTED_CHECKSUM_MASK_OFFSET,
             self.supported_checksum_mask,
+            int(self.capability_bits),
             self.timestamp_hz,
             self.data_frame_bytes,
             self.max_control_frame_bytes,
@@ -276,6 +310,13 @@ class Info:
                 payload_bytes,
                 constants.INFO_RESPONSE_SUPPORTED_CHECKSUM_MASK_OFFSET,
             )[0],
+            capability_bits=constants.Capability(
+                struct.unpack_from(
+                    "<I",
+                    payload_bytes,
+                    constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET,
+                )[0]
+            ),
             protocol_version=payload_bytes[
                 constants.INFO_RESPONSE_PROTOCOL_VERSION_OFFSET
             ],
@@ -331,7 +372,7 @@ DeviceInfo = Info
 
 @dataclass(frozen=True, slots=True)
 class Status:
-    """Device state, active configuration, and cumulative run counters."""
+    """Device state, active configuration, and statistics-generation counters."""
 
     device_state: constants.DeviceState
     stream_mask: constants.StreamMask
@@ -344,6 +385,7 @@ class Status:
     gpio_items_dropped: int = 0
     parser_errors: int = 0
     transport_errors: int = 0
+    stats_generation: int = 1
 
     def __post_init__(self) -> None:
         valid_streams = int(constants.StreamMask.ADC | constants.StreamMask.GPIO)
@@ -362,9 +404,12 @@ class Status:
             _unsigned(name, getattr(self, name), 64)
         _unsigned("parser_errors", self.parser_errors, 32)
         _unsigned("transport_errors", self.transport_errors, 32)
+        _unsigned("stats_generation", self.stats_generation, 32)
+        if self.stats_generation == 0:
+            raise ValueError("stats_generation must be nonzero")
 
     def to_payload(self) -> bytes:
-        """Encode a successful 52-byte STATUS response payload."""
+        """Encode a successful 56-byte GET_STATUS response payload."""
 
         payload = bytearray(constants.STATUS_RESPONSE_PAYLOAD_SIZE)
         _RESPONSE_PREFIX.pack_into(
@@ -391,6 +436,12 @@ class Status:
             self.gpio_items_dropped,
             self.parser_errors,
             self.transport_errors,
+        )
+        struct.pack_into(
+            "<I",
+            payload,
+            constants.STATUS_RESPONSE_STATS_GENERATION_OFFSET,
+            self.stats_generation,
         )
         return bytes(payload)
 
@@ -427,6 +478,11 @@ class Status:
             gpio_items_dropped=counters[3],
             parser_errors=counters[4],
             transport_errors=counters[5],
+            stats_generation=struct.unpack_from(
+                "<I",
+                payload_bytes,
+                constants.STATUS_RESPONSE_STATS_GENERATION_OFFSET,
+            )[0],
         )
 
 
@@ -832,7 +888,7 @@ class StreamGap:
         )
 
 
-ResponseValue = Info | Configuration | Status | constants.DeviceState
+ResponseValue = Info | Configuration | Status | constants.DeviceState | int
 DecodedMessage = AdcBlock | GpioBlock | CommandResponse[ResponseValue] | Frame
 
 
@@ -858,12 +914,22 @@ def decode_response(frame: Frame) -> CommandResponse[ResponseValue]:
             constants.FrameKind.START_RESPONSE,
         }:
             value = Configuration.from_payload(frame.payload[4:])
-        elif frame.header.kind is constants.FrameKind.STATUS_RESPONSE:
+        elif frame.header.kind is constants.FrameKind.GET_STATUS_RESPONSE:
             value = Status.from_payload(frame.payload)
         elif frame.header.kind is constants.FrameKind.STOP_RESPONSE:
             value = constants.DeviceState(
                 frame.payload[constants.STOP_RESPONSE_DEVICE_STATE_OFFSET]
             )
+        elif frame.header.kind is constants.FrameKind.RESET_STATS_RESPONSE:
+            value = struct.unpack_from(
+                "<I",
+                frame.payload,
+                constants.RESET_STATS_RESPONSE_STATS_GENERATION_OFFSET,
+            )[0]
+        elif frame.header.kind is constants.FrameKind.PING_RESPONSE:
+            value = struct.unpack_from(
+                "<Q", frame.payload, constants.PING_RESPONSE_NONCE_OFFSET
+            )[0]
     elif frame.header.kind is constants.FrameKind.ERROR_RESPONSE:
         rejected_kind = frame.payload[constants.ERROR_RESPONSE_REJECTED_KIND_OFFSET]
         rejected_version = frame.payload[

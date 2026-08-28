@@ -3,8 +3,23 @@
   "protocol_version": 1,
   "byte_order": "little",
   "magic": 3735928559,
+  "scalar_types": {
+    "u8": {"width": 1, "signed": false},
+    "u16": {"width": 2, "signed": false},
+    "u32": {"width": 4, "signed": false},
+    "u64": {"width": 8, "signed": false}
+  },
+  "compatibility": {
+    "unknown_version": "reject the candidate before interpreting its payload and make no state change",
+    "unknown_frame_kind": "reject the candidate before waiting for its declared payload and make no state change",
+    "unknown_command_kind": "command kinds are request frame kinds; reject an unknown request frame kind",
+    "unknown_checksum": "reject the candidate before waiting for its declared payload",
+    "reserved_fields": "all reserved scalar fields and reserved request-mask bits are zero on send and rejected when nonzero",
+    "unknown_capability_bits": "reserved in protocol v1 and rejected in an INFO response"
+  },
   "header": {
     "size": 44,
+    "encoding": "fixed-width unsigned integers in little-endian byte order",
     "fields": [
       {"name": "magic", "offset": 0, "type": "u32"},
       {"name": "version", "offset": 4, "type": "u8"},
@@ -26,12 +41,26 @@
     "size": 4,
     "type": "u32",
     "byte_order": "little",
-    "coverage": "all header and payload bytes, excluding the trailer"
+    "coverage": "all 44 header bytes followed by every payload byte, starting at magic offset 0 and excluding all 4 trailer bytes"
   },
   "limits": {
     "data_frame_bytes": 4096,
+    "max_data_frame_bytes": 4096,
     "max_control_frame_bytes": 1024,
+    "max_command_frame_bytes": 56,
+    "max_command_payload_bytes": 8,
     "min_frame_bytes": 48
+  },
+  "counter_semantics": {
+    "reset_events": ["successful START", "successful RESET_STATS"],
+    "stats_generation": "nonzero u32 incremented modulo 2^32 with zero skipped whenever counters reset",
+    "overflow": "all reported counters saturate at the maximum value of their wire type",
+    "adc_frames_emitted": "complete ADC_DATA frames admitted to the USB transmit path",
+    "gpio_frames_emitted": "complete GPIO_DATA frames admitted to the USB transmit path",
+    "adc_items_dropped": "ADC sample pairs not emitted because of acquisition, queue, or transport loss",
+    "gpio_items_dropped": "packed eight-pin GPIO sample instants not emitted because of acquisition, queue, or transport loss",
+    "parser_errors": "rejected inbound frame candidates",
+    "transport_errors": "bounded USB read/write failure events"
   },
   "timing": {
     "timestamp_hz": 8000000,
@@ -74,6 +103,11 @@
       "description": "This is the first frame for this stream in a new run."
     },
     {
+      "name": "OVERRUN_BEFORE",
+      "value": 8,
+      "description": "Firmware lost one or more logical items before this frame; GAP_BEFORE is also required."
+    },
+    {
       "name": "RESPONSE_ERROR",
       "value": 32768,
       "description": "The response prefix reports a nonzero error code."
@@ -106,14 +140,14 @@
       "value": 1,
       "class": "data",
       "payload_schema": "adc_data",
-      "allowed_flags": ["SYNTHETIC", "GAP_BEFORE", "EPOCH_START"]
+      "allowed_flags": ["SYNTHETIC", "GAP_BEFORE", "EPOCH_START", "OVERRUN_BEFORE"]
     },
     {
       "name": "GPIO_DATA",
       "value": 2,
       "class": "data",
       "payload_schema": "gpio_data",
-      "allowed_flags": ["SYNTHETIC", "GAP_BEFORE", "EPOCH_START"]
+      "allowed_flags": ["SYNTHETIC", "GAP_BEFORE", "EPOCH_START", "OVERRUN_BEFORE"]
     },
     {
       "name": "INFO_REQUEST",
@@ -140,11 +174,11 @@
       "allowed_flags": []
     },
     {
-      "name": "STATUS_REQUEST",
+      "name": "GET_STATUS_REQUEST",
       "value": 19,
       "class": "request",
       "payload_schema": "empty",
-      "response_kind": "STATUS_RESPONSE",
+      "response_kind": "GET_STATUS_RESPONSE",
       "allowed_flags": []
     },
     {
@@ -153,6 +187,22 @@
       "class": "request",
       "payload_schema": "empty",
       "response_kind": "STOP_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "RESET_STATS_REQUEST",
+      "value": 21,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "RESET_STATS_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "PING_REQUEST",
+      "value": 22,
+      "class": "request",
+      "payload_schema": "ping_request",
+      "response_kind": "PING_RESPONSE",
       "allowed_flags": []
     },
     {
@@ -180,7 +230,7 @@
       "allowed_flags": ["RESPONSE_ERROR"]
     },
     {
-      "name": "STATUS_RESPONSE",
+      "name": "GET_STATUS_RESPONSE",
       "value": 147,
       "class": "response",
       "payload_schema": "status_response",
@@ -196,12 +246,37 @@
       "allowed_flags": ["RESPONSE_ERROR"]
     },
     {
+      "name": "RESET_STATS_RESPONSE",
+      "value": 149,
+      "class": "response",
+      "payload_schema": "reset_stats_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
+      "name": "PING_RESPONSE",
+      "value": 150,
+      "class": "response",
+      "payload_schema": "ping_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
       "name": "ERROR_RESPONSE",
       "value": 159,
       "class": "error_response",
       "payload_schema": "error_response",
       "allowed_flags": ["RESPONSE_ERROR"]
     }
+  ],
+  "command_kinds": [
+    {"name": "INFO", "value": 16, "request_kind": "INFO_REQUEST", "response_kind": "INFO_RESPONSE", "optional": false},
+    {"name": "CONFIGURE", "value": 17, "request_kind": "CONFIGURE_REQUEST", "response_kind": "CONFIGURE_RESPONSE", "optional": false},
+    {"name": "START", "value": 18, "request_kind": "START_REQUEST", "response_kind": "START_RESPONSE", "optional": false},
+    {"name": "GET_STATUS", "value": 19, "request_kind": "GET_STATUS_REQUEST", "response_kind": "GET_STATUS_RESPONSE", "optional": false},
+    {"name": "STOP", "value": 20, "request_kind": "STOP_REQUEST", "response_kind": "STOP_RESPONSE", "optional": false},
+    {"name": "RESET_STATS", "value": 21, "request_kind": "RESET_STATS_REQUEST", "response_kind": "RESET_STATS_RESPONSE", "optional": false},
+    {"name": "PING", "value": 22, "request_kind": "PING_REQUEST", "response_kind": "PING_RESPONSE", "optional": true}
   ],
   "enums": {
     "response_status": [
@@ -232,6 +307,14 @@
     "stream_mask": [
       {"name": "ADC", "value": 1},
       {"name": "GPIO", "value": 2}
+    ],
+    "capability_bits": [
+      {"name": "ADC_STREAM", "value": 1},
+      {"name": "GPIO_STREAM", "value": 2},
+      {"name": "HARDWARE_SOURCE", "value": 4},
+      {"name": "SYNTHETIC_SOURCE", "value": 8},
+      {"name": "RESET_STATS", "value": 16},
+      {"name": "PING", "value": 32}
     ],
     "source": [
       {"name": "HARDWARE", "value": 0},
@@ -285,7 +368,7 @@
       ]
     },
     "info_response": {
-      "size": 94,
+      "size": 98,
       "fields": [
         {"name": "response_status", "offset": 0, "type": "u8"},
         {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
@@ -295,27 +378,28 @@
         {"name": "supported_stream_mask", "offset": 6, "type": "u8"},
         {"name": "supported_source_mask", "offset": 7, "type": "u8"},
         {"name": "supported_checksum_mask", "offset": 8, "type": "u32"},
-        {"name": "timestamp_hz", "offset": 12, "type": "u32"},
-        {"name": "data_frame_bytes", "offset": 16, "type": "u32"},
-        {"name": "max_control_frame_bytes", "offset": 20, "type": "u32"},
-        {"name": "adc_pair_rate_hz", "offset": 24, "type": "u32"},
-        {"name": "gpio_sample_rate_hz", "offset": 28, "type": "u32"},
-        {"name": "adc_pair_period_ticks", "offset": 32, "type": "u16"},
-        {"name": "adc1_phase_ticks", "offset": 34, "type": "u16"},
-        {"name": "gpio_sample_period_ticks", "offset": 36, "type": "u16"},
-        {"name": "adc_resolution_bits", "offset": 38, "type": "u8"},
-        {"name": "adc_container_bytes", "offset": 39, "type": "u8"},
-        {"name": "gpio_pin_count", "offset": 40, "type": "u8"},
-        {"name": "reserved_1", "offset": 41, "type": "u8", "required": 0},
-        {"name": "gpio_pin_map", "offset": 42, "type": "u8_array", "count": 8},
-        {"name": "hardware_serial", "offset": 50, "type": "u32"},
-        {"name": "firmware_version_major", "offset": 54, "type": "u8"},
-        {"name": "firmware_version_minor", "offset": 55, "type": "u8"},
-        {"name": "firmware_version_patch", "offset": 56, "type": "u8"},
-        {"name": "reserved_2", "offset": 57, "type": "u8", "required": 0},
-        {"name": "board_id", "offset": 58, "type": "u16"},
-        {"name": "mcu_id", "offset": 60, "type": "u16"},
-        {"name": "build_id", "offset": 62, "type": "nul_ascii", "count": 32}
+        {"name": "capability_bits", "offset": 12, "type": "u32"},
+        {"name": "timestamp_hz", "offset": 16, "type": "u32"},
+        {"name": "data_frame_bytes", "offset": 20, "type": "u32"},
+        {"name": "max_control_frame_bytes", "offset": 24, "type": "u32"},
+        {"name": "adc_pair_rate_hz", "offset": 28, "type": "u32"},
+        {"name": "gpio_sample_rate_hz", "offset": 32, "type": "u32"},
+        {"name": "adc_pair_period_ticks", "offset": 36, "type": "u16"},
+        {"name": "adc1_phase_ticks", "offset": 38, "type": "u16"},
+        {"name": "gpio_sample_period_ticks", "offset": 40, "type": "u16"},
+        {"name": "adc_resolution_bits", "offset": 42, "type": "u8"},
+        {"name": "adc_container_bytes", "offset": 43, "type": "u8"},
+        {"name": "gpio_pin_count", "offset": 44, "type": "u8"},
+        {"name": "reserved_1", "offset": 45, "type": "u8", "required": 0},
+        {"name": "gpio_pin_map", "offset": 46, "type": "u8_array", "count": 8},
+        {"name": "hardware_serial", "offset": 54, "type": "u32"},
+        {"name": "firmware_version_major", "offset": 58, "type": "u8"},
+        {"name": "firmware_version_minor", "offset": 59, "type": "u8"},
+        {"name": "firmware_version_patch", "offset": 60, "type": "u8"},
+        {"name": "reserved_2", "offset": 61, "type": "u8", "required": 0},
+        {"name": "board_id", "offset": 62, "type": "u16"},
+        {"name": "mcu_id", "offset": 64, "type": "u16"},
+        {"name": "build_id", "offset": 66, "type": "nul_ascii", "count": 32}
       ]
     },
     "configure_response": {
@@ -332,7 +416,7 @@
       ]
     },
     "status_response": {
-      "size": 52,
+      "size": 56,
       "fields": [
         {"name": "response_status", "offset": 0, "type": "u8"},
         {"name": "reserved", "offset": 1, "type": "u8", "required": 0},
@@ -347,7 +431,8 @@
         {"name": "adc_items_dropped", "offset": 28, "type": "u64"},
         {"name": "gpio_items_dropped", "offset": 36, "type": "u64"},
         {"name": "parser_errors", "offset": 44, "type": "u32"},
-        {"name": "transport_errors", "offset": 48, "type": "u32"}
+        {"name": "transport_errors", "offset": 48, "type": "u32"},
+        {"name": "stats_generation", "offset": 52, "type": "u32"}
       ]
     },
     "stop_response": {
@@ -359,6 +444,30 @@
         {"name": "device_state", "offset": 4, "type": "u8"},
         {"name": "reserved_1", "offset": 5, "type": "u8", "required": 0},
         {"name": "reserved_2", "offset": 6, "type": "u16", "required": 0}
+      ]
+    },
+    "reset_stats_response": {
+      "size": 8,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"},
+        {"name": "stats_generation", "offset": 4, "type": "u32"}
+      ]
+    },
+    "ping_request": {
+      "size": 8,
+      "fields": [
+        {"name": "nonce", "offset": 0, "type": "u64"}
+      ]
+    },
+    "ping_response": {
+      "size": 12,
+      "fields": [
+        {"name": "response_status", "offset": 0, "type": "u8"},
+        {"name": "reserved", "offset": 1, "type": "u8", "required": 0},
+        {"name": "error_code", "offset": 2, "type": "u16"},
+        {"name": "nonce", "offset": 4, "type": "u64"}
       ]
     },
     "error_response": {
@@ -423,8 +532,8 @@
       "payload": {"schema": "empty", "values": {}}
     },
     {
-      "name": "status-request",
-      "kind": "STATUS_REQUEST",
+      "name": "get-status-request",
+      "kind": "GET_STATUS_REQUEST",
       "request_id": 4,
       "payload": {"schema": "empty", "values": {}}
     },
@@ -433,6 +542,21 @@
       "kind": "STOP_REQUEST",
       "request_id": 5,
       "payload": {"schema": "empty", "values": {}}
+    },
+    {
+      "name": "reset-stats-request",
+      "kind": "RESET_STATS_REQUEST",
+      "request_id": 6,
+      "payload": {"schema": "empty", "values": {}}
+    },
+    {
+      "name": "ping-request",
+      "kind": "PING_REQUEST",
+      "request_id": 7,
+      "payload": {
+        "schema": "ping_request",
+        "values": {"nonce": 81985529216486895}
+      }
     },
     {
       "name": "info-response",
@@ -448,6 +572,7 @@
           "supported_stream_mask": 3,
           "supported_source_mask": 3,
           "supported_checksum_mask": 2,
+          "capability_bits": 63,
           "timestamp_hz": 8000000,
           "data_frame_bytes": 4096,
           "max_control_frame_bytes": 1024,
@@ -504,8 +629,8 @@
       }
     },
     {
-      "name": "status-response",
-      "kind": "STATUS_RESPONSE",
+      "name": "get-status-response",
+      "kind": "GET_STATUS_RESPONSE",
       "run_id": 7,
       "request_id": 4,
       "payload": {
@@ -523,7 +648,8 @@
           "adc_items_dropped": 0,
           "gpio_items_dropped": 0,
           "parser_errors": 0,
-          "transport_errors": 0
+          "transport_errors": 0,
+          "stats_generation": 2
         }
       }
     },
@@ -538,10 +664,38 @@
       }
     },
     {
+      "name": "reset-stats-response",
+      "kind": "RESET_STATS_RESPONSE",
+      "run_id": 7,
+      "request_id": 6,
+      "payload": {
+        "schema": "reset_stats_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "stats_generation": 3
+        }
+      }
+    },
+    {
+      "name": "ping-response",
+      "kind": "PING_RESPONSE",
+      "run_id": 7,
+      "request_id": 7,
+      "payload": {
+        "schema": "ping_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "nonce": 81985529216486895
+        }
+      }
+    },
+    {
       "name": "error-response",
       "kind": "ERROR_RESPONSE",
       "flags": ["RESPONSE_ERROR"],
-      "request_id": 6,
+      "request_id": 8,
       "payload": {
         "schema": "error_response",
         "values": {

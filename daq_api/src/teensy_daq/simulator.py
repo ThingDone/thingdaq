@@ -68,6 +68,7 @@ class SimulatedDevice:
         self._gpio_items_dropped = 0
         self._parser_error_baseline = 0
         self._transport_errors = 0
+        self._stats_generation = 1
         self._next_stream_index = 0
         if auto_boot:
             self.finish_boot()
@@ -177,6 +178,7 @@ class SimulatedDevice:
             parser_errors=(self._request_parser.errors - self._parser_error_baseline)
             & constants.UINT32_MAX,
             transport_errors=self._transport_errors,
+            stats_generation=self._stats_generation,
         )
 
     def _handle_frame(self, request: Frame) -> bytes | None:
@@ -194,8 +196,10 @@ class SimulatedDevice:
             constants.FrameKind.INFO_REQUEST: self._handle_info,
             constants.FrameKind.CONFIGURE_REQUEST: self._handle_configure,
             constants.FrameKind.START_REQUEST: self._handle_start,
-            constants.FrameKind.STATUS_REQUEST: self._handle_status,
+            constants.FrameKind.GET_STATUS_REQUEST: self._handle_status,
             constants.FrameKind.STOP_REQUEST: self._handle_stop,
+            constants.FrameKind.RESET_STATS_REQUEST: self._handle_reset_stats,
+            constants.FrameKind.PING_REQUEST: self._handle_ping,
         }
         return handlers[request.header.kind](request)
 
@@ -205,6 +209,13 @@ class SimulatedDevice:
             build_id=self._build_id,
             firmware_version=(0, 1, 0),
             supported_source_mask=1 << int(constants.Source.SYNTHETIC),
+            capability_bits=(
+                constants.Capability.ADC_STREAM
+                | constants.Capability.GPIO_STREAM
+                | constants.Capability.SYNTHETIC_SOURCE
+                | constants.Capability.RESET_STATS
+                | constants.Capability.PING
+            ),
         )
         return self._success_response(request, info.to_payload())
 
@@ -268,6 +279,29 @@ class SimulatedDevice:
         )
         return self._success_response(request, payload)
 
+    def _handle_reset_stats(self, request: Frame) -> bytes:
+        if self._state not in {
+            constants.DeviceState.IDLE,
+            constants.DeviceState.CONFIGURED,
+        }:
+            return self._typed_error(request, constants.ErrorCode.INVALID_STATE)
+        self._reset_counters()
+        payload = bytearray(constants.RESET_STATS_RESPONSE_PAYLOAD_SIZE)
+        payload[: len(_SUCCESS_PREFIX)] = _SUCCESS_PREFIX
+        struct.pack_into(
+            "<I",
+            payload,
+            constants.RESET_STATS_RESPONSE_STATS_GENERATION_OFFSET,
+            self._stats_generation,
+        )
+        return self._success_response(request, payload)
+
+    def _handle_ping(self, request: Frame) -> bytes:
+        payload = bytearray(constants.PING_RESPONSE_PAYLOAD_SIZE)
+        payload[: len(_SUCCESS_PREFIX)] = _SUCCESS_PREFIX
+        payload[constants.PING_RESPONSE_NONCE_OFFSET :] = request.payload
+        return self._success_response(request, payload)
+
     def _reset_epoch(self) -> None:
         self._adc_sequence = 0
         self._gpio_sequence = 0
@@ -275,13 +309,19 @@ class SimulatedDevice:
         self._gpio_first_ticks = 0
         self._adc_item_index = 0
         self._gpio_item_index = 0
+        self._reset_counters()
+        self._next_stream_index = 0
+
+    def _reset_counters(self) -> None:
         self._adc_frames_emitted = 0
         self._gpio_frames_emitted = 0
         self._adc_items_dropped = 0
         self._gpio_items_dropped = 0
         self._parser_error_baseline = self._request_parser.errors
         self._transport_errors = 0
-        self._next_stream_index = 0
+        self._stats_generation = (self._stats_generation + 1) & constants.UINT32_MAX
+        if self._stats_generation == 0:
+            self._stats_generation = 1
 
     def _next_adc_frame(self, configuration: Configuration) -> bytes:
         flags = constants.FrameFlag.SYNTHETIC

@@ -67,6 +67,20 @@ def enum_map(entries: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return result
 
 
+def validate_enum_width(
+    owner: str, entries: Sequence[Mapping[str, Any]], bits: int
+) -> None:
+    """Require every enum value to fit its declared unsigned wire width."""
+
+    maximum = (1 << bits) - 1
+    for entry in entries:
+        value = int(entry["value"])
+        if not 0 <= value <= maximum:
+            raise ContractError(
+                f"{owner}.{entry['name']}={value} does not fit unsigned {bits} bits"
+            )
+
+
 def field_width(field: Mapping[str, Any]) -> int:
     """Return the encoded width for a machine-readable field definition."""
 
@@ -114,6 +128,14 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     if int(contract["protocol_version"]) != 1:
         raise ContractError("this generator only accepts protocol version 1")
 
+    scalar_types = contract["scalar_types"]
+    if set(scalar_types) != set(INTEGER_WIDTHS):
+        raise ContractError("scalar type table must define u8, u16, u32, and u64")
+    for name, width in INTEGER_WIDTHS.items():
+        scalar = scalar_types[name]
+        if int(scalar["width"]) != width or scalar["signed"] is not False:
+            raise ContractError(f"{name} must be an unsigned {width}-byte scalar")
+
     header = contract["header"]
     header_size = int(header["size"])
     validate_fields("header", header_size, header["fields"])
@@ -125,14 +147,23 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
 
     limits = contract["limits"]
     data_frame_bytes = int(limits["data_frame_bytes"])
+    max_data_frame_bytes = int(limits["max_data_frame_bytes"])
     min_frame_bytes = int(limits["min_frame_bytes"])
     max_control_frame_bytes = int(limits["max_control_frame_bytes"])
+    max_command_frame_bytes = int(limits["max_command_frame_bytes"])
+    max_command_payload_bytes = int(limits["max_command_payload_bytes"])
     if data_frame_bytes != 4096:
         raise ContractError("v1 data frames must be exactly 4096 bytes")
+    if max_data_frame_bytes != data_frame_bytes:
+        raise ContractError("the fixed data frame must also be the maximum data frame")
     if min_frame_bytes != header_size + trailer_size:
         raise ContractError("minimum frame size must equal header plus trailer")
     if max_control_frame_bytes > data_frame_bytes:
         raise ContractError("control-frame bound must not exceed a data frame")
+    if max_command_frame_bytes != min_frame_bytes + max_command_payload_bytes:
+        raise ContractError("command frame and payload limits are inconsistent")
+    if max_command_frame_bytes > max_control_frame_bytes:
+        raise ContractError("command-frame bound must fit inside the control bound")
 
     data_payload_bytes = data_frame_bytes - header_size - trailer_size
     layouts = contract["data_layouts"]
@@ -156,10 +187,16 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         raise ContractError("ADC and GPIO frames must cover equal nominal time")
 
     flag_values = enum_map(contract["flags"])
+    validate_enum_width("flags", contract["flags"], 16)
     if any(value == 0 or value & (value - 1) for value in flag_values.values()):
         raise ContractError("every named frame flag must be one nonzero bit")
+    capability_values = enum_map(contract["enums"]["capability_bits"])
+    validate_enum_width("capability_bits", contract["enums"]["capability_bits"], 32)
+    if any(value == 0 or value & (value - 1) for value in capability_values.values()):
+        raise ContractError("every named capability must be one nonzero bit")
 
     checksums = enum_map(contract["checksum_algorithms"])
+    validate_enum_width("checksum_algorithms", contract["checksum_algorithms"], 8)
     enabled_checksums = {
         str(entry["name"])
         for entry in contract["checksum_algorithms"]
@@ -175,6 +212,8 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         raise ContractError("default checksum must be enabled")
 
     kinds = enum_map(contract["frame_kinds"])
+    validate_enum_width("frame_kinds", contract["frame_kinds"], 8)
+    kind_specs = {str(entry["name"]): entry for entry in contract["frame_kinds"]}
     schemas = contract["payload_schemas"]
     for schema_name, schema in schemas.items():
         validate_fields(
@@ -199,6 +238,59 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
                 f"{kind['name']} references unknown response {kind['response_kind']!r}"
             )
 
+    commands = enum_map(contract["command_kinds"])
+    validate_enum_width("command_kinds", contract["command_kinds"], 8)
+    observed_command_payload_max = 0
+    for command in contract["command_kinds"]:
+        name = str(command["name"])
+        request_name = str(command["request_kind"])
+        response_name = str(command["response_kind"])
+        if request_name not in kind_specs or response_name not in kind_specs:
+            raise ContractError(f"command {name} references an unknown frame kind")
+        request = kind_specs[request_name]
+        response = kind_specs[response_name]
+        if request["class"] != "request" or response["class"] != "response":
+            raise ContractError(f"command {name} must map request and response classes")
+        if int(command["value"]) != int(request["value"]):
+            raise ContractError(f"command {name} ID must equal its request frame ID")
+        if int(response["value"]) != (int(command["value"]) | 0x80):
+            raise ContractError(f"command {name} response ID must be request ID | 0x80")
+        if request.get("response_kind") != response_name:
+            raise ContractError(
+                f"command {name} disagrees with request response mapping"
+            )
+        request_payload_size = int(schemas[str(request["payload_schema"])]["size"])
+        observed_command_payload_max = max(
+            observed_command_payload_max, request_payload_size
+        )
+        if request_payload_size > max_command_payload_bytes:
+            raise ContractError(f"command {name} payload exceeds the command bound")
+    request_kind_names = {
+        name for name, spec in kind_specs.items() if spec["class"] == "request"
+    }
+    if request_kind_names != {
+        str(command["request_kind"]) for command in contract["command_kinds"]
+    }:
+        raise ContractError("every request frame kind must map to one command kind")
+    if set(commands.values()) != {
+        int(kind_specs[name]["value"]) for name in request_kind_names
+    }:
+        raise ContractError("command IDs must exactly cover request frame IDs")
+    if observed_command_payload_max != max_command_payload_bytes:
+        raise ContractError("command payload bound must equal the largest command")
+
+    for enum_name, bits in {
+        "response_status": 8,
+        "error_code": 16,
+        "device_state": 8,
+        "stream_mask": 8,
+        "source": 8,
+        "board_id": 16,
+        "mcu_id": 16,
+    }.items():
+        enum_map(contract["enums"][enum_name])
+        validate_enum_width(enum_name, contract["enums"][enum_name], bits)
+
     fixtures = contract["golden_fixtures"]
     fixture_names = [str(fixture["name"]) for fixture in fixtures]
     if len(fixture_names) != len(set(fixture_names)):
@@ -211,6 +303,14 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
             f"golden fixtures must cover every frame kind; missing={missing}, "
             f"extra={extra}"
         )
+    fixtures_by_kind = {str(fixture["kind"]): fixture for fixture in fixtures}
+    for command in contract["command_kinds"]:
+        request = fixtures_by_kind[str(command["request_kind"])]
+        response = fixtures_by_kind[str(command["response_kind"])]
+        if int(request["request_id"]) != int(response["request_id"]):
+            raise ContractError(
+                f"{command['name']} golden response must echo its request ID"
+            )
 
 
 def snake_to_pascal(name: str) -> str:
@@ -246,8 +346,10 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     timing = contract["timing"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
+    commands = contract["command_kinds"]
     checksums = contract["checksum_algorithms"]
     flags = contract["flags"]
+    capabilities = contract["enums"]["capability_bits"]
     schemas = contract["payload_schemas"]
     header_format = "<" + "".join(
         INTEGER_FORMATS[str(field["type"])] for field in header["fields"]
@@ -285,9 +387,12 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"TRAILER_SIZE = {int(trailer['size'])}",
         f"MIN_FRAME_BYTES = {int(limits['min_frame_bytes'])}",
         f"DATA_FRAME_BYTES = {int(limits['data_frame_bytes'])}",
+        f"MAX_DATA_FRAME_BYTES = {int(limits['max_data_frame_bytes'])}",
         f"DATA_PAYLOAD_BYTES = {data_payload_bytes}",
         f"MAX_CONTROL_FRAME_BYTES = {int(limits['max_control_frame_bytes'])}",
         "MAX_CONTROL_PAYLOAD_BYTES = MAX_CONTROL_FRAME_BYTES - HEADER_SIZE - TRAILER_SIZE",
+        f"MAX_COMMAND_FRAME_BYTES = {int(limits['max_command_frame_bytes'])}",
+        f"MAX_COMMAND_PAYLOAD_BYTES = {int(limits['max_command_payload_bytes'])}",
         f"TIMESTAMP_HZ = {int(timing['timestamp_hz'])}",
         f"ADC_PAIR_RATE_HZ = {int(timing['adc_pair_rate_hz'])}",
         f"ADC_PAIR_PERIOD_TICKS = {int(timing['adc_pair_period_ticks'])}",
@@ -312,6 +417,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.extend(["", ""])
 
     lines.extend(python_enum("FrameKind", kinds))
+    lines.extend(python_enum("CommandKind", commands))
     lines.extend(python_enum("FrameFlag", flags, base="IntFlag", include_none=True))
     lines.extend(python_enum("ChecksumAlgorithm", checksums))
     lines.extend(python_enum("ResponseStatus", contract["enums"]["response_status"]))
@@ -321,6 +427,14 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         python_enum(
             "StreamMask",
             contract["enums"]["stream_mask"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
+    lines.extend(
+        python_enum(
+            "Capability",
+            capabilities,
             base="IntFlag",
             include_none=True,
         )
@@ -346,6 +460,13 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         if entry["enabled_in_v1"]
     )
     lines.append(f"SUPPORTED_CHECKSUM_MASK = {supported_checksum_mask}")
+    lines.append(
+        "KNOWN_FRAME_FLAG_MASK = " + str(sum(int(entry["value"]) for entry in flags))
+    )
+    lines.append(
+        "KNOWN_CAPABILITY_MASK = "
+        + str(sum(int(entry["value"]) for entry in capabilities))
+    )
     lines.extend(["", ""])
 
     lines.append("FRAME_KIND_CLASS: dict[FrameKind, str] = {")
@@ -370,6 +491,47 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         if "response_kind" in kind:
             lines.append(
                 f"    FrameKind.{kind['name']}: FrameKind.{kind['response_kind']},"
+            )
+    lines.extend(["}", ""])
+
+    lines.append("COMMAND_REQUEST_KIND: dict[CommandKind, FrameKind] = {")
+    for command in commands:
+        lines.append(
+            f"    CommandKind.{command['name']}: FrameKind.{command['request_kind']},"
+        )
+    lines.extend(["}", ""])
+
+    lines.append("COMMAND_RESPONSE_KIND: dict[CommandKind, FrameKind] = {")
+    for command in commands:
+        lines.append(
+            f"    CommandKind.{command['name']}: FrameKind.{command['response_kind']},"
+        )
+    lines.extend(["}", ""])
+
+    lines.append("COMMAND_BY_REQUEST_KIND: dict[FrameKind, CommandKind] = {")
+    for command in commands:
+        lines.append(
+            f"    FrameKind.{command['request_kind']}: CommandKind.{command['name']},"
+        )
+    lines.extend(["}", ""])
+
+    lines.append("COMMAND_BY_RESPONSE_KIND: dict[FrameKind, CommandKind] = {")
+    for command in commands:
+        lines.append(
+            f"    FrameKind.{command['response_kind']}: CommandKind.{command['name']},"
+        )
+    lines.extend(["}", ""])
+
+    lines.append("PAYLOAD_SCHEMA_BY_KIND: dict[FrameKind, str] = {")
+    for kind in kinds:
+        lines.append(f'    FrameKind.{kind["name"]}: "{kind["payload_schema"]}",')
+    lines.extend(["}", ""])
+
+    lines.append("ERROR_PAYLOAD_SCHEMA_BY_KIND: dict[FrameKind, str] = {")
+    for kind in kinds:
+        if "error_payload_schema" in kind:
+            lines.append(
+                f'    FrameKind.{kind["name"]}: "{kind["error_payload_schema"]}",'
             )
     lines.extend(["}", ""])
 
@@ -414,8 +576,10 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     timing = contract["timing"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
+    commands = contract["command_kinds"]
     checksums = contract["checksum_algorithms"]
     flags = contract["flags"]
+    capabilities = contract["enums"]["capability_bits"]
     schemas = contract["payload_schemas"]
     data_payload_bytes = (
         int(limits["data_frame_bytes"]) - int(header["size"]) - int(trailer["size"])
@@ -443,6 +607,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"inline constexpr std::size_t kTrailerSize = {int(trailer['size'])}U;",
         f"inline constexpr std::size_t kMinFrameBytes = {int(limits['min_frame_bytes'])}U;",
         f"inline constexpr std::size_t kDataFrameBytes = {int(limits['data_frame_bytes'])}U;",
+        f"inline constexpr std::size_t kMaxDataFrameBytes = {int(limits['max_data_frame_bytes'])}U;",
         f"inline constexpr std::size_t kDataPayloadBytes = {data_payload_bytes}U;",
         (
             "inline constexpr std::size_t kMaxControlFrameBytes = "
@@ -450,6 +615,14 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         ),
         "inline constexpr std::size_t kMaxControlPayloadBytes =",
         "    kMaxControlFrameBytes - kHeaderSize - kTrailerSize;",
+        (
+            "inline constexpr std::size_t kMaxCommandFrameBytes = "
+            f"{int(limits['max_command_frame_bytes'])}U;"
+        ),
+        (
+            "inline constexpr std::size_t kMaxCommandPayloadBytes = "
+            f"{int(limits['max_command_payload_bytes'])}U;"
+        ),
         f"inline constexpr std::uint32_t kTimestampHz = {int(timing['timestamp_hz'])}U;",
         f"inline constexpr std::uint32_t kAdcPairRateHz = {int(timing['adc_pair_rate_hz'])}U;",
         (
@@ -485,6 +658,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.append("")
 
     lines.extend(cpp_enum("FrameKind", "std::uint8_t", kinds))
+    lines.extend(cpp_enum("CommandKind", "std::uint8_t", commands))
     lines.extend(cpp_enum("FrameFlag", "std::uint16_t", flags))
     lines.extend(cpp_enum("ChecksumAlgorithm", "std::uint8_t", checksums))
     lines.extend(
@@ -499,6 +673,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.extend(
         cpp_enum("StreamMask", "std::uint8_t", contract["enums"]["stream_mask"])
     )
+    lines.extend(cpp_enum("Capability", "std::uint32_t", capabilities))
     lines.extend(cpp_enum("Source", "std::uint8_t", contract["enums"]["source"]))
     lines.extend(cpp_enum("BoardId", "std::uint16_t", contract["enums"]["board_id"]))
     lines.extend(cpp_enum("McuId", "std::uint16_t", contract["enums"]["mcu_id"]))
@@ -515,6 +690,12 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
                     if entry["enabled_in_v1"]
                 )
             )
+            + "U;",
+            "inline constexpr std::uint16_t kKnownFrameFlagMask = "
+            + str(sum(int(entry["value"]) for entry in flags))
+            + "U;",
+            "inline constexpr std::uint32_t kKnownCapabilityMask = "
+            + str(sum(int(entry["value"]) for entry in capabilities))
             + "U;",
             "",
         ]
@@ -558,6 +739,49 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             ]
         )
     lines.extend(["  }", "  return 0U;", "}", ""])
+
+    lines.extend(
+        [
+            "constexpr FrameKind requestFrameKind(CommandKind command) {",
+            "  switch (command) {",
+        ]
+    )
+    for command in commands:
+        lines.extend(
+            [
+                f"    case CommandKind::k{snake_to_pascal(str(command['name']))}:",
+                "      return FrameKind::k"
+                + snake_to_pascal(str(command["request_kind"]))
+                + ";",
+            ]
+        )
+    lines.extend(
+        [
+            "  }",
+            "  return FrameKind::kInfoRequest;",
+            "}",
+            "",
+            "constexpr FrameKind responseFrameKind(CommandKind command) {",
+            "  switch (command) {",
+        ]
+    )
+    for command in commands:
+        lines.extend(
+            [
+                f"    case CommandKind::k{snake_to_pascal(str(command['name']))}:",
+                "      return FrameKind::k"
+                + snake_to_pascal(str(command["response_kind"]))
+                + ";",
+            ]
+        )
+    lines.extend(
+        [
+            "  }",
+            "  return FrameKind::kInfoResponse;",
+            "}",
+            "",
+        ]
+    )
 
     lines.extend(
         [
@@ -689,12 +913,26 @@ def build_golden_frames(
         kind_name = str(fixture["kind"])
         kind_spec = kind_specs[kind_name]
         payload = encode_fixture_payload(contract, fixture)
+        payload_spec = fixture["payload"]
+        if (
+            "schema" in payload_spec
+            and payload_spec["schema"] != kind_spec["payload_schema"]
+        ):
+            raise ContractError(
+                f"fixture {fixture_name} schema disagrees with {kind_name}"
+            )
         flags = sum(flag_values[str(name)] for name in fixture.get("flags", []))
         allowed_flags = sum(
             flag_values[str(name)] for name in kind_spec["allowed_flags"]
         )
         if flags & ~allowed_flags:
             raise ContractError(f"fixture {fixture_name} uses disallowed flags")
+        if flags & flag_values["OVERRUN_BEFORE"] and not (
+            flags & flag_values["GAP_BEFORE"]
+        ):
+            raise ContractError(
+                f"fixture {fixture_name} uses OVERRUN_BEFORE without GAP_BEFORE"
+            )
 
         run_id = int(fixture.get("run_id", 0))
         sequence = int(fixture.get("sequence", 0))
@@ -710,6 +948,10 @@ def build_golden_frames(
         else:
             if total_length > int(limits["max_control_frame_bytes"]):
                 raise ContractError(f"fixture {fixture_name} exceeds control bound")
+            if kind_spec["class"] == "request" and total_length > int(
+                limits["max_command_frame_bytes"]
+            ):
+                raise ContractError(f"fixture {fixture_name} exceeds command bound")
             if request_id == 0:
                 raise ContractError(
                     f"control fixture {fixture_name} needs a request ID"
@@ -807,6 +1049,15 @@ def check_outputs(outputs: Mapping[Path, bytes]) -> int:
         for path, expected in outputs.items()
         if not path.is_file() or path.read_bytes() != expected
     ]
+    if MANIFEST_PATH in outputs:
+        expected_fixture_paths = {
+            path for path in outputs if path.parent == FIXTURE_DIRECTORY
+        }
+        drifted.extend(
+            path
+            for path in FIXTURE_DIRECTORY.glob("*.bin")
+            if path not in expected_fixture_paths
+        )
     if drifted:
         print("Generated protocol files are missing or stale:", file=sys.stderr)
         for relative_path in relative_paths(drifted):
@@ -824,16 +1075,27 @@ def write_outputs(outputs: Mapping[Path, bytes]) -> int:
     """Write only changed outputs, preserving mtimes for identical files."""
 
     changed: list[Path] = []
+    removed: list[Path] = []
+    if MANIFEST_PATH in outputs:
+        expected_fixture_paths = {
+            path for path in outputs if path.parent == FIXTURE_DIRECTORY
+        }
+        for path in FIXTURE_DIRECTORY.glob("*.bin"):
+            if path not in expected_fixture_paths:
+                path.unlink()
+                removed.append(path)
     for path, expected in outputs.items():
         if path.is_file() and path.read_bytes() == expected:
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(expected)
         changed.append(path)
-    if changed:
+    if changed or removed:
         print("Generated protocol files:")
         for relative_path in relative_paths(changed):
             print(f"  {relative_path}")
+        for relative_path in relative_paths(removed):
+            print(f"  removed {relative_path}")
     else:
         print(f"Protocol outputs already current ({len(outputs)} files).")
     return 0

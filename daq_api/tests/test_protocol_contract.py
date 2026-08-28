@@ -24,6 +24,8 @@ FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"
 MANIFEST_PATH = FIXTURE_DIRECTORY / "manifest.json"
 GENERATOR_PATH = REPOSITORY_ROOT / "tools/generate_protocol.py"
 CPP_CONSTANTS_PATH = REPOSITORY_ROOT / "firmware/src/generated/protocol_constants.h"
+PROTOCOL_DOCUMENT_PATH = REPOSITORY_ROOT / "doc/protocol/protocol-v1.md"
+ADR_PATH = REPOSITORY_ROOT / "doc/decisions/adr-001-wire-protocol.md"
 GENERATOR_SPEC = importlib.util.spec_from_file_location(
     "generate_protocol", GENERATOR_PATH
 )
@@ -81,8 +83,14 @@ class ProtocolContractTests(unittest.TestCase):
             constants.FrameKind.INFO_REQUEST: constants.FrameKind.INFO_RESPONSE,
             constants.FrameKind.CONFIGURE_REQUEST: constants.FrameKind.CONFIGURE_RESPONSE,
             constants.FrameKind.START_REQUEST: constants.FrameKind.START_RESPONSE,
-            constants.FrameKind.STATUS_REQUEST: constants.FrameKind.STATUS_RESPONSE,
+            constants.FrameKind.GET_STATUS_REQUEST: (
+                constants.FrameKind.GET_STATUS_RESPONSE
+            ),
             constants.FrameKind.STOP_REQUEST: constants.FrameKind.STOP_RESPONSE,
+            constants.FrameKind.RESET_STATS_REQUEST: (
+                constants.FrameKind.RESET_STATS_RESPONSE
+            ),
+            constants.FrameKind.PING_REQUEST: constants.FrameKind.PING_RESPONSE,
         }
         self.assertEqual(expected_pairs, constants.REQUEST_RESPONSE_KIND)
         self.assertEqual(0, constants.ErrorCode.OK)
@@ -94,6 +102,64 @@ class ProtocolContractTests(unittest.TestCase):
             constants.MAX_CONTROL_FRAME_BYTES,
         )
 
+    def test_command_ids_capabilities_and_bounds_are_generated_once(self) -> None:
+        expected_commands = {
+            constants.CommandKind.INFO: constants.FrameKind.INFO_REQUEST,
+            constants.CommandKind.CONFIGURE: constants.FrameKind.CONFIGURE_REQUEST,
+            constants.CommandKind.START: constants.FrameKind.START_REQUEST,
+            constants.CommandKind.GET_STATUS: constants.FrameKind.GET_STATUS_REQUEST,
+            constants.CommandKind.STOP: constants.FrameKind.STOP_REQUEST,
+            constants.CommandKind.RESET_STATS: (
+                constants.FrameKind.RESET_STATS_REQUEST
+            ),
+            constants.CommandKind.PING: constants.FrameKind.PING_REQUEST,
+        }
+        self.assertEqual(expected_commands, constants.COMMAND_REQUEST_KIND)
+        for command, request_kind in expected_commands.items():
+            with self.subTest(command=command.name):
+                response_kind = constants.COMMAND_RESPONSE_KIND[command]
+                self.assertEqual(int(command), int(request_kind))
+                self.assertEqual(int(request_kind) | 0x80, int(response_kind))
+                self.assertEqual(
+                    command, constants.COMMAND_BY_REQUEST_KIND[request_kind]
+                )
+                self.assertEqual(
+                    command, constants.COMMAND_BY_RESPONSE_KIND[response_kind]
+                )
+
+        self.assertEqual(4096, constants.MAX_DATA_FRAME_BYTES)
+        self.assertEqual(56, constants.MAX_COMMAND_FRAME_BYTES)
+        self.assertEqual(8, constants.MAX_COMMAND_PAYLOAD_BYTES)
+        self.assertEqual(
+            0x3F,
+            int(
+                constants.Capability.ADC_STREAM
+                | constants.Capability.GPIO_STREAM
+                | constants.Capability.HARDWARE_SOURCE
+                | constants.Capability.SYNTHETIC_SOURCE
+                | constants.Capability.RESET_STATS
+                | constants.Capability.PING
+            ),
+        )
+        self.assertEqual(0x3F, constants.KNOWN_CAPABILITY_MASK)
+
+    def test_scalar_field_table_and_control_schemas_are_unambiguous(self) -> None:
+        self.assertEqual(
+            {
+                "u8": {"width": 1, "signed": False},
+                "u16": {"width": 2, "signed": False},
+                "u32": {"width": 4, "signed": False},
+                "u64": {"width": 8, "signed": False},
+            },
+            self.contract["scalar_types"],
+        )
+        self.assertEqual(98, constants.INFO_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(56, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(8, constants.RESET_STATS_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(8, constants.PING_REQUEST_PAYLOAD_SIZE)
+        self.assertEqual(12, constants.PING_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(8, constants.FrameFlag.OVERRUN_BEFORE)
+
     def test_generated_python_and_cpp_record_the_same_source_hash(self) -> None:
         source_hash = hashlib.sha256(CONTRACT_PATH.read_bytes()).hexdigest()
         cpp_constants = CPP_CONSTANTS_PATH.read_text(encoding="utf-8")
@@ -103,6 +169,35 @@ class ProtocolContractTests(unittest.TestCase):
         self.assertIn(source_hash, cpp_constants)
         self.assertIn("kMagic = 0xDEADBEEFU", cpp_constants)
         self.assertIn("kDataFrameBytes = 4096U", cpp_constants)
+
+    def test_normative_tables_and_adr_links_track_the_contract(self) -> None:
+        protocol_document = PROTOCOL_DOCUMENT_PATH.read_text(encoding="utf-8")
+        adr = ADR_PATH.read_text(encoding="utf-8")
+
+        for field in self.contract["header"]["fields"]:
+            with self.subTest(header_field=field["name"]):
+                self.assertIn(
+                    f"| {field['offset']} | {generate_protocol.field_width(field)} "
+                    f"| `{field['type']}` | No |",
+                    protocol_document,
+                )
+        for kind in self.contract["frame_kinds"]:
+            with self.subTest(frame_kind=kind["name"]):
+                self.assertIn(
+                    f"| `0x{kind['value']:02X}` | `{kind['name']}` |",
+                    protocol_document,
+                )
+        for capability in self.contract["enums"]["capability_bits"]:
+            with self.subTest(capability=capability["name"]):
+                self.assertIn(
+                    f"| `0x{capability['value']:08X}` | `{capability['name']}` |",
+                    protocol_document,
+                )
+
+        self.assertIn("[[ADR-001-Wire-Protocol]]", protocol_document)
+        self.assertIn("[[Protocol-V1]]", adr)
+        self.assertTrue(protocol_document.startswith("---\ntype: reference\n"))
+        self.assertTrue(adr.startswith("---\ntype: analysis\n"))
 
     def test_every_frame_kind_has_a_structurally_valid_golden_frame(self) -> None:
         entries = self.manifest["fixtures"]

@@ -10,7 +10,7 @@ tags:
 related:
   - '[[Protocol-V1]]'
   - '[[System-Overview]]'
-  - '[[ADR-001-Protocol-Wire-Contract]]'
+  - '[[ADR-001-Wire-Protocol]]'
 ---
 
 # Phase 01 synthetic prototype gate
@@ -102,7 +102,7 @@ Representative source and generated-output identities were:
 | Golden-fixture manifest | 8,723 | `b129906465e281cabd28bec1c0ac3aa86dc21eea97503965b8c9a2d280090fd2` |
 
 These outputs implement the contract and decisions documented in
-[[Protocol-V1]] and [[ADR-001-Protocol-Wire-Contract]].
+[[Protocol-V1]] and [[ADR-001-Wire-Protocol]].
 
 ## Synthetic demo evidence
 

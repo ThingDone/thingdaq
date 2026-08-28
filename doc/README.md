@@ -9,7 +9,7 @@ related:
   - '[[System-Overview]]'
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
-  - '[[ADR-001-Protocol-Wire-Contract]]'
+  - '[[ADR-001-Wire-Protocol]]'
   - '[[Phase-01-Synthetic-Prototype-Gate]]'
 ---
 
@@ -26,7 +26,7 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
 - `protocol/` contains versioned wire-contract specifications, beginning with
   [[Protocol-V1]].
 - `decisions/` contains architecture decision records, beginning with
-  [[ADR-001-Protocol-Wire-Contract]].
+  [[ADR-001-Wire-Protocol]].
 - `reference/` records durable inventories and implementation references,
   beginning with [[Foundation-Reuse-Inventory]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
