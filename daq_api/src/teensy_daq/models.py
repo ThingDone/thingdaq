@@ -972,6 +972,17 @@ class ADCBlock:
         return constants.ADC_PAIRS_PER_FRAME
 
     @property
+    def payload_view(self) -> memoryview:
+        """Zero-copy byte view over the interleaved little-endian pair payload."""
+
+        return memoryview(self.payload)
+
+    def pairs(self) -> Iterator[tuple[int, int]]:
+        """Iterate decoded ``(ADC0, ADC1)`` pairs without building a container."""
+
+        return struct.iter_unpack("<HH", self.payload)
+
+    @property
     def adc0(self) -> AdcChannelView:
         return AdcChannelView(self, AdcConverter.ADC0)
 
@@ -1112,6 +1123,12 @@ class GPIOBlock:
     @property
     def samples(self) -> memoryview:
         """Zero-copy byte view preserving the packed D6-through-D13 bit order."""
+
+        return memoryview(self.payload)
+
+    @property
+    def payload_view(self) -> memoryview:
+        """Alias for the zero-copy packed-sample view."""
 
         return memoryview(self.payload)
 

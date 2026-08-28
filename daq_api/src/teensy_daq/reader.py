@@ -33,6 +33,7 @@ from .transport import (
 
 DataBlock: TypeAlias = AdcBlock | GpioBlock
 ReaderEvent: TypeAlias = Frame
+DEFAULT_MAX_QUEUED_BLOCKS = 512
 
 
 class ReaderError(RuntimeError):
@@ -126,6 +127,19 @@ class ReaderCounters:
     pending_requests: int
     queued_blocks: int
     queued_events: int
+    readinto_calls: int = 0
+    maximum_read_bytes: int = 0
+    pending_request_high_water: int = 0
+    block_queue_high_water: int = 0
+    event_queue_high_water: int = 0
+    adc_frames_received: int = 0
+    gpio_frames_received: int = 0
+    adc_block_queue_drops: int = 0
+    gpio_block_queue_drops: int = 0
+    adc_stale_blocks_discarded: int = 0
+    gpio_stale_blocks_discarded: int = 0
+    adc_boundary_blocks_discarded: int = 0
+    gpio_boundary_blocks_discarded: int = 0
 
 
 @dataclass(slots=True)
@@ -158,7 +172,7 @@ class BackgroundReader:
         *,
         read_size: int = 64 * 1024,
         max_pending_requests: int = 32,
-        max_queued_blocks: int = 8,
+        max_queued_blocks: int = DEFAULT_MAX_QUEUED_BLOCKS,
         max_queued_events: int = 32,
         request_timeout: float = 1.0,
         queue_timeout: float = 1.0,
@@ -199,6 +213,7 @@ class BackgroundReader:
         self._shutdown_timeout = float(shutdown_timeout)
         self._idle_sleep = float(idle_sleep)
         self._parser = parser if parser is not None else IncrementalFrameParser()
+        self._read_buffer = bytearray(read_size)
 
         self._condition = Condition(RLock())
         self._write_lock = Lock()
@@ -227,6 +242,19 @@ class BackgroundReader:
         self._boundary_blocks_discarded = 0
         self._protocol_failures = 0
         self._disconnects = 0
+        self._readinto_calls = 0
+        self._maximum_read_bytes = 0
+        self._pending_request_high_water = 0
+        self._block_queue_high_water = 0
+        self._event_queue_high_water = 0
+        self._adc_frames_received = 0
+        self._gpio_frames_received = 0
+        self._adc_block_queue_drops = 0
+        self._gpio_block_queue_drops = 0
+        self._adc_stale_blocks_discarded = 0
+        self._gpio_stale_blocks_discarded = 0
+        self._adc_boundary_blocks_discarded = 0
+        self._gpio_boundary_blocks_discarded = 0
 
     @property
     def transport(self) -> ByteTransport:
@@ -254,6 +282,12 @@ class BackgroundReader:
             return len(self._pending)
 
     @property
+    def read_buffer_size(self) -> int:
+        """Fixed reusable receive-buffer capacity in bytes."""
+
+        return len(self._read_buffer)
+
+    @property
     def parser_counters(self) -> ParserCounters:
         """Return the independent incremental-parser counter snapshot."""
 
@@ -279,6 +313,19 @@ class BackgroundReader:
                 pending_requests=len(self._pending),
                 queued_blocks=len(self._blocks),
                 queued_events=len(self._events),
+                readinto_calls=self._readinto_calls,
+                maximum_read_bytes=self._maximum_read_bytes,
+                pending_request_high_water=self._pending_request_high_water,
+                block_queue_high_water=self._block_queue_high_water,
+                event_queue_high_water=self._event_queue_high_water,
+                adc_frames_received=self._adc_frames_received,
+                gpio_frames_received=self._gpio_frames_received,
+                adc_block_queue_drops=self._adc_block_queue_drops,
+                gpio_block_queue_drops=self._gpio_block_queue_drops,
+                adc_stale_blocks_discarded=self._adc_stale_blocks_discarded,
+                gpio_stale_blocks_discarded=self._gpio_stale_blocks_discarded,
+                adc_boundary_blocks_discarded=(self._adc_boundary_blocks_discarded),
+                gpio_boundary_blocks_discarded=(self._gpio_boundary_blocks_discarded),
             )
 
     def start(self) -> BackgroundReader:
@@ -339,6 +386,10 @@ class BackgroundReader:
                 request_id=request_id,
             )
             self._pending[request_id] = pending
+            self._pending_request_high_water = max(
+                self._pending_request_high_water,
+                len(self._pending),
+            )
 
         try:
             self._write_all(wire, pending)
@@ -509,8 +560,29 @@ class BackgroundReader:
     def _reader_loop(self) -> None:
         while not self._stop_event.is_set():
             self._expire_pending_requests()
+            reusable_chunk: memoryview | None = None
             try:
-                chunk = self._transport.read(self._read_size)
+                readinto = getattr(self._transport, "readinto", None)
+                if callable(readinto):
+                    received = readinto(self._read_buffer)
+                    if (
+                        not isinstance(received, int)
+                        or isinstance(received, bool)
+                        or not 0 <= received <= self._read_size
+                    ):
+                        raise TransportError(
+                            "transport returned an invalid readinto count"
+                        )
+                    reusable_chunk = memoryview(self._read_buffer)[:received]
+                    chunk: bytes | memoryview = reusable_chunk
+                    used_readinto = True
+                else:
+                    chunk = self._transport.read(self._read_size)
+                    if len(chunk) > self._read_size:
+                        raise TransportError(
+                            "transport returned more bytes than requested"
+                        )
+                    used_readinto = False
             except (
                 TransportClosedError,
                 TransportDisconnectedError,
@@ -527,7 +599,15 @@ class BackgroundReader:
             with self._condition:
                 self._read_calls += 1
                 self._bytes_read += len(chunk)
+                self._maximum_read_bytes = max(
+                    self._maximum_read_bytes,
+                    len(chunk),
+                )
+                if used_readinto:
+                    self._readinto_calls += 1
             if not chunk:
+                if reusable_chunk is not None:
+                    reusable_chunk.release()
                 if not self._transport.is_open:
                     self._terminate(
                         DeviceDisconnectedError("device transport closed"),
@@ -545,6 +625,9 @@ class BackgroundReader:
                     protocol_failure=True,
                 )
                 return
+            finally:
+                if reusable_chunk is not None:
+                    reusable_chunk.release()
 
             for frame in frames:
                 if self._stop_event.is_set():
@@ -610,13 +693,29 @@ class BackgroundReader:
 
     def _dispatch_block(self, block: DataBlock) -> None:
         with self._condition:
+            if isinstance(block, AdcBlock):
+                self._adc_frames_received += 1
+            else:
+                self._gpio_frames_received += 1
             if not self._stream_active or block.run_id != self._active_run_id:
                 self._stale_blocks_discarded += 1
+                if isinstance(block, AdcBlock):
+                    self._adc_stale_blocks_discarded += 1
+                else:
+                    self._gpio_stale_blocks_discarded += 1
                 return
             if len(self._blocks) >= self._max_queued_blocks:
-                self._blocks.popleft()
+                dropped = self._blocks.popleft()
                 self._host_block_queue_drops += 1
+                if isinstance(dropped, AdcBlock):
+                    self._adc_block_queue_drops += 1
+                else:
+                    self._gpio_block_queue_drops += 1
             self._blocks.append(block)
+            self._block_queue_high_water = max(
+                self._block_queue_high_water,
+                len(self._blocks),
+            )
             self._condition.notify_all()
 
     def _dispatch_event(self, event: ReaderEvent) -> None:
@@ -625,6 +724,10 @@ class BackgroundReader:
                 self._events.popleft()
                 self._host_event_queue_drops += 1
             self._events.append(event)
+            self._event_queue_high_water = max(
+                self._event_queue_high_water,
+                len(self._events),
+            )
             self._condition.notify_all()
 
     def _write_all(self, wire: bytes, pending: _PendingRequest) -> None:
@@ -732,17 +835,25 @@ class BackgroundReader:
     def _activate_run_locked(self, run_id: int) -> None:
         if run_id == 0:
             raise ReaderProtocolError("successful START established run ID zero")
-        self._boundary_blocks_discarded += len(self._blocks)
+        self._record_boundary_blocks_locked()
         self._blocks.clear()
         self._active_run_id = run_id
         self._stream_active = True
         self._condition.notify_all()
 
     def _deactivate_stream_locked(self) -> None:
-        self._boundary_blocks_discarded += len(self._blocks)
+        self._record_boundary_blocks_locked()
         self._blocks.clear()
         self._stream_active = False
         self._condition.notify_all()
+
+    def _record_boundary_blocks_locked(self) -> None:
+        self._boundary_blocks_discarded += len(self._blocks)
+        for block in self._blocks:
+            if isinstance(block, AdcBlock):
+                self._adc_boundary_blocks_discarded += 1
+            else:
+                self._gpio_boundary_blocks_discarded += 1
 
     def _allocate_request_id_locked(self) -> int:
         for _ in range(self._max_pending_requests + 1):
@@ -778,6 +889,7 @@ class BackgroundReader:
 
 
 __all__ = [
+    "DEFAULT_MAX_QUEUED_BLOCKS",
     "BackgroundReader",
     "DataBlock",
     "DeviceDisconnectedError",

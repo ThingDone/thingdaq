@@ -31,6 +31,7 @@ from .client import (
     TeensyDAQError,
     UnexpectedMessageError,
     UnexpectedStreamGapError,
+    UnexpectedStreamValidationError,
 )
 from .discovery import (
     DEFAULT_DISCOVERY_TIMEOUT,
@@ -97,6 +98,7 @@ from .protocol import (
     encode_frame,
 )
 from .reader import (
+    DEFAULT_MAX_QUEUED_BLOCKS,
     BackgroundReader,
     DeviceDisconnectedError,
     PendingRequestLimitError,
@@ -112,13 +114,27 @@ from .reader import (
     StreamStoppedError,
 )
 from .simulator import SimulatedDevice, SimulatorError, SimulatorInputError
+from .streaming import (
+    CommandLatencyDistribution,
+    CounterReconciliation,
+    MemoryHighWaterMetrics,
+    QueueDepthMetrics,
+    SoakMetrics,
+    StreamRateMetrics,
+    SyntheticStreamValidator,
+    run_synthetic_soak,
+)
 from .synthetic import (
+    SyntheticPatternError,
     synthetic_adc0_code,
     synthetic_adc1_code,
     synthetic_adc_code,
     synthetic_adc_payload,
     synthetic_gpio_byte,
     synthetic_gpio_payload,
+    validate_synthetic_adc_payload,
+    validate_synthetic_block,
+    validate_synthetic_gpio_payload,
 )
 from .transport import (
     ByteTransport,
@@ -139,6 +155,7 @@ __version__ = "0.0.0"
 
 __all__ = [
     "DEFAULT_DISCOVERY_TIMEOUT",
+    "DEFAULT_MAX_QUEUED_BLOCKS",
     "PHASE03_MINIMUM_FIRMWARE_VERSION",
     "TEENSY_DAQ_PRODUCT",
     "TEENSY_USB_SERIAL_PID",
@@ -156,9 +173,11 @@ __all__ = [
     "ChecksumAlgorithm",
     "ChecksumMismatchError",
     "CommandKind",
+    "CommandLatencyDistribution",
     "CommandResponse",
     "CommandTimeoutError",
     "Configuration",
+    "CounterReconciliation",
     "DAQClosedError",
     "DAQConfiguration",
     "DAQStateError",
@@ -199,11 +218,13 @@ __all__ = [
     "LossCounters",
     "LossOrigin",
     "McuId",
+    "MemoryHighWaterMetrics",
     "MemoryTransport",
     "MultipleDevicesFoundError",
     "ParserCounters",
     "PendingRequestLimitError",
     "ProtocolError",
+    "QueueDepthMetrics",
     "QueueWaitTimeoutError",
     "ReaderClosedError",
     "ReaderCounters",
@@ -220,12 +241,16 @@ __all__ = [
     "SimulatedDevice",
     "SimulatorError",
     "SimulatorInputError",
+    "SoakMetrics",
     "Source",
     "Status",
     "StreamGap",
     "StreamItem",
     "StreamMask",
+    "StreamRateMetrics",
     "StreamStoppedError",
+    "SyntheticPatternError",
+    "SyntheticStreamValidator",
     "TeensyDAQ",
     "TeensyDAQError",
     "Transport",
@@ -237,6 +262,7 @@ __all__ = [
     "TransportTimeoutError",
     "UnexpectedMessageError",
     "UnexpectedStreamGapError",
+    "UnexpectedStreamValidationError",
     "UnsupportedChecksumError",
     "compute_checksum",
     "decode_frame",
@@ -248,6 +274,7 @@ __all__ = [
     "extract_gpio_channel",
     "interleave_adc",
     "probe_candidate",
+    "run_synthetic_soak",
     "select_device",
     "synthetic_adc0_code",
     "synthetic_adc1_code",
@@ -256,4 +283,7 @@ __all__ = [
     "synthetic_gpio_byte",
     "synthetic_gpio_payload",
     "validate_device_identity",
+    "validate_synthetic_adc_payload",
+    "validate_synthetic_block",
+    "validate_synthetic_gpio_payload",
 ]

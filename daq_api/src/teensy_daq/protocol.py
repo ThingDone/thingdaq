@@ -115,6 +115,12 @@ class Frame:
 
         return self.header.to_bytes() + self.payload + _TRAILER.pack(self.checksum)
 
+    @property
+    def payload_view(self) -> memoryview:
+        """Return a zero-copy read-only view over the owned payload bytes."""
+
+        return memoryview(self.payload)
+
 
 @dataclass(frozen=True, slots=True)
 class ParserCounters:

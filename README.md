@@ -213,6 +213,17 @@ data; production iterators emit visible `StreamGap` events, strict mode raises
 on any gap, and firmware versus host queue-loss counters remain separate.
 NumPy is not required.
 
+The Phase 04 streaming path uses one reusable 64 KiB receive buffer whenever a
+transport offers `readinto`, retains bounded decoded queues (512 data frames by
+default, about 2 MiB of payload storage), and exposes zero-copy payload views.
+Strict synthetic validation checks the complete ADC/GPIO formulas as bulk
+cyclic views in addition to run IDs, independent sequences, timestamps, gap
+flags, parser errors, firmware counters, and host drops. `run_synthetic_soak()`
+wraps the synchronous API with interleaved STATUS commands, separate payload
+and framed throughput, bounded command-latency samples, queue/parser/Python
+memory high-water marks, graceful STOP, final STATUS, and exact
+firmware-to-wire-to-consumer reconciliation.
+
 Phase 03's zero-stream hardware profile is available through
 `TeensyDAQ.configure_control_only()` and
 `TeensyDAQ.simulated(control_only=True)`. Serial opens discard one valid INFO

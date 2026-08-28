@@ -71,6 +71,11 @@ class ByteTransport(Protocol):
 
         ...
 
+    # Implementations may additionally expose ``readinto(buffer) -> int``.
+    # BackgroundReader detects that optional fast path without making it part
+    # of this runtime-checkable minimum protocol, so existing application
+    # transports remain source compatible.
+
     def flush(self) -> None:
         """Boundedly wait for accepted output to leave the transport."""
 
@@ -92,6 +97,8 @@ class _SerialPort(Protocol):
     def is_open(self) -> bool: ...
 
     def read(self, size: int = 1) -> bytes: ...
+
+    def readinto(self, buffer: bytearray | memoryview) -> int | None: ...
 
     def write(self, data: BytesLike) -> int | None: ...
 
@@ -293,6 +300,31 @@ class SerialTransport:
         if len(chunk) > size:
             raise TransportError("serial read returned more bytes than requested")
         return chunk
+
+    def readinto(self, buffer: bytearray | memoryview) -> int:
+        """Read directly into reusable caller storage when PySerial supports it."""
+
+        view = memoryview(buffer).cast("B")
+        try:
+            if not view:
+                return 0
+            serial_port = self._require_open()
+            readinto = getattr(serial_port, "readinto", None)
+            try:
+                if callable(readinto):
+                    result = readinto(view)
+                    received = 0 if result is None else result
+                else:
+                    chunk = bytes(serial_port.read(len(view)))
+                    received = len(chunk)
+                    view[:received] = chunk
+            except (serial.SerialException, OSError) as error:
+                raise _mapped_serial_error("read", error) from error
+            if not isinstance(received, int) or not 0 <= received <= len(view):
+                raise TransportError("serial readinto returned an invalid byte count")
+            return received
+        finally:
+            view.release()
 
     def write(self, data: BytesLike) -> int:
         """Perform one bounded write, preserving PySerial's partial count."""
@@ -570,28 +602,37 @@ class InMemoryTransport:
             self._require_open()
             if size <= 0:
                 raise ValueError("read size must be positive")
-            if not self._pending:
-                if self._demand_driven and self._stream_credits == 0:
-                    return b""
-                now = monotonic()
-                if self._stream_interval is not None and now < self._next_stream_at:
-                    return b""
-                data_frame = self.device.next_data_frame()
-                if data_frame is not None:
-                    self._pending.extend(data_frame)
-                    if self._demand_driven:
-                        self._stream_credits -= 1
-                    if self._stream_interval is not None:
-                        self._next_stream_at = now + self._stream_interval
+            self._produce_stream_frame_locked()
             if not self._pending:
                 return b""
 
-            returned = min(size, len(self._pending))
-            if self._read_chunk_size is not None:
-                returned = min(returned, self._read_chunk_size)
+            returned = self._bounded_read_size_locked(size)
             chunk = bytes(self._pending[:returned])
             del self._pending[:returned]
             return chunk
+
+    def readinto(self, buffer: bytearray | memoryview) -> int:
+        """Copy a bounded chunk directly into reusable caller-owned storage."""
+
+        view = memoryview(buffer).cast("B")
+        try:
+            if not view:
+                return 0
+            with self._lock:
+                self._require_open()
+                self._produce_stream_frame_locked()
+                if not self._pending:
+                    return 0
+                returned = self._bounded_read_size_locked(len(view))
+                pending_view = memoryview(self._pending)
+                try:
+                    view[:returned] = pending_view[:returned]
+                finally:
+                    pending_view.release()
+                del self._pending[:returned]
+                return returned
+        finally:
+            view.release()
 
     def request_stream_frame(self) -> None:
         """Grant one simulator frame credit to a waiting public consumer.
@@ -625,6 +666,29 @@ class InMemoryTransport:
     def _require_open(self) -> None:
         if not self._is_open:
             raise TransportClosedError("transport is closed")
+
+    def _produce_stream_frame_locked(self) -> None:
+        if self._pending:
+            return
+        if self._demand_driven and self._stream_credits == 0:
+            return
+        now = monotonic()
+        if self._stream_interval is not None and now < self._next_stream_at:
+            return
+        data_frame = self.device.next_data_frame()
+        if data_frame is None:
+            return
+        self._pending.extend(data_frame)
+        if self._demand_driven:
+            self._stream_credits -= 1
+        if self._stream_interval is not None:
+            self._next_stream_at = now + self._stream_interval
+
+    def _bounded_read_size_locked(self, requested: int) -> int:
+        returned = min(requested, len(self._pending))
+        if self._read_chunk_size is not None:
+            returned = min(returned, self._read_chunk_size)
+        return returned
 
 
 MemoryTransport = InMemoryTransport

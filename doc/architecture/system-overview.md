@@ -257,9 +257,13 @@ The Python package exposes one synchronous `TeensyDAQ` facade over a minimal
 that exact byte boundary, including partial reads and writes. `SerialTransport`
 implements bounded PySerial I/O, while `BackgroundReader` owns incremental
 parsing, concurrent request-ID correlation, and bounded decoded block/event
-queues. The public facade uses the same reader for INFO, CONFIGURE, START,
-GET_STATUS, STOP, RESET_STATS, and streaming; simulator operation has no
-parallel decoder or synchronous parsing shortcut.
+queues. Its optional `readinto` fast path reuses one 64 KiB receive buffer;
+the default 512-frame decoded queue remains bounded while covering a full
+large read and ordinary command-response jitter. Per-source receive/drop and
+queue/parser high-water telemetry makes that storage policy measurable. The
+public facade uses the same reader for INFO, CONFIGURE, START, GET_STATUS,
+STOP, RESET_STATS, and streaming; simulator operation has no parallel decoder
+or synchronous parsing shortcut.
 
 Metadata-first discovery filters PySerial enumeration for the legitimate
 Teensy USB Serial VID/PID before opening anything, then validates plausible
@@ -287,7 +291,13 @@ The typed surface consists of `DeviceInfo` with nested `DeviceCapabilities`,
 separate `FirmwareCounters`, `HostCounters`, and `LossCounters`. Reader queue
 drops remain distinct from firmware GET_STATUS counters. Production iterators
 emit a visible gap before continuing; strict mode raises with the gap and
-current block attached.
+current block attached. Synthetic strict mode additionally checks full payload
+formulas in bulk cyclic views, parser health, and explicit firmware/host
+counters without requiring NumPy. `run_synthetic_soak()` layers bounded
+duration/frame-count execution over the same synchronous API and reports
+payload versus framed throughput, command latency percentiles, queue/parser
+and Python-allocation high-water marks, graceful STOP/final STATUS, and exact
+firmware-to-wire-to-consumer reconciliation.
 
 The simulator and firmware now share the deterministic acquisition formulas,
 run/sequence semantics, and 8 MHz epoch timestamps. The simulator may still

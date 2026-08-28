@@ -194,6 +194,55 @@ gaps, `GAP_BEFORE`/`OVERRUN_BEFORE` flags, or the firmware counters returned by
 GET_STATUS. `stale_blocks_discarded` separately records blocks rejected because
 their run ID is not the active START epoch.
 
+Hardware-capable transports may implement `readinto(buffer)`. The reader
+detects that optional extension and repeatedly fills one fixed 64 KiB
+`bytearray`; transports that only implement the original `read(size)` contract
+remain compatible. The default data queue holds 512 complete frames (about
+2 MiB), enough to absorb a large read and ordinary command-response jitter
+while remaining explicitly bounded. Reader snapshots include current and
+high-water queue depths, maximum read size, reusable-read call count, and
+per-source receive, queue-drop, STOP-boundary, and stale-run accounting.
+
+## Strict synthetic soaks and metrics
+
+`validate_synthetic_block()` checks complete ADC and GPIO payloads against
+their periodic formulas using bulk memory views on the normal path. It does
+not expand packed GPIO bits, materialize ADC sample objects, import NumPy, or
+loop over individual bytes. `strict=True` applies formula and parser checks to
+ordinary facade reads in addition to the existing run/sequence/timestamp/gap
+policy. `validate_stream_health()` explicitly grades firmware and host health
+counters without changing production `loss_counters()` behavior.
+
+For a complete bounded run, use the reusable soak layer:
+
+```python
+from teensy_daq import TeensyDAQ, run_synthetic_soak
+
+with TeensyDAQ.open(hardware_serial=12345670, strict=True) as daq:
+    metrics = run_synthetic_soak(
+        daq,
+        duration=10.0,
+        status_interval=0.25,
+    )
+
+print(metrics.payload_bytes_per_second)
+print(metrics.framed_bytes_per_second)
+print(metrics.command_latency.p99_seconds)
+print(metrics.queues.block_queue_high_water)
+print(metrics.memory.peak_bytes)
+metrics.reconciliation.require_exact()
+```
+
+The runner owns CONFIGURE→START→capture→STOP→final STATUS for its epoch and
+leaves the open facade in IDLE. STATUS requests use the same background reader
+as data. After STOP, the runner waits for the finite firmware drain to settle
+and reconciles each source's firmware-emitted count with wire-decoded frames,
+validated consumer frames, bounded queue drops, and deliberate boundary/stale
+discards. Command latency retention is bounded and reports how many samples,
+if any, were discarded from its percentile window. `frame_count=` is an
+alternative deterministic bound for offline simulator checks; real acceptance
+soaks normally use `duration=`.
+
 ## Metadata-first device discovery
 
 Discovery never opens unrelated serial ports. `enumerate_candidates()` uses

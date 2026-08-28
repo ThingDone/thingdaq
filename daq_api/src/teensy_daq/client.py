@@ -44,6 +44,7 @@ from .models import (
 )
 from .protocol import ParserCounters
 from .reader import (
+    DEFAULT_MAX_QUEUED_BLOCKS,
     BackgroundReader,
     DeviceDisconnectedError,
     QueueWaitTimeoutError,
@@ -54,6 +55,7 @@ from .reader import (
     StreamStoppedError,
 )
 from .simulator import SimulatedDevice
+from .synthetic import SyntheticPatternError, validate_synthetic_block
 from .transport import ByteTransport, InMemoryTransport, SerialTransport
 
 DataBlock: TypeAlias = ADCBlock | GPIOBlock
@@ -184,6 +186,14 @@ class UnexpectedStreamGapError(TeensyDAQError):
         self.block = block
 
 
+class UnexpectedStreamValidationError(UnexpectedMessageError):
+    """Strict validation found corrupt data or a nonzero health counter."""
+
+    def __init__(self, category: str, message: str) -> None:
+        super().__init__(f"strict stream validation failed ({category}): {message}")
+        self.category = category
+
+
 class HostBufferFullError(TeensyDAQError):
     """The compatibility injection queue has no remaining bounded capacity."""
 
@@ -204,7 +214,7 @@ class TeensyDAQ:
         *,
         strict: bool = False,
         read_size: int = 64 * 1024,
-        max_buffered_blocks: int = 8,
+        max_buffered_blocks: int = DEFAULT_MAX_QUEUED_BLOCKS,
         max_buffered_events: int = 32,
         max_pending_requests: int = 32,
         command_timeout: float = 1.0,
@@ -263,6 +273,8 @@ class TeensyDAQ:
         self._last_host_queue_drops = 0
         self._unattributed_host_queue_drops = 0
         self._observed_stream_gaps = 0
+        self._stream_parser_error_baseline = 0
+        self._stream_host_drop_baseline = 0
         self._closed = False
         self._reader.start()
 
@@ -285,7 +297,7 @@ class TeensyDAQ:
         serial_close_timeout: float = 0.5,
         strict: bool = False,
         read_size: int = 64 * 1024,
-        max_buffered_blocks: int = 8,
+        max_buffered_blocks: int = DEFAULT_MAX_QUEUED_BLOCKS,
         max_buffered_events: int = 32,
         max_pending_requests: int = 32,
         command_timeout: float = 1.0,
@@ -409,7 +421,7 @@ class TeensyDAQ:
         stream_interval: float | None = None,
         strict: bool = False,
         read_size: int = 64 * 1024,
-        max_buffered_blocks: int = 8,
+        max_buffered_blocks: int = DEFAULT_MAX_QUEUED_BLOCKS,
         max_buffered_events: int = 32,
         max_pending_requests: int = 32,
         command_timeout: float = 1.0,
@@ -663,6 +675,10 @@ class TeensyDAQ:
             self._pending_items.clear()
             self._initialize_stream_expectations(response.value)
             self._last_host_queue_drops = host_drop_baseline
+            self._stream_host_drop_baseline = host_drop_baseline
+            self._stream_parser_error_baseline = (
+                self._reader.parser_counters.corruption_events
+            )
             self._unattributed_host_queue_drops = 0
             self._observed_stream_gaps = 0
             self._last_status = None
@@ -813,6 +829,57 @@ class TeensyDAQ:
             host=self.host_counters,
             observed_stream_gaps=self._observed_stream_gaps,
         )
+
+    def validate_stream_health(self, status: Status | None = None) -> Status:
+        """Strictly reject parser, host-queue, and firmware health failures.
+
+        Passing an already retrieved status avoids another command round trip.
+        This check is explicit so production callers may continue to use
+        :meth:`loss_counters` for observe-and-report behavior even when the
+        facade's block policy is strict.
+        """
+
+        with self._lock:
+            self._ensure_open()
+            snapshot = self.status() if status is None else status
+            if not isinstance(snapshot, Status):
+                raise TypeError("status must be a Status snapshot")
+            parser_errors = (
+                self._reader.parser_counters.corruption_events
+                - self._stream_parser_error_baseline
+            )
+            if parser_errors:
+                raise UnexpectedStreamValidationError(
+                    "parser_errors",
+                    f"observed {parser_errors} new rejected frame candidate(s)",
+                )
+            host_drops = (
+                self._reader.counters.host_block_queue_drops
+                - self._stream_host_drop_baseline
+            )
+            if host_drops:
+                raise UnexpectedStreamValidationError(
+                    "host_queue_drops",
+                    f"dropped {host_drops} decoded block(s)",
+                )
+            if snapshot.adc_items_dropped or snapshot.gpio_items_dropped:
+                raise UnexpectedStreamValidationError(
+                    "firmware_drops",
+                    "firmware reported "
+                    f"{snapshot.adc_items_dropped} ADC pair(s) and "
+                    f"{snapshot.gpio_items_dropped} GPIO sample(s) dropped",
+                )
+            if snapshot.parser_errors:
+                raise UnexpectedStreamValidationError(
+                    "firmware_parser_errors",
+                    f"firmware reported {snapshot.parser_errors} parser error(s)",
+                )
+            if snapshot.transport_errors:
+                raise UnexpectedStreamValidationError(
+                    "firmware_transport_errors",
+                    f"firmware reported {snapshot.transport_errors} transport error(s)",
+                )
+            return snapshot
 
     def close(self, *, stop: bool = True) -> None:
         """Close idempotently, normally STOPping configured/running firmware.
@@ -1018,6 +1085,27 @@ class TeensyDAQ:
         self._expected_sequence[kind] = (block.sequence + 1) & constants.UINT32_MAX
         self._expected_ticks[kind] = block.end_tick_exclusive
         if gap is None:
+            if self._strict:
+                parser_errors = (
+                    self._reader.parser_counters.corruption_events
+                    - self._stream_parser_error_baseline
+                )
+                if parser_errors:
+                    raise UnexpectedStreamValidationError(
+                        "parser_errors",
+                        f"observed {parser_errors} new rejected frame candidate(s)",
+                    )
+                if (
+                    self._configuration is not None
+                    and self._configuration.source is constants.Source.SYNTHETIC
+                ):
+                    try:
+                        validate_synthetic_block(block)
+                    except SyntheticPatternError as error:
+                        raise UnexpectedStreamValidationError(
+                            "synthetic_pattern",
+                            str(error),
+                        ) from error
             return block
 
         self._unattributed_host_queue_drops -= gap.host_queue_drops
@@ -1072,4 +1160,5 @@ __all__ = [
     "TeensyDAQError",
     "UnexpectedMessageError",
     "UnexpectedStreamGapError",
+    "UnexpectedStreamValidationError",
 ]
