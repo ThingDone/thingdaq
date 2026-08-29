@@ -1593,6 +1593,50 @@ def _available_process_memory_bytes() -> int | None:
     return None
 
 
+def _cgroup_cpu_statistics() -> dict[str, int]:
+    """Read normalized cgroup CPU counters without probing during streaming."""
+
+    paths = ("/sys/fs/cgroup/cpu.stat", "/sys/fs/cgroup/cpu/cpu.stat")
+    for path in paths:
+        try:
+            with open(path, encoding="ascii") as handle:
+                values = {
+                    parts[0]: int(parts[1])
+                    for line in handle
+                    if len(parts := line.split()) == 2
+                }
+        except (FileNotFoundError, OSError, ValueError):
+            continue
+        if "throttled_time" in values and "throttled_usec" not in values:
+            values["throttled_usec"] = values["throttled_time"] // 1_000
+        return values
+    return {}
+
+
+class CpuTracker:
+    """Boundary-only cgroup quota evidence for host-stall classification."""
+
+    def __init__(self) -> None:
+        self.baseline = _cgroup_cpu_statistics()
+        self.final = dict(self.baseline)
+
+    def sample(self) -> None:
+        self.final = _cgroup_cpu_statistics()
+
+    def summary(self) -> dict[str, object]:
+        delta = {
+            name: max(0, value - self.baseline[name])
+            for name, value in self.final.items()
+            if name in self.baseline
+        }
+        return {
+            "coverage": "control boundaries only",
+            "baseline": self.baseline,
+            "final": self.final,
+            "delta": delta,
+        }
+
+
 class MemoryTracker:
     """Boundary tracing plus continuous process RSS high-water evidence.
 
@@ -1791,6 +1835,9 @@ def _build_adc_pattern() -> bytes:
 ADC_PATTERN = _build_adc_pattern()
 ADC_PATTERN_DOUBLE = ADC_PATTERN + ADC_PATTERN
 GPIO_PATTERN_EXPANDED = bytes(range(256)) * 17
+ADC_PHYSICAL_OUT_OF_RANGE_MASK = int.from_bytes(
+    b"\x00\xf0" * (DATA_PAYLOAD_BYTES // 2), "little"
+)
 
 
 @dataclass
@@ -1943,9 +1990,9 @@ class StreamValidator:
                 raise SoakFailure("pattern_error", "ADC formula bytes differ")
             return
 
-        high_bytes = frame.payload[1::2]
         require(
-            max(high_bytes) <= 0x0F,
+            int.from_bytes(frame.payload, "little") & ADC_PHYSICAL_OUT_OF_RANGE_MASK
+            == 0,
             "physical_range",
             "physical ADC payload contains a code above 4095",
         )
@@ -2646,8 +2693,12 @@ class SoakRunner:
         self.status_latency = BoundedLatency()
         self.command_latency = BoundedLatency()
         self.memory = MemoryTracker()
+        self.cpu = CpuTracker()
         self.reopen_count = 0
         self.cleanup: dict[str, object] = {"attempted": False}
+        self.active_epoch_index: int | None = None
+        self.active_validator: StreamValidator | None = None
+        self.active_status: StatusSnapshot | None = None
 
     def _check_budget(self, context: str, *, reserve: float = 0.0) -> None:
         remaining = self.hard_deadline - self.clock.monotonic()
@@ -2823,6 +2874,9 @@ class SoakRunner:
             self.settings.checksum_algorithm,
             self.clock,
         )
+        self.active_epoch_index = index
+        self.active_validator = validator
+        self.active_status = None
         for frame in deferred:
             validator.accept(frame)
         expected_generation = (configured_status.stats_generation + 1) & 0xFFFFFFFF or 1
@@ -2884,6 +2938,7 @@ class SoakRunner:
                 self.status_latency.add(latency)
                 self.command_latency.add(latency)
                 status = decode_status(status_frame)
+                self.active_status = status
                 expected_commands = link.accepted_requests - accepted_before_start - 1
                 validate_running_status(
                     status,
@@ -3117,6 +3172,7 @@ class SoakRunner:
             )
 
         self.memory.sample(checkpoint=True)
+        self.cpu.sample()
         memory_summary = self.memory.summary()
         require(
             self.memory.traced_growth_bytes <= MAX_TRACED_GROWTH_BYTES,
@@ -3199,6 +3255,7 @@ class SoakRunner:
                 },
                 "maximum_queues": maximum_queues,
                 "memory": memory_summary,
+                "cpu": self.cpu.summary(),
             },
             "epochs": [epoch.as_dict() for epoch in self.epochs],
             "cleanup": {"attempted": False, "normal_close": True},
@@ -3299,6 +3356,7 @@ class SoakRunner:
 
     def failure_result(self, error: BaseException) -> dict[str, object]:
         self.memory.end_streaming()
+        self.cpu.sample()
         category = error.category if isinstance(error, SoakFailure) else "program"
         return {
             "schema_version": RESULT_SCHEMA_VERSION,
@@ -3329,6 +3387,8 @@ class SoakRunner:
                     "all_commands": self.command_latency.summary(),
                 },
                 "memory": self.memory.summary(),
+                "cpu": self.cpu.summary(),
+                "active_epoch": self._active_epoch_evidence(),
             },
             "epochs": [epoch.as_dict() for epoch in self.epochs],
             "cleanup": self.cleanup,
@@ -3340,6 +3400,47 @@ class SoakRunner:
                 "serial_read_bytes": self.settings.serial_read_bytes,
             },
             "completed_utc": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def _active_epoch_evidence(self) -> dict[str, object] | None:
+        validator = self.active_validator
+        if validator is None:
+            return None
+        link = self.link
+        status = self.active_status
+        return {
+            "index": self.active_epoch_index,
+            "source": (
+                "synthetic" if validator.source == SOURCE_SYNTHETIC else "hardware"
+            ),
+            "run_id": validator.run_id,
+            "adc_frames": validator.adc.frames,
+            "gpio_frames": validator.gpio.frames,
+            "maximum_receive_gap_seconds": validator.maximum_receive_gap_seconds,
+            "parser": (
+                {
+                    "bytes_received": link.parser.bytes_received,
+                    "frames_decoded": link.parser.frames_decoded,
+                    "bytes_discarded": link.parser.bytes_discarded,
+                    "errors": link.parser.errors,
+                    "high_water_bytes": link.parser.high_water_bytes,
+                    "maximum_read_bytes": link.maximum_read_bytes,
+                    "buffered_bytes": len(link.parser.buffer),
+                }
+                if link is not None
+                else None
+            ),
+            "last_status_nonzero_errors": (
+                _nonzero_errors(status, allow_physical_stop_tail=False)
+                if status is not None
+                else None
+            ),
+            "last_status_queues": (
+                {name: status.values[name] for name in QUEUE_FIELDS}
+                if status is not None
+                else None
+            ),
+            "diagnostic_samples": validator.diagnostics.summary(),
         }
 
     def close(self) -> None:

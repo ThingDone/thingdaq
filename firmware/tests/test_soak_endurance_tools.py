@@ -483,6 +483,55 @@ class SoakGeneratorTests(unittest.TestCase):
 
 
 class SoakValidatorFailureTests(unittest.TestCase):
+    def test_physical_adc_range_check_covers_every_high_nibble(self) -> None:
+        adc_wire = (PROTOCOL_FIXTURES / "adc-data.bin").read_bytes()
+        parsed = canonical_validator.FrameParser().feed(adc_wire)[0]
+        physical = replace(
+            parsed,
+            flags=canonical_validator.FLAG_EPOCH_START,
+            payload=bytes(len(parsed.payload)),
+        )
+        canonical_validator.StreamValidator(
+            physical.run_id,
+            canonical_validator.SOURCE_HARDWARE,
+            physical.checksum_algorithm,
+            VirtualClock(),
+        ).accept(physical)
+
+        for byte_index in (
+            1,
+            len(physical.payload) // 2 + 1,
+            len(physical.payload) - 1,
+        ):
+            invalid = bytearray(physical.payload)
+            invalid[byte_index] = 0x10
+            validator = canonical_validator.StreamValidator(
+                physical.run_id,
+                canonical_validator.SOURCE_HARDWARE,
+                physical.checksum_algorithm,
+                VirtualClock(),
+            )
+            with self.subTest(byte_index=byte_index):
+                with self.assertRaises(canonical_validator.SoakFailure) as caught:
+                    validator.accept(replace(physical, payload=bytes(invalid)))
+                self.assertEqual("physical_range", caught.exception.category)
+
+    def test_cgroup_cpu_tracker_reports_boundary_deltas(self) -> None:
+        with patch.object(
+            canonical_validator,
+            "_cgroup_cpu_statistics",
+            side_effect=[
+                {"nr_periods": 10, "nr_throttled": 2, "throttled_usec": 5_000},
+                {"nr_periods": 20, "nr_throttled": 7, "throttled_usec": 17_000},
+            ],
+        ):
+            cpu = canonical_validator.CpuTracker()
+            cpu.sample()
+        summary = cpu.summary()
+        self.assertEqual(10, summary["delta"]["nr_periods"])
+        self.assertEqual(5, summary["delta"]["nr_throttled"])
+        self.assertEqual(12_000, summary["delta"]["throttled_usec"])
+
     def test_wire_and_resource_failures_match_transcript_categories(self) -> None:
         clock = VirtualClock()
         adc_wire = (PROTOCOL_FIXTURES / "adc-data.bin").read_bytes()
@@ -692,6 +741,58 @@ class SoakValidatorFailureTests(unittest.TestCase):
 
 
 class AcceleratedCampaignTests(unittest.TestCase):
+    def test_failure_retains_active_epoch_and_host_pressure_evidence(self) -> None:
+        rig = _load_module(
+            GENERATED_DIRECTORY / generator.OUTPUTS["physical-combined"],
+            "generated_soak_active_failure",
+        )
+        clock = VirtualClock()
+        ports: list[AcceleratedSerial] = []
+        settings = rig.load_settings()
+        device = AcceleratedSoakDevice(settings, rig)
+        healthy_status = device.status
+
+        def status_with_pressure() -> Status:
+            status = healthy_status()
+            if device.state is constants.DeviceState.RUNNING:
+                return replace(status, packet_pool_exhaustions=1)
+            return status
+
+        with (
+            patch.object(rig, "ADC_PAIR_RATE_HZ", ACCELERATED_ADC_PAIR_RATE_HZ),
+            patch.object(rig, "GPIO_SAMPLE_RATE_HZ", ACCELERATED_GPIO_SAMPLE_RATE_HZ),
+            patch.object(
+                rig,
+                "TARGET_COMBINED_PAYLOAD_BYTES_PER_SECOND",
+                ACCELERATED_PAYLOAD_BYTES_PER_SECOND,
+            ),
+            patch.object(rig, "_current_rss_bytes", return_value=64 * 1024**2),
+            patch.object(rig, "_peak_rss_bytes", return_value=64 * 1024**2),
+            patch.object(
+                rig,
+                "_available_process_memory_bytes",
+                return_value=512 * 1024**2,
+            ),
+            patch.object(rig, "_cgroup_cpu_statistics", return_value={}),
+            patch.object(device, "status", side_effect=status_with_pressure),
+        ):
+            exit_code, result = rig.run_generated(
+                settings,
+                AcceleratedPortFactory(device, clock, ports),
+                clock=clock,
+            )
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual("counter_disagreement", result["failure"]["category"])
+        active = result["metrics"]["active_epoch"]
+        self.assertEqual(1, active["index"])
+        self.assertEqual("hardware", active["source"])
+        self.assertEqual(
+            1, active["last_status_nonzero_errors"]["packet_pool_exhaustions"]
+        )
+        self.assertEqual(0, active["parser"]["errors"])
+        self.assertIn("maximum_receive_gap_seconds", active)
+
     def test_all_generated_600_second_modes_execute_with_a_fake_clock(self) -> None:
         for index, (mode, filename) in enumerate(generator.OUTPUTS.items(), start=1):
             rig = _load_module(

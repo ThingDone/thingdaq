@@ -80,6 +80,9 @@ control-stress runs use 16 KiB batches. The smaller hardware batch bounds each
 non-yielding range/structure-validation visit on the service's constrained CPU
 runner, so physical DMA keeps the proven host-drain cadence. The selected byte
 count is included in both `SOAK_EVENT program_start` and the terminal result.
+Physical ADC range validation uses one C-level integer mask over every 12-bit
+sample instead of a Python byte-lane loop, keeping the same exhaustive check
+while reducing work inside the service's 0.5-core quota.
 
 ## Validation and stdout contract
 
@@ -92,7 +95,10 @@ undeclared external analog or digital stimulus cannot be quality-graded.
 
 Evidence is bounded to first/last diagnostic samples, representative STATUS
 snapshots, latency samples, queue maxima, counter endpoints, `tracemalloc`, RSS,
-and available container/process memory. Progress lines begin with `SOAK_EVENT`.
+available container/process memory, and boundary-only cgroup CPU/throttling
+counters. A failed active epoch also retains its receive-gap maximum, parser
+counters, last STATUS errors/queues, and bounded samples so a host scheduling
+stall can be separated from device-originated loss. Progress lines begin with `SOAK_EVENT`.
 Exactly one terminal line begins with `SOAK_RESULT ` followed by compact JSON;
 the process exits zero only when that result is `PASS`.
 
