@@ -8,6 +8,7 @@ tags:
   - documentation
 related:
   - '[[Quickstart]]'
+  - '[[soak-harness]]'
   - '[[Python-API]]'
   - '[[API-Reference]]'
   - '[[Hardware-Safety]]'
@@ -48,7 +49,8 @@ double-bracket document links so the project can be explored as a graph.
 
 ## Organization
 
-- `guides/` contains executable user workflows, beginning with [[Quickstart]].
+- `guides/` contains executable user workflows, beginning with [[Quickstart]]
+  and the generated remote endurance workflow in [[soak-harness]].
 - `architecture/` describes system boundaries and component relationships,
   beginning with [[System-Overview]] and [[Firmware-Resource-Map]], with the
   centralized physical lifecycle and Phase 08 composition audit in

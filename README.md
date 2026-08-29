@@ -122,6 +122,7 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 
 - [Documentation index](doc/README.md)
 - [Quickstart](doc/guides/quickstart.md)
+- [Autonomous soak harness](doc/guides/soak-harness.md)
 - [Python API architecture](doc/architecture/python-api.md)
 - [Python API reference](doc/reference/api-reference.md)
 - [Hardware safety](doc/reference/hardware-safety.md)

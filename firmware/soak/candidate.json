@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "artifact": {
+    "name": "firmware.ino.hex",
+    "sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769"
+  },
+  "board": {
+    "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+    "hardware_serial": 20512460,
+    "board_id": 1,
+    "mcu_id": 1
+  },
+  "firmware": {
+    "version": [
+      0,
+      7,
+      0
+    ],
+    "build_id": "tdaq-ea010335c9b63bb7",
+    "source_id": "ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85"
+  },
+  "protocol": {
+    "version": 1,
+    "checksum_algorithm": 1,
+    "checksum_name": "ADLER32"
+  },
+  "soak": {
+    "measured_duration_seconds": 600.0,
+    "warmup_seconds": 1.0,
+    "status_interval_seconds": 0.5,
+    "info_interval_seconds": 30.0,
+    "control_epoch_seconds": 12.0,
+    "control_reopen_every_epochs": 4,
+    "hard_deadline_seconds": 780.0,
+    "service_container_limit_seconds": 900.0
+  }
+}
