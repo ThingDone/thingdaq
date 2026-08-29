@@ -16,6 +16,7 @@ namespace teensy_daq::runtime {
 
 struct LoopReport : acquisition::Report {
   usb::ServiceReport receive{};
+  usb::ServiceReport transmit_before_producers{};
   usb::ServiceReport transmit{};
   control::PendingEvents events{};
   packet::PromotionReport packet_promotion{};

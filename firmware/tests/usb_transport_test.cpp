@@ -468,7 +468,7 @@ void testTransmitBudgets() {
   usb::CdcTransport transport(stream, statistics, &lower);
 
   const usb::ServiceReport first = transport.serviceTransmit();
-  expect(first.bytes_written == teensy_daq::board::kUsbTxBudgetBytesPerLoop &&
+  expect(first.bytes_written == teensy_daq::board::kUsbTxBudgetBytesPerVisit &&
              first.byte_budget_exhausted &&
              first.frames_completed == 2U && first.io_calls == 4U &&
              stream.write_requests.size() == 4U &&
@@ -513,9 +513,9 @@ void testTransmitBudgets() {
   const usb::ServiceReport recovered =
       call_limited_transport.serviceTransmit();
   expect(recovered.bytes_written ==
-                 teensy_daq::board::kUsbTxCallsPerLoop *
+                 teensy_daq::board::kUsbTxCallsPerVisit *
                      teensy_daq::board::kUsbTxMinimumWriteBytes &&
-             recovered.io_calls == teensy_daq::board::kUsbTxCallsPerLoop &&
+             recovered.io_calls == teensy_daq::board::kUsbTxCallsPerVisit &&
              recovered.call_budget_exhausted &&
              !call_limited_stream.write_requests.empty() &&
              call_limited_stream.write_requests.front() ==

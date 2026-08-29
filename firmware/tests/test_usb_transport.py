@@ -93,7 +93,7 @@ class FirmwareUsbTransportTests(unittest.TestCase):
 
         self.assertIn("std::array", portable_source)
         self.assertIn("kUsbRxBudgetBytesPerLoop", portable_source)
-        self.assertIn("kUsbTxCallsPerLoop", portable_source)
+        self.assertIn("kUsbTxCallsPerVisit", portable_source)
         self.assertIn("LowerPriorityFrameSource", portable_source)
 
     def test_teensy_adapter_uses_core_identity_without_dtr_gating(self) -> None:

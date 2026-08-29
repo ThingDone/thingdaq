@@ -236,11 +236,11 @@ static_assert(board::kResponseQueueDepth > 0U);
 static_assert(board::kUsbRxScratchBytes >=
               protocol_v1::kMaxCommandFrameBytes);
 static_assert(board::kUsbRxBudgetBytesPerLoop > 0U);
-static_assert(board::kUsbTxBudgetBytesPerLoop > 0U);
+static_assert(board::kUsbTxBudgetBytesPerVisit > 0U);
 static_assert(board::kUsbTxMinimumWriteBytes > 1U);
 static_assert(board::kUsbTxMinimumWriteBytes <=
               board::kUsbTxMaxWriteBytes);
 static_assert(board::kUsbTxMaxWriteBytes <=
-              board::kUsbTxBudgetBytesPerLoop);
+              board::kUsbTxBudgetBytesPerVisit);
 
 }  // namespace teensy_daq::usb

@@ -795,8 +795,19 @@ DrainResult drain(app::FirmwareRuntime &firmware, FakeCdcStream &stream) {
 
     expect(report.receive.bytes_processed <= board::kUsbRxBudgetBytesPerLoop &&
                report.receive.io_calls <= board::kUsbRxCallsPerLoop &&
-               report.transmit.bytes_written <= board::kUsbTxBudgetBytesPerLoop &&
-               report.transmit.io_calls <= board::kUsbTxCallsPerLoop,
+               report.transmit_before_producers.bytes_written <=
+                   board::kUsbTxBudgetBytesPerVisit &&
+               report.transmit_before_producers.io_calls <=
+                   board::kUsbTxCallsPerVisit &&
+               report.transmit.bytes_written <=
+                   board::kUsbTxBudgetBytesPerVisit &&
+               report.transmit.io_calls <= board::kUsbTxCallsPerVisit &&
+               report.transmit_before_producers.bytes_written +
+                       report.transmit.bytes_written <=
+                   board::kUsbTxBudgetBytesPerLoop &&
+               report.transmit_before_producers.io_calls +
+                       report.transmit.io_calls <=
+                   board::kUsbTxCallsPerLoop,
            "each cooperative loop respects every USB work budget");
     expect(after.commands_dequeued - before.commands_dequeued <= 1U,
            "each cooperative loop dispatches at most one command");
@@ -1234,6 +1245,54 @@ void testStartupSchedulingJitterFitsPacketPool() {
   expect(data_frames[0] == kJitterIntervals &&
              data_frames[1] == kJitterIntervals && status_responses == 1U,
          "jitter recovery preserves both streams and interleaved STATUS");
+}
+
+void testTransmitVisitsBracketProducerWork() {
+  FakeCdcStream stream{};
+  stream.max_read_size = 128U;
+  stream.available_write_size = board::kUsbTxMaxWriteBytes;
+  stream.max_write_size = constants::kDataFrameBytes;
+  packet::OwnedPacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  app::FirmwareRuntime firmware{stream, packet_storage, clock};
+  expect(firmware.begin(7070U), "bracketed TX test completes BOOT");
+
+  stream.appendInput(configureRequest(181U));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 182U));
+  expect(drain(firmware, stream).quiescent && firmware.runId() == 1U,
+         "bracketed TX test reaches a paced RUNNING epoch");
+  stream.output.clear();
+  stream.max_write_size = board::kUsbTxMinimumWriteBytes;
+
+  clock.ticks = synthetic::kFrameCoverageTicks;
+  const app::LoopReport first = firmware.service();
+  expect(first.transmit_before_producers.bytes_written == 0U &&
+             first.synthetic.frames_framed == 2U &&
+             first.transmit.bytes_written == constants::kDataFrameBytes &&
+             first.transmit.call_budget_exhausted,
+         "first interval uses only the bounded post-producer TX visit");
+
+  clock.ticks = 2U * synthetic::kFrameCoverageTicks;
+  const app::LoopReport second = firmware.service();
+  expect(second.transmit_before_producers.bytes_written ==
+                 constants::kDataFrameBytes &&
+             second.transmit_before_producers.call_budget_exhausted &&
+             second.synthetic.frames_framed == 2U &&
+             second.transmit.bytes_written == constants::kDataFrameBytes &&
+             second.transmit.call_budget_exhausted &&
+             second.transmit_before_producers.bytes_written +
+                     second.transmit.bytes_written <=
+                 board::kUsbTxBudgetBytesPerLoop,
+         "recovered capacity drains backlog before and new work after producers");
+  const packet::PipelineSnapshot snapshot = firmware.packetSnapshot();
+  expect(snapshot.sources[0].frames_dropped == 0U &&
+             snapshot.sources[1].frames_dropped == 0U &&
+             snapshot.pool_exhaustions == 0U,
+         "bracketed visits preserve both streams without packet pressure");
+
+  stream.max_write_size = constants::kDataFrameBytes;
+  expect(drain(firmware, stream).quiescent,
+         "bracketed TX test drains its remaining complete frame");
 }
 
 void testStopDrainGatesNextStartAndPreventsStaleRunData() {
@@ -2102,6 +2161,7 @@ int main() {
   testCompleteControlPlane();
   testSyntheticDataCountersReachStatus();
   testStartupSchedulingJitterFitsPacketPool();
+  testTransmitVisitsBracketProducerWork();
   testStopDrainGatesNextStartAndPreventsStaleRunData();
   testAcquisitionControllerAuditsBothPhysicalEnginesAtomically();
   testCombinedControllerUsesOneEpochAndDeterministicLifecycle();

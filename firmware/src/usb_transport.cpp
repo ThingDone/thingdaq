@@ -196,8 +196,8 @@ ServiceReport CdcTransport::serviceTransmit() {
   ServiceReport report{};
   bool stalled = false;
 
-  while (report.bytes_written < board::kUsbTxBudgetBytesPerLoop) {
-    if (report.io_calls >= board::kUsbTxCallsPerLoop) {
+  while (report.bytes_written < board::kUsbTxBudgetBytesPerVisit) {
+    if (report.io_calls >= board::kUsbTxCallsPerVisit) {
       report.call_budget_exhausted = true;
       saturatingIncrement(counters_.tx_call_budget_exhaustions);
       break;
@@ -232,7 +232,7 @@ ServiceReport CdcTransport::serviceTransmit() {
 
     const std::size_t frame_remaining = selection.bytes.size - tx_offset_;
     const std::size_t budget_remaining =
-        board::kUsbTxBudgetBytesPerLoop - report.bytes_written;
+        board::kUsbTxBudgetBytesPerVisit - report.bytes_written;
     const std::size_t minimum_write =
         minimum(frame_remaining, board::kUsbTxMinimumWriteBytes);
     if (budget_remaining < minimum_write) {
@@ -302,7 +302,7 @@ ServiceReport CdcTransport::serviceTransmit() {
     }
   }
 
-  if (report.bytes_written == board::kUsbTxBudgetBytesPerLoop &&
+  if (report.bytes_written == board::kUsbTxBudgetBytesPerVisit &&
       hasPendingTransmission()) {
     report.byte_budget_exhausted = true;
     saturatingIncrement(counters_.tx_byte_budget_exhaustions);

@@ -151,9 +151,16 @@ LoopReport FirmwareRuntime::service() {
   // pass. Consume it now so a failed START cannot generate data for one loop.
   applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
 
+  // Give already queued frames one bounded opportunity to enter the core TX
+  // ring before potentially expensive physical packing. A second, separately
+  // bounded visit below admits newly produced work and uses any capacity the
+  // high-speed USB engine recovered while producers ran. This brackets the
+  // only long cooperative work without an unbounded drain loop.
+  report.transmit_before_producers = transport_.serviceTransmit();
+
   // Pattern construction, framing/checksum work, queue ownership, and USB all
   // stay in this bounded cooperative path. Newly due work is promoted and
-  // offered to CDC during the same visit. The production clock is polled; no
+  // offered to CDC during the same loop. The production clock is polled; no
   // pacing ISR is installed.
   report.synthetic = synthetic_source_.service(now_ticks, packet_pipeline_);
   acquisition_controller_.service(report);

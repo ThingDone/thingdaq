@@ -126,15 +126,17 @@ class SyntheticPipelineTests(unittest.TestCase):
         self.assertIn("pipeline.beginFill", combined)
         self.assertIn("pipeline.finishFill", combined)
         self.assertIn("encodeDataFrameInPlace", combined)
-        self.assertIn("transport_.serviceTransmit()", runtime)
+        self.assertEqual(2, runtime.count("transport_.serviceTransmit()"))
+        transmit_before = runtime.index("report.transmit_before_producers =")
+        producer = runtime.index("synthetic_source_.service(")
+        promotion = runtime.index("packet_pipeline_.serviceReadyFrames()")
+        transmit_after = runtime.index("report.transmit =")
         self.assertLess(
-            runtime.index("synthetic_source_.service("),
-            runtime.index("packet_pipeline_.serviceReadyFrames()"),
+            transmit_before,
+            producer,
         )
-        self.assertLess(
-            runtime.index("packet_pipeline_.serviceReadyFrames()"),
-            runtime.index("transport_.serviceTransmit()"),
-        )
+        self.assertLess(producer, promotion)
+        self.assertLess(promotion, transmit_after)
         self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("attachInterrupt", sketch)
         self.assertNotIn("IntervalTimer", sketch)
