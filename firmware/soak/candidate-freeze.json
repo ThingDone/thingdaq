@@ -59,7 +59,7 @@
       "checksum_resources": {
         "algorithms": {
           "ADLER32": {
-            "code_address": "0x000010f8",
+            "code_address": "0x00001120",
             "code_symbol": "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)",
             "code_symbol_type": "T",
             "implementation": "arithmetic (no lookup table)",
@@ -68,8 +68,8 @@
             "table_ram_bytes": 0
           },
           "CRC32C": {
-            "address": "0x60011f64",
-            "code_address": "0x00001170",
+            "address": "0x6001202c",
+            "code_address": "0x00001198",
             "code_symbol": "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)",
             "code_symbol_type": "T",
             "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
@@ -80,8 +80,8 @@
             "table_ram_bytes": 0
           },
           "CRC32_ISO_HDLC": {
-            "address": "0x6000ff64",
-            "code_address": "0x000012a4",
+            "address": "0x6001002c",
+            "code_address": "0x000012cc",
             "code_symbol": "teensy_daq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
             "code_symbol_type": "T",
             "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
@@ -94,7 +94,7 @@
         },
         "placement": "memory-mapped program flash (.progmem.checksum.*)",
         "shared_dispatch": {
-          "address": "0x000013d8",
+          "address": "0x00001400",
           "code_bytes": 84,
           "symbol": "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
           "symbol_type": "T"
@@ -190,15 +190,15 @@
     "manifest_schema_version": 10,
     "memory_usage": {
       "flash": {
-        "code_bytes": 92956,
+        "code_bytes": 93220,
         "data_bytes": 23496,
         "free_for_files_bytes": 1906692,
-        "headers_bytes": 8472
+        "headers_bytes": 8208
       },
       "ram1": {
-        "code_bytes": 32696,
+        "code_bytes": 32760,
         "free_for_locals_bytes": 34560,
-        "padding_bytes": 72,
+        "padding_bytes": 8,
         "variables_bytes": 456960
       },
       "ram2": {
@@ -207,10 +207,10 @@
       }
     },
     "source": {
-      "build_id": "tdaq-cff5eb8e024e1399",
+      "build_id": "tdaq-4f1423acdfa045f2",
       "firmware_input_changes": [],
       "firmware_inputs_clean": true,
-      "git_commit": "a10d087b58eaa489a7879bbeabd63de72a541eca",
+      "git_commit": "38844310dd0ffd31fa7d24b29e2331ee271d7a42",
       "inputs": [
         "firmware/firmware.ino",
         "firmware/src/acquisition_controller.cpp",
@@ -277,24 +277,24 @@
         "firmware/src/usb_transport.h",
         "protocol/protocol-v1.json"
       ],
-      "source_id": "cff5eb8e024e1399126bc4648c9f2ace12de83020ad0705985d43520d3b850cb",
-      "timestamp_epoch": 1788029682,
+      "source_id": "4f1423acdfa045f23e8fa02a180fb73648996108ee0aae03417d5910fbeeda7a",
+      "timestamp_epoch": 1788031205,
       "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
-      "timestamp_utc": "2026-08-29T18:54:42Z"
+      "timestamp_utc": "2026-08-29T19:20:05Z"
     }
   },
   "candidate": {
     "artifact_name": "firmware.ino.hex",
-    "artifact_sha256": "00e16765cf71763307c3c5bf5174c91d82a92d3973391bdabfa89fb221a27a39",
-    "build_id": "tdaq-cff5eb8e024e1399",
+    "artifact_sha256": "f10798db45504fffb7dbbaacafaa06a8317b9c6fbab6b07c788e1a198881a3ba",
+    "build_id": "tdaq-4f1423acdfa045f2",
     "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
     "path": "firmware/soak/candidate.json",
-    "sha256": "68b92240f0823e52d0fb71fcb9cf1b686876753d59d784baacbe171a80f4f530",
-    "source_id": "cff5eb8e024e1399126bc4648c9f2ace12de83020ad0705985d43520d3b850cb"
+    "sha256": "c2dac797f1e1f54310ee38d022435818dc84038e55dbf88a893d6b39c96621f6",
+    "source_id": "4f1423acdfa045f23e8fa02a180fb73648996108ee0aae03417d5910fbeeda7a"
   },
-  "created_utc": "2026-08-29T18:55:45+00:00",
+  "created_utc": "2026-08-29T19:22:01+00:00",
   "protected": {
-    "base_git_commit": "a10d087b58eaa489a7879bbeabd63de72a541eca",
+    "base_git_commit": "38844310dd0ffd31fa7d24b29e2331ee271d7a42",
     "file_count": 240,
     "files": [
       {
@@ -374,7 +374,7 @@
       },
       {
         "path": "daq_api/src/teensy_daq/_generated/protocol_constants.py",
-        "sha256": "80ed34388b9ca08832f116a2253c202cb0fb80881b9f3d7c8a715ed3de58b8b5",
+        "sha256": "0a618cdaed300fdc84970587986302740cb7c8dd5482d1dfd3960713ad668c03",
         "size_bytes": 51173
       },
       {
@@ -564,7 +564,7 @@
       },
       {
         "path": "daq_api/tests/test_gpio_clock_diagnostic_models.py",
-        "sha256": "9aa669fdd1639ca29b03c50d14fbd29000e77b546aba37cf56c4ae479d1f343f",
+        "sha256": "172a2e272d29dcb1ed2ff2084cac42dd0f4b5646d23be8d12c26cc00b13822b2",
         "size_bytes": 6028
       },
       {
@@ -609,7 +609,7 @@
       },
       {
         "path": "daq_api/tests/test_protocol_vectors_exhaustive.py",
-        "sha256": "fbe2c2f63c30eb0354f8771caad25c7f4e324e24cbc65788290dad02a6d9f348",
+        "sha256": "a10c27e06b5febdfd9965559678314e50e935c978a22f21d15d69a8fb38d0f94",
         "size_bytes": 16623
       },
       {
@@ -664,13 +664,13 @@
       },
       {
         "path": "firmware/soak/candidate.json",
-        "sha256": "c2ed8fd936b1931caa8418321410d2700e7b25ebd1e6cf2827bcda6401ad18f6",
+        "sha256": "cd72485df1601686e1a36a9e9973f087d5c5a2e73e35d0993e87331551d8b6f1",
         "size_bytes": 916
       },
       {
         "path": "firmware/soak/validator.py",
-        "sha256": "287e312dc1bc08784054e0027ca56a8d46efafa7254bc140f8eeab379de37d4b",
-        "size_bytes": 130324
+        "sha256": "4df6e31ae1e27dcf639b3dd121f7da54cef7373f9af875e69ef8546b2832d527",
+        "size_bytes": 131673
       },
       {
         "path": "firmware/src/acquisition_controller.cpp",
@@ -694,8 +694,8 @@
       },
       {
         "path": "firmware/src/adc_dma_capture_teensy.cpp",
-        "sha256": "7f23262a37565d5a378636b56c32cb24bb28ac562633bd2f67c286129a909456",
-        "size_bytes": 28287
+        "sha256": "d8832ed05c49cb04aa22d96b7cdec97c28dff351bf0f4129e95e12d6464ab6ad",
+        "size_bytes": 29252
       },
       {
         "path": "firmware/src/adc_dma_capture_teensy.h",
@@ -754,8 +754,8 @@
       },
       {
         "path": "firmware/src/board_config.h",
-        "sha256": "fb85304d1d60cbafb45b1de4a99e35f06678ff5dbd02d3e81ee41c597508c230",
-        "size_bytes": 47099
+        "sha256": "37ebca752ae16451784ac6eed86334b173ee16fb4640de30abea677707ddab3d",
+        "size_bytes": 47208
       },
       {
         "path": "firmware/src/checksum.cpp",
@@ -824,7 +824,7 @@
       },
       {
         "path": "firmware/src/generated/protocol_constants.h",
-        "sha256": "d7438a266b104f2545ce8629412fa76ddb17cd568dc1f63ff9808c67fc4b0dc5",
+        "sha256": "60483d9bcdba1f7baaf3c65c8370e83f4518ea4ad3cb37e775b675714711ee05",
         "size_bytes": 67564
       },
       {
@@ -904,7 +904,7 @@
       },
       {
         "path": "firmware/src/gpio_raw_capture_teensy.cpp",
-        "sha256": "95cf994ff353c42e775641b34ba72820e6c20b361cfabb694044dcc78c5f6b93",
+        "sha256": "2c4d33b4b43c0f75edd6f28b921923c041bb274a12c6fbf42eaf742730f699a8",
         "size_bytes": 18177
       },
       {
@@ -999,8 +999,8 @@
       },
       {
         "path": "firmware/tests/adc_register_adapter_test.cpp",
-        "sha256": "4e2e3d435d91bdf1e865c63369d1bb027c99363ae8f37d158acd18c3a995aa99",
-        "size_bytes": 21772
+        "sha256": "5edf3eeaa9fb2c1d6dc6013657d8ec378666a9629db31b9a96c6eed20c5a89a4",
+        "size_bytes": 21758
       },
       {
         "path": "firmware/tests/adc_trigger_test.cpp",
@@ -1059,18 +1059,18 @@
       },
       {
         "path": "firmware/tests/generated/rig_soak_control_stress.py",
-        "sha256": "90f0a423ed4dff5ce90a99048ee8ee5015c0b5fd65ef7958d2d2d7bbd3ac3761",
-        "size_bytes": 130243
+        "sha256": "4bb289b8597fb3f470c2020a86487d92265dc8e2ff3d1496b7f36980f1f18560",
+        "size_bytes": 131592
       },
       {
         "path": "firmware/tests/generated/rig_soak_physical_combined.py",
-        "sha256": "d3e54d062477eee04f2e27d4a3468785a43a8a5001578d36923832eca598c7e4",
-        "size_bytes": 130246
+        "sha256": "abea20defbd959b0611aad3ec91be5738c3df9810b58c9ba32056b468e22a1fe",
+        "size_bytes": 131595
       },
       {
         "path": "firmware/tests/generated/rig_soak_synthetic.py",
-        "sha256": "6b27b276d0377527cb5152fbc9d52add7d5d9f14305eb80278f806ebfb1a3732",
-        "size_bytes": 130238
+        "sha256": "f46601f0e9e6460978ee0f74574a49c22fceb71b62f1a85e3c1a0b80eed59c0a",
+        "size_bytes": 131587
       },
       {
         "path": "firmware/tests/gpio_batch_packer_benchmark.cpp",
@@ -1104,7 +1104,7 @@
       },
       {
         "path": "firmware/tests/identity_resource_test.cpp",
-        "sha256": "83975dec5b789f629148dc5662762dda3ea7a20f480659190eee441ae0ba6a79",
+        "sha256": "c5655a707749468344d168377cfb91774d728eb37cdbb9b8e8915d49d6931287",
         "size_bytes": 19444
       },
       {
@@ -1119,7 +1119,7 @@
       },
       {
         "path": "firmware/tests/protocol_primitives_test.cpp",
-        "sha256": "2768d6a208d488f7f531ff767995877557be5c3ed8baa0063b74b6baee217bd6",
+        "sha256": "09c46d6c73b0727a4720175c18bef87031535949a926524c9abb7bc81c219b61",
         "size_bytes": 40418
       },
       {
@@ -1134,7 +1134,7 @@
       },
       {
         "path": "firmware/tests/rig_combined_capture.py",
-        "sha256": "6d4a25d188b54498fb6e0c4104ef94303eb1046b51b4262d90fcf37cfb03dd7a",
+        "sha256": "0a7dad0aadfe3fc86583bf7afb47337a5f014d9ff9daba5770cdbf1cf2d1ae0a",
         "size_bytes": 147820
       },
       {
@@ -1149,7 +1149,7 @@
       },
       {
         "path": "firmware/tests/rig_gpio_capture.py",
-        "sha256": "ad68478e515d3729f406ff65873401f40c5781844b2253ca16527a7bb5b2baee",
+        "sha256": "00f5ace92129167f8243104f4fb5febd4fb8adabe8b7ae308be108ca10ae5221",
         "size_bytes": 101884
       },
       {
@@ -1174,8 +1174,8 @@
       },
       {
         "path": "firmware/tests/test_adc_dma_capture.py",
-        "sha256": "95b283979601f34db2db49291d43e3ca672c4b35726294e7ee292406980865fe",
-        "size_bytes": 5697
+        "sha256": "d851d68315b80a7ca4db9b3be4af8fe4d098a26ebf8bec24eceb5f7747f4b430",
+        "size_bytes": 5859
       },
       {
         "path": "firmware/tests/test_adc_frame_packer.py",
@@ -1324,8 +1324,8 @@
       },
       {
         "path": "firmware/tests/test_soak_endurance_tools.py",
-        "sha256": "bc3cc07ba74e08f8d0c1e4bc17a1e9cec1942ce4bf37de320dc26b3006ac814a",
-        "size_bytes": 43210
+        "sha256": "904091c35fc1ec57339dc05ef8d6910e4a05868e3bc9505f4bc6cbf38028a98e",
+        "size_bytes": 43489
       },
       {
         "path": "firmware/tests/test_synthetic_pipeline.py",
@@ -1414,7 +1414,7 @@
       },
       {
         "path": "protocol/fixtures/gpio-capture-diagnostic-response.bin",
-        "sha256": "da417e2659e00a1a032d33b546a949e5d157f38286b6e6eb7d7d1d0438499bd2",
+        "sha256": "ac24a6d9392364deefef376eda2e95cdc3fd51098d8a6d8231c0a7d9abd2d993",
         "size_bytes": 192
       },
       {
@@ -1424,7 +1424,7 @@
       },
       {
         "path": "protocol/fixtures/gpio-clock-diagnostic-response.bin",
-        "sha256": "6fd1ba4a5db9ecfb731162cc865698e43ff38c2e229811daa01a5892ab7f37b4",
+        "sha256": "25352e73531d85c93de82974718ae980caf53e22f8294db861184c55cd17af80",
         "size_bytes": 188
       },
       {
@@ -1439,12 +1439,12 @@
       },
       {
         "path": "protocol/fixtures/info-response.bin",
-        "sha256": "74f6824f6eed93b7346231e2d48f58a210fb68ee724969219ba059d5815f280c",
+        "sha256": "e0af805baca6ad2b3243df79b250c345735f68face5a802785ff012051cde0a5",
         "size_bytes": 424
       },
       {
         "path": "protocol/fixtures/manifest.json",
-        "sha256": "04a814b5082a476fdb965bd4d04ced9ca7a06aa001dd10b5bb53939cbf1b94c2",
+        "sha256": "e171220687aecc243bdcf18ec84097399223180b3ffaa63c98d7dae045cc9fe5",
         "size_bytes": 15671
       },
       {
@@ -1489,16 +1489,16 @@
       },
       {
         "path": "protocol/protocol-v1.json",
-        "sha256": "ee82cb67adee1cbe763c07f85dbf4639c8fdfe5d0703d8f270a7863cf871858c",
+        "sha256": "b8fe28ecdeb48b1238594d23a74efbda865a99b518a561614de2d8e92a6a4333",
         "size_bytes": 104552
       },
       {
         "path": "tools/generate_protocol.py",
-        "sha256": "180867f5c2b1ef6db7d534ff520cd4cb9da394939146b0ba637edbd326b6e40f",
+        "sha256": "0cba5b1ad20c929e361a2608548927e7d185f6e6bca8a27c387e921b5bcb9cb8",
         "size_bytes": 87698
       }
     ],
-    "tree_sha256": "2b803f65db9c0ebf9eef7ccdb92c386a31ec7c9483a70fc52ba37e9ee012c57a"
+    "tree_sha256": "98ed6dfbf98148dcc4f9365eb1a56ea793b1d3fa19f0b153999880efbf825419"
   },
   "reproducibility": {
     "artifacts": [
@@ -1509,55 +1509,55 @@
       },
       {
         "path": "firmware.ino.elf",
-        "sha256": "ed006fc3bfbbcc35e5ba14aa7410dac70f939b12393cb46366cbeee2ecba0408",
-        "size_bytes": 1792664
+        "sha256": "f6e5d1ecc32507b4eab5916fc417e7ce027c7d548b39342302cd55fa3cfdd26f",
+        "size_bytes": 1794976
       },
       {
         "path": "firmware.ino.hex",
-        "sha256": "00e16765cf71763307c3c5bf5174c91d82a92d3973391bdabfa89fb221a27a39",
-        "size_bytes": 351467
+        "sha256": "f10798db45504fffb7dbbaacafaa06a8317b9c6fbab6b07c788e1a198881a3ba",
+        "size_bytes": 351454
       },
       {
         "path": "firmware.ino.map",
-        "sha256": "fb8c6476a4b38b7eca9c1b202d22282c042165e789894231d9cf2f4ad633a858",
-        "size_bytes": 828532
+        "sha256": "c7fc54c780b75e096927600d6defa9149474f24db86eb6aa096e7c3755414481",
+        "size_bytes": 828888
       }
     ],
     "build_count": 2,
     "byte_identical": true,
     "manifest_sha256": {
-      "first": "14add26d4102069dabcd3d0b53f9bec101d45c182f86981a0c27db319ce04d0a",
-      "second": "14add26d4102069dabcd3d0b53f9bec101d45c182f86981a0c27db319ce04d0a"
+      "first": "9e2b239930367e0aaa5b718a99d851a92bd8d4865ec9fb21869840c1fc9da6cb",
+      "second": "9e2b239930367e0aaa5b718a99d851a92bd8d4865ec9fb21869840c1fc9da6cb"
     }
   },
   "schema_version": 1,
   "staged": {
-    "directory": ".maestro/playbooks/Working/phase-11-soak-candidate-00010/frozen",
+    "directory": ".maestro/playbooks/Working/phase-11-soak-candidate-00011/frozen",
     "files": [
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00010/frozen/build-manifest.json",
-        "sha256": "14add26d4102069dabcd3d0b53f9bec101d45c182f86981a0c27db319ce04d0a",
-        "size_bytes": 12789
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00011/frozen/build-manifest.json",
+        "sha256": "9e2b239930367e0aaa5b718a99d851a92bd8d4865ec9fb21869840c1fc9da6cb",
+        "size_bytes": 12787
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00010/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00011/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00010/frozen/firmware.ino.elf",
-        "sha256": "ed006fc3bfbbcc35e5ba14aa7410dac70f939b12393cb46366cbeee2ecba0408",
-        "size_bytes": 1792664
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00011/frozen/firmware.ino.elf",
+        "sha256": "f6e5d1ecc32507b4eab5916fc417e7ce027c7d548b39342302cd55fa3cfdd26f",
+        "size_bytes": 1794976
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00010/frozen/firmware.ino.hex",
-        "sha256": "00e16765cf71763307c3c5bf5174c91d82a92d3973391bdabfa89fb221a27a39",
-        "size_bytes": 351467
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00011/frozen/firmware.ino.hex",
+        "sha256": "f10798db45504fffb7dbbaacafaa06a8317b9c6fbab6b07c788e1a198881a3ba",
+        "size_bytes": 351454
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00010/frozen/firmware.ino.map",
-        "sha256": "fb8c6476a4b38b7eca9c1b202d22282c042165e789894231d9cf2f4ad633a858",
-        "size_bytes": 828532
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00011/frozen/firmware.ino.map",
+        "sha256": "c7fc54c780b75e096927600d6defa9149474f24db86eb6aa096e7c3755414481",
+        "size_bytes": 828888
       }
     ]
   }
