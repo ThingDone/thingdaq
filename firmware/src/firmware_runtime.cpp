@@ -151,33 +151,44 @@ LoopReport FirmwareRuntime::service() {
   // pass. Consume it now so a failed START cannot generate data for one loop.
   applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
 
-  // Give already queued frames one bounded opportunity to enter the core TX
-  // ring before potentially expensive physical packing. A second, separately
-  // bounded visit below admits newly produced work and uses any capacity the
-  // high-speed USB engine recovered while producers ran. This brackets the
-  // only long cooperative work without an unbounded drain loop.
-  report.transmit_before_producers = transport_.serviceTransmit();
-
   // Pattern construction, framing/checksum work, queue ownership, and USB all
   // stay in this bounded cooperative path. Newly due work is promoted and
-  // offered to CDC during the same loop. The production clock is polled; no
+  // offered to CDC during the same visit. The production clock is polled; no
   // pacing ISR is installed.
   report.synthetic = synthetic_source_.service(now_ticks, packet_pipeline_);
   acquisition_controller_.service(report);
   if (report.physical_fault_detected &&
       control_.state() != protocol_v1::DeviceState::kIdle) {
-    report.recovered_to_idle = control_.recoverToIdle();
-    if (!report.recovered_to_idle) {
-      report.internal_error = true;
-    }
-    // The controller has already initiated fail-safe source teardown. Consume
-    // ControlState's STOP signal in the same visit so a failed trigger cleanup
-    // is retried without leaving the externally visible state RUNNING.
-    applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
+    recoverPhysicalFault(now_ticks, report);
+  }
+  // Promote and transmit only after servicing physical ownership. While the
+  // high-speed core drains that bounded 8 KiB visit, service ownership again
+  // so ADC/GPIO completions cannot be hidden behind USB catch-up work.
+  report.packet_promotion_before_second_acquisition =
+      packet_pipeline_.serviceReadyFrames();
+  report.transmit_before_second_acquisition = transport_.serviceTransmit();
+
+  acquisition_controller_.service(report);
+  if (report.physical_fault_detected &&
+      control_.state() != protocol_v1::DeviceState::kIdle) {
+    recoverPhysicalFault(now_ticks, report);
   }
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
   return report;
+}
+
+TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.physical_fault")
+void FirmwareRuntime::recoverPhysicalFault(std::uint64_t now_ticks,
+                                           LoopReport &report) {
+  report.recovered_to_idle = control_.recoverToIdle();
+  if (!report.recovered_to_idle) {
+    report.internal_error = true;
+  }
+  // The controller has already initiated fail-safe source teardown. Consume
+  // ControlState's STOP signal in the same visit so a failed trigger cleanup
+  // is retried without leaving the externally visible state RUNNING.
+  applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
 }
 
 TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.pending_events")

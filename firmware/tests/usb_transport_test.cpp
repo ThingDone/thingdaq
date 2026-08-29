@@ -470,14 +470,14 @@ void testTransmitBudgets() {
   const usb::ServiceReport first = transport.serviceTransmit();
   expect(first.bytes_written == teensy_daq::board::kUsbTxBudgetBytesPerVisit &&
              first.byte_budget_exhausted &&
-             first.frames_completed == 2U && first.io_calls == 4U &&
-             stream.write_requests.size() == 4U &&
+             first.frames_completed == 2U && first.io_calls == 8U &&
+             stream.write_requests.size() == 8U &&
              std::all_of(stream.write_requests.begin(),
                          stream.write_requests.end(), [](std::size_t request) {
                            return request ==
                                   teensy_daq::board::kUsbTxMaxWriteBytes;
                          }),
-         "one loop fills the bounded four-buffer core TX ring");
+         "one loop fills the core TX ring in bounded USB-packet calls");
   expect(transport.snapshot().active_frame_bytes_sent == 0U &&
              lower.frames.size() == 1U,
          "byte budget stops at a complete frame boundary");
@@ -498,6 +498,9 @@ void testTransmitBudgets() {
   call_limited_lower.frames.push_back(dataFrame(
       constants::FrameKind::kGpioData, 10U, 1U,
       constants::kFrameCoverageTicks));
+  call_limited_lower.frames.push_back(dataFrame(
+      constants::FrameKind::kGpioData, 10U, 2U,
+      2U * constants::kFrameCoverageTicks));
   FakeCdcStream call_limited_stream{};
   call_limited_stream.writable_limit = 1;
   stats::Statistics call_limited_statistics{};

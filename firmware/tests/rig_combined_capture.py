@@ -44,7 +44,7 @@ STOP_DRAIN_DEADLINE_SECONDS = 2.0
 STOP_DRAIN_QUIET_SECONDS = 0.10
 DEFAULT_CAPTURE_SECONDS = 10.0
 DEFAULT_WARMUP_SECONDS = 0.25
-DEFAULT_STATUS_INTERVAL_SECONDS = 0.25
+DEFAULT_STATUS_INTERVAL_SECONDS = 0.5
 MAX_CAPTURE_SECONDS = 3600.0
 MAX_WARMUP_SECONDS = 10.0
 MIN_STATUS_INTERVAL_SECONDS = 0.01
@@ -2303,6 +2303,7 @@ class CombinedValidator:
         checksum_algorithm: int,
         resolution_bits: int,
         fixture: FixtureStimulus | None,
+        track_gpio_transitions: bool = False,
     ) -> None:
         if not 1 <= run_id <= 0xFFFFFFFF:
             raise ValueError("run ID must be a nonzero uint32")
@@ -2315,6 +2316,7 @@ class CombinedValidator:
         self.code_min = ADC_CODE_MIN
         self.code_max = (1 << resolution_bits) - 1
         self.fixture = fixture
+        self.track_gpio_transitions = track_gpio_transitions
         if fixture is not None:
             for index, channel in enumerate(fixture.channels):
                 if not (
@@ -2416,16 +2418,11 @@ class CombinedValidator:
             raise ProtocolFailure(
                 f"ADC payload contains a code outside {self.code_min}..{self.code_max}"
             )
-        self.channel_sums[0] += sum(frame.payload[0::4]) + 256 * sum(
-            frame.payload[1::4]
-        )
-        self.channel_sums[1] += sum(frame.payload[2::4]) + 256 * sum(
-            frame.payload[3::4]
-        )
-        # The byte-lane checks and sums above cover every code without
-        # allocating thousands of Python integers per frame. One complete
+        # The byte-lane check above covers every code without allocating
+        # thousands of Python integers per frame. One complete
         # frame supplies representative extrema when no external fixture is
-        # declared; a fixture retains exhaustive per-code envelope grading.
+        # declared; a fixture retains exhaustive per-code envelope and mean
+        # grading.
         if self.adc.frames == 0 or self.fixture is not None:
             samples = ADC_PAYLOAD_STRUCT.unpack(frame.payload)
             channels = (samples[0::2], samples[1::2])
@@ -2440,6 +2437,7 @@ class CombinedValidator:
                 )
                 if self.fixture is not None:
                     fixture = self.fixture.channels[index]
+                    self.channel_sums[index] += sum(values)
                     self.fixture_violations[index] += sum(
                         value < fixture.minimum_code or value > fixture.maximum_code
                         for value in values
@@ -2456,18 +2454,24 @@ class CombinedValidator:
             )
         if len(frame.payload) != GPIO_SAMPLES_PER_FRAME:
             raise ProtocolFailure("GPIO payload does not contain one byte per sample")
-        for value in set(frame.payload):
-            self.gpio_payload_and &= value
-            self.gpio_payload_or |= value
-            self.gpio_low_seen |= (~value) & 0xFF
-            self.gpio_high_seen |= value
-        if (
-            self._last_gpio_value is not None
-            and frame.payload[0] != self._last_gpio_value
-        ):
-            self.gpio_transitions += 1
-        self.gpio_transitions += count_adjacent_byte_transitions(frame.payload)
-        self._last_gpio_value = frame.payload[-1]
+        # ``bytes`` makes every sample intrinsically safe in 0..255, and the
+        # frame checksum covers all of them. Derive representative extrema
+        # once unless an external-transition claim explicitly needs exhaustive
+        # stream-wide level and transition evidence.
+        if self.gpio.frames == 0 or self.track_gpio_transitions:
+            for value in set(frame.payload):
+                self.gpio_payload_and &= value
+                self.gpio_payload_or |= value
+                self.gpio_low_seen |= (~value) & 0xFF
+                self.gpio_high_seen |= value
+        if self.track_gpio_transitions:
+            if (
+                self._last_gpio_value is not None
+                and frame.payload[0] != self._last_gpio_value
+            ):
+                self.gpio_transitions += 1
+            self.gpio_transitions += count_adjacent_byte_transitions(frame.payload)
+            self._last_gpio_value = frame.payload[-1]
         self._advance(self.gpio, frame)
 
     def means(self) -> tuple[float, float]:
@@ -3546,6 +3550,7 @@ def run_acceptance(
             checksum_algorithm,
             resolution_bits,
             fixture,
+            track_gpio_transitions=digital_exercised,
         )
         for data_frame in deferred:
             validator.accept(data_frame)

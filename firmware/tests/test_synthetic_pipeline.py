@@ -126,17 +126,25 @@ class SyntheticPipelineTests(unittest.TestCase):
         self.assertIn("pipeline.beginFill", combined)
         self.assertIn("pipeline.finishFill", combined)
         self.assertIn("encodeDataFrameInPlace", combined)
+        self.assertEqual(2, runtime.count("acquisition_controller_.service(report)"))
         self.assertEqual(2, runtime.count("transport_.serviceTransmit()"))
-        transmit_before = runtime.index("report.transmit_before_producers =")
         producer = runtime.index("synthetic_source_.service(")
-        promotion = runtime.index("packet_pipeline_.serviceReadyFrames()")
-        transmit_after = runtime.index("report.transmit =")
-        self.assertLess(
-            transmit_before,
-            producer,
+        first_acquisition = runtime.index("acquisition_controller_.service(report)")
+        first_promotion = runtime.index(
+            "report.packet_promotion_before_second_acquisition ="
         )
-        self.assertLess(producer, promotion)
-        self.assertLess(promotion, transmit_after)
+        first_transmit = runtime.index("report.transmit_before_second_acquisition =")
+        second_acquisition = runtime.index(
+            "acquisition_controller_.service(report)", first_acquisition + 1
+        )
+        second_promotion = runtime.index("report.packet_promotion =")
+        second_transmit = runtime.index("report.transmit =")
+        self.assertLess(producer, first_acquisition)
+        self.assertLess(first_acquisition, first_promotion)
+        self.assertLess(first_promotion, first_transmit)
+        self.assertLess(first_transmit, second_acquisition)
+        self.assertLess(second_acquisition, second_promotion)
+        self.assertLess(second_promotion, second_transmit)
         self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("attachInterrupt", sketch)
         self.assertNotIn("IntervalTimer", sketch)

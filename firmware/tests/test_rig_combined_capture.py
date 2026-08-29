@@ -569,7 +569,13 @@ class CombinedRigTests(unittest.TestCase):
         fixture = rig.load_fixture_stimulus(json.dumps(declaration))
         self.assertIsNotNone(fixture)
         assert fixture is not None
-        validator = rig.CombinedValidator(7, rig.CHECKSUM_ADLER32, 12, fixture)
+        validator = rig.CombinedValidator(
+            7,
+            rig.CHECKSUM_ADLER32,
+            12,
+            fixture,
+            track_gpio_transitions=True,
+        )
         adc_payload = struct.pack("<HH", 150, 350) * rig.ADC_PAIRS_PER_FRAME
         validator.accept(
             rig.Frame(

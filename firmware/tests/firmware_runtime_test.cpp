@@ -795,17 +795,17 @@ DrainResult drain(app::FirmwareRuntime &firmware, FakeCdcStream &stream) {
 
     expect(report.receive.bytes_processed <= board::kUsbRxBudgetBytesPerLoop &&
                report.receive.io_calls <= board::kUsbRxCallsPerLoop &&
-               report.transmit_before_producers.bytes_written <=
+               report.transmit_before_second_acquisition.bytes_written <=
                    board::kUsbTxBudgetBytesPerVisit &&
-               report.transmit_before_producers.io_calls <=
+               report.transmit_before_second_acquisition.io_calls <=
                    board::kUsbTxCallsPerVisit &&
                report.transmit.bytes_written <=
                    board::kUsbTxBudgetBytesPerVisit &&
                report.transmit.io_calls <= board::kUsbTxCallsPerVisit &&
-               report.transmit_before_producers.bytes_written +
+               report.transmit_before_second_acquisition.bytes_written +
                        report.transmit.bytes_written <=
                    board::kUsbTxBudgetBytesPerLoop &&
-               report.transmit_before_producers.io_calls +
+               report.transmit_before_second_acquisition.io_calls +
                        report.transmit.io_calls <=
                    board::kUsbTxCallsPerLoop,
            "each cooperative loop respects every USB work budget");
@@ -1247,7 +1247,7 @@ void testStartupSchedulingJitterFitsPacketPool() {
          "jitter recovery preserves both streams and interleaved STATUS");
 }
 
-void testTransmitVisitsBracketProducerWork() {
+void testTransmitVisitsInterleaveAcquisitionWork() {
   FakeCdcStream stream{};
   stream.max_read_size = 128U;
   stream.available_write_size = board::kUsbTxMaxWriteBytes;
@@ -1255,44 +1255,40 @@ void testTransmitVisitsBracketProducerWork() {
   packet::OwnedPacketBufferStorage packet_storage{};
   FakeTickClock clock{};
   app::FirmwareRuntime firmware{stream, packet_storage, clock};
-  expect(firmware.begin(7070U), "bracketed TX test completes BOOT");
+  expect(firmware.begin(7070U), "interleaved TX test completes BOOT");
 
   stream.appendInput(configureRequest(181U));
   stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 182U));
   expect(drain(firmware, stream).quiescent && firmware.runId() == 1U,
-         "bracketed TX test reaches a paced RUNNING epoch");
+         "interleaved TX test reaches a paced RUNNING epoch");
   stream.output.clear();
   stream.max_write_size = board::kUsbTxMinimumWriteBytes;
 
   clock.ticks = synthetic::kFrameCoverageTicks;
-  const app::LoopReport first = firmware.service();
-  expect(first.transmit_before_producers.bytes_written == 0U &&
-             first.synthetic.frames_framed == 2U &&
-             first.transmit.bytes_written == constants::kDataFrameBytes &&
-             first.transmit.call_budget_exhausted,
-         "first interval uses only the bounded post-producer TX visit");
-
-  clock.ticks = 2U * synthetic::kFrameCoverageTicks;
-  const app::LoopReport second = firmware.service();
-  expect(second.transmit_before_producers.bytes_written ==
+  const app::LoopReport report = firmware.service();
+  expect(report.synthetic.frames_framed == 2U &&
+             report.packet_promotion_before_second_acquisition.frames_promoted ==
+                 2U &&
+             report.transmit_before_second_acquisition.bytes_written ==
                  constants::kDataFrameBytes &&
-             second.transmit_before_producers.call_budget_exhausted &&
-             second.synthetic.frames_framed == 2U &&
-             second.transmit.bytes_written == constants::kDataFrameBytes &&
-             second.transmit.call_budget_exhausted &&
-             second.transmit_before_producers.bytes_written +
-                     second.transmit.bytes_written <=
+             report.transmit_before_second_acquisition.io_calls ==
+                 board::kUsbTxCallsPerVisit &&
+             report.transmit_before_second_acquisition.call_budget_exhausted &&
+             report.packet_promotion.frames_promoted == 0U &&
+             report.transmit.bytes_written == constants::kDataFrameBytes &&
+             report.transmit.io_calls == board::kUsbTxCallsPerVisit &&
+             report.transmit.call_budget_exhausted &&
+             report.transmit_before_second_acquisition.bytes_written +
+                     report.transmit.bytes_written <=
                  board::kUsbTxBudgetBytesPerLoop,
-         "recovered capacity drains backlog before and new work after producers");
+         "two bounded post-producer visits transmit both source frames");
   const packet::PipelineSnapshot snapshot = firmware.packetSnapshot();
-  expect(snapshot.sources[0].frames_dropped == 0U &&
+  expect(snapshot.sources[0].frames_transmitted == 1U &&
+             snapshot.sources[1].frames_transmitted == 1U &&
+             snapshot.sources[0].frames_dropped == 0U &&
              snapshot.sources[1].frames_dropped == 0U &&
              snapshot.pool_exhaustions == 0U,
-         "bracketed visits preserve both streams without packet pressure");
-
-  stream.max_write_size = constants::kDataFrameBytes;
-  expect(drain(firmware, stream).quiescent,
-         "bracketed TX test drains its remaining complete frame");
+         "interleaved visits preserve both streams without packet pressure");
 }
 
 void testStopDrainGatesNextStartAndPreventsStaleRunData() {
@@ -2161,7 +2157,7 @@ int main() {
   testCompleteControlPlane();
   testSyntheticDataCountersReachStatus();
   testStartupSchedulingJitterFitsPacketPool();
-  testTransmitVisitsBracketProducerWork();
+  testTransmitVisitsInterleaveAcquisitionWork();
   testStopDrainGatesNextStartAndPreventsStaleRunData();
   testAcquisitionControllerAuditsBothPhysicalEnginesAtomically();
   testCombinedControllerUsesOneEpochAndDeterministicLifecycle();

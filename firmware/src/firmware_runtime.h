@@ -16,9 +16,10 @@ namespace teensy_daq::runtime {
 
 struct LoopReport : acquisition::Report {
   usb::ServiceReport receive{};
-  usb::ServiceReport transmit_before_producers{};
+  usb::ServiceReport transmit_before_second_acquisition{};
   usb::ServiceReport transmit{};
   control::PendingEvents events{};
+  packet::PromotionReport packet_promotion_before_second_acquisition{};
   packet::PromotionReport packet_promotion{};
   packet::OperationStatus packet_start_status =
       packet::OperationStatus::kNotRunning;
@@ -102,6 +103,7 @@ class FirmwareRuntime {
                            protocol::ControlFrame &response,
                            bool transport_already_recorded,
                            LoopReport &report);
+  void recoverPhysicalFault(std::uint64_t now_ticks, LoopReport &report);
   void resetTransportStatisticsEpoch();
   void observeTransportQueueDepths();
   void publishPacketStatistics();

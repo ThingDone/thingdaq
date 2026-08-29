@@ -336,9 +336,10 @@ inline constexpr std::size_t kPinnedUsbCdcTxStorageBytes =
     kPinnedUsbCdcTxBufferCount * kPinnedUsbCdcTxBufferBytes;
 inline constexpr std::size_t kUsbRxBudgetBytesPerLoop = 1024U;
 // One physical acquisition visit may consume a meaningful fraction of the
-// 1,012 us frame interval. Bracket producers with two TX visits, each able to
-// fill the pinned core's existing four-buffer ring. Individual writes remain
-// core-buffer-sized and both the per-visit and total loop work stay bounded.
+// 1,012 us frame interval. Let the following TX visit fill the pinned core's
+// existing four-buffer ring, but offer at most two 512-byte high-speed packets
+// per call so the paired ADC completion IRQs cannot be hidden behind a 2 KiB
+// core copy. The aggregate byte and call work remains fixed and bounded.
 inline constexpr std::size_t kUsbTxBudgetBytesPerVisit =
     kPinnedUsbCdcTxStorageBytes;
 inline constexpr std::size_t kUsbTxVisitsPerLoop = 2U;
@@ -348,8 +349,7 @@ inline constexpr std::size_t kUsbTxBudgetBytesPerLoop =
 // possible. A visit waits for at least one high-speed USB packet of capacity
 // instead of deliberately degrading into byte-at-a-time calls. Unexpected
 // backend prefixes are still retained and resumed exactly.
-inline constexpr std::size_t kUsbTxMaxWriteBytes =
-    kPinnedUsbCdcTxBufferBytes;
+inline constexpr std::size_t kUsbTxMaxWriteBytes = 1024U;
 inline constexpr std::size_t kUsbTxMinimumWriteBytes = 512U;
 inline constexpr std::size_t kUsbRxCallsPerLoop = 8U;
 inline constexpr std::size_t kUsbTxCallsPerVisit = 8U;
@@ -925,7 +925,7 @@ static_assert(kUsbRxCallsPerLoop * kUsbRxScratchBytes >=
 static_assert(kUsbTxCallsPerVisit > 0U && kUsbRxCallsPerLoop > 0U,
               "USB per-loop call budgets must be nonzero");
 static_assert(kUsbTxVisitsPerLoop == 2U,
-              "runtime brackets producers with exactly two TX visits");
+              "runtime interleaves exactly two TX and acquisition visits");
 static_assert(kUsbTxBudgetBytesPerVisit <= kPinnedUsbCdcTxStorageBytes,
               "one cooperative TX visit must not outrun core TX storage");
 static_assert(kUsbTxCallsPerVisit * kUsbTxMaxWriteBytes >=
