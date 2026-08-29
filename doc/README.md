@@ -17,6 +17,8 @@ related:
   - '[[Phase-05-Checksum-Benchmark]]'
   - '[[Phase-06-GPIO-DMA]]'
   - '[[Phase-07-Dual-ADC]]'
+  - '[[Phase-08-Combined-Acquisition]]'
+  - '[[Phase-09-Loss-Recovery]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
@@ -68,7 +70,10 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   CPU/queue evidence, and sequential diagnostic/smoke/soak results are recorded
   in [[Phase-06-GPIO-DMA]]. The paired converter, calibration, trigger/
   completion timing, eDMA, full-rate stream, and explicit unstimulated-input
-  scope are recorded in [[Phase-07-Dual-ADC]].
+  scope are recorded in [[Phase-07-Dual-ADC]]. The common-epoch physical
+  composition acceptance is in [[Phase-08-Combined-Acquisition]], followed by
+  the exact loss, malformed-control, CDC reopen, reset/re-enumeration, and
+  normal-regression campaign in [[Phase-09-Loss-Recovery]].
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`

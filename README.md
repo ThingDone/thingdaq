@@ -569,7 +569,11 @@ state, reconciles any close-induced loss, and requires final IDLE. Both accept
 the shared `SERIAL_PORT`, `EXPECTED_BUILD_ID`, and
 `EXPECTED_HARDWARE_SERIAL` environment variables and print exact `CHECK`, JSON
 `EVENT`, and final `SUMMARY` records that separate intentional loss/rejections
-from unexpected framing, acquisition, transport, or hardware faults.
+from unexpected framing, acquisition, transport, or hardware faults. The
+accepted 0.25/1/3-second stall campaign, 100-cycle CDC/control recovery, six
+independent reset/re-enumeration jobs, repaired BOOT timing probe, and final
+60-second zero-complete-frame-loss regression are recorded in
+`doc/results/phase-09-loss-recovery.md`.
 
 ## Synchronous Python API and offline simulator
 
