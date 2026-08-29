@@ -26,6 +26,7 @@ related:
   - '[[Phase-07-Dual-ADC]]'
   - '[[Phase-08-Combined-Acquisition]]'
   - '[[Phase-09-Loss-Recovery]]'
+  - '[[Phase-10-Package-Local-Gate]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
@@ -86,7 +87,10 @@ double-bracket document links so the project can be explored as a graph.
   scope are recorded in [[Phase-07-Dual-ADC]]. The common-epoch physical
   composition acceptance is in [[Phase-08-Combined-Acquisition]], followed by
   the exact loss, malformed-control, CDC reopen, reset/re-enumeration, and
-  normal-regression campaign in [[Phase-09-Loss-Recovery]].
+  normal-regression campaign in [[Phase-09-Loss-Recovery]]. The reproducible
+  package contents, clean-install CPython 3.10-3.14 matrix, optional-NumPy
+  parity, installed typing, consoles, simulator, and examples are recorded in
+  [[Phase-10-Package-Local-Gate]].
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`
