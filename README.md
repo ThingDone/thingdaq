@@ -85,9 +85,11 @@ python3 -m venv .venv
 .venv/bin/python -m pip install --editable './daq_api[dev,numpy]'
 ```
 
-The `teensy-daq-local` distribution name and `Private :: Do Not Upload`
-classifier are deliberate publication guards. Rename and review the
-distribution metadata before any future package-index release.
+The single authoritative distribution name is `[project].name` in
+`daq_api/pyproject.toml`; its local placeholder and `Private :: Do Not Upload`
+classifier are deliberate publication guards. The package README records the
+independent host-version policy, exact artifact boundary, and the mandatory
+Teensy® trademark/name review before any possible package-index submission.
 
 ## Protocol contract
 

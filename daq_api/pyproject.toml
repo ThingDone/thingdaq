@@ -1,21 +1,31 @@
 [build-system]
-requires = ["setuptools>=77"]
+requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# This distribution name is deliberately local and separate from the stable
-# ``teensy_daq`` import package. Choose public metadata only after naming and
-# publication review; this playbook never uploads a distribution.
+# This is the single authoritative distribution-name setting. It is a private
+# local placeholder, separate from the stable ``teensy_daq`` import package.
+# Review trademark and index availability, and replace it here, before any
+# public-package submission. Repository tooling never uploads a distribution.
 name = "teensy-daq-local"
-version = "0.0.0"
-description = "Local-development Python API scaffold for Teensy DAQ"
-readme = "README.md"
-requires-python = ">=3.10"
+dynamic = ["version"]
+description = "Typed local Python API for Teensy DAQ acquisition hardware"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10,<3.15"
 dependencies = [
     "pyserial>=3.5",
 ]
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Operating System :: OS Independent",
     "Private :: Do Not Upload",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
 ]
 
 [project.scripts]
@@ -34,5 +44,34 @@ dev = [
     "types-pyserial>=3.5",
 ]
 
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.dynamic]
+version = { attr = "teensy_daq._version.__version__" }
+
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["teensy_daq", "teensy_daq.*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+teensy_daq = ["py.typed"]
+
+[tool.setuptools.exclude-package-data]
+"*" = [
+    ".env",
+    ".env.*",
+    "*.bin",
+    "*.csv",
+    "*.elf",
+    "*.hex",
+    "*.json",
+    "*.key",
+    "*.map",
+    "*.npy",
+    "*.npz",
+    "*.pem",
+    "captures/*",
+    "credentials/*",
+]

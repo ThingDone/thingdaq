@@ -1,0 +1,14 @@
+include MANIFEST.in
+include README.md
+include pyproject.toml
+recursive-include src/teensy_daq *.py
+include src/teensy_daq/py.typed
+
+# Build only the installable runtime source. The canonical protocol JSON,
+# generator, and golden fixtures remain repository validation inputs because
+# runtime code imports the generated Python constants directly.
+prune tests
+prune captures
+prune build
+prune dist
+prune credentials

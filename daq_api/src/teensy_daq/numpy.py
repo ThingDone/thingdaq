@@ -18,8 +18,8 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised without NumPy
     if exc.name != "numpy":
         raise
     raise ImportError(
-        "optional NumPy support is not installed; install "
-        "'teensy-daq-local[numpy]' or continue with the pure-Python block views"
+        "optional NumPy support is not installed; install this distribution "
+        "with its 'numpy' extra or continue with the pure-Python block views"
     ) from exc
 
 from .calibration import CalibrationRecord

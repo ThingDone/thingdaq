@@ -30,6 +30,7 @@ from ._generated.protocol_constants import (
     Source,
     StreamMask,
 )
+from ._version import __version__ as __version__
 from .alignment import (
     AlignedInterval,
     AlignmentInput,
@@ -240,8 +241,6 @@ from .transport import (
     TransportOpenError,
     TransportTimeoutError,
 )
-
-__version__ = "0.0.0"
 
 __all__ = [
     "CALIBRATION_FILE_FORMAT",

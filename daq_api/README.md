@@ -20,8 +20,9 @@ related:
 # Teensy DAQ Python package
 
 This directory contains the private, local-development Python distribution for
-the Teensy DAQ host API. Its installable distribution name is
-`teensy-daq-local`, while its stable import package is `teensy_daq`.
+the Teensy DAQ host API. The single authoritative installable distribution name
+is `[project].name` in `pyproject.toml`, while the stable import package is
+`teensy_daq`.
 
 The base installation includes PySerial for the bounded hardware transport.
 NumPy remains optional, and test, lint, type-check, and package-build tools are
@@ -31,10 +32,48 @@ available through development extras:
 python3 -m pip install --editable '.[dev,numpy]'
 ```
 
-The local distribution is intentionally marked `Private :: Do Not Upload`.
-Choose and review public distribution metadata before publishing anything.
 See [[System-Overview]] for the package boundary and
 [[Foundation-Reuse-Inventory]] for the implementation-pattern audit.
+
+## Distribution and publication boundary
+
+The host API uses pre-1.0 semantic versioning independent of the firmware
+semantic version and wire-protocol version. Its value is single-sourced in
+`teensy_daq._version`, exposed as `teensy_daq.__version__`, and consumed by the
+build metadata declared in `pyproject.toml`. The supported interpreter range
+is CPython 3.10 through 3.14; the base dependency is PySerial, NumPy is an
+explicit optional extra, and build/test/lint/type tools are development-only.
+
+The package is fully typed and ships `py.typed`. Wheel contents are limited to
+the runtime Python modules, the generated protocol constants, that marker, and
+standard distribution metadata. The source distribution adds only the package
+README, build metadata, and source-manifest policy. Tests, captures, firmware
+builds, credentials, local calibration records, the canonical protocol JSON,
+the generator, and golden fixtures are deliberately excluded. The latter three
+are repository validation inputs, not runtime inputs: installed code uses the
+tracked `teensy_daq._generated.protocol_constants` module.
+
+The local distribution remains marked `Private :: Do Not Upload`. PJRC presents
+the hardware under the registered `Teensy®` name at
+https://www.pjrc.com/teensy/. Trademark usage and package-index naming require
+review, and `[project].name` may need replacement, before any PyPI submission.
+Do not reserve, upload, or publish this distribution from repository workflows.
+No license metadata is declared because this repository currently has no
+license file.
+
+Build both local artifacts from the repository root with a source-derived,
+fixed archive epoch:
+
+```bash
+package_source_epoch="$(git log -1 --format=%ct -- daq_api)"
+SOURCE_DATE_EPOCH="${package_source_epoch}" \
+  .venv/bin/python -m build --outdir daq_api/dist daq_api
+```
+
+Reproducibility checks compare sorted archive member paths and bytes after
+normalizing container timestamps and ownership fields. Wheel output is also
+expected to be byte-for-byte stable under the same backend, interpreter, source
+state, and `SOURCE_DATE_EPOCH`.
 
 ## Synchronous public and simulator API
 
