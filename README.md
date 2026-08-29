@@ -249,12 +249,14 @@ remaining responsive during combined physical streaming.
 The Teensy USB layer retains PJRC's USB Serial VID/PID and chip-derived serial
 number while overriding only the weak product string with `Teensy DAQ`. Boot
 does not wait for a host or emit an unframed banner. Its portable CDC transport
-uses fixed command/response queues, bounded byte and call budgets, 2,048-byte
+uses fixed command/response queues, bounded byte and call budgets, 1,024-byte
 maximum write requests, 512-byte minimum capacity admission, exact
 partial/zero-write continuation, response-first frame scheduling, and exposed
-request/queue/stall diagnostics. Short data tails and complete control frames
-remain atomic admission units; an unexpectedly short backend result is retained
-and resumed rather than abandoned.
+request/queue/stall diagnostics. The runtime makes two bounded transmit visits
+after producer service, with a physical-acquisition ownership visit between
+them. Short data tails and complete control frames remain atomic admission
+units; an unexpectedly short backend result is retained and resumed rather
+than abandoned.
 
 Phase 04 supplies deterministic ADC-pair and GPIO-byte sources through the
 same allocation-free packet path used by later physical acquisition. ADC0 and
@@ -532,6 +534,17 @@ analog-quality grading explicit. Without that declaration the program prints
 that A0/A1 are unstimulated and that neither analog quality nor aperture was
 graded. No code-range or DC declaration is promoted to analog-aperture
 evidence.
+
+`firmware/tests/rig_combined_capture.py` is the standalone Phase 08 physical
+combined-acquisition program. It independently configures both engines on one
+epoch, validates every checksum plus ADC/GPIO sequence, timestamp, layout,
+safe range, and equal-duration relationship, polls STATUS under load, and
+reconciles the final target/host counters after a clean STOP. The accepted
+clean image passed the full local gate, a 5-second synthetic regression, and
+sequential 10-second and 60-second physical jobs at approximately 4 MB/s per
+source with zero live or complete-frame loss. Artifact, rate, timing, queue,
+memory, error, latency, and fixture-limit evidence is recorded in
+`doc/results/phase-08-combined-acquisition.md`.
 
 ## Synchronous Python API and offline simulator
 
