@@ -553,6 +553,23 @@ source with zero live or complete-frame loss. Artifact, rate, timing, queue,
 memory, error, latency, and fixture-limit evidence is recorded in
 `doc/results/phase-08-combined-acquisition.md`.
 
+Phase 09 adds two self-contained negative rig programs, each using only the
+standard library plus PySerial. `firmware/tests/rig_host_stall_recovery.py`
+starts physical combined acquisition, proves a zero-loss baseline, performs no
+reads for `STALL_SECONDS` (1 second by default and required to exceed the
+advertised packet-pool duration), catches both sources back up past live STATUS
+snapshots, and reconciles sequence/timestamp gaps, flags, block/item/byte loss,
+pressure eviction, and packet conservation before a bounded STOP.
+`firmware/tests/rig_control_recovery.py` checks corrupt, oversized, truncated,
+unknown-kind/version, reserved-field, duplicate-ID, and illegal-state commands;
+runs `CONTROL_RECOVERY_CYCLES` complete physical lifecycles (100 by default and
+never fewer); then closes/reopens CDC during streaming, reprobes identity/run
+state, reconciles any close-induced loss, and requires final IDLE. Both accept
+the shared `SERIAL_PORT`, `EXPECTED_BUILD_ID`, and
+`EXPECTED_HARDWARE_SERIAL` environment variables and print exact `CHECK`, JSON
+`EVENT`, and final `SUMMARY` records that separate intentional loss/rejections
+from unexpected framing, acquisition, transport, or hardware faults.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS and
