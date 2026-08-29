@@ -484,7 +484,14 @@ class CombinedRigTests(unittest.TestCase):
             decoded.extend(parser.feed(wire[offset : offset + 509]))
         self.assertEqual(len(names), len(decoded))
         self.assertEqual(0, parser.errors)
-        self.assertEqual(143, len(rig.decode_status(decoded[1]).values))
+        status = rig.decode_status(decoded[1])
+        self.assertEqual(143, len(status.values))
+        status.values["gpio_raw_samples_lost"] = 4_048
+        with self.assertRaisesRegex(
+            rig.ProtocolFailure,
+            r'"gpio_raw_samples_lost":4048',
+        ):
+            rig.validate_status_accounting(status)
 
         for fixture_name in ("adc-data.bin", "gpio-data.bin"):
             corrupted = bytearray((FIXTURES / fixture_name).read_bytes())

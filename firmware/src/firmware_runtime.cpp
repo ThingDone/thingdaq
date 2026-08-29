@@ -25,7 +25,10 @@ bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
 LoopReport FirmwareRuntime::service() {
   LoopReport report{};
   report.receive = transport_.serviceReceive();
-  publishPacketStatistics();
+  // Preserve per-epoch queue high-water marks before takeCommand() removes the
+  // newly received request.  This lightweight transport-only observation
+  // replaces the former complete data-path snapshot at this point.
+  observeTransportQueueDepths();
   const std::uint64_t now_ticks = clock_.nowTicks();
 
   protocol::ParsedCommand command{};
@@ -33,6 +36,12 @@ LoopReport FirmwareRuntime::service() {
   bool response_ready = false;
   if (transport_.takeCommand(command)) {
     report.command_dispatched = true;
+    // STATUS must include receive-queue activity from this visit and every
+    // completed data-path operation.  Refresh it on demand instead of paying
+    // for the complete telemetry traversal on every command-free loop.
+    if (command.request.kind == protocol_v1::CommandKind::kGetStatus) {
+      publishPacketStatistics();
+    }
     control::DispatchReadiness readiness{};
     benchmark::RunResult benchmark_result{};
     gpio_clock::RunResult gpio_clock_result{};
@@ -161,6 +170,10 @@ LoopReport FirmwareRuntime::service() {
   }
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
+  // Publish once, after every producer and consumer has run.  The previous
+  // implementation also rebuilt the complete packet, transport, ADC, and GPIO
+  // snapshot before every command-free service visit; that duplicate
+  // flash-resident traversal only shortened the physical DMA service budget.
   publishPacketStatistics();
   return report;
 }

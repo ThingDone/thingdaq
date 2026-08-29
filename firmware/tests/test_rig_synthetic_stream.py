@@ -46,7 +46,7 @@ rig = _load_rig_script()
 
 
 class HardwareSyntheticDevice(SimulatedDevice):
-    """Streaming simulator with the exact Phase 04 hardware INFO identity."""
+    """Streaming simulator with the current synthetic-capable INFO identity."""
 
     def __init__(self) -> None:
         super().__init__(build_id="tdaq-0123456789abcdef")
@@ -57,16 +57,15 @@ class HardwareSyntheticDevice(SimulatedDevice):
             device_state=self.state,
             build_id="tdaq-0123456789abcdef",
             hardware_serial=12_345_670,
-            firmware_version=(0, 6, 0),
+            firmware_version=(0, 7, 0),
             board_id=BoardId.TEENSY_40,
             mcu_id=McuId.IMXRT1062,
             supported_stream_mask=StreamMask.ADC | StreamMask.GPIO,
-            supported_source_mask=1 << int(constants.Source.SYNTHETIC),
-            supported_configuration_mask=(
-                constants.ConfigurationProfile.SYNTHETIC_ADC
-                | constants.ConfigurationProfile.SYNTHETIC_GPIO
-                | constants.ConfigurationProfile.SYNTHETIC_COMBINED
+            supported_source_mask=(
+                (1 << int(constants.Source.HARDWARE))
+                | (1 << int(constants.Source.SYNTHETIC))
             ),
+            supported_configuration_mask=constants.SUPPORTED_CONFIGURATION_MASK,
             applied_stream_mask=(
                 configuration.stream_mask
                 if configuration is not None
@@ -76,11 +75,20 @@ class HardwareSyntheticDevice(SimulatedDevice):
             capability_bits=(
                 Capability.ADC_STREAM
                 | Capability.GPIO_STREAM
+                | Capability.HARDWARE_SOURCE
                 | Capability.SYNTHETIC_SOURCE
                 | Capability.RESET_STATS
                 | Capability.PING
                 | Capability.CHECKSUM_BENCHMARK
                 | Capability.GPIO_CLOCK_DIAGNOSTIC
+                | Capability.GPIO_CAPTURE_DIAGNOSTIC
+            ),
+            gpio_capture_diagnostic_mode=(
+                constants.GpioCaptureDiagnosticMode.NON_DRIVING_CAPTURE
+            ),
+            gpio_capture_diagnostic_flags=(
+                constants.GpioCaptureDiagnosticFlag.AVAILABLE
+                | constants.GpioCaptureDiagnosticFlag.DECLARATION_VALID
             ),
         )
         return self._success_response(request, info.to_payload())

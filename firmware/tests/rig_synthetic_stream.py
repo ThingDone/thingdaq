@@ -133,6 +133,7 @@ SOURCE_HARDWARE = 0
 SOURCE_SYNTHETIC = 1
 CAPABILITY_ADC_STREAM = 1
 CAPABILITY_GPIO_STREAM = 2
+CAPABILITY_HARDWARE_SOURCE = 4
 CAPABILITY_SYNTHETIC_SOURCE = 8
 CAPABILITY_RESET_STATS = 16
 CAPABILITY_PING = 32
@@ -142,11 +143,13 @@ CAPABILITY_GPIO_CAPTURE_DIAGNOSTIC = 256
 EXPECTED_CAPABILITIES = (
     CAPABILITY_ADC_STREAM
     | CAPABILITY_GPIO_STREAM
+    | CAPABILITY_HARDWARE_SOURCE
     | CAPABILITY_SYNTHETIC_SOURCE
     | CAPABILITY_RESET_STATS
     | CAPABILITY_PING
     | CAPABILITY_CHECKSUM_BENCHMARK
     | CAPABILITY_GPIO_CLOCK_DIAGNOSTIC
+    | CAPABILITY_GPIO_CAPTURE_DIAGNOSTIC
 )
 
 HEADER = struct.Struct("<IBBHHBBIIIIIQI")
@@ -937,7 +940,7 @@ def grade_info(
         "device_state": STATE_IDLE,
         "protocol_version": PROTOCOL_VERSION,
         "supported_stream_mask": STREAM_BOTH,
-        "supported_source_mask": 1 << SOURCE_SYNTHETIC,
+        "supported_source_mask": (1 << SOURCE_HARDWARE) | (1 << SOURCE_SYNTHETIC),
         "supported_checksum_mask": 0b1110,
         "capability_bits": EXPECTED_CAPABILITIES,
         "timestamp_hz": TIMESTAMP_HZ,
@@ -953,7 +956,7 @@ def grade_info(
         "gpio_pin_count": len(GPIO_PINS_BY_BIT),
         "data_checksum_algorithm": DEFAULT_DATA_CHECKSUM,
         "gpio_pin_map": GPIO_PINS_BY_BIT,
-        "firmware_version": (0, 6, 0),
+        "firmware_version": (0, 7, 0),
         "board_id": 1,
         "mcu_id": 1,
     }

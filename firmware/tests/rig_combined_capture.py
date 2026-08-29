@@ -2510,9 +2510,13 @@ def _status_errors(status: StatusSnapshot) -> dict[str, int]:
 def validate_status_accounting(status: StatusSnapshot) -> None:
     """Reject inconsistent running-stage, byte, queue, or error telemetry."""
 
-    if any(_status_errors(status).values()):
+    nonzero_errors = {
+        name: value for name, value in _status_errors(status).items() if value
+    }
+    if nonzero_errors:
         raise ProtocolFailure(
-            "STATUS reports loss, firmware errors, or host-visible drops"
+            "STATUS reports loss, firmware errors, or host-visible drops: "
+            + json.dumps(nonzero_errors, sort_keys=True, separators=(",", ":"))
         )
     if status.adc0_dma_results != status.adc0_dma_major_loops * ADC_PAIRS_PER_FRAME:
         raise ProtocolFailure("STATUS ADC0 results disagree with major loops")
