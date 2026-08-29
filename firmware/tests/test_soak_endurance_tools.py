@@ -456,6 +456,31 @@ class SoakGeneratorTests(unittest.TestCase):
                 )
                 self.assertEqual(mode, isolated.stdout.strip())
 
+    def test_generated_read_batches_preserve_physical_runner_cadence(self) -> None:
+        expected = {
+            "synthetic": canonical_validator.SYNTHETIC_SERIAL_READ_BYTES,
+            "physical-combined": canonical_validator.PHYSICAL_SERIAL_READ_BYTES,
+            "control-stress": canonical_validator.PHYSICAL_SERIAL_READ_BYTES,
+        }
+        self.assertEqual(64 * 1024, expected["synthetic"])
+        self.assertEqual(16 * 1024, expected["physical-combined"])
+        for index, (mode, filename) in enumerate(generator.OUTPUTS.items(), start=1):
+            rig = _load_module(
+                GENERATED_DIRECTORY / filename,
+                f"generated_soak_read_batch_{index}",
+            )
+            settings = rig.load_settings()
+            with self.subTest(mode=mode):
+                self.assertEqual(expected[mode], settings.serial_read_bytes)
+                clock = VirtualClock()
+                link = rig.SerialLink(
+                    NoResponsePort(clock),
+                    clock,
+                    read_bytes=settings.serial_read_bytes,
+                )
+                self.assertEqual(expected[mode], link.read_bytes)
+                self.assertEqual(expected[mode], link.parser.maximum_input_bytes)
+
 
 class SoakValidatorFailureTests(unittest.TestCase):
     def test_wire_and_resource_failures_match_transcript_categories(self) -> None:

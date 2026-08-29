@@ -80,7 +80,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate_sha256": "1ae0ce075bb02209da4c5f3a791729787f5df757a83ee7a020e150cf431c2f20",
   "generator_schema_version": 1,
   "mode": "synthetic",
-  "validator_sha256": "151de875b9421863eb9ce844389ef321132306cec5f7ec80abeb9eab4f6ecd0e"
+  "validator_sha256": "7820ac1438875029757f4d3fbcd425eeb57e44578d4daf87e90c1041fc82cbdc"
 }
 """
 )
@@ -95,7 +95,8 @@ SUPPORTED_MODES = frozenset({"synthetic", "physical-combined", "control-stress"}
 BAUD_RATE = 115_200
 SERIAL_READ_TIMEOUT_SECONDS = 0.02
 SERIAL_WRITE_TIMEOUT_SECONDS = 0.5
-SERIAL_READ_BYTES = 64 * 1024
+SYNTHETIC_SERIAL_READ_BYTES = 64 * 1024
+PHYSICAL_SERIAL_READ_BYTES = 16 * 1024
 STARTUP_DRAIN_SECONDS = 0.25
 REOPEN_SETTLE_SECONDS = 0.25
 SYNC_ATTEMPTS = 4
@@ -325,7 +326,13 @@ def encode_request(kind: int, request_id: int, payload: bytes = b"") -> bytes:
 class FrameParser:
     """Bounded parser for arbitrary CDC chunks with strict corruption signals."""
 
-    def __init__(self) -> None:
+    def __init__(self, maximum_input_bytes: int = SYNTHETIC_SERIAL_READ_BYTES) -> None:
+        require(
+            maximum_input_bytes > 0,
+            "configuration",
+            "parser maximum input bytes must be positive",
+        )
+        self.maximum_input_bytes = maximum_input_bytes
         self.buffer = bytearray()
         self.scan_start = 0
         self.bytes_received = 0
@@ -411,7 +418,7 @@ class FrameParser:
             "parser",
             f"parser retained {self._buffered_bytes()} bytes",
         )
-        high_water_bound = SERIAL_READ_BYTES + retained_bound
+        high_water_bound = self.maximum_input_bytes + retained_bound
         require(
             self.high_water_bytes <= high_water_bound,
             "parser",
@@ -598,10 +605,21 @@ class FrameParser:
 class SerialLink:
     """One-request-at-a-time link that drains data while awaiting control."""
 
-    def __init__(self, port: SerialPort, clock: Clock) -> None:
+    def __init__(
+        self,
+        port: SerialPort,
+        clock: Clock,
+        read_bytes: int = SYNTHETIC_SERIAL_READ_BYTES,
+    ) -> None:
+        require(
+            read_bytes > 0,
+            "configuration",
+            "serial read bytes must be positive",
+        )
         self.port = port
         self.clock = clock
-        self.parser = FrameParser()
+        self.read_bytes = read_bytes
+        self.parser = FrameParser(read_bytes)
         self.next_request_id = 1
         self.stale_responses = 0
         self.discarded_data_frames = 0
@@ -612,7 +630,7 @@ class SerialLink:
         deadline = self.clock.monotonic() + duration
         discarded_frames = 0
         while self.clock.monotonic() < deadline:
-            chunk = bytes(self.port.read(SERIAL_READ_BYTES))
+            chunk = bytes(self.port.read(self.read_bytes))
             self.maximum_read_bytes = max(self.maximum_read_bytes, len(chunk))
             if chunk:
                 before_errors = self.parser.errors
@@ -741,7 +759,7 @@ class SerialLink:
         return frames
 
     def _read_chunk_and_frames(self) -> tuple[bytes, list[Frame]]:
-        chunk = bytes(self.port.read(SERIAL_READ_BYTES))
+        chunk = bytes(self.port.read(self.read_bytes))
         self.maximum_read_bytes = max(self.maximum_read_bytes, len(chunk))
         if not chunk:
             return chunk, []
@@ -1286,6 +1304,7 @@ class RuntimeSettings:
     control_reopen_every_epochs: int
     hard_deadline_seconds: float
     service_container_limit_seconds: float
+    serial_read_bytes: int
     candidate_sha256: str
     validator_sha256: str
 
@@ -1413,6 +1432,11 @@ def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSet
         ),
         hard_deadline_seconds=hard_deadline,
         service_container_limit_seconds=service_limit,
+        serial_read_bytes=(
+            SYNTHETIC_SERIAL_READ_BYTES
+            if mode == "synthetic"
+            else PHYSICAL_SERIAL_READ_BYTES
+        ),
         candidate_sha256=_string(config.get("candidate_sha256"), "candidate_sha256"),
         validator_sha256=_string(config.get("validator_sha256"), "validator_sha256"),
     )
@@ -2642,7 +2666,11 @@ class SoakRunner:
     def open_and_synchronize(self, *, reopened: bool = False) -> None:
         self._check_budget("serial open", reserve=5.0)
         self.port = self.port_factory()
-        self.link = SerialLink(self.port, self.clock)
+        self.link = SerialLink(
+            self.port,
+            self.clock,
+            read_bytes=self.settings.serial_read_bytes,
+        )
         self.link.drain_startup(
             REOPEN_SETTLE_SECONDS if reopened else STARTUP_DRAIN_SECONDS
         )
@@ -2763,7 +2791,7 @@ class SoakRunner:
         )
 
         deferred: list[Frame] = []
-        deferred_limit = math.ceil(SERIAL_READ_BYTES / DATA_FRAME_BYTES) + 1
+        deferred_limit = math.ceil(link.read_bytes / DATA_FRAME_BYTES) + 1
 
         def collect_start_data(frame: Frame) -> None:
             require(
@@ -3185,6 +3213,7 @@ class SoakRunner:
                 "validator_sha256": self.settings.validator_sha256,
                 "candidate_sha256": self.settings.candidate_sha256,
                 "python": sys.version.split()[0],
+                "serial_read_bytes": self.settings.serial_read_bytes,
             },
             "completed_utc": datetime.now(timezone.utc).isoformat(),
         }
@@ -3314,6 +3343,7 @@ class SoakRunner:
                 "validator_sha256": self.settings.validator_sha256,
                 "candidate_sha256": self.settings.candidate_sha256,
                 "python": sys.version.split()[0],
+                "serial_read_bytes": self.settings.serial_read_bytes,
             },
             "completed_utc": datetime.now(timezone.utc).isoformat(),
         }
@@ -3415,6 +3445,7 @@ def main() -> int:
         measured_duration_seconds=settings.measured_duration_seconds,
         hard_deadline_seconds=settings.hard_deadline_seconds,
         service_container_limit_seconds=settings.service_container_limit_seconds,
+        serial_read_bytes=settings.serial_read_bytes,
         protocol_version=settings.protocol_version,
         firmware_version=list(settings.firmware_version),
         build_id=settings.build_id,

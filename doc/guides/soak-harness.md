@@ -74,6 +74,13 @@ Every program has a 780-second internal deadline and records the service's
 900-second container limit, leaving 120 seconds for bounded STOP, final STATUS,
 process teardown, and service cleanup.
 
+The serial loop keeps the previously accepted mode-specific synchronous read
+cadence: synthetic runs use 64 KiB batches, while physical-combined and
+control-stress runs use 16 KiB batches. The smaller hardware batch bounds each
+non-yielding range/structure-validation visit on the service's constrained CPU
+runner, so physical DMA keeps the proven host-drain cadence. The selected byte
+count is included in both `SOAK_EVENT program_start` and the terminal result.
+
 ## Validation and stdout contract
 
 The validator consumes arbitrary serial chunks without retaining the capture.
