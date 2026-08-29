@@ -161,8 +161,10 @@ first verifies both calibrated converters and rejects an already-running PIT,
 enabled ADC_ETC trigger, or active ADC. While stopped, it selects the same
 verified 24 MHz PERCLK root used by GPIO, writes PIT0 `LDVAL=5`, writes chained
 PIT1 `LDVAL=3`, fans XBARA1 input 57 to outputs 103/107, configures asynchronous
-one-segment queues 0/4, clears `TSC_BYPASS`, writes raw initial delays 0/75,
-and switches ADC1/ADC2 command slot zero to hardware-trigger mode. Every clock,
+one-segment queues 0/4, clears `SOFTRST` and then `TSC_BYPASS` with the two
+successive `CTRL` writes required by the reset-state behavior observed on the
+i.MX RT1062 and used by PJRC's ADC setup, writes raw initial delays 0/75, and
+switches ADC1/ADC2 command slot zero to hardware-trigger mode. Every clock,
 route, queue, delay, and hardware-trigger setting is read back before arming.
 
 The BOOT diagnostic clears ADC_ETC/NVIC state, enables queues 0/4, enables

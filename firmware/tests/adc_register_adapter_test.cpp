@@ -51,6 +51,8 @@ void resetFakeRegisters() {
   fake_imxrt::adc1 = {};
   fake_imxrt::adc2 = {};
   fake_imxrt::adc_etc = {};
+  fake_imxrt::adc_etc.CTRL.reset(ADC_ETC_CTRL_SOFTRST |
+                                 ADC_ETC_CTRL_TSC_BYPASS);
   for (IMXRT_PIT_CHANNEL_t &pit : fake_imxrt::pit_channels) {
     pit = {};
   }
@@ -81,6 +83,23 @@ std::size_t writeIndex(const fake_imxrt::Register32 &target,
     }
   }
   return std::numeric_limits<std::size_t>::max();
+}
+
+std::size_t writeCount(const fake_imxrt::Register32 &target,
+                       std::uint32_t value) {
+  const std::size_t count =
+      fake_imxrt::register_write_count < fake_imxrt::register_writes.size()
+          ? fake_imxrt::register_write_count
+          : fake_imxrt::register_writes.size();
+  std::size_t matches = 0U;
+  for (std::size_t index = 0U; index < count; ++index) {
+    const fake_imxrt::RegisterWrite &write =
+        fake_imxrt::register_writes[index];
+    if (write.address == &target && write.value == value) {
+      ++matches;
+    }
+  }
+  return matches;
 }
 
 void testFixedPinModuleRoutesAndLegalResolutionModes() {
@@ -151,6 +170,10 @@ void testExactStoppedTriggerScheduleAndResourceIsolation() {
              configured.configuration_flags ==
                  trigger::kStoppedConfigurationFlags,
          "the fixed trigger adapter configures successfully from stopped state");
+  expect(writeCount(fake_imxrt::adc_etc.CTRL,
+                    ADC_ETC_CTRL_PRE_DIVIDER(
+                        v1::kAdcTriggerPredivider)) == 2U,
+         "ADC_ETC reset state receives separate SOFTRST and TSC_BYPASS clears");
   expect(fake_imxrt::pit_channels[0].LDVAL ==
                  v1::kAdcTriggerGpioMasterPitLoad &&
              fake_imxrt::pit_channels[0].TCTRL == 0U &&

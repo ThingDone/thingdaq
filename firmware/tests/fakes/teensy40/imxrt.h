@@ -230,6 +230,8 @@ inline std::array<bool, 160U> interrupt_pending{};
 
 #define ADC_ETC_CTRL_PRE_DIVIDER(value) \
   ((static_cast<std::uint32_t>(value) & 0xFFU) << 16U)
+#define ADC_ETC_CTRL_SOFTRST (std::uint32_t{1U} << 31U)
+#define ADC_ETC_CTRL_TSC_BYPASS (std::uint32_t{1U} << 30U)
 #define ADC_ETC_CTRL_TRIG_ENABLE(value) \
   (static_cast<std::uint32_t>(value) & 0xFFU)
 #define ADC_ETC_DONE0_1_IRQ_TRIG_DONE1(value) \

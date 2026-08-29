@@ -263,6 +263,11 @@ class TeensyPlatform final : public Platform {
                   protocol_v1::kAdcTriggerXbarOutputs[index]);
     }
 
+    // CTRL resets with both SOFTRST and TSC_BYPASS set.  On i.MX RT1062 the
+    // first write clears SOFTRST only; a second write is required to clear
+    // TSC_BYPASS so ADC_ETC channel 1 can control ADC2.  PJRC's target ADC
+    // setup uses the same two-write sequence.
+    ADC_ETC_CTRL = kAdcEtcControlConfiguration;
     ADC_ETC_CTRL = kAdcEtcControlConfiguration;
     ADC_ETC_DMA_CTRL = 0U;
     for (std::size_t index = 0U; index < kConverterCount; ++index) {
