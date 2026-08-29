@@ -52,6 +52,8 @@ constexpr std::uint16_t kTcdControl =
     DMA_TCD_CSR_ESG | DMA_TCD_CSR_INTMAJOR;
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100U;
+constexpr std::uint32_t kDmaPairWaitCycles =
+    protocol_v1::kAdcTriggerDwtClockHz / 100000U;
 constexpr std::uint32_t kStopBoundaryPollLimit =
     protocol_v1::kAdcTriggerDiagnosticPollLimit;
 constexpr std::uint16_t kStopBoundaryArmMinimumPairs =
@@ -404,6 +406,21 @@ void processDmaCompletion(std::size_t converter) {
   barrier();
 }
 
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_wait")
+std::uint32_t waitForDmaPair(std::uint32_t pending) {
+  // ADC1 has the higher fixed eDMA priority so it can occasionally finish
+  // first when the earlier ADC0 transfer was preempted by GPIO traffic. Once
+  // ADC1 releases the engine, ADC0 normally completes within a few bus cycles.
+  // Bound the rare reconciliation below one ADC major-loop interval; a real
+  // missing completion still enters the normal fail-safe path.
+  const std::uint32_t started = ARM_DWT_CYCCNT;
+  while (pending != kAdcDmaChannelMask &&
+         ARM_DWT_CYCCNT - started < kDmaPairWaitCycles) {
+    pending = DMA_INT & kAdcDmaChannelMask;
+  }
+  return pending;
+}
+
 TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_fault")
 void recordIncompleteDmaPair(std::uint32_t pending) {
   for (std::size_t converter = 0U; converter < kConverterCount;
@@ -422,10 +439,13 @@ void recordIncompleteDmaPair(std::uint32_t pending) {
 void adcPairDmaIsr() {
   // ADC0 is triggered and completes before ADC1. Both descriptors retain
   // INTMAJOR so DMA_INT is the hardware barrier, but only the later ADC1 NVIC
-  // line dispatches. Consuming both bits in one fixed-order ISR prevents two
-  // independently pending equal-priority handlers from losing their relative
-  // generation when one interrupt is delayed or coalesced.
-  const std::uint32_t pending = DMA_INT & kAdcDmaChannelMask;
+  // line dispatches. Consuming both bits in one fixed-order ISR prevents NVIC
+  // dispatch or a brief eDMA completion-order inversion from separating the
+  // converters' shared software generation.
+  std::uint32_t pending = DMA_INT & kAdcDmaChannelMask;
+  if (pending != kAdcDmaChannelMask) {
+    pending = waitForDmaPair(pending);
+  }
   if (pending != kAdcDmaChannelMask) {
     recordIncompleteDmaPair(pending);
   } else {

@@ -109,8 +109,13 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "arm_dcache_flush_delete(&g_adc_dma_descriptors",
             "NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR, board::kAdcEdmaIrqPriority)",
             "void adcPairDmaIsr()",
-            "const std::uint32_t pending = DMA_INT & kAdcDmaChannelMask",
+            "std::uint32_t pending = DMA_INT & kAdcDmaChannelMask",
+            "kDmaPairWaitCycles",
+            "protocol_v1::kAdcTriggerDwtClockHz / 100000U",
+            "ARM_DWT_CYCCNT - started < kDmaPairWaitCycles",
+            "std::uint32_t waitForDmaPair(std::uint32_t pending)",
             "void recordIncompleteDmaPair(std::uint32_t pending)",
+            'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_wait")',
             'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_fault")',
             'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")',
             "attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr)",
@@ -132,10 +137,12 @@ class AdcDmaCaptureTests(unittest.TestCase):
                 self.assertNotIn(token, source)
 
         paired_isr = source[source.index("void adcPairDmaIsr()") :]
+        wait = paired_isr.index("waitForDmaPair(pending)")
         incomplete = paired_isr.index("recordIncompleteDmaPair(pending)")
         adc0 = paired_isr.index("processDmaCompletion(0U)")
         adc1 = paired_isr.index("processDmaCompletion(1U)")
         enable = source[source.index("void enableInterrupts()") :]
+        self.assertLess(wait, incomplete)
         self.assertLess(incomplete, adc0)
         self.assertLess(adc0, adc1)
         self.assertNotIn("attachInterruptVector(IRQ_DMA_CH0", enable)
