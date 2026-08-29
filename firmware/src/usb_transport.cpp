@@ -203,7 +203,7 @@ ServiceReport CdcTransport::serviceTransmit() {
       break;
     }
 
-    const FrameSelection selection = selectTransmitFrame();
+    FrameSelection selection = selectTransmitFrame();
     if (selection.kind == ActiveFrame::kNone) {
       break;
     }
@@ -244,6 +244,22 @@ ServiceReport CdcTransport::serviceTransmit() {
       saturatingIncrement(counters_.short_capacity_deferrals);
       stalled = true;
       break;
+    }
+    if (tx_offset_ == 0U &&
+        selection.kind == ActiveFrame::kLowerPriority) {
+      if (lower_priority_ == nullptr ||
+          !lower_priority_->prepareFrontFrame()) {
+        recordIoError();
+        stalled = true;
+        break;
+      }
+      selection.bytes = lower_priority_->frontFrame();
+      if (!selection.bytes.valid() ||
+          selection.bytes.size != protocol_v1::kDataFrameBytes) {
+        recordIoError();
+        stalled = true;
+        break;
+      }
     }
     const std::size_t requested =
         minimum(minimum(minimum(frame_remaining, budget_remaining),
@@ -290,6 +306,11 @@ ServiceReport CdcTransport::serviceTransmit() {
       if (selection.kind == ActiveFrame::kLowerPriority) {
         active_lower_priority_frame_ = selection.bytes;
       }
+    }
+    if (tx_offset_ == 0U && accepted != 0U &&
+        selection.kind == ActiveFrame::kLowerPriority &&
+        lower_priority_ != nullptr) {
+      lower_priority_->markFrontFrameStarted();
     }
     tx_offset_ += accepted;
     report.bytes_written += accepted;

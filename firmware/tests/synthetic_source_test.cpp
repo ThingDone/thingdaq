@@ -270,21 +270,61 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
   const packet::PipelineSnapshot pressure = pipeline.snapshot();
   expect(pressure.sources[0].frames_produced == elapsed_frames &&
              pressure.sources[1].frames_produced == elapsed_frames &&
-             pressure.sources[0].frames_framed ==
-                 retained_frames_per_stream &&
-             pressure.sources[1].frames_framed ==
-                 retained_frames_per_stream &&
+             pressure.sources[0].frames_framed == elapsed_frames &&
+             pressure.sources[1].frames_framed == elapsed_frames &&
              pressure.sources[0].frames_dropped ==
                  dropped_frames_per_stream &&
              pressure.sources[1].frames_dropped ==
-                 dropped_frames_per_stream,
-         "elapsed real-time frames split exactly into framed and dropped totals");
+                 dropped_frames_per_stream &&
+             pressure.sources[0].frames_evicted ==
+                 dropped_frames_per_stream &&
+             pressure.sources[1].frames_evicted ==
+                 dropped_frames_per_stream &&
+             pressure.pressure_evictions ==
+                 packet::kStreamCount * dropped_frames_per_stream,
+         "elapsed real-time frames stay framed while the oldest complete coverage is evicted exactly");
 
   expect(pipeline.serviceReadyFrames(board::kPacketBufferCount)
                  .frames_promoted == board::kPacketBufferCount,
-         "all retained pre-gap frames move to transport ownership");
+         "all current retained frames move to transport ownership");
+  const std::uint16_t gap_flags =
+      static_cast<std::uint16_t>(constants::FrameFlag::kGapBefore) |
+      static_cast<std::uint16_t>(constants::FrameFlag::kOverrunBefore);
+  const wire::DecodedFrame first_adc =
+      decodeFront(pipeline, "first retained pressure ADC frame");
+  const std::uint64_t first_adc_index =
+      dropped_frames_per_stream * constants::kAdcPairsPerFrame;
+  expect(first_adc.header.kind == constants::FrameKind::kAdcData &&
+             first_adc.header.sequence == dropped_frames_per_stream &&
+             first_adc.header.first_sample_ticks ==
+                 dropped_frames_per_stream *
+                     synthetic::kFrameCoverageTicks &&
+             (first_adc.header.flags & gap_flags) == gap_flags &&
+             sampleCode(first_adc.payload, 0U) ==
+                 synthetic::SyntheticSource::adc0Code(first_adc_index) &&
+             sampleCode(first_adc.payload, 2U) ==
+                 synthetic::SyntheticSource::adc1Code(first_adc_index),
+         "oldest-drop ADC successor exposes matching sequence, time, flags, and formula");
   pipeline.releaseFrontFrame();
+  const wire::DecodedFrame first_gpio =
+      decodeFront(pipeline, "first retained pressure GPIO frame");
+  const std::uint64_t first_gpio_index =
+      dropped_frames_per_stream * constants::kGpioSamplesPerFrame;
+  expect(first_gpio.header.kind == constants::FrameKind::kGpioData &&
+             first_gpio.header.sequence == dropped_frames_per_stream &&
+             first_gpio.header.first_sample_ticks ==
+                 dropped_frames_per_stream *
+                     synthetic::kFrameCoverageTicks &&
+             (first_gpio.header.flags & gap_flags) == gap_flags &&
+             first_gpio.payload.data[0] ==
+                 synthetic::SyntheticSource::gpioByte(first_gpio_index),
+         "oldest-drop GPIO successor exposes matching sequence, time, flags, and formula");
   pipeline.releaseFrontFrame();
+  for (std::size_t old_frame = 2U;
+       old_frame < board::kPacketBufferCount; ++old_frame) {
+    pipeline.releaseFrontFrame();
+  }
+
   const synthetic::ServiceReport recovered = source.service(
       epoch + (elapsed_frames + 1U) * synthetic::kFrameCoverageTicks,
       pipeline);
@@ -292,27 +332,20 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
              recovered.frames_dropped == 0U &&
              pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
          "new due frames recover when two fixed buffers become free");
-  for (std::size_t old_frame = 2U;
-       old_frame < board::kPacketBufferCount; ++old_frame) {
-    pipeline.releaseFrontFrame();
-  }
 
   const wire::DecodedFrame adc = decodeFront(pipeline, "post-gap ADC frame");
-  const std::uint16_t gap_flags =
-      static_cast<std::uint16_t>(constants::FrameFlag::kGapBefore) |
-      static_cast<std::uint16_t>(constants::FrameFlag::kOverrunBefore);
   const std::uint64_t adc_index =
       elapsed_frames * constants::kAdcPairsPerFrame;
   expect(adc.header.kind == constants::FrameKind::kAdcData &&
              adc.header.sequence == elapsed_frames &&
              adc.header.first_sample_ticks ==
                  elapsed_frames * synthetic::kFrameCoverageTicks &&
-             (adc.header.flags & gap_flags) == gap_flags &&
+             (adc.header.flags & gap_flags) == 0U &&
              sampleCode(adc.payload, 0U) ==
                  synthetic::SyntheticSource::adc0Code(adc_index) &&
              sampleCode(adc.payload, 2U) ==
                  synthetic::SyntheticSource::adc1Code(adc_index),
-         "post-gap ADC exposes loss while preserving sequence, time, and formula");
+         "post-gap ADC continues without repeating already reported loss");
   pipeline.releaseFrontFrame();
   const wire::DecodedFrame gpio = decodeFront(pipeline, "post-gap GPIO frame");
   const std::uint64_t gpio_index =
@@ -321,18 +354,17 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
              gpio.header.sequence == elapsed_frames &&
              gpio.header.first_sample_ticks ==
                  elapsed_frames * synthetic::kFrameCoverageTicks &&
-             (gpio.header.flags & gap_flags) == gap_flags &&
+             (gpio.header.flags & gap_flags) == 0U &&
              gpio.payload.data[0] ==
                  synthetic::SyntheticSource::gpioByte(gpio_index),
-         "post-gap GPIO exposes loss while preserving sequence, time, and formula");
+         "post-gap GPIO continues without repeating already reported loss");
   pipeline.releaseFrontFrame();
 
   const packet::PipelineSnapshot final = pipeline.snapshot();
   expect(final.sources[0].items_produced ==
                  (elapsed_frames + 1U) * constants::kAdcPairsPerFrame &&
              final.sources[0].items_framed ==
-                 (retained_frames_per_stream + 1U) *
-                     constants::kAdcPairsPerFrame &&
+                 (elapsed_frames + 1U) * constants::kAdcPairsPerFrame &&
              final.sources[0].items_transmitted ==
                  (retained_frames_per_stream + 1U) *
                      constants::kAdcPairsPerFrame &&
@@ -341,6 +373,11 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
                      constants::kAdcPairsPerFrame &&
              final.sources[1].items_produced ==
                  (elapsed_frames + 1U) * constants::kGpioSamplesPerFrame &&
+             final.sources[1].items_framed ==
+                 (elapsed_frames + 1U) * constants::kGpioSamplesPerFrame &&
+             final.sources[1].items_transmitted ==
+                 (retained_frames_per_stream + 1U) *
+                     constants::kGpioSamplesPerFrame &&
              final.sources[1].items_dropped ==
                  dropped_frames_per_stream *
                      constants::kGpioSamplesPerFrame,

@@ -214,9 +214,13 @@ void testFixedQueueBoundaries() {
          "fixed queue refuses overflow without replacing its front");
   expect(queue.pop(item) && item == 1U && queue.push(4U),
          "fixed queue reuses one slot after wraparound");
-  expect(queue.pop(item) && item == 2U && queue.pop(item) && item == 3U &&
-             queue.pop(item) && item == 4U && queue.empty(),
-         "fixed queue preserves FIFO order across wraparound");
+  expect(queue.eraseFirst(3U) && !queue.eraseFirst(99U) &&
+             queue.size() == 2U,
+         "fixed queue erases one interior value without fabricating a match");
+  expect(queue.pop(item) && item == 2U,
+         "erased fixed-queue values do not disturb the front");
+  expect(queue.pop(item) && item == 4U && queue.empty(),
+         "fixed queue preserves survivor order across erase and wraparound");
   expect(!queue.popFront() && queue.front() == nullptr,
          "fixed queue refuses an empty front removal");
 }

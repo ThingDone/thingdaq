@@ -84,6 +84,8 @@ class AdcFramePackerTests(unittest.TestCase):
         self.assertIn("handle.first_pair * protocol_v1::kAdcPairPeriodTicks", source)
         self.assertIn("std::memcpy(payload.data, handle.pairs", source)
         self.assertIn("recordSourceFrameDrops(packet::Stream::kAdc", source)
+        self.assertIn("expected_pressure_drop", source)
+        self.assertNotIn("pipeline.freeBuffers()", source)
 
 
 if __name__ == "__main__":

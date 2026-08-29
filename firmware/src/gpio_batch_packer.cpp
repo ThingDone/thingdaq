@@ -546,10 +546,6 @@ bool GpioBatchPacker::packetizeOne(
   if (front == nullptr || *front >= records_.size()) {
     return false;
   }
-  if (pipeline.freeBuffers() == 0U) {
-    report.waiting_for_packet_buffer = true;
-    return false;
-  }
 
   const std::uint8_t index = *front;
   BufferRecord &record = records_[index];
@@ -572,6 +568,8 @@ bool GpioBatchPacker::packetizeOne(
 
   const packet::BeginFillResult begun =
       pipeline.beginFill(packet::Stream::kGpio);
+  const bool expected_pressure_drop =
+      begun.status == packet::OperationStatus::kPoolExhausted;
   bool framed = begun.ok();
   if (framed) {
     protocol::MutableByteView payload = pipeline.writablePayload(begun.handle);
@@ -610,8 +608,10 @@ bool GpioBatchPacker::packetizeOne(
     ++report.frames_framed;
   } else {
     packet_gap_pending_ = true;
-    saturatingIncrement(pipeline_errors_);
-    report.pipeline_error = true;
+    if (!expected_pressure_drop) {
+      saturatingIncrement(pipeline_errors_);
+      report.pipeline_error = true;
+    }
     ++report.frames_dropped;
   }
   return true;

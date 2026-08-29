@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -87,6 +88,34 @@ packet::FinishFillResult fillAndFinish(packet::PacketBufferPipeline &pipeline,
   completion.checksum_algorithm = checksum;
   completion.payload_bytes_written = payload.size;
   return pipeline.finishFill(handle, completion);
+}
+
+wire::ControlFrame statusResponse(std::uint32_t request_id,
+                                  std::uint32_t run_id) {
+  wire::Request request{};
+  request.kind = constants::CommandKind::kGetStatus;
+  request.request_id = request_id;
+  wire::Configuration configuration{};
+  configuration.stream_mask = packet::kAllStreamMask;
+  configuration.source = constants::Source::kHardware;
+  stats::Statistics statistics{};
+  wire::StatusResponse status = statistics.wireStatus(
+      constants::DeviceState::kRunning, configuration);
+  wire::ControlFrame frame{};
+  expect(wire::encodeStatusResponse(request, run_id, status, frame).ok(),
+         "encode a valid STATUS response during packet pressure");
+  return frame;
+}
+
+wire::ControlFrame stopResponse(std::uint32_t request_id,
+                                std::uint32_t run_id) {
+  wire::Request request{};
+  request.kind = constants::CommandKind::kStop;
+  request.request_id = request_id;
+  wire::ControlFrame frame{};
+  expect(wire::encodeStopResponse(request, run_id, frame).ok(),
+         "encode a valid STOP response during packet pressure");
+  return frame;
 }
 
 void testRunChecksumIsImmutableUntilTheQueueIsQuiescent() {
@@ -460,11 +489,13 @@ void testPoolExhaustionIsBoundedAndSequenceVisible() {
   const packet::BeginFillResult overflow =
       pipeline.beginFill(packet::Stream::kGpio);
   expect(overflow.status == packet::OperationStatus::kPoolExhausted,
-         "the seventeenth concurrent frame is dropped without allocation");
+         "a pool containing only incomplete producer blocks cannot evict one");
   const packet::PipelineSnapshot full = pipeline.snapshot();
   const packet::SourceCounters &gpio = full.sources[1];
   expect(full.buffers_owned_high_water == board::kPacketBufferCount &&
              full.pool_exhaustions == 1U &&
+             full.pressure_evictions == 0U &&
+             full.capacity_drops_without_evictable_frame == 1U &&
              gpio.frames_produced == board::kPacketBufferCount + 1U &&
              gpio.frames_dropped == 1U &&
              gpio.next_sequence == board::kPacketBufferCount + 1U,
@@ -481,6 +512,195 @@ void testPoolExhaustionIsBoundedAndSequenceVisible() {
          "STOP cancels the final partial fill and prevents new production");
 }
 
+void testOldestCompletePressureEvictionKeepsLiveDataAndControlServiceable() {
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  constexpr std::uint32_t run_id = 41U;
+  constexpr std::uint64_t coverage = constants::kFrameCoverageTicks;
+  constexpr std::uint32_t initial_frames_per_source =
+      static_cast<std::uint32_t>(board::kPacketBufferCount / 2U);
+  expect(board::kPacketBufferCount % 2U == 0U &&
+             pipeline.startRun(run_id) == packet::OperationStatus::kOk,
+         "start an even-capacity combined pressure epoch");
+
+  for (std::uint32_t sequence = 0U;
+       sequence < initial_frames_per_source; ++sequence) {
+    for (packet::Stream stream : {packet::Stream::kAdc,
+                                  packet::Stream::kGpio}) {
+      packet::FillHandle handle{};
+      expect(fillAndFinish(
+                 pipeline, stream,
+                 static_cast<std::uint64_t>(sequence) * coverage,
+                 sequence == 0U
+                     ? static_cast<std::uint16_t>(
+                           constants::FrameFlag::kEpochStart)
+                     : 0U,
+                 handle)
+                 .ok(),
+             "fill the complete shared packet pool in timestamp order");
+    }
+  }
+  expect(pipeline.freeBuffers() == 0U &&
+             pipeline.serviceReadyFrames(board::kPacketBufferCount)
+                     .frames_promoted == board::kPacketBufferCount,
+         "move the full complete backlog into unsent transport ownership");
+
+  FakeCdcStream stream{};
+  stream.write_plan = {37, 0};
+  stats::Statistics transport_statistics{};
+  usb::CdcTransport transport{stream, transport_statistics, &pipeline};
+  const usb::ServiceReport partial = transport.serviceTransmit();
+  expect(partial.stalled && partial.bytes_written == 37U &&
+             transport.snapshot().active_frame_bytes_sent == 37U,
+         "pin the oldest ADC frame only after USB accepts its first prefix");
+
+  const wire::ControlFrame status = statusResponse(700U, run_id);
+  const wire::ControlFrame stop = stopResponse(701U, run_id);
+  expect(transport.queueResponse(status) && transport.queueResponse(stop),
+         "STATUS and STOP responses remain admissible while data is stalled");
+
+  packet::FillHandle adc_new{};
+  packet::FillHandle gpio_new{};
+  expect(fillAndFinish(
+             pipeline, packet::Stream::kAdc,
+             static_cast<std::uint64_t>(initial_frames_per_source) * coverage,
+             0U, adc_new)
+             .ok() &&
+             fillAndFinish(
+                 pipeline, packet::Stream::kGpio,
+                 static_cast<std::uint64_t>(initial_frames_per_source) *
+                     coverage,
+                 0U, gpio_new)
+                 .ok(),
+         "new live ADC and GPIO blocks replace complete unsent old coverage");
+  expect(adc_new.sequence == initial_frames_per_source &&
+             gpio_new.sequence == initial_frames_per_source,
+         "pressure admission preserves each source's produced sequence");
+
+  packet::PipelineSnapshot pressured = pipeline.snapshot();
+  const packet::SourceCounters &adc = pressured.sources[0];
+  const packet::SourceCounters &gpio = pressured.sources[1];
+  expect(pressured.pool_exhaustions == 2U &&
+             pressured.pressure_evictions == 2U &&
+             pressured.capacity_drops_without_evictable_frame == 0U &&
+             adc.frames_produced == initial_frames_per_source + 1U &&
+             gpio.frames_produced == initial_frames_per_source + 1U &&
+             adc.frames_dropped == 1U && gpio.frames_dropped == 1U &&
+             adc.frames_evicted == 1U && gpio.frames_evicted == 1U &&
+             adc.items_dropped == constants::kAdcPairsPerFrame &&
+             gpio.items_dropped == constants::kGpioSamplesPerFrame &&
+             pressured.source_bytes[0].payload_bytes_dropped ==
+                 constants::kDataPayloadBytes &&
+             pressured.source_bytes[1].payload_bytes_dropped ==
+                 constants::kDataPayloadBytes &&
+             pressured.source_bytes[0].framed_bytes_evicted ==
+                 constants::kDataFrameBytes &&
+             pressured.source_bytes[1].framed_bytes_evicted ==
+                 constants::kDataFrameBytes &&
+             transport.snapshot().active_frame_bytes_sent == 37U,
+         "source-aware eviction accounts exact blocks, items, bytes, and the pinned prefix");
+
+  const packet::StopReport stopping = pipeline.stopProduction();
+  expect(stopping.transmitting_frames_to_drain ==
+                 board::kPacketBufferCount - 2U &&
+             stopping.ready_frames_to_drain == 2U,
+         "STOP freezes production but retains every complete survivor");
+  for (std::size_t visit = 0U;
+       visit < board::kPacketBufferCount + 16U &&
+       (pipeline.readyFrames() != 0U || transport.hasPendingTransmission());
+       ++visit) {
+    (void)pipeline.serviceReadyFrames(board::kPacketBufferCount);
+    (void)transport.serviceTransmit();
+  }
+  expect(!transport.hasPendingTransmission() && pipeline.quiescent(),
+         "bounded resumed service drains control and the current complete backlog");
+
+  std::size_t offset = 0U;
+  std::size_t frame_index = 0U;
+  std::array<std::uint32_t, packet::kStreamCount> expected_sequence{};
+  std::array<std::uint64_t, packet::kStreamCount> expected_ticks{};
+  std::array<std::uint32_t, packet::kStreamCount> inferred_sequence_loss{};
+  std::array<std::uint32_t, packet::kStreamCount> inferred_timestamp_loss{};
+  std::array<bool, packet::kStreamCount> saw_gap_marker{};
+  std::array<std::size_t, packet::kStreamCount> data_frames{};
+  while (offset < stream.output.size()) {
+    std::uint32_t total = 0U;
+    expect(wire::loadU32({stream.output.data(), stream.output.size()},
+                         offset + constants::kHeaderTotalLengthOffset,
+                         total) &&
+               total >= constants::kMinFrameBytes &&
+               total <= stream.output.size() - offset,
+           "walk each resumed frame by its validated declared length");
+    if (total < constants::kMinFrameBytes ||
+        total > stream.output.size() - offset) {
+      break;
+    }
+    wire::DecodedFrame decoded{};
+    expect(wire::decodeFrame({stream.output.data() + offset, total}, decoded)
+               .ok(),
+           "every partial/control/data survivor remains a valid frame");
+    if (frame_index == 0U) {
+      expect(decoded.header.kind == constants::FrameKind::kAdcData &&
+                 decoded.header.sequence == 0U,
+             "the started ADC frame is never abandoned under pressure");
+    } else if (frame_index == 1U) {
+      expect(decoded.header.kind ==
+                 constants::FrameKind::kGetStatusResponse,
+             "STATUS runs at the first boundary after the partial data frame");
+    } else if (frame_index == 2U) {
+      expect(decoded.header.kind == constants::FrameKind::kStopResponse,
+             "STOP follows STATUS before another unsent data frame");
+    }
+
+    if (decoded.header.kind == constants::FrameKind::kAdcData ||
+        decoded.header.kind == constants::FrameKind::kGpioData) {
+      const std::size_t source =
+          decoded.header.kind == constants::FrameKind::kAdcData ? 0U : 1U;
+      const std::uint32_t sequence_gap =
+          decoded.header.sequence - expected_sequence[source];
+      const std::uint64_t tick_delta =
+          decoded.header.first_sample_ticks - expected_ticks[source];
+      expect(tick_delta % coverage == 0U,
+             "retained source timestamps stay on complete-frame boundaries");
+      const std::uint64_t timestamp_gap = tick_delta / coverage;
+      expect(timestamp_gap <= std::numeric_limits<std::uint32_t>::max(),
+             "test timestamp loss fits the exact source counter width");
+      inferred_sequence_loss[source] += sequence_gap;
+      inferred_timestamp_loss[source] +=
+          static_cast<std::uint32_t>(timestamp_gap);
+      if (sequence_gap != 0U || timestamp_gap != 0U) {
+        const std::uint16_t required = static_cast<std::uint16_t>(
+            static_cast<std::uint16_t>(constants::FrameFlag::kGapBefore) |
+            static_cast<std::uint16_t>(
+                constants::FrameFlag::kOverrunBefore));
+        expect((decoded.header.flags & required) == required,
+               "the exact chronological successor reports gap and overrun");
+        saw_gap_marker[source] = true;
+      }
+      expected_sequence[source] = decoded.header.sequence + 1U;
+      expected_ticks[source] = decoded.header.first_sample_ticks + coverage;
+      ++data_frames[source];
+    }
+    offset += total;
+    ++frame_index;
+  }
+
+  pressured = pipeline.snapshot();
+  expect(offset == stream.output.size() && frame_index ==
+                 board::kPacketBufferCount + 2U &&
+             data_frames[0] == initial_frames_per_source &&
+             data_frames[1] == initial_frames_per_source &&
+             inferred_sequence_loss[0] == 1U &&
+             inferred_sequence_loss[1] == 1U &&
+             inferred_timestamp_loss == inferred_sequence_loss &&
+             saw_gap_marker[0] && saw_gap_marker[1] &&
+             pressured.sources[0].frames_transmitted ==
+                 initial_frames_per_source &&
+             pressured.sources[1].frames_transmitted ==
+                 initial_frames_per_source,
+         "sequence, timestamp, flags, counters, and transmitted survivors reconcile exactly");
+}
+
 }  // namespace
 
 int main() {
@@ -489,6 +709,7 @@ int main() {
   testFairPromotionKeepsNominalCoverageAligned();
   testCombinedFairnessBoundsLeadAndCountsMissingCoverage();
   testPoolExhaustionIsBoundedAndSequenceVisible();
+  testOldestCompletePressureEvictionKeepsLiveDataAndControlServiceable();
   testRunChecksumIsImmutableUntilTheQueueIsQuiescent();
   if (failures != 0) {
     std::cerr << failures << " packet pipeline assertion(s) failed\n";

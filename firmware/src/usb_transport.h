@@ -35,6 +35,14 @@ class LowerPriorityFrameSource {
   virtual ~LowerPriorityFrameSource() = default;
 
   virtual protocol::ByteView frontFrame() const = 0;
+  // Finalize any metadata that became known after queue admission. This runs
+  // only at a frame boundary and before byte zero is offered to USB.
+  virtual bool prepareFrontFrame() { return true; }
+  // Called exactly once after USB accepts the first byte of the current front
+  // frame. Before this callback the complete frame is still unsent and may be
+  // replaced by the source's pressure policy; afterward it must remain pinned
+  // until releaseFrontFrame() observes the final byte.
+  virtual void markFrontFrameStarted() {}
   virtual void releaseFrontFrame() = 0;
   virtual std::size_t queuedFrames() const = 0;
 };
@@ -137,6 +145,29 @@ class FixedQueue {
       return false;
     }
     head_ = (head_ + 1U) % Capacity;
+    --size_;
+    return true;
+  }
+
+  // Remove one queued value without disturbing the relative order of any
+  // survivor. Packet pressure uses this only for a complete frame that has not
+  // begun transmission; normal FIFO service remains pop()/popFront().
+  bool eraseFirst(const Item &item) {
+    std::size_t found = size_;
+    for (std::size_t offset = 0U; offset < size_; ++offset) {
+      if (storage_[(head_ + offset) % Capacity] == item) {
+        found = offset;
+        break;
+      }
+    }
+    if (found == size_) {
+      return false;
+    }
+    for (std::size_t offset = found; offset + 1U < size_; ++offset) {
+      storage_[(head_ + offset) % Capacity] =
+          storage_[(head_ + offset + 1U) % Capacity];
+    }
+    tail_ = (tail_ + Capacity - 1U) % Capacity;
     --size_;
     return true;
   }

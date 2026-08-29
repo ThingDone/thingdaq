@@ -309,6 +309,9 @@ void FirmwareRuntime::publishPacketStatistics() {
   queues.owned_high_water = pipeline.buffers_owned_high_water;
   queues.frames_promoted = pipeline.frames_promoted;
   queues.fairness_deferrals = pipeline.fairness_deferrals;
+  queues.pressure_evictions = pipeline.pressure_evictions;
+  queues.capacity_drops_without_evictable_frame =
+      pipeline.capacity_drops_without_evictable_frame;
   queues.accounted_frame_skew = pipeline.accounted_frame_skew;
   queues.data_payload_bytes_transmitted =
       pipeline.data_payload_bytes_transmitted;

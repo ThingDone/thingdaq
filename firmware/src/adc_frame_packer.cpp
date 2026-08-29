@@ -85,10 +85,6 @@ ServiceReport AdcFramePacker::service(
   }
 
   while (report.buffers_consumed < buffer_limit) {
-    if (pipeline.freeBuffers() == 0U) {
-      report.waiting_for_packet_buffer = true;
-      break;
-    }
     const adc_capture::AcquireResult acquired = source_.acquireReady();
     if (acquired.status == adc_capture::OperationStatus::kNoReadyBuffer) {
       report.waiting_for_buffer = true;
@@ -171,6 +167,8 @@ bool AdcFramePacker::consume(
 
   const packet::BeginFillResult begun =
       pipeline.beginFill(packet::Stream::kAdc);
+  const bool expected_pressure_drop =
+      begun.status == packet::OperationStatus::kPoolExhausted;
   bool framed = begun.ok();
   if (framed) {
     protocol::MutableByteView payload = pipeline.writablePayload(begun.handle);
@@ -207,8 +205,14 @@ bool AdcFramePacker::consume(
     ++report.frames_framed;
   } else {
     packet_gap_pending_ = true;
-    saturatingIncrement(pipeline_errors_);
-    report.pipeline_error = true;
+    // A pool with no complete unsent eviction candidate is loss, not a
+    // hardware/pipeline fault. Release the DMA lease and keep draining future
+    // completions; the shared packet layer already consumed sequence and exact
+    // drop counters for this frame.
+    if (!expected_pressure_drop) {
+      saturatingIncrement(pipeline_errors_);
+      report.pipeline_error = true;
+    }
     ++report.frames_dropped;
   }
   return true;

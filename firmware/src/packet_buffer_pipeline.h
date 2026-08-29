@@ -214,6 +214,11 @@ struct SourceCounters {
   std::uint64_t items_transmitted = 0U;
   std::uint64_t frames_dropped = 0U;
   std::uint64_t items_dropped = 0U;
+  // Pressure evictions are the subset of drops where a complete, immutable,
+  // not-yet-started frame was removed to admit newer live data.
+  std::uint64_t frames_evicted = 0U;
+  std::uint64_t items_evicted = 0U;
+  std::uint64_t frames_evicted_after_promotion = 0U;
   std::uint32_t next_sequence = 0U;
   std::size_t ready_queue_high_water = 0U;
   std::size_t transmit_queue_high_water = 0U;
@@ -229,9 +234,11 @@ struct SourceByteCounters {
   std::uint64_t payload_bytes_emitted = 0U;
   std::uint64_t payload_bytes_transmitted = 0U;
   std::uint64_t payload_bytes_dropped = 0U;
+  std::uint64_t payload_bytes_evicted = 0U;
   std::uint64_t framed_bytes_framed = 0U;
   std::uint64_t framed_bytes_emitted = 0U;
   std::uint64_t framed_bytes_transmitted = 0U;
+  std::uint64_t framed_bytes_evicted = 0U;
 };
 
 struct PipelineSnapshot {
@@ -253,6 +260,8 @@ struct PipelineSnapshot {
   std::uint32_t transmit_queue_rejections = 0U;
   std::uint64_t frames_promoted = 0U;
   std::uint64_t fairness_deferrals = 0U;
+  std::uint64_t pressure_evictions = 0U;
+  std::uint64_t capacity_drops_without_evictable_frame = 0U;
   std::uint64_t accounted_frame_skew = 0U;
   std::uint64_t data_payload_bytes_transmitted = 0U;
   std::uint64_t data_framed_bytes_transmitted = 0U;
@@ -326,6 +335,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
       std::size_t limit = board::kPacketPromotionsPerLoop);
 
   protocol::ByteView frontFrame() const override;
+  bool prepareFrontFrame() override;
+  void markFrontFrameStarted() override;
   void releaseFrontFrame() override;
   std::size_t queuedFrames() const override;
 
@@ -362,6 +373,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   struct BufferRecord {
     BufferState state = BufferState::kFree;
     Stream stream = Stream::kAdc;
+    bool transmission_started = false;
+    bool gap_before_required = false;
     std::uint32_t run_id = 0U;
     std::uint32_t sequence = 0U;
     std::uint32_t item_count = 0U;
@@ -379,6 +392,12 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::size_t selectReadySource(bool &fairness_deferred) const;
   std::uint64_t accountedFrames(std::size_t source_index) const;
   BufferIndex takeFreeBuffer();
+  BufferIndex oldestEvictableCompleteBuffer() const;
+  bool evictCompleteBuffer(BufferIndex index);
+  void dropBuffer(BufferIndex index, bool pressure_eviction);
+  void propagateGapAfter(const BufferRecord &dropped);
+  void markGapBefore(BufferIndex index);
+  bool finalizeGapBefore(BufferIndex index);
   void recycle(BufferIndex index);
   void recordDrop(Stream stream, std::uint32_t item_count);
   void updateOwnedHighWater();
@@ -404,11 +423,15 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::uint32_t transmit_queue_rejections_ = 0U;
   std::uint64_t frames_promoted_ = 0U;
   std::uint64_t fairness_deferrals_ = 0U;
+  std::uint64_t pressure_evictions_ = 0U;
+  std::uint64_t capacity_drops_without_evictable_frame_ = 0U;
   std::size_t next_free_search_ = 0U;
   std::size_t next_ready_source_ = 0U;
+  std::size_t next_eviction_source_ = 0U;
   std::size_t ready_queue_high_water_ = 0U;
   std::size_t transmit_queue_high_water_ = 0U;
   std::size_t buffers_owned_high_water_ = 0U;
+  std::array<bool, kStreamCount> gap_before_next_frame_{};
   bool accepting_frames_ = false;
 };
 

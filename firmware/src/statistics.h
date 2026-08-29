@@ -145,6 +145,8 @@ struct PacketQueueProgress {
   std::size_t owned_high_water = 0U;
   std::uint64_t frames_promoted = 0U;
   std::uint64_t fairness_deferrals = 0U;
+  std::uint64_t pressure_evictions = 0U;
+  std::uint64_t capacity_drops_without_evictable_frame = 0U;
   std::uint64_t accounted_frame_skew = 0U;
   std::uint64_t data_payload_bytes_transmitted = 0U;
   std::uint64_t data_framed_bytes_transmitted = 0U;

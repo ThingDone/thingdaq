@@ -119,7 +119,9 @@ class GpioBatchPackerTests(unittest.TestCase):
         self.assertIn("packGpio2Batch", source)
         self.assertIn("FixedQueue", source)
         self.assertIn("recordSourceFrameDrops", source)
+        self.assertIn("expected_pressure_drop", source)
         self.assertIn("kPackedWireBytesPerSample = 1U", source)
+        self.assertNotIn("pipeline.freeBuffers()", source)
         self.assertNotIn("sizeof(std::uint32_t) * sample_count", source)
 
 
