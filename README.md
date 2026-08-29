@@ -479,6 +479,32 @@ frame-boundary STOP behavior, and sequential diagnostic, 10-second smoke, and
 60-second physical stream evidence are consolidated in
 `doc/results/phase-06-gpio-dma.md`.
 
+`firmware/tests/rig_adc_capture.py` is the standalone Phase 07 physical
+dual-ADC acceptance program. It independently grades the Teensy 4.0 identity,
+both bounded calibration results, fixed A0/ADC1/channel-7 and
+A1/ADC2/channel-8 routes, exact 1 MHz/500 ns trigger arithmetic, and the
+PIT/XBAR/ADC_ETC register snapshot. The BOOT one-pair completion check is
+treated only as digital timing evidence. Because protocol v1 deliberately has
+no variable-rate ADC configuration, the preliminary capture limits volume
+with `ADC_REDUCED_CAPTURE_FRAMES` while retaining the production 1 MHz
+schedule; it does not misreport that epoch as a lower hardware rate. A second,
+timed epoch then checks every physical ADC frame's checksum, four-byte
+little-endian `adc0, adc1` pair layout, advertised code range, count, run,
+sequence, timestamp, flags, and final firmware-to-host accounting while
+polling STATUS under load.
+
+The full-rate epoch defaults to 10 seconds; use `ADC_CAPTURE_SECONDS=60` for
+the soak. Optional controls are `ADC_STATUS_INTERVAL_SECONDS`,
+`ADC_REDUCED_CAPTURE_FRAMES`, and `ADC_CHECKSUM_ALGORITHM`, with the shared
+`EXPECTED_BUILD_ID` and `EXPECTED_HARDWARE_SERIAL` identity pins. If the rig
+has an analog stimulus, `ADC_FIXTURE_STIMULUS_JSON` must use schema
+`teensy-daq-adc-stimulus-v1`, name the fixture/stimulus, and declare exact A0
+and A1 minimum/maximum accepted codes; optional complete mean-code bounds make
+analog-quality grading explicit. Without that declaration the program prints
+that A0/A1 are unstimulated and that neither analog quality nor aperture was
+graded. No code-range or DC declaration is promoted to analog-aperture
+evidence.
+
 ## Synchronous Python API and offline simulator
 
 The Python facade runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS and
