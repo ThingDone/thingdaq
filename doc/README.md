@@ -27,6 +27,7 @@ related:
   - '[[Phase-08-Combined-Acquisition]]'
   - '[[Phase-09-Loss-Recovery]]'
   - '[[Phase-10-Package-Local-Gate]]'
+  - '[[Phase-10-Package-Workflows]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
@@ -90,7 +91,10 @@ double-bracket document links so the project can be explored as a graph.
   normal-regression campaign in [[Phase-09-Loss-Recovery]]. The reproducible
   package contents, clean-install CPython 3.10-3.14 matrix, optional-NumPy
   parity, installed typing, consoles, simulator, and examples are recorded in
-  [[Phase-10-Package-Local-Gate]].
+  [[Phase-10-Package-Local-Gate]]. Its byte-matched firmware rebuild and final
+  sequential identity/capability, physical combined-stream, live STATUS, raw
+  interpretation, clean STOP, and counter-reconciliation gate are recorded in
+  [[Phase-10-Package-Workflows]].
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`

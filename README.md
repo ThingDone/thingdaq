@@ -107,7 +107,10 @@ the nominal ADC/GPIO rates with zero complete-frame or payload loss, deliberate
 host-stall loss/recovery checks, malformed-control recovery, repeated lifecycle
 cycles, and CDC close/reopen recovery. Exact evidence is in
 [Phase 08](doc/results/phase-08-combined-acquisition.md) and
-[Phase 09](doc/results/phase-09-loss-recovery.md).
+[Phase 09](doc/results/phase-09-loss-recovery.md). The reproducible package
+matrix and final byte-matched real-device workflow are recorded in the
+[Phase 10 local gate](doc/results/phase-10-package-local-gate.md) and
+[Phase 10 physical workflow](doc/results/phase-10-package-workflows.md).
 
 Those runs used unstimulated A0/A1 and no declared external digital stimulus.
 They do not establish analog accuracy, analog bandwidth, true aperture timing,
@@ -126,6 +129,7 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 - [Optional NumPy integration](doc/architecture/numpy-integration.md)
 - [Protocol v1](doc/protocol/protocol-v1.md)
 - [System overview](doc/architecture/system-overview.md)
+- [Phase 10 package workflow evidence](doc/results/phase-10-package-workflows.md)
 
 ## Repository layout and checks
 
