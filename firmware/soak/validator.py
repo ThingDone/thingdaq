@@ -2358,8 +2358,8 @@ def reconcile_final_status(
         frame,
         expected_state=STATE_IDLE,
         expected_stream_mask=STREAM_NONE,
-        source=validator.source,
-        checksum_algorithm=validator.checksum_algorithm,
+        source=SOURCE_HARDWARE,
+        checksum_algorithm=BOOTSTRAP_CHECKSUM,
         expected_generation=expected_generation,
         run_id=validator.run_id,
     )

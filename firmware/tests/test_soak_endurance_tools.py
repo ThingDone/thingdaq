@@ -275,7 +275,11 @@ class AcceleratedSoakDevice(PhysicalCombinedDevice):
         gpio_items = base.gpio_items_framed_pipeline
         return replace(
             base,
-            source=constants.Source.SYNTHETIC,
+            source=(
+                constants.Source.HARDWARE
+                if self.state is constants.DeviceState.IDLE
+                else constants.Source.SYNTHETIC
+            ),
             commands_accepted=self.commands_accepted,
             adc_pairs_framed=adc_items,
             adc_pairs_transmitted=adc_items,

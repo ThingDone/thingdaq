@@ -80,7 +80,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate_sha256": "1ae0ce075bb02209da4c5f3a791729787f5df757a83ee7a020e150cf431c2f20",
   "generator_schema_version": 1,
   "mode": "physical-combined",
-  "validator_sha256": "45352039be2007ba9164347ad1ddff0d7f240e12804f709badbed1ccbb8192e6"
+  "validator_sha256": "151de875b9421863eb9ce844389ef321132306cec5f7ec80abeb9eab4f6ecd0e"
 }
 """
 )
@@ -2364,8 +2364,8 @@ def reconcile_final_status(
         frame,
         expected_state=STATE_IDLE,
         expected_stream_mask=STREAM_NONE,
-        source=validator.source,
-        checksum_algorithm=validator.checksum_algorithm,
+        source=SOURCE_HARDWARE,
+        checksum_algorithm=BOOTSTRAP_CHECKSUM,
         expected_generation=expected_generation,
         run_id=validator.run_id,
     )
