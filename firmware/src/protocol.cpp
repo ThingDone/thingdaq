@@ -2025,7 +2025,8 @@ bool storeU16(MutableByteView output, std::size_t offset,
   }
   for (std::size_t index = 0U; index < sizeof(value); ++index) {
     output.data[offset + index] =
-        static_cast<std::uint8_t>((value >> (index * 8U)) & 0xFFU);
+        static_cast<std::uint8_t>(
+            (static_cast<std::uint32_t>(value) >> (index * 8U)) & 0xFFU);
   }
   return true;
 }
