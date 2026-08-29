@@ -4,7 +4,6 @@
 
 #include <array>
 #include <cstdint>
-#include <limits>
 
 #include <core_pins.h>
 #include <imxrt.h>
@@ -14,6 +13,8 @@
 
 #define TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
+#define TEENSY_DAQ_ADC_TRIGGER_TARGET_HOT_CODE \
+  __attribute__((optimize("Os"), noinline, noipa, used))
 
 namespace teensy_daq::adc_trigger {
 namespace {
@@ -43,7 +44,7 @@ std::uint32_t g_done2_err_irq_final = 0U;
 
 std::uint32_t readPrimask() {
 #if defined(TEENSY_DAQ_HOST_REGISTER_TEST)
-  return 0U;
+  return fake_imxrt::interrupts_enabled ? 0U : 1U;
 #else
   std::uint32_t value = 0U;
   __asm__ volatile("mrs %0, primask" : "=r"(value));
@@ -58,12 +59,6 @@ void restorePrimask(std::uint32_t value) {
 }
 
 void barrier() { gpio_dma_route::barrier(); }
-
-void saturatingIncrement(volatile std::uint32_t &value) {
-  if (value != std::numeric_limits<std::uint32_t>::max()) {
-    ++value;
-  }
-}
 
 volatile std::uint16_t *xbarSelectRegister(std::uint8_t output) {
   return &XBARA1_SEL0 + output / 2U;
@@ -203,41 +198,55 @@ void resetDiagnosticState() {
   restorePrimask(primask);
 }
 
-void adcEtcDone0Isr() {
-  const std::uint32_t pending = ADC_ETC_DONE0_1_IRQ & kDone0Mask;
-  if (pending != 0U) {
-    if (g_completion_counts[0] == 0U) {
-      g_first_completion_cycles[0] = ARM_DWT_CYCCNT;
-      g_completion_counts[0] = 1U;
-    }
-    ADC_ETC_DONE0_1_IRQ = pending;
-    // One completion is sufficient for the BOOT timing cross-check.  Leaving
-    // this 1 MHz source enabled can continuously preempt the equal-priority
-    // ADC1 completion vector before it records its first timestamp.
-    NVIC_DISABLE_IRQ(IRQ_ADC_ETC0);
-  }
-}
-
-void adcEtcDone1Isr() {
-  const std::uint32_t pending = ADC_ETC_DONE0_1_IRQ & kDone1Mask;
-  if (pending != 0U) {
-    if (g_completion_counts[1] == 0U) {
-      g_first_completion_cycles[1] = ARM_DWT_CYCCNT;
-      g_completion_counts[1] = 1U;
-    }
-    ADC_ETC_DONE0_1_IRQ = pending;
-    NVIC_DISABLE_IRQ(IRQ_ADC_ETC1);
-  }
-}
-
 TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
-    ".flashmem.adc_trigger.target_error_isr")
-void adcEtcErrorIsr() {
-  const std::uint32_t pending = ADC_ETC_DONE2_ERR_IRQ & kTriggerErrorMask;
-  if (pending != 0U) {
-    g_trigger_error_flags |= pending;
-    saturatingIncrement(g_trigger_error_count);
-    ADC_ETC_DONE2_ERR_IRQ = pending;
+    ".flashmem.adc_trigger.target_record_diagnostic_error")
+void recordDiagnosticError(std::uint32_t pending) {
+  g_trigger_error_flags |= pending;
+  g_trigger_error_count = 1U;
+  ADC_ETC_DONE2_ERR_IRQ = pending;
+}
+
+// Keep the polling loop in ITCM even though its caller is deliberately cold.
+// Masking interrupts for this bounded BOOT-only window makes each DWT timestamp
+// describe when the hardware DONE bit becomes visible, rather than when NVIC
+// happens to dispatch two already-pending equal-priority handlers.
+TEENSY_DAQ_ADC_TRIGGER_TARGET_HOT_CODE
+void captureCompletionStatusTransitions() {
+  const std::uint32_t started = ARM_DWT_CYCCNT;
+  std::uint32_t captured = 0U;
+  for (std::uint32_t poll = 0U;
+       poll < protocol_v1::kAdcTriggerDiagnosticPollLimit; ++poll) {
+#if defined(TEENSY_DAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK)
+    TEENSY_DAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK();
+#endif
+    const std::uint32_t done_pending =
+        ADC_ETC_DONE0_1_IRQ & (kDone0Mask | kDone1Mask);
+    const std::uint32_t error_pending =
+        ADC_ETC_DONE2_ERR_IRQ & kTriggerErrorMask;
+    const std::uint32_t observed = ARM_DWT_CYCCNT;
+    const std::uint32_t first_pending = done_pending & ~captured;
+
+    if ((first_pending & kDone0Mask) != 0U) {
+      g_first_completion_cycles[0] = observed;
+      g_completion_counts[0] = 1U;
+      captured |= kDone0Mask;
+    }
+    if ((first_pending & kDone1Mask) != 0U) {
+      g_first_completion_cycles[1] = observed;
+      g_completion_counts[1] = 1U;
+      captured |= kDone1Mask;
+    }
+    if (first_pending != 0U) {
+      ADC_ETC_DONE0_1_IRQ = first_pending;
+    }
+    if (error_pending != 0U) {
+      recordDiagnosticError(error_pending);
+      return;
+    }
+    if (captured == (kDone0Mask | kDone1Mask) ||
+        observed - started >= kDiagnosticDeadlineCycles) {
+      return;
+    }
   }
 }
 
@@ -393,21 +402,12 @@ class TeensyPlatform final : public Platform {
     ADC_ETC_DONE2_ERR_IRQ = kTriggerErrorMask;
     if (completion_diagnostic) {
       resetDiagnosticState();
-      attachInterruptVector(IRQ_ADC_ETC0, adcEtcDone0Isr);
-      attachInterruptVector(IRQ_ADC_ETC1, adcEtcDone1Isr);
-      attachInterruptVector(IRQ_ADC_ETC_ERR, adcEtcErrorIsr);
-      NVIC_SET_PRIORITY(IRQ_ADC_ETC0,
-                        protocol_v1::kAdcTriggerIrqPriority);
-      NVIC_SET_PRIORITY(IRQ_ADC_ETC1,
-                        protocol_v1::kAdcTriggerIrqPriority);
-      NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR,
-                        protocol_v1::kAdcTriggerIrqPriority);
+      NVIC_DISABLE_IRQ(IRQ_ADC_ETC0);
+      NVIC_DISABLE_IRQ(IRQ_ADC_ETC1);
+      NVIC_DISABLE_IRQ(IRQ_ADC_ETC_ERR);
       NVIC_CLEAR_PENDING(IRQ_ADC_ETC0);
       NVIC_CLEAR_PENDING(IRQ_ADC_ETC1);
       NVIC_CLEAR_PENDING(IRQ_ADC_ETC_ERR);
-      NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-      NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
-      NVIC_ENABLE_IRQ(IRQ_ADC_ETC_ERR);
     } else {
       // The production ADC DMA adapter already owns IRQ_ADC_ETC_ERR. The
       // completion vectors are diagnostic-only and must not race DMA buffer
@@ -417,16 +417,29 @@ class TeensyPlatform final : public Platform {
       NVIC_CLEAR_PENDING(IRQ_ADC_ETC0);
       NVIC_CLEAR_PENDING(IRQ_ADC_ETC1);
     }
+    const std::uint32_t diagnostic_primask =
+        completion_diagnostic ? readPrimask() : 0U;
+    if (completion_diagnostic) {
+      __disable_irq();
+    }
     ADC_ETC_CTRL = kAdcEtcControlConfiguration |
                    ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask);
     barrier();
     pairPit().TCTRL = PIT_TCTRL_CHN | PIT_TCTRL_TEN;
     masterPit().TCTRL = PIT_TCTRL_TEN;
     barrier();
-    return (ADC_ETC_CTRL & ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask)) ==
-               ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask) &&
-           (pairPit().TCTRL & PIT_TCTRL_TEN) != 0U &&
-           (masterPit().TCTRL & PIT_TCTRL_TEN) != 0U;
+    const bool armed =
+        (ADC_ETC_CTRL & ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask)) ==
+            ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask) &&
+        (pairPit().TCTRL & PIT_TCTRL_TEN) != 0U &&
+        (masterPit().TCTRL & PIT_TCTRL_TEN) != 0U;
+    if (completion_diagnostic && armed) {
+      captureCompletionStatusTransitions();
+    }
+    if (completion_diagnostic) {
+      restorePrimask(diagnostic_primask);
+    }
+    return armed;
   }
 
   TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
@@ -522,3 +535,4 @@ static_assert(XBARA1_OUT_ADC_ETC_TRIG10 ==
 #endif
 
 #undef TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE
+#undef TEENSY_DAQ_ADC_TRIGGER_TARGET_HOT_CODE

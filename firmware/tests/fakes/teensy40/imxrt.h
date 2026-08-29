@@ -139,6 +139,13 @@ inline std::array<void (*)(void), 160U> interrupt_vectors{};
 inline std::array<std::uint8_t, 160U> interrupt_priorities{};
 inline std::array<bool, 160U> interrupt_enabled{};
 inline std::array<bool, 160U> interrupt_pending{};
+inline void (*adc_trigger_diagnostic_poll_hook)() = nullptr;
+
+inline void runAdcTriggerDiagnosticPollHook() {
+  if (adc_trigger_diagnostic_poll_hook != nullptr) {
+    adc_trigger_diagnostic_poll_hook();
+  }
+}
 
 }  // namespace fake_imxrt
 
@@ -170,6 +177,8 @@ inline std::array<bool, 160U> interrupt_pending{};
 #define ARM_DEMCR fake_imxrt::arm_demcr
 #define ARM_DWT_CTRL fake_imxrt::arm_dwt_ctrl
 #define ARM_DWT_CYCCNT fake_imxrt::arm_dwt_cyccnt
+#define TEENSY_DAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK() \
+  fake_imxrt::runAdcTriggerDiagnosticPollHook()
 
 #define CCM_CSCMR1_PERCLK_CLK_SEL (std::uint32_t{1U} << 6U)
 #define CCM_CSCMR1_PERCLK_PODF(value) \

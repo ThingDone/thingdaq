@@ -43,9 +43,10 @@ struct ConfigureResult {
   HardwareEvidence evidence{};
 };
 
-// This diagnostic timestamps ADC_ETC conversion-completion interrupts. It is
-// an implementation cross-check of the programmed relative trigger delay; it
-// is deliberately not evidence of the analog sample-and-hold aperture.
+// This diagnostic timestamps the first ADC_ETC conversion-completion status
+// transitions. It is an implementation cross-check of the programmed relative
+// trigger delay; it is deliberately not evidence of the analog sample-and-hold
+// aperture.
 struct Snapshot {
   std::uint16_t configuration_flags = 0U;
   std::uint32_t error_flags = 0U;
@@ -103,9 +104,9 @@ class Platform {
   virtual ConfigureResult configureStopped() = 0;
   virtual bool beginCycleCounter(std::uint32_t &frequency_hz) = 0;
   virtual std::uint32_t readCycles() = 0;
-  // BOOT uses completion interrupts for the bounded timing diagnostic.
-  // Production leaves those vectors to the dual-DMA owner and enables only
-  // the stopped trigger schedule.
+  // BOOT performs a bounded, target-owned completion-status diagnostic while
+  // arming. Production leaves the ADC_ETC error vector to the dual-DMA owner
+  // and enables only the stopped trigger schedule.
   virtual bool armFromStopped(bool completion_diagnostic) = 0;
   virtual std::array<std::uint32_t, kConverterCount> completionCounts() = 0;
   virtual std::array<std::uint32_t, kConverterCount>

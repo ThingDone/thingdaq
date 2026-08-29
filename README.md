@@ -161,10 +161,11 @@ A1/ADC2/channel-8 routes, per-converter calibration states/cycles, and typed
 initialization faults. The BOOT boundary also programs the shared PIT0 4 MHz
 to chained PIT1 1 MHz source, fans PIT1 through XBARA1 to independent ADC_ETC
 queues 0/4, and writes raw delays 0/75 (effective 1/76 IPG cycles, exactly
-500 ns apart). A bounded stopped-to-armed-to-stopped diagnostic publishes
-first conversion-completion IRQ timing, trigger errors, completion counts, and
-clock/XBAR/queue/register readbacks in INFO/STATUS. That DWT delta is
-completion timing, not analog aperture evidence. The fixed eDMA 0/1 adapter
+500 ns apart). A bounded stopped-to-armed-to-stopped diagnostic masks
+interrupts briefly and publishes first conversion-completion status timing,
+trigger errors, completion counts, and clock/XBAR/queue/register readbacks in
+INFO/STATUS. That DWT delta is completion timing, not analog aperture evidence.
+The fixed eDMA 0/1 adapter
 now writes ADC1/ADC2 result halfwords directly to offsets 0/2 of four-byte
 sample pairs with equal 1,012-result major loops and deterministic
 scatter/gather rotation. A generation-and-epoch barrier publishes a buffer

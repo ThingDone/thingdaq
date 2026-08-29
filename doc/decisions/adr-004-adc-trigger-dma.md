@@ -183,21 +183,20 @@ i.MX RT1062 and used by PJRC's ADC setup, writes raw initial delays 0/75, and
 switches ADC1/ADC2 command slot zero to hardware-trigger mode. Every clock,
 route, queue, delay, and hardware-trigger setting is read back before arming.
 
-The BOOT diagnostic clears ADC_ETC/NVIC state, enables queues 0/4, enables
-chained PIT1, and enables the 4 MHz PIT0 master last. Separate ITCM completion
-ISRs timestamp the first queue-0 Done0 and queue-4 Done1 interrupts with the
-free-running 600 MHz DWT counter, latch one completion apiece, and disable
-their own NVIC lines so the continuing 1 MHz queue-0 source cannot starve the
-equal-priority queue-4 first-completion timestamp; the error ISR remains
-enabled and retains ADC_ETC trigger-error state and a saturating count. The
-portable scheduler waits for both
-completions with independent 2,000 us and 2,000,000-poll ceilings. Teardown
+The BOOT diagnostic clears ADC_ETC/NVIC state, leaves the three ADC_ETC IRQ
+lines disabled, briefly masks interrupts, enables queues 0/4 and chained PIT1,
+and enables the 4 MHz PIT0 master last. A bounded ITCM loop timestamps the
+first queue-0 Done0 and queue-4 Done1 status transitions with the free-running
+600 MHz DWT counter, clears each observed status bit, and retains the first
+ADC_ETC trigger-error state. This avoids mistaking NVIC tail-chaining latency
+for the programmed hardware phase when both equal-priority completion IRQs
+have become pending before either handler runs. The target poll and portable
+scheduler retain independent 2,000 us and 2,000,000-poll ceilings. Teardown
 stops PIT0 first, disables both queues, waits boundedly for both ADCs to become
-idle, disables and acknowledges the interrupts, and verifies the stopped
-state.
+idle, disables and acknowledges the IRQ lines, and verifies the stopped state.
 
 Identically configured conversions should complete 300 DWT cycles apart. The
-cross-check accepts ±120 DWT cycles to cover interrupt-entry variation and
+cross-check accepts ±120 DWT cycles to cover register-observation variation and
 publishes the observed delta, expected delta, tolerance, elapsed cycles,
 completion counts, trigger-error count, final IRQ words, and configured
 CCM/PIT/XBAR/ADC_ETC register evidence through INFO and STATUS. This is

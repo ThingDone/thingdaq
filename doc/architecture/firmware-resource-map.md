@@ -122,12 +122,12 @@ Chained PIT1 divides the verified 4 MHz PIT0 event by four. In the 150 MHz
 ADC_ETC/IPG domain with predivider zero, raw initial delays 0 and 75 become
 effective delays of 1 and 76 cycles; their difference is exactly 75 cycles, or
 500 ns. This four-tick phase is digital trigger/timestamp metadata, not a
-physical aperture claim. The BOOT diagnostic records first ADC_ETC
-conversion-completion interrupts against DWT, accepts an explicit 300 ± 120
-cycle completion delta, and exposes configured registers, counts, and errors
-in INFO/STATUS. Later hardware work must still prove the trigger path on
-silicon and keep completion timing separate from analog aperture before final
-physical ADC acceptance.
+physical aperture claim. The BOOT diagnostic records the first ADC_ETC
+conversion-completion status transitions against DWT under a bounded,
+interrupt-masked poll, accepts an explicit 300 ± 120 cycle completion delta,
+and exposes configured registers, counts, and errors in INFO/STATUS. Later
+hardware work must still keep completion timing separate from analog aperture
+before making a physical analog-timing claim.
 
 ## eDMA reservations
 

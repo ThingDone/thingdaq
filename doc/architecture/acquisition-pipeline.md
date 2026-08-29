@@ -133,7 +133,7 @@ invalid production contract from compiling.
 | eDMA/DMAMUX | Range plus unique channel/source rejection | ADC 0/24, ADC 1/88, GPIO 2/30 |
 | DMA arbitration | Distinct fixed channel priorities | ADC 0/1, GPIO 2 |
 | NVIC priorities | Complete logical allocation, equal ADC generation/error priority, ADC before GPIO | production ADC 48; GPIO 64 |
-| BOOT diagnostic IRQ | Kept separate from production allocation and required to be higher urgency | ADC completion diagnostic 32; disabled before production ownership |
+| BOOT diagnostic poll | Bounded ITCM status observation while all interrupts are briefly masked | ADC_ETC completion/error IRQs remain disabled; production ownership is untouched |
 | DMA memory | Nonzero power-of-two alignment, unique use, RAM1/RAM2 budgets, DMA destinations in OCRAM | ADC/raw-GPIO rings, sinks, and TCD banks in RAM2 |
 | Cache regions | Every DMA/cache-sensitive allocation occupies complete 32-byte lines | DMA rings/sinks/TCDs, packet banks, packed GPIO, diagnostic and checksum buffers |
 

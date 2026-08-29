@@ -78,6 +78,7 @@ void resetFakeRegisters() {
   fake_imxrt::interrupt_priorities.fill(0U);
   fake_imxrt::interrupt_enabled.fill(false);
   fake_imxrt::interrupt_pending.fill(false);
+  fake_imxrt::adc_trigger_diagnostic_poll_hook = nullptr;
   fake_imxrt::clearRegisterWrites();
 }
 
@@ -320,34 +321,64 @@ void testDeterministicArmStopOrderAndOwnedConflict() {
          "an active owned PIT1 rejects configuration before any register write");
 }
 
-void testCompletionDiagnosticLatchesOneInterruptPerConverter() {
+std::uint32_t diagnostic_poll_count = 0U;
+
+void publishDiagnosticCompletions() {
+  ++diagnostic_poll_count;
+  fake_imxrt::adc_etc.DONE2_ERR_IRQ.reset(0U);
+  if (diagnostic_poll_count == 1U) {
+    fake_imxrt::arm_dwt_cyccnt = 1'000U;
+    fake_imxrt::adc_etc.DONE0_1_IRQ.reset(
+        ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(v1::kAdcTriggerQueues[0]));
+  } else if (diagnostic_poll_count == 2U) {
+    fake_imxrt::arm_dwt_cyccnt = 1'300U;
+    fake_imxrt::adc_etc.DONE0_1_IRQ.reset(
+        ADC_ETC_DONE0_1_IRQ_TRIG_DONE1(v1::kAdcTriggerQueues[1]));
+  }
+}
+
+void testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked() {
   resetFakeRegisters();
+  diagnostic_poll_count = 0U;
+  fake_imxrt::adc_trigger_diagnostic_poll_hook =
+      publishDiagnosticCompletions;
   trigger::TeensyPlatform platform{};
   expect(platform.configureStopped().error_flags == 0U &&
              platform.armFromStopped(true),
          "completion diagnostic arms from verified stopped state");
 
-  const std::uint32_t done0 =
-      ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(v1::kAdcTriggerQueues[0]);
-  const std::uint32_t done1 =
-      ADC_ETC_DONE0_1_IRQ_TRIG_DONE1(v1::kAdcTriggerQueues[1]);
-  fake_imxrt::arm_dwt_cyccnt = 1'000U;
-  fake_imxrt::adc_etc.DONE0_1_IRQ.reset(done0);
-  fake_imxrt::interrupt_vectors[IRQ_ADC_ETC0]();
-  fake_imxrt::arm_dwt_cyccnt = 1'300U;
-  fake_imxrt::adc_etc.DONE0_1_IRQ.reset(done1);
-  fake_imxrt::interrupt_vectors[IRQ_ADC_ETC1]();
-
-  expect(platform.completionCounts() ==
-                 std::array<std::uint32_t, 2U>{1U, 1U} &&
-             platform.firstCompletionCycles() ==
+  const auto completion_counts = platform.completionCounts();
+  const auto completion_cycles = platform.firstCompletionCycles();
+  expect(completion_counts == std::array<std::uint32_t, 2U>{1U, 1U} &&
+             completion_cycles ==
                  std::array<std::uint32_t, 2U>{1'000U, 1'300U},
-         "diagnostic retains exactly the first 300-cycle-spaced completions");
+         "diagnostic retains exactly the first 300-cycle-spaced DONE transitions (counts " +
+             std::to_string(completion_counts[0]) + "/" +
+             std::to_string(completion_counts[1]) + ", cycles " +
+             std::to_string(completion_cycles[0]) + "/" +
+             std::to_string(completion_cycles[1]) + ")");
   expect(!fake_imxrt::interrupt_enabled[IRQ_ADC_ETC0] &&
              !fake_imxrt::interrupt_enabled[IRQ_ADC_ETC1] &&
-             fake_imxrt::interrupt_enabled[IRQ_ADC_ETC_ERR],
-         "each completion ISR disables itself without hiding trigger errors");
+             !fake_imxrt::interrupt_enabled[IRQ_ADC_ETC_ERR] &&
+             fake_imxrt::interrupt_vectors[IRQ_ADC_ETC0] == nullptr &&
+             fake_imxrt::interrupt_vectors[IRQ_ADC_ETC1] == nullptr &&
+             fake_imxrt::interrupts_enabled,
+         "BOOT polling neither installs completion vectors nor leaks its interrupt mask");
   expect(platform.stop(), "latched completion diagnostic stops cleanly");
+
+  resetFakeRegisters();
+  diagnostic_poll_count = 0U;
+  fake_imxrt::adc_trigger_diagnostic_poll_hook =
+      publishDiagnosticCompletions;
+  fake_imxrt::interrupts_enabled = false;
+  trigger::TeensyPlatform masked_platform{};
+  expect(masked_platform.configureStopped().error_flags == 0U &&
+             masked_platform.armFromStopped(true) &&
+             !fake_imxrt::interrupts_enabled,
+         "BOOT polling preserves a caller's pre-existing global interrupt mask");
+  __enable_irq();
+  expect(masked_platform.stop(),
+         "pre-masked completion diagnostic stops cleanly");
 }
 
 std::uint8_t selectedXbarInput(std::uint8_t output) {
@@ -367,7 +398,7 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
   gpio_route::clearEdmaChannelState();
   gpio_route::configureEdmaPriority();
   gpio_route::enableEdmaRequest();
-  expect(platform.armFromStopped(true),
+  expect(platform.armFromStopped(false),
          "combined register fixture arms the one common schedule");
 
   const std::uint32_t trigger_enable_mask =
@@ -407,19 +438,11 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
              v1::kGpioSamplesPerFrame * v1::kGpioSamplePeriodTicks ==
                  v1::kAdcPairsPerFrame * v1::kAdcPairPeriodTicks,
          "PIT0 produces four GPIO events per ADC pair with equal frame coverage");
-  expect(fake_imxrt::interrupt_priorities[IRQ_ADC_ETC0] ==
-                 v1::kAdcTriggerIrqPriority &&
-             fake_imxrt::interrupt_priorities[IRQ_ADC_ETC1] ==
-                 v1::kAdcTriggerIrqPriority &&
-             fake_imxrt::interrupt_priorities[IRQ_ADC_ETC_ERR] ==
-                 v1::kAdcTriggerIrqPriority &&
-             board::kAdcEdmaPriorities[0] == 0U &&
+  expect(board::kAdcEdmaPriorities[0] == 0U &&
              board::kAdcEdmaPriorities[1] == 1U &&
              board::kGpioEdmaPriority == 2U &&
-             v1::kAdcTriggerIrqPriority <
-                 board::kAdcEdmaIrqPriority &&
              board::kAdcEdmaIrqPriority < board::kGpioEdmaIrqPriority,
-         "BOOT trigger diagnostics, production ADC state writers, and GPIO completion use strict IRQ tiers without sharing DMA priorities");
+         "production ADC state writers and GPIO completion use strict IRQ tiers without sharing DMA priorities");
 
   expect(platform.stop(),
          "combined stop first disables PIT0/PIT1 and ADC_ETC");
@@ -445,7 +468,7 @@ int main() {
   testFixedPinModuleRoutesAndLegalResolutionModes();
   testExactStoppedTriggerScheduleAndResourceIsolation();
   testDeterministicArmStopOrderAndOwnedConflict();
-  testCompletionDiagnosticLatchesOneInterruptPerConverter();
+  testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked();
   testCombinedRegisterResourcesCoexistWithPriorityIsolation();
   if (failures != 0) {
     std::cerr << failures << " ADC register-adapter assertion(s) failed\n";

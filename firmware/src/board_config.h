@@ -839,8 +839,7 @@ inline constexpr AcquisitionResourceContract kAcquisitionResourceContract{
     validAdcEtcAllocations(kAdcEtcAllocations),
     validEdmaAllocations(kEdmaAllocations) &&
         validEdmaPriorities(kAdcEdmaPriorities, kGpioEdmaPriority),
-    validInterruptAllocations(kInterruptAllocations) &&
-        protocol_v1::kAdcTriggerIrqPriority < kAdcEdmaIrqPriority,
+    validInterruptAllocations(kInterruptAllocations),
     validMemoryAllocations(kMemoryAllocations) &&
         kReservedRam1Bytes <= kRam1BudgetBytes &&
         kReservedRam2Bytes <= kRam2BudgetBytes,
@@ -942,8 +941,6 @@ static_assert(kAdcDmaDescriptorBytes % kCacheLineBytes == 0U,
 static_assert(countOf(kAdcEdmaPriorities) == kLogicalAdcCount);
 static_assert(kAdcEdmaIrqPriority < kGpioEdmaIrqPriority,
               "ADC completion/error IRQs must preempt GPIO completion");
-static_assert(protocol_v1::kAdcTriggerIrqPriority < kAdcEdmaIrqPriority,
-              "BOOT completion diagnostic must retain higher IRQ priority");
 static_assert(kGpioRawDmaBufferBytes % kCacheLineBytes == 0U,
               "each raw GPIO DMA buffer must occupy complete cache lines");
 static_assert(kGpioRawDmaRingDepth >= 2U,
