@@ -112,6 +112,15 @@ matrix and final byte-matched real-device workflow are recorded in the
 [Phase 10 local gate](doc/results/phase-10-package-local-gate.md) and
 [Phase 10 physical workflow](doc/results/phase-10-package-workflows.md).
 
+The autonomous release-candidate gate adds two 10-minute synthetic runs, three
+10-minute physical-combined runs, and one 10-minute alternating control-stress
+run on one immutable artifact. The six-job decision, complete exclusion
+lineage, conservation equations, fixture limits, and post-campaign
+reproducibility gate are in the
+[Phase 11 soak evidence](doc/results/phase-11-soak-evidence.md) and the
+[cross-phase evidence index](doc/results/evidence-index.md). A later Windows
+run is additive evidence and is not a prerequisite for that autonomous PASS.
+
 Those runs used unstimulated A0/A1 and no declared external digital stimulus.
 They do not establish analog accuracy, analog bandwidth, true aperture timing,
 external GPIO transition timing, or compatibility with a particular customer
@@ -121,6 +130,8 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 ## Documentation map
 
 - [Documentation index](doc/README.md)
+- [Evidence index](doc/results/evidence-index.md)
+- [Phase 11 autonomous soak evidence](doc/results/phase-11-soak-evidence.md)
 - [Quickstart](doc/guides/quickstart.md)
 - [Autonomous soak harness](doc/guides/soak-harness.md)
 - [Python API architecture](doc/architecture/python-api.md)
