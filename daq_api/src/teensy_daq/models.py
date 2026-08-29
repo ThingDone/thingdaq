@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         CalibratedAdcSample,
         CalibrationRecord,
     )
+    from .numpy import ADCArrayView, GPIOArrayView
 
 _CONFIGURATION = struct.Struct("<BBBBI")
 _CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
@@ -4893,6 +4894,13 @@ class ADCBlock:
             analog_front_end_profile=analog_front_end_profile,
         )
 
+    def as_numpy(self) -> ADCArrayView:
+        """Load the optional NumPy integration and borrow this payload."""
+
+        from .numpy import adc_view
+
+        return adc_view(self)
+
 
 # Preserve the conventional mixed-case Phase 01 spelling.
 AdcBlock = ADCBlock
@@ -5093,6 +5101,13 @@ class GPIOBlock:
         """Return one nominal packed-byte START-relative time in seconds."""
 
         return self.sample_ticks(index) / self.timestamp_hz
+
+    def as_numpy(self) -> GPIOArrayView:
+        """Load the optional NumPy integration without expanding GPIO bits."""
+
+        from .numpy import gpio_view
+
+        return gpio_view(self)
 
     def channel(self, pin: int) -> GpioChannelView:
         return GpioChannelView(self, pin)

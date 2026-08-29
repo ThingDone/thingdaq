@@ -14,6 +14,7 @@ related:
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[Calibration]]'
+  - '[[NumPy-Integration]]'
 ---
 
 # Teensy DAQ Python package
@@ -300,6 +301,16 @@ identity. They create a denser nominal two-converter time grid; they do not
 increase either input's analog bandwidth. GPIO payloads remain packed, and
 `block.channel(pin)` lazily extracts D6-D13 without an eager eightfold Boolean
 expansion. None of these operations imports or requires NumPy.
+
+The optional `teensy_daq.numpy` module vectorizes the same models without
+changing that baseline. `block.as_numpy().pairs` is a read-only, zero-copy
+`(1012, 2)` `<u2` view in ADC0/ADC1 order, and a GPIO block's corresponding
+`packed` view is read-only, zero-copy `uint8`. Explicit methods generate
+interleaved ticks, calibrated `float64` voltages, or Boolean columns only for
+requested GPIO pins. The arrays retain the immutable payload owner and source
+block; no eight-channel GPIO expansion occurs unless the caller names all
+eight pins. See [[NumPy-Integration]] for endianness, alignment, lifetime,
+allocation, and pure-Python parity details.
 
 Per-unit host calibration is a separate opt-in layer. Immutable schema-v1
 records are keyed by the physical hardware serial and an optional exact analog

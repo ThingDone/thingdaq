@@ -589,7 +589,11 @@ duplicate/reorder/stale/timestamp `StreamAnomaly`, and exact per-source
 corresponding typed exception. Sequence/timestamp inference, frame flags, and
 cumulative firmware block/item/byte counters remain independently visible,
 and START/RESET/reconnect/wrap boundaries cannot join runs. NumPy is not
-required.
+required. When the optional extra is installed, `ADCBlock.as_numpy()` exposes
+read-only zero-copy little-endian pair views and `GPIOBlock.as_numpy()` keeps
+samples packed until callers explicitly request selected bit columns; the
+ownership and allocation contract is documented in
+`doc/architecture/numpy-integration.md`.
 
 The Phase 04 streaming path uses one reusable 64 KiB receive buffer whenever a
 transport offers `readinto`, retains bounded decoded queues (512 data frames by

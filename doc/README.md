@@ -10,6 +10,7 @@ related:
   - '[[Firmware-Resource-Map]]'
   - '[[Acquisition-Pipeline]]'
   - '[[Calibration]]'
+  - '[[NumPy-Integration]]'
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Checksum-Candidates]]'
   - '[[Phase-05-Checksum-Correctness]]'
@@ -44,7 +45,8 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   beginning with [[System-Overview]] and [[Firmware-Resource-Map]], with the
   centralized physical lifecycle and Phase 08 composition audit in
   [[Acquisition-Pipeline]], and the immutable opt-in host correction model in
-  [[Calibration]].
+  [[Calibration]], plus the allocation, ownership, and pure-Python parity
+  contract for optional arrays in [[NumPy-Integration]].
 - `protocol/` contains versioned wire-contract specifications, beginning with
   [[Protocol-V1]].
 - `decisions/` contains architecture decision records, including
