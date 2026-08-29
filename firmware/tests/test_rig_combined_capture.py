@@ -494,6 +494,14 @@ class CombinedRigTests(unittest.TestCase):
             decoded.extend(parser.feed(wire[offset : offset + 509]))
         self.assertEqual(len(names), len(decoded))
         self.assertEqual(0, parser.errors)
+        bulk_parser = rig.FrameParser()
+        bulk_wire = (
+            (FIXTURES / "adc-data.bin").read_bytes()
+            + (FIXTURES / "gpio-data.bin").read_bytes()
+        ) * 2
+        self.assertEqual(4, len(bulk_parser.feed(bulk_wire)))
+        self.assertEqual(0, bulk_parser.errors)
+        self.assertFalse(bulk_parser.buffer)
         status = rig.decode_status(decoded[1])
         self.assertEqual(143, len(status.values))
         previous = rig.StatusSnapshot(
@@ -601,16 +609,44 @@ class CombinedRigTests(unittest.TestCase):
             self.assertTrue(validator.grade_analog_fixture(rig.Evidence()))
 
         bad = rig.CombinedValidator(7, rig.CHECKSUM_ADLER32, 12, None)
+        bad.accept(
+            rig.Frame(
+                rig.ADC_DATA,
+                rig.FLAG_EPOCH_START,
+                rig.CHECKSUM_ADLER32,
+                7,
+                0,
+                0,
+                0,
+                rig.ADC_PAIRS_PER_FRAME,
+                struct.pack("<HH", 1, 2) * rig.ADC_PAIRS_PER_FRAME,
+                0,
+            )
+        )
+        bad.accept(
+            rig.Frame(
+                rig.GPIO_DATA,
+                rig.FLAG_EPOCH_START,
+                rig.CHECKSUM_ADLER32,
+                7,
+                0,
+                0,
+                0,
+                rig.GPIO_SAMPLES_PER_FRAME,
+                bytes(rig.GPIO_SAMPLES_PER_FRAME),
+                0,
+            )
+        )
         with self.assertRaisesRegex(rig.ProtocolFailure, "outside"):
             bad.accept(
                 rig.Frame(
                     rig.ADC_DATA,
-                    rig.FLAG_EPOCH_START,
+                    0,
                     rig.CHECKSUM_ADLER32,
                     7,
+                    1,
                     0,
-                    0,
-                    0,
+                    rig.FRAME_COVERAGE_TICKS,
                     rig.ADC_PAIRS_PER_FRAME,
                     struct.pack("<HH", 4096, 1) * rig.ADC_PAIRS_PER_FRAME,
                     0,

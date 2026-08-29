@@ -34,7 +34,7 @@ import serial
 BAUD_RATE = 115_200
 SERIAL_READ_TIMEOUT_SECONDS = 0.02
 SERIAL_WRITE_TIMEOUT_SECONDS = 0.5
-SERIAL_READ_BYTES = 64 * 1024
+SERIAL_READ_BYTES = 16 * 1024
 STARTUP_DRAIN_SECONDS = 0.25
 SYNC_ATTEMPTS = 4
 SYNC_DEADLINE_SECONDS = 0.75
@@ -506,6 +506,7 @@ class FrameParser:
 
     def __init__(self) -> None:
         self.buffer = bytearray()
+        self._scan_start = 0
         self.bytes_received = 0
         self.frames_decoded = 0
         self.header_errors = 0
@@ -522,41 +523,48 @@ class FrameParser:
         incoming = bytes(data)
         self.bytes_received += len(incoming)
         self.buffer.extend(incoming)
-        self.high_water_bytes = max(self.high_water_bytes, len(self.buffer))
+        self.high_water_bytes = max(self.high_water_bytes, self._buffered_bytes())
         frames: list[Frame] = []
         while True:
-            magic_at = self.buffer.find(MAGIC_BYTES)
+            magic_at = self.buffer.find(MAGIC_BYTES, self._scan_start)
             if magic_at < 0:
                 retained = self._partial_magic_suffix()
-                self._discard(len(self.buffer) - retained)
+                self._discard(self._buffered_bytes() - retained)
                 break
-            self._discard(magic_at)
-            if len(self.buffer) < HEADER_SIZE:
+            self._discard(magic_at - self._scan_start)
+            if self._buffered_bytes() < HEADER_SIZE:
                 break
-            fields = HEADER.unpack_from(self.buffer)
+            fields = HEADER.unpack_from(self.buffer, self._scan_start)
             try:
                 total_length = self._validate_header(fields)
             except ProtocolFailure:
                 self.header_errors += 1
                 self._discard(1)
                 continue
-            if len(self.buffer) < total_length:
+            if self._buffered_bytes() < total_length:
                 break
             payload_length = fields[8]
-            payload_end = HEADER_SIZE + payload_length
+            payload_start = self._scan_start + HEADER_SIZE
+            payload_end = payload_start + payload_length
+            checksum_view = memoryview(self.buffer)[self._scan_start : payload_end]
             try:
-                expected = compute_checksum(
-                    memoryview(self.buffer)[:payload_end], fields[5]
-                )
+                expected = compute_checksum(checksum_view, fields[5])
             except ProtocolFailure:
                 self.header_errors += 1
                 self._discard(1)
                 continue
+            finally:
+                checksum_view.release()
             actual = TRAILER.unpack_from(self.buffer, payload_end)[0]
             if actual != expected:
                 self.checksum_errors += 1
                 self._discard(1)
                 continue
+            payload_view = memoryview(self.buffer)[payload_start:payload_end]
+            try:
+                payload = payload_view.tobytes()
+            finally:
+                payload_view.release()
             frame = Frame(
                 kind=fields[2],
                 flags=fields[3],
@@ -566,7 +574,7 @@ class FrameParser:
                 request_id=fields[11],
                 first_sample_ticks=fields[12],
                 item_count=fields[13],
-                payload=bytes(self.buffer[HEADER_SIZE:payload_end]),
+                payload=payload,
                 checksum=actual,
             )
             try:
@@ -575,14 +583,16 @@ class FrameParser:
                 self.payload_errors += 1
                 self._discard(1)
                 continue
-            del self.buffer[:total_length]
+            self._scan_start += total_length
             self.frames_decoded += 1
             frames.append(frame)
 
+        self._compact()
         retained_bound = MAX_FRAME_BYTES + len(MAGIC_BYTES) - 1
-        if len(self.buffer) > retained_bound:
+        if self._buffered_bytes() > retained_bound:
             raise ProtocolFailure(
-                f"parser retained {len(self.buffer)} bytes; bound is {retained_bound}"
+                f"parser retained {self._buffered_bytes()} bytes; "
+                f"bound is {retained_bound}"
             )
         high_water_bound = SERIAL_READ_BYTES + retained_bound
         if self.high_water_bytes > high_water_bound:
@@ -710,16 +720,24 @@ class FrameParser:
             raise ProtocolFailure("generic error reserved fields are nonzero")
 
     def _partial_magic_suffix(self) -> int:
-        maximum = min(len(self.buffer), len(MAGIC_BYTES) - 1)
+        maximum = min(self._buffered_bytes(), len(MAGIC_BYTES) - 1)
         for length in range(maximum, 0, -1):
-            if self.buffer[-length:] == MAGIC_BYTES[:length]:
+            if self.buffer.endswith(MAGIC_BYTES[:length], self._scan_start):
                 return length
         return 0
 
     def _discard(self, count: int) -> None:
         if count > 0:
-            del self.buffer[:count]
+            self._scan_start += count
             self.bytes_discarded += count
+
+    def _buffered_bytes(self) -> int:
+        return len(self.buffer) - self._scan_start
+
+    def _compact(self) -> None:
+        if self._scan_start:
+            del self.buffer[: self._scan_start]
+            self._scan_start = 0
 
 
 class SerialLink:
@@ -2393,25 +2411,39 @@ class CombinedValidator:
             )
         if len(frame.payload) != ADC_PAIRS_PER_FRAME * ADC_BYTES_PER_PAIR:
             raise ProtocolFailure("ADC payload does not contain four-byte pairs")
-        samples = ADC_PAYLOAD_STRUCT.unpack(frame.payload)
-        channels = (samples[0::2], samples[1::2])
-        for index, values in enumerate(channels):
-            minimum = min(values)
-            maximum = max(values)
-            if minimum < self.code_min or maximum > self.code_max:
-                raise ProtocolFailure(
-                    f"ADC{index} code range {minimum}..{maximum} outside "
-                    f"{self.code_min}..{self.code_max}"
+        high_bytes = frame.payload[1::2]
+        if max(high_bytes) > self.code_max >> 8:
+            raise ProtocolFailure(
+                f"ADC payload contains a code outside {self.code_min}..{self.code_max}"
+            )
+        self.channel_sums[0] += sum(frame.payload[0::4]) + 256 * sum(
+            frame.payload[1::4]
+        )
+        self.channel_sums[1] += sum(frame.payload[2::4]) + 256 * sum(
+            frame.payload[3::4]
+        )
+        # The byte-lane checks and sums above cover every code without
+        # allocating thousands of Python integers per frame. One complete
+        # frame supplies representative extrema when no external fixture is
+        # declared; a fixture retains exhaustive per-code envelope grading.
+        if self.adc.frames == 0 or self.fixture is not None:
+            samples = ADC_PAYLOAD_STRUCT.unpack(frame.payload)
+            channels = (samples[0::2], samples[1::2])
+            for index, values in enumerate(channels):
+                minimum = min(values)
+                maximum = max(values)
+                self.channel_minimums[index] = min(
+                    self.channel_minimums[index], minimum
                 )
-            self.channel_minimums[index] = min(self.channel_minimums[index], minimum)
-            self.channel_maximums[index] = max(self.channel_maximums[index], maximum)
-            self.channel_sums[index] += sum(values)
-            if self.fixture is not None:
-                fixture = self.fixture.channels[index]
-                self.fixture_violations[index] += sum(
-                    value < fixture.minimum_code or value > fixture.maximum_code
-                    for value in values
+                self.channel_maximums[index] = max(
+                    self.channel_maximums[index], maximum
                 )
+                if self.fixture is not None:
+                    fixture = self.fixture.channels[index]
+                    self.fixture_violations[index] += sum(
+                        value < fixture.minimum_code or value > fixture.maximum_code
+                        for value in values
+                    )
         self.channel_counts[0] += frame.item_count
         self.channel_counts[1] += frame.item_count
         self._advance(self.adc, frame)

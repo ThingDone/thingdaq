@@ -335,7 +335,12 @@ inline constexpr std::size_t kPinnedUsbCdcTxBufferBytes = 2048U;
 inline constexpr std::size_t kPinnedUsbCdcTxStorageBytes =
     kPinnedUsbCdcTxBufferCount * kPinnedUsbCdcTxBufferBytes;
 inline constexpr std::size_t kUsbRxBudgetBytesPerLoop = 1024U;
-inline constexpr std::size_t kUsbTxBudgetBytesPerLoop = 2048U;
+// One physical acquisition visit may consume a meaningful fraction of the
+// 1,012 us frame interval. Let the following TX visit fill the pinned core's
+// existing four-buffer ring instead of limiting it to one 2 KiB buffer. Each
+// individual write remains core-buffer-sized and the call budget stays fixed.
+inline constexpr std::size_t kUsbTxBudgetBytesPerLoop =
+    kPinnedUsbCdcTxStorageBytes;
 // Data is offered to the pinned core in one core-buffer-sized block whenever
 // possible. A visit waits for at least one high-speed USB packet of capacity
 // instead of deliberately degrading into byte-at-a-time calls. Unexpected
@@ -914,8 +919,11 @@ static_assert(kUsbRxCallsPerLoop * kUsbRxScratchBytes >=
               "USB read-call bound must be able to reach its byte budget");
 static_assert(kUsbTxCallsPerLoop > 0U && kUsbRxCallsPerLoop > 0U,
               "USB per-loop call budgets must be nonzero");
-static_assert(kUsbTxBudgetBytesPerLoop <= kPinnedUsbCdcTxBufferBytes,
-              "one cooperative TX visit must not outrun a core TX buffer");
+static_assert(kUsbTxBudgetBytesPerLoop <= kPinnedUsbCdcTxStorageBytes,
+              "one cooperative TX visit must not outrun core TX storage");
+static_assert(kUsbTxCallsPerLoop * kUsbTxMaxWriteBytes >=
+                  kUsbTxBudgetBytesPerLoop,
+              "USB write-call bound must be able to reach its byte budget");
 static_assert(kPacketBufferStorageBytes % kCacheLineBytes == 0U,
               "packet storage must occupy complete alignment units");
 static_assert(kAdcDmaBufferStrideBytes % kCacheLineBytes == 0U,

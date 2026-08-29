@@ -459,6 +459,10 @@ void testTransmitBudgets() {
   FakeLowerPrioritySource lower{};
   lower.frames.push_back(
       dataFrame(constants::FrameKind::kAdcData, 9U, 0U, 0U));
+  lower.frames.push_back(
+      dataFrame(constants::FrameKind::kGpioData, 9U, 0U, 0U));
+  lower.frames.push_back(dataFrame(constants::FrameKind::kAdcData, 9U, 1U,
+                                   constants::kFrameCoverageTicks));
   FakeCdcStream stream{};
   stats::Statistics statistics{};
   usb::CdcTransport transport(stream, statistics, &lower);
@@ -466,25 +470,34 @@ void testTransmitBudgets() {
   const usb::ServiceReport first = transport.serviceTransmit();
   expect(first.bytes_written == teensy_daq::board::kUsbTxBudgetBytesPerLoop &&
              first.byte_budget_exhausted &&
-             first.io_calls == 1U && stream.write_requests.size() == 1U &&
-             stream.write_requests[0] ==
-                 teensy_daq::board::kUsbTxMaxWriteBytes,
-         "one loop offers one large write within byte/call budgets");
-  expect(transport.snapshot().active_frame_bytes_sent ==
-             teensy_daq::board::kUsbTxBudgetBytesPerLoop,
-         "budget boundary retains the active frame offset");
+             first.frames_completed == 2U && first.io_calls == 4U &&
+             stream.write_requests.size() == 4U &&
+             std::all_of(stream.write_requests.begin(),
+                         stream.write_requests.end(), [](std::size_t request) {
+                           return request ==
+                                  teensy_daq::board::kUsbTxMaxWriteBytes;
+                         }),
+         "one loop fills the bounded four-buffer core TX ring");
+  expect(transport.snapshot().active_frame_bytes_sent == 0U &&
+             lower.frames.size() == 1U,
+         "byte budget stops at a complete frame boundary");
   transport.serviceTransmit();
-  expect(stream.output.size() == constants::kDataFrameBytes && lower.frames.empty(),
-         "the next bounded loop completes the same large frame");
+  expect(stream.output.size() == 3U * constants::kDataFrameBytes &&
+             lower.frames.empty(),
+         "the next bounded loop completes the remaining frame");
   const usb::TransportSnapshot large_snapshot = transport.snapshot();
   expect(large_snapshot.max_write_request_bytes ==
              teensy_daq::board::kUsbTxMaxWriteBytes &&
-             large_snapshot.tx_bytes_requested == constants::kDataFrameBytes,
+             large_snapshot.tx_bytes_requested ==
+                 3U * constants::kDataFrameBytes,
          "transport exposes exact large-write request telemetry");
 
   FakeLowerPrioritySource call_limited_lower{};
   call_limited_lower.frames.push_back(
       dataFrame(constants::FrameKind::kGpioData, 10U, 0U, 0U));
+  call_limited_lower.frames.push_back(dataFrame(
+      constants::FrameKind::kGpioData, 10U, 1U,
+      constants::kFrameCoverageTicks));
   FakeCdcStream call_limited_stream{};
   call_limited_stream.writable_limit = 1;
   stats::Statistics call_limited_statistics{};
@@ -500,11 +513,14 @@ void testTransmitBudgets() {
   const usb::ServiceReport recovered =
       call_limited_transport.serviceTransmit();
   expect(recovered.bytes_written ==
-             teensy_daq::board::kUsbTxBudgetBytesPerLoop &&
+                 teensy_daq::board::kUsbTxCallsPerLoop *
+                     teensy_daq::board::kUsbTxMinimumWriteBytes &&
+             recovered.io_calls == teensy_daq::board::kUsbTxCallsPerLoop &&
+             recovered.call_budget_exhausted &&
              !call_limited_stream.write_requests.empty() &&
              call_limited_stream.write_requests.front() ==
                  teensy_daq::board::kUsbTxMinimumWriteBytes,
-         "recovered capacity resumes with USB-packet-sized block requests");
+         "recovered capacity remains bounded by USB-packet-sized call count");
 
   FakeLowerPrioritySource malformed_lower{};
   malformed_lower.frames.emplace_back(100U, 0x5AU);
