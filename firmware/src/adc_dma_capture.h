@@ -294,6 +294,10 @@ class HardwareCapture : public PairSource {
  public:
   virtual StartStatus inspectStart(std::uint32_t epoch) = 0;
   virtual StartStatus prepare(std::uint32_t epoch) = 0;
+  // The caller invokes this while ADC triggers are still active. The target
+  // adapter must request a complete paired-DMA boundary and wait boundedly;
+  // it must not tear down DMA resources here.
+  virtual bool stopAtBoundaryBeforeTriggers() = 0;
   // The caller must disable ADC triggers first. Complete buffers remain
   // drainable, while every partial generation is accounted and discarded.
   virtual StopReport stopAfterTriggers() = 0;

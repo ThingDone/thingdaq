@@ -169,21 +169,9 @@ void FirmwareRuntime::applyPendingEvents(
     if (physical_run_active_) {
       if (physical_stream_mask_ == static_cast<std::uint8_t>(
                                        protocol_v1::StreamMask::kAdc)) {
-        report.adc_trigger_stopped = adc_trigger_scheduler_->stop();
-        if (!report.adc_trigger_stopped) {
-          control_.statistics().recordAdcStopError();
+        if (!stopAdcPhysicalPath(report)) {
           physical_drain_pending_ = true;
-          report.internal_error = true;
           return;
-        }
-        report.adc_capture_stop = adc_capture_->stopAfterTriggers();
-        report.adc_capture_stopped = true;
-        if (report.adc_capture_stop.status !=
-                adc_capture::OperationStatus::kOk &&
-            report.adc_capture_stop.status !=
-                adc_capture::OperationStatus::kNotRunning) {
-          control_.statistics().recordAdcStopError();
-          report.internal_error = true;
         }
       } else {
         report.gpio_capture_stop = gpio_capture_->stop();
@@ -497,6 +485,37 @@ bool FirmwareRuntime::physicalPathReady(
          gpio_packer_->readyForStart();
 }
 
+TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.adc_stop")
+bool FirmwareRuntime::stopAdcPhysicalPath(LoopReport &report) {
+  bool stop_error = false;
+  report.adc_capture_boundary_stopped =
+      adc_capture_->stopAtBoundaryBeforeTriggers();
+  if (!report.adc_capture_boundary_stopped) {
+    stop_error = true;
+    report.internal_error = true;
+  }
+
+  report.adc_trigger_stopped = adc_trigger_scheduler_->stop();
+  if (!report.adc_trigger_stopped) {
+    control_.statistics().recordAdcStopError();
+    report.internal_error = true;
+    return false;
+  }
+
+  report.adc_capture_stop = adc_capture_->stopAfterTriggers();
+  report.adc_capture_stopped = true;
+  if (report.adc_capture_stop.status != adc_capture::OperationStatus::kOk &&
+      report.adc_capture_stop.status !=
+          adc_capture::OperationStatus::kNotRunning) {
+    stop_error = true;
+    report.internal_error = true;
+  }
+  if (stop_error) {
+    control_.statistics().recordAdcStopError();
+  }
+  return true;
+}
+
 TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.physical_service")
 void FirmwareRuntime::servicePhysicalPath(LoopReport &report) {
   if (!physical_run_active_ && !physical_drain_pending_) {
@@ -507,23 +526,11 @@ void FirmwareRuntime::servicePhysicalPath(LoopReport &report) {
   if (physical_stream_mask_ == static_cast<std::uint8_t>(
                                    protocol_v1::StreamMask::kAdc)) {
     if (physical_drain_pending_ && physical_run_active_) {
-      report.adc_trigger_stopped = adc_trigger_scheduler_->stop();
-      if (!report.adc_trigger_stopped) {
-        control_.statistics().recordAdcStopError();
-        report.internal_error = true;
+      if (!stopAdcPhysicalPath(report)) {
         report.physical_drain_pending = true;
         return;
       }
-      report.adc_capture_stop = adc_capture_->stopAfterTriggers();
-      report.adc_capture_stopped = true;
       physical_run_active_ = false;
-      if (report.adc_capture_stop.status !=
-              adc_capture::OperationStatus::kOk &&
-          report.adc_capture_stop.status !=
-              adc_capture::OperationStatus::kNotRunning) {
-        control_.statistics().recordAdcStopError();
-        report.internal_error = true;
-      }
     }
 
     (void)adc_capture_->serviceOwnership();

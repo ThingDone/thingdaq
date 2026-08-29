@@ -179,6 +179,29 @@ class PortableSourceBoundaryTests(unittest.TestCase):
         self.assertIn("kStopBoundaryTimeoutCycles", adapter[boundary:stop])
         self.assertIn("partial_samples != 0U", adapter[stop:])
 
+    def test_adc_stop_finishes_both_dma_channels_before_trigger_shutdown(self) -> None:
+        adapter = _source(FIRMWARE_SOURCE / "adc_dma_capture_teensy.cpp")
+        boundary = adapter.index("bool waitForCompleteStopBoundary()")
+        dreq = adapter.index("DMA_TCD_CSR_DREQ", boundary)
+        wait = adapter.index("DMA_ERQ & kAdcDmaChannelMask", dreq)
+        facade = adapter.index(
+            "TeensyAdcDmaCapture::stopAtBoundaryBeforeTriggers()", wait
+        )
+        self.assertLess(boundary, dreq)
+        self.assertLess(dreq, wait)
+        self.assertLess(wait, facade)
+        self.assertIn("kStopBoundaryTimeoutCycles", adapter[boundary:facade])
+
+        runtime = _source(FIRMWARE_SOURCE / "firmware_runtime.cpp")
+        stop = runtime.index("bool FirmwareRuntime::stopAdcPhysicalPath")
+        boundary_request = runtime.index(
+            "adc_capture_->stopAtBoundaryBeforeTriggers()", stop
+        )
+        trigger_stop = runtime.index("adc_trigger_scheduler_->stop()", boundary_request)
+        dma_teardown = runtime.index("adc_capture_->stopAfterTriggers()", trigger_stop)
+        self.assertLess(boundary_request, trigger_stop)
+        self.assertLess(trigger_stop, dma_teardown)
+
     def test_adc_target_owns_the_core_startup_hook_without_calibrating_early(
         self,
     ) -> None:

@@ -47,6 +47,7 @@ class TeensyAdcDmaCapture final : public HardwareCapture {
  public:
   StartStatus inspectStart(std::uint32_t epoch) override;
   StartStatus prepare(std::uint32_t epoch) override;
+  bool stopAtBoundaryBeforeTriggers() override;
   StopReport stopAfterTriggers() override;
   std::size_t serviceOwnership() override;
   AcquireResult acquireReady() override;

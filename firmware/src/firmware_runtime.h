@@ -57,6 +57,7 @@ struct LoopReport {
   bool gpio_packer_started = false;
   bool gpio_packer_stopped = false;
   bool adc_capture_prepared = false;
+  bool adc_capture_boundary_stopped = false;
   bool adc_capture_stopped = false;
   bool adc_packer_started = false;
   bool adc_packer_stopped = false;
@@ -144,6 +145,7 @@ class FirmwareRuntime {
       const protocol::Configuration &configuration) const;
   bool physicalPathReady(const protocol::Configuration &configuration,
                          std::uint32_t epoch);
+  bool stopAdcPhysicalPath(LoopReport &report);
   void servicePhysicalPath(LoopReport &report);
   static protocol::GpioCaptureDiagnosticResponse gpioDiagnosticResponse(
       const gpio_diagnostic::Runner &runner,

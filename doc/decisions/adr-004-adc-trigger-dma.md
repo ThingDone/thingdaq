@@ -127,6 +127,18 @@ schedule exhaustion, and rejected stale interrupts have independent counters.
 Complete corrupt blocks and partial STOP work contribute exact discarded-pair
 counts.
 
+Normal STOP first waits for both live channels to enter the first quarter of
+the same DMA generation, then atomically sets `DREQ` on both active TCDs while
+triggers remain live. This avoids a channel-transition race while retaining
+ample time before the next boundary. It waits at most 10 ms and 2,000,000 polls
+for both request-enable bits to clear at the matching major-loop boundary,
+then stops the shared trigger schedule before disabling ADC DMA requests,
+interrupts, and routes. This preserves every complete paired generation
+without treating an arbitrary command arrival point as data loss.
+A boundary timeout remains fail-safe: it is reported as a STOP error, triggers
+are still disabled before DMA teardown, and any actual partial progress is
+accounted exactly by the paired ring.
+
 ### Shared clock and phase arithmetic
 
 The accepted [[ADR-003-GPIO-Clock-DMA]] clock is a 24 MHz peripheral root with

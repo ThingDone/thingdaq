@@ -424,6 +424,11 @@ class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
     return report;
   }
 
+  bool stopAtBoundaryBeforeTriggers() override {
+    operations_.push_back("dma_boundary_stop");
+    return true;
+  }
+
   std::size_t serviceOwnership() override { return 0U; }
 
   adc_capture::AcquireResult acquireReady() override {
@@ -1144,8 +1149,9 @@ void testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs() {
              !firmware.physicalDrainPending() &&
              operations ==
                  std::vector<std::string>{"dma_prepare", "trigger_arm",
-                                          "trigger_stop", "dma_stop"},
-         "physical ADC STOP disables triggers before DMA and drains every complete generation");
+                                          "dma_boundary_stop", "trigger_stop",
+                                          "dma_stop"},
+         "physical ADC STOP finishes a paired boundary, disables triggers, then tears down DMA");
   frames = decodeOutput(stream.output);
   expect(frames.size() == 2U &&
              frames[0].header.kind == constants::FrameKind::kStopResponse &&

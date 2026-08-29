@@ -50,6 +50,13 @@ constexpr std::uint16_t kTcdAttributes =
     DMA_TCD_ATTR_SSIZE(1U) | DMA_TCD_ATTR_DSIZE(1U);
 constexpr std::uint16_t kTcdControl =
     DMA_TCD_CSR_ESG | DMA_TCD_CSR_INTMAJOR;
+constexpr std::uint32_t kStopBoundaryTimeoutCycles =
+    protocol_v1::kAdcTriggerDwtClockHz / 100U;
+constexpr std::uint32_t kStopBoundaryPollLimit =
+    protocol_v1::kAdcTriggerDiagnosticPollLimit;
+constexpr std::uint16_t kStopBoundaryArmMinimumPairs =
+    static_cast<std::uint16_t>(
+        (protocol_v1::kAdcPairsPerFrame * 3U) / 4U);
 constexpr std::uint32_t kAdcDmaChannelMask =
     (std::uint32_t{1U} <<
      board::kAdcConverterConfigurations[0].edma_channel) |
@@ -470,6 +477,60 @@ std::uint32_t activeMinorPairs(std::size_t converter) {
   return static_cast<std::uint32_t>(biter - citer);
 }
 
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+    ".flashmem.adc_dma.target_stop_boundary")
+bool waitForCompleteStopBoundary() {
+  if (!g_hardware_prepared || g_faulted) {
+    return false;
+  }
+  ARM_DEMCR |= ARM_DEMCR_TRCENA;
+  ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
+  const std::uint32_t started = ARM_DWT_CYCCNT;
+  std::uint32_t polls = 0U;
+  bool armed = false;
+  while (ARM_DWT_CYCCNT - started < kStopBoundaryTimeoutCycles &&
+         polls < kStopBoundaryPollLimit && !armed) {
+    ++polls;
+    const std::uint32_t primask = readPrimask();
+    __disable_irq();
+    bool safe_to_arm =
+        (DMA_ERQ & kAdcDmaChannelMask) == kAdcDmaChannelMask &&
+        g_current_generations[0] == g_current_generations[1] &&
+        g_current_destinations[0] == g_current_destinations[1];
+    for (std::size_t converter = 0U;
+         converter < kConverterCount && safe_to_arm; ++converter) {
+      const IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
+      safe_to_arm =
+          tcd.BITER_ELINKNO == protocol_v1::kAdcPairsPerFrame &&
+          tcd.CITER_ELINKNO > kStopBoundaryArmMinimumPairs &&
+          tcd.CITER_ELINKNO <= tcd.BITER_ELINKNO;
+    }
+    if (safe_to_arm) {
+      for (std::size_t converter = 0U; converter < kConverterCount;
+           ++converter) {
+        IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
+        tcd.CSR =
+            static_cast<std::uint16_t>(tcd.CSR | DMA_TCD_CSR_DREQ);
+      }
+      barrier();
+      armed = true;
+    }
+    restorePrimask(primask);
+  }
+
+  while ((DMA_ERQ & kAdcDmaChannelMask) != 0U &&
+         ARM_DWT_CYCCNT - started < kStopBoundaryTimeoutCycles &&
+         polls < kStopBoundaryPollLimit) {
+    ++polls;
+  }
+  const bool completed = armed &&
+      (DMA_ERQ & kAdcDmaChannelMask) == 0U;
+  if (!completed) {
+    saturatingIncrement(g_stop_errors);
+  }
+  return completed;
+}
+
 TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_inspect")
 StartStatus inspectHardwareStart(std::uint32_t epoch) {
   if (epoch == 0U) {
@@ -662,6 +723,10 @@ StartStatus TeensyAdcDmaCapture::prepare(std::uint32_t epoch) {
   return prepareHardware(epoch);
 }
 
+bool TeensyAdcDmaCapture::stopAtBoundaryBeforeTriggers() {
+  return waitForCompleteStopBoundary();
+}
+
 StopReport TeensyAdcDmaCapture::stopAfterTriggers() {
   return stopHardwareAfterTriggers();
 }
@@ -708,6 +773,9 @@ static_assert(sizeof(g_adc_dma_overflow_sink) ==
               board::kAdcDmaOverflowSinkBytes);
 static_assert(protocol_v1::kAdcPairsPerFrame <=
               std::numeric_limits<std::int16_t>::max());
+static_assert(kStopBoundaryTimeoutCycles == 6000000U);
+static_assert(kStopBoundaryPollLimit == 2000000U);
+static_assert(kStopBoundaryArmMinimumPairs == 759U);
 static_assert(board::kAdcConverterConfigurations[0].edma_channel == 0U);
 static_assert(board::kAdcConverterConfigurations[1].edma_channel == 1U);
 static_assert(board::kAdcConverterConfigurations[0].dmamux_source ==
