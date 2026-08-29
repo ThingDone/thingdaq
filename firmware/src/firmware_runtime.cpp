@@ -170,11 +170,6 @@ LoopReport FirmwareRuntime::service() {
   }
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
-  // Publish once, after every producer and consumer has run.  The previous
-  // implementation also rebuilt the complete packet, transport, ADC, and GPIO
-  // snapshot before every command-free service visit; that duplicate
-  // flash-resident traversal only shortened the physical DMA service budget.
-  publishPacketStatistics();
   return report;
 }
 

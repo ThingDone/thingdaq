@@ -1057,11 +1057,18 @@ void testSyntheticDataCountersReachStatus() {
   expect(drain(firmware, stream).quiescent,
          "one elapsed interval transmits both complete data frames");
   const packet::PipelineSnapshot packet_counters = firmware.packetSnapshot();
+  expect(packet_counters.sources[0].frames_transmitted == 1U &&
+             packet_counters.sources[1].frames_transmitted == 1U,
+         "packet ownership records both transmitted source frames");
+
+  stream.output.clear();
+  stream.appendInput(
+      emptyRequest(constants::FrameKind::kGetStatusRequest, 103U));
+  expect(drain(firmware, stream).quiescent,
+         "STATUS is serviced while the paced source waits for its deadline");
   const teensy_daq::stats::Snapshot native_counters =
       firmware.statistics().snapshot();
-  expect(packet_counters.sources[0].frames_transmitted == 1U &&
-             packet_counters.sources[1].frames_transmitted == 1U &&
-             native_counters.data_path.adc.items_generated ==
+  expect(native_counters.data_path.adc.items_generated ==
                  constants::kAdcPairsPerFrame &&
              native_counters.data_path.adc.items_framed ==
                  constants::kAdcPairsPerFrame &&
@@ -1075,13 +1082,7 @@ void testSyntheticDataCountersReachStatus() {
                  constants::kGpioSamplesPerFrame &&
              native_counters.data_path.gpio.items_transmitted ==
                  constants::kGpioSamplesPerFrame,
-         "native STATUS diagnostics retain every exact data ownership stage");
-
-  stream.output.clear();
-  stream.appendInput(
-      emptyRequest(constants::FrameKind::kGetStatusRequest, 103U));
-  expect(drain(firmware, stream).quiescent,
-         "STATUS is serviced while the paced source waits for its deadline");
+         "on-demand STATUS publication retains every data ownership stage");
   const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
   expect(frames.size() == 1U &&
              frames[0].header.kind ==
