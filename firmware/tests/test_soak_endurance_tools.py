@@ -180,6 +180,33 @@ class AcceleratedSoakDevice(PhysicalCombinedDevice):
         self.settings = settings
         self.rig = rig
         self.last_source = constants.Source.HARDWARE
+        self.pressure_adc_frames = 0
+        self.pressure_gpio_frames = 0
+        self.adc_gap_pending = False
+        self.gpio_gap_pending = False
+
+    def _reset_counters(self) -> None:
+        super()._reset_counters()
+        self.pressure_adc_frames = 0
+        self.pressure_gpio_frames = 0
+        self.adc_gap_pending = False
+        self.gpio_gap_pending = False
+
+    def inject_expected_pressure_loss(self, frames_per_source: int = 1) -> None:
+        if self.state is not constants.DeviceState.RUNNING:
+            raise AssertionError("pressure loss requires a live accelerated run")
+        if frames_per_source <= 0:
+            raise AssertionError("pressure loss must skip complete frames")
+        self.pressure_adc_frames += frames_per_source
+        self.pressure_gpio_frames += frames_per_source
+        self._adc_sequence += frames_per_source
+        self._gpio_sequence += frames_per_source
+        self._adc_first_ticks += frames_per_source * constants.FRAME_COVERAGE_TICKS
+        self._gpio_first_ticks += frames_per_source * constants.FRAME_COVERAGE_TICKS
+        self._adc_item_index += frames_per_source * constants.ADC_PAIRS_PER_FRAME
+        self._gpio_item_index += frames_per_source * constants.GPIO_SAMPLES_PER_FRAME
+        self.adc_gap_pending = True
+        self.gpio_gap_pending = True
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
         configuration = self.configuration
@@ -269,7 +296,122 @@ class AcceleratedSoakDevice(PhysicalCombinedDevice):
 
     def status(self) -> Status:
         if self.last_source is constants.Source.HARDWARE:
-            return PhysicalCombinedDevice.status(self)
+            base = PhysicalCombinedDevice.status(self)
+            adc_received = self._adc_frames_emitted
+            gpio_received = self._gpio_frames_emitted
+            adc_generated = adc_received + self.pressure_adc_frames
+            gpio_generated = gpio_received + self.pressure_gpio_frames
+            adc_generated_items = adc_generated * constants.ADC_PAIRS_PER_FRAME
+            gpio_generated_items = gpio_generated * constants.GPIO_SAMPLES_PER_FRAME
+            adc_received_items = adc_received * constants.ADC_PAIRS_PER_FRAME
+            gpio_received_items = gpio_received * constants.GPIO_SAMPLES_PER_FRAME
+            adc_stop_tail = base.adc_stop_pairs_discarded
+            gpio_stop_tail = base.gpio_raw_samples_lost
+            pressure_total = self.pressure_adc_frames + self.pressure_gpio_frames
+            return replace(
+                base,
+                adc_items_dropped=(
+                    self.pressure_adc_frames * constants.ADC_PAIRS_PER_FRAME
+                    + adc_stop_tail
+                ),
+                gpio_items_dropped=(
+                    self.pressure_gpio_frames * constants.GPIO_SAMPLES_PER_FRAME
+                    + gpio_stop_tail
+                ),
+                gpio_samples_captured=gpio_generated_items + gpio_stop_tail,
+                gpio_samples_packed=gpio_generated_items,
+                gpio_samples_framed=gpio_generated_items,
+                gpio_samples_transmitted=gpio_received_items,
+                gpio_dma_major_loops=gpio_generated,
+                adc0_dma_major_loops=adc_generated,
+                adc1_dma_major_loops=adc_generated,
+                adc0_dma_results=adc_generated_items,
+                adc1_dma_results=adc_generated_items,
+                adc_paired_major_loops=adc_generated,
+                adc_buffers_completed=adc_generated,
+                adc_buffers_acquired=adc_generated,
+                adc_buffers_released=adc_generated,
+                adc_pairs_captured=adc_generated_items + adc_stop_tail,
+                adc_pairs_delivered=adc_generated_items,
+                adc_pairs_framed=adc_generated_items,
+                adc_pairs_transmitted=adc_received_items,
+                adc_frames_generated=adc_generated,
+                adc_items_generated=adc_generated_items,
+                adc_frames_framed_pipeline=adc_generated,
+                adc_items_framed_pipeline=adc_generated_items,
+                adc_items_emitted=adc_received_items,
+                adc_frames_transmitted=adc_received,
+                adc_items_transmitted_pipeline=adc_received_items,
+                adc_frames_dropped=self.pressure_adc_frames,
+                gpio_frames_generated=gpio_generated,
+                gpio_items_generated=gpio_generated_items,
+                gpio_frames_framed_pipeline=gpio_generated,
+                gpio_items_framed_pipeline=gpio_generated_items,
+                gpio_items_emitted=gpio_received_items,
+                gpio_frames_transmitted=gpio_received,
+                gpio_items_transmitted_pipeline=gpio_received_items,
+                gpio_frames_dropped=self.pressure_gpio_frames,
+                adc_payload_bytes_produced=(
+                    adc_generated * constants.DATA_PAYLOAD_BYTES
+                ),
+                adc_payload_bytes_framed=(adc_generated * constants.DATA_PAYLOAD_BYTES),
+                adc_payload_bytes_emitted=(adc_received * constants.DATA_PAYLOAD_BYTES),
+                adc_payload_bytes_transmitted=(
+                    adc_received * constants.DATA_PAYLOAD_BYTES
+                ),
+                adc_payload_bytes_dropped=(
+                    self.pressure_adc_frames * constants.DATA_PAYLOAD_BYTES
+                ),
+                adc_framed_bytes_framed=(adc_generated * constants.DATA_FRAME_BYTES),
+                adc_framed_bytes_emitted=(adc_received * constants.DATA_FRAME_BYTES),
+                adc_framed_bytes_transmitted=(
+                    adc_received * constants.DATA_FRAME_BYTES
+                ),
+                gpio_payload_bytes_produced=(
+                    gpio_generated * constants.DATA_PAYLOAD_BYTES
+                ),
+                gpio_payload_bytes_framed=(
+                    gpio_generated * constants.DATA_PAYLOAD_BYTES
+                ),
+                gpio_payload_bytes_emitted=(
+                    gpio_received * constants.DATA_PAYLOAD_BYTES
+                ),
+                gpio_payload_bytes_transmitted=(
+                    gpio_received * constants.DATA_PAYLOAD_BYTES
+                ),
+                gpio_payload_bytes_dropped=(
+                    self.pressure_gpio_frames * constants.DATA_PAYLOAD_BYTES
+                ),
+                gpio_framed_bytes_framed=(gpio_generated * constants.DATA_FRAME_BYTES),
+                gpio_framed_bytes_emitted=(gpio_received * constants.DATA_FRAME_BYTES),
+                gpio_framed_bytes_transmitted=(
+                    gpio_received * constants.DATA_FRAME_BYTES
+                ),
+                packet_pool_exhaustions=pressure_total,
+                packet_owned_high_water=(
+                    constants.PACKET_BUFFER_COUNT
+                    if pressure_total
+                    else base.packet_owned_high_water
+                ),
+                packet_ready_high_water=(
+                    constants.PACKET_READY_QUEUE_CAPACITY
+                    if pressure_total
+                    else base.packet_ready_high_water
+                ),
+                packet_frames_promoted=adc_received + gpio_received,
+                packet_accounted_frame_skew=abs(adc_generated - gpio_generated),
+                data_payload_bytes_transmitted=(
+                    (adc_received + gpio_received) * constants.DATA_PAYLOAD_BYTES
+                ),
+                data_framed_bytes_transmitted=(
+                    (adc_received + gpio_received) * constants.DATA_FRAME_BYTES
+                ),
+                packet_pressure_evictions=pressure_total,
+                adc_frames_evicted=self.pressure_adc_frames,
+                gpio_frames_evicted=self.pressure_gpio_frames,
+                adc_frames_dropped_after_framing=self.pressure_adc_frames,
+                gpio_frames_dropped_after_framing=self.pressure_gpio_frames,
+            )
         base = SimulatedDevice.status(self)
         adc_items = base.adc_items_framed_pipeline
         gpio_items = base.gpio_items_framed_pipeline
@@ -290,21 +432,51 @@ class AcceleratedSoakDevice(PhysicalCombinedDevice):
     def _next_adc_frame(self, configuration: Configuration) -> bytes:
         if configuration.source is constants.Source.SYNTHETIC:
             return SimulatedDevice._next_adc_frame(self, configuration)
-        return PhysicalCombinedDevice._next_adc_frame(self, configuration)
+        wire = PhysicalCombinedDevice._next_adc_frame(self, configuration)
+        if self.adc_gap_pending:
+            self.adc_gap_pending = False
+            wire = self._with_expected_gap_flags(wire)
+        return wire
 
     def _next_gpio_frame(self, configuration: Configuration) -> bytes:
         if configuration.source is constants.Source.SYNTHETIC:
             return SimulatedDevice._next_gpio_frame(self, configuration)
-        return PhysicalCombinedDevice._next_gpio_frame(self, configuration)
+        wire = PhysicalCombinedDevice._next_gpio_frame(self, configuration)
+        if self.gpio_gap_pending:
+            self.gpio_gap_pending = False
+            wire = self._with_expected_gap_flags(wire)
+        return wire
+
+    @staticmethod
+    def _with_expected_gap_flags(wire: bytes) -> bytes:
+        result = bytearray(wire)
+        flags = struct.unpack_from("<H", result, constants.HEADER_FLAGS_OFFSET)[0]
+        flags |= int(
+            constants.FrameFlag.GAP_BEFORE | constants.FrameFlag.OVERRUN_BEFORE
+        )
+        struct.pack_into("<H", result, constants.HEADER_FLAGS_OFFSET, flags)
+        struct.pack_into(
+            "<I",
+            result,
+            len(result) - constants.TRAILER_SIZE,
+            canonical_validator.adler32(result[: -constants.TRAILER_SIZE]),
+        )
+        return bytes(result)
 
 
 class AcceleratedSerial:
     """PySerial-shaped peer that runs 600 virtual seconds in wall-clock seconds."""
 
-    def __init__(self, device: AcceleratedSoakDevice, clock: VirtualClock) -> None:
+    def __init__(
+        self,
+        device: AcceleratedSoakDevice,
+        clock: VirtualClock,
+        *,
+        startup_noise: bool,
+    ) -> None:
         self.device = device
         self.clock = clock
-        self.pending = bytearray(b"boot noise\r\n\xef\xbe")
+        self.pending = bytearray(b"boot noise\r\n\xef\xbe" if startup_noise else b"")
         self.closed = False
 
     def read(self, size: int = 1) -> bytes:
@@ -352,7 +524,16 @@ class AcceleratedPortFactory:
         self.ports = ports
 
     def __call__(self) -> AcceleratedSerial:
-        port = AcceleratedSerial(self.device, self.clock)
+        live_reopen = (
+            bool(self.ports) and self.device.state is constants.DeviceState.RUNNING
+        )
+        if live_reopen:
+            self.device.inject_expected_pressure_loss()
+        port = AcceleratedSerial(
+            self.device,
+            self.clock,
+            startup_noise=not self.ports,
+        )
         self.ports.append(port)
         return port
 
@@ -593,6 +774,16 @@ class SoakValidatorFailureTests(unittest.TestCase):
                 canonical_validator._STATUS_DIAGNOSTIC_U32_FIELDS,
                 canonical_validator._STATUS_USB_U32_FIELDS,
                 canonical_validator._STATUS_USB_U16_FIELDS,
+                canonical_validator._STATUS_CACHE_U32_FIELDS,
+                canonical_validator._STATUS_PARSER_DETAIL_U32_FIELDS,
+                canonical_validator._STATUS_RESPONSE_U32_FIELDS,
+                canonical_validator._STATUS_PRESSURE_U64_FIELDS,
+                canonical_validator._STATUS_EVICTION_U64_FIELDS,
+                canonical_validator._STATUS_DROP_BOUNDARY_U64_FIELDS,
+                canonical_validator._STATUS_GPIO_PIPELINE_DETAIL_U64_FIELDS,
+                canonical_validator._STATUS_GPIO_PACKER_DETAIL_U64_FIELDS,
+                canonical_validator._STATUS_ADC_PIPELINE_DETAIL_U64_FIELDS,
+                canonical_validator._STATUS_DROP_PROJECTION_U64_FIELDS,
             )
             for name in names
         }
@@ -606,6 +797,10 @@ class SoakValidatorFailureTests(unittest.TestCase):
                 "adc_raw_ready_depth": 0,
                 "adc_raw_ready_high_water": 0,
                 "packet_ready_depth": 1,
+                "packet_owned_depth": 1,
+                "usb_active_frame_size": 0,
+                "adc_packet_filling_depth": 0,
+                "gpio_packet_filling_depth": 0,
             }
         )
         with self.assertRaises(canonical_validator.SoakFailure) as caught:
@@ -871,6 +1066,39 @@ class AcceleratedCampaignTests(unittest.TestCase):
                         sources[:4],
                     )
                     self.assertGreater(result["metrics"]["cdc_reopen_count"], 0)
+                    self.assertEqual(
+                        1, result["metrics"]["expected_negative_subcase_count"]
+                    )
+                    self.assertEqual(1, len(result["negative_subcases"]))
+                    negative = result["negative_subcases"][0]
+                    self.assertEqual("cdc_close_reopen_pressure", negative["name"])
+                    self.assertEqual("PASS", negative["result"])
+                    self.assertEqual("IDLE", negative["final_state"])
+                    loss = negative["loss"]
+                    self.assertGreater(loss["adc_frames"], 0)
+                    self.assertGreater(loss["gpio_frames"], 0)
+                    self.assertEqual(
+                        loss["adc_frames"] + loss["gpio_frames"],
+                        loss["packet_pressure_evictions"],
+                    )
+                    self.assertEqual(
+                        0, loss["packet_capacity_drops_without_evictable_frame"]
+                    )
+                    lossy_epochs = [
+                        epoch
+                        for epoch in result["epochs"]
+                        if epoch["expected_negative_subcase"] is not None
+                    ]
+                    self.assertEqual(1, len(lossy_epochs))
+                    self.assertEqual("hardware", lossy_epochs[0]["source"])
+                    self.assertTrue(
+                        all(
+                            epoch["timed"]["adc_missing_frames"] == 0
+                            and epoch["timed"]["gpio_missing_frames"] == 0
+                            for epoch in result["epochs"]
+                            if epoch is not lossy_epochs[0]
+                        )
+                    )
                 else:
                     self.assertEqual(1, result["metrics"]["epoch_count"])
 

@@ -74,6 +74,16 @@ Every program has a 780-second internal deadline and records the service's
 900-second container limit, leaving 120 seconds for bounded STOP, final STATUS,
 process teardown, and service cleanup.
 
+The control-stress program includes exactly one named
+`cdc_close_reopen_pressure` negative subcase in its first physical epoch. It
+closes CDC only at a complete-frame boundary while acquisition remains
+`RUNNING`, pauses for 250 ms, reopens and re-synchronizes to the same device and
+run ID, then validates each retained frame. The permitted sequence/timestamp
+gaps must carry both `GAP_BEFORE` and `OVERRUN_BEFORE`; their exact ADC/GPIO
+frame, item, and payload-byte counts must equal the firmware's pressure
+eviction, packet-exhaustion, and stage-conservation counters. All other epochs
+remain strictly zero-loss, and later periodic CDC reopens occur from `IDLE`.
+
 The serial loop keeps the previously accepted mode-specific synchronous read
 cadence: synthetic runs use 64 KiB batches, while physical-combined and
 control-stress runs use 16 KiB batches. The smaller hardware batch bounds each
@@ -89,9 +99,12 @@ while reducing work inside the service's 0.5-core quota.
 The validator consumes arbitrary serial chunks without retaining the capture.
 It checks every frame checksum, protocol field, run ID, source flag, independent
 sequence, common timestamp epoch, synthetic ADC/GPIO formula, scheduler skew,
-and final firmware conservation equation. Physical mode grades the complete
-conversion/capture/DMA/packing/transport path while explicitly recording that
-undeclared external analog or digital stimulus cannot be quality-graded.
+and final firmware conservation equation. It decodes the complete STATUS
+pressure/ownership extension through the raw and packer loss projections so a
+named negative subcase cannot hide a missing or mismatched counter. Physical
+mode grades the complete conversion/capture/DMA/packing/transport path while
+explicitly recording that undeclared external analog or digital stimulus
+cannot be quality-graded.
 
 Evidence is bounded to first/last diagnostic samples, representative STATUS
 snapshots, latency samples, queue maxima, counter endpoints, `tracemalloc`, RSS,

@@ -80,7 +80,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate_sha256": "32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656",
   "generator_schema_version": 1,
   "mode": "physical-combined",
-  "validator_sha256": "4075c735fae366887f6c4417e4c524e544a5ace7cf24d11156acf91444043fb5"
+  "validator_sha256": "f0bea9f75a312b0ecdf5efb000de5fb84225335dc73225af021a25b975c65237"
 }
 """
 )
@@ -99,6 +99,8 @@ SYNTHETIC_SERIAL_READ_BYTES = 64 * 1024
 PHYSICAL_SERIAL_READ_BYTES = 16 * 1024
 STARTUP_DRAIN_SECONDS = 0.25
 REOPEN_SETTLE_SECONDS = 0.25
+EXPECTED_NEGATIVE_REOPEN_SECONDS = 0.25
+EXPECTED_NEGATIVE_REOPEN_DEADLINE_SECONDS = 4.0
 SYNC_ATTEMPTS = 4
 SYNC_DEADLINE_SECONDS = 0.75
 COMMAND_DEADLINE_SECONDS = 0.5
@@ -108,6 +110,7 @@ MAX_STATUS_SAMPLES = 4_096
 MAX_LATENCY_SAMPLES = 4_096
 MAX_DIAGNOSTIC_SAMPLES = 8
 MAX_COUNTER_SAMPLES = 12
+MAX_EXPECTED_GAP_EVENTS = 8
 RATE_TOLERANCE_FRACTION = 0.01
 STATUS_P99_LIMIT_SECONDS = 0.100
 STATUS_MAXIMUM_LIMIT_SECONDS = 0.250
@@ -902,6 +905,8 @@ def synchronize(
     link: SerialLink,
     *,
     hard_deadline: float,
+    on_data: Callable[[Frame], None] | None = None,
+    expected_run_id: int | None = None,
 ) -> tuple[dict[str, object], list[float]]:
     previous: dict[str, object] | None = None
     latencies: list[float] = []
@@ -911,9 +916,16 @@ def synchronize(
             frame, latency = link.exchange(
                 INFO_REQUEST,
                 timeout=SYNC_DEADLINE_SECONDS,
+                on_data=on_data,
                 hard_deadline=hard_deadline,
             )
             current = decode_info(frame)
+            if expected_run_id is not None:
+                require(
+                    frame.run_id == expected_run_id,
+                    "stale_run",
+                    f"reopened INFO run ID {frame.run_id} != {expected_run_id}",
+                )
             latencies.append(latency)
         except SoakFailure as error:
             last_error = str(error)
@@ -1101,6 +1113,62 @@ _STATUS_USB_U16_FIELDS = (
     "usb_response_queue_high_water",
     "usb_active_frame_bytes_sent",
 )
+_STATUS_CACHE_U32_FIELDS = (
+    "gpio_cache_dma_discards",
+    "gpio_cache_cpu_invalidations",
+    "adc_cache_dma_discards",
+    "adc_cache_cpu_invalidations",
+)
+_STATUS_PARSER_DETAIL_U32_FIELDS = (
+    "bad_flags",
+    "bad_payloads",
+    "bad_request_ids",
+)
+_STATUS_RESPONSE_U32_FIELDS = (
+    "responses_queued",
+    "responses_completed",
+    "response_queue_rejections",
+    "response_reservations_abandoned",
+)
+_STATUS_PRESSURE_U64_FIELDS = (
+    "packet_pressure_evictions",
+    "packet_capacity_drops_without_evictable_frame",
+)
+_STATUS_EVICTION_U64_FIELDS = (
+    "adc_frames_evicted",
+    "adc_frames_evicted_after_promotion",
+    "gpio_frames_evicted",
+    "gpio_frames_evicted_after_promotion",
+)
+_STATUS_DROP_BOUNDARY_U64_FIELDS = (
+    "adc_frames_dropped_after_framing",
+    "adc_frames_dropped_after_promotion",
+    "gpio_frames_dropped_after_framing",
+    "gpio_frames_dropped_after_promotion",
+)
+_STATUS_GPIO_PIPELINE_DETAIL_U64_FIELDS = (
+    "gpio_buffers_completed",
+    "gpio_buffers_acquired",
+    "gpio_buffers_released",
+    "gpio_samples_delivered",
+    "gpio_stop_samples_discarded",
+)
+_STATUS_GPIO_PACKER_DETAIL_U64_FIELDS = (
+    "gpio_frames_produced",
+    "gpio_samples_produced",
+    "gpio_frames_packed",
+    "gpio_duplicate_samples_ignored",
+)
+_STATUS_ADC_PIPELINE_DETAIL_U64_FIELDS = (
+    "adc_frames_consumed",
+    "adc_pairs_consumed",
+    "adc_raw_gap_pairs",
+    "adc_raw_drop_pairs_projected",
+)
+_STATUS_DROP_PROJECTION_U64_FIELDS = (
+    "gpio_raw_drop_samples_projected",
+    "gpio_packer_drop_samples_projected",
+)
 
 _STATUS_NON_MONOTONIC_FIELDS = frozenset(
     {
@@ -1125,6 +1193,10 @@ _STATUS_NON_MONOTONIC_FIELDS = frozenset(
         "usb_response_queue_depth",
         "usb_lower_priority_queue_depth",
         "usb_active_frame_bytes_sent",
+        "packet_owned_depth",
+        "usb_active_frame_size",
+        "adc_packet_filling_depth",
+        "gpio_packet_filling_depth",
     }
 )
 
@@ -1183,6 +1255,41 @@ _ZERO_ERROR_FIELDS = (
     "timeouts",
     "state_errors",
     "usb_io_errors",
+    "bad_flags",
+    "bad_payloads",
+    "bad_request_ids",
+    "response_queue_rejections",
+    "response_reservations_abandoned",
+    "packet_pressure_evictions",
+    "packet_capacity_drops_without_evictable_frame",
+    "adc_frames_evicted",
+    "adc_frames_evicted_after_promotion",
+    "gpio_frames_evicted",
+    "gpio_frames_evicted_after_promotion",
+    "adc_frames_dropped_after_framing",
+    "adc_frames_dropped_after_promotion",
+    "gpio_frames_dropped_after_framing",
+    "gpio_frames_dropped_after_promotion",
+)
+_EXPECTED_PRESSURE_LOSS_FIELDS = frozenset(
+    {
+        "adc_items_dropped",
+        "gpio_items_dropped",
+        "adc_frames_dropped",
+        "gpio_frames_dropped",
+        "adc_payload_bytes_dropped",
+        "gpio_payload_bytes_dropped",
+        "packet_pool_exhaustions",
+        "packet_pressure_evictions",
+        "adc_frames_evicted",
+        "adc_frames_evicted_after_promotion",
+        "gpio_frames_evicted",
+        "gpio_frames_evicted_after_promotion",
+        "adc_frames_dropped_after_framing",
+        "adc_frames_dropped_after_promotion",
+        "gpio_frames_dropped_after_framing",
+        "gpio_frames_dropped_after_promotion",
+    }
 )
 _PHYSICAL_STOP_TAIL_FIELDS = frozenset(
     {
@@ -1251,6 +1358,26 @@ def decode_status(frame: Frame) -> StatusSnapshot:
     values.update(_decode_run(payload, 912, "I", _STATUS_DIAGNOSTIC_U32_FIELDS))
     values.update(_decode_run(payload, 948, "I", _STATUS_USB_U32_FIELDS))
     values.update(_decode_run(payload, 964, "H", _STATUS_USB_U16_FIELDS))
+    values["packet_owned_depth"] = _u16(payload, 976)
+    values["usb_active_frame_size"] = _u16(payload, 978)
+    values.update(_decode_run(payload, 980, "I", _STATUS_CACHE_U32_FIELDS))
+    values.update(_decode_run(payload, 996, "I", _STATUS_PARSER_DETAIL_U32_FIELDS))
+    values.update(_decode_run(payload, 1008, "I", _STATUS_RESPONSE_U32_FIELDS))
+    values.update(_decode_run(payload, 1024, "Q", _STATUS_PRESSURE_U64_FIELDS))
+    values.update(_decode_run(payload, 1040, "Q", _STATUS_EVICTION_U64_FIELDS))
+    values["adc_packet_filling_depth"] = _u16(payload, 1072)
+    values["gpio_packet_filling_depth"] = _u16(payload, 1074)
+    values.update(_decode_run(payload, 1076, "Q", _STATUS_DROP_BOUNDARY_U64_FIELDS))
+    values.update(
+        _decode_run(payload, 1108, "Q", _STATUS_GPIO_PIPELINE_DETAIL_U64_FIELDS)
+    )
+    values.update(
+        _decode_run(payload, 1148, "Q", _STATUS_GPIO_PACKER_DETAIL_U64_FIELDS)
+    )
+    values.update(
+        _decode_run(payload, 1180, "Q", _STATUS_ADC_PIPELINE_DETAIL_U64_FIELDS)
+    )
+    values.update(_decode_run(payload, 1212, "Q", _STATUS_DROP_PROJECTION_U64_FIELDS))
     return StatusSnapshot(values)
 
 
@@ -1851,12 +1978,18 @@ class StreamTotals:
     expected_sequence: int = 0
     expected_ticks: int = 0
     frames: int = 0
+    missing_frames: int = 0
+    gap_flag_frames: int = 0
     items: int = 0
     payload_bytes: int = 0
     framed_bytes: int = 0
 
     def snapshot(self) -> tuple[int, int, int, int]:
         return self.frames, self.items, self.payload_bytes, self.framed_bytes
+
+    @property
+    def logical_frames(self) -> int:
+        return self.frames + self.missing_frames
 
 
 class StreamValidator:
@@ -1868,6 +2001,8 @@ class StreamValidator:
         source: int,
         checksum_algorithm: int,
         clock: Clock,
+        *,
+        allow_expected_gaps: bool = False,
     ) -> None:
         require(1 <= run_id <= 0xFFFFFFFF, "control", "START returned run ID zero")
         require(source in {SOURCE_HARDWARE, SOURCE_SYNTHETIC}, "control", "source")
@@ -1875,8 +2010,10 @@ class StreamValidator:
         self.source = source
         self.checksum_algorithm = checksum_algorithm
         self.clock = clock
+        self.allow_expected_gaps = allow_expected_gaps
         self.adc = StreamTotals()
         self.gpio = StreamTotals()
+        self.expected_gaps = BoundedSamples(MAX_EXPECTED_GAP_EVENTS)
         self.maximum_frame_skew = 0
         self.maximum_receive_gap_seconds = 0.0
         self.last_received_at: float | None = None
@@ -1910,37 +2047,64 @@ class StreamValidator:
             "source",
             "data SYNTHETIC flag disagrees with configured source",
         )
-        require(
-            not frame.flags & (FLAG_GAP_BEFORE | FLAG_OVERRUN_BEFORE),
-            "source_gap",
-            f"frame kind=0x{frame.kind:02x} sequence={frame.sequence} carries gap",
-        )
         totals = self.adc if frame.kind == ADC_DATA else self.gpio
+        missing = (frame.sequence - totals.expected_sequence) & 0xFFFFFFFF
+        require(
+            missing <= 0x7FFFFFFF,
+            "source_gap",
+            f"kind 0x{frame.kind:02x} reordered sequence {frame.sequence}",
+        )
+        require(
+            self.allow_expected_gaps or missing == 0,
+            "source_gap",
+            f"kind 0x{frame.kind:02x} sequence {frame.sequence} "
+            f"!= {totals.expected_sequence}",
+        )
         expected_flags = FLAG_SYNTHETIC if expected_synthetic else 0
-        if totals.frames == 0:
+        if frame.sequence == 0 and frame.first_sample_ticks == 0:
             expected_flags |= FLAG_EPOCH_START
+        if missing:
+            expected_flags |= FLAG_GAP_BEFORE | FLAG_OVERRUN_BEFORE
         require(
             frame.flags == expected_flags,
             "source_gap",
             f"frame flags 0x{frame.flags:04x} != 0x{expected_flags:04x}",
         )
+        expected_ticks = (
+            totals.expected_ticks + missing * FRAME_COVERAGE_TICKS
+        ) & 0xFFFFFFFFFFFFFFFF
         require(
-            frame.sequence == totals.expected_sequence,
-            "source_gap",
-            f"kind 0x{frame.kind:02x} sequence {frame.sequence} "
-            f"!= {totals.expected_sequence}",
-        )
-        require(
-            frame.first_sample_ticks == totals.expected_ticks,
+            frame.first_sample_ticks == expected_ticks,
             "timestamp",
             f"kind 0x{frame.kind:02x} timestamp {frame.first_sample_ticks} "
-            f"!= {totals.expected_ticks}",
+            f"!= {expected_ticks}",
         )
         if frame.kind == ADC_DATA:
             self._validate_adc(frame)
         else:
             self._validate_gpio(frame)
         totals.frames += 1
+        if missing:
+            totals.missing_frames += missing
+            totals.gap_flag_frames += 1
+            self.expected_gaps.add(
+                {
+                    "kind": "adc" if frame.kind == ADC_DATA else "gpio",
+                    "first_missing_sequence": (frame.sequence - missing) & 0xFFFFFFFF,
+                    "last_missing_sequence": (frame.sequence - 1) & 0xFFFFFFFF,
+                    "missing_frames": missing,
+                    "successor_sequence": frame.sequence,
+                    "successor_ticks": frame.first_sample_ticks,
+                    "flags": frame.flags,
+                }
+            )
+            emit_event(
+                "expected_negative_gap",
+                source="adc" if frame.kind == ADC_DATA else "gpio",
+                missing_frames=missing,
+                successor_sequence=frame.sequence,
+                successor_ticks=frame.first_sample_ticks,
+            )
         totals.items += frame.item_count
         totals.payload_bytes += len(frame.payload)
         totals.framed_bytes += DATA_FRAME_BYTES
@@ -1948,13 +2112,17 @@ class StreamValidator:
         totals.expected_ticks = (
             frame.first_sample_ticks + FRAME_COVERAGE_TICKS
         ) & 0xFFFFFFFFFFFFFFFF
-        skew = abs(self.adc.frames - self.gpio.frames)
+        skew = abs(self.adc.logical_frames - self.gpio.logical_frames)
         self.maximum_frame_skew = max(self.maximum_frame_skew, skew)
-        require(
-            skew <= 1,
-            "source_gap",
-            f"combined fair-scheduler frame skew reached {skew}",
+        gap_successors_are_paired = (
+            self.adc.gap_flag_frames == self.gpio.gap_flag_frames
         )
+        if not self.allow_expected_gaps or gap_successors_are_paired:
+            require(
+                skew <= 1,
+                "source_gap",
+                f"combined fair-scheduler frame skew reached {skew}",
+            )
         self.diagnostics.add(
             {
                 "kind": "adc" if frame.kind == ADC_DATA else "gpio",
@@ -2045,7 +2213,10 @@ QUEUE_FIELDS = (
     "gpio_packed_ready_high_water",
     "packet_ready_depth",
     "packet_transmit_depth",
+    "packet_owned_depth",
     "packet_owned_high_water",
+    "adc_packet_filling_depth",
+    "gpio_packet_filling_depth",
     "adc_raw_ready_depth",
     "adc_raw_ready_high_water",
     "adc_packet_ready_depth",
@@ -2060,6 +2231,7 @@ QUEUE_FIELDS = (
     "packet_transmit_high_water",
     "usb_command_queue_depth",
     "usb_response_queue_depth",
+    "usb_lower_priority_queue_depth",
     "usb_command_queue_high_water",
     "usb_response_queue_high_water",
 )
@@ -2112,12 +2284,17 @@ def _nonzero_errors(
     status: StatusSnapshot,
     *,
     allow_physical_stop_tail: bool,
+    allow_expected_pressure_loss: bool = False,
 ) -> dict[str, int]:
     return {
         name: status.values[name]
         for name in _ZERO_ERROR_FIELDS
         if status.values[name]
         and (not allow_physical_stop_tail or name not in _PHYSICAL_STOP_TAIL_FIELDS)
+        and (
+            not allow_expected_pressure_loss
+            or name not in _EXPECTED_PRESSURE_LOSS_FIELDS
+        )
     }
 
 
@@ -2126,8 +2303,13 @@ def validate_status_invariants(
     *,
     source: int,
     allow_physical_stop_tail: bool = False,
+    allow_expected_pressure_loss: bool = False,
 ) -> None:
-    errors = _nonzero_errors(status, allow_physical_stop_tail=allow_physical_stop_tail)
+    errors = _nonzero_errors(
+        status,
+        allow_physical_stop_tail=allow_physical_stop_tail,
+        allow_expected_pressure_loss=allow_expected_pressure_loss,
+    )
     require(
         not errors,
         "counter_disagreement",
@@ -2141,13 +2323,15 @@ def validate_status_invariants(
             source == SOURCE_HARDWARE
             and 0 <= adc_tail < 2 * ADC_PAIRS_PER_FRAME
             and status.adc_raw_pairs_lost == adc_tail
-            and status.adc_items_dropped == adc_tail
             and 0 <= status.adc_incomplete_buffers <= 2
             and 0 <= status.adc_completion_mismatches <= status.adc_incomplete_buffers
             and 0 <= status.adc_incomplete_conversions <= adc_tail
             and (adc_tail == 0) == (status.adc_incomplete_buffers == 0)
             and 0 <= gpio_tail < GPIO_SAMPLES_PER_FRAME
-            and status.gpio_items_dropped == gpio_tail,
+            and status.gpio_items_dropped
+            == status.gpio_frames_dropped * GPIO_SAMPLES_PER_FRAME + gpio_tail
+            and status.adc_items_dropped
+            == status.adc_frames_dropped * ADC_PAIRS_PER_FRAME + adc_tail,
             "counter_disagreement",
             "physical STOP-tail counters do not reconcile",
         )
@@ -2160,6 +2344,14 @@ def validate_status_invariants(
         framed = status.values[f"{prefix}_frames_framed_pipeline"]
         emitted = status.values[f"{prefix}_frames_emitted"]
         transmitted = status.values[f"{prefix}_frames_transmitted"]
+        dropped = status.values[f"{prefix}_frames_dropped"]
+        filling = status.values[f"{prefix}_packet_filling_depth"]
+        ready = status.values[f"{prefix}_packet_ready_depth"]
+        transmitting = status.values[f"{prefix}_packet_transmit_depth"]
+        dropped_after_framing = status.values[f"{prefix}_frames_dropped_after_framing"]
+        dropped_after_promotion = status.values[
+            f"{prefix}_frames_dropped_after_promotion"
+        ]
         require(
             generated >= framed >= emitted >= transmitted,
             "counter_disagreement",
@@ -2177,6 +2369,49 @@ def validate_status_invariants(
                 "counter_disagreement",
                 f"{name}={status.values[name]} != {expected}",
             )
+        tail_items = 0
+        if allow_physical_stop_tail and prefix == "adc":
+            tail_items = status.adc_stop_pairs_discarded
+        elif allow_physical_stop_tail and prefix == "gpio":
+            tail_items = status.gpio_raw_samples_lost
+        require(
+            status.values[f"{prefix}_items_dropped"]
+            == dropped * items_per_frame + tail_items,
+            "counter_disagreement",
+            f"{prefix} dropped-item accounting disagrees with frames/tail",
+        )
+        require(
+            status.values[f"{prefix}_payload_bytes_dropped"]
+            == dropped * items_per_frame * item_bytes,
+            "counter_disagreement",
+            f"{prefix} dropped payload bytes disagree with dropped frames",
+        )
+        require(
+            generated == transmitted + dropped + filling + ready + transmitting,
+            "counter_disagreement",
+            f"{prefix} produced-frame conservation failed",
+        )
+        require(
+            framed == transmitted + ready + transmitting + dropped_after_framing,
+            "counter_disagreement",
+            f"{prefix} framed-frame conservation failed",
+        )
+        require(
+            emitted == transmitted + transmitting + dropped_after_promotion,
+            "counter_disagreement",
+            f"{prefix} emitted-frame conservation failed",
+        )
+        evicted = status.values[f"{prefix}_frames_evicted"]
+        evicted_after_promotion = status.values[
+            f"{prefix}_frames_evicted_after_promotion"
+        ]
+        require(
+            evicted <= dropped_after_framing
+            and evicted_after_promotion <= evicted
+            and evicted_after_promotion <= dropped_after_promotion,
+            "counter_disagreement",
+            f"{prefix} pressure-eviction boundaries disagree",
+        )
         expected_bytes = {
             f"{prefix}_payload_bytes_produced": generated
             * items_per_frame
@@ -2222,6 +2457,15 @@ def validate_status_invariants(
         "counter_disagreement",
         "packet accounted frame skew exceeds one",
     )
+    require(
+        status.packet_pressure_evictions
+        == status.adc_frames_evicted + status.gpio_frames_evicted
+        and status.adc_frames_dropped + status.gpio_frames_dropped
+        == status.packet_pressure_evictions
+        + status.packet_capacity_drops_without_evictable_frame,
+        "counter_disagreement",
+        "shared pressure/drop counters do not reconcile",
+    )
 
     queue_limits = {
         "gpio_raw_ready_depth": GPIO_RAW_RING_DEPTH,
@@ -2233,6 +2477,9 @@ def validate_status_invariants(
         "packet_ready_depth": PACKET_QUEUE_CAPACITY,
         "packet_transmit_depth": PACKET_QUEUE_CAPACITY,
         "packet_owned_high_water": PACKET_BUFFER_COUNT,
+        "packet_owned_depth": PACKET_BUFFER_COUNT,
+        "adc_packet_filling_depth": PACKET_BUFFER_COUNT,
+        "gpio_packet_filling_depth": PACKET_BUFFER_COUNT,
         "adc_packet_ready_depth": PACKET_QUEUE_CAPACITY,
         "gpio_packet_ready_depth": PACKET_QUEUE_CAPACITY,
         "adc_packet_transmit_depth": PACKET_QUEUE_CAPACITY,
@@ -2247,6 +2494,9 @@ def validate_status_invariants(
         "usb_response_queue_depth": RESPONSE_QUEUE_CAPACITY,
         "usb_command_queue_high_water": COMMAND_QUEUE_CAPACITY,
         "usb_response_queue_high_water": RESPONSE_QUEUE_CAPACITY,
+        "usb_lower_priority_queue_depth": PACKET_QUEUE_CAPACITY,
+        "usb_active_frame_bytes_sent": DATA_FRAME_BYTES,
+        "usb_active_frame_size": DATA_FRAME_BYTES,
     }
     for name, limit in queue_limits.items():
         require(
@@ -2263,9 +2513,23 @@ def validate_status_invariants(
         "aggregate and per-source packet depths disagree",
     )
     require(
-        status.packet_ready_depth + status.packet_transmit_depth <= PACKET_BUFFER_COUNT,
+        status.packet_owned_depth
+        == status.packet_ready_depth
+        + status.packet_transmit_depth
+        + status.adc_packet_filling_depth
+        + status.gpio_packet_filling_depth,
+        "counter_disagreement",
+        "packet ownership states do not sum to owned depth",
+    )
+    require(
+        status.packet_owned_depth <= status.packet_owned_high_water,
         "queue_bound",
-        "aggregate packet ownership exceeds the pool",
+        "packet owned depth exceeds its high-water mark",
+    )
+    require(
+        status.usb_lower_priority_queue_depth == status.packet_transmit_depth,
+        "counter_disagreement",
+        "USB lower-priority depth disagrees with packet transmit depth",
     )
     require(
         status.gpio_processing_cpu_basis_points <= 10_000,
@@ -2273,9 +2537,10 @@ def validate_status_invariants(
         "GPIO processing CPU exceeds 100 percent",
     )
     require(
-        status.usb_active_frame_bytes_sent < DATA_FRAME_BYTES,
+        status.usb_active_frame_bytes_sent <= status.usb_active_frame_size
+        and status.usb_active_frame_size in {0, DATA_FRAME_BYTES},
         "counter_disagreement",
-        "USB active-frame offset exceeds one frame",
+        "USB active-frame progress/size is invalid",
     )
 
     if source == SOURCE_HARDWARE:
@@ -2388,6 +2653,7 @@ def validate_running_status(
     host_adc_floor: int,
     host_gpio_floor: int,
     previous: StatusSnapshot | None,
+    allow_expected_pressure_loss: bool = False,
 ) -> None:
     validate_status_identity(
         status,
@@ -2399,7 +2665,11 @@ def validate_running_status(
         expected_generation=expected_generation,
         run_id=validator.run_id,
     )
-    validate_status_invariants(status, source=validator.source)
+    validate_status_invariants(
+        status,
+        source=validator.source,
+        allow_expected_pressure_loss=allow_expected_pressure_loss,
+    )
     require(
         status.adc_frames_emitted >= host_adc_floor
         and status.gpio_frames_emitted >= host_gpio_floor,
@@ -2428,7 +2698,8 @@ def reconcile_final_status(
     *,
     expected_generation: int,
     expected_commands: int,
-) -> None:
+    allow_expected_pressure_loss: bool = False,
+) -> dict[str, object] | None:
     physical = validator.source == SOURCE_HARDWARE
     validate_status_identity(
         status,
@@ -2444,44 +2715,61 @@ def reconcile_final_status(
         status,
         source=validator.source,
         allow_physical_stop_tail=physical,
+        allow_expected_pressure_loss=allow_expected_pressure_loss,
     )
     adc_frames = validator.adc.frames
     gpio_frames = validator.gpio.frames
     adc_items = validator.adc.items
     gpio_items = validator.gpio.items
+    adc_logical_frames = validator.adc.logical_frames
+    gpio_logical_frames = validator.gpio.logical_frames
+    adc_logical_items = adc_logical_frames * ADC_PAIRS_PER_FRAME
+    gpio_logical_items = gpio_logical_frames * GPIO_SAMPLES_PER_FRAME
+    adc_framed_frames = adc_frames + status.adc_frames_dropped_after_framing
+    gpio_framed_frames = gpio_frames + status.gpio_frames_dropped_after_framing
+    adc_emitted_frames = adc_frames + status.adc_frames_dropped_after_promotion
+    gpio_emitted_frames = gpio_frames + status.gpio_frames_dropped_after_promotion
     common_exact = {
-        "adc_frames_emitted": adc_frames,
-        "gpio_frames_emitted": gpio_frames,
-        "adc_frames_generated": adc_frames,
-        "adc_items_generated": adc_items,
-        "adc_frames_framed_pipeline": adc_frames,
-        "adc_items_framed_pipeline": adc_items,
-        "adc_items_emitted": adc_items,
+        "adc_frames_emitted": adc_emitted_frames,
+        "gpio_frames_emitted": gpio_emitted_frames,
+        "adc_frames_generated": adc_logical_frames,
+        "adc_items_generated": adc_logical_items,
+        "adc_frames_framed_pipeline": adc_framed_frames,
+        "adc_items_framed_pipeline": adc_framed_frames * ADC_PAIRS_PER_FRAME,
+        "adc_items_emitted": adc_emitted_frames * ADC_PAIRS_PER_FRAME,
         "adc_frames_transmitted": adc_frames,
         "adc_items_transmitted_pipeline": adc_items,
-        "gpio_frames_generated": gpio_frames,
-        "gpio_items_generated": gpio_items,
-        "gpio_frames_framed_pipeline": gpio_frames,
-        "gpio_items_framed_pipeline": gpio_items,
-        "gpio_items_emitted": gpio_items,
+        "gpio_frames_generated": gpio_logical_frames,
+        "gpio_items_generated": gpio_logical_items,
+        "gpio_frames_framed_pipeline": gpio_framed_frames,
+        "gpio_items_framed_pipeline": gpio_framed_frames * GPIO_SAMPLES_PER_FRAME,
+        "gpio_items_emitted": gpio_emitted_frames * GPIO_SAMPLES_PER_FRAME,
         "gpio_frames_transmitted": gpio_frames,
         "gpio_items_transmitted_pipeline": gpio_items,
-        "adc_payload_bytes_produced": validator.adc.payload_bytes,
-        "adc_payload_bytes_framed": validator.adc.payload_bytes,
-        "adc_payload_bytes_emitted": validator.adc.payload_bytes,
+        "adc_frames_dropped": validator.adc.missing_frames,
+        "gpio_frames_dropped": validator.gpio.missing_frames,
+        "adc_payload_bytes_produced": adc_logical_items * ADC_BYTES_PER_PAIR,
+        "adc_payload_bytes_framed": adc_framed_frames * DATA_PAYLOAD_BYTES,
+        "adc_payload_bytes_emitted": adc_emitted_frames * DATA_PAYLOAD_BYTES,
         "adc_payload_bytes_transmitted": validator.adc.payload_bytes,
-        "adc_framed_bytes_framed": validator.adc.framed_bytes,
-        "adc_framed_bytes_emitted": validator.adc.framed_bytes,
+        "adc_payload_bytes_dropped": (
+            validator.adc.missing_frames * DATA_PAYLOAD_BYTES
+        ),
+        "adc_framed_bytes_framed": adc_framed_frames * DATA_FRAME_BYTES,
+        "adc_framed_bytes_emitted": adc_emitted_frames * DATA_FRAME_BYTES,
         "adc_framed_bytes_transmitted": validator.adc.framed_bytes,
-        "gpio_payload_bytes_produced": validator.gpio.payload_bytes,
-        "gpio_payload_bytes_framed": validator.gpio.payload_bytes,
-        "gpio_payload_bytes_emitted": validator.gpio.payload_bytes,
+        "gpio_payload_bytes_produced": gpio_logical_items,
+        "gpio_payload_bytes_framed": gpio_framed_frames * DATA_PAYLOAD_BYTES,
+        "gpio_payload_bytes_emitted": gpio_emitted_frames * DATA_PAYLOAD_BYTES,
         "gpio_payload_bytes_transmitted": validator.gpio.payload_bytes,
-        "gpio_framed_bytes_framed": validator.gpio.framed_bytes,
-        "gpio_framed_bytes_emitted": validator.gpio.framed_bytes,
+        "gpio_payload_bytes_dropped": (
+            validator.gpio.missing_frames * DATA_PAYLOAD_BYTES
+        ),
+        "gpio_framed_bytes_framed": gpio_framed_frames * DATA_FRAME_BYTES,
+        "gpio_framed_bytes_emitted": gpio_emitted_frames * DATA_FRAME_BYTES,
         "gpio_framed_bytes_transmitted": validator.gpio.framed_bytes,
-        "packet_frames_promoted": adc_frames + gpio_frames,
-        "packet_accounted_frame_skew": abs(adc_frames - gpio_frames),
+        "packet_frames_promoted": adc_emitted_frames + gpio_emitted_frames,
+        "packet_accounted_frame_skew": abs(adc_logical_frames - gpio_logical_frames),
         "data_payload_bytes_transmitted": (
             validator.adc.payload_bytes + validator.gpio.payload_bytes
         ),
@@ -2491,6 +2779,9 @@ def reconcile_final_status(
         "commands_accepted": expected_commands,
         "packet_ready_depth": 0,
         "packet_transmit_depth": 0,
+        "packet_owned_depth": 0,
+        "adc_packet_filling_depth": 0,
+        "gpio_packet_filling_depth": 0,
         "adc_packet_ready_depth": 0,
         "gpio_packet_ready_depth": 0,
         "adc_packet_transmit_depth": 0,
@@ -2499,6 +2790,7 @@ def reconcile_final_status(
         "usb_response_queue_depth": 0,
         "usb_lower_priority_queue_depth": 0,
         "usb_active_frame_bytes_sent": 0,
+        "usb_active_frame_size": 0,
     }
     for name, expected in common_exact.items():
         require(
@@ -2509,22 +2801,24 @@ def reconcile_final_status(
 
     if physical:
         physical_exact = {
-            "gpio_samples_captured": gpio_items + status.gpio_raw_samples_lost,
-            "gpio_samples_packed": gpio_items,
-            "gpio_samples_framed": gpio_items,
+            "gpio_samples_captured": (
+                gpio_logical_items + status.gpio_raw_samples_lost
+            ),
+            "gpio_samples_packed": gpio_logical_items,
+            "gpio_samples_framed": gpio_framed_frames * GPIO_SAMPLES_PER_FRAME,
             "gpio_samples_transmitted": gpio_items,
-            "gpio_dma_major_loops": gpio_frames,
-            "adc0_dma_major_loops": adc_frames,
-            "adc1_dma_major_loops": adc_frames,
-            "adc0_dma_results": adc_items,
-            "adc1_dma_results": adc_items,
-            "adc_paired_major_loops": adc_frames,
-            "adc_buffers_completed": adc_frames,
-            "adc_buffers_acquired": adc_frames,
-            "adc_buffers_released": adc_frames,
-            "adc_pairs_captured": adc_items + status.adc_stop_pairs_discarded,
-            "adc_pairs_delivered": adc_items,
-            "adc_pairs_framed": adc_items,
+            "gpio_dma_major_loops": gpio_logical_frames,
+            "adc0_dma_major_loops": adc_logical_frames,
+            "adc1_dma_major_loops": adc_logical_frames,
+            "adc0_dma_results": adc_logical_items,
+            "adc1_dma_results": adc_logical_items,
+            "adc_paired_major_loops": adc_logical_frames,
+            "adc_buffers_completed": adc_logical_frames,
+            "adc_buffers_acquired": adc_logical_frames,
+            "adc_buffers_released": adc_logical_frames,
+            "adc_pairs_captured": (adc_logical_items + status.adc_stop_pairs_discarded),
+            "adc_pairs_delivered": adc_logical_items,
+            "adc_pairs_framed": adc_framed_frames * ADC_PAIRS_PER_FRAME,
             "adc_pairs_transmitted": adc_items,
             "gpio_raw_ready_depth": 0,
             "gpio_packed_ready_depth": 0,
@@ -2542,6 +2836,53 @@ def reconcile_final_status(
             "counter_disagreement",
             "synthetic run has physical STOP-tail counters",
         )
+
+    gap_summary = validator.expected_gaps.summary()
+    if not allow_expected_pressure_loss:
+        require(
+            validator.adc.missing_frames == 0
+            and validator.gpio.missing_frames == 0
+            and gap_summary["total"] == 0,
+            "source_gap",
+            "normal epoch recorded expected-loss gaps",
+        )
+        return None
+
+    missing_total = validator.adc.missing_frames + validator.gpio.missing_frames
+    require(
+        physical
+        and validator.adc.missing_frames > 0
+        and validator.gpio.missing_frames > 0
+        and validator.adc.gap_flag_frames > 0
+        and validator.gpio.gap_flag_frames > 0,
+        "expected_negative_loss",
+        "named CDC pressure subcase did not induce flagged loss in both streams",
+    )
+    require(
+        status.adc_frames_evicted == validator.adc.missing_frames
+        and status.gpio_frames_evicted == validator.gpio.missing_frames
+        and status.packet_pressure_evictions == missing_total
+        and status.packet_pool_exhaustions == missing_total
+        and status.packet_capacity_drops_without_evictable_frame == 0,
+        "expected_negative_loss",
+        "named CDC pressure loss does not exactly match eviction counters",
+    )
+    return {
+        "adc_frames": validator.adc.missing_frames,
+        "adc_items": validator.adc.missing_frames * ADC_PAIRS_PER_FRAME,
+        "adc_payload_bytes": validator.adc.missing_frames * DATA_PAYLOAD_BYTES,
+        "adc_gap_flag_frames": validator.adc.gap_flag_frames,
+        "gpio_frames": validator.gpio.missing_frames,
+        "gpio_items": validator.gpio.missing_frames * GPIO_SAMPLES_PER_FRAME,
+        "gpio_payload_bytes": validator.gpio.missing_frames * DATA_PAYLOAD_BYTES,
+        "gpio_gap_flag_frames": validator.gpio.gap_flag_frames,
+        "packet_pressure_evictions": status.packet_pressure_evictions,
+        "packet_pool_exhaustions": status.packet_pool_exhaustions,
+        "packet_capacity_drops_without_evictable_frame": (
+            status.packet_capacity_drops_without_evictable_frame
+        ),
+        "gaps": gap_summary,
+    }
 
 
 FINAL_REPORT_FIELDS = (
@@ -2561,9 +2902,11 @@ FINAL_REPORT_FIELDS = (
     "adc_frames_generated",
     "adc_frames_framed_pipeline",
     "adc_frames_transmitted",
+    "adc_frames_dropped",
     "gpio_frames_generated",
     "gpio_frames_framed_pipeline",
     "gpio_frames_transmitted",
+    "gpio_frames_dropped",
     "adc_payload_bytes_produced",
     "adc_payload_bytes_framed",
     "adc_payload_bytes_transmitted",
@@ -2573,6 +2916,14 @@ FINAL_REPORT_FIELDS = (
     "data_payload_bytes_transmitted",
     "data_framed_bytes_transmitted",
     "packet_frames_promoted",
+    "packet_pressure_evictions",
+    "packet_capacity_drops_without_evictable_frame",
+    "adc_frames_evicted",
+    "gpio_frames_evicted",
+    "adc_frames_dropped_after_framing",
+    "adc_frames_dropped_after_promotion",
+    "gpio_frames_dropped_after_framing",
+    "gpio_frames_dropped_after_promotion",
     "packet_owned_high_water",
     "packet_ready_high_water",
     "packet_transmit_high_water",
@@ -2600,10 +2951,14 @@ class EpochReport:
     measured_elapsed_seconds: float
     timed_adc_frames: int
     timed_gpio_frames: int
+    timed_adc_missing_frames: int
+    timed_gpio_missing_frames: int
     timed_adc_items: int
     timed_gpio_items: int
     total_adc_frames: int
     total_gpio_frames: int
+    total_adc_missing_frames: int
+    total_gpio_missing_frames: int
     total_adc_items: int
     total_gpio_items: int
     status_latency: dict[str, float | int | None]
@@ -2613,6 +2968,7 @@ class EpochReport:
     diagnostics: dict[str, object]
     maximum_receive_gap_seconds: float
     parser: dict[str, int]
+    expected_negative_subcase: dict[str, object] | None
 
     @property
     def timed_payload_bytes(self) -> int:
@@ -2621,6 +2977,19 @@ class EpochReport:
     @property
     def timed_framed_bytes(self) -> int:
         return (self.timed_adc_frames + self.timed_gpio_frames) * DATA_FRAME_BYTES
+
+    @property
+    def logical_timed_adc_items(self) -> int:
+        return (
+            self.timed_adc_items + self.timed_adc_missing_frames * ADC_PAIRS_PER_FRAME
+        )
+
+    @property
+    def logical_timed_gpio_items(self) -> int:
+        return (
+            self.timed_gpio_items
+            + self.timed_gpio_missing_frames * GPIO_SAMPLES_PER_FRAME
+        )
 
     def as_dict(self) -> dict[str, object]:
         elapsed = self.measured_elapsed_seconds
@@ -2636,18 +3005,28 @@ class EpochReport:
             "timed": {
                 "adc_frames": self.timed_adc_frames,
                 "gpio_frames": self.timed_gpio_frames,
+                "adc_missing_frames": self.timed_adc_missing_frames,
+                "gpio_missing_frames": self.timed_gpio_missing_frames,
                 "adc_pairs": self.timed_adc_items,
                 "gpio_samples": self.timed_gpio_items,
+                "logical_adc_pairs": self.logical_timed_adc_items,
+                "logical_gpio_samples": self.logical_timed_gpio_items,
                 "payload_bytes": self.timed_payload_bytes,
                 "framed_bytes": self.timed_framed_bytes,
                 "adc_pair_rate_hz": self.timed_adc_items / elapsed,
                 "gpio_sample_rate_hz": self.timed_gpio_items / elapsed,
+                "logical_adc_pair_rate_hz": self.logical_timed_adc_items / elapsed,
+                "logical_gpio_sample_rate_hz": (
+                    self.logical_timed_gpio_items / elapsed
+                ),
                 "payload_bytes_per_second": self.timed_payload_bytes / elapsed,
                 "framed_bytes_per_second": self.timed_framed_bytes / elapsed,
             },
             "total": {
                 "adc_frames": self.total_adc_frames,
                 "gpio_frames": self.total_gpio_frames,
+                "adc_missing_frames": self.total_adc_missing_frames,
+                "gpio_missing_frames": self.total_gpio_missing_frames,
                 "adc_pairs": self.total_adc_items,
                 "gpio_samples": self.total_gpio_items,
             },
@@ -2660,6 +3039,7 @@ class EpochReport:
             "diagnostic_samples": self.diagnostics,
             "maximum_receive_gap_seconds": self.maximum_receive_gap_seconds,
             "parser": self.parser,
+            "expected_negative_subcase": self.expected_negative_subcase,
             "fixture_scope": (
                 {
                     "external_analog_stimulus": "not-declared",
@@ -2749,6 +3129,108 @@ class SoakRunner:
         self.reopen_count += 1
         emit_event("cdc_reopened", count=self.reopen_count)
 
+    def reopen_running_with_expected_pressure(
+        self,
+        validator: StreamValidator,
+    ) -> tuple[SerialLink, dict[str, object], list[float]]:
+        """Reopen one live CDC session and retain exact named-loss evidence."""
+
+        port = self.port
+        old_link = self.link
+        if port is None or old_link is None:
+            raise SoakFailure("control", "cannot live-reopen a closed session")
+        require(
+            not old_link.parser.buffer,
+            "parser",
+            "live CDC close was not aligned to a complete frame boundary",
+        )
+        old_parser = {
+            "bytes_received": old_link.parser.bytes_received,
+            "frames_decoded": old_link.parser.frames_decoded,
+            "bytes_discarded": old_link.parser.bytes_discarded,
+            "errors": old_link.parser.errors,
+            "buffered_bytes": len(old_link.parser.buffer),
+        }
+        emit_event(
+            "expected_negative_subcase_begin",
+            subcase="cdc_close_reopen_pressure",
+            expected_device_state="RUNNING",
+            pause_seconds=EXPECTED_NEGATIVE_REOPEN_SECONDS,
+            run_id=validator.run_id,
+        )
+        started = self.clock.monotonic()
+        port.close()
+        self.port = None
+        self.link = None
+        self.clock.sleep(EXPECTED_NEGATIVE_REOPEN_SECONDS)
+        self._check_budget("live CDC reopen", reserve=8.0)
+
+        reopened_port = self.port_factory()
+        reopened_link = SerialLink(
+            reopened_port,
+            self.clock,
+            read_bytes=self.settings.serial_read_bytes,
+        )
+        reopened_link.accepted_requests = old_link.accepted_requests
+        reopened_link.discarded_data_frames = old_link.discarded_data_frames
+        reopened_link.stale_responses = old_link.stale_responses
+        reopened_link.maximum_read_bytes = old_link.maximum_read_bytes
+        self.port = reopened_port
+        self.link = reopened_link
+        info, latencies = synchronize(
+            reopened_link,
+            hard_deadline=self.hard_deadline,
+            on_data=validator.accept,
+            expected_run_id=validator.run_id,
+        )
+        validate_info_identity(
+            info,
+            self.settings,
+            expected_state=STATE_RUNNING,
+            expected_source=validator.source,
+        )
+        require(
+            self.identity is not None
+            and stable_identity(info) == stable_identity(self.identity),
+            "identity",
+            "identity changed during live CDC reopen",
+        )
+        require(
+            reopened_link.parser.bytes_discarded == 0,
+            "parser",
+            "live CDC reopen exposed an invalid partial wire fragment",
+        )
+        elapsed = self.clock.monotonic() - started
+        require(
+            elapsed <= EXPECTED_NEGATIVE_REOPEN_DEADLINE_SECONDS,
+            "latency_violation",
+            f"live CDC reopen {elapsed:.6f}s exceeds "
+            f"{EXPECTED_NEGATIVE_REOPEN_DEADLINE_SECONDS:.6f}s",
+        )
+        self.reopen_count += 1
+        evidence: dict[str, object] = {
+            "name": "cdc_close_reopen_pressure",
+            "result": "pending",
+            "run_id": validator.run_id,
+            "expected_device_state": "RUNNING",
+            "pause_seconds": EXPECTED_NEGATIVE_REOPEN_SECONDS,
+            "elapsed_seconds": elapsed,
+            "old_session_parser": old_parser,
+            "new_session_parser": {
+                "bytes_discarded": reopened_link.parser.bytes_discarded,
+                "errors": reopened_link.parser.errors,
+                "buffered_bytes": len(reopened_link.parser.buffer),
+            },
+        }
+        emit_event(
+            "expected_negative_subcase_reopened",
+            subcase="cdc_close_reopen_pressure",
+            elapsed_seconds=elapsed,
+            run_id=validator.run_id,
+            state="RUNNING",
+        )
+        return reopened_link, evidence, latencies
+
     def run_epoch(
         self,
         *,
@@ -2757,6 +3239,7 @@ class SoakRunner:
         measured_seconds: float,
         warmup_seconds: float,
         previous_run_id: int | None,
+        expected_negative_subcase: str | None = None,
     ) -> EpochReport:
         link = self.link
         if link is None:
@@ -2879,6 +3362,7 @@ class SoakRunner:
             source,
             self.settings.checksum_algorithm,
             self.clock,
+            allow_expected_gaps=expected_negative_subcase is not None,
         )
         self.active_epoch_index = index
         self.active_validator = validator
@@ -2893,10 +3377,11 @@ class SoakRunner:
         active_started = self.clock.monotonic()
         warmup_deadline = active_started + warmup_seconds
         timed_started_at: float | None = None
-        timed_baseline = (0, 0, 0, 0, 0, 0, 0, 0)
+        timed_baseline = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         next_status_at = active_started
         next_info_at = active_started + self.settings.info_interval_seconds
         previous_status: StatusSnapshot | None = None
+        negative_evidence: dict[str, object] | None = None
         projected_statuses = max(
             1,
             math.ceil(
@@ -2919,6 +3404,8 @@ class SoakRunner:
                     validator.gpio.payload_bytes,
                     validator.adc.framed_bytes,
                     validator.gpio.framed_bytes,
+                    validator.adc.missing_frames,
+                    validator.gpio.missing_frames,
                 )
                 emit_event(
                     "warmup_complete",
@@ -2931,6 +3418,41 @@ class SoakRunner:
                 and now >= timed_started_at + measured_seconds
             ):
                 break
+            if (
+                expected_negative_subcase is not None
+                and negative_evidence is None
+                and timed_started_at is not None
+                and now >= timed_started_at + min(2.0, measured_seconds / 3.0)
+            ):
+                require(
+                    expected_negative_subcase == "cdc_close_reopen_pressure",
+                    "configuration",
+                    f"unknown expected negative subcase {expected_negative_subcase!r}",
+                )
+                require(
+                    previous_status is not None
+                    and previous_status.adc_frames_dropped == 0
+                    and previous_status.gpio_frames_dropped == 0,
+                    "expected_negative_loss",
+                    "live CDC pressure baseline was not zero-loss",
+                )
+                assert previous_status is not None
+                link, negative_evidence, reopen_latencies = (
+                    self.reopen_running_with_expected_pressure(validator)
+                )
+                negative_evidence["baseline"] = {
+                    "stats_generation": previous_status.stats_generation,
+                    "adc_frames_generated": previous_status.adc_frames_generated,
+                    "gpio_frames_generated": previous_status.gpio_frames_generated,
+                    "adc_frames_dropped": previous_status.adc_frames_dropped,
+                    "gpio_frames_dropped": previous_status.gpio_frames_dropped,
+                    "device_state": previous_status.device_state,
+                }
+                for reopen_latency in reopen_latencies:
+                    epoch_command_latency.add(reopen_latency)
+                    self.command_latency.add(reopen_latency)
+                next_status_at = self.clock.monotonic()
+                continue
             if now >= next_status_at:
                 adc_floor = validator.adc.frames
                 gpio_floor = validator.gpio.frames
@@ -2955,6 +3477,7 @@ class SoakRunner:
                     host_adc_floor=adc_floor,
                     host_gpio_floor=gpio_floor,
                     previous=previous_status,
+                    allow_expected_pressure_loss=negative_evidence is not None,
                 )
                 previous_status = status
                 status_rollup.observe(status)
@@ -2985,11 +3508,21 @@ class SoakRunner:
             link.pump_once(validator.accept)
 
         require(timed_started_at is not None, "timeout", "measured phase never began")
+        require(
+            expected_negative_subcase is None or negative_evidence is not None,
+            "expected_negative_loss",
+            "planned named negative subcase did not execute",
+        )
         measured_elapsed = self.clock.monotonic() - timed_started_at
         baseline_adc_frames, baseline_gpio_frames = timed_baseline[:2]
         baseline_adc_items, baseline_gpio_items = timed_baseline[2:4]
+        baseline_adc_missing, baseline_gpio_missing = timed_baseline[8:10]
         timed_adc_frames = validator.adc.frames - baseline_adc_frames
         timed_gpio_frames = validator.gpio.frames - baseline_gpio_frames
+        timed_adc_missing_frames = validator.adc.missing_frames - baseline_adc_missing
+        timed_gpio_missing_frames = (
+            validator.gpio.missing_frames - baseline_gpio_missing
+        )
         timed_adc_items = validator.adc.items - baseline_adc_items
         timed_gpio_items = validator.gpio.items - baseline_gpio_items
 
@@ -3015,13 +3548,33 @@ class SoakRunner:
         self.command_latency.add(latency)
         final_status = decode_status(final_frame)
         expected_commands = link.accepted_requests - accepted_before_start - 1
-        reconcile_final_status(
+        pressure_loss = reconcile_final_status(
             final_status,
             final_frame,
             validator,
             expected_generation=expected_generation,
             expected_commands=expected_commands,
+            allow_expected_pressure_loss=negative_evidence is not None,
         )
+        if negative_evidence is not None:
+            require(
+                pressure_loss is not None,
+                "expected_negative_loss",
+                "named negative subcase produced no reconciled loss summary",
+            )
+            negative_evidence["result"] = "PASS"
+            negative_evidence["loss"] = pressure_loss
+            negative_evidence["final_state"] = "IDLE"
+            negative_evidence["stats_generation"] = expected_generation
+            emit_event(
+                "expected_negative_subcase_complete",
+                subcase=expected_negative_subcase,
+                run_id=validator.run_id,
+                adc_frames=validator.adc.missing_frames,
+                gpio_frames=validator.gpio.missing_frames,
+                packet_pressure_evictions=final_status.packet_pressure_evictions,
+                state="IDLE",
+            )
         status_rollup.observe(final_status)
         self.memory.end_streaming()
 
@@ -3042,11 +3595,17 @@ class SoakRunner:
             "rate",
             "measured epoch contains no complete data",
         )
+        graded_adc_items = (
+            timed_adc_items + timed_adc_missing_frames * ADC_PAIRS_PER_FRAME
+        )
+        graded_gpio_items = (
+            timed_gpio_items + timed_gpio_missing_frames * GPIO_SAMPLES_PER_FRAME
+        )
         rates = {
-            "adc_pair_rate_hz": timed_adc_items / measured_elapsed,
-            "gpio_sample_rate_hz": timed_gpio_items / measured_elapsed,
+            "adc_pair_rate_hz": graded_adc_items / measured_elapsed,
+            "gpio_sample_rate_hz": graded_gpio_items / measured_elapsed,
             "payload_bytes_per_second": (
-                timed_adc_items * ADC_BYTES_PER_PAIR + timed_gpio_items
+                graded_adc_items * ADC_BYTES_PER_PAIR + graded_gpio_items
             )
             / measured_elapsed,
         }
@@ -3089,10 +3648,14 @@ class SoakRunner:
             measured_elapsed_seconds=measured_elapsed,
             timed_adc_frames=timed_adc_frames,
             timed_gpio_frames=timed_gpio_frames,
+            timed_adc_missing_frames=timed_adc_missing_frames,
+            timed_gpio_missing_frames=timed_gpio_missing_frames,
             timed_adc_items=timed_adc_items,
             timed_gpio_items=timed_gpio_items,
             total_adc_frames=validator.adc.frames,
             total_gpio_frames=validator.gpio.frames,
+            total_adc_missing_frames=validator.adc.missing_frames,
+            total_gpio_missing_frames=validator.gpio.missing_frames,
             total_adc_items=validator.adc.items,
             total_gpio_items=validator.gpio.items,
             status_latency=status_summary,
@@ -3112,6 +3675,7 @@ class SoakRunner:
                 "maximum_read_bytes": link.maximum_read_bytes,
                 "buffered_bytes": len(link.parser.buffer),
             },
+            expected_negative_subcase=negative_evidence,
         )
         emit_event(
             "epoch_complete",
@@ -3162,6 +3726,9 @@ class SoakRunner:
                     measured_seconds=measured_seconds,
                     warmup_seconds=min(0.25, self.settings.warmup_seconds),
                     previous_run_id=previous_run_id,
+                    expected_negative_subcase=(
+                        "cdc_close_reopen_pressure" if epoch_index == 1 else None
+                    ),
                 )
                 self.epochs.append(report)
                 previous_run_id = report.run_id
@@ -3176,6 +3743,25 @@ class SoakRunner:
                 "timeout",
                 "control campaign ended before its 600-second measured duration",
             )
+            negative_subcases = [
+                epoch.expected_negative_subcase
+                for epoch in self.epochs
+                if epoch.expected_negative_subcase is not None
+            ]
+            require(
+                len(negative_subcases) == 1
+                and negative_subcases[0].get("name") == "cdc_close_reopen_pressure"
+                and negative_subcases[0].get("result") == "PASS",
+                "expected_negative_loss",
+                "control campaign did not complete exactly one named loss subcase",
+            )
+
+        require(
+            bool(self.epochs)
+            and self.epochs[-1].final_counters.get("device_state") == STATE_IDLE,
+            "control",
+            "campaign did not finish in IDLE",
+        )
 
         self.memory.sample(checkpoint=True)
         self.cpu.sample()
@@ -3212,6 +3798,11 @@ class SoakRunner:
         framed_bytes = sum(epoch.timed_framed_bytes for epoch in self.epochs)
         adc_pairs = sum(epoch.timed_adc_items for epoch in self.epochs)
         gpio_samples = sum(epoch.timed_gpio_items for epoch in self.epochs)
+        negative_subcases = [
+            epoch.expected_negative_subcase
+            for epoch in self.epochs
+            if epoch.expected_negative_subcase is not None
+        ]
         maximum_queues = {name: 0 for name in QUEUE_FIELDS}
         for epoch in self.epochs:
             status_rollup = epoch.status_rollup
@@ -3247,6 +3838,7 @@ class SoakRunner:
             "metrics": {
                 "epoch_count": len(self.epochs),
                 "cdc_reopen_count": self.reopen_count,
+                "expected_negative_subcase_count": len(negative_subcases),
                 "payload_bytes": payload_bytes,
                 "framed_bytes": framed_bytes,
                 "adc_pairs": adc_pairs,
@@ -3264,6 +3856,7 @@ class SoakRunner:
                 "cpu": self.cpu.summary(),
             },
             "epochs": [epoch.as_dict() for epoch in self.epochs],
+            "negative_subcases": negative_subcases,
             "cleanup": {"attempted": False, "normal_close": True},
             "program": {
                 "sha256": _program_sha256(),
