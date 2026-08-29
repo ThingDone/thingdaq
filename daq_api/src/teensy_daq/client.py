@@ -1273,7 +1273,7 @@ class TeensyDAQ:
             self._pending_items.append(block)
 
     def _ensure_open(self) -> None:
-        if self._closed or not self._transport.is_open:
+        if self._closed:
             raise DAQClosedError("TeensyDAQ is closed")
         if not self._reader.is_running:
             counters = self._reader.counters
@@ -1282,6 +1282,8 @@ class TeensyDAQ:
             if counters.protocol_failures:
                 raise ReaderProtocolError("device reader terminated on protocol error")
             raise DAQClosedError("TeensyDAQ reader is not running")
+        if not self._transport.is_open:
+            raise DAQClosedError("TeensyDAQ transport is closed")
 
 
 __all__ = [
