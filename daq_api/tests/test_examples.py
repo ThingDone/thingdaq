@@ -27,8 +27,27 @@ class SimulatorExampleTests(unittest.TestCase):
 
         for script in EXAMPLE_SCRIPTS:
             with self.subTest(example=script.name):
+                runner = f"""
+import runpy
+import socket
+import sys
+import serial
+import serial.tools.list_ports
+
+def forbidden(*args, **kwargs):
+    raise AssertionError("default example attempted hardware or network access")
+
+socket.create_connection = forbidden
+serial.Serial = forbidden
+serial.serial_for_url = forbidden
+serial.tools.list_ports.comports = forbidden
+script = {str(script)!r}
+sys.path.insert(0, {str(EXAMPLES_ROOT)!r})
+sys.argv = [script]
+runpy.run_path(script, run_name="__main__")
+"""
                 completed = subprocess.run(
-                    [sys.executable, str(script)],
+                    [sys.executable, "-c", runner],
                     cwd=REPOSITORY_ROOT,
                     env=environment,
                     capture_output=True,

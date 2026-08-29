@@ -31,8 +31,8 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
-  - '[[Phase-01-Synthetic-Prototype-Gate]]'
-  - '[[Phase-02-Protocol-Python-Gate]]'
+  - '[[Phase-01-Prototype]]'
+  - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
   - '[[Phase-03-Control-Plane]]'
   - '[[Phase-04-Synthetic-Streaming]]'
@@ -67,8 +67,8 @@ double-bracket document links so the project can be explored as a graph.
 - `research/` records evidence gathered before implementation or selection,
   beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
-  including [[Phase-01-Synthetic-Prototype-Gate]] and
-  [[Phase-02-Protocol-Python-Gate]], followed by the compile-only
+  including [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
+  by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical
   [[Phase-03-Control-Plane]] control acceptance and
   [[Phase-04-Synthetic-Streaming]] full-rate synthetic-stream acceptance,

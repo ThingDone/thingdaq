@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import struct
 import subprocess
 import sys
 import textwrap
@@ -102,6 +103,40 @@ class NumPyIntegrationTests(unittest.TestCase):
         retained_pairs = adc_view.pairs
         del adc_view, adc
         self.assertEqual([0, 1], retained_pairs[0].tolist())
+
+        retained_packed = gpio_view.packed
+        del gpio_view, gpio
+        self.assertEqual([0, 1, 2, 3], retained_packed[:4].tolist())
+
+    def test_crafted_wire_bytes_remain_little_endian_after_input_normalization(
+        self,
+    ) -> None:
+        payload = bytearray(constants.ADC_DATA_PAYLOAD_SIZE)
+        struct.pack_into("<HHHH", payload, 0, 0x0102, 0x0304, 0x0506, 0x0708)
+        backing = bytearray(len(payload) + 1)
+        unaligned_input = memoryview(backing)[1:]
+        unaligned_input[:] = payload
+        block = ADCBlock(
+            run_id=7,
+            sequence=3,
+            first_sample_ticks=16,
+            payload=unaligned_input,
+            metadata=AdcBlockMetadata(hardware_serial=12345670),
+        )
+
+        view = block.as_numpy()
+        backing[1:9] = b"\x00" * 8
+
+        self.assertEqual("<u2", view.pairs.dtype.str)
+        self.assertEqual(
+            [[0x0102, 0x0304], [0x0506, 0x0708]],
+            view.pairs[:2].tolist(),
+        )
+        self.assertEqual(bytes(payload[:8]), view.pairs[:2].tobytes())
+        self.assertTrue(view.pairs.flags.aligned)
+        self.assertEqual(0, view.pairs.ctypes.data % view.pairs.dtype.alignment)
+        self.assertIs(block.payload, view.payload_owner)
+        self.assertIsNot(backing, view.payload_owner)
 
     def test_vectorized_interleaving_and_timestamps_match_pure_python_at_wrap(
         self,

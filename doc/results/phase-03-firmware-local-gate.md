@@ -13,7 +13,7 @@ related:
   - '[[Firmware-Resource-Map]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
-  - '[[Phase-02-Protocol-Python-Gate]]'
+  - '[[Phase-02-Protocol-Python]]'
 ---
 
 # Phase 03 firmware local gate

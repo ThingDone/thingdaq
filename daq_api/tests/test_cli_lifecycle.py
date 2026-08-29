@@ -63,6 +63,115 @@ class PublicNamespaceTests(unittest.TestCase):
             self.assertTrue(daq.is_open)
         self.assertFalse(daq.is_open)
 
+    def test_phase10_exports_and_return_annotations_are_stable(self) -> None:
+        required_exports = {
+            "__version__",
+            "TeensyDAQ",
+            "DeviceCapabilities",
+            "DAQConfiguration",
+            "ADCBlock",
+            "GPIOBlock",
+            "CalibrationRecord",
+            "CalibrationDatabase",
+            "CalibrationStore",
+            "ConverterCalibration",
+            "CalibratedAdcChannels",
+            "CalibratedAdcSample",
+            "calibrated_channels",
+            "calibrated_interleaved",
+            "estimate_offset_gain",
+            "save_calibration",
+            "load_calibration",
+            "DeviceCapabilityError",
+            "DAQClosedError",
+            "DAQShutdownError",
+            "DAQStateError",
+            "UnexpectedMessageError",
+            "low_level",
+        }
+        exported = teensy_daq.__all__
+
+        self.assertEqual(len(exported), len(set(exported)))
+        self.assertTrue(required_exports.issubset(exported))
+        for name in required_exports:
+            with self.subTest(name=name):
+                self.assertTrue(hasattr(teensy_daq, name))
+
+        method_returns = {
+            TeensyDAQ.__enter__: TeensyDAQ,
+            TeensyDAQ.open: TeensyDAQ,
+            TeensyDAQ.simulated: TeensyDAQ,
+            TeensyDAQ.info: teensy_daq.DeviceInfo,
+            TeensyDAQ.configure: teensy_daq.DAQConfiguration,
+            TeensyDAQ.start: int,
+            TeensyDAQ.status: teensy_daq.Status,
+            TeensyDAQ.stop: DeviceState,
+        }
+        for method, expected in method_returns.items():
+            with self.subTest(method=method.__name__):
+                self.assertIs(expected, get_type_hints(method)["return"])
+        self.assertIs(
+            teensy_daq.ConverterCalibration,
+            get_type_hints(teensy_daq.estimate_offset_gain)["return"],
+        )
+        self.assertIs(
+            teensy_daq.CalibratedAdcChannels,
+            get_type_hints(
+                teensy_daq.calibrated_channels,
+                localns={"ADCBlock": teensy_daq.ADCBlock},
+            )["return"],
+        )
+
+    def test_documented_exception_hierarchy_is_stable(self) -> None:
+        facade_errors = (
+            teensy_daq.DAQClosedError,
+            teensy_daq.CommandTimeoutError,
+            teensy_daq.DAQShutdownError,
+            teensy_daq.BlockTimeoutError,
+            teensy_daq.DeviceCommandError,
+            teensy_daq.MultipleDevicesFoundError,
+            teensy_daq.DeviceIdentityMismatchError,
+            teensy_daq.DeviceSynchronizationError,
+            teensy_daq.UnexpectedMessageError,
+            teensy_daq.UnexpectedStreamGapError,
+            teensy_daq.UnexpectedHostQueueLossError,
+            teensy_daq.UnexpectedStreamAnomalyError,
+        )
+        for error_type in facade_errors:
+            with self.subTest(error=error_type.__name__):
+                self.assertTrue(issubclass(error_type, teensy_daq.TeensyDAQError))
+
+        self.assertTrue(
+            issubclass(teensy_daq.DAQStateError, teensy_daq.DeviceCommandError)
+        )
+        self.assertTrue(
+            issubclass(
+                teensy_daq.DeviceCapabilityError,
+                teensy_daq.DeviceCommandError,
+            )
+        )
+        self.assertTrue(
+            issubclass(
+                teensy_daq.UnexpectedStreamValidationError,
+                teensy_daq.UnexpectedMessageError,
+            )
+        )
+        self.assertTrue(
+            issubclass(teensy_daq.DeviceNotFoundError, teensy_daq.DiscoveryError)
+        )
+        self.assertTrue(
+            issubclass(
+                teensy_daq.CalibrationFormatError,
+                teensy_daq.CalibrationError,
+            )
+        )
+        self.assertTrue(
+            issubclass(
+                teensy_daq.CalibrationMismatchError,
+                teensy_daq.CalibrationError,
+            )
+        )
+
 
 class JsonCliLifecycleTests(unittest.TestCase):
     def test_configure_reports_exact_echo_and_fixed_capability_requirements(

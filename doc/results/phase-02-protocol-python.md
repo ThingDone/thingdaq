@@ -11,7 +11,7 @@ tags:
 related:
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
-  - '[[Phase-01-Synthetic-Prototype-Gate]]'
+  - '[[Phase-01-Prototype]]'
   - '[[System-Overview]]'
 ---
 
@@ -166,7 +166,7 @@ python -I -c 'import pathlib, teensy_daq; print(pathlib.Path(teensy_daq.__file__
 
 The isolated import resolved inside the clean environment's
 `lib/python3.11/site-packages/teensy_daq/`, confirming a non-editable wheel
-install. The installed console entry point then reran the [[Phase-01-Synthetic-Prototype-Gate]]
+install. The installed console entry point then reran the [[Phase-01-Prototype]]
 flow through the current `BackgroundReader` and synchronous public API:
 
 ```bash
