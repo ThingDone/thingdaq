@@ -131,15 +131,14 @@ schedule exhaustion, and rejected stale interrupts have independent counters.
 Complete corrupt blocks and partial STOP work contribute exact discarded-pair
 counts.
 
-Both channel TCDs retain `INTMAJOR`, but only the later ADC1 NVIC line is
-enabled. Its handler requires both `DMA_INT` bits and consumes ADC0 then ADC1
-in one fixed-order barrier operation. Earlier ADC0 has numeric eDMA priority
-1 while later ADC1 has priority 0, so ADC0 wins any pairwise contention and
-GPIO remains highest at priority 2. An initially incomplete pair receives a
-bounded 10-microsecond flag-visibility reconciliation window. The earlier
-ADC0 line remains reserved and masked. A pair that is still incomplete records
-a DMA fault and initiates the normal fail-safe recovery instead of
-desynchronizing its software generations.
+Both channel TCDs retain `INTMAJOR`, and both equal-priority NVIC lines dispatch
+one shared handler. It snapshots and acknowledges every visible `DMA_INT` bit
+before ownership work, then consumes captured completions in ADC0-to-ADC1
+order. A lone completion advances only its converter and remains incomplete in
+`PairCaptureRing` until the partner interrupt arrives; the buffer becomes
+ready only after both generations match. This removes any requirement for the
+two independently timed hardware flags to be simultaneous while preventing a
+long first completion path from coalescing the partner interrupt.
 
 Normal STOP first waits for both live channels to enter the first quarter of
 the same DMA generation, then atomically sets `DREQ` on both active TCDs while

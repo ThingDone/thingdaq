@@ -214,16 +214,15 @@ inline constexpr std::uint8_t kGpioPitChannel = 0U;
 inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
 inline constexpr std::uint8_t kGpioEdmaPriority = 2U;
 inline constexpr std::uint8_t kGpioEdmaIrqPriority = 64U;
-// Preserve unique fixed priorities while making the earlier ADC0 request win
-// any ADC-pair contention. GPIO remains higher than both capture channels.
-inline constexpr std::uint8_t kAdcEdmaPriorities[] = {1U, 0U};
+// Preserve the reset-unique fixed-priority ordering for channels 0-2. The
+// shared ISR accepts either ADC completion order without priority coupling.
+inline constexpr std::uint8_t kAdcEdmaPriorities[] = {0U, 1U};
 inline constexpr std::uint8_t kAdcEdmaIrqPriority = 48U;
 
-// The later ADC1 completion IRQ consumes both ADC DMA_INT bits as one paired
-// barrier after a bounded reconciliation wait; ADC0's line stays reserved but
-// masked. That handler and ADC_ETC errors share one priority because they
-// mutate the same generation state. GPIO tolerates either preempting its
-// lower-priority completion interrupt.
+// Both ADC completion lines dispatch one shared handler that snapshots and
+// acknowledges visible flags before serialized ownership work. That handler
+// and ADC_ETC errors share one priority because they mutate the same generation
+// state. GPIO tolerates either preempting its lower-priority completion IRQ.
 inline constexpr InterruptAllocation kInterruptAllocations[] = {
     {InterruptUse::kAdc0DmaCompletion, kAdcEdmaIrqPriority,
      ResourceOwner::kAdc0Capture},

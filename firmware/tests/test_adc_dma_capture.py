@@ -108,18 +108,14 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "ADC_GC_DMAEN",
             "arm_dcache_flush_delete(&g_adc_dma_descriptors",
             "NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR, board::kAdcEdmaIrqPriority)",
-            "void adcPairDmaIsr()",
-            "std::uint32_t pending = DMA_INT & kAdcDmaChannelMask",
-            "kDmaPairWaitCycles",
-            "protocol_v1::kAdcTriggerDwtClockHz / 100000U",
-            "ARM_DWT_CYCCNT - started < kDmaPairWaitCycles",
-            "std::uint32_t waitForDmaPair(std::uint32_t pending)",
-            "void recordIncompleteDmaPair(std::uint32_t pending)",
-            'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_wait")',
-            'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_fault")',
+            "void processAcknowledgedDmaCompletion(std::size_t converter)",
+            "if (!completed.consumed || !completed.ok())",
+            "void adcDmaIsr()",
+            "const std::uint32_t pending = DMA_INT & kAdcDmaChannelMask",
+            "attachInterruptVector(IRQ_DMA_CH0, adcDmaIsr)",
+            "attachInterruptVector(IRQ_DMA_CH1, adcDmaIsr)",
             'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")',
-            "attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr)",
-            "NVIC_DISABLE_IRQ(IRQ_DMA_CH0)",
+            "NVIC_ENABLE_IRQ(IRQ_DMA_CH0)",
             "NVIC_ENABLE_IRQ(IRQ_DMA_CH1)",
             "recordAdcEtcError",
             "onMajorLoopComplete",
@@ -132,21 +128,28 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "DMAChannel",
             "analogRead(",
             "std::vector",
+            "adcPairDmaIsr",
+            "waitForDmaPair",
+            "recordIncompleteDmaPair",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
 
-        paired_isr = source[source.index("void adcPairDmaIsr()") :]
-        wait = paired_isr.index("waitForDmaPair(pending)")
-        incomplete = paired_isr.index("recordIncompleteDmaPair(pending)")
-        adc0 = paired_isr.index("processDmaCompletion(0U)")
-        adc1 = paired_isr.index("processDmaCompletion(1U)")
+        shared_isr = source[source.index("void adcDmaIsr()") :]
+        ack0 = shared_isr.index(
+            "DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel"
+        )
+        ack1 = shared_isr.index(
+            "DMA_CINT = board::kAdcConverterConfigurations[1].edma_channel"
+        )
+        adc0 = shared_isr.index("processAcknowledgedDmaCompletion(0U)")
+        adc1 = shared_isr.index("processAcknowledgedDmaCompletion(1U)")
         enable = source[source.index("void enableInterrupts()") :]
-        self.assertLess(wait, incomplete)
-        self.assertLess(incomplete, adc0)
+        self.assertLess(ack0, adc0)
+        self.assertLess(ack1, adc0)
         self.assertLess(adc0, adc1)
-        self.assertNotIn("attachInterruptVector(IRQ_DMA_CH0", enable)
-        self.assertNotIn("NVIC_ENABLE_IRQ(IRQ_DMA_CH0)", enable)
+        self.assertIn("attachInterruptVector(IRQ_DMA_CH0, adcDmaIsr)", enable)
+        self.assertIn("attachInterruptVector(IRQ_DMA_CH1, adcDmaIsr)", enable)
 
 
 if __name__ == "__main__":

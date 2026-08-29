@@ -52,8 +52,6 @@ constexpr std::uint16_t kTcdControl =
     DMA_TCD_CSR_ESG | DMA_TCD_CSR_INTMAJOR;
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100U;
-constexpr std::uint32_t kDmaPairWaitCycles =
-    protocol_v1::kAdcTriggerDwtClockHz / 100000U;
 constexpr std::uint32_t kStopBoundaryPollLimit =
     protocol_v1::kAdcTriggerDiagnosticPollLimit;
 constexpr std::uint16_t kStopBoundaryArmMinimumPairs =
@@ -357,13 +355,11 @@ bool configuredHardwareValid() {
   return true;
 }
 
-void processDmaCompletion(std::size_t converter) {
+void processAcknowledgedDmaCompletion(std::size_t converter) {
   const std::uint8_t channel =
       board::kAdcConverterConfigurations[converter].edma_channel;
   const std::uint32_t mask = channelMask(converter);
-  const bool pending = (DMA_INT & mask) != 0U;
-  DMA_CINT = channel;
-  if (!pending || !g_hardware_prepared) {
+  if (!g_hardware_prepared) {
     saturatingIncrement(g_stale_interrupts);
     return;
   }
@@ -379,8 +375,11 @@ void processDmaCompletion(std::size_t converter) {
   const CompletionResult completed = g_ring.onMajorLoopComplete(
       static_cast<std::uint8_t>(converter), g_epoch,
       completed_generation, completed_destination);
-  if (!completed.consumed) {
-    saturatingIncrement(g_stale_interrupts);
+  if (!completed.consumed || !completed.ok()) {
+    if (!completed.consumed) {
+      saturatingIncrement(g_stale_interrupts);
+    }
+    g_faulted = true;
     return;
   }
 
@@ -406,54 +405,37 @@ void processDmaCompletion(std::size_t converter) {
   barrier();
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_wait")
-std::uint32_t waitForDmaPair(std::uint32_t pending) {
-  // ADC0's higher fixed eDMA priority makes it complete before ADC1 whenever
-  // both requests contend. Bound a rare flag-visibility reconciliation below
-  // one ADC major-loop interval; a real missing completion still enters the
-  // normal fail-safe path.
-  const std::uint32_t started = ARM_DWT_CYCCNT;
-  while (pending != kAdcDmaChannelMask &&
-         ARM_DWT_CYCCNT - started < kDmaPairWaitCycles) {
-    pending = DMA_INT & kAdcDmaChannelMask;
+void processDmaCompletion(std::size_t converter) {
+  const std::uint8_t channel =
+      board::kAdcConverterConfigurations[converter].edma_channel;
+  const bool pending = (DMA_INT & channelMask(converter)) != 0U;
+  DMA_CINT = channel;
+  if (!pending) {
+    saturatingIncrement(g_stale_interrupts);
+    return;
   }
-  return pending;
+  processAcknowledgedDmaCompletion(converter);
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_fault")
-void recordIncompleteDmaPair(std::uint32_t pending) {
-  for (std::size_t converter = 0U; converter < kConverterCount;
-       ++converter) {
-    if ((pending & channelMask(converter)) != 0U) {
-      processDmaCompletion(converter);
-    } else if (g_hardware_prepared) {
-      g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
-    }
+void adcDmaIsr() {
+  // Both NVIC lines dispatch this equal-priority handler. Snapshot and clear
+  // every visible peripheral source before doing ownership work so a long
+  // first completion path cannot coalesce a later major-loop interrupt. A
+  // lone completion remains pending in PairCaptureRing until its partner
+  // arrives through either line.
+  const std::uint32_t pending = DMA_INT & kAdcDmaChannelMask;
+  if ((pending & channelMask(0U)) != 0U) {
+    DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel;
   }
-  if (g_hardware_prepared) {
-    g_faulted = true;
+  if ((pending & channelMask(1U)) != 0U) {
+    DMA_CINT = board::kAdcConverterConfigurations[1].edma_channel;
   }
-}
-
-void adcPairDmaIsr() {
-  // ADC0 is triggered and completes before ADC1. Both descriptors retain
-  // INTMAJOR so DMA_INT is the hardware barrier, but only the later ADC1 NVIC
-  // line dispatches. Consuming both bits in one fixed-order ISR prevents NVIC
-  // dispatch or a brief eDMA completion-order inversion from separating the
-  // converters' shared software generation.
-  std::uint32_t pending = DMA_INT & kAdcDmaChannelMask;
-  if (pending != kAdcDmaChannelMask) {
-    pending = waitForDmaPair(pending);
+  if ((pending & channelMask(0U)) != 0U) {
+    processAcknowledgedDmaCompletion(0U);
   }
-  if (pending != kAdcDmaChannelMask) {
-    recordIncompleteDmaPair(pending);
-  } else {
-    processDmaCompletion(0U);
-    processDmaCompletion(1U);
+  if ((pending & channelMask(1U)) != 0U) {
+    processAcknowledgedDmaCompletion(1U);
   }
-  // Channel 0 intentionally has no enabled NVIC line. Clear any latched
-  // pending state after its DMA_INT source has been acknowledged above.
-  NVIC_CLEAR_PENDING(IRQ_DMA_CH0);
   __asm__ volatile("dsb" : : : "memory");
 }
 
@@ -495,16 +477,17 @@ void clearInterruptState() {
 }
 
 void enableInterrupts() {
-  attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr);
+  attachInterruptVector(IRQ_DMA_CH0, adcDmaIsr);
+  attachInterruptVector(IRQ_DMA_CH1, adcDmaIsr);
   attachInterruptVector(IRQ_ADC_ETC_ERR, adcEtcErrorIsr);
   NVIC_SET_PRIORITY(IRQ_DMA_CH0, board::kAdcEdmaIrqPriority);
   NVIC_SET_PRIORITY(IRQ_DMA_CH1, board::kAdcEdmaIrqPriority);
   // All acquisition-state writers use one preemption priority. Main context
   // uses the shared critical section, while equal-priority IRQs serialize the
-  // paired completion path and ADC_ETC error attribution.
+  // shared completion path and ADC_ETC error attribution.
   NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR, board::kAdcEdmaIrqPriority);
   clearInterruptState();
-  NVIC_DISABLE_IRQ(IRQ_DMA_CH0);
+  NVIC_ENABLE_IRQ(IRQ_DMA_CH0);
   NVIC_ENABLE_IRQ(IRQ_DMA_CH1);
   NVIC_ENABLE_IRQ(IRQ_ADC_ETC_ERR);
 }
@@ -825,8 +808,8 @@ static_assert(board::kAdcConverterConfigurations[0].dmamux_source ==
               DMAMUX_SOURCE_ADC1);
 static_assert(board::kAdcConverterConfigurations[1].dmamux_source ==
               DMAMUX_SOURCE_ADC2);
-static_assert(board::kAdcEdmaPriorities[0] == 1U);
-static_assert(board::kAdcEdmaPriorities[1] == 0U);
+static_assert(board::kAdcEdmaPriorities[0] == 0U);
+static_assert(board::kAdcEdmaPriorities[1] == 1U);
 
 }  // namespace teensy_daq::adc_capture
 

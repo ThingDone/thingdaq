@@ -438,8 +438,8 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
              v1::kGpioSamplesPerFrame * v1::kGpioSamplePeriodTicks ==
                  v1::kAdcPairsPerFrame * v1::kAdcPairPeriodTicks,
          "PIT0 produces four GPIO events per ADC pair with equal frame coverage");
-  expect(board::kAdcEdmaPriorities[0] == 1U &&
-             board::kAdcEdmaPriorities[1] == 0U &&
+  expect(board::kAdcEdmaPriorities[0] == 0U &&
+             board::kAdcEdmaPriorities[1] == 1U &&
              board::kGpioEdmaPriority == 2U &&
              board::kAdcEdmaIrqPriority < board::kGpioEdmaIrqPriority,
          "production ADC state writers and GPIO completion use strict IRQ tiers without sharing DMA priorities");

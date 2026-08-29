@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 36388cc20a5e8aedd26214bb557ec9ce05db2cd78476e869c42cd8c43acf5a7c
+// Source SHA-256: ee82cb67adee1cbe763c07f85dbf4639c8fdfe5d0703d8f270a7863cf871858c
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "36388cc20a5e8aedd26214bb557ec9ce05db2cd78476e869c42cd8c43acf5a7c";
+inline constexpr char kSourceSha256[] = "ee82cb67adee1cbe763c07f85dbf4639c8fdfe5d0703d8f270a7863cf871858c";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -35,7 +35,7 @@ inline constexpr std::uint16_t kAdcPairsPerBuffer = 1012U;
 inline constexpr std::uint8_t kAdcPairBytes = 4U;
 inline constexpr std::uint32_t kAdcDmaRingBytes = 16256U;
 inline constexpr std::uint8_t kAdcEdmaChannels[] = {0U, 1U};
-inline constexpr std::uint8_t kAdcEdmaPriorities[] = {1U, 0U};
+inline constexpr std::uint8_t kAdcEdmaPriorities[] = {0U, 1U};
 inline constexpr std::uint8_t kAdcDmamuxSources[] = {24U, 88U};
 inline constexpr std::uint8_t kAdcDmaIrqPriority = 48U;
 inline constexpr std::uint8_t kGpioDmaIrqPriority = 64U;
