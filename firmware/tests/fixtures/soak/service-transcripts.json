@@ -1,0 +1,205 @@
+{
+  "success": {
+    "job_id": "00000000-0000-4000-8000-000000000001",
+    "service": {
+      "completed": true,
+      "program_success": true,
+      "exit_code": 0,
+      "message": "test completed"
+    },
+    "metadata": {
+      "artifact_sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769",
+      "program_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_id": "ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85",
+      "build_id": "tdaq-ea010335c9b63bb7",
+      "client_started_utc": "2026-08-29T12:00:00+00:00",
+      "client_completed_utc": "2026-08-29T12:10:45+00:00",
+      "service_version": "phase-11-fixture",
+      "client_version": "phase-11-fixture"
+    },
+    "soak": {
+      "schema_version": 1,
+      "result": "PASS",
+      "mode": "synthetic",
+      "failure": null,
+      "expected": {
+        "protocol_version": 1,
+        "firmware_version": [0, 7, 0],
+        "build_id": "tdaq-ea010335c9b63bb7",
+        "source_id": "ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85",
+        "artifact_sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769",
+        "hardware_serial": 20512460,
+        "board_id": 1,
+        "mcu_id": 1
+      },
+      "observed_identity": {
+        "protocol_version": 1,
+        "firmware_version": [0, 7, 0],
+        "build_id": "tdaq-ea010335c9b63bb7",
+        "hardware_serial": 20512460,
+        "board_id": 1,
+        "mcu_id": 1
+      },
+      "timing": {
+        "measured_duration_seconds": 600.0,
+        "measured_elapsed_seconds": 600.25,
+        "streaming_elapsed_seconds": 600.0
+      },
+      "metrics": {
+        "payload_bytes": 4800000000,
+        "framed_bytes": 4856916996,
+        "payload_bytes_per_streaming_second": 8000000.0,
+        "framed_bytes_per_streaming_second": 8094861.66,
+        "adc_pair_rate_hz": 1000000.0,
+        "gpio_sample_rate_hz": 4000000.0,
+        "latency": {
+          "status": {
+            "p99_seconds": 0.0123,
+            "maximum_seconds": 0.021
+          },
+          "all_commands": {
+            "maximum_seconds": 0.0345
+          }
+        },
+        "memory": {
+          "tracemalloc": {
+            "growth_bytes": 4096
+          },
+          "process_rss": {
+            "growth_bytes": 8192
+          },
+          "minimum_available_bytes": 536870912
+        },
+        "maximum_queues": {
+          "packet_owned_high_water": 2,
+          "packet_ready_high_water": 1,
+          "packet_transmit_high_water": 1
+        }
+      },
+      "epochs": [
+        {
+          "warmup_seconds": 1.0,
+          "timed": {
+            "payload_bytes": 4800000000
+          },
+          "total": {
+            "payload_bytes": 4808000000
+          }
+        }
+      ],
+      "program": {
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    }
+  },
+  "checksum_corruption": {
+    "job_id": "00000000-0000-4000-8000-000000000002",
+    "service": {"completed": true, "program_success": true, "exit_code": 1},
+    "metadata": {},
+    "soak": {
+      "schema_version": 1,
+      "result": "FAIL",
+      "mode": "synthetic",
+      "failure": {"category": "checksum_corruption", "message": "checksum mismatch"}
+    }
+  },
+  "pattern_error": {
+    "job_id": "00000000-0000-4000-8000-000000000003",
+    "service": {"completed": true, "program_success": true, "exit_code": 1},
+    "metadata": {},
+    "soak": {
+      "schema_version": 1,
+      "result": "FAIL",
+      "mode": "synthetic",
+      "failure": {"category": "pattern_error", "message": "ADC formula mismatch"}
+    }
+  },
+  "source_gap": {
+    "job_id": "00000000-0000-4000-8000-000000000004",
+    "service": {"completed": true, "program_success": true, "exit_code": 1},
+    "metadata": {},
+    "soak": {
+      "schema_version": 1,
+      "result": "FAIL",
+      "mode": "synthetic",
+      "failure": {"category": "source_gap", "message": "sequence gap"}
+    }
+  },
+  "counter_disagreement": {
+    "job_id": "00000000-0000-4000-8000-000000000005",
+    "service": {"completed": true, "program_success": true, "exit_code": 1},
+    "metadata": {},
+    "soak": {
+      "schema_version": 1,
+      "result": "FAIL",
+      "mode": "physical-combined",
+      "failure": {"category": "counter_disagreement", "message": "counter mismatch"}
+    }
+  },
+  "latency_violation": {
+    "job_id": "00000000-0000-4000-8000-000000000006",
+    "service": {"completed": true, "program_success": true, "exit_code": 1},
+    "metadata": {},
+    "soak": {
+      "schema_version": 1,
+      "result": "FAIL",
+      "mode": "control-stress",
+      "failure": {"category": "latency_violation", "message": "STATUS p99 exceeded"}
+    }
+  },
+  "memory_growth": {
+    "job_id": "00000000-0000-4000-8000-000000000007",
+    "service": {"completed": true, "program_success": true, "exit_code": 1},
+    "metadata": {},
+    "soak": {
+      "schema_version": 1,
+      "result": "FAIL",
+      "mode": "control-stress",
+      "failure": {"category": "memory_growth", "message": "traced memory grew"}
+    }
+  },
+  "timeout": {
+    "job_id": "00000000-0000-4000-8000-000000000008",
+    "service": {"completed": true, "program_success": true, "exit_code": 1},
+    "metadata": {},
+    "soak": {
+      "schema_version": 1,
+      "result": "FAIL",
+      "mode": "synthetic",
+      "failure": {"category": "timeout", "message": "request deadline expired"}
+    }
+  },
+  "upload_failure": {
+    "job_id": "00000000-0000-4000-8000-000000000009",
+    "service": {
+      "completed": true,
+      "program_success": false,
+      "exit_code": -130,
+      "message": "firmware upload failed"
+    },
+    "metadata": {},
+    "soak": null
+  },
+  "service_failure": {
+    "job_id": "00000000-0000-4000-8000-000000000010",
+    "service": {
+      "completed": false,
+      "program_success": null,
+      "exit_code": -120,
+      "message": "worker interrupted"
+    },
+    "metadata": {},
+    "soak": null
+  },
+  "truncated_result": {
+    "job_id": "00000000-0000-4000-8000-000000000011",
+    "service": {
+      "completed": true,
+      "program_success": true,
+      "exit_code": 1,
+      "stdout": "SOAK_EVENT {\"event\":\"program_start\"}\nSOAK_RESULT {\"schema_version\":1,\"result\":\"FAIL\""
+    },
+    "metadata": {},
+    "soak": null
+  }
+}
