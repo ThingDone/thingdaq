@@ -297,9 +297,12 @@ inline constexpr std::size_t kCommandParserCapacityBytes = 64U;
 inline constexpr std::size_t kUsbRxScratchBytes = 128U;
 inline constexpr std::size_t kCommandQueueDepth = 4U;
 inline constexpr std::size_t kResponseQueueDepth = 4U;
-inline constexpr std::size_t kAdcDmaRingDepth = 4U;
-inline constexpr std::size_t kAdcDmaDescriptorCount =
-    kAdcDmaRingDepth + 1U;
+// Six data buffers retain two complete generations beyond the four-entry
+// hardware look-ahead pipeline. Eight generation-indexed TCD slots keep
+// descriptor links unique even when multiple pressure generations target the
+// shared overflow sink.
+inline constexpr std::size_t kAdcDmaRingDepth = 6U;
+inline constexpr std::size_t kAdcDmaDescriptorCount = 8U;
 inline constexpr std::size_t kAdcFramesPerLoop = 2U;
 inline constexpr std::size_t kAdcPackerStateBudgetBytes = 512U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;

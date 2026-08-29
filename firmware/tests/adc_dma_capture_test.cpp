@@ -205,10 +205,35 @@ void testDirectPairLayoutDualBarrierAndCacheOwnership() {
          "a stale lease cannot release the same pair buffer twice");
 }
 
+void testExplicitLookaheadReservationsRemainGenerationOrdered() {
+  Fixture fixture{};
+  const capture::PrimeResult primed = fixture.ring.prime(9U);
+  const capture::ReservationResult third =
+      fixture.ring.reserveGeneration(9U, 2U);
+  const capture::ReservationResult fourth =
+      fixture.ring.reserveGeneration(9U, 3U);
+  const capture::ReservationResult duplicate =
+      fixture.ring.reserveGeneration(9U, 3U);
+  const capture::ReservationResult skipped =
+      fixture.ring.reserveGeneration(9U, 5U);
+  expect(primed.ok() && third.ok() && fourth.ok() && duplicate.ok() &&
+             third.destination == 2U && fourth.destination == 3U &&
+             duplicate.destination == fourth.destination && !skipped.ok(),
+         "explicit lookahead reserves sequential generations idempotently");
+
+  const std::array<capture::ChannelStopState, 2U> stopped{{
+      {0U, 0U, primed.active_destination},
+      {0U, 0U, primed.active_destination},
+  }};
+  expect(fixture.ring.stop(stopped).ok() && fixture.ring.quiescent(),
+         "unstarted lookahead generations reclaim cleanly at STOP");
+}
+
 void testDeterministicRotationAndExactPressureLoss() {
   Fixture fixture{};
   expect(fixture.ring.prime(11U).ok(), "pressure fixture primes");
-  for (std::uint32_t generation = 0U; generation < 4U; ++generation) {
+  for (std::uint32_t generation = 0U;
+       generation < board::kAdcDmaRingDepth; ++generation) {
     const capture::CompletionResult paired = complete(
         fixture, 11U, generation,
         static_cast<std::uint8_t>(generation),
@@ -219,17 +244,19 @@ void testDeterministicRotationAndExactPressureLoss() {
   capture::Snapshot snapshot = fixture.ring.snapshot();
   expect(snapshot.ready_depth == board::kAdcDmaRingDepth &&
              snapshot.progress.pairs_lost == 0U,
-         "all four fixed buffers may remain CPU-pending without overwrite");
+         "all fixed buffers may remain CPU-pending without overwrite");
 
   const capture::CompletionResult overflow = complete(
-      fixture, 11U, 4U, capture::kOverflowDestination, 0U);
+      fixture, 11U, static_cast<std::uint32_t>(board::kAdcDmaRingDepth),
+      capture::kOverflowDestination, 0U);
   snapshot = fixture.ring.snapshot();
   expect(overflow.pair_lost && !overflow.pair_ready &&
              snapshot.progress.ring_overruns == 1U &&
              snapshot.progress.pairs_lost ==
                  constants::kAdcPairsPerFrame &&
              snapshot.progress.pairs_captured ==
-                 5U * constants::kAdcPairsPerFrame,
+                 (board::kAdcDmaRingDepth + 1U) *
+                     constants::kAdcPairsPerFrame,
          "one paired sink generation reports one exact frame of lost pairs");
 
   const capture::AcquireResult oldest = fixture.ring.acquireReady();
@@ -239,12 +266,16 @@ void testDeterministicRotationAndExactPressureLoss() {
          "the oldest retained pair generation drains first");
   const capture::CompletionResult next_overflow_first =
       fixture.ring.onMajorLoopComplete(
-          0U, 11U, 5U, capture::kOverflowDestination);
+          0U, 11U,
+          static_cast<std::uint32_t>(board::kAdcDmaRingDepth + 1U),
+          capture::kOverflowDestination);
   expect(next_overflow_first.future_destination == oldest.handle.buffer_index,
          "a released buffer re-enters the deterministic future schedule");
   const capture::CompletionResult next_overflow_second =
       fixture.ring.onMajorLoopComplete(
-          1U, 11U, 5U, capture::kOverflowDestination);
+          1U, 11U,
+          static_cast<std::uint32_t>(board::kAdcDmaRingDepth + 1U),
+          capture::kOverflowDestination);
   snapshot = fixture.ring.snapshot();
   expect(next_overflow_second.pair_lost &&
              snapshot.progress.ring_overruns == 2U &&
@@ -512,15 +543,18 @@ void testStopAcrossEveryBufferOwnershipState() {
   {
     Fixture fixture{};
     expect(fixture.ring.prime(61U).ok(), "overflow STOP fixture primes");
-    for (std::uint32_t generation = 0U; generation < 4U; ++generation) {
+    for (std::uint32_t generation = 0U;
+         generation < board::kAdcDmaRingDepth; ++generation) {
       expect(complete(fixture, 61U, generation,
                       static_cast<std::uint8_t>(generation), 0U)
                  .pair_ready,
              "overflow STOP fixture fills one retained ring buffer");
     }
     const std::array<capture::ChannelStopState, 2U> stopped{{
-        {4U, 10U, capture::kOverflowDestination},
-        {4U, 7U, capture::kOverflowDestination},
+        {static_cast<std::uint32_t>(board::kAdcDmaRingDepth), 10U,
+         capture::kOverflowDestination},
+        {static_cast<std::uint32_t>(board::kAdcDmaRingDepth), 7U,
+         capture::kOverflowDestination},
     }};
     const capture::StopReport report = fixture.ring.stop(stopped);
     capture::Snapshot snapshot = fixture.ring.snapshot();
@@ -545,6 +579,7 @@ void testStopAcrossEveryBufferOwnershipState() {
 
 int main() {
   testDirectPairLayoutDualBarrierAndCacheOwnership();
+  testExplicitLookaheadReservationsRemainGenerationOrdered();
   testDeterministicRotationAndExactPressureLoss();
   testErrorsMismatchAndDeferredDiscardRemainLive();
   testStaleGenerationAndStopAccounting();

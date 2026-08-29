@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: b8fe28ecdeb48b1238594d23a74efbda865a99b518a561614de2d8e92a6a4333
+// Source SHA-256: f918fee1878f03630a1248fe79969e0fc1f62a0fd2bf277204b62a562127fee2
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "b8fe28ecdeb48b1238594d23a74efbda865a99b518a561614de2d8e92a6a4333";
+inline constexpr char kSourceSha256[] = "f918fee1878f03630a1248fe79969e0fc1f62a0fd2bf277204b62a562127fee2";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -30,10 +30,10 @@ inline constexpr std::uint32_t kGpioSampleRateHz = 4000000U;
 inline constexpr std::uint32_t kGpioSamplePeriodTicks = 2U;
 inline constexpr std::uint32_t kFrameCoverageTicks = 8096U;
 inline constexpr std::uint16_t kSupportedConfigurationMask = 63U;
-inline constexpr std::uint8_t kAdcDmaRingDepth = 4U;
+inline constexpr std::uint8_t kAdcDmaRingDepth = 6U;
 inline constexpr std::uint16_t kAdcPairsPerBuffer = 1012U;
 inline constexpr std::uint8_t kAdcPairBytes = 4U;
-inline constexpr std::uint32_t kAdcDmaRingBytes = 16256U;
+inline constexpr std::uint32_t kAdcDmaRingBytes = 24384U;
 inline constexpr std::uint8_t kAdcEdmaChannels[] = {0U, 1U};
 inline constexpr std::uint8_t kAdcEdmaPriorities[] = {2U, 1U};
 inline constexpr std::uint8_t kAdcDmamuxSources[] = {24U, 88U};

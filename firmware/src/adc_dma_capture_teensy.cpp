@@ -54,6 +54,8 @@ constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100U;
 constexpr std::uint32_t kDmaPairWaitCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100000U;
+constexpr std::size_t kDmaPipelineDepth = 4U;
+constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
 constexpr std::uint32_t kStopBoundaryPollLimit =
     protocol_v1::kAdcTriggerDiagnosticPollLimit;
 constexpr std::uint16_t kStopBoundaryArmMinimumPairs =
@@ -135,6 +137,10 @@ std::array<std::uint8_t, kConverterCount> g_current_destinations{
     kInvalidDestination, kInvalidDestination};
 std::array<std::uint8_t, kConverterCount> g_next_destinations{
     kInvalidDestination, kInvalidDestination};
+std::array<std::uint32_t, kDmaPipelineDepth> g_pipeline_generations{};
+std::array<std::uint8_t, kDmaPipelineDepth> g_pipeline_destinations{
+    kInvalidDestination, kInvalidDestination, kInvalidDestination,
+    kInvalidDestination};
 std::uint32_t g_epoch = 0U;
 std::uint32_t g_adc_etc_error_flags = 0U;
 std::uint32_t g_adc_etc_error_interrupts = 0U;
@@ -184,13 +190,18 @@ volatile std::uint8_t &priorityRegister(std::size_t converter) {
   return converter == 0U ? DMA_DCHPRI0 : DMA_DCHPRI1;
 }
 
+constexpr std::size_t descriptorSlot(std::uint32_t generation) {
+  return generation % board::kAdcDmaDescriptorCount;
+}
+
 std::int32_t descriptorAddress(std::size_t converter,
-                               std::uint8_t destination) {
-  if (converter >= kConverterCount || destination > kOverflowDestination) {
+                               std::size_t slot) {
+  if (converter >= kConverterCount ||
+      slot >= board::kAdcDmaDescriptorCount) {
     return 0;
   }
   return static_cast<std::int32_t>(address32(
-      &g_adc_dma_descriptors.descriptors[converter][destination]));
+      &g_adc_dma_descriptors.descriptors[converter][slot]));
 }
 
 bool triggersStopped() {
@@ -244,7 +255,8 @@ void disableRequests() {
 
 void configureDescriptor(IMXRT_DMA_TCD_t &descriptor,
                          std::size_t converter,
-                         std::uint8_t destination) {
+                         std::uint8_t destination,
+                         std::uint32_t next_generation) {
   descriptor.SADDR = adcResultAddress(converter);
   descriptor.SOFF = 0;
   descriptor.ATTR = kTcdAttributes;
@@ -258,15 +270,15 @@ void configureDescriptor(IMXRT_DMA_TCD_t &descriptor,
                         : static_cast<std::int16_t>(sizeof(SamplePair));
   descriptor.CITER_ELINKNO = static_cast<std::uint16_t>(
       protocol_v1::kAdcPairsPerFrame);
-  descriptor.DLASTSGA = descriptorAddress(converter, kOverflowDestination);
+  descriptor.DLASTSGA =
+      descriptorAddress(converter, descriptorSlot(next_generation));
   descriptor.CSR = kTcdControl;
   descriptor.BITER_ELINKNO = static_cast<std::uint16_t>(
       protocol_v1::kAdcPairsPerFrame);
 }
 
 void copyDescriptorToHardware(std::size_t converter,
-                              const IMXRT_DMA_TCD_t &source,
-                              std::int32_t next_descriptor) {
+                              const IMXRT_DMA_TCD_t &source) {
   IMXRT_DMA_TCD_t &destination = hardwareTcd(converter);
   destination.SADDR = source.SADDR;
   destination.SOFF = source.SOFF;
@@ -276,19 +288,26 @@ void copyDescriptorToHardware(std::size_t converter,
   destination.DADDR = source.DADDR;
   destination.DOFF = source.DOFF;
   destination.CITER_ELINKNO = source.CITER_ELINKNO;
-  destination.DLASTSGA = next_descriptor;
+  destination.DLASTSGA = source.DLASTSGA;
   destination.CSR = source.CSR;
   destination.BITER_ELINKNO = source.BITER_ELINKNO;
 }
 
-void configureDescriptors(const PrimeResult &prime) {
+void configureDescriptors() {
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
-    for (std::uint8_t destination = 0U;
-         destination <= kOverflowDestination; ++destination) {
+    for (std::size_t slot = 0U;
+         slot < board::kAdcDmaDescriptorCount; ++slot) {
       configureDescriptor(
-          g_adc_dma_descriptors.descriptors[converter][destination],
-          converter, destination);
+          g_adc_dma_descriptors.descriptors[converter][slot], converter,
+          kOverflowDestination, static_cast<std::uint32_t>(slot + 1U));
+    }
+    for (std::size_t index = 0U; index < kDmaPipelineDepth; ++index) {
+      const std::uint32_t generation = g_pipeline_generations[index];
+      configureDescriptor(
+          g_adc_dma_descriptors
+              .descriptors[converter][descriptorSlot(generation)],
+          converter, g_pipeline_destinations[index], generation + 1U);
     }
   }
   arm_dcache_flush_delete(&g_adc_dma_descriptors,
@@ -298,8 +317,8 @@ void configureDescriptors(const PrimeResult &prime) {
     copyDescriptorToHardware(
         converter,
         g_adc_dma_descriptors
-            .descriptors[converter][prime.active_destination],
-        descriptorAddress(converter, prime.queued_destination));
+            .descriptors[converter][descriptorSlot(
+                g_pipeline_generations[0])]);
   }
 }
 
@@ -329,6 +348,75 @@ bool hardwareDestinationMatches(std::size_t converter,
   return current >= first && current <= end;
 }
 
+std::size_t hardwarePipelineIndex(std::size_t converter) {
+  const IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
+  for (std::size_t index = 0U; index < kDmaPipelineDepth; ++index) {
+    const std::uint32_t generation = g_pipeline_generations[index];
+    if (hardwareDestinationMatches(
+            converter, g_pipeline_destinations[index]) &&
+        tcd.DLASTSGA == descriptorAddress(
+                             converter,
+                             descriptorSlot(generation + 1U))) {
+      return index;
+    }
+  }
+  return kInvalidPipelineIndex;
+}
+
+void syncPublishedPipelineState() {
+  g_current_generations = {g_pipeline_generations[0],
+                           g_pipeline_generations[0]};
+  g_current_destinations = {g_pipeline_destinations[0],
+                            g_pipeline_destinations[0]};
+  g_next_destinations = {g_pipeline_destinations[1],
+                         g_pipeline_destinations[1]};
+}
+
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+    ".flashmem.adc_dma.descriptor_flush")
+void flushDescriptor(std::size_t converter, std::uint32_t generation) {
+  IMXRT_DMA_TCD_t &descriptor =
+      g_adc_dma_descriptors
+          .descriptors[converter][descriptorSlot(generation)];
+  arm_dcache_flush(&descriptor, sizeof(descriptor));
+}
+
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+    ".flashmem.adc_dma.pipeline_append")
+bool appendFutureGeneration() {
+  const std::uint32_t latest_generation =
+      g_pipeline_generations[kDmaPipelineDepth - 1U];
+  const std::uint32_t future_generation = latest_generation + 1U;
+  const ReservationResult reserved =
+      g_ring.reserveGeneration(g_epoch, future_generation);
+  if (!reserved.ok()) {
+    return false;
+  }
+
+  for (std::size_t converter = 0U; converter < kConverterCount;
+       ++converter) {
+    IMXRT_DMA_TCD_t &future =
+        g_adc_dma_descriptors
+            .descriptors[converter][descriptorSlot(future_generation)];
+    configureDescriptor(future, converter, reserved.destination,
+                        future_generation + 1U);
+    flushDescriptor(converter, future_generation);
+  }
+  barrier();
+
+  for (std::size_t index = 0U; index + 1U < kDmaPipelineDepth;
+       ++index) {
+    g_pipeline_generations[index] = g_pipeline_generations[index + 1U];
+    g_pipeline_destinations[index] =
+        g_pipeline_destinations[index + 1U];
+  }
+  g_pipeline_generations[kDmaPipelineDepth - 1U] = future_generation;
+  g_pipeline_destinations[kDmaPipelineDepth - 1U] =
+      reserved.destination;
+  syncPublishedPipelineState();
+  return true;
+}
+
 bool configuredHardwareValid() {
   if ((DMA_ERQ & kAdcDmaChannelMask) != kAdcDmaChannelMask ||
       (ADC1_GC & ADC_GC_DMAEN) == 0U ||
@@ -347,6 +435,10 @@ bool configuredHardwareValid() {
         tcd.CITER_ELINKNO != protocol_v1::kAdcPairsPerFrame ||
         tcd.BITER_ELINKNO != protocol_v1::kAdcPairsPerFrame ||
         tcd.CSR != kTcdControl ||
+        tcd.DLASTSGA != descriptorAddress(
+                             converter,
+                             descriptorSlot(
+                                 g_pipeline_generations[1])) ||
         (priorityRegister(converter) & 0x0FU) !=
             board::kAdcEdmaPriorities[converter] ||
         !hardwareDestinationMatches(converter,
@@ -357,66 +449,36 @@ bool configuredHardwareValid() {
   return true;
 }
 
-void processAcknowledgedDmaCompletion(std::size_t converter) {
-  const std::uint8_t channel =
-      board::kAdcConverterConfigurations[converter].edma_channel;
-  const std::uint32_t mask = channelMask(converter);
-  if (!g_hardware_prepared) {
-    saturatingIncrement(g_stale_interrupts);
-    return;
-  }
-  if ((DMA_ERR & mask) != 0U) {
-    DMA_CERR = channel;
-    g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
-  }
-
-  const std::uint32_t completed_generation =
-      g_current_generations[converter];
-  const std::uint8_t completed_destination =
-      g_current_destinations[converter];
-  const CompletionResult completed = g_ring.onMajorLoopComplete(
-      static_cast<std::uint8_t>(converter), g_epoch,
-      completed_generation, completed_destination);
-  if (!completed.consumed || !completed.ok()) {
-    if (!completed.consumed) {
-      saturatingIncrement(g_stale_interrupts);
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+    ".flashmem.adc_dma.pipeline_complete")
+bool processInferredPairCompletion() {
+  const std::uint32_t completed_generation = g_pipeline_generations[0];
+  const std::uint8_t completed_destination = g_pipeline_destinations[0];
+  const std::uint8_t expected_future_destination =
+      g_pipeline_destinations[2];
+  for (std::size_t converter = 0U; converter < kConverterCount;
+       ++converter) {
+    const std::uint8_t channel =
+        board::kAdcConverterConfigurations[converter].edma_channel;
+    const std::uint32_t mask = channelMask(converter);
+    if ((DMA_ERR & mask) != 0U) {
+      DMA_CERR = channel;
+      g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
+      return false;
     }
-    g_faulted = true;
-    return;
+    const CompletionResult completed = g_ring.onMajorLoopComplete(
+        static_cast<std::uint8_t>(converter), g_epoch,
+        completed_generation, completed_destination);
+    if (!completed.consumed || !completed.ok() ||
+        completed.future_generation != completed_generation + 2U ||
+        completed.future_destination != expected_future_destination) {
+      if (!completed.consumed) {
+        saturatingIncrement(g_stale_interrupts);
+      }
+      return false;
+    }
   }
-
-  g_current_generations[converter] = completed_generation + 1U;
-  g_current_destinations[converter] = g_next_destinations[converter];
-  g_next_destinations[converter] = completed.future_destination;
-  if (!hardwareDestinationMatches(converter,
-                                  g_current_destinations[converter])) {
-    g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
-    g_faulted = true;
-    g_next_destinations[converter] = kOverflowDestination;
-  }
-  const std::int32_t next = descriptorAddress(
-      converter, g_next_destinations[converter]);
-  if (next == 0) {
-    g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
-    g_faulted = true;
-    hardwareTcd(converter).DLASTSGA =
-        descriptorAddress(converter, kOverflowDestination);
-  } else {
-    hardwareTcd(converter).DLASTSGA = next;
-  }
-  barrier();
-}
-
-void processDmaCompletion(std::size_t converter) {
-  const std::uint8_t channel =
-      board::kAdcConverterConfigurations[converter].edma_channel;
-  const bool pending = (DMA_INT & channelMask(converter)) != 0U;
-  DMA_CINT = channel;
-  if (!pending) {
-    saturatingIncrement(g_stale_interrupts);
-    return;
-  }
-  processAcknowledgedDmaCompletion(converter);
+  return appendFutureGeneration();
 }
 
 TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_wait")
@@ -438,7 +500,8 @@ void recordIncompleteDmaPair(std::uint32_t pending) {
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
     if ((pending & channelMask(converter)) != 0U) {
-      processDmaCompletion(converter);
+      DMA_CINT =
+          board::kAdcConverterConfigurations[converter].edma_channel;
     } else if (g_hardware_prepared) {
       g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
     }
@@ -448,21 +511,72 @@ void recordIncompleteDmaPair(std::uint32_t pending) {
   }
 }
 
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+    ".flashmem.adc_dma.pipeline_wait")
+std::size_t waitForAlignedPipeline() {
+  const std::uint32_t started = ARM_DWT_CYCCNT;
+  do {
+    const std::size_t adc0 = hardwarePipelineIndex(0U);
+    const std::size_t adc1 = hardwarePipelineIndex(1U);
+    if (adc0 == adc1 && adc0 != 0U &&
+        adc0 < kDmaPipelineDepth - 1U) {
+      return adc0;
+    }
+  } while (ARM_DWT_CYCCNT - started < kDmaPairWaitCycles);
+  return kInvalidPipelineIndex;
+}
+
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+    ".flashmem.adc_dma.pipeline_service")
+bool servicePendingDmaPair() {
+  if (!g_hardware_prepared) {
+    saturatingIncrement(g_stale_interrupts);
+    return false;
+  }
+  for (std::size_t attempt = 0U; attempt < kDmaPipelineDepth; ++attempt) {
+    std::uint32_t pending = DMA_INT & kAdcDmaChannelMask;
+    if (pending == 0U) {
+      return hardwarePipelineIndex(0U) == 0U &&
+             hardwarePipelineIndex(1U) == 0U;
+    }
+    if (pending != kAdcDmaChannelMask) {
+      pending = waitForDmaPair(pending);
+    }
+    if (pending != kAdcDmaChannelMask) {
+      recordIncompleteDmaPair(pending);
+      return false;
+    }
+
+    const std::size_t completed_generations = waitForAlignedPipeline();
+    DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel;
+    DMA_CINT = board::kAdcConverterConfigurations[1].edma_channel;
+    if (completed_generations == kInvalidPipelineIndex) {
+      g_ring.recordDmaError(g_epoch, 0U);
+      g_ring.recordDmaError(g_epoch, 1U);
+      g_faulted = true;
+      return false;
+    }
+    for (std::size_t completed = 0U;
+         completed < completed_generations; ++completed) {
+      if (!processInferredPairCompletion()) {
+        g_faulted = true;
+        return false;
+      }
+    }
+  }
+  g_ring.recordDmaError(g_epoch, 0U);
+  g_ring.recordDmaError(g_epoch, 1U);
+  g_faulted = true;
+  return false;
+}
+
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_isr")
 void adcPairDmaIsr() {
-  // Only the later ADC1 completion line dispatches. The higher-priority ADC0
-  // transfer must already have retired, so the two DMA_INT bits form one
-  // generation barrier and ownership advances in deterministic ADC0/ADC1
-  // order.
-  std::uint32_t pending = DMA_INT & kAdcDmaChannelMask;
-  if (pending != kAdcDmaChannelMask) {
-    pending = waitForDmaPair(pending);
-  }
-  if (pending != kAdcDmaChannelMask) {
-    recordIncompleteDmaPair(pending);
-  } else {
-    processDmaCompletion(0U);
-    processDmaCompletion(1U);
-  }
+  // Four generation-indexed descriptors are prelinked ahead of hardware.
+  // DADDR plus DLASTSGA identifies the active generation even when one or two
+  // major-loop IRQ events coalesce, so every completed buffer can be advanced
+  // exactly once without writing a live TCD.
+  (void)servicePendingDmaPair();
   NVIC_CLEAR_PENDING(IRQ_DMA_CH0);
   __asm__ volatile("dsb" : : : "memory");
 }
@@ -619,27 +733,45 @@ StartStatus prepareHardware(std::uint32_t epoch) {
                ? StartStatus::kInvalidEpoch
                : StartStatus::kNotQuiescent;
   }
+  const ReservationResult third =
+      g_ring.reserveGeneration(epoch, prime.active_generation + 2U);
+  const ReservationResult fourth =
+      g_ring.reserveGeneration(epoch, prime.active_generation + 3U);
+  if (!third.ok() || !fourth.ok()) {
+    const std::array<ChannelStopState, kConverterCount> stopped{{
+        {prime.active_generation, 0U, prime.active_destination},
+        {prime.active_generation, 0U, prime.active_destination},
+    }};
+    (void)g_ring.stop(stopped);
+    (void)g_ring.serviceDiscarded();
+    saturatingIncrement(g_start_errors);
+    return StartStatus::kNotQuiescent;
+  }
+
+  g_pipeline_generations = {
+      prime.active_generation, prime.queued_generation,
+      third.generation, fourth.generation};
+  g_pipeline_destinations = {
+      prime.active_destination, prime.queued_destination,
+      third.destination, fourth.destination};
+  syncPublishedPipelineState();
 
   disableInterrupts();
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
     clearChannelState(converter);
   }
-  configureDescriptors(prime);
+  configureDescriptors();
   configurePriorities();
 
   g_epoch = epoch;
-  g_current_generations = {prime.active_generation,
-                           prime.active_generation};
-  g_current_destinations = {prime.active_destination,
-                            prime.active_destination};
-  g_next_destinations = {prime.queued_destination,
-                         prime.queued_destination};
   g_adc_etc_error_flags = 0U;
   g_adc_etc_error_interrupts = 0U;
   g_stale_interrupts = 0U;
   g_faulted = false;
   g_hardware_prepared = true;
+  ARM_DEMCR |= ARM_DEMCR_TRCENA;
+  ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
   enableInterrupts();
 
   ADC1_GC |= ADC_GC_DMAEN;
@@ -692,11 +824,8 @@ StopReport stopHardwareAfterTriggers() {
   disableInterrupts();
   const std::uint32_t primask = readPrimask();
   __disable_irq();
-  for (std::size_t converter = 0U; converter < kConverterCount;
-       ++converter) {
-    if ((DMA_INT & channelMask(converter)) != 0U) {
-      processDmaCompletion(converter);
-    }
+  if ((DMA_INT & kAdcDmaChannelMask) != 0U) {
+    (void)servicePendingDmaPair();
   }
 
   std::array<ChannelStopState, kConverterCount> stopped{};
@@ -719,6 +848,8 @@ StopReport stopHardwareAfterTriggers() {
   g_epoch = 0U;
   g_current_destinations = {kInvalidDestination, kInvalidDestination};
   g_next_destinations = {kInvalidDestination, kInvalidDestination};
+  g_pipeline_destinations = {kInvalidDestination, kInvalidDestination,
+                             kInvalidDestination, kInvalidDestination};
   return report;
 }
 

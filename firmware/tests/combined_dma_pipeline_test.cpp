@@ -169,6 +169,13 @@ class AdcDmaDriver {
   adc_capture::PrimeResult prime(std::uint32_t epoch) {
     const adc_capture::PrimeResult result = ring_.prime(epoch);
     if (result.ok()) {
+      const adc_capture::ReservationResult third =
+          ring_.reserveGeneration(epoch, result.active_generation + 2U);
+      const adc_capture::ReservationResult fourth =
+          ring_.reserveGeneration(epoch, result.active_generation + 3U);
+      if (!third.ok() || !fourth.ok()) {
+        return {};
+      }
       epoch_ = epoch;
       generations_ = {result.active_generation, result.active_generation};
       destinations_ = {result.active_destination,
@@ -188,10 +195,18 @@ class AdcDmaDriver {
     const adc_capture::CompletionResult result = ring_.onMajorLoopComplete(
         static_cast<std::uint8_t>(converter), epoch_,
         generations_[converter], destinations_[converter]);
+    const std::uint32_t completed_generation = generations_[converter];
     if (result.consumed) {
       ++generations_[converter];
       destinations_[converter] = next_destinations_[converter];
       next_destinations_[converter] = result.future_destination;
+    }
+    if (result.pair_ready || result.pair_lost) {
+      const adc_capture::ReservationResult future = ring_.reserveGeneration(
+          epoch_, completed_generation + 4U);
+      if (!future.ok()) {
+        return {};
+      }
     }
     return result;
   }
@@ -454,8 +469,8 @@ void testConcurrentPressureWrapUsbAndCounterReconciliation() {
   constexpr std::uint32_t kFirstSequence =
       std::numeric_limits<std::uint32_t>::max() - 2U;
   constexpr std::size_t kInitialCompletions = 6U;
-  constexpr std::size_t kTotalCompletions = 9U;
-  constexpr std::size_t kRetainedFrames = 5U;
+  constexpr std::size_t kTotalCompletions = 11U;
+  constexpr std::size_t kRetainedFrames = 7U;
   constexpr std::size_t kDroppedFrames = 4U;
 
   expect(fixture.pipeline.startRun(kRunId) ==
@@ -486,12 +501,12 @@ void testConcurrentPressureWrapUsbAndCounterReconciliation() {
   expect(adc_pressured.ready_depth == board::kAdcDmaRingDepth &&
              adc_pressured.progress.ready_high_water ==
                  board::kAdcDmaRingDepth &&
-             adc_pressured.progress.ring_overruns == 2U &&
+             adc_pressured.progress.ring_overruns == 0U &&
              gpio_pressured.ready_depth == board::kGpioRawDmaRingDepth &&
              gpio_pressured.progress.ready_high_water ==
                  board::kGpioRawDmaRingDepth &&
              gpio_pressured.progress.raw_ring_overruns == 2U,
-         "simultaneous source pressure fills each ring and loses only DMA overflow generations");
+         "different-depth source rings expose only their expected initial pressure losses");
 
   const adc_packer::ServiceReport adc_initial =
       fixture.adc_frame_packer.service(fixture.pipeline,
@@ -521,8 +536,8 @@ void testConcurrentPressureWrapUsbAndCounterReconciliation() {
   }
   expect(fixture.adc_frame_packer.service(fixture.pipeline, 1U)
                      .frames_framed == 1U &&
-             fixture.gpio_frame_packer.service(fixture.pipeline, 1U, 1U)
-                     .frames_framed == 1U,
+             fixture.gpio_frame_packer.service(fixture.pipeline, 3U, 3U)
+                     .frames_framed == 3U,
          "the next retained interval projects every intervening raw loss");
 
   const adc_capture::StopReport adc_stop =
@@ -586,11 +601,17 @@ void testConcurrentPressureWrapUsbAndCounterReconciliation() {
              headers[2].request_id == 502U,
          "responses wait for the active data tail, then precede the next data frame");
 
-  const std::array<std::uint32_t, kRetainedFrames> expected_sequences{
-      kFirstSequence, kFirstSequence + 1U, kFirstSequence + 2U, 0U, 5U};
+  const std::array<std::array<std::uint32_t, kRetainedFrames>,
+                   packet::kStreamCount>
+      expected_sequences{{
+          {kFirstSequence, kFirstSequence + 1U, kFirstSequence + 2U,
+           0U, 1U, 2U, 7U},
+          {kFirstSequence, kFirstSequence + 1U, kFirstSequence + 2U,
+           0U, 5U, 6U, 7U},
+      }};
   std::array<std::vector<std::uint32_t>, packet::kStreamCount>
       observed_sequences{};
-  std::array<std::uint16_t, packet::kStreamCount> final_flags{};
+  std::array<bool, packet::kStreamCount> gap_observed{};
   for (const wire::FrameHeader &header : headers) {
     if (header.kind != constants::FrameKind::kAdcData &&
         header.kind != constants::FrameKind::kGpioData) {
@@ -599,18 +620,20 @@ void testConcurrentPressureWrapUsbAndCounterReconciliation() {
     const std::size_t source =
         header.kind == constants::FrameKind::kAdcData ? 0U : 1U;
     observed_sequences[source].push_back(header.sequence);
-    final_flags[source] = header.flags;
+    gap_observed[source] =
+        gap_observed[source] ||
+        (header.flags & static_cast<std::uint16_t>(
+                            constants::FrameFlag::kGapBefore)) != 0U;
     expect(header.run_id == kRunId,
            "all drained data remains in the pressured run");
   }
   for (std::size_t source = 0U; source < packet::kStreamCount; ++source) {
     expect(std::equal(observed_sequences[source].begin(),
                       observed_sequences[source].end(),
-                      expected_sequences.begin(), expected_sequences.end()) &&
-               (final_flags[source] & static_cast<std::uint16_t>(
-                                          constants::FrameFlag::kGapBefore)) !=
-                   0U,
-           "each source wraps modulo 2^32 and exposes the four-frame pressure gap");
+                      expected_sequences[source].begin(),
+                      expected_sequences[source].end()) &&
+               gap_observed[source],
+           "each source wraps modulo 2^32 and exposes its four-frame pressure gap");
   }
 
   const adc_capture::Snapshot adc = fixture.adc_ring.snapshot();

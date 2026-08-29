@@ -108,6 +108,36 @@ PrimeResult PairCaptureRing::prime(std::uint32_t epoch,
   return result;
 }
 
+TEENSY_DAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.reserve")
+ReservationResult PairCaptureRing::reserveGeneration(
+    std::uint32_t epoch, std::uint32_t generation) {
+  ReservationResult result{};
+  result.epoch = epoch;
+  result.generation = generation;
+  const std::uint32_t token = critical_.enter();
+  if (!running_) {
+    critical_.exit(token);
+    result.status = OperationStatus::kNotRunning;
+    return result;
+  }
+  if (epoch == 0U || epoch != epoch_) {
+    critical_.exit(token);
+    result.status = OperationStatus::kInvalidEpoch;
+    return result;
+  }
+
+  GenerationSlot *const reserved = scheduleGeneration(generation);
+  if (reserved == nullptr) {
+    critical_.exit(token);
+    result.status = OperationStatus::kInvalidCompletion;
+    return result;
+  }
+  result.destination = reserved->destination;
+  result.status = OperationStatus::kOk;
+  critical_.exit(token);
+  return result;
+}
+
 CompletionResult PairCaptureRing::onMajorLoopComplete(
     std::uint8_t converter, std::uint32_t epoch,
     std::uint32_t generation, std::uint8_t destination) {

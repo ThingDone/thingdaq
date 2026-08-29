@@ -115,6 +115,15 @@ struct PrimeResult {
   constexpr bool ok() const { return status == OperationStatus::kOk; }
 };
 
+struct ReservationResult {
+  OperationStatus status = OperationStatus::kNotRunning;
+  std::uint32_t epoch = 0U;
+  std::uint32_t generation = 0U;
+  std::uint8_t destination = kInvalidDestination;
+
+  constexpr bool ok() const { return status == OperationStatus::kOk; }
+};
+
 struct CompletionResult {
   OperationStatus status = OperationStatus::kInvalidCompletion;
   std::uint32_t epoch = 0U;
@@ -218,6 +227,8 @@ class PairCaptureRing final : public PairSource {
   PrimeResult prime(std::uint32_t epoch,
                     std::uint32_t initial_generation = 0U,
                     std::uint64_t first_pair = 0U);
+  ReservationResult reserveGeneration(std::uint32_t epoch,
+                                      std::uint32_t generation);
   CompletionResult onMajorLoopComplete(std::uint8_t converter,
                                        std::uint32_t epoch,
                                        std::uint32_t generation,

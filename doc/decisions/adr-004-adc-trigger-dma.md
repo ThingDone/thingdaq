@@ -108,10 +108,10 @@ halfwords at pair offset 2, both with a four-byte destination stride. Channel
 0 reads `ADC1_R0` through DMAMUX source 24 and channel 1 reads `ADC2_R0`
 through source 88. Both use 16-bit source/destination attributes, two-byte
 minor transfers, equal 1,012-result major loops, fixed priorities 2/1 above
-GPIO priority 0, major
-completion interrupts, and five scatter/gather descriptors per channel.
+GPIO priority 0, major completion interrupts, and eight generation-indexed
+scatter/gather descriptor slots per channel.
 
-Four 4,064-byte cache-line-aligned OCRAM buffers each contain 1,012 native
+Six 4,064-byte cache-line-aligned OCRAM buffers each contain 1,012 native
 `{uint16_t adc0, uint16_t adc1}` pairs plus alignment padding. Both channel
 descriptors for a generation target the same buffer. The first completion can
 schedule future work but cannot publish data; only the second completion with
@@ -122,7 +122,7 @@ event cannot advance CPU ownership.
 Cache deletion precedes initial DMA ownership and every transition back to
 `FREE`. CPU acquisition invalidates the complete buffer only after the paired
 barrier. Tainted generations enter `DISCARD_PENDING` and are cache-cleaned by
-bounded cooperative service, never by an ISR. When all four consumer buffers
+bounded cooperative service, never by an ISR. When all six consumer buffers
 are owned, both channels use separate halfwords of an isolated 32-byte sink
 with zero destination stride. Each completed sink generation advances one
 ring-overrun event and exactly 1,012 lost pairs while acquisition remains live.
@@ -134,11 +134,17 @@ counts.
 
 Both channel TCDs retain `INTMAJOR`, but only the later ADC1 NVIC line
 dispatches. Numeric eDMA priority 2 is highest, so the earlier ADC0 result runs
-ahead of ADC1 at priority 1; continuous GPIO traffic runs at priority 0. The
-ADC1 handler waits at most 10 us for both visible `DMA_INT` bits, then consumes
-the generation in ADC0-to-ADC1 order. An incomplete pair faults before software
-ownership can advance, while a matching pair is the only path that makes the
-buffer ready.
+ahead of ADC1 at priority 1; continuous GPIO traffic runs at priority 0. Four
+generations are always prelinked, and each descriptor slot is keyed by
+generation rather than destination so repeated pressure-sink generations
+cannot alias. The handler waits at most 10 us for both visible `DMA_INT` bits,
+then uses the live `DADDR` plus `DLASTSGA` link to infer whether one or two
+paired generations completed before it ran. It reconciles each inferred
+generation exactly once in ADC0-to-ADC1 order, patches only descriptors at
+least two generations ahead, and never writes the active hardware TCD link.
+An incomplete pair or a delay spanning three generations faults before
+software ownership can advance, while a matching pair is the only path that
+makes a buffer ready.
 
 Normal STOP first waits for both live channels to enter the first quarter of
 the same DMA generation, then atomically sets `DREQ` on both active TCDs while

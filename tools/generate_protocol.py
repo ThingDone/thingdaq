@@ -199,7 +199,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     if int(combined["supported_configuration_mask"]) != known_profile_mask:
         raise ContractError("combined profile mask must advertise all six profiles")
     if (
-        int(combined["adc_dma_ring_depth"]) != 4
+        int(combined["adc_dma_ring_depth"]) != 6
         or int(combined["adc_pairs_per_buffer"]) != int(adc["items_per_frame"])
         or int(combined["adc_pair_bytes"]) != int(adc["bytes_per_item"])
         or int(combined["dma_alignment_bytes"]) != 32

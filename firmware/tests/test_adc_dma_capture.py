@@ -107,9 +107,13 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "DMAMUX_SOURCE_ADC2",
             "ADC_GC_DMAEN",
             "arm_dcache_flush_delete(&g_adc_dma_descriptors",
+            "arm_dcache_flush(&descriptor, sizeof(descriptor))",
             "NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR, board::kAdcEdmaIrqPriority)",
-            "void processAcknowledgedDmaCompletion(std::size_t converter)",
-            "if (!completed.consumed || !completed.ok())",
+            "constexpr std::size_t kDmaPipelineDepth = 4U",
+            "std::size_t hardwarePipelineIndex(std::size_t converter)",
+            "bool processInferredPairCompletion()",
+            "g_ring.reserveGeneration(g_epoch, future_generation)",
+            "bool servicePendingDmaPair()",
             "void adcPairDmaIsr()",
             "std::uint32_t pending = DMA_INT & kAdcDmaChannelMask",
             "kDmaPairWaitCycles",
@@ -134,19 +138,24 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "DMAChannel",
             "analogRead(",
             "std::vector",
+            "hardwareTcd(converter).DLASTSGA =",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
 
+        service = source[source.index("bool servicePendingDmaPair()") :]
+        wait = service.index("waitForDmaPair(pending)")
+        aligned = service.index("waitForAlignedPipeline()")
+        acknowledge = service.index(
+            "DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel"
+        )
+        inferred = service.index("processInferredPairCompletion()")
         paired_isr = source[source.index("void adcPairDmaIsr()") :]
-        wait = paired_isr.index("waitForDmaPair(pending)")
-        incomplete = paired_isr.index("recordIncompleteDmaPair(pending)")
-        adc0 = paired_isr.index("processDmaCompletion(0U)")
-        adc1 = paired_isr.index("processDmaCompletion(1U)")
         enable = source[source.index("void enableInterrupts()") :]
-        self.assertLess(wait, incomplete)
-        self.assertLess(incomplete, adc0)
-        self.assertLess(adc0, adc1)
+        self.assertLess(wait, aligned)
+        self.assertLess(aligned, acknowledge)
+        self.assertLess(acknowledge, inferred)
+        self.assertIn("(void)servicePendingDmaPair()", paired_isr)
         self.assertNotIn("attachInterruptVector(IRQ_DMA_CH0", enable)
         self.assertNotIn("NVIC_ENABLE_IRQ(IRQ_DMA_CH0)", enable)
 

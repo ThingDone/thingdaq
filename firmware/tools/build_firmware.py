@@ -118,7 +118,7 @@ GPIO_RAW_DMA_BUFFER_ALIGNMENT = 32
 ADC_DMA_BUFFER_SYMBOLS = {
     "RING": (
         "teensy_daq::adc_capture::g_adc_dma_buffers",
-        4 * 4_064,
+        6 * 4_064,
     ),
     "OVERFLOW_SINK": (
         "teensy_daq::adc_capture::g_adc_dma_overflow_sink",
@@ -126,7 +126,7 @@ ADC_DMA_BUFFER_SYMBOLS = {
     ),
     "DESCRIPTORS": (
         "teensy_daq::adc_capture::g_adc_dma_descriptors",
-        2 * 5 * 32,
+        2 * 8 * 32,
     ),
 }
 ADC_DMA_BUFFER_ALIGNMENT = 32

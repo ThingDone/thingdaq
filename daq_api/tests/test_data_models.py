@@ -77,7 +77,7 @@ class TypedControlModelTests(unittest.TestCase):
                     )
                 )
         self.assertEqual(1012, info_response.value.adc_pairs_per_buffer)
-        self.assertEqual(16256, info_response.value.adc_dma_ring_bytes)
+        self.assertEqual(24384, info_response.value.adc_dma_ring_bytes)
         self.assertEqual(200, info_response.value.packet_buffer_count)
 
         self.assertIsInstance(configure_response.value, Configuration)
