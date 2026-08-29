@@ -610,7 +610,9 @@ void testFixedQueueAndPipelineWraparound() {
   packet::PacketBufferPipeline pipeline{storage};
   expect(pipeline.frontFrame().size == 0U && pipeline.readyFrames() == 0U &&
              pipeline.queuedFrames() == 0U &&
-             pipeline.startRun(11U) == packet::OperationStatus::kOk,
+             pipeline.startRun(11U, constants::kDefaultChecksumAlgorithm,
+                               packet::kAdcStreamMask) ==
+                 packet::OperationStatus::kOk,
          "pipeline queue fronts begin empty");
   for (std::uint32_t sequence = 0U;
        sequence < static_cast<std::uint32_t>(board::kPacketBufferCount);
@@ -695,8 +697,13 @@ void testFairSchedulingWithUnequalArrivals() {
         static_cast<std::uint64_t>(sequence) * synthetic::kFrameCoverageTicks,
         static_cast<std::uint64_t>(sequence) * constants::kGpioSamplesPerFrame);
   }
-  expect(pipeline.serviceReadyFrames(9U).frames_promoted == 9U,
-         "promote all unequal arrivals without starving either source");
+  const packet::PromotionReport active = pipeline.serviceReadyFrames(9U);
+  expect(active.frames_promoted == 7U && active.fairness_deferred &&
+             pipeline.snapshot().ready_depth_by_source[0] == 2U,
+         "active combined scheduling bounds one source to a one-frame coverage lead");
+  (void)pipeline.stopProduction();
+  expect(pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+         "STOP drains complete unmatched frames without abandoning them");
   const std::array<constants::FrameKind, 9U> expected{
       constants::FrameKind::kAdcData,  constants::FrameKind::kGpioData,
       constants::FrameKind::kAdcData,  constants::FrameKind::kGpioData,

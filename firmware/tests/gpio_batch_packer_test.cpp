@@ -185,7 +185,8 @@ void testRawBoundariesBecomeExactChecksummedFrames() {
          "prepare continuous batches that cross two frame boundaries");
   PipelineFixture fixture{};
   expect(fixture.pipeline.startRun(
-             42U, constants::ChecksumAlgorithm::kAdler32) ==
+             42U, constants::ChecksumAlgorithm::kAdler32,
+             packet::kGpioStreamMask) ==
              packet::OperationStatus::kOk,
          "start packet epoch for physical GPIO");
   packer::GpioBatchPacker gpio{source, fixture.packed_storage};
@@ -258,7 +259,9 @@ void testRawGapAdvancesSequenceWithoutDoubleCountingStatus() {
                         constants::kGpioSamplesPerFrame),
          "prepare one exact missing raw frame");
   PipelineFixture fixture{};
-  expect(fixture.pipeline.startRun(51U) == packet::OperationStatus::kOk,
+  expect(fixture.pipeline.startRun(
+             51U, constants::kDefaultChecksumAlgorithm,
+             packet::kGpioStreamMask) == packet::OperationStatus::kOk,
          "start raw-gap packet epoch");
   packer::GpioBatchPacker gpio{source, fixture.packed_storage};
   expect(gpio.startRun(51U, constants::kDefaultChecksumAlgorithm,
@@ -323,7 +326,9 @@ void testPackedRingPressureStaysBoundedAndVisible() {
            "prepare packed-ring pressure frame");
   }
   PipelineFixture fixture{};
-  expect(fixture.pipeline.startRun(61U) == packet::OperationStatus::kOk,
+  expect(fixture.pipeline.startRun(
+             61U, constants::kDefaultChecksumAlgorithm,
+             packet::kGpioStreamMask) == packet::OperationStatus::kOk,
          "start packed-pressure packet epoch");
   packer::GpioBatchPacker gpio{source, fixture.packed_storage};
   expect(gpio.startRun(61U, constants::kDefaultChecksumAlgorithm,
@@ -377,7 +382,9 @@ void testStopDrainsReadyFrameAndDiscardsOnlyPartialTail() {
              source.add(constants::kGpioSamplesPerFrame, 37U),
          "prepare one complete frame followed by a partial STOP tail");
   PipelineFixture fixture{};
-  expect(fixture.pipeline.startRun(71U) == packet::OperationStatus::kOk,
+  expect(fixture.pipeline.startRun(
+             71U, constants::kDefaultChecksumAlgorithm,
+             packet::kGpioStreamMask) == packet::OperationStatus::kOk,
          "start STOP-race packet epoch");
   packer::GpioBatchPacker gpio{source, fixture.packed_storage};
   expect(gpio.startRun(71U, constants::kDefaultChecksumAlgorithm,
@@ -463,7 +470,9 @@ void testTargetProcessingProfileHandlesCounterWrap() {
   FakeRawSource source{};
   FakeCycleCounter counter{};
   PipelineFixture fixture{};
-  expect(fixture.pipeline.startRun(81U) == packet::OperationStatus::kOk,
+  expect(fixture.pipeline.startRun(
+             81U, constants::kDefaultChecksumAlgorithm,
+             packet::kGpioStreamMask) == packet::OperationStatus::kOk,
          "start packet epoch for processing profile");
   packer::GpioBatchPacker gpio{source, fixture.packed_storage, &counter};
   expect(gpio.startRun(81U, constants::kDefaultChecksumAlgorithm,

@@ -166,8 +166,8 @@ preempt one another.
 | Raw batches consumed per loop | 2 buffers | GPIO packer |
 | Packed frames finalized per loop | 2 frames | GPIO packer / packetizer |
 | Aligned complete-frame packet pool | 105 DTCM + 95 OCRAM = 200 × 4,096-byte buffers | Packetizer |
-| Per-source ready queues | 200 ADC + 200 GPIO indexes; shared pool limits actual ownership to 200 | Packetizer |
-| Complete-frame transmit queue | 200 indexes | Packetizer / USB transport |
+| Per-source ready queues | 200 ADC + 200 GPIO one-byte indexes (400 bytes); shared pool limits actual ownership to 200 | Packetizer |
+| Complete-frame transmit queue | 200 one-byte indexes (200 bytes) | Packetizer / USB transport |
 | Synthetic generation per loop | 2 complete frame attempts | Synthetic source |
 | Ready-to-transmit promotions per loop | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
@@ -227,6 +227,14 @@ to two frames per service call and waits when no packet buffer is free.
 | **RAM1 subtotal** |  |  | **449,440** |  |  |
 | **RAM2 subtotal** |  |  | **491,072** |  |  |
 
+The simultaneous combined-acquisition subset is 440,832 RAM1 bytes for the
+primary packet bank, packet records/index queues, and both packer-state budgets,
+plus 486,944 RAM2 bytes for the reserve packet bank and all ADC/raw-GPIO/packed
+GPIO DMA storage. Adding the pinned core's 8,192-byte USB TX ring makes the
+combined RAM2 buffer footprint 495,136 bytes. Compile-time assertions enforce
+all three totals against their real memory regions; the linker/map gate remains
+authoritative for unrelated core globals and final stack/heap headroom.
+
 The application packet pool is split between an aligned ordinary-global DTCM
 primary and an aligned `DMAMEM` OCRAM reserve. Both are CPU-owned; Teensy USB
 Serial copies from either bank into its separate core-owned TX ring and flushes
@@ -280,12 +288,17 @@ FREE -> FILLING -> READY -> TRANSMITTING -> FREE
 
 Only `FILLING` exposes the 4,048-byte payload as mutable. Finalization validates
 the exact payload count and writes the header plus checksum in place before a
-buffer can enter its source's bounded `READY` queue. Bounded alternating
-promotion transfers ownership to the transmit-index queue and makes the frame
-immutable. STOP cancels incomplete `FILLING` work and drains complete `READY`
-and `TRANSMITTING` frames. START returns `BUSY` until every prior-run owner is
-`FREE`; only then are queues and sequences reset, so a partially emitted frame
-cannot be abandoned and stale data cannot cross an acknowledged epoch.
+buffer can enter its source's bounded `READY` queue. For a combined epoch,
+bounded promotion uses each source's equal-duration `emitted + dropped`
+coverage and a rotating tie-break so a retained source can lead its peer by at
+most one frame; counted missing intervals consume fairness slots without
+changing the independent sequences. Single-source epochs skip the peer wait.
+Promotion transfers ownership to the transmit-index queue and makes the frame
+immutable. STOP cancels incomplete `FILLING` work, relaxes the active-run
+fairness wait, and drains complete `READY` and `TRANSMITTING` frames. START
+returns `BUSY` until every prior-run owner is `FREE`; only then are queues and
+sequences reset, so a partially emitted frame cannot be abandoned and stale
+data cannot cross an acknowledged epoch.
 Command responses are selected before unsent data at each frame boundary; an
 active data frame finishes first. Partial and zero writes retain both frame
 ownership and the byte offset for a later bounded loop visit.

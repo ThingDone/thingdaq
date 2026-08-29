@@ -32,12 +32,38 @@ Integer saturatingMultiply(Integer left, Integer right) {
   return left > maximum / right ? maximum : left * right;
 }
 
+TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.byte_counters")
+SourceByteCounters byteCounters(Stream stream,
+                                const SourceCounters &source) {
+  SourceByteCounters result{};
+  const std::uint64_t payload_bytes_per_item = payloadBytesPerItem(stream);
+  const std::uint64_t frame_bytes = protocol_v1::kDataFrameBytes;
+  result.payload_bytes_produced = saturatingMultiply(
+      source.items_produced, payload_bytes_per_item);
+  result.payload_bytes_framed = saturatingMultiply(
+      source.items_framed, payload_bytes_per_item);
+  result.payload_bytes_emitted = saturatingMultiply(
+      source.items_emitted, payload_bytes_per_item);
+  result.payload_bytes_transmitted = saturatingMultiply(
+      source.items_transmitted, payload_bytes_per_item);
+  result.payload_bytes_dropped = saturatingMultiply(
+      source.items_dropped, payload_bytes_per_item);
+  result.framed_bytes_framed =
+      saturatingMultiply(source.frames_framed, frame_bytes);
+  result.framed_bytes_emitted =
+      saturatingMultiply(source.frames_emitted, frame_bytes);
+  result.framed_bytes_transmitted =
+      saturatingMultiply(source.frames_transmitted, frame_bytes);
+  return result;
+}
+
 }  // namespace
 
 TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.start")
 OperationStatus PacketBufferPipeline::startRun(
     std::uint32_t run_id,
-    protocol_v1::ChecksumAlgorithm checksum_algorithm) {
+    protocol_v1::ChecksumAlgorithm checksum_algorithm,
+    std::uint8_t enabled_stream_mask) {
   if (run_id == 0U || run_id == run_id_) {
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kInvalidRunId;
@@ -54,6 +80,10 @@ OperationStatus PacketBufferPipeline::startRun(
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kUnsupportedChecksum;
   }
+  if (!validStreamMask(enabled_stream_mask)) {
+    saturatingIncrement(run_start_rejections_);
+    return OperationStatus::kInvalidStreamMask;
+  }
 
   for (ReadyQueue &queue : ready_queues_) {
     queue.clear();
@@ -65,6 +95,7 @@ OperationStatus PacketBufferPipeline::startRun(
   source_counters_ = {};
   transmit_depth_by_source_ = {};
   run_id_ = run_id;
+  enabled_stream_mask_ = enabled_stream_mask;
   checksum_algorithm_ = checksum_algorithm;
   next_free_search_ = 0U;
   next_ready_source_ = 0U;
@@ -77,6 +108,7 @@ OperationStatus PacketBufferPipeline::startRun(
   ready_queue_rejections_ = 0U;
   transmit_queue_rejections_ = 0U;
   frames_promoted_ = 0U;
+  fairness_deferrals_ = 0U;
   accepting_frames_ = true;
   saturatingIncrement(run_starts_);
   return OperationStatus::kOk;
@@ -106,6 +138,11 @@ BeginFillResult PacketBufferPipeline::beginFill(Stream stream) {
   if (!accepting_frames_ || run_id_ == 0U || !validStream(stream)) {
     saturatingIncrement(invalid_operations_);
     result.status = OperationStatus::kNotRunning;
+    return result;
+  }
+  if (!streamEnabled(enabled_stream_mask_, stream)) {
+    saturatingIncrement(invalid_operations_);
+    result.status = OperationStatus::kStreamDisabled;
     return result;
   }
 
@@ -153,6 +190,10 @@ OperationStatus PacketBufferPipeline::recordSourceFrameDrops(
   if (!accepting_frames_ || run_id_ == 0U || !validStream(stream)) {
     saturatingIncrement(invalid_operations_);
     return OperationStatus::kNotRunning;
+  }
+  if (!streamEnabled(enabled_stream_mask_, stream)) {
+    saturatingIncrement(invalid_operations_);
+    return OperationStatus::kStreamDisabled;
   }
   if (frame_count == 0U) {
     return OperationStatus::kOk;
@@ -280,16 +321,14 @@ PromotionReport PacketBufferPipeline::serviceReadyFrames(std::size_t limit) {
       break;
     }
 
-    std::size_t selected_source = kStreamCount;
-    for (std::size_t attempt = 0U; attempt < kStreamCount; ++attempt) {
-      const std::size_t candidate =
-          (next_ready_source_ + attempt) % kStreamCount;
-      if (!ready_queues_[candidate].empty()) {
-        selected_source = candidate;
-        break;
-      }
-    }
+    bool fairness_deferred = false;
+    const std::size_t selected_source =
+        selectReadySource(fairness_deferred);
     if (selected_source == kStreamCount) {
+      if (fairness_deferred) {
+        saturatingIncrement(fairness_deferrals_);
+        report.fairness_deferred = true;
+      }
       break;
     }
 
@@ -411,9 +450,18 @@ bool PacketBufferPipeline::readyForStart() const {
   return !accepting_frames_ && quiescent();
 }
 
+TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.snapshot")
 PipelineSnapshot PacketBufferPipeline::snapshot() const {
   PipelineSnapshot result{};
   result.sources = source_counters_;
+  for (std::size_t source = 0U; source < kStreamCount; ++source) {
+    result.source_bytes[source] = byteCounters(
+        static_cast<Stream>(source), source_counters_[source]);
+    saturatingAdd(result.data_payload_bytes_transmitted,
+                  result.source_bytes[source].payload_bytes_transmitted);
+    saturatingAdd(result.data_framed_bytes_transmitted,
+                  result.source_bytes[source].framed_bytes_transmitted);
+  }
   for (const BufferRecord &record : records_) {
     const std::size_t state = static_cast<std::size_t>(record.state);
     if (state < result.buffers_by_state.size()) {
@@ -426,6 +474,7 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
         transmit_depth_by_source_[source];
   }
   result.run_id = run_id_;
+  result.enabled_stream_mask = enabled_stream_mask_;
   result.checksum_algorithm = checksum_algorithm_;
   result.run_starts = run_starts_;
   result.run_start_rejections = run_start_rejections_;
@@ -435,6 +484,11 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.ready_queue_rejections = ready_queue_rejections_;
   result.transmit_queue_rejections = transmit_queue_rejections_;
   result.frames_promoted = frames_promoted_;
+  result.fairness_deferrals = fairness_deferrals_;
+  result.accounted_frame_skew =
+      accountedFrames(0U) > accountedFrames(1U)
+          ? accountedFrames(0U) - accountedFrames(1U)
+          : accountedFrames(1U) - accountedFrames(0U);
   result.ready_queue_depth = readyFrames();
   result.transmit_queue_depth = transmit_queue_.size();
   result.ready_queue_high_water = ready_queue_high_water_;
@@ -454,6 +508,41 @@ bool PacketBufferPipeline::handleMatches(const FillHandle &handle) const {
   return record.state == BufferState::kFilling &&
          record.stream == handle.stream &&
          record.sequence == handle.sequence && record.lease == handle.lease;
+}
+
+std::size_t PacketBufferPipeline::selectReadySource(
+    bool &fairness_deferred) const {
+  fairness_deferred = false;
+  const bool equal_coverage_fairness =
+      accepting_frames_ && enabled_stream_mask_ == kAllStreamMask;
+  for (std::size_t attempt = 0U; attempt < kStreamCount; ++attempt) {
+    const std::size_t candidate =
+        (next_ready_source_ + attempt) % kStreamCount;
+    if (!streamEnabled(enabled_stream_mask_,
+                       static_cast<Stream>(candidate)) ||
+        ready_queues_[candidate].empty()) {
+      continue;
+    }
+    if (!equal_coverage_fairness) {
+      return candidate;
+    }
+    const std::size_t peer = (candidate + 1U) % kStreamCount;
+    if (accountedFrames(candidate) <= accountedFrames(peer)) {
+      return candidate;
+    }
+    fairness_deferred = true;
+  }
+  return kStreamCount;
+}
+
+std::uint64_t PacketBufferPipeline::accountedFrames(
+    std::size_t source_index) const {
+  if (source_index >= source_counters_.size()) {
+    return 0U;
+  }
+  std::uint64_t result = source_counters_[source_index].frames_emitted;
+  saturatingAdd(result, source_counters_[source_index].frames_dropped);
+  return result;
 }
 
 PacketBufferPipeline::BufferIndex PacketBufferPipeline::takeFreeBuffer() {

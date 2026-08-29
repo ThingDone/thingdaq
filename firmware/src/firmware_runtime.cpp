@@ -183,7 +183,8 @@ void FirmwareRuntime::applyPendingEvents(
     report.packet_start_status =
         packet_pipeline_.startRun(
             events.run_id,
-            control_.appliedConfiguration().data_checksum_algorithm);
+            control_.appliedConfiguration().data_checksum_algorithm,
+            control_.appliedConfiguration().stream_mask);
     report.packet_run_started =
         report.packet_start_status == packet::OperationStatus::kOk;
     if (!report.packet_run_started) {

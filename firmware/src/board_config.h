@@ -374,6 +374,31 @@ inline constexpr std::size_t kPacketBufferPrimaryStorageBytes =
     kPacketBufferPrimaryCount * protocol_v1::kDataFrameBytes;
 inline constexpr std::size_t kPacketBufferReserveStorageBytes =
     kPacketBufferReserveCount * protocol_v1::kDataFrameBytes;
+// READY and TRANSMIT queues contain one-byte indexes into the shared packet
+// pool; they never allocate another payload copy. Their backing arrays and all
+// queue metadata/records are covered by kPacketPipelineStateBudgetBytes and
+// the PacketBufferPipeline sizeof assertion.
+inline constexpr std::size_t kPacketReadyIndexStorageBytes =
+    2U * kPacketReadyQueueDepth * sizeof(std::uint8_t);
+inline constexpr std::size_t kPacketTransmitIndexStorageBytes =
+    kPacketTransmitQueueDepth * sizeof(std::uint8_t);
+inline constexpr std::size_t kPacketIndexStorageBytes =
+    kPacketReadyIndexStorageBytes + kPacketTransmitIndexStorageBytes;
+
+// The combined physical path reuses these simultaneous, fixed reservations.
+// Packet frames change ownership in place, so the READY and TRANSMIT stages do
+// not appear here as duplicate 4,096-byte banks.
+inline constexpr std::size_t kCombinedAcquisitionRam1BufferBytes =
+    kPacketBufferPrimaryStorageBytes + kPacketPipelineStateBudgetBytes +
+    kAdcPackerStateBudgetBytes + kGpioPackerStateBudgetBytes;
+inline constexpr std::size_t kCombinedAcquisitionRam2BufferBytes =
+    kPacketBufferReserveStorageBytes + kAdcDmaRingBytes +
+    kAdcDmaOverflowSinkBytes + kAdcDmaDescriptorBytes +
+    kGpioRawDmaRingBytes + kGpioRawDmaOverflowSinkBytes +
+    kGpioRawDmaDescriptorBytes +
+    kGpioPackedRingDepth * kGpioPackedBufferStrideBytes;
+inline constexpr std::size_t kCombinedAcquisitionAndUsbRam2BufferBytes =
+    kCombinedAcquisitionRam2BufferBytes + kPinnedUsbCdcTxStorageBytes;
 
 inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kCommandParser, MemoryRegion::kDtcmRam1,
@@ -927,6 +952,14 @@ static_assert(kChecksumBenchmarkBufferBytes % kCacheLineBytes == 0U,
 static_assert(kPacketReadyQueueDepth >= kPacketBufferCount &&
                   kPacketTransmitQueueDepth >= kPacketBufferCount,
               "packet index queues must be able to represent the whole pool");
+static_assert(kPacketPipelineStateBudgetBytes >= kPacketIndexStorageBytes,
+              "packet state budget must include ready/transmit indexes");
+static_assert(kCombinedAcquisitionRam1BufferBytes <= kRam1BudgetBytes,
+              "combined packet/packer buffers exceed RAM1");
+static_assert(kCombinedAcquisitionRam2BufferBytes <= kRam2BudgetBytes,
+              "combined DMA/packet buffers exceed RAM2");
+static_assert(kCombinedAcquisitionAndUsbRam2BufferBytes <= kRam2BudgetBytes,
+              "combined buffers plus the pinned USB TX ring exceed RAM2");
 static_assert(kPacketPromotionsPerLoop > 0U &&
                   kPacketPromotionsPerLoop <= kPacketBufferCount,
               "packet promotion work must be nonzero and pool-bounded");

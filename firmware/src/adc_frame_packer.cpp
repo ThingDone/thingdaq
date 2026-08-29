@@ -42,9 +42,8 @@ OperationStatus AdcFramePacker::startRun(
   if (!quiescent()) {
     return OperationStatus::kNotQuiescent;
   }
-  const packet::PipelineSnapshot packet_snapshot = pipeline.snapshot();
-  if (!packet_snapshot.accepting_frames || packet_snapshot.run_id != run_id ||
-      packet_snapshot.checksum_algorithm != checksum_algorithm ||
+  if (!pipeline.accepts(packet::Stream::kAdc, run_id,
+                        checksum_algorithm) ||
       !protocol::isSupportedChecksum(checksum_algorithm)) {
     return OperationStatus::kPipelineNotReady;
   }
@@ -136,9 +135,8 @@ Snapshot AdcFramePacker::snapshot(
 
 bool AdcFramePacker::pipelineMatches(
     const packet::PacketBufferPipeline &pipeline) const {
-  const packet::PipelineSnapshot value = pipeline.snapshot();
-  return value.accepting_frames && value.run_id == run_id_ &&
-         value.checksum_algorithm == checksum_algorithm_;
+  return pipeline.accepts(packet::Stream::kAdc, run_id_,
+                          checksum_algorithm_);
 }
 
 TEENSY_DAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.consume")

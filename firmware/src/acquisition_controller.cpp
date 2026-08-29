@@ -199,9 +199,11 @@ bool Controller::start(const protocol::Configuration &configuration,
     return false;
   }
 
-  const packet::PipelineSnapshot packet = packet_pipeline_.snapshot();
-  if (!packet.accepting_frames || packet.run_id != run_id ||
-      packet.checksum_algorithm != configuration.data_checksum_algorithm) {
+  if (!packet_pipeline_.acceptingFrames() ||
+      packet_pipeline_.runId() != run_id ||
+      packet_pipeline_.checksumAlgorithm() !=
+          configuration.data_checksum_algorithm ||
+      packet_pipeline_.enabledStreamMask() != configuration.stream_mask) {
     report.internal_error = true;
     report.packet_stop = packet_pipeline_.stopProduction();
     report.packet_production_stopped = true;

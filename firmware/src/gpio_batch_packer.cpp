@@ -77,9 +77,8 @@ OperationStatus GpioBatchPacker::startRun(
   if (!quiescent()) {
     return OperationStatus::kNotQuiescent;
   }
-  const packet::PipelineSnapshot packet_snapshot = pipeline.snapshot();
-  if (!packet_snapshot.accepting_frames || packet_snapshot.run_id != run_id ||
-      packet_snapshot.checksum_algorithm != checksum_algorithm ||
+  if (!pipeline.accepts(packet::Stream::kGpio, run_id,
+                        checksum_algorithm) ||
       !protocol::isSupportedChecksum(checksum_algorithm)) {
     return OperationStatus::kPipelineNotReady;
   }
@@ -311,9 +310,8 @@ std::uint16_t GpioBatchPacker::processingCpuBasisPoints() const {
 
 bool GpioBatchPacker::pipelineMatches(
     const packet::PacketBufferPipeline &pipeline) const {
-  const packet::PipelineSnapshot value = pipeline.snapshot();
-  return value.accepting_frames && value.run_id == run_id_ &&
-         value.checksum_algorithm == checksum_algorithm_;
+  return pipeline.accepts(packet::Stream::kGpio, run_id_,
+                          checksum_algorithm_);
 }
 
 bool GpioBatchPacker::consume(const gpio_capture::BufferHandle &handle,
@@ -684,9 +682,8 @@ TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.progress")
 stats::GpioPackerProgress GpioBatchPacker::progress(
     const packet::PacketBufferPipeline &pipeline) const {
   stats::GpioPackerProgress result = progress_;
-  const packet::PipelineSnapshot packet_snapshot = pipeline.snapshot();
-  const packet::SourceCounters &gpio =
-      packet_snapshot.sources[packet::streamIndex(packet::Stream::kGpio)];
+  const packet::SourceCounters gpio =
+      pipeline.sourceCounters(packet::Stream::kGpio);
   result.frames_framed = gpio.frames_framed;
   result.samples_framed = gpio.items_framed;
   result.frames_transmitted = gpio.frames_transmitted;

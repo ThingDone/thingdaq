@@ -99,7 +99,8 @@ void testPhysicalPairFramingTimestampsAndGapProjection() {
   constexpr v1::ChecksumAlgorithm checksum =
       v1::ChecksumAlgorithm::kCrc32c;
 
-  expect(pipeline.startRun(run_id, checksum) == packet::OperationStatus::kOk &&
+  expect(pipeline.startRun(run_id, checksum, packet::kAdcStreamMask) ==
+                 packet::OperationStatus::kOk &&
              adc.startRun(run_id, checksum, pipeline, 123456U) ==
                  packer::OperationStatus::kOk,
          "packet and ADC owners accept one common nonzero run epoch");
@@ -176,7 +177,8 @@ void testStaleEpochCannotCrossRuns() {
   packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
   packer::AdcFramePacker adc{source};
-  expect(pipeline.startRun(21U, v1::ChecksumAlgorithm::kAdler32) ==
+  expect(pipeline.startRun(21U, v1::ChecksumAlgorithm::kAdler32,
+                           packet::kAdcStreamMask) ==
                  packet::OperationStatus::kOk &&
              adc.startRun(21U, v1::ChecksumAlgorithm::kAdler32, pipeline) ==
                  packer::OperationStatus::kOk,
@@ -210,7 +212,8 @@ void testAlignedFrameBoundaryAtLargestSafeTimestamp() {
                 std::numeric_limits<std::uint64_t>::max() -
                     v1::kAdcPairsPerFrame);
 
-  expect(pipeline.startRun(27U, v1::ChecksumAlgorithm::kCrc32IsoHdlc) ==
+  expect(pipeline.startRun(27U, v1::ChecksumAlgorithm::kCrc32IsoHdlc,
+                           packet::kAdcStreamMask) ==
                  packet::OperationStatus::kOk &&
              adc.startRun(27U, v1::ChecksumAlgorithm::kCrc32IsoHdlc,
                           pipeline) == packer::OperationStatus::kOk,
@@ -264,7 +267,8 @@ void testPairCountAndCounterBoundariesFailClosed() {
     packet::OwnedPacketBufferStorage storage{};
     packet::PacketBufferPipeline pipeline{storage};
     packer::AdcFramePacker adc{source};
-    expect(pipeline.startRun(31U, v1::ChecksumAlgorithm::kAdler32) ==
+    expect(pipeline.startRun(31U, v1::ChecksumAlgorithm::kAdler32,
+                             packet::kAdcStreamMask) ==
                    packet::OperationStatus::kOk &&
                adc.startRun(31U, v1::ChecksumAlgorithm::kAdler32,
                             pipeline) == packer::OperationStatus::kOk,
@@ -284,7 +288,8 @@ void testPairCountAndCounterBoundariesFailClosed() {
     packet::OwnedPacketBufferStorage storage{};
     packet::PacketBufferPipeline pipeline{storage};
     packer::AdcFramePacker adc{source};
-    expect(pipeline.startRun(33U, v1::ChecksumAlgorithm::kAdler32) ==
+    expect(pipeline.startRun(33U, v1::ChecksumAlgorithm::kAdler32,
+                             packet::kAdcStreamMask) ==
                    packet::OperationStatus::kOk &&
                adc.startRun(33U, v1::ChecksumAlgorithm::kAdler32,
                             pipeline) == packer::OperationStatus::kOk,

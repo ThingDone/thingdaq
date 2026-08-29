@@ -247,10 +247,16 @@ void testTransportOwnershipSurvivesPartialWrites() {
   stats::Statistics statistics{};
   usb::CdcTransport transport{stream, statistics, &pipeline};
   const usb::ServiceReport partial = transport.serviceTransmit();
+  const usb::TransportSnapshot stalled = transport.snapshot();
   expect(partial.stalled && partial.bytes_written == 37U &&
              pipeline.queuedFrames() == 2U &&
-             pipeline.snapshot().sources[0].frames_transmitted == 0U,
-         "partial then zero USB writes retain the immutable front frame");
+             pipeline.snapshot().sources[0].frames_transmitted == 0U &&
+             stalled.partial_write_events == 1U &&
+             stalled.tx_stall_events == 1U &&
+             stalled.max_consecutive_tx_stalls == 1U &&
+             stalled.lower_priority_queue_depth == 2U &&
+             statistics.snapshot().partial_usb_writes == 1U,
+         "partial then zero USB writes retain ownership and expose shared stall telemetry");
   const packet::StopReport stopping = pipeline.stopProduction();
   expect(stopping.ready_frames_to_drain == 0U &&
              stopping.transmitting_frames_to_drain == 2U &&
@@ -265,14 +271,18 @@ void testTransportOwnershipSurvivesPartialWrites() {
     transport.serviceTransmit();
   }
   const packet::PipelineSnapshot drained = pipeline.snapshot();
+  const usb::TransportSnapshot transmitted = transport.snapshot();
   expect(!transport.hasPendingTransmission() && pipeline.quiescent() &&
              pipeline.readyForStart() &&
              stream.output.size() == 2U * constants::kDataFrameBytes &&
              drained.sources[0].frames_transmitted == 1U &&
              drained.sources[1].frames_transmitted == 1U &&
+             drained.transmit_queue_high_water == 2U &&
+             transmitted.lower_priority_frames_completed == 2U &&
+             transmitted.lower_priority_queue_depth == 0U &&
              drained.buffers_by_state[static_cast<std::size_t>(
                  packet::BufferState::kFree)] == board::kPacketBufferCount,
-         "final bytes release each frame exactly once back to FREE");
+         "final bytes release each frame once with exact queue high-water telemetry");
 
   std::size_t offset = 0U;
   for (constants::FrameKind expected : {constants::FrameKind::kAdcData,
@@ -338,6 +348,102 @@ void testFairPromotionKeepsNominalCoverageAligned() {
          "neither source starves under an unequal ready-arrival backlog");
 }
 
+void testCombinedFairnessBoundsLeadAndCountsMissingCoverage() {
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  expect(pipeline.startRun(18U, constants::kDefaultChecksumAlgorithm,
+                           packet::kAllStreamMask) ==
+             packet::OperationStatus::kOk,
+         "start an explicit equal-coverage combined packet epoch");
+  constexpr std::uint64_t coverage_ticks = constants::kFrameCoverageTicks;
+
+  for (std::uint32_t sequence = 0U; sequence < 4U; ++sequence) {
+    packet::FillHandle handle{};
+    expect(fillAndFinish(
+               pipeline, packet::Stream::kAdc,
+               static_cast<std::uint64_t>(sequence) * coverage_ticks,
+               sequence == 0U
+                   ? static_cast<std::uint16_t>(
+                         constants::FrameFlag::kEpochStart)
+                   : 0U,
+               handle)
+               .ok(),
+           "queue an early ADC frame before matching GPIO coverage");
+  }
+
+  const packet::PromotionReport first = pipeline.serviceReadyFrames(4U);
+  packet::PipelineSnapshot snapshot = pipeline.snapshot();
+  expect(first.frames_promoted == 1U && first.fairness_deferred &&
+             snapshot.ready_depth_by_source[0] == 3U &&
+             snapshot.transmit_depth_by_source[0] == 1U &&
+             snapshot.accounted_frame_skew == 1U &&
+             snapshot.enabled_stream_mask == packet::kAllStreamMask,
+         "one source may lead by one equal-duration frame but cannot monopolize USB");
+
+  expect(pipeline.recordSourceFrameDrops(packet::Stream::kGpio, 2U) ==
+             packet::OperationStatus::kOk,
+         "two missing GPIO intervals consume independent sequence and fairness slots");
+  const packet::PromotionReport after_drops =
+      pipeline.serviceReadyFrames(4U);
+  expect(after_drops.frames_promoted == 2U &&
+             after_drops.fairness_deferred &&
+             pipeline.snapshot().ready_depth_by_source[0] == 1U,
+         "retained ADC coverage advances only across explicitly counted GPIO loss");
+
+  packet::FillHandle gpio{};
+  expect(fillAndFinish(pipeline, packet::Stream::kGpio,
+                       2U * coverage_ticks, 0U, gpio)
+             .ok() &&
+             gpio.sequence == 2U,
+         "the next retained GPIO frame preserves its independent gap sequence");
+  expect(pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+         "matching GPIO coverage releases itself and the final held ADC frame");
+
+  for (std::size_t frame = 0U; frame < 5U; ++frame) {
+    expect(pipeline.frontFrame().size == constants::kDataFrameBytes,
+           "transport owns only complete fair-scheduled frames");
+    pipeline.releaseFrontFrame();
+  }
+  snapshot = pipeline.snapshot();
+  const std::uint64_t transmitted_payload =
+      5U * constants::kDataPayloadBytes;
+  const std::uint64_t transmitted_framed =
+      5U * constants::kDataFrameBytes;
+  expect(snapshot.sources[0].frames_transmitted == 4U &&
+             snapshot.sources[1].frames_transmitted == 1U &&
+             snapshot.sources[1].frames_dropped == 2U &&
+             snapshot.source_bytes[0].payload_bytes_transmitted ==
+                 4U * constants::kDataPayloadBytes &&
+             snapshot.source_bytes[1].payload_bytes_dropped ==
+                 2U * constants::kDataPayloadBytes &&
+             snapshot.data_payload_bytes_transmitted ==
+                 transmitted_payload &&
+             snapshot.data_framed_bytes_transmitted == transmitted_framed &&
+             snapshot.fairness_deferrals >= 2U,
+         "per-source loss and payload bytes remain separate from framed wire bytes");
+  expect(packet::kNominalPayloadBytesPerSecondPerStream == 4000000U &&
+             packet::kNominalCombinedPayloadBytesPerSecond == 8000000U &&
+             packet::kNominalFramedBytesPerSecondPerStream == 4047431U &&
+             packet::kNominalCombinedFramedBytesPerSecond == 8094862U,
+         "the nominal 4+4 MB/s payload model reports framing overhead separately");
+
+  (void)pipeline.stopProduction();
+  expect(pipeline.startRun(19U, constants::kDefaultChecksumAlgorithm,
+                           packet::kAdcStreamMask) ==
+             packet::OperationStatus::kOk &&
+             pipeline.beginFill(packet::Stream::kGpio).status ==
+                 packet::OperationStatus::kStreamDisabled &&
+             pipeline.beginFill(packet::Stream::kAdc).ok(),
+         "a single-source epoch rejects production from an unconfigured stream");
+  (void)pipeline.stopProduction();
+  expect(pipeline.startRun(20U, constants::kDefaultChecksumAlgorithm, 0U) ==
+                 packet::OperationStatus::kInvalidStreamMask &&
+             pipeline.startRun(20U, constants::kDefaultChecksumAlgorithm,
+                               0x80U) ==
+                 packet::OperationStatus::kInvalidStreamMask,
+         "empty and unknown stream masks fail before packet ownership changes");
+}
+
 void testPoolExhaustionIsBoundedAndSequenceVisible() {
   packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
@@ -381,6 +487,7 @@ int main() {
   testAlignedFixedPoolAndFailureAccounting();
   testTransportOwnershipSurvivesPartialWrites();
   testFairPromotionKeepsNominalCoverageAligned();
+  testCombinedFairnessBoundsLeadAndCountsMissingCoverage();
   testPoolExhaustionIsBoundedAndSequenceVisible();
   testRunChecksumIsImmutableUntilTheQueueIsQuiescent();
   if (failures != 0) {

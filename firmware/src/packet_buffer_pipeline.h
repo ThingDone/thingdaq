@@ -32,6 +32,12 @@ enum class Stream : std::uint8_t {
 
 inline constexpr std::size_t kStreamCount = 2U;
 inline constexpr std::uint8_t kInvalidBufferIndex = 0xFFU;
+inline constexpr std::uint8_t kAdcStreamMask =
+    static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc);
+inline constexpr std::uint8_t kGpioStreamMask =
+    static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
+inline constexpr std::uint8_t kAllStreamMask =
+    static_cast<std::uint8_t>(kAdcStreamMask | kGpioStreamMask);
 
 constexpr std::size_t streamIndex(Stream stream) {
   return static_cast<std::size_t>(stream);
@@ -39,6 +45,18 @@ constexpr std::size_t streamIndex(Stream stream) {
 
 constexpr bool validStream(Stream stream) {
   return streamIndex(stream) < kStreamCount;
+}
+
+constexpr std::uint8_t streamBit(Stream stream) {
+  return stream == Stream::kAdc ? kAdcStreamMask : kGpioStreamMask;
+}
+
+constexpr bool validStreamMask(std::uint8_t mask) {
+  return mask != 0U && (mask & static_cast<std::uint8_t>(~kAllStreamMask)) == 0U;
+}
+
+constexpr bool streamEnabled(std::uint8_t mask, Stream stream) {
+  return validStream(stream) && (mask & streamBit(stream)) != 0U;
 }
 
 constexpr protocol_v1::FrameKind frameKind(Stream stream) {
@@ -52,6 +70,27 @@ constexpr std::uint32_t itemsPerFrame(Stream stream) {
              : static_cast<std::uint32_t>(
                    protocol_v1::kGpioSamplesPerFrame);
 }
+
+constexpr std::uint32_t payloadBytesPerItem(Stream stream) {
+  return stream == Stream::kAdc
+             ? static_cast<std::uint32_t>(protocol_v1::kAdcBytesPerPair)
+             : 1U;
+}
+
+constexpr std::uint64_t roundedRate(std::uint64_t bytes_per_frame) {
+  return (bytes_per_frame * protocol_v1::kTimestampHz +
+          protocol_v1::kFrameCoverageTicks / 2U) /
+         protocol_v1::kFrameCoverageTicks;
+}
+
+inline constexpr std::uint64_t kNominalPayloadBytesPerSecondPerStream =
+    roundedRate(protocol_v1::kDataPayloadBytes);
+inline constexpr std::uint64_t kNominalFramedBytesPerSecondPerStream =
+    roundedRate(protocol_v1::kDataFrameBytes);
+inline constexpr std::uint64_t kNominalCombinedPayloadBytesPerSecond =
+    kStreamCount * kNominalPayloadBytesPerSecondPerStream;
+inline constexpr std::uint64_t kNominalCombinedFramedBytesPerSecond =
+    kStreamCount * kNominalFramedBytesPerSecondPerStream;
 
 using PacketFrame =
     std::array<std::uint8_t, protocol_v1::kDataFrameBytes>;
@@ -146,6 +185,8 @@ enum class OperationStatus : std::uint8_t {
   kTransmissionPending,
   kUnsupportedChecksum,
   kChecksumMismatch,
+  kInvalidStreamMask,
+  kStreamDisabled,
 };
 
 struct BeginFillResult {
@@ -178,12 +219,29 @@ struct SourceCounters {
   std::size_t transmit_queue_high_water = 0U;
 };
 
+// Byte totals are a derived view of the item/frame counters. Payload bytes
+// exclude protocol overhead; framed bytes include the complete 4,096-byte
+// wire frame. Keeping both prevents a nominal 8 MB/s payload target from
+// being confused with the slightly larger CDC data-frame rate.
+struct SourceByteCounters {
+  std::uint64_t payload_bytes_produced = 0U;
+  std::uint64_t payload_bytes_framed = 0U;
+  std::uint64_t payload_bytes_emitted = 0U;
+  std::uint64_t payload_bytes_transmitted = 0U;
+  std::uint64_t payload_bytes_dropped = 0U;
+  std::uint64_t framed_bytes_framed = 0U;
+  std::uint64_t framed_bytes_emitted = 0U;
+  std::uint64_t framed_bytes_transmitted = 0U;
+};
+
 struct PipelineSnapshot {
   std::array<SourceCounters, kStreamCount> sources{};
+  std::array<SourceByteCounters, kStreamCount> source_bytes{};
   std::array<std::size_t, 4U> buffers_by_state{};
   std::array<std::size_t, kStreamCount> ready_depth_by_source{};
   std::array<std::size_t, kStreamCount> transmit_depth_by_source{};
   std::uint32_t run_id = 0U;
+  std::uint8_t enabled_stream_mask = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
       protocol_v1::kDefaultChecksumAlgorithm;
   std::uint32_t run_starts = 0U;
@@ -194,6 +252,10 @@ struct PipelineSnapshot {
   std::uint32_t ready_queue_rejections = 0U;
   std::uint32_t transmit_queue_rejections = 0U;
   std::uint64_t frames_promoted = 0U;
+  std::uint64_t fairness_deferrals = 0U;
+  std::uint64_t accounted_frame_skew = 0U;
+  std::uint64_t data_payload_bytes_transmitted = 0U;
+  std::uint64_t data_framed_bytes_transmitted = 0U;
   std::size_t ready_queue_depth = 0U;
   std::size_t transmit_queue_depth = 0U;
   std::size_t ready_queue_high_water = 0U;
@@ -207,6 +269,7 @@ struct PipelineSnapshot {
 struct PromotionReport {
   std::size_t frames_promoted = 0U;
   bool transmit_queue_full = false;
+  bool fairness_deferred = false;
   bool invariant_error = false;
 };
 
@@ -234,7 +297,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   OperationStatus startRun(
       std::uint32_t run_id,
       protocol_v1::ChecksumAlgorithm checksum_algorithm =
-          protocol_v1::kDefaultChecksumAlgorithm);
+          protocol_v1::kDefaultChecksumAlgorithm,
+      std::uint8_t enabled_stream_mask = kAllStreamMask);
   // STOP cancels any producer-owned partial construction, then drains every
   // already complete READY/TRANSMITTING frame through normal USB ownership.
   StopReport stopProduction();
@@ -255,7 +319,9 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   bool cancelFill(const FillHandle &handle);
 
   // Move a bounded number of complete READY frames into immutable transport
-  // ownership. Sources alternate whenever both have work.
+  // ownership. A combined active run admits at most one equal-duration frame
+  // beyond the other source's emitted-or-dropped coverage; STOP relaxes that
+  // wait so every remaining complete frame drains.
   PromotionReport serviceReadyFrames(
       std::size_t limit = board::kPacketPromotionsPerLoop);
 
@@ -267,6 +333,25 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::size_t freeBuffers() const;
   bool quiescent() const;
   bool readyForStart() const;
+  constexpr bool acceptingFrames() const { return accepting_frames_; }
+  constexpr std::uint32_t runId() const { return run_id_; }
+  constexpr std::uint8_t enabledStreamMask() const {
+    return enabled_stream_mask_;
+  }
+  constexpr protocol_v1::ChecksumAlgorithm checksumAlgorithm() const {
+    return checksum_algorithm_;
+  }
+  constexpr bool accepts(
+      Stream stream, std::uint32_t run_id,
+      protocol_v1::ChecksumAlgorithm checksum_algorithm) const {
+    return accepting_frames_ && run_id_ == run_id &&
+           checksum_algorithm_ == checksum_algorithm &&
+           streamEnabled(enabled_stream_mask_, stream);
+  }
+  SourceCounters sourceCounters(Stream stream) const {
+    return validStream(stream) ? source_counters_[streamIndex(stream)]
+                               : SourceCounters{};
+  }
   PipelineSnapshot snapshot() const;
 
  private:
@@ -291,6 +376,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
       BufferIndex, board::kPacketTransmitQueueDepth>;
 
   bool handleMatches(const FillHandle &handle) const;
+  std::size_t selectReadySource(bool &fairness_deferred) const;
+  std::uint64_t accountedFrames(std::size_t source_index) const;
   BufferIndex takeFreeBuffer();
   void recycle(BufferIndex index);
   void recordDrop(Stream stream, std::uint32_t item_count);
@@ -304,6 +391,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::array<SourceCounters, kStreamCount> source_counters_{};
   std::array<std::size_t, kStreamCount> transmit_depth_by_source_{};
   std::uint32_t run_id_ = 0U;
+  std::uint8_t enabled_stream_mask_ = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm_ =
       protocol_v1::kDefaultChecksumAlgorithm;
   std::uint32_t next_lease_ = 1U;
@@ -315,6 +403,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::uint32_t ready_queue_rejections_ = 0U;
   std::uint32_t transmit_queue_rejections_ = 0U;
   std::uint64_t frames_promoted_ = 0U;
+  std::uint64_t fairness_deferrals_ = 0U;
   std::size_t next_free_search_ = 0U;
   std::size_t next_ready_source_ = 0U;
   std::size_t ready_queue_high_water_ = 0U;
@@ -324,6 +413,14 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
 };
 
 static_assert(kStreamCount == 2U);
+static_assert(kAllStreamMask == 3U);
+static_assert(protocol_v1::kAdcPairsPerFrame *
+                      protocol_v1::kAdcBytesPerPair ==
+                  protocol_v1::kDataPayloadBytes);
+static_assert(protocol_v1::kGpioSamplesPerFrame ==
+              protocol_v1::kDataPayloadBytes);
+static_assert(kNominalPayloadBytesPerSecondPerStream == 4000000U);
+static_assert(kNominalCombinedPayloadBytesPerSecond == 8000000U);
 static_assert(board::kPacketBufferCount < kInvalidBufferIndex);
 static_assert(alignof(PacketBufferPrimaryStorage) == board::kCacheLineBytes);
 static_assert(alignof(PacketBufferReserveStorage) == board::kCacheLineBytes);

@@ -1321,7 +1321,8 @@ void testCombinedControllerUsesOneEpochAndDeterministicLifecycle() {
   constexpr std::uint32_t kRunOne = 41U;
   constexpr std::uint64_t kEpochOne = 0x123456789ABCULL;
   expect(packet_pipeline.startRun(kRunOne,
-                                  combined.data_checksum_algorithm) ==
+                                  combined.data_checksum_algorithm,
+                                  combined.stream_mask) ==
                  packet::OperationStatus::kOk,
          "combined lifecycle reserves one packet epoch");
   acquisition::Report started{};
@@ -1419,7 +1420,8 @@ void testCombinedControllerUsesOneEpochAndDeterministicLifecycle() {
 
   constexpr std::uint32_t kFaultRun = 42U;
   expect(packet_pipeline.startRun(kFaultRun,
-                                  combined.data_checksum_algorithm) ==
+                                  combined.data_checksum_algorithm,
+                                  combined.stream_mask) ==
                  packet::OperationStatus::kOk,
          "a fresh packet epoch starts after the combined drain");
   acquisition::Report restarted{};
@@ -1487,9 +1489,23 @@ void testCombinedStartRollsBackEveryPreparedOwner() {
   expect(controller.initialize().trigger.error_flags == 0U,
          "rollback fixture completes the trigger BOOT gate");
   operations.clear();
+
+  expect(packet_pipeline.startRun(50U,
+                                  combined.data_checksum_algorithm,
+                                  packet::kAdcStreamMask) ==
+                 packet::OperationStatus::kOk,
+         "mismatch fixture reserves an ADC-only packet epoch");
+  acquisition::Report mismatched{};
+  expect(!controller.start(combined, 50U, 8999U, mismatched) &&
+             mismatched.internal_error &&
+             mismatched.packet_production_stopped && operations.empty() &&
+             controller.quiescent() && packet_pipeline.readyForStart(),
+         "combined acquisition rejects a different packet stream mask before arming any owner");
+
   gpio_capture.prepare_status = gpio_capture::StartStatus::kHardwareError;
   expect(packet_pipeline.startRun(51U,
-                                  combined.data_checksum_algorithm) ==
+                                  combined.data_checksum_algorithm,
+                                  combined.stream_mask) ==
                  packet::OperationStatus::kOk,
          "rollback fixture reserves the packet epoch");
 

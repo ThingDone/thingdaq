@@ -245,6 +245,16 @@ static_assert(teensy_daq::board::kPacketReadyQueueDepth ==
               teensy_daq::board::kPacketBufferCount);
 static_assert(teensy_daq::board::kPacketTransmitQueueDepth ==
               teensy_daq::board::kPacketBufferCount);
+static_assert(teensy_daq::board::kPacketReadyIndexStorageBytes == 400U);
+static_assert(teensy_daq::board::kPacketTransmitIndexStorageBytes == 200U);
+static_assert(teensy_daq::board::kPacketIndexStorageBytes == 600U);
+static_assert(teensy_daq::board::kCombinedAcquisitionRam1BufferBytes ==
+              440832U);
+static_assert(teensy_daq::board::kCombinedAcquisitionRam2BufferBytes ==
+              486944U);
+static_assert(
+    teensy_daq::board::kCombinedAcquisitionAndUsbRam2BufferBytes ==
+    495136U);
 static_assert(teensy_daq::board::kReservedRam1Bytes <=
               teensy_daq::board::kRam1BudgetBytes);
 static_assert(teensy_daq::board::kReservedRam2Bytes <=

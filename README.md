@@ -263,13 +263,18 @@ frame. Normal mode waits for each frame's real-time 8 MHz deadline. The
 explicitly selected `unpaced-diagnostic` mode removes only that wait and still
 uses the generator, framing, checksum, queues, and USB transport unchanged.
 
-One hundred six aligned 4,096-byte DTCM frames move through explicit
-`FREE -> FILLING -> READY -> TRANSMITTING -> FREE` ownership. Per-source ready
-FIFOs feed one bounded transmit FIFO, and every queue exposes current and
-high-water depth. Frames are validated and checksummed in place before
+Two hundred aligned 4,096-byte frames split across 105 DTCM and 95 CPU-owned
+OCRAM slots move through explicit `FREE -> FILLING -> READY -> TRANSMITTING ->
+FREE` ownership. Per-source ready FIFOs feed one bounded transmit FIFO. An
+active combined epoch promotes equal-duration coverage with a rotating
+tie-break and no more than a one-frame source lead; counted source loss consumes
+its own fairness slots, while STOP drains every complete unmatched tail. Every
+queue exposes current and high-water depth. Frames are validated and
+checksummed in place before
 transport admission; a partial USB write keeps immutable ownership until the
 final byte succeeds. Native diagnostics retain exact generated, framed,
-emitted, transmitted, and dropped frame/item counts. Fixed protocol-v1 STATUS
+emitted, transmitted, and dropped frame/item counts plus separate payload and
+framed byte totals. Fixed protocol-v1 STATUS
 projects transport-admitted frames and dropped items alongside the applied
 synthetic source.
 

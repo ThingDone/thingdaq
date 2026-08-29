@@ -200,6 +200,51 @@ The physical report is now a base of the cooperative runtime report, so all
 existing status flags and lifecycle tests remain source compatible while the
 sequencing implementation has one owner.
 
+## Combined packet and USB scheduling
+
+The common packet epoch now snapshots the configured stream mask together with
+the run ID and checksum. A producer for a disabled stream is rejected before
+it can reserve a packet buffer, and the acquisition controller refuses to arm
+if its complete requested mask differs from the packet epoch. ADC-only and
+GPIO-only runs therefore use the same queues without waiting for an absent
+peer, while combined runs enable equal-coverage scheduling.
+
+Each ADC frame and GPIO frame covers exactly 8,096 timestamp ticks. During an
+active combined run, ready-frame promotion compares each source's cumulative
+`emitted + dropped` frame count. It may promote a source whose accounted
+coverage is tied with or behind its peer, which permits at most a one-frame
+lead. A counted source drop consumes its independent sequence and fairness
+slot, so retained coverage can advance without pretending that the missing
+frame existed. At equal coverage the existing rotating preference alternates
+ADC and GPIO. Once production stops, the coverage wait is relaxed and every
+remaining complete frame drains; STOP cannot strand a legitimate unmatched
+tail.
+
+The downstream CDC rules remain unchanged and are shared by synthetic and
+physical acquisition:
+
+- a complete ready frame becomes immutable transport ownership before any byte
+  is offered to USB;
+- once a write accepts a prefix, that frame finishes before any response or
+  peer data frame, preserving byte-stream framing;
+- queued command responses have priority at the next frame boundary and both
+  command and response work remain bounded;
+- packet, packed, and raw-ring pressure can discard only work that has not
+  begun USB transmission; the later Phase 09 policy selects which complete
+  unsent block to discard under a deliberately sustained stall.
+
+Native telemetry keeps independent produced, packed/consumed, framed, emitted,
+transmitted, and dropped item/frame counters. `PipelineSnapshot` additionally
+derives per-source payload-byte totals and complete framed-byte totals, reports
+current/per-source/aggregate queue depths and high waters, and exposes fairness
+deferrals and accounted-coverage skew. `TransportSnapshot` supplies the shared
+USB byte, partial-write, write-stall, command/response queue, and queue
+high-water counters. The nominal model is 4,000,000 payload bytes/s per source
+(8,000,000 combined) and 4,047,431 framed data bytes/s per source (8,094,862
+combined, rounded to the nearest byte/s). Control-response bytes remain a
+separate part of total USB bytes rather than being mislabeled as acquisition
+payload.
+
 ## Timing model retained for combined work
 
 All time derives from the START snapshot in the advertised 8 MHz domain; no
@@ -224,6 +269,13 @@ single START epoch; no ISR entry time participates in a sample timestamp.
 The controller adds no payload storage. It reuses the four-buffer ADC pair
 ring, four-buffer raw GPIO ring, four-buffer packed GPIO ring, isolated sinks,
 and the common 200-frame packet pool documented in [[Firmware-Resource-Map]].
+READY and TRANSMIT queues contain 400 and 200 one-byte indexes respectively;
+the packet buffers change ownership in place rather than being copied into
+another payload bank. Compile-time combined buffer totals reserve 440,832
+bytes in RAM1 and 486,944 bytes in RAM2. Including the pinned core's four
+2,048-byte USB TX buffers brings the simultaneous RAM2 buffer total to 495,136
+bytes, still inside the 512 KiB region before the exact linker gate accounts
+for all remaining core globals.
 The exact pinned combined-lifecycle image uses 454,944 bytes of RAM1 variables,
 32,728 bytes of RAM1 code, 40 bytes of alignment padding, and leaves 36,576
 bytes for locals/stack. It uses 503,488 bytes of RAM2 variables and leaves
@@ -239,8 +291,8 @@ cooperative packet or USB layers.
 ## Remaining combined-enablement work
 
 Combined hardware lifecycle is implemented behind the current protocol gate.
-The remaining Phase 08 work is to integrate bounded fair packet/USB scheduling,
-expose combined configuration/capability and complete telemetry, implement host
-alignment, expand adversarial tests, and run the physical combined acceptance
-campaign. Until those gates pass, firmware must not advertise combined
-physical acquisition as an accepted capability.
+The packet/USB scheduler is now combined-aware behind that same gate. The
+remaining Phase 08 work is to expose combined configuration/capability and
+wire telemetry, implement host alignment, expand adversarial tests, and run the
+physical combined acceptance campaign. Until those gates pass, firmware must
+not advertise combined physical acquisition as an accepted capability.

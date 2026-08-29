@@ -18,12 +18,6 @@ void saturatingIncrement(Integer &value) {
   saturatingAdd(value, Integer{1U});
 }
 
-constexpr std::uint8_t streamMask(packet::Stream stream) {
-  return stream == packet::Stream::kAdc
-             ? static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc)
-             : static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
-}
-
 constexpr std::uint16_t flag(protocol_v1::FrameFlag value) {
   return static_cast<std::uint16_t>(value);
 }
@@ -49,9 +43,10 @@ OperationStatus SyntheticSource::startRun(
       configuration.data_frame_bytes != protocol_v1::kDataFrameBytes) {
     return OperationStatus::kInvalidConfiguration;
   }
-  const packet::PipelineSnapshot packet_snapshot = pipeline.snapshot();
-  if (!packet_snapshot.accepting_frames ||
-      packet_snapshot.run_id != run_id) {
+  if (!pipeline.acceptingFrames() || pipeline.runId() != run_id ||
+      pipeline.enabledStreamMask() != configuration.stream_mask ||
+      pipeline.checksumAlgorithm() !=
+          configuration.data_checksum_algorithm) {
     return OperationStatus::kPipelineNotReady;
   }
 
@@ -143,7 +138,7 @@ Snapshot SyntheticSource::snapshot() const {
 }
 
 bool SyntheticSource::streamEnabled(packet::Stream stream) const {
-  return (configuration_.stream_mask & streamMask(stream)) != 0U;
+  return packet::streamEnabled(configuration_.stream_mask, stream);
 }
 
 bool SyntheticSource::frameDue(packet::Stream stream,
