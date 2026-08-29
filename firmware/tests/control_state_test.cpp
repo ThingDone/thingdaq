@@ -1015,6 +1015,8 @@ void testStatisticsDetailAndSaturation() {
   processing.frames_produced = 13U;
   processing.samples_produced = 52U;
   processing.frames_packed = 11U;
+  processing.samples_framed = 44U;
+  processing.samples_transmitted = 40U;
   processing.duplicate_samples_ignored = 2U;
   statistics.publishGpioPacker(processing);
   stats::GpioRawCaptureProgress gpio_capture{};
@@ -1042,6 +1044,8 @@ void testStatisticsDetailAndSaturation() {
   data_path.adc.items_dropped = maximum64;
   data_path.adc.frames_dropped_after_framing = 2U;
   data_path.adc.frames_dropped_after_promotion = 1U;
+  data_path.gpio.items_framed = 7000U;
+  data_path.gpio.items_transmitted = 6000U;
   statistics.publishDataPath(data_path);
   stats::PacketQueueProgress packet_queue{};
   packet_queue.filling_depth_by_source = {1U, 2U};
@@ -1065,6 +1069,8 @@ void testStatisticsDetailAndSaturation() {
              status.parser_errors == 7U && status.transport_errors == 3U &&
              status.stats_generation == 1U &&
              status.gpio_processing_cpu_basis_points == 1234U &&
+             status.gpio_samples_framed == 7000U &&
+             status.gpio_samples_transmitted == 6000U &&
              status.gpio_buffers_completed == 10U &&
              status.gpio_duplicate_samples_ignored == 2U &&
              status.gpio_cache_dma_discards == 6U &&
@@ -1078,7 +1084,8 @@ void testStatisticsDetailAndSaturation() {
              status.usb.responses_queued == 9U &&
              status.usb.responses_completed == 8U &&
              status.usb.active_frame_size == 1276U,
-         "GET_STATUS projection uses the protocol-defined aggregates");
+         "GET_STATUS projection uses shared pipeline counters for "
+         "source-independent framing telemetry");
 
   wire::ParserCounters saturating_parser{};
   saturating_parser.candidates_rejected = maximum32;

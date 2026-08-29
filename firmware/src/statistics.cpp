@@ -259,9 +259,9 @@ protocol::StatusResponse Statistics::wireStatus(
   response.gpio_samples_captured =
       counters_.gpio_raw_capture.samples_captured;
   response.gpio_samples_packed = counters_.gpio_packer.samples_packed;
-  response.gpio_samples_framed = counters_.gpio_packer.samples_framed;
+  response.gpio_samples_framed = counters_.data_path.gpio.items_framed;
   response.gpio_samples_transmitted =
-      counters_.gpio_packer.samples_transmitted;
+      counters_.data_path.gpio.items_transmitted;
   response.gpio_raw_samples_lost = counters_.gpio_raw_capture.samples_lost;
   response.gpio_packer_samples_dropped =
       counters_.gpio_packer.packer_drop_samples;
