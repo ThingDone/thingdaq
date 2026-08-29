@@ -151,6 +151,322 @@ def _accepted_record(
     return _record_from_case(case)
 
 
+def _release_counters(*, frames: int, source: str, dropped: int = 0) -> dict[str, int]:
+    counters = {name: 0 for name in aggregator.REQUIRED_ZERO_ERROR_COUNTERS}
+    for prefix, items_per_frame, item_bytes in (
+        ("adc", aggregator.ADC_PAIRS_PER_FRAME, aggregator.ADC_BYTES_PER_PAIR),
+        ("gpio", aggregator.GPIO_SAMPLES_PER_FRAME, 1),
+    ):
+        generated = frames + dropped
+        generated_items = generated * items_per_frame
+        transmitted_items = frames * items_per_frame
+        counters.update(
+            {
+                f"{prefix}_frames_generated": generated,
+                f"{prefix}_frames_framed_pipeline": generated,
+                f"{prefix}_frames_emitted": generated,
+                f"{prefix}_frames_transmitted": frames,
+                f"{prefix}_frames_dropped": dropped,
+                f"{prefix}_packet_filling_depth": 0,
+                f"{prefix}_packet_ready_depth": 0,
+                f"{prefix}_packet_transmit_depth": 0,
+                f"{prefix}_frames_dropped_after_framing": dropped,
+                f"{prefix}_frames_dropped_after_promotion": dropped,
+                f"{prefix}_frames_evicted": dropped,
+                f"{prefix}_frames_evicted_after_promotion": dropped,
+                f"{prefix}_items_generated": generated_items,
+                f"{prefix}_items_framed_pipeline": generated_items,
+                f"{prefix}_items_emitted": generated_items,
+                f"{prefix}_items_transmitted_pipeline": transmitted_items,
+                f"{prefix}_items_dropped": dropped * items_per_frame,
+                f"{prefix}_payload_bytes_produced": generated_items * item_bytes,
+                f"{prefix}_payload_bytes_framed": generated_items * item_bytes,
+                f"{prefix}_payload_bytes_emitted": generated_items * item_bytes,
+                f"{prefix}_payload_bytes_transmitted": (transmitted_items * item_bytes),
+                f"{prefix}_payload_bytes_dropped": (
+                    dropped * items_per_frame * item_bytes
+                ),
+                f"{prefix}_framed_bytes_framed": (
+                    generated * aggregator.DATA_FRAME_BYTES
+                ),
+                f"{prefix}_framed_bytes_emitted": (
+                    generated * aggregator.DATA_FRAME_BYTES
+                ),
+                f"{prefix}_framed_bytes_transmitted": (
+                    frames * aggregator.DATA_FRAME_BYTES
+                ),
+            }
+        )
+    counters.update(
+        {
+            "adc_stop_pairs_discarded": 0,
+            "gpio_raw_samples_lost": 0,
+            "data_payload_bytes_transmitted": (
+                counters["adc_payload_bytes_transmitted"]
+                + counters["gpio_payload_bytes_transmitted"]
+            ),
+            "data_framed_bytes_transmitted": (
+                counters["adc_framed_bytes_transmitted"]
+                + counters["gpio_framed_bytes_transmitted"]
+            ),
+            "packet_pressure_evictions": 2 * dropped,
+            "packet_capacity_drops_without_evictable_frame": 0,
+            "packet_pool_exhaustions": 2 * dropped,
+            "device_state": int(constants.DeviceState.IDLE),
+            "source": int(
+                constants.Source.SYNTHETIC
+                if source == "synthetic"
+                else constants.Source.HARDWARE
+            ),
+        }
+    )
+    return counters
+
+
+def _release_epoch(
+    *,
+    index: int,
+    source: str,
+    seconds: float,
+    dropped: int = 0,
+) -> dict[str, object]:
+    frames = int(seconds * aggregator.TARGET_ADC_PAIR_RATE_HZ) // (
+        aggregator.ADC_PAIRS_PER_FRAME
+    )
+    adc_pairs = frames * aggregator.ADC_PAIRS_PER_FRAME
+    gpio_samples = frames * aggregator.GPIO_SAMPLES_PER_FRAME
+    payload_bytes = adc_pairs * aggregator.ADC_BYTES_PER_PAIR + gpio_samples
+    framed_bytes = 2 * frames * aggregator.DATA_FRAME_BYTES
+    timed: dict[str, object] = {
+        "adc_frames": frames,
+        "gpio_frames": frames,
+        "adc_pairs": adc_pairs,
+        "gpio_samples": gpio_samples,
+        "payload_bytes": payload_bytes,
+        "framed_bytes": framed_bytes,
+    }
+    negative: dict[str, object] | None = None
+    if dropped:
+        timed["adc_missing_frames"] = dropped
+        timed["gpio_missing_frames"] = dropped
+        loss = {
+            "adc_frames": dropped,
+            "gpio_frames": dropped,
+            "packet_pressure_evictions": 2 * dropped,
+            "packet_pool_exhaustions": 2 * dropped,
+            "packet_capacity_drops_without_evictable_frame": 0,
+        }
+        negative = {
+            "name": "serial_read_stall_pressure",
+            "result": "PASS",
+            "final_state": "IDLE",
+            "loss": loss,
+        }
+    fixture_scope = (
+        {"synthetic_formulas": "all-payload-items"}
+        if source == "synthetic"
+        else {
+            "external_analog_stimulus": "not-declared",
+            "external_digital_stimulus": "not-declared",
+            "graded": "physical conversion/capture/DMA/packing/transport only",
+        }
+    )
+    counters = _release_counters(frames=frames, source=source, dropped=dropped)
+    counters["stats_generation"] = 2 * index + 1
+    return {
+        "index": index,
+        "source": source,
+        "run_id": index,
+        "stats_generation": 2 * index + 1,
+        "warmup_seconds": 1.0,
+        "measured_elapsed_seconds": seconds,
+        "timed": timed,
+        "total": {
+            "adc_frames": frames,
+            "gpio_frames": frames,
+            "adc_pairs": adc_pairs,
+            "gpio_samples": gpio_samples,
+        },
+        "parser": {
+            "errors": 0,
+            "bytes_discarded": 0,
+            "buffered_bytes": 0,
+        },
+        "fixture_scope": fixture_scope,
+        "expected_negative_subcase": negative,
+        "status": {"count": 10, "final_counters": counters},
+        "final_counters": counters,
+    }
+
+
+def _release_record(
+    sequence: int,
+    *,
+    mode: str,
+    started: str,
+    completed: str,
+    traced_growth_bytes: int = 4_096,
+) -> aggregator.JobRecord:
+    case = copy.deepcopy(_transcripts()["success"])
+    case["job_id"] = f"40000000-0000-4000-8000-{sequence:012d}"
+    metadata = case["metadata"]
+    soak = case["soak"]
+    if not isinstance(metadata, dict) or not isinstance(soak, dict):
+        raise TypeError("release fixture is malformed")
+    program_sha256 = {
+        "synthetic": "1" * 64,
+        "physical-combined": "2" * 64,
+        "control-stress": "3" * 64,
+    }[mode]
+    metadata.update(
+        {
+            "program_sha256": program_sha256,
+            "client_started_utc": started,
+            "client_completed_utc": completed,
+        }
+    )
+    epochs = (
+        [
+            _release_epoch(index=1, source="hardware", seconds=300.0, dropped=1),
+            _release_epoch(index=2, source="synthetic", seconds=300.0),
+        ]
+        if mode == "control-stress"
+        else [
+            _release_epoch(
+                index=1,
+                source="synthetic" if mode == "synthetic" else "hardware",
+                seconds=600.0,
+            )
+        ]
+    )
+    streaming_seconds = sum(
+        float(epoch["measured_elapsed_seconds"]) for epoch in epochs
+    )
+    payload_bytes = sum(int(epoch["timed"]["payload_bytes"]) for epoch in epochs)  # type: ignore[index]
+    framed_bytes = sum(int(epoch["timed"]["framed_bytes"]) for epoch in epochs)  # type: ignore[index]
+    adc_pairs = sum(int(epoch["timed"]["adc_pairs"]) for epoch in epochs)  # type: ignore[index]
+    gpio_samples = sum(int(epoch["timed"]["gpio_samples"]) for epoch in epochs)  # type: ignore[index]
+    memory = soak["metrics"]["memory"]  # type: ignore[index]
+    if not isinstance(memory, dict):
+        raise TypeError("release fixture memory is malformed")
+    memory["tracemalloc"] = {"growth_bytes": traced_growth_bytes}
+    memory["process_rss"] = {"growth_bytes": 8_192}
+    memory["minimum_available_bytes"] = 512 * 1024 * 1024
+    soak.update(
+        {
+            "mode": mode,
+            "completed_utc": completed,
+            "cleanup": {"attempted": False, "normal_close": True},
+            "timing": {
+                "measured_duration_seconds": 600.0,
+                "measured_elapsed_seconds": 600.0,
+                "streaming_elapsed_seconds": streaming_seconds,
+            },
+            "program": {
+                "sha256": program_sha256,
+                "validator_sha256": "4" * 64,
+                "candidate_sha256": "5" * 64,
+            },
+            "epochs": epochs,
+            "negative_subcases": [
+                epoch["expected_negative_subcase"]
+                for epoch in epochs
+                if epoch["expected_negative_subcase"] is not None
+            ],
+            "metrics": {
+                **soak["metrics"],  # type: ignore[dict-item]
+                "epoch_count": len(epochs),
+                "payload_bytes": payload_bytes,
+                "framed_bytes": framed_bytes,
+                "adc_pairs": adc_pairs,
+                "gpio_samples": gpio_samples,
+                "payload_bytes_per_streaming_second": (
+                    payload_bytes / streaming_seconds
+                ),
+                "framed_bytes_per_streaming_second": (framed_bytes / streaming_seconds),
+                "adc_pair_rate_hz": adc_pairs / streaming_seconds,
+                "gpio_sample_rate_hz": gpio_samples / streaming_seconds,
+                "memory": memory,
+                "maximum_queues": {
+                    "packet_owned_high_water": 200 if mode == "control-stress" else 2,
+                    "packet_ready_high_water": 2,
+                    "packet_transmit_high_water": (
+                        200 if mode == "control-stress" else 2
+                    ),
+                },
+            },
+        }
+    )
+    return _record_from_case(case)
+
+
+def _release_records() -> list[aggregator.JobRecord]:
+    modes = (
+        "synthetic",
+        "synthetic",
+        "physical-combined",
+        "physical-combined",
+        "physical-combined",
+        "control-stress",
+    )
+    traced = (1_000, 1_100, 2_000, 2_200, 2_100, 3_000)
+    return [
+        _release_record(
+            index,
+            mode=mode,
+            started=f"2026-08-29T{index:02d}:00:00+00:00",
+            completed=f"2026-08-29T{index:02d}:10:30+00:00",
+            traced_growth_bytes=traced[index - 1],
+        )
+        for index, mode in enumerate(modes, start=1)
+    ]
+
+
+def _release_indexes(
+    records: list[aggregator.JobRecord],
+) -> list[tuple[str, dict[str, object]]]:
+    campaign_by_mode = {
+        "synthetic": "phase-11-synthetic",
+        "physical-combined": "phase-11-physical-combined",
+        "control-stress": "phase-11-control-stress",
+    }
+    result: list[tuple[str, dict[str, object]]] = []
+    for mode, campaign in campaign_by_mode.items():
+        accepted = [
+            {
+                "job_id": record.job_id,
+                "classification": "accepted",
+                "bundle": str(TRANSCRIPT_PATH),
+            }
+            for record in records
+            if record.soak is not None and record.soak.get("mode") == mode
+        ]
+        result.append(
+            (
+                f"fixture:{campaign}",
+                {
+                    "schema_version": 1,
+                    "campaign": campaign,
+                    "accepted": accepted,
+                    "excluded": (
+                        [
+                            {
+                                "job_id": "49999999-0000-4000-8000-000000000001",
+                                "classification": "test_failure",
+                                "reason": "explicit fixture exclusion",
+                                "bundle": str(TRANSCRIPT_PATH),
+                            }
+                        ]
+                        if mode == "synthetic"
+                        else []
+                    ),
+                    "infrastructure_incidents": [],
+                },
+            )
+        )
+    return result
+
+
 class VirtualClock:
     """Strictly monotonic virtual time advanced only by the fake serial peer."""
 
@@ -1295,6 +1611,92 @@ class SoakAggregatorTests(unittest.TestCase):
         self.assertFalse(result["accepted_identity_is_uniform"])
         self.assertEqual(2, len(result["accepted_identity_sets"]["artifact_sha256"]))
 
+    def test_phase_11_release_gate_accepts_complete_six_job_campaign(self) -> None:
+        records = _release_records()
+        aggregate_result = aggregator.aggregate(records)
+        release = aggregator.evaluate_phase_11_release(
+            records,
+            aggregate_result,
+            _release_indexes(records),
+        )
+
+        self.assertEqual("PASS", release["result"], release["problems"])
+        self.assertTrue(all(release["checks"].values()))
+        self.assertEqual(6, len(release["run_evidence"]))
+        self.assertEqual(1, len(release["excluded_jobs"]))
+        self.assertEqual([], release["infrastructure_incidents"])
+        self.assertEqual(
+            [[0, 7, 0]], aggregate_result["accepted_identity_sets"]["firmware_version"]
+        )
+
+    def test_phase_11_release_gate_fails_closed_on_each_policy_boundary(self) -> None:
+        mutations: dict[str, object] = {}
+
+        mixed_identity = _release_records()
+        mixed_soak = mixed_identity[0].soak
+        if mixed_soak is None:
+            self.fail("release fixture has no SOAK_RESULT")
+        mixed_soak["expected"]["artifact_sha256"] = "a" * 64  # type: ignore[index]
+        mixed_identity[0].metadata["artifact_sha256"] = "a" * 64
+        mutations["identity"] = mixed_identity
+
+        short = _release_records()
+        short_soak = short[0].soak
+        if short_soak is None:
+            self.fail("release fixture has no SOAK_RESULT")
+        short_soak["timing"]["measured_duration_seconds"] = 60.0  # type: ignore[index]
+        mutations["duration_and_evidence"] = short
+
+        bad_latency = _release_records()
+        latency_soak = bad_latency[0].soak
+        if latency_soak is None:
+            self.fail("release fixture has no SOAK_RESULT")
+        latency_soak["metrics"]["latency"]["status"]["p99_seconds"] = 0.2  # type: ignore[index]
+        mutations["latency"] = bad_latency
+
+        broken_conservation = _release_records()
+        conservation_soak = broken_conservation[0].soak
+        if conservation_soak is None:
+            self.fail("release fixture has no SOAK_RESULT")
+        del conservation_soak["epochs"][0]["status"]["final_counters"][  # type: ignore[index]
+            "adc_payload_bytes_produced"
+        ]
+        mutations["conservation"] = broken_conservation
+
+        monotonic_resources = _release_records()
+        for record, growth in zip(monotonic_resources[2:5], (1_000, 2_000, 3_000)):
+            if record.soak is None:
+                self.fail("release fixture has no SOAK_RESULT")
+            record.soak["metrics"]["memory"]["tracemalloc"][  # type: ignore[index]
+                "growth_bytes"
+            ] = growth
+        mutations["resources"] = monotonic_resources
+
+        for expected_check, raw_records in mutations.items():
+            if not isinstance(raw_records, list):
+                self.fail("release mutation is not a record list")
+            records = raw_records
+            aggregate_result = aggregator.aggregate(records)
+            release = aggregator.evaluate_phase_11_release(
+                records,
+                aggregate_result,
+                _release_indexes(records),
+            )
+            with self.subTest(check=expected_check):
+                self.assertEqual("FAIL", release["result"])
+                self.assertFalse(release["checks"][expected_check])
+
+        missing_lineage = _release_records()
+        indexes = _release_indexes(missing_lineage)
+        del indexes[0][1]["infrastructure_incidents"]
+        release = aggregator.evaluate_phase_11_release(
+            missing_lineage,
+            aggregator.aggregate(missing_lineage),
+            indexes,
+        )
+        self.assertEqual("FAIL", release["result"])
+        self.assertFalse(release["checks"]["campaign_indexes"])
+
 
 class SoakAggregatorCliTests(unittest.TestCase):
     def test_saved_bundle_parse_and_strict_exit_codes(self) -> None:
@@ -1317,9 +1719,19 @@ class SoakAggregatorCliTests(unittest.TestCase):
             stderr = io.StringIO()
             with redirect_stdout(stdout), redirect_stderr(stderr):
                 exit_code = aggregator.main(["--strict", str(path)])
-        self.assertEqual(0, exit_code, stderr.getvalue())
-        parsed = json.loads(stdout.getvalue())
-        self.assertEqual({"accepted": 1}, parsed["classification_counts"])
+            self.assertEqual(0, exit_code, stderr.getvalue())
+            parsed = json.loads(stdout.getvalue())
+            self.assertEqual({"accepted": 1}, parsed["classification_counts"])
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                release_exit = aggregator.main(
+                    ["--strict", "--phase-11-release", str(path)]
+                )
+            self.assertEqual(1, release_exit, stderr.getvalue())
+            release_result = json.loads(stdout.getvalue())
+            self.assertEqual("FAIL", release_result["release_gate"]["result"])
 
 
 if __name__ == "__main__":

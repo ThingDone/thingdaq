@@ -151,6 +151,32 @@ Aggregate one or more saved bundles and fail unless every record is accepted:
   --pretty --strict saved-job-*.json
 ```
 
+For the final Phase 11 decision, also supply the accepted/excluded campaign
+index for each mode and enable the release policy:
+
+```bash
+.venv/bin/python firmware/tools/aggregate_soak_results.py \
+  --pretty --strict --phase-11-release \
+  --campaign-index synthetic-campaign-index.json \
+  --campaign-index physical-campaign-index.json \
+  --campaign-index control-campaign-index.json \
+  --output phase-11-accepted-soaks.json \
+  accepted-synthetic-1.json accepted-synthetic-2.json \
+  accepted-physical-1.json accepted-physical-2.json accepted-physical-3.json \
+  accepted-control.json
+```
+
+That gate requires one uniform source, build, firmware, protocol, and artifact
+identity; two synthetic, three physical-combined, and one control-stress job
+whose configured and observed durations are at least 600 seconds; complete
+per-epoch parser, formula, counter, queue, latency, and memory evidence; exact
+produced/framed/emitted/transmitted/dropped conservation; stable one-percent
+rates; the Phase 04 100/250/500 ms latency limits; and an exact match between
+the aggregate inputs and campaign-index accepted IDs. Every campaign index
+must explicitly contain `excluded` and `infrastructure_incidents` lists, even
+when either list is empty. Any missing field makes `release_gate.result` fail
+and the command exit nonzero.
+
 The output preserves the test process exit status separately from its
 classification and normalizes rates, latency milliseconds, queue high-water
 marks, and memory bytes for cross-run comparison.
