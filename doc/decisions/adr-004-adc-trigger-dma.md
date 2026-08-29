@@ -133,12 +133,13 @@ counts.
 
 Both channel TCDs retain `INTMAJOR`, but only the later ADC1 NVIC line is
 enabled. Its handler requires both `DMA_INT` bits and consumes ADC0 then ADC1
-in one fixed-order barrier operation. ADC1 has the higher numeric eDMA
-priority and can rarely complete first when GPIO traffic preempts ADC0, so an
-initially incomplete pair receives a bounded 10-microsecond reconciliation
-window. The earlier ADC0 line remains reserved and masked. A pair that is
-still incomplete records a DMA fault and initiates the normal fail-safe
-recovery instead of desynchronizing its software generations.
+in one fixed-order barrier operation. Earlier ADC0 has numeric eDMA priority
+1 while later ADC1 has priority 0, so ADC0 wins any pairwise contention and
+GPIO remains highest at priority 2. An initially incomplete pair receives a
+bounded 10-microsecond flag-visibility reconciliation window. The earlier
+ADC0 line remains reserved and masked. A pair that is still incomplete records
+a DMA fault and initiates the normal fail-safe recovery instead of
+desynchronizing its software generations.
 
 Normal STOP first waits for both live channels to enter the first quarter of
 the same DMA generation, then atomically sets `DREQ` on both active TCDs while

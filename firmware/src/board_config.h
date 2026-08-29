@@ -214,10 +214,9 @@ inline constexpr std::uint8_t kGpioPitChannel = 0U;
 inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
 inline constexpr std::uint8_t kGpioEdmaPriority = 2U;
 inline constexpr std::uint8_t kGpioEdmaIrqPriority = 64U;
-// Preserve the reset-unique fixed-priority ordering for channels 0-2. Numeric
-// priority 1 lets later ADC1 finish promptly after a GPIO preemption; the
-// paired completion barrier tolerates its rare completion-order inversion.
-inline constexpr std::uint8_t kAdcEdmaPriorities[] = {0U, 1U};
+// Preserve unique fixed priorities while making the earlier ADC0 request win
+// any ADC-pair contention. GPIO remains higher than both capture channels.
+inline constexpr std::uint8_t kAdcEdmaPriorities[] = {1U, 0U};
 inline constexpr std::uint8_t kAdcEdmaIrqPriority = 48U;
 
 // The later ADC1 completion IRQ consumes both ADC DMA_INT bits as one paired

@@ -211,7 +211,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         )
         * int(combined["dma_alignment_bytes"])
         or list(combined["adc_edma_channels"]) != [0, 1]
-        or list(combined["adc_edma_priorities"]) != [0, 1]
+        or list(combined["adc_edma_priorities"]) != [1, 0]
         or list(combined["adc_dmamux_sources"]) != [24, 88]
         or int(combined["packet_buffer_count"])
         != int(combined["packet_primary_count"]) + int(combined["packet_reserve_count"])

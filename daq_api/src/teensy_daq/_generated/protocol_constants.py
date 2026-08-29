@@ -1,14 +1,14 @@
 """Generated protocol-v1 constants. Do not edit by hand.
 
 Source: protocol/protocol-v1.json
-Source SHA-256: ee82cb67adee1cbe763c07f85dbf4639c8fdfe5d0703d8f270a7863cf871858c
+Source SHA-256: 36388cc20a5e8aedd26214bb557ec9ce05db2cd78476e869c42cd8c43acf5a7c
 """
 
 from __future__ import annotations
 
 from enum import IntEnum, IntFlag
 
-SOURCE_SHA256 = "ee82cb67adee1cbe763c07f85dbf4639c8fdfe5d0703d8f270a7863cf871858c"
+SOURCE_SHA256 = "36388cc20a5e8aedd26214bb557ec9ce05db2cd78476e869c42cd8c43acf5a7c"
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
 PROTOCOL_VERSION = 1
@@ -37,7 +37,7 @@ ADC_PAIRS_PER_BUFFER = 1012
 ADC_PAIR_BYTES = 4
 ADC_DMA_RING_BYTES = 16256
 ADC_EDMA_CHANNELS = (0, 1)
-ADC_EDMA_PRIORITIES = (0, 1)
+ADC_EDMA_PRIORITIES = (1, 0)
 ADC_DMAMUX_SOURCES = (24, 88)
 ADC_DMA_IRQ_PRIORITY = 48
 GPIO_DMA_IRQ_PRIORITY = 64

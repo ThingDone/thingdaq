@@ -408,11 +408,10 @@ void processDmaCompletion(std::size_t converter) {
 
 TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_wait")
 std::uint32_t waitForDmaPair(std::uint32_t pending) {
-  // ADC1 has the higher fixed eDMA priority so it can occasionally finish
-  // first when the earlier ADC0 transfer was preempted by GPIO traffic. Once
-  // ADC1 releases the engine, ADC0 normally completes within a few bus cycles.
-  // Bound the rare reconciliation below one ADC major-loop interval; a real
-  // missing completion still enters the normal fail-safe path.
+  // ADC0's higher fixed eDMA priority makes it complete before ADC1 whenever
+  // both requests contend. Bound a rare flag-visibility reconciliation below
+  // one ADC major-loop interval; a real missing completion still enters the
+  // normal fail-safe path.
   const std::uint32_t started = ARM_DWT_CYCCNT;
   while (pending != kAdcDmaChannelMask &&
          ARM_DWT_CYCCNT - started < kDmaPairWaitCycles) {
@@ -826,8 +825,8 @@ static_assert(board::kAdcConverterConfigurations[0].dmamux_source ==
               DMAMUX_SOURCE_ADC1);
 static_assert(board::kAdcConverterConfigurations[1].dmamux_source ==
               DMAMUX_SOURCE_ADC2);
-static_assert(board::kAdcEdmaPriorities[0] == 0U);
-static_assert(board::kAdcEdmaPriorities[1] == 1U);
+static_assert(board::kAdcEdmaPriorities[0] == 1U);
+static_assert(board::kAdcEdmaPriorities[1] == 0U);
 
 }  // namespace teensy_daq::adc_capture
 
