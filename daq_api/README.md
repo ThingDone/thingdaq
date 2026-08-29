@@ -73,7 +73,8 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
 `GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
 `GpioCaptureDiagnosticResult`, `StreamGap`, `HostQueueLoss`, `StreamAnomaly`,
 `FirmwareLossEvidence`, `FirmwareCounters`, `HostCounters`, `LossCounters`,
-`NominalEpoch`, `AlignedInterval`, and `AlignmentLoss` validate
+`FirmwareFaultSnapshot`, `RunCounterReconciliation`, `NominalEpoch`,
+`AlignedInterval`, and `AlignmentLoss` validate
 their values when constructed. The Phase 01 names
 `Info`, `Configuration`, `AdcBlock`, and `GpioBlock` remain aliases. INFO,
 GET_STATUS, and STOP are legal in every post-boot state; CONFIGURE and
@@ -242,6 +243,7 @@ teensy-daq configure --hardware-serial 12345670 --streams both --source hardware
 teensy-daq start --hardware-serial 12345670
 teensy-daq stop --hardware-serial 12345670
 teensy-daq reset-stats --hardware-serial 12345670
+teensy-daq reconcile --hardware-serial 12345670
 teensy-daq monitor --hardware-serial 12345670 --streams both --source hardware --duration 10
 teensy-daq capture --simulate --streams both --source synthetic --duration 2
 ```
@@ -258,7 +260,17 @@ always attempt STOP and close from a finalizer. `--streams` accepts `adc`,
 or `synthetic`, and omission selects an advertised exact profile. Diagnostics
 are typed and machine-visible: no device (exit 3),
 timeout (4), busy/denied port (5), wrong identity (6), unsupported capability
-(7), disconnect (8), invalid state (9), and other device errors (10).
+(7), disconnect (8), invalid state (9), other device errors (10), and a
+counter inconsistency or saturation that prevents an exact proof (11).
+
+`reconcile` captures one STATUS snapshot and prints the run/generation,
+source-wise frame/item/byte conservation equations, the first inconsistent or
+saturated counter, and typed firmware faults. A live snapshot includes current
+filling/ready/transmit ownership in its equations; after STOP, exact zero-depth
+equations provide the strongest whole-run proof. The same API is available as
+`reconcile_run_counters(status)` and `snapshot_firmware_faults(status)`.
+Saturated operands are reported as indeterminate rather than mistaken for
+either equality or a wrap.
 
 The simulator advertises only the deterministic synthetic source. Each
 successful START allocates a new run ID, resets both stream epochs and

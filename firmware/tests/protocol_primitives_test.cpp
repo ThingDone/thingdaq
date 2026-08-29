@@ -435,6 +435,8 @@ void testGoldenEncode(const std::string &fixture_directory,
   status.diagnostics.commands_accepted = 4U;
   status.usb.command_queue_high_water = 1U;
   status.usb.response_queue_high_water = 1U;
+  status.usb.responses_queued = 3U;
+  status.usb.responses_completed = 3U;
   expect(wire::encodeStatusResponse(
              request(constants::CommandKind::kGetStatus, 4U), 7U, status,
              response)

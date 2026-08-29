@@ -286,6 +286,7 @@ class ControlCliTests(unittest.TestCase):
         for command, expected_text in (
             ("probe", "build_id=teensy-daq-simulator-v1"),
             ("status", "stats_generation=1"),
+            ("reconcile", "conservation=PASS"),
             ("configure", "profile=SYNTHETIC_COMBINED"),
             ("reset-stats", "stats_generation=2"),
         ):

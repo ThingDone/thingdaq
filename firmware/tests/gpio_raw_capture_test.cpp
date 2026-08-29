@@ -113,6 +113,10 @@ void testOwnershipCacheAndContinuousOverflow() {
          "prime reserves two distinct DMA destinations");
   expect(fixture.cache.count == board::kGpioRawDmaRingDepth + 1U,
          "prime discards every consumer buffer and the overflow sink");
+  expect(fixture.ring.snapshot().progress.cache_dma_discards ==
+                 board::kGpioRawDmaRingDepth + 1U &&
+             fixture.ring.snapshot().progress.cache_cpu_invalidations == 0U,
+         "GPIO cache telemetry counts each completed ownership operation");
   for (std::size_t index = 0U;
        index < board::kGpioRawDmaRingDepth; ++index) {
     expect(fixture.cache.events[index].kind ==
@@ -151,6 +155,8 @@ void testOwnershipCacheAndContinuousOverflow() {
              fixture.cache.events[fixture.cache.count - 1U].bytes ==
                  sizeof(capture::RawBuffer),
          "CPU ownership invalidates the completed DMA buffer");
+  expect(fixture.ring.snapshot().progress.cache_cpu_invalidations == 1U,
+         "GPIO CPU-invalidation telemetry advances with the acquired lease");
 
   completed = fixture.ring.onMajorLoopComplete();
   expect(completed.ok() && completed.completed_destination == 1U &&
@@ -192,6 +198,9 @@ void testOwnershipCacheAndContinuousOverflow() {
              fixture.cache.events[fixture.cache.count - 1U].bytes ==
                  sizeof(capture::RawBuffer),
          "release discards CPU cache before the buffer becomes FREE");
+  expect(fixture.ring.snapshot().progress.cache_dma_discards ==
+             board::kGpioRawDmaRingDepth + 2U,
+         "GPIO DMA-discard telemetry advances before lease recycling");
   expect(fixture.ring.release(first.handle) ==
              capture::OperationStatus::kInvalidHandle,
          "stale leases cannot free a buffer twice");

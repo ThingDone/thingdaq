@@ -928,9 +928,6 @@ void testCompleteControlPlane() {
       emptyRequest(constants::FrameKind::kGetStatusRequest, 4U));
   stream.appendInput(pingRequest(5U, nonce));
   stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 6U));
-  stream.appendInput(
-      emptyRequest(constants::FrameKind::kResetStatsRequest, 7U));
-  stream.appendInput(emptyRequest(constants::FrameKind::kInfoRequest, 8U));
   const DrainResult stopped = drain(firmware, stream);
   expect(stopped.quiescent && !stopped.saw_start && stopped.saw_stop &&
              !stopped.packet_started && stopped.packet_stopped &&
@@ -938,7 +935,13 @@ void testCompleteControlPlane() {
              firmware.runId() == 1U &&
              !firmware.packetSnapshot().accepting_frames &&
              !firmware.syntheticSnapshot().running,
-         "STATUS-PING-STOP-RESET-INFO stops synthetic production in clean IDLE");
+         "STATUS-PING-STOP stops synthetic production in clean IDLE");
+
+  stream.appendInput(
+      emptyRequest(constants::FrameKind::kResetStatsRequest, 7U));
+  stream.appendInput(emptyRequest(constants::FrameKind::kInfoRequest, 8U));
+  expect(drain(firmware, stream).quiescent,
+         "RESET and INFO run after every prior response is complete");
 
   const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
   expect(frames.size() == 9U,
@@ -1065,6 +1068,49 @@ void testCompleteControlPlane() {
              transport.responses_completed == 9U &&
              transport.response_reservations_abandoned == 0U,
          "transport lifetime diagnostics account for parser recovery and I/O");
+}
+
+void testResetStatsWaitsForOlderControlResponses() {
+  FakeCdcStream stream{};
+  packet::OwnedPacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  app::FirmwareRuntime firmware{stream, packet_storage, clock};
+  expect(firmware.begin(167772151U),
+         "RESET ordering runtime completes BOOT");
+
+  stream.max_write_size = 1U;
+  stream.appendInput(pingRequest(1U, 0x1122334455667788ULL));
+  stream.appendInput(
+      emptyRequest(constants::FrameKind::kResetStatsRequest, 2U));
+  (void)firmware.service();
+  (void)firmware.service();
+  expect(firmware.transportSnapshot().response_queue_depth == 2U &&
+             firmware.statistics().generation() == 1U,
+         "RESET returns BUSY while an older response remains in flight");
+
+  stream.max_write_size = 2048U;
+  expect(drain(firmware, stream).quiescent,
+         "older response and BUSY RESET response drain in order");
+  std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
+  expect(frames.size() == 2U &&
+             frames[0].header.kind == constants::FrameKind::kPingResponse &&
+             frames[1].header.kind ==
+                 constants::FrameKind::kResetStatsResponse &&
+             responseError(frames[1]) == constants::ErrorCode::kBusy &&
+             firmware.statistics().generation() == 1U,
+         "rejected RESET preserves generation behind an older response");
+
+  stream.appendInput(
+      emptyRequest(constants::FrameKind::kResetStatsRequest, 3U));
+  expect(drain(firmware, stream).quiescent,
+         "quiescent RESET response drains");
+  frames = decodeOutput(stream.output);
+  expect(frames.size() == 3U &&
+             frames[2].header.kind ==
+                 constants::FrameKind::kResetStatsResponse &&
+             responseError(frames[2]) == constants::ErrorCode::kOk &&
+             firmware.statistics().generation() == 2U,
+         "quiescent RESET starts one unambiguous response-counter epoch");
 }
 
 void testSyntheticDataCountersReachStatus() {
@@ -2172,6 +2218,7 @@ void testGpioClockRoundTripPreservesIdleAcquisitionState() {
 
 int main() {
   testCompleteControlPlane();
+  testResetStatsWaitsForOlderControlResponses();
   testSyntheticDataCountersReachStatus();
   testStartupSchedulingJitterFitsPacketPool();
   testTransmitVisitsInterleaveAcquisitionWork();

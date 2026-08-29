@@ -496,6 +496,9 @@ void testPoolExhaustionIsBoundedAndSequenceVisible() {
              full.pool_exhaustions == 1U &&
              full.pressure_evictions == 0U &&
              full.capacity_drops_without_evictable_frame == 1U &&
+             full.filling_depth_by_source[0] == 0U &&
+             full.filling_depth_by_source[1] == board::kPacketBufferCount &&
+             full.buffers_owned == board::kPacketBufferCount &&
              gpio.frames_produced == board::kPacketBufferCount + 1U &&
              gpio.frames_dropped == 1U &&
              gpio.next_sequence == board::kPacketBufferCount + 1U,
@@ -587,6 +590,14 @@ void testOldestCompletePressureEvictionKeepsLiveDataAndControlServiceable() {
              gpio.frames_produced == initial_frames_per_source + 1U &&
              adc.frames_dropped == 1U && gpio.frames_dropped == 1U &&
              adc.frames_evicted == 1U && gpio.frames_evicted == 1U &&
+             adc.frames_dropped_after_framing == 1U &&
+             gpio.frames_dropped_after_framing == 1U &&
+             adc.frames_dropped_after_promotion == 1U &&
+             gpio.frames_dropped_after_promotion == 1U &&
+             adc.frames_evicted_after_promotion == 1U &&
+             gpio.frames_evicted_after_promotion == 1U &&
+             pressured.filling_depth_by_source[0] == 0U &&
+             pressured.filling_depth_by_source[1] == 0U &&
              adc.items_dropped == constants::kAdcPairsPerFrame &&
              gpio.items_dropped == constants::kGpioSamplesPerFrame &&
              pressured.source_bytes[0].payload_bytes_dropped ==

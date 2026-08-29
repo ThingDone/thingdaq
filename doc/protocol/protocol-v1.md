@@ -2,7 +2,7 @@
 type: reference
 title: Protocol V1
 created: 2026-08-27
-updated: 2026-08-28
+updated: 2026-08-29
 tags:
   - teensy-daq
   - protocol
@@ -14,6 +14,7 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[Acquisition-Pipeline]]'
 ---
 
 # Protocol v1
@@ -75,10 +76,10 @@ for its kind.
 | ADC data | exactly 4,096 | exactly 4,048 | run, sequence, time, and item count are meaningful |
 | GPIO data | exactly 4,096 | exactly 4,048 | run, sequence, time, and item count are meaningful |
 | Request | 48 through 56 | 0 through 8 | nonzero request ID; run/sequence/time/items are zero |
-| Response | 52 through 1,024 | 4 through 976 | request ID is copied; sequence/time/items are zero |
+| Response | 52 through 1,280 | 4 through 1,232 | request ID is copied; sequence/time/items are zero |
 
 The largest data frame is 4,096 bytes, the largest v1 command is 56 bytes,
-and the defensive bound for any control response is 1,024 bytes. In addition
+and the defensive bound for any control response is 1,280 bytes. In addition
 to those class bounds, every control kind has the exact
 payload shape given below. A v1 receiver rejects trailing fields, shortened
 fields, nonzero reserved bytes, and unknown flag bits instead of partially
@@ -546,7 +547,7 @@ control state can commit the run.
 ### GET_STATUS
 
 GET_STATUS is idempotent in every post-boot state and has an empty request. Its
-976-byte success payload contains the common prefix, configuration and legacy
+1,228-byte success payload contains the common prefix, configuration and legacy
 stream counters, physical GPIO stage counts, queue and lifecycle diagnostics,
 the immutable ADC initialization/trigger snapshot, and detailed ADC
 DMA-to-transport accounting. It then publishes complete per-source packet and
@@ -653,6 +654,19 @@ acquisition.
 | 912 | 36 / `u32[9]` | commands accepted/rejected, checksum/length/type/version errors, timeouts, partial writes, state errors |
 | 948 | 16 / `u32[4]` | USB short-capacity deferrals, RX/TX stalls, and I/O errors |
 | 964 | 12 / `u16[6]` | USB command/response/lower-priority depths, command/response high-water depths, active-frame bytes sent |
+| 976 | 2 / `u16` | packet buffers currently owned across filling, ready, and transmitting states |
+| 978 | 2 / `u16` | complete wire size of the active USB frame; zero when idle |
+| 980 | 16 / `u32[4]` | ADC/GPIO DMA cache discards and CPU cache invalidations |
+| 996 | 12 / `u32[3]` | bad flag, typed-payload, and request-ID parser classifications |
+| 1008 | 16 / `u32[4]` | responses queued/completed, queue rejections, and abandoned reservations |
+| 1024 | 16 / `u64[2]` | pressure evictions and allocation drops with no evictable complete frame |
+| 1040 | 32 / `u64[4]` | ADC/GPIO pressure evictions, including the post-promotion subsets |
+| 1072 | 4 / `u16[2]` | current producer-owned ADC/GPIO filling depths |
+| 1076 | 32 / `u64[4]` | ADC/GPIO frames dropped after framing and after promotion |
+| 1108 | 40 / `u64[5]` | GPIO raw buffers completed/acquired/released, samples delivered, and STOP-discarded samples |
+| 1148 | 32 / `u64[4]` | GPIO packer frames/samples produced, frames packed, and duplicate samples ignored |
+| 1180 | 32 / `u64[4]` | ADC packer frames/pairs consumed, raw-gap pairs, and projected raw-drop pairs |
+| 1212 | 16 / `u64[2]` | projected GPIO raw-capture and packer-drop samples |
 
 | Counter | Wire type | Unit |
 | --- | --- | --- |
@@ -675,11 +689,26 @@ acquisition.
 | Per-source payload/framed byte counters | `u64` | Logical payload bytes and complete wire bytes at each packet/USB boundary |
 | Shared packet/fairness counters | `u64`/`u32` | Promotion, arbitration, skew, transmitted bytes, allocation, encoding, and queue rejection evidence |
 | Firmware command/USB diagnostics | `u32` | Accepted/rejected commands, parser classes, timeouts, partial writes, stalls, and I/O errors |
+| Cache-maintenance counters | `u32` | Completed discard or invalidate operations at a DMA/CPU ownership transition |
+| Response lifecycle counters | `u32` | Complete responses admitted, completed, rejected, or abandoned |
+| Packet filling/ready/transmit/owned and USB active depths | `u16` | Current complete-frame ownership or wire-byte progress, as named |
+| Post-framing/post-promotion and pressure counters | `u64` | Complete frames discarded at the named shared-pipeline boundary |
+| GPIO raw/packer counters | `u64` | Complete buffers, packed sample instants, or complete frames, as named |
+| ADC packer/projection counters | `u64` | Complete frames or simultaneous ADC sample-pair instants, as named |
 
-These are firmware counters only. They saturate at their type maximum and
+These are firmware counters only. Cumulative `u64` and `u32` values saturate
+at their type maximum; current `u16` depths are gauges and high-water values
+are monotonic within a generation. Run ID, statistics generation, and data
+sequence are the explicitly wrapping identities described above. Counters
 reset on successful START or RESET_STATS. Host parser corruption, decoded-
 queue drops, and late responses live in separate host models and must never be
 added to or described as these firmware counters.
+
+The complete canonical field-to-unit registry and conservation equations are
+in [[Acquisition-Pipeline]]. In particular, an ADC item is one simultaneous
+ADC0/ADC1 sample-pair instant, a GPIO item is one packed eight-pin sample
+instant, a payload byte excludes framing, and a framed byte includes the
+44-byte header plus four-byte trailer.
 
 ### STOP
 
@@ -715,13 +744,17 @@ next successful START.
 
 ### RESET_STATS
 
-RESET_STATS has an empty request and is valid only in IDLE or CONFIGURED, so a
-counter reset cannot race with in-flight acquisition data. Success zeros every
-reported firmware counter, advances the nonzero `stats_generation` modulo
-\(2^{32}\) while skipping zero, and returns the new generation after the common
-prefix in an eight-byte payload. It does not change configuration, run ID,
-sequence values, or timestamp state. A request while RUNNING returns
-`INVALID_STATE` without changing counters.
+RESET_STATS has an empty request and is valid only in IDLE or CONFIGURED. It
+also requires raw capture, packer, packet, and data-transport ownership to be
+quiescent and requires the older control-response queue to be empty. A legal-
+state request received while old-run data or a prior response remains owned
+returns `BUSY` without changing counters or generation; a RUNNING request
+returns `INVALID_STATE`. Success zeros every reported firmware counter,
+advances the nonzero `stats_generation` modulo \(2^{32}\) while skipping zero,
+and returns the new generation after the common prefix in an eight-byte
+payload. It does not change configuration, run ID, sequence values, or
+timestamp state. Transport diagnostics are rebased before the accepted RESET
+event is recorded, making the response the first response of the new epoch.
 
 ### PING
 

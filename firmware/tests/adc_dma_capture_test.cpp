@@ -128,6 +128,10 @@ void testDirectPairLayoutDualBarrierAndCacheOwnership() {
          "prime reserves one shared active and queued destination");
   expect(fixture.cache.count == board::kAdcDmaRingDepth + 1U,
          "prime discards every ADC buffer and the isolated sink");
+  expect(fixture.ring.snapshot().progress.cache_dma_discards ==
+                 board::kAdcDmaRingDepth + 1U &&
+             fixture.ring.snapshot().progress.cache_cpu_invalidations == 0U,
+         "ADC cache telemetry counts each completed ownership operation");
   for (std::size_t index = 0U; index < board::kAdcDmaRingDepth; ++index) {
     expect(fixture.cache.events[index].kind ==
                    CacheEvent::Kind::kDmaDiscard &&
@@ -186,11 +190,16 @@ void testDirectPairLayoutDualBarrierAndCacheOwnership() {
              fixture.cache.events[fixture.cache.count - 1U].address ==
                  acquired.handle.pairs,
          "CPU invalidation occurs only after the dual barrier");
+  expect(fixture.ring.snapshot().progress.cache_cpu_invalidations == 1U,
+         "ADC CPU-invalidation telemetry advances with the acquired lease");
   expect(fixture.ring.release(acquired.handle) ==
                  capture::OperationStatus::kOk &&
              fixture.cache.events[fixture.cache.count - 1U].kind ==
                  CacheEvent::Kind::kDmaDiscard,
          "release discards CPU cache before the buffer becomes reusable");
+  expect(fixture.ring.snapshot().progress.cache_dma_discards ==
+             board::kAdcDmaRingDepth + 2U,
+         "ADC DMA-discard telemetry advances before lease recycling");
   expect(fixture.ring.release(acquired.handle) ==
              capture::OperationStatus::kInvalidHandle,
          "a stale lease cannot release the same pair buffer twice");

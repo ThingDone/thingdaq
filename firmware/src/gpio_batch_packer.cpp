@@ -220,6 +220,7 @@ Snapshot GpioBatchPacker::snapshot(
     const packet::PacketBufferPipeline &pipeline) const {
   Snapshot result{};
   result.progress = progress(pipeline);
+  result.progress.duplicate_samples_ignored = duplicate_samples_ignored_;
   for (std::size_t index = 0U; index < records_.size(); ++index) {
     result.buffer_states[index] = records_[index].state;
   }

@@ -57,6 +57,10 @@ void Statistics::recordCommandRejected(protocol_v1::ErrorCode error) {
   saturatingAdd(counters_.commands_rejected, std::uint32_t{1U});
   if (error == protocol_v1::ErrorCode::kInvalidState) {
     saturatingAdd(counters_.state_errors, std::uint32_t{1U});
+  } else if (error == protocol_v1::ErrorCode::kInvalidRequestId) {
+    saturatingAdd(counters_.bad_request_ids, std::uint32_t{1U});
+  } else if (error == protocol_v1::ErrorCode::kInvalidPayload) {
+    saturatingAdd(counters_.bad_payloads, std::uint32_t{1U});
   }
 }
 
@@ -67,6 +71,9 @@ void Statistics::recordParserDelta(const protocol::ParserCounters &delta) {
   saturatingAdd(counters_.bad_lengths, delta.bad_lengths);
   saturatingAdd(counters_.bad_types, delta.bad_kinds);
   saturatingAdd(counters_.bad_versions, delta.bad_versions);
+  saturatingAdd(counters_.bad_flags, delta.bad_flags);
+  saturatingAdd(counters_.bad_payloads, delta.bad_payloads);
+  saturatingAdd(counters_.bad_request_ids, delta.bad_request_ids);
 }
 
 void Statistics::recordTimeout() {
@@ -262,6 +269,21 @@ protocol::StatusResponse Statistics::wireStatus(
       counters_.gpio_raw_capture.raw_ring_overruns;
   response.gpio_dma_major_loops =
       counters_.gpio_raw_capture.major_loops_completed;
+  response.gpio_buffers_completed =
+      counters_.gpio_raw_capture.buffers_completed;
+  response.gpio_buffers_acquired =
+      counters_.gpio_raw_capture.buffers_acquired;
+  response.gpio_buffers_released =
+      counters_.gpio_raw_capture.buffers_released;
+  response.gpio_samples_delivered =
+      counters_.gpio_raw_capture.samples_delivered;
+  response.gpio_stop_samples_discarded =
+      counters_.gpio_raw_capture.stop_discarded_samples;
+  response.gpio_frames_produced = counters_.gpio_packer.frames_produced;
+  response.gpio_samples_produced = counters_.gpio_packer.samples_produced;
+  response.gpio_frames_packed = counters_.gpio_packer.frames_packed;
+  response.gpio_duplicate_samples_ignored =
+      counters_.gpio_packer.duplicate_samples_ignored;
   response.gpio_raw_ready_depth =
       narrowDepth(counters_.gpio_raw_capture.ready_depth);
   response.gpio_raw_ready_high_water =
@@ -293,6 +315,10 @@ protocol::StatusResponse Statistics::wireStatus(
   response.gpio_stop_errors = counters_.gpio_raw_capture.stop_errors;
   response.gpio_stale_dma_completions =
       counters_.gpio_raw_capture.stale_dma_completions;
+  response.gpio_cache_dma_discards =
+      counters_.gpio_raw_capture.cache_dma_discards;
+  response.gpio_cache_cpu_invalidations =
+      counters_.gpio_raw_capture.cache_cpu_invalidations;
   response.adc0_dma_major_loops = counters_.adc_capture.adc0_major_loops;
   response.adc1_dma_major_loops = counters_.adc_capture.adc1_major_loops;
   response.adc0_dma_results = counters_.adc_capture.adc0_results;
@@ -315,6 +341,10 @@ protocol::StatusResponse Statistics::wireStatus(
       counters_.adc_capture.overwritten_conversions;
   response.adc_raw_ring_overruns = counters_.adc_capture.ring_overruns;
   response.adc_incomplete_buffers = counters_.adc_capture.incomplete_buffers;
+  response.adc_cache_dma_discards =
+      counters_.adc_capture.cache_dma_discards;
+  response.adc_cache_cpu_invalidations =
+      counters_.adc_capture.cache_cpu_invalidations;
   response.adc_raw_ready_depth =
       narrowDepth(counters_.adc_capture.ready_depth);
   response.adc_raw_ready_high_water =
@@ -340,6 +370,15 @@ protocol::StatusResponse Statistics::wireStatus(
   response.adc_packer_pipeline_errors = counters_.adc_packer.pipeline_errors;
   response.adc_packer_chronology_errors =
       counters_.adc_packer.chronology_errors;
+  response.adc_frames_consumed = counters_.adc_packer.frames_consumed;
+  response.adc_pairs_consumed = counters_.adc_packer.pairs_consumed;
+  response.adc_raw_gap_pairs = counters_.adc_packer.raw_gap_pairs;
+  response.adc_raw_drop_pairs_projected =
+      counters_.adc_packer.raw_drop_pairs_projected;
+  response.gpio_raw_drop_samples_projected =
+      counters_.gpio_packer.raw_drop_samples_projected;
+  response.gpio_packer_drop_samples_projected =
+      counters_.gpio_packer.packer_drop_samples_projected;
   const auto project_stream = [](const StreamProgress &source,
                                  protocol::StreamTelemetry &destination) {
     destination.frames_generated = source.frames_generated;
@@ -350,6 +389,13 @@ protocol::StatusResponse Statistics::wireStatus(
     destination.frames_transmitted = source.frames_transmitted;
     destination.items_transmitted = source.items_transmitted;
     destination.frames_dropped = source.frames_dropped;
+    destination.frames_evicted = source.frames_evicted;
+    destination.frames_evicted_after_promotion =
+        source.frames_evicted_after_promotion;
+    destination.frames_dropped_after_framing =
+        source.frames_dropped_after_framing;
+    destination.frames_dropped_after_promotion =
+        source.frames_dropped_after_promotion;
     destination.payload_bytes_produced = source.payload_bytes_produced;
     destination.payload_bytes_framed = source.payload_bytes_framed;
     destination.payload_bytes_emitted = source.payload_bytes_emitted;
@@ -368,6 +414,8 @@ protocol::StatusResponse Statistics::wireStatus(
         counters_.packet_queue.ready_depth_by_source[index]);
     response.streams[index].packet_transmit_depth = narrowDepth(
         counters_.packet_queue.transmit_depth_by_source[index]);
+    response.streams[index].packet_filling_depth = narrowDepth(
+        counters_.packet_queue.filling_depth_by_source[index]);
     response.streams[index].packet_ready_high_water = narrowDepth(
         counters_.packet_queue.ready_high_water_by_source[index]);
     response.streams[index].packet_transmit_high_water = narrowDepth(
@@ -375,11 +423,17 @@ protocol::StatusResponse Statistics::wireStatus(
   }
   response.packet.ready_high_water =
       narrowDepth(counters_.packet_queue.ready_high_water);
+  response.packet.owned_depth =
+      narrowDepth(counters_.packet_queue.owned_depth);
   response.packet.transmit_high_water =
       narrowDepth(counters_.packet_queue.transmit_high_water);
   response.packet.frames_promoted = counters_.packet_queue.frames_promoted;
   response.packet.fairness_deferrals =
       counters_.packet_queue.fairness_deferrals;
+  response.packet.pressure_evictions =
+      counters_.packet_queue.pressure_evictions;
+  response.packet.capacity_drops_without_evictable_frame =
+      counters_.packet_queue.capacity_drops_without_evictable_frame;
   response.packet.accounted_frame_skew =
       counters_.packet_queue.accounted_frame_skew;
   response.packet.data_payload_bytes_transmitted =
@@ -402,6 +456,9 @@ protocol::StatusResponse Statistics::wireStatus(
   response.diagnostics.bad_lengths = counters_.bad_lengths;
   response.diagnostics.bad_types = counters_.bad_types;
   response.diagnostics.bad_versions = counters_.bad_versions;
+  response.diagnostics.bad_flags = counters_.bad_flags;
+  response.diagnostics.bad_payloads = counters_.bad_payloads;
+  response.diagnostics.bad_request_ids = counters_.bad_request_ids;
   response.diagnostics.timeouts = counters_.timeouts;
   response.diagnostics.partial_usb_writes = counters_.partial_usb_writes;
   response.diagnostics.state_errors = counters_.state_errors;
@@ -410,6 +467,12 @@ protocol::StatusResponse Statistics::wireStatus(
   response.usb.rx_stall_events = counters_.usb.rx_stall_events;
   response.usb.tx_stall_events = counters_.usb.tx_stall_events;
   response.usb.io_errors = counters_.usb.io_errors;
+  response.usb.responses_queued = counters_.usb.responses_queued;
+  response.usb.responses_completed = counters_.usb.responses_completed;
+  response.usb.response_queue_rejections =
+      counters_.usb.response_queue_rejections;
+  response.usb.response_reservations_abandoned =
+      counters_.usb.response_reservations_abandoned;
   response.usb.command_queue_depth =
       narrowDepth(counters_.usb.command_queue_depth);
   response.usb.response_queue_depth =
@@ -422,6 +485,8 @@ protocol::StatusResponse Statistics::wireStatus(
       narrowDepth(counters_.usb.response_queue_high_water);
   response.usb.active_frame_bytes_sent =
       narrowDepth(counters_.usb.active_frame_bytes_sent);
+  response.usb.active_frame_size =
+      narrowDepth(counters_.usb.active_frame_size);
   return response;
 }
 

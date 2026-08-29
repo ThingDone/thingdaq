@@ -308,7 +308,7 @@ and 95-frame CPU-owned OCRAM reserve cover 101.200 ms at the nominal combined
 framed rate, plus 1.012 ms in the core ring. This absorbs the 60.715 ms service
 gap observed by the Phase 05 CRC campaign while the exact linker gate retains
 at least 32 KiB for locals and stack. The compile-time registry reserves
-449,440 bytes of RAM1 project data and 491,072 bytes of RAM2 storage, including
+450,464 bytes of RAM1 project data and 491,072 bytes of RAM2 storage, including
 the acquisition rings, isolated benchmark buffers, and the GPIO clock
 diagnostic cache line; see
 `doc/architecture/firmware-resource-map.md` and

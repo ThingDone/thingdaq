@@ -111,9 +111,11 @@ PrimeResult RawCaptureRing::prime() {
 
   for (RawBuffer &buffer : storage_.buffers) {
     cache_.discardBeforeDmaWrite(buffer.words.data(), sizeof(buffer));
+    saturatingIncrement(progress_.cache_dma_discards);
   }
   cache_.discardBeforeDmaWrite(overflow_sink_.words.data(),
                                sizeof(overflow_sink_));
+  saturatingIncrement(progress_.cache_dma_discards);
   return result;
 }
 
@@ -219,6 +221,7 @@ AcquireResult RawCaptureRing::acquireReady() {
 
   cache_.invalidateBeforeCpuRead(storage_.buffers[selected].words.data(),
                                  sizeof(RawBuffer));
+  saturatingIncrement(progress_.cache_cpu_invalidations);
   result.status = OperationStatus::kOk;
   return result;
 }
@@ -235,6 +238,7 @@ OperationStatus RawCaptureRing::release(const BufferHandle &handle) {
 
   cache_.discardBeforeDmaWrite(
       storage_.buffers[handle.buffer_index].words.data(), sizeof(RawBuffer));
+  saturatingIncrement(progress_.cache_dma_discards);
 
   token = critical_.enter();
   if (!handleMatches(handle, BufferState::kReleasing)) {
@@ -305,6 +309,7 @@ StopReport RawCaptureRing::stop(std::uint32_t active_samples) {
   if (isBufferDestination(active_to_discard)) {
     cache_.discardBeforeDmaWrite(
         storage_.buffers[active_to_discard].words.data(), sizeof(RawBuffer));
+    saturatingIncrement(progress_.cache_dma_discards);
     const std::uint32_t release_token = critical_.enter();
     records_[active_to_discard].state = BufferState::kFree;
     records_[active_to_discard].lease = 0U;
@@ -312,6 +317,7 @@ StopReport RawCaptureRing::stop(std::uint32_t active_samples) {
   } else {
     cache_.discardBeforeDmaWrite(overflow_sink_.words.data(),
                                  sizeof(overflow_sink_));
+    saturatingIncrement(progress_.cache_dma_discards);
   }
   report.status = OperationStatus::kOk;
   return report;

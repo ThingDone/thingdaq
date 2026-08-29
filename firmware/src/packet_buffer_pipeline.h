@@ -219,6 +219,11 @@ struct SourceCounters {
   std::uint64_t frames_evicted = 0U;
   std::uint64_t items_evicted = 0U;
   std::uint64_t frames_evicted_after_promotion = 0U;
+  // Every drop is classified by the latest ownership stage it reached. These
+  // totals include pressure evictions and exceptional invariant/encoding
+  // failures, so live conservation never has to infer a missing stage.
+  std::uint64_t frames_dropped_after_framing = 0U;
+  std::uint64_t frames_dropped_after_promotion = 0U;
   std::uint32_t next_sequence = 0U;
   std::size_t ready_queue_high_water = 0U;
   std::size_t transmit_queue_high_water = 0U;
@@ -247,6 +252,7 @@ struct PipelineSnapshot {
   std::array<std::size_t, 4U> buffers_by_state{};
   std::array<std::size_t, kStreamCount> ready_depth_by_source{};
   std::array<std::size_t, kStreamCount> transmit_depth_by_source{};
+  std::array<std::size_t, kStreamCount> filling_depth_by_source{};
   std::uint32_t run_id = 0U;
   std::uint8_t enabled_stream_mask = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
@@ -267,6 +273,7 @@ struct PipelineSnapshot {
   std::uint64_t data_framed_bytes_transmitted = 0U;
   std::size_t ready_queue_depth = 0U;
   std::size_t transmit_queue_depth = 0U;
+  std::size_t buffers_owned = 0U;
   std::size_t ready_queue_high_water = 0U;
   std::size_t transmit_queue_high_water = 0U;
   std::size_t buffers_owned_high_water = 0U;

@@ -23,6 +23,7 @@ from .client import (
     TeensyDAQ,
     TeensyDAQError,
 )
+from .diagnostics import RunCounterReconciliation, reconcile_run_counters
 from .discovery import (
     DeviceNotFoundError,
     DiscoveryError,
@@ -64,6 +65,7 @@ class CliExitCode(IntEnum):
     DISCONNECTED = 8
     INVALID_STATE = 9
     DEVICE_ERROR = 10
+    COUNTER_INCONSISTENCY = 11
 
 
 def _unsigned_serial(value: str) -> int:
@@ -172,6 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
     command_help = {
         "probe": "synchronize and print validated INFO",
         "status": "print decoded GET_STATUS state and counters",
+        "reconcile": "prove firmware counter conservation and print fault evidence",
         "configure": "atomically apply one advertised acquisition profile",
         "start": "start the previously configured run",
         "stop": "idempotently return the device to IDLE",
@@ -417,6 +420,44 @@ def _print_status(status: Status, run_id: int, output: TextIO) -> None:
         print(f"{status_field.name}={_format_value(value)}", file=output)
 
 
+def _print_reconciliation(
+    report: RunCounterReconciliation,
+    output: TextIO,
+) -> None:
+    """Print a stable, line-oriented conservation and fault report."""
+
+    overall = "PASS" if report.exact else "FAIL"
+    if report.first_inconsistent_counter is None and not report.exact:
+        overall = "SATURATED"
+    print(f"run_id={report.run_id}", file=output)
+    print(f"stats_generation={report.stats_generation}", file=output)
+    print(f"conservation={overall}", file=output)
+    print(f"equation_count={len(report.equations)}", file=output)
+    for index, equation in enumerate(report.equations):
+        print(
+            f"equation[{index:03d}]={equation.state.name} "
+            f"counter={equation.counter} actual={equation.actual} "
+            f'relation="{equation.relation}" expected={equation.expected} '
+            f"difference={equation.difference} unit={equation.unit}",
+            file=output,
+        )
+    print(
+        "first_inconsistent_counter=" + (report.first_inconsistent_counter or "-"),
+        file=output,
+    )
+    print(
+        "first_indeterminate_counter=" + (report.first_indeterminate_counter or "-"),
+        file=output,
+    )
+    print(f"fault_count={len(report.fault_snapshot.faults)}", file=output)
+    for index, fault in enumerate(report.fault_snapshot.faults):
+        print(
+            f"fault[{index:03d}]={fault.counter} value={fault.value} "
+            f"unit={fault.unit} category={fault.category}",
+            file=output,
+        )
+
+
 def _print_configuration(configuration: DAQConfiguration, output: TextIO) -> None:
     print("state=CONFIGURED", file=output)
     print(f"profile={configuration.profile.name}", file=output)
@@ -579,6 +620,11 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
             _print_info(info, output)
         elif arguments.action == "status":
             _print_status(daq.status(), daq.run_id, output)
+        elif arguments.action == "reconcile":
+            report = reconcile_run_counters(daq.status(), run_id=daq.run_id)
+            _print_reconciliation(report, output)
+            if not report.exact:
+                return CliExitCode.COUNTER_INCONSISTENCY
         elif arguments.action == "configure":
             configuration = _configuration_from_arguments(daq, arguments)
             _print_configuration(configuration, output)

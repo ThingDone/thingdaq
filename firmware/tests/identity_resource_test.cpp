@@ -348,7 +348,7 @@ static_assert(teensy_daq::board::kGpioMappingsByPackedBit[7].teensy_pin ==
 static_assert(teensy_daq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
 static_assert(teensy_daq::board::kGpio7ToGpio2Gpr27ClearMask ==
               teensy_daq::board::kGpio2PsrCaptureMask);
-static_assert(teensy_daq::board::kReservedRam1Bytes == 449440U);
+static_assert(teensy_daq::board::kReservedRam1Bytes == 450464U);
 static_assert(teensy_daq::board::kGpioRawDmaBufferBytes == 16192U);
 static_assert(teensy_daq::board::kGpioRawDmaRingBytes == 64768U);
 static_assert(teensy_daq::board::kAdcDmaBufferStrideBytes == 4064U);

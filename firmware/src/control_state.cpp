@@ -205,6 +205,9 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
         return reject(request, protocol_v1::ErrorCode::kInvalidState,
                       response);
       }
+      if (!readiness.statistics_reset_ready) {
+        return reject(request, protocol_v1::ErrorCode::kBusy, response);
+      }
       const std::uint32_t next_generation =
           statistics_.generationAfterReset();
       const protocol::Result encoding = protocol::encodeResetStatsResponse(

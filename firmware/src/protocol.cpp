@@ -1326,6 +1326,9 @@ Result validateStatus(ByteView payload) {
       protocol_v1::kStatusResponsePacketReadyHighWaterOffset,
       protocol_v1::kStatusResponsePacketTransmitHighWaterOffset,
       protocol_v1::kStatusResponseUsbLowerPriorityQueueDepthOffset,
+      protocol_v1::kStatusResponsePacketOwnedDepthOffset,
+      protocol_v1::kStatusResponseAdcPacketFillingDepthOffset,
+      protocol_v1::kStatusResponseGpioPacketFillingDepthOffset,
   };
   for (std::size_t index = 0U;
        index < sizeof(packet_depth_offsets) / sizeof(packet_depth_offsets[0]);
@@ -1355,6 +1358,18 @@ Result validateStatus(ByteView payload) {
                protocol_v1::kStatusResponseUsbActiveFrameBytesSentOffset,
                depth) ||
       depth > protocol_v1::kDataFrameBytes) {
+    return badPayload();
+  }
+  std::uint16_t active_bytes_sent = 0U;
+  std::uint16_t active_frame_size = 0U;
+  if (!loadU16(payload,
+               protocol_v1::kStatusResponseUsbActiveFrameBytesSentOffset,
+               active_bytes_sent) ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponseUsbActiveFrameSizeOffset,
+               active_frame_size) ||
+      active_frame_size > protocol_v1::kDataFrameBytes ||
+      active_bytes_sent > active_frame_size) {
     return badPayload();
   }
   const Result adc_result = validateAdcMetadata(
@@ -2864,6 +2879,65 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
                    usb.response_queue_high_water);
   STORE_STATUS_U16(UsbActiveFrameBytesSent,
                    usb.active_frame_bytes_sent);
+  STORE_STATUS_U16(PacketOwnedDepth, packet.owned_depth);
+  STORE_STATUS_U16(UsbActiveFrameSize, usb.active_frame_size);
+  STORE_STATUS_U32(AdcCacheDmaDiscards, adc_cache_dma_discards);
+  STORE_STATUS_U32(AdcCacheCpuInvalidations,
+                   adc_cache_cpu_invalidations);
+  STORE_STATUS_U32(GpioCacheDmaDiscards, gpio_cache_dma_discards);
+  STORE_STATUS_U32(GpioCacheCpuInvalidations,
+                   gpio_cache_cpu_invalidations);
+  STORE_STATUS_U32(BadFlags, diagnostics.bad_flags);
+  STORE_STATUS_U32(BadPayloads, diagnostics.bad_payloads);
+  STORE_STATUS_U32(BadRequestIds, diagnostics.bad_request_ids);
+  STORE_STATUS_U32(ResponsesQueued, usb.responses_queued);
+  STORE_STATUS_U32(ResponsesCompleted, usb.responses_completed);
+  STORE_STATUS_U32(ResponseQueueRejections,
+                   usb.response_queue_rejections);
+  STORE_STATUS_U32(ResponseReservationsAbandoned,
+                   usb.response_reservations_abandoned);
+  STORE_STATUS_U64(PacketPressureEvictions,
+                   packet.pressure_evictions);
+  STORE_STATUS_U64(PacketCapacityDropsWithoutEvictableFrame,
+                   packet.capacity_drops_without_evictable_frame);
+  STORE_STATUS_U64(AdcFramesEvicted, streams[0U].frames_evicted);
+  STORE_STATUS_U64(AdcFramesEvictedAfterPromotion,
+                   streams[0U].frames_evicted_after_promotion);
+  STORE_STATUS_U64(GpioFramesEvicted, streams[1U].frames_evicted);
+  STORE_STATUS_U64(GpioFramesEvictedAfterPromotion,
+                   streams[1U].frames_evicted_after_promotion);
+  STORE_STATUS_U16(AdcPacketFillingDepth,
+                   streams[0U].packet_filling_depth);
+  STORE_STATUS_U16(GpioPacketFillingDepth,
+                   streams[1U].packet_filling_depth);
+  STORE_STATUS_U64(AdcFramesDroppedAfterFraming,
+                   streams[0U].frames_dropped_after_framing);
+  STORE_STATUS_U64(AdcFramesDroppedAfterPromotion,
+                   streams[0U].frames_dropped_after_promotion);
+  STORE_STATUS_U64(GpioFramesDroppedAfterFraming,
+                   streams[1U].frames_dropped_after_framing);
+  STORE_STATUS_U64(GpioFramesDroppedAfterPromotion,
+                   streams[1U].frames_dropped_after_promotion);
+  STORE_STATUS_U64(GpioBuffersCompleted, gpio_buffers_completed);
+  STORE_STATUS_U64(GpioBuffersAcquired, gpio_buffers_acquired);
+  STORE_STATUS_U64(GpioBuffersReleased, gpio_buffers_released);
+  STORE_STATUS_U64(GpioSamplesDelivered, gpio_samples_delivered);
+  STORE_STATUS_U64(GpioStopSamplesDiscarded,
+                   gpio_stop_samples_discarded);
+  STORE_STATUS_U64(GpioFramesProduced, gpio_frames_produced);
+  STORE_STATUS_U64(GpioSamplesProduced, gpio_samples_produced);
+  STORE_STATUS_U64(GpioFramesPacked, gpio_frames_packed);
+  STORE_STATUS_U64(GpioDuplicateSamplesIgnored,
+                   gpio_duplicate_samples_ignored);
+  STORE_STATUS_U64(AdcFramesConsumed, adc_frames_consumed);
+  STORE_STATUS_U64(AdcPairsConsumed, adc_pairs_consumed);
+  STORE_STATUS_U64(AdcRawGapPairs, adc_raw_gap_pairs);
+  STORE_STATUS_U64(AdcRawDropPairsProjected,
+                   adc_raw_drop_pairs_projected);
+  STORE_STATUS_U64(GpioRawDropSamplesProjected,
+                   gpio_raw_drop_samples_projected);
+  STORE_STATUS_U64(GpioPackerDropSamplesProjected,
+                   gpio_packer_drop_samples_projected);
 #undef STORE_STATUS_U16
 #undef STORE_STATUS_U32
 #undef STORE_STATUS_U64

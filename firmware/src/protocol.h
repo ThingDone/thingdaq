@@ -449,6 +449,10 @@ struct StreamTelemetry {
   std::uint64_t frames_transmitted = 0U;
   std::uint64_t items_transmitted = 0U;
   std::uint64_t frames_dropped = 0U;
+  std::uint64_t frames_evicted = 0U;
+  std::uint64_t frames_evicted_after_promotion = 0U;
+  std::uint64_t frames_dropped_after_framing = 0U;
+  std::uint64_t frames_dropped_after_promotion = 0U;
   std::uint64_t payload_bytes_produced = 0U;
   std::uint64_t payload_bytes_framed = 0U;
   std::uint64_t payload_bytes_emitted = 0U;
@@ -459,15 +463,19 @@ struct StreamTelemetry {
   std::uint64_t framed_bytes_transmitted = 0U;
   std::uint16_t packet_ready_depth = 0U;
   std::uint16_t packet_transmit_depth = 0U;
+  std::uint16_t packet_filling_depth = 0U;
   std::uint16_t packet_ready_high_water = 0U;
   std::uint16_t packet_transmit_high_water = 0U;
 };
 
 struct PacketTelemetry {
+  std::uint16_t owned_depth = 0U;
   std::uint16_t ready_high_water = 0U;
   std::uint16_t transmit_high_water = 0U;
   std::uint64_t frames_promoted = 0U;
   std::uint64_t fairness_deferrals = 0U;
+  std::uint64_t pressure_evictions = 0U;
+  std::uint64_t capacity_drops_without_evictable_frame = 0U;
   std::uint64_t accounted_frame_skew = 0U;
   std::uint64_t data_payload_bytes_transmitted = 0U;
   std::uint64_t data_framed_bytes_transmitted = 0U;
@@ -485,6 +493,9 @@ struct FirmwareDiagnosticTelemetry {
   std::uint32_t bad_lengths = 0U;
   std::uint32_t bad_types = 0U;
   std::uint32_t bad_versions = 0U;
+  std::uint32_t bad_flags = 0U;
+  std::uint32_t bad_payloads = 0U;
+  std::uint32_t bad_request_ids = 0U;
   std::uint32_t timeouts = 0U;
   std::uint32_t partial_usb_writes = 0U;
   std::uint32_t state_errors = 0U;
@@ -495,12 +506,17 @@ struct UsbTelemetry {
   std::uint32_t rx_stall_events = 0U;
   std::uint32_t tx_stall_events = 0U;
   std::uint32_t io_errors = 0U;
+  std::uint32_t responses_queued = 0U;
+  std::uint32_t responses_completed = 0U;
+  std::uint32_t response_queue_rejections = 0U;
+  std::uint32_t response_reservations_abandoned = 0U;
   std::uint16_t command_queue_depth = 0U;
   std::uint16_t response_queue_depth = 0U;
   std::uint16_t lower_priority_queue_depth = 0U;
   std::uint16_t command_queue_high_water = 0U;
   std::uint16_t response_queue_high_water = 0U;
   std::uint16_t active_frame_bytes_sent = 0U;
+  std::uint16_t active_frame_size = 0U;
 };
 
 struct StatusResponse {
@@ -521,6 +537,15 @@ struct StatusResponse {
   std::uint64_t gpio_packer_samples_dropped = 0U;
   std::uint64_t gpio_raw_ring_overruns = 0U;
   std::uint64_t gpio_dma_major_loops = 0U;
+  std::uint64_t gpio_buffers_completed = 0U;
+  std::uint64_t gpio_buffers_acquired = 0U;
+  std::uint64_t gpio_buffers_released = 0U;
+  std::uint64_t gpio_samples_delivered = 0U;
+  std::uint64_t gpio_stop_samples_discarded = 0U;
+  std::uint64_t gpio_frames_produced = 0U;
+  std::uint64_t gpio_samples_produced = 0U;
+  std::uint64_t gpio_frames_packed = 0U;
+  std::uint64_t gpio_duplicate_samples_ignored = 0U;
   std::uint16_t gpio_raw_ready_depth = 0U;
   std::uint16_t gpio_raw_ready_high_water = 0U;
   std::uint16_t gpio_packed_ready_depth = 0U;
@@ -538,6 +563,8 @@ struct StatusResponse {
   std::uint32_t gpio_start_errors = 0U;
   std::uint32_t gpio_stop_errors = 0U;
   std::uint32_t gpio_stale_dma_completions = 0U;
+  std::uint32_t gpio_cache_dma_discards = 0U;
+  std::uint32_t gpio_cache_cpu_invalidations = 0U;
   AdcInitializationMetadata adc{};
   std::uint64_t adc0_dma_major_loops = 0U;
   std::uint64_t adc1_dma_major_loops = 0U;
@@ -557,6 +584,8 @@ struct StatusResponse {
   std::uint64_t adc_overwritten_conversions = 0U;
   std::uint64_t adc_raw_ring_overruns = 0U;
   std::uint64_t adc_incomplete_buffers = 0U;
+  std::uint32_t adc_cache_dma_discards = 0U;
+  std::uint32_t adc_cache_cpu_invalidations = 0U;
   std::uint16_t adc_raw_ready_depth = 0U;
   std::uint16_t adc_raw_ready_high_water = 0U;
   std::uint32_t adc_etc_error_events = 0U;
@@ -574,6 +603,12 @@ struct StatusResponse {
   std::uint32_t adc_packer_source_errors = 0U;
   std::uint32_t adc_packer_pipeline_errors = 0U;
   std::uint32_t adc_packer_chronology_errors = 0U;
+  std::uint64_t adc_frames_consumed = 0U;
+  std::uint64_t adc_pairs_consumed = 0U;
+  std::uint64_t adc_raw_gap_pairs = 0U;
+  std::uint64_t adc_raw_drop_pairs_projected = 0U;
+  std::uint64_t gpio_raw_drop_samples_projected = 0U;
+  std::uint64_t gpio_packer_drop_samples_projected = 0U;
   std::array<StreamTelemetry, 2U> streams{};
   PacketTelemetry packet{};
   FirmwareDiagnosticTelemetry diagnostics{};

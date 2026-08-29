@@ -98,7 +98,7 @@ def _info_payload() -> bytes:
         0x1FF,
         8_000_000,
         4_096,
-        1_024,
+        1_280,
         1_000_000,
         4_000_000,
     )
@@ -152,7 +152,7 @@ def _info_payload() -> bytes:
 
 
 def _status_payload() -> bytes:
-    payload = bytearray(976)
+    payload = bytearray(1228)
     struct.pack_into(
         "<BBHBBBBIQQQQIII",
         payload,
@@ -241,6 +241,7 @@ def _status_payload() -> bytes:
     struct.pack_into("<5Q", payload, 852, 2, 0, 0, 8096, 8192)
     struct.pack_into("<18I", payload, 892, 0, 0, 0, 0, 0, 4, *([0] * 12))
     struct.pack_into("<6H", payload, 964, 0, 0, 0, 1, 1, 0)
+    struct.pack_into("<4I", payload, 1008, 3, 3, 0, 0)
     return bytes(payload)
 
 

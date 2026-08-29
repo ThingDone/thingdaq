@@ -2,6 +2,7 @@
 type: analysis
 title: 'ADR 001: Wire Protocol'
 created: 2026-08-27
+updated: 2026-08-29
 tags:
   - teensy-daq
   - decision
@@ -61,7 +62,7 @@ typed responses:
 ADC and GPIO data frames are exactly 4,096 bytes. Their 4,048-byte payloads
 hold either 1,012 ADC pairs or 4,048 packed GPIO samples, so each frame covers
 exactly 8,096 ticks (1,012 µs). Commands are at most 56 bytes and control
-responses are defensively bounded at 1,024 bytes.
+responses are defensively bounded at 1,280 bytes.
 
 Request frame-kind IDs are also command-kind IDs. INFO through PING occupy
 `0x10` through `0x16`; each typed response is its request ID ORed with `0x80`.

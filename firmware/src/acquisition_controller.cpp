@@ -627,6 +627,8 @@ void Controller::publishStatistics(std::uint32_t run_id) {
     raw.overwritten_conversions = source.overwritten_conversions;
     raw.ring_overruns = source.ring_overruns;
     raw.incomplete_buffers = source.incomplete_buffers;
+    raw.cache_dma_discards = source.cache_dma_discards;
+    raw.cache_cpu_invalidations = source.cache_cpu_invalidations;
     raw.ready_depth = capture.ready_depth;
     raw.ready_high_water = source.ready_high_water;
     raw.adc_etc_error_events = source.adc_etc_error_events;

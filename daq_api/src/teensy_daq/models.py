@@ -57,6 +57,31 @@ _STATUS_PIPELINE_U64_FIELDS = (
     "packet_accounted_frame_skew",
     "data_payload_bytes_transmitted",
     "data_framed_bytes_transmitted",
+    "packet_pressure_evictions",
+    "packet_capacity_drops_without_evictable_frame",
+    "adc_frames_evicted",
+    "adc_frames_evicted_after_promotion",
+    "gpio_frames_evicted",
+    "gpio_frames_evicted_after_promotion",
+    "adc_frames_dropped_after_framing",
+    "adc_frames_dropped_after_promotion",
+    "gpio_frames_dropped_after_framing",
+    "gpio_frames_dropped_after_promotion",
+    "gpio_buffers_completed",
+    "gpio_buffers_acquired",
+    "gpio_buffers_released",
+    "gpio_samples_delivered",
+    "gpio_stop_samples_discarded",
+    "gpio_frames_produced",
+    "gpio_samples_produced",
+    "gpio_frames_packed",
+    "gpio_duplicate_samples_ignored",
+    "adc_frames_consumed",
+    "adc_pairs_consumed",
+    "adc_raw_gap_pairs",
+    "adc_raw_drop_pairs_projected",
+    "gpio_raw_drop_samples_projected",
+    "gpio_packer_drop_samples_projected",
 )
 _STATUS_DIAGNOSTIC_U32_FIELDS = (
     "packet_pool_exhaustions",
@@ -77,6 +102,15 @@ _STATUS_DIAGNOSTIC_U32_FIELDS = (
     "usb_rx_stall_events",
     "usb_tx_stall_events",
     "usb_io_errors",
+    "gpio_cache_dma_discards",
+    "gpio_cache_cpu_invalidations",
+    "bad_flags",
+    "bad_payloads",
+    "bad_request_ids",
+    "responses_queued",
+    "responses_completed",
+    "response_queue_rejections",
+    "response_reservations_abandoned",
 )
 _STATUS_QUEUE_U16_FIELDS = (
     "adc_packet_ready_depth",
@@ -95,6 +129,10 @@ _STATUS_QUEUE_U16_FIELDS = (
     "usb_command_queue_high_water",
     "usb_response_queue_high_water",
     "usb_active_frame_bytes_sent",
+    "packet_owned_depth",
+    "usb_active_frame_size",
+    "adc_packet_filling_depth",
+    "gpio_packet_filling_depth",
 )
 _ResponseValue = TypeVar("_ResponseValue")
 _DEFAULT_ADC_CONFIGURATION_FLAGS = (
@@ -589,6 +627,8 @@ _ADC_ACQUISITION_U32_FIELDS = (
     ("ADC_PACKER_SOURCE_ERRORS", "adc_packer_source_errors"),
     ("ADC_PACKER_PIPELINE_ERRORS", "adc_packer_pipeline_errors"),
     ("ADC_PACKER_CHRONOLOGY_ERRORS", "adc_packer_chronology_errors"),
+    ("ADC_CACHE_DMA_DISCARDS", "adc_cache_dma_discards"),
+    ("ADC_CACHE_CPU_INVALIDATIONS", "adc_cache_cpu_invalidations"),
 )
 
 
@@ -631,6 +671,8 @@ class AdcAcquisitionStatus:
     adc_packer_source_errors: int = 0
     adc_packer_pipeline_errors: int = 0
     adc_packer_chronology_errors: int = 0
+    adc_cache_dma_discards: int = 0
+    adc_cache_cpu_invalidations: int = 0
 
     def __post_init__(self) -> None:
         for _, name in _ADC_ACQUISITION_U64_FIELDS:
@@ -3478,6 +3520,31 @@ class Status:
     packet_accounted_frame_skew: int = 0
     data_payload_bytes_transmitted: int = 0
     data_framed_bytes_transmitted: int = 0
+    packet_pressure_evictions: int = 0
+    packet_capacity_drops_without_evictable_frame: int = 0
+    adc_frames_evicted: int = 0
+    adc_frames_evicted_after_promotion: int = 0
+    gpio_frames_evicted: int = 0
+    gpio_frames_evicted_after_promotion: int = 0
+    adc_frames_dropped_after_framing: int = 0
+    adc_frames_dropped_after_promotion: int = 0
+    gpio_frames_dropped_after_framing: int = 0
+    gpio_frames_dropped_after_promotion: int = 0
+    gpio_buffers_completed: int = 0
+    gpio_buffers_acquired: int = 0
+    gpio_buffers_released: int = 0
+    gpio_samples_delivered: int = 0
+    gpio_stop_samples_discarded: int = 0
+    gpio_frames_produced: int = 0
+    gpio_samples_produced: int = 0
+    gpio_frames_packed: int = 0
+    gpio_duplicate_samples_ignored: int = 0
+    adc_frames_consumed: int = 0
+    adc_pairs_consumed: int = 0
+    adc_raw_gap_pairs: int = 0
+    adc_raw_drop_pairs_projected: int = 0
+    gpio_raw_drop_samples_projected: int = 0
+    gpio_packer_drop_samples_projected: int = 0
     packet_pool_exhaustions: int = 0
     packet_invalid_operations: int = 0
     packet_encoding_rejections: int = 0
@@ -3496,12 +3563,25 @@ class Status:
     usb_rx_stall_events: int = 0
     usb_tx_stall_events: int = 0
     usb_io_errors: int = 0
+    gpio_cache_dma_discards: int = 0
+    gpio_cache_cpu_invalidations: int = 0
+    bad_flags: int = 0
+    bad_payloads: int = 0
+    bad_request_ids: int = 0
+    responses_queued: int = 0
+    responses_completed: int = 0
+    response_queue_rejections: int = 0
+    response_reservations_abandoned: int = 0
     usb_command_queue_depth: int = 0
     usb_response_queue_depth: int = 0
     usb_lower_priority_queue_depth: int = 0
     usb_command_queue_high_water: int = 0
     usb_response_queue_high_water: int = 0
     usb_active_frame_bytes_sent: int = 0
+    packet_owned_depth: int = 0
+    usb_active_frame_size: int = 0
+    adc_packet_filling_depth: int = 0
+    gpio_packet_filling_depth: int = 0
     gpio_samples_captured: int = 0
     gpio_samples_packed: int = 0
     gpio_samples_framed: int = 0
@@ -3599,6 +3679,8 @@ class Status:
     adc_packer_source_errors: int = 0
     adc_packer_pipeline_errors: int = 0
     adc_packer_chronology_errors: int = 0
+    adc_cache_dma_discards: int = 0
+    adc_cache_cpu_invalidations: int = 0
 
     def __post_init__(self) -> None:
         if any(
@@ -3718,11 +3800,50 @@ class Status:
             "usb_command_queue_high_water": constants.COMMAND_QUEUE_CAPACITY,
             "usb_response_queue_high_water": constants.RESPONSE_QUEUE_CAPACITY,
             "usb_active_frame_bytes_sent": constants.DATA_FRAME_BYTES,
+            "packet_owned_depth": constants.PACKET_BUFFER_COUNT,
+            "usb_active_frame_size": constants.DATA_FRAME_BYTES,
+            "adc_packet_filling_depth": constants.PACKET_BUFFER_COUNT,
+            "gpio_packet_filling_depth": constants.PACKET_BUFFER_COUNT,
         }
         for name in _STATUS_QUEUE_U16_FIELDS:
             _unsigned(name, getattr(self, name), 16)
             if getattr(self, name) > extended_depth_limits[name]:
                 raise ValueError(f"{name} exceeds its advertised capacity")
+        current_high_water_pairs = (
+            ("gpio_raw_ready_depth", "gpio_raw_ready_high_water"),
+            ("gpio_packed_ready_depth", "gpio_packed_ready_high_water"),
+            ("packet_ready_depth", "packet_ready_high_water"),
+            ("packet_transmit_depth", "packet_transmit_high_water"),
+            ("packet_owned_depth", "packet_owned_high_water"),
+            ("adc_packet_ready_depth", "adc_packet_ready_high_water"),
+            ("gpio_packet_ready_depth", "gpio_packet_ready_high_water"),
+            ("adc_packet_transmit_depth", "adc_packet_transmit_high_water"),
+            ("gpio_packet_transmit_depth", "gpio_packet_transmit_high_water"),
+            ("usb_command_queue_depth", "usb_command_queue_high_water"),
+            ("usb_response_queue_depth", "usb_response_queue_high_water"),
+        )
+        for current_name, high_water_name in current_high_water_pairs:
+            if getattr(self, current_name) > getattr(self, high_water_name):
+                raise ValueError(f"{current_name} exceeds {high_water_name}")
+        if self.packet_ready_depth != (
+            self.adc_packet_ready_depth + self.gpio_packet_ready_depth
+        ):
+            raise ValueError("per-source packet-ready depths do not sum to total")
+        if self.packet_transmit_depth != (
+            self.adc_packet_transmit_depth + self.gpio_packet_transmit_depth
+        ):
+            raise ValueError("per-source packet-transmit depths do not sum to total")
+        if self.packet_owned_depth != (
+            self.packet_ready_depth
+            + self.packet_transmit_depth
+            + self.adc_packet_filling_depth
+            + self.gpio_packet_filling_depth
+        ):
+            raise ValueError("packet ownership states do not sum to owned depth")
+        if self.usb_lower_priority_queue_depth != self.packet_transmit_depth:
+            raise ValueError("USB and packet transmit depths disagree")
+        if self.usb_active_frame_bytes_sent > self.usb_active_frame_size:
+            raise ValueError("USB active-frame progress exceeds frame size")
         _unsigned(
             "gpio_processing_cpu_basis_points",
             self.gpio_processing_cpu_basis_points,
@@ -3826,6 +3947,8 @@ class Status:
             adc_packer_source_errors=self.adc_packer_source_errors,
             adc_packer_pipeline_errors=self.adc_packer_pipeline_errors,
             adc_packer_chronology_errors=self.adc_packer_chronology_errors,
+            adc_cache_dma_discards=self.adc_cache_dma_discards,
+            adc_cache_cpu_invalidations=self.adc_cache_cpu_invalidations,
             **{
                 name: getattr(self, name)
                 for name in (
@@ -4101,6 +4224,31 @@ class FirmwareCounters:
     packet_accounted_frame_skew: int = 0
     data_payload_bytes_transmitted: int = 0
     data_framed_bytes_transmitted: int = 0
+    packet_pressure_evictions: int = 0
+    packet_capacity_drops_without_evictable_frame: int = 0
+    adc_frames_evicted: int = 0
+    adc_frames_evicted_after_promotion: int = 0
+    gpio_frames_evicted: int = 0
+    gpio_frames_evicted_after_promotion: int = 0
+    adc_frames_dropped_after_framing: int = 0
+    adc_frames_dropped_after_promotion: int = 0
+    gpio_frames_dropped_after_framing: int = 0
+    gpio_frames_dropped_after_promotion: int = 0
+    gpio_buffers_completed: int = 0
+    gpio_buffers_acquired: int = 0
+    gpio_buffers_released: int = 0
+    gpio_samples_delivered: int = 0
+    gpio_stop_samples_discarded: int = 0
+    gpio_frames_produced: int = 0
+    gpio_samples_produced: int = 0
+    gpio_frames_packed: int = 0
+    gpio_duplicate_samples_ignored: int = 0
+    adc_frames_consumed: int = 0
+    adc_pairs_consumed: int = 0
+    adc_raw_gap_pairs: int = 0
+    adc_raw_drop_pairs_projected: int = 0
+    gpio_raw_drop_samples_projected: int = 0
+    gpio_packer_drop_samples_projected: int = 0
     packet_pool_exhaustions: int = 0
     packet_invalid_operations: int = 0
     packet_encoding_rejections: int = 0
@@ -4119,6 +4267,15 @@ class FirmwareCounters:
     usb_rx_stall_events: int = 0
     usb_tx_stall_events: int = 0
     usb_io_errors: int = 0
+    gpio_cache_dma_discards: int = 0
+    gpio_cache_cpu_invalidations: int = 0
+    bad_flags: int = 0
+    bad_payloads: int = 0
+    bad_request_ids: int = 0
+    responses_queued: int = 0
+    responses_completed: int = 0
+    response_queue_rejections: int = 0
+    response_reservations_abandoned: int = 0
     gpio_samples_captured: int = 0
     gpio_samples_packed: int = 0
     gpio_samples_framed: int = 0
@@ -4172,6 +4329,8 @@ class FirmwareCounters:
     adc_packer_source_errors: int = 0
     adc_packer_pipeline_errors: int = 0
     adc_packer_chronology_errors: int = 0
+    adc_cache_dma_discards: int = 0
+    adc_cache_cpu_invalidations: int = 0
 
     def __post_init__(self) -> None:
         for name in (

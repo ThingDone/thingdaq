@@ -411,6 +411,7 @@ bool CdcTransport::hasPendingTransmission() const {
          lower_priority_->frontFrame().size != 0U;
 }
 
+TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.snapshot")
 TransportSnapshot CdcTransport::snapshot() const {
   TransportSnapshot result = counters_;
   result.command_queue_depth = command_queue_.size();
@@ -500,10 +501,16 @@ void CdcTransport::publishParserDelta() {
                                     published_parser_counters_.bad_versions);
   delta.bad_kinds = counterDelta(current.bad_kinds,
                                  published_parser_counters_.bad_kinds);
+  delta.bad_flags = counterDelta(current.bad_flags,
+                                 published_parser_counters_.bad_flags);
   delta.bad_lengths = counterDelta(current.bad_lengths,
                                    published_parser_counters_.bad_lengths);
   delta.bad_checksums = counterDelta(
       current.bad_checksums, published_parser_counters_.bad_checksums);
+  delta.bad_payloads = counterDelta(
+      current.bad_payloads, published_parser_counters_.bad_payloads);
+  delta.bad_request_ids = counterDelta(
+      current.bad_request_ids, published_parser_counters_.bad_request_ids);
   statistics_.recordParserDelta(delta);
   published_parser_counters_ = current;
 }

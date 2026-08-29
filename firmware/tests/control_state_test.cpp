@@ -413,6 +413,17 @@ void testSyntheticLifecycle() {
 
   const std::uint32_t generation_before_reset =
       state.statistics().generation();
+  control::DispatchReadiness reset_blocked{};
+  reset_blocked.statistics_reset_ready = false;
+  expect(!state.dispatch(request(constants::CommandKind::kResetStats, 2200U),
+                         response, reset_blocked)
+              .commandAccepted(),
+         "RESET_STATS rejects a non-quiescent statistics boundary");
+  expectTypedResponse(response, constants::FrameKind::kResetStatsResponse,
+                      2200U, constants::ErrorCode::kBusy,
+                      "busy RESET_STATS response");
+  expect(state.statistics().generation() == generation_before_reset,
+         "busy RESET_STATS preserves the complete statistics epoch");
   expect(state.dispatch(request(constants::CommandKind::kResetStats, 22U),
                         response)
              .commandAccepted(),
@@ -965,6 +976,9 @@ void testStatisticsDetailAndSaturation() {
   parser.bad_lengths = 2U;
   parser.bad_kinds = 3U;
   parser.bad_versions = 1U;
+  parser.bad_flags = 4U;
+  parser.bad_payloads = 5U;
+  parser.bad_request_ids = 6U;
   statistics.recordParserDelta(parser);
   statistics.recordCommandAccepted();
   statistics.recordCommandRejected(constants::ErrorCode::kInvalidState);
@@ -987,7 +1001,9 @@ void testStatisticsDetailAndSaturation() {
              snapshot.parser_errors == 7U,
          "accepted, rejected, and aggregate parser counters are distinct");
   expect(snapshot.bad_checksums == 1U && snapshot.bad_lengths == 2U &&
-             snapshot.bad_types == 3U && snapshot.bad_versions == 1U,
+             snapshot.bad_types == 3U && snapshot.bad_versions == 1U &&
+             snapshot.bad_flags == 4U && snapshot.bad_payloads == 5U &&
+             snapshot.bad_request_ids == 6U,
          "parser rejection classifications are retained");
   expect(snapshot.state_errors == 1U && snapshot.timeouts == 2U &&
              snapshot.partial_usb_writes == 3U &&
@@ -996,7 +1012,49 @@ void testStatisticsDetailAndSaturation() {
 
   stats::GpioPackerProgress processing{};
   processing.processing_cpu_basis_points = 1234U;
+  processing.frames_produced = 13U;
+  processing.samples_produced = 52U;
+  processing.frames_packed = 11U;
+  processing.duplicate_samples_ignored = 2U;
   statistics.publishGpioPacker(processing);
+  stats::GpioRawCaptureProgress gpio_capture{};
+  gpio_capture.buffers_completed = 10U;
+  gpio_capture.buffers_acquired = 9U;
+  gpio_capture.buffers_released = 8U;
+  gpio_capture.samples_delivered = 36U;
+  gpio_capture.stop_discarded_samples = 7U;
+  gpio_capture.cache_dma_discards = 6U;
+  gpio_capture.cache_cpu_invalidations = 5U;
+  statistics.publishGpioRawCapture(gpio_capture);
+  stats::AdcCaptureProgress adc_capture{};
+  adc_capture.cache_dma_discards = 4U;
+  adc_capture.cache_cpu_invalidations = 3U;
+  statistics.publishAdcCapture(adc_capture);
+  stats::AdcPackerProgress adc_packer{};
+  adc_packer.frames_consumed = 2U;
+  adc_packer.pairs_consumed = 2024U;
+  adc_packer.raw_gap_pairs = 12U;
+  adc_packer.raw_drop_pairs_projected = 8U;
+  statistics.publishAdcPacker(adc_packer);
+  stats::DataPathProgress data_path{};
+  data_path.adc.frames_emitted = maximum64;
+  data_path.gpio.frames_emitted = 7U;
+  data_path.adc.items_dropped = maximum64;
+  data_path.adc.frames_dropped_after_framing = 2U;
+  data_path.adc.frames_dropped_after_promotion = 1U;
+  statistics.publishDataPath(data_path);
+  stats::PacketQueueProgress packet_queue{};
+  packet_queue.filling_depth_by_source = {1U, 2U};
+  packet_queue.owned_depth = 3U;
+  packet_queue.pressure_evictions = 4U;
+  statistics.publishPacketQueues(packet_queue);
+  stats::UsbProgress usb{};
+  usb.responses_queued = 9U;
+  usb.responses_completed = 8U;
+  usb.response_queue_rejections = 1U;
+  usb.active_frame_size = 1276U;
+  usb.active_frame_bytes_sent = 511U;
+  statistics.publishUsb(usb);
   const wire::StatusResponse status = statistics.wireStatus(
       constants::DeviceState::kRunning,
       control::kSyntheticConfiguration);
@@ -1006,7 +1064,20 @@ void testStatisticsDetailAndSaturation() {
              status.gpio_frames_emitted == 7U &&
              status.parser_errors == 7U && status.transport_errors == 3U &&
              status.stats_generation == 1U &&
-             status.gpio_processing_cpu_basis_points == 1234U,
+             status.gpio_processing_cpu_basis_points == 1234U &&
+             status.gpio_buffers_completed == 10U &&
+             status.gpio_duplicate_samples_ignored == 2U &&
+             status.gpio_cache_dma_discards == 6U &&
+             status.adc_cache_cpu_invalidations == 3U &&
+             status.adc_frames_consumed == 2U &&
+             status.streams[0U].frames_dropped_after_framing == 2U &&
+             status.streams[0U].packet_filling_depth == 1U &&
+             status.streams[1U].packet_filling_depth == 2U &&
+             status.packet.owned_depth == 3U &&
+             status.packet.pressure_evictions == 4U &&
+             status.usb.responses_queued == 9U &&
+             status.usb.responses_completed == 8U &&
+             status.usb.active_frame_size == 1276U,
          "GET_STATUS projection uses the protocol-defined aggregates");
 
   wire::ParserCounters saturating_parser{};
@@ -1015,6 +1086,9 @@ void testStatisticsDetailAndSaturation() {
   saturating_parser.bad_lengths = maximum32;
   saturating_parser.bad_kinds = maximum32;
   saturating_parser.bad_versions = maximum32;
+  saturating_parser.bad_flags = maximum32;
+  saturating_parser.bad_payloads = maximum32;
+  saturating_parser.bad_request_ids = maximum32;
   statistics.recordParserDelta(saturating_parser);
   statistics.recordParserDelta(saturating_parser);
   snapshot = statistics.snapshot();
@@ -1023,7 +1097,10 @@ void testStatisticsDetailAndSaturation() {
              snapshot.bad_checksums == maximum32 &&
              snapshot.bad_lengths == maximum32 &&
              snapshot.bad_types == maximum32 &&
-             snapshot.bad_versions == maximum32,
+             snapshot.bad_versions == maximum32 &&
+             snapshot.bad_flags == maximum32 &&
+             snapshot.bad_payloads == maximum32 &&
+             snapshot.bad_request_ids == maximum32,
          "32-bit diagnostic counters saturate");
 
   expect(statistics.resetForNewGeneration() == 2U,

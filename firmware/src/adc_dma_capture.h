@@ -91,6 +91,8 @@ struct Progress {
   std::uint64_t overwritten_conversions = 0U;
   std::uint64_t ring_overruns = 0U;
   std::uint64_t incomplete_buffers = 0U;
+  std::uint32_t cache_dma_discards = 0U;
+  std::uint32_t cache_cpu_invalidations = 0U;
   std::size_t ready_high_water = 0U;
   std::uint32_t adc_etc_error_events = 0U;
   std::uint32_t adc_etc_error_flags = 0U;

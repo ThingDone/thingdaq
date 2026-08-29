@@ -19,6 +19,10 @@ struct StreamProgress {
   std::uint64_t items_transmitted = 0U;
   std::uint64_t frames_dropped = 0U;
   std::uint64_t items_dropped = 0U;
+  std::uint64_t frames_evicted = 0U;
+  std::uint64_t frames_evicted_after_promotion = 0U;
+  std::uint64_t frames_dropped_after_framing = 0U;
+  std::uint64_t frames_dropped_after_promotion = 0U;
   std::uint64_t payload_bytes_produced = 0U;
   std::uint64_t payload_bytes_framed = 0U;
   std::uint64_t payload_bytes_emitted = 0U;
@@ -54,6 +58,8 @@ struct AdcCaptureProgress {
   std::uint64_t overwritten_conversions = 0U;
   std::uint64_t ring_overruns = 0U;
   std::uint64_t incomplete_buffers = 0U;
+  std::uint32_t cache_dma_discards = 0U;
+  std::uint32_t cache_cpu_invalidations = 0U;
   std::size_t ready_depth = 0U;
   std::size_t ready_high_water = 0U;
   std::uint32_t adc_etc_error_events = 0U;
@@ -96,6 +102,8 @@ struct GpioRawCaptureProgress {
   std::uint64_t raw_ring_overruns = 0U;
   std::uint64_t samples_lost = 0U;
   std::uint64_t stop_discarded_samples = 0U;
+  std::uint32_t cache_dma_discards = 0U;
+  std::uint32_t cache_cpu_invalidations = 0U;
   std::size_t ready_high_water = 0U;
   std::size_t ready_depth = 0U;
   std::uint32_t hardware_errors = 0U;
@@ -125,6 +133,7 @@ struct GpioPackerProgress {
   std::uint64_t packer_drop_samples = 0U;
   std::uint64_t raw_drop_samples_projected = 0U;
   std::uint64_t packer_drop_samples_projected = 0U;
+  std::uint64_t duplicate_samples_ignored = 0U;
   std::size_t ready_depth = 0U;
   std::size_t ready_high_water = 0U;
   std::uint16_t processing_cpu_basis_points = 0U;
@@ -134,12 +143,14 @@ struct GpioPackerProgress {
 };
 
 struct PacketQueueProgress {
+  std::array<std::size_t, 2U> filling_depth_by_source{};
   std::array<std::size_t, 2U> ready_depth_by_source{};
   std::array<std::size_t, 2U> transmit_depth_by_source{};
   std::array<std::size_t, 2U> ready_high_water_by_source{};
   std::array<std::size_t, 2U> transmit_high_water_by_source{};
   std::size_t ready_depth = 0U;
   std::size_t transmit_depth = 0U;
+  std::size_t owned_depth = 0U;
   std::size_t ready_high_water = 0U;
   std::size_t transmit_high_water = 0U;
   std::size_t owned_high_water = 0U;
@@ -162,12 +173,17 @@ struct UsbProgress {
   std::uint32_t rx_stall_events = 0U;
   std::uint32_t tx_stall_events = 0U;
   std::uint32_t io_errors = 0U;
+  std::uint32_t responses_queued = 0U;
+  std::uint32_t responses_completed = 0U;
+  std::uint32_t response_queue_rejections = 0U;
+  std::uint32_t response_reservations_abandoned = 0U;
   std::size_t command_queue_depth = 0U;
   std::size_t response_queue_depth = 0U;
   std::size_t lower_priority_queue_depth = 0U;
   std::size_t command_queue_high_water = 0U;
   std::size_t response_queue_high_water = 0U;
   std::size_t active_frame_bytes_sent = 0U;
+  std::size_t active_frame_size = 0U;
 };
 
 // Detailed firmware diagnostics remain available to firmware tests and are
@@ -183,6 +199,9 @@ struct Snapshot {
   std::uint32_t bad_lengths = 0U;
   std::uint32_t bad_types = 0U;
   std::uint32_t bad_versions = 0U;
+  std::uint32_t bad_flags = 0U;
+  std::uint32_t bad_payloads = 0U;
+  std::uint32_t bad_request_ids = 0U;
   std::uint32_t timeouts = 0U;
   std::uint32_t partial_usb_writes = 0U;
   std::uint32_t state_errors = 0U;

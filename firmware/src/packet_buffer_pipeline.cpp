@@ -519,6 +519,10 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
     if (state < result.buffers_by_state.size()) {
       ++result.buffers_by_state[state];
     }
+    if (record.state == BufferState::kFilling &&
+        validStream(record.stream)) {
+      ++result.filling_depth_by_source[streamIndex(record.stream)];
+    }
   }
   for (std::size_t source = 0U; source < kStreamCount; ++source) {
     result.ready_depth_by_source[source] = ready_queues_[source].size();
@@ -546,6 +550,7 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
           : accountedFrames(1U) - accountedFrames(0U);
   result.ready_queue_depth = readyFrames();
   result.transmit_queue_depth = transmit_queue_.size();
+  result.buffers_owned = ownedBuffers();
   result.ready_queue_high_water = ready_queue_high_water_;
   result.transmit_queue_high_water = transmit_queue_high_water_;
   result.buffers_owned_high_water = buffers_owned_high_water_;
@@ -729,8 +734,15 @@ void PacketBufferPipeline::dropBuffer(BufferIndex index,
     return;
   }
   const BufferRecord dropped = records_[index];
+  SourceCounters &source = source_counters_[streamIndex(dropped.stream)];
+  if (dropped.state == BufferState::kReady ||
+      dropped.state == BufferState::kTransmitting) {
+    saturatingIncrement(source.frames_dropped_after_framing);
+  }
+  if (dropped.state == BufferState::kTransmitting) {
+    saturatingIncrement(source.frames_dropped_after_promotion);
+  }
   if (pressure_eviction) {
-    SourceCounters &source = source_counters_[streamIndex(dropped.stream)];
     saturatingIncrement(source.frames_evicted);
     saturatingAdd(source.items_evicted,
                   static_cast<std::uint64_t>(dropped.item_count));

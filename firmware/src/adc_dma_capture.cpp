@@ -100,9 +100,11 @@ PrimeResult PairCaptureRing::prime(std::uint32_t epoch,
   // cache line here therefore precedes the first possible DMA write.
   for (PairBuffer &buffer : storage_.buffers) {
     cache_.discardBeforeDmaWrite(buffer.pairs.data(), sizeof(buffer));
+    saturatingIncrement(progress_.cache_dma_discards);
   }
   cache_.discardBeforeDmaWrite(overflow_sink_.halfwords.data(),
                                sizeof(overflow_sink_));
+  saturatingIncrement(progress_.cache_dma_discards);
   return result;
 }
 
@@ -276,6 +278,7 @@ AcquireResult PairCaptureRing::acquireReady() {
 
   cache_.invalidateBeforeCpuRead(
       storage_.buffers[selected].pairs.data(), sizeof(PairBuffer));
+  saturatingIncrement(progress_.cache_cpu_invalidations);
   result.status = OperationStatus::kOk;
   return result;
 }
@@ -293,6 +296,7 @@ OperationStatus PairCaptureRing::release(const BufferHandle &handle) {
   cache_.discardBeforeDmaWrite(
       storage_.buffers[handle.buffer_index].pairs.data(),
       sizeof(PairBuffer));
+  saturatingIncrement(progress_.cache_dma_discards);
 
   token = critical_.enter();
   if (!handleMatches(handle, BufferState::kReleasing)) {
@@ -326,6 +330,7 @@ std::size_t PairCaptureRing::serviceDiscarded(std::size_t limit) {
 
     cache_.discardBeforeDmaWrite(
         storage_.buffers[selected].pairs.data(), sizeof(PairBuffer));
+    saturatingIncrement(progress_.cache_dma_discards);
     token = critical_.enter();
     if (records_[selected].state != BufferState::kReleasing) {
       noteInvariantError();

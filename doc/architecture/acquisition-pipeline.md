@@ -2,12 +2,14 @@
 type: analysis
 title: Acquisition Pipeline
 created: 2026-08-28
+updated: 2026-08-29
 tags:
   - teensy-daq
   - architecture
   - acquisition
   - resource-audit
   - phase-08
+  - phase-09
 related:
   - '[[Firmware-Resource-Map]]'
   - '[[System-Overview]]'
@@ -23,7 +25,7 @@ related:
 
 ## Status and scope
 
-Phase 08 begins with one portable `acquisition::Controller` around the proven
+Phase 08 began with one portable `acquisition::Controller` around the proven
 Phase 06 GPIO and Phase 07 ADC engines. It is now the only firmware-runtime
 boundary that initializes, preflights, starts, stops, drains, services, and
 publishes telemetry for physical acquisition. `FirmwareRuntime` retains the
@@ -38,6 +40,12 @@ synthetic ADC-only, GPIO-only, and combined profile matrix, publishes its
 complete fixed resource metadata, and exposes the controller/packet/USB
 telemetry through INFO and STATUS. The dedicated synthetic plus 10/60-second
 physical campaign is accepted in [[Phase-08-Combined-Acquisition]].
+
+Phase 09 closes the diagnostic boundary around that pipeline. Every ownership
+stage now has a current-depth or cumulative counter, every deliberate discard
+has an exact source and stage, and the host can reconcile a stopped or live
+STATUS snapshot without inferring units from field names. The fixed wire
+layout and reset rules remain normative in [[Protocol-V1]].
 
 ## Evidence reinspected
 
@@ -247,6 +255,113 @@ combined, rounded to the nearest byte/s). Control-response bytes remain a
 separate part of total USB bytes rather than being mislabeled as acquisition
 payload.
 
+## Complete-frame drop state machine
+
+The common packet pool is the single authority for packet ownership and loss.
+A producer reserves one source-tagged buffer in `FILLING`, finishes it into
+`READY`, the fair scheduler moves it to `TRANSMITTING`, and USB completion
+returns it to `FREE`:
+
+```mermaid
+stateDiagram-v2
+    [*] --> FREE
+    FREE --> FILLING: begin / frame produced
+    FILLING --> READY: finish / frame framed
+    READY --> TRANSMITTING: promote / frame emitted
+    TRANSMITTING --> FREE: final byte accepted / frame transmitted
+    FILLING --> FREE: producer cancel / pre-framing drop
+    READY --> FREE: pressure eviction / post-framing drop
+    TRANSMITTING --> FREE: zero-byte pressure eviction / post-promotion drop
+```
+
+Once USB accepts byte zero, the transmitting record is pinned until its final
+byte is accepted. It cannot be evicted, abandoned, or interleaved with a
+control response. A `TRANSMITTING` frame is evictable only while its accepted
+byte count is still zero. Under pressure, the pool chooses the oldest complete
+unsent frame while accounting source coverage, so neither ADC nor GPIO can
+monopolize retained history. If every candidate is partial or producer-owned,
+the new allocation is rejected and
+`packet_capacity_drops_without_evictable_frame` distinguishes that event from
+`packet_pressure_evictions`.
+
+Every drop advances the affected stream's independent sequence/timestamp
+coverage and arms `GAP_BEFORE | OVERRUN_BEFORE` on its next retained frame.
+The generic post-framing and post-promotion counters include all causes at
+their ownership boundary; `*_frames_evicted*` is the pressure-only subset.
+This makes an ordinary producer cancellation, a pressure eviction, and an
+impossible-to-evict admission failure distinguishable without double counting.
+
+## Conservation contract and canonical units
+
+For source `s`, let `P`, `Fr`, `E`, `T`, and `D` be produced, framed, emitted,
+transmitted, and dropped complete frames; `F`, `R`, and `Q` are current
+`FILLING`, `READY`, and `TRANSMITTING` frame ownership. A snapshot is exact
+when none of its operands has saturated and these equations hold:
+
+\[
+P_s = T_s + D_s + F_s + R_s + Q_s
+\]
+
+\[
+Fr_s = T_s + R_s + Q_s + D^{after\ framing}_s
+\]
+
+\[
+E_s = T_s + Q_s + D^{after\ promotion}_s
+\]
+
+The shared ownership equation is
+`packet_owned_depth = Σ(F_s + R_s + Q_s)`. Logical-item and byte equations
+use the immutable frame layout: one ADC frame contains 1,012 sample pairs, one
+GPIO frame contains 4,048 packed eight-pin sample instants, each data payload
+is 4,048 bytes, and each complete framed record is 4,096 bytes. Raw ADC and
+GPIO projections separately prove that DMA/ring/STOP/packer losses explain
+the source items that never reach the shared packet pool.
+
+The following registry is the canonical unit assignment for firmware STATUS.
+Names joined by `/` have the same unit; current-depth fields are instantaneous
+gauges and high-water fields are the maximum matching gauge observed in the
+current statistics generation.
+
+| Field or field family | Canonical unit |
+| --- | --- |
+| `adc_frames_*`, `gpio_frames_*`, `packet_frames_promoted`, `packet_pressure_evictions`, `packet_capacity_drops_without_evictable_frame` | complete protocol data frames |
+| `adc_items_*`, `adc_pairs_*`, `adc_raw_gap_pairs`, `adc_raw_drop_pairs_projected` | simultaneous ADC0/ADC1 sample-pair instants |
+| `gpio_items_*`, `gpio_samples_*`, `gpio_stop_samples_discarded`, `gpio_duplicate_samples_ignored`, `gpio_raw_drop_samples_projected`, `gpio_packer_drop_samples_projected` | packed eight-pin GPIO sample instants |
+| `adc_payload_bytes_*`, `gpio_payload_bytes_*`, `data_payload_bytes_transmitted` | logical payload bytes |
+| `adc_framed_bytes_*`, `gpio_framed_bytes_*`, `data_framed_bytes_transmitted` | complete wire bytes including header and checksum |
+| `adc0_dma_major_loops`, `adc1_dma_major_loops`, `adc_paired_major_loops`, `gpio_dma_major_loops`, raw-overrun capacity counters | completed or lost DMA major loops, as named |
+| `adc0_conversion_results`, `adc1_conversion_results`, incomplete/overwritten result counters | individual converter results |
+| `adc_buffers_*`, `gpio_buffers_*`, redirected/rejected buffer counters | complete fixed-capacity DMA buffers |
+| `*_cache_dma_discards`, `*_cache_cpu_invalidations` | completed cache-maintenance operations |
+| ADC_ETC/eDMA/error/resource/lifecycle/ownership/chronology/stale counters | detected fault or rejected-operation events; `*_error_flags` is a bit mask, not an event count |
+| command-parser class counters, `commands_accepted`, `commands_rejected` | complete command candidates classified or dispatched |
+| `bad_request_ids` | rejected request identifiers |
+| `responses_queued`, `responses_completed`, response rejection/abandonment counters | complete control responses |
+| `partial_usb_writes` | successful USB writes shorter than requested |
+| USB deferral/stall/error counters | cooperative service events |
+| packet/raw/packed/command/response queue depths and high waters | owned frames, raw/packed buffers, commands, or responses, as named |
+| `usb_active_frame_bytes_sent`, `usb_active_frame_size` | wire bytes within the currently owned frame |
+| `packet_fairness_deferrals` | scheduler deferral decisions |
+| `packet_accounted_frame_skew` | complete frames of maximum observed source-coverage lead |
+| `gpio_processing_cpu_basis_points` | hundredths of one percent of one 600 MHz core |
+
+All cumulative `u64` and `u32` diagnostics saturate at their maximum instead
+of wrapping. Current depths are gauges; high-water values are monotonic until
+the next counter epoch. Per-stream wire sequence numbers explicitly wrap
+modulo \(2^{32}\), while run IDs and `stats_generation` advance modulo
+\(2^{32}\) and skip zero. Host reconciliation reports any equation containing
+a saturated operand as indeterminate rather than falsely claiming equality or
+loss.
+
+A successful START establishes a new run/counter epoch. `RESET_STATS` is
+accepted only in IDLE or CONFIGURED and only after raw, packed, packet, and
+data-transport ownership is quiescent and the older control-response queue is
+empty. Otherwise it returns `BUSY` without changing the generation or any
+counter. On success, command/response/parser baselines are reset as one ordered
+transport event, so the RESET response itself is the first queued response
+belonging unambiguously to the new generation.
+
 ## Timing model retained for combined work
 
 All time derives from the START snapshot in the advertised 8 MHz domain; no
@@ -314,12 +429,12 @@ bytes in RAM1 and 486,944 bytes in RAM2. Including the pinned core's four
 2,048-byte USB TX buffers brings the simultaneous RAM2 buffer total to 495,136
 bytes, still inside the 512 KiB region before the exact linker gate accounts
 for all remaining core globals.
-The accepted exact pinned combined image uses 455,488 bytes of RAM1 variables,
-32,728 bytes of RAM1 code, 40 bytes of alignment padding, and leaves 36,032
-bytes for locals/stack. It uses 503,488 bytes of RAM2 variables and leaves
-20,800 bytes of heap headroom. Cold controller lifecycle paths and non-measured
-checksum-vector preparation remain in flash so the additional orchestration
-does not consume another 32 KiB ITCM block.
+The Phase 09 pinned linker gate uses 456,960 bytes of RAM1 variables, 32,712
+bytes of RAM1 code, 56 bytes of alignment padding, and leaves 34,560 bytes for
+locals/stack. It uses 503,488 bytes of RAM2 variables and leaves 20,800 bytes
+of heap headroom. Cold controller lifecycle, diagnostic snapshot, and
+non-measured checksum-vector preparation remain in flash so the additional
+telemetry does not consume another 32 KiB ITCM block.
 
 DMA and CPU ownership remain local to the existing ring state machines. The
 controller never receives a mutable DMA pointer and never performs cache

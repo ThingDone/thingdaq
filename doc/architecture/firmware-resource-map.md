@@ -2,7 +2,7 @@
 type: reference
 title: Firmware Resource Map
 created: 2026-08-28
-updated: 2026-08-28
+updated: 2026-08-29
 tags:
   - teensy-daq
   - teensy-4-0
@@ -15,6 +15,7 @@ related:
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[Acquisition-Pipeline]]'
 ---
 
 # Firmware resource map
@@ -181,7 +182,7 @@ preempt one another.
 The 64-byte parser capacity covers the generated 56-byte maximum command plus
 three possible bytes of the next magic and alignment slack. The separate
 128-byte scratch preserves already-read bytes when the complete-command queue
-fills. Control responses reserve the generated 1,024-byte defensive maximum
+fills. Control responses reserve the generated 1,280-byte defensive maximum
 even though current typed responses are smaller. The byte and call limits both
 bound each cooperative-loop visit, including a backend that repeatedly returns
 short or zero-length operations. Data writes wait for one 512-byte high-speed
@@ -208,7 +209,7 @@ to two frames per service call and waits when no packet buffer is free.
 | Command parser | DTCM / RAM1 | fixed | 64 | 4 | Control plane |
 | USB RX scratch | DTCM / RAM1 | fixed | 128 | 4 | USB transport |
 | Command queue | DTCM / RAM1 | `4 × 56` | 224 | 4 | Control plane |
-| Response queue | DTCM / RAM1 | `4 × 1,024` | 4,096 | 4 | USB transport |
+| Response queue | DTCM / RAM1 | `4 × 1,280` | 5,120 | 4 | USB transport |
 | Primary packet buffers | DTCM / RAM1 | `105 × 4,096` | 430,080 | 32 | Packetizer |
 | Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 8,192 | 32 | Packetizer |
 | GPIO packer state and telemetry | DTCM / RAM1 | compile-time ceiling | 2,048 | 32 | GPIO packer |
@@ -224,7 +225,7 @@ to two frames per service call and waits when no packet buffer is free.
 | Packet-buffer reserve | OCRAM / RAM2 `.dmabuffers` | `95 × 4,096` | 389,120 | 32 | Packetizer |
 | Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
-| **RAM1 subtotal** |  |  | **449,440** |  |  |
+| **RAM1 subtotal** |  |  | **450,464** |  |  |
 | **RAM2 subtotal** |  |  | **491,072** |  |  |
 
 The simultaneous combined-acquisition subset is 440,832 RAM1 bytes for the
