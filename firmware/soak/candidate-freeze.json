@@ -210,7 +210,7 @@
       "build_id": "tdaq-85b0536139cd3f8a",
       "firmware_input_changes": [],
       "firmware_inputs_clean": true,
-      "git_commit": "df8b20901a0d7361b28482902a9242a44b36bd88",
+      "git_commit": "b02a75e5273f16a538088a5bd88c7193ba39d8d1",
       "inputs": [
         "firmware/firmware.ino",
         "firmware/src/acquisition_controller.cpp",
@@ -292,9 +292,9 @@
     "sha256": "1ae0ce075bb02209da4c5f3a791729787f5df757a83ee7a020e150cf431c2f20",
     "source_id": "85b0536139cd3f8ae61b68dc6528d81eafe75d1e3a86fbefb1774af93a766718"
   },
-  "created_utc": "2026-08-29T17:23:15+00:00",
+  "created_utc": "2026-08-29T17:49:51+00:00",
   "protected": {
-    "base_git_commit": "df8b20901a0d7361b28482902a9242a44b36bd88",
+    "base_git_commit": "b02a75e5273f16a538088a5bd88c7193ba39d8d1",
     "file_count": 240,
     "files": [
       {
@@ -669,8 +669,8 @@
       },
       {
         "path": "firmware/soak/validator.py",
-        "sha256": "7820ac1438875029757f4d3fbcd425eeb57e44578d4daf87e90c1041fc82cbdc",
-        "size_bytes": 126531
+        "sha256": "287e312dc1bc08784054e0027ca56a8d46efafa7254bc140f8eeab379de37d4b",
+        "size_bytes": 130324
       },
       {
         "path": "firmware/src/acquisition_controller.cpp",
@@ -1059,18 +1059,18 @@
       },
       {
         "path": "firmware/tests/generated/rig_soak_control_stress.py",
-        "sha256": "e0347c408ad613287b9cc455246d8882b9b3a3bae7f0cd8322b7e4272713ef4b",
-        "size_bytes": 126450
+        "sha256": "e3519ff1351dc4165b6344f4169197fa55b3b741d3350591f685e99b40f49c9b",
+        "size_bytes": 130243
       },
       {
         "path": "firmware/tests/generated/rig_soak_physical_combined.py",
-        "sha256": "5946f53497be6a877871fbc2afe6d4450aaaaaa83877142453b1791237a5c5cd",
-        "size_bytes": 126453
+        "sha256": "6d8267756bfdfdea24274f324238b8d681a9655fbd03a0a3f86f4243aa689721",
+        "size_bytes": 130246
       },
       {
         "path": "firmware/tests/generated/rig_soak_synthetic.py",
-        "sha256": "8912f84b98d2b4b6b83fba34c2f44222c6ccfccaca2bdeb71f16a6b5a481d30f",
-        "size_bytes": 126445
+        "sha256": "9ec326f5909761e933b2956780fd6ec2e85e4704b28694e8cda7ebe008238f9f",
+        "size_bytes": 130238
       },
       {
         "path": "firmware/tests/gpio_batch_packer_benchmark.cpp",
@@ -1324,8 +1324,8 @@
       },
       {
         "path": "firmware/tests/test_soak_endurance_tools.py",
-        "sha256": "624dff3460f8116eec78c2c4740c2d3fa95b8fde75d0d0b018ffcf554309f77d",
-        "size_bytes": 38959
+        "sha256": "bc3cc07ba74e08f8d0c1e4bc17a1e9cec1942ce4bf37de320dc26b3006ac814a",
+        "size_bytes": 43210
       },
       {
         "path": "firmware/tests/test_synthetic_pipeline.py",
@@ -1498,7 +1498,7 @@
         "size_bytes": 87698
       }
     ],
-    "tree_sha256": "45832c6df8220a5668c63d7fe23d6732f4dafeb4e538e230fda31ccebcb5069a"
+    "tree_sha256": "148397dc0f4d70cb9b8ea64352786706449f90154f86f81cbf6d98ad96c5491a"
   },
   "reproducibility": {
     "artifacts": [
@@ -1526,36 +1526,36 @@
     "build_count": 2,
     "byte_identical": true,
     "manifest_sha256": {
-      "first": "78330c38158c23955a6db294c0f468521504b6c18f9bf2f0e21a27ac992cec50",
-      "second": "78330c38158c23955a6db294c0f468521504b6c18f9bf2f0e21a27ac992cec50"
+      "first": "0c693ff447443f526dd68e0d21b1e9593af757c078a1285b4aa5deb34565239d",
+      "second": "0c693ff447443f526dd68e0d21b1e9593af757c078a1285b4aa5deb34565239d"
     }
   },
   "schema_version": 1,
   "staged": {
-    "directory": ".maestro/playbooks/Working/phase-11-soak-candidate-00005/frozen",
+    "directory": ".maestro/playbooks/Working/phase-11-soak-candidate-00006/frozen",
     "files": [
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00005/frozen/build-manifest.json",
-        "sha256": "78330c38158c23955a6db294c0f468521504b6c18f9bf2f0e21a27ac992cec50",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00006/frozen/build-manifest.json",
+        "sha256": "0c693ff447443f526dd68e0d21b1e9593af757c078a1285b4aa5deb34565239d",
         "size_bytes": 12788
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00005/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00006/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00005/frozen/firmware.ino.elf",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00006/frozen/firmware.ino.elf",
         "sha256": "09fcec8e9b3c8526175383a6f1eee781142fc94b4ecb67ad463a221eac3d6f9e",
         "size_bytes": 1791852
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00005/frozen/firmware.ino.hex",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00006/frozen/firmware.ino.hex",
         "sha256": "066cecbc3e777e05fe0206caab3a583a7e43a3c79eecffc2ae4b4afb3c152c4e",
         "size_bytes": 351467
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00005/frozen/firmware.ino.map",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00006/frozen/firmware.ino.map",
         "sha256": "34048551ac165052f37749a355e77fcfe630b58ddcc7e68e0ee469a49520d5cc",
         "size_bytes": 828812
       }
