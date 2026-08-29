@@ -278,6 +278,14 @@ framed byte totals. Fixed protocol-v1 STATUS
 projects transport-admitted frames and dropped items alongside the applied
 synthetic source.
 
+The host keeps immediate independent `ADCBlock`/`GPIOBlock` delivery and adds
+an optional bounded `TimestampAligner` above it. Equal 8,096-tick intervals are
+paired by run ID and first-sample tick without copying either payload; missing
+sides, missing ranges, and per-source sequence/timestamp gaps remain explicit.
+The aligned model exposes the nominal 8 MHz START-relative epoch and retains
+ADC0/ADC1 identity plus packed GPIO bytes, while deliberately making no claim
+about unmeasured external pad propagation or analog aperture latency.
+
 STOP disables production immediately, cancels only an incomplete producer-owned
 fill, and drains every already complete ready or transport-owned frame. A new
 START returns typed `BUSY` while that bounded drain remains, without allocating

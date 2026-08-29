@@ -264,6 +264,42 @@ coverage, the 4:1 GPIO-to-pair period ratio, and the ADC1 half-period phase.
 Packers derive each frame timestamp from source completion counters plus the
 single START epoch; no ISR entry time participates in a sample timestamp.
 
+## Host timestamp alignment
+
+The Python API keeps independent decoding and delivery as its low-level
+contract. `ADCBlock`, `GPIOBlock`, and `StreamGap` therefore leave the reader
+queue as soon as the application consumes them; the background reader never
+waits for a peer source. The optional `TimestampAligner` composes those typed
+objects afterward.
+
+The aligner keys each interval by nonzero run ID and first-sample tick, requires
+the fixed 8,096-tick coverage and one physical-or-synthetic source identity,
+and emits only monotonically ordered intervals within a run. Its configurable
+event-time window holds at most that many unresolved timestamps, permitting
+bounded out-of-order delivery. When the watermark passes an unresolved
+interval, an `AlignmentLoss` names the missing ADC, GPIO, or both before a
+partial `AlignedInterval`; an explicit flush provides the finite timeout/STOP
+boundary for the terminal tail. A run change flushes old pending work with a
+run-boundary reason and resets both independent sequence expectations. A
+source change within one run, duplicate side, late block, invalid coverage, or
+inconsistent gap evidence raises a typed alignment error instead of joining
+unrelated data.
+
+Per-source continuity remains visible as `StreamGap`, distinct from alignment
+loss. The aligned interval also retains those gap objects so a caller cannot
+silently concatenate across sequence or timestamp discontinuities. Missing
+intervals do not advance source expectations; the next observed block must
+therefore independently corroborate the loss in its sequence and timestamp.
+
+No combined sample allocation exists. `AlignedInterval` stores the original
+block references and returns memoryviews over their immutable payload bytes.
+ADC0/ADC1 channel views and packed GPIO bytes retain their existing layouts.
+`NominalEpoch` exposes START-relative tick zero and converts item ticks with the
+advertised 8 MHz frequency: ADC pair `n` remains at `t + 8n`, ADC1 at
+`t + 8n + 4`, and GPIO byte `m` at `t + 2m`. Its external-latency value remains
+explicitly absent because neither GPIO-pad propagation nor ADC aperture
+latency has been measured.
+
 ## Buffer and cache composition
 
 The controller adds no payload storage. It reuses the four-buffer ADC pair
@@ -293,6 +329,6 @@ cooperative packet or USB layers.
 Combined hardware lifecycle is implemented behind the current protocol gate.
 The packet/USB scheduler is now combined-aware behind that same gate. The
 remaining Phase 08 work is to expose combined configuration/capability and
-wire telemetry, implement host alignment, expand adversarial tests, and run the
-physical combined acceptance campaign. Until those gates pass, firmware must
-not advertise combined physical acquisition as an accepted capability.
+wire telemetry, expand adversarial tests, and run the physical combined
+acceptance campaign. Until those gates pass, firmware must not advertise
+combined physical acquisition as an accepted capability.

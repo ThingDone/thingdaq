@@ -67,7 +67,7 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
 `DAQConfiguration`, `Status`, `ADCBlock`, `GPIOBlock`,
 `GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
 `GpioCaptureDiagnosticResult`, `StreamGap`, `FirmwareCounters`, `HostCounters`,
-and `LossCounters` validate
+`LossCounters`, `NominalEpoch`, `AlignedInterval`, and `AlignmentLoss` validate
 their values when constructed. The Phase 01 names
 `Info`, `Configuration`, `AdcBlock`, and `GpioBlock` remain aliases. INFO,
 GET_STATUS, and STOP are legal in every post-boot state; CONFIGURE and
@@ -256,6 +256,53 @@ firmware `GAP_BEFORE`/`OVERRUN_BEFORE`, host queue-drop attribution, and an
 otherwise observed discontinuity remain separate. `loss_counters()` combines
 an explicit `FirmwareCounters` and `HostCounters` snapshot without adding the
 two domains together.
+
+## Optional bounded ADC/GPIO alignment
+
+Raw delivery remains the primary path: `read_block()` and `blocks()` expose
+each typed `ADCBlock`, `GPIOBlock`, and `StreamGap` as soon as the application
+consumes it. Applications that need equal-time cross-stream records can feed
+those same objects into `TimestampAligner` without changing reader ownership
+or constructing a combined payload:
+
+```python
+from teensy_daq import AlignedInterval, AlignmentLoss, TimestampAligner
+
+aligner = TimestampAligner(max_pending_intervals=8)
+
+for raw_item in daq.blocks():
+    # raw_item remains available immediately with its typed payload.
+    for aligned_item in aligner.push(raw_item):
+        if isinstance(aligned_item, AlignmentLoss):
+            print("missing", aligned_item.missing_streams)
+        elif isinstance(aligned_item, AlignedInterval):
+            print(aligned_item.adc, aligned_item.gpio)
+
+# Call at a finite timeout, STOP, or other application boundary.
+for final_item in aligner.flush():
+    print(final_item)
+```
+
+Alignment keys are the nonzero run ID and first-sample timestamp. ADC and GPIO
+must each cover the fixed 8,096-tick interval and report the same physical or
+synthetic source. The event-time lateness window retains at most the configured
+number of unresolved timestamps, accepts bounded out-of-order arrival, and
+emits `AlignmentLoss` before an `AlignedInterval` whose absent side is
+explicitly `None`. A skipped interval with neither side is one loss record with
+an exact `interval_count`. `flush()` resolves a terminal delayed side
+immediately; `align_by_timestamp()` performs that flush automatically for a
+finite iterable. Per-source sequence/timestamp discontinuities remain separate
+`StreamGap` events and are also attached to `AlignedInterval.stream_gaps`.
+
+`AlignedInterval` retains the original block objects. Its
+`adc_payload_view` and `gpio_payload_view` point at their original immutable
+bytes, so alignment never forces an allocated combined copy. ADC pair times
+remain `(t + 8n, t + 8n + 4)` with ADC0/ADC1 identity, while packed GPIO-byte
+times remain `t + 2m`. `NominalEpoch` converts those ticks using the advertised
+8 MHz frequency and exposes START as relative tick zero.
+`NominalEpoch.external_latency_ticks` is deliberately `None`: these are
+schedule times, not measurements of external GPIO-pad propagation or ADC
+aperture latency.
 
 ## Production transport and background reader
 

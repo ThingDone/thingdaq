@@ -3637,6 +3637,12 @@ class AdcSample:
     def pin(self) -> str:
         return self.converter.pin
 
+    @property
+    def timestamp_seconds(self) -> float:
+        """Nominal START-relative time on the advertised 8 MHz schedule."""
+
+        return self.timestamp_ticks / constants.TIMESTAMP_HZ
+
 
 class AdcChannelView(Sequence[int]):
     """Lazy sequence view over one converter in an interleaved wire payload."""
@@ -3816,6 +3822,18 @@ class ADCBlock:
         return self.t0_ticks
 
     @property
+    def timestamp_hz(self) -> int:
+        """Frequency of the advertised START-relative timestamp domain."""
+
+        return self.metadata.timestamp_hz
+
+    @property
+    def t0_seconds(self) -> float:
+        """Nominal first ADC0 time without an analog-aperture claim."""
+
+        return self.t0_ticks / self.timestamp_hz
+
+    @property
     def pair_period_ticks(self) -> int:
         return self.metadata.pair_period_ticks
 
@@ -3918,6 +3936,12 @@ class ADCBlock:
             self.first_sample_ticks + index * self.pair_period_ticks
         ) & constants.UINT64_MAX
         return adc0_tick, (adc0_tick + self.adc1_phase_ticks) & (constants.UINT64_MAX)
+
+    def pair_seconds(self, index: int) -> tuple[float, float]:
+        """Return nominal ADC0/ADC1 START-relative times in seconds."""
+
+        adc0_tick, adc1_tick = self.pair_ticks(index)
+        return adc0_tick / self.timestamp_hz, adc1_tick / self.timestamp_hz
 
     def interleaved(self) -> Iterator[AdcSample]:
         """Explicitly merge ADC0/ADC1 times without claiming added bandwidth."""
@@ -4038,6 +4062,16 @@ class GPIOBlock:
         return self.checksum_algorithm
 
     @property
+    def source(self) -> constants.Source:
+        """Source identity encoded by the common data-frame flag."""
+
+        return (
+            constants.Source.SYNTHETIC
+            if self.flags & constants.FrameFlag.SYNTHETIC
+            else constants.Source.HARDWARE
+        )
+
+    @property
     def item_count(self) -> int:
         """Count of simultaneous eight-pin samples in the payload."""
 
@@ -4048,6 +4082,36 @@ class GPIOBlock:
         """Zero-copy byte view preserving the packed D6-through-D13 bit order."""
 
         return memoryview(self.payload)
+
+    @property
+    def timestamp_hz(self) -> int:
+        """Frequency of the advertised START-relative timestamp domain."""
+
+        return constants.TIMESTAMP_HZ
+
+    @property
+    def t0_ticks(self) -> int:
+        """Nominal run-relative timestamp of the first packed GPIO byte."""
+
+        return self.first_sample_ticks
+
+    @property
+    def t0(self) -> int:
+        return self.t0_ticks
+
+    @property
+    def t0_seconds(self) -> float:
+        """Nominal first packed-byte time without a GPIO-pad latency claim."""
+
+        return self.t0_ticks / self.timestamp_hz
+
+    @property
+    def sample_period_ticks(self) -> int:
+        return constants.GPIO_SAMPLE_PERIOD_TICKS
+
+    @property
+    def sample_period(self) -> int:
+        return self.sample_period_ticks
 
     @property
     def payload_view(self) -> memoryview:
@@ -4079,6 +4143,11 @@ class GPIOBlock:
         return (
             self.first_sample_ticks + index * constants.GPIO_SAMPLE_PERIOD_TICKS
         ) & constants.UINT64_MAX
+
+    def sample_seconds(self, index: int) -> float:
+        """Return one nominal packed-byte START-relative time in seconds."""
+
+        return self.sample_ticks(index) / self.timestamp_hz
 
     def channel(self, pin: int) -> GpioChannelView:
         return GpioChannelView(self, pin)

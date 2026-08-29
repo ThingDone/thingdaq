@@ -343,13 +343,17 @@ The typed surface consists of `DeviceInfo` with nested `DeviceCapabilities`,
 separate `FirmwareCounters`, `HostCounters`, and `LossCounters`. Reader queue
 drops remain distinct from firmware GET_STATUS counters. Production iterators
 emit a visible gap before continuing; strict mode raises with the gap and
-current block attached. Synthetic strict mode additionally checks full payload
-formulas in bulk cyclic views, parser health, and explicit firmware/host
-counters without requiring NumPy. `run_synthetic_soak()` layers bounded
-duration/frame-count execution over the same synchronous API and reports
-payload versus framed throughput, command latency percentiles, queue/parser
-and Python-allocation high-water marks, graceful STOP/final STATUS, and exact
-firmware-to-wire-to-consumer reconciliation.
+current block attached. The optional `TimestampAligner` pairs equal-coverage
+ADC/GPIO blocks above that immediate raw path, retains a bounded out-of-order
+window, and exposes missing sides as `AlignmentLoss` plus partial
+`AlignedInterval` objects without copying either payload. Synthetic strict mode
+additionally checks full payload formulas in bulk cyclic views, parser health,
+and explicit firmware/host counters without requiring NumPy.
+`run_synthetic_soak()` layers bounded duration/frame-count execution over the
+same synchronous API and reports payload versus framed throughput, command
+latency percentiles, queue/parser and Python-allocation high-water marks,
+graceful STOP/final STATUS, and exact firmware-to-wire-to-consumer
+reconciliation.
 
 The simulator and firmware now share the deterministic acquisition formulas,
 run/sequence semantics, and 8 MHz epoch timestamps. The simulator may still
