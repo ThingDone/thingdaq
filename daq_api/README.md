@@ -62,8 +62,10 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
     generation = daq.reset_stats()  # valid after STOP, or while CONFIGURED
 ```
 
-`DeviceInfo`, `DeviceCapabilities`, `AdcTriggerMetadata`, `DAQConfiguration`, `Status`, `ADCBlock`,
-`GPIOBlock`, `GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
+`DeviceInfo`, `DeviceCapabilities`, `AdcCalibrationMetadata`,
+`AdcTriggerMetadata`, `AdcAcquisitionStatus`, `AdcBlockMetadata`,
+`DAQConfiguration`, `Status`, `ADCBlock`, `GPIOBlock`,
+`GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
 `GpioCaptureDiagnosticResult`, `StreamGap`, `FirmwareCounters`, `HostCounters`,
 and `LossCounters` validate
 their values when constructed. The Phase 01 names
@@ -220,16 +222,35 @@ parser, decoder, and reader path.
 ## Stream data and loss policy
 
 ADC blocks always retain separate `adc0`/A0 and `adc1`/A1 lazy channel views.
-`interleave_adc(block)` is the explicit operation that emits timestamped
-samples in ADC0, ADC1 order while retaining each sample's converter identity.
-GPIO payloads remain packed, and `block.channel(pin)` lazily extracts D6-D13
-without an eager eightfold Boolean expansion. Neither operation requires
-NumPy.
+Each view exposes the shared zero-copy `payload_view` plus its byte offset and
+four-byte stride, so optional array consumers can use the native pair buffer
+without changing the pure-Python path. `t0_ticks`, `pair_period_ticks`,
+`adc1_phase_ticks`, `resolution_bits`, `sequence`, `run_id`, `gap`, and
+`calibration` expose the actual INFO-advertised format and run context. The
+facade validates every raw code against the advertised 12-bit or explicitly
+gated 10-bit range; hardware inputs may otherwise vary freely or float and are
+never checked against the synthetic ramp formula.
+
+`interleave_adc(block)` and `block.interleaved()` are explicit operations that
+emit timestamped samples in ADC0, ADC1 order while retaining converter
+identity. They create a denser nominal two-converter time grid; they do not
+increase either input's analog bandwidth. GPIO payloads remain packed, and
+`block.channel(pin)` lazily extracts D6-D13 without an eager eightfold Boolean
+expansion. None of these operations imports or requires NumPy.
+
+`Status.adc_acquisition` exposes the complete physical dual-DMA, pair,
+framing, loss, ADC_ETC/eDMA conversion-error, lifecycle, and packer snapshot.
+`Status.has_adc_errors` includes initialization and trigger errors as well as
+those live counters. If a RUNNING STATUS has been polled, subsequently
+delivered ADC blocks retain that immutable snapshot as `block.acquisition`;
+otherwise it is `None` rather than fabricated per-frame evidence.
 
 Production mode is the default. A sequence, timestamp, or firmware-flagged
 discontinuity causes `blocks()` to emit `StreamGap` immediately before the
 current data block and then continue. `strict=True` instead raises
-`UnexpectedStreamGapError`, with both the gap and current block attached.
+`UnexpectedStreamGapError`, with both the gap and current block attached. For
+ADC data, the following block also retains the same `StreamGap` in
+`block.gap`, including in production mode where the gap event is yielded first.
 `StreamGap.origin` never infers firmware loss from a host queue eviction:
 firmware `GAP_BEFORE`/`OVERRUN_BEFORE`, host queue-drop attribution, and an
 otherwise observed discontinuity remain separate. `loss_counters()` combines

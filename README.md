@@ -177,8 +177,12 @@ generation directly into one fixed packet payload, preserving little-endian
 counters, projecting whole raw gaps into the independent ADC sequence, and
 using the negotiated checksum without heap allocation. ADC-only physical
 CONFIGURE/START is enabled in firmware; combined physical ADC/GPIO remains
-disabled, and the richer Python physical-ADC model plus hardware rig gates
-remain later Phase 07 work. STATUS extends the raw-to-USB accounting with both
+disabled. The Python block model binds the actual INFO-advertised timing,
+resolution, calibration, trigger, and latest STATUS acquisition evidence to
+zero-copy-friendly ADC0/A0 and ADC1/A1 views, validates only payload shape and
+the selected code range for physical inputs, and retains explicit gap context
+without implying increased analog bandwidth. The hardware rig gates remain
+later Phase 07 work. STATUS extends the raw-to-USB accounting with both
 DMA channel totals, paired buffers, captured/delivered/framed/transmitted pairs,
 exact raw/STOP loss, queue depth, lifecycle, stale, and packer errors.
 

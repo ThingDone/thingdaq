@@ -5,6 +5,8 @@ from __future__ import annotations
 import struct
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
+from dataclasses import replace as dataclass_replace
 from enum import Enum, IntEnum
 from typing import Any, Generic, TypeVar, overload
 
@@ -366,6 +368,374 @@ def _normalize_adc_metadata(value: Any) -> None:
     object.__setattr__(value, "adc_calibration_cycles", calibration_cycles)
 
 
+@dataclass(frozen=True, slots=True)
+class AdcCalibrationMetadata:
+    """Per-converter boot calibration evidence attached to ADC blocks.
+
+    These values describe digital configuration and the bounded hardware
+    calibration operation. They are not per-unit voltage calibration data.
+    """
+
+    states: tuple[constants.AdcCalibrationState, constants.AdcCalibrationState] = (
+        constants.AdcCalibrationState.NOT_RUN,
+        constants.AdcCalibrationState.NOT_RUN,
+    )
+    cycles: tuple[int, int] = (0, 0)
+    deadline_us: int = constants.ADC_CALIBRATION_DEADLINE_US
+    configuration_flags: constants.AdcConfigurationFlag = (
+        _DEFAULT_ADC_CONFIGURATION_FLAGS
+    )
+    error_flags: constants.AdcInitializationError = (
+        constants.AdcInitializationError.NONE
+    )
+
+    def __post_init__(self) -> None:
+        if isinstance(self.configuration_flags, bool) or isinstance(
+            self.error_flags, bool
+        ):
+            raise TypeError("ADC calibration metadata contains an unknown flag")
+        try:
+            states = tuple(constants.AdcCalibrationState(item) for item in self.states)
+            flags = constants.AdcConfigurationFlag(self.configuration_flags)
+            errors = constants.AdcInitializationError(self.error_flags)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "ADC calibration metadata contains an unknown enum value"
+            ) from exc
+        cycles = tuple(self.cycles)
+        if len(states) != 2 or len(cycles) != 2:
+            raise ValueError("ADC calibration metadata requires two converters")
+        for value in cycles:
+            _unsigned("ADC calibration cycles", value, 32)
+        _unsigned("ADC calibration deadline", self.deadline_us, 32)
+        if self.deadline_us != constants.ADC_CALIBRATION_DEADLINE_US:
+            raise ValueError(
+                "ADC calibration deadline is incompatible with protocol v1"
+            )
+        if int(flags) & ~constants.KNOWN_ADC_CONFIGURATION_FLAG_MASK:
+            raise ValueError("ADC calibration configuration contains reserved flags")
+        if int(errors) & ~constants.KNOWN_ADC_INITIALIZATION_ERROR_MASK:
+            raise ValueError("ADC calibration errors contain reserved flags")
+        if flags & constants.AdcConfigurationFlag.INITIALIZED and (
+            errors
+            or states
+            != (
+                constants.AdcCalibrationState.SUCCEEDED,
+                constants.AdcCalibrationState.SUCCEEDED,
+            )
+            or flags
+            & (
+                constants.AdcConfigurationFlag.ROUTES_VALIDATED
+                | constants.AdcConfigurationFlag.CONFIGURATION_READBACK_VALID
+                | constants.AdcConfigurationFlag.CALIBRATION_COMPLETE
+            )
+            != (
+                constants.AdcConfigurationFlag.ROUTES_VALIDATED
+                | constants.AdcConfigurationFlag.CONFIGURATION_READBACK_VALID
+                | constants.AdcConfigurationFlag.CALIBRATION_COMPLETE
+            )
+        ):
+            raise ValueError("initialized ADC calibration metadata is inconsistent")
+        object.__setattr__(self, "states", states)
+        object.__setattr__(self, "cycles", cycles)
+        object.__setattr__(self, "configuration_flags", flags)
+        object.__setattr__(self, "error_flags", errors)
+
+    @classmethod
+    def from_device_metadata(cls, value: Any) -> AdcCalibrationMetadata:
+        """Copy the common validated INFO/STATUS calibration fields."""
+
+        return cls(
+            states=tuple(value.adc_calibration_states),
+            cycles=tuple(value.adc_calibration_cycles),
+            deadline_us=value.adc_calibration_deadline_us,
+            configuration_flags=value.adc_configuration_flags,
+            error_flags=value.adc_initialization_error_flags,
+        )
+
+    @property
+    def ready(self) -> bool:
+        """Whether both converters completed the bounded calibration path."""
+
+        return bool(
+            self.configuration_flags & constants.AdcConfigurationFlag.INITIALIZED
+        )
+
+    def converter_ready(self, converter: AdcConverter | int) -> bool:
+        """Return the independently reported calibration result for one ADC."""
+
+        if isinstance(converter, bool):
+            raise TypeError("converter must be ADC0 or ADC1")
+        try:
+            selected = AdcConverter(converter)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("converter must be ADC0 or ADC1") from exc
+        return self.states[int(selected)] is constants.AdcCalibrationState.SUCCEEDED
+
+
+_ADC_ACQUISITION_U64_FIELDS = (
+    ("ADC0_DMA_MAJOR_LOOPS", "adc0_dma_major_loops"),
+    ("ADC1_DMA_MAJOR_LOOPS", "adc1_dma_major_loops"),
+    ("ADC0_DMA_RESULTS", "adc0_dma_results"),
+    ("ADC1_DMA_RESULTS", "adc1_dma_results"),
+    ("ADC_PAIRED_MAJOR_LOOPS", "adc_paired_major_loops"),
+    ("ADC_BUFFERS_COMPLETED", "adc_buffers_completed"),
+    ("ADC_BUFFERS_ACQUIRED", "adc_buffers_acquired"),
+    ("ADC_BUFFERS_RELEASED", "adc_buffers_released"),
+    ("ADC_PAIRS_CAPTURED", "adc_pairs_captured"),
+    ("ADC_PAIRS_DELIVERED", "adc_pairs_delivered"),
+    ("ADC_PAIRS_FRAMED", "adc_pairs_framed"),
+    ("ADC_PAIRS_TRANSMITTED", "adc_pairs_transmitted"),
+    ("ADC_RAW_PAIRS_LOST", "adc_raw_pairs_lost"),
+    ("ADC_STOP_PAIRS_DISCARDED", "adc_stop_pairs_discarded"),
+    ("ADC_INCOMPLETE_CONVERSIONS", "adc_incomplete_conversions"),
+    ("ADC_OVERWRITTEN_CONVERSIONS", "adc_overwritten_conversions"),
+    ("ADC_RAW_RING_OVERRUNS", "adc_raw_ring_overruns"),
+    ("ADC_INCOMPLETE_BUFFERS", "adc_incomplete_buffers"),
+)
+_ADC_ACQUISITION_U32_FIELDS = (
+    ("ADC_ETC_ERROR_EVENTS", "adc_etc_error_events"),
+    ("ADC_ETC_ERROR_FLAGS", "adc_etc_error_flags"),
+    ("ADC_DMA_ERROR_EVENTS", "adc_dma_error_events"),
+    ("ADC_COMPLETION_MISMATCHES", "adc_completion_mismatches"),
+    ("ADC_DESTINATION_MISMATCHES", "adc_destination_mismatches"),
+    ("ADC_SCHEDULE_EXHAUSTIONS", "adc_schedule_exhaustions"),
+    ("ADC_RAW_INVARIANT_ERRORS", "adc_raw_invariant_errors"),
+    ("ADC_STALE_COMPLETIONS", "adc_stale_completions"),
+    ("ADC_RESOURCE_CONFLICTS", "adc_resource_conflicts"),
+    ("ADC_START_ERRORS", "adc_start_errors"),
+    ("ADC_STOP_ERRORS", "adc_stop_errors"),
+    ("ADC_STALE_INTERRUPTS", "adc_stale_interrupts"),
+    ("ADC_PACKER_SOURCE_ERRORS", "adc_packer_source_errors"),
+    ("ADC_PACKER_PIPELINE_ERRORS", "adc_packer_pipeline_errors"),
+    ("ADC_PACKER_CHRONOLOGY_ERRORS", "adc_packer_chronology_errors"),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class AdcAcquisitionStatus:
+    """One typed STATUS snapshot of the physical ADC DMA-to-USB path."""
+
+    adc0_dma_major_loops: int = 0
+    adc1_dma_major_loops: int = 0
+    adc0_dma_results: int = 0
+    adc1_dma_results: int = 0
+    adc_paired_major_loops: int = 0
+    adc_buffers_completed: int = 0
+    adc_buffers_acquired: int = 0
+    adc_buffers_released: int = 0
+    adc_pairs_captured: int = 0
+    adc_pairs_delivered: int = 0
+    adc_pairs_framed: int = 0
+    adc_pairs_transmitted: int = 0
+    adc_raw_pairs_lost: int = 0
+    adc_stop_pairs_discarded: int = 0
+    adc_incomplete_conversions: int = 0
+    adc_overwritten_conversions: int = 0
+    adc_raw_ring_overruns: int = 0
+    adc_incomplete_buffers: int = 0
+    adc_raw_ready_depth: int = 0
+    adc_raw_ready_high_water: int = 0
+    adc_etc_error_events: int = 0
+    adc_etc_error_flags: int = 0
+    adc_dma_error_events: int = 0
+    adc_completion_mismatches: int = 0
+    adc_destination_mismatches: int = 0
+    adc_schedule_exhaustions: int = 0
+    adc_raw_invariant_errors: int = 0
+    adc_stale_completions: int = 0
+    adc_resource_conflicts: int = 0
+    adc_start_errors: int = 0
+    adc_stop_errors: int = 0
+    adc_stale_interrupts: int = 0
+    adc_packer_source_errors: int = 0
+    adc_packer_pipeline_errors: int = 0
+    adc_packer_chronology_errors: int = 0
+
+    def __post_init__(self) -> None:
+        for _, name in _ADC_ACQUISITION_U64_FIELDS:
+            _unsigned(name, getattr(self, name), 64)
+        for _, name in _ADC_ACQUISITION_U32_FIELDS:
+            _unsigned(name, getattr(self, name), 32)
+        _unsigned("adc_raw_ready_depth", self.adc_raw_ready_depth, 16)
+        _unsigned("adc_raw_ready_high_water", self.adc_raw_ready_high_water, 16)
+        if self.adc_raw_ready_depth > self.adc_raw_ready_high_water:
+            raise ValueError("ADC current ready depth exceeds its high-water depth")
+
+    @classmethod
+    def from_status_fields(cls, value: Any) -> AdcAcquisitionStatus:
+        """Copy the detailed physical ADC counters from a STATUS-like model."""
+
+        values = {
+            name: getattr(value, name)
+            for _, name in (
+                *_ADC_ACQUISITION_U64_FIELDS,
+                *_ADC_ACQUISITION_U32_FIELDS,
+            )
+        }
+        values["adc_raw_ready_depth"] = value.adc_raw_ready_depth
+        values["adc_raw_ready_high_water"] = value.adc_raw_ready_high_water
+        return cls(**values)
+
+    @property
+    def has_conversion_errors(self) -> bool:
+        """Whether ADC_ETC/eDMA reported missing or overwritten conversions."""
+
+        return bool(
+            self.adc_etc_error_events
+            or self.adc_etc_error_flags
+            or self.adc_dma_error_events
+            or self.adc_incomplete_conversions
+            or self.adc_overwritten_conversions
+        )
+
+    @property
+    def nonzero_error_fields(self) -> tuple[tuple[str, int], ...]:
+        """Return nonzero hardware, ownership, lifecycle, and packer errors."""
+
+        error_names = (
+            "adc_incomplete_conversions",
+            "adc_overwritten_conversions",
+            *(name for _, name in _ADC_ACQUISITION_U32_FIELDS),
+        )
+        return tuple(
+            (name, getattr(self, name)) for name in error_names if getattr(self, name)
+        )
+
+    @property
+    def has_errors(self) -> bool:
+        return bool(self.nonzero_error_fields)
+
+    @property
+    def has_loss(self) -> bool:
+        return bool(
+            self.adc_raw_pairs_lost
+            or self.adc_stop_pairs_discarded
+            or self.adc_raw_ring_overruns
+            or self.adc_incomplete_buffers
+            or self.has_conversion_errors
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class AdcBlockMetadata:
+    """Actual ADC format, timing, calibration, and latest error evidence."""
+
+    source: constants.Source = constants.Source.HARDWARE
+    timestamp_hz: int = constants.TIMESTAMP_HZ
+    pair_rate_hz: int = constants.ADC_PAIR_RATE_HZ
+    pair_period_ticks: int = constants.ADC_PAIR_PERIOD_TICKS
+    adc1_phase_ticks: int = constants.ADC1_PHASE_TICKS
+    resolution_bits: int = constants.ADC_RESOLUTION_BITS
+    container_bytes: int = constants.ADC_CONTAINER_BITS // 8
+    code_min: int = constants.ADC_CODE_MIN
+    code_max: int = (1 << constants.ADC_PRIMARY_RESOLUTION_BITS) - 1
+    calibration: AdcCalibrationMetadata = dataclass_field(
+        default_factory=AdcCalibrationMetadata
+    )
+    trigger: AdcTriggerMetadata = dataclass_field(default_factory=AdcTriggerMetadata)
+    acquisition: AdcAcquisitionStatus | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.source, bool):
+            raise TypeError("ADC block source is invalid")
+        try:
+            source = constants.Source(self.source)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("ADC block source is invalid") from exc
+        object.__setattr__(self, "source", source)
+        fixed_values = (
+            ("timestamp_hz", self.timestamp_hz, constants.TIMESTAMP_HZ),
+            ("pair_rate_hz", self.pair_rate_hz, constants.ADC_PAIR_RATE_HZ),
+            (
+                "pair_period_ticks",
+                self.pair_period_ticks,
+                constants.ADC_PAIR_PERIOD_TICKS,
+            ),
+            ("adc1_phase_ticks", self.adc1_phase_ticks, constants.ADC1_PHASE_TICKS),
+            (
+                "container_bytes",
+                self.container_bytes,
+                constants.ADC_CONTAINER_BITS // 8,
+            ),
+            ("code_min", self.code_min, constants.ADC_CODE_MIN),
+        )
+        if any(
+            not isinstance(actual, int)
+            or isinstance(actual, bool)
+            or actual != expected
+            for _, actual, expected in fixed_values
+        ):
+            raise ValueError("ADC block timing/container metadata is incompatible")
+        if self.resolution_bits not in (
+            constants.ADC_PRIMARY_RESOLUTION_BITS,
+            constants.ADC_FALLBACK_RESOLUTION_BITS,
+        ) or isinstance(self.resolution_bits, bool):
+            raise ValueError("ADC block resolution must be 12 or gated 10 bits")
+        if self.code_max != (1 << self.resolution_bits) - 1:
+            raise ValueError("ADC block code range disagrees with its resolution")
+        if not isinstance(self.calibration, AdcCalibrationMetadata):
+            raise TypeError("calibration must be AdcCalibrationMetadata")
+        if not isinstance(self.trigger, AdcTriggerMetadata):
+            raise TypeError("trigger must be AdcTriggerMetadata")
+        if self.acquisition is not None and not isinstance(
+            self.acquisition, AdcAcquisitionStatus
+        ):
+            raise TypeError("acquisition must be AdcAcquisitionStatus or None")
+        selected_resolution_flag = (
+            constants.AdcConfigurationFlag.PRIMARY_12_BIT
+            if self.resolution_bits == constants.ADC_PRIMARY_RESOLUTION_BITS
+            else constants.AdcConfigurationFlag.FALLBACK_10_BIT
+        )
+        other_resolution_flag = (
+            constants.AdcConfigurationFlag.FALLBACK_10_BIT
+            if self.resolution_bits == constants.ADC_PRIMARY_RESOLUTION_BITS
+            else constants.AdcConfigurationFlag.PRIMARY_12_BIT
+        )
+        flags = self.calibration.configuration_flags
+        if not flags & selected_resolution_flag or flags & other_resolution_flag:
+            raise ValueError("ADC block calibration flags disagree with resolution")
+
+    @classmethod
+    def from_device_metadata(
+        cls,
+        value: Any,
+        *,
+        source: constants.Source | int,
+        acquisition: AdcAcquisitionStatus | None = None,
+    ) -> AdcBlockMetadata:
+        """Build block metadata from validated INFO plus optional STATUS data."""
+
+        if isinstance(source, bool):
+            raise TypeError("ADC block source is invalid")
+        try:
+            selected_source = constants.Source(source)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("ADC block source is invalid") from exc
+        return cls(
+            source=selected_source,
+            timestamp_hz=value.timestamp_hz,
+            pair_rate_hz=value.adc_pair_rate_hz,
+            pair_period_ticks=value.adc_pair_period_ticks,
+            adc1_phase_ticks=value.adc1_phase_ticks,
+            resolution_bits=value.adc_resolution_bits,
+            container_bytes=value.adc_container_bytes,
+            code_min=value.adc_code_min,
+            code_max=value.adc_code_max,
+            calibration=AdcCalibrationMetadata.from_device_metadata(value),
+            trigger=value.adc_trigger,
+            acquisition=acquisition,
+        )
+
+    @property
+    def pair_period_seconds(self) -> float:
+        return self.pair_period_ticks / self.timestamp_hz
+
+    @property
+    def adc1_phase_seconds(self) -> float:
+        return self.adc1_phase_ticks / self.timestamp_hz
+
+
 def _adc_offset(prefix: str, field: str) -> int:
     separator = "" if field[:1] in {"0", "1"} else "_"
     return int(getattr(constants, f"{prefix}_ADC{separator}{field}_OFFSET"))
@@ -661,6 +1031,72 @@ def _unpack_adc_metadata(payload: bytes, prefix: str) -> dict[str, Any]:
         ),
         "adc_trigger": _unpack_adc_trigger_metadata(payload, prefix),
     }
+
+
+def _pack_adc_acquisition_status(payload: bytearray, value: Any) -> None:
+    """Pack the detailed STATUS-only ADC acquisition fields."""
+
+    for field_name, attribute_name in _ADC_ACQUISITION_U64_FIELDS:
+        struct.pack_into(
+            "<Q",
+            payload,
+            getattr(constants, f"STATUS_RESPONSE_{field_name}_OFFSET"),
+            getattr(value, attribute_name),
+        )
+    struct.pack_into(
+        "<HH",
+        payload,
+        constants.STATUS_RESPONSE_ADC_RAW_READY_DEPTH_OFFSET,
+        value.adc_raw_ready_depth,
+        value.adc_raw_ready_high_water,
+    )
+    for field_name, attribute_name in _ADC_ACQUISITION_U32_FIELDS:
+        struct.pack_into(
+            "<I",
+            payload,
+            getattr(constants, f"STATUS_RESPONSE_{field_name}_OFFSET"),
+            getattr(value, attribute_name),
+        )
+
+
+def _unpack_adc_acquisition_status(payload: bytes) -> dict[str, Any]:
+    """Unpack every STATUS-only ADC acquisition counter without expansion."""
+
+    values = {
+        attribute_name: int(
+            struct.unpack_from(
+                "<Q",
+                payload,
+                getattr(constants, f"STATUS_RESPONSE_{field_name}_OFFSET"),
+            )[0]
+        )
+        for field_name, attribute_name in _ADC_ACQUISITION_U64_FIELDS
+    }
+    values["adc_raw_ready_depth"] = int(
+        struct.unpack_from(
+            "<H", payload, constants.STATUS_RESPONSE_ADC_RAW_READY_DEPTH_OFFSET
+        )[0]
+    )
+    values["adc_raw_ready_high_water"] = int(
+        struct.unpack_from(
+            "<H",
+            payload,
+            constants.STATUS_RESPONSE_ADC_RAW_READY_HIGH_WATER_OFFSET,
+        )[0]
+    )
+    values.update(
+        {
+            attribute_name: int(
+                struct.unpack_from(
+                    "<I",
+                    payload,
+                    getattr(constants, f"STATUS_RESPONSE_{field_name}_OFFSET"),
+                )[0]
+            )
+            for field_name, attribute_name in _ADC_ACQUISITION_U32_FIELDS
+        }
+    )
+    return values
 
 
 @dataclass(frozen=True, slots=True)
@@ -1898,6 +2334,26 @@ class DeviceCapabilities:
         if gpio_pin_map != constants.GPIO_PINS_BY_BIT:
             raise ValueError("GPIO bit order must remain D6 through D13")
 
+    @property
+    def adc_calibration(self) -> AdcCalibrationMetadata:
+        """Return the bounded per-converter calibration evidence."""
+
+        return AdcCalibrationMetadata.from_device_metadata(self)
+
+    def adc_block_metadata(
+        self,
+        source: constants.Source | int,
+        *,
+        acquisition: AdcAcquisitionStatus | None = None,
+    ) -> AdcBlockMetadata:
+        """Create the immutable ADC metadata attached to decoded blocks."""
+
+        return AdcBlockMetadata.from_device_metadata(
+            self,
+            source=source,
+            acquisition=acquisition,
+        )
+
     def supports_source(self, source: constants.Source | int) -> bool:
         """Return whether this device advertises ``source``."""
 
@@ -2151,6 +2607,26 @@ class DeviceInfo:
             gpio_dmamux_source=self.gpio_dmamux_source,
             gpio_edma_priority=self.gpio_edma_priority,
             gpio_xbar_active_edge=self.gpio_xbar_active_edge,
+        )
+
+    @property
+    def adc_calibration(self) -> AdcCalibrationMetadata:
+        """Return the bounded per-converter calibration evidence."""
+
+        return AdcCalibrationMetadata.from_device_metadata(self)
+
+    def adc_block_metadata(
+        self,
+        source: constants.Source | int,
+        *,
+        acquisition: AdcAcquisitionStatus | None = None,
+    ) -> AdcBlockMetadata:
+        """Create the immutable ADC metadata attached to decoded blocks."""
+
+        return AdcBlockMetadata.from_device_metadata(
+            self,
+            source=source,
+            acquisition=acquisition,
         )
 
     def supports_source(self, source: constants.Source | int) -> bool:
@@ -2517,6 +2993,41 @@ class Status:
         constants.AdcInitializationError.NONE
     )
     adc_trigger: AdcTriggerMetadata = AdcTriggerMetadata()
+    adc0_dma_major_loops: int = 0
+    adc1_dma_major_loops: int = 0
+    adc0_dma_results: int = 0
+    adc1_dma_results: int = 0
+    adc_paired_major_loops: int = 0
+    adc_buffers_completed: int = 0
+    adc_buffers_acquired: int = 0
+    adc_buffers_released: int = 0
+    adc_pairs_captured: int = 0
+    adc_pairs_delivered: int = 0
+    adc_pairs_framed: int = 0
+    adc_pairs_transmitted: int = 0
+    adc_raw_pairs_lost: int = 0
+    adc_stop_pairs_discarded: int = 0
+    adc_incomplete_conversions: int = 0
+    adc_overwritten_conversions: int = 0
+    adc_raw_ring_overruns: int = 0
+    adc_incomplete_buffers: int = 0
+    adc_raw_ready_depth: int = 0
+    adc_raw_ready_high_water: int = 0
+    adc_etc_error_events: int = 0
+    adc_etc_error_flags: int = 0
+    adc_dma_error_events: int = 0
+    adc_completion_mismatches: int = 0
+    adc_destination_mismatches: int = 0
+    adc_schedule_exhaustions: int = 0
+    adc_raw_invariant_errors: int = 0
+    adc_stale_completions: int = 0
+    adc_resource_conflicts: int = 0
+    adc_start_errors: int = 0
+    adc_stop_errors: int = 0
+    adc_stale_interrupts: int = 0
+    adc_packer_source_errors: int = 0
+    adc_packer_pipeline_errors: int = 0
+    adc_packer_chronology_errors: int = 0
 
     def __post_init__(self) -> None:
         if any(
@@ -2620,6 +3131,32 @@ class Status:
         if self.stats_generation == 0:
             raise ValueError("stats_generation must be nonzero")
         _normalize_adc_metadata(self)
+        # Constructing this nested snapshot validates every STATUS-only ADC
+        # counter while retaining the schema field names on Status itself.
+        AdcAcquisitionStatus.from_status_fields(self)
+
+    @property
+    def adc_calibration(self) -> AdcCalibrationMetadata:
+        """Return independently reported ADC0/ADC1 calibration evidence."""
+
+        return AdcCalibrationMetadata.from_device_metadata(self)
+
+    @property
+    def adc_acquisition(self) -> AdcAcquisitionStatus:
+        """Return the detailed physical ADC DMA-to-USB status snapshot."""
+
+        return AdcAcquisitionStatus.from_status_fields(self)
+
+    @property
+    def has_adc_errors(self) -> bool:
+        """Whether initialization, trigger, conversion, or pipeline errors exist."""
+
+        return bool(
+            self.adc_initialization_error_flags
+            or self.adc_trigger.error_flags
+            or self.adc_trigger.trigger_error_count
+            or self.adc_acquisition.has_errors
+        )
 
     @property
     def counters(self) -> FirmwareCounters:
@@ -2651,6 +3188,41 @@ class Status:
             gpio_start_errors=self.gpio_start_errors,
             gpio_stop_errors=self.gpio_stop_errors,
             gpio_stale_dma_completions=self.gpio_stale_dma_completions,
+            adc0_dma_major_loops=self.adc0_dma_major_loops,
+            adc1_dma_major_loops=self.adc1_dma_major_loops,
+            adc0_dma_results=self.adc0_dma_results,
+            adc1_dma_results=self.adc1_dma_results,
+            adc_paired_major_loops=self.adc_paired_major_loops,
+            adc_buffers_completed=self.adc_buffers_completed,
+            adc_buffers_acquired=self.adc_buffers_acquired,
+            adc_buffers_released=self.adc_buffers_released,
+            adc_pairs_captured=self.adc_pairs_captured,
+            adc_pairs_delivered=self.adc_pairs_delivered,
+            adc_pairs_framed=self.adc_pairs_framed,
+            adc_pairs_transmitted=self.adc_pairs_transmitted,
+            adc_raw_pairs_lost=self.adc_raw_pairs_lost,
+            adc_stop_pairs_discarded=self.adc_stop_pairs_discarded,
+            adc_incomplete_conversions=self.adc_incomplete_conversions,
+            adc_overwritten_conversions=self.adc_overwritten_conversions,
+            adc_raw_ring_overruns=self.adc_raw_ring_overruns,
+            adc_incomplete_buffers=self.adc_incomplete_buffers,
+            adc_raw_ready_depth=self.adc_raw_ready_depth,
+            adc_raw_ready_high_water=self.adc_raw_ready_high_water,
+            adc_etc_error_events=self.adc_etc_error_events,
+            adc_etc_error_flags=self.adc_etc_error_flags,
+            adc_dma_error_events=self.adc_dma_error_events,
+            adc_completion_mismatches=self.adc_completion_mismatches,
+            adc_destination_mismatches=self.adc_destination_mismatches,
+            adc_schedule_exhaustions=self.adc_schedule_exhaustions,
+            adc_raw_invariant_errors=self.adc_raw_invariant_errors,
+            adc_stale_completions=self.adc_stale_completions,
+            adc_resource_conflicts=self.adc_resource_conflicts,
+            adc_start_errors=self.adc_start_errors,
+            adc_stop_errors=self.adc_stop_errors,
+            adc_stale_interrupts=self.adc_stale_interrupts,
+            adc_packer_source_errors=self.adc_packer_source_errors,
+            adc_packer_pipeline_errors=self.adc_packer_pipeline_errors,
+            adc_packer_chronology_errors=self.adc_packer_chronology_errors,
         )
 
     @property
@@ -2740,6 +3312,7 @@ class Status:
             self.gpio_stale_dma_completions,
         )
         _pack_adc_metadata(payload, self, "STATUS_RESPONSE")
+        _pack_adc_acquisition_status(payload, self)
         return bytes(payload)
 
     @classmethod
@@ -2825,6 +3398,7 @@ class Status:
             gpio_stop_errors=errors[7],
             gpio_stale_dma_completions=errors[8],
             **_unpack_adc_metadata(payload_bytes, "STATUS_RESPONSE"),
+            **_unpack_adc_acquisition_status(payload_bytes),
         )
 
 
@@ -2857,6 +3431,41 @@ class FirmwareCounters:
     gpio_start_errors: int = 0
     gpio_stop_errors: int = 0
     gpio_stale_dma_completions: int = 0
+    adc0_dma_major_loops: int = 0
+    adc1_dma_major_loops: int = 0
+    adc0_dma_results: int = 0
+    adc1_dma_results: int = 0
+    adc_paired_major_loops: int = 0
+    adc_buffers_completed: int = 0
+    adc_buffers_acquired: int = 0
+    adc_buffers_released: int = 0
+    adc_pairs_captured: int = 0
+    adc_pairs_delivered: int = 0
+    adc_pairs_framed: int = 0
+    adc_pairs_transmitted: int = 0
+    adc_raw_pairs_lost: int = 0
+    adc_stop_pairs_discarded: int = 0
+    adc_incomplete_conversions: int = 0
+    adc_overwritten_conversions: int = 0
+    adc_raw_ring_overruns: int = 0
+    adc_incomplete_buffers: int = 0
+    adc_raw_ready_depth: int = 0
+    adc_raw_ready_high_water: int = 0
+    adc_etc_error_events: int = 0
+    adc_etc_error_flags: int = 0
+    adc_dma_error_events: int = 0
+    adc_completion_mismatches: int = 0
+    adc_destination_mismatches: int = 0
+    adc_schedule_exhaustions: int = 0
+    adc_raw_invariant_errors: int = 0
+    adc_stale_completions: int = 0
+    adc_resource_conflicts: int = 0
+    adc_start_errors: int = 0
+    adc_stop_errors: int = 0
+    adc_stale_interrupts: int = 0
+    adc_packer_source_errors: int = 0
+    adc_packer_pipeline_errors: int = 0
+    adc_packer_chronology_errors: int = 0
 
     def __post_init__(self) -> None:
         for name in (
@@ -2898,6 +3507,13 @@ class FirmwareCounters:
         _unsigned("stats_generation", self.stats_generation, 32)
         if self.stats_generation == 0:
             raise ValueError("stats_generation must be nonzero")
+        AdcAcquisitionStatus.from_status_fields(self)
+
+    @property
+    def adc_acquisition(self) -> AdcAcquisitionStatus:
+        """Return the physical ADC acquisition counters in one typed view."""
+
+        return AdcAcquisitionStatus.from_status_fields(self)
 
     @property
     def items_dropped(self) -> int:
@@ -2907,7 +3523,7 @@ class FirmwareCounters:
 
     @property
     def has_loss(self) -> bool:
-        return self.items_dropped > 0
+        return self.items_dropped > 0 or self.adc_acquisition.has_loss
 
 
 @dataclass(frozen=True, slots=True)
@@ -3039,6 +3655,28 @@ class AdcChannelView(Sequence[int]):
     def __len__(self) -> int:
         return self._block.item_count
 
+    @property
+    def payload_view(self) -> memoryview:
+        """Zero-copy view of the shared pair buffer backing this channel."""
+
+        return self._block.payload_view
+
+    @property
+    def byte_offset(self) -> int:
+        """Byte offset of this converter's first little-endian ``uint16``."""
+
+        return 2 * int(self.converter)
+
+    @property
+    def byte_stride(self) -> int:
+        """Byte distance between consecutive values for this converter."""
+
+        return constants.ADC_BYTES_PER_PAIR
+
+    @property
+    def item_size(self) -> int:
+        return constants.ADC_CONTAINER_BITS // 8
+
     @overload
     def __getitem__(self, index: int) -> int: ...
 
@@ -3055,7 +3693,7 @@ class AdcChannelView(Sequence[int]):
             position += len(self)
         if not 0 <= position < len(self):
             raise IndexError("ADC sample index out of range")
-        offset = position * constants.ADC_BYTES_PER_PAIR + 2 * int(self.converter)
+        offset = position * self.byte_stride + self.byte_offset
         return struct.unpack_from("<H", self._block.payload, offset)[0]
 
 
@@ -3071,6 +3709,8 @@ class ADCBlock:
     checksum_algorithm: constants.ChecksumAlgorithm = (
         constants.DEFAULT_CHECKSUM_ALGORITHM
     )
+    metadata: AdcBlockMetadata = dataclass_field(default_factory=AdcBlockMetadata)
+    gap: StreamGap | None = None
 
     def __post_init__(self) -> None:
         _unsigned("run_id", self.run_id, 32)
@@ -3099,17 +3739,48 @@ class ADCBlock:
         object.__setattr__(self, "checksum_algorithm", checksum)
         if len(payload) != constants.ADC_DATA_PAYLOAD_SIZE:
             raise ValueError("ADC blocks require exactly 1012 sample pairs")
-        code_mask = (1 << constants.ADC_RESOLUTION_BITS) - 1
+        if not isinstance(self.metadata, AdcBlockMetadata):
+            raise TypeError("ADC block metadata must be AdcBlockMetadata")
+        wire_source = (
+            constants.Source.SYNTHETIC
+            if self.flags & constants.FrameFlag.SYNTHETIC
+            else constants.Source.HARDWARE
+        )
+        if self.metadata.source is not wire_source:
+            object.__setattr__(
+                self,
+                "metadata",
+                dataclass_replace(self.metadata, source=wire_source),
+            )
         if any(
-            adc0 & ~code_mask or adc1 & ~code_mask
+            not self.metadata.code_min <= adc0 <= self.metadata.code_max
+            or not self.metadata.code_min <= adc1 <= self.metadata.code_max
             for adc0, adc1 in struct.iter_unpack("<HH", payload)
         ):
-            raise ValueError("ADC codes must fit the configured 12-bit range")
+            raise ValueError(
+                "ADC codes must fit the advertised "
+                f"{self.metadata.resolution_bits}-bit range"
+            )
+        if self.gap is not None:
+            if not isinstance(self.gap, StreamGap):
+                raise TypeError("ADC gap metadata must be StreamGap or None")
+            if (
+                self.gap.kind is not constants.FrameKind.ADC_DATA
+                or self.gap.run_id != self.run_id
+                or self.gap.observed_sequence != self.sequence
+                or self.gap.observed_first_sample_ticks != self.first_sample_ticks
+            ):
+                raise ValueError("ADC gap metadata does not describe this block")
 
     @classmethod
     def from_frame(cls, frame: Frame) -> ADCBlock:
         if frame.header.kind is not constants.FrameKind.ADC_DATA:
             raise TypeError("frame is not ADC_DATA")
+        source = (
+            constants.Source.SYNTHETIC
+            if frame.header.flags & constants.FrameFlag.SYNTHETIC
+            else constants.Source.HARDWARE
+        )
         return cls(
             run_id=frame.header.run_id,
             sequence=frame.header.sequence,
@@ -3117,6 +3788,7 @@ class ADCBlock:
             payload=frame.payload,
             flags=frame.header.flags,
             checksum_algorithm=frame.header.checksum_algorithm,
+            metadata=AdcBlockMetadata(source=source),
         )
 
     @property
@@ -3130,6 +3802,78 @@ class ADCBlock:
         """Logical pair count; this is not a combined two-channel sample rate."""
 
         return constants.ADC_PAIRS_PER_FRAME
+
+    @property
+    def t0_ticks(self) -> int:
+        """Run-relative nominal ADC0 timestamp for the first pair."""
+
+        return self.first_sample_ticks
+
+    @property
+    def t0(self) -> int:
+        """Concise tick-domain alias for :attr:`t0_ticks`."""
+
+        return self.t0_ticks
+
+    @property
+    def pair_period_ticks(self) -> int:
+        return self.metadata.pair_period_ticks
+
+    @property
+    def pair_period(self) -> int:
+        """Concise tick-domain alias for :attr:`pair_period_ticks`."""
+
+        return self.pair_period_ticks
+
+    @property
+    def adc1_phase_ticks(self) -> int:
+        return self.metadata.adc1_phase_ticks
+
+    @property
+    def adc1_phase(self) -> int:
+        """Concise tick-domain alias for :attr:`adc1_phase_ticks`."""
+
+        return self.adc1_phase_ticks
+
+    @property
+    def resolution_bits(self) -> int:
+        return self.metadata.resolution_bits
+
+    @property
+    def resolution(self) -> int:
+        return self.resolution_bits
+
+    @property
+    def code_range(self) -> tuple[int, int]:
+        return self.metadata.code_min, self.metadata.code_max
+
+    @property
+    def source(self) -> constants.Source:
+        return self.metadata.source
+
+    @property
+    def run(self) -> int:
+        return self.run_id
+
+    @property
+    def calibration(self) -> AdcCalibrationMetadata:
+        return self.metadata.calibration
+
+    @property
+    def trigger(self) -> AdcTriggerMetadata:
+        return self.metadata.trigger
+
+    @property
+    def acquisition(self) -> AdcAcquisitionStatus | None:
+        """Latest STATUS evidence known when this block was delivered, if any."""
+
+        return self.metadata.acquisition
+
+    @property
+    def gap_before(self) -> bool:
+        """Whether continuity metadata reports a gap immediately before this block."""
+
+        return self.gap is not None or bool(self.flags & constants.FrameFlag.GAP_BEFORE)
 
     @property
     def payload_view(self) -> memoryview:
@@ -3153,14 +3897,14 @@ class ADCBlock:
     @property
     def end_tick_exclusive(self) -> int:
         return (
-            self.first_sample_ticks + self.item_count * constants.ADC_PAIR_PERIOD_TICKS
+            self.first_sample_ticks + self.item_count * self.pair_period_ticks
         ) & constants.UINT64_MAX
 
     @property
     def first_pair_index(self) -> int:
         """Global per-converter sample index implied by the 8 MHz timestamp."""
 
-        return self.first_sample_ticks // constants.ADC_PAIR_PERIOD_TICKS
+        return self.first_sample_ticks // self.pair_period_ticks
 
     def pair(self, index: int) -> tuple[int, int]:
         return self.adc0[index], self.adc1[index]
@@ -3171,14 +3915,12 @@ class ADCBlock:
         if not 0 <= index < self.item_count:
             raise IndexError("ADC pair index out of range")
         adc0_tick = (
-            self.first_sample_ticks + index * constants.ADC_PAIR_PERIOD_TICKS
+            self.first_sample_ticks + index * self.pair_period_ticks
         ) & constants.UINT64_MAX
-        return adc0_tick, (adc0_tick + constants.ADC1_PHASE_TICKS) & (
-            constants.UINT64_MAX
-        )
+        return adc0_tick, (adc0_tick + self.adc1_phase_ticks) & (constants.UINT64_MAX)
 
     def interleaved(self) -> Iterator[AdcSample]:
-        """Return the explicit ADC0/ADC1 timestamped sample iterator."""
+        """Explicitly merge ADC0/ADC1 times without claiming added bandwidth."""
 
         return interleave_adc(self)
 
@@ -3188,7 +3930,7 @@ AdcBlock = ADCBlock
 
 
 def interleave_adc(block: ADCBlock) -> Iterator[AdcSample]:
-    """Lazily order ADC0/A0 then ADC1/A1 samples by nominal acquisition time."""
+    """Lazily merge nominal times; this does not increase analog bandwidth."""
 
     adc0 = block.adc0
     adc1 = block.adc1
@@ -3470,8 +4212,8 @@ class StreamGap:
         if tick_delta > constants.UINT64_MAX // 2:
             raise ValueError("reversed timestamp is not a forward gap")
         period = (
-            constants.ADC_PAIR_PERIOD_TICKS
-            if kind is constants.FrameKind.ADC_DATA
+            current.pair_period_ticks
+            if isinstance(current, ADCBlock)
             else constants.GPIO_SAMPLE_PERIOD_TICKS
         )
         if tick_delta % period:
@@ -3605,7 +4347,10 @@ def decode_message(frame: Frame) -> DecodedMessage:
 
 __all__ = [
     "ADCBlock",
+    "AdcAcquisitionStatus",
     "AdcBlock",
+    "AdcBlockMetadata",
+    "AdcCalibrationMetadata",
     "AdcChannelView",
     "AdcConverter",
     "AdcSample",

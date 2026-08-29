@@ -77,8 +77,11 @@ from .identity import (
     validate_device_identity,
 )
 from .models import (
+    AdcAcquisitionStatus,
     ADCBlock,
     AdcBlock,
+    AdcBlockMetadata,
+    AdcCalibrationMetadata,
     AdcChannelView,
     AdcConverter,
     AdcSample,
@@ -190,7 +193,10 @@ __all__ = [
     "TEENSY_USB_SERIAL_PID",
     "TEENSY_USB_SERIAL_VID",
     "ADCBlock",
+    "AdcAcquisitionStatus",
     "AdcBlock",
+    "AdcBlockMetadata",
+    "AdcCalibrationMetadata",
     "AdcCalibrationState",
     "AdcChannelView",
     "AdcClockSource",

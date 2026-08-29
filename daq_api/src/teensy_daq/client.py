@@ -30,6 +30,7 @@ from .identity import (
     validate_device_identity,
 )
 from .models import (
+    AdcAcquisitionStatus,
     ADCBlock,
     CommandResponse,
     DAQConfiguration,
@@ -937,6 +938,19 @@ class TeensyDAQ:
                     f"{snapshot.adc_items_dropped} ADC pair(s) and "
                     f"{snapshot.gpio_items_dropped} GPIO sample(s) dropped",
                 )
+            if snapshot.has_adc_errors:
+                acquisition_errors = ", ".join(
+                    f"{name}={value}"
+                    for name, value in snapshot.adc_acquisition.nonzero_error_fields
+                )
+                raise UnexpectedStreamValidationError(
+                    "firmware_adc_errors",
+                    "firmware reported ADC initialization="
+                    f"{int(snapshot.adc_initialization_error_flags)}, trigger="
+                    f"{int(snapshot.adc_trigger.error_flags)}, trigger_events="
+                    f"{snapshot.adc_trigger.trigger_error_count}"
+                    + (f", {acquisition_errors}" if acquisition_errors else ""),
+                )
             if snapshot.parser_errors:
                 raise UnexpectedStreamValidationError(
                     "firmware_parser_errors",
@@ -1147,6 +1161,42 @@ class TeensyDAQ:
                 f"received disabled {kind.name} stream for the active configuration"
             )
 
+        if isinstance(block, ADCBlock):
+            configuration = self._configuration
+            info = self._device_info
+            if configuration is None or info is None:
+                raise UnexpectedMessageError(
+                    "ADC_DATA arrived without active configuration/INFO metadata"
+                )
+            expected_synthetic = configuration.source is constants.Source.SYNTHETIC
+            wire_synthetic = bool(block.flags & constants.FrameFlag.SYNTHETIC)
+            if wire_synthetic != expected_synthetic:
+                raise UnexpectedMessageError(
+                    "ADC_DATA source flag disagrees with the active configuration"
+                )
+            acquisition: AdcAcquisitionStatus | None = None
+            status = self._last_status
+            if (
+                status is not None
+                and status.device_state is constants.DeviceState.RUNNING
+                and status.source is configuration.source
+                and status.stream_mask & constants.StreamMask.ADC
+            ):
+                acquisition = status.adc_acquisition
+            try:
+                block = replace(
+                    block,
+                    metadata=info.adc_block_metadata(
+                        configuration.source,
+                        acquisition=acquisition,
+                    ),
+                    gap=None,
+                )
+            except (TypeError, ValueError) as error:
+                raise UnexpectedMessageError(
+                    f"ADC_DATA contradicts advertised ADC metadata: {error}"
+                ) from error
+
         total_host_drops = self._reader.counters.host_block_queue_drops
         if total_host_drops < self._last_host_queue_drops:
             raise ReaderProtocolError("host queue-drop counter moved backwards")
@@ -1193,6 +1243,8 @@ class TeensyDAQ:
                         ) from error
             return block
 
+        if isinstance(block, ADCBlock):
+            block = replace(block, gap=gap)
         self._unattributed_host_queue_drops -= gap.host_queue_drops
         self._observed_stream_gaps += 1
         if self._strict:
