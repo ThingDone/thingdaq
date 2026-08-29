@@ -2,7 +2,7 @@
   "schema_version": 1,
   "artifact": {
     "name": "firmware.ino.hex",
-    "sha256": "00e16765cf71763307c3c5bf5174c91d82a92d3973391bdabfa89fb221a27a39"
+    "sha256": "f10798db45504fffb7dbbaacafaa06a8317b9c6fbab6b07c788e1a198881a3ba"
   },
   "board": {
     "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
@@ -16,8 +16,8 @@
       7,
       0
     ],
-    "build_id": "tdaq-cff5eb8e024e1399",
-    "source_id": "cff5eb8e024e1399126bc4648c9f2ace12de83020ad0705985d43520d3b850cb"
+    "build_id": "tdaq-4f1423acdfa045f2",
+    "source_id": "4f1423acdfa045f23e8fa02a180fb73648996108ee0aae03417d5910fbeeda7a"
   },
   "protocol": {
     "version": 1,
