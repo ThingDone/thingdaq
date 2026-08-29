@@ -404,16 +404,41 @@ void processDmaCompletion(std::size_t converter) {
   barrier();
 }
 
-void adc0DmaIsr() {
-  processDmaCompletion(0U);
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_fault")
+void recordIncompleteDmaPair(std::uint32_t pending) {
+  for (std::size_t converter = 0U; converter < kConverterCount;
+       ++converter) {
+    if ((pending & channelMask(converter)) != 0U) {
+      processDmaCompletion(converter);
+    } else if (g_hardware_prepared) {
+      g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
+    }
+  }
+  if (g_hardware_prepared) {
+    g_faulted = true;
+  }
+}
+
+void adcPairDmaIsr() {
+  // ADC0 is triggered and completes before ADC1. Both descriptors retain
+  // INTMAJOR so DMA_INT is the hardware barrier, but only the later ADC1 NVIC
+  // line dispatches. Consuming both bits in one fixed-order ISR prevents two
+  // independently pending equal-priority handlers from losing their relative
+  // generation when one interrupt is delayed or coalesced.
+  const std::uint32_t pending = DMA_INT & kAdcDmaChannelMask;
+  if (pending != kAdcDmaChannelMask) {
+    recordIncompleteDmaPair(pending);
+  } else {
+    processDmaCompletion(0U);
+    processDmaCompletion(1U);
+  }
+  // Channel 0 intentionally has no enabled NVIC line. Clear any latched
+  // pending state after its DMA_INT source has been acknowledged above.
+  NVIC_CLEAR_PENDING(IRQ_DMA_CH0);
   __asm__ volatile("dsb" : : : "memory");
 }
 
-void adc1DmaIsr() {
-  processDmaCompletion(1U);
-  __asm__ volatile("dsb" : : : "memory");
-}
-
+TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")
 void adcEtcErrorIsr() {
   const std::uint32_t pending = ADC_ETC_DONE2_ERR_IRQ & kAdcEtcErrorMask;
   if (pending == 0U) {
@@ -451,17 +476,16 @@ void clearInterruptState() {
 }
 
 void enableInterrupts() {
-  attachInterruptVector(IRQ_DMA_CH0, adc0DmaIsr);
-  attachInterruptVector(IRQ_DMA_CH1, adc1DmaIsr);
+  attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr);
   attachInterruptVector(IRQ_ADC_ETC_ERR, adcEtcErrorIsr);
   NVIC_SET_PRIORITY(IRQ_DMA_CH0, board::kAdcEdmaIrqPriority);
   NVIC_SET_PRIORITY(IRQ_DMA_CH1, board::kAdcEdmaIrqPriority);
   // All acquisition-state writers use one preemption priority. Main context
   // uses the shared critical section, while equal-priority IRQs serialize the
-  // two completion paths and ADC_ETC error attribution.
+  // paired completion path and ADC_ETC error attribution.
   NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR, board::kAdcEdmaIrqPriority);
   clearInterruptState();
-  NVIC_ENABLE_IRQ(IRQ_DMA_CH0);
+  NVIC_DISABLE_IRQ(IRQ_DMA_CH0);
   NVIC_ENABLE_IRQ(IRQ_DMA_CH1);
   NVIC_ENABLE_IRQ(IRQ_ADC_ETC_ERR);
 }

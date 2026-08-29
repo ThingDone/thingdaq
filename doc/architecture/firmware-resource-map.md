@@ -145,8 +145,10 @@ fixed priority values 0/1, use NVIC priority 48, and each own five 32-byte
 scatter/gather TCDs. Channel 0 reads `ADC1_R0` and channel 1 reads `ADC2_R0`;
 both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012`, and
 `DOFF=4` for consumer buffers. Both completion IRQs and the production
-ADC_ETC error IRQ share priority 48 so their generation-state writes cannot
-preempt one another.
+ADC_ETC error IRQ share priority 48. ADC0's completion line remains reserved
+but masked; the later ADC1 line requires both DMA pending bits and consumes
+the paired generation in fixed ADC0-to-ADC1 order, so independent NVIC
+dispatch cannot desynchronize the shared ownership state.
 
 ## Queue and per-loop bounds
 

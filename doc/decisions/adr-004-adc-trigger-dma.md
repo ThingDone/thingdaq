@@ -131,6 +131,14 @@ schedule exhaustion, and rejected stale interrupts have independent counters.
 Complete corrupt blocks and partial STOP work contribute exact discarded-pair
 counts.
 
+Both channel TCDs retain `INTMAJOR`, but only the later ADC1 NVIC line is
+enabled. Its handler requires both `DMA_INT` bits and consumes ADC0 then ADC1
+in one fixed-order barrier operation. The earlier ADC0 line remains reserved
+and masked. An incomplete pending pair records a DMA fault and initiates the
+normal fail-safe recovery instead of letting independently dispatched,
+equal-priority completion handlers permanently desynchronize their software
+generations.
+
 Normal STOP first waits for both live channels to enter the first quarter of
 the same DMA generation, then atomically sets `DREQ` on both active TCDs while
 triggers remain live. This avoids a channel-transition race while retaining

@@ -108,6 +108,14 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "ADC_GC_DMAEN",
             "arm_dcache_flush_delete(&g_adc_dma_descriptors",
             "NVIC_SET_PRIORITY(IRQ_ADC_ETC_ERR, board::kAdcEdmaIrqPriority)",
+            "void adcPairDmaIsr()",
+            "const std::uint32_t pending = DMA_INT & kAdcDmaChannelMask",
+            "void recordIncompleteDmaPair(std::uint32_t pending)",
+            'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_fault")',
+            'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")',
+            "attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr)",
+            "NVIC_DISABLE_IRQ(IRQ_DMA_CH0)",
+            "NVIC_ENABLE_IRQ(IRQ_DMA_CH1)",
             "recordAdcEtcError",
             "onMajorLoopComplete",
         ):
@@ -122,6 +130,16 @@ class AdcDmaCaptureTests(unittest.TestCase):
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
+
+        paired_isr = source[source.index("void adcPairDmaIsr()") :]
+        incomplete = paired_isr.index("recordIncompleteDmaPair(pending)")
+        adc0 = paired_isr.index("processDmaCompletion(0U)")
+        adc1 = paired_isr.index("processDmaCompletion(1U)")
+        enable = source[source.index("void enableInterrupts()") :]
+        self.assertLess(incomplete, adc0)
+        self.assertLess(adc0, adc1)
+        self.assertNotIn("attachInterruptVector(IRQ_DMA_CH0", enable)
+        self.assertNotIn("NVIC_ENABLE_IRQ(IRQ_DMA_CH0)", enable)
 
 
 if __name__ == "__main__":

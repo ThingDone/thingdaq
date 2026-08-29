@@ -220,9 +220,10 @@ inline constexpr std::uint8_t kGpioEdmaIrqPriority = 64U;
 inline constexpr std::uint8_t kAdcEdmaPriorities[] = {0U, 1U};
 inline constexpr std::uint8_t kAdcEdmaIrqPriority = 48U;
 
-// ADC completion and ADC_ETC error handlers share one priority because they
-// mutate the same paired-generation state. GPIO packing can tolerate the ADC
-// handlers preempting its lower-priority major-loop completion interrupt.
+// The later ADC1 completion IRQ consumes both ADC DMA_INT bits as one paired
+// barrier; ADC0's line stays reserved but masked. That handler and ADC_ETC
+// errors share one priority because they mutate the same generation state.
+// GPIO tolerates either preempting its lower-priority completion interrupt.
 inline constexpr InterruptAllocation kInterruptAllocations[] = {
     {InterruptUse::kAdc0DmaCompletion, kAdcEdmaIrqPriority,
      ResourceOwner::kAdc0Capture},
