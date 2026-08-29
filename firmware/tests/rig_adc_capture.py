@@ -1855,9 +1855,52 @@ class PhysicalAdcValidator:
         if len(frame.payload) != ADC_PAIRS_PER_FRAME * ADC_BYTES_PER_PAIR:
             raise ProtocolFailure("ADC payload does not contain fixed four-byte pairs")
 
+        # Keep the per-pair acceptance loop below the 1 MS/s producer budget.
+        # Attribute lookups and two helper calls per pair were individually
+        # bounded but, together with serial parsing, could backpressure the
+        # target on the slower rig worker. Accumulate into locals and publish
+        # once per immutable frame while still checking every converter code.
+        minimum0, minimum1 = self.channel_minimums
+        maximum0, maximum1 = self.channel_maximums
+        sum0, sum1 = self.channel_sums
+        violations0, violations1 = self.fixture_violations
+        fixture0 = self.fixture.channels[0] if self.fixture is not None else None
+        fixture1 = self.fixture.channels[1] if self.fixture is not None else None
+        code_min = self.code_min
+        code_max = self.code_max
         for adc0, adc1 in struct.iter_unpack("<HH", frame.payload):
-            self._accept_code(0, adc0)
-            self._accept_code(1, adc1)
+            if not code_min <= adc0 <= code_max:
+                raise ProtocolFailure(
+                    f"ADC0 code {adc0} outside {code_min}..{code_max}"
+                )
+            if not code_min <= adc1 <= code_max:
+                raise ProtocolFailure(
+                    f"ADC1 code {adc1} outside {code_min}..{code_max}"
+                )
+            if adc0 < minimum0:  # noqa: PLR1730 - hot loop avoids calls
+                minimum0 = adc0
+            if adc1 < minimum1:  # noqa: PLR1730 - hot loop avoids calls
+                minimum1 = adc1
+            if adc0 > maximum0:  # noqa: PLR1730 - hot loop avoids calls
+                maximum0 = adc0
+            if adc1 > maximum1:  # noqa: PLR1730 - hot loop avoids calls
+                maximum1 = adc1
+            sum0 += adc0
+            sum1 += adc1
+            if fixture0 is not None and not (
+                fixture0.minimum_code <= adc0 <= fixture0.maximum_code
+            ):
+                violations0 += 1
+            if fixture1 is not None and not (
+                fixture1.minimum_code <= adc1 <= fixture1.maximum_code
+            ):
+                violations1 += 1
+        self.channel_minimums[:] = minimum0, minimum1
+        self.channel_maximums[:] = maximum0, maximum1
+        self.channel_sums[:] = sum0, sum1
+        self.fixture_violations[:] = violations0, violations1
+        self.channel_counts[0] += frame.item_count
+        self.channel_counts[1] += frame.item_count
 
         self.adc.frames += 1
         self.adc.items += frame.item_count
@@ -1867,20 +1910,6 @@ class PhysicalAdcValidator:
         self.adc.expected_ticks = (
             self.adc.expected_ticks + ADC_FRAME_COVERAGE_TICKS
         ) & 0xFFFFFFFFFFFFFFFF
-
-    def _accept_code(self, converter: int, value: int) -> None:
-        if not self.code_min <= value <= self.code_max:
-            raise ProtocolFailure(
-                f"ADC{converter} code {value} outside {self.code_min}..{self.code_max}"
-            )
-        self.channel_minimums[converter] = min(self.channel_minimums[converter], value)
-        self.channel_maximums[converter] = max(self.channel_maximums[converter], value)
-        self.channel_sums[converter] += value
-        self.channel_counts[converter] += 1
-        if self.fixture is not None:
-            declared = self.fixture.channels[converter]
-            if not declared.minimum_code <= value <= declared.maximum_code:
-                self.fixture_violations[converter] += 1
 
     def means(self) -> tuple[float, float]:
         if not all(self.channel_counts):
@@ -2862,14 +2891,34 @@ def run_acceptance(
                         on_data=lambda _frame: None,
                     )
                     failure_status = decode_status(failure_frame)
+                    nonzero_errors = {
+                        name: value
+                        for name, value in _status_error_values(failure_status).items()
+                        if value
+                    }
                     emit_event(
                         "failure_status",
+                        adc0_dma_major_loops=(failure_status.adc0_dma_major_loops),
+                        adc1_dma_major_loops=(failure_status.adc1_dma_major_loops),
+                        adc_buffers_acquired=(failure_status.adc_buffers_acquired),
+                        adc_buffers_completed=(failure_status.adc_buffers_completed),
+                        adc_buffers_released=(failure_status.adc_buffers_released),
                         adc_dma_error_events=failure_status.adc_dma_error_events,
                         adc_etc_error_events=failure_status.adc_etc_error_events,
                         adc_frames_emitted=failure_status.adc_frames_emitted,
                         adc_items_dropped=failure_status.adc_items_dropped,
                         adc_pairs_transmitted=failure_status.adc_pairs_transmitted,
+                        adc_raw_ready_depth=failure_status.adc_raw_ready_depth,
+                        adc_raw_ready_high_water=(
+                            failure_status.adc_raw_ready_high_water
+                        ),
                         latency_seconds=failure_latency,
+                        nonzero_errors=nonzero_errors,
+                        packet_owned_high_water=(
+                            failure_status.packet_owned_high_water
+                        ),
+                        packet_ready_depth=failure_status.packet_ready_depth,
+                        packet_transmit_depth=(failure_status.packet_transmit_depth),
                         parser_errors=failure_status.parser_errors,
                         state=failure_status.device_state,
                         stats_generation=failure_status.stats_generation,
