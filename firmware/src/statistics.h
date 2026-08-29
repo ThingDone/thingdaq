@@ -25,6 +25,55 @@ struct DataPathProgress {
   StreamProgress gpio{};
 };
 
+// The paired ADC DMA owner produces complete wire-sized generations directly.
+// These counters preserve the raw dual-channel barrier and exact STOP/overrun
+// losses independently from packet ownership.
+struct AdcCaptureProgress {
+  std::uint64_t adc0_major_loops = 0U;
+  std::uint64_t adc1_major_loops = 0U;
+  std::uint64_t adc0_results = 0U;
+  std::uint64_t adc1_results = 0U;
+  std::uint64_t paired_major_loops = 0U;
+  std::uint64_t buffers_completed = 0U;
+  std::uint64_t buffers_acquired = 0U;
+  std::uint64_t buffers_released = 0U;
+  std::uint64_t pairs_captured = 0U;
+  std::uint64_t pairs_delivered = 0U;
+  std::uint64_t pairs_lost = 0U;
+  std::uint64_t stop_discarded_pairs = 0U;
+  std::uint64_t incomplete_conversions = 0U;
+  std::uint64_t overwritten_conversions = 0U;
+  std::uint64_t ring_overruns = 0U;
+  std::uint64_t incomplete_buffers = 0U;
+  std::size_t ready_depth = 0U;
+  std::size_t ready_high_water = 0U;
+  std::uint32_t adc_etc_error_events = 0U;
+  std::uint32_t adc_etc_error_flags = 0U;
+  std::uint32_t dma_error_events = 0U;
+  std::uint32_t completion_mismatches = 0U;
+  std::uint32_t destination_mismatches = 0U;
+  std::uint32_t schedule_exhaustions = 0U;
+  std::uint32_t invariant_errors = 0U;
+  std::uint32_t stale_completions = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t stale_interrupts = 0U;
+};
+
+// Whole raw generations are projected into packet sequence/drop slots before
+// the next retained frame. The projection field prevents those same pairs
+// from being counted a second time in the aggregate STATUS loss counter.
+struct AdcPackerProgress {
+  std::uint64_t frames_consumed = 0U;
+  std::uint64_t pairs_consumed = 0U;
+  std::uint64_t raw_gap_pairs = 0U;
+  std::uint64_t raw_drop_pairs_projected = 0U;
+  std::uint32_t source_errors = 0U;
+  std::uint32_t pipeline_errors = 0U;
+  std::uint32_t chronology_errors = 0U;
+};
+
 // Raw acquisition precedes packing and packet ownership. Keeping this stage
 // in the common model makes a DMA-ring loss visible even when no packet was
 // ever available to carry the affected samples.
@@ -81,9 +130,8 @@ struct PacketQueueProgress {
   std::size_t owned_high_water = 0U;
 };
 
-// Detailed firmware diagnostics remain available to firmware tests and future
-// transport/status extensions. Protocol v1 currently projects only the data,
-// parser, transport, and generation fields into GET_STATUS.
+// Detailed firmware diagnostics remain available to firmware tests and are
+// projected into the fixed protocol-v1 STATUS layout where defined.
 struct Snapshot {
   std::uint64_t adc_frames_emitted = 0U;
   std::uint64_t gpio_frames_emitted = 0U;
@@ -102,6 +150,8 @@ struct Snapshot {
   std::uint32_t transport_errors = 0U;
   std::uint32_t generation = 1U;
   DataPathProgress data_path{};
+  AdcCaptureProgress adc_capture{};
+  AdcPackerProgress adc_packer{};
   GpioRawCaptureProgress gpio_raw_capture{};
   GpioPackerProgress gpio_packer{};
   PacketQueueProgress packet_queue{};
@@ -136,6 +186,9 @@ class Statistics {
   void recordGpioResourceConflict();
   void recordGpioStartError();
   void recordGpioStopError();
+  void recordAdcResourceConflict();
+  void recordAdcStartError();
+  void recordAdcStopError();
 
   void recordAdcFrameEmitted(std::uint64_t count = 1U);
   void recordGpioFrameEmitted(std::uint64_t count = 1U);
@@ -146,6 +199,8 @@ class Statistics {
   // native snapshot retains every ownership stage exactly; protocol v1 STATUS
   // projects completed frames and dropped logical items into its fixed fields.
   void publishDataPath(const DataPathProgress &progress);
+  void publishAdcCapture(const AdcCaptureProgress &progress);
+  void publishAdcPacker(const AdcPackerProgress &progress);
   void publishGpioRawCapture(const GpioRawCaptureProgress &progress);
   void publishGpioPacker(const GpioPackerProgress &progress);
   void publishPacketQueues(const PacketQueueProgress &progress);

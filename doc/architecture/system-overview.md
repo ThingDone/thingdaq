@@ -127,7 +127,7 @@ a fabricated transport failure.
 ## Complete-frame packet pipeline
 
 The deterministic synthetic source uses a 200-entry pool of aligned 4,096-byte
-frames: 106 in a primary DTCM bank and 94 in an OCRAM reserve bank. The pool is
+frames: 105 in a primary DTCM bank and 95 in an OCRAM reserve bank. The pool is
 fixed storage with no steady-path allocation. `beginFill()` assigns the next
 independent ADC or GPIO sequence and
 records source production before asking for a free buffer, so pool exhaustion
@@ -229,12 +229,13 @@ source input list in the build manifest. Rebuilding the same source with the
 same epoch therefore produces identical application build metadata. The
 source ID, rather than wall-clock time, is the stale-image compatibility key.
 
-## Phase 06 physical GPIO capabilities
+## Phase 06/07 physical acquisition capabilities
 
 Firmware advertises both `SYNTHETIC_SOURCE` and `HARDWARE_SOURCE`. Synthetic
 CONFIGURE accepts every nonempty ADC/GPIO subset; hardware CONFIGURE accepts
-only the GPIO stream. Physical ADC, combined physical ADC/GPIO, zero-stream,
-and busy-resource requests fail before changing pin or peripheral registers.
+either ADC-only or GPIO-only acquisition. Combined physical ADC/GPIO,
+zero-stream, and busy-resource requests fail before changing pin or peripheral
+registers.
 
 Physical START performs a read-only resource/quiescence preflight, snapshots
 one 8 MHz epoch, then arms packet storage, the packed ring, raw DMA buffers,
@@ -243,6 +244,17 @@ request, DMAMUX, and XBAR DMA output in deterministic reverse order. Complete
 old-run work drains under bounded loop budgets, and CONFIGURE/START return
 `BUSY` until quiescent; stale DMA interrupts are counted and cannot cross into
 the next run.
+
+For ADC-only acquisition, START similarly arms the packet owner and ADC
+packer, primes both generation-matched eDMA channels and their buffers, then
+enables the shared PIT/ADC_ETC trigger schedule last. STOP disables that trigger
+schedule before tearing down either DMA channel, preserves complete paired
+buffers for bounded draining, and rejects stale epochs at the DMA lease,
+packer, and packet boundaries. Each complete 1,012-pair DMA generation maps to
+one ADC frame without rearrangement: little-endian ADC0 then ADC1 halfwords,
+independent ADC sequence/run identity, selected checksum, and an exact
+pair-counter timestamp of \(8n\) ticks from START. ADC1's fixed \(+4\)-tick
+phase remains INFO metadata rather than a second frame timestamp.
 
 The optional IDLE-only `GPIO_CLOCK_DIAGNOSTIC` retains its isolated sentinel
 transfer. `GPIO_CAPTURE_DIAGNOSTIC` now advertises the fail-closed capture
@@ -281,6 +293,13 @@ packed losses, ring overruns, queue depths/high-water marks, resource
 conflicts, lifecycle errors, and stale DMA completions. Every counter
 saturates, and a successful START or RESET_STATS advances the nonzero
 statistics generation.
+
+ADC STATUS accounting spans per-channel DMA loops/results, paired buffers,
+captured/delivered/framed/transmitted pairs, exact raw and STOP loss, ADC_ETC
+and DMA evidence, queue depth, lifecycle failures, rejected stale work, and
+packer errors. Whole lost DMA generations consume packet sequence slots before
+the next retained frame; a projection marker prevents those pairs from being
+counted twice in the aggregate dropped-pair total.
 
 ## Host architecture
 
@@ -347,5 +366,6 @@ ownership, update bounded counters, and signal work. They do not invalidate
 cache lines, build patterns, parse, checksum, write USB, wait, or perform broad
 state changes. ADC cache invalidation occurs only after the two-channel
 generation barrier grants a CPU lease; corrupt buffers are reclaimed by the
-cooperative owner. This keeps the control plane responsive when the remaining
-ADC lifecycle and packetization integration is enabled.
+cooperative owner. ADC packet copying, checksum finalization, queue promotion,
+and complete-buffer draining all remain bounded cooperative work, keeping the
+control plane responsive during physical ADC streaming.

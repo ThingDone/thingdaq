@@ -37,9 +37,12 @@ python3 tools/generate_protocol.py --check
 
 Every integer is unsigned and explicitly little endian. `u8`, `u16`, `u32`,
 and `u64` are respectively 1, 2, 4, and 8 bytes wide and are never signed.
-Firmware must write fields bytewise or with little-endian helpers rather than
-transmitting a native struct. The magic integer is `0xDEADBEEF`; its wire
-bytes are `EF BE AD DE`.
+Firmware writes envelope and control fields bytewise or with little-endian
+helpers rather than transmitting a native struct. The fixed i.MX RT1062 ADC
+payload is the deliberate exception: DMA produces a compile-time-checked
+standard-layout pair on the little-endian target, and the packer copies only
+those payload bytes. The magic integer is `0xDEADBEEF`; its wire bytes are
+`EF BE AD DE`.
 
 | Offset | Width | Type | Signed | Field | Rule |
 | ---: | ---: | --- | --- | --- | --- |
@@ -215,7 +218,9 @@ corroboration.
 First-sample time is an unsigned 64-bit count of 8 MHz ticks (125 ns) since the
 current START epoch. Arithmetic is formally modulo \(2^{64}\), although wrap
 is outside any practical run. Timestamps come from acquisition sample
-counters, never from DMA-interrupt or USB-write time.
+counters, never from DMA-interrupt or USB-write time. Firmware snapshots the
+absolute clock at START for lifecycle provenance but resets the wire epoch to
+zero; physical ADC pair counter \(n\) therefore maps to tick \(8n\).
 
 ## ADC data payload
 
@@ -475,7 +480,7 @@ eight-byte request is:
 
 | Offset | Type | Field | v1 constraint |
 | ---: | --- | --- | --- |
-| 0 | `u8` | stream mask | Nonzero subset of ADC/GPIO; hardware accepts GPIO only |
+| 0 | `u8` | stream mask | Nonzero subset of ADC/GPIO; hardware accepts exactly one stream |
 | 1 | `u8` | source | Hardware (0) or synthetic (1) |
 | 2 | `u8` | data checksum | An advertised enabled algorithm ID (1, 2, or 3) |
 | 3 | `u8` | reserved | Zero |
@@ -486,12 +491,12 @@ by the exact eight-byte applied configuration. Unsupported values are rejected
 atomically; no partial configuration is applied. If prior-run frames are still
 queued, CONFIGURE returns `BUSY` and preserves the prior configuration.
 
-Physical protocol-v1 firmware accepts one deliberately narrow acquisition
-profile: stream mask GPIO, hardware source, any advertised checksum, and
-`data_frame_bytes = 4096`. Physical ADC-only, combined ADC/GPIO, and zero-stream
-requests are rejected atomically before any pin, PIT, XBAR, DMAMUX, or eDMA
-register changes. Synthetic mode retains ADC-only, GPIO-only, and combined
-stream profiles.
+Physical protocol-v1 firmware accepts two deliberately narrow acquisition
+profiles: either ADC-only or GPIO-only, hardware source, any advertised
+checksum, and `data_frame_bytes = 4096`. Combined physical ADC/GPIO and
+zero-stream requests are rejected atomically before any pin, PIT, XBAR,
+ADC_ETC, DMAMUX, or eDMA register changes. Synthetic mode retains ADC-only,
+GPIO-only, and combined stream profiles.
 
 ### START
 
@@ -504,16 +509,21 @@ and quiescence inspection, snapshots one epoch, arms packet, packed-ring, raw
 DMA, and TCD state, and enables the PIT trigger last. A `BUSY` or failed
 preflight changes no acquisition registers and allocates no run ID.
 
+Physical ADC START performs the same read-only preflight, arms packet and
+packer state, primes both generation-matched DMA channels and all cache-safe
+buffers, and enables the PIT/ADC_ETC trigger schedule last. The first retained
+pair is pair zero of the new run epoch regardless of interrupt latency.
+
 ### GET_STATUS
 
 GET_STATUS is idempotent in every post-boot state and has an empty request. Its
-368-byte success payload contains the common prefix, configuration and legacy
-stream counters, followed by physical GPIO stage counts, queue depths/high-
-water marks, resource conflicts, lifecycle failures, stale-completion
-diagnostics, and the same immutable ADC initialization and trigger snapshots
-reported by INFO. The header carries the current or most recent run ID. INFO,
-GET_STATUS, and STOP are dispatched before bounded GPIO pack/packet work so
-they remain responsive during GPIO-only streaming.
+576-byte success payload contains the common prefix, configuration and legacy
+stream counters, physical GPIO stage counts, queue and lifecycle diagnostics,
+the immutable ADC initialization/trigger snapshot, and detailed ADC
+DMA-to-transport accounting. The header carries the current or most recent run
+ID. INFO, GET_STATUS, and STOP are dispatched before bounded physical
+pack/packet work so they remain responsive during either single-stream
+hardware mode.
 
 | Offset | Width/type | Field |
 | ---: | --- | --- |
@@ -569,6 +579,41 @@ they remain responsive during GPIO-only streaming.
 | 212 | 8 / `u32[2]` | ADC0 and ADC1 calibration elapsed DWT cycles |
 | 220 | 4 / `u32` | ADC initialization error flags |
 | 224 | 144 / ADC trigger block | exact trigger plan, register evidence, completion timing/counts, and errors; same relative layout defined under INFO |
+| 368 | 8 / `u64` | ADC0 DMA major loops completed |
+| 376 | 8 / `u64` | ADC1 DMA major loops completed |
+| 384 | 8 / `u64` | ADC0 conversion results completed by DMA |
+| 392 | 8 / `u64` | ADC1 conversion results completed by DMA |
+| 400 | 8 / `u64` | generation-matched dual-channel major loops |
+| 408 | 8 / `u64` | complete paired buffers published by DMA ownership |
+| 416 | 8 / `u64` | paired buffers acquired by the ADC packer |
+| 424 | 8 / `u64` | paired buffers released by the ADC packer |
+| 432 | 8 / `u64` | pair instants captured by at least one converter DMA path |
+| 440 | 8 / `u64` | complete pairs delivered to the ADC packer |
+| 448 | 8 / `u64` | complete pairs admitted to ADC data frames |
+| 456 | 8 / `u64` | complete ADC pairs fully transmitted by CDC |
+| 464 | 8 / `u64` | raw pairs lost before framing |
+| 472 | 8 / `u64` | partial pairs discarded by STOP |
+| 480 | 8 / `u64` | incomplete single-converter results |
+| 488 | 8 / `u64` | converter results overwritten per ADC_ETC evidence |
+| 496 | 8 / `u64` | paired major loops redirected to the pressure sink |
+| 504 | 8 / `u64` | paired buffers rejected for incomplete/error evidence |
+| 512 | 2 / `u16` | current ADC raw-ready depth |
+| 514 | 2 / `u16` | ADC raw-ready high-water depth |
+| 516 | 4 / `u32` | ADC_ETC error event count |
+| 520 | 4 / `u32` | accumulated ADC_ETC error flags |
+| 524 | 4 / `u32` | ADC eDMA error event count |
+| 528 | 4 / `u32` | per-channel completion-generation mismatches |
+| 532 | 4 / `u32` | per-channel destination mismatches |
+| 536 | 4 / `u32` | bounded generation-schedule exhaustion count |
+| 540 | 4 / `u32` | raw ADC ownership invariant failures |
+| 544 | 4 / `u32` | stale/duplicate DMA completions rejected by the ring |
+| 548 | 4 / `u32` | ADC resource conflicts |
+| 552 | 4 / `u32` | ADC START failures |
+| 556 | 4 / `u32` | ADC STOP/cleanup failures |
+| 560 | 4 / `u32` | target DMA interrupts rejected outside the active epoch |
+| 564 | 4 / `u32` | ADC packer source/lease errors |
+| 568 | 4 / `u32` | ADC packer/packet-pipeline errors |
+| 572 | 4 / `u32` | ADC packer chronology errors |
 
 | Counter | Wire type | Unit |
 | --- | --- | --- |
@@ -578,6 +623,10 @@ they remain responsive during GPIO-only streaming.
 | `gpio_items_dropped` | `u64` | Packed eight-pin GPIO sample instants not emitted |
 | `parser_errors` | `u32` | Rejected inbound frame candidates |
 | `transport_errors` | `u32` | Bounded USB read/write failure events |
+| `adc0_dma_major_loops` through `adc_pairs_transmitted` | `u64` | Monotonic dual-DMA, paired-buffer, framing, and transmission stages |
+| ADC raw/STOP/conversion/overrun counters | `u64` | Stage-specific pair instants, converter results, or buffer capacity lost before transmission |
+| ADC raw-ready depth/high-water fields | `u16` | Current bounded backlog and maximum ownership observed in this statistics generation |
+| ADC error/resource/lifecycle/packer counters | `u32` | Hardware evidence, ownership/chronology faults, resource conflicts, failed START/STOP operations, and rejected stale work |
 | `gpio_samples_captured` through `gpio_samples_transmitted` | `u64` | Monotonic sample accounting across DMA, packing, framing, and transmission stages |
 | GPIO loss/overrun counters | `u64` | Stage-specific samples or major-loop capacity lost before transmission |
 | GPIO queue depth/high-water fields | `u16` | Current bounded backlog and maximum ownership observed in this statistics generation |
@@ -613,6 +662,13 @@ normal response priority at the next frame boundary, so drained old-run data
 may follow STOP_RESPONSE, but it must precede any later successful
 START_RESPONSE. DMA completions observed after the run is disarmed increment
 the stale-completion counter and are never published into a later epoch.
+
+Physical ADC STOP disables the PIT/ADC_ETC trigger schedule first, then tears
+down both eDMA requests and routes. Unequal partial channel progress is
+accounted and discarded, while every complete dual-channel buffer remains
+drainable through the ADC packer and selected checksum. The same bounded drain
+gate prevents any stale DMA lease, packet frame, or sequence from crossing the
+next successful START.
 
 ### RESET_STATS
 

@@ -150,8 +150,8 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_packet_buffer_provenance_requires_split_target_regions(self) -> None:
         symbols = (
-            "200022c0 0006a000 b (anonymous namespace)::packet_storage_primary\n"
-            "20200000 0005e000 b (anonymous namespace)::packet_storage_reserve"
+            "200022c0 00069000 b (anonymous namespace)::packet_storage_primary\n"
+            "20200000 0005f000 b (anonymous namespace)::packet_storage_reserve"
         )
         resources = build_firmware.packet_buffer_usage(symbols)
 
@@ -161,7 +161,7 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertEqual("0x20200000", resources["banks"]["OCRAM_RESERVE"]["address"])
         with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
             build_firmware.packet_buffer_usage(
-                symbols.replace("20200000 0005e000", "2006c4c0 0005e000")
+                symbols.replace("20200000 0005f000", "2006c4c0 0005f000")
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.packet_buffer_usage(symbols.splitlines()[0])

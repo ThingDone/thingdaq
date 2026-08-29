@@ -23,18 +23,16 @@ This is the human-readable projection of the compile-time registry in
 `firmware/src/board_config.h`. Numeric allocations are fixed so acquisition
 modules cannot silently compete. Phase 06 has silicon-verified the isolated
 PIT/XBAR/eDMA clock path in [[ADR-003-GPIO-Clock-DMA]] and advertises its
-IDLE-only diagnostic. The separate raw adapter now implements selective
-D6-D13 remapping and rotating `GPIO2_PSR` capture, but the physical GPIO source
-remains disabled until the later packing, integration, and streaming gates
-pass. The existing synthetic generators and packetizer remain cooperative and
-do not claim physical acquisition resources. Phase 07 now fixes the complete
-logical-converter routes and implements their PIT/XBAR/ADC_ETC schedule,
-stopped arm/teardown, bounded completion-timing diagnostic, fixed dual-eDMA
-TCDs, and cache-safe paired ring in [[ADR-004-ADC-Trigger-DMA]]. The DMA owner
-is compiled and link-verified but is not connected to START/STOP or the packet
-path yet, so physical ADC capability remains disabled. See [[System-Overview]]
-for that boundary and [[Protocol-V1]] with [[ADR-001-Wire-Protocol]] for the
-wire metadata.
+IDLE-only diagnostic plus the integrated physical GPIO path. Phase 07 fixes
+the complete logical-converter routes and implements their PIT/XBAR/ADC_ETC
+schedule, stopped arm/teardown, bounded completion-timing diagnostic, fixed
+dual-eDMA TCDs, cache-safe paired ring, cooperative frame packer, and
+START/STOP integration in [[ADR-004-ADC-Trigger-DMA]]. Firmware now accepts
+either ADC-only or GPIO-only physical acquisition while keeping combined
+physical ownership disabled. The existing synthetic generators use the same
+packet/checksum queues without claiming physical acquisition resources. See
+[[System-Overview]] for the lifecycle boundary and [[Protocol-V1]] with
+[[ADR-001-Wire-Protocol]] for the wire metadata.
 
 ## Fixed platform
 
@@ -55,7 +53,7 @@ can observe. The installed core itself remains unmodified.
 
 ## Pin ownership
 
-| Logical use | Teensy pin | Peripheral interpretation | Future owner |
+| Logical use | Teensy pin | Peripheral interpretation | Owner |
 | --- | ---: | --- | --- |
 | ADC0 input | A0 / D14 | `GPIO_AD_B1_02`, NXP ADC1 channel 7 | ADC0 capture |
 | ADC1 input | A1 / D15 | `GPIO_AD_B1_03`, NXP ADC2 channel 8 | ADC1 capture |
@@ -85,7 +83,7 @@ exact-value assertions prevent a legal-but-wrong A0/A1 swap.
 
 ## Timer and trigger reservations
 
-| Resource | Numeric ID | Planned route | Future owner |
+| Resource | Numeric ID | Planned route | Owner |
 | --- | ---: | --- | --- |
 | PIT channel | 0 | 24 MHz / 6, verified exact 4 MHz GPIO event | GPIO capture |
 | PIT channel | 1 | Chained from PIT0 with `LDVAL=3`; selected exact 1 MHz ADC-pair event | Acquisition clock |
@@ -127,12 +125,12 @@ physical aperture claim. The BOOT diagnostic records first ADC_ETC
 conversion-completion interrupts against DWT, accepts an explicit 300 ± 120
 cycle completion delta, and exposes configured registers, counts, and errors
 in INFO/STATUS. Later hardware work must still prove the trigger path on
-silicon and keep completion timing separate from analog aperture before
-enabling physical ADC capability.
+silicon and keep completion timing separate from analog aperture before final
+physical ADC acceptance.
 
 ## eDMA reservations
 
-| eDMA channel | DMAMUX source | Core identity | Future owner |
+| eDMA channel | DMAMUX source | Core identity | Owner |
 | ---: | ---: | --- | --- |
 | 0 | 24 | `DMAMUX_SOURCE_ADC1` | ADC0 capture |
 | 1 | 88 | `DMAMUX_SOURCE_ADC2` | ADC1 capture |
@@ -160,13 +158,14 @@ preempt one another.
 | ADC DMA ring | 4 buffers | ADC capture |
 | ADC DMA pressure sink | 1 isolated cache line shared at distinct halfwords | ADC capture |
 | ADC scatter/gather TCDs | 2 channels × 5 descriptors | ADC capture |
+| ADC DMA generations consumed per loop | 2 buffers; up to all 4 while stopping | ADC packer |
 | Raw GPIO DMA ring | 4 buffers | GPIO capture |
 | Raw GPIO pressure sink | 1 isolated cache line | GPIO capture |
 | Raw GPIO scatter/gather TCDs | 5 descriptors | GPIO capture |
 | Packed GPIO ring | 4 buffers | GPIO packer |
 | Raw batches consumed per loop | 2 buffers | GPIO packer |
 | Packed frames finalized per loop | 2 frames | GPIO packer / packetizer |
-| Aligned complete-frame packet pool | 106 DTCM + 94 OCRAM = 200 × 4,096-byte buffers | Packetizer |
+| Aligned complete-frame packet pool | 105 DTCM + 95 OCRAM = 200 × 4,096-byte buffers | Packetizer |
 | Per-source ready queues | 200 ADC + 200 GPIO indexes; shared pool limits actual ownership to 200 | Packetizer |
 | Complete-frame transmit queue | 200 indexes | Packetizer / USB transport |
 | Synthetic generation per loop | 2 complete frame attempts | Synthetic source |
@@ -194,8 +193,9 @@ never heap-growth hints.
 At the nominal combined framed rate, one 4,096-byte application buffer covers
 0.506 ms. The 200-frame pool therefore retains 101.200 ms of complete frames,
 and the pinned core's 8,192-byte TX ring contributes 1.012 ms more. Its
-106-frame DTCM primary retains 53.636 ms; the 94-frame OCRAM reserve covers the
-60.715 ms service gap observed by the Phase 05 CRC campaign. Linker verification
+105-frame DTCM primary retains 53.130 ms and its 95-frame OCRAM reserve retains
+48.070 ms; together they cover the 60.715 ms service gap observed by the Phase
+05 CRC campaign. Linker verification
 still requires at least 32 KiB of DTCM for locals/stack, and no queue can grow at
 runtime. Normal real-time mode admits only coverage intervals elapsed on the
 shared 8 MHz epoch. The explicitly selected unpaced diagnostic remains bounded
@@ -203,15 +203,16 @@ to two frames per service call and waits when no packet buffer is free.
 
 ## Memory reservations
 
-| Use | Region | Calculation | Reserved bytes | Alignment | Future owner |
+| Use | Region | Calculation | Reserved bytes | Alignment | Owner |
 | --- | --- | ---: | ---: | ---: | --- |
 | Command parser | DTCM / RAM1 | fixed | 64 | 4 | Control plane |
 | USB RX scratch | DTCM / RAM1 | fixed | 128 | 4 | USB transport |
 | Command queue | DTCM / RAM1 | `4 × 56` | 224 | 4 | Control plane |
 | Response queue | DTCM / RAM1 | `4 × 1,024` | 4,096 | 4 | USB transport |
-| Primary packet buffers | DTCM / RAM1 | `106 × 4,096` | 434,176 | 32 | Packetizer |
+| Primary packet buffers | DTCM / RAM1 | `105 × 4,096` | 430,080 | 32 | Packetizer |
 | Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 8,192 | 32 | Packetizer |
 | GPIO packer state and telemetry | DTCM / RAM1 | compile-time ceiling | 2,048 | 32 | GPIO packer |
+| ADC packer state and telemetry | DTCM / RAM1 | compile-time ceiling | 512 | 8 | ADC packer |
 | ADC DMA ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | ADC capture |
 | ADC DMA pressure sink | OCRAM / RAM2 | one isolated cache line | 32 | 32 | ADC capture |
 | ADC TCD banks | OCRAM / RAM2 | `2 × 5 × 32` | 320 | 32 | ADC capture |
@@ -220,11 +221,11 @@ to two frames per service call and waits when no packet buffer is free.
 | Raw GPIO TCD bank | OCRAM / RAM2 | `5 × 32` | 160 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
 | GPIO clock diagnostic sink | OCRAM / RAM2 `.dmabuffers` | one isolated cache line | 32 | 32 | GPIO capture |
-| Packet-buffer reserve | OCRAM / RAM2 `.dmabuffers` | `94 × 4,096` | 385,024 | 32 | Packetizer |
+| Packet-buffer reserve | OCRAM / RAM2 `.dmabuffers` | `95 × 4,096` | 389,120 | 32 | Packetizer |
 | Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
-| **RAM1 subtotal** |  |  | **453,024** |  |  |
-| **RAM2 subtotal** |  |  | **486,976** |  |  |
+| **RAM1 subtotal** |  |  | **449,440** |  |  |
+| **RAM2 subtotal** |  |  | **491,072** |  |  |
 
 The application packet pool is split between an aligned ordinary-global DTCM
 primary and an aligned `DMAMEM` OCRAM reserve. Both are CPU-owned; Teensy USB
@@ -235,7 +236,8 @@ ring, pressure sink, and two TCD banks are likewise concrete `.dmabuffers`
 allocations. Raw ownership uses explicit cache maintenance; the packed ring
 remains CPU-owned and cached.
 Compile-time checks bind the two packet banks to 819,200 total bytes, cap
-pipeline metadata at 8,192 bytes and GPIO packer state at 2,048 bytes, and
+pipeline metadata at 8,192 bytes, GPIO packer state at 2,048 bytes, and ADC
+packer state at 512 bytes, and
 reject zero-sized, non-power-of-two, misaligned, or over-budget registry
 entries. The build manifest additionally checks the linked addresses and sizes
 of both packet banks, the isolated GPIO clock diagnostic cache line, all three
@@ -361,6 +363,31 @@ and duplicate completions; a lead beyond one complete major loop taints the
 affected bounded schedule while later generations continue. ADC_ETC trigger
 errors count overwritten converter results and taint the active generation;
 STOP can account unequal partial TCD progress exactly before reclaiming it.
+
+The ADC packetization path is:
+
+```text
+raw READING lease -> common packet FILLING -> READY -> TRANSMITTING
+                  -> raw RELEASING -> FREE
+```
+
+One complete raw generation is exactly one 4,048-byte wire payload, so the
+cooperative packer performs one bounded copy without an intermediate ring.
+Native little-endian layout preserves ADC0 at pair offset zero and ADC1 at
+offset two; compile-time layout and byte-order guards make that assumption
+explicit. The raw `first_pair` counter becomes `first_sample_ticks = 8n`,
+items remain pairs, and INFO supplies ADC1's additional four-tick phase.
+Whole-generation raw gaps consume independent ADC packet sequence slots and
+set `GAP_BEFORE | OVERRUN_BEFORE` on the next retained physical frame without
+setting `SYNTHETIC`.
+
+Physical ADC START arms packet state and the packer before priming both DMA
+channels, then enables PIT/ADC_ETC triggers last. STOP disables triggers before
+DMA teardown, drains every complete paired buffer through the selected
+checksum and existing queues, and keeps CONFIGURE/START busy until raw, packer,
+packet, and transport ownership are all quiescent. DMA leases and packet
+records retain the nonzero run epoch, so stale conversions cannot enter a
+later run.
 
 GPIO acquisition and packed-frame transitions do not change the packet-pool
 contract. No project ISR packs or frames data, calculates checksums, mutates

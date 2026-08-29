@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 071a210cfc9359a9f8002ce96aff246e4255a2317977ee91cbe7a97ed74d44cc
+// Source SHA-256: 5b86098f2c189c9ef2eacb0e68f3f9b98794ec423898e2e6899254eaad8a36cd
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "071a210cfc9359a9f8002ce96aff246e4255a2317977ee91cbe7a97ed74d44cc";
+inline constexpr char kSourceSha256[] = "5b86098f2c189c9ef2eacb0e68f3f9b98794ec423898e2e6899254eaad8a36cd";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -553,7 +553,7 @@ inline constexpr std::size_t kConfigureResponseSourceOffset = 5U;
 inline constexpr std::size_t kConfigureResponseDataChecksumAlgorithmOffset = 6U;
 inline constexpr std::size_t kConfigureResponseReserved1Offset = 7U;
 inline constexpr std::size_t kConfigureResponseDataFrameBytesOffset = 8U;
-inline constexpr std::size_t kStatusResponsePayloadSize = 368U;
+inline constexpr std::size_t kStatusResponsePayloadSize = 576U;
 inline constexpr std::size_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::size_t kStatusResponseErrorCodeOffset = 2U;
@@ -672,6 +672,41 @@ inline constexpr std::size_t kStatusResponseAdcCompletionDiagnosticElapsedCycles
 inline constexpr std::size_t kStatusResponseAdcTriggerErrorCountOffset = 360U;
 inline constexpr std::size_t kStatusResponseAdc0TriggerXbarSelConfiguredOffset = 364U;
 inline constexpr std::size_t kStatusResponseAdc1TriggerXbarSelConfiguredOffset = 366U;
+inline constexpr std::size_t kStatusResponseAdc0DmaMajorLoopsOffset = 368U;
+inline constexpr std::size_t kStatusResponseAdc1DmaMajorLoopsOffset = 376U;
+inline constexpr std::size_t kStatusResponseAdc0DmaResultsOffset = 384U;
+inline constexpr std::size_t kStatusResponseAdc1DmaResultsOffset = 392U;
+inline constexpr std::size_t kStatusResponseAdcPairedMajorLoopsOffset = 400U;
+inline constexpr std::size_t kStatusResponseAdcBuffersCompletedOffset = 408U;
+inline constexpr std::size_t kStatusResponseAdcBuffersAcquiredOffset = 416U;
+inline constexpr std::size_t kStatusResponseAdcBuffersReleasedOffset = 424U;
+inline constexpr std::size_t kStatusResponseAdcPairsCapturedOffset = 432U;
+inline constexpr std::size_t kStatusResponseAdcPairsDeliveredOffset = 440U;
+inline constexpr std::size_t kStatusResponseAdcPairsFramedOffset = 448U;
+inline constexpr std::size_t kStatusResponseAdcPairsTransmittedOffset = 456U;
+inline constexpr std::size_t kStatusResponseAdcRawPairsLostOffset = 464U;
+inline constexpr std::size_t kStatusResponseAdcStopPairsDiscardedOffset = 472U;
+inline constexpr std::size_t kStatusResponseAdcIncompleteConversionsOffset = 480U;
+inline constexpr std::size_t kStatusResponseAdcOverwrittenConversionsOffset = 488U;
+inline constexpr std::size_t kStatusResponseAdcRawRingOverrunsOffset = 496U;
+inline constexpr std::size_t kStatusResponseAdcIncompleteBuffersOffset = 504U;
+inline constexpr std::size_t kStatusResponseAdcRawReadyDepthOffset = 512U;
+inline constexpr std::size_t kStatusResponseAdcRawReadyHighWaterOffset = 514U;
+inline constexpr std::size_t kStatusResponseAdcEtcErrorEventsOffset = 516U;
+inline constexpr std::size_t kStatusResponseAdcEtcErrorFlagsOffset = 520U;
+inline constexpr std::size_t kStatusResponseAdcDmaErrorEventsOffset = 524U;
+inline constexpr std::size_t kStatusResponseAdcCompletionMismatchesOffset = 528U;
+inline constexpr std::size_t kStatusResponseAdcDestinationMismatchesOffset = 532U;
+inline constexpr std::size_t kStatusResponseAdcScheduleExhaustionsOffset = 536U;
+inline constexpr std::size_t kStatusResponseAdcRawInvariantErrorsOffset = 540U;
+inline constexpr std::size_t kStatusResponseAdcStaleCompletionsOffset = 544U;
+inline constexpr std::size_t kStatusResponseAdcResourceConflictsOffset = 548U;
+inline constexpr std::size_t kStatusResponseAdcStartErrorsOffset = 552U;
+inline constexpr std::size_t kStatusResponseAdcStopErrorsOffset = 556U;
+inline constexpr std::size_t kStatusResponseAdcStaleInterruptsOffset = 560U;
+inline constexpr std::size_t kStatusResponseAdcPackerSourceErrorsOffset = 564U;
+inline constexpr std::size_t kStatusResponseAdcPackerPipelineErrorsOffset = 568U;
+inline constexpr std::size_t kStatusResponseAdcPackerChronologyErrorsOffset = 572U;
 inline constexpr std::size_t kStopResponsePayloadSize = 8U;
 inline constexpr std::size_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStopResponseReserved0Offset = 1U;

@@ -46,35 +46,17 @@ LoopReport FirmwareRuntime::service() {
       readiness.configuration_ready = dataPathQuiescent();
       if (readiness.configuration_ready &&
           physicalConfiguration(command.request.configuration)) {
-        if (gpio_capture_ == nullptr || gpio_packer_ == nullptr) {
-          readiness.configuration_ready = false;
-        } else {
-          const gpio_capture::StartStatus status =
-              gpio_capture_->inspectStart();
-          readiness.configuration_ready =
-              status == gpio_capture::StartStatus::kOk &&
-              gpio_packer_->readyForStart();
-          if (status == gpio_capture::StartStatus::kResourceBusy) {
-            control_.statistics().recordGpioResourceConflict();
-          }
-        }
+        readiness.configuration_ready = physicalPathReady(
+            command.request.configuration,
+            control::ControlState::nextRunId(control_.runId()));
       }
     } else if (command.request.kind == protocol_v1::CommandKind::kStart) {
       readiness.start_ready = dataPathQuiescent();
       if (readiness.start_ready &&
           physicalConfiguration(control_.appliedConfiguration())) {
-        if (gpio_capture_ == nullptr || gpio_packer_ == nullptr) {
-          readiness.start_ready = false;
-        } else {
-          const gpio_capture::StartStatus status =
-              gpio_capture_->inspectStart();
-          readiness.start_ready =
-              status == gpio_capture::StartStatus::kOk &&
-              gpio_packer_->readyForStart();
-          if (status == gpio_capture::StartStatus::kResourceBusy) {
-            control_.statistics().recordGpioResourceConflict();
-          }
-        }
+        readiness.start_ready = physicalPathReady(
+            control_.appliedConfiguration(),
+            control::ControlState::nextRunId(control_.runId()));
       }
     } else if (command.request.kind ==
                    protocol_v1::CommandKind::kChecksumBenchmark &&
@@ -185,14 +167,34 @@ void FirmwareRuntime::applyPendingEvents(
 
   if (events.has(control::Event::kStop)) {
     if (physical_run_active_) {
-      report.gpio_capture_stop = gpio_capture_->stop();
-      report.gpio_capture_stopped = true;
-      if (report.gpio_capture_stop.status !=
-              gpio_capture::OperationStatus::kOk &&
-          report.gpio_capture_stop.status !=
-              gpio_capture::OperationStatus::kNotRunning) {
-        control_.statistics().recordGpioStopError();
-        report.internal_error = true;
+      if (physical_stream_mask_ == static_cast<std::uint8_t>(
+                                       protocol_v1::StreamMask::kAdc)) {
+        report.adc_trigger_stopped = adc_trigger_scheduler_->stop();
+        if (!report.adc_trigger_stopped) {
+          control_.statistics().recordAdcStopError();
+          physical_drain_pending_ = true;
+          report.internal_error = true;
+          return;
+        }
+        report.adc_capture_stop = adc_capture_->stopAfterTriggers();
+        report.adc_capture_stopped = true;
+        if (report.adc_capture_stop.status !=
+                adc_capture::OperationStatus::kOk &&
+            report.adc_capture_stop.status !=
+                adc_capture::OperationStatus::kNotRunning) {
+          control_.statistics().recordAdcStopError();
+          report.internal_error = true;
+        }
+      } else {
+        report.gpio_capture_stop = gpio_capture_->stop();
+        report.gpio_capture_stopped = true;
+        if (report.gpio_capture_stop.status !=
+                gpio_capture::OperationStatus::kOk &&
+            report.gpio_capture_stop.status !=
+                gpio_capture::OperationStatus::kNotRunning) {
+          control_.statistics().recordGpioStopError();
+          report.internal_error = true;
+        }
       }
       physical_run_active_ = false;
       physical_drain_pending_ = true;
@@ -215,6 +217,63 @@ void FirmwareRuntime::applyPendingEvents(
       return;
     }
     if (physicalConfiguration(control_.appliedConfiguration())) {
+      if (adcPhysicalConfiguration(control_.appliedConfiguration())) {
+        report.adc_packer_start_status = adc_packer_->startRun(
+            events.run_id,
+            control_.appliedConfiguration().data_checksum_algorithm,
+            packet_pipeline_, now_ticks);
+        report.adc_packer_started =
+            report.adc_packer_start_status ==
+            adc_packer::OperationStatus::kOk;
+        if (!report.adc_packer_started) {
+          control_.statistics().recordAdcStartError();
+          report.packet_stop = packet_pipeline_.stopProduction();
+          report.packet_production_stopped = true;
+          report.internal_error = true;
+          return;
+        }
+
+        report.adc_capture_start_status =
+            adc_capture_->prepare(events.run_id);
+        report.adc_capture_prepared =
+            report.adc_capture_start_status == adc_capture::StartStatus::kOk;
+        if (!report.adc_capture_prepared) {
+          if (report.adc_capture_start_status ==
+              adc_capture::StartStatus::kResourceBusy) {
+            control_.statistics().recordAdcResourceConflict();
+          } else {
+            control_.statistics().recordAdcStartError();
+          }
+          report.adc_packer_stop = adc_packer_->stopProduction();
+          report.adc_packer_stopped = true;
+          report.packet_stop = packet_pipeline_.stopProduction();
+          report.packet_production_stopped = true;
+          report.internal_error = true;
+          return;
+        }
+
+        report.adc_trigger_armed = adc_trigger_scheduler_->arm();
+        if (!report.adc_trigger_armed) {
+          (void)adc_trigger_scheduler_->stop();
+          report.adc_capture_stop = adc_capture_->stopAfterTriggers();
+          report.adc_capture_stopped = true;
+          report.adc_packer_stop = adc_packer_->stopProduction();
+          report.adc_packer_stopped = true;
+          report.packet_stop = packet_pipeline_.stopProduction();
+          report.packet_production_stopped = true;
+          control_.statistics().recordAdcStartError();
+          report.internal_error = true;
+          return;
+        }
+
+        physical_stream_mask_ = static_cast<std::uint8_t>(
+            protocol_v1::StreamMask::kAdc);
+        physical_run_active_ = true;
+        physical_drain_pending_ = false;
+        packet_stats_generation_ = events.stats_generation;
+        return;
+      }
+
       report.gpio_packer_start_status = gpio_packer_->startRun(
           events.run_id,
           control_.appliedConfiguration().data_checksum_algorithm,
@@ -247,6 +306,8 @@ void FirmwareRuntime::applyPendingEvents(
         return;
       }
       physical_run_active_ = true;
+      physical_stream_mask_ = static_cast<std::uint8_t>(
+          protocol_v1::StreamMask::kGpio);
       physical_drain_pending_ = false;
       packet_stats_generation_ = events.stats_generation;
       return;
@@ -267,6 +328,7 @@ void FirmwareRuntime::applyPendingEvents(
   }
 }
 
+TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.publish_statistics")
 void FirmwareRuntime::publishPacketStatistics() {
   if (packet_stats_generation_ == 0U ||
       packet_stats_generation_ != control_.statistics().generation()) {
@@ -298,20 +360,68 @@ void FirmwareRuntime::publishPacketStatistics() {
   queues.transmit_depth = pipeline.transmit_queue_depth;
   queues.owned_high_water = pipeline.buffers_owned_high_water;
   control_.statistics().publishPacketQueues(queues);
-  if (gpio_capture_ != nullptr) {
-    const gpio_capture::Snapshot capture = gpio_capture_->rawSnapshot();
-    stats::GpioRawCaptureProgress raw = capture.progress;
-    raw.ready_depth = capture.ready_depth;
-    raw.invariant_errors = capture.invariant_errors;
-    raw.resource_conflicts = capture.resource_conflicts;
-    raw.start_errors = capture.start_errors;
-    raw.stop_errors = capture.stop_errors;
-    raw.stale_dma_completions = capture.stale_dma_completions;
-    control_.statistics().publishGpioRawCapture(raw);
-  }
   if (gpio_packer_ != nullptr) {
-    control_.statistics().publishGpioPacker(
-        gpio_packer_->snapshot(packet_pipeline_).progress);
+    const gpio_packer::Snapshot packed =
+        gpio_packer_->snapshot(packet_pipeline_);
+    if (packed.run_id != 0U && packed.run_id == control_.runId()) {
+      if (gpio_capture_ != nullptr) {
+        const gpio_capture::Snapshot capture =
+            gpio_capture_->rawSnapshot();
+        stats::GpioRawCaptureProgress raw = capture.progress;
+        raw.ready_depth = capture.ready_depth;
+        raw.invariant_errors = capture.invariant_errors;
+        raw.resource_conflicts = capture.resource_conflicts;
+        raw.start_errors = capture.start_errors;
+        raw.stop_errors = capture.stop_errors;
+        raw.stale_dma_completions = capture.stale_dma_completions;
+        control_.statistics().publishGpioRawCapture(raw);
+      }
+      control_.statistics().publishGpioPacker(packed.progress);
+    }
+  }
+  if (adc_packer_ != nullptr) {
+    const adc_packer::Snapshot packed =
+        adc_packer_->snapshot(packet_pipeline_);
+    if (packed.run_id != 0U && packed.run_id == control_.runId()) {
+      if (adc_capture_ != nullptr) {
+        const adc_capture::Snapshot capture =
+            adc_capture_->rawSnapshot();
+        const adc_capture::Progress &source = capture.progress;
+        stats::AdcCaptureProgress raw{};
+        raw.adc0_major_loops = source.channel_major_loops[0];
+        raw.adc1_major_loops = source.channel_major_loops[1];
+        raw.adc0_results = source.channel_results[0];
+        raw.adc1_results = source.channel_results[1];
+        raw.paired_major_loops = source.paired_major_loops;
+        raw.buffers_completed = source.buffers_completed;
+        raw.buffers_acquired = source.buffers_acquired;
+        raw.buffers_released = source.buffers_released;
+        raw.pairs_captured = source.pairs_captured;
+        raw.pairs_delivered = source.pairs_delivered;
+        raw.pairs_lost = source.pairs_lost;
+        raw.stop_discarded_pairs = source.stop_discarded_pairs;
+        raw.incomplete_conversions = source.incomplete_conversions;
+        raw.overwritten_conversions = source.overwritten_conversions;
+        raw.ring_overruns = source.ring_overruns;
+        raw.incomplete_buffers = source.incomplete_buffers;
+        raw.ready_depth = capture.ready_depth;
+        raw.ready_high_water = source.ready_high_water;
+        raw.adc_etc_error_events = source.adc_etc_error_events;
+        raw.adc_etc_error_flags = source.adc_etc_error_flags;
+        raw.dma_error_events = source.dma_error_events;
+        raw.completion_mismatches = source.completion_mismatches;
+        raw.destination_mismatches = source.destination_mismatches;
+        raw.schedule_exhaustions = source.schedule_exhaustions;
+        raw.invariant_errors = source.invariant_errors;
+        raw.stale_completions = source.stale_completions;
+        raw.resource_conflicts = capture.resource_conflicts;
+        raw.start_errors = capture.start_errors;
+        raw.stop_errors = capture.stop_errors;
+        raw.stale_interrupts = capture.stale_interrupts;
+        control_.statistics().publishAdcCapture(raw);
+      }
+      control_.statistics().publishAdcPacker(packed.progress);
+    }
   }
 }
 
@@ -324,20 +434,128 @@ bool FirmwareRuntime::dataPathQuiescent() const {
   if (gpio_packer_ != nullptr && !gpio_packer_->readyForStart()) {
     return false;
   }
-  return gpio_capture_ == nullptr || gpio_capture_->rawSnapshot().quiescent;
+  if (gpio_capture_ != nullptr && !gpio_capture_->rawSnapshot().quiescent) {
+    return false;
+  }
+  if (adc_trigger_scheduler_ != nullptr &&
+      adc_trigger_scheduler_->running()) {
+    return false;
+  }
+  if (adc_packer_ != nullptr && !adc_packer_->readyForStart()) {
+    return false;
+  }
+  return adc_capture_ == nullptr || adc_capture_->rawSnapshot().quiescent;
 }
 
 TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.physical_configuration")
 bool FirmwareRuntime::physicalConfiguration(
+    const protocol::Configuration &configuration) const {
+  return adcPhysicalConfiguration(configuration) ||
+         gpioPhysicalConfiguration(configuration);
+}
+
+bool FirmwareRuntime::adcPhysicalConfiguration(
+    const protocol::Configuration &configuration) const {
+  return configuration.source == protocol_v1::Source::kHardware &&
+         configuration.stream_mask ==
+             static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc);
+}
+
+bool FirmwareRuntime::gpioPhysicalConfiguration(
     const protocol::Configuration &configuration) const {
   return configuration.source == protocol_v1::Source::kHardware &&
          configuration.stream_mask ==
              static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
 }
 
+TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.physical_ready")
+bool FirmwareRuntime::physicalPathReady(
+    const protocol::Configuration &configuration, std::uint32_t epoch) {
+  if (adcPhysicalConfiguration(configuration)) {
+    if (adc_capture_ == nullptr || adc_packer_ == nullptr ||
+        adc_trigger_scheduler_ == nullptr ||
+        !adc_trigger_scheduler_->snapshot().ready() ||
+        adc_trigger_scheduler_->running() ||
+        !adc_packer_->readyForStart()) {
+      return false;
+    }
+    const adc_capture::StartStatus status =
+        adc_capture_->inspectStart(epoch);
+    if (status == adc_capture::StartStatus::kResourceBusy) {
+      control_.statistics().recordAdcResourceConflict();
+    }
+    return status == adc_capture::StartStatus::kOk;
+  }
+  if (gpio_capture_ == nullptr || gpio_packer_ == nullptr) {
+    return false;
+  }
+  const gpio_capture::StartStatus status = gpio_capture_->inspectStart();
+  if (status == gpio_capture::StartStatus::kResourceBusy) {
+    control_.statistics().recordGpioResourceConflict();
+  }
+  return status == gpio_capture::StartStatus::kOk &&
+         gpio_packer_->readyForStart();
+}
+
+TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.physical_service")
 void FirmwareRuntime::servicePhysicalPath(LoopReport &report) {
-  if (gpio_capture_ == nullptr || gpio_packer_ == nullptr ||
-      (!physical_run_active_ && !physical_drain_pending_)) {
+  if (!physical_run_active_ && !physical_drain_pending_) {
+    report.physical_drain_pending = physical_drain_pending_;
+    return;
+  }
+
+  if (physical_stream_mask_ == static_cast<std::uint8_t>(
+                                   protocol_v1::StreamMask::kAdc)) {
+    if (physical_drain_pending_ && physical_run_active_) {
+      report.adc_trigger_stopped = adc_trigger_scheduler_->stop();
+      if (!report.adc_trigger_stopped) {
+        control_.statistics().recordAdcStopError();
+        report.internal_error = true;
+        report.physical_drain_pending = true;
+        return;
+      }
+      report.adc_capture_stop = adc_capture_->stopAfterTriggers();
+      report.adc_capture_stopped = true;
+      physical_run_active_ = false;
+      if (report.adc_capture_stop.status !=
+              adc_capture::OperationStatus::kOk &&
+          report.adc_capture_stop.status !=
+              adc_capture::OperationStatus::kNotRunning) {
+        control_.statistics().recordAdcStopError();
+        report.internal_error = true;
+      }
+    }
+
+    (void)adc_capture_->serviceOwnership();
+    const std::size_t buffer_limit =
+        physical_drain_pending_ ? board::kAdcDmaRingDepth
+                                : board::kAdcFramesPerLoop;
+    report.adc_packer =
+        adc_packer_->service(packet_pipeline_, buffer_limit);
+    if (!physical_drain_pending_) {
+      return;
+    }
+
+    const adc_capture::Snapshot capture = adc_capture_->rawSnapshot();
+    adc_packer::Snapshot packer = adc_packer_->snapshot(packet_pipeline_);
+    if (capture.ready_depth == 0U && capture.reading_depth == 0U &&
+        capture.discard_depth == 0U && packer.running) {
+      report.adc_packer_stop = adc_packer_->stopProduction();
+      report.adc_packer_stopped = true;
+      packer = adc_packer_->snapshot(packet_pipeline_);
+    }
+    if (capture.quiescent && packer.quiescent) {
+      report.packet_stop = packet_pipeline_.stopProduction();
+      report.packet_production_stopped = true;
+      physical_drain_pending_ = false;
+      physical_stream_mask_ = 0U;
+    }
+    report.physical_drain_pending = physical_drain_pending_;
+    return;
+  }
+
+  if (gpio_capture_ == nullptr || gpio_packer_ == nullptr) {
+    report.internal_error = true;
     report.physical_drain_pending = physical_drain_pending_;
     return;
   }
@@ -367,6 +585,7 @@ void FirmwareRuntime::servicePhysicalPath(LoopReport &report) {
     report.packet_stop = packet_pipeline_.stopProduction();
     report.packet_production_stopped = true;
     physical_drain_pending_ = false;
+    physical_stream_mask_ = 0U;
   }
   report.physical_drain_pending = physical_drain_pending_;
 }

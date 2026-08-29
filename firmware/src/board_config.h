@@ -24,6 +24,7 @@ enum class ResourceOwner : std::uint8_t {
   kAdcCapture,
   kAdc0Capture,
   kAdc1Capture,
+  kAdcPacker,
   kGpioCapture,
   kGpioPacker,
   kPacketizer,
@@ -47,6 +48,7 @@ enum class MemoryUse : std::uint8_t {
   kAdcDmaRing,
   kAdcDmaOverflowSink,
   kAdcDmaDescriptors,
+  kAdcPackerState,
   kGpioRawDmaRing,
   kGpioRawDmaOverflowSink,
   kGpioRawDmaDescriptors,
@@ -269,6 +271,8 @@ inline constexpr std::size_t kResponseQueueDepth = 4U;
 inline constexpr std::size_t kAdcDmaRingDepth = 4U;
 inline constexpr std::size_t kAdcDmaDescriptorCount =
     kAdcDmaRingDepth + 1U;
+inline constexpr std::size_t kAdcFramesPerLoop = 2U;
+inline constexpr std::size_t kAdcPackerStateBudgetBytes = 512U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaDescriptorCount =
     kGpioRawDmaRingDepth + 1U;
@@ -277,13 +281,13 @@ inline constexpr std::size_t kGpioRawBuffersPerLoop = 2U;
 inline constexpr std::size_t kGpioPackedFramesPerLoop = 2U;
 inline constexpr std::size_t kGpioPackerStateBudgetBytes = 2048U;
 // At the nominal combined framed rate, each 4096-byte buffer represents 0.506
-// ms. Keep the proven 106-frame primary bank in cacheless DTCM, then add a
-// fixed 94-frame CPU-owned OCRAM reserve. The complete 200-frame pool retains
+// ms. Keep a 105-frame primary bank in cacheless DTCM, then add a fixed
+// 95-frame CPU-owned OCRAM reserve. The complete 200-frame pool retains
 // 101.200 ms and the pinned core contributes another 1.012 ms in four 2048-byte
 // TX buffers. This covers the 60.715 ms Phase 05 service gap while retaining at
 // least 32 KiB of target RAM1 for locals/stack and every future DMA-ring budget.
-inline constexpr std::size_t kPacketBufferPrimaryCount = 106U;
-inline constexpr std::size_t kPacketBufferReserveCount = 94U;
+inline constexpr std::size_t kPacketBufferPrimaryCount = 105U;
+inline constexpr std::size_t kPacketBufferReserveCount = 95U;
 inline constexpr std::size_t kPacketBufferCount =
     kPacketBufferPrimaryCount + kPacketBufferReserveCount;
 inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
@@ -376,6 +380,9 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kAdcDmaDescriptors, MemoryRegion::kOcramRam2Dma,
      kAdcDmaDescriptorBytes, kCacheLineBytes,
      ResourceOwner::kAdcCapture},
+    {MemoryUse::kAdcPackerState, MemoryRegion::kDtcmRam1,
+     kAdcPackerStateBudgetBytes, alignof(std::uint64_t),
+     ResourceOwner::kAdcPacker},
     {MemoryUse::kGpioRawDmaRing, MemoryRegion::kOcramRam2Dma,
      kGpioRawDmaRingBytes, kCacheLineBytes,
      ResourceOwner::kGpioCapture},

@@ -40,9 +40,9 @@ constexpr std::uint8_t sourceBit(protocol_v1::Source source) {
       1U << static_cast<std::uint8_t>(source));
 }
 
-// Synthetic mode retains both deterministic stream layouts. Physical mode is
-// deliberately narrower: the fixed GPIO-only pipeline owns the advertised
-// PIT/XBAR/eDMA resources, while physical ADC remains unavailable.
+// Synthetic mode retains both deterministic stream layouts. Physical mode
+// accepts either proven single-source acquisition path; concurrent ADC/GPIO
+// ownership remains disabled until the combined controller gate.
 inline constexpr std::uint8_t kSupportedStreamMask =
     static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc) |
     static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);

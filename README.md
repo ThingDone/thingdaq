@@ -171,8 +171,16 @@ scatter/gather rotation. A generation-and-epoch barrier publishes a buffer
 only after both channels complete; cache ownership, an isolated pressure sink,
 ADC_ETC overwrite evidence, mismatched completions, stale interrupts, ring
 overruns, and exact discarded-pair counts are centralized in the portable ADC
-DMA core. Physical ADC capability remains disabled until the later lifecycle,
-packetization, host-model, and rig gates pass.
+DMA core. The cooperative ADC frame packer now copies each complete DMA
+generation directly into one fixed packet payload, preserving little-endian
+`(ADC0, ADC1)` pair identity, deriving run-relative timestamps from exact pair
+counters, projecting whole raw gaps into the independent ADC sequence, and
+using the negotiated checksum without heap allocation. ADC-only physical
+CONFIGURE/START is enabled in firmware; combined physical ADC/GPIO remains
+disabled, and the richer Python physical-ADC model plus hardware rig gates
+remain later Phase 07 work. STATUS extends the raw-to-USB accounting with both
+DMA channel totals, paired buffers, captured/delivered/framed/transmitted pairs,
+exact raw/STOP loss, queue depth, lifecycle, stale, and packer errors.
 
 The advertised physical GPIO mode selectively returns only D6-D13 from
 GPIO7 to GPIO2, keeps them inputs on START/STOP/error, and uses channel 2 to
@@ -186,9 +194,10 @@ boundaries into 4,048-byte frames, releases raw leases promptly, and stages
 four complete packed buffers before the existing fixed packet ready/transmit
 queues apply run, sequence, first-sample timestamp, gap flags, and the selected
 checksum. When either raw or packed storage fills, acquisition remains live and
-the exact loss is projected once into shared statistics. CONFIGURE accepts the
-GPIO-only hardware profile and rejects physical ADC or conflicting resource
-states before touching acquisition registers. START snapshots one epoch and
+the exact loss is projected once into shared statistics. CONFIGURE accepts
+either the ADC-only or GPIO-only hardware profile and rejects combined physical
+acquisition or conflicting resource states before touching acquisition
+registers. START snapshots one epoch and
 arms buffers/DMA before enabling PIT; STOP disables the trigger and DMA route
 in reverse order, then drains complete old-run work before another START.
 INFO and STATUS expose pin order, rate/period, packed width, ring/resource
@@ -222,7 +231,8 @@ The portable firmware control module implements bounded BOOT → IDLE,
 CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
 STOP, RESET_STATS, PING, optional CHECKSUM_BENCHMARK, and optional
 GPIO_CLOCK_DIAGNOSTIC and GPIO_CAPTURE_DIAGNOSTIC. Synthetic mode accepts any
-nonempty ADC/GPIO subset; physical mode accepts GPIO only. INFO and STATUS
+nonempty ADC/GPIO subset; physical mode accepts either single stream. INFO and
+STATUS
 distinguish source, publish the fixed GPIO hardware resources, and remain
 responsive while the physical stream is running.
 
@@ -267,13 +277,13 @@ always serialized before any later successful START response.
 
 The split packet placement follows a reinspection of pinned Teensy core 1.62.0:
 USB Serial copies writes into its own four 2,048-byte aligned `DMAMEM` buffers
-and flushes those buffers before DMA. A 106-frame cacheless DTCM primary bank
-and 94-frame CPU-owned OCRAM reserve cover 101.200 ms at the nominal combined
+and flushes those buffers before DMA. A 105-frame cacheless DTCM primary bank
+and 95-frame CPU-owned OCRAM reserve cover 101.200 ms at the nominal combined
 framed rate, plus 1.012 ms in the core ring. This absorbs the 60.715 ms service
 gap observed by the Phase 05 CRC campaign while the exact linker gate retains
 at least 32 KiB for locals and stack. The compile-time registry reserves
-450,976 bytes of RAM1 project data and 486,432 bytes of RAM2 storage, including
-the future acquisition rings, isolated benchmark buffers, and the GPIO clock
+449,440 bytes of RAM1 project data and 491,072 bytes of RAM2 storage, including
+the acquisition rings, isolated benchmark buffers, and the GPIO clock
 diagnostic cache line; see
 `doc/architecture/firmware-resource-map.md` and
 `doc/reference/Foundation-Reuse-Inventory.md`.

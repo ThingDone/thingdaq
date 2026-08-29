@@ -329,9 +329,13 @@ protocol_v1::ErrorCode ControlState::validateConfiguration(
                ? protocol_v1::ErrorCode::kUnsupportedConfiguration
                : protocol_v1::ErrorCode::kOk;
   }
+  const std::uint8_t adc =
+      static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc);
+  const std::uint8_t gpio =
+      static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
   if (configuration.source != protocol_v1::Source::kHardware ||
-      configuration.stream_mask !=
-          static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio)) {
+      (configuration.stream_mask != adc &&
+       configuration.stream_mask != gpio)) {
     return protocol_v1::ErrorCode::kUnsupportedConfiguration;
   }
   return protocol_v1::ErrorCode::kOk;

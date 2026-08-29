@@ -230,6 +230,19 @@ void testCompletionTimingAndTriggerErrorsStayDistinct() {
   assert(!error_snapshot.ready());
 }
 
+void testFailedProductionArmForcesStoppedCleanup() {
+  FakePlatform platform{};
+  adc_trigger::Scheduler scheduler{platform};
+  assert(scheduler.initialize(true).ready());
+  platform.operations.clear();
+  platform.arm_ok = false;
+
+  assert(!scheduler.arm());
+  assert(!scheduler.running());
+  assert((platform.operations ==
+          std::vector<std::string>{"arm", "stop"}));
+}
+
 }  // namespace
 
 int main() {
@@ -238,5 +251,6 @@ int main() {
   testConfigurationAndCounterFailuresAreObservable();
   testDiagnosticTimeoutIsBoundedAndLeavesStopped();
   testCompletionTimingAndTriggerErrorsStayDistinct();
+  testFailedProductionArmForcesStoppedCleanup();
   return 0;
 }

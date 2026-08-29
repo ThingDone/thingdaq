@@ -178,8 +178,14 @@ struct Snapshot {
   std::size_t ready_depth = 0U;
   std::size_t reading_depth = 0U;
   std::size_t discard_depth = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t stale_interrupts = 0U;
   bool running = false;
   bool quiescent = true;
+  bool hardware_prepared = false;
+  bool faulted = false;
 };
 
 class PairSource {

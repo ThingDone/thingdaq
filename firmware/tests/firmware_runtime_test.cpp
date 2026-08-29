@@ -14,6 +14,10 @@
 namespace {
 
 namespace app = teensy_daq::runtime;
+namespace adc = teensy_daq::adc;
+namespace adc_capture = teensy_daq::adc_capture;
+namespace adc_packer = teensy_daq::adc_packer;
+namespace adc_trigger = teensy_daq::adc_trigger;
 namespace benchmark = teensy_daq::benchmark;
 namespace board = teensy_daq::board;
 namespace constants = teensy_daq::protocol_v1;
@@ -79,6 +83,32 @@ wire::CommandFrame configureRequest(
   expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame)
              .ok(),
          "encode CONFIGURE request");
+  return frame;
+}
+
+wire::CommandFrame physicalAdcConfigureRequest(
+    std::uint32_t request_id,
+    constants::ChecksumAlgorithm checksum_algorithm =
+        constants::ChecksumAlgorithm::kAdler32) {
+  std::array<std::uint8_t, constants::kConfigureRequestPayloadSize> payload{};
+  payload[constants::kConfigureRequestStreamMaskOffset] =
+      static_cast<std::uint8_t>(constants::StreamMask::kAdc);
+  payload[constants::kConfigureRequestSourceOffset] =
+      static_cast<std::uint8_t>(constants::Source::kHardware);
+  payload[constants::kConfigureRequestDataChecksumAlgorithmOffset] =
+      static_cast<std::uint8_t>(checksum_algorithm);
+  expect(wire::storeU32(
+             {payload.data(), payload.size()},
+             constants::kConfigureRequestDataFrameBytesOffset,
+             static_cast<std::uint32_t>(constants::kDataFrameBytes)),
+         "encode physical ADC configuration");
+  wire::FrameFields fields{};
+  fields.kind = constants::FrameKind::kConfigureRequest;
+  fields.request_id = request_id;
+  wire::CommandFrame frame{};
+  expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame)
+             .ok(),
+         "encode physical ADC CONFIGURE request");
   return frame;
 }
 
@@ -272,6 +302,199 @@ class FakeGpioClockPlatform final : public gpio_clock::Platform {
 
   std::uint32_t calls = 0U;
   gpio_clock::Plan observed{};
+};
+
+class ReadyAdcPlatform final : public adc::Platform {
+ public:
+  adc::PrepareStatus prepareConverter(
+      const board::AdcConverterConfiguration &,
+      const adc::Settings &) override {
+    return adc::PrepareStatus::kOk;
+  }
+  bool beginCycleCounter(std::uint32_t &frequency_hz) override {
+    frequency_hz = constants::kAdcCalibrationCycleCounterHz;
+    return true;
+  }
+  std::uint32_t readCycles() override {
+    const std::uint32_t value = cycles;
+    cycles += 100U;
+    return value;
+  }
+  bool startCalibration(
+      const board::AdcConverterConfiguration &) override {
+    return true;
+  }
+  bool calibrationActive(
+      const board::AdcConverterConfiguration &) override {
+    return false;
+  }
+  bool calibrationFailed(
+      const board::AdcConverterConfiguration &) override {
+    return false;
+  }
+  bool verifyConverter(const board::AdcConverterConfiguration &,
+                       const adc::Settings &) override {
+    return true;
+  }
+  void abortCalibration(
+      const board::AdcConverterConfiguration &) override {}
+
+ private:
+  std::uint32_t cycles = 0U;
+};
+
+class LifecycleTriggerPlatform final : public adc_trigger::Platform {
+ public:
+  explicit LifecycleTriggerPlatform(std::vector<std::string> &operations)
+      : operations_(operations) {}
+
+  adc_trigger::ConfigureResult configureStopped() override {
+    adc_trigger::ConfigureResult result{};
+    result.configuration_flags = adc_trigger::kStoppedConfigurationFlags;
+    return result;
+  }
+  bool beginCycleCounter(std::uint32_t &frequency_hz) override {
+    frequency_hz = constants::kAdcTriggerDwtClockHz;
+    return true;
+  }
+  std::uint32_t readCycles() override {
+    const std::uint32_t value = cycles_;
+    cycles_ += 100U;
+    return value;
+  }
+  bool armFromStopped(bool completion_diagnostic) override {
+    operations_.push_back(completion_diagnostic ? "diagnostic_arm"
+                                                : "trigger_arm");
+    return true;
+  }
+  std::array<std::uint32_t, 2U> completionCounts() override {
+    return {1U, 1U};
+  }
+  std::array<std::uint32_t, 2U> firstCompletionCycles() override {
+    return {100U, 400U};
+  }
+  std::uint32_t triggerErrorFlags() override { return 0U; }
+  std::uint32_t triggerErrorCount() override { return 0U; }
+  bool stop() override {
+    operations_.push_back("trigger_stop");
+    return true;
+  }
+  adc_trigger::HardwareEvidence evidence() override { return {}; }
+
+ private:
+  std::vector<std::string> &operations_;
+  std::uint32_t cycles_ = 0U;
+};
+
+class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
+ public:
+  explicit LifecycleAdcCapture(std::vector<std::string> &operations)
+      : operations_(operations) {}
+
+  adc_capture::StartStatus inspectStart(std::uint32_t epoch) override {
+    return epoch != 0U && snapshot_.quiescent
+               ? adc_capture::StartStatus::kOk
+               : adc_capture::StartStatus::kNotQuiescent;
+  }
+
+  adc_capture::StartStatus prepare(std::uint32_t epoch) override {
+    if (inspectStart(epoch) != adc_capture::StartStatus::kOk) {
+      return adc_capture::StartStatus::kNotQuiescent;
+    }
+    operations_.push_back("dma_prepare");
+    epoch_ = epoch;
+    snapshot_.epoch = epoch;
+    snapshot_.running = true;
+    snapshot_.quiescent = false;
+    snapshot_.hardware_prepared = true;
+    return adc_capture::StartStatus::kOk;
+  }
+
+  adc_capture::StopReport stopAfterTriggers() override {
+    operations_.push_back("dma_stop");
+    adc_capture::StopReport report{};
+    if (!snapshot_.running) {
+      return report;
+    }
+    snapshot_.running = false;
+    snapshot_.hardware_prepared = false;
+    snapshot_.quiescent = !ready_ && !leased_;
+    report.status = adc_capture::OperationStatus::kOk;
+    report.ready_buffers_to_drain = ready_ ? 1U : 0U;
+    return report;
+  }
+
+  std::size_t serviceOwnership() override { return 0U; }
+
+  adc_capture::AcquireResult acquireReady() override {
+    if (!ready_ || leased_) {
+      return {};
+    }
+    leased_ = true;
+    snapshot_.ready_depth = 0U;
+    snapshot_.reading_depth = 1U;
+    ++snapshot_.progress.buffers_acquired;
+    snapshot_.progress.pairs_delivered += constants::kAdcPairsPerFrame;
+    adc_capture::BufferHandle handle{};
+    handle.pairs = buffer_.pairs.data();
+    handle.first_pair = first_pair_;
+    handle.pair_count = constants::kAdcPairsPerFrame;
+    handle.epoch = epoch_;
+    handle.lease = lease_;
+    handle.buffer_index = 0U;
+    return {adc_capture::OperationStatus::kOk, handle};
+  }
+
+  adc_capture::OperationStatus release(
+      const adc_capture::BufferHandle &handle) override {
+    if (!leased_ || handle.pairs != buffer_.pairs.data() ||
+        handle.epoch != epoch_ || handle.lease != lease_) {
+      return adc_capture::OperationStatus::kInvalidHandle;
+    }
+    leased_ = false;
+    ready_ = false;
+    snapshot_.reading_depth = 0U;
+    ++snapshot_.progress.buffers_released;
+    snapshot_.quiescent = !snapshot_.running;
+    return adc_capture::OperationStatus::kOk;
+  }
+
+  adc_capture::Snapshot rawSnapshot() override { return snapshot_; }
+
+  void publish(std::uint64_t first_pair) {
+    first_pair_ = first_pair;
+    ++lease_;
+    if (lease_ == 0U) {
+      ++lease_;
+    }
+    for (std::size_t pair = 0U; pair < buffer_.pairs.size(); ++pair) {
+      buffer_.pairs[pair].adc0 =
+          static_cast<std::uint16_t>(pair & 0x0FFFU);
+      buffer_.pairs[pair].adc1 =
+          static_cast<std::uint16_t>((pair + 1U) & 0x0FFFU);
+    }
+    ready_ = true;
+    snapshot_.quiescent = false;
+    snapshot_.ready_depth = 1U;
+    snapshot_.progress.ready_high_water = 1U;
+    ++snapshot_.progress.channel_major_loops[0];
+    ++snapshot_.progress.channel_major_loops[1];
+    snapshot_.progress.channel_results[0] += constants::kAdcPairsPerFrame;
+    snapshot_.progress.channel_results[1] += constants::kAdcPairsPerFrame;
+    ++snapshot_.progress.paired_major_loops;
+    ++snapshot_.progress.buffers_completed;
+    snapshot_.progress.pairs_captured += constants::kAdcPairsPerFrame;
+  }
+
+ private:
+  std::vector<std::string> &operations_;
+  adc_capture::PairBuffer buffer_{};
+  adc_capture::Snapshot snapshot_{};
+  std::uint64_t first_pair_ = 0U;
+  std::uint32_t epoch_ = 0U;
+  std::uint32_t lease_ = 0U;
+  bool ready_ = false;
+  bool leased_ = false;
 };
 
 struct DrainResult {
@@ -798,6 +1021,174 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
          "interleaved lifecycle retained large-request and partial-write accounting");
 }
 
+void testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs() {
+  FakeCdcStream stream{};
+  stream.max_read_size = 128U;
+  stream.available_write_size = board::kUsbTxMaxWriteBytes;
+  stream.max_write_size = constants::kDataFrameBytes;
+  packet::OwnedPacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  std::vector<std::string> operations{};
+  ReadyAdcPlatform adc_platform{};
+  adc::Initializer adc_initializer{adc_platform};
+  LifecycleTriggerPlatform trigger_platform{operations};
+  adc_trigger::Scheduler trigger_scheduler{trigger_platform};
+  LifecycleAdcCapture adc_capture{operations};
+  adc_packer::AdcFramePacker adc_frame_packer{adc_capture};
+  app::FirmwareRuntime firmware{
+      stream, packet_storage, clock, synthetic::Mode::kRealtime,
+      nullptr, nullptr, nullptr, nullptr, nullptr, &adc_initializer,
+      &trigger_scheduler, &adc_capture, &adc_frame_packer};
+
+  expect(firmware.begin(9090U) && trigger_scheduler.snapshot().ready(),
+         "physical ADC runtime completes converter and trigger BOOT gates");
+  operations.clear();
+  clock.ticks = 123456U;
+  stream.appendInput(physicalAdcConfigureRequest(
+      251U, constants::ChecksumAlgorithm::kCrc32c));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 252U));
+  expect(drain(firmware, stream).quiescent &&
+             firmware.state() == constants::DeviceState::kRunning &&
+             firmware.runId() == 1U &&
+             operations == std::vector<std::string>{"dma_prepare",
+                                                    "trigger_arm"},
+         "physical ADC START prepares packet/DMA ownership before arming triggers");
+  stream.output.clear();
+
+  adc_capture.publish(0U);
+  expect(drain(firmware, stream).quiescent,
+         "one complete dual-DMA generation reaches USB");
+  std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
+  expect(frames.size() == 1U &&
+             frames[0].header.kind == constants::FrameKind::kAdcData &&
+             frames[0].header.run_id == 1U &&
+             frames[0].header.sequence == 0U &&
+             frames[0].header.first_sample_ticks == 0U &&
+             frames[0].header.item_count == constants::kAdcPairsPerFrame &&
+             frames[0].header.checksum_algorithm ==
+                 constants::ChecksumAlgorithm::kCrc32c &&
+             (frames[0].header.flags &
+              static_cast<std::uint16_t>(constants::FrameFlag::kEpochStart)) !=
+                 0U &&
+             (frames[0].header.flags &
+              static_cast<std::uint16_t>(constants::FrameFlag::kSynthetic)) ==
+                 0U,
+         "physical ADC frame retains run-relative pair timing, CRC-32C, and source metadata");
+  if (frames.size() == 1U) {
+    std::uint16_t adc0 = 1U;
+    std::uint16_t adc1 = 0U;
+    expect(wire::loadU16(frames[0].payload, 0U, adc0) &&
+               wire::loadU16(frames[0].payload, sizeof(std::uint16_t), adc1) &&
+               adc0 == 0U && adc1 == 1U,
+           "physical payload keeps ADC0 then ADC1 identity in each counted pair");
+  }
+
+  stream.output.clear();
+  stream.appendInput(
+      emptyRequest(constants::FrameKind::kGetStatusRequest, 253U));
+  expect(drain(firmware, stream).quiescent,
+         "physical ADC STATUS remains responsive between DMA generations");
+  frames = decodeOutput(stream.output);
+  if (frames.size() == 1U) {
+    std::uint64_t adc0_loops = 0U;
+    std::uint64_t adc1_loops = 0U;
+    std::uint64_t pairs_captured = 0U;
+    std::uint64_t pairs_delivered = 0U;
+    std::uint64_t pairs_framed = 0U;
+    std::uint64_t pairs_transmitted = 0U;
+    expect(frames[0].header.kind ==
+                   constants::FrameKind::kGetStatusResponse &&
+               frames[0].payload
+                       .data[constants::kStatusResponseSourceOffset] ==
+                   static_cast<std::uint8_t>(constants::Source::kHardware) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdc0DmaMajorLoopsOffset,
+                   adc0_loops) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdc1DmaMajorLoopsOffset,
+                   adc1_loops) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdcPairsCapturedOffset,
+                   pairs_captured) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdcPairsDeliveredOffset,
+                   pairs_delivered) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdcPairsFramedOffset,
+                   pairs_framed) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdcPairsTransmittedOffset,
+                   pairs_transmitted) &&
+               adc0_loops == 1U && adc1_loops == 1U &&
+               pairs_captured == constants::kAdcPairsPerFrame &&
+               pairs_delivered == constants::kAdcPairsPerFrame &&
+               pairs_framed == constants::kAdcPairsPerFrame &&
+               pairs_transmitted == constants::kAdcPairsPerFrame,
+           "STATUS reconciles both ADC DMA channels through transmitted pair counts");
+  } else {
+    expect(false, "physical ADC STATUS emits one typed response");
+  }
+
+  adc_capture.publish(constants::kAdcPairsPerFrame);
+  stream.output.clear();
+  stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 254U));
+  const DrainResult stopped = drain(firmware, stream);
+  expect(stopped.quiescent && stopped.saw_stop && stopped.packet_stopped &&
+             firmware.state() == constants::DeviceState::kIdle &&
+             !firmware.physicalDrainPending() &&
+             operations ==
+                 std::vector<std::string>{"dma_prepare", "trigger_arm",
+                                          "trigger_stop", "dma_stop"},
+         "physical ADC STOP disables triggers before DMA and drains every complete generation");
+  frames = decodeOutput(stream.output);
+  expect(frames.size() == 2U &&
+             frames[0].header.kind == constants::FrameKind::kStopResponse &&
+             frames[0].header.run_id == 1U &&
+             frames[1].header.kind == constants::FrameKind::kAdcData &&
+             frames[1].header.run_id == 1U &&
+             frames[1].header.sequence == 1U &&
+             frames[1].header.first_sample_ticks ==
+                 constants::kAdcPairsPerFrame *
+                     constants::kAdcPairPeriodTicks &&
+             adc_frame_packer.readyForStart(),
+         "STOP response precedes the final immutable old-run ADC frame");
+
+  stream.output.clear();
+  stream.appendInput(configureRequest(255U));
+  stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 256U));
+  expect(drain(firmware, stream).quiescent && firmware.runId() == 2U &&
+             firmware.state() == constants::DeviceState::kRunning,
+         "a synthetic epoch can start only after the physical ADC drain");
+  stream.output.clear();
+  stream.appendInput(
+      emptyRequest(constants::FrameKind::kGetStatusRequest, 257U));
+  expect(drain(firmware, stream).quiescent,
+         "the new synthetic generation publishes a fresh STATUS snapshot");
+  frames = decodeOutput(stream.output);
+  if (frames.size() == 1U) {
+    std::uint64_t stale_dma_loops = 1U;
+    std::uint64_t stale_pairs = 1U;
+    expect(wire::loadU64(
+               frames[0].payload,
+               constants::kStatusResponseAdc0DmaMajorLoopsOffset,
+               stale_dma_loops) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdcPairsCapturedOffset,
+                   stale_pairs) &&
+               stale_dma_loops == 0U && stale_pairs == 0U,
+           "old physical ADC counters cannot cross the new run/statistics epoch");
+  } else {
+    expect(false, "the fresh synthetic epoch emits one typed STATUS response");
+  }
+}
+
 void testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState() {
   FakeCdcStream stream{};
   packet::OwnedPacketBufferStorage packet_storage{};
@@ -921,6 +1312,7 @@ int main() {
   testSyntheticDataCountersReachStatus();
   testStartupSchedulingJitterFitsPacketPool();
   testStopDrainGatesNextStartAndPreventsStaleRunData();
+  testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs();
   testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState();
   testGpioClockRoundTripPreservesIdleAcquisitionState();
   if (failures != 0) {

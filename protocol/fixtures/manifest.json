@@ -254,20 +254,20 @@
       "total_length": 60
     },
     {
-      "checksum": "0x32cb14ea",
+      "checksum": "0x5355148c",
       "checksum_algorithm": "ADLER32",
       "file": "get-status-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_sha256": "ed28d09dd95541b24c99893ed75eca09ba51904bf243c61bfd62da6899624aa3",
+      "frame_sha256": "ddd00193d5ba470df824d5ae19bbb6a1296ba1811bf829ec51815545773c0b61",
       "item_count": 0,
       "kind": "GET_STATUS_RESPONSE",
-      "payload_length": 368,
-      "payload_sha256": "0bcae63c866f99a3dea95a097e5aad7b72d33c61f5d62700ccffb78d7968fd71",
+      "payload_length": 576,
+      "payload_sha256": "a400c05eb7f776caa38880dba9ba7f640a01bfc2830f9dc1bf784a643b01305a",
       "request_id": 4,
       "run_id": 7,
       "sequence": 0,
-      "total_length": 416
+      "total_length": 624
     },
     {
       "checksum": "0xd1340448",
@@ -392,5 +392,5 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 1,
   "source": "protocol/protocol-v1.json",
-  "source_sha256": "071a210cfc9359a9f8002ce96aff246e4255a2317977ee91cbe7a97ed74d44cc"
+  "source_sha256": "5b86098f2c189c9ef2eacb0e68f3f9b98794ec423898e2e6899254eaad8a36cd"
 }

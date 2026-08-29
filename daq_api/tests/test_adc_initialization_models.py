@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from typing import TypedDict
 
 from teensy_daq import AdcTriggerMetadata, DeviceInfo, Status
 from teensy_daq._generated import protocol_constants as constants
@@ -18,6 +19,14 @@ READY_FLAGS = (
     | constants.AdcConfigurationFlag.CALIBRATION_COMPLETE
     | constants.AdcConfigurationFlag.PRIMARY_12_BIT
 )
+
+
+class AdcReadyMetadata(TypedDict):
+    adc_configuration_flags: constants.AdcConfigurationFlag
+    adc_calibration_states: tuple[
+        constants.AdcCalibrationState, constants.AdcCalibrationState
+    ]
+    adc_calibration_cycles: tuple[int, int]
 
 
 class AdcInitializationModelTests(unittest.TestCase):
@@ -102,7 +111,7 @@ class AdcInitializationModelTests(unittest.TestCase):
             )
 
     def test_info_and_status_round_trip_actual_success_snapshot(self) -> None:
-        metadata = {
+        metadata: AdcReadyMetadata = {
             "adc_configuration_flags": READY_FLAGS,
             "adc_calibration_states": (
                 constants.AdcCalibrationState.SUCCEEDED,

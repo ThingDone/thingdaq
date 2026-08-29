@@ -174,8 +174,14 @@ const Snapshot &Scheduler::initialize(bool converters_ready) {
 
 TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.arm")
 bool Scheduler::arm() {
-  if (running_ || !snapshot_.ready() ||
-      !platform_.armFromStopped(false)) {
+  if (running_ || !snapshot_.ready()) {
+    return false;
+  }
+  if (!platform_.armFromStopped(false)) {
+    // A target can reject the final readback after it has already written
+    // one or more enable registers. Always drive the platform back through
+    // its bounded stopped-state cleanup before the caller tears down DMA.
+    (void)platform_.stop();
     return false;
   }
   running_ = true;

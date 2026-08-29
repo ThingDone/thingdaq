@@ -2,6 +2,13 @@
 
 #include <limits>
 
+#if defined(__IMXRT1062__)
+#define TEENSY_DAQ_PACKET_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define TEENSY_DAQ_PACKET_COLD_CODE(section_name)
+#endif
+
 namespace teensy_daq::packet {
 namespace {
 
@@ -27,6 +34,7 @@ Integer saturatingMultiply(Integer left, Integer right) {
 
 }  // namespace
 
+TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.start")
 OperationStatus PacketBufferPipeline::startRun(
     std::uint32_t run_id,
     protocol_v1::ChecksumAlgorithm checksum_algorithm) {
@@ -74,6 +82,7 @@ OperationStatus PacketBufferPipeline::startRun(
   return OperationStatus::kOk;
 }
 
+TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.stop")
 StopReport PacketBufferPipeline::stopProduction() {
   StopReport report{};
   accepting_frames_ = false;
@@ -138,6 +147,7 @@ BeginFillResult PacketBufferPipeline::beginFill(Stream stream) {
   return result;
 }
 
+TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.source_drops")
 OperationStatus PacketBufferPipeline::recordSourceFrameDrops(
     Stream stream, std::uint64_t frame_count) {
   if (!accepting_frames_ || run_id_ == 0U || !validStream(stream)) {
@@ -250,6 +260,7 @@ FinishFillResult PacketBufferPipeline::finishFill(
   return result;
 }
 
+TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.cancel")
 bool PacketBufferPipeline::cancelFill(const FillHandle &handle) {
   if (!handleMatches(handle)) {
     saturatingIncrement(invalid_operations_);
@@ -464,6 +475,7 @@ void PacketBufferPipeline::recycle(BufferIndex index) {
   records_[index] = {};
 }
 
+TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.record_drop")
 void PacketBufferPipeline::recordDrop(Stream stream,
                                       std::uint32_t item_count) {
   if (!validStream(stream)) {
@@ -492,5 +504,7 @@ std::size_t PacketBufferPipeline::ownedBuffers() const {
   }
   return owned;
 }
+
+#undef TEENSY_DAQ_PACKET_COLD_CODE
 
 }  // namespace teensy_daq::packet

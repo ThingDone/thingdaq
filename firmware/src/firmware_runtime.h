@@ -3,6 +3,8 @@
 #include <cstdint>
 
 #include "adc_initializer.h"
+#include "adc_dma_capture.h"
+#include "adc_frame_packer.h"
 #include "adc_trigger.h"
 #include "checksum_benchmark.h"
 #include "control_state.h"
@@ -30,10 +32,17 @@ struct LoopReport {
   gpio_packer::ServiceReport gpio_packer{};
   gpio_capture::StopReport gpio_capture_stop{};
   gpio_packer::StopReport gpio_packer_stop{};
+  adc_packer::ServiceReport adc_packer{};
+  adc_capture::StopReport adc_capture_stop{};
+  adc_packer::StopReport adc_packer_stop{};
   gpio_capture::StartStatus gpio_capture_start_status =
       gpio_capture::StartStatus::kNotQuiescent;
   gpio_packer::OperationStatus gpio_packer_start_status =
       gpio_packer::OperationStatus::kNotRunning;
+  adc_capture::StartStatus adc_capture_start_status =
+      adc_capture::StartStatus::kNotQuiescent;
+  adc_packer::OperationStatus adc_packer_start_status =
+      adc_packer::OperationStatus::kNotRunning;
   bool command_dispatched = false;
   bool response_queued = false;
   bool internal_error = false;
@@ -47,6 +56,12 @@ struct LoopReport {
   bool gpio_capture_stopped = false;
   bool gpio_packer_started = false;
   bool gpio_packer_stopped = false;
+  bool adc_capture_prepared = false;
+  bool adc_capture_stopped = false;
+  bool adc_packer_started = false;
+  bool adc_packer_stopped = false;
+  bool adc_trigger_armed = false;
+  bool adc_trigger_stopped = false;
   bool physical_drain_pending = false;
 };
 
@@ -67,7 +82,9 @@ class FirmwareRuntime {
                   gpio_packer::GpioBatchPacker *gpio_packer = nullptr,
                   gpio_diagnostic::Runner *gpio_capture_diagnostic = nullptr,
                   adc::Initializer *adc_initializer = nullptr,
-                  adc_trigger::Scheduler *adc_trigger_scheduler = nullptr)
+                  adc_trigger::Scheduler *adc_trigger_scheduler = nullptr,
+                  adc_capture::HardwareCapture *adc_capture = nullptr,
+                  adc_packer::AdcFramePacker *adc_packer = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
@@ -79,7 +96,9 @@ class FirmwareRuntime {
         gpio_packer_(gpio_packer),
         gpio_capture_diagnostic_(gpio_capture_diagnostic),
         adc_initializer_(adc_initializer),
-        adc_trigger_scheduler_(adc_trigger_scheduler) {}
+        adc_trigger_scheduler_(adc_trigger_scheduler),
+        adc_capture_(adc_capture),
+        adc_packer_(adc_packer) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -119,6 +138,12 @@ class FirmwareRuntime {
   bool dataPathQuiescent() const;
   bool physicalConfiguration(const protocol::Configuration &configuration)
       const;
+  bool adcPhysicalConfiguration(
+      const protocol::Configuration &configuration) const;
+  bool gpioPhysicalConfiguration(
+      const protocol::Configuration &configuration) const;
+  bool physicalPathReady(const protocol::Configuration &configuration,
+                         std::uint32_t epoch);
   void servicePhysicalPath(LoopReport &report);
   static protocol::GpioCaptureDiagnosticResponse gpioDiagnosticResponse(
       const gpio_diagnostic::Runner &runner,
@@ -136,7 +161,10 @@ class FirmwareRuntime {
   gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
   adc::Initializer *adc_initializer_ = nullptr;
   adc_trigger::Scheduler *adc_trigger_scheduler_ = nullptr;
+  adc_capture::HardwareCapture *adc_capture_ = nullptr;
+  adc_packer::AdcFramePacker *adc_packer_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
+  std::uint8_t physical_stream_mask_ = 0U;
   bool physical_run_active_ = false;
   bool physical_drain_pending_ = false;
 };

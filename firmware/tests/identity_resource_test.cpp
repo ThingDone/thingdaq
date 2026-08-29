@@ -163,11 +163,11 @@ static_assert(teensy_daq::board::kUsbRxScratchBytes >=
               teensy_daq::protocol_v1::kMaxCommandFrameBytes);
 static_assert(teensy_daq::board::kCommandQueueDepth == 4U);
 static_assert(teensy_daq::board::kResponseQueueDepth == 4U);
-static_assert(teensy_daq::board::kPacketBufferPrimaryCount == 106U);
-static_assert(teensy_daq::board::kPacketBufferReserveCount == 94U);
+static_assert(teensy_daq::board::kPacketBufferPrimaryCount == 105U);
+static_assert(teensy_daq::board::kPacketBufferReserveCount == 95U);
 static_assert(teensy_daq::board::kPacketBufferCount == 200U);
-static_assert(teensy_daq::board::kPacketBufferPrimaryStorageBytes == 434176U);
-static_assert(teensy_daq::board::kPacketBufferReserveStorageBytes == 385024U);
+static_assert(teensy_daq::board::kPacketBufferPrimaryStorageBytes == 430080U);
+static_assert(teensy_daq::board::kPacketBufferReserveStorageBytes == 389120U);
 static_assert(teensy_daq::board::kPacketBufferStorageBytes == 819200U);
 static_assert(teensy_daq::board::kPacketReadyQueueDepth ==
               teensy_daq::board::kPacketBufferCount);
@@ -266,7 +266,7 @@ static_assert(teensy_daq::board::kGpioMappingsByPackedBit[7].teensy_pin ==
 static_assert(teensy_daq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
 static_assert(teensy_daq::board::kGpio7ToGpio2Gpr27ClearMask ==
               teensy_daq::board::kGpio2PsrCaptureMask);
-static_assert(teensy_daq::board::kReservedRam1Bytes == 453024U);
+static_assert(teensy_daq::board::kReservedRam1Bytes == 449440U);
 static_assert(teensy_daq::board::kGpioRawDmaBufferBytes == 16192U);
 static_assert(teensy_daq::board::kGpioRawDmaRingBytes == 64768U);
 static_assert(teensy_daq::board::kAdcDmaBufferStrideBytes == 4064U);
@@ -283,7 +283,8 @@ static_assert(teensy_daq::board::kGpioRawDmaDescriptorBytes == 160U);
 static_assert(teensy_daq::board::kGpioPackedRingDepth == 4U);
 static_assert(teensy_daq::board::kGpioPackedBufferStrideBytes == 4064U);
 static_assert(teensy_daq::board::kGpioPackerStateBudgetBytes == 2048U);
-static_assert(teensy_daq::board::kReservedRam2Bytes == 486976U);
+static_assert(teensy_daq::board::kAdcPackerStateBudgetBytes == 512U);
+static_assert(teensy_daq::board::kReservedRam2Bytes == 491072U);
 static_assert(teensy_daq::board::kChecksumBenchmarkBufferBytes == 4096U);
 static_assert(teensy_daq::board::kGpioClockDiagnosticSinkBytes == 32U);
 static_assert(teensy_daq::board::kGpioPitChannel == 0U);

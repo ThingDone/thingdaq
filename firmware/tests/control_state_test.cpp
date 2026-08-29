@@ -534,6 +534,7 @@ void testConfigurationValidationAndAtomicity() {
   adc.stream_mask = static_cast<std::uint8_t>(constants::StreamMask::kAdc);
   wire::Configuration hardware = control::kSyntheticConfiguration;
   hardware.source = constants::Source::kHardware;
+  wire::Configuration physical_adc = control::kPhysicalAdcConfiguration;
   wire::Configuration physical_gpio = control::kPhysicalGpioConfiguration;
   wire::Configuration zero_stream = control::kSyntheticConfiguration;
   zero_stream.stream_mask = 0U;
@@ -595,6 +596,13 @@ void testConfigurationValidationAndAtomicity() {
              state.appliedConfiguration().data_checksum_algorithm ==
                  constants::ChecksumAlgorithm::kCrc32c,
          "negotiated CRC-32C configuration is retained");
+  expect(state.dispatch(configureRequest(request_id++, physical_adc), response)
+             .commandAccepted() &&
+             state.appliedConfiguration().stream_mask ==
+                 static_cast<std::uint8_t>(constants::StreamMask::kAdc) &&
+             state.appliedConfiguration().source ==
+                 constants::Source::kHardware,
+         "physical ADC-only configuration is accepted atomically");
   expect(state.dispatch(configureRequest(request_id++, physical_gpio), response)
              .commandAccepted() &&
              state.appliedConfiguration().stream_mask ==

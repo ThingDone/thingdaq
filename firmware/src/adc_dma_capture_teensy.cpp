@@ -679,7 +679,19 @@ OperationStatus TeensyAdcDmaCapture::release(
   return g_ring.release(handle);
 }
 
-Snapshot TeensyAdcDmaCapture::rawSnapshot() { return g_ring.snapshot(); }
+Snapshot TeensyAdcDmaCapture::rawSnapshot() {
+  Snapshot value = g_ring.snapshot();
+  const std::uint32_t primask = readPrimask();
+  __disable_irq();
+  value.resource_conflicts = g_resource_conflicts;
+  value.start_errors = g_start_errors;
+  value.stop_errors = g_stop_errors;
+  value.stale_interrupts = g_stale_interrupts;
+  value.hardware_prepared = g_hardware_prepared;
+  value.faulted = g_faulted;
+  restorePrimask(primask);
+  return value;
+}
 
 HardwareSnapshot TeensyAdcDmaCapture::snapshot() {
   return hardwareSnapshot();

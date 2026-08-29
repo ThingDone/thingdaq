@@ -83,13 +83,13 @@ BENCHMARK_BUFFER_ALIGNMENT = 32
 PACKET_BUFFER_SYMBOLS = {
     "DTCM_PRIMARY": (
         "(anonymous namespace)::packet_storage_primary",
-        106 * 4096,
+        105 * 4096,
         0x20000000,
         0x20200000,
     ),
     "OCRAM_RESERVE": (
         "(anonymous namespace)::packet_storage_reserve",
-        94 * 4096,
+        95 * 4096,
         0x20200000,
         0x20280000,
     ),

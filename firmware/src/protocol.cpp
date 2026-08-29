@@ -2463,6 +2463,42 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
   STORE_STATUS_U32(GpioStartErrors, gpio_start_errors);
   STORE_STATUS_U32(GpioStopErrors, gpio_stop_errors);
   STORE_STATUS_U32(GpioStaleDmaCompletions, gpio_stale_dma_completions);
+  STORE_STATUS_U64(Adc0DmaMajorLoops, adc0_dma_major_loops);
+  STORE_STATUS_U64(Adc1DmaMajorLoops, adc1_dma_major_loops);
+  STORE_STATUS_U64(Adc0DmaResults, adc0_dma_results);
+  STORE_STATUS_U64(Adc1DmaResults, adc1_dma_results);
+  STORE_STATUS_U64(AdcPairedMajorLoops, adc_paired_major_loops);
+  STORE_STATUS_U64(AdcBuffersCompleted, adc_buffers_completed);
+  STORE_STATUS_U64(AdcBuffersAcquired, adc_buffers_acquired);
+  STORE_STATUS_U64(AdcBuffersReleased, adc_buffers_released);
+  STORE_STATUS_U64(AdcPairsCaptured, adc_pairs_captured);
+  STORE_STATUS_U64(AdcPairsDelivered, adc_pairs_delivered);
+  STORE_STATUS_U64(AdcPairsFramed, adc_pairs_framed);
+  STORE_STATUS_U64(AdcPairsTransmitted, adc_pairs_transmitted);
+  STORE_STATUS_U64(AdcRawPairsLost, adc_raw_pairs_lost);
+  STORE_STATUS_U64(AdcStopPairsDiscarded, adc_stop_pairs_discarded);
+  STORE_STATUS_U64(AdcIncompleteConversions, adc_incomplete_conversions);
+  STORE_STATUS_U64(AdcOverwrittenConversions, adc_overwritten_conversions);
+  STORE_STATUS_U64(AdcRawRingOverruns, adc_raw_ring_overruns);
+  STORE_STATUS_U64(AdcIncompleteBuffers, adc_incomplete_buffers);
+  STORE_STATUS_U16(AdcRawReadyDepth, adc_raw_ready_depth);
+  STORE_STATUS_U16(AdcRawReadyHighWater, adc_raw_ready_high_water);
+  STORE_STATUS_U32(AdcEtcErrorEvents, adc_etc_error_events);
+  STORE_STATUS_U32(AdcEtcErrorFlags, adc_etc_error_flags);
+  STORE_STATUS_U32(AdcDmaErrorEvents, adc_dma_error_events);
+  STORE_STATUS_U32(AdcCompletionMismatches, adc_completion_mismatches);
+  STORE_STATUS_U32(AdcDestinationMismatches, adc_destination_mismatches);
+  STORE_STATUS_U32(AdcScheduleExhaustions, adc_schedule_exhaustions);
+  STORE_STATUS_U32(AdcRawInvariantErrors, adc_raw_invariant_errors);
+  STORE_STATUS_U32(AdcStaleCompletions, adc_stale_completions);
+  STORE_STATUS_U32(AdcResourceConflicts, adc_resource_conflicts);
+  STORE_STATUS_U32(AdcStartErrors, adc_start_errors);
+  STORE_STATUS_U32(AdcStopErrors, adc_stop_errors);
+  STORE_STATUS_U32(AdcStaleInterrupts, adc_stale_interrupts);
+  STORE_STATUS_U32(AdcPackerSourceErrors, adc_packer_source_errors);
+  STORE_STATUS_U32(AdcPackerPipelineErrors, adc_packer_pipeline_errors);
+  STORE_STATUS_U32(AdcPackerChronologyErrors,
+                   adc_packer_chronology_errors);
 #undef STORE_STATUS_U16
 #undef STORE_STATUS_U32
 #undef STORE_STATUS_U64

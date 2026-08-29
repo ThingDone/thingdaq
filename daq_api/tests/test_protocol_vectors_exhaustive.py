@@ -134,7 +134,7 @@ def _info_payload() -> bytes:
 
 
 def _status_payload() -> bytes:
-    payload = bytearray(368)
+    payload = bytearray(576)
     struct.pack_into(
         "<BBHBBBBIQQQQIII",
         payload,

@@ -97,22 +97,44 @@ void Statistics::recordGpioStopError() {
                 std::uint32_t{1U});
 }
 
+void Statistics::recordAdcResourceConflict() {
+  saturatingAdd(counters_.adc_capture.resource_conflicts,
+                std::uint32_t{1U});
+}
+
+void Statistics::recordAdcStartError() {
+  saturatingAdd(counters_.adc_capture.start_errors, std::uint32_t{1U});
+}
+
+void Statistics::recordAdcStopError() {
+  saturatingAdd(counters_.adc_capture.stop_errors, std::uint32_t{1U});
+}
+
+TEENSY_DAQ_STATISTICS_COLD_CODE(
+    ".flashmem.statistics.legacy_adc_emitted")
 void Statistics::recordAdcFrameEmitted(std::uint64_t count) {
   saturatingAdd(counters_.adc_frames_emitted, count);
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(
+    ".flashmem.statistics.legacy_gpio_emitted")
 void Statistics::recordGpioFrameEmitted(std::uint64_t count) {
   saturatingAdd(counters_.gpio_frames_emitted, count);
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(
+    ".flashmem.statistics.legacy_adc_dropped")
 void Statistics::recordAdcItemsDropped(std::uint64_t count) {
   saturatingAdd(counters_.adc_items_dropped, count);
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(
+    ".flashmem.statistics.legacy_gpio_dropped")
 void Statistics::recordGpioItemsDropped(std::uint64_t count) {
   saturatingAdd(counters_.gpio_items_dropped, count);
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_data")
 void Statistics::publishDataPath(const DataPathProgress &progress) {
   counters_.data_path = progress;
   counters_.adc_frames_emitted = progress.adc.frames_emitted;
@@ -121,6 +143,44 @@ void Statistics::publishDataPath(const DataPathProgress &progress) {
   refreshDataProjection();
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_adc_capture")
+void Statistics::publishAdcCapture(const AdcCaptureProgress &progress) {
+  const AdcCaptureProgress previous = counters_.adc_capture;
+  counters_.adc_capture = progress;
+  counters_.adc_capture.adc_etc_error_events = maximum(
+      previous.adc_etc_error_events, progress.adc_etc_error_events);
+  counters_.adc_capture.adc_etc_error_flags |=
+      previous.adc_etc_error_flags;
+  counters_.adc_capture.dma_error_events = maximum(
+      previous.dma_error_events, progress.dma_error_events);
+  counters_.adc_capture.completion_mismatches = maximum(
+      previous.completion_mismatches, progress.completion_mismatches);
+  counters_.adc_capture.destination_mismatches = maximum(
+      previous.destination_mismatches, progress.destination_mismatches);
+  counters_.adc_capture.schedule_exhaustions = maximum(
+      previous.schedule_exhaustions, progress.schedule_exhaustions);
+  counters_.adc_capture.invariant_errors = maximum(
+      previous.invariant_errors, progress.invariant_errors);
+  counters_.adc_capture.stale_completions = maximum(
+      previous.stale_completions, progress.stale_completions);
+  counters_.adc_capture.resource_conflicts = maximum(
+      previous.resource_conflicts, progress.resource_conflicts);
+  counters_.adc_capture.start_errors = maximum(
+      previous.start_errors, progress.start_errors);
+  counters_.adc_capture.stop_errors = maximum(
+      previous.stop_errors, progress.stop_errors);
+  counters_.adc_capture.stale_interrupts = maximum(
+      previous.stale_interrupts, progress.stale_interrupts);
+  refreshDataProjection();
+}
+
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_adc_packer")
+void Statistics::publishAdcPacker(const AdcPackerProgress &progress) {
+  counters_.adc_packer = progress;
+  refreshDataProjection();
+}
+
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_gpio_capture")
 void Statistics::publishGpioRawCapture(
     const GpioRawCaptureProgress &progress) {
   const GpioRawCaptureProgress previous = counters_.gpio_raw_capture;
@@ -140,16 +200,24 @@ void Statistics::publishGpioRawCapture(
   refreshDataProjection();
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_gpio_packer")
 void Statistics::publishGpioPacker(const GpioPackerProgress &progress) {
   counters_.gpio_packer = progress;
   refreshDataProjection();
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_packet_queues")
 void Statistics::publishPacketQueues(const PacketQueueProgress &progress) {
   counters_.packet_queue = progress;
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.refresh_projection")
 void Statistics::refreshDataProjection() {
+  const std::uint64_t unprojected_adc_loss = subtractFloor(
+      counters_.adc_capture.pairs_lost,
+      counters_.adc_packer.raw_drop_pairs_projected);
+  counters_.adc_items_dropped = saturatingSum(
+      counters_.data_path.adc.items_dropped, unprojected_adc_loss);
   const std::uint64_t unprojected_raw_loss = subtractFloor(
       counters_.gpio_raw_capture.samples_lost,
       counters_.gpio_packer.raw_drop_samples_projected);
@@ -220,6 +288,53 @@ protocol::StatusResponse Statistics::wireStatus(
   response.gpio_stop_errors = counters_.gpio_raw_capture.stop_errors;
   response.gpio_stale_dma_completions =
       counters_.gpio_raw_capture.stale_dma_completions;
+  response.adc0_dma_major_loops = counters_.adc_capture.adc0_major_loops;
+  response.adc1_dma_major_loops = counters_.adc_capture.adc1_major_loops;
+  response.adc0_dma_results = counters_.adc_capture.adc0_results;
+  response.adc1_dma_results = counters_.adc_capture.adc1_results;
+  response.adc_paired_major_loops =
+      counters_.adc_capture.paired_major_loops;
+  response.adc_buffers_completed = counters_.adc_capture.buffers_completed;
+  response.adc_buffers_acquired = counters_.adc_capture.buffers_acquired;
+  response.adc_buffers_released = counters_.adc_capture.buffers_released;
+  response.adc_pairs_captured = counters_.adc_capture.pairs_captured;
+  response.adc_pairs_delivered = counters_.adc_capture.pairs_delivered;
+  response.adc_pairs_framed = counters_.data_path.adc.items_framed;
+  response.adc_pairs_transmitted = counters_.data_path.adc.items_transmitted;
+  response.adc_raw_pairs_lost = counters_.adc_capture.pairs_lost;
+  response.adc_stop_pairs_discarded =
+      counters_.adc_capture.stop_discarded_pairs;
+  response.adc_incomplete_conversions =
+      counters_.adc_capture.incomplete_conversions;
+  response.adc_overwritten_conversions =
+      counters_.adc_capture.overwritten_conversions;
+  response.adc_raw_ring_overruns = counters_.adc_capture.ring_overruns;
+  response.adc_incomplete_buffers = counters_.adc_capture.incomplete_buffers;
+  response.adc_raw_ready_depth =
+      narrowDepth(counters_.adc_capture.ready_depth);
+  response.adc_raw_ready_high_water =
+      narrowDepth(counters_.adc_capture.ready_high_water);
+  response.adc_etc_error_events =
+      counters_.adc_capture.adc_etc_error_events;
+  response.adc_etc_error_flags = counters_.adc_capture.adc_etc_error_flags;
+  response.adc_dma_error_events = counters_.adc_capture.dma_error_events;
+  response.adc_completion_mismatches =
+      counters_.adc_capture.completion_mismatches;
+  response.adc_destination_mismatches =
+      counters_.adc_capture.destination_mismatches;
+  response.adc_schedule_exhaustions =
+      counters_.adc_capture.schedule_exhaustions;
+  response.adc_raw_invariant_errors =
+      counters_.adc_capture.invariant_errors;
+  response.adc_stale_completions = counters_.adc_capture.stale_completions;
+  response.adc_resource_conflicts = counters_.adc_capture.resource_conflicts;
+  response.adc_start_errors = counters_.adc_capture.start_errors;
+  response.adc_stop_errors = counters_.adc_capture.stop_errors;
+  response.adc_stale_interrupts = counters_.adc_capture.stale_interrupts;
+  response.adc_packer_source_errors = counters_.adc_packer.source_errors;
+  response.adc_packer_pipeline_errors = counters_.adc_packer.pipeline_errors;
+  response.adc_packer_chronology_errors =
+      counters_.adc_packer.chronology_errors;
   return response;
 }
 
