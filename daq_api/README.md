@@ -69,6 +69,15 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
     generation = daq.reset_stats()  # valid after STOP, or while CONFIGURED
 ```
 
+`TeensyDAQ.open(...)` and `TeensyDAQ.simulated(...)` return the same typed
+context manager. Exiting it attempts bounded STOP when needed, closes the
+reader/transport deterministically, and preserves typed shutdown evidence.
+Normal applications import the facade and immutable models from `teensy_daq`.
+Raw frames, parsers, the background reader, and byte transports remain
+available for protocol tooling under the explicitly expert-only
+`teensy_daq.low_level` namespace; existing root imports remain stable for
+compatibility.
+
 `DeviceInfo`, `DeviceCapabilities`, `AdcCalibrationMetadata`,
 `AdcTriggerMetadata`, `AdcAcquisitionStatus`, `AdcBlockMetadata`,
 `DAQConfiguration`, `Status`, `ADCBlock`, `GPIOBlock`,
@@ -247,7 +256,8 @@ teensy-daq stop --hardware-serial 12345670
 teensy-daq reset-stats --hardware-serial 12345670
 teensy-daq reconcile --hardware-serial 12345670
 teensy-daq monitor --hardware-serial 12345670 --streams both --source hardware --duration 10
-teensy-daq capture --simulate --streams both --source synthetic --duration 2
+teensy-daq capture --simulate --streams both --source synthetic --duration 2 --strict-loss --gpio-channel D6 --gpio-channel D13
+teensy-daq info --simulate --json
 ```
 
 `list` uses VID/PID metadata and opens nothing. Every other command performs
@@ -264,6 +274,34 @@ are typed and machine-visible: no device (exit 3),
 timeout (4), busy/denied port (5), wrong identity (6), unsupported capability
 (7), disconnect (8), invalid state (9), other device errors (10), and a
 counter inconsistency or saturation that prevents an exact proof (11).
+
+Every command accepts `--json` after its command name. One-shot operations
+emit one JSON document containing typed INFO, STATUS, applied configuration,
+or reconciliation data. Bounded `monitor`/`capture` buffers only its explicitly
+limited sample preview and emits one final document with the running and
+post-STOP STATUS snapshots, exact applied configuration, rates, selected
+samples, firmware counters, host counters, and observed loss domains. The
+default `--sample-limit 4` previews raw ADC0/A0 and ADC1/A1 codes plus packed
+GPIO bytes; `--gpio-channel D6` through `D13` adds only the requested lazy bit
+views and can be repeated. Set `--sample-limit 0` for telemetry only.
+
+Calibrated preview is opt-in and requires an explicit user path:
+
+```bash
+teensy-daq capture --hardware-serial 12345670 --streams adc --source hardware \
+  --adc-output calibrated --calibration /explicit/path/calibration.json \
+  --analog-front-end-profile buffered-input --duration 10 --strict-loss --json
+```
+
+Each calibrated row remains visibly marked, retains both raw codes, and adds
+volts plus record provenance; no implicit calibration file is searched. For
+offline simulator calibration tests, `--calibration-hardware-serial` supplies
+the explicit record identity because simulator INFO intentionally has no
+physical serial. `--strict-loss` raises on gaps, anomalies, host queue loss,
+parser corruption, nonzero firmware drop/error counters, or inconsistent
+telemetry. Human output prints both firmware and host loss summaries. SIGINT
+and SIGTERM are converted to a typed interruption while the capture finalizer
+attempts STOP and deterministic reader close; interrupted capture exits 130.
 
 `reconcile` captures one STATUS snapshot and prints the run/generation,
 source-wise frame/item/byte conservation equations, the first inconsistent or

@@ -1,5 +1,6 @@
-"""Synchronous API, simulator, protocol, and models for the Teensy DAQ project."""
+"""Stable synchronous API and typed data models for the Teensy DAQ project."""
 
+from . import low_level as low_level
 from ._generated.protocol_constants import (
     AdcCalibrationState,
     AdcClockSource,
@@ -420,6 +421,7 @@ __all__ = [
     "UnexpectedStreamGapError",
     "UnexpectedStreamValidationError",
     "UnsupportedChecksumError",
+    "__version__",
     "align_by_timestamp",
     "analyze_stream_continuity",
     "apply_correction",
@@ -440,6 +442,7 @@ __all__ = [
     "extract_gpio_channel",
     "interleave_adc",
     "load_calibration",
+    "low_level",
     "probe_candidate",
     "reconcile_run_counters",
     "run_synthetic_soak",

@@ -444,10 +444,18 @@ class TeensyDAQ:
             if hardware_serial is not None:
                 chosen = select_device(devices, hardware_serial=hardware_serial)
             elif not devices:
-                raise DeviceNotFoundError("no compatible Teensy DAQ was discovered")
+                raise DeviceNotFoundError(
+                    "no compatible Teensy DAQ was discovered; check USB/serial "
+                    "permissions and call discover() again"
+                )
             elif len(devices) > 1:
+                available_serials = ", ".join(
+                    str(item.hardware_serial)
+                    for item in sorted(devices, key=lambda item: item.hardware_serial)
+                )
                 raise MultipleDevicesFoundError(
-                    "multiple Teensy DAQs were discovered; select hardware_serial"
+                    "multiple Teensy DAQs were discovered; pass "
+                    f"hardware_serial=<serial> (available: {available_serials})"
                 )
             else:
                 chosen = devices[0]
@@ -1840,15 +1848,21 @@ class TeensyDAQ:
 
     def _ensure_open(self) -> None:
         if self._closed:
-            raise DAQClosedError("TeensyDAQ is closed")
+            raise DAQClosedError(
+                "TeensyDAQ is closed; open a new context-managed session"
+            )
         if not self._reader.is_running:
             terminal = self._reader.terminal_error
             if terminal is not None:
                 terminal.evidence = self._recovery_evidence()
                 raise terminal
-            raise DAQClosedError("TeensyDAQ reader is not running")
+            raise DAQClosedError(
+                "TeensyDAQ reader is not running; close this session and reopen"
+            )
         if not self._transport.is_open:
-            raise DAQClosedError("TeensyDAQ transport is closed")
+            raise DAQClosedError(
+                "TeensyDAQ transport is closed; rediscover the device and reopen"
+            )
 
     def _recovery_evidence(self) -> RecoveryEvidence:
         return RecoveryEvidence(

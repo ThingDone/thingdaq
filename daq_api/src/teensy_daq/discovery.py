@@ -432,7 +432,8 @@ def select_device(
     ]
     if not matches:
         raise DeviceNotFoundError(
-            f"no discovered Teensy DAQ has hardware serial {hardware_serial!r}"
+            f"no discovered Teensy DAQ has hardware serial {hardware_serial!r}; "
+            "perform a fresh discover() scan and verify USB/serial permissions"
         )
     return min(matches, key=lambda device: _candidate_sort_key(device.candidate))
 
