@@ -8,6 +8,7 @@ tags:
 related:
   - '[[System-Overview]]'
   - '[[Firmware-Resource-Map]]'
+  - '[[Acquisition-Pipeline]]'
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Checksum-Candidates]]'
   - '[[Phase-05-Checksum-Correctness]]'
@@ -37,7 +38,9 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
 ## Organization
 
 - `architecture/` describes system boundaries and component relationships,
-  beginning with [[System-Overview]] and [[Firmware-Resource-Map]].
+  beginning with [[System-Overview]] and [[Firmware-Resource-Map]], with the
+  centralized physical lifecycle and Phase 08 composition audit in
+  [[Acquisition-Pipeline]].
 - `protocol/` contains versioned wire-contract specifications, beginning with
   [[Protocol-V1]].
 - `decisions/` contains architecture decision records, including

@@ -13,6 +13,8 @@ using teensy_daq::board::AdcEtcAllocation;
 using teensy_daq::board::AdcInputPad;
 using teensy_daq::board::EdmaAllocation;
 using teensy_daq::board::GpioPinMapping;
+using teensy_daq::board::InterruptAllocation;
+using teensy_daq::board::InterruptUse;
 using teensy_daq::board::MemoryAllocation;
 using teensy_daq::board::MemoryRegion;
 using teensy_daq::board::MemoryUse;
@@ -94,6 +96,7 @@ constexpr EdmaAllocation kOutOfRangeEdma[] = {
     {teensy_daq::board::kEdmaChannelCount, 24U,
      ResourceOwner::kAdc0Capture},
 };
+constexpr std::uint8_t kConflictingEdmaPriorities[] = {0U, 2U};
 constexpr MemoryAllocation kConflictingMemory[] = {
     {MemoryUse::kCommandParser, MemoryRegion::kDtcmRam1, 64U, 4U,
      ResourceOwner::kControlPlane},
@@ -107,6 +110,50 @@ constexpr MemoryAllocation kMisalignedMemory[] = {
 constexpr MemoryAllocation kInvalidAlignment[] = {
     {MemoryUse::kGpioRawDmaRing, MemoryRegion::kOcramRam2Dma, 96U, 3U,
      ResourceOwner::kGpioCapture},
+};
+constexpr MemoryAllocation kDmaRingInDtcm[] = {
+    {MemoryUse::kAdcDmaRing, MemoryRegion::kDtcmRam1, 64U, 32U,
+     ResourceOwner::kAdcCapture},
+};
+constexpr MemoryAllocation kCacheUnsafePackedRing[] = {
+    {MemoryUse::kGpioPackedRing, MemoryRegion::kOcramRam2Dma, 64U, 16U,
+     ResourceOwner::kGpioPacker},
+};
+constexpr InterruptAllocation kDuplicateInterruptUse[] = {
+    {InterruptUse::kAdc0DmaCompletion, 48U,
+     ResourceOwner::kAdc0Capture},
+    {InterruptUse::kAdc0DmaCompletion, 48U,
+     ResourceOwner::kAdc1Capture},
+    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
+    {InterruptUse::kGpioDmaCompletion, 64U,
+     ResourceOwner::kGpioCapture},
+};
+constexpr InterruptAllocation kUnsafeInterruptPriority[] = {
+    {InterruptUse::kAdc0DmaCompletion, 48U,
+     ResourceOwner::kAdc0Capture},
+    {InterruptUse::kAdc1DmaCompletion, 48U,
+     ResourceOwner::kAdc1Capture},
+    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
+    {InterruptUse::kGpioDmaCompletion, 40U,
+     ResourceOwner::kGpioCapture},
+};
+constexpr InterruptAllocation kWrongInterruptOwner[] = {
+    {InterruptUse::kAdc0DmaCompletion, 48U,
+     ResourceOwner::kAdc1Capture},
+    {InterruptUse::kAdc1DmaCompletion, 48U,
+     ResourceOwner::kAdc1Capture},
+    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
+    {InterruptUse::kGpioDmaCompletion, 64U,
+     ResourceOwner::kGpioCapture},
+};
+constexpr InterruptAllocation kReorderedInterrupts[] = {
+    {InterruptUse::kGpioDmaCompletion, 64U,
+     ResourceOwner::kGpioCapture},
+    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
+    {InterruptUse::kAdc1DmaCompletion, 48U,
+     ResourceOwner::kAdc1Capture},
+    {InterruptUse::kAdc0DmaCompletion, 48U,
+     ResourceOwner::kAdc0Capture},
 };
 
 static_assert(teensy_daq::board::validPins(
@@ -126,8 +173,16 @@ static_assert(teensy_daq::board::validAdcEtcAllocations(
     teensy_daq::board::kAdcEtcAllocations));
 static_assert(teensy_daq::board::validEdmaAllocations(
     teensy_daq::board::kEdmaAllocations));
+static_assert(teensy_daq::board::validEdmaPriorities(
+    teensy_daq::board::kAdcEdmaPriorities,
+    teensy_daq::board::kGpioEdmaPriority));
 static_assert(teensy_daq::board::validMemoryAllocations(
     teensy_daq::board::kMemoryAllocations));
+static_assert(teensy_daq::board::validInterruptAllocations(
+    teensy_daq::board::kInterruptAllocations));
+static_assert(teensy_daq::board::validAcquisitionMemoryRegions(
+    teensy_daq::board::kMemoryAllocations));
+static_assert(teensy_daq::board::kAcquisitionResourceContract.valid());
 static_assert(!teensy_daq::board::validPins(kConflictingPins));
 static_assert(!teensy_daq::board::validPins(kOutOfRangePin));
 static_assert(!teensy_daq::board::validGpioPinMappings(
@@ -152,10 +207,27 @@ static_assert(
     !teensy_daq::board::validAdcEtcAllocations(kOutOfRangeAdcEtc));
 static_assert(!teensy_daq::board::validEdmaAllocations(kInvalidEdma));
 static_assert(!teensy_daq::board::validEdmaAllocations(kOutOfRangeEdma));
+static_assert(!teensy_daq::board::validEdmaPriorities(
+    kConflictingEdmaPriorities, 2U));
 static_assert(
     !teensy_daq::board::validMemoryAllocations(kConflictingMemory));
 static_assert(!teensy_daq::board::validMemoryAllocations(kMisalignedMemory));
 static_assert(!teensy_daq::board::validMemoryAllocations(kInvalidAlignment));
+static_assert(teensy_daq::board::validMemoryAllocations(kDmaRingInDtcm));
+static_assert(!teensy_daq::board::validAcquisitionMemoryRegions(
+    kDmaRingInDtcm));
+static_assert(teensy_daq::board::validMemoryAllocations(
+    kCacheUnsafePackedRing));
+static_assert(!teensy_daq::board::validAcquisitionMemoryRegions(
+    kCacheUnsafePackedRing));
+static_assert(!teensy_daq::board::validInterruptAllocations(
+    kDuplicateInterruptUse));
+static_assert(!teensy_daq::board::validInterruptAllocations(
+    kUnsafeInterruptPriority));
+static_assert(!teensy_daq::board::validInterruptAllocations(
+    kWrongInterruptOwner));
+static_assert(teensy_daq::board::validInterruptAllocations(
+    kReorderedInterrupts));
 static_assert(teensy_daq::board::alignUp(4048U, 32U) == 4064U);
 static_assert(teensy_daq::board::kCommandParserCapacityBytes >=
               teensy_daq::protocol::kCommandParserStorageBytes);

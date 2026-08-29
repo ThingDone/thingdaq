@@ -14,6 +14,7 @@
 namespace {
 
 namespace app = teensy_daq::runtime;
+namespace acquisition = teensy_daq::acquisition;
 namespace adc = teensy_daq::adc;
 namespace adc_capture = teensy_daq::adc_capture;
 namespace adc_packer = teensy_daq::adc_packer;
@@ -23,6 +24,7 @@ namespace board = teensy_daq::board;
 namespace constants = teensy_daq::protocol_v1;
 namespace control = teensy_daq::control;
 namespace gpio_clock = teensy_daq::gpio_clock;
+namespace gpio_packer = teensy_daq::gpio_packer;
 namespace identity = teensy_daq::identity;
 namespace packet = teensy_daq::packet;
 namespace synthetic = teensy_daq::synthetic;
@@ -392,6 +394,7 @@ class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
       : operations_(operations) {}
 
   adc_capture::StartStatus inspectStart(std::uint32_t epoch) override {
+    ++inspect_calls;
     return epoch != 0U && snapshot_.quiescent
                ? adc_capture::StartStatus::kOk
                : adc_capture::StartStatus::kNotQuiescent;
@@ -491,6 +494,8 @@ class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
     snapshot_.progress.pairs_captured += constants::kAdcPairsPerFrame;
   }
 
+  std::uint32_t inspect_calls = 0U;
+
  private:
   std::vector<std::string> &operations_;
   adc_capture::PairBuffer buffer_{};
@@ -500,6 +505,33 @@ class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
   std::uint32_t lease_ = 0U;
   bool ready_ = false;
   bool leased_ = false;
+};
+
+class AuditGpioCapture final : public teensy_daq::gpio_capture::HardwareCapture {
+ public:
+  teensy_daq::gpio_capture::StartStatus inspectStart() override {
+    ++inspect_calls;
+    return inspect_status;
+  }
+  teensy_daq::gpio_capture::StartStatus start() override {
+    return inspect_status;
+  }
+  teensy_daq::gpio_capture::StopReport stop() override { return {}; }
+  teensy_daq::gpio_capture::AcquireResult acquireReady() override {
+    return {};
+  }
+  teensy_daq::gpio_capture::OperationStatus release(
+      const teensy_daq::gpio_capture::BufferHandle &) override {
+    return teensy_daq::gpio_capture::OperationStatus::kInvalidHandle;
+  }
+  teensy_daq::gpio_capture::Snapshot rawSnapshot() override {
+    return snapshot;
+  }
+
+  teensy_daq::gpio_capture::StartStatus inspect_status =
+      teensy_daq::gpio_capture::StartStatus::kOk;
+  teensy_daq::gpio_capture::Snapshot snapshot{};
+  std::uint32_t inspect_calls = 0U;
 };
 
 struct DrainResult {
@@ -1026,6 +1058,77 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
          "interleaved lifecycle retained large-request and partial-write accounting");
 }
 
+void testAcquisitionControllerAuditsBothPhysicalEnginesAtomically() {
+  packet::OwnedPacketBufferStorage packet_storage{};
+  packet::PacketBufferPipeline packet_pipeline{packet_storage};
+  teensy_daq::stats::Statistics statistics{};
+  std::vector<std::string> operations{};
+  ReadyAdcPlatform adc_platform{};
+  adc::Initializer adc_initializer{adc_platform};
+  LifecycleTriggerPlatform trigger_platform{operations};
+  adc_trigger::Scheduler trigger_scheduler{trigger_platform};
+  LifecycleAdcCapture adc_capture{operations};
+  adc_packer::AdcFramePacker adc_frame_packer{adc_capture};
+  AuditGpioCapture gpio_capture{};
+  gpio_packer::PackedBufferStorage gpio_storage{};
+  gpio_packer::GpioBatchPacker gpio_frame_packer{gpio_capture, gpio_storage};
+  acquisition::Controller controller{
+      statistics, packet_pipeline, &gpio_capture, &gpio_frame_packer,
+      &adc_initializer, &trigger_scheduler, &adc_capture, &adc_frame_packer};
+
+  const wire::AdcInitializationMetadata metadata = controller.initialize();
+  expect(metadata.calibration_states[0] ==
+                 constants::AdcCalibrationState::kSucceeded &&
+             metadata.calibration_states[1] ==
+                 constants::AdcCalibrationState::kSucceeded &&
+             trigger_scheduler.snapshot().ready(),
+         "controller owns one bounded ADC initialization/trigger boundary");
+  operations.clear();
+
+  wire::Configuration combined = control::kPhysicalAdcConfiguration;
+  combined.stream_mask =
+      static_cast<std::uint8_t>(constants::StreamMask::kAdc) |
+      static_cast<std::uint8_t>(constants::StreamMask::kGpio);
+  expect(acquisition::Controller::isHardwareConfiguration(combined) &&
+             !acquisition::Controller::isExecutableConfiguration(combined),
+         "combined hardware is auditable but remains disabled in Protocol V1");
+  const acquisition::Audit ready = controller.inspect(combined, 1U);
+  expect(ready.ready() && ready.contract.valid() &&
+             ready.profile == acquisition::Profile::kCombined &&
+             ready.adc_inspected && ready.gpio_inspected &&
+             ready.adc_capture_status == adc_capture::StartStatus::kOk &&
+             ready.gpio_capture_status ==
+                 teensy_daq::gpio_capture::StartStatus::kOk &&
+             adc_capture.inspect_calls == 1U &&
+             gpio_capture.inspect_calls == 1U && operations.empty(),
+         "combined preflight audits both engines without arming hardware");
+  acquisition::Report blocked_start{};
+  expect(!controller.start(combined, 1U, 0U, blocked_start) &&
+             blocked_start.internal_error &&
+             blocked_start.packet_production_stopped && operations.empty(),
+         "combined execution fails closed without touching physical hardware");
+
+  gpio_capture.inspect_status =
+      teensy_daq::gpio_capture::StartStatus::kResourceBusy;
+  const acquisition::Audit conflict = controller.inspect(combined, 2U);
+  expect(!conflict.ready() &&
+             conflict.has(acquisition::Conflict::kGpioCaptureUnavailable) &&
+             !conflict.has(acquisition::Conflict::kAdcCaptureUnavailable) &&
+             conflict.adc_inspected && conflict.gpio_inspected &&
+             operations.empty(),
+         "one GPIO resource collision rejects the whole combined audit");
+  expect(!controller.readyForStart(combined, 2U) &&
+             statistics.snapshot().gpio_raw_capture.resource_conflicts == 1U,
+         "runtime preflight projects a typed GPIO resource conflict once");
+
+  acquisition::Controller missing{statistics, packet_pipeline};
+  const acquisition::Audit absent = missing.inspect(combined, 3U);
+  expect(absent.has(acquisition::Conflict::kAdcComponentsMissing) &&
+             absent.has(acquisition::Conflict::kGpioComponentsMissing) &&
+             !absent.ready(),
+         "combined preflight fails closed when either engine is absent");
+}
+
 void testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs() {
   FakeCdcStream stream{};
   stream.max_read_size = 128U;
@@ -1318,6 +1421,7 @@ int main() {
   testSyntheticDataCountersReachStatus();
   testStartupSchedulingJitterFitsPacketPool();
   testStopDrainGatesNextStartAndPreventsStaleRunData();
+  testAcquisitionControllerAuditsBothPhysicalEnginesAtomically();
   testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs();
   testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState();
   testGpioClockRoundTripPreservesIdleAcquisitionState();

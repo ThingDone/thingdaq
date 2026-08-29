@@ -192,13 +192,17 @@ class PortableSourceBoundaryTests(unittest.TestCase):
         self.assertLess(wait, facade)
         self.assertIn("kStopBoundaryTimeoutCycles", adapter[boundary:facade])
 
-        runtime = _source(FIRMWARE_SOURCE / "firmware_runtime.cpp")
-        stop = runtime.index("bool FirmwareRuntime::stopAdcPhysicalPath")
-        boundary_request = runtime.index(
+        controller = _source(FIRMWARE_SOURCE / "acquisition_controller.cpp")
+        stop = controller.index("bool Controller::stopAdcPath")
+        boundary_request = controller.index(
             "adc_capture_->stopAtBoundaryBeforeTriggers()", stop
         )
-        trigger_stop = runtime.index("adc_trigger_scheduler_->stop()", boundary_request)
-        dma_teardown = runtime.index("adc_capture_->stopAfterTriggers()", trigger_stop)
+        trigger_stop = controller.index(
+            "adc_trigger_scheduler_->stop()", boundary_request
+        )
+        dma_teardown = controller.index(
+            "adc_capture_->stopAfterTriggers()", trigger_stop
+        )
         self.assertLess(boundary_request, trigger_stop)
         self.assertLess(trigger_stop, dma_teardown)
 

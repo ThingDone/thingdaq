@@ -59,6 +59,13 @@ enum class MemoryUse : std::uint8_t {
   kChecksumBenchmarkOcramBuffer,
 };
 
+enum class InterruptUse : std::uint8_t {
+  kAdc0DmaCompletion,
+  kAdc1DmaCompletion,
+  kAdcEtcError,
+  kGpioDmaCompletion,
+};
+
 struct PinAllocation {
   std::uint8_t pin;
   ResourceOwner owner;
@@ -120,6 +127,12 @@ struct MemoryAllocation {
   MemoryRegion region;
   std::size_t bytes;
   std::size_t alignment;
+  ResourceOwner owner;
+};
+
+struct InterruptAllocation {
+  InterruptUse use;
+  std::uint8_t priority;
   ResourceOwner owner;
 };
 
@@ -206,6 +219,20 @@ inline constexpr std::uint8_t kGpioEdmaIrqPriority = 64U;
 // alias that could conflict with another (even disabled) eDMA channel.
 inline constexpr std::uint8_t kAdcEdmaPriorities[] = {0U, 1U};
 inline constexpr std::uint8_t kAdcEdmaIrqPriority = 48U;
+
+// ADC completion and ADC_ETC error handlers share one priority because they
+// mutate the same paired-generation state. GPIO packing can tolerate the ADC
+// handlers preempting its lower-priority major-loop completion interrupt.
+inline constexpr InterruptAllocation kInterruptAllocations[] = {
+    {InterruptUse::kAdc0DmaCompletion, kAdcEdmaIrqPriority,
+     ResourceOwner::kAdc0Capture},
+    {InterruptUse::kAdc1DmaCompletion, kAdcEdmaIrqPriority,
+     ResourceOwner::kAdc1Capture},
+    {InterruptUse::kAdcEtcError, kAdcEdmaIrqPriority,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kGpioDmaCompletion, kGpioEdmaIrqPriority,
+     ResourceOwner::kGpioCapture},
+};
 
 inline constexpr PinAllocation kPinAllocations[] = {
     {kAdc0Pin, ResourceOwner::kAdc0Capture},
@@ -586,6 +613,26 @@ constexpr bool validEdmaAllocations(const EdmaAllocation (&allocations)[N]) {
   return true;
 }
 
+template <std::size_t N>
+constexpr bool validEdmaPriorities(
+    const std::uint8_t (&adc_priorities)[N],
+    std::uint8_t gpio_priority) {
+  if (N != kLogicalAdcCount) {
+    return false;
+  }
+  for (std::size_t left = 0U; left < N; ++left) {
+    if (adc_priorities[left] == gpio_priority) {
+      return false;
+    }
+    for (std::size_t right = left + 1U; right < N; ++right) {
+      if (adc_priorities[left] == adc_priorities[right]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 constexpr bool isPowerOfTwo(std::size_t value) {
   return value != 0U && (value & (value - 1U)) == 0U;
 }
@@ -603,6 +650,95 @@ constexpr bool validMemoryAllocations(
       if (allocation.use == allocations[later].use) {
         return false;
       }
+    }
+  }
+  return true;
+}
+
+template <std::size_t N>
+constexpr bool validInterruptAllocations(
+    const InterruptAllocation (&allocations)[N]) {
+  if (N != 4U) {
+    return false;
+  }
+  bool adc0_seen = false;
+  bool adc1_seen = false;
+  bool adc_etc_seen = false;
+  bool gpio_seen = false;
+  std::uint8_t adc0_priority = 0U;
+  std::uint8_t adc1_priority = 0U;
+  std::uint8_t adc_etc_priority = 0U;
+  std::uint8_t gpio_priority = 0U;
+  for (const InterruptAllocation &allocation : allocations) {
+    switch (allocation.use) {
+      case InterruptUse::kAdc0DmaCompletion:
+        if (adc0_seen || allocation.owner != ResourceOwner::kAdc0Capture) {
+          return false;
+        }
+        adc0_seen = true;
+        adc0_priority = allocation.priority;
+        break;
+      case InterruptUse::kAdc1DmaCompletion:
+        if (adc1_seen || allocation.owner != ResourceOwner::kAdc1Capture) {
+          return false;
+        }
+        adc1_seen = true;
+        adc1_priority = allocation.priority;
+        break;
+      case InterruptUse::kAdcEtcError:
+        if (adc_etc_seen || allocation.owner != ResourceOwner::kAdcCapture) {
+          return false;
+        }
+        adc_etc_seen = true;
+        adc_etc_priority = allocation.priority;
+        break;
+      case InterruptUse::kGpioDmaCompletion:
+        if (gpio_seen || allocation.owner != ResourceOwner::kGpioCapture) {
+          return false;
+        }
+        gpio_seen = true;
+        gpio_priority = allocation.priority;
+        break;
+      default:
+        return false;
+    }
+  }
+  return adc0_seen && adc1_seen && adc_etc_seen && gpio_seen &&
+         adc0_priority == adc1_priority &&
+         adc0_priority == adc_etc_priority &&
+         adc0_priority < gpio_priority;
+}
+
+constexpr bool dmaWritesMemory(MemoryUse use) {
+  return use == MemoryUse::kAdcDmaRing ||
+         use == MemoryUse::kAdcDmaOverflowSink ||
+         use == MemoryUse::kAdcDmaDescriptors ||
+         use == MemoryUse::kGpioRawDmaRing ||
+         use == MemoryUse::kGpioRawDmaOverflowSink ||
+         use == MemoryUse::kGpioRawDmaDescriptors;
+}
+
+constexpr bool cacheSensitiveMemory(MemoryUse use) {
+  return dmaWritesMemory(use) || use == MemoryUse::kPacketBufferStorage ||
+         use == MemoryUse::kPacketBufferReserveStorage ||
+         use == MemoryUse::kGpioPackedRing ||
+         use == MemoryUse::kGpioClockDiagnosticSink ||
+         use == MemoryUse::kChecksumBenchmarkDtcmBuffer ||
+         use == MemoryUse::kChecksumBenchmarkOcramBuffer;
+}
+
+template <std::size_t N>
+constexpr bool validAcquisitionMemoryRegions(
+    const MemoryAllocation (&allocations)[N]) {
+  for (const MemoryAllocation &allocation : allocations) {
+    if (dmaWritesMemory(allocation.use) &&
+        allocation.region != MemoryRegion::kOcramRam2Dma) {
+      return false;
+    }
+    if (cacheSensitiveMemory(allocation.use) &&
+        (allocation.alignment != kCacheLineBytes ||
+         allocation.bytes % kCacheLineBytes != 0U)) {
+      return false;
     }
   }
   return true;
@@ -638,6 +774,43 @@ inline constexpr std::size_t kReservedRam1Bytes =
     memoryBytes(kMemoryAllocations, MemoryRegion::kDtcmRam1);
 inline constexpr std::size_t kReservedRam2Bytes =
     memoryBytes(kMemoryAllocations, MemoryRegion::kOcramRam2Dma);
+
+// One aggregate projection is consumed by the acquisition controller at
+// runtime and asserted here at compile time. Keeping the categories separate
+// makes a future route edit fail with a useful resource-class diagnosis.
+struct AcquisitionResourceContract {
+  bool pins = false;
+  bool pit = false;
+  bool xbar = false;
+  bool adc_etc = false;
+  bool edma = false;
+  bool irq_priorities = false;
+  bool dma_memory = false;
+  bool cache_regions = false;
+
+  constexpr bool valid() const {
+    return pins && pit && xbar && adc_etc && edma && irq_priorities &&
+           dma_memory && cache_regions;
+  }
+};
+
+inline constexpr AcquisitionResourceContract kAcquisitionResourceContract{
+    validPins(kPinAllocations) &&
+        validGpioPinMappings(kGpioMappingsByPackedBit) &&
+        gpioPinOrderMatches(kGpioMappingsByPackedBit, kGpioPinsByBit) &&
+        validAdcConverterConfigurations(kAdcConverterConfigurations),
+    validPitAllocations(kPitAllocations),
+    validXbarRoutes(kXbarRoutes),
+    validAdcEtcAllocations(kAdcEtcAllocations),
+    validEdmaAllocations(kEdmaAllocations) &&
+        validEdmaPriorities(kAdcEdmaPriorities, kGpioEdmaPriority),
+    validInterruptAllocations(kInterruptAllocations) &&
+        protocol_v1::kAdcTriggerIrqPriority < kAdcEdmaIrqPriority,
+    validMemoryAllocations(kMemoryAllocations) &&
+        kReservedRam1Bytes <= kRam1BudgetBytes &&
+        kReservedRam2Bytes <= kRam2BudgetBytes,
+    validAcquisitionMemoryRegions(kMemoryAllocations),
+};
 
 static_assert(validPins(kPinAllocations),
               "pin allocation is unsupported or conflicts");
@@ -692,8 +865,16 @@ static_assert(validAdcEtcAllocations(kAdcEtcAllocations),
               "ADC_ETC allocation is unsupported or conflicts");
 static_assert(validEdmaAllocations(kEdmaAllocations),
               "eDMA allocation is unsupported or conflicts");
+static_assert(validEdmaPriorities(kAdcEdmaPriorities, kGpioEdmaPriority),
+              "eDMA arbitration priorities must be unique");
+static_assert(validInterruptAllocations(kInterruptAllocations),
+              "acquisition IRQ priorities are incomplete or unsafe");
 static_assert(validMemoryAllocations(kMemoryAllocations),
               "memory allocations must be nonzero and alignment-safe");
+static_assert(validAcquisitionMemoryRegions(kMemoryAllocations),
+              "DMA/cache allocations use an unsafe region or alignment");
+static_assert(kAcquisitionResourceContract.valid(),
+              "combined acquisition resource contract is invalid");
 static_assert(kReservedRam1Bytes <= kRam1BudgetBytes,
               "control queues exceed the RAM1 budget");
 static_assert(kReservedRam2Bytes <= kRam2BudgetBytes,
@@ -719,7 +900,10 @@ static_assert(kAdcDmaRingDepth >= 2U,
 static_assert(kAdcDmaDescriptorBytes % kCacheLineBytes == 0U,
               "ADC DMA descriptors must occupy complete cache lines");
 static_assert(countOf(kAdcEdmaPriorities) == kLogicalAdcCount);
-static_assert(kAdcEdmaPriorities[0] != kAdcEdmaPriorities[1]);
+static_assert(kAdcEdmaIrqPriority < kGpioEdmaIrqPriority,
+              "ADC completion/error IRQs must preempt GPIO completion");
+static_assert(protocol_v1::kAdcTriggerIrqPriority < kAdcEdmaIrqPriority,
+              "BOOT completion diagnostic must retain higher IRQ priority");
 static_assert(kGpioRawDmaBufferBytes % kCacheLineBytes == 0U,
               "each raw GPIO DMA buffer must occupy complete cache lines");
 static_assert(kGpioRawDmaRingDepth >= 2U,

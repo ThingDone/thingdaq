@@ -1,0 +1,207 @@
+---
+type: analysis
+title: Acquisition Pipeline
+created: 2026-08-28
+tags:
+  - teensy-daq
+  - architecture
+  - acquisition
+  - resource-audit
+  - phase-08
+related:
+  - '[[Firmware-Resource-Map]]'
+  - '[[System-Overview]]'
+  - '[[ADR-003-GPIO-Clock-DMA]]'
+  - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[Protocol-V1]]'
+  - '[[Phase-06-GPIO-DMA]]'
+  - '[[Phase-07-Dual-ADC]]'
+---
+
+# Acquisition pipeline
+
+## Status and scope
+
+Phase 08 begins with one portable `acquisition::Controller` around the proven
+Phase 06 GPIO and Phase 07 ADC engines. It is now the only firmware-runtime
+boundary that initializes, preflights, starts, stops, drains, services, and
+publishes telemetry for physical acquisition. `FirmwareRuntime` retains the
+control protocol, synthetic source, common packet pool, and USB scheduler but
+no longer owns per-peripheral lifecycle state or sequencing.
+
+The controller preserves the accepted ADC-only and GPIO-only behavior. Its
+read-only audit already evaluates an ADC-plus-GPIO request as one atomic
+resource plan, but [[Protocol-V1]] still rejects combined physical CONFIGURE
+and the controller fails closed if combined execution reaches `start()`. The
+next Phase 08 task must add one shared hardware arm/stop sequence before that
+capability is enabled. This document therefore records a composition audit and
+controller boundary, not combined-stream hardware acceptance.
+
+## Evidence reinspected
+
+The audit used the checked-in [[Firmware-Resource-Map]], the current target
+adapters, the exact linker-verified Phase 07 image, and the accepted physical
+results in [[Phase-06-GPIO-DMA]] and [[Phase-07-Dual-ADC]]. It also reinspected
+the pinned Teensy core 1.62.0 `IntervalTimer` and `DMAChannel` implementations
+and the bundled `OctoWS2811` XBAR/eDMA setup.
+
+| Evidence | Retained conclusion |
+| --- | --- |
+| [[ADR-003-GPIO-Clock-DMA]] and Phase 06 target results | PIT0 at 24 MHz / 6 produces the verified 4 MHz GPIO master; XBARA1 output 0, DMAMUX 30, and eDMA 2 are the accepted rising-edge path. |
+| [[ADR-004-ADC-Trigger-DMA]] and Phase 07 target results | Chained PIT1 divides the same master by four; ADC_ETC queues 0/4 feed fixed eDMA 0/1 and passed 1 MS/s-per-converter capture. |
+| Pinned `IntervalTimer.cpp` | It dynamically takes an unused PIT channel and cannot enforce this project's PIT0/PIT1 ownership; it remains excluded. |
+| Pinned `DMAChannel.cpp` | Its allocator and priority helpers are dynamic; acquisition continues to bind channels 0, 1, and 2 directly. |
+| Pinned `OctoWS2811_imxrt.cpp` | Its selective GPIO remap/cache/TCD patterns remain useful precedent, but it collides with XBAR DMA outputs 0-2 and sources 30/31/94 and cannot coexist. |
+| Current packet and ownership modules | The existing fixed packet pool, alternating ready-frame promotion, source-specific sequences, DMA rings, cache transitions, and complete-frame USB continuation are reusable without another buffer layer. |
+
+No new timing or electrical claim is inferred from this code refactor. The
+latest target evidence remains the single-source Phase 06/07 campaigns, and
+their unstimulated-input limitations still apply.
+
+## One clock tree, distinct data routes
+
+The apparent PIT0 collision is intentional clock sharing. It must have one
+schedule owner rather than two independently started timer owners:
+
+```text
+24 MHz PERCLK
+    |
+    +-> PIT0, LDVAL=5, 4 MHz master
+         |
+         +-> XBARA1 input 56 -> output 0 -> DMAMUX 30 -> eDMA 2
+         |                                           -> GPIO2_PSR ring
+         |
+         +-> chained PIT1, LDVAL=3, 1 MHz pair event
+              |
+              +-> XBARA1 input 57 -> output 103 -> ADC_ETC 0
+              |                                      -> ADC1 -> eDMA 0
+              |
+              +-> XBARA1 input 57 -> output 107 -> ADC_ETC 4
+                                                     -> ADC2 -> eDMA 1
+```
+
+GPIO and ADC do not compete for XBAR outputs, ADC_ETC queues, DMAMUX sources,
+or eDMA channels. They do share PIT0 configuration and enable state. The ADC
+trigger adapter already configures the complete stopped PIT0/PIT1 schedule and
+reuses `gpio_dma_route_teensy.h` for the 24 MHz root. The GPIO adapter still
+configures/enables PIT0 internally for its accepted standalone mode. Combined
+START must split GPIO DMA preparation from timer enable and let the controller
+enable this one schedule only after both engines are armed.
+
+## Compile-time conflict contract
+
+`board::kAcquisitionResourceContract` is the aggregate compile-time result.
+The controller copies it into every audit, while `static_assert` prevents an
+invalid production contract from compiling.
+
+| Resource class | Compile-time checks | Accepted allocation |
+| --- | --- | --- |
+| Pins | Board range, duplicate pin/pad/port-bit rejection, exact protocol order, fixed converter tuples | A0/D14, A1/D15, and D6-D13 are disjoint |
+| PIT | Range and duplicate channel rejection | PIT0 master and chained PIT1 |
+| XBAR | Input/output range and unique output rejection; repeated input fan-out allowed | GPIO output 0; ADC outputs 103/107 |
+| ADC_ETC | Queue/peripheral range and uniqueness | Queue 0/ADC1 and queue 4/ADC2 |
+| eDMA/DMAMUX | Range plus unique channel/source rejection | ADC 0/24, ADC 1/88, GPIO 2/30 |
+| DMA arbitration | Distinct fixed channel priorities | ADC 0/1, GPIO 2 |
+| NVIC priorities | Complete logical allocation, equal ADC generation/error priority, ADC before GPIO | production ADC 48; GPIO 64 |
+| BOOT diagnostic IRQ | Kept separate from production allocation and required to be higher urgency | ADC completion diagnostic 32; disabled before production ownership |
+| DMA memory | Nonzero power-of-two alignment, unique use, RAM1/RAM2 budgets, DMA destinations in OCRAM | ADC/raw-GPIO rings, sinks, and TCD banks in RAM2 |
+| Cache regions | Every DMA/cache-sensitive allocation occupies complete 32-byte lines | DMA rings/sinks/TCDs, packet banks, packed GPIO, diagnostic and checksum buffers |
+
+Host compile tests include negative contracts for duplicate interrupt users,
+unsafe IRQ ordering, a reused eDMA arbitration priority, a DMA ring placed in
+DTCM, and an under-aligned cached ring. Existing negative tests continue to
+cover every pin, PIT, XBAR, ADC_ETC, eDMA, DMAMUX, size, and alignment
+collision.
+
+## Runtime atomic preflight
+
+`Controller::inspect(configuration, next_run_id)` performs no arm, route,
+cache, DMA, or timer write. For every requested physical source it checks:
+
+1. the complete static contract above;
+2. controller active/draining state;
+3. presence of the capture, packer, and trigger components;
+4. stopped/ready ADC trigger evidence;
+5. packer quiescence;
+6. each target facade's read-only `inspectStart()` result.
+
+The target facade checks cover live PIT/ADC_ETC activity and ADC conversion
+state, eDMA request bits, ADC DMA enables, DMAMUX enables, the GPIO XBAR request
+state, raw-ring quiescence, and nonzero ADC epoch. A resource-busy result is
+projected into the existing per-source conflict counter. For a combined plan,
+both engine inspections always run and either failure rejects the whole audit;
+there is no first-source reservation or partial hardware mutation to roll back.
+
+## Controller ownership
+
+The controller composes storage-owning modules rather than replacing them:
+
+```text
+ControlState START event
+    -> common PacketBufferPipeline epoch
+    -> acquisition::Controller
+         -> ADC packer -> paired ADC DMA ring -> ADC trigger scheduler
+         -> GPIO packer -> raw GPIO DMA ring
+    -> fair ready-frame promotion
+    -> response-first CDC transport
+```
+
+For currently supported single-source runs, the controller preserves these
+invariants:
+
+- one nonzero run ID is the DMA ownership epoch and packet run identity;
+- packer and DMA storage are armed before a source trigger is enabled;
+- ADC STOP requests a paired DMA boundary, disables the trigger schedule, then
+  tears down DMA;
+- GPIO STOP retains its accepted complete-boundary behavior and restores input
+  safety;
+- complete old-run work drains before packet production stops;
+- CONFIGURE/START remain busy until raw, packed, packet, and USB ownership are
+  quiescent;
+- raw and packer telemetry is published only when its run ID matches the
+  current statistics generation.
+
+The physical report is now a base of the cooperative runtime report, so all
+existing status flags and lifecycle tests remain source compatible while the
+sequencing implementation has one owner.
+
+## Timing model retained for combined work
+
+All time derives from the START snapshot in the advertised 8 MHz domain; no
+DMA or interrupt timestamp defines sample time.
+
+| Item | Nominal time |
+| --- | --- |
+| GPIO byte `m` | `epoch + 2m` ticks |
+| ADC pair `n` / ADC0 | `epoch + 8n` ticks |
+| ADC1 in pair `n` | `epoch + 8n + 4` ticks |
+
+Thus four GPIO samples cover one ADC pair period, and ADC1 retains its nominal
+four-tick phase. These are hardware-schedule relationships from
+[[ADR-004-ADC-Trigger-DMA]], not measurements of external pad propagation or
+analog aperture.
+
+## Buffer and cache composition
+
+The controller adds no payload storage. It reuses the four-buffer ADC pair
+ring, four-buffer raw GPIO ring, four-buffer packed GPIO ring, isolated sinks,
+and the common 200-frame packet pool documented in [[Firmware-Resource-Map]].
+The compile-time budget remains 449,440 bytes of RAM1 and 491,072 bytes of RAM2;
+the accepted Phase 07 linker result left 36,608 bytes for RAM1 locals/stack and
+20,800 bytes of RAM2 heap headroom.
+
+DMA and CPU ownership remain local to the existing ring state machines. The
+controller never receives a mutable DMA pointer and never performs cache
+maintenance itself. This preserves the rule that cache deletion/invalidation
+occurs only at explicit DMA/CPU ownership transitions and never inside the
+cooperative packet or USB layers.
+
+## Remaining combined-enablement work
+
+Before combined hardware CONFIGURE can be advertised, the controller must gain
+one prepare/arm transaction that reserves all components, primes both packers
+and all three DMA channels, configures GPIO routing without starting PIT0, and
+then enables the common PIT0/PIT1 schedule once. STOP/fault handling must
+disable source triggers first and drain/discard only complete work according to
+policy. That work belongs to the next Phase 08 task and must retain the atomic
+audit described here.

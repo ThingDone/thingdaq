@@ -13,6 +13,8 @@ FIRMWARE_DIRECTORY = REPOSITORY_ROOT / "firmware"
 FIRMWARE_SOURCE = FIRMWARE_DIRECTORY / "src"
 CPP_TEST = FIRMWARE_DIRECTORY / "tests/firmware_runtime_test.cpp"
 PORTABLE_SOURCES = (
+    FIRMWARE_SOURCE / "acquisition_controller.h",
+    FIRMWARE_SOURCE / "acquisition_controller.cpp",
     FIRMWARE_SOURCE / "firmware_runtime.h",
     FIRMWARE_SOURCE / "firmware_runtime.cpp",
     FIRMWARE_SOURCE / "adc_initializer.h",
@@ -55,6 +57,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     "-fno-rtti",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
+                    str(FIRMWARE_SOURCE / "acquisition_controller.cpp"),
                     str(FIRMWARE_SOURCE / "firmware_runtime.cpp"),
                     str(FIRMWARE_SOURCE / "adc_initializer.cpp"),
                     str(FIRMWARE_SOURCE / "adc_trigger.cpp"),
