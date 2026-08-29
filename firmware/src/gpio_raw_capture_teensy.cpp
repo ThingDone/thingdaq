@@ -541,7 +541,7 @@ static_assert(protocol_v1::kGpioSamplesPerFrame <=
 static_assert(kProductionPitLoad == 5U);
 static_assert(kStopBoundaryTimeoutCycles == 6000000U);
 static_assert(board::kGpioEdmaChannel == 2U);
-static_assert(board::kGpioEdmaPriority == 2U);
+static_assert(board::kGpioEdmaPriority == 0U);
 
 }  // namespace teensy_daq::gpio_capture
 
