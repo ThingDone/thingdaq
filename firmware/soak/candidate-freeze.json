@@ -292,9 +292,9 @@
     "sha256": "32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656",
     "source_id": "a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba"
   },
-  "created_utc": "2026-08-29T21:57:02+00:00",
+  "created_utc": "2026-08-29T22:08:51+00:00",
   "protected": {
-    "base_git_commit": "26d1035c6723fae5872f9207121e4d5eed99d20f",
+    "base_git_commit": "443eb0c556d8be42818760f87dd7f7d31d58193d",
     "file_count": 240,
     "files": [
       {
@@ -669,8 +669,8 @@
       },
       {
         "path": "firmware/soak/validator.py",
-        "sha256": "f0bea9f75a312b0ecdf5efb000de5fb84225335dc73225af021a25b975c65237",
-        "size_bytes": 157065
+        "sha256": "c75ecab3a6a25b0d06bfeb453423bed45242c08b1e0608fc5f280e3d59de66f2",
+        "size_bytes": 159602
       },
       {
         "path": "firmware/src/acquisition_controller.cpp",
@@ -1059,18 +1059,18 @@
       },
       {
         "path": "firmware/tests/generated/rig_soak_control_stress.py",
-        "sha256": "cd275361a8bc022c14ca2e2b7482c0f8037e522954b40d40e4077b0bbfeefe50",
-        "size_bytes": 156984
+        "sha256": "3f273ce43446fe2ba7b3281d6dfaeb6f1de8180d75a0abf67cc89c590f3623cf",
+        "size_bytes": 159521
       },
       {
         "path": "firmware/tests/generated/rig_soak_physical_combined.py",
-        "sha256": "e71c185cd64a2c823e3527d3aef47589ffae4757470c5a990b1505259adf2b03",
-        "size_bytes": 156987
+        "sha256": "1127b86e1edec109f67616f680cfdd7221e998159b80f44fda6d9843857490ca",
+        "size_bytes": 159524
       },
       {
         "path": "firmware/tests/generated/rig_soak_synthetic.py",
-        "sha256": "597434d328cdcc7e5bed2a5f561d4e122a4420e0e9e9cfcfc740eb8451b72054",
-        "size_bytes": 156979
+        "sha256": "7225a62cf9e8f4d79fa89a0afab93bcb70b4e07ce61fe8008b5a2b6828b1ada7",
+        "size_bytes": 159516
       },
       {
         "path": "firmware/tests/gpio_batch_packer_benchmark.cpp",
@@ -1324,8 +1324,8 @@
       },
       {
         "path": "firmware/tests/test_soak_endurance_tools.py",
-        "sha256": "01b354ece1f76d9764ccb35cc75ca06cc32045f6d93282a593c00091e6802037",
-        "size_bytes": 54879
+        "sha256": "4e573d254909cb738256fe347db298e447bc21aa65656bfd13827b4bef594118",
+        "size_bytes": 59322
       },
       {
         "path": "firmware/tests/test_synthetic_pipeline.py",
@@ -1498,7 +1498,7 @@
         "size_bytes": 87698
       }
     ],
-    "tree_sha256": "ce98cd3a9978dd658fa48c8db8125eee936bcdf925ceda7475a7bbecdade7c77"
+    "tree_sha256": "6dafad486c7eb4b0f3a2d01a4c131bd35d2fe2838b289b4522035a94b626dfc4"
   },
   "reproducibility": {
     "artifacts": [
@@ -1532,30 +1532,30 @@
   },
   "schema_version": 1,
   "staged": {
-    "directory": ".maestro/playbooks/Working/phase-11-soak-candidate-00015/frozen",
+    "directory": ".maestro/playbooks/Working/phase-11-soak-candidate-00016/frozen",
     "files": [
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00015/frozen/build-manifest.json",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00016/frozen/build-manifest.json",
         "sha256": "6741c3fe10c44b8d7ff5666ddfd9a6eba2147c584e687e34794a1165e9af384b",
         "size_bytes": 12788
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00015/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00016/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00015/frozen/firmware.ino.elf",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00016/frozen/firmware.ino.elf",
         "sha256": "d656c0f93212d2f2c33bf8391c59fbf1843a567b94d55d2601cab2d4bcd0eb89",
         "size_bytes": 1808808
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00015/frozen/firmware.ino.hex",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00016/frozen/firmware.ino.hex",
         "sha256": "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
         "size_bytes": 357214
       },
       {
-        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00015/frozen/firmware.ino.map",
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00016/frozen/firmware.ino.map",
         "sha256": "b023e30fe587ca7855e632487f859fa441f3b60c8c831a0ad7d5b624909530c7",
         "size_bytes": 830863
       }
