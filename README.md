@@ -402,6 +402,14 @@ full, partial, zero, and recovered fake-CDC writes while incrementally received
 PING commands arrive behind active data frames; every resulting frame checksum,
 timestamp, sequence, formula, and ownership-stage counter is reconciled.
 
+The combined-acquisition host executable drives the real portable ADC and GPIO
+DMA rings, both packers, the fair packet pipeline, and USB transport together.
+It covers adversarial completion order, source and packed-ring pressure,
+independent sequence wrap, partial USB stalls with concurrent commands, exact
+counter reconciliation, and stale lease/interrupt rejection across run
+boundaries. Its companion pinned linker/map fixture proves the simultaneous
+packet, ADC, GPIO, and USB storage layout is in-bounds and non-overlapping.
+
 After installing the development environment above, run the focused gate from
 the repository root:
 

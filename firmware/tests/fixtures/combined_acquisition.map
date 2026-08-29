@@ -1,0 +1,31 @@
+# Deterministic excerpt from the pinned Teensy 4.0 O2STD link.  The test keeps
+# the size summary, linker memory regions, relevant output sections, and
+# demangled `nm --print-size` records together as one combined-budget input.
+Memory Usage on Teensy 4.0:
+  FLASH: code:86620, data:23496, headers:8664   free for files:1912836
+   RAM1: variables:455488, code:32616, padding:152   free for local variables:36032
+   RAM2: variables:503488  free for malloc/new:20800
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+ITCM             0x00000000         0x00080000         xr
+DTCM             0x20000000         0x00080000         rw
+RAM              0x20200000         0x00080000         rw
+FLASH            0x60000000         0x001f0000         xr
+
+Linker output sections
+.bss            0x20001ac0    0x6d880
+.bss.dma        0x20200000    0x7aec0
+
+Demangled nm --print-size records
+20002ac0 00069000 b (anonymous namespace)::packet_storage_primary
+20200000 0005f000 b (anonymous namespace)::packet_storage_reserve
+2025f000 00000140 B teensy_daq::adc_capture::g_adc_dma_descriptors
+2025f140 00000020 B teensy_daq::adc_capture::g_adc_dma_overflow_sink
+2025f160 00003f80 B teensy_daq::adc_capture::g_adc_dma_buffers
+202640e0 00003f80 B teensy_daq::gpio_packer::g_gpio_packed_buffers
+20268080 000000a0 B teensy_daq::gpio_capture::g_gpio_raw_dma_descriptors
+20268120 00000020 B teensy_daq::gpio_capture::g_gpio_raw_dma_overflow_sink
+20268140 0000fd00 B teensy_daq::gpio_capture::g_gpio_raw_dma_buffers
+20278ec0 00002000 b txbuffer

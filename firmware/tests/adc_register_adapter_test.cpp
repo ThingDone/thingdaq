@@ -19,6 +19,7 @@ namespace {
 
 namespace adc = teensy_daq::adc;
 namespace board = teensy_daq::board;
+namespace gpio_route = teensy_daq::gpio_dma_route;
 namespace trigger = teensy_daq::adc_trigger;
 namespace v1 = teensy_daq::protocol_v1;
 
@@ -51,6 +52,17 @@ void resetFakeRegisters() {
   fake_imxrt::adc1 = {};
   fake_imxrt::adc2 = {};
   fake_imxrt::adc_etc = {};
+  fake_imxrt::dma_erq = 0U;
+  fake_imxrt::dma_cerq = 0U;
+  fake_imxrt::dma_cerr = 0U;
+  fake_imxrt::dma_ceei = 0U;
+  fake_imxrt::dma_cint = 0U;
+  fake_imxrt::dma_cdne = 0U;
+  fake_imxrt::dma_serq = 0U;
+  for (std::size_t channel = 0U; channel < 32U; ++channel) {
+    fake_imxrt::dmamux_chcfg[channel] = 0U;
+    fake_imxrt::dma_dchpri[channel] = 0U;
+  }
   fake_imxrt::adc_etc.CTRL.reset(ADC_ETC_CTRL_SOFTRST |
                                  ADC_ETC_CTRL_TSC_BYPASS);
   for (IMXRT_PIT_CHANNEL_t &pit : fake_imxrt::pit_channels) {
@@ -338,6 +350,95 @@ void testCompletionDiagnosticLatchesOneInterruptPerConverter() {
   expect(platform.stop(), "latched completion diagnostic stops cleanly");
 }
 
+std::uint8_t selectedXbarInput(std::uint8_t output) {
+  const std::uint16_t selected = fake_imxrt::xbara1_sel[output / 2U];
+  return static_cast<std::uint8_t>(
+      (output & 1U) == 0U ? selected & 0x00FFU
+                          : (selected >> 8U) & 0x00FFU);
+}
+
+void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
+  resetFakeRegisters();
+  trigger::TeensyPlatform platform{};
+  expect(platform.configureStopped().error_flags == 0U,
+         "combined register fixture configures the ADC schedule stopped");
+
+  gpio_route::configureXbarRequest();
+  gpio_route::clearEdmaChannelState();
+  gpio_route::configureEdmaPriority();
+  gpio_route::enableEdmaRequest();
+  expect(platform.armFromStopped(true),
+         "combined register fixture arms the one common schedule");
+
+  const std::uint32_t trigger_enable_mask =
+      (std::uint32_t{1U} << v1::kAdcTriggerQueues[0]) |
+      (std::uint32_t{1U} << v1::kAdcTriggerQueues[1]);
+  expect(board::countOf(board::kPinAllocations) == 10U &&
+             board::countOf(board::kPitAllocations) == 2U &&
+             board::countOf(board::kXbarRoutes) == 3U &&
+             board::countOf(board::kAdcEtcAllocations) == 2U &&
+             board::countOf(board::kEdmaAllocations) == 3U &&
+             board::countOf(board::kInterruptAllocations) == 4U &&
+             board::kAcquisitionResourceContract.valid(),
+         "the target registry allocates the complete combined resource set");
+  expect(selectedXbarInput(board::kGpioXbarOutput) ==
+                 board::kGpioXbarInput &&
+             selectedXbarInput(v1::kAdcTriggerXbarOutputs[0]) ==
+                 v1::kAdcTriggerXbarInputs[0] &&
+             selectedXbarInput(v1::kAdcTriggerXbarOutputs[1]) ==
+                 v1::kAdcTriggerXbarInputs[1] &&
+             fake_imxrt::dmamux_chcfg[board::kGpioEdmaChannel] ==
+                 gpio_route::kDmamuxConfiguration &&
+             gpio_route::edmaPriority() == board::kGpioEdmaPriority,
+         "GPIO XBAR/eDMA channel 2 coexists with both ADC_ETC XBAR routes");
+  expect(fake_imxrt::pit_channels[v1::kAdcTriggerGpioMasterPitChannel]
+                     .LDVAL == v1::kAdcTriggerGpioMasterPitLoad &&
+             fake_imxrt::pit_channels[v1::kAdcTriggerGpioMasterPitChannel]
+                     .TCTRL == PIT_TCTRL_TEN &&
+             fake_imxrt::pit_channels[v1::kAdcTriggerPairPitChannel]
+                     .LDVAL == v1::kAdcTriggerPairPitLoad &&
+             fake_imxrt::pit_channels[v1::kAdcTriggerPairPitChannel]
+                     .TCTRL == (PIT_TCTRL_CHN | PIT_TCTRL_TEN) &&
+             (static_cast<std::uint32_t>(ADC_ETC_CTRL) &
+              trigger_enable_mask) == trigger_enable_mask &&
+             v1::kAdcTriggerGpioMasterRateHz /
+                     v1::kAdcTriggerPairRateHz ==
+                 4U &&
+             v1::kGpioSamplesPerFrame * v1::kGpioSamplePeriodTicks ==
+                 v1::kAdcPairsPerFrame * v1::kAdcPairPeriodTicks,
+         "PIT0 produces four GPIO events per ADC pair with equal frame coverage");
+  expect(fake_imxrt::interrupt_priorities[IRQ_ADC_ETC0] ==
+                 v1::kAdcTriggerIrqPriority &&
+             fake_imxrt::interrupt_priorities[IRQ_ADC_ETC1] ==
+                 v1::kAdcTriggerIrqPriority &&
+             fake_imxrt::interrupt_priorities[IRQ_ADC_ETC_ERR] ==
+                 v1::kAdcTriggerIrqPriority &&
+             board::kAdcEdmaPriorities[0] == 0U &&
+             board::kAdcEdmaPriorities[1] == 1U &&
+             board::kGpioEdmaPriority == 2U &&
+             v1::kAdcTriggerIrqPriority <
+                 board::kAdcEdmaIrqPriority &&
+             board::kAdcEdmaIrqPriority < board::kGpioEdmaIrqPriority,
+         "BOOT trigger diagnostics, production ADC state writers, and GPIO completion use strict IRQ tiers without sharing DMA priorities");
+
+  expect(platform.stop(),
+         "combined stop first disables PIT0/PIT1 and ADC_ETC");
+  expect(gpio_route::edmaRequestBusy() &&
+             gpio_route::selectedOutputBusy(),
+         "common-source stop leaves GPIO DMA ownership intact until its explicit teardown");
+  gpio_route::disableEdmaRequest();
+  gpio_route::disableXbarRequest();
+  expect(!gpio_route::edmaRequestBusy() &&
+             !gpio_route::selectedOutputBusy() &&
+             fake_imxrt::pit_channels[v1::kAdcTriggerGpioMasterPitChannel]
+                     .TCTRL == 0U &&
+             fake_imxrt::pit_channels[v1::kAdcTriggerPairPitChannel]
+                     .TCTRL == PIT_TCTRL_CHN &&
+             (static_cast<std::uint32_t>(ADC_ETC_CTRL) &
+              trigger_enable_mask) == 0U,
+         "GPIO request teardown follows the stopped common source and leaves every trigger disabled");
+}
+
 }  // namespace
 
 int main() {
@@ -345,6 +446,7 @@ int main() {
   testExactStoppedTriggerScheduleAndResourceIsolation();
   testDeterministicArmStopOrderAndOwnedConflict();
   testCompletionDiagnosticLatchesOneInterruptPerConverter();
+  testCombinedRegisterResourcesCoexistWithPriorityIsolation();
   if (failures != 0) {
     std::cerr << failures << " ADC register-adapter assertion(s) failed\n";
     return 1;
