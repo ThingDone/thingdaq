@@ -42,7 +42,26 @@ the actual artifact bytes and update the candidate before generating:
   --update-candidate
 ```
 
-The command refuses a manifest/artifact digest mismatch. It emits these
+The candidate-update command refuses a manifest/artifact digest mismatch.
+
+After two clean builds reproduce every manifest-declared artifact, freeze the
+second build into the campaign's dedicated working directory:
+
+```bash
+.venv/bin/python firmware/tools/freeze_soak_candidate.py --create \
+  --first-build-directory .maestro/playbooks/Working/phase-11-soak-candidate-00001/first-build
+.venv/bin/python firmware/tools/freeze_soak_candidate.py --check
+```
+
+`firmware/soak/candidate-freeze.json` records both manifest hashes, every
+exported artifact hash, the inspected memory/resource sections, and a
+path-aware hash of all package, protocol, firmware, harness, generated, test,
+and example inputs. The accepted artifacts live under the ignored staged path
+recorded by that file. Every service submission must use that staged HEX and
+run `--check` immediately before preflight. The check fails closed on a
+changed, added, or removed protected file, candidate-identity drift, or staged
+artifact drift; any intentional edit therefore requires a new two-build freeze
+and restarts the consecutive-pass series. The soak generator emits these
 deterministic, executable programs under `firmware/tests/generated/`:
 
 | Mode | Generated program | Measured contract |
