@@ -9,6 +9,10 @@ tags:
   - package
   - local-development
 related:
+  - '[[Quickstart]]'
+  - '[[Python-API]]'
+  - '[[API-Reference]]'
+  - '[[Hardware-Safety]]'
   - '[[System-Overview]]'
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
@@ -23,6 +27,9 @@ This directory contains the private, local-development Python distribution for
 the Teensy DAQ host API. The single authoritative installable distribution name
 is `[project].name` in `pyproject.toml`, while the stable import package is
 `teensy_daq`.
+
+Start with [[Quickstart]], read [[Hardware-Safety]] before connecting signals,
+and use [[API-Reference]] for the stable public surface.
 
 The base installation includes PySerial for the bounded hardware transport.
 NumPy remains optional, and test, lint, type-check, and package-build tools are
@@ -46,8 +53,9 @@ explicit optional extra, and build/test/lint/type tools are development-only.
 
 The package is fully typed and ships `py.typed`. Wheel contents are limited to
 the runtime Python modules, the generated protocol constants, that marker, and
-standard distribution metadata. The source distribution adds only the package
-README, build metadata, and source-manifest policy. Tests, captures, firmware
+standard distribution metadata. The source distribution additionally carries
+the package README, build metadata, source-manifest policy, and small runnable
+Python examples. Tests, captures, firmware
 builds, credentials, local calibration records, the canonical protocol JSON,
 the generator, and golden fixtures are deliberately excluded. The latter three
 are repository validation inputs, not runtime inputs: installed code uses the
@@ -90,7 +98,13 @@ from teensy_daq import ADCBlock, HostQueueLoss, StreamAnomaly, StreamGap, Teensy
 
 with TeensyDAQ.simulated(read_chunk_size=47) as daq:
     info = daq.info()
-    applied = daq.configure(adc=True, gpio=True)
+    applied = daq.configure(
+        adc=True,
+        gpio=True,
+        adc_pair_rate_hz=1_000_000,
+        gpio_sample_rate_hz=4_000_000,
+        adc_resolution_bits=12,
+    )
     run_id = daq.start()
 
     for item in daq.blocks(4):  # four data blocks, plus any gap events
@@ -116,6 +130,32 @@ Raw frames, parsers, the background reader, and byte transports remain
 available for protocol tooling under the explicitly expert-only
 `teensy_daq.low_level` namespace; existing root imports remain stable for
 compatibility.
+
+CONFIGURE is capability-driven. The facade rejects unsupported stream, source,
+checksum, exact source/stream profile, fixed-rate, and resolution requirements
+before writing CONFIGURE. Rate/resolution keywords are INFO preconditions and
+do not alter the fixed eight-byte protocol body. The successful device echo
+must equal the request, and START must repeat that same applied configuration.
+CLI human/JSON output reports the echoed body plus active fixed ADC/GPIO rate
+and resolution metadata.
+
+## Runnable workflows
+
+The nine scripts in `examples/` cover discovery/serial selection, raw ADC
+channels, explicit interleaving, optional calibration, packed/selected GPIO,
+combined timestamp alignment, live STATUS/loss handling, standalone simulator
+use, and explicit clean shutdown. Every script's no-argument path uses the
+simulator. Physical access is opt-in via `--real`; calibration additionally
+requires an explicit user-owned path:
+
+```bash
+python examples/raw_adc_channels.py
+python examples/combined_alignment.py
+python examples/status_and_loss.py
+python examples/raw_adc_channels.py --real --hardware-serial 20512460
+```
+
+The complete roster and physical prerequisites are in [[Quickstart]].
 
 `DeviceInfo`, `DeviceCapabilities`, `AdcCalibrationMetadata`,
 `AdcTriggerMetadata`, `AdcAcquisitionStatus`, `AdcBlockMetadata`,

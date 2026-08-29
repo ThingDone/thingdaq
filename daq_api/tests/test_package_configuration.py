@@ -114,6 +114,7 @@ class PackageConfigurationTests(unittest.TestCase):
 
         self.assertIn("recursive-include src/teensy_daq *.py", manifest)
         self.assertIn("include src/teensy_daq/py.typed", manifest)
+        self.assertIn("recursive-include examples *.py", manifest)
         for excluded in (
             "prune tests",
             "prune captures",

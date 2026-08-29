@@ -8,6 +8,8 @@ tags:
   - adc
   - python
 related:
+  - '[[Quickstart]]'
+  - '[[API-Reference]]'
   - '[[Python-API]]'
   - '[[Hardware-Safety]]'
   - '[[Phase-07-Dual-ADC]]'

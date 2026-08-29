@@ -9,6 +9,8 @@ tags:
   - adc
   - gpio
 related:
+  - '[[Quickstart]]'
+  - '[[API-Reference]]'
   - '[[Python-API]]'
   - '[[Calibration]]'
   - '[[Acquisition-Pipeline]]'

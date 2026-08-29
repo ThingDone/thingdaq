@@ -2,10 +2,15 @@
 type: reference
 title: Teensy DAQ Documentation Index
 created: 2026-08-27
+updated: 2026-08-29
 tags:
   - teensy-daq
   - documentation
 related:
+  - '[[Quickstart]]'
+  - '[[Python-API]]'
+  - '[[API-Reference]]'
+  - '[[Hardware-Safety]]'
   - '[[System-Overview]]'
   - '[[Firmware-Resource-Map]]'
   - '[[Acquisition-Pipeline]]'
@@ -37,24 +42,28 @@ related:
 
 Every Markdown artifact below `doc/` begins with YAML front matter containing
 `type`, `title`, `created`, `tags`, and `related`. Related artifacts use
-`[[Wiki-Links]]` so the project can be explored as a documentation graph.
+double-bracket document links so the project can be explored as a graph.
 
 ## Organization
 
+- `guides/` contains executable user workflows, beginning with [[Quickstart]].
 - `architecture/` describes system boundaries and component relationships,
   beginning with [[System-Overview]] and [[Firmware-Resource-Map]], with the
   centralized physical lifecycle and Phase 08 composition audit in
-  [[Acquisition-Pipeline]], and the immutable opt-in host correction model in
-  [[Calibration]], plus the allocation, ownership, and pure-Python parity
-  contract for optional arrays in [[NumPy-Integration]].
+  [[Acquisition-Pipeline]], the synchronized public host boundary in
+  [[Python-API]], the immutable opt-in host correction model in [[Calibration]],
+  and the allocation, ownership, and pure-Python parity contract for optional
+  arrays in [[NumPy-Integration]].
 - `protocol/` contains versioned wire-contract specifications, beginning with
   [[Protocol-V1]].
 - `decisions/` contains architecture decision records, including
   [[ADR-001-Wire-Protocol]], [[ADR-002-Checksum-Selection]], and
   [[ADR-003-GPIO-Clock-DMA]], followed by the permanent converter, trigger,
   and DMA resource contract in [[ADR-004-ADC-Trigger-DMA]].
-- `reference/` records durable inventories and implementation references,
-  beginning with [[Foundation-Reuse-Inventory]].
+- `reference/` records durable user and implementation references: begin with
+  [[Hardware-Safety]] before connecting signals, use [[API-Reference]] for the
+  stable Python surface, and consult [[Foundation-Reuse-Inventory]] for the
+  original implementation audit.
 - `research/` records evidence gathered before implementation or selection,
   beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,

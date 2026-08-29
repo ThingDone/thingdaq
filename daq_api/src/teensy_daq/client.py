@@ -816,8 +816,19 @@ class TeensyDAQ:
         source: constants.Source | int | None = None,
         checksum_algorithm: constants.ChecksumAlgorithm
         | int = constants.DEFAULT_CHECKSUM_ALGORITHM,
+        adc_pair_rate_hz: int | None = None,
+        gpio_sample_rate_hz: int | None = None,
+        adc_resolution_bits: int | None = None,
     ) -> DAQConfiguration:
-        """Apply an atomic configuration without starting acquisition."""
+        """Apply an advertised configuration without starting acquisition.
+
+        Protocol v1 has fixed acquisition rates and ADC resolution rather than
+        carrying those fields in the eight-byte CONFIGURE body.  The optional
+        rate/resolution arguments are therefore exact host requirements: they
+        are checked against the synchronized INFO response before CONFIGURE is
+        sent.  The returned value is the exact configuration echoed by the
+        device, and a response that differs from the request is rejected.
+        """
 
         with self._lock:
             self._require_verified_identity()
@@ -829,6 +840,10 @@ class TeensyDAQ:
             if configuration is None:
                 if not isinstance(adc, bool) or not isinstance(gpio, bool):
                     raise TypeError("adc and gpio selectors must be booleans")
+                if isinstance(source, bool):
+                    raise TypeError("source must be HARDWARE, SYNTHETIC, or None")
+                if isinstance(checksum_algorithm, bool):
+                    raise TypeError("checksum_algorithm must be a checksum enum or ID")
                 stream_mask = constants.StreamMask.NONE
                 if adc:
                     stream_mask |= constants.StreamMask.ADC
@@ -864,7 +879,12 @@ class TeensyDAQ:
                 )
             elif not isinstance(configuration, DAQConfiguration):
                 raise TypeError("configuration must be DAQConfiguration")
-            self._validate_configuration_capabilities(configuration)
+            self._validate_configuration_capabilities(
+                configuration,
+                adc_pair_rate_hz=adc_pair_rate_hz,
+                gpio_sample_rate_hz=gpio_sample_rate_hz,
+                adc_resolution_bits=adc_resolution_bits,
+            )
 
             response = self._command(
                 constants.FrameKind.CONFIGURE_REQUEST,
@@ -878,6 +898,11 @@ class TeensyDAQ:
             self._configuration = response.value
             self._run_id = response.run_id
             self._last_status = None
+            if response.value != configuration:
+                raise UnexpectedMessageError(
+                    "CONFIGURE applied configuration differs from the request: "
+                    f"requested={configuration!r}, applied={response.value!r}"
+                )
             return response.value
 
     def configure_control_only(self) -> DAQConfiguration:
@@ -891,6 +916,9 @@ class TeensyDAQ:
         with self._lock:
             self._require_verified_identity()
             self._require_state("start", constants.DeviceState.CONFIGURED)
+            requested_configuration = self._configuration
+            if requested_configuration is None:  # pragma: no cover - state guard
+                raise UnexpectedMessageError("START has no requested configuration")
             host_baseline = self.host_counters
             parser_error_baseline = self._reader.parser_counters.corruption_events
             response = self._command(constants.FrameKind.START_REQUEST)
@@ -903,6 +931,12 @@ class TeensyDAQ:
             self._state = constants.DeviceState.RUNNING
             self._configuration = response.value
             self._run_id = response.run_id
+            if response.value != requested_configuration:
+                raise UnexpectedMessageError(
+                    "START applied configuration differs from CONFIGURE: "
+                    f"configured={requested_configuration!r}, "
+                    f"applied={response.value!r}"
+                )
             self._pending_items.clear()
             self._initialize_stream_expectations(response.value)
             self._host_loss_baseline = host_baseline
@@ -1401,7 +1435,32 @@ class TeensyDAQ:
     def _validate_configuration_capabilities(
         self,
         configuration: DAQConfiguration,
+        *,
+        adc_pair_rate_hz: int | None,
+        gpio_sample_rate_hz: int | None,
+        adc_resolution_bits: int | None,
     ) -> None:
+        requirements = (
+            ("adc_pair_rate_hz", adc_pair_rate_hz),
+            ("gpio_sample_rate_hz", gpio_sample_rate_hz),
+            ("adc_resolution_bits", adc_resolution_bits),
+        )
+        for name, value in requirements:
+            if value is not None and (
+                not isinstance(value, int) or isinstance(value, bool)
+            ):
+                raise TypeError(f"{name} must be a positive integer or None")
+            if value is not None and value <= 0:
+                raise ValueError(f"{name} must be a positive integer or None")
+
+        has_adc = bool(configuration.stream_mask & constants.StreamMask.ADC)
+        has_gpio = bool(configuration.stream_mask & constants.StreamMask.GPIO)
+        if not has_adc and (
+            adc_pair_rate_hz is not None or adc_resolution_bits is not None
+        ):
+            raise ValueError("ADC rate/resolution requirements need an ADC stream")
+        if not has_gpio and gpio_sample_rate_hz is not None:
+            raise ValueError("GPIO rate requirements need a GPIO stream")
         if (
             configuration.data_checksum_algorithm
             not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS
@@ -1413,23 +1472,71 @@ class TeensyDAQ:
             )
         capabilities = self.capabilities
         if capabilities is None:
-            return
+            raise DeviceSynchronizationError(
+                "CONFIGURE capability validation requires a synchronized INFO"
+            )
         unsupported_streams = int(configuration.stream_mask) & ~int(
             capabilities.supported_stream_mask
         )
         if unsupported_streams:
-            raise DeviceCapabilityError("device does not advertise requested streams")
-        if not capabilities.supports_source(configuration.source):
-            raise DeviceCapabilityError("device does not advertise requested source")
-        if not capabilities.supports_checksum(configuration.data_checksum_algorithm):
             raise DeviceCapabilityError(
-                "device does not advertise requested checksum",
+                "device does not advertise requested streams "
+                f"{configuration.stream_mask!s}; advertised="
+                f"{capabilities.supported_stream_mask!s}"
+            )
+        if not capabilities.supports_source(configuration.source):
+            advertised_sources = ",".join(
+                source.name
+                for source in constants.Source
+                if capabilities.supports_source(source)
+            )
+            raise DeviceCapabilityError(
+                f"device does not advertise requested source "
+                f"{configuration.source.name}; advertised={advertised_sources}"
+            )
+        if not capabilities.supports_checksum(configuration.data_checksum_algorithm):
+            advertised_checksums = ",".join(
+                algorithm.name
+                for algorithm in capabilities.supported_checksum_algorithms
+            )
+            raise DeviceCapabilityError(
+                "device does not advertise requested checksum "
+                f"{configuration.data_checksum_algorithm.name}; "
+                f"advertised={advertised_checksums}",
                 error_code=constants.ErrorCode.UNSUPPORTED_CHECKSUM,
             )
         if not capabilities.supports_configuration(configuration):
             raise DeviceCapabilityError(
-                "device does not advertise the exact requested source/stream profile",
+                "device does not advertise the exact requested source/stream profile "
+                f"{configuration.profile.name}; advertised="
+                f"{capabilities.supported_configuration_mask!s}",
                 error_code=constants.ErrorCode.UNSUPPORTED_CONFIGURATION,
+            )
+        if (
+            adc_pair_rate_hz is not None
+            and adc_pair_rate_hz != capabilities.adc_pair_rate_hz
+        ):
+            raise DeviceCapabilityError(
+                f"requested ADC pair rate {adc_pair_rate_hz} Hz is unsupported; "
+                f"INFO advertises exactly {capabilities.adc_pair_rate_hz} Hz"
+            )
+        if (
+            gpio_sample_rate_hz is not None
+            and gpio_sample_rate_hz != capabilities.gpio_sample_rate_hz
+        ):
+            raise DeviceCapabilityError(
+                f"requested GPIO sample rate {gpio_sample_rate_hz} Hz is "
+                f"unsupported; INFO advertises exactly "
+                f"{capabilities.gpio_sample_rate_hz} Hz"
+            )
+        if (
+            adc_resolution_bits is not None
+            and adc_resolution_bits != capabilities.adc_resolution_bits
+        ):
+            raise DeviceCapabilityError(
+                f"requested ADC resolution {adc_resolution_bits} bits is "
+                f"unsupported; INFO advertises exactly "
+                f"{capabilities.adc_resolution_bits} bits"
             )
 
     def _initialize_stream_expectations(

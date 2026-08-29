@@ -9,6 +9,10 @@ tags:
   - wire-format
   - usb-cdc
 related:
+  - '[[Quickstart]]'
+  - '[[Python-API]]'
+  - '[[API-Reference]]'
+  - '[[Hardware-Safety]]'
   - '[[System-Overview]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
@@ -516,6 +520,21 @@ Success moves the device to CONFIGURED and returns the common prefix followed
 by the exact eight-byte applied configuration. Unsupported values are rejected
 atomically; no partial configuration is applied. If prior-run frames are still
 queued, CONFIGURE returns `BUSY` and preserves the prior configuration.
+
+A capability-driven host must obtain and validate INFO before CONFIGURE. It
+must test the exact configuration-profile bit in addition to the individual
+stream/source masks, require the checksum in both the device mask and its own
+implementation set, and verify the returned applied body byte-for-byte against
+the request. START must echo the same body again. The Python facade performs
+all of these checks before activating a run; see [[Python-API]].
+
+ADC pair rate, GPIO sample rate, ADC resolution/range, and timestamp periods
+are fixed INFO capabilities in protocol v1, not mutable CONFIGURE fields. A
+caller that requires exact values checks them before sending this request. It
+must not encode rate/resolution in the reserved byte or infer them from the
+selected profile. The public Python keywords `adc_pair_rate_hz`,
+`gpio_sample_rate_hz`, and `adc_resolution_bits` are host-side preconditions;
+they do not change this eight-byte wire schema.
 
 Protocol-v1 firmware accepts all six advertised profiles: ADC-only, GPIO-only,
 or combined from either the hardware or synthetic source, with any advertised

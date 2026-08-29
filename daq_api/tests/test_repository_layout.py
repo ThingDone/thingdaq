@@ -15,6 +15,7 @@ REQUIRED_DIRECTORIES = (
     "daq_api/src/teensy_daq",
     "daq_api/tests",
     "doc/architecture",
+    "doc/guides",
     "doc/protocol",
     "doc/decisions",
     "doc/reference",

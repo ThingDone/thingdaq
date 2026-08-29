@@ -65,6 +65,67 @@ class PublicNamespaceTests(unittest.TestCase):
 
 
 class JsonCliLifecycleTests(unittest.TestCase):
+    def test_configure_reports_exact_echo_and_fixed_capability_requirements(
+        self,
+    ) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main(
+                [
+                    "configure",
+                    "--simulate",
+                    "--streams",
+                    "both",
+                    "--source",
+                    "synthetic",
+                    "--checksum",
+                    "crc32c",
+                    "--adc-pair-rate-hz",
+                    "1000000",
+                    "--gpio-sample-rate-hz",
+                    "4000000",
+                    "--adc-resolution-bits",
+                    "12",
+                    "--json",
+                ]
+            )
+
+        self.assertEqual(CliExitCode.OK, exit_code, stderr.getvalue())
+        applied = json.loads(stdout.getvalue())["applied_configuration"]
+        self.assertEqual("SYNTHETIC_COMBINED", applied["profile"])
+        self.assertEqual("CRC32C", applied["data_checksum_algorithm"])
+        self.assertEqual(4096, applied["data_frame_bytes"])
+        self.assertEqual(1_000_000, applied["adc_pair_rate_hz"])
+        self.assertEqual(4_000_000, applied["gpio_sample_rate_hz"])
+        self.assertEqual(12, applied["adc_resolution_bits"])
+
+    def test_configure_rejects_wrong_resolution_as_unsupported_capability(
+        self,
+    ) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main(
+                [
+                    "configure",
+                    "--simulate",
+                    "--streams",
+                    "adc",
+                    "--source",
+                    "synthetic",
+                    "--adc-resolution-bits",
+                    "10",
+                    "--json",
+                ]
+            )
+
+        self.assertEqual(CliExitCode.UNSUPPORTED_CAPABILITY, exit_code)
+        self.assertEqual("", stdout.getvalue())
+        error = json.loads(stderr.getvalue())["error"]
+        self.assertEqual("unsupported-capability", error["category"])
+        self.assertIn("advertises exactly 12 bits", error["message"])
+
     def test_metadata_list_json_never_opens_a_candidate(self) -> None:
         candidate = SerialPortCandidate(
             port="COM9",

@@ -1,652 +1,158 @@
-# teensy_daq
+# Teensy DAQ
 
-This project is going to run on a teensy 4.0.
+Teensy DAQ is a Teensy 4.0 firmware and typed Python API for synchronized,
+loss-visible acquisition of two phase-shifted ADC channels and eight packed
+digital inputs. The same public API runs against a deterministic in-memory
+simulator, so discovery, configuration, parsing, timestamps, calibration,
+alignment, loss handling, and cleanup can be developed without hardware.
 
-We want it make a firmware based DAQ we can use on multiple projects for different customers. The idea is we are going to have python scripts that want to read data from live systems. 
+> [!WARNING]
+> Read the [hardware-safety guide](doc/reference/hardware-safety.md) before
+> connecting a signal. A0/A1 and D6-D13 are 3.3 V inputs and are not 5 V
+> tolerant. Host calibration does not add electrical protection.
 
-We want to support the following:
-1. Dual ADCs running interleaved on pins A0 and A1 at 1MHz. We want them running via DMA interlaved on some rotating buffers. 
-2. 8 pins (accessible from headers on a breadboard) read out at 4MHz. Ideally we want to read this out via dma or potentially some interrupt driven system.
-3. We default to sending information, but we need a command set to enable/disable different functionality
-4. We want a native python api for detecting and controlling our teensy daq
-5. We will support a test mode that sends out patterns for validating that we are reassembling the data properly.
+## Supported acquisition
 
-Data format:
-In the future, we may accept some commands, but for now we are encapselating the data we send into messages. Here is the format:
+| Input | Physical schedule | Python representation |
+| --- | --- | --- |
+| ADC0 on A0/D14 | 1 MS/s, nominal ticks `0, 8, 16, ...` | unchanged 12-bit raw codes |
+| ADC1 on A1/D15 | 1 MS/s, nominally 500 ns after ADC0 | unchanged 12-bit raw codes |
+| GPIO D6-D13 | 4 MS/s simultaneous packed snapshots | one byte per sample, D6 in bit 0 through D13 in bit 7 |
 
-*Entire set of message must be a multiple of 512 bytes*
-Header 4bytes - 0xdeadbeef
-Type 2 bytes  - (0->ADC, 1->GPIO)
-Size 2 bytes  - size of payload
-Time 4 bytes  - 8x microseconds for resynchronization
-payload  0->size byte
-checksum 4bytes - Standard Adler-32
+The timestamp domain is an unsigned, START-relative 8 MHz clock. Explicit ADC
+interleaving yields the nominal order `ADC0[0], ADC1[0], ADC0[1], ADC1[1], ...`.
+That 2 MS/s view does **not** increase the analog bandwidth of the converters,
+pins, source, or front end.
 
-Ideally it will show up as a serial port in windows, and we can have python read out the different packets of information. It can then reassemble it according to time, and also determine if some time slice has dropped.
+## Start without hardware
 
-The command format should be similar but do not have to be multiples of 512 byte:
-Header 4bytes - 0xdeadbeef
-Type 2 bytes  - Command Type
-Size 2 bytes  - size of payload
-payload  0->size byte
-checksum 4bytes - Standard Adler-32
-
-# Testing
-We will leaverage /home/bill/agents/fw_experiments/docs/guides/new-firmware-projects.md for building and testing our project here.
-
-We want to evaluate the following:
-1. Test that our firmware works and can be carefully controlled via python.
-2. We will ensure our python api is well documented.
-3. We will have a benchmark on how much usb bandwidth is used.
-4.
-
-## Repository layout
-
-- `firmware/` contains the Teensy 4.0 sketch boundary, portable C++ modules,
-  local build tooling, and firmware-focused host tests.
-- `daq_api/` contains the installable `teensy_daq` Python package in a
-  `src/` layout and its test suite.
-- `doc/` contains structured architecture, protocol, decision, reference, and
-  result artifacts. Start with `doc/README.md` and
-  `doc/architecture/system-overview.md`.
-
-Generated builds, captures, virtual environments, benchmark scratch data,
-credentials, and language-tool caches are ignored. Small deterministic test
-fixtures remain tracked under the firmware or Python test trees.
-
-Every Markdown artifact under `doc/` must begin with YAML front matter
-containing `type`, `title`, `created`, `tags`, and `related`, and must use
-`[[Wiki-Links]]` for related project documents.
-
-## Reproducible local setup
-
-The firmware build is intentionally fixed to Teensy 4.0, USB Serial, 600 MHz,
-standard `-O2`, and Teensy core 1.62.0. The helper refuses a different installed
-core, performs a clean all-warnings compile with the complete
-`teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` FQBN, and records the
-Arduino CLI, compiler, resolved menu properties, deterministic source/build
-identity, source-input Git state, reproducible UTC timestamp policy, Flash/RAM
-usage, command, and SHA-256 hashes in a gitignored build manifest. The exported
-artifacts include the HEX, ELF, and linker map needed for pre-upload review;
-ELF inspection also proves the packet banks, checksum buffers/tables, GPIO
-clock diagnostic cache line, paired ADC ring/sink/two-channel TCD bank, raw
-GPIO ring/sink/TCD bank, and packed GPIO ring occupy their claimed regions:
-
-```bash
-python3 firmware/tools/build_firmware.py
-```
-
-For Python API development, install the private local distribution and its
-development tools from the repository root. NumPy remains an explicit optional
-feature rather than a runtime requirement:
+Create an environment and install the private local package:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --editable './daq_api[dev,numpy]'
 ```
 
-The single authoritative distribution name is `[project].name` in
-`daq_api/pyproject.toml`; its local placeholder and `Private :: Do Not Upload`
-classifier are deliberate publication guards. The package README records the
-independent host-version policy, exact artifact boundary, and the mandatory
-Teensy® trademark/name review before any possible package-index submission.
-
-## Protocol contract
-
-Protocol v1 uses one generated, explicitly little-endian frame contract for
-firmware and Python. ADC/GPIO frames are fixed at 4,096 bytes; bounded control
-frames use generated INFO, CONFIGURE, START, GET_STATUS, STOP, RESET_STATS,
-and optional PING command IDs, echoed request IDs, typed responses, explicit
-run identity, and capability bits over the same resynchronizable envelope. The
-normative specification is
-`doc/protocol/protocol-v1.md`, with rationale in
-`doc/decisions/adr-001-wire-protocol.md` and the production checksum decision
-in `doc/decisions/adr-002-checksum-selection.md`.
-
-Regenerate the Python constants, C++ constants, and shared golden frames—or
-check that tracked output has not drifted—with:
+Run the complete deterministic demo or a bounded CLI capture:
 
 ```bash
-python3 tools/generate_protocol.py
-python3 tools/generate_protocol.py --check
+.venv/bin/teensy-daq-demo --frames 2
+.venv/bin/teensy-daq capture --simulate --duration 1 --strict-loss \
+  --gpio-channel D6 --gpio-channel D13
 ```
 
-Phase 05 adds stateless firmware candidates for Adler-32, CRC-32C, and
-CRC-32/ISO-HDLC behind one allocation-free checksum interface. INFO advertises
-all three for data frames, CONFIGURE selects one, and each data header carries
-the selected ID. INFO exposes the generated default in IDLE and the applied
-selection in CONFIGURED/RUNNING; STATUS and Python ADC/GPIO block metadata
-repeat it. Every command and response remains unambiguously protected by
-bootstrap Adler-32. The fixed Phase 05 policy retained Adler-32 as the
-production data default because CRC-32C exceeded the relative STATUS-p99 gate
-and CRC-32/ISO-HDLC exceeded the relative STATUS-maximum gate; both CRCs remain
-advertised and decodable. Reconfiguration returns `BUSY` until prior-run frames
-have drained. The pinned-core, Cortex-M7, i.MX RT1062,
-FastCRC, and hardware-accelerator findings are recorded in
-`doc/research/checksum-candidates.md`; notably, the general-memory DCP computes
-CRC-32/MPEG-2 rather than either evaluated CRC and is not used.
-
-The optional IDLE-only `CHECKSUM_BENCHMARK` command measures those same narrow
-firmware implementations with the verified 600 MHz DWT counter. It calibrates
-and subtracts read overhead, excludes interrupts from each timed interval,
-publishes an optimization-proof digest, and reports raw/net cycles, processed
-bytes, Q16.16 cycles/byte, decimal MB/s, projected CPU at 8.1 MB/s, recurring
-cache setup, and code/table/RAM cost. Vectors cover empty input, canonical
-`123456789`, aligned 64/512-byte buffers, and an actual 4,092-byte framed
-header-plus-payload. Separate 4,096-byte buffers exercise native DTCM and
-DMA-visible OCRAM in hot and meaningful cold-invalidated states. The protocol
-and method are specified in `doc/protocol/protocol-v1.md`.
-
-Phase 06 adds an optional IDLE-only `GPIO_CLOCK_DIAGNOSTIC` command. It drives
-the fixed 24 MHz PERCLK → PIT0 → XBARA1 rising-edge request → DMAMUX → eDMA
-channel 2 path at exact divisors from 1 kHz through the immutable 4 MHz
-production rate, without remapping or reading D6-D13. The response exposes the
-clock gates, timer, XBAR, DMAMUX, eDMA/TCD registers, 600 MHz DWT interval,
-scheduled/sample counts, route IDs, and typed hardware errors. The accepted
-route and rejected dual-edge alternatives are recorded in
-`doc/decisions/adr-003-gpio-clock-dma.md`.
-
-Phase 07 fixes one compile-time ADC route table and now applies it during
-bounded BOOT initialization:
-logical ADC0 is A0 through NXP ADC1 channel 7, and logical ADC1 is A1 through
-NXP ADC2 channel 8. The same tuples own ADC_ETC queues 0/4, XBAR outputs
-103/107, and eDMA channels 0/1 with DMAMUX sources 24/88. The selected clock,
-500 ns trigger-delay arithmetic, initial 12-bit conversion budget, and explicit
-10-bit fallback gate are recorded in
-`doc/decisions/adr-004-adc-trigger-dma.md`. Both modules are explicitly set to
-12-bit `uint16_t`, synchronous 37.5 MHz high-speed conversion with the shortest
-three-ADCK sample and no hardware averaging, then calibrated independently
-under a 10 ms DWT deadline. The target adapter defers Teensy core's normally
-unbounded startup calibration so this is the sole ADC calibration path.
-INFO/STATUS publish the actual settings, fixed A0/ADC1/channel-7 and
-A1/ADC2/channel-8 routes, per-converter calibration states/cycles, and typed
-initialization faults. The BOOT boundary also programs the shared PIT0 4 MHz
-to chained PIT1 1 MHz source, fans PIT1 through XBARA1 to independent ADC_ETC
-queues 0/4, and writes raw delays 0/75 (effective 1/76 IPG cycles, exactly
-500 ns apart). A bounded stopped-to-armed-to-stopped diagnostic masks
-interrupts briefly and publishes first conversion-completion status timing,
-trigger errors, completion counts, and clock/XBAR/queue/register readbacks in
-INFO/STATUS. That DWT delta is completion timing, not analog aperture evidence.
-The fixed eDMA 0/1 adapter
-now writes ADC1/ADC2 result halfwords directly to offsets 0/2 of four-byte
-sample pairs with equal 1,012-result major loops and deterministic
-scatter/gather rotation. A generation-and-epoch barrier publishes a buffer
-only after both channels complete; cache ownership, an isolated pressure sink,
-ADC_ETC overwrite evidence, mismatched completions, stale interrupts, ring
-overruns, and exact discarded-pair counts are centralized in the portable ADC
-DMA core. The cooperative ADC frame packer now copies each complete DMA
-generation directly into one fixed packet payload, preserving little-endian
-`(ADC0, ADC1)` pair identity, deriving run-relative timestamps from exact pair
-counters, projecting whole raw gaps into the independent ADC sequence, and
-using the negotiated checksum without heap allocation. ADC-only, GPIO-only,
-and combined physical CONFIGURE/START are enabled in firmware behind one
-explicit applied-profile contract. The Python block model binds the actual INFO-advertised timing,
-resolution, calibration, trigger, and latest STATUS acquisition evidence to
-zero-copy-friendly ADC0/A0 and ADC1/A1 views, validates only payload shape and
-the selected code range for physical inputs, and retains explicit gap context
-without implying increased analog bandwidth. The complete sequential hardware
-gate is recorded in `doc/results/phase-07-dual-adc.md`: the accepted 12-bit
-image passed the bounded diagnostic, 10-second smoke, and 60-second ADC-only
-soak at 1 MS/s per converter with zero target or host loss/error counters.
-A0/A1 were unstimulated, so that result intentionally makes no analog-quality
-or aperture claim. STATUS extends the raw-to-USB accounting with both
-DMA channel totals, paired buffers, captured/delivered/framed/transmitted pairs,
-exact raw/STOP loss, queue depth, lifecycle, stale, and packer errors.
-
-The advertised physical GPIO mode selectively returns only D6-D13 from
-GPIO7 to GPIO2, keeps them inputs on START/STOP/error, and uses channel 2 to
-copy fixed 32-bit `GPIO2_PSR` samples into four aligned 4,048-word OCRAM
-buffers. Scatter/gather completion interrupts occur once per buffer, not at
-4 MHz. Explicit `FREE → DMA_QUEUED → DMA_ACTIVE → READY → PACKING →
-RELEASING` ownership and centralized cache deletion/invalidation prevent DMA
-from touching CPU-owned data. The cooperative batch packer gathers GPIO2 bits
-10, 17, 16, 11, 0, 2, 1, and 3 into wire bits 0-7, assembles arbitrary raw
-boundaries into 4,048-byte frames, releases raw leases promptly, and stages
-four complete packed buffers before the existing fixed packet ready/transmit
-queues apply run, sequence, first-sample timestamp, gap flags, and the selected
-checksum. When either raw or packed storage fills, acquisition remains live and
-the exact loss is projected once into shared statistics. CONFIGURE accepts all
-six exact ADC-only, GPIO-only, and combined hardware/synthetic profiles while
-rejecting zero-stream, malformed, unadvertised, or per-stream mixed-source
-requests atomically. Combined START audits and prepares both physical engines,
-then arms their one common epoch only after every owner is ready. STOP disables the trigger and DMA route
-in reverse order, then drains complete old-run work before another START.
-INFO and STATUS expose pin order, rate/period, packed width, ring/resource
-capacities, stage counts, queue depths, resource conflicts, lifecycle errors,
-rejected stale DMA completions, and a cumulative DWT active/elapsed percentage
-for the GPIO pack/copy/checksum/framing service.
-
-The registered Port 15 fixture documentation does not establish that D6-D13
-are unconnected or safe to drive and declares no machine-readable loopback or
-stimulus. The autonomous GPIO capture diagnostic therefore fails closed to an
-input-only mode: it reuses one bounded 4 MHz production-ring capture, reports
-raw/packed observations plus before/during/after register and count evidence,
-drains all leases, and restores GPIO2 inputs. It never writes a GPIO data
-register, and it explicitly leaves external transition, pad-electrical, and
-self-driven 256-value stable-window validation unexercised. The existing
-host-C++ packer test independently covers all 256 logical GPIO bytes. The
-optional `GPIO_CAPTURE_DIAGNOSTIC` command now advertises this fail-closed
-evidence path while keeping its fixture policy immutable from the host.
-
-The Python codec uses exact standard-library C implementations for Adler-32
-and CRC-32/ISO-HDLC and a bounded table-driven fallback for CRC-32C. Its
-machine-readable benchmark measures full 4,096-byte ADC and GPIO encode and
-validation paths separately; it records backend/platform provenance but never
-uses host-specific timing to redefine wire compatibility:
+All examples default to the simulator. A script touches hardware only when
+`--real` is present:
 
 ```bash
-PYTHONPATH=daq_api/src .venv/bin/python -m teensy_daq.checksum_benchmark
+.venv/bin/python daq_api/examples/raw_adc_channels.py
+.venv/bin/python daq_api/examples/combined_alignment.py
+.venv/bin/python daq_api/examples/status_and_loss.py
 ```
 
-The portable firmware control module implements bounded BOOT → IDLE,
-CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
-STOP, RESET_STATS, PING, optional CHECKSUM_BENCHMARK, and optional
-GPIO_CLOCK_DIAGNOSTIC and GPIO_CAPTURE_DIAGNOSTIC. Synthetic and physical modes
-each accept ADC-only, GPIO-only, or combined acquisition. INFO publishes the
-exact applied profile, six-bit profile matrix, rates/phases/pin map, aligned
-ADC/GPIO rings, packet banks, queue capacities, and checksum. STATUS adds every
-per-source frame/item/byte stage, shared allocation/fairness counters, current
-and high-water queues, command diagnostics, and USB stall/error snapshots while
-remaining responsive during combined physical streaming.
+See the [quickstart](doc/guides/quickstart.md) for the complete example roster,
+physical discovery by hardware serial, and lifecycle guidance.
 
-The Teensy USB layer retains PJRC's USB Serial VID/PID and chip-derived serial
-number while overriding only the weak product string with `Teensy DAQ`. Boot
-does not wait for a host or emit an unframed banner. Its portable CDC transport
-uses fixed command/response queues, bounded byte and call budgets, 1,024-byte
-maximum write requests, 512-byte minimum capacity admission, exact
-partial/zero-write continuation, response-first frame scheduling, and exposed
-request/queue/stall diagnostics. The runtime makes two bounded transmit visits
-after producer service, with a physical-acquisition ownership visit between
-them. Short data tails and complete control frames remain atomic admission
-units; an unexpectedly short backend result is retained and resumed rather
-than abandoned.
+## Minimal API
 
-Phase 04 supplies deterministic ADC-pair and GPIO-byte sources through the
-same allocation-free packet path used by later physical acquisition. ADC0 and
-ADC1 retain pair identity as `2n` and `2n + 1` modulo 12 bits; GPIO is `m`
-modulo 256 with D6-through-D13 in bits 0-through-7. Both streams share one
-START epoch, use independent sequences, and cover the same 8,096 ticks per
-frame. Normal mode waits for each frame's real-time 8 MHz deadline. The
-explicitly selected `unpaced-diagnostic` mode removes only that wait and still
-uses the generator, framing, checksum, queues, and USB transport unchanged.
+```python
+from teensy_daq import ADCBlock, GPIOBlock, Source, TeensyDAQ
 
-Two hundred aligned 4,096-byte frames split across 105 DTCM and 95 CPU-owned
-OCRAM slots move through explicit `FREE -> FILLING -> READY -> TRANSMITTING ->
-FREE` ownership. Per-source ready FIFOs feed one bounded transmit FIFO. An
-active combined epoch promotes equal-duration coverage with a rotating
-tie-break and no more than a one-frame source lead; counted source loss consumes
-its own fairness slots, while STOP drains every complete unmatched tail. Every
-queue exposes current and high-water depth. Frames are validated and
-checksummed in place before
-transport admission; a partial USB write keeps immutable ownership until the
-final byte succeeds. Native diagnostics retain exact generated, framed,
-emitted, transmitted, and dropped frame/item counts plus separate payload and
-framed byte totals. Fixed protocol-v1 STATUS projects those counters for either
-source together with shared packet/USB telemetry; this preserves the Phase 04
-full-rate synthetic path as the unchanged performance baseline for later
-physical combinations.
+with TeensyDAQ.simulated(strict=True) as daq:
+    applied = daq.configure(
+        adc=True,
+        gpio=True,
+        source=Source.SYNTHETIC,
+        adc_pair_rate_hz=1_000_000,
+        gpio_sample_rate_hz=4_000_000,
+        adc_resolution_bits=12,
+    )
+    run_id = daq.start()
 
-The host keeps immediate independent `ADCBlock`/`GPIOBlock` delivery and adds
-an optional bounded `TimestampAligner` above it. Equal 8,096-tick intervals are
-paired by run ID and first-sample tick without copying either payload; missing
-sides, missing ranges, and per-source sequence/timestamp gaps remain explicit.
-The aligned model exposes the nominal 8 MHz START-relative epoch and retains
-ADC0/ADC1 identity plus packed GPIO bytes, while deliberately making no claim
-about unmeasured external pad propagation or analog aperture latency.
+    for item in daq.blocks(2):
+        if isinstance(item, ADCBlock):
+            print(run_id, item.adc0[0], item.adc1[0])
+        elif isinstance(item, GPIOBlock):
+            print(item.sample(0), item.channel(6)[0])
 
-STOP disables production immediately, cancels only an incomplete producer-owned
-fill, and drains every already complete ready or transport-owned frame. A new
-START returns typed `BUSY` while that bounded drain remains, without allocating
-a run ID or resetting an epoch. Once quiescent, the runtime resets every queue
-deterministically, arms the packet/source epoch, and only then admits the
-successful START response. Consequently no prior-run data can follow an
-acknowledged new START. The STOP response itself still wins at the next frame
-boundary, so remaining old-run complete frames may follow STOP, but they are
-always serialized before any later successful START response.
+    daq.validate_stream_health()
+    daq.stop()
+```
 
-The split packet placement follows a reinspection of pinned Teensy core 1.62.0:
-USB Serial copies writes into its own four 2,048-byte aligned `DMAMEM` buffers
-and flushes those buffers before DMA. A 105-frame cacheless DTCM primary bank
-and 95-frame CPU-owned OCRAM reserve cover 101.200 ms at the nominal combined
-framed rate, plus 1.012 ms in the core ring. This absorbs the 60.715 ms service
-gap observed by the Phase 05 CRC campaign while the exact linker gate retains
-at least 32 KiB for locals and stack. The compile-time registry reserves
-450,464 bytes of RAM1 project data and 491,072 bytes of RAM2 storage, including
-the acquisition rings, isolated benchmark buffers, and the GPIO clock
-diagnostic cache line; see
-`doc/architecture/firmware-resource-map.md` and
-`doc/reference/Foundation-Reuse-Inventory.md`.
+`configure()` checks the exact stream/source profile, checksum, and optional
+rate/resolution requirements against synchronized INFO capabilities before it
+sends CONFIGURE. The returned `DAQConfiguration` is the device's exact applied
+echo; a changed CONFIGURE or START echo is rejected.
 
-`FirmwareRuntime` connects that transport to the portable control dispatcher,
-polled 8 MHz clock, deterministic source, and packet pipeline. The thin sketch
-constructs the Teensy CDC/clock adapters and aligned packet storage before the
-runtime, binds INFO to the core-derived hardware serial during bounded BOOT,
-and makes one cooperative service call per loop. Each call performs bounded
-receive work, dispatches at most one command, applies compact START/STOP events
-before admitting their successful responses, generates at most two due
-synthetic frames, promotes bounded ready frames, and performs bounded transmit
-work. No pacing ISR is installed.
-Expected typed command errors are
-state-atomic; an internal response-path failure emits an INTERNAL_ERROR when
-possible, releases its queue reservation, and fails safe to IDLE. INFO exposes
-the protocol version, semantic firmware version, board/MCU IDs, hardware
-serial, source-derived build ID, and truthful capability masks needed to reject
-a stale or incompatible image before control changes.
+## Hardware use
 
-## Portable firmware tests
-
-The firmware test suite host-compiles the production protocol, control,
-statistics, checksum benchmark, GPIO clock diagnostic, synthetic-source,
-safe GPIO capture diagnostic, packet-pipeline, transport, and runtime sources
-with allocation-free C++17 flags.
-It exercises every split and truncation point for every command, corrupt-stream
-recovery, the complete state-transition matrix, idempotency, counters, and
-fixed frame/queue boundaries. A bidirectional interoperability test sends
-Python-encoded commands through the C++ decoder and sends C++-encoded responses
-through the Python decoder; both directions must match the tracked golden
-fixtures byte for byte. Dependency checks keep Arduino and Teensy core APIs in
-the guarded board/USB adapters rather than the portable protocol/control
-closure.
-
-The benchmark tests inject a deterministic wrapping cycle counter and verify
-overhead subtraction, interrupt-mask restoration, warm-up exclusion, hot DTCM,
-cold OCRAM cache costs, real production-frame coverage, duration bounds, and
-unchanged acquisition state/counters. They also fail closed on aggregate cycle
-overflow and require repeatable metrics/digests under an `-O3 -flto` host
-build with explicit compiler barriers and observable publication. A separate
-correctness suite checks published values, independent bitwise references, 32
-input alignments, length/reduction edges, 97 seeded C++/Python buffers with
-byte-identical little-endian results, representative corruption classes,
-negotiation transitions, and parser recovery after every candidate's bad
-trailer. The finite corruption matrix and its non-security limitations are
-recorded in `doc/results/phase-05-checksum-correctness.md`. The pinned build
-additionally inspects ELF symbols for exact checksum-body sizes, lookup-table
-Flash residency, and the two benchmark-buffer addresses and alignments.
-The complete pre-rig correctness, generated-table, package-build, pinned-image,
-resource-delta, and repeated host-timing gate is recorded in
-`doc/results/phase-05-checksum-local-gate.md`.
-The accepted candidate-isolated on-device microbenchmarks and sequential
-60-second Adler-32, CRC-32C, and CRC-32/ISO-HDLC streams are recorded in
-`doc/results/phase-05-checksum-physical-campaign.md`; the fixed-policy checksum
-selection is documented in `doc/decisions/adr-002-checksum-selection.md`. The
-clean selected-image rebuild and three consecutive 60-second Adler-32
-acceptance runs are consolidated in
-`doc/results/phase-05-checksum-benchmark.md`.
-
-The GPIO clock tests independently prove exact PIT/DWT divisor arithmetic,
-request duration and TCD bounds, dead/duplicate/short-window classification,
-unarmed resource behavior, protocol round trips, IDLE-only state atomicity,
-and simulator refusal to fabricate target-only evidence. The pinned target
-build and hardware spike additionally validate the explicit register adapter;
-the accepted evidence is consolidated in
-`doc/decisions/adr-003-gpio-clock-dma.md`.
-
-The raw GPIO host test exhausts the ownership scheduler through normal
-rotation, CPU packing leases, stopped partial buffers, stale handles, and
-sustained sink pressure. It also proves cache calls occur only at ownership
-boundaries, exact raw losses combine with later packet drops without overflow,
-and the selective GPR27/GDIR helper cannot modify unrelated bits. The pinned
-build separately verifies the four-buffer ring, one-line sink, and five TCDs
-are exact, 32-byte-aligned OCRAM allocations.
-
-The GPIO batch-packer test exhausts all 256 packed values, unrelated GPIO2-bit
-noise, raw batches split across frame boundaries, exact two-tick timestamps,
-selected checksums, sequence/gap projection, packed-ring pressure, and
-produced/packed/framed/transmitted/dropped reconciliation. Its repeatable host
-microbenchmark measures the selected allocation-free, four-sample-unrolled
-shift/mask loop; one local run sustained 2,481.196 MB/s of packed payload versus
-the 4 MB/s production requirement. This host observation is not a substitute
-for the later target CPU/queue gate. The pinned build link-verifies the four
-4,064-byte-stride packed buffers in OCRAM.
-
-The separate synthetic-pipeline stress executable exercises every packet
-ownership transition, fixed-queue full/empty and ring-wrap edges, unequal-source
-fairness, 32-bit sequence rollover, STOP/reset cleanup, and stale-run rejection.
-It also sends long real-time and unpaced ADC/GPIO runs through deterministic
-full, partial, zero, and recovered fake-CDC writes while incrementally received
-PING commands arrive behind active data frames; every resulting frame checksum,
-timestamp, sequence, formula, and ownership-stage counter is reconciled.
-
-The combined-acquisition host executable drives the real portable ADC and GPIO
-DMA rings, both packers, the fair packet pipeline, and USB transport together.
-It covers adversarial completion order, source and packed-ring pressure,
-independent sequence wrap, partial USB stalls with concurrent commands, exact
-counter reconciliation, and stale lease/interrupt rejection across run
-boundaries. Its companion pinned linker/map fixture proves the simultaneous
-packet, ADC, GPIO, and USB storage layout is in-bounds and non-overlapping.
-
-The dedicated pressure/recovery executable separately tests the completed
-firmware policy against every possible partial 4,096-byte USB offset, logical
-4/6/8-frame pool capacities, adversarial dual-source completion, oldest/fair
-eviction, exact loss/gap reconciliation, corrupt and long-garbage commands,
-all illegal lifecycle edges, queue wrap, RESET_STATS boundaries, rapid
-STOP/START traffic, and CDC close/reopen while acquisition remains live.
-
-After installing the development environment above, run the focused gate from
-the repository root:
+Metadata-only enumeration never opens candidate ports:
 
 ```bash
-.venv/bin/python -m pytest -q firmware/tests
+.venv/bin/teensy-daq list
+.venv/bin/teensy-daq info --hardware-serial 20512460
+.venv/bin/teensy-daq monitor --hardware-serial 20512460 \
+  --streams both --source hardware --duration 10 --strict-loss
 ```
 
-`firmware/tests/rig_control_smoke.py` is the separately graded hardware test.
-It is a single-file Python 3.13 script that depends only on the standard
-library and PySerial, reads the rig-provided `SERIAL_PORT`, independently
-encodes and validates protocol v1, and leaves the board in IDLE. Its offline
-tests compare the independent codec with every control fixture and exercise the
-full lifecycle through reset noise and partial serial I/O before any rig time
-is used.
+Use the stable fuse-derived INFO serial instead of assuming a COM or `/dev`
+path remains attached to the same unit. The client re-probes identity when it
+opens the selected endpoint, and context-manager exit attempts bounded STOP
+before deterministic reader/transport shutdown.
 
-`firmware/tests/rig_synthetic_stream.py` is the corresponding Phase 04
-full-rate acceptance program. It remains independent of `daq_api`, parses and
-checks every ADC/GPIO frame as it arrives, interleaves bounded STATUS requests,
-and prints JSON `EVENT`, expected-versus-actual `METRIC`, and final `SUMMARY`
-records. It defaults to a 10-second capture; set
-`SYNTHETIC_CAPTURE_SECONDS=60` for the soak. Optional `EXPECTED_BUILD_ID` and
-`EXPECTED_HARDWARE_SERIAL` pins reject a flashed artifact or board mismatch;
-`SYNTHETIC_CHECKSUM_ALGORITHM` accepts `ADLER32`, `CRC32C`, or
-`CRC32_ISO_HDLC` and defaults to the selected production Adler-32. The rig
-uses zlib only for exact matching variants, retains its own bounded pure-Python
-fallbacks, and emits separate non-grading host encode/validation benchmark
-events before acquisition.
-The program enforces the 1% per-source and combined payload/framed rate bounds,
-100 ms STATUS p99 and 250 ms maximum response latency, zero parser/formula/gap/
-drop errors, bounded process RSS, a finite post-STOP drain, and exact final
-firmware-to-host frame reconciliation before returning success in IDLE.
+## Validation scope
 
-`firmware/tests/rig_checksum_benchmark.py` is the standalone Phase 05 checksum
-campaign. Before opening the serial port it checks all 15 algorithm/vector
-combinations against embedded values through separate bitwise and streaming
-implementations. It then discovers the device-advertised candidates and, for
-each one in sequence, runs the meaningful 14-profile DTCM/OCRAM hot/cold
-microbenchmark matrix followed by a full-rate synthetic ADC/GPIO capture. Every
-frame trailer, payload formula, sequence, timestamp, STATUS snapshot, and final
-counter is checked without importing `daq_api` or retaining bulk captures.
-Machine-readable `EVENT`, per-algorithm `CANDIDATE`, and final `SUMMARY` JSON
-records include cycles/byte, projected CPU, throughput, implementation/table
-Flash, benchmark RAM, command latency, parser queue high water, and all exposed
-drop/error counters. Protocol v1 does not expose firmware queue depth, so the
-record says so explicitly and reports its fixed capacity plus the observable
-gap/drop/counter exhaustion evidence.
+The accepted Teensy 4.0 campaign includes a 60-second combined physical run at
+the nominal ADC/GPIO rates with zero complete-frame or payload loss, deliberate
+host-stall loss/recovery checks, malformed-control recovery, repeated lifecycle
+cycles, and CDC close/reopen recovery. Exact evidence is in
+[Phase 08](doc/results/phase-08-combined-acquisition.md) and
+[Phase 09](doc/results/phase-09-loss-recovery.md).
 
-The campaign defaults to 10 seconds per advertised candidate. Physical
-acceptance sets `CHECKSUM_CAPTURE_SECONDS=60`; optional
-`CHECKSUM_STATUS_INTERVAL_SECONDS`, `CHECKSUM_BENCHMARK_BATCH_COUNT`, and
-`CHECKSUM_BENCHMARK_ITERATIONS_PER_BATCH` remain strictly bounded. Set
-`CHECKSUM_CAMPAIGN_ALGORITHM` to an advertised name or numeric ID to run one
-candidate in an isolated job; omitting it retains the all-candidates sequential
-campaign. As with the other rig programs, `EXPECTED_BUILD_ID` and
-`EXPECTED_HARDWARE_SERIAL` can pin the exact artifact and board. The
-network-disabled rig retains a bounded slicing-by-eight CRC-32C implementation
-for arbitrary data and all independent vectors. During the fixed synthetic
-campaign it additionally proves each payload against the complete source
-formula, combines the actual 44-byte header CRC with one of 528 precomputed
-payload CRCs, and reports how many trailers used that equivalent bounded path.
-This validates every received byte and trailer without retaining stream frames
-or making the service host's Python speed part of the device result. A dedicated
-reader drains the TTY into at most 32 16 KiB chunks while validation runs;
-the campaign disables cyclic garbage collection, reports that queue's exact
-capacity/high water/final occupancy, and still fails on any target-side gap or
-drop instead of hiding sustained backpressure.
+Those runs used unstimulated A0/A1 and no declared external digital stimulus.
+They do not establish analog accuracy, analog bandwidth, true aperture timing,
+external GPIO transition timing, or compatibility with a particular customer
+front end. The distinction between tested and untested claims is maintained in
+the [hardware-safety guide](doc/reference/hardware-safety.md).
 
-`firmware/tests/rig_gpio_capture.py` is the standalone Phase 06 physical-GPIO
-acceptance program. It verifies the exact Teensy 4.0 identity, D6-through-D13
-bit order, fixed ring/resource metadata, and selected checksum without
-importing `daq_api`. Before streaming, it runs bounded exact-divisor clock/DMA
-windows at 1 kHz and 4 MHz, checks the PIT/XBAR/DMAMUX/eDMA register snapshots
-and DWT/event/sample ratios, and invokes the build-time fixture-policy capture
-diagnostic. A declared self-driven sweep must prove all 256 values with stable
-windows; the registered documentation-only fixture instead remains input-only
-and produces the explicit line `ELECTRICAL_STIMULUS: external electrical
-stimulus was not exercised`.
+## Documentation map
 
-The physical capture defaults to 10 seconds and interleaves STATUS requests
-while independently checking every GPIO frame checksum, run ID, sequence,
-timestamp, flags, item count, and fixed 4,096-byte shape. It requires 4 MHz
-sample/payload throughput within 1%, responsive STATUS, no more than 50% of
-one 600 MHz core in the measured GPIO processing service, zero firmware DMA/
-cache/packer/frame/transport losses or errors, bounded host parser/RSS state,
-empty queues after STOP, and exact final firmware-to-wire reconciliation.
-Use `GPIO_CAPTURE_SECONDS=60` for the soak. Optional controls are
-`GPIO_STATUS_INTERVAL_SECONDS`, `GPIO_LOW_RATE_HZ`,
-`GPIO_LOW_RATE_EVENT_COUNT`, `GPIO_PRODUCTION_EVENT_COUNT`, and
-`GPIO_CHECKSUM_ALGORITHM`; `EXPECTED_BUILD_ID` and
-`EXPECTED_HARDWARE_SERIAL` pin the artifact and board as in the earlier rig
-programs.
+- [Documentation index](doc/README.md)
+- [Quickstart](doc/guides/quickstart.md)
+- [Python API architecture](doc/architecture/python-api.md)
+- [Python API reference](doc/reference/api-reference.md)
+- [Hardware safety](doc/reference/hardware-safety.md)
+- [Calibration](doc/architecture/calibration.md)
+- [Optional NumPy integration](doc/architecture/numpy-integration.md)
+- [Protocol v1](doc/protocol/protocol-v1.md)
+- [System overview](doc/architecture/system-overview.md)
 
-The accepted clean artifact, local throughput/resource gate, repaired
-frame-boundary STOP behavior, and sequential diagnostic, 10-second smoke, and
-60-second physical stream evidence are consolidated in
-`doc/results/phase-06-gpio-dma.md`.
+## Repository layout and checks
 
-`firmware/tests/rig_adc_capture.py` is the standalone Phase 07 physical
-dual-ADC acceptance program. It independently grades the Teensy 4.0 identity,
-both bounded calibration results, fixed A0/ADC1/channel-7 and
-A1/ADC2/channel-8 routes, exact 1 MHz/500 ns trigger arithmetic, and the
-PIT/XBAR/ADC_ETC register snapshot. The BOOT one-pair completion check is
-treated only as digital timing evidence. Because protocol v1 deliberately has
-no variable-rate ADC configuration, the preliminary capture limits volume
-with `ADC_REDUCED_CAPTURE_FRAMES` while retaining the production 1 MHz
-schedule; it does not misreport that epoch as a lower hardware rate. A second,
-timed epoch then checks every physical ADC frame's checksum, four-byte
-little-endian `adc0, adc1` pair layout, advertised code range, count, run,
-sequence, timestamp, flags, and final firmware-to-host accounting while
-polling STATUS under load.
+- `firmware/`: Teensy 4.0 sketch, portable C++ components, build tooling, and
+  host-compiled firmware tests.
+- `daq_api/`: installable `teensy_daq` package, CLI, simulator, examples, and
+  Python tests.
+- `protocol/`: canonical machine-readable contract and cross-language golden
+  frames.
+- `doc/`: structured architecture, guide, reference, decision, and evidence
+  artifacts.
 
-The full-rate epoch defaults to 10 seconds; use `ADC_CAPTURE_SECONDS=60` for
-the soak. Optional controls are `ADC_STATUS_INTERVAL_SECONDS`,
-`ADC_REDUCED_CAPTURE_FRAMES`, and `ADC_CHECKSUM_ALGORITHM`, with the shared
-`EXPECTED_BUILD_ID` and `EXPECTED_HARDWARE_SERIAL` identity pins. If the rig
-has an analog stimulus, `ADC_FIXTURE_STIMULUS_JSON` must use schema
-`teensy-daq-adc-stimulus-v1`, name the fixture/stimulus, and declare exact A0
-and A1 minimum/maximum accepted codes; optional complete mean-code bounds make
-analog-quality grading explicit. Without that declaration the program prints
-that A0/A1 are unstimulated and that neither analog quality nor aperture was
-graded. No code-range or DC declaration is promoted to analog-aperture
-evidence.
-
-`firmware/tests/rig_combined_capture.py` is the standalone Phase 08 physical
-combined-acquisition program. It independently configures both engines on one
-epoch, validates every checksum plus ADC/GPIO sequence, timestamp, layout,
-safe range, and equal-duration relationship, polls STATUS under load, and
-reconciles the final target/host counters after a clean STOP. The accepted
-clean image passed the full local gate, a 5-second synthetic regression, and
-sequential 10-second and 60-second physical jobs at approximately 4 MB/s per
-source with zero live or complete-frame loss. Artifact, rate, timing, queue,
-memory, error, latency, and fixture-limit evidence is recorded in
-`doc/results/phase-08-combined-acquisition.md`.
-
-Phase 09 adds two self-contained negative rig programs, each using only the
-standard library plus PySerial. `firmware/tests/rig_host_stall_recovery.py`
-starts physical combined acquisition, proves a zero-loss baseline, performs no
-reads for `STALL_SECONDS` (1 second by default and required to exceed the
-advertised packet-pool duration), catches both sources back up past live STATUS
-snapshots, and reconciles sequence/timestamp gaps, flags, block/item/byte loss,
-pressure eviction, and packet conservation before a bounded STOP.
-`firmware/tests/rig_control_recovery.py` checks corrupt, oversized, truncated,
-unknown-kind/version, reserved-field, duplicate-ID, and illegal-state commands;
-runs `CONTROL_RECOVERY_CYCLES` complete physical lifecycles (100 by default and
-never fewer); then closes/reopens CDC during streaming, reprobes identity/run
-state, reconciles any close-induced loss, and requires final IDLE. Both accept
-the shared `SERIAL_PORT`, `EXPECTED_BUILD_ID`, and
-`EXPECTED_HARDWARE_SERIAL` environment variables and print exact `CHECK`, JSON
-`EVENT`, and final `SUMMARY` records that separate intentional loss/rejections
-from unexpected framing, acquisition, transport, or hardware faults. The
-accepted 0.25/1/3-second stall campaign, 100-cycle CDC/control recovery, six
-independent reset/re-enumeration jobs, repaired BOOT timing probe, and final
-60-second zero-complete-frame-loss regression are recorded in
-`doc/results/phase-09-loss-recovery.md`.
-
-## Synchronous Python API and offline simulator
-
-The Python facade runs INFO→CONFIGURE→START→GET_STATUS→STOP→RESET_STATS and
-optional diagnostics through the same background reader for serial hardware
-and the in-memory simulator. `TeensyDAQ.gpio_clock_diagnostic()` returns a
-typed, read-only register/count result after identity, capability, and IDLE
-checks; the simulator rejects it rather than fabricate hardware evidence. The
-stream models preserve raw ADC converter identity and packed GPIO data.
-Production iterators emit firmware-reconciled `StreamGap`, typed
-duplicate/reorder/stale/timestamp `StreamAnomaly`, and exact per-source
-`HostQueueLoss` events while continuing to drain; strict mode raises the
-corresponding typed exception. Sequence/timestamp inference, frame flags, and
-cumulative firmware block/item/byte counters remain independently visible,
-and START/RESET/reconnect/wrap boundaries cannot join runs. NumPy is not
-required. When the optional extra is installed, `ADCBlock.as_numpy()` exposes
-read-only zero-copy little-endian pair views and `GPIOBlock.as_numpy()` keeps
-samples packed until callers explicitly request selected bit columns; the
-ownership and allocation contract is documented in
-`doc/architecture/numpy-integration.md`.
-
-The Phase 04 streaming path uses one reusable 64 KiB receive buffer whenever a
-transport offers `readinto`, retains bounded decoded queues (512 data frames by
-default, about 2 MiB of payload storage), and exposes zero-copy payload views.
-Strict synthetic validation checks the complete ADC/GPIO formulas as bulk
-cyclic views in addition to run IDs, independent sequences, timestamps, gap
-flags, parser errors, firmware counters, and host drops. `run_synthetic_soak()`
-wraps the synchronous API with interleaved STATUS commands, separate payload
-and framed throughput, bounded command-latency samples, queue/parser/Python
-memory high-water marks, graceful STOP, final STATUS, and exact
-firmware-to-wire-to-consumer reconciliation.
-
-The dedicated Phase 04 correctness/performance suite runs multi-second paced
-streams at the nominal and above-target schedules through seeded random read
-boundaries, validates a separate two-epoch wire corpus, and stress-tests the
-drop-oldest host queue. Its benchmark excludes corpus construction, measures
-incremental parsing plus full formula validation across three deterministic
-chunk distributions, and requires at least 1.25 times the approximately
-8.095 MB/s framed target. Use `-s` to retain the structured platform and timing
-record printed by the guard:
+Common local gates:
 
 ```bash
-.venv/bin/python -m pytest -q -s \
-  daq_api/tests/test_streaming_correctness_performance.py
+.venv/bin/python tools/generate_protocol.py --check
+.venv/bin/python -m ruff format --check daq_api firmware tools
+.venv/bin/python -m ruff check daq_api firmware tools
+.venv/bin/python -m mypy daq_api/src/teensy_daq
+.venv/bin/python -m pytest
+python3 firmware/tools/build_firmware.py
 ```
 
-Physical GPIO is configured with
-`TeensyDAQ.configure(adc=False, gpio=True, source=Source.HARDWARE)`. Phase 03's
-zero-stream profile remains available through `TeensyDAQ.configure_control_only()`
-and `TeensyDAQ.simulated(control_only=True)` for legacy probing. Serial opens
-discard one valid INFO
-probe, require a second identity-equal response, retry reset/BOOT noise within
-an explicit bound, and validate the protocol, Teensy target, minimum firmware,
-source-derived build ID, and hardware serial before mutation. The installed
-`teensy-daq` CLI lists filtered USB candidates and provides `probe`, `status`,
-`configure`, `start`, `stop`, `reset-stats`, and bounded `monitor`/`capture`
-commands with typed nonzero exit
-codes for timeout, busy port, wrong device, unsupported capability, disconnect,
-and illegal state. Exact artifact pins can be supplied with
-`--expect-build-id`, `--expect-firmware`, and `--hardware-serial`; see
-`daq_api/README.md` for the full command reference. The bounded workflow prints
-live per-source rates, observed gaps, firmware/host queue high-water marks, and
-command latency, and always sends STOP and closes in its finalizer.
+## Private distribution boundary
 
-After installing `daq_api`, run the complete synthetic flow without a Teensy,
-serial port, or credentials. The demo validates every ADC/GPIO sample, stream
-timestamp, sequence, and counter before printing `PASS`; any mismatch exits
-nonzero. Frame count is per stream, and parser chunk size deliberately
-exercises arbitrary byte boundaries:
-
-```bash
-.venv/bin/python -m teensy_daq.demo --frame-count 2 --parser-chunk-size 17
-.venv/bin/teensy-daq-demo --frame-count 2 --parser-chunk-size 17
-```
+The distribution name in `daq_api/pyproject.toml` is a replaceable local
+placeholder and the package is marked `Private :: Do Not Upload`. `Teensy®` is
+a PJRC trademark; naming, trademark use, index availability, and the absence of
+a repository license must be reviewed before any public package submission.
+Repository workflows must not reserve, upload, or publish this distribution.

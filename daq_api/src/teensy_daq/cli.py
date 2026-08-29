@@ -46,6 +46,7 @@ from .identity import ExpectedDeviceIdentity
 from .models import (
     ADCBlock,
     DAQConfiguration,
+    DeviceCapabilities,
     DeviceInfo,
     GPIOBlock,
     HostQueueLoss,
@@ -197,6 +198,21 @@ def _add_acquisition_arguments(parser: argparse.ArgumentParser) -> None:
         choices=("adler32", "crc32c", "crc32-iso-hdlc"),
         default="adler32",
         help="data-frame checksum (default: adler32)",
+    )
+    parser.add_argument(
+        "--adc-pair-rate-hz",
+        type=int,
+        help="require this exact INFO-advertised ADC pair rate before CONFIGURE",
+    )
+    parser.add_argument(
+        "--gpio-sample-rate-hz",
+        type=int,
+        help="require this exact INFO-advertised GPIO rate before CONFIGURE",
+    )
+    parser.add_argument(
+        "--adc-resolution-bits",
+        type=int,
+        help="require this exact INFO-advertised ADC resolution before CONFIGURE",
     )
 
 
@@ -410,6 +426,9 @@ def _configuration_from_arguments(
         gpio=bool(stream_mask & constants.StreamMask.GPIO),
         source=source,
         checksum_algorithm=checksum,
+        adc_pair_rate_hz=arguments.adc_pair_rate_hz,
+        gpio_sample_rate_hz=arguments.gpio_sample_rate_hz,
+        adc_resolution_bits=arguments.adc_resolution_bits,
     )
 
 
@@ -771,6 +790,7 @@ def _print_configuration(
     output: TextIO,
     *,
     state: constants.DeviceState = constants.DeviceState.CONFIGURED,
+    capabilities: DeviceCapabilities | None = None,
 ) -> None:
     print(f"state={state.name}", file=output)
     print(f"profile={configuration.profile.name}", file=output)
@@ -780,6 +800,45 @@ def _print_configuration(
     )
     print(f"source={configuration.source.name}", file=output)
     print(f"checksum={configuration.data_checksum_algorithm.name}", file=output)
+    print(f"data_frame_bytes={configuration.data_frame_bytes}", file=output)
+    if (
+        capabilities is not None
+        and configuration.stream_mask & constants.StreamMask.ADC
+    ):
+        print(f"adc_pair_rate_hz={capabilities.adc_pair_rate_hz}", file=output)
+        print(f"adc_resolution_bits={capabilities.adc_resolution_bits}", file=output)
+    if (
+        capabilities is not None
+        and configuration.stream_mask & constants.StreamMask.GPIO
+    ):
+        print(f"gpio_sample_rate_hz={capabilities.gpio_sample_rate_hz}", file=output)
+
+
+def _configuration_details(
+    configuration: DAQConfiguration,
+    capabilities: DeviceCapabilities | None,
+) -> dict[str, object]:
+    """Return the echoed wire body plus active fixed-rate INFO metadata."""
+
+    details: dict[str, object] = {
+        "profile": configuration.profile,
+        "stream_mask": configuration.stream_mask,
+        "source": configuration.source,
+        "data_checksum_algorithm": configuration.data_checksum_algorithm,
+        "data_frame_bytes": configuration.data_frame_bytes,
+    }
+    if (
+        capabilities is not None
+        and configuration.stream_mask & constants.StreamMask.ADC
+    ):
+        details["adc_pair_rate_hz"] = capabilities.adc_pair_rate_hz
+        details["adc_resolution_bits"] = capabilities.adc_resolution_bits
+    if (
+        capabilities is not None
+        and configuration.stream_mask & constants.StreamMask.GPIO
+    ):
+        details["gpio_sample_rate_hz"] = capabilities.gpio_sample_rate_hz
+    return details
 
 
 def _run_monitor(
@@ -814,7 +873,11 @@ def _run_monitor(
         configuration = _configuration_from_arguments(daq, arguments)
         command_latencies_ms.append((monotonic() - command_started) * 1_000)
         if not json_output:
-            _print_configuration(configuration, output)
+            _print_configuration(
+                configuration,
+                output,
+                capabilities=daq.capabilities,
+            )
 
         command_started = monotonic()
         run_id = daq.start()
@@ -995,7 +1058,7 @@ def _run_monitor(
         }
     return {
         "command": arguments.command,
-        "configuration": configuration,
+        "configuration": _configuration_details(configuration, daq.capabilities),
         "run_id": run_id,
         "adc_output": arguments.adc_output,
         "gpio_channels": [f"D{pin}" for pin in gpio_pins],
@@ -1078,12 +1141,19 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                     {
                         "command": "configure",
                         "state": daq.state,
-                        "applied_configuration": applied_configuration,
+                        "applied_configuration": _configuration_details(
+                            applied_configuration,
+                            daq.capabilities,
+                        ),
                     },
                     output,
                 )
             else:
-                _print_configuration(applied_configuration, output)
+                _print_configuration(
+                    applied_configuration,
+                    output,
+                    capabilities=daq.capabilities,
+                )
         elif arguments.action == "monitor":
             with _capture_signal_handlers():
                 capture_report = _run_monitor(daq, arguments, output)
@@ -1102,7 +1172,10 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                         "command": "start",
                         "state": daq.state,
                         "run_id": run_id,
-                        "applied_configuration": started_configuration,
+                        "applied_configuration": _configuration_details(
+                            started_configuration,
+                            daq.capabilities,
+                        ),
                     },
                     output,
                 )
@@ -1111,6 +1184,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                     started_configuration,
                     output,
                     state=constants.DeviceState.RUNNING,
+                    capabilities=daq.capabilities,
                 )
                 print(f"run_id={run_id}", file=output)
         elif arguments.action == "stop":
