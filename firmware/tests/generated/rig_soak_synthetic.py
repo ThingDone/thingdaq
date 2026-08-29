@@ -80,7 +80,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate_sha256": "6ee2acb578559ea7a8ca1484c72be269d4b7b47be869a55f32e3c7b9f0ea762a",
   "generator_schema_version": 1,
   "mode": "synthetic",
-  "validator_sha256": "064089fcf4f8f710fec8ce7d14adb8f1a5888ba51a74b5e555f21c3186d3caa3"
+  "validator_sha256": "4075c735fae366887f6c4417e4c524e544a5ace7cf24d11156acf91444043fb5"
 }
 """
 )
@@ -192,7 +192,7 @@ COMMAND_QUEUE_CAPACITY = 4
 RESPONSE_QUEUE_CAPACITY = 4
 GPIO_RAW_RING_DEPTH = 4
 GPIO_PACKED_RING_DEPTH = 4
-ADC_RAW_RING_DEPTH = 6
+ADC_RAW_RING_DEPTH = 8
 
 HEADER = struct.Struct("<IBBHHBBIIIIIQI")
 TRAILER = struct.Struct("<I")

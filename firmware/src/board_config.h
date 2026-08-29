@@ -298,12 +298,14 @@ inline constexpr std::size_t kCommandParserCapacityBytes = 64U;
 inline constexpr std::size_t kUsbRxScratchBytes = 128U;
 inline constexpr std::size_t kCommandQueueDepth = 4U;
 inline constexpr std::size_t kResponseQueueDepth = 4U;
-// Six data buffers retain two complete generations beyond the four-entry
-// hardware look-ahead pipeline. Eight generation-indexed TCD slots keep
+// Eight data buffers retain two complete generations beyond the six-entry
+// hardware look-ahead pipeline. Twelve generation-indexed TCD slots keep
 // descriptor links unique even when multiple pressure generations target the
 // shared overflow sink.
-inline constexpr std::size_t kAdcDmaRingDepth = 6U;
-inline constexpr std::size_t kAdcDmaDescriptorCount = 8U;
+inline constexpr std::size_t kAdcDmaRingDepth = 8U;
+inline constexpr std::size_t kAdcDmaPipelineDepth = 6U;
+inline constexpr std::size_t kAdcDmaDescriptorCount =
+    2U * kAdcDmaPipelineDepth;
 inline constexpr std::size_t kAdcFramesPerLoop = 2U;
 inline constexpr std::size_t kAdcPackerStateBudgetBytes = 512U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
@@ -942,6 +944,12 @@ static_assert(kAdcDmaBufferStrideBytes % kCacheLineBytes == 0U,
               "each ADC DMA buffer must occupy complete cache lines");
 static_assert(kAdcDmaRingDepth >= 2U,
               "continuous paired ADC DMA needs two destinations");
+static_assert(kAdcDmaPipelineDepth >= 4U,
+              "paired ADC DMA needs bounded interrupt-coalescing headroom");
+static_assert(kAdcDmaRingDepth >= kAdcDmaPipelineDepth + 2U,
+              "ADC ring must retain two buffers beyond hardware look-ahead");
+static_assert(kAdcDmaDescriptorCount >= 2U * kAdcDmaPipelineDepth,
+              "ADC descriptor slots must not alias the live look-ahead");
 static_assert(kAdcDmaDescriptorBytes % kCacheLineBytes == 0U,
               "ADC DMA descriptors must occupy complete cache lines");
 static_assert(countOf(kAdcEdmaPriorities) == kLogicalAdcCount);

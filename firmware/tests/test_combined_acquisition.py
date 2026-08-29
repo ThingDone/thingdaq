@@ -187,11 +187,11 @@ class CombinedAcquisitionTests(unittest.TestCase):
             + resources["gpio_packed"]["bytes"]
         )
         self.assertEqual(430_080, ram1_buffer_bytes)
-        self.assertEqual(495_264, ram2_buffer_bytes)
+        self.assertEqual(503_648, ram2_buffer_bytes)
         self.assertEqual(8_192, resources["usb_tx"]["bytes"])
         self.assertLessEqual(ram1_buffer_bytes, regions["DTCM"][1] - regions["DTCM"][0])
         ram2_and_usb_bytes = ram2_buffer_bytes + resources["usb_tx"]["bytes"]
-        self.assertEqual(503_456, ram2_and_usb_bytes)
+        self.assertEqual(511_840, ram2_and_usb_bytes)
         self.assertLessEqual(
             ram2_and_usb_bytes,
             regions["RAM"][1] - regions["RAM"][0],

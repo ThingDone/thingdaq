@@ -393,11 +393,11 @@ empty. Its 376-byte success payload reports:
 | 328 | 6 / `u16[3]` | payload bytes, ADC pairs/frame, GPIO samples/frame |
 | 334 | 2 / `u16` | reserved, zero |
 | 336 | 4 / `u32` | common frame coverage in 8 MHz ticks |
-| 340 | 2 / `u8[2]` | ADC DMA ring depth (exactly 6) and bytes/pair (exactly 4) |
+| 340 | 2 / `u8[2]` | ADC DMA ring depth (exactly 8) and bytes/pair (exactly 4) |
 | 342 | 6 / `u8[2] × 3` | ADC eDMA channels, priorities, and DMAMUX sources |
 | 348 | 2 / `u8[2]` | ADC and GPIO DMA IRQ priorities |
 | 350 | 2 / `u16` | ADC pairs per DMA buffer |
-| 352 | 4 / `u32` | aligned ADC DMA ring bytes, exactly 24,384 |
+| 352 | 4 / `u32` | aligned ADC DMA ring bytes, exactly 32,512 |
 | 356 | 10 / `u16[5]` | total, primary, reserve packet counts and ready/transmit queue capacities |
 | 366 | 2 / `u8[2]` | command and response queue capacities |
 | 368 | 8 / `u32[2]` | nominal payload and framed bytes/s per enabled stream |

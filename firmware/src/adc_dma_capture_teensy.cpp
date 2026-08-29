@@ -54,7 +54,7 @@ constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100U;
 constexpr std::uint32_t kDmaAlignmentWaitCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100000U;
-constexpr std::size_t kDmaPipelineDepth = 4U;
+constexpr std::size_t kDmaPipelineDepth = board::kAdcDmaPipelineDepth;
 constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
 constexpr std::size_t kPairDispatchConverter = 1U;
 constexpr std::uint32_t kStopBoundaryPollLimit =
@@ -141,7 +141,7 @@ std::array<std::uint8_t, kConverterCount> g_next_destinations{
 std::array<std::uint32_t, kDmaPipelineDepth> g_pipeline_generations{};
 std::array<std::uint8_t, kDmaPipelineDepth> g_pipeline_destinations{
     kInvalidDestination, kInvalidDestination, kInvalidDestination,
-    kInvalidDestination};
+    kInvalidDestination, kInvalidDestination, kInvalidDestination};
 std::uint32_t g_epoch = 0U;
 std::uint32_t g_adc_etc_error_flags = 0U;
 std::uint32_t g_adc_etc_error_interrupts = 0U;
@@ -539,8 +539,8 @@ bool servicePendingDmaPair() {
 
 TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_isr")
 void adcPairDmaIsr() {
-  // Four generation-indexed descriptors are prelinked ahead of hardware.
-  // DADDR plus DLASTSGA identifies the active generation even when one or two
+  // Six generation-indexed descriptors are prelinked ahead of hardware.
+  // DADDR plus DLASTSGA identifies the active generation when as many as four
   // major-loop IRQ events coalesce, so every completed buffer can be advanced
   // exactly once without writing a live TCD.
   (void)servicePendingDmaPair();
@@ -700,11 +700,22 @@ StartStatus prepareHardware(std::uint32_t epoch) {
                ? StartStatus::kInvalidEpoch
                : StartStatus::kNotQuiescent;
   }
-  const ReservationResult third =
-      g_ring.reserveGeneration(epoch, prime.active_generation + 2U);
-  const ReservationResult fourth =
-      g_ring.reserveGeneration(epoch, prime.active_generation + 3U);
-  if (!third.ok() || !fourth.ok()) {
+  g_pipeline_generations[0] = prime.active_generation;
+  g_pipeline_generations[1] = prime.queued_generation;
+  g_pipeline_destinations[0] = prime.active_destination;
+  g_pipeline_destinations[1] = prime.queued_destination;
+  bool pipeline_reserved = true;
+  for (std::size_t index = 2U; index < kDmaPipelineDepth; ++index) {
+    const ReservationResult reserved = g_ring.reserveGeneration(
+        epoch, prime.active_generation + static_cast<std::uint32_t>(index));
+    if (!reserved.ok()) {
+      pipeline_reserved = false;
+      break;
+    }
+    g_pipeline_generations[index] = reserved.generation;
+    g_pipeline_destinations[index] = reserved.destination;
+  }
+  if (!pipeline_reserved) {
     const std::array<ChannelStopState, kConverterCount> stopped{{
         {prime.active_generation, 0U, prime.active_destination},
         {prime.active_generation, 0U, prime.active_destination},
@@ -715,12 +726,6 @@ StartStatus prepareHardware(std::uint32_t epoch) {
     return StartStatus::kNotQuiescent;
   }
 
-  g_pipeline_generations = {
-      prime.active_generation, prime.queued_generation,
-      third.generation, fourth.generation};
-  g_pipeline_destinations = {
-      prime.active_destination, prime.queued_destination,
-      third.destination, fourth.destination};
   syncPublishedPipelineState();
 
   disableInterrupts();
@@ -815,8 +820,7 @@ StopReport stopHardwareAfterTriggers() {
   g_epoch = 0U;
   g_current_destinations = {kInvalidDestination, kInvalidDestination};
   g_next_destinations = {kInvalidDestination, kInvalidDestination};
-  g_pipeline_destinations = {kInvalidDestination, kInvalidDestination,
-                             kInvalidDestination, kInvalidDestination};
+  g_pipeline_destinations.fill(kInvalidDestination);
   return report;
 }
 
@@ -936,6 +940,7 @@ static_assert(board::kAdcConverterConfigurations[1].dmamux_source ==
 static_assert(board::kAdcEdmaPriorities[0] == 2U);
 static_assert(board::kAdcEdmaPriorities[1] == 1U);
 static_assert(kPairDispatchConverter == 1U);
+static_assert(kDmaPipelineDepth == 6U);
 static_assert(kDmaAlignmentWaitCycles == 6000U);
 
 }  // namespace teensy_daq::adc_capture

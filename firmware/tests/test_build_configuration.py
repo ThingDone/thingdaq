@@ -212,25 +212,25 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_adc_dma_buffers_require_exact_aligned_ocram_storage(self) -> None:
         symbols = (
-            "20279000 00005f40 B "
+            "20277000 00007f00 B "
             "teensy_daq::adc_capture::g_adc_dma_buffers\n"
-            "2027ef40 00000020 B "
+            "2027ef00 00000020 B "
             "teensy_daq::adc_capture::g_adc_dma_overflow_sink\n"
-            "2027ef60 00000200 B "
+            "2027ef20 00000300 B "
             "teensy_daq::adc_capture::g_adc_dma_descriptors"
         )
         resources = build_firmware.adc_dma_buffer_usage(symbols)
 
-        self.assertEqual(24_928, resources["total_bytes"])
-        self.assertEqual("0x20279000", resources["allocations"]["RING"]["address"])
-        self.assertEqual(512, resources["allocations"]["DESCRIPTORS"]["bytes"])
+        self.assertEqual(33_312, resources["total_bytes"])
+        self.assertEqual("0x20277000", resources["allocations"]["RING"]["address"])
+        self.assertEqual(768, resources["allocations"]["DESCRIPTORS"]["bytes"])
         with self.assertRaisesRegex(build_firmware.BuildError, "cache-line aligned"):
             build_firmware.adc_dma_buffer_usage(
-                symbols.replace("2027ef60 00000200", "2027ef64 00000200")
+                symbols.replace("2027ef20 00000300", "2027ef24 00000300")
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
             build_firmware.adc_dma_buffer_usage(
-                symbols.replace("20279000 00005f40", "20079000 00005f40")
+                symbols.replace("20277000 00007f00", "20077000 00007f00")
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.adc_dma_buffer_usage(symbols.splitlines()[0])

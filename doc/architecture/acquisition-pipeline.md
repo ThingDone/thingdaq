@@ -419,20 +419,20 @@ latency has been measured.
 
 ## Buffer and cache composition
 
-The controller adds no payload storage. It reuses the six-buffer ADC pair
+The controller adds no payload storage. It reuses the eight-buffer ADC pair
 ring, four-buffer raw GPIO ring, four-buffer packed GPIO ring, isolated sinks,
 and the common 200-frame packet pool documented in [[Firmware-Resource-Map]].
 READY and TRANSMIT queues contain 400 and 200 one-byte indexes respectively;
 the packet buffers change ownership in place rather than being copied into
 another payload bank. Compile-time combined buffer totals reserve 440,832
-bytes in RAM1 and 495,264 bytes in RAM2. Including the pinned core's four
-2,048-byte USB TX buffers brings the simultaneous RAM2 buffer total to 503,456
+bytes in RAM1 and 503,648 bytes in RAM2. Including the pinned core's four
+2,048-byte USB TX buffers brings the simultaneous RAM2 buffer total to 511,840
 bytes, still inside the 512 KiB region before the exact linker gate accounts
 for all remaining core globals.
-The current prelinked ADC pipeline build uses 456,960 bytes of RAM1 variables,
-32,744 bytes of RAM1 code, 24 bytes of alignment padding, and leaves 34,560
-bytes for locals/stack. It uses 511,808 bytes of RAM2 variables and leaves
-12,480 bytes of heap headroom. Cold controller lifecycle, diagnostic snapshot, and
+The current prelinked ADC pipeline build uses 456,992 bytes of RAM1 variables,
+32,744 bytes of RAM1 code, 24 bytes of alignment padding, and leaves 34,528
+bytes for locals/stack. It uses 520,192 bytes of RAM2 variables and leaves
+4,096 bytes of heap headroom. Cold controller lifecycle, diagnostic snapshot, and
 non-measured checksum-vector preparation remain in flash so the additional
 telemetry does not consume another 32 KiB ITCM block.
 

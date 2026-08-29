@@ -131,13 +131,13 @@ def _info_payload() -> bytes:
     struct.pack_into("<IIIIII", payload, 156, 150_000_000, 37_500_000, 10_000, 0, 0, 0)
     _pack_adc_trigger_reference(payload, 180)
     struct.pack_into("<BBHHHHHI", payload, 324, 0, 0, 63, 4048, 1012, 4048, 0, 8096)
-    payload[340:350] = bytes((6, 4, 0, 1, 2, 1, 24, 88, 48, 64))
+    payload[340:350] = bytes((8, 4, 0, 1, 2, 1, 24, 88, 48, 64))
     struct.pack_into(
         "<HIHHHHHBBII",
         payload,
         350,
         1012,
-        24384,
+        32512,
         200,
         105,
         95,

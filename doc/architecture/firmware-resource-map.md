@@ -141,14 +141,14 @@ All eDMA channels must be below 32, all DMAMUX sources below 128, and neither
 set may contain duplicates. Pinned core macros are asserted against all three
 source numbers. Acquisition code must bind these exact channels rather than
 use an unconstrained first-free allocator. ADC0/ADC1 use fixed priority values
-2/1, above GPIO's priority 0, use NVIC priority 48, and each own eight 32-byte
+2/1, above GPIO's priority 0, use NVIC priority 48, and each own twelve 32-byte
 generation-indexed scatter/gather TCDs. Channel 0 reads `ADC1_R0` and channel 1 reads `ADC2_R0`;
 both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012`, and
 `DOFF=4` for consumer buffers. Both completion IRQs and the production
 ADC_ETC error IRQ share priority 48. Only the later ADC1 completion line
 dispatches and is used only as a wakeup. Its handler acknowledges both latches
 before inspection, waits for the live TCD positions to align, identifies the
-active entry in a four-generation prelinked pipeline from `DADDR` and
+active entry in a six-generation prelinked pipeline from `DADDR` and
 `DLASTSGA`, then consumes every inferred paired generation once in fixed
 ADC0-to-ADC1 order. Runtime updates touch only descriptors at least two
 generations ahead, never the active hardware TCD link. ADC0's NVIC line remains
@@ -162,10 +162,10 @@ reserved but masked.
 | USB receive scratch | 128 bytes | USB transport |
 | Complete command queue | 4 frames | Control plane |
 | Complete response queue | 4 frames | USB transport |
-| ADC DMA ring | 6 buffers | ADC capture |
+| ADC DMA ring | 8 buffers | ADC capture |
 | ADC DMA pressure sink | 1 isolated cache line shared at distinct halfwords | ADC capture |
-| ADC scatter/gather TCDs | 2 channels × 8 descriptors | ADC capture |
-| ADC DMA generations consumed per loop | 2 buffers; up to all 6 while stopping | ADC packer |
+| ADC scatter/gather TCDs | 2 channels × 12 descriptors | ADC capture |
+| ADC DMA generations consumed per loop | 2 buffers; up to all 8 while stopping | ADC packer |
 | Raw GPIO DMA ring | 4 buffers | GPIO capture |
 | Raw GPIO pressure sink | 1 isolated cache line | GPIO capture |
 | Raw GPIO scatter/gather TCDs | 5 descriptors | GPIO capture |
@@ -220,9 +220,9 @@ to two frames per service call and waits when no packet buffer is free.
 | Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 8,192 | 32 | Packetizer |
 | GPIO packer state and telemetry | DTCM / RAM1 | compile-time ceiling | 2,048 | 32 | GPIO packer |
 | ADC packer state and telemetry | DTCM / RAM1 | compile-time ceiling | 512 | 8 | ADC packer |
-| ADC DMA ring | OCRAM / RAM2 | `6 × align32(4,048)` | 24,384 | 32 | ADC capture |
+| ADC DMA ring | OCRAM / RAM2 | `8 × align32(4,048)` | 32,512 | 32 | ADC capture |
 | ADC DMA pressure sink | OCRAM / RAM2 | one isolated cache line | 32 | 32 | ADC capture |
-| ADC TCD banks | OCRAM / RAM2 | `2 × 8 × 32` | 512 | 32 | ADC capture |
+| ADC TCD banks | OCRAM / RAM2 | `2 × 12 × 32` | 768 | 32 | ADC capture |
 | Raw GPIO DMA ring | OCRAM / RAM2 | `4 × 4,048 × 4` | 64,768 | 32 | GPIO capture |
 | Raw GPIO pressure sink | OCRAM / RAM2 | one isolated cache line | 32 | 32 | GPIO capture |
 | Raw GPIO TCD bank | OCRAM / RAM2 | `5 × 32` | 160 | 32 | GPIO capture |
@@ -232,13 +232,13 @@ to two frames per service call and waits when no packet buffer is free.
 | Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | **RAM1 subtotal** |  |  | **450,464** |  |  |
-| **RAM2 subtotal** |  |  | **499,392** |  |  |
+| **RAM2 subtotal** |  |  | **507,776** |  |  |
 
 The simultaneous combined-acquisition subset is 440,832 RAM1 bytes for the
 primary packet bank, packet records/index queues, and both packer-state budgets,
-plus 495,264 RAM2 bytes for the reserve packet bank and all ADC/raw-GPIO/packed
+plus 503,648 RAM2 bytes for the reserve packet bank and all ADC/raw-GPIO/packed
 GPIO DMA storage. Adding the pinned core's 8,192-byte USB TX ring makes the
-combined RAM2 buffer footprint 503,456 bytes. Compile-time assertions enforce
+combined RAM2 buffer footprint 511,840 bytes. Compile-time assertions enforce
 all three totals against their real memory regions; the linker/map gate remains
 authoritative for unrelated core globals and final stack/heap headroom.
 
@@ -375,7 +375,7 @@ cache operation occurs in either major-loop ISR. CPU acquisition invalidates
 the whole aligned buffer only after the dual barrier; release or cooperative
 discard deletes the cache lines before `FREE` becomes visible to the ISR.
 
-If all six consumer buffers are owned, both channels rotate to distinct
+If all eight consumer buffers are owned, both channels rotate to distinct
 halfwords in one isolated 32-byte sink with `DOFF=0`. Each paired sink major
 loop counts one overrun and exactly 1,012 lost pairs without touching
 `READY`/`READING` data. Epoch plus modulo-32-bit DMA generations reject stale
