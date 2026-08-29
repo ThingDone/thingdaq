@@ -8,11 +8,18 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from dataclasses import replace as dataclass_replace
 from enum import Enum, IntEnum
-from typing import Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from ._generated import protocol_constants as constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .protocol import Frame, FrameValidationError
+
+if TYPE_CHECKING:
+    from .calibration import (
+        CalibratedAdcChannels,
+        CalibratedAdcSample,
+        CalibrationRecord,
+    )
 
 _CONFIGURATION = struct.Struct("<BBBBI")
 _CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
@@ -752,6 +759,7 @@ class AdcBlockMetadata:
     container_bytes: int = constants.ADC_CONTAINER_BITS // 8
     code_min: int = constants.ADC_CODE_MIN
     code_max: int = (1 << constants.ADC_PRIMARY_RESOLUTION_BITS) - 1
+    hardware_serial: int = 0
     calibration: AdcCalibrationMetadata = dataclass_field(
         default_factory=AdcCalibrationMetadata
     )
@@ -796,6 +804,7 @@ class AdcBlockMetadata:
             raise ValueError("ADC block resolution must be 12 or gated 10 bits")
         if self.code_max != (1 << self.resolution_bits) - 1:
             raise ValueError("ADC block code range disagrees with its resolution")
+        _unsigned("hardware_serial", self.hardware_serial, 32)
         if not isinstance(self.calibration, AdcCalibrationMetadata):
             raise TypeError("calibration must be AdcCalibrationMetadata")
         if not isinstance(self.trigger, AdcTriggerMetadata):
@@ -844,6 +853,7 @@ class AdcBlockMetadata:
             container_bytes=value.adc_container_bytes,
             code_min=value.adc_code_min,
             code_max=value.adc_code_max,
+            hardware_serial=getattr(value, "hardware_serial", 0),
             calibration=AdcCalibrationMetadata.from_device_metadata(value),
             trigger=value.adc_trigger,
             acquisition=acquisition,
@@ -4846,6 +4856,42 @@ class ADCBlock:
         """Explicitly merge ADC0/ADC1 times without claiming added bandwidth."""
 
         return interleave_adc(self)
+
+    def calibrated_channels(
+        self,
+        calibration: CalibrationRecord,
+        *,
+        hardware_serial: int | None = None,
+        analog_front_end_profile: str | None = None,
+    ) -> CalibratedAdcChannels:
+        """Return opt-in calibrated volts while retaining both raw views."""
+
+        from .calibration import calibrated_channels
+
+        return calibrated_channels(
+            self,
+            calibration,
+            hardware_serial=hardware_serial,
+            analog_front_end_profile=analog_front_end_profile,
+        )
+
+    def calibrated_interleaved(
+        self,
+        calibration: CalibrationRecord,
+        *,
+        hardware_serial: int | None = None,
+        analog_front_end_profile: str | None = None,
+    ) -> Iterator[CalibratedAdcSample]:
+        """Return calibrated timestamped samples without changing raw codes."""
+
+        from .calibration import calibrated_interleaved
+
+        return calibrated_interleaved(
+            self,
+            calibration,
+            hardware_serial=hardware_serial,
+            analog_front_end_profile=analog_front_end_profile,
+        )
 
 
 # Preserve the conventional mixed-case Phase 01 spelling.

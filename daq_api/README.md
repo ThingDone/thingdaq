@@ -13,6 +13,7 @@ related:
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
+  - '[[Calibration]]'
 ---
 
 # Teensy DAQ Python package
@@ -299,6 +300,18 @@ identity. They create a denser nominal two-converter time grid; they do not
 increase either input's analog bandwidth. GPIO payloads remain packed, and
 `block.channel(pin)` lazily extracts D6-D13 without an eager eightfold Boolean
 expansion. None of these operations imports or requires NumPy.
+
+Per-unit host calibration is a separate opt-in layer. Immutable schema-v1
+records are keyed by the physical hardware serial and an optional exact analog
+front-end profile, live only at a user-selected JSON path, and are checked
+against the block identity, resolution, code range, and nominal input range
+before use. `block.calibrated_channels(record, ...)` returns lazy voltage views
+with `calibrated=True`, `units="V"`, and direct access to the raw block and
+channels. `block.calibrated_interleaved(record, ...)` retains each sample's
+`raw_code` beside its calibrated `voltage`. Neither operation changes the raw
+payload or timestamps; schema-v1 timing skew is provenance-only and is not
+applied. The formulas, safe-store contract, workflow, and limitations are in
+[[Calibration]].
 
 `Status.adc_acquisition` exposes the complete physical dual-DMA, pair,
 framing, loss, ADC_ETC/eDMA conversion-error, lifecycle, and packer snapshot.
