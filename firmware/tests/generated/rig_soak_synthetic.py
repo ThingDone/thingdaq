@@ -43,7 +43,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate": {
     "artifact": {
       "name": "firmware.ino.hex",
-      "sha256": "066cecbc3e777e05fe0206caab3a583a7e43a3c79eecffc2ae4b4afb3c152c4e"
+      "sha256": "6a7eebf1703a03a2e19610fd81573f23f7cfe99d046cb91ac25fed942a661c00"
     },
     "board": {
       "board_id": 1,
@@ -52,8 +52,8 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
       "mcu_id": 1
     },
     "firmware": {
-      "build_id": "tdaq-85b0536139cd3f8a",
-      "source_id": "85b0536139cd3f8ae61b68dc6528d81eafe75d1e3a86fbefb1774af93a766718",
+      "build_id": "tdaq-edb033c44b9267da",
+      "source_id": "edb033c44b9267da3c6e7360face32c7aeff067c7c571851db9e83cec2a6ce3d",
       "version": [
         0,
         7,
@@ -77,7 +77,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
       "warmup_seconds": 1.0
     }
   },
-  "candidate_sha256": "1ae0ce075bb02209da4c5f3a791729787f5df757a83ee7a020e150cf431c2f20",
+  "candidate_sha256": "0f9c2fa3064eb3b66395ee269b1dbcb7e05e6a737ca7a0793e1f271fafb11ebf",
   "generator_schema_version": 1,
   "mode": "synthetic",
   "validator_sha256": "287e312dc1bc08784054e0027ca56a8d46efafa7254bc140f8eeab379de37d4b"
