@@ -294,12 +294,43 @@ void testDeterministicArmStopOrderAndOwnedConflict() {
          "an active owned PIT1 rejects configuration before any register write");
 }
 
+void testCompletionDiagnosticLatchesOneInterruptPerConverter() {
+  resetFakeRegisters();
+  trigger::TeensyPlatform platform{};
+  expect(platform.configureStopped().error_flags == 0U &&
+             platform.armFromStopped(true),
+         "completion diagnostic arms from verified stopped state");
+
+  const std::uint32_t done0 =
+      ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(v1::kAdcTriggerQueues[0]);
+  const std::uint32_t done1 =
+      ADC_ETC_DONE0_1_IRQ_TRIG_DONE1(v1::kAdcTriggerQueues[1]);
+  fake_imxrt::arm_dwt_cyccnt = 1'000U;
+  fake_imxrt::adc_etc.DONE0_1_IRQ.reset(done0);
+  fake_imxrt::interrupt_vectors[IRQ_ADC_ETC0]();
+  fake_imxrt::arm_dwt_cyccnt = 1'300U;
+  fake_imxrt::adc_etc.DONE0_1_IRQ.reset(done1);
+  fake_imxrt::interrupt_vectors[IRQ_ADC_ETC1]();
+
+  expect(platform.completionCounts() ==
+                 std::array<std::uint32_t, 2U>{1U, 1U} &&
+             platform.firstCompletionCycles() ==
+                 std::array<std::uint32_t, 2U>{1'000U, 1'300U},
+         "diagnostic retains exactly the first 300-cycle-spaced completions");
+  expect(!fake_imxrt::interrupt_enabled[IRQ_ADC_ETC0] &&
+             !fake_imxrt::interrupt_enabled[IRQ_ADC_ETC1] &&
+             fake_imxrt::interrupt_enabled[IRQ_ADC_ETC_ERR],
+         "each completion ISR disables itself without hiding trigger errors");
+  expect(platform.stop(), "latched completion diagnostic stops cleanly");
+}
+
 }  // namespace
 
 int main() {
   testFixedPinModuleRoutesAndLegalResolutionModes();
   testExactStoppedTriggerScheduleAndResourceIsolation();
   testDeterministicArmStopOrderAndOwnedConflict();
+  testCompletionDiagnosticLatchesOneInterruptPerConverter();
   if (failures != 0) {
     std::cerr << failures << " ADC register-adapter assertion(s) failed\n";
     return 1;

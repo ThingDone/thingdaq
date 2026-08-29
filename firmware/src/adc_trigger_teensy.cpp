@@ -208,9 +208,13 @@ void adcEtcDone0Isr() {
   if (pending != 0U) {
     if (g_completion_counts[0] == 0U) {
       g_first_completion_cycles[0] = ARM_DWT_CYCCNT;
+      g_completion_counts[0] = 1U;
     }
-    saturatingIncrement(g_completion_counts[0]);
     ADC_ETC_DONE0_1_IRQ = pending;
+    // One completion is sufficient for the BOOT timing cross-check.  Leaving
+    // this 1 MHz source enabled can continuously preempt the equal-priority
+    // ADC1 completion vector before it records its first timestamp.
+    NVIC_DISABLE_IRQ(IRQ_ADC_ETC0);
   }
 }
 
@@ -219,9 +223,10 @@ void adcEtcDone1Isr() {
   if (pending != 0U) {
     if (g_completion_counts[1] == 0U) {
       g_first_completion_cycles[1] = ARM_DWT_CYCCNT;
+      g_completion_counts[1] = 1U;
     }
-    saturatingIncrement(g_completion_counts[1]);
     ADC_ETC_DONE0_1_IRQ = pending;
+    NVIC_DISABLE_IRQ(IRQ_ADC_ETC1);
   }
 }
 

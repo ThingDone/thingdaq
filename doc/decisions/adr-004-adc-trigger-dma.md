@@ -170,8 +170,11 @@ route, queue, delay, and hardware-trigger setting is read back before arming.
 The BOOT diagnostic clears ADC_ETC/NVIC state, enables queues 0/4, enables
 chained PIT1, and enables the 4 MHz PIT0 master last. Separate ITCM completion
 ISRs timestamp the first queue-0 Done0 and queue-4 Done1 interrupts with the
-free-running 600 MHz DWT counter; the error ISR retains ADC_ETC trigger-error
-state and a saturating count. The portable scheduler waits for both
+free-running 600 MHz DWT counter, latch one completion apiece, and disable
+their own NVIC lines so the continuing 1 MHz queue-0 source cannot starve the
+equal-priority queue-4 first-completion timestamp; the error ISR remains
+enabled and retains ADC_ETC trigger-error state and a saturating count. The
+portable scheduler waits for both
 completions with independent 2,000 us and 2,000,000-poll ceilings. Teardown
 stops PIT0 first, disables both queues, waits boundedly for both ADCs to become
 idle, disables and acknowledges the interrupts, and verifies the stopped
