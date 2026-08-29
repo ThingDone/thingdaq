@@ -412,6 +412,13 @@ counter reconciliation, and stale lease/interrupt rejection across run
 boundaries. Its companion pinned linker/map fixture proves the simultaneous
 packet, ADC, GPIO, and USB storage layout is in-bounds and non-overlapping.
 
+The dedicated pressure/recovery executable separately tests the completed
+firmware policy against every possible partial 4,096-byte USB offset, logical
+4/6/8-frame pool capacities, adversarial dual-source completion, oldest/fair
+eviction, exact loss/gap reconciliation, corrupt and long-garbage commands,
+all illegal lifecycle edges, queue wrap, RESET_STATS boundaries, rapid
+STOP/START traffic, and CDC close/reopen while acquisition remains live.
+
 After installing the development environment above, run the focused gate from
 the repository root:
 
