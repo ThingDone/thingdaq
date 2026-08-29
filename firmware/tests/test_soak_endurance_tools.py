@@ -588,6 +588,79 @@ class SoakValidatorFailureTests(unittest.TestCase):
         self.assertEqual(0.099, summary["p99_seconds"])
         self.assertEqual(0.100, summary["maximum_seconds"])
 
+    def test_streaming_memory_sampling_avoids_tracing_and_filesystem_probes(
+        self,
+    ) -> None:
+        canonical_validator.tracemalloc.stop()
+        try:
+            with (
+                patch.object(
+                    canonical_validator,
+                    "_current_rss_bytes",
+                    return_value=64 * 1024**2,
+                ),
+                patch.object(
+                    canonical_validator,
+                    "_peak_rss_bytes",
+                    return_value=64 * 1024**2,
+                ),
+                patch.object(
+                    canonical_validator,
+                    "_available_process_memory_bytes",
+                    return_value=512 * 1024**2,
+                ),
+            ):
+                memory = canonical_validator.MemoryTracker()
+                memory.begin_streaming()
+
+            self.assertFalse(canonical_validator.tracemalloc.is_tracing())
+            with (
+                patch.object(
+                    canonical_validator,
+                    "_current_rss_bytes",
+                    side_effect=AssertionError("streaming current RSS probe"),
+                ),
+                patch.object(
+                    canonical_validator,
+                    "_available_process_memory_bytes",
+                    side_effect=AssertionError("streaming available-memory probe"),
+                ),
+                patch.object(
+                    canonical_validator,
+                    "_peak_rss_bytes",
+                    return_value=70 * 1024**2,
+                ),
+            ):
+                memory.sample_streaming(checkpoint=True)
+
+            with (
+                patch.object(
+                    canonical_validator,
+                    "_current_rss_bytes",
+                    return_value=65 * 1024**2,
+                ),
+                patch.object(
+                    canonical_validator,
+                    "_peak_rss_bytes",
+                    return_value=70 * 1024**2,
+                ),
+                patch.object(
+                    canonical_validator,
+                    "_available_process_memory_bytes",
+                    return_value=500 * 1024**2,
+                ),
+            ):
+                memory.end_streaming()
+
+            summary = memory.summary()
+            self.assertTrue(canonical_validator.tracemalloc.is_tracing())
+            self.assertEqual(1, summary["coverage"]["streaming_windows"])
+            self.assertEqual(1, summary["coverage"]["streaming_samples"])
+            self.assertEqual(6 * 1024**2, summary["process_rss"]["growth_bytes"])
+            self.assertEqual(500 * 1024**2, summary["minimum_available_bytes"])
+        finally:
+            canonical_validator.tracemalloc.stop()
+
 
 class AcceleratedCampaignTests(unittest.TestCase):
     def test_all_generated_600_second_modes_execute_with_a_fake_clock(self) -> None:

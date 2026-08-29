@@ -80,7 +80,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate_sha256": "1ae0ce075bb02209da4c5f3a791729787f5df757a83ee7a020e150cf431c2f20",
   "generator_schema_version": 1,
   "mode": "synthetic",
-  "validator_sha256": "e35740ee8a1f8ec0c939dd06af139d8474bdb0d1dfa7931db7cffa759cf63c47"
+  "validator_sha256": "45352039be2007ba9164347ad1ddff0d7f240e12804f709badbed1ccbb8192e6"
 }
 """
 )
@@ -1576,7 +1576,14 @@ def _available_process_memory_bytes() -> int | None:
 
 
 class MemoryTracker:
-    """Tracemalloc plus best available process/container memory evidence."""
+    """Boundary tracing plus continuous process RSS high-water evidence.
+
+    Tracing every short-lived frame and payload allocation materially reduces
+    throughput in the service's Alpine container.  Keep ``tracemalloc`` and
+    filesystem-backed current/available-memory probes at control boundaries;
+    during full-rate streaming, sample only the kernel-maintained process RSS
+    high water so memory evidence cannot itself backpressure the device.
+    """
 
     def __init__(self) -> None:
         tracemalloc.start()
@@ -1591,6 +1598,9 @@ class MemoryTracker:
         self.final_traced_bytes = self.baseline_traced_bytes
         self.final_rss_bytes = self.baseline_rss_bytes
         self.samples = 0
+        self.streaming_samples = 0
+        self.streaming_windows = 0
+        self.streaming_active = False
         self.checkpoints: list[dict[str, int | None]] = []
         self.sample(checkpoint=True)
 
@@ -1624,9 +1634,60 @@ class MemoryTracker:
                 {
                     "traced_bytes": current_traced,
                     "rss_bytes": current_rss,
+                    "peak_rss_bytes": peak_rss,
                     "available_bytes": available,
                 }
             )
+
+    def begin_streaming(self) -> None:
+        """Pause allocation tracing before one full-rate acquisition epoch."""
+
+        require(
+            not self.streaming_active,
+            "memory_growth",
+            "memory tracker streaming window is already active",
+        )
+        self.sample(checkpoint=True)
+        if tracemalloc.is_tracing():
+            tracemalloc.stop()
+        self.streaming_active = True
+        self.streaming_windows += 1
+
+    def sample_streaming(self, *, checkpoint: bool = False) -> None:
+        """Record the OS process high water without allocating payload traces."""
+
+        require(
+            self.streaming_active,
+            "memory_growth",
+            "streaming memory sample is outside an acquisition epoch",
+        )
+        peak_rss = _peak_rss_bytes()
+        self.samples += 1
+        self.streaming_samples += 1
+        if peak_rss is not None:
+            self.maximum_peak_rss_bytes = max(
+                self.maximum_peak_rss_bytes or 0,
+                peak_rss,
+            )
+        if checkpoint and len(self.checkpoints) < MAX_COUNTER_SAMPLES:
+            self.checkpoints.append(
+                {
+                    "traced_bytes": None,
+                    "rss_bytes": None,
+                    "peak_rss_bytes": peak_rss,
+                    "available_bytes": None,
+                }
+            )
+
+    def end_streaming(self) -> None:
+        """Resume allocation tracing and take a complete boundary sample."""
+
+        if not self.streaming_active:
+            return
+        self.streaming_active = False
+        if not tracemalloc.is_tracing():
+            tracemalloc.start()
+        self.sample(checkpoint=True)
 
     @property
     def traced_growth_bytes(self) -> int:
@@ -1634,13 +1695,28 @@ class MemoryTracker:
 
     @property
     def rss_growth_bytes(self) -> int | None:
-        if self.baseline_rss_bytes is None or self.maximum_rss_bytes is None:
-            return None
-        return max(0, self.maximum_rss_bytes - self.baseline_rss_bytes)
+        if (
+            self.baseline_peak_rss_bytes is not None
+            and self.maximum_peak_rss_bytes is not None
+        ):
+            return max(
+                0,
+                self.maximum_peak_rss_bytes - self.baseline_peak_rss_bytes,
+            )
+        if self.baseline_rss_bytes is not None and self.maximum_rss_bytes is not None:
+            return max(0, self.maximum_rss_bytes - self.baseline_rss_bytes)
+        return None
 
     def summary(self) -> dict[str, object]:
         return {
             "sample_count": self.samples,
+            "coverage": {
+                "tracemalloc": "control-and-epoch-boundaries",
+                "process_rss_peak": "sampled-throughout-streaming",
+                "available_memory": "control-and-epoch-boundaries",
+                "streaming_samples": self.streaming_samples,
+                "streaming_windows": self.streaming_windows,
+            },
             "tracemalloc": {
                 "baseline_bytes": self.baseline_traced_bytes,
                 "final_bytes": self.final_traced_bytes,
@@ -2697,6 +2773,7 @@ class SoakRunner:
             )
             deferred.append(frame)
 
+        self.memory.begin_streaming()
         accepted_before_start = link.accepted_requests
         start_frame, latency = link.exchange(
             START_REQUEST,
@@ -2798,7 +2875,7 @@ class SoakRunner:
                 )
                 previous_status = status
                 status_rollup.observe(status)
-                self.memory.sample(
+                self.memory.sample_streaming(
                     checkpoint=status_rollup.count % checkpoint_interval == 0
                 )
                 next_status_at += self.settings.status_interval_seconds
@@ -2863,7 +2940,7 @@ class SoakRunner:
             expected_commands=expected_commands,
         )
         status_rollup.observe(final_status)
-        self.memory.sample(checkpoint=True)
+        self.memory.end_streaming()
 
         require(
             link.parser.errors == parser_errors_at_start,
@@ -3198,6 +3275,7 @@ class SoakRunner:
             self.cleanup["final_status"] = f"{type(error).__name__}: {error}"
 
     def failure_result(self, error: BaseException) -> dict[str, object]:
+        self.memory.end_streaming()
         category = error.category if isinstance(error, SoakFailure) else "program"
         return {
             "schema_version": RESULT_SCHEMA_VERSION,
