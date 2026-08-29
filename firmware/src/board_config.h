@@ -220,11 +220,12 @@ inline constexpr std::uint8_t kGpioEdmaIrqPriority = 64U;
 inline constexpr std::uint8_t kAdcEdmaPriorities[] = {2U, 1U};
 inline constexpr std::uint8_t kAdcEdmaIrqPriority = 48U;
 
-// The later ADC1 completion IRQ consumes both DMA_INT bits as one paired
-// barrier after a bounded reconciliation wait; ADC0's line stays reserved but
-// masked. That handler and ADC_ETC errors share one priority because they
-// mutate the same generation state. GPIO tolerates either preempting its
-// lower-priority completion interrupt.
+// The later ADC1 completion IRQ is the paired path's sole wakeup; progress is
+// inferred from both live TCDs after immediately acknowledging the latches, so
+// a clear cannot erase a newer ADC0 completion. ADC0's line stays reserved but
+// masked. That handler and ADC_ETC errors share one priority because they mutate
+// the same generation state. GPIO tolerates either preempting its lower-priority
+// completion interrupt.
 inline constexpr InterruptAllocation kInterruptAllocations[] = {
     {InterruptUse::kAdc0DmaCompletion, kAdcEdmaIrqPriority,
      ResourceOwner::kAdc0Capture},

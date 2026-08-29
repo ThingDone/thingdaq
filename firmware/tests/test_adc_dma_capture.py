@@ -115,14 +115,11 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "g_ring.reserveGeneration(g_epoch, future_generation)",
             "bool servicePendingDmaPair()",
             "void adcPairDmaIsr()",
-            "std::uint32_t pending = DMA_INT & kAdcDmaChannelMask",
-            "kDmaPairWaitCycles",
+            "DMA_INT & channelMask(kPairDispatchConverter)",
+            "kDmaAlignmentWaitCycles",
             "protocol_v1::kAdcTriggerDwtClockHz / 100000U",
-            "ARM_DWT_CYCCNT - started < kDmaPairWaitCycles",
-            "std::uint32_t waitForDmaPair(std::uint32_t pending)",
-            "void recordIncompleteDmaPair(std::uint32_t pending)",
-            'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_wait")',
-            'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_fault")',
+            "ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles",
+            "constexpr std::size_t kPairDispatchConverter = 1U",
             "attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr)",
             'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")',
             "NVIC_DISABLE_IRQ(IRQ_DMA_CH0)",
@@ -139,22 +136,29 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "analogRead(",
             "std::vector",
             "hardwareTcd(converter).DLASTSGA =",
+            "waitForDmaPair",
+            "recordIncompleteDmaPair",
+            "pending != kAdcDmaChannelMask",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
 
         service = source[source.index("bool servicePendingDmaPair()") :]
-        wait = service.index("waitForDmaPair(pending)")
-        aligned = service.index("waitForAlignedPipeline()")
         acknowledge = service.index(
+            "DMA_CINT = board::kAdcConverterConfigurations[kPairDispatchConverter]"
+        )
+        adc0_acknowledge = service.index(
             "DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel"
         )
+        barrier = service.index("barrier();")
+        aligned = service.index("waitForAlignedPipeline()")
         inferred = service.index("processInferredPairCompletion()")
         paired_isr = source[source.index("void adcPairDmaIsr()") :]
         enable = source[source.index("void enableInterrupts()") :]
-        self.assertLess(wait, aligned)
-        self.assertLess(aligned, acknowledge)
-        self.assertLess(acknowledge, inferred)
+        self.assertLess(acknowledge, adc0_acknowledge)
+        self.assertLess(adc0_acknowledge, barrier)
+        self.assertLess(barrier, aligned)
+        self.assertLess(aligned, inferred)
         self.assertIn("(void)servicePendingDmaPair()", paired_isr)
         self.assertNotIn("attachInterruptVector(IRQ_DMA_CH0", enable)
         self.assertNotIn("NVIC_ENABLE_IRQ(IRQ_DMA_CH0)", enable)

@@ -52,10 +52,11 @@ constexpr std::uint16_t kTcdControl =
     DMA_TCD_CSR_ESG | DMA_TCD_CSR_INTMAJOR;
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100U;
-constexpr std::uint32_t kDmaPairWaitCycles =
+constexpr std::uint32_t kDmaAlignmentWaitCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100000U;
 constexpr std::size_t kDmaPipelineDepth = 4U;
 constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
+constexpr std::size_t kPairDispatchConverter = 1U;
 constexpr std::uint32_t kStopBoundaryPollLimit =
     protocol_v1::kAdcTriggerDiagnosticPollLimit;
 constexpr std::uint16_t kStopBoundaryArmMinimumPairs =
@@ -481,36 +482,6 @@ bool processInferredPairCompletion() {
   return appendFutureGeneration();
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_wait")
-std::uint32_t waitForDmaPair(std::uint32_t pending) {
-  // ADC0 has the highest fixed eDMA priority and completes 500 ns before
-  // ADC1 by construction. Bound flag-visibility reconciliation to 10 us;
-  // a real missing completion still enters the fail-safe path before another
-  // major-loop boundary can be mistaken for this generation.
-  const std::uint32_t started = ARM_DWT_CYCCNT;
-  while (pending != kAdcDmaChannelMask &&
-         ARM_DWT_CYCCNT - started < kDmaPairWaitCycles) {
-    pending = DMA_INT & kAdcDmaChannelMask;
-  }
-  return pending;
-}
-
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_fault")
-void recordIncompleteDmaPair(std::uint32_t pending) {
-  for (std::size_t converter = 0U; converter < kConverterCount;
-       ++converter) {
-    if ((pending & channelMask(converter)) != 0U) {
-      DMA_CINT =
-          board::kAdcConverterConfigurations[converter].edma_channel;
-    } else if (g_hardware_prepared) {
-      g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
-    }
-  }
-  if (g_hardware_prepared) {
-    g_faulted = true;
-  }
-}
-
 TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_wait")
 std::size_t waitForAlignedPipeline() {
@@ -522,7 +493,7 @@ std::size_t waitForAlignedPipeline() {
         adc0 < kDmaPipelineDepth - 1U) {
       return adc0;
     }
-  } while (ARM_DWT_CYCCNT - started < kDmaPairWaitCycles);
+  } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles);
   return kInvalidPipelineIndex;
 }
 
@@ -534,22 +505,18 @@ bool servicePendingDmaPair() {
     return false;
   }
   for (std::size_t attempt = 0U; attempt < kDmaPipelineDepth; ++attempt) {
-    std::uint32_t pending = DMA_INT & kAdcDmaChannelMask;
-    if (pending == 0U) {
-      return hardwarePipelineIndex(0U) == 0U &&
-             hardwarePipelineIndex(1U) == 0U;
-    }
-    if (pending != kAdcDmaChannelMask) {
-      pending = waitForDmaPair(pending);
-    }
-    if (pending != kAdcDmaChannelMask) {
-      recordIncompleteDmaPair(pending);
-      return false;
+    if ((DMA_INT & channelMask(kPairDispatchConverter)) == 0U) {
+      return true;
     }
 
-    const std::size_t completed_generations = waitForAlignedPipeline();
+    // ADC1's enabled NVIC line is only a wakeup. Acknowledge both latched
+    // bits before inspecting progress so a later ADC0 completion cannot be
+    // erased after it has already been attributed to a newer generation.
+    DMA_CINT = board::kAdcConverterConfigurations[kPairDispatchConverter]
+                   .edma_channel;
     DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel;
-    DMA_CINT = board::kAdcConverterConfigurations[1].edma_channel;
+    barrier();
+    const std::size_t completed_generations = waitForAlignedPipeline();
     if (completed_generations == kInvalidPipelineIndex) {
       g_ring.recordDmaError(g_epoch, 0U);
       g_ring.recordDmaError(g_epoch, 1U);
@@ -824,7 +791,7 @@ StopReport stopHardwareAfterTriggers() {
   disableInterrupts();
   const std::uint32_t primask = readPrimask();
   __disable_irq();
-  if ((DMA_INT & kAdcDmaChannelMask) != 0U) {
+  if ((DMA_INT & channelMask(kPairDispatchConverter)) != 0U) {
     (void)servicePendingDmaPair();
   }
 
@@ -968,7 +935,8 @@ static_assert(board::kAdcConverterConfigurations[1].dmamux_source ==
               DMAMUX_SOURCE_ADC2);
 static_assert(board::kAdcEdmaPriorities[0] == 2U);
 static_assert(board::kAdcEdmaPriorities[1] == 1U);
-static_assert(kDmaPairWaitCycles == 6000U);
+static_assert(kPairDispatchConverter == 1U);
+static_assert(kDmaAlignmentWaitCycles == 6000U);
 
 }  // namespace teensy_daq::adc_capture
 

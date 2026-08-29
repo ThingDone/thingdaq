@@ -146,8 +146,9 @@ generation-indexed scatter/gather TCDs. Channel 0 reads `ADC1_R0` and channel 1 
 both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012`, and
 `DOFF=4` for consumer buffers. Both completion IRQs and the production
 ADC_ETC error IRQ share priority 48. Only the later ADC1 completion line
-dispatches; after a bounded flag-reconciliation wait, its handler identifies
-the active entry in a four-generation prelinked pipeline from `DADDR` and
+dispatches and is used only as a wakeup. Its handler acknowledges both latches
+before inspection, waits for the live TCD positions to align, identifies the
+active entry in a four-generation prelinked pipeline from `DADDR` and
 `DLASTSGA`, then consumes every inferred paired generation once in fixed
 ADC0-to-ADC1 order. Runtime updates touch only descriptors at least two
 generations ahead, never the active hardware TCD link. ADC0's NVIC line remains

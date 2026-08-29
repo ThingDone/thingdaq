@@ -137,9 +137,11 @@ dispatches. Numeric eDMA priority 2 is highest, so the earlier ADC0 result runs
 ahead of ADC1 at priority 1; continuous GPIO traffic runs at priority 0. Four
 generations are always prelinked, and each descriptor slot is keyed by
 generation rather than destination so repeated pressure-sink generations
-cannot alias. The handler waits at most 10 us for both visible `DMA_INT` bits,
-then uses the live `DADDR` plus `DLASTSGA` link to infer whether one or two
-paired generations completed before it ran. It reconciles each inferred
+cannot alias. ADC1's enabled interrupt is only a wakeup: the handler immediately
+acknowledges both latches so a newer ADC0 completion cannot be erased by a late
+clear, then waits at most 10 us for the two live TCD positions to align. Their
+`DADDR` plus `DLASTSGA` links identify whether one or two paired generations
+completed before it ran. It reconciles each inferred
 generation exactly once in ADC0-to-ADC1 order, patches only descriptors at
 least two generations ahead, and never writes the active hardware TCD link.
 An incomplete pair or a delay spanning three generations faults before

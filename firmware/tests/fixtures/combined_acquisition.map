@@ -2,7 +2,7 @@
 # the size summary, linker memory regions, relevant output sections, and
 # demangled `nm --print-size` records together as one combined-budget input.
 Memory Usage on Teensy 4.0:
-  FLASH: code:94412, data:23496, headers:9064   free for files:1904644
+  FLASH: code:94188, data:23496, headers:8264   free for files:1905668
    RAM1: variables:456960, code:32744, padding:24   free for local variables:34560
    RAM2: variables:511808  free for malloc/new:12480
 
