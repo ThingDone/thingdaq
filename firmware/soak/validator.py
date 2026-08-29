@@ -3314,6 +3314,40 @@ class SoakRunner:
             return
         try:
             frame, latency = link.exchange(
+                GET_STATUS_REQUEST,
+                timeout=min(
+                    COMMAND_DEADLINE_SECONDS,
+                    max(0.01, self.hard_deadline - self.clock.monotonic()),
+                ),
+                on_data=lambda _frame: None,
+                hard_deadline=self.hard_deadline,
+            )
+            status = decode_status(frame)
+            self.cleanup["pre_stop_status"] = {
+                "state": status.device_state,
+                "run_id": frame.run_id,
+                "adc_frames": status.adc_frames_emitted,
+                "gpio_frames": status.gpio_frames_emitted,
+                "adc_drop": status.adc_items_dropped,
+                "gpio_drop": status.gpio_items_dropped,
+                "nonzero_errors": _nonzero_errors(
+                    status,
+                    allow_physical_stop_tail=False,
+                ),
+                "queues": {
+                    name: status.values[name] for name in QUEUE_FIELDS
+                },
+                "latency_seconds": latency,
+            }
+        except Exception as error:  # noqa: BLE001 - best-effort remote evidence
+            self.cleanup["pre_stop_status"] = (
+                f"{type(error).__name__}: {error}"
+            )
+        if self.clock.monotonic() >= self.hard_deadline:
+            self.cleanup["stop"] = "unavailable"
+            return
+        try:
+            frame, latency = link.exchange(
                 STOP_REQUEST,
                 timeout=min(
                     COMMAND_DEADLINE_SECONDS,
