@@ -75,14 +75,16 @@ Every program has a 780-second internal deadline and records the service's
 process teardown, and service cleanup.
 
 The control-stress program includes exactly one named
-`cdc_close_reopen_pressure` negative subcase in its first physical epoch. It
-closes CDC only at a complete-frame boundary while acquisition remains
-`RUNNING`, pauses for 250 ms, reopens and re-synchronizes to the same device and
-run ID, then validates each retained frame. The permitted sequence/timestamp
-gaps must carry both `GAP_BEFORE` and `OVERRUN_BEFORE`; their exact ADC/GPIO
-frame, item, and payload-byte counts must equal the firmware's pressure
-eviction, packet-exhaustion, and stage-conservation counters. All other epochs
-remain strictly zero-loss, and later periodic CDC reopens occur from `IDLE`.
+`cdc_close_reopen_pressure` negative subcase in its first physical epoch. Before
+closing CDC, it reads exactly the bytes needed to finish any parser-retained
+frame without consuming the following frame, proving that the old session ends
+at a complete-frame boundary while acquisition remains `RUNNING`. It pauses for
+250 ms, reopens and re-synchronizes to the same device and run ID, then validates
+each retained frame. The permitted sequence/timestamp gaps must carry both
+`GAP_BEFORE` and `OVERRUN_BEFORE`; their exact ADC/GPIO frame, item, and
+payload-byte counts must equal the firmware's pressure eviction,
+packet-exhaustion, and stage-conservation counters. All other epochs remain
+strictly zero-loss, and later periodic CDC reopens occur from `IDLE`.
 
 The serial loop keeps the previously accepted mode-specific synchronous read
 cadence: synthetic runs use 64 KiB batches, while physical-combined and

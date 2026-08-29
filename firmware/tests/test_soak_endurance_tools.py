@@ -664,6 +664,43 @@ class SoakGeneratorTests(unittest.TestCase):
 
 
 class SoakValidatorFailureTests(unittest.TestCase):
+    def test_serial_link_aligns_partial_frame_without_reading_the_next(self) -> None:
+        clock = VirtualClock()
+        wire = (PROTOCOL_FIXTURES / "adc-data.bin").read_bytes()
+        split_at = 137
+
+        class BoundaryPort:
+            def __init__(self) -> None:
+                self.pending = bytearray(wire[split_at:] + wire)
+
+            def read(self, size: int = 1) -> bytes:
+                clock.advance(0.001)
+                count = min(size, len(self.pending))
+                result = bytes(self.pending[:count])
+                del self.pending[:count]
+                return result
+
+            def write(self, data: bytes | bytearray | memoryview) -> int:
+                return len(data)
+
+            def close(self) -> None:
+                return None
+
+        port = BoundaryPort()
+        link = canonical_validator.SerialLink(port, clock)
+        self.assertEqual([], link.parser.feed(wire[:split_at]))
+        accepted: list[canonical_validator.Frame] = []
+
+        aligned_bytes = link.align_to_frame_boundary(
+            accepted.append,
+            hard_deadline=clock.monotonic() + 1.0,
+        )
+
+        self.assertEqual(len(wire) - split_at, aligned_bytes)
+        self.assertEqual(1, len(accepted))
+        self.assertEqual(b"", link.parser.buffer)
+        self.assertEqual(wire, bytes(port.pending))
+
     def test_physical_adc_range_check_covers_every_high_nibble(self) -> None:
         adc_wire = (PROTOCOL_FIXTURES / "adc-data.bin").read_bytes()
         parsed = canonical_validator.FrameParser().feed(adc_wire)[0]
@@ -991,6 +1028,80 @@ class AcceleratedCampaignTests(unittest.TestCase):
         self.assertIn("packet_owned_high_water", cleanup["queues"])
         self.assertEqual(0, active["parser"]["errors"])
         self.assertIn("maximum_receive_gap_seconds", active)
+
+    def test_control_stress_aligns_a_partial_frame_before_live_reopen(self) -> None:
+        rig = _load_module(
+            GENERATED_DIRECTORY / generator.OUTPUTS["control-stress"],
+            "generated_soak_partial_reopen",
+        )
+        clock = VirtualClock()
+        ports: list[AcceleratedSerial] = []
+        settings = replace(rig.load_settings(), measured_duration_seconds=24.0)
+        device = AcceleratedSoakDevice(settings, rig)
+        output = io.StringIO()
+        original_reopen = rig.SoakRunner.reopen_running_with_expected_pressure
+        injected: dict[str, int] = {}
+
+        def reopen_with_partial_frame(
+            runner: canonical_validator.SoakRunner,
+            validator: canonical_validator.StreamValidator,
+        ) -> tuple[
+            canonical_validator.SerialLink,
+            dict[str, object],
+            list[float],
+        ]:
+            link = runner.link
+            port = runner.port
+            self.assertIsNotNone(link)
+            self.assertIsInstance(port, AcceleratedSerial)
+            assert link is not None and isinstance(port, AcceleratedSerial)
+            self.assertEqual(b"", link.parser.buffer)
+            self.assertEqual(b"", port.pending)
+            wire = device.next_data_frame()
+            self.assertTrue(wire)
+            split_at = 137
+            clock.advance(ACCELERATED_STREAM_STEP_SECONDS)
+            self.assertEqual([], link.parser.feed(wire[:split_at]))
+            port.pending.extend(wire[split_at:])
+            injected["remaining"] = len(wire) - split_at
+            return original_reopen(runner, validator)
+
+        with (
+            patch.object(rig, "ADC_PAIR_RATE_HZ", ACCELERATED_ADC_PAIR_RATE_HZ),
+            patch.object(rig, "GPIO_SAMPLE_RATE_HZ", ACCELERATED_GPIO_SAMPLE_RATE_HZ),
+            patch.object(
+                rig,
+                "TARGET_COMBINED_PAYLOAD_BYTES_PER_SECOND",
+                ACCELERATED_PAYLOAD_BYTES_PER_SECOND,
+            ),
+            patch.object(rig, "RATE_TOLERANCE_FRACTION", 0.12),
+            patch.object(rig, "_current_rss_bytes", return_value=64 * 1024**2),
+            patch.object(rig, "_peak_rss_bytes", return_value=64 * 1024**2),
+            patch.object(
+                rig,
+                "_available_process_memory_bytes",
+                return_value=512 * 1024**2,
+            ),
+            patch.object(
+                rig.SoakRunner,
+                "reopen_running_with_expected_pressure",
+                new=reopen_with_partial_frame,
+            ),
+            redirect_stdout(output),
+        ):
+            exit_code, result = rig.run_generated(
+                settings,
+                AcceleratedPortFactory(device, clock, ports),
+                clock=clock,
+            )
+
+        self.assertEqual(0, exit_code, output.getvalue() + repr(result))
+        negative = result["negative_subcases"][0]
+        self.assertEqual(
+            injected["remaining"],
+            negative["old_session_parser"]["boundary_alignment_bytes"],
+        )
+        self.assertEqual(0, negative["old_session_parser"]["buffered_bytes"])
 
     def test_all_generated_600_second_modes_execute_with_a_fake_clock(self) -> None:
         for index, (mode, filename) in enumerate(generator.OUTPUTS.items(), start=1):

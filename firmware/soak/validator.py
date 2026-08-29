@@ -344,6 +344,23 @@ class FrameParser:
     def errors(self) -> int:
         return self.header_errors + self.checksum_errors + self.payload_errors
 
+    def bytes_to_frame_boundary(self) -> int:
+        """Return the exact byte count needed to finish the retained frame."""
+
+        buffered = self._buffered_bytes()
+        if buffered == 0:
+            return 0
+        if buffered < HEADER_SIZE:
+            return HEADER_SIZE - buffered
+        fields = HEADER.unpack_from(self.buffer, self.scan_start)
+        total_length = self._validate_header(fields)
+        require(
+            buffered < total_length,
+            "parser",
+            "parser retained an already-complete frame",
+        )
+        return total_length - buffered
+
     def feed(self, data: bytes) -> list[Frame]:
         incoming = bytes(data)
         self.bytes_received += len(incoming)
@@ -697,6 +714,42 @@ class SerialLink:
             )
             on_data(frame)
         return len(chunk)
+
+    def align_to_frame_boundary(
+        self,
+        on_data: Callable[[Frame], None],
+        *,
+        hard_deadline: float,
+    ) -> int:
+        """Finish only the retained frame without consuming a following frame."""
+
+        aligned_bytes = 0
+        while self.parser.buffer:
+            if self.clock.monotonic() >= hard_deadline:
+                raise DeadlineExpired("partial frame did not finish before deadline")
+            requested = self.parser.bytes_to_frame_boundary()
+            require(requested > 0, "parser", "invalid frame-boundary read size")
+            chunk = bytes(self.port.read(requested))
+            require(
+                len(chunk) <= requested,
+                "transport",
+                f"serial read returned {len(chunk)} bytes for a {requested}-byte read",
+            )
+            self.maximum_read_bytes = max(self.maximum_read_bytes, len(chunk))
+            if not chunk:
+                continue
+            before_errors = self.parser.errors
+            frames = self.parser.feed(chunk)
+            self._raise_new_parser_error(before_errors)
+            for frame in frames:
+                require(
+                    frame.kind in DATA_KINDS,
+                    "protocol",
+                    f"unsolicited response 0x{frame.kind:02x}",
+                )
+                on_data(frame)
+            aligned_bytes += len(chunk)
+        return aligned_bytes
 
     def drain_until_quiet(
         self,
@@ -3133,6 +3186,15 @@ class SoakRunner:
         old_link = self.link
         if port is None or old_link is None:
             raise SoakFailure("control", "cannot live-reopen a closed session")
+        alignment_started = self.clock.monotonic()
+        boundary_alignment_bytes = old_link.align_to_frame_boundary(
+            validator.accept,
+            hard_deadline=min(
+                self.hard_deadline,
+                alignment_started + COMMAND_DEADLINE_SECONDS,
+            ),
+        )
+        boundary_alignment_elapsed = self.clock.monotonic() - alignment_started
         require(
             not old_link.parser.buffer,
             "parser",
@@ -3144,6 +3206,8 @@ class SoakRunner:
             "bytes_discarded": old_link.parser.bytes_discarded,
             "errors": old_link.parser.errors,
             "buffered_bytes": len(old_link.parser.buffer),
+            "boundary_alignment_bytes": boundary_alignment_bytes,
+            "boundary_alignment_elapsed_seconds": boundary_alignment_elapsed,
         }
         emit_event(
             "expected_negative_subcase_begin",
