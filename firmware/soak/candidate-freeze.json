@@ -1,0 +1,1564 @@
+{
+  "build": {
+    "binary_inspection": {
+      "adc_dma_buffers": {
+        "allocations": {
+          "DESCRIPTORS": {
+            "address": "0x2025f000",
+            "alignment_bytes": 32,
+            "bytes": 320,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "teensy_daq::adc_capture::g_adc_dma_descriptors",
+            "symbol_type": "B"
+          },
+          "OVERFLOW_SINK": {
+            "address": "0x2025f140",
+            "alignment_bytes": 32,
+            "bytes": 32,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "teensy_daq::adc_capture::g_adc_dma_overflow_sink",
+            "symbol_type": "B"
+          },
+          "RING": {
+            "address": "0x2025f160",
+            "alignment_bytes": 32,
+            "bytes": 16256,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "teensy_daq::adc_capture::g_adc_dma_buffers",
+            "symbol_type": "B"
+          }
+        },
+        "total_bytes": 16608
+      },
+      "checksum_benchmark_buffers": {
+        "regions": {
+          "DTCM_PACKET": {
+            "address": "0x20001ac0",
+            "alignment_bytes": 32,
+            "bytes": 4096,
+            "range_end_exclusive": "0x20200000",
+            "range_start": "0x20000000",
+            "symbol": "teensy_daq::benchmark::g_checksum_benchmark_dtcm_buffer",
+            "symbol_type": "B"
+          },
+          "OCRAM_DMA": {
+            "address": "0x202630e0",
+            "alignment_bytes": 32,
+            "bytes": 4096,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "teensy_daq::benchmark::g_checksum_benchmark_ocram_buffer",
+            "symbol_type": "B"
+          }
+        },
+        "working_ram_bytes": 8192
+      },
+      "checksum_resources": {
+        "algorithms": {
+          "ADLER32": {
+            "code_address": "0x00001128",
+            "code_symbol": "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "arithmetic (no lookup table)",
+            "implementation_code_bytes": 120,
+            "table_flash_bytes": 0,
+            "table_ram_bytes": 0
+          },
+          "CRC32C": {
+            "address": "0x60011ea4",
+            "code_address": "0x000011a0",
+            "code_symbol": "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "teensy_daq::checksum::detail::kCrc32cTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          },
+          "CRC32_ISO_HDLC": {
+            "address": "0x6000fea4",
+            "code_address": "0x000012d4",
+            "code_symbol": "teensy_daq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "teensy_daq::checksum::detail::kCrc32IsoHdlcTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          }
+        },
+        "placement": "memory-mapped program flash (.progmem.checksum.*)",
+        "shared_dispatch": {
+          "address": "0x00001408",
+          "code_bytes": 84,
+          "symbol": "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
+          "symbol_type": "T"
+        },
+        "total_implementation_code_bytes": 736,
+        "total_table_flash_bytes": 16384,
+        "total_table_ram_bytes": 0
+      },
+      "gpio_clock_diagnostic_buffer": {
+        "address": "0x20268060",
+        "alignment_bytes": 32,
+        "bytes": 32,
+        "range_end_exclusive": "0x20280000",
+        "range_start": "0x20200000",
+        "symbol": "teensy_daq::gpio_clock::g_gpio_clock_diagnostic_buffer",
+        "symbol_type": "B"
+      },
+      "gpio_packed_buffers": {
+        "address": "0x202640e0",
+        "alignment_bytes": 32,
+        "buffers": 4,
+        "bytes": 16256,
+        "payload_bytes_per_buffer": 4048,
+        "range_end_exclusive": "0x20280000",
+        "range_start": "0x20200000",
+        "stride_bytes": 4064,
+        "symbol": "teensy_daq::gpio_packer::g_gpio_packed_buffers",
+        "symbol_type": "B"
+      },
+      "gpio_raw_dma_buffers": {
+        "allocations": {
+          "DESCRIPTORS": {
+            "address": "0x20268080",
+            "alignment_bytes": 32,
+            "bytes": 160,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "teensy_daq::gpio_capture::g_gpio_raw_dma_descriptors",
+            "symbol_type": "B"
+          },
+          "OVERFLOW_SINK": {
+            "address": "0x20268120",
+            "alignment_bytes": 32,
+            "bytes": 32,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "teensy_daq::gpio_capture::g_gpio_raw_dma_overflow_sink",
+            "symbol_type": "B"
+          },
+          "RING": {
+            "address": "0x20268140",
+            "alignment_bytes": 32,
+            "bytes": 64768,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "teensy_daq::gpio_capture::g_gpio_raw_dma_buffers",
+            "symbol_type": "B"
+          }
+        },
+        "total_bytes": 64960
+      },
+      "nm_path": "/home/bill/.arduino15/packages/teensy/tools/teensy-compile/15.2.1/arm/bin/arm-none-eabi-nm",
+      "packet_buffers": {
+        "banks": {
+          "DTCM_PRIMARY": {
+            "address": "0x20002ac0",
+            "alignment_bytes": 32,
+            "bytes": 430080,
+            "frames": 105,
+            "range_end_exclusive": "0x20200000",
+            "range_start": "0x20000000",
+            "symbol": "(anonymous namespace)::packet_storage_primary",
+            "symbol_type": "b"
+          },
+          "OCRAM_RESERVE": {
+            "address": "0x20200000",
+            "alignment_bytes": 32,
+            "bytes": 389120,
+            "frames": 95,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "(anonymous namespace)::packet_storage_reserve",
+            "symbol_type": "b"
+          }
+        },
+        "total_bytes": 819200,
+        "total_frames": 200
+      }
+    },
+    "compiler_identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+    "core_id": "teensy:avr",
+    "core_version": "1.62.0",
+    "manifest_schema_version": 10,
+    "memory_usage": {
+      "flash": {
+        "code_bytes": 92812,
+        "data_bytes": 23496,
+        "free_for_files_bytes": 1906692,
+        "headers_bytes": 8616
+      },
+      "ram1": {
+        "code_bytes": 32744,
+        "free_for_locals_bytes": 34560,
+        "padding_bytes": 24,
+        "variables_bytes": 456960
+      },
+      "ram2": {
+        "free_for_heap_bytes": 20800,
+        "variables_bytes": 503488
+      }
+    },
+    "source": {
+      "build_id": "tdaq-ea010335c9b63bb7",
+      "firmware_input_changes": [],
+      "firmware_inputs_clean": true,
+      "git_commit": "992986f3262b5f6102dbb0d26c31a3f434b283dc",
+      "inputs": [
+        "firmware/firmware.ino",
+        "firmware/src/acquisition_controller.cpp",
+        "firmware/src/acquisition_controller.h",
+        "firmware/src/adc_dma_capture.cpp",
+        "firmware/src/adc_dma_capture.h",
+        "firmware/src/adc_dma_capture_teensy.cpp",
+        "firmware/src/adc_dma_capture_teensy.h",
+        "firmware/src/adc_frame_packer.cpp",
+        "firmware/src/adc_frame_packer.h",
+        "firmware/src/adc_initializer.cpp",
+        "firmware/src/adc_initializer.h",
+        "firmware/src/adc_initializer_teensy.cpp",
+        "firmware/src/adc_initializer_teensy.h",
+        "firmware/src/adc_trigger.cpp",
+        "firmware/src/adc_trigger.h",
+        "firmware/src/adc_trigger_teensy.cpp",
+        "firmware/src/adc_trigger_teensy.h",
+        "firmware/src/board_config.h",
+        "firmware/src/checksum.cpp",
+        "firmware/src/checksum.h",
+        "firmware/src/checksum_benchmark.cpp",
+        "firmware/src/checksum_benchmark.h",
+        "firmware/src/checksum_benchmark_teensy.cpp",
+        "firmware/src/checksum_benchmark_teensy.h",
+        "firmware/src/control_state.cpp",
+        "firmware/src/control_state.h",
+        "firmware/src/dma_buffer_ownership.h",
+        "firmware/src/firmware_capabilities.h",
+        "firmware/src/firmware_identity.h",
+        "firmware/src/firmware_runtime.cpp",
+        "firmware/src/firmware_runtime.h",
+        "firmware/src/generated/protocol_constants.h",
+        "firmware/src/gpio_batch_packer.cpp",
+        "firmware/src/gpio_batch_packer.h",
+        "firmware/src/gpio_batch_packer_teensy.cpp",
+        "firmware/src/gpio_batch_packer_teensy.h",
+        "firmware/src/gpio_capture_diagnostic.cpp",
+        "firmware/src/gpio_capture_diagnostic.h",
+        "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+        "firmware/src/gpio_capture_diagnostic_teensy.h",
+        "firmware/src/gpio_clock_diagnostic.cpp",
+        "firmware/src/gpio_clock_diagnostic.h",
+        "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+        "firmware/src/gpio_clock_diagnostic_teensy.h",
+        "firmware/src/gpio_dma_route_teensy.h",
+        "firmware/src/gpio_raw_capture.cpp",
+        "firmware/src/gpio_raw_capture.h",
+        "firmware/src/gpio_raw_capture_teensy.cpp",
+        "firmware/src/gpio_raw_capture_teensy.h",
+        "firmware/src/packet_buffer_pipeline.cpp",
+        "firmware/src/packet_buffer_pipeline.h",
+        "firmware/src/protocol.cpp",
+        "firmware/src/protocol.h",
+        "firmware/src/statistics.cpp",
+        "firmware/src/statistics.h",
+        "firmware/src/synthetic_source.cpp",
+        "firmware/src/synthetic_source.h",
+        "firmware/src/teensy_clock.cpp",
+        "firmware/src/teensy_clock.h",
+        "firmware/src/teensy_usb.cpp",
+        "firmware/src/teensy_usb.h",
+        "firmware/src/usb_transport.cpp",
+        "firmware/src/usb_transport.h",
+        "protocol/protocol-v1.json"
+      ],
+      "source_id": "ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85",
+      "timestamp_epoch": 1788006940,
+      "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+      "timestamp_utc": "2026-08-29T12:35:40Z"
+    }
+  },
+  "candidate": {
+    "artifact_name": "firmware.ino.hex",
+    "artifact_sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769",
+    "build_id": "tdaq-ea010335c9b63bb7",
+    "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+    "path": "firmware/soak/candidate.json",
+    "sha256": "41f87e7d776d202de08edf4ae2671b8a0dc202786b862f692901a5831e373d45",
+    "source_id": "ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85"
+  },
+  "created_utc": "2026-08-29T16:10:55+00:00",
+  "protected": {
+    "base_git_commit": "992986f3262b5f6102dbb0d26c31a3f434b283dc",
+    "file_count": 240,
+    "files": [
+      {
+        "path": "daq_api/MANIFEST.in",
+        "sha256": "d24c8a44fb9e6d36d99b2de6ab620f542bab11d3e1e9fbb40b71f3b34cfeeb1d",
+        "size_bytes": 447
+      },
+      {
+        "path": "daq_api/README.md",
+        "sha256": "fc1abcabfb6a3a458c9be0288d66e6294bfa578ae7439c948767b31e1ad528d0",
+        "size_bytes": 31634
+      },
+      {
+        "path": "daq_api/examples/_common.py",
+        "sha256": "418a99d344875f0f5e617bb6b400cf294c60a565047d1bfaef949e5aee4ac983",
+        "size_bytes": 3938
+      },
+      {
+        "path": "daq_api/examples/calibrated_adc.py",
+        "sha256": "0ddcaa496601d1bd5b1c6eee0ce4be0ad20353100658c3fbb8dcc728009db8a9",
+        "size_bytes": 3341
+      },
+      {
+        "path": "daq_api/examples/clean_shutdown.py",
+        "sha256": "ee11301185fc87726cb958db535c5f76fa0874f909a82c9b6f23943595a03c0a",
+        "size_bytes": 1375
+      },
+      {
+        "path": "daq_api/examples/combined_alignment.py",
+        "sha256": "4908401af603414a1d3cda025804fbf3d8552ac1520c6a6ef81cef5f9eac76c9",
+        "size_bytes": 2173
+      },
+      {
+        "path": "daq_api/examples/discovery_and_selection.py",
+        "sha256": "cce2dac7e11f8bb6634009df6d4348a78a25349d163df5101de38d94c480ea6e",
+        "size_bytes": 1716
+      },
+      {
+        "path": "daq_api/examples/gpio_channels.py",
+        "sha256": "c1ab8251b991bfc6123c7f6b85a9c977e9c8f1dce416355b1647f7d777236865",
+        "size_bytes": 1324
+      },
+      {
+        "path": "daq_api/examples/interleaved_adc.py",
+        "sha256": "ceb780f34605dfa65a9cffa1f7c172ecd37e78a4ed1184991ccb0e7086ccfdd6",
+        "size_bytes": 1302
+      },
+      {
+        "path": "daq_api/examples/raw_adc_channels.py",
+        "sha256": "1d4ad1f7b59ec5c50ad458cb7c50b4c9470e39b238447f4761baad403cd09f44",
+        "size_bytes": 1415
+      },
+      {
+        "path": "daq_api/examples/simulator.py",
+        "sha256": "6517632f055c820bc293bc44455036fd6b3f2288af068b5be6b358eff57e0467",
+        "size_bytes": 1486
+      },
+      {
+        "path": "daq_api/examples/status_and_loss.py",
+        "sha256": "b74ae6d15a5d8c6f5c8f3037644c68d72f6d373a367caa8460f3f92bedf06f80",
+        "size_bytes": 1866
+      },
+      {
+        "path": "daq_api/pyproject.toml",
+        "sha256": "b86232e232f6e32be196e4eb5a4d273313e6f1ab637dd288387a1f127894dcf0",
+        "size_bytes": 1914
+      },
+      {
+        "path": "daq_api/src/teensy_daq/__init__.py",
+        "sha256": "4547e4eb03f179903a03596a68bd630bc18b7ab122c603711e5b3f2d74d8c703",
+        "size_bytes": 11161
+      },
+      {
+        "path": "daq_api/src/teensy_daq/_generated/__init__.py",
+        "sha256": "c3db3c6a037cd541d49ed722d8e9fb58e22fc1905d97c164c390b2535d6575e3",
+        "size_bytes": 75
+      },
+      {
+        "path": "daq_api/src/teensy_daq/_generated/protocol_constants.py",
+        "sha256": "80ed34388b9ca08832f116a2253c202cb0fb80881b9f3d7c8a715ed3de58b8b5",
+        "size_bytes": 51173
+      },
+      {
+        "path": "daq_api/src/teensy_daq/_version.py",
+        "sha256": "b61384aefea9f7d6fca64e8065a3483d9d2737186784fea0a5135bdbd3f42961",
+        "size_bytes": 122
+      },
+      {
+        "path": "daq_api/src/teensy_daq/alignment.py",
+        "sha256": "9953954083a48d93fc05ccbf047ed1954036ffe4a105f947da1b8889522236a8",
+        "size_bytes": 30092
+      },
+      {
+        "path": "daq_api/src/teensy_daq/calibration.py",
+        "sha256": "46e5f01f6763fbe16d126cc4c738be89215d01ed56a235acf89ed4341ea36003",
+        "size_bytes": 31734
+      },
+      {
+        "path": "daq_api/src/teensy_daq/checksum.py",
+        "sha256": "9f3a519b784bd39b6419748544cf887e57055878ae784982c133e90017fdec00",
+        "size_bytes": 7247
+      },
+      {
+        "path": "daq_api/src/teensy_daq/checksum_benchmark.py",
+        "sha256": "008c90006592dbdce27f9f40069719e4878d8fcd42ff3ccaf7cda6e487fbd546",
+        "size_bytes": 12997
+      },
+      {
+        "path": "daq_api/src/teensy_daq/cli.py",
+        "sha256": "95ca70deae1c42d5a23b20a73734eb6e23340885a03f1cce64231bb3f3a65ce3",
+        "size_bytes": 51645
+      },
+      {
+        "path": "daq_api/src/teensy_daq/client.py",
+        "sha256": "95accfcf79687c724a81088ef2ea804774a1fbc528be59dbea7b05bf07a73290",
+        "size_bytes": 82295
+      },
+      {
+        "path": "daq_api/src/teensy_daq/demo.py",
+        "sha256": "f8d0d7ccf29db8e166af2b04ac913281bdb2bed67ef1c01b6e7fcb79da5b3378",
+        "size_bytes": 16852
+      },
+      {
+        "path": "daq_api/src/teensy_daq/diagnostics.py",
+        "sha256": "234ba87f3e46d27c08ed2243d65e7d98850468a61c836211e6b4a799dd519837",
+        "size_bytes": 44924
+      },
+      {
+        "path": "daq_api/src/teensy_daq/discovery.py",
+        "sha256": "da869f25a290aa7fab02945723e9b254f10e863031acb3b4938ca33842fc32d0",
+        "size_bytes": 14794
+      },
+      {
+        "path": "daq_api/src/teensy_daq/identity.py",
+        "sha256": "fdfb725c97fb002ec84fbbe56e60965977a3599992cbb696dc0731ef86f54d2d",
+        "size_bytes": 6740
+      },
+      {
+        "path": "daq_api/src/teensy_daq/low_level.py",
+        "sha256": "d5eaa023a01ddb1f12dc710b90535c2192b8a4bf99c566a57a2a94d0b7e6f6b3",
+        "size_bytes": 2480
+      },
+      {
+        "path": "daq_api/src/teensy_daq/models.py",
+        "sha256": "959c027f3037b4ee1b86fffbacb6ff448634f9d101ee3b21d7e2269a8aba8c6f",
+        "size_bytes": 248191
+      },
+      {
+        "path": "daq_api/src/teensy_daq/numpy.py",
+        "sha256": "aafba524ab1772b30381bb070429b325bc7bb8c1f5831d66c7a0cd8b0d4292f8",
+        "size_bytes": 21423
+      },
+      {
+        "path": "daq_api/src/teensy_daq/protocol.py",
+        "sha256": "e8e3bca1431a86971070497f58cfc68f303d38efef3aa72767e8da13cd74417a",
+        "size_bytes": 62238
+      },
+      {
+        "path": "daq_api/src/teensy_daq/py.typed",
+        "sha256": "668396440b0ff6e0d4181321df529989ac0b692df022c6c81fdf2adbb8276206",
+        "size_bytes": 72
+      },
+      {
+        "path": "daq_api/src/teensy_daq/reader.py",
+        "sha256": "85db35d721952e342f6b56bcbe9f3e6606fc25592b568485d969102b7f0c403e",
+        "size_bytes": 42605
+      },
+      {
+        "path": "daq_api/src/teensy_daq/simulator.py",
+        "sha256": "e6369c6084cec24f3a79be55eab79219b90aa96144b760972fa1583194159761",
+        "size_bytes": 22746
+      },
+      {
+        "path": "daq_api/src/teensy_daq/streaming.py",
+        "sha256": "41c4cfab1cf62a3f5a1a57eab6099ad4badc4849a3b4371f14539643bfe43e1f",
+        "size_bytes": 34550
+      },
+      {
+        "path": "daq_api/src/teensy_daq/synthetic.py",
+        "sha256": "1c0dea74d05c50111c699edaf7ff70cb4dcbcdedf8345f3f6e99621cfa66e311",
+        "size_bytes": 8719
+      },
+      {
+        "path": "daq_api/src/teensy_daq/transport.py",
+        "sha256": "c7436fd4b355fd9b2d237799ac30575d1f83135dcbb6796eb9d3c912d73db146",
+        "size_bytes": 24161
+      },
+      {
+        "path": "daq_api/tests/test_adc_initialization_models.py",
+        "sha256": "f15a0b5638ac14f02b3b7b4393a8e21c3fc6cf664f8a5f0bf6947048078decb8",
+        "size_bytes": 8684
+      },
+      {
+        "path": "daq_api/tests/test_adc_physical_models.py",
+        "sha256": "e929fe4e26f20c8b6e121542a23a5350912597cec4dc173c7a97f2630443a87e",
+        "size_bytes": 12590
+      },
+      {
+        "path": "daq_api/tests/test_alignment.py",
+        "sha256": "0fb8662f70d9e3178e374ab65f983bf3a63f90fdb9bfb6dac7aa5577085a1a94",
+        "size_bytes": 10405
+      },
+      {
+        "path": "daq_api/tests/test_calibration.py",
+        "sha256": "12fab60484c70ddbdeb31976b79c8ada641a0b49929851996137b8ae66e304d8",
+        "size_bytes": 15273
+      },
+      {
+        "path": "daq_api/tests/test_capability_validation.py",
+        "sha256": "6edb0f0b936fe7f24c37844d579bf527af32cc4795a055e0acf135c285488791",
+        "size_bytes": 5036
+      },
+      {
+        "path": "daq_api/tests/test_checksum_benchmark_models.py",
+        "sha256": "a5bf3cad610edefc29904e1ccd343ab53b5232f795c844f62dac14a1755eb155",
+        "size_bytes": 5714
+      },
+      {
+        "path": "daq_api/tests/test_cli_lifecycle.py",
+        "sha256": "7ca576023150b0c64af257a8d6e2b5d91d3b91608a169feb53b09d67fe4348e0",
+        "size_bytes": 15902
+      },
+      {
+        "path": "daq_api/tests/test_combined_python.py",
+        "sha256": "0cedeceb408ab7b3d9457753e371e32445c6a47649b95df744d9059c767e6969",
+        "size_bytes": 33863
+      },
+      {
+        "path": "daq_api/tests/test_control_cli.py",
+        "sha256": "4af9f167564d40755a96e8b8afcab0bd8658c17cf6f07f4afdd774243f313e9d",
+        "size_bytes": 15341
+      },
+      {
+        "path": "daq_api/tests/test_data_models.py",
+        "sha256": "1c30c5082fe481e089bb3a2f734d2e99d8b941922f35fcca9fb5ef00fc5c3840",
+        "size_bytes": 11587
+      },
+      {
+        "path": "daq_api/tests/test_demo.py",
+        "sha256": "ed5f44ed8484d0b2d594d4b130facbd6c1d9fd7f4ea94f63d785d1a76b142d80",
+        "size_bytes": 5155
+      },
+      {
+        "path": "daq_api/tests/test_diagnostics.py",
+        "sha256": "a8b5c59c88d761dd66b993cde8f67842ee891b16a2f36c7bbfd8be0a29e631ee",
+        "size_bytes": 7611
+      },
+      {
+        "path": "daq_api/tests/test_discovery.py",
+        "sha256": "4261a902ed6bf880251dd373d15c742bec00a23df626f93a94927f294ac9c630",
+        "size_bytes": 11731
+      },
+      {
+        "path": "daq_api/tests/test_distribution_artifacts.py",
+        "sha256": "97e9782c7ac535d7b523ce53ba9fe909397aedf07f71f966f0549b2c41ed8d8e",
+        "size_bytes": 11889
+      },
+      {
+        "path": "daq_api/tests/test_documentation_integrity.py",
+        "sha256": "4c9fd6ff8f2ef73def420665237462a9ef5ec5031b57de0c7f33e5c555e48282",
+        "size_bytes": 5439
+      },
+      {
+        "path": "daq_api/tests/test_examples.py",
+        "sha256": "b8c110fb8b9262891334212bc944f4c6f7f916eff2dccf646ac1bac137dcb731",
+        "size_bytes": 2212
+      },
+      {
+        "path": "daq_api/tests/test_gpio_clock_diagnostic_models.py",
+        "sha256": "9aa669fdd1639ca29b03c50d14fbd29000e77b546aba37cf56c4ae479d1f343f",
+        "size_bytes": 6028
+      },
+      {
+        "path": "daq_api/tests/test_gpio_models.py",
+        "sha256": "9351b1629012e9e9bf01220922123310db9b3c3c411fb4f893762b143220a310",
+        "size_bytes": 9030
+      },
+      {
+        "path": "daq_api/tests/test_loss_semantics.py",
+        "sha256": "163ced5839300c7f63442b7a8896232c4edc485b977d5e853add4f1aac098bf0",
+        "size_bytes": 17942
+      },
+      {
+        "path": "daq_api/tests/test_numpy_integration.py",
+        "sha256": "750de65267190678c8b24ef16e4ab5d410a3ae4d8b37a8e65ba77965ae649aa6",
+        "size_bytes": 14019
+      },
+      {
+        "path": "daq_api/tests/test_package_configuration.py",
+        "sha256": "954069dc2ed48040397f38bcef3c591bd17abd7da446cd0ffbb8824c6373a314",
+        "size_bytes": 5361
+      },
+      {
+        "path": "daq_api/tests/test_parser_adversarial.py",
+        "sha256": "fbdacd5213b8201baf22d13800d610f58be8040419f8ecde01169a7f4e9589f4",
+        "size_bytes": 14649
+      },
+      {
+        "path": "daq_api/tests/test_protocol_contract.py",
+        "sha256": "380d7ba4049fec573833501a82596b7e6b8d259215c841b46fc2017b68e6035e",
+        "size_bytes": 17781
+      },
+      {
+        "path": "daq_api/tests/test_protocol_core.py",
+        "sha256": "fa5468330222b5263d675368e122a50f8ee6e0d89d07158d20718a9a4e27cafa",
+        "size_bytes": 18265
+      },
+      {
+        "path": "daq_api/tests/test_protocol_generation_drift.py",
+        "sha256": "978a503a3983b20ae8757033cf2fc4072dff5d29f8f0fbd5fc579bb05f72b0bd",
+        "size_bytes": 15265
+      },
+      {
+        "path": "daq_api/tests/test_protocol_vectors_exhaustive.py",
+        "sha256": "fbe2c2f63c30eb0354f8771caad25c7f4e324e24cbc65788290dad02a6d9f348",
+        "size_bytes": 16623
+      },
+      {
+        "path": "daq_api/tests/test_public_api.py",
+        "sha256": "b2b5b4963a958ad9c45796aa710a9645349b7ac6fc206b13d0e422f8831f1d72",
+        "size_bytes": 13396
+      },
+      {
+        "path": "daq_api/tests/test_python_checksum_benchmark.py",
+        "sha256": "d0cfbdb3732aa4a9a606213768d112838db5eb7c8a9604de7f77c97eca134ccd",
+        "size_bytes": 6361
+      },
+      {
+        "path": "daq_api/tests/test_python_loss_recovery.py",
+        "sha256": "77c499800e45e43b2508fdd39f358e863afe48b209d82e08b26d289b74d83a97",
+        "size_bytes": 28533
+      },
+      {
+        "path": "daq_api/tests/test_repository_layout.py",
+        "sha256": "26f9e1f7f0d6fddf739c7de4754d8b40fd5c989c6fb7ce7e5f43990e3b97fb13",
+        "size_bytes": 3066
+      },
+      {
+        "path": "daq_api/tests/test_serial_stack_adversarial.py",
+        "sha256": "11e695219bf288b6d116da66fa079e95b675408cbf83f3552fc4bc7296858392",
+        "size_bytes": 24196
+      },
+      {
+        "path": "daq_api/tests/test_simulator_api.py",
+        "sha256": "c5061435badfeb0da7cb14867c0446074ab98354d4501eabfbf2bd938eda293b",
+        "size_bytes": 14702
+      },
+      {
+        "path": "daq_api/tests/test_streaming.py",
+        "sha256": "a6d069a3376052782bd55290da1472866b4fe51a81ea9f83d57036112c03b4d6",
+        "size_bytes": 7967
+      },
+      {
+        "path": "daq_api/tests/test_streaming_correctness_performance.py",
+        "sha256": "e815e63c8db2c97fb45a2b62a0e3806902bfbad77df0f15786afde2f923afcd1",
+        "size_bytes": 26752
+      },
+      {
+        "path": "daq_api/tests/test_transport_reader.py",
+        "sha256": "1dbf7775e0baa863f5ee78feb79208a2ce5894bc8b551570a2e3a3876f586855",
+        "size_bytes": 25516
+      },
+      {
+        "path": "firmware/firmware.ino",
+        "sha256": "43e50ea7320493feef89eb9398653a674419f19b9bc0d4a43bd70deb665a2869",
+        "size_bytes": 2496
+      },
+      {
+        "path": "firmware/soak/candidate.json",
+        "sha256": "2b983c6252f5c30eb4c71922276b404322911fada1eeb064594bd70bdd8906e8",
+        "size_bytes": 916
+      },
+      {
+        "path": "firmware/soak/validator.py",
+        "sha256": "e35740ee8a1f8ec0c939dd06af139d8474bdb0d1dfa7931db7cffa759cf63c47",
+        "size_bytes": 122541
+      },
+      {
+        "path": "firmware/src/acquisition_controller.cpp",
+        "sha256": "7479d9e74d8831df45a0e94a2e4474960ad1610bbcc0471d4c827baf66932d11",
+        "size_bytes": 23833
+      },
+      {
+        "path": "firmware/src/acquisition_controller.h",
+        "sha256": "5e24bc80ca2297fd76c4f547324242a6d4afea640733dfc08efccee10ab8857a",
+        "size_bytes": 8857
+      },
+      {
+        "path": "firmware/src/adc_dma_capture.cpp",
+        "sha256": "6af93f56e186951eb290a0151c1cc2150a5d93302cf8a8593309b232a0f864af",
+        "size_bytes": 23852
+      },
+      {
+        "path": "firmware/src/adc_dma_capture.h",
+        "sha256": "432cbf6fb0cc476dd118a7f890331db4d6ff9f65b8ecc63e815c2ad8eda8bee8",
+        "size_bytes": 11406
+      },
+      {
+        "path": "firmware/src/adc_dma_capture_teensy.cpp",
+        "sha256": "6f2e6e9cfa03a0d9767bdf414273a3ed4a2a87684043b43613cf4ef603c7d3ce",
+        "size_bytes": 27163
+      },
+      {
+        "path": "firmware/src/adc_dma_capture_teensy.h",
+        "sha256": "97f49d27d8391159e474778ff5e2fcd1bae906fa058932d05426f51f542bc0f8",
+        "size_bytes": 1939
+      },
+      {
+        "path": "firmware/src/adc_frame_packer.cpp",
+        "sha256": "14e58164d9c598a66cf11fb6ef257caf8e16b43b69efe8a114dbbc677e2d5295",
+        "size_bytes": 8666
+      },
+      {
+        "path": "firmware/src/adc_frame_packer.h",
+        "sha256": "d0c5c2df2b9cec926d18e36e7dfb2cff5a36776564f6eb637597f7670900d06f",
+        "size_bytes": 3805
+      },
+      {
+        "path": "firmware/src/adc_initializer.cpp",
+        "sha256": "f9b97395baadd68c9a886df4a46156d7f439b2a25b49aca95f340f7d0ff25695",
+        "size_bytes": 9252
+      },
+      {
+        "path": "firmware/src/adc_initializer.h",
+        "sha256": "9a2420cac1114ebfbb6114c661d49f1cfe69f231546b488bcc0e3311e10201e8",
+        "size_bytes": 7665
+      },
+      {
+        "path": "firmware/src/adc_initializer_teensy.cpp",
+        "sha256": "b63a1b14faed1282a9f9caa26652bf403a9530af8378d849070092bc6bc599e0",
+        "size_bytes": 9738
+      },
+      {
+        "path": "firmware/src/adc_initializer_teensy.h",
+        "sha256": "005cea695514ed0c5020134ed565a2c7a1c58d12d46b603de6acaac667e6b784",
+        "size_bytes": 293
+      },
+      {
+        "path": "firmware/src/adc_trigger.cpp",
+        "sha256": "765723fe1b0b26b7da8332bb121fa0958256128bbfadba9a02bbf2bfed56994f",
+        "size_bytes": 7315
+      },
+      {
+        "path": "firmware/src/adc_trigger.h",
+        "sha256": "facc0d213f7fd2160c9f0100bd3d837e01a4d7048f774a8bfadf26b6de76a2d1",
+        "size_bytes": 6809
+      },
+      {
+        "path": "firmware/src/adc_trigger_teensy.cpp",
+        "sha256": "5de07e967cace4c924ba1ca2fc0de32ef199435abc3be6179eca18fd4ff62c5d",
+        "size_bytes": 20134
+      },
+      {
+        "path": "firmware/src/adc_trigger_teensy.h",
+        "sha256": "f63de6c19ea23d2bcff8eadd9c091142f367eaa1c8b00c52f0d764dfffd6b1e6",
+        "size_bytes": 275
+      },
+      {
+        "path": "firmware/src/board_config.h",
+        "sha256": "aa4989c00af644dfe9b59379c153c1e4326caf57be7ee82b680d5323f829a4f4",
+        "size_bytes": 47094
+      },
+      {
+        "path": "firmware/src/checksum.cpp",
+        "sha256": "bdba2dd656ca22d7544a5ec0fe17fbb01d9e1c700c83acac00e6f346f07c3b5e",
+        "size_bytes": 5635
+      },
+      {
+        "path": "firmware/src/checksum.h",
+        "sha256": "7b52c06a8d818283a22a98b85c97cda19fcf8b6cf6ef478f9b09e3a918b4a70b",
+        "size_bytes": 2503
+      },
+      {
+        "path": "firmware/src/checksum_benchmark.cpp",
+        "sha256": "daceba0f4a0797cd8c3189c78d99a359e81bcbdeec4f3b27aec95a05b1455ae6",
+        "size_bytes": 11068
+      },
+      {
+        "path": "firmware/src/checksum_benchmark.h",
+        "sha256": "d7c690b5df11c5ce89cd6299f205cbe109dabcbdb010eabe6ab2a87d2ecb42d0",
+        "size_bytes": 3060
+      },
+      {
+        "path": "firmware/src/checksum_benchmark_teensy.cpp",
+        "sha256": "838f856d8d759de5df60ba5505fcda7fb396b72ce309f19eda1f506c7462732b",
+        "size_bytes": 2189
+      },
+      {
+        "path": "firmware/src/checksum_benchmark_teensy.h",
+        "sha256": "6101d42e2be837de27ff729025e7f7eed353c000c9e66cf87781b8d9c9a551aa",
+        "size_bytes": 292
+      },
+      {
+        "path": "firmware/src/control_state.cpp",
+        "sha256": "b94eb334be44ac64637dd2fa28a5429564ef1d9908b066130663a54a9638e32b",
+        "size_bytes": 18930
+      },
+      {
+        "path": "firmware/src/control_state.h",
+        "sha256": "851ec9c7a1b2f4f1467ed9d65407c61469b464c40966058337a83aad7b50b4ed",
+        "size_bytes": 8811
+      },
+      {
+        "path": "firmware/src/dma_buffer_ownership.h",
+        "sha256": "af7d1d319d083a56e05c938316f36a850403405b69baa062a7ba0921636887ac",
+        "size_bytes": 971
+      },
+      {
+        "path": "firmware/src/firmware_capabilities.h",
+        "sha256": "4c589e469509007a207a380b6d2af4aaea530eb1a6c89a583d51bf2e73aac2da",
+        "size_bytes": 7571
+      },
+      {
+        "path": "firmware/src/firmware_identity.h",
+        "sha256": "794b2e04c76906bb346d775f3e4890f83fa9b017cdfc921514e9408651ea456c",
+        "size_bytes": 9628
+      },
+      {
+        "path": "firmware/src/firmware_runtime.cpp",
+        "sha256": "4888a84a1b7d867f957ef06baf5b30b5ea245ef0c51da56380010669ec3a4646",
+        "size_bytes": 25351
+      },
+      {
+        "path": "firmware/src/firmware_runtime.h",
+        "sha256": "31dc1481750f717d75b2622c77b429146b941880ac286389a9a29e8dc5a833cb",
+        "size_bytes": 5348
+      },
+      {
+        "path": "firmware/src/generated/protocol_constants.h",
+        "sha256": "d7438a266b104f2545ce8629412fa76ddb17cd568dc1f63ff9808c67fc4b0dc5",
+        "size_bytes": 67564
+      },
+      {
+        "path": "firmware/src/gpio_batch_packer.cpp",
+        "sha256": "d668bc5f9ce2e9eba49741d84dbf310de91c8b82df4397623fa8a55cf1f2e967",
+        "size_bytes": 25507
+      },
+      {
+        "path": "firmware/src/gpio_batch_packer.h",
+        "sha256": "f2d83a14d6296db051b3762b57cb6ff548cd7052a85c6852316ed9819b13a07c",
+        "size_bytes": 9672
+      },
+      {
+        "path": "firmware/src/gpio_batch_packer_teensy.cpp",
+        "sha256": "33373d7aaa1bf673ac52a31d867c12dcd6707af5139c8540b1e8d6beee04c254",
+        "size_bytes": 1585
+      },
+      {
+        "path": "firmware/src/gpio_batch_packer_teensy.h",
+        "sha256": "4a66e8e32bf7c123a3b10a7e2dd958c04451f9dd328b51327c233aafb4ec7f7d",
+        "size_bytes": 399
+      },
+      {
+        "path": "firmware/src/gpio_capture_diagnostic.cpp",
+        "sha256": "edeb54ef231da2a9ff23f3c492f72aac999043f0f5e562a287bd9822a63d98fa",
+        "size_bytes": 5761
+      },
+      {
+        "path": "firmware/src/gpio_capture_diagnostic.h",
+        "sha256": "f35343d3e178a1aa425307883ca4e885ee48464b4aa5ec687e1bc14cc2878e46",
+        "size_bytes": 5922
+      },
+      {
+        "path": "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+        "sha256": "6ba72f9e8ffd69695865ad5579b4a8b4652c9d5bb10523eeb30b935d64eb6870",
+        "size_bytes": 8147
+      },
+      {
+        "path": "firmware/src/gpio_capture_diagnostic_teensy.h",
+        "sha256": "101255bc82c3391c9bfbb327c16350e676e2f798b9305666cff85e4b50cd5711",
+        "size_bytes": 788
+      },
+      {
+        "path": "firmware/src/gpio_clock_diagnostic.cpp",
+        "sha256": "c3a801f12011df40e085daeea11184600d6a8535eb59bbe872623c0c3ea722fb",
+        "size_bytes": 4544
+      },
+      {
+        "path": "firmware/src/gpio_clock_diagnostic.h",
+        "sha256": "c8e055a2a51eacd0f0937374e203bb75112f41daea4439a60af6a37332fcace8",
+        "size_bytes": 1710
+      },
+      {
+        "path": "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+        "sha256": "2961df3475320b24fbbc75b3e7a9b869e8b93d48f53f99e3b4619ae2ecc94436",
+        "size_bytes": 12183
+      },
+      {
+        "path": "firmware/src/gpio_clock_diagnostic_teensy.h",
+        "sha256": "675120e6220dad5a7eb4f443c09642ed6f5554bc3c04abdf5b43f96657d3fd99",
+        "size_bytes": 307
+      },
+      {
+        "path": "firmware/src/gpio_dma_route_teensy.h",
+        "sha256": "c112f4d28de3129422e2348ee7f381241313abb0ae60cfd54594b06ecc82b73f",
+        "size_bytes": 5658
+      },
+      {
+        "path": "firmware/src/gpio_raw_capture.cpp",
+        "sha256": "c1c5f9e4e9753482a281c976c1c4cce391b8428fd2eebc37067c5c115e568210",
+        "size_bytes": 14996
+      },
+      {
+        "path": "firmware/src/gpio_raw_capture.h",
+        "sha256": "31431ca3cef75b51a141dc21839dd56671e5ab82d9bf9f908ef17596a98bc442",
+        "size_bytes": 10148
+      },
+      {
+        "path": "firmware/src/gpio_raw_capture_teensy.cpp",
+        "sha256": "95cf994ff353c42e775641b34ba72820e6c20b361cfabb694044dcc78c5f6b93",
+        "size_bytes": 18177
+      },
+      {
+        "path": "firmware/src/gpio_raw_capture_teensy.h",
+        "sha256": "c131ce75ce7264f318d101dfe9f59eee303cafe3f70f214cd4c2e880471249aa",
+        "size_bytes": 1417
+      },
+      {
+        "path": "firmware/src/packet_buffer_pipeline.cpp",
+        "sha256": "4ac0b11d94a6d6e673057a70b464b01c70af7d4dd1266c0ec7f488f79b0a2d90",
+        "size_bytes": 31330
+      },
+      {
+        "path": "firmware/src/packet_buffer_pipeline.h",
+        "sha256": "b951b51e737e1611336694e5a7f4787f9f9c13429002c2637e140250986341b2",
+        "size_bytes": 18084
+      },
+      {
+        "path": "firmware/src/protocol.cpp",
+        "sha256": "8b608b311859b4c728d082d346d06352392c4532140c1516c2378ec042b158f9",
+        "size_bytes": 155818
+      },
+      {
+        "path": "firmware/src/protocol.h",
+        "sha256": "10010e86815fd1322cc205c2c116ca839e97cbcd9893da4c15188ef989b09204",
+        "size_bytes": 34810
+      },
+      {
+        "path": "firmware/src/statistics.cpp",
+        "sha256": "7f71ca77d0f6c7a485dd99c3dc935ad90a9fc022ed542f33d9866df2659a465c",
+        "size_bytes": 22611
+      },
+      {
+        "path": "firmware/src/statistics.h",
+        "sha256": "69e0f87b2bc8139402fa467f5814cefd3c35b361146f4206d3179fb5e26d875a",
+        "size_bytes": 10831
+      },
+      {
+        "path": "firmware/src/synthetic_source.cpp",
+        "sha256": "19a45ce0bb6f0c5b35dc1f54a3f56efc20e77ca75e254b98684f623287a305ae",
+        "size_bytes": 9267
+      },
+      {
+        "path": "firmware/src/synthetic_source.h",
+        "sha256": "2bd8d63b323e869d2ff7b5d197f5c7f844ca6bfb965d345c3706209852d8c1ec",
+        "size_bytes": 5752
+      },
+      {
+        "path": "firmware/src/teensy_clock.cpp",
+        "sha256": "568b61df9f2bf6ad23b23ce32d35340b5c641bfad3e677e524c216fb54ce9a86",
+        "size_bytes": 574
+      },
+      {
+        "path": "firmware/src/teensy_clock.h",
+        "sha256": "35806db2e87a58a10a76cb51457b9016c69573bc94cb0085abf75ade26c4b5ae",
+        "size_bytes": 579
+      },
+      {
+        "path": "firmware/src/teensy_usb.cpp",
+        "sha256": "53be0cb117efe35036a744a5b960e54e5d5317bb2f7d5f1b417d814d6b6ab40e",
+        "size_bytes": 4282
+      },
+      {
+        "path": "firmware/src/teensy_usb.h",
+        "sha256": "1680859bc7c169fae61efcce01a304b45e04fced5898226a9c185fb680d4831f",
+        "size_bytes": 1218
+      },
+      {
+        "path": "firmware/src/usb_transport.cpp",
+        "sha256": "6429e74030578bb6a4fda805fb89e294c64edae528b60da209f632059bcaa572",
+        "size_bytes": 18782
+      },
+      {
+        "path": "firmware/src/usb_transport.h",
+        "sha256": "354f653f63b0da6cd7838ec62fafdba8ae07a10fc1b859a44326602940a3d258",
+        "size_bytes": 10070
+      },
+      {
+        "path": "firmware/tests/adc_dma_capture_test.cpp",
+        "sha256": "39f9b786ae93e80ed66eec27c59161da4efe57b0591eba93760487b3a2c58439",
+        "size_bytes": 24902
+      },
+      {
+        "path": "firmware/tests/adc_frame_packer_test.cpp",
+        "sha256": "51b5edbd3df3f2496c6c45e06c13ec558ba0b57f9078f3f9803ce5540748e10e",
+        "size_bytes": 13798
+      },
+      {
+        "path": "firmware/tests/adc_initializer_test.cpp",
+        "sha256": "124e88c70a16250f5aacb0b2480b9754b2a8f3d0579960a4e8551b989932c816",
+        "size_bytes": 14824
+      },
+      {
+        "path": "firmware/tests/adc_register_adapter_test.cpp",
+        "sha256": "4e2e3d435d91bdf1e865c63369d1bb027c99363ae8f37d158acd18c3a995aa99",
+        "size_bytes": 21772
+      },
+      {
+        "path": "firmware/tests/adc_trigger_test.cpp",
+        "sha256": "fcb11d494355f33ce12a3ae52fd44a401ddb3bdb45ec9ab681d12e95cf91caf8",
+        "size_bytes": 9525
+      },
+      {
+        "path": "firmware/tests/checksum_benchmark_test.cpp",
+        "sha256": "50142756a213374c6ff3a20e8cd9957f6548c1217d871b2609a18c87470cf8d0",
+        "size_bytes": 15875
+      },
+      {
+        "path": "firmware/tests/checksum_candidates_test.cpp",
+        "sha256": "8bba573436568a2aba6d51e2feb8e5f00392b83397c781a6fe49e95e6f1d3daf",
+        "size_bytes": 5000
+      },
+      {
+        "path": "firmware/tests/checksum_correctness_test.cpp",
+        "sha256": "c5a82b4e01836a1d6571764e2934cf3da3d7a81c08c5840c72a0344b99a2f540",
+        "size_bytes": 7380
+      },
+      {
+        "path": "firmware/tests/combined_dma_pipeline_test.cpp",
+        "sha256": "7b596514d9ef99600da50c524562e0ca5fa887090bfcfdf9ce60aae6a0a723fb",
+        "size_bytes": 34677
+      },
+      {
+        "path": "firmware/tests/control_state_test.cpp",
+        "sha256": "e643bdb51284a851d4beed72f95b8fc58469fef78a4f7aafcc898b70998ba7e7",
+        "size_bytes": 54369
+      },
+      {
+        "path": "firmware/tests/fakes/teensy40/core_pins.h",
+        "sha256": "d4c5fe8f3fe64790281d46b6a9d97d6cc5cda102453fca51885ea00e066c7f81",
+        "size_bytes": 2195
+      },
+      {
+        "path": "firmware/tests/fakes/teensy40/imxrt.h",
+        "sha256": "66e9d6e787848a791cf39e11376a6f26460f7275f3fb1653122d9281de730e0c",
+        "size_bytes": 10610
+      },
+      {
+        "path": "firmware/tests/firmware_runtime_test.cpp",
+        "sha256": "781fa83812f455f8d7dfbfee17a49bf55725b7679f40cb04e5171b4b715d6495",
+        "size_bytes": 97745
+      },
+      {
+        "path": "firmware/tests/fixtures/combined_acquisition.map",
+        "sha256": "9fa244db5bbc562427d5261f6fd61543df9c96fe0b8bf65bad37e8f37d1caeaa",
+        "size_bytes": 1565
+      },
+      {
+        "path": "firmware/tests/fixtures/soak/service-transcripts.json",
+        "sha256": "5b8cbd55d7a98a820816b28ca42b8765f196c35026850cd563fbe57221aa6b97",
+        "size_bytes": 6297
+      },
+      {
+        "path": "firmware/tests/generated/rig_soak_control_stress.py",
+        "sha256": "42815d6ead54c1c5982896839be988601d9da9ad18b4e2d91c60c16027597947",
+        "size_bytes": 122460
+      },
+      {
+        "path": "firmware/tests/generated/rig_soak_physical_combined.py",
+        "sha256": "3512638b288c4005a6a30b5c0ff93eb73cdf1a409a9fd0a53506cdc1d0ac463a",
+        "size_bytes": 122463
+      },
+      {
+        "path": "firmware/tests/generated/rig_soak_synthetic.py",
+        "sha256": "4ebd8905faa857a5a023a0d515c510b7b6ed7787651930a5a4fc555abb6f7323",
+        "size_bytes": 122455
+      },
+      {
+        "path": "firmware/tests/gpio_batch_packer_benchmark.cpp",
+        "sha256": "8c3a52f0353aa47453c041003538ce0583ebce3f19fef1d8c196fbb1e92e3899",
+        "size_bytes": 2927
+      },
+      {
+        "path": "firmware/tests/gpio_batch_packer_test.cpp",
+        "sha256": "901b2efa96ad2f627625bea91df16b9bf2240cc1096a88665d73fc80b456c1f7",
+        "size_bytes": 23033
+      },
+      {
+        "path": "firmware/tests/gpio_capture_diagnostic_test.cpp",
+        "sha256": "f6f6da1f79a95bcc014d88c166c3153970ca30dd15e8e3608b6a90e751bbd98b",
+        "size_bytes": 9528
+      },
+      {
+        "path": "firmware/tests/gpio_clock_diagnostic_test.cpp",
+        "sha256": "b54ce1341687a5fef03b3221606736f40d72424199c90a557c89adbb1edac766",
+        "size_bytes": 7625
+      },
+      {
+        "path": "firmware/tests/gpio_raw_capture_test.cpp",
+        "sha256": "583096d25854bea960db08b32053f2cfa76eb994b0687d4b8c675d78fda8c768",
+        "size_bytes": 16011
+      },
+      {
+        "path": "firmware/tests/gpio_register_configuration_test.cpp",
+        "sha256": "c629217cc619c79c8f462759d690f564027e58648a54e6f2f474ce76367698fa",
+        "size_bytes": 10181
+      },
+      {
+        "path": "firmware/tests/identity_resource_test.cpp",
+        "sha256": "83975dec5b789f629148dc5662762dda3ea7a20f480659190eee441ae0ba6a79",
+        "size_bytes": 19444
+      },
+      {
+        "path": "firmware/tests/packet_buffer_pipeline_test.cpp",
+        "sha256": "70e3b8235d9bbd61ea5ebb5d652d5424b54893d9d8641718b00053b6e511cd4a",
+        "size_bytes": 34894
+      },
+      {
+        "path": "firmware/tests/pressure_recovery_test.cpp",
+        "sha256": "7cb8348df7722d555bd794a71675c34671c0146065396b5216c3cecd2d0fa090",
+        "size_bytes": 58466
+      },
+      {
+        "path": "firmware/tests/protocol_primitives_test.cpp",
+        "sha256": "2768d6a208d488f7f531ff767995877557be5c3ed8baa0063b74b6baee217bd6",
+        "size_bytes": 40418
+      },
+      {
+        "path": "firmware/tests/rig_adc_capture.py",
+        "sha256": "8ac2ad0a8938a4e49d8af065887dbe02aa42a0bea2701cd9f27e1d37439b9c3c",
+        "size_bytes": 115687
+      },
+      {
+        "path": "firmware/tests/rig_checksum_benchmark.py",
+        "sha256": "a39de167c9644a921137486e75b743ed0efbb3035446d98200cf83ffc4059dde",
+        "size_bytes": 108309
+      },
+      {
+        "path": "firmware/tests/rig_combined_capture.py",
+        "sha256": "6d4a25d188b54498fb6e0c4104ef94303eb1046b51b4262d90fcf37cfb03dd7a",
+        "size_bytes": 147820
+      },
+      {
+        "path": "firmware/tests/rig_control_recovery.py",
+        "sha256": "65eacf8b1cd729a7b6c7fa065777add0e43444d414674df9a90257ab0eca2dc1",
+        "size_bytes": 56270
+      },
+      {
+        "path": "firmware/tests/rig_control_smoke.py",
+        "sha256": "c9f36fd32e9231c5ee65e56af4f7a358eb1d60b9279e6cb1c44f8c835dbc1929",
+        "size_bytes": 32634
+      },
+      {
+        "path": "firmware/tests/rig_gpio_capture.py",
+        "sha256": "ad68478e515d3729f406ff65873401f40c5781844b2253ca16527a7bb5b2baee",
+        "size_bytes": 101884
+      },
+      {
+        "path": "firmware/tests/rig_host_stall_recovery.py",
+        "sha256": "9914e6cc9159ea8c701ca8d0771b439e84aaf3af16a94c97634612d1b8381e44",
+        "size_bytes": 56433
+      },
+      {
+        "path": "firmware/tests/rig_synthetic_stream.py",
+        "sha256": "17ce238c30d05e6c5521d9ba7d8b06fc01e1dbaa89bb4e7d66a8872948d020b9",
+        "size_bytes": 74988
+      },
+      {
+        "path": "firmware/tests/synthetic_pipeline_test.cpp",
+        "sha256": "9fe4dd9b1fefe86dfe0292a7aff124fafc96a1e2e1d240e64650e2bf07dd7fa4",
+        "size_bytes": 42647
+      },
+      {
+        "path": "firmware/tests/synthetic_source_test.cpp",
+        "sha256": "77f4b04924c3853f318fca5701192d7f61354dabf4d03491697b5b50c57292f2",
+        "size_bytes": 19370
+      },
+      {
+        "path": "firmware/tests/test_adc_dma_capture.py",
+        "sha256": "d835631e278c1b7fa1fd56dc0bb7252ccd86435d34596c42c843e32d4ea3a72f",
+        "size_bytes": 4286
+      },
+      {
+        "path": "firmware/tests/test_adc_frame_packer.py",
+        "sha256": "ed2e63a82cab4f043fd756f17b84a1e198c71195649f4d3e074648e5e2591e86",
+        "size_bytes": 3255
+      },
+      {
+        "path": "firmware/tests/test_adc_initializer.py",
+        "sha256": "f1966f963205b28f07b0d898c8cafe3d67476f66a8972547179c38427fed6099",
+        "size_bytes": 1917
+      },
+      {
+        "path": "firmware/tests/test_adc_register_adapter.py",
+        "sha256": "61ba29cedff59a9efdd651e5fcc63e4e037587134a5bb74d1a324fe861daf020",
+        "size_bytes": 2066
+      },
+      {
+        "path": "firmware/tests/test_adc_trigger.py",
+        "sha256": "60a7065255fc6ae843c73bd17dea1b6e8d01474e8bfbe3b9699304e7a783d11c",
+        "size_bytes": 2002
+      },
+      {
+        "path": "firmware/tests/test_build_configuration.py",
+        "sha256": "40d477e126ee4fa7bfffa1688323d74ac35da0561744a57650339196b4672a49",
+        "size_bytes": 17178
+      },
+      {
+        "path": "firmware/tests/test_checksum_benchmark.py",
+        "sha256": "d0df2e579bdf2adf7dd46250936d4d73303b9aa80d3d9d008613d155286a540d",
+        "size_bytes": 2960
+      },
+      {
+        "path": "firmware/tests/test_checksum_candidates.py",
+        "sha256": "062d13ec18b92643e7bd4b16e1095062a3115ad721a0395b373b6a08c84e1077",
+        "size_bytes": 3060
+      },
+      {
+        "path": "firmware/tests/test_checksum_correctness.py",
+        "sha256": "0911996bcfcd66703fcfbcbf8a6ab837487e2a32cc4e4504359144d1793dc134",
+        "size_bytes": 13647
+      },
+      {
+        "path": "firmware/tests/test_combined_acquisition.py",
+        "sha256": "1a225273f7fe5bfdc6390add0e3c248fa85d66677c7c983c69f980e4d65f3957",
+        "size_bytes": 8533
+      },
+      {
+        "path": "firmware/tests/test_control_state.py",
+        "sha256": "b99ba18a2d831c5c5484b0dafbeeca63950a5c53afc40c7160fa24208cccc861",
+        "size_bytes": 3296
+      },
+      {
+        "path": "firmware/tests/test_firmware_identity_resources.py",
+        "sha256": "b560a6d05583219052b54f02bc8d2d337407f5982a368ba1b612b239f51a60b6",
+        "size_bytes": 3231
+      },
+      {
+        "path": "firmware/tests/test_firmware_runtime.py",
+        "sha256": "0d83c6c2565d7c46c3a273c5e38bde40c777dddcce7299aade36b013232b50ec",
+        "size_bytes": 5380
+      },
+      {
+        "path": "firmware/tests/test_gpio_batch_packer.py",
+        "sha256": "d72d7e27eb0574e49714f95a8a8ef01f07a6f8fd97aaec78cdeb15b895f14bbd",
+        "size_bytes": 4761
+      },
+      {
+        "path": "firmware/tests/test_gpio_capture_diagnostic.py",
+        "sha256": "30fbbbe7125c155a591e06a7c6b760355551a4ea3be6b4b204fff6c286d1a804",
+        "size_bytes": 3398
+      },
+      {
+        "path": "firmware/tests/test_gpio_clock_diagnostic.py",
+        "sha256": "2db72e4bf237f1982920223763b5bc29e703708b26ff4a27c1c486c052794aa2",
+        "size_bytes": 2235
+      },
+      {
+        "path": "firmware/tests/test_gpio_raw_capture.py",
+        "sha256": "ae521164add99e6e40e26d8b9e0b4af92c85f2c50ff7295c88d709f63420e084",
+        "size_bytes": 4439
+      },
+      {
+        "path": "firmware/tests/test_gpio_register_configuration.py",
+        "sha256": "9f66dc08ebab680d0d84162de739ec3ddf01f34cbc29301add90c742b946f11c",
+        "size_bytes": 2099
+      },
+      {
+        "path": "firmware/tests/test_packet_buffer_pipeline.py",
+        "sha256": "8fc5b0a598a20828cfb42d12d8743a38a7c162318daa762fc69d46f6d74632ae",
+        "size_bytes": 3555
+      },
+      {
+        "path": "firmware/tests/test_portable_source_boundaries.py",
+        "sha256": "c5b8c1d055ef5e9a57fac34fa4c1416ae5851eb1c5c076e2a9505971d00b53b7",
+        "size_bytes": 9544
+      },
+      {
+        "path": "firmware/tests/test_pressure_recovery.py",
+        "sha256": "568ef2e98e1833820b4b5b93bdb217a21b4774647368681522f51fd09e0c3737",
+        "size_bytes": 2525
+      },
+      {
+        "path": "firmware/tests/test_protocol_primitives.py",
+        "sha256": "96acfdbfb62d8eb64b8c4dce8afd7d75a0ea80ca4df804de085246a1f64ae46f",
+        "size_bytes": 8849
+      },
+      {
+        "path": "firmware/tests/test_rig_adc_capture.py",
+        "sha256": "b792c73392610afa1c1c052230f22a1976c17844e1f11693d1072bbc77b83b0e",
+        "size_bytes": 23465
+      },
+      {
+        "path": "firmware/tests/test_rig_checksum_benchmark.py",
+        "sha256": "628aa08b5136a9e85697d0558848931c40aafe60db971ef97eec1eb9a5bf3707",
+        "size_bytes": 25215
+      },
+      {
+        "path": "firmware/tests/test_rig_combined_capture.py",
+        "sha256": "3d71a78dd64d80492cc390057f6f4d9edc18bfde031f983f0a837beb19e6c888",
+        "size_bytes": 29028
+      },
+      {
+        "path": "firmware/tests/test_rig_control_smoke.py",
+        "sha256": "095633eb20507b1877e65b06ea65b864ec3ad1a9912ff1dfea0624c352bf1711",
+        "size_bytes": 7179
+      },
+      {
+        "path": "firmware/tests/test_rig_gpio_capture.py",
+        "sha256": "b330cd8bce718d13194528744a6f00dc6c95a5e493953457e1597059065a4925",
+        "size_bytes": 22427
+      },
+      {
+        "path": "firmware/tests/test_rig_recovery_programs.py",
+        "sha256": "0be12b0d94346c5decdcd45efaafc54bc7a6089b5487e8b0ff1c0a9b94332a39",
+        "size_bytes": 33720
+      },
+      {
+        "path": "firmware/tests/test_rig_synthetic_stream.py",
+        "sha256": "ad3390a107fbf48b55542ee9f55732fec648f71a449a725b638ea0d4378dd857",
+        "size_bytes": 16688
+      },
+      {
+        "path": "firmware/tests/test_soak_candidate_freeze.py",
+        "sha256": "bc0a02fe678f87b2f82d329688a6e80c5428d90f37a5705906aa77ce39e9937a",
+        "size_bytes": 8001
+      },
+      {
+        "path": "firmware/tests/test_soak_endurance_tools.py",
+        "sha256": "5937583d59c722790910aea9113f67ffaf185983e1e56f26cd9ca968fd13d96e",
+        "size_bytes": 34828
+      },
+      {
+        "path": "firmware/tests/test_synthetic_pipeline.py",
+        "sha256": "413bb35218f8a69cc6473fb2dae3322a91bca72d83ce44b90767843bdf782588",
+        "size_bytes": 6172
+      },
+      {
+        "path": "firmware/tests/test_synthetic_source.py",
+        "sha256": "02eb3f61ab770ab9d200552509923535fa7cb329a5984689d9c500a76d50a078",
+        "size_bytes": 3272
+      },
+      {
+        "path": "firmware/tests/test_usb_transport.py",
+        "sha256": "7013930abc490414cad4823c055b2c4fe517ab74f8a6c3911370ba182efc1143",
+        "size_bytes": 4312
+      },
+      {
+        "path": "firmware/tests/usb_transport_test.cpp",
+        "sha256": "80afe0999fd43992879b3f30cd303ca45bfe2a3830c8503eaa9b472359f845ed",
+        "size_bytes": 26412
+      },
+      {
+        "path": "firmware/tools/aggregate_soak_results.py",
+        "sha256": "8481c918520be8d63081a2d7a3fd63c5ca39cb99640a395363bf245c6ccf4aff",
+        "size_bytes": 26598
+      },
+      {
+        "path": "firmware/tools/build_firmware.py",
+        "sha256": "3350a04c335bfcc71826632a5266a5e63ef491fbfea465e20b8232abba68ec34",
+        "size_bytes": 37087
+      },
+      {
+        "path": "firmware/tools/freeze_soak_candidate.py",
+        "sha256": "ffc9500878c9936d38ecfeac6601f9a82e75f4f76419c294ec6309ce19b6f858",
+        "size_bytes": 22745
+      },
+      {
+        "path": "firmware/tools/generate_soak_programs.py",
+        "sha256": "d6934ce6114403ea36dcd95d2619f258c403f7f62cad0dab35378700adabcf8b",
+        "size_bytes": 12405
+      },
+      {
+        "path": "protocol/fixtures/adc-data.bin",
+        "sha256": "31a14e47c224fe2b7ef4bda7153b7ea37ecb7905c2b3e9732eb2fcecff2efd6a",
+        "size_bytes": 4096
+      },
+      {
+        "path": "protocol/fixtures/checksum-benchmark-request.bin",
+        "sha256": "95c062b0b6b8213c4a53278339f600ce86f67c7cdd64f0c485071a722b37602d",
+        "size_bytes": 56
+      },
+      {
+        "path": "protocol/fixtures/checksum-benchmark-response.bin",
+        "sha256": "968e404a1d835f71b000be629fead1e4b821dcc9b235e7a8a3901d6ef063af7b",
+        "size_bytes": 144
+      },
+      {
+        "path": "protocol/fixtures/configure-request.bin",
+        "sha256": "d78ac3972e6b7d049b6c764f835949d6098f104cce83595f1fcd7197c3b43cf9",
+        "size_bytes": 56
+      },
+      {
+        "path": "protocol/fixtures/configure-response.bin",
+        "sha256": "aabf46243e588eb0d7e534ec6fa408f6cb0565c49d8c989e5743f5e25c13c95c",
+        "size_bytes": 60
+      },
+      {
+        "path": "protocol/fixtures/error-response.bin",
+        "sha256": "d999ee9858397c7559bf937bb8c96e179e9cd7d158316f0ba4aac059c1efc47a",
+        "size_bytes": 56
+      },
+      {
+        "path": "protocol/fixtures/get-status-request.bin",
+        "sha256": "c656785ffd4c3fbc4970ed3d31b134039bab2bc29300f564c0352017d5c17706",
+        "size_bytes": 48
+      },
+      {
+        "path": "protocol/fixtures/get-status-response.bin",
+        "sha256": "fb1b9d1b471048f55a2c87b80bb436859e9aa6de4bf9c30d3031a0a694cab979",
+        "size_bytes": 1276
+      },
+      {
+        "path": "protocol/fixtures/gpio-capture-diagnostic-request.bin",
+        "sha256": "33e8b9e6395b4c0e9ef2f48bc6695b1fc06b79f15d899e1bcfec86629f61e8a6",
+        "size_bytes": 48
+      },
+      {
+        "path": "protocol/fixtures/gpio-capture-diagnostic-response.bin",
+        "sha256": "da417e2659e00a1a032d33b546a949e5d157f38286b6e6eb7d7d1d0438499bd2",
+        "size_bytes": 192
+      },
+      {
+        "path": "protocol/fixtures/gpio-clock-diagnostic-request.bin",
+        "sha256": "7d5fb760c5f6ad97fceb2576e248c0f9cefec7923db55a4e2c3f910dac995c66",
+        "size_bytes": 56
+      },
+      {
+        "path": "protocol/fixtures/gpio-clock-diagnostic-response.bin",
+        "sha256": "6fd1ba4a5db9ecfb731162cc865698e43ff38c2e229811daa01a5892ab7f37b4",
+        "size_bytes": 188
+      },
+      {
+        "path": "protocol/fixtures/gpio-data.bin",
+        "sha256": "2b998c3d3c587d0f3e2dcb71a657912c5081e85c729aae5927d8c3120a310749",
+        "size_bytes": 4096
+      },
+      {
+        "path": "protocol/fixtures/info-request.bin",
+        "sha256": "29b9b57a1d6fd8ac9599343b0c4a6f99d050d7fea89d8e4eacdf1dea95b45f3c",
+        "size_bytes": 48
+      },
+      {
+        "path": "protocol/fixtures/info-response.bin",
+        "sha256": "74f6824f6eed93b7346231e2d48f58a210fb68ee724969219ba059d5815f280c",
+        "size_bytes": 424
+      },
+      {
+        "path": "protocol/fixtures/manifest.json",
+        "sha256": "04a814b5082a476fdb965bd4d04ced9ca7a06aa001dd10b5bb53939cbf1b94c2",
+        "size_bytes": 15671
+      },
+      {
+        "path": "protocol/fixtures/ping-request.bin",
+        "sha256": "3861fce26f53e4e1d2939756569b6e6b0819e15be856b878632b1d0b7d3d9cd8",
+        "size_bytes": 56
+      },
+      {
+        "path": "protocol/fixtures/ping-response.bin",
+        "sha256": "7a0b37d42dc14845a3673052d2b5ec3472307f404f418a48dd0048db56b66f11",
+        "size_bytes": 60
+      },
+      {
+        "path": "protocol/fixtures/reset-stats-request.bin",
+        "sha256": "4411da315ac2363cf323e858bdf89e351b221e80c255b523fc50846551091646",
+        "size_bytes": 48
+      },
+      {
+        "path": "protocol/fixtures/reset-stats-response.bin",
+        "sha256": "cc22d2ea1cbcedfdd6863616557560e91db1b411d3782fa2dfe8fa21edc5f337",
+        "size_bytes": 56
+      },
+      {
+        "path": "protocol/fixtures/start-request.bin",
+        "sha256": "6a05f4efc6119d9a0576d4629fa28eb2f01036cf3f1d6713d1b5690f179a70dd",
+        "size_bytes": 48
+      },
+      {
+        "path": "protocol/fixtures/start-response.bin",
+        "sha256": "9d546cf5cbce61f812dc3f375b3d984c218b27e89af484b19d32839a7dded688",
+        "size_bytes": 60
+      },
+      {
+        "path": "protocol/fixtures/stop-request.bin",
+        "sha256": "8025d47b1a62867a2c5b68eab10922f2b1c98c316d1c58254ce0488420013f9b",
+        "size_bytes": 48
+      },
+      {
+        "path": "protocol/fixtures/stop-response.bin",
+        "sha256": "2a40df907e291a408b59482dd0267779634788aeb85d0ec8651331074726f13b",
+        "size_bytes": 56
+      },
+      {
+        "path": "protocol/protocol-v1.json",
+        "sha256": "ee82cb67adee1cbe763c07f85dbf4639c8fdfe5d0703d8f270a7863cf871858c",
+        "size_bytes": 104552
+      },
+      {
+        "path": "tools/generate_protocol.py",
+        "sha256": "180867f5c2b1ef6db7d534ff520cd4cb9da394939146b0ba637edbd326b6e40f",
+        "size_bytes": 87698
+      }
+    ],
+    "tree_sha256": "4eede0780fb00d81e79607f4c67e08049bf4845223a4f652c605b073570c4027"
+  },
+  "reproducibility": {
+    "artifacts": [
+      {
+        "path": "firmware.ino.eep",
+        "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "size_bytes": 34
+      },
+      {
+        "path": "firmware.ino.elf",
+        "sha256": "9337ac3ddbeb0461e48bc8050422c446bb0f4f216058b0d2e32f148370e1c292",
+        "size_bytes": 1791648
+      },
+      {
+        "path": "firmware.ino.hex",
+        "sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769",
+        "size_bytes": 351467
+      },
+      {
+        "path": "firmware.ino.map",
+        "sha256": "92ea75bcfcbedcb4c331f40670b43760e2c2fbe2ff89050e027b56c116b0e1a8",
+        "size_bytes": 828851
+      }
+    ],
+    "build_count": 2,
+    "byte_identical": true,
+    "manifest_sha256": {
+      "first": "1f146fa8bd2656b7ec419f3d6d2817986e179cda929b79c7e5ac206c53b61767",
+      "second": "1f146fa8bd2656b7ec419f3d6d2817986e179cda929b79c7e5ac206c53b61767"
+    }
+  },
+  "schema_version": 1,
+  "staged": {
+    "directory": ".maestro/playbooks/Working/phase-11-soak-candidate-00001/frozen",
+    "files": [
+      {
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00001/frozen/build-manifest.json",
+        "sha256": "1f146fa8bd2656b7ec419f3d6d2817986e179cda929b79c7e5ac206c53b61767",
+        "size_bytes": 12789
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00001/frozen/firmware.ino.eep",
+        "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "size_bytes": 34
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00001/frozen/firmware.ino.elf",
+        "sha256": "9337ac3ddbeb0461e48bc8050422c446bb0f4f216058b0d2e32f148370e1c292",
+        "size_bytes": 1791648
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00001/frozen/firmware.ino.hex",
+        "sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769",
+        "size_bytes": 351467
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase-11-soak-candidate-00001/frozen/firmware.ino.map",
+        "sha256": "92ea75bcfcbedcb4c331f40670b43760e2c2fbe2ff89050e027b56c116b0e1a8",
+        "size_bytes": 828851
+      }
+    ]
+  }
+}
