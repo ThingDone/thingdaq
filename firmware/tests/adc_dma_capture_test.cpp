@@ -36,6 +36,12 @@ class FakeCache final : public capture::CacheMaintenance {
  public:
   void discardBeforeDmaWrite(void *address, std::size_t bytes) override {
     record(CacheEvent::Kind::kDmaDiscard, address, bytes);
+    if (stop_on_next_discard && stop_ring != nullptr) {
+      stop_on_next_discard = false;
+      const capture::Snapshot before_stop = stop_ring->snapshot();
+      observed_state = before_stop.buffer_states[observed_buffer];
+      nested_stop = stop_ring->stop(stop_channels);
+    }
   }
 
   void invalidateBeforeCpuRead(void *address, std::size_t bytes) override {
@@ -44,6 +50,13 @@ class FakeCache final : public capture::CacheMaintenance {
 
   std::array<CacheEvent, 128U> events{};
   std::size_t count = 0U;
+  capture::PairCaptureRing *stop_ring = nullptr;
+  std::array<capture::ChannelStopState, capture::kConverterCount>
+      stop_channels{};
+  capture::StopReport nested_stop{};
+  capture::BufferState observed_state = capture::BufferState::kFree;
+  std::uint8_t observed_buffer = 0U;
+  bool stop_on_next_discard = false;
 
  private:
   void record(CacheEvent::Kind kind, void *address, std::size_t bytes) {
@@ -381,6 +394,144 @@ void testStopDoesNotInventLossForUnstartedTaintedGenerations() {
          "a latched ADC_ETC overwrite contributes one evidenced lost pair");
 }
 
+void testStopAcrossEveryBufferOwnershipState() {
+  {
+    Fixture fixture{};
+    expect(fixture.ring.prime(41U).ok(),
+           "FREE/DMA_OWNED STOP fixture primes");
+    const capture::Snapshot before = fixture.ring.snapshot();
+    const std::array<capture::ChannelStopState, 2U> stopped{{
+        {0U, 0U, 0U},
+        {0U, 0U, 0U},
+    }};
+    const capture::StopReport report = fixture.ring.stop(stopped);
+    const capture::Snapshot after = fixture.ring.snapshot();
+    expect(before.buffer_states[0] == capture::BufferState::kDmaOwned &&
+               before.buffer_states[1] == capture::BufferState::kDmaOwned &&
+               before.buffer_states[2] == capture::BufferState::kFree &&
+               report.ok() && report.buffers_discarded == 2U &&
+               report.pairs_discarded == 0U && after.quiescent,
+           "STOP reclaims DMA_OWNED buffers and preserves untouched FREE buffers without invented loss");
+  }
+
+  {
+    Fixture fixture{};
+    expect(fixture.ring.prime(43U).ok(), "READY STOP fixture primes");
+    expect(complete(fixture, 43U, 0U, 0U, 0U).pair_ready,
+           "READY STOP fixture publishes one buffer");
+    const std::array<capture::ChannelStopState, 2U> stopped{{
+        {1U, 0U, 1U},
+        {1U, 0U, 1U},
+    }};
+    const capture::StopReport report = fixture.ring.stop(stopped);
+    capture::Snapshot snapshot = fixture.ring.snapshot();
+    expect(report.ok() && report.ready_buffers_to_drain == 1U &&
+               report.reading_buffers_to_release == 0U &&
+               snapshot.ready_depth == 1U && !snapshot.quiescent,
+           "STOP preserves a complete READY buffer for post-trigger drain");
+    const capture::AcquireResult ready = fixture.ring.acquireReady();
+    expect(ready.ok() && fixture.ring.release(ready.handle) ==
+                             capture::OperationStatus::kOk &&
+               fixture.ring.quiescent(),
+           "a READY lease remains readable and releasable after STOP");
+  }
+
+  {
+    Fixture fixture{};
+    expect(fixture.ring.prime(47U).ok(), "READING STOP fixture primes");
+    expect(complete(fixture, 47U, 0U, 0U, 1U).pair_ready,
+           "READING STOP fixture publishes one buffer");
+    const capture::AcquireResult reading = fixture.ring.acquireReady();
+    const std::array<capture::ChannelStopState, 2U> stopped{{
+        {1U, 0U, 1U},
+        {1U, 0U, 1U},
+    }};
+    const capture::StopReport report = fixture.ring.stop(stopped);
+    const capture::Snapshot snapshot = fixture.ring.snapshot();
+    expect(reading.ok() && report.ok() &&
+               report.reading_buffers_to_release == 1U &&
+               snapshot.reading_depth == 1U && !snapshot.quiescent,
+           "STOP reports but never steals an active READING lease");
+    expect(fixture.ring.release(reading.handle) ==
+                   capture::OperationStatus::kOk &&
+               fixture.ring.quiescent(),
+           "the pre-STOP READING lease releases cleanly afterward");
+  }
+
+  {
+    Fixture fixture{};
+    expect(fixture.ring.prime(53U).ok(), "RELEASING STOP fixture primes");
+    expect(complete(fixture, 53U, 0U, 0U, 0U).pair_ready,
+           "RELEASING STOP fixture publishes one buffer");
+    const capture::AcquireResult releasing = fixture.ring.acquireReady();
+    fixture.cache.stop_ring = &fixture.ring;
+    fixture.cache.stop_channels = {{
+        {1U, 0U, 1U},
+        {1U, 0U, 1U},
+    }};
+    fixture.cache.observed_buffer = releasing.handle.buffer_index;
+    fixture.cache.stop_on_next_discard = true;
+    const capture::OperationStatus released =
+        fixture.ring.release(releasing.handle);
+    expect(released == capture::OperationStatus::kOk &&
+               fixture.cache.observed_state ==
+                   capture::BufferState::kReleasing &&
+               fixture.cache.nested_stop.ok() && fixture.ring.quiescent(),
+           "a concurrent STOP observes RELEASING ownership without invalidating the release");
+  }
+
+  {
+    Fixture fixture{};
+    expect(fixture.ring.prime(59U).ok(),
+           "DISCARD_PENDING STOP fixture primes");
+    fixture.ring.recordAdcEtcError(59U, 0x01U, 0x00010000U);
+    expect(complete(fixture, 59U, 0U, 0U, 1U).pair_lost,
+           "ADC_ETC evidence produces a DISCARD_PENDING buffer");
+    const capture::Snapshot pending = fixture.ring.snapshot();
+    const std::array<capture::ChannelStopState, 2U> stopped{{
+        {1U, 0U, 1U},
+        {1U, 0U, 1U},
+    }};
+    const capture::StopReport report = fixture.ring.stop(stopped);
+    const capture::Snapshot after = fixture.ring.snapshot();
+    expect(pending.discard_depth == 1U && report.ok() && after.quiescent &&
+               after.progress.pairs_lost == constants::kAdcPairsPerFrame &&
+               after.progress.stop_discarded_pairs == 0U,
+           "STOP services DISCARD_PENDING ownership without double-counting its prior loss");
+  }
+
+  {
+    Fixture fixture{};
+    expect(fixture.ring.prime(61U).ok(), "overflow STOP fixture primes");
+    for (std::uint32_t generation = 0U; generation < 4U; ++generation) {
+      expect(complete(fixture, 61U, generation,
+                      static_cast<std::uint8_t>(generation), 0U)
+                 .pair_ready,
+             "overflow STOP fixture fills one retained ring buffer");
+    }
+    const std::array<capture::ChannelStopState, 2U> stopped{{
+        {4U, 10U, capture::kOverflowDestination},
+        {4U, 7U, capture::kOverflowDestination},
+    }};
+    const capture::StopReport report = fixture.ring.stop(stopped);
+    capture::Snapshot snapshot = fixture.ring.snapshot();
+    expect(report.ok() && report.pairs_discarded == 10U &&
+               report.ready_buffers_to_drain == board::kAdcDmaRingDepth &&
+               snapshot.progress.ring_overruns == 1U &&
+               snapshot.progress.incomplete_conversions == 3U,
+           "STOP accounts partial overflow-sink ownership by exact max/difference pairs");
+    for (std::size_t index = 0U; index < board::kAdcDmaRingDepth; ++index) {
+      const capture::AcquireResult ready = fixture.ring.acquireReady();
+      expect(ready.ok() && fixture.ring.release(ready.handle) ==
+                               capture::OperationStatus::kOk,
+             "each retained buffer drains after overflow STOP");
+    }
+    snapshot = fixture.ring.snapshot();
+    expect(snapshot.quiescent,
+           "all ownership states converge to quiescent after bounded drain");
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -390,6 +541,7 @@ int main() {
   testStaleGenerationAndStopAccounting();
   testDmaGenerationWrapKeepsThePairBarrierUnambiguous();
   testStopDoesNotInventLossForUnstartedTaintedGenerations();
+  testStopAcrossEveryBufferOwnershipState();
   if (failures != 0) {
     std::cerr << failures << " ADC DMA capture assertion(s) failed\n";
     return 1;

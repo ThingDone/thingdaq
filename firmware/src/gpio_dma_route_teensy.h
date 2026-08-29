@@ -45,7 +45,11 @@ inline constexpr std::uint32_t kDmamuxConfiguration =
     DMAMUX_CHCFG_ENBL | board::kGpioDmamuxSource;
 
 inline void barrier() {
+#if defined(TEENSY_DAQ_HOST_REGISTER_TEST)
+  __asm__ volatile("" : : : "memory");
+#else
   __asm__ volatile("dsb\n\tisb" : : : "memory");
+#endif
 }
 
 inline volatile std::uint16_t *xbarSelectRegister() {

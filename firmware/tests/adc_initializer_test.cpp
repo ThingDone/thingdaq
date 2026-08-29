@@ -282,6 +282,46 @@ void testFallbackGatePolicy() {
          "authorized fallback is fully and unambiguously advertised");
 }
 
+void testEveryFallbackGateCombination() {
+  constexpr std::uint16_t primary_flag =
+      flag(v1::AdcConfigurationFlag::kPrimary12Bit);
+  constexpr std::uint16_t fallback_flag =
+      flag(v1::AdcConfigurationFlag::kFallback10Bit);
+  for (std::uint32_t mask = 0U; mask < 64U; ++mask) {
+    const adc::ResolutionGate gate{
+        (mask & (1U << 0U)) != 0U,
+        (mask & (1U << 1U)) != 0U,
+        (mask & (1U << 2U)) != 0U,
+        (mask & (1U << 3U)) != 0U,
+        (mask & (1U << 4U)) != 0U,
+        (mask & (1U << 5U)) != 0U,
+    };
+    const bool fallback_authorized =
+        gate.completed && gate.configuration_corrected &&
+        gate.exact_rate_verified && gate.calibration_verified &&
+        (!gate.timing_within_budget || !gate.error_free);
+    const std::uint8_t expected_resolution =
+        fallback_authorized ? v1::kAdcFallbackResolutionBits
+                            : v1::kAdcPrimaryResolutionBits;
+    const adc::Settings settings = adc::settingsFor(gate);
+    const adc::Snapshot snapshot = adc::defaultSnapshot(gate);
+    const bool primary_advertised =
+        (snapshot.configuration_flags & primary_flag) != 0U;
+    const bool fallback_advertised =
+        (snapshot.configuration_flags & fallback_flag) != 0U;
+
+    expect(adc::selectResolution(gate) == expected_resolution &&
+               settings.resolution_bits == expected_resolution &&
+               settings.code_max == adc::codeMaximum(expected_resolution) &&
+               settings.conversion_mode ==
+                   adc::conversionMode(expected_resolution),
+           "all 64 fallback evidence combinations select one deterministic format");
+    expect(primary_advertised != fallback_advertised &&
+               fallback_advertised == fallback_authorized,
+           "every fallback combination advertises exactly the selected resolution");
+  }
+}
+
 void testFrozenCounterPollLimit() {
   FakePlatform platform{};
   platform.active_polls = {std::numeric_limits<std::uint32_t>::max(), 0U};
@@ -307,6 +347,7 @@ int main() {
   testRouteConfigurationAndClockFailures();
   testIndependentTimeoutAndCycleWrap();
   testFallbackGatePolicy();
+  testEveryFallbackGateCombination();
   testFrozenCounterPollLimit();
   if (failures != 0) {
     std::cerr << failures << " ADC initializer assertion(s) failed\n";

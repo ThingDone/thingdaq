@@ -116,6 +116,59 @@ class PhysicalAdcBlockModelTests(unittest.TestCase):
         self.assertEqual([4095, 7, 12, 3001], [item.code for item in samples])
         self.assertEqual([16, 20, 24, 28], [item.timestamp_ticks for item in samples])
 
+    def test_raw_channel_and_interleave_views_cover_both_frame_boundaries(
+        self,
+    ) -> None:
+        first_pair_index = 5
+        first_tick = first_pair_index * constants.ADC_PAIR_PERIOD_TICKS
+        block = ADCBlock(
+            run_id=11,
+            sequence=7,
+            first_sample_ticks=first_tick,
+            payload=_payload((1, 2), (3, 4)),
+            metadata=AdcBlockMetadata(
+                source=Source.HARDWARE,
+                calibration=_calibration(),
+            ),
+        )
+
+        self.assertEqual(constants.ADC_PAIRS_PER_FRAME, len(block.adc0))
+        self.assertEqual(constants.ADC_PAIRS_PER_FRAME, len(block.adc1))
+        self.assertEqual((1, 3, 1, 3), block.adc0[:4])
+        self.assertEqual((2, 4, 2, 4), block.adc1[:4])
+        self.assertEqual((3, 4), block.pair(-1))
+        self.assertEqual(first_pair_index, block.first_pair_index)
+        self.assertEqual(
+            first_tick + constants.FRAME_COVERAGE_TICKS,
+            block.end_tick_exclusive,
+        )
+        self.assertEqual(
+            (first_tick, first_tick + constants.ADC1_PHASE_TICKS), block.pair_ticks(0)
+        )
+
+        last_adc0_tick = (
+            first_tick
+            + (constants.ADC_PAIRS_PER_FRAME - 1) * constants.ADC_PAIR_PERIOD_TICKS
+        )
+        self.assertEqual(
+            (last_adc0_tick, last_adc0_tick + constants.ADC1_PHASE_TICKS),
+            block.pair_ticks(-1),
+        )
+        merged = tuple(block.interleaved())
+        self.assertEqual(2 * constants.ADC_PAIRS_PER_FRAME, len(merged))
+        self.assertEqual(
+            (AdcConverter.ADC0, AdcConverter.ADC1),
+            (merged[0].converter, merged[1].converter),
+        )
+        self.assertEqual(
+            (constants.ADC_PAIRS_PER_FRAME - 1,) * 2,
+            (merged[-2].pair_index, merged[-1].pair_index),
+        )
+        self.assertEqual(
+            (last_adc0_tick, last_adc0_tick + constants.ADC1_PHASE_TICKS),
+            (merged[-2].timestamp_ticks, merged[-1].timestamp_ticks),
+        )
+
     def test_payload_size_and_advertised_fallback_range_are_enforced(self) -> None:
         fallback = AdcBlockMetadata(
             source=Source.HARDWARE,
@@ -133,6 +186,49 @@ class PhysicalAdcBlockModelTests(unittest.TestCase):
             ADCBlock(1, 0, 0, bytes(invalid), metadata=fallback)
         with self.assertRaisesRegex(ValueError, "exactly 1012"):
             ADCBlock(1, 0, 0, valid.payload[:-4], metadata=fallback)
+
+        with self.assertRaisesRegex(ValueError, "flags disagree"):
+            AdcBlockMetadata(
+                source=Source.HARDWARE,
+                resolution_bits=constants.ADC_FALLBACK_RESOLUTION_BITS,
+                code_max=(1 << constants.ADC_FALLBACK_RESOLUTION_BITS) - 1,
+                calibration=_calibration(constants.ADC_PRIMARY_RESOLUTION_BITS),
+            )
+
+    def test_gap_metadata_matches_the_following_frame_boundary(self) -> None:
+        observed_sequence = 3
+        observed_tick = 3 * constants.FRAME_COVERAGE_TICKS
+        block = ADCBlock(
+            run_id=13,
+            sequence=observed_sequence,
+            first_sample_ticks=observed_tick,
+            payload=_payload((0, 1)),
+            flags=FrameFlag.GAP_BEFORE | FrameFlag.OVERRUN_BEFORE,
+            metadata=AdcBlockMetadata(
+                source=Source.HARDWARE,
+                calibration=_calibration(),
+            ),
+        )
+        gap = StreamGap.from_expected(
+            block,
+            expected_sequence=1,
+            expected_first_sample_ticks=constants.FRAME_COVERAGE_TICKS,
+        )
+        self.assertIsNotNone(gap)
+        assert gap is not None
+        attached = replace(block, gap=gap)
+        self.assertIs(gap, attached.gap)
+        self.assertEqual(2, gap.missing_frames)
+        self.assertEqual(2 * constants.ADC_PAIRS_PER_FRAME, gap.missing_items)
+        self.assertEqual(
+            2 * constants.FRAME_COVERAGE_TICKS,
+            gap.missing_duration_ticks,
+        )
+        self.assertTrue(gap.firmware_reported)
+        self.assertTrue(gap.firmware_overrun)
+
+        with self.assertRaisesRegex(ValueError, "does not describe this block"):
+            replace(attached, sequence=observed_sequence + 1)
 
     def test_production_gap_is_attached_to_the_following_adc_block(self) -> None:
         transport = InMemoryTransport(_GapFirstAdcDevice())

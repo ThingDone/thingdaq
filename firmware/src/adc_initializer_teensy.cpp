@@ -162,7 +162,11 @@ class TeensyPlatform final : public Platform {
     }
     ARM_DEMCR |= ARM_DEMCR_TRCENA;
     ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
+#if defined(TEENSY_DAQ_HOST_REGISTER_TEST)
+    __asm__ volatile("" : : : "memory");
+#else
     __asm__ volatile("dsb\n\tisb" : : : "memory");
+#endif
     const std::uint32_t begin = ARM_DWT_CYCCNT;
     __asm__ volatile("nop\n\tnop\n\tnop\n\tnop" : : : "memory");
     frequency_hz = F_CPU_ACTUAL;

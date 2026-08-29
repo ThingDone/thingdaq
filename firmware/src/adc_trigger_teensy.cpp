@@ -42,9 +42,13 @@ std::uint32_t g_done0_1_irq_final = 0U;
 std::uint32_t g_done2_err_irq_final = 0U;
 
 std::uint32_t readPrimask() {
+#if defined(TEENSY_DAQ_HOST_REGISTER_TEST)
+  return 0U;
+#else
   std::uint32_t value = 0U;
   __asm__ volatile("mrs %0, primask" : "=r"(value));
   return value;
+#endif
 }
 
 void restorePrimask(std::uint32_t value) {

@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <string>
 
 #include "adc_frame_packer.h"
@@ -26,7 +27,8 @@ void expect(bool condition, const std::string &message) {
 class FakePairSource final : public capture::PairSource {
  public:
   void push(std::uint64_t first_pair, std::uint32_t epoch,
-            std::uint16_t base) {
+            std::uint16_t base,
+            std::uint32_t pair_count = v1::kAdcPairsPerFrame) {
     const std::size_t slot = queued_;
     if (slot >= buffers_.size()) {
       return;
@@ -39,7 +41,7 @@ class FakePairSource final : public capture::PairSource {
     }
     handles_[slot].pairs = buffers_[slot].pairs.data();
     handles_[slot].first_pair = first_pair;
-    handles_[slot].pair_count = v1::kAdcPairsPerFrame;
+    handles_[slot].pair_count = pair_count;
     handles_[slot].epoch = epoch;
     handles_[slot].lease = static_cast<std::uint32_t>(slot + 1U);
     handles_[slot].buffer_index = static_cast<std::uint8_t>(slot);
@@ -189,11 +191,123 @@ void testStaleEpochCannotCrossRuns() {
   (void)pipeline.stopProduction();
 }
 
+void testAlignedFrameBoundaryAtLargestSafeTimestamp() {
+  FakePairSource source{};
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  packer::AdcFramePacker adc{source};
+  constexpr std::uint64_t maximum_pair_for_timestamp =
+      std::numeric_limits<std::uint64_t>::max() /
+      v1::kAdcPairPeriodTicks;
+  constexpr std::uint64_t first_pair =
+      maximum_pair_for_timestamp -
+      maximum_pair_for_timestamp % v1::kAdcPairsPerFrame;
+  constexpr std::uint64_t dropped_frames =
+      first_pair / v1::kAdcPairsPerFrame;
+  static_assert(first_pair * v1::kAdcPairPeriodTicks <=
+                std::numeric_limits<std::uint64_t>::max());
+  static_assert(first_pair <=
+                std::numeric_limits<std::uint64_t>::max() -
+                    v1::kAdcPairsPerFrame);
+
+  expect(pipeline.startRun(27U, v1::ChecksumAlgorithm::kCrc32IsoHdlc) ==
+                 packet::OperationStatus::kOk &&
+             adc.startRun(27U, v1::ChecksumAlgorithm::kCrc32IsoHdlc,
+                          pipeline) == packer::OperationStatus::kOk,
+         "maximum-timestamp fixture starts");
+  source.push(first_pair, 27U, 0x0200U);
+  const packer::ServiceReport service = adc.service(pipeline, 1U);
+  wire::DecodedFrame decoded = promoteAndDecode(pipeline);
+  const std::uint16_t gap_flags = static_cast<std::uint16_t>(
+      static_cast<std::uint16_t>(v1::FrameFlag::kGapBefore) |
+      static_cast<std::uint16_t>(v1::FrameFlag::kOverrunBefore));
+  expect(service.frames_framed == 1U &&
+             decoded.header.sequence ==
+                 static_cast<std::uint32_t>(dropped_frames) &&
+             decoded.header.first_sample_ticks ==
+                 first_pair * v1::kAdcPairPeriodTicks &&
+             decoded.header.item_count == v1::kAdcPairsPerFrame &&
+             decoded.header.flags == gap_flags,
+         "an aligned high pair index keeps exact 64-bit timestamp and frame sequence arithmetic");
+
+  std::uint16_t first_adc0 = 0U;
+  std::uint16_t first_adc1 = 0U;
+  std::uint16_t last_adc0 = 0U;
+  std::uint16_t last_adc1 = 0U;
+  const std::size_t last_offset =
+      (v1::kAdcPairsPerFrame - 1U) * sizeof(capture::SamplePair);
+  expect(wire::loadU16(decoded.payload, 0U, first_adc0) &&
+             wire::loadU16(decoded.payload, sizeof(std::uint16_t),
+                           first_adc1) &&
+             wire::loadU16(decoded.payload, last_offset, last_adc0) &&
+             wire::loadU16(decoded.payload,
+                           last_offset + sizeof(std::uint16_t), last_adc1) &&
+             first_adc0 == 0x0200U && first_adc1 == 0x0A00U &&
+             last_adc0 == 0x05F3U && last_adc1 == 0x0DF3U,
+         "first and last payload boundaries preserve adc0,adc1 halfword order");
+
+  const packer::Snapshot snapshot = adc.snapshot(pipeline);
+  expect(snapshot.progress.raw_gap_pairs == first_pair &&
+             snapshot.progress.raw_drop_pairs_projected == first_pair &&
+             snapshot.progress.chronology_errors == 0U &&
+             snapshot.next_source_pair ==
+                 first_pair + v1::kAdcPairsPerFrame,
+         "aligned frame loss projects exact pair counts without a partial-boundary error");
+  pipeline.releaseFrontFrame();
+  (void)adc.stopProduction();
+  (void)pipeline.stopProduction();
+}
+
+void testPairCountAndCounterBoundariesFailClosed() {
+  {
+    FakePairSource source{};
+    packet::OwnedPacketBufferStorage storage{};
+    packet::PacketBufferPipeline pipeline{storage};
+    packer::AdcFramePacker adc{source};
+    expect(pipeline.startRun(31U, v1::ChecksumAlgorithm::kAdler32) ==
+                   packet::OperationStatus::kOk &&
+               adc.startRun(31U, v1::ChecksumAlgorithm::kAdler32,
+                            pipeline) == packer::OperationStatus::kOk,
+           "invalid-count fixture starts");
+    source.push(0U, 31U, 0U,
+                static_cast<std::uint32_t>(v1::kAdcPairsPerFrame - 1U));
+    const packer::ServiceReport rejected = adc.service(pipeline, 1U);
+    expect(rejected.source_error && rejected.frames_framed == 0U &&
+               pipeline.readyFrames() == 0U,
+           "a source handle with less than one fixed ADC frame is rejected");
+    (void)adc.stopProduction();
+    (void)pipeline.stopProduction();
+  }
+
+  {
+    FakePairSource source{};
+    packet::OwnedPacketBufferStorage storage{};
+    packet::PacketBufferPipeline pipeline{storage};
+    packer::AdcFramePacker adc{source};
+    expect(pipeline.startRun(33U, v1::ChecksumAlgorithm::kAdler32) ==
+                   packet::OperationStatus::kOk &&
+               adc.startRun(33U, v1::ChecksumAlgorithm::kAdler32,
+                            pipeline) == packer::OperationStatus::kOk,
+           "overflowing-counter fixture starts");
+    source.push(std::numeric_limits<std::uint64_t>::max() -
+                    v1::kAdcPairsPerFrame + 2U,
+                33U, 0U);
+    const packer::ServiceReport rejected = adc.service(pipeline, 1U);
+    expect(rejected.source_error && rejected.frames_framed == 0U &&
+               source.releases == 1U && pipeline.readyFrames() == 0U,
+           "a pair counter whose fixed frame would wrap is released and never timestamped");
+    (void)adc.stopProduction();
+    (void)pipeline.stopProduction();
+  }
+}
+
 }  // namespace
 
 int main() {
   testPhysicalPairFramingTimestampsAndGapProjection();
   testStaleEpochCannotCrossRuns();
+  testAlignedFrameBoundaryAtLargestSafeTimestamp();
+  testPairCountAndCounterBoundariesFailClosed();
   if (failures != 0) {
     std::cerr << failures << " ADC frame packer assertion(s) failed\n";
     return 1;
