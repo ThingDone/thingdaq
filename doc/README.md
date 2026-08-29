@@ -15,6 +15,7 @@ related:
   - '[[Phase-05-Checksum-Physical-Campaign]]'
   - '[[Phase-05-Checksum-Benchmark]]'
   - '[[Phase-06-GPIO-DMA]]'
+  - '[[Phase-07-Dual-ADC]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-002-Checksum-Selection]]'
@@ -62,7 +63,9 @@ Every Markdown artifact below `doc/` begins with YAML front matter containing
   rebuild plus three-run acceptance is consolidated in
   [[Phase-05-Checksum-Benchmark]]. The exact-rate physical GPIO gate, target
   CPU/queue evidence, and sequential diagnostic/smoke/soak results are recorded
-  in [[Phase-06-GPIO-DMA]].
+  in [[Phase-06-GPIO-DMA]]. The paired converter, calibration, trigger/
+  completion timing, eDMA, full-rate stream, and explicit unstimulated-input
+  scope are recorded in [[Phase-07-Dual-ADC]].
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`

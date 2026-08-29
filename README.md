@@ -181,8 +181,12 @@ disabled. The Python block model binds the actual INFO-advertised timing,
 resolution, calibration, trigger, and latest STATUS acquisition evidence to
 zero-copy-friendly ADC0/A0 and ADC1/A1 views, validates only payload shape and
 the selected code range for physical inputs, and retains explicit gap context
-without implying increased analog bandwidth. The hardware rig gates remain
-later Phase 07 work. STATUS extends the raw-to-USB accounting with both
+without implying increased analog bandwidth. The complete sequential hardware
+gate is recorded in `doc/results/phase-07-dual-adc.md`: the accepted 12-bit
+image passed the bounded diagnostic, 10-second smoke, and 60-second ADC-only
+soak at 1 MS/s per converter with zero target or host loss/error counters.
+A0/A1 were unstimulated, so that result intentionally makes no analog-quality
+or aperture claim. STATUS extends the raw-to-USB accounting with both
 DMA channel totals, paired buffers, captured/delivered/framed/transmitted pairs,
 exact raw/STOP loss, queue depth, lifecycle, stale, and packer errors.
 

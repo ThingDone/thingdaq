@@ -18,6 +18,7 @@ related:
   - '[[Protocol-V1]]'
   - '[[System-Overview]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
+  - '[[Phase-07-Dual-ADC]]'
 ---
 
 # ADR 004: ADC trigger and DMA
@@ -33,9 +34,12 @@ teardown order, bounded conversion-completion diagnostic, and INFO/STATUS
 evidence are also implemented and pass host and pinned-target build gates.
 The fixed dual-eDMA register adapter and cache-safe paired ring are implemented
 and pass host plus pinned-target build gates. Physical lifecycle/packet
-integration and on-silicon trigger/calibration/DMA evidence remain future
-Phase 07 work and must pass their separate local and rig gates before this
-decision can be described as silicon-verified.
+integration and the sequential on-silicon trigger, calibration, DMA,
+10-second smoke, and 60-second full-rate gates now pass in
+[[Phase-07-Dual-ADC]]. This decision is silicon-verified for the digital
+acquisition and transport path. Because the accepted A0/A1 inputs were
+unstimulated, analog accuracy and sample-and-hold aperture remain explicitly
+outside that claim.
 
 ## Context
 
@@ -199,7 +203,8 @@ completion counts, trigger-error count, final IRQ words, and configured
 CCM/PIT/XBAR/ADC_ETC register evidence through INFO and STATUS. This is
 conversion-completion timing only. It does not observe either ADC's analog
 sample-and-hold aperture and must never be presented as aperture or phase
-accuracy evidence. The later target rig task owns that physical distinction.
+accuracy evidence. The accepted target rig in [[Phase-07-Dual-ADC]] preserves
+that distinction.
 
 ### Implemented initialization and conversion setting
 
@@ -245,11 +250,11 @@ pin/peripheral/channel identities, deadline, per-converter calibration state
 and cycles, configuration flags, and initialization errors. An uninitialized
 or failed snapshot never carries the `INITIALIZED` flag.
 
-The arithmetic plus bounded completion matching now verifies the programmed
-digital path, but remains configuration evidence rather than full-rate analog
-acceptance evidence. Full-rate target capture must still prove it. The
-shortest sample setting also places an explicit low-source-impedance
-requirement on any accuracy fixture.
+The arithmetic plus bounded completion matching verifies the programmed
+digital path, and [[Phase-07-Dual-ADC]] proves full-rate paired capture and
+transport on silicon. Neither is full-rate analog-accuracy evidence. The
+shortest sample setting places an explicit low-source-impedance requirement on
+any accuracy fixture.
 Unstimulated or high-impedance A0/A1 data can prove routing and code range but
 cannot prove 12-bit accuracy, analog bandwidth, aperture, phase, or settling.
 
@@ -259,12 +264,14 @@ The initializer defaults to the 12-bit configuration above. Its resolution
 selector can choose 10-bit only when a completed gate records corrected
 configuration, exact-rate and calibration verification, and then a remaining
 timing-budget or conversion-error failure. An incomplete gate, route error, or
-calibration error cannot authorize fallback. The forthcoming full-rate target
-gate owns those inputs; because it has not yet run, the committed build remains
-explicitly 12-bit. It may select 10-bit only when that defined gate still fails
-at the exact 1 MHz-per-converter rate after clocks, calibration, trigger
-queues, and DMA ownership have been verified. A 10-bit fallback keeps the
-`uint16_t` container and the permanent ADC0/A0 and ADC1/A1 routes, but must
+calibration error cannot authorize fallback. The completed full-rate target
+gate passed at 12 bits with exact-rate, calibration, trigger, DMA, and zero-
+error evidence, so fallback was not authorized and the accepted build remains
+explicitly 12-bit. A future regression may select 10-bit only when that same
+defined gate still fails at the exact 1 MHz-per-converter rate after clocks,
+calibration, trigger queues, and DMA ownership have been verified. A 10-bit
+fallback keeps the `uint16_t` container and the permanent ADC0/A0 and ADC1/A1
+routes, but must
 change advertised resolution/code range, update this ADR, and rerun every
 local and physical acceptance test. It is never silent and never triggered by
 the numeric values observed on floating or unstimulated inputs.
@@ -286,11 +293,9 @@ ADC capability remains unavailable rather than weakening metadata.
   queues 0/4, ADC peripherals 1/2, eDMA channels 0/1, and DMAMUX sources 24/88
   remain unique and cannot conflict with GPIO channel 2/source 30.
 - The initial 12-bit timing calculation fits one microsecond but has narrow
-  headroom. Physical gating, not this arithmetic, determines whether it is
-  accepted.
+  headroom. The completed physical gate, not this arithmetic alone, accepts it.
 - Bounded low-level initialization, calibration, trigger arm/teardown, and
-  completion matching now run before BOOT enters IDLE, and their exact
-  snapshots are visible in INFO/STATUS. Fixed interleaved DMA storage and its
-  internal diagnostics now compile into the target but are not armed by the
-  runtime. Later tasks still own lifecycle/packet integration, public STATUS
-  projection, host data decoding, and on-silicon target evidence.
+  completion matching run before BOOT enters IDLE, and their exact snapshots
+  are visible in INFO/STATUS. The runtime now arms fixed interleaved DMA,
+  packetizes paired generations, projects complete STATUS accounting, and has
+  passed sequential on-silicon target evidence in [[Phase-07-Dual-ADC]].
