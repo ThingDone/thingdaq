@@ -1000,6 +1000,14 @@ void testSyntheticDataCountersReachStatus() {
     std::uint64_t gpio_emitted = 0U;
     std::uint64_t adc_dropped = 1U;
     std::uint64_t gpio_dropped = 1U;
+    std::uint64_t adc_generated = 0U;
+    std::uint64_t gpio_generated = 0U;
+    std::uint64_t adc_payload_transmitted = 0U;
+    std::uint64_t gpio_payload_transmitted = 0U;
+    std::uint64_t frames_promoted = 0U;
+    std::uint64_t payload_transmitted = 0U;
+    std::uint16_t command_queue_high_water = 0U;
+    std::uint16_t response_queue_high_water = 0U;
     expect(wire::loadU64(
                frames[0].payload,
                constants::kStatusResponseAdcFramesEmittedOffset,
@@ -1016,13 +1024,52 @@ void testSyntheticDataCountersReachStatus() {
                    frames[0].payload,
                    constants::kStatusResponseGpioItemsDroppedOffset,
                    gpio_dropped) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdcFramesGeneratedOffset,
+                   adc_generated) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseGpioFramesGeneratedOffset,
+                   gpio_generated) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseAdcPayloadBytesTransmittedOffset,
+                   adc_payload_transmitted) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseGpioPayloadBytesTransmittedOffset,
+                   gpio_payload_transmitted) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponsePacketFramesPromotedOffset,
+                   frames_promoted) &&
+               wire::loadU64(
+                   frames[0].payload,
+                   constants::kStatusResponseDataPayloadBytesTransmittedOffset,
+                   payload_transmitted) &&
+               wire::loadU16(
+                   frames[0].payload,
+                   constants::kStatusResponseUsbCommandQueueHighWaterOffset,
+                   command_queue_high_water) &&
+               wire::loadU16(
+                   frames[0].payload,
+                   constants::kStatusResponseUsbResponseQueueHighWaterOffset,
+                   response_queue_high_water) &&
                adc_emitted == 1U && gpio_emitted == 1U &&
                adc_dropped == 0U && gpio_dropped == 0U &&
+               adc_generated == 1U && gpio_generated == 1U &&
+               adc_payload_transmitted == constants::kDataPayloadBytes &&
+               gpio_payload_transmitted == constants::kDataPayloadBytes &&
+               frames_promoted == 2U &&
+               payload_transmitted == 2U * constants::kDataPayloadBytes &&
+               command_queue_high_water == 1U &&
+               response_queue_high_water == 1U &&
                frames[0]
                        .payload.data[constants::kStatusResponseSourceOffset] ==
                    static_cast<std::uint8_t>(
                        constants::Source::kSynthetic),
-           "wire STATUS reports emitted frames, drops, and synthetic source");
+           "wire STATUS reports source/shared byte, queue, and frame telemetry");
   }
 }
 

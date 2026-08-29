@@ -29,7 +29,7 @@ from teensy_daq import (
     TransportTimeoutError,
     decode_frame,
 )
-from teensy_daq.cli import CliExitCode, _execute, main
+from teensy_daq.cli import CliExitCode, _execute, build_parser, main
 
 
 class ResetNoiseTransport(InMemoryTransport):
@@ -191,7 +191,7 @@ class ControlCliTests(unittest.TestCase):
         for command, expected_text in (
             ("probe", "build_id=teensy-daq-simulator-v1"),
             ("status", "stats_generation=1"),
-            ("configure", "profile=control-only"),
+            ("configure", "profile=SYNTHETIC_COMBINED"),
             ("reset-stats", "stats_generation=2"),
         ):
             with self.subTest(command=command):
@@ -201,6 +201,56 @@ class ControlCliTests(unittest.TestCase):
                     exit_code = main([command, "--simulate"])
                 self.assertEqual(CliExitCode.OK, exit_code, stderr.getvalue())
                 self.assertIn(expected_text, stdout.getvalue())
+
+    def test_monitor_is_bounded_and_always_stops_and_closes(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            exit_code = main(
+                [
+                    "monitor",
+                    "--simulate",
+                    "--duration",
+                    "0.02",
+                    "--status-interval",
+                    "0.01",
+                    "--block-timeout",
+                    "0.002",
+                ]
+            )
+        self.assertEqual(CliExitCode.OK, exit_code, stderr.getvalue())
+        self.assertIn("profile=SYNTHETIC_COMBINED", stdout.getvalue())
+        self.assertIn("adc_payload_Bps=", stdout.getvalue())
+        self.assertIn("packet_ready_hwm=", stdout.getvalue())
+        self.assertIn("command_latency_max_ms=", stdout.getvalue())
+        self.assertIn("final_state=IDLE", stdout.getvalue())
+
+        device = SimulatedDevice()
+        daq = TeensyDAQ.open(InMemoryTransport(device))
+        arguments = build_parser().parse_args(
+            [
+                "capture",
+                "--simulate",
+                "--duration",
+                "0.02",
+                "--status-interval",
+                "0.01",
+                "--block-timeout",
+                "0.002",
+            ]
+        )
+        with (
+            patch("teensy_daq.cli._open_device", return_value=daq),
+            patch.object(
+                daq,
+                "read_block",
+                side_effect=DeviceDisconnectedError("test disconnect"),
+            ),
+            self.assertRaises(DeviceDisconnectedError),
+        ):
+            _execute(arguments, io.StringIO())
+        self.assertEqual(DeviceState.IDLE, device.state)
+        self.assertFalse(daq.is_open)
 
     def test_cli_diagnostics_are_typed_and_have_stable_exit_codes(self) -> None:
         allowed = frozenset({DeviceState.CONFIGURED})

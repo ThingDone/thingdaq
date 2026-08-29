@@ -117,6 +117,7 @@ class PhysicalGpioDevice(SimulatedDevice):
         super().__init__(build_id="tdaq-0123456789abcdef")
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
+        configuration = self.configuration
         info = DeviceInfo(
             device_state=self.state,
             build_id="tdaq-0123456789abcdef",
@@ -128,6 +129,16 @@ class PhysicalGpioDevice(SimulatedDevice):
                 constants.StreamMask.ADC | constants.StreamMask.GPIO
             ),
             supported_source_mask=0x03,
+            applied_stream_mask=(
+                configuration.stream_mask
+                if configuration is not None
+                else constants.StreamMask.NONE
+            ),
+            applied_source=(
+                configuration.source
+                if configuration is not None
+                else constants.Source.HARDWARE
+            ),
             data_checksum_algorithm=self.status().data_checksum_algorithm,
             capability_bits=constants.Capability(constants.KNOWN_CAPABILITY_MASK),
             gpio_capture_diagnostic_mode=(

@@ -14,6 +14,7 @@ from teensy_daq import (
     AdcConverter,
     CommandResponse,
     Configuration,
+    DAQConfiguration,
     DeviceState,
     FrameFlag,
     GpioBlock,
@@ -64,6 +65,20 @@ class TypedControlModelTests(unittest.TestCase):
         self.assertEqual("synthetic-golden-v1", info_response.value.build_id)
         self.assertEqual(constants.GPIO_PINS_BY_BIT, info_response.value.gpio_pin_map)
         self.assertTrue(info_response.value.supports_source(Source.SYNTHETIC))
+        for source in (Source.HARDWARE, Source.SYNTHETIC):
+            for streams in (
+                StreamMask.ADC,
+                StreamMask.GPIO,
+                StreamMask.ADC | StreamMask.GPIO,
+            ):
+                self.assertTrue(
+                    info_response.value.capabilities.supports_configuration(
+                        DAQConfiguration(streams, source)
+                    )
+                )
+        self.assertEqual(1012, info_response.value.adc_pairs_per_buffer)
+        self.assertEqual(16256, info_response.value.adc_dma_ring_bytes)
+        self.assertEqual(200, info_response.value.packet_buffer_count)
 
         self.assertIsInstance(configure_response.value, Configuration)
         assert isinstance(configure_response.value, Configuration)
@@ -79,6 +94,13 @@ class TypedControlModelTests(unittest.TestCase):
         self.assertEqual(1, status_response.value.gpio_frames_emitted)
         self.assertEqual(0, status_response.value.adc_items_dropped)
         self.assertEqual(1234, status_response.value.gpio_processing_cpu_basis_points)
+        self.assertEqual(1012, status_response.value.adc_items_generated)
+        self.assertEqual(4048, status_response.value.gpio_items_generated)
+        self.assertEqual(8096, status_response.value.data_payload_bytes_transmitted)
+        self.assertEqual(8192, status_response.value.data_framed_bytes_transmitted)
+        self.assertEqual(2, status_response.value.packet_ready_high_water)
+        self.assertEqual(4, status_response.value.commands_accepted)
+        self.assertEqual(1, status_response.value.usb_command_queue_high_water)
 
     def test_typed_payload_models_round_trip_the_golden_payloads(self) -> None:
         info_frame = decode_frame(

@@ -196,8 +196,8 @@ class ProtocolContractTests(unittest.TestCase):
             },
             self.contract["scalar_types"],
         )
-        self.assertEqual(324, constants.INFO_RESPONSE_PAYLOAD_SIZE)
-        self.assertEqual(576, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(376, constants.INFO_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(976, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(8, constants.RESET_STATS_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(8, constants.PING_REQUEST_PAYLOAD_SIZE)
         self.assertEqual(12, constants.PING_RESPONSE_PAYLOAD_SIZE)

@@ -179,10 +179,10 @@ REQUEST_PAYLOAD_SIZE = {
     GPIO_CAPTURE_DIAGNOSTIC_REQUEST: 0,
 }
 SUCCESS_PAYLOAD_SIZE = {
-    INFO_RESPONSE: 324,
+    INFO_RESPONSE: 376,
     CONFIGURE_RESPONSE: 12,
     START_RESPONSE: 12,
-    GET_STATUS_RESPONSE: 576,
+    GET_STATUS_RESPONSE: 976,
     STOP_RESPONSE: 8,
     RESET_STATS_RESPONSE: 8,
     PING_RESPONSE: 12,
@@ -597,6 +597,7 @@ class FrameParser:
                 or any(payload[118:120])
                 or payload[127]
                 or any(payload[154:156])
+                or any(payload[334:336])
             ):
                 raise ProtocolFailure("INFO reserved fields are nonzero")
             supported_checksum_mask = struct.unpack_from("<I", payload, 8)[0]

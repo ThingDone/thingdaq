@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -18,6 +19,14 @@ struct StreamProgress {
   std::uint64_t items_transmitted = 0U;
   std::uint64_t frames_dropped = 0U;
   std::uint64_t items_dropped = 0U;
+  std::uint64_t payload_bytes_produced = 0U;
+  std::uint64_t payload_bytes_framed = 0U;
+  std::uint64_t payload_bytes_emitted = 0U;
+  std::uint64_t payload_bytes_transmitted = 0U;
+  std::uint64_t payload_bytes_dropped = 0U;
+  std::uint64_t framed_bytes_framed = 0U;
+  std::uint64_t framed_bytes_emitted = 0U;
+  std::uint64_t framed_bytes_transmitted = 0U;
 };
 
 struct DataPathProgress {
@@ -125,9 +134,38 @@ struct GpioPackerProgress {
 };
 
 struct PacketQueueProgress {
+  std::array<std::size_t, 2U> ready_depth_by_source{};
+  std::array<std::size_t, 2U> transmit_depth_by_source{};
+  std::array<std::size_t, 2U> ready_high_water_by_source{};
+  std::array<std::size_t, 2U> transmit_high_water_by_source{};
   std::size_t ready_depth = 0U;
   std::size_t transmit_depth = 0U;
+  std::size_t ready_high_water = 0U;
+  std::size_t transmit_high_water = 0U;
   std::size_t owned_high_water = 0U;
+  std::uint64_t frames_promoted = 0U;
+  std::uint64_t fairness_deferrals = 0U;
+  std::uint64_t accounted_frame_skew = 0U;
+  std::uint64_t data_payload_bytes_transmitted = 0U;
+  std::uint64_t data_framed_bytes_transmitted = 0U;
+  std::uint32_t pool_exhaustions = 0U;
+  std::uint32_t invalid_operations = 0U;
+  std::uint32_t encoding_rejections = 0U;
+  std::uint32_t ready_queue_rejections = 0U;
+  std::uint32_t transmit_queue_rejections = 0U;
+};
+
+struct UsbProgress {
+  std::uint32_t short_capacity_deferrals = 0U;
+  std::uint32_t rx_stall_events = 0U;
+  std::uint32_t tx_stall_events = 0U;
+  std::uint32_t io_errors = 0U;
+  std::size_t command_queue_depth = 0U;
+  std::size_t response_queue_depth = 0U;
+  std::size_t lower_priority_queue_depth = 0U;
+  std::size_t command_queue_high_water = 0U;
+  std::size_t response_queue_high_water = 0U;
+  std::size_t active_frame_bytes_sent = 0U;
 };
 
 // Detailed firmware diagnostics remain available to firmware tests and are
@@ -155,6 +193,7 @@ struct Snapshot {
   GpioRawCaptureProgress gpio_raw_capture{};
   GpioPackerProgress gpio_packer{};
   PacketQueueProgress packet_queue{};
+  UsbProgress usb{};
 };
 
 class Statistics {
@@ -204,6 +243,7 @@ class Statistics {
   void publishGpioRawCapture(const GpioRawCaptureProgress &progress);
   void publishGpioPacker(const GpioPackerProgress &progress);
   void publishPacketQueues(const PacketQueueProgress &progress);
+  void publishUsb(const UsbProgress &progress);
 
   protocol::StatusResponse wireStatus(
       protocol_v1::DeviceState state,

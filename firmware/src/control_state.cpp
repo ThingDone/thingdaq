@@ -324,18 +324,8 @@ protocol_v1::ErrorCode ControlState::validateConfiguration(
     return protocol_v1::ErrorCode::kUnsupportedConfiguration;
   }
 
-  if (configuration.source == protocol_v1::Source::kSynthetic) {
-    return configuration.stream_mask == 0U
-               ? protocol_v1::ErrorCode::kUnsupportedConfiguration
-               : protocol_v1::ErrorCode::kOk;
-  }
-  const std::uint8_t adc =
-      static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc);
-  const std::uint8_t gpio =
-      static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
-  if (configuration.source != protocol_v1::Source::kHardware ||
-      (configuration.stream_mask != adc &&
-       configuration.stream_mask != gpio)) {
+  if (!capabilities::supportsConfiguration(configuration.source,
+                                           configuration.stream_mask)) {
     return protocol_v1::ErrorCode::kUnsupportedConfiguration;
   }
   return protocol_v1::ErrorCode::kOk;
@@ -390,6 +380,8 @@ protocol::InfoResponse ControlState::infoResponse() const {
       capabilities::kMetadata.supported_stream_mask;
   response.supported_source_mask =
       capabilities::kMetadata.supported_source_mask;
+  response.supported_configuration_mask =
+      capabilities::kMetadata.supported_configuration_mask;
   response.supported_checksum_mask =
       capabilities::kMetadata.supported_checksum_mask;
   response.capability_bits = capabilities::kMetadata.capability_bits;
@@ -409,6 +401,7 @@ protocol::InfoResponse ControlState::infoResponse() const {
   response.adc = adc_metadata_;
   response.data_checksum_algorithm =
       appliedConfiguration().data_checksum_algorithm;
+  response.applied_configuration = appliedConfiguration();
   for (std::size_t index = 0U; index < response.gpio_pin_map.size(); ++index) {
     response.gpio_pin_map[index] =
         capabilities::kMetadata.gpio_pins_by_bit[index];

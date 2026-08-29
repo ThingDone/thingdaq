@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from teensy_daq import (
     BoardId,
     Capability,
+    ConfigurationProfile,
     DeviceInfo,
     DeviceState,
     FrameFlag,
@@ -172,6 +173,7 @@ class GPIOBlockTests(unittest.TestCase):
             mcu_id=McuId.IMXRT1062,
             supported_stream_mask=StreamMask.GPIO,
             supported_source_mask=1 << int(Source.HARDWARE),
+            supported_configuration_mask=ConfigurationProfile.HARDWARE_GPIO,
             capability_bits=(
                 Capability.GPIO_STREAM
                 | Capability.HARDWARE_SOURCE
@@ -192,6 +194,8 @@ class GPIOBlockTests(unittest.TestCase):
             build_id="synthetic-gpio-layout",
             supported_stream_mask=StreamMask.GPIO,
             supported_source_mask=1 << int(Source.SYNTHETIC),
+            supported_configuration_mask=ConfigurationProfile.SYNTHETIC_GPIO,
+            applied_source=Source.SYNTHETIC,
             capability_bits=(
                 Capability.GPIO_STREAM
                 | Capability.SYNTHETIC_SOURCE

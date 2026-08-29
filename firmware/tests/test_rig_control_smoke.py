@@ -63,6 +63,7 @@ class PhysicalControlDevice(SimulatedDevice):
             mcu_id=McuId.IMXRT1062,
             supported_stream_mask=StreamMask.NONE,
             supported_source_mask=1,
+            supported_configuration_mask=0,
             capability_bits=(
                 Capability.HARDWARE_SOURCE | Capability.RESET_STATS | Capability.PING
             ),

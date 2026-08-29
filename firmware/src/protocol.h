@@ -394,6 +394,105 @@ struct InfoResponse {
   std::uint8_t gpio_edma_priority = protocol_v1::kGpioEdmaPriority;
   std::uint8_t gpio_xbar_active_edge = protocol_v1::kGpioXbarActiveEdge;
   AdcInitializationMetadata adc{};
+  Configuration applied_configuration{};
+  std::uint16_t supported_configuration_mask =
+      protocol_v1::kSupportedConfigurationMask;
+  std::uint16_t data_payload_bytes = protocol_v1::kDataPayloadBytes;
+  std::uint16_t adc_pairs_per_frame = protocol_v1::kAdcPairsPerFrame;
+  std::uint16_t gpio_samples_per_frame = protocol_v1::kGpioSamplesPerFrame;
+  std::uint32_t frame_coverage_ticks = protocol_v1::kFrameCoverageTicks;
+  std::uint8_t adc_dma_ring_depth = protocol_v1::kAdcDmaRingDepth;
+  std::uint8_t adc_pair_bytes = protocol_v1::kAdcPairBytes;
+  std::array<std::uint8_t, 2U> adc_edma_channels{
+      protocol_v1::kAdcEdmaChannels[0], protocol_v1::kAdcEdmaChannels[1]};
+  std::array<std::uint8_t, 2U> adc_edma_priorities{
+      protocol_v1::kAdcEdmaPriorities[0],
+      protocol_v1::kAdcEdmaPriorities[1]};
+  std::array<std::uint8_t, 2U> adc_dmamux_sources{
+      protocol_v1::kAdcDmamuxSources[0],
+      protocol_v1::kAdcDmamuxSources[1]};
+  std::uint8_t adc_dma_irq_priority = protocol_v1::kAdcDmaIrqPriority;
+  std::uint8_t gpio_dma_irq_priority = protocol_v1::kGpioDmaIrqPriority;
+  std::uint16_t adc_pairs_per_buffer = protocol_v1::kAdcPairsPerBuffer;
+  std::uint32_t adc_dma_ring_bytes = protocol_v1::kAdcDmaRingBytes;
+  std::uint16_t packet_buffer_count = protocol_v1::kPacketBufferCount;
+  std::uint16_t packet_primary_count = protocol_v1::kPacketPrimaryCount;
+  std::uint16_t packet_reserve_count = protocol_v1::kPacketReserveCount;
+  std::uint16_t packet_ready_queue_capacity =
+      protocol_v1::kPacketReadyQueueCapacity;
+  std::uint16_t packet_transmit_queue_capacity =
+      protocol_v1::kPacketTransmitQueueCapacity;
+  std::uint8_t command_queue_capacity =
+      protocol_v1::kCommandQueueCapacity;
+  std::uint8_t response_queue_capacity =
+      protocol_v1::kResponseQueueCapacity;
+  std::uint32_t nominal_payload_bytes_per_second_per_stream =
+      protocol_v1::kNominalPayloadBytesPerSecondPerStream;
+  std::uint32_t nominal_framed_bytes_per_second_per_stream =
+      protocol_v1::kNominalFramedBytesPerSecondPerStream;
+};
+
+struct StreamTelemetry {
+  std::uint64_t frames_generated = 0U;
+  std::uint64_t items_generated = 0U;
+  std::uint64_t frames_framed = 0U;
+  std::uint64_t items_framed = 0U;
+  std::uint64_t items_emitted = 0U;
+  std::uint64_t frames_transmitted = 0U;
+  std::uint64_t items_transmitted = 0U;
+  std::uint64_t frames_dropped = 0U;
+  std::uint64_t payload_bytes_produced = 0U;
+  std::uint64_t payload_bytes_framed = 0U;
+  std::uint64_t payload_bytes_emitted = 0U;
+  std::uint64_t payload_bytes_transmitted = 0U;
+  std::uint64_t payload_bytes_dropped = 0U;
+  std::uint64_t framed_bytes_framed = 0U;
+  std::uint64_t framed_bytes_emitted = 0U;
+  std::uint64_t framed_bytes_transmitted = 0U;
+  std::uint16_t packet_ready_depth = 0U;
+  std::uint16_t packet_transmit_depth = 0U;
+  std::uint16_t packet_ready_high_water = 0U;
+  std::uint16_t packet_transmit_high_water = 0U;
+};
+
+struct PacketTelemetry {
+  std::uint16_t ready_high_water = 0U;
+  std::uint16_t transmit_high_water = 0U;
+  std::uint64_t frames_promoted = 0U;
+  std::uint64_t fairness_deferrals = 0U;
+  std::uint64_t accounted_frame_skew = 0U;
+  std::uint64_t data_payload_bytes_transmitted = 0U;
+  std::uint64_t data_framed_bytes_transmitted = 0U;
+  std::uint32_t pool_exhaustions = 0U;
+  std::uint32_t invalid_operations = 0U;
+  std::uint32_t encoding_rejections = 0U;
+  std::uint32_t ready_queue_rejections = 0U;
+  std::uint32_t transmit_queue_rejections = 0U;
+};
+
+struct FirmwareDiagnosticTelemetry {
+  std::uint32_t commands_accepted = 0U;
+  std::uint32_t commands_rejected = 0U;
+  std::uint32_t bad_checksums = 0U;
+  std::uint32_t bad_lengths = 0U;
+  std::uint32_t bad_types = 0U;
+  std::uint32_t bad_versions = 0U;
+  std::uint32_t timeouts = 0U;
+  std::uint32_t partial_usb_writes = 0U;
+  std::uint32_t state_errors = 0U;
+};
+
+struct UsbTelemetry {
+  std::uint32_t short_capacity_deferrals = 0U;
+  std::uint32_t rx_stall_events = 0U;
+  std::uint32_t tx_stall_events = 0U;
+  std::uint32_t io_errors = 0U;
+  std::uint16_t command_queue_depth = 0U;
+  std::uint16_t response_queue_depth = 0U;
+  std::uint16_t lower_priority_queue_depth = 0U;
+  std::uint16_t command_queue_high_water = 0U;
+  std::uint16_t response_queue_high_water = 0U;
+  std::uint16_t active_frame_bytes_sent = 0U;
 };
 
 struct StatusResponse {
@@ -467,6 +566,10 @@ struct StatusResponse {
   std::uint32_t adc_packer_source_errors = 0U;
   std::uint32_t adc_packer_pipeline_errors = 0U;
   std::uint32_t adc_packer_chronology_errors = 0U;
+  std::array<StreamTelemetry, 2U> streams{};
+  PacketTelemetry packet{};
+  FirmwareDiagnosticTelemetry diagnostics{};
+  UsbTelemetry usb{};
 };
 
 struct ChecksumBenchmarkResponse {

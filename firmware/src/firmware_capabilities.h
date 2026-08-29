@@ -12,6 +12,7 @@ struct CapabilityMetadata {
   std::uint8_t protocol_version;
   std::uint8_t supported_stream_mask;
   std::uint8_t supported_source_mask;
+  std::uint16_t supported_configuration_mask;
   std::uint32_t supported_checksum_mask;
   std::uint32_t capability_bits;
   std::uint32_t timestamp_hz;
@@ -40,9 +41,53 @@ constexpr std::uint8_t sourceBit(protocol_v1::Source source) {
       1U << static_cast<std::uint8_t>(source));
 }
 
-// Synthetic mode retains both deterministic stream layouts. Physical mode
-// accepts either proven single-source acquisition path; concurrent ADC/GPIO
-// ownership remains disabled until the combined controller gate.
+constexpr std::uint16_t configurationProfileBit(
+    protocol_v1::Source source, std::uint8_t stream_mask) {
+  const std::uint8_t adc =
+      static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc);
+  const std::uint8_t gpio =
+      static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
+  if (source == protocol_v1::Source::kHardware) {
+    if (stream_mask == adc) {
+      return static_cast<std::uint16_t>(
+          protocol_v1::ConfigurationProfile::kHardwareAdc);
+    }
+    if (stream_mask == gpio) {
+      return static_cast<std::uint16_t>(
+          protocol_v1::ConfigurationProfile::kHardwareGpio);
+    }
+    if (stream_mask == static_cast<std::uint8_t>(adc | gpio)) {
+      return static_cast<std::uint16_t>(
+          protocol_v1::ConfigurationProfile::kHardwareCombined);
+    }
+  }
+  if (source == protocol_v1::Source::kSynthetic) {
+    if (stream_mask == adc) {
+      return static_cast<std::uint16_t>(
+          protocol_v1::ConfigurationProfile::kSyntheticAdc);
+    }
+    if (stream_mask == gpio) {
+      return static_cast<std::uint16_t>(
+          protocol_v1::ConfigurationProfile::kSyntheticGpio);
+    }
+    if (stream_mask == static_cast<std::uint8_t>(adc | gpio)) {
+      return static_cast<std::uint16_t>(
+          protocol_v1::ConfigurationProfile::kSyntheticCombined);
+    }
+  }
+  return 0U;
+}
+
+constexpr bool supportsConfiguration(protocol_v1::Source source,
+                                     std::uint8_t stream_mask) {
+  const std::uint16_t profile = configurationProfileBit(source, stream_mask);
+  return profile != 0U &&
+         (protocol_v1::kSupportedConfigurationMask & profile) != 0U;
+}
+
+// Every nonempty ADC/GPIO subset is available from either the shared physical
+// controller or the deterministic synthetic USB/host baseline. The explicit
+// profile mask prevents a host from inferring unsupported cross-products.
 inline constexpr std::uint8_t kSupportedStreamMask =
     static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc) |
     static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
@@ -70,6 +115,7 @@ inline constexpr CapabilityMetadata kMetadata{
     identity::kProtocolVersion,
     kSupportedStreamMask,
     kSupportedSourceMask,
+    protocol_v1::kSupportedConfigurationMask,
     protocol_v1::kSupportedChecksumMask,
     kCapabilityBits,
     protocol_v1::kTimestampHz,
@@ -97,6 +143,15 @@ inline constexpr std::uint32_t kDataCapabilityMask =
     capabilityBit(protocol_v1::Capability::kHardwareSource);
 
 static_assert(kMetadata.supported_stream_mask == 3U);
+static_assert(kMetadata.supported_configuration_mask ==
+              protocol_v1::kKnownConfigurationProfileMask);
+static_assert(supportsConfiguration(protocol_v1::Source::kHardware, 1U));
+static_assert(supportsConfiguration(protocol_v1::Source::kHardware, 2U));
+static_assert(supportsConfiguration(protocol_v1::Source::kHardware, 3U));
+static_assert(supportsConfiguration(protocol_v1::Source::kSynthetic, 1U));
+static_assert(supportsConfiguration(protocol_v1::Source::kSynthetic, 2U));
+static_assert(supportsConfiguration(protocol_v1::Source::kSynthetic, 3U));
+static_assert(!supportsConfiguration(protocol_v1::Source::kHardware, 0U));
 static_assert((kMetadata.capability_bits & kDataCapabilityMask) ==
               kDataCapabilityMask);
 static_assert(kMetadata.supported_source_mask ==

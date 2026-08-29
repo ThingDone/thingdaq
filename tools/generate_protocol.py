@@ -186,6 +186,56 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     if adc_coverage != gpio_coverage:
         raise ContractError("ADC and GPIO frames must cover equal nominal time")
 
+    combined = contract["combined_acquisition"]
+    profile_values = enum_map(contract["enums"]["configuration_profile"])
+    validate_enum_width(
+        "configuration_profile",
+        contract["enums"]["configuration_profile"],
+        16,
+    )
+    if any(value == 0 or value & (value - 1) for value in profile_values.values()):
+        raise ContractError("every configuration profile must be one nonzero bit")
+    known_profile_mask = sum(profile_values.values())
+    if int(combined["supported_configuration_mask"]) != known_profile_mask:
+        raise ContractError("combined profile mask must advertise all six profiles")
+    if (
+        int(combined["adc_dma_ring_depth"]) != 4
+        or int(combined["adc_pairs_per_buffer"]) != int(adc["items_per_frame"])
+        or int(combined["adc_pair_bytes"]) != int(adc["bytes_per_item"])
+        or int(combined["dma_alignment_bytes"]) != 32
+        or int(combined["adc_dma_ring_bytes"])
+        != int(combined["adc_dma_ring_depth"])
+        * (
+            (int(adc["payload_bytes"]) + int(combined["dma_alignment_bytes"]) - 1)
+            // int(combined["dma_alignment_bytes"])
+        )
+        * int(combined["dma_alignment_bytes"])
+        or list(combined["adc_edma_channels"]) != [0, 1]
+        or list(combined["adc_edma_priorities"]) != [0, 1]
+        or list(combined["adc_dmamux_sources"]) != [24, 88]
+        or int(combined["packet_buffer_count"])
+        != int(combined["packet_primary_count"]) + int(combined["packet_reserve_count"])
+        or int(combined["packet_buffer_count"])
+        != int(contract["gpio_capture"]["packet_buffer_count"])
+        or int(combined["packet_ready_queue_capacity"])
+        != int(combined["packet_buffer_count"])
+        or int(combined["packet_transmit_queue_capacity"])
+        != int(combined["packet_buffer_count"])
+    ):
+        raise ContractError("combined acquisition storage/resources are inconsistent")
+    payload_rate = (
+        int(adc["payload_bytes"]) * int(timing["timestamp_hz"]) // adc_coverage
+    )
+    framed_rate = (
+        int(limits["data_frame_bytes"]) * int(timing["timestamp_hz"])
+        + adc_coverage // 2
+    ) // adc_coverage
+    if (
+        int(combined["nominal_payload_bytes_per_second_per_stream"]) != payload_rate
+        or int(combined["nominal_framed_bytes_per_second_per_stream"]) != framed_rate
+    ):
+        raise ContractError("combined nominal byte rates are inconsistent")
+
     benchmark = contract["checksum_benchmark"]
     positive_benchmark_fields = (
         "cycle_counter_hz",
@@ -476,6 +526,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         "error_code": 16,
         "device_state": 8,
         "stream_mask": 8,
+        "configuration_profile": 16,
         "source": 8,
         "board_id": 16,
         "mcu_id": 16,
@@ -550,6 +601,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     benchmark = contract["checksum_benchmark"]
     gpio_clock = contract["gpio_clock_diagnostic"]
     gpio_capture = contract["gpio_capture"]
+    combined = contract["combined_acquisition"]
     gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
     adc_initialization = contract["adc_initialization"]
     adc_trigger = contract["adc_trigger"]
@@ -610,6 +662,31 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"GPIO_SAMPLE_RATE_HZ = {int(timing['gpio_sample_rate_hz'])}",
         f"GPIO_SAMPLE_PERIOD_TICKS = {int(timing['gpio_sample_period_ticks'])}",
         f"FRAME_COVERAGE_TICKS = {coverage_ticks}",
+        f"SUPPORTED_CONFIGURATION_MASK = {int(combined['supported_configuration_mask'])}",
+        f"ADC_DMA_RING_DEPTH = {int(combined['adc_dma_ring_depth'])}",
+        f"ADC_PAIRS_PER_BUFFER = {int(combined['adc_pairs_per_buffer'])}",
+        f"ADC_PAIR_BYTES = {int(combined['adc_pair_bytes'])}",
+        f"ADC_DMA_RING_BYTES = {int(combined['adc_dma_ring_bytes'])}",
+        f"ADC_EDMA_CHANNELS = {tuple(combined['adc_edma_channels'])!r}",
+        f"ADC_EDMA_PRIORITIES = {tuple(combined['adc_edma_priorities'])!r}",
+        f"ADC_DMAMUX_SOURCES = {tuple(combined['adc_dmamux_sources'])!r}",
+        f"ADC_DMA_IRQ_PRIORITY = {int(combined['adc_dma_irq_priority'])}",
+        f"GPIO_DMA_IRQ_PRIORITY = {int(combined['gpio_dma_irq_priority'])}",
+        f"PACKET_BUFFER_COUNT = {int(combined['packet_buffer_count'])}",
+        f"PACKET_PRIMARY_COUNT = {int(combined['packet_primary_count'])}",
+        f"PACKET_RESERVE_COUNT = {int(combined['packet_reserve_count'])}",
+        f"PACKET_READY_QUEUE_CAPACITY = {int(combined['packet_ready_queue_capacity'])}",
+        f"PACKET_TRANSMIT_QUEUE_CAPACITY = {int(combined['packet_transmit_queue_capacity'])}",
+        f"COMMAND_QUEUE_CAPACITY = {int(combined['command_queue_capacity'])}",
+        f"RESPONSE_QUEUE_CAPACITY = {int(combined['response_queue_capacity'])}",
+        (
+            "NOMINAL_PAYLOAD_BYTES_PER_SECOND_PER_STREAM = "
+            f"{int(combined['nominal_payload_bytes_per_second_per_stream'])}"
+        ),
+        (
+            "NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM = "
+            f"{int(combined['nominal_framed_bytes_per_second_per_stream'])}"
+        ),
         f"CHECKSUM_BENCHMARK_CYCLE_COUNTER_HZ = {int(benchmark['cycle_counter_hz'])}",
         (
             "CHECKSUM_BENCHMARK_TARGET_FRAMED_BYTES_PER_SECOND = "
@@ -732,6 +809,14 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     )
     lines.extend(
         python_enum(
+            "ConfigurationProfile",
+            contract["enums"]["configuration_profile"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
+    lines.extend(
+        python_enum(
             "Capability",
             capabilities,
             base="IntFlag",
@@ -843,6 +928,15 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.append(
         "KNOWN_CAPABILITY_MASK = "
         + str(sum(int(entry["value"]) for entry in capabilities))
+    )
+    lines.append(
+        "KNOWN_CONFIGURATION_PROFILE_MASK = "
+        + str(
+            sum(
+                int(entry["value"])
+                for entry in contract["enums"]["configuration_profile"]
+            )
+        )
     )
     lines.append(
         "KNOWN_GPIO_CLOCK_ERROR_MASK = "
@@ -1010,6 +1104,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     benchmark = contract["checksum_benchmark"]
     gpio_clock = contract["gpio_clock_diagnostic"]
     gpio_capture = contract["gpio_capture"]
+    combined = contract["combined_acquisition"]
     gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
     adc_initialization = contract["adc_initialization"]
     adc_trigger = contract["adc_trigger"]
@@ -1079,6 +1174,39 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             f"{int(timing['gpio_sample_period_ticks'])}U;"
         ),
         f"inline constexpr std::uint32_t kFrameCoverageTicks = {coverage_ticks}U;",
+        f"inline constexpr std::uint16_t kSupportedConfigurationMask = {int(combined['supported_configuration_mask'])}U;",
+        f"inline constexpr std::uint8_t kAdcDmaRingDepth = {int(combined['adc_dma_ring_depth'])}U;",
+        f"inline constexpr std::uint16_t kAdcPairsPerBuffer = {int(combined['adc_pairs_per_buffer'])}U;",
+        f"inline constexpr std::uint8_t kAdcPairBytes = {int(combined['adc_pair_bytes'])}U;",
+        f"inline constexpr std::uint32_t kAdcDmaRingBytes = {int(combined['adc_dma_ring_bytes'])}U;",
+        "inline constexpr std::uint8_t kAdcEdmaChannels[] = {"
+        + ", ".join(f"{int(value)}U" for value in combined["adc_edma_channels"])
+        + "};",
+        "inline constexpr std::uint8_t kAdcEdmaPriorities[] = {"
+        + ", ".join(f"{int(value)}U" for value in combined["adc_edma_priorities"])
+        + "};",
+        "inline constexpr std::uint8_t kAdcDmamuxSources[] = {"
+        + ", ".join(f"{int(value)}U" for value in combined["adc_dmamux_sources"])
+        + "};",
+        f"inline constexpr std::uint8_t kAdcDmaIrqPriority = {int(combined['adc_dma_irq_priority'])}U;",
+        f"inline constexpr std::uint8_t kGpioDmaIrqPriority = {int(combined['gpio_dma_irq_priority'])}U;",
+        f"inline constexpr std::uint16_t kPacketBufferCount = {int(combined['packet_buffer_count'])}U;",
+        f"inline constexpr std::uint16_t kPacketPrimaryCount = {int(combined['packet_primary_count'])}U;",
+        f"inline constexpr std::uint16_t kPacketReserveCount = {int(combined['packet_reserve_count'])}U;",
+        f"inline constexpr std::uint16_t kPacketReadyQueueCapacity = {int(combined['packet_ready_queue_capacity'])}U;",
+        f"inline constexpr std::uint16_t kPacketTransmitQueueCapacity = {int(combined['packet_transmit_queue_capacity'])}U;",
+        f"inline constexpr std::uint8_t kCommandQueueCapacity = {int(combined['command_queue_capacity'])}U;",
+        f"inline constexpr std::uint8_t kResponseQueueCapacity = {int(combined['response_queue_capacity'])}U;",
+        (
+            "inline constexpr std::uint32_t "
+            "kNominalPayloadBytesPerSecondPerStream = "
+            f"{int(combined['nominal_payload_bytes_per_second_per_stream'])}U;"
+        ),
+        (
+            "inline constexpr std::uint32_t "
+            "kNominalFramedBytesPerSecondPerStream = "
+            f"{int(combined['nominal_framed_bytes_per_second_per_stream'])}U;"
+        ),
         (
             "inline constexpr std::uint32_t kChecksumBenchmarkCycleCounterHz = "
             f"{int(benchmark['cycle_counter_hz'])}U;"
@@ -1254,6 +1382,13 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.extend(
         cpp_enum("StreamMask", "std::uint8_t", contract["enums"]["stream_mask"])
     )
+    lines.extend(
+        cpp_enum(
+            "ConfigurationProfile",
+            "std::uint16_t",
+            contract["enums"]["configuration_profile"],
+        )
+    )
     lines.extend(cpp_enum("Capability", "std::uint32_t", capabilities))
     lines.extend(cpp_enum("Source", "std::uint8_t", contract["enums"]["source"]))
     lines.extend(cpp_enum("BoardId", "std::uint16_t", contract["enums"]["board_id"]))
@@ -1371,6 +1506,14 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             + "U;",
             "inline constexpr std::uint32_t kKnownCapabilityMask = "
             + str(sum(int(entry["value"]) for entry in capabilities))
+            + "U;",
+            "inline constexpr std::uint16_t kKnownConfigurationProfileMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["configuration_profile"]
+                )
+            )
             + "U;",
             "inline constexpr std::uint32_t kKnownGpioClockErrorMask = "
             + str(

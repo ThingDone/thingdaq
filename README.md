@@ -175,9 +175,9 @@ DMA core. The cooperative ADC frame packer now copies each complete DMA
 generation directly into one fixed packet payload, preserving little-endian
 `(ADC0, ADC1)` pair identity, deriving run-relative timestamps from exact pair
 counters, projecting whole raw gaps into the independent ADC sequence, and
-using the negotiated checksum without heap allocation. ADC-only physical
-CONFIGURE/START is enabled in firmware; combined physical ADC/GPIO remains
-disabled. The Python block model binds the actual INFO-advertised timing,
+using the negotiated checksum without heap allocation. ADC-only, GPIO-only,
+and combined physical CONFIGURE/START are enabled in firmware behind one
+explicit applied-profile contract. The Python block model binds the actual INFO-advertised timing,
 resolution, calibration, trigger, and latest STATUS acquisition evidence to
 zero-copy-friendly ADC0/A0 and ADC1/A1 views, validates only payload shape and
 the selected code range for physical inputs, and retains explicit gap context
@@ -202,11 +202,11 @@ boundaries into 4,048-byte frames, releases raw leases promptly, and stages
 four complete packed buffers before the existing fixed packet ready/transmit
 queues apply run, sequence, first-sample timestamp, gap flags, and the selected
 checksum. When either raw or packed storage fills, acquisition remains live and
-the exact loss is projected once into shared statistics. CONFIGURE accepts
-either the ADC-only or GPIO-only hardware profile and rejects combined physical
-acquisition or conflicting resource states before touching acquisition
-registers. START snapshots one epoch and
-arms buffers/DMA before enabling PIT; STOP disables the trigger and DMA route
+the exact loss is projected once into shared statistics. CONFIGURE accepts all
+six exact ADC-only, GPIO-only, and combined hardware/synthetic profiles while
+rejecting zero-stream, malformed, unadvertised, or per-stream mixed-source
+requests atomically. Combined START audits and prepares both physical engines,
+then arms their one common epoch only after every owner is ready. STOP disables the trigger and DMA route
 in reverse order, then drains complete old-run work before another START.
 INFO and STATUS expose pin order, rate/period, packed width, ring/resource
 capacities, stage counts, queue depths, resource conflicts, lifecycle errors,
@@ -238,11 +238,13 @@ PYTHONPATH=daq_api/src .venv/bin/python -m teensy_daq.checksum_benchmark
 The portable firmware control module implements bounded BOOT → IDLE,
 CONFIGURED, and RUNNING transitions plus INFO, CONFIGURE, START, GET_STATUS,
 STOP, RESET_STATS, PING, optional CHECKSUM_BENCHMARK, and optional
-GPIO_CLOCK_DIAGNOSTIC and GPIO_CAPTURE_DIAGNOSTIC. Synthetic mode accepts any
-nonempty ADC/GPIO subset; physical mode accepts either single stream. INFO and
-STATUS
-distinguish source, publish the fixed GPIO hardware resources, and remain
-responsive while the physical stream is running.
+GPIO_CLOCK_DIAGNOSTIC and GPIO_CAPTURE_DIAGNOSTIC. Synthetic and physical modes
+each accept ADC-only, GPIO-only, or combined acquisition. INFO publishes the
+exact applied profile, six-bit profile matrix, rates/phases/pin map, aligned
+ADC/GPIO rings, packet banks, queue capacities, and checksum. STATUS adds every
+per-source frame/item/byte stage, shared allocation/fairness counters, current
+and high-water queues, command diagnostics, and USB stall/error snapshots while
+remaining responsive during combined physical streaming.
 
 The Teensy USB layer retains PJRC's USB Serial VID/PID and chip-derived serial
 number while overriding only the weak product string with `Teensy DAQ`. Boot
@@ -274,9 +276,10 @@ checksummed in place before
 transport admission; a partial USB write keeps immutable ownership until the
 final byte succeeds. Native diagnostics retain exact generated, framed,
 emitted, transmitted, and dropped frame/item counts plus separate payload and
-framed byte totals. Fixed protocol-v1 STATUS
-projects transport-admitted frames and dropped items alongside the applied
-synthetic source.
+framed byte totals. Fixed protocol-v1 STATUS projects those counters for either
+source together with shared packet/USB telemetry; this preserves the Phase 04
+full-rate synthetic path as the unchanged performance baseline for later
+physical combinations.
 
 The host keeps immediate independent `ADCBlock`/`GPIOBlock` delivery and adds
 an optional bounded `TimestampAligner` above it. Equal 8,096-tick intervals are
@@ -568,11 +571,14 @@ probe, require a second identity-equal response, retry reset/BOOT noise within
 an explicit bound, and validate the protocol, Teensy target, minimum firmware,
 source-derived build ID, and hardware serial before mutation. The installed
 `teensy-daq` CLI lists filtered USB candidates and provides `probe`, `status`,
-`configure`, `start`, `stop`, and `reset-stats` commands with typed nonzero exit
+`configure`, `start`, `stop`, `reset-stats`, and bounded `monitor`/`capture`
+commands with typed nonzero exit
 codes for timeout, busy port, wrong device, unsupported capability, disconnect,
 and illegal state. Exact artifact pins can be supplied with
 `--expect-build-id`, `--expect-firmware`, and `--hardware-serial`; see
-`daq_api/README.md` for the full command reference.
+`daq_api/README.md` for the full command reference. The bounded workflow prints
+live per-source rates, observed gaps, firmware/host queue high-water marks, and
+command latency, and always sends STOP and closes in its finalizer.
 
 After installing `daq_api`, run the complete synthetic flow without a Teensy,
 serial port, or credentials. The demo validates every ADC/GPIO sample, stream

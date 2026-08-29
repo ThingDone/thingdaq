@@ -101,7 +101,10 @@ def _ready_metadata() -> ReadyAdcMetadata:
     }
 
 
-def _device_info(state: constants.DeviceState) -> DeviceInfo:
+def _device_info(
+    state: constants.DeviceState,
+    configuration: Configuration | None = None,
+) -> DeviceInfo:
     return DeviceInfo(
         device_state=state,
         build_id="tdaq-0123456789abcdef",
@@ -111,6 +114,16 @@ def _device_info(state: constants.DeviceState) -> DeviceInfo:
         mcu_id=constants.McuId.IMXRT1062,
         supported_stream_mask=constants.StreamMask.ADC | constants.StreamMask.GPIO,
         supported_source_mask=0x03,
+        applied_stream_mask=(
+            configuration.stream_mask
+            if configuration is not None
+            else constants.StreamMask.NONE
+        ),
+        applied_source=(
+            configuration.source
+            if configuration is not None
+            else constants.Source.HARDWARE
+        ),
         capability_bits=constants.Capability(constants.KNOWN_CAPABILITY_MASK),
         gpio_capture_diagnostic_mode=(
             constants.GpioCaptureDiagnosticMode.NON_DRIVING_CAPTURE
@@ -130,7 +143,7 @@ class PhysicalAdcDevice(SimulatedDevice):
         super().__init__(build_id="tdaq-0123456789abcdef")
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
-        info = _device_info(self.state)
+        info = _device_info(self.state, self.configuration)
         return self._success_response(request, info.to_payload())
 
     def _handle_configure(self, request):  # type: ignore[no-untyped-def]

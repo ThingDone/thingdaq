@@ -57,6 +57,7 @@ class HardwareBenchmarkDevice(SimulatedDevice):
         self.configured_checksums: list[int] = []
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
+        configuration = self.configuration
         info = Info(
             device_state=self.state,
             build_id="tdaq-0123456789abcdef",
@@ -66,6 +67,17 @@ class HardwareBenchmarkDevice(SimulatedDevice):
             mcu_id=McuId.IMXRT1062,
             supported_stream_mask=StreamMask.ADC | StreamMask.GPIO,
             supported_source_mask=1 << int(constants.Source.SYNTHETIC),
+            supported_configuration_mask=(
+                constants.ConfigurationProfile.SYNTHETIC_ADC
+                | constants.ConfigurationProfile.SYNTHETIC_GPIO
+                | constants.ConfigurationProfile.SYNTHETIC_COMBINED
+            ),
+            applied_stream_mask=(
+                configuration.stream_mask
+                if configuration is not None
+                else constants.StreamMask.NONE
+            ),
+            applied_source=constants.Source.SYNTHETIC,
             data_checksum_algorithm=self.status().data_checksum_algorithm,
             capability_bits=(
                 Capability.ADC_STREAM

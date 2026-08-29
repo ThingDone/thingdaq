@@ -117,25 +117,27 @@ does not advertise this capability and raises `DeviceCapabilityError` instead
 of fabricating target register evidence. See [[Protocol-V1]] and
 [[ADR-003-GPIO-Clock-DMA]].
 
-Firmware 0.7.0 adds physical GPIO-only streaming and the fail-closed capture
-diagnostic. D6 through D13 map to bits 0 through 7 at 4 MHz. INFO exposes the
-fixed rings/resources, and STATUS exposes stage counts and resource/lifecycle
-errors:
+Firmware supports ADC-only, GPIO-only, and combined physical streaming plus
+the fail-closed GPIO capture diagnostic. D6 through D13 map to bits 0 through 7
+at 4 MHz while A0/A1 retain one 1 MHz pair stream with a 500 ns ADC1 phase.
+INFO exposes the exact applied/supported profiles, rates, phases, pin map,
+aligned rings, frame sizes, queue capacities, and checksum. STATUS exposes all
+per-source/shared stage, byte, queue, firmware-diagnostic, and USB counters:
 
 ```python
 from teensy_daq import Source, TeensyDAQ
 
 with TeensyDAQ.open(hardware_serial=12345670) as daq:
     evidence = daq.gpio_capture_diagnostic()
-    applied = daq.configure(adc=False, gpio=True, source=Source.HARDWARE)
+    applied = daq.configure(adc=True, gpio=True, source=Source.HARDWARE)
     run_id = daq.start()
-    block = daq.read_gpio_block()
+    adc_or_gpio = daq.read_block()
     final = daq.stop()
     print(
         run_id,
         applied.stream_mask,
         daq.device_info.gpio_pin_map,
-        block.item_count,
+        adc_or_gpio.item_count,
         final,
         evidence.healthy,
     )
@@ -196,17 +198,25 @@ The installed `teensy-daq` command exposes bounded one-shot hardware controls:
 teensy-daq list
 teensy-daq probe --hardware-serial 12345670 --expect-build-id tdaq-39300273210c1c89
 teensy-daq status --hardware-serial 12345670
-teensy-daq configure --hardware-serial 12345670
+teensy-daq configure --hardware-serial 12345670 --streams both --source hardware
 teensy-daq start --hardware-serial 12345670
 teensy-daq stop --hardware-serial 12345670
 teensy-daq reset-stats --hardware-serial 12345670
+teensy-daq monitor --hardware-serial 12345670 --streams both --source hardware --duration 10
+teensy-daq capture --simulate --streams both --source synthetic --duration 2
 ```
 
 `list` uses VID/PID metadata and opens nothing. Every other command performs
 the synchronized identity check before its operation. `configure` and `start`
 release the port without undoing their new device state so the next invocation
 can continue the lifecycle; normal Python context-manager cleanup still STOPs
-by default. Diagnostics are typed and machine-visible: no device (exit 3),
+by default. `monitor` and its `capture` alias own one bounded
+CONFIGURE→START→capture→STOP session. They print live ADC/GPIO payload rates,
+gap counts, device/host queue high-water marks, and STATUS command latency, and
+always attempt STOP and close from a finalizer. `--streams` accepts `adc`,
+`gpio`, `both`, or the legacy control-only `none`; `--source` accepts `hardware`
+or `synthetic`, and omission selects an advertised exact profile. Diagnostics
+are typed and machine-visible: no device (exit 3),
 timeout (4), busy/denied port (5), wrong identity (6), unsupported capability
 (7), disconnect (8), invalid state (9), and other device errors (10).
 

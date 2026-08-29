@@ -629,20 +629,32 @@ class TeensyDAQ:
                 if gpio:
                     stream_mask |= constants.StreamMask.GPIO
                 capabilities = self.capabilities
+                selected_checksum = constants.ChecksumAlgorithm(checksum_algorithm)
                 if source is None:
-                    source = (
-                        constants.Source.HARDWARE
-                        if capabilities is not None
-                        and capabilities.supports_source(constants.Source.HARDWARE)
-                        and stream_mask == constants.StreamMask.GPIO
-                        else constants.Source.SYNTHETIC
-                    )
+                    if stream_mask is constants.StreamMask.NONE:
+                        source = constants.Source.HARDWARE
+                    else:
+                        candidates = (
+                            constants.Source.HARDWARE,
+                            constants.Source.SYNTHETIC,
+                        )
+                        source = constants.Source.SYNTHETIC
+                    if capabilities is not None and stream_mask:
+                        for candidate in candidates:
+                            candidate_configuration = DAQConfiguration(
+                                stream_mask=stream_mask,
+                                source=candidate,
+                                data_checksum_algorithm=selected_checksum,
+                            )
+                            if capabilities.supports_configuration(
+                                candidate_configuration
+                            ):
+                                source = candidate
+                                break
                 configuration = DAQConfiguration(
                     stream_mask=stream_mask,
                     source=constants.Source(source),
-                    data_checksum_algorithm=constants.ChecksumAlgorithm(
-                        checksum_algorithm
-                    ),
+                    data_checksum_algorithm=selected_checksum,
                 )
             elif not isinstance(configuration, DAQConfiguration):
                 raise TypeError("configuration must be DAQConfiguration")
@@ -1071,6 +1083,8 @@ class TeensyDAQ:
         self._run_id = response.run_id
         if info.device_state is constants.DeviceState.IDLE:
             self._configuration = None
+        else:
+            self._configuration = info.applied_configuration
         return info, identity
 
     def _require_verified_identity(self) -> None:
@@ -1105,21 +1119,6 @@ class TeensyDAQ:
         capabilities = self.capabilities
         if capabilities is None:
             return
-        if (
-            configuration.source is constants.Source.HARDWARE
-            and not configuration.is_control_only
-            and configuration.stream_mask != constants.StreamMask.GPIO
-        ):
-            raise DeviceCapabilityError(
-                "protocol-v1 physical acquisition supports GPIO-only streaming"
-            )
-        if configuration.is_control_only and (
-            capabilities.supported_stream_mask != constants.StreamMask.NONE
-            or not capabilities.supports_source(constants.Source.HARDWARE)
-        ):
-            raise DeviceCapabilityError(
-                "device does not advertise the Phase 03 control-only profile"
-            )
         unsupported_streams = int(configuration.stream_mask) & ~int(
             capabilities.supported_stream_mask
         )
@@ -1131,6 +1130,11 @@ class TeensyDAQ:
             raise DeviceCapabilityError(
                 "device does not advertise requested checksum",
                 error_code=constants.ErrorCode.UNSUPPORTED_CHECKSUM,
+            )
+        if not capabilities.supports_configuration(configuration):
+            raise DeviceCapabilityError(
+                "device does not advertise the exact requested source/stream profile",
+                error_code=constants.ErrorCode.UNSUPPORTED_CONFIGURATION,
             )
 
     def _initialize_stream_expectations(

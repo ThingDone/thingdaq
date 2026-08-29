@@ -212,7 +212,7 @@ void testBootAndInfo() {
          "INFO advertises both implemented stream layouts");
   expect(decoded.payload
              .data[constants::kInfoResponseSupportedSourceMaskOffset] == 3U,
-         "INFO advertises physical GPIO and retained synthetic sources");
+         "INFO advertises physical and retained synthetic sources");
   expect(decoded.payload
              .data[constants::kInfoResponseDataChecksumAlgorithmOffset] ==
              static_cast<std::uint8_t>(constants::kDefaultChecksumAlgorithm),
@@ -243,7 +243,14 @@ void testBootAndInfo() {
                           constants::Capability::kGpioClockDiagnostic)) != 0U &&
              (value & static_cast<std::uint32_t>(
                           constants::Capability::kGpioCaptureDiagnostic)) != 0U,
-         "INFO capability bits advertise physical GPIO and diagnostics");
+         "INFO capability bits advertise physical acquisition and diagnostics");
+  std::uint16_t configuration_mask = 0U;
+  expect(wire::loadU16(
+             decoded.payload,
+             constants::kInfoResponseSupportedConfigurationMaskOffset,
+             configuration_mask) &&
+             configuration_mask == constants::kSupportedConfigurationMask,
+         "INFO advertises all six exact acquisition profiles");
   expect(decoded.payload.data[
              constants::kInfoResponseGpioPackedWidthBitsOffset] == 8U &&
              decoded.payload.data[
@@ -532,10 +539,13 @@ void testConfigurationValidationAndAtomicity() {
 
   wire::Configuration adc = control::kSyntheticConfiguration;
   adc.stream_mask = static_cast<std::uint8_t>(constants::StreamMask::kAdc);
-  wire::Configuration hardware = control::kSyntheticConfiguration;
-  hardware.source = constants::Source::kHardware;
+  wire::Configuration synthetic_gpio = control::kSyntheticConfiguration;
+  synthetic_gpio.stream_mask =
+      static_cast<std::uint8_t>(constants::StreamMask::kGpio);
   wire::Configuration physical_adc = control::kPhysicalAdcConfiguration;
   wire::Configuration physical_gpio = control::kPhysicalGpioConfiguration;
+  wire::Configuration physical_combined =
+      control::kPhysicalCombinedConfiguration;
   wire::Configuration zero_stream = control::kSyntheticConfiguration;
   zero_stream.stream_mask = 0U;
   wire::Configuration crc = control::kSyntheticConfiguration;
@@ -556,9 +566,7 @@ void testConfigurationValidationAndAtomicity() {
   unknown_checksum.data_checksum_algorithm =
       static_cast<constants::ChecksumAlgorithm>(0xFFU);
 
-  const std::array<Case, 7U> cases{{
-      {hardware, constants::ErrorCode::kUnsupportedConfiguration,
-       "physical source"},
+  const std::array<Case, 6U> cases{{
       {zero_stream, constants::ErrorCode::kUnsupportedConfiguration,
        "zero-stream profile"},
       {bad_size, constants::ErrorCode::kInvalidPayload, "wrong frame size"},
@@ -610,6 +618,13 @@ void testConfigurationValidationAndAtomicity() {
              state.appliedConfiguration().source ==
                  constants::Source::kHardware,
          "physical GPIO-only configuration is accepted atomically");
+  expect(state.dispatch(configureRequest(request_id++, physical_combined),
+                        response)
+             .commandAccepted() &&
+             state.appliedConfiguration().stream_mask == 3U &&
+             state.appliedConfiguration().source ==
+                 constants::Source::kHardware,
+         "combined physical configuration is accepted atomically");
   expect(state.dispatch(configureRequest(request_id++, crc_iso), response)
              .commandAccepted() &&
              state.appliedConfiguration().data_checksum_algorithm ==
@@ -624,14 +639,30 @@ void testConfigurationValidationAndAtomicity() {
   expect(crc_info.payload
              .data[constants::kInfoResponseDataChecksumAlgorithmOffset] ==
              static_cast<std::uint8_t>(
-                 constants::ChecksumAlgorithm::kCrc32IsoHdlc),
-         "CONFIGURED INFO exposes the selected data checksum");
+                 constants::ChecksumAlgorithm::kCrc32IsoHdlc) &&
+             crc_info.payload
+                     .data[constants::kInfoResponseAppliedStreamMaskOffset] ==
+                 3U &&
+             crc_info.payload
+                     .data[constants::kInfoResponseAppliedSourceOffset] ==
+                 static_cast<std::uint8_t>(constants::Source::kSynthetic),
+         "CONFIGURED INFO exposes the selected checksum and exact profile");
   expect(state.dispatch(configureRequest(request_id++, adc), response)
              .commandAccepted() &&
              state.appliedConfiguration().stream_mask ==
                  static_cast<std::uint8_t>(constants::StreamMask::kAdc),
          "a supported single synthetic stream can be selected atomically");
-  state.dispatch(configureRequest(request_id, hardware), response);
+  expect(state.dispatch(configureRequest(request_id++, synthetic_gpio), response)
+             .commandAccepted() &&
+             state.appliedConfiguration().stream_mask ==
+                 static_cast<std::uint8_t>(constants::StreamMask::kGpio) &&
+             state.appliedConfiguration().source ==
+                 constants::Source::kSynthetic,
+         "synthetic GPIO-only can be selected atomically");
+  expect(state.dispatch(configureRequest(request_id++, adc), response)
+             .commandAccepted(),
+         "synthetic ADC-only is restored before atomic rejection");
+  state.dispatch(configureRequest(request_id, zero_stream), response);
   expect(state.state() == constants::DeviceState::kConfigured &&
              state.appliedConfiguration().stream_mask ==
                  static_cast<std::uint8_t>(constants::StreamMask::kAdc) &&

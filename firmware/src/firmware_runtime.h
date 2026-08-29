@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "acquisition_controller.h"
@@ -100,6 +101,8 @@ class FirmwareRuntime {
                            protocol::ControlFrame &response,
                            bool transport_already_recorded,
                            LoopReport &report);
+  void resetTransportStatisticsEpoch();
+  void observeTransportQueueDepths();
   void publishPacketStatistics();
   bool dataPathQuiescent() const;
   static protocol::GpioCaptureDiagnosticResponse gpioDiagnosticResponse(
@@ -116,6 +119,9 @@ class FirmwareRuntime {
   gpio_clock::Runner *gpio_clock_diagnostic_ = nullptr;
   gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
+  usb::TransportSnapshot transport_stats_baseline_{};
+  std::size_t transport_command_queue_high_water_ = 0U;
+  std::size_t transport_response_queue_high_water_ = 0U;
 };
 
 }  // namespace teensy_daq::runtime

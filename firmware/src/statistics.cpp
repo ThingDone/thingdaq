@@ -211,6 +211,11 @@ void Statistics::publishPacketQueues(const PacketQueueProgress &progress) {
   counters_.packet_queue = progress;
 }
 
+TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_usb")
+void Statistics::publishUsb(const UsbProgress &progress) {
+  counters_.usb = progress;
+}
+
 TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.refresh_projection")
 void Statistics::refreshDataProjection() {
   const std::uint64_t unprojected_adc_loss = subtractFloor(
@@ -335,6 +340,88 @@ protocol::StatusResponse Statistics::wireStatus(
   response.adc_packer_pipeline_errors = counters_.adc_packer.pipeline_errors;
   response.adc_packer_chronology_errors =
       counters_.adc_packer.chronology_errors;
+  const auto project_stream = [](const StreamProgress &source,
+                                 protocol::StreamTelemetry &destination) {
+    destination.frames_generated = source.frames_generated;
+    destination.items_generated = source.items_generated;
+    destination.frames_framed = source.frames_framed;
+    destination.items_framed = source.items_framed;
+    destination.items_emitted = source.items_emitted;
+    destination.frames_transmitted = source.frames_transmitted;
+    destination.items_transmitted = source.items_transmitted;
+    destination.frames_dropped = source.frames_dropped;
+    destination.payload_bytes_produced = source.payload_bytes_produced;
+    destination.payload_bytes_framed = source.payload_bytes_framed;
+    destination.payload_bytes_emitted = source.payload_bytes_emitted;
+    destination.payload_bytes_transmitted =
+        source.payload_bytes_transmitted;
+    destination.payload_bytes_dropped = source.payload_bytes_dropped;
+    destination.framed_bytes_framed = source.framed_bytes_framed;
+    destination.framed_bytes_emitted = source.framed_bytes_emitted;
+    destination.framed_bytes_transmitted =
+        source.framed_bytes_transmitted;
+  };
+  project_stream(counters_.data_path.adc, response.streams[0U]);
+  project_stream(counters_.data_path.gpio, response.streams[1U]);
+  for (std::size_t index = 0U; index < response.streams.size(); ++index) {
+    response.streams[index].packet_ready_depth = narrowDepth(
+        counters_.packet_queue.ready_depth_by_source[index]);
+    response.streams[index].packet_transmit_depth = narrowDepth(
+        counters_.packet_queue.transmit_depth_by_source[index]);
+    response.streams[index].packet_ready_high_water = narrowDepth(
+        counters_.packet_queue.ready_high_water_by_source[index]);
+    response.streams[index].packet_transmit_high_water = narrowDepth(
+        counters_.packet_queue.transmit_high_water_by_source[index]);
+  }
+  response.packet.ready_high_water =
+      narrowDepth(counters_.packet_queue.ready_high_water);
+  response.packet.transmit_high_water =
+      narrowDepth(counters_.packet_queue.transmit_high_water);
+  response.packet.frames_promoted = counters_.packet_queue.frames_promoted;
+  response.packet.fairness_deferrals =
+      counters_.packet_queue.fairness_deferrals;
+  response.packet.accounted_frame_skew =
+      counters_.packet_queue.accounted_frame_skew;
+  response.packet.data_payload_bytes_transmitted =
+      counters_.packet_queue.data_payload_bytes_transmitted;
+  response.packet.data_framed_bytes_transmitted =
+      counters_.packet_queue.data_framed_bytes_transmitted;
+  response.packet.pool_exhaustions =
+      counters_.packet_queue.pool_exhaustions;
+  response.packet.invalid_operations =
+      counters_.packet_queue.invalid_operations;
+  response.packet.encoding_rejections =
+      counters_.packet_queue.encoding_rejections;
+  response.packet.ready_queue_rejections =
+      counters_.packet_queue.ready_queue_rejections;
+  response.packet.transmit_queue_rejections =
+      counters_.packet_queue.transmit_queue_rejections;
+  response.diagnostics.commands_accepted = counters_.commands_accepted;
+  response.diagnostics.commands_rejected = counters_.commands_rejected;
+  response.diagnostics.bad_checksums = counters_.bad_checksums;
+  response.diagnostics.bad_lengths = counters_.bad_lengths;
+  response.diagnostics.bad_types = counters_.bad_types;
+  response.diagnostics.bad_versions = counters_.bad_versions;
+  response.diagnostics.timeouts = counters_.timeouts;
+  response.diagnostics.partial_usb_writes = counters_.partial_usb_writes;
+  response.diagnostics.state_errors = counters_.state_errors;
+  response.usb.short_capacity_deferrals =
+      counters_.usb.short_capacity_deferrals;
+  response.usb.rx_stall_events = counters_.usb.rx_stall_events;
+  response.usb.tx_stall_events = counters_.usb.tx_stall_events;
+  response.usb.io_errors = counters_.usb.io_errors;
+  response.usb.command_queue_depth =
+      narrowDepth(counters_.usb.command_queue_depth);
+  response.usb.response_queue_depth =
+      narrowDepth(counters_.usb.response_queue_depth);
+  response.usb.lower_priority_queue_depth =
+      narrowDepth(counters_.usb.lower_priority_queue_depth);
+  response.usb.command_queue_high_water =
+      narrowDepth(counters_.usb.command_queue_high_water);
+  response.usb.response_queue_high_water =
+      narrowDepth(counters_.usb.response_queue_high_water);
+  response.usb.active_frame_bytes_sent =
+      narrowDepth(counters_.usb.active_frame_bytes_sent);
   return response;
 }
 

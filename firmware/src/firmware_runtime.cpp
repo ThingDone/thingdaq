@@ -8,6 +8,13 @@
 #endif
 
 namespace teensy_daq::runtime {
+namespace {
+
+std::uint32_t counterDelta(std::uint32_t current, std::uint32_t baseline) {
+  return current - baseline;
+}
+
+}  // namespace
 
 TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.begin")
 bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
@@ -127,6 +134,8 @@ LoopReport FirmwareRuntime::service() {
     report.response_queued = transport_.queueResponse(response);
     if (!report.response_queued) {
       recoverResponsePath(command.request, response, true, report);
+    } else {
+      observeTransportQueueDepths();
     }
   }
   // Response-path recovery can create one STOP event after the first event
@@ -191,6 +200,7 @@ void FirmwareRuntime::applyPendingEvents(
       report.internal_error = true;
       return;
     }
+    resetTransportStatisticsEpoch();
     if (acquisition::Controller::isExecutableConfiguration(
             control_.appliedConfiguration())) {
       if (!acquisition_controller_.start(control_.appliedConfiguration(),
@@ -227,6 +237,7 @@ void FirmwareRuntime::publishPacketStatistics() {
   const packet::PipelineSnapshot pipeline = packet_pipeline_.snapshot();
   stats::DataPathProgress progress{};
   const auto copy = [](const packet::SourceCounters &source,
+                       const packet::SourceByteCounters &bytes,
                        stats::StreamProgress &destination) {
     destination.frames_generated = source.frames_produced;
     destination.items_generated = source.items_produced;
@@ -238,18 +249,96 @@ void FirmwareRuntime::publishPacketStatistics() {
     destination.items_transmitted = source.items_transmitted;
     destination.frames_dropped = source.frames_dropped;
     destination.items_dropped = source.items_dropped;
+    destination.payload_bytes_produced = bytes.payload_bytes_produced;
+    destination.payload_bytes_framed = bytes.payload_bytes_framed;
+    destination.payload_bytes_emitted = bytes.payload_bytes_emitted;
+    destination.payload_bytes_transmitted =
+        bytes.payload_bytes_transmitted;
+    destination.payload_bytes_dropped = bytes.payload_bytes_dropped;
+    destination.framed_bytes_framed = bytes.framed_bytes_framed;
+    destination.framed_bytes_emitted = bytes.framed_bytes_emitted;
+    destination.framed_bytes_transmitted =
+        bytes.framed_bytes_transmitted;
   };
   copy(pipeline.sources[packet::streamIndex(packet::Stream::kAdc)],
+       pipeline.source_bytes[packet::streamIndex(packet::Stream::kAdc)],
        progress.adc);
   copy(pipeline.sources[packet::streamIndex(packet::Stream::kGpio)],
+       pipeline.source_bytes[packet::streamIndex(packet::Stream::kGpio)],
        progress.gpio);
   control_.statistics().publishDataPath(progress);
   stats::PacketQueueProgress queues{};
   queues.ready_depth = pipeline.ready_queue_depth;
   queues.transmit_depth = pipeline.transmit_queue_depth;
+  queues.ready_depth_by_source = pipeline.ready_depth_by_source;
+  queues.transmit_depth_by_source = pipeline.transmit_depth_by_source;
+  for (std::size_t index = 0U; index < packet::kStreamCount; ++index) {
+    queues.ready_high_water_by_source[index] =
+        pipeline.sources[index].ready_queue_high_water;
+    queues.transmit_high_water_by_source[index] =
+        pipeline.sources[index].transmit_queue_high_water;
+  }
+  queues.ready_high_water = pipeline.ready_queue_high_water;
+  queues.transmit_high_water = pipeline.transmit_queue_high_water;
   queues.owned_high_water = pipeline.buffers_owned_high_water;
+  queues.frames_promoted = pipeline.frames_promoted;
+  queues.fairness_deferrals = pipeline.fairness_deferrals;
+  queues.accounted_frame_skew = pipeline.accounted_frame_skew;
+  queues.data_payload_bytes_transmitted =
+      pipeline.data_payload_bytes_transmitted;
+  queues.data_framed_bytes_transmitted =
+      pipeline.data_framed_bytes_transmitted;
+  queues.pool_exhaustions = pipeline.pool_exhaustions;
+  queues.invalid_operations = pipeline.invalid_operations;
+  queues.encoding_rejections = pipeline.encoding_rejections;
+  queues.ready_queue_rejections = pipeline.ready_queue_rejections;
+  queues.transmit_queue_rejections = pipeline.transmit_queue_rejections;
   control_.statistics().publishPacketQueues(queues);
+  const usb::TransportSnapshot transport = transport_.snapshot();
+  if (transport.command_queue_depth > transport_command_queue_high_water_) {
+    transport_command_queue_high_water_ = transport.command_queue_depth;
+  }
+  if (transport.response_queue_depth > transport_response_queue_high_water_) {
+    transport_response_queue_high_water_ = transport.response_queue_depth;
+  }
+  stats::UsbProgress usb{};
+  usb.short_capacity_deferrals = counterDelta(
+      transport.short_capacity_deferrals,
+      transport_stats_baseline_.short_capacity_deferrals);
+  usb.rx_stall_events = counterDelta(
+      transport.rx_stall_events, transport_stats_baseline_.rx_stall_events);
+  usb.tx_stall_events = counterDelta(
+      transport.tx_stall_events, transport_stats_baseline_.tx_stall_events);
+  usb.io_errors = counterDelta(transport.io_errors,
+                               transport_stats_baseline_.io_errors);
+  usb.command_queue_depth = transport.command_queue_depth;
+  usb.response_queue_depth = transport.response_queue_depth;
+  usb.lower_priority_queue_depth = transport.lower_priority_queue_depth;
+  usb.command_queue_high_water = transport_command_queue_high_water_;
+  usb.response_queue_high_water = transport_response_queue_high_water_;
+  usb.active_frame_bytes_sent = transport.active_frame_bytes_sent;
+  control_.statistics().publishUsb(usb);
   acquisition_controller_.publishStatistics(control_.runId());
+}
+
+TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.reset_transport_statistics")
+void FirmwareRuntime::resetTransportStatisticsEpoch() {
+  transport_stats_baseline_ = transport_.snapshot();
+  transport_command_queue_high_water_ =
+      transport_stats_baseline_.command_queue_depth;
+  transport_response_queue_high_water_ =
+      transport_stats_baseline_.response_queue_depth;
+}
+
+TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.observe_transport_queues")
+void FirmwareRuntime::observeTransportQueueDepths() {
+  const usb::TransportSnapshot transport = transport_.snapshot();
+  if (transport.command_queue_depth > transport_command_queue_high_water_) {
+    transport_command_queue_high_water_ = transport.command_queue_depth;
+  }
+  if (transport.response_queue_depth > transport_response_queue_high_water_) {
+    transport_response_queue_high_water_ = transport.response_queue_depth;
+  }
 }
 
 TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.quiescence")

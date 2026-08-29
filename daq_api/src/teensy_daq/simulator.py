@@ -160,6 +160,12 @@ class SimulatedDevice:
         """Return the current status model without going through the wire."""
 
         configuration = self._configuration
+        adc_items = self._adc_frames_emitted * constants.ADC_PAIRS_PER_FRAME
+        gpio_items = self._gpio_frames_emitted * constants.GPIO_SAMPLES_PER_FRAME
+        adc_payload_bytes = self._adc_frames_emitted * constants.DATA_PAYLOAD_BYTES
+        gpio_payload_bytes = self._gpio_frames_emitted * constants.DATA_PAYLOAD_BYTES
+        adc_framed_bytes = self._adc_frames_emitted * constants.DATA_FRAME_BYTES
+        gpio_framed_bytes = self._gpio_frames_emitted * constants.DATA_FRAME_BYTES
         return Status(
             device_state=self._state,
             stream_mask=(
@@ -189,6 +195,39 @@ class SimulatedDevice:
             & constants.UINT32_MAX,
             transport_errors=self._transport_errors,
             stats_generation=self._stats_generation,
+            adc_frames_generated=self._adc_frames_emitted,
+            adc_items_generated=adc_items,
+            adc_frames_framed_pipeline=self._adc_frames_emitted,
+            adc_items_framed_pipeline=adc_items,
+            adc_items_emitted=adc_items,
+            adc_frames_transmitted=self._adc_frames_emitted,
+            adc_items_transmitted_pipeline=adc_items,
+            gpio_frames_generated=self._gpio_frames_emitted,
+            gpio_items_generated=gpio_items,
+            gpio_frames_framed_pipeline=self._gpio_frames_emitted,
+            gpio_items_framed_pipeline=gpio_items,
+            gpio_items_emitted=gpio_items,
+            gpio_frames_transmitted=self._gpio_frames_emitted,
+            gpio_items_transmitted_pipeline=gpio_items,
+            adc_payload_bytes_produced=adc_payload_bytes,
+            adc_payload_bytes_framed=adc_payload_bytes,
+            adc_payload_bytes_emitted=adc_payload_bytes,
+            adc_payload_bytes_transmitted=adc_payload_bytes,
+            adc_framed_bytes_framed=adc_framed_bytes,
+            adc_framed_bytes_emitted=adc_framed_bytes,
+            adc_framed_bytes_transmitted=adc_framed_bytes,
+            gpio_payload_bytes_produced=gpio_payload_bytes,
+            gpio_payload_bytes_framed=gpio_payload_bytes,
+            gpio_payload_bytes_emitted=gpio_payload_bytes,
+            gpio_payload_bytes_transmitted=gpio_payload_bytes,
+            gpio_framed_bytes_framed=gpio_framed_bytes,
+            gpio_framed_bytes_emitted=gpio_framed_bytes,
+            gpio_framed_bytes_transmitted=gpio_framed_bytes,
+            packet_frames_promoted=(
+                self._adc_frames_emitted + self._gpio_frames_emitted
+            ),
+            data_payload_bytes_transmitted=(adc_payload_bytes + gpio_payload_bytes),
+            data_framed_bytes_transmitted=(adc_framed_bytes + gpio_framed_bytes),
         )
 
     def _handle_frame(self, request: Frame) -> bytes | None:
@@ -232,6 +271,7 @@ class SimulatedDevice:
                 | constants.Capability.PING
             )
             firmware_version = (0, 3, 0)
+            supported_configuration_mask = constants.ConfigurationProfile.NONE
         else:
             supported_stream_mask = constants.StreamMask.ADC | constants.StreamMask.GPIO
             supported_source_mask = 1 << int(constants.Source.SYNTHETIC)
@@ -243,12 +283,33 @@ class SimulatedDevice:
                 | constants.Capability.PING
             )
             firmware_version = (0, 1, 0)
+            supported_configuration_mask = (
+                constants.ConfigurationProfile.SYNTHETIC_ADC
+                | constants.ConfigurationProfile.SYNTHETIC_GPIO
+                | constants.ConfigurationProfile.SYNTHETIC_COMBINED
+            )
+        configuration = self._configuration
         info = Info(
             device_state=self._state,
             build_id=self._build_id,
             firmware_version=firmware_version,
             supported_stream_mask=supported_stream_mask,
             supported_source_mask=supported_source_mask,
+            supported_configuration_mask=supported_configuration_mask,
+            applied_stream_mask=(
+                configuration.stream_mask
+                if configuration is not None
+                else constants.StreamMask.NONE
+            ),
+            applied_source=(
+                configuration.source
+                if configuration is not None
+                else (
+                    constants.Source.HARDWARE
+                    if self._control_only
+                    else constants.Source.SYNTHETIC
+                )
+            ),
             data_checksum_algorithm=self.status().data_checksum_algorithm,
             capability_bits=capability_bits,
         )

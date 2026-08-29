@@ -32,10 +32,11 @@ no longer owns per-peripheral lifecycle state or sequencing.
 The controller preserves the accepted ADC-only and GPIO-only behavior and now
 executes an ADC-plus-GPIO request as one atomic internal resource transaction.
 It owns one run ID, one 8 MHz epoch, and one shared hardware schedule across
-both paths. [[Protocol-V1]] still rejects combined physical CONFIGURE until the
-later Phase 08 capability/configuration task exposes the mode and its complete
-metadata. This is therefore implementation evidence for deterministic
-combined lifecycle behavior, not combined-stream physical acceptance.
+both paths. [[Protocol-V1]] now advertises and validates the exact hardware and
+synthetic ADC-only, GPIO-only, and combined profile matrix, publishes its
+complete fixed resource metadata, and exposes the controller/packet/USB
+telemetry through INFO and STATUS. Physical acceptance evidence still awaits
+the dedicated Phase 08 rig campaign.
 
 ## Evidence reinspected
 
@@ -312,11 +313,12 @@ bytes in RAM1 and 486,944 bytes in RAM2. Including the pinned core's four
 2,048-byte USB TX buffers brings the simultaneous RAM2 buffer total to 495,136
 bytes, still inside the 512 KiB region before the exact linker gate accounts
 for all remaining core globals.
-The exact pinned combined-lifecycle image uses 454,944 bytes of RAM1 variables,
-32,728 bytes of RAM1 code, 40 bytes of alignment padding, and leaves 36,576
+The exact pinned combined-lifecycle image uses 455,488 bytes of RAM1 variables,
+32,616 bytes of RAM1 code, 152 bytes of alignment padding, and leaves 36,032
 bytes for locals/stack. It uses 503,488 bytes of RAM2 variables and leaves
-20,800 bytes of heap headroom. Cold controller lifecycle paths remain in flash
-so the additional orchestration does not consume another 32 KiB ITCM block.
+20,800 bytes of heap headroom. Cold controller lifecycle paths and non-measured
+checksum-vector preparation remain in flash so the additional orchestration
+does not consume another 32 KiB ITCM block.
 
 DMA and CPU ownership remain local to the existing ring state machines. The
 controller never receives a mutable DMA pointer and never performs cache
@@ -326,9 +328,9 @@ cooperative packet or USB layers.
 
 ## Remaining combined-enablement work
 
-Combined hardware lifecycle is implemented behind the current protocol gate.
-The packet/USB scheduler is now combined-aware behind that same gate. The
-remaining Phase 08 work is to expose combined configuration/capability and
-wire telemetry, expand adversarial tests, and run the physical combined
-acceptance campaign. Until those gates pass, firmware must not advertise
-combined physical acquisition as an accepted capability.
+Combined hardware lifecycle, capability/configuration negotiation, telemetry,
+and bounded host monitoring are enabled. Remaining Phase 08 work is the
+separate adversarial firmware/Python test expansion, self-contained combined
+rig, and 10/60-second physical acceptance campaign. Until that campaign passes,
+the profile is implemented and advertised but has no claimed combined target
+throughput, loss, or external stimulus evidence.

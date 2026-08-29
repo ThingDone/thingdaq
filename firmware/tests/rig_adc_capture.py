@@ -248,10 +248,10 @@ REQUEST_PAYLOAD_SIZE = {
     RESET_STATS_REQUEST: 0,
 }
 SUCCESS_PAYLOAD_SIZE = {
-    INFO_RESPONSE: 324,
+    INFO_RESPONSE: 376,
     CONFIGURE_RESPONSE: 12,
     START_RESPONSE: 12,
-    GET_STATUS_RESPONSE: 576,
+    GET_STATUS_RESPONSE: 976,
     STOP_RESPONSE: 8,
     RESET_STATS_RESPONSE: 8,
     ERROR_RESPONSE: 8,
@@ -768,6 +768,7 @@ class FrameParser:
                 payload[154:156],
                 payload[182:184],
                 payload[230:232],
+                payload[334:336],
             )
             if any(any(section) for section in reserved_ranges):
                 raise ProtocolFailure("INFO reserved fields are nonzero")

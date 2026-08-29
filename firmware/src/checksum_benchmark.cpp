@@ -71,6 +71,7 @@ std::uint32_t mixDigest(std::uint32_t digest, std::uint32_t checksum_value,
 
 std::uint32_t publishedDigest() { return g_published_digest; }
 
+TEENSY_DAQ_BENCHMARK_COLD_CODE(".flashmem.checksum_benchmark.prepare_vector")
 bool Runner::prepareVector(const protocol::ChecksumBenchmarkRequest &request,
                            Buffer &buffer) {
   for (std::size_t index = 0U; index < buffer.bytes.size(); ++index) {

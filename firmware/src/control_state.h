@@ -40,6 +40,13 @@ inline constexpr protocol::Configuration kPhysicalAdcConfiguration{
     static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes),
 };
 
+inline constexpr protocol::Configuration kPhysicalCombinedConfiguration{
+    capabilities::kSupportedStreamMask,
+    protocol_v1::Source::kHardware,
+    protocol_v1::kDefaultChecksumAlgorithm,
+    static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes),
+};
+
 enum class Event : std::uint8_t {
   kNone = 0U,
   kStartEpoch = 1U,
@@ -191,6 +198,9 @@ static_assert(kPhysicalGpioConfiguration.source ==
               protocol_v1::Source::kHardware);
 static_assert(kPhysicalAdcConfiguration.stream_mask == 1U);
 static_assert(kPhysicalAdcConfiguration.source ==
+              protocol_v1::Source::kHardware);
+static_assert(kPhysicalCombinedConfiguration.stream_mask == 3U);
+static_assert(kPhysicalCombinedConfiguration.source ==
               protocol_v1::Source::kHardware);
 static_assert(capabilities::kSupportedStreamMask == 3U);
 static_assert(ControlState::nextRunId(0U) == 1U);

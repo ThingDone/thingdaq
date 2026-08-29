@@ -186,6 +186,40 @@ constexpr bool isKnownSource(std::uint8_t source) {
   return source <= static_cast<std::uint8_t>(protocol_v1::Source::kSynthetic);
 }
 
+constexpr std::uint16_t configurationProfileBit(std::uint8_t source,
+                                                std::uint8_t streams) {
+  const std::uint8_t adc =
+      static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc);
+  const std::uint8_t gpio =
+      static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
+  const bool combined = streams == static_cast<std::uint8_t>(adc | gpio);
+  if (source == static_cast<std::uint8_t>(protocol_v1::Source::kHardware)) {
+    return streams == adc
+               ? static_cast<std::uint16_t>(
+                     protocol_v1::ConfigurationProfile::kHardwareAdc)
+           : streams == gpio
+               ? static_cast<std::uint16_t>(
+                     protocol_v1::ConfigurationProfile::kHardwareGpio)
+           : combined
+               ? static_cast<std::uint16_t>(
+                     protocol_v1::ConfigurationProfile::kHardwareCombined)
+               : 0U;
+  }
+  if (source == static_cast<std::uint8_t>(protocol_v1::Source::kSynthetic)) {
+    return streams == adc
+               ? static_cast<std::uint16_t>(
+                     protocol_v1::ConfigurationProfile::kSyntheticAdc)
+           : streams == gpio
+               ? static_cast<std::uint16_t>(
+                     protocol_v1::ConfigurationProfile::kSyntheticGpio)
+           : combined
+               ? static_cast<std::uint16_t>(
+                     protocol_v1::ConfigurationProfile::kSyntheticCombined)
+               : 0U;
+  }
+  return 0U;
+}
+
 constexpr bool isKnownBoard(std::uint16_t board) {
   return board <= static_cast<std::uint16_t>(protocol_v1::BoardId::kTeensy40);
 }
@@ -1084,8 +1118,134 @@ Result validateInfo(ByteView payload) {
   if (!adc_result.ok()) {
     return adc_result;
   }
-  return validateAdcTriggerMetadata(
+  const Result trigger_result = validateAdcTriggerMetadata(
       payload, protocol_v1::kInfoResponseAdcTriggerConfigurationFlagsOffset);
+  if (!trigger_result.ok()) {
+    return trigger_result;
+  }
+
+  const std::uint8_t state =
+      payload.data[protocol_v1::kInfoResponseDeviceStateOffset];
+  const std::uint8_t applied_streams =
+      payload.data[protocol_v1::kInfoResponseAppliedStreamMaskOffset];
+  const std::uint8_t applied_source =
+      payload.data[protocol_v1::kInfoResponseAppliedSourceOffset];
+  if ((applied_streams & static_cast<std::uint8_t>(~kValidStreamMask)) != 0U ||
+      !isKnownSource(applied_source) ||
+      (state == static_cast<std::uint8_t>(protocol_v1::DeviceState::kIdle) &&
+       applied_streams != 0U)) {
+    return badPayload();
+  }
+
+  std::uint16_t profile_mask = 0U;
+  const std::uint8_t supported_streams =
+      payload.data[protocol_v1::kInfoResponseSupportedStreamMaskOffset];
+  if (!loadU16(payload,
+               protocol_v1::kInfoResponseSupportedConfigurationMaskOffset,
+               profile_mask) ||
+      (profile_mask & ~protocol_v1::kKnownConfigurationProfileMask) != 0U ||
+      ((supported_streams == 0U) != (profile_mask == 0U))) {
+    return badPayload();
+  }
+  const std::uint8_t supported_sources =
+      payload.data[protocol_v1::kInfoResponseSupportedSourceMaskOffset];
+  const std::uint8_t applied_source_bit =
+      static_cast<std::uint8_t>(1U << applied_source);
+  const std::uint16_t applied_profile =
+      configurationProfileBit(applied_source, applied_streams);
+  if ((supported_sources & applied_source_bit) == 0U ||
+      (state != static_cast<std::uint8_t>(protocol_v1::DeviceState::kIdle) &&
+       ((supported_streams == 0U &&
+         (applied_streams != 0U ||
+          applied_source != static_cast<std::uint8_t>(
+                                protocol_v1::Source::kHardware))) ||
+        (supported_streams != 0U &&
+         (applied_profile == 0U ||
+          (profile_mask & applied_profile) == 0U))))) {
+    return badPayload();
+  }
+
+  const std::size_t combined_u16_offsets[] = {
+      protocol_v1::kInfoResponseDataPayloadBytesOffset,
+      protocol_v1::kInfoResponseAdcPairsPerFrameOffset,
+      protocol_v1::kInfoResponseGpioSamplesPerFrameOffset,
+      protocol_v1::kInfoResponseAdcPairsPerBufferOffset,
+      protocol_v1::kInfoResponsePacketBufferCountOffset,
+      protocol_v1::kInfoResponsePacketPrimaryCountOffset,
+      protocol_v1::kInfoResponsePacketReserveCountOffset,
+      protocol_v1::kInfoResponsePacketReadyQueueCapacityOffset,
+      protocol_v1::kInfoResponsePacketTransmitQueueCapacityOffset,
+  };
+  const std::uint16_t combined_u16_expected[] = {
+      static_cast<std::uint16_t>(protocol_v1::kDataPayloadBytes),
+      protocol_v1::kAdcPairsPerFrame,
+      protocol_v1::kGpioSamplesPerFrame,
+      protocol_v1::kAdcPairsPerBuffer,
+      protocol_v1::kPacketBufferCount,
+      protocol_v1::kPacketPrimaryCount,
+      protocol_v1::kPacketReserveCount,
+      protocol_v1::kPacketReadyQueueCapacity,
+      protocol_v1::kPacketTransmitQueueCapacity,
+  };
+  for (std::size_t index = 0U;
+       index < sizeof(combined_u16_offsets) / sizeof(combined_u16_offsets[0]);
+       ++index) {
+    if (!loadU16(payload, combined_u16_offsets[index], value16) ||
+        value16 != combined_u16_expected[index]) {
+      return badPayload();
+    }
+  }
+  if (!loadU16(payload, protocol_v1::kInfoResponseReserved8Offset, value16) ||
+      value16 != 0U) {
+    return badPayload();
+  }
+
+  const std::size_t combined_u32_offsets[] = {
+      protocol_v1::kInfoResponseFrameCoverageTicksOffset,
+      protocol_v1::kInfoResponseAdcDmaRingBytesOffset,
+      protocol_v1::kInfoResponseNominalPayloadBytesPerSecondPerStreamOffset,
+      protocol_v1::kInfoResponseNominalFramedBytesPerSecondPerStreamOffset,
+  };
+  const std::uint32_t combined_u32_expected[] = {
+      protocol_v1::kFrameCoverageTicks,
+      protocol_v1::kAdcDmaRingBytes,
+      protocol_v1::kNominalPayloadBytesPerSecondPerStream,
+      protocol_v1::kNominalFramedBytesPerSecondPerStream,
+  };
+  for (std::size_t index = 0U;
+       index < sizeof(combined_u32_offsets) / sizeof(combined_u32_offsets[0]);
+       ++index) {
+    if (!loadU32(payload, combined_u32_offsets[index], value32) ||
+        value32 != combined_u32_expected[index]) {
+      return badPayload();
+    }
+  }
+
+  if (payload.data[protocol_v1::kInfoResponseAdcDmaRingDepthOffset] !=
+          protocol_v1::kAdcDmaRingDepth ||
+      payload.data[protocol_v1::kInfoResponseAdcPairBytesOffset] !=
+          protocol_v1::kAdcPairBytes ||
+      payload.data[protocol_v1::kInfoResponseAdcDmaIrqPriorityOffset] !=
+          protocol_v1::kAdcDmaIrqPriority ||
+      payload.data[protocol_v1::kInfoResponseGpioDmaIrqPriorityOffset] !=
+          protocol_v1::kGpioDmaIrqPriority ||
+      payload.data[protocol_v1::kInfoResponseCommandQueueCapacityOffset] !=
+          protocol_v1::kCommandQueueCapacity ||
+      payload.data[protocol_v1::kInfoResponseResponseQueueCapacityOffset] !=
+          protocol_v1::kResponseQueueCapacity) {
+    return badPayload();
+  }
+  for (std::size_t index = 0U; index < 2U; ++index) {
+    if (payload.data[protocol_v1::kInfoResponseAdcEdmaChannelsOffset + index] !=
+            protocol_v1::kAdcEdmaChannels[index] ||
+        payload.data[protocol_v1::kInfoResponseAdcEdmaPrioritiesOffset + index] !=
+            protocol_v1::kAdcEdmaPriorities[index] ||
+        payload.data[protocol_v1::kInfoResponseAdcDmamuxSourcesOffset + index] !=
+            protocol_v1::kAdcDmamuxSources[index]) {
+      return badPayload();
+    }
+  }
+  return Result::success();
 }
 
 Result validateStatus(ByteView payload) {
@@ -1152,6 +1312,49 @@ Result validateStatus(ByteView payload) {
                protocol_v1::kStatusResponsePacketOwnedHighWaterOffset,
                depth) ||
       depth > protocol_v1::kGpioPacketBufferCount) {
+    return badPayload();
+  }
+  const std::size_t packet_depth_offsets[] = {
+      protocol_v1::kStatusResponseAdcPacketReadyDepthOffset,
+      protocol_v1::kStatusResponseGpioPacketReadyDepthOffset,
+      protocol_v1::kStatusResponseAdcPacketTransmitDepthOffset,
+      protocol_v1::kStatusResponseGpioPacketTransmitDepthOffset,
+      protocol_v1::kStatusResponseAdcPacketReadyHighWaterOffset,
+      protocol_v1::kStatusResponseGpioPacketReadyHighWaterOffset,
+      protocol_v1::kStatusResponseAdcPacketTransmitHighWaterOffset,
+      protocol_v1::kStatusResponseGpioPacketTransmitHighWaterOffset,
+      protocol_v1::kStatusResponsePacketReadyHighWaterOffset,
+      protocol_v1::kStatusResponsePacketTransmitHighWaterOffset,
+      protocol_v1::kStatusResponseUsbLowerPriorityQueueDepthOffset,
+  };
+  for (std::size_t index = 0U;
+       index < sizeof(packet_depth_offsets) / sizeof(packet_depth_offsets[0]);
+       ++index) {
+    if (!loadU16(payload, packet_depth_offsets[index], depth) ||
+        depth > protocol_v1::kPacketBufferCount) {
+      return badPayload();
+    }
+  }
+  if (!loadU16(payload,
+               protocol_v1::kStatusResponseUsbCommandQueueDepthOffset,
+               depth) ||
+      depth > protocol_v1::kCommandQueueCapacity ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponseUsbCommandQueueHighWaterOffset,
+               depth) ||
+      depth > protocol_v1::kCommandQueueCapacity ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponseUsbResponseQueueDepthOffset,
+               depth) ||
+      depth > protocol_v1::kResponseQueueCapacity ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponseUsbResponseQueueHighWaterOffset,
+               depth) ||
+      depth > protocol_v1::kResponseQueueCapacity ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponseUsbActiveFrameBytesSentOffset,
+               depth) ||
+      depth > protocol_v1::kDataFrameBytes) {
     return badPayload();
   }
   const Result adc_result = validateAdcMetadata(
@@ -2350,6 +2553,63 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   encodeAdcTriggerMetadata(
       bytes, protocol_v1::kInfoResponseAdcTriggerConfigurationFlagsOffset,
       response.adc.trigger);
+  payload[protocol_v1::kInfoResponseAppliedStreamMaskOffset] =
+      response.applied_configuration.stream_mask;
+  payload[protocol_v1::kInfoResponseAppliedSourceOffset] =
+      static_cast<std::uint8_t>(response.applied_configuration.source);
+  storeU16(bytes, protocol_v1::kInfoResponseSupportedConfigurationMaskOffset,
+           response.supported_configuration_mask);
+  storeU16(bytes, protocol_v1::kInfoResponseDataPayloadBytesOffset,
+           response.data_payload_bytes);
+  storeU16(bytes, protocol_v1::kInfoResponseAdcPairsPerFrameOffset,
+           response.adc_pairs_per_frame);
+  storeU16(bytes, protocol_v1::kInfoResponseGpioSamplesPerFrameOffset,
+           response.gpio_samples_per_frame);
+  storeU32(bytes, protocol_v1::kInfoResponseFrameCoverageTicksOffset,
+           response.frame_coverage_ticks);
+  payload[protocol_v1::kInfoResponseAdcDmaRingDepthOffset] =
+      response.adc_dma_ring_depth;
+  payload[protocol_v1::kInfoResponseAdcPairBytesOffset] =
+      response.adc_pair_bytes;
+  for (std::size_t index = 0U; index < 2U; ++index) {
+    payload[protocol_v1::kInfoResponseAdcEdmaChannelsOffset + index] =
+        response.adc_edma_channels[index];
+    payload[protocol_v1::kInfoResponseAdcEdmaPrioritiesOffset + index] =
+        response.adc_edma_priorities[index];
+    payload[protocol_v1::kInfoResponseAdcDmamuxSourcesOffset + index] =
+        response.adc_dmamux_sources[index];
+  }
+  payload[protocol_v1::kInfoResponseAdcDmaIrqPriorityOffset] =
+      response.adc_dma_irq_priority;
+  payload[protocol_v1::kInfoResponseGpioDmaIrqPriorityOffset] =
+      response.gpio_dma_irq_priority;
+  storeU16(bytes, protocol_v1::kInfoResponseAdcPairsPerBufferOffset,
+           response.adc_pairs_per_buffer);
+  storeU32(bytes, protocol_v1::kInfoResponseAdcDmaRingBytesOffset,
+           response.adc_dma_ring_bytes);
+  storeU16(bytes, protocol_v1::kInfoResponsePacketBufferCountOffset,
+           response.packet_buffer_count);
+  storeU16(bytes, protocol_v1::kInfoResponsePacketPrimaryCountOffset,
+           response.packet_primary_count);
+  storeU16(bytes, protocol_v1::kInfoResponsePacketReserveCountOffset,
+           response.packet_reserve_count);
+  storeU16(bytes, protocol_v1::kInfoResponsePacketReadyQueueCapacityOffset,
+           response.packet_ready_queue_capacity);
+  storeU16(bytes,
+           protocol_v1::kInfoResponsePacketTransmitQueueCapacityOffset,
+           response.packet_transmit_queue_capacity);
+  payload[protocol_v1::kInfoResponseCommandQueueCapacityOffset] =
+      response.command_queue_capacity;
+  payload[protocol_v1::kInfoResponseResponseQueueCapacityOffset] =
+      response.response_queue_capacity;
+  storeU32(
+      bytes,
+      protocol_v1::kInfoResponseNominalPayloadBytesPerSecondPerStreamOffset,
+      response.nominal_payload_bytes_per_second_per_stream);
+  storeU32(
+      bytes,
+      protocol_v1::kInfoResponseNominalFramedBytesPerSecondPerStreamOffset,
+      response.nominal_framed_bytes_per_second_per_stream);
   return encodeFrame(
       responseFields(protocol_v1::FrameKind::kInfoResponse, request, run_id),
       view(payload), output);
@@ -2499,6 +2759,111 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
   STORE_STATUS_U32(AdcPackerPipelineErrors, adc_packer_pipeline_errors);
   STORE_STATUS_U32(AdcPackerChronologyErrors,
                    adc_packer_chronology_errors);
+#define STORE_STREAM_TELEMETRY(prefix, index)                              \
+  storeU64(bytes, protocol_v1::kStatusResponse##prefix##FramesGeneratedOffset, \
+           response.streams[index].frames_generated);                     \
+  storeU64(bytes, protocol_v1::kStatusResponse##prefix##ItemsGeneratedOffset, \
+           response.streams[index].items_generated);                      \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##FramesFramedPipelineOffset, \
+           response.streams[index].frames_framed);                        \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##ItemsFramedPipelineOffset, \
+           response.streams[index].items_framed);                         \
+  storeU64(bytes, protocol_v1::kStatusResponse##prefix##ItemsEmittedOffset, \
+           response.streams[index].items_emitted);                        \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##FramesTransmittedOffset, \
+           response.streams[index].frames_transmitted);                   \
+  storeU64(                                                               \
+      bytes,                                                              \
+      protocol_v1::kStatusResponse##prefix##ItemsTransmittedPipelineOffset, \
+      response.streams[index].items_transmitted);                         \
+  storeU64(bytes, protocol_v1::kStatusResponse##prefix##FramesDroppedOffset, \
+           response.streams[index].frames_dropped);                       \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##PayloadBytesProducedOffset, \
+           response.streams[index].payload_bytes_produced);               \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##PayloadBytesFramedOffset, \
+           response.streams[index].payload_bytes_framed);                 \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##PayloadBytesEmittedOffset, \
+           response.streams[index].payload_bytes_emitted);                \
+  storeU64(                                                               \
+      bytes,                                                              \
+      protocol_v1::kStatusResponse##prefix##PayloadBytesTransmittedOffset, \
+      response.streams[index].payload_bytes_transmitted);                 \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##PayloadBytesDroppedOffset, \
+           response.streams[index].payload_bytes_dropped);                \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##FramedBytesFramedOffset, \
+           response.streams[index].framed_bytes_framed);                  \
+  storeU64(bytes,                                                         \
+           protocol_v1::kStatusResponse##prefix##FramedBytesEmittedOffset, \
+           response.streams[index].framed_bytes_emitted);                 \
+  storeU64(                                                               \
+      bytes,                                                              \
+      protocol_v1::kStatusResponse##prefix##FramedBytesTransmittedOffset, \
+      response.streams[index].framed_bytes_transmitted)
+  STORE_STREAM_TELEMETRY(Adc, 0U);
+  STORE_STREAM_TELEMETRY(Gpio, 1U);
+#undef STORE_STREAM_TELEMETRY
+  STORE_STATUS_U16(AdcPacketReadyDepth, streams[0U].packet_ready_depth);
+  STORE_STATUS_U16(GpioPacketReadyDepth, streams[1U].packet_ready_depth);
+  STORE_STATUS_U16(AdcPacketTransmitDepth,
+                   streams[0U].packet_transmit_depth);
+  STORE_STATUS_U16(GpioPacketTransmitDepth,
+                   streams[1U].packet_transmit_depth);
+  STORE_STATUS_U16(AdcPacketReadyHighWater,
+                   streams[0U].packet_ready_high_water);
+  STORE_STATUS_U16(GpioPacketReadyHighWater,
+                   streams[1U].packet_ready_high_water);
+  STORE_STATUS_U16(AdcPacketTransmitHighWater,
+                   streams[0U].packet_transmit_high_water);
+  STORE_STATUS_U16(GpioPacketTransmitHighWater,
+                   streams[1U].packet_transmit_high_water);
+  STORE_STATUS_U16(PacketReadyHighWater, packet.ready_high_water);
+  STORE_STATUS_U16(PacketTransmitHighWater, packet.transmit_high_water);
+  STORE_STATUS_U64(PacketFramesPromoted, packet.frames_promoted);
+  STORE_STATUS_U64(PacketFairnessDeferrals, packet.fairness_deferrals);
+  STORE_STATUS_U64(PacketAccountedFrameSkew, packet.accounted_frame_skew);
+  STORE_STATUS_U64(DataPayloadBytesTransmitted,
+                   packet.data_payload_bytes_transmitted);
+  STORE_STATUS_U64(DataFramedBytesTransmitted,
+                   packet.data_framed_bytes_transmitted);
+  STORE_STATUS_U32(PacketPoolExhaustions, packet.pool_exhaustions);
+  STORE_STATUS_U32(PacketInvalidOperations, packet.invalid_operations);
+  STORE_STATUS_U32(PacketEncodingRejections, packet.encoding_rejections);
+  STORE_STATUS_U32(PacketReadyQueueRejections,
+                   packet.ready_queue_rejections);
+  STORE_STATUS_U32(PacketTransmitQueueRejections,
+                   packet.transmit_queue_rejections);
+  STORE_STATUS_U32(CommandsAccepted, diagnostics.commands_accepted);
+  STORE_STATUS_U32(CommandsRejected, diagnostics.commands_rejected);
+  STORE_STATUS_U32(BadChecksums, diagnostics.bad_checksums);
+  STORE_STATUS_U32(BadLengths, diagnostics.bad_lengths);
+  STORE_STATUS_U32(BadTypes, diagnostics.bad_types);
+  STORE_STATUS_U32(BadVersions, diagnostics.bad_versions);
+  STORE_STATUS_U32(Timeouts, diagnostics.timeouts);
+  STORE_STATUS_U32(PartialUsbWrites, diagnostics.partial_usb_writes);
+  STORE_STATUS_U32(StateErrors, diagnostics.state_errors);
+  STORE_STATUS_U32(UsbShortCapacityDeferrals,
+                   usb.short_capacity_deferrals);
+  STORE_STATUS_U32(UsbRxStallEvents, usb.rx_stall_events);
+  STORE_STATUS_U32(UsbTxStallEvents, usb.tx_stall_events);
+  STORE_STATUS_U32(UsbIoErrors, usb.io_errors);
+  STORE_STATUS_U16(UsbCommandQueueDepth, usb.command_queue_depth);
+  STORE_STATUS_U16(UsbResponseQueueDepth, usb.response_queue_depth);
+  STORE_STATUS_U16(UsbLowerPriorityQueueDepth,
+                   usb.lower_priority_queue_depth);
+  STORE_STATUS_U16(UsbCommandQueueHighWater,
+                   usb.command_queue_high_water);
+  STORE_STATUS_U16(UsbResponseQueueHighWater,
+                   usb.response_queue_high_water);
+  STORE_STATUS_U16(UsbActiveFrameBytesSent,
+                   usb.active_frame_bytes_sent);
 #undef STORE_STATUS_U16
 #undef STORE_STATUS_U32
 #undef STORE_STATUS_U64

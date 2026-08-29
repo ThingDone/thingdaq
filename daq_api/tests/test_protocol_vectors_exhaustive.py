@@ -88,7 +88,7 @@ def _pack_adc_trigger_reference(payload: bytearray, base: int) -> None:
 
 
 def _info_payload() -> bytes:
-    payload = bytearray(324)
+    payload = bytearray(376)
     struct.pack_into("<BBHBBBB", payload, 0, 0, 0, 0, 1, 1, 3, 3)
     struct.pack_into(
         "<IIIIIII",
@@ -130,11 +130,29 @@ def _info_payload() -> bytes:
     struct.pack_into("<BBBBBBBBH", payload, 146, 0, 0, 14, 15, 1, 2, 7, 8, 0)
     struct.pack_into("<IIIIII", payload, 156, 150_000_000, 37_500_000, 10_000, 0, 0, 0)
     _pack_adc_trigger_reference(payload, 180)
+    struct.pack_into("<BBHHHHHI", payload, 324, 0, 0, 63, 4048, 1012, 4048, 0, 8096)
+    payload[340:350] = bytes((4, 4, 0, 1, 0, 1, 24, 88, 48, 64))
+    struct.pack_into(
+        "<HIHHHHHBBII",
+        payload,
+        350,
+        1012,
+        16256,
+        200,
+        105,
+        95,
+        200,
+        200,
+        4,
+        4,
+        4_000_000,
+        4_047_431,
+    )
     return bytes(payload)
 
 
 def _status_payload() -> bytes:
-    payload = bytearray(576)
+    payload = bytearray(976)
     struct.pack_into(
         "<BBHBBBBIQQQQIII",
         payload,
@@ -177,6 +195,52 @@ def _status_payload() -> bytes:
     struct.pack_into("<BBBBBB", payload, 194, 14, 15, 1, 2, 7, 8)
     struct.pack_into("<IIIIII", payload, 200, 150_000_000, 37_500_000, 10_000, 0, 0, 0)
     _pack_adc_trigger_reference(payload, 224)
+    struct.pack_into(
+        "<16Q",
+        payload,
+        576,
+        1,
+        1012,
+        1,
+        1012,
+        1012,
+        1,
+        1012,
+        0,
+        1,
+        4048,
+        1,
+        4048,
+        4048,
+        1,
+        4048,
+        0,
+    )
+    struct.pack_into(
+        "<16Q",
+        payload,
+        704,
+        4048,
+        4048,
+        4048,
+        4048,
+        0,
+        4096,
+        4096,
+        4096,
+        4048,
+        4048,
+        4048,
+        4048,
+        0,
+        4096,
+        4096,
+        4096,
+    )
+    struct.pack_into("<10H", payload, 832, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2)
+    struct.pack_into("<5Q", payload, 852, 2, 0, 0, 8096, 8192)
+    struct.pack_into("<18I", payload, 892, 0, 0, 0, 0, 0, 4, *([0] * 12))
+    struct.pack_into("<6H", payload, 964, 0, 0, 0, 1, 1, 0)
     return bytes(payload)
 
 

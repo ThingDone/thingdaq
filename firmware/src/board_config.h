@@ -971,6 +971,33 @@ static_assert(kGpioRawDmaRingBytes == protocol_v1::kGpioRawRingBytes);
 static_assert(kGpioPackedRingDepth * kGpioPackedBufferStrideBytes ==
               protocol_v1::kGpioPackedRingBytes);
 static_assert(kPacketBufferCount == protocol_v1::kGpioPacketBufferCount);
+static_assert(kAdcDmaRingDepth == protocol_v1::kAdcDmaRingDepth);
+static_assert(protocol_v1::kDataPayloadBytes / protocol_v1::kAdcPairBytes ==
+              protocol_v1::kAdcPairsPerBuffer);
+static_assert(kAdcDmaRingBytes == protocol_v1::kAdcDmaRingBytes);
+static_assert(kAdcConverterConfigurations[0].edma_channel ==
+              protocol_v1::kAdcEdmaChannels[0]);
+static_assert(kAdcConverterConfigurations[1].edma_channel ==
+              protocol_v1::kAdcEdmaChannels[1]);
+static_assert(kAdcEdmaPriorities[0] ==
+                  protocol_v1::kAdcEdmaPriorities[0] &&
+              kAdcEdmaPriorities[1] ==
+                  protocol_v1::kAdcEdmaPriorities[1]);
+static_assert(kAdcConverterConfigurations[0].dmamux_source ==
+              protocol_v1::kAdcDmamuxSources[0]);
+static_assert(kAdcConverterConfigurations[1].dmamux_source ==
+              protocol_v1::kAdcDmamuxSources[1]);
+static_assert(kAdcEdmaIrqPriority == protocol_v1::kAdcDmaIrqPriority);
+static_assert(kGpioEdmaIrqPriority == protocol_v1::kGpioDmaIrqPriority);
+static_assert(kPacketBufferCount == protocol_v1::kPacketBufferCount);
+static_assert(kPacketBufferPrimaryCount == protocol_v1::kPacketPrimaryCount);
+static_assert(kPacketBufferReserveCount == protocol_v1::kPacketReserveCount);
+static_assert(kPacketReadyQueueDepth ==
+              protocol_v1::kPacketReadyQueueCapacity);
+static_assert(kPacketTransmitQueueDepth ==
+              protocol_v1::kPacketTransmitQueueCapacity);
+static_assert(kCommandQueueDepth == protocol_v1::kCommandQueueCapacity);
+static_assert(kResponseQueueDepth == protocol_v1::kResponseQueueCapacity);
 static_assert(kGpioPitChannel == protocol_v1::kGpioPitChannel);
 static_assert(kGpioXbarInput == protocol_v1::kGpioXbarInput);
 static_assert(kGpioXbarOutput == protocol_v1::kGpioXbarOutput);

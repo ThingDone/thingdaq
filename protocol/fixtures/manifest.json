@@ -204,20 +204,20 @@
       "total_length": 48
     },
     {
-      "checksum": "0xd98f22bd",
+      "checksum": "0xafcd2e2c",
       "checksum_algorithm": "ADLER32",
       "file": "info-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_sha256": "d74a928f8517fa9814a3f78ffcd6f3cc07e85bd38ccf1a40d5e233a2e1b95fb5",
+      "frame_sha256": "4556fded1c8b090123265fba0062348234e18881d332b3f133f2ebea1834c91b",
       "item_count": 0,
       "kind": "INFO_RESPONSE",
-      "payload_length": 324,
-      "payload_sha256": "e19bec3e3ca1c432b156ea0274987433d5745f2ef4f0a2cd6a868a48e80c7845",
+      "payload_length": 376,
+      "payload_sha256": "cfc0d850397c57ebea62baca52539105039dd1e98558c7dd5c8b076b2b0fbb6d",
       "request_id": 1,
       "run_id": 0,
       "sequence": 0,
-      "total_length": 372
+      "total_length": 424
     },
     {
       "checksum": "0xe2080457",
@@ -254,20 +254,20 @@
       "total_length": 60
     },
     {
-      "checksum": "0x5355148c",
+      "checksum": "0xa53c2454",
       "checksum_algorithm": "ADLER32",
       "file": "get-status-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_sha256": "ddd00193d5ba470df824d5ae19bbb6a1296ba1811bf829ec51815545773c0b61",
+      "frame_sha256": "ccecef01d093703b1ebe2efc1a8291b5ecbcf8d5a16a14a850cbe2ca5d9f67ab",
       "item_count": 0,
       "kind": "GET_STATUS_RESPONSE",
-      "payload_length": 576,
-      "payload_sha256": "a400c05eb7f776caa38880dba9ba7f640a01bfc2830f9dc1bf784a643b01305a",
+      "payload_length": 976,
+      "payload_sha256": "40804a2927582fc53d9e63368325158686ef7506903553acb6d548feb8c14308",
       "request_id": 4,
       "run_id": 7,
       "sequence": 0,
-      "total_length": 624
+      "total_length": 1024
     },
     {
       "checksum": "0xd1340448",
@@ -392,5 +392,5 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 1,
   "source": "protocol/protocol-v1.json",
-  "source_sha256": "5b86098f2c189c9ef2eacb0e68f3f9b98794ec423898e2e6899254eaad8a36cd"
+  "source_sha256": "e5287a44c25cf02f838c77a9f689057b488831781695aa457ba2afbedcfe4596"
 }

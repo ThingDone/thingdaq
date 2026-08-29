@@ -295,7 +295,7 @@ version, and two reserved zero bytes.
 ### INFO
 
 INFO is idempotent and valid in IDLE, CONFIGURED, and RUNNING. Its request is
-empty. Its 324-byte success payload reports:
+empty. Its 376-byte success payload reports:
 
 - state and protocol version;
 - supported stream and source masks;
@@ -314,7 +314,11 @@ empty. Its 324-byte success payload reports:
   cycle count, and typed initialization flags/errors;
 - the exact shared PIT/XBAR/ADC_ETC trigger plan, raw/effective phase delays,
   configured-register readbacks, bounded completion counts/timing, and typed
-  trigger errors.
+  trigger errors;
+- the exact applied stream/source profile and an explicit six-bit supported-
+  profile matrix rather than an inferred stream/source cross-product; and
+- fixed ADC DMA routing/aligned ring size, frame/item coverage, packet-bank and
+  queue capacities, IRQ priorities, and nominal per-stream byte rates.
 
 | Offset | Width/type | Field |
 | ---: | --- | --- |
@@ -378,6 +382,20 @@ empty. Its 324-byte success payload reports:
 | 164 | 4 / `u32` | per-converter calibration deadline in us, 10,000 |
 | 168 | 8 / `u32[2]` | ADC0 and ADC1 calibration elapsed DWT cycles |
 | 176 | 4 / `u32` | ADC initialization error flags |
+| 324 | 1 / `u8` | applied stream mask; zero in IDLE |
+| 325 | 1 / `u8` | applied source ID |
+| 326 | 2 / `u16` | supported configuration-profile mask |
+| 328 | 6 / `u16[3]` | payload bytes, ADC pairs/frame, GPIO samples/frame |
+| 334 | 2 / `u16` | reserved, zero |
+| 336 | 4 / `u32` | common frame coverage in 8 MHz ticks |
+| 340 | 2 / `u8[2]` | ADC DMA ring depth and bytes/pair |
+| 342 | 6 / `u8[2] × 3` | ADC eDMA channels, priorities, and DMAMUX sources |
+| 348 | 2 / `u8[2]` | ADC and GPIO DMA IRQ priorities |
+| 350 | 2 / `u16` | ADC pairs per DMA buffer |
+| 352 | 4 / `u32` | aligned ADC DMA ring bytes |
+| 356 | 10 / `u16[5]` | total, primary, reserve packet counts and ready/transmit queue capacities |
+| 366 | 2 / `u8[2]` | command and response queue capacities |
+| 368 | 8 / `u32[2]` | nominal payload and framed bytes/s per enabled stream |
 
 The final 144-byte ADC trigger block starts at INFO offset 180 and at STATUS
 offset 224. The relative layout is identical in both responses:
@@ -446,6 +464,12 @@ applied configuration in CONFIGURED or RUNNING. It must be present in the
 supported checksum mask. STATUS and each ADC/GPIO frame repeat the same
 selection so a host never infers a polynomial from context.
 
+The supported configuration-profile mask is authoritative: hardware ADC = 1,
+hardware GPIO = 2, hardware combined = 4, synthetic ADC = 8, synthetic GPIO =
+16, and synthetic combined = 32. Firmware advertises mask 63. A host must test
+the exact profile bit; it must not infer that arbitrary source/stream mixes are
+valid merely because their individual source and stream bits are present.
+
 The fixed Phase 05 qualification policy selected standard Adler-32 as the
 production data default. CRC-32C and CRC-32/ISO-HDLC remain enabled in the
 supported mask for explicit negotiation, validation of retained evidence, and
@@ -480,7 +504,7 @@ eight-byte request is:
 
 | Offset | Type | Field | v1 constraint |
 | ---: | --- | --- | --- |
-| 0 | `u8` | stream mask | Nonzero subset of ADC/GPIO; hardware accepts exactly one stream |
+| 0 | `u8` | stream mask | ADC-only, GPIO-only, or both |
 | 1 | `u8` | source | Hardware (0) or synthetic (1) |
 | 2 | `u8` | data checksum | An advertised enabled algorithm ID (1, 2, or 3) |
 | 3 | `u8` | reserved | Zero |
@@ -491,12 +515,13 @@ by the exact eight-byte applied configuration. Unsupported values are rejected
 atomically; no partial configuration is applied. If prior-run frames are still
 queued, CONFIGURE returns `BUSY` and preserves the prior configuration.
 
-Physical protocol-v1 firmware accepts two deliberately narrow acquisition
-profiles: either ADC-only or GPIO-only, hardware source, any advertised
-checksum, and `data_frame_bytes = 4096`. Combined physical ADC/GPIO and
-zero-stream requests are rejected atomically before any pin, PIT, XBAR,
-ADC_ETC, DMAMUX, or eDMA register changes. Synthetic mode retains ADC-only,
-GPIO-only, and combined stream profiles.
+Protocol-v1 firmware accepts all six advertised profiles: ADC-only, GPIO-only,
+or combined from either the hardware or synthetic source, with any advertised
+checksum and `data_frame_bytes = 4096`. One configuration carries one source
+for every enabled stream, so per-stream source mixing is unrepresentable.
+Zero-stream, reserved-bit, unknown-source, wrong-size, and unadvertised-profile
+requests are rejected atomically before any pin, PIT, XBAR, ADC_ETC, DMAMUX, or
+eDMA register changes.
 
 ### START
 
@@ -513,17 +538,23 @@ Physical ADC START performs the same read-only preflight, arms packet and
 packer state, primes both generation-matched DMA channels and all cache-safe
 buffers, and enables the PIT/ADC_ETC trigger schedule last. The first retained
 pair is pair zero of the new run epoch regardless of interrupt latency.
+Combined physical START audits both engines, prepares ADC then GPIO ownership,
+and arms their one common PIT-derived schedule only after both are ready. Any
+resource or preparation failure rolls every prepared owner back before the
+control state can commit the run.
 
 ### GET_STATUS
 
 GET_STATUS is idempotent in every post-boot state and has an empty request. Its
-576-byte success payload contains the common prefix, configuration and legacy
+976-byte success payload contains the common prefix, configuration and legacy
 stream counters, physical GPIO stage counts, queue and lifecycle diagnostics,
 the immutable ADC initialization/trigger snapshot, and detailed ADC
-DMA-to-transport accounting. The header carries the current or most recent run
-ID. INFO, GET_STATUS, and STOP are dispatched before bounded physical
-pack/packet work so they remain responsive during either single-stream
-hardware mode.
+DMA-to-transport accounting. It then publishes complete per-source packet and
+byte accounting, shared pool/fairness telemetry, firmware command diagnostics,
+and USB queue/stall/error snapshots. The header carries the current or most
+recent run ID. INFO, GET_STATUS, and STOP are dispatched before bounded
+physical pack/packet work so they remain responsive during combined hardware
+acquisition.
 
 | Offset | Width/type | Field |
 | ---: | --- | --- |
@@ -614,6 +645,14 @@ hardware mode.
 | 564 | 4 / `u32` | ADC packer source/lease errors |
 | 568 | 4 / `u32` | ADC packer/packet-pipeline errors |
 | 572 | 4 / `u32` | ADC packer chronology errors |
+| 576 | 128 / `u64[16]` | ADC then GPIO frames/items generated, framed, emitted, transmitted, and dropped |
+| 704 | 128 / `u64[16]` | ADC then GPIO payload/framed bytes produced, framed, emitted, transmitted, and dropped |
+| 832 | 20 / `u16[10]` | per-source current/high-water ready/transmit depths, then shared ready/transmit high-water depths |
+| 852 | 40 / `u64[5]` | promoted frames, fairness deferrals, accounted skew, shared transmitted payload/framed bytes |
+| 892 | 20 / `u32[5]` | pool exhaustion, invalid operation, encoding, ready-queue, and transmit-queue rejections |
+| 912 | 36 / `u32[9]` | commands accepted/rejected, checksum/length/type/version errors, timeouts, partial writes, state errors |
+| 948 | 16 / `u32[4]` | USB short-capacity deferrals, RX/TX stalls, and I/O errors |
+| 964 | 12 / `u16[6]` | USB command/response/lower-priority depths, command/response high-water depths, active-frame bytes sent |
 
 | Counter | Wire type | Unit |
 | --- | --- | --- |
@@ -632,6 +671,10 @@ hardware mode.
 | GPIO queue depth/high-water fields | `u16` | Current bounded backlog and maximum ownership observed in this statistics generation |
 | `gpio_processing_cpu_basis_points` | `u16` | Cumulative DWT active/elapsed ratio for the cooperative GPIO pack/copy/checksum/framing service; 100 basis points = 1% of one 600 MHz core |
 | GPIO error/resource/lifecycle counters | `u32` | Hardware flags, invariant failures, resource conflicts, failed START/STOP operations, and rejected stale completions |
+| Per-source generated/framed/emitted/transmitted/drop counters | `u64` | Frames and logical ADC-pair/GPIO-sample items at every shared packet stage |
+| Per-source payload/framed byte counters | `u64` | Logical payload bytes and complete wire bytes at each packet/USB boundary |
+| Shared packet/fairness counters | `u64`/`u32` | Promotion, arbitration, skew, transmitted bytes, allocation, encoding, and queue rejection evidence |
+| Firmware command/USB diagnostics | `u32` | Accepted/rejected commands, parser classes, timeouts, partial writes, stalls, and I/O errors |
 
 These are firmware counters only. They saturate at their type maximum and
 reset on successful START or RESET_STATS. Host parser corruption, decoded-

@@ -19,12 +19,92 @@ _CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
 _GPIO_CLOCK_DIAGNOSTIC_REQUEST = struct.Struct("<IHH")
 _RESPONSE_PREFIX = struct.Struct("<BBH")
 _STATUS_COUNTERS = struct.Struct("<QQQQII")
+_STATUS_PIPELINE_U64_FIELDS = (
+    "adc_frames_generated",
+    "adc_items_generated",
+    "adc_frames_framed_pipeline",
+    "adc_items_framed_pipeline",
+    "adc_items_emitted",
+    "adc_frames_transmitted",
+    "adc_items_transmitted_pipeline",
+    "adc_frames_dropped",
+    "gpio_frames_generated",
+    "gpio_items_generated",
+    "gpio_frames_framed_pipeline",
+    "gpio_items_framed_pipeline",
+    "gpio_items_emitted",
+    "gpio_frames_transmitted",
+    "gpio_items_transmitted_pipeline",
+    "gpio_frames_dropped",
+    "adc_payload_bytes_produced",
+    "adc_payload_bytes_framed",
+    "adc_payload_bytes_emitted",
+    "adc_payload_bytes_transmitted",
+    "adc_payload_bytes_dropped",
+    "adc_framed_bytes_framed",
+    "adc_framed_bytes_emitted",
+    "adc_framed_bytes_transmitted",
+    "gpio_payload_bytes_produced",
+    "gpio_payload_bytes_framed",
+    "gpio_payload_bytes_emitted",
+    "gpio_payload_bytes_transmitted",
+    "gpio_payload_bytes_dropped",
+    "gpio_framed_bytes_framed",
+    "gpio_framed_bytes_emitted",
+    "gpio_framed_bytes_transmitted",
+    "packet_frames_promoted",
+    "packet_fairness_deferrals",
+    "packet_accounted_frame_skew",
+    "data_payload_bytes_transmitted",
+    "data_framed_bytes_transmitted",
+)
+_STATUS_DIAGNOSTIC_U32_FIELDS = (
+    "packet_pool_exhaustions",
+    "packet_invalid_operations",
+    "packet_encoding_rejections",
+    "packet_ready_queue_rejections",
+    "packet_transmit_queue_rejections",
+    "commands_accepted",
+    "commands_rejected",
+    "bad_checksums",
+    "bad_lengths",
+    "bad_types",
+    "bad_versions",
+    "timeouts",
+    "partial_usb_writes",
+    "state_errors",
+    "usb_short_capacity_deferrals",
+    "usb_rx_stall_events",
+    "usb_tx_stall_events",
+    "usb_io_errors",
+)
+_STATUS_QUEUE_U16_FIELDS = (
+    "adc_packet_ready_depth",
+    "gpio_packet_ready_depth",
+    "adc_packet_transmit_depth",
+    "gpio_packet_transmit_depth",
+    "adc_packet_ready_high_water",
+    "gpio_packet_ready_high_water",
+    "adc_packet_transmit_high_water",
+    "gpio_packet_transmit_high_water",
+    "packet_ready_high_water",
+    "packet_transmit_high_water",
+    "usb_command_queue_depth",
+    "usb_response_queue_depth",
+    "usb_lower_priority_queue_depth",
+    "usb_command_queue_high_water",
+    "usb_response_queue_high_water",
+    "usb_active_frame_bytes_sent",
+)
 _ResponseValue = TypeVar("_ResponseValue")
 _DEFAULT_ADC_CONFIGURATION_FLAGS = (
     constants.AdcConfigurationFlag.NO_HARDWARE_AVERAGING
     | constants.AdcConfigurationFlag.HIGH_SPEED
     | constants.AdcConfigurationFlag.SHORTEST_SAMPLE
     | constants.AdcConfigurationFlag.PRIMARY_12_BIT
+)
+_ALL_CONFIGURATION_PROFILES = constants.ConfigurationProfile(
+    constants.SUPPORTED_CONFIGURATION_MASK
 )
 
 
@@ -1161,6 +1241,39 @@ class DAQConfiguration:
             and self.source is constants.Source.HARDWARE
         )
 
+    @property
+    def profile(self) -> constants.ConfigurationProfile:
+        """Return the exact source/stream capability bit for this profile."""
+
+        if self.is_control_only:
+            return constants.ConfigurationProfile.NONE
+        profiles = {
+            (constants.Source.HARDWARE, constants.StreamMask.ADC): (
+                constants.ConfigurationProfile.HARDWARE_ADC
+            ),
+            (constants.Source.HARDWARE, constants.StreamMask.GPIO): (
+                constants.ConfigurationProfile.HARDWARE_GPIO
+            ),
+            (
+                constants.Source.HARDWARE,
+                constants.StreamMask.ADC | constants.StreamMask.GPIO,
+            ): constants.ConfigurationProfile.HARDWARE_COMBINED,
+            (constants.Source.SYNTHETIC, constants.StreamMask.ADC): (
+                constants.ConfigurationProfile.SYNTHETIC_ADC
+            ),
+            (constants.Source.SYNTHETIC, constants.StreamMask.GPIO): (
+                constants.ConfigurationProfile.SYNTHETIC_GPIO
+            ),
+            (
+                constants.Source.SYNTHETIC,
+                constants.StreamMask.ADC | constants.StreamMask.GPIO,
+            ): constants.ConfigurationProfile.SYNTHETIC_COMBINED,
+        }
+        try:
+            return profiles[(self.source, self.stream_mask)]
+        except KeyError as exc:  # pragma: no cover - constructor constrains values
+            raise ValueError("configuration has no protocol-v1 profile") from exc
+
     @classmethod
     def control_only(cls) -> DAQConfiguration:
         """Construct the exact Phase 03 zero-stream hardware configuration."""
@@ -2154,6 +2267,9 @@ class DeviceCapabilities:
     supported_source_mask: int
     supported_checksum_mask: int
     capability_bits: constants.Capability
+    supported_configuration_mask: constants.ConfigurationProfile = (
+        _ALL_CONFIGURATION_PROFILES
+    )
     protocol_version: int = constants.PROTOCOL_VERSION
     timestamp_hz: int = constants.TIMESTAMP_HZ
     data_frame_bytes: int = constants.DATA_FRAME_BYTES
@@ -2221,6 +2337,32 @@ class DeviceCapabilities:
     gpio_dmamux_source: int = constants.GPIO_DMAMUX_SOURCE
     gpio_edma_priority: int = constants.GPIO_EDMA_PRIORITY
     gpio_xbar_active_edge: int = constants.GPIO_XBAR_ACTIVE_EDGE
+    data_payload_bytes: int = constants.DATA_PAYLOAD_BYTES
+    adc_pairs_per_frame: int = constants.ADC_PAIRS_PER_FRAME
+    gpio_samples_per_frame: int = constants.GPIO_SAMPLES_PER_FRAME
+    frame_coverage_ticks: int = constants.FRAME_COVERAGE_TICKS
+    adc_dma_ring_depth: int = constants.ADC_DMA_RING_DEPTH
+    adc_pair_bytes: int = constants.ADC_PAIR_BYTES
+    adc_edma_channels: tuple[int, int] = constants.ADC_EDMA_CHANNELS
+    adc_edma_priorities: tuple[int, int] = constants.ADC_EDMA_PRIORITIES
+    adc_dmamux_sources: tuple[int, int] = constants.ADC_DMAMUX_SOURCES
+    adc_dma_irq_priority: int = constants.ADC_DMA_IRQ_PRIORITY
+    gpio_dma_irq_priority: int = constants.GPIO_DMA_IRQ_PRIORITY
+    adc_pairs_per_buffer: int = constants.ADC_PAIRS_PER_BUFFER
+    adc_dma_ring_bytes: int = constants.ADC_DMA_RING_BYTES
+    packet_buffer_count: int = constants.PACKET_BUFFER_COUNT
+    packet_primary_count: int = constants.PACKET_PRIMARY_COUNT
+    packet_reserve_count: int = constants.PACKET_RESERVE_COUNT
+    packet_ready_queue_capacity: int = constants.PACKET_READY_QUEUE_CAPACITY
+    packet_transmit_queue_capacity: int = constants.PACKET_TRANSMIT_QUEUE_CAPACITY
+    command_queue_capacity: int = constants.COMMAND_QUEUE_CAPACITY
+    response_queue_capacity: int = constants.RESPONSE_QUEUE_CAPACITY
+    nominal_payload_bytes_per_second_per_stream: int = (
+        constants.NOMINAL_PAYLOAD_BYTES_PER_SECOND_PER_STREAM
+    )
+    nominal_framed_bytes_per_second_per_stream: int = (
+        constants.NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM
+    )
 
     def __post_init__(self) -> None:
         if isinstance(self.supported_stream_mask, bool) or isinstance(
@@ -2230,10 +2372,14 @@ class DeviceCapabilities:
         try:
             stream_mask = constants.StreamMask(self.supported_stream_mask)
             capability_bits = constants.Capability(self.capability_bits)
+            configuration_mask = constants.ConfigurationProfile(
+                self.supported_configuration_mask
+            )
         except (TypeError, ValueError) as exc:
             raise ValueError("capabilities contain an unknown enum value") from exc
         object.__setattr__(self, "supported_stream_mask", stream_mask)
         object.__setattr__(self, "capability_bits", capability_bits)
+        object.__setattr__(self, "supported_configuration_mask", configuration_mask)
         try:
             diagnostic_mode = constants.GpioCaptureDiagnosticMode(
                 self.gpio_capture_diagnostic_mode
@@ -2251,6 +2397,12 @@ class DeviceCapabilities:
         object.__setattr__(self, "gpio_capture_diagnostic_flags", diagnostic_flags)
         gpio_pin_map = tuple(self.gpio_pin_map)
         object.__setattr__(self, "gpio_pin_map", gpio_pin_map)
+        adc_edma_channels = tuple(self.adc_edma_channels)
+        adc_edma_priorities = tuple(self.adc_edma_priorities)
+        adc_dmamux_sources = tuple(self.adc_dmamux_sources)
+        object.__setattr__(self, "adc_edma_channels", adc_edma_channels)
+        object.__setattr__(self, "adc_edma_priorities", adc_edma_priorities)
+        object.__setattr__(self, "adc_dmamux_sources", adc_dmamux_sources)
         _normalize_adc_metadata(self)
 
         valid_streams = int(constants.StreamMask.ADC | constants.StreamMask.GPIO)
@@ -2264,6 +2416,52 @@ class DeviceCapabilities:
             raise ValueError("supported checksum mask is incompatible with protocol v1")
         if int(capability_bits) & ~constants.KNOWN_CAPABILITY_MASK:
             raise ValueError("capability mask contains reserved protocol-v1 bits")
+        if int(configuration_mask) & ~constants.KNOWN_CONFIGURATION_PROFILE_MASK:
+            raise ValueError("configuration profile mask contains reserved bits")
+        if bool(stream_mask) != bool(configuration_mask):
+            raise ValueError(
+                "configuration profile mask disagrees with supported streams"
+            )
+        profile_contracts = (
+            (
+                constants.ConfigurationProfile.HARDWARE_ADC,
+                constants.Source.HARDWARE,
+                constants.StreamMask.ADC,
+            ),
+            (
+                constants.ConfigurationProfile.HARDWARE_GPIO,
+                constants.Source.HARDWARE,
+                constants.StreamMask.GPIO,
+            ),
+            (
+                constants.ConfigurationProfile.HARDWARE_COMBINED,
+                constants.Source.HARDWARE,
+                constants.StreamMask.ADC | constants.StreamMask.GPIO,
+            ),
+            (
+                constants.ConfigurationProfile.SYNTHETIC_ADC,
+                constants.Source.SYNTHETIC,
+                constants.StreamMask.ADC,
+            ),
+            (
+                constants.ConfigurationProfile.SYNTHETIC_GPIO,
+                constants.Source.SYNTHETIC,
+                constants.StreamMask.GPIO,
+            ),
+            (
+                constants.ConfigurationProfile.SYNTHETIC_COMBINED,
+                constants.Source.SYNTHETIC,
+                constants.StreamMask.ADC | constants.StreamMask.GPIO,
+            ),
+        )
+        for profile, source, streams in profile_contracts:
+            if configuration_mask & profile and (
+                not self.supported_source_mask & (1 << int(source))
+                or streams & ~stream_mask
+            ):
+                raise ValueError(
+                    "configuration profile mask disagrees with stream/source masks"
+                )
 
         stream_capabilities = constants.Capability.NONE
         if stream_mask & constants.StreamMask.ADC:
@@ -2323,6 +2521,37 @@ class DeviceCapabilities:
             (self.gpio_dmamux_source, constants.GPIO_DMAMUX_SOURCE),
             (self.gpio_edma_priority, constants.GPIO_EDMA_PRIORITY),
             (self.gpio_xbar_active_edge, constants.GPIO_XBAR_ACTIVE_EDGE),
+            (self.data_payload_bytes, constants.DATA_PAYLOAD_BYTES),
+            (self.adc_pairs_per_frame, constants.ADC_PAIRS_PER_FRAME),
+            (self.gpio_samples_per_frame, constants.GPIO_SAMPLES_PER_FRAME),
+            (self.frame_coverage_ticks, constants.FRAME_COVERAGE_TICKS),
+            (self.adc_dma_ring_depth, constants.ADC_DMA_RING_DEPTH),
+            (self.adc_pair_bytes, constants.ADC_PAIR_BYTES),
+            (self.adc_dma_irq_priority, constants.ADC_DMA_IRQ_PRIORITY),
+            (self.gpio_dma_irq_priority, constants.GPIO_DMA_IRQ_PRIORITY),
+            (self.adc_pairs_per_buffer, constants.ADC_PAIRS_PER_BUFFER),
+            (self.adc_dma_ring_bytes, constants.ADC_DMA_RING_BYTES),
+            (self.packet_buffer_count, constants.PACKET_BUFFER_COUNT),
+            (self.packet_primary_count, constants.PACKET_PRIMARY_COUNT),
+            (self.packet_reserve_count, constants.PACKET_RESERVE_COUNT),
+            (
+                self.packet_ready_queue_capacity,
+                constants.PACKET_READY_QUEUE_CAPACITY,
+            ),
+            (
+                self.packet_transmit_queue_capacity,
+                constants.PACKET_TRANSMIT_QUEUE_CAPACITY,
+            ),
+            (self.command_queue_capacity, constants.COMMAND_QUEUE_CAPACITY),
+            (self.response_queue_capacity, constants.RESPONSE_QUEUE_CAPACITY),
+            (
+                self.nominal_payload_bytes_per_second_per_stream,
+                constants.NOMINAL_PAYLOAD_BYTES_PER_SECOND_PER_STREAM,
+            ),
+            (
+                self.nominal_framed_bytes_per_second_per_stream,
+                constants.NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM,
+            ),
         )
         if any(
             not isinstance(actual, int)
@@ -2333,6 +2562,12 @@ class DeviceCapabilities:
             raise ValueError("INFO capabilities are incompatible with protocol v1")
         if gpio_pin_map != constants.GPIO_PINS_BY_BIT:
             raise ValueError("GPIO bit order must remain D6 through D13")
+        if (
+            adc_edma_channels != constants.ADC_EDMA_CHANNELS
+            or adc_edma_priorities != constants.ADC_EDMA_PRIORITIES
+            or adc_dmamux_sources != constants.ADC_DMAMUX_SOURCES
+        ):
+            raise ValueError("ADC DMA route metadata is incompatible with protocol v1")
 
     @property
     def adc_calibration(self) -> AdcCalibrationMetadata:
@@ -2371,6 +2606,18 @@ class DeviceCapabilities:
         except (TypeError, ValueError) as exc:
             raise ValueError("checksum is not a protocol-v1 algorithm") from exc
         return bool(self.supported_checksum_mask & (1 << int(selected)))
+
+    def supports_configuration(self, configuration: DAQConfiguration) -> bool:
+        """Return whether the exact source/stream profile is advertised."""
+
+        if not isinstance(configuration, DAQConfiguration):
+            raise TypeError("configuration must be a DAQConfiguration")
+        if configuration.is_control_only:
+            return (
+                self.supported_stream_mask is constants.StreamMask.NONE
+                and self.supports_source(constants.Source.HARDWARE)
+            )
+        return bool(self.supported_configuration_mask & configuration.profile)
 
     @property
     def supported_checksum_algorithms(
@@ -2411,6 +2658,11 @@ class DeviceInfo:
     )
     supported_source_mask: int = 0x03
     supported_checksum_mask: int = constants.SUPPORTED_CHECKSUM_MASK
+    supported_configuration_mask: constants.ConfigurationProfile = (
+        _ALL_CONFIGURATION_PROFILES
+    )
+    applied_stream_mask: constants.StreamMask = constants.StreamMask.NONE
+    applied_source: constants.Source = constants.Source.HARDWARE
     data_checksum_algorithm: constants.ChecksumAlgorithm = (
         constants.DEFAULT_CHECKSUM_ALGORITHM
     )
@@ -2487,6 +2739,32 @@ class DeviceInfo:
     gpio_dmamux_source: int = constants.GPIO_DMAMUX_SOURCE
     gpio_edma_priority: int = constants.GPIO_EDMA_PRIORITY
     gpio_xbar_active_edge: int = constants.GPIO_XBAR_ACTIVE_EDGE
+    data_payload_bytes: int = constants.DATA_PAYLOAD_BYTES
+    adc_pairs_per_frame: int = constants.ADC_PAIRS_PER_FRAME
+    gpio_samples_per_frame: int = constants.GPIO_SAMPLES_PER_FRAME
+    frame_coverage_ticks: int = constants.FRAME_COVERAGE_TICKS
+    adc_dma_ring_depth: int = constants.ADC_DMA_RING_DEPTH
+    adc_pair_bytes: int = constants.ADC_PAIR_BYTES
+    adc_edma_channels: tuple[int, int] = constants.ADC_EDMA_CHANNELS
+    adc_edma_priorities: tuple[int, int] = constants.ADC_EDMA_PRIORITIES
+    adc_dmamux_sources: tuple[int, int] = constants.ADC_DMAMUX_SOURCES
+    adc_dma_irq_priority: int = constants.ADC_DMA_IRQ_PRIORITY
+    gpio_dma_irq_priority: int = constants.GPIO_DMA_IRQ_PRIORITY
+    adc_pairs_per_buffer: int = constants.ADC_PAIRS_PER_BUFFER
+    adc_dma_ring_bytes: int = constants.ADC_DMA_RING_BYTES
+    packet_buffer_count: int = constants.PACKET_BUFFER_COUNT
+    packet_primary_count: int = constants.PACKET_PRIMARY_COUNT
+    packet_reserve_count: int = constants.PACKET_RESERVE_COUNT
+    packet_ready_queue_capacity: int = constants.PACKET_READY_QUEUE_CAPACITY
+    packet_transmit_queue_capacity: int = constants.PACKET_TRANSMIT_QUEUE_CAPACITY
+    command_queue_capacity: int = constants.COMMAND_QUEUE_CAPACITY
+    response_queue_capacity: int = constants.RESPONSE_QUEUE_CAPACITY
+    nominal_payload_bytes_per_second_per_stream: int = (
+        constants.NOMINAL_PAYLOAD_BYTES_PER_SECOND_PER_STREAM
+    )
+    nominal_framed_bytes_per_second_per_stream: int = (
+        constants.NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(self.device_state, constants.DeviceState):
@@ -2547,6 +2825,44 @@ class DeviceInfo:
             "gpio_capture_diagnostic_flags",
             capabilities.gpio_capture_diagnostic_flags,
         )
+        object.__setattr__(
+            self,
+            "supported_configuration_mask",
+            capabilities.supported_configuration_mask,
+        )
+        if isinstance(self.applied_stream_mask, bool) or isinstance(
+            self.applied_source, bool
+        ):
+            raise TypeError("INFO applied configuration contains an unknown enum")
+        try:
+            applied_streams = constants.StreamMask(self.applied_stream_mask)
+            applied_source = constants.Source(self.applied_source)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "INFO applied configuration contains an unknown enum"
+            ) from exc
+        object.__setattr__(self, "applied_stream_mask", applied_streams)
+        object.__setattr__(self, "applied_source", applied_source)
+        if not capabilities.supports_source(applied_source):
+            raise ValueError("INFO applied source is not advertised")
+        if self.device_state is constants.DeviceState.IDLE:
+            if applied_streams:
+                raise ValueError("IDLE INFO requires an empty applied stream mask")
+        elif applied_streams:
+            applied = DAQConfiguration(
+                stream_mask=applied_streams,
+                source=applied_source,
+                data_checksum_algorithm=data_checksum,
+            )
+            if not capabilities.supports_configuration(applied):
+                raise ValueError("INFO applied configuration is not advertised")
+        elif not (
+            capabilities.supported_stream_mask is constants.StreamMask.NONE
+            and applied_source is constants.Source.HARDWARE
+        ):
+            raise ValueError(
+                "zero-stream CONFIGURED/RUNNING INFO requires a control-only device"
+            )
 
     @property
     def capabilities(self) -> DeviceCapabilities:
@@ -2557,6 +2873,7 @@ class DeviceInfo:
             supported_source_mask=self.supported_source_mask,
             supported_checksum_mask=self.supported_checksum_mask,
             capability_bits=self.capability_bits,
+            supported_configuration_mask=self.supported_configuration_mask,
             protocol_version=self.protocol_version,
             timestamp_hz=self.timestamp_hz,
             data_frame_bytes=self.data_frame_bytes,
@@ -2607,6 +2924,44 @@ class DeviceInfo:
             gpio_dmamux_source=self.gpio_dmamux_source,
             gpio_edma_priority=self.gpio_edma_priority,
             gpio_xbar_active_edge=self.gpio_xbar_active_edge,
+            data_payload_bytes=self.data_payload_bytes,
+            adc_pairs_per_frame=self.adc_pairs_per_frame,
+            gpio_samples_per_frame=self.gpio_samples_per_frame,
+            frame_coverage_ticks=self.frame_coverage_ticks,
+            adc_dma_ring_depth=self.adc_dma_ring_depth,
+            adc_pair_bytes=self.adc_pair_bytes,
+            adc_edma_channels=self.adc_edma_channels,
+            adc_edma_priorities=self.adc_edma_priorities,
+            adc_dmamux_sources=self.adc_dmamux_sources,
+            adc_dma_irq_priority=self.adc_dma_irq_priority,
+            gpio_dma_irq_priority=self.gpio_dma_irq_priority,
+            adc_pairs_per_buffer=self.adc_pairs_per_buffer,
+            adc_dma_ring_bytes=self.adc_dma_ring_bytes,
+            packet_buffer_count=self.packet_buffer_count,
+            packet_primary_count=self.packet_primary_count,
+            packet_reserve_count=self.packet_reserve_count,
+            packet_ready_queue_capacity=self.packet_ready_queue_capacity,
+            packet_transmit_queue_capacity=self.packet_transmit_queue_capacity,
+            command_queue_capacity=self.command_queue_capacity,
+            response_queue_capacity=self.response_queue_capacity,
+            nominal_payload_bytes_per_second_per_stream=(
+                self.nominal_payload_bytes_per_second_per_stream
+            ),
+            nominal_framed_bytes_per_second_per_stream=(
+                self.nominal_framed_bytes_per_second_per_stream
+            ),
+        )
+
+    @property
+    def applied_configuration(self) -> DAQConfiguration | None:
+        """Return the exact applied profile, or ``None`` while IDLE."""
+
+        if self.device_state is constants.DeviceState.IDLE:
+            return None
+        return DAQConfiguration(
+            stream_mask=self.applied_stream_mask,
+            source=self.applied_source,
+            data_checksum_algorithm=self.data_checksum_algorithm,
         )
 
     @property
@@ -2746,6 +3101,61 @@ class DeviceInfo:
             )
         )
         _pack_adc_metadata(payload, self, "INFO_RESPONSE")
+        payload[constants.INFO_RESPONSE_APPLIED_STREAM_MASK_OFFSET] = int(
+            self.applied_stream_mask
+        )
+        payload[constants.INFO_RESPONSE_APPLIED_SOURCE_OFFSET] = int(
+            self.applied_source
+        )
+        struct.pack_into(
+            "<HHHHHI",
+            payload,
+            constants.INFO_RESPONSE_SUPPORTED_CONFIGURATION_MASK_OFFSET,
+            int(self.supported_configuration_mask),
+            self.data_payload_bytes,
+            self.adc_pairs_per_frame,
+            self.gpio_samples_per_frame,
+            0,
+            self.frame_coverage_ticks,
+        )
+        payload[constants.INFO_RESPONSE_ADC_DMA_RING_DEPTH_OFFSET] = (
+            self.adc_dma_ring_depth
+        )
+        payload[constants.INFO_RESPONSE_ADC_PAIR_BYTES_OFFSET] = self.adc_pair_bytes
+        for offset, values in (
+            (constants.INFO_RESPONSE_ADC_EDMA_CHANNELS_OFFSET, self.adc_edma_channels),
+            (
+                constants.INFO_RESPONSE_ADC_EDMA_PRIORITIES_OFFSET,
+                self.adc_edma_priorities,
+            ),
+            (
+                constants.INFO_RESPONSE_ADC_DMAMUX_SOURCES_OFFSET,
+                self.adc_dmamux_sources,
+            ),
+        ):
+            payload[offset : offset + 2] = bytes(values)
+        payload[constants.INFO_RESPONSE_ADC_DMA_IRQ_PRIORITY_OFFSET] = (
+            self.adc_dma_irq_priority
+        )
+        payload[constants.INFO_RESPONSE_GPIO_DMA_IRQ_PRIORITY_OFFSET] = (
+            self.gpio_dma_irq_priority
+        )
+        struct.pack_into(
+            "<HIHHHHHBBII",
+            payload,
+            constants.INFO_RESPONSE_ADC_PAIRS_PER_BUFFER_OFFSET,
+            self.adc_pairs_per_buffer,
+            self.adc_dma_ring_bytes,
+            self.packet_buffer_count,
+            self.packet_primary_count,
+            self.packet_reserve_count,
+            self.packet_ready_queue_capacity,
+            self.packet_transmit_queue_capacity,
+            self.command_queue_capacity,
+            self.response_queue_capacity,
+            self.nominal_payload_bytes_per_second_per_stream,
+            self.nominal_framed_bytes_per_second_per_stream,
+        )
         return bytes(payload)
 
     @classmethod
@@ -2804,6 +3214,19 @@ class DeviceInfo:
                     "<I",
                     payload_bytes,
                     constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET,
+                )[0]
+            ),
+            applied_stream_mask=constants.StreamMask(
+                payload_bytes[constants.INFO_RESPONSE_APPLIED_STREAM_MASK_OFFSET]
+            ),
+            applied_source=constants.Source(
+                payload_bytes[constants.INFO_RESPONSE_APPLIED_SOURCE_OFFSET]
+            ),
+            supported_configuration_mask=constants.ConfigurationProfile(
+                struct.unpack_from(
+                    "<H",
+                    payload_bytes,
+                    constants.INFO_RESPONSE_SUPPORTED_CONFIGURATION_MASK_OFFSET,
                 )[0]
             ),
             protocol_version=payload_bytes[
@@ -2907,6 +3330,83 @@ class DeviceInfo:
             gpio_xbar_active_edge=payload_bytes[
                 constants.INFO_RESPONSE_GPIO_XBAR_ACTIVE_EDGE_OFFSET
             ],
+            data_payload_bytes=struct.unpack_from(
+                "<H", payload_bytes, constants.INFO_RESPONSE_DATA_PAYLOAD_BYTES_OFFSET
+            )[0],
+            adc_pairs_per_frame=struct.unpack_from(
+                "<H", payload_bytes, constants.INFO_RESPONSE_ADC_PAIRS_PER_FRAME_OFFSET
+            )[0],
+            gpio_samples_per_frame=struct.unpack_from(
+                "<H",
+                payload_bytes,
+                constants.INFO_RESPONSE_GPIO_SAMPLES_PER_FRAME_OFFSET,
+            )[0],
+            frame_coverage_ticks=struct.unpack_from(
+                "<I", payload_bytes, constants.INFO_RESPONSE_FRAME_COVERAGE_TICKS_OFFSET
+            )[0],
+            adc_dma_ring_depth=payload_bytes[
+                constants.INFO_RESPONSE_ADC_DMA_RING_DEPTH_OFFSET
+            ],
+            adc_pair_bytes=payload_bytes[constants.INFO_RESPONSE_ADC_PAIR_BYTES_OFFSET],
+            adc_edma_channels=(
+                payload_bytes[constants.INFO_RESPONSE_ADC_EDMA_CHANNELS_OFFSET],
+                payload_bytes[constants.INFO_RESPONSE_ADC_EDMA_CHANNELS_OFFSET + 1],
+            ),
+            adc_edma_priorities=(
+                payload_bytes[constants.INFO_RESPONSE_ADC_EDMA_PRIORITIES_OFFSET],
+                payload_bytes[constants.INFO_RESPONSE_ADC_EDMA_PRIORITIES_OFFSET + 1],
+            ),
+            adc_dmamux_sources=(
+                payload_bytes[constants.INFO_RESPONSE_ADC_DMAMUX_SOURCES_OFFSET],
+                payload_bytes[constants.INFO_RESPONSE_ADC_DMAMUX_SOURCES_OFFSET + 1],
+            ),
+            adc_dma_irq_priority=payload_bytes[
+                constants.INFO_RESPONSE_ADC_DMA_IRQ_PRIORITY_OFFSET
+            ],
+            gpio_dma_irq_priority=payload_bytes[
+                constants.INFO_RESPONSE_GPIO_DMA_IRQ_PRIORITY_OFFSET
+            ],
+            adc_pairs_per_buffer=struct.unpack_from(
+                "<H", payload_bytes, constants.INFO_RESPONSE_ADC_PAIRS_PER_BUFFER_OFFSET
+            )[0],
+            adc_dma_ring_bytes=struct.unpack_from(
+                "<I", payload_bytes, constants.INFO_RESPONSE_ADC_DMA_RING_BYTES_OFFSET
+            )[0],
+            packet_buffer_count=struct.unpack_from(
+                "<H", payload_bytes, constants.INFO_RESPONSE_PACKET_BUFFER_COUNT_OFFSET
+            )[0],
+            packet_primary_count=struct.unpack_from(
+                "<H", payload_bytes, constants.INFO_RESPONSE_PACKET_PRIMARY_COUNT_OFFSET
+            )[0],
+            packet_reserve_count=struct.unpack_from(
+                "<H", payload_bytes, constants.INFO_RESPONSE_PACKET_RESERVE_COUNT_OFFSET
+            )[0],
+            packet_ready_queue_capacity=struct.unpack_from(
+                "<H",
+                payload_bytes,
+                constants.INFO_RESPONSE_PACKET_READY_QUEUE_CAPACITY_OFFSET,
+            )[0],
+            packet_transmit_queue_capacity=struct.unpack_from(
+                "<H",
+                payload_bytes,
+                constants.INFO_RESPONSE_PACKET_TRANSMIT_QUEUE_CAPACITY_OFFSET,
+            )[0],
+            command_queue_capacity=payload_bytes[
+                constants.INFO_RESPONSE_COMMAND_QUEUE_CAPACITY_OFFSET
+            ],
+            response_queue_capacity=payload_bytes[
+                constants.INFO_RESPONSE_RESPONSE_QUEUE_CAPACITY_OFFSET
+            ],
+            nominal_payload_bytes_per_second_per_stream=struct.unpack_from(
+                "<I",
+                payload_bytes,
+                constants.INFO_RESPONSE_NOMINAL_PAYLOAD_BYTES_PER_SECOND_PER_STREAM_OFFSET,
+            )[0],
+            nominal_framed_bytes_per_second_per_stream=struct.unpack_from(
+                "<I",
+                payload_bytes,
+                constants.INFO_RESPONSE_NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM_OFFSET,
+            )[0],
             **_unpack_adc_metadata(payload_bytes, "INFO_RESPONSE"),
         )
 
@@ -2931,6 +3431,77 @@ class Status:
     parser_errors: int = 0
     transport_errors: int = 0
     stats_generation: int = 1
+    adc_frames_generated: int = 0
+    adc_items_generated: int = 0
+    adc_frames_framed_pipeline: int = 0
+    adc_items_framed_pipeline: int = 0
+    adc_items_emitted: int = 0
+    adc_frames_transmitted: int = 0
+    adc_items_transmitted_pipeline: int = 0
+    adc_frames_dropped: int = 0
+    gpio_frames_generated: int = 0
+    gpio_items_generated: int = 0
+    gpio_frames_framed_pipeline: int = 0
+    gpio_items_framed_pipeline: int = 0
+    gpio_items_emitted: int = 0
+    gpio_frames_transmitted: int = 0
+    gpio_items_transmitted_pipeline: int = 0
+    gpio_frames_dropped: int = 0
+    adc_payload_bytes_produced: int = 0
+    adc_payload_bytes_framed: int = 0
+    adc_payload_bytes_emitted: int = 0
+    adc_payload_bytes_transmitted: int = 0
+    adc_payload_bytes_dropped: int = 0
+    adc_framed_bytes_framed: int = 0
+    adc_framed_bytes_emitted: int = 0
+    adc_framed_bytes_transmitted: int = 0
+    gpio_payload_bytes_produced: int = 0
+    gpio_payload_bytes_framed: int = 0
+    gpio_payload_bytes_emitted: int = 0
+    gpio_payload_bytes_transmitted: int = 0
+    gpio_payload_bytes_dropped: int = 0
+    gpio_framed_bytes_framed: int = 0
+    gpio_framed_bytes_emitted: int = 0
+    gpio_framed_bytes_transmitted: int = 0
+    adc_packet_ready_depth: int = 0
+    gpio_packet_ready_depth: int = 0
+    adc_packet_transmit_depth: int = 0
+    gpio_packet_transmit_depth: int = 0
+    adc_packet_ready_high_water: int = 0
+    gpio_packet_ready_high_water: int = 0
+    adc_packet_transmit_high_water: int = 0
+    gpio_packet_transmit_high_water: int = 0
+    packet_ready_high_water: int = 0
+    packet_transmit_high_water: int = 0
+    packet_frames_promoted: int = 0
+    packet_fairness_deferrals: int = 0
+    packet_accounted_frame_skew: int = 0
+    data_payload_bytes_transmitted: int = 0
+    data_framed_bytes_transmitted: int = 0
+    packet_pool_exhaustions: int = 0
+    packet_invalid_operations: int = 0
+    packet_encoding_rejections: int = 0
+    packet_ready_queue_rejections: int = 0
+    packet_transmit_queue_rejections: int = 0
+    commands_accepted: int = 0
+    commands_rejected: int = 0
+    bad_checksums: int = 0
+    bad_lengths: int = 0
+    bad_types: int = 0
+    bad_versions: int = 0
+    timeouts: int = 0
+    partial_usb_writes: int = 0
+    state_errors: int = 0
+    usb_short_capacity_deferrals: int = 0
+    usb_rx_stall_events: int = 0
+    usb_tx_stall_events: int = 0
+    usb_io_errors: int = 0
+    usb_command_queue_depth: int = 0
+    usb_response_queue_depth: int = 0
+    usb_lower_priority_queue_depth: int = 0
+    usb_command_queue_high_water: int = 0
+    usb_response_queue_high_water: int = 0
+    usb_active_frame_bytes_sent: int = 0
     gpio_samples_captured: int = 0
     gpio_samples_packed: int = 0
     gpio_samples_framed: int = 0
@@ -3120,6 +3691,38 @@ class Status:
             _unsigned(name, getattr(self, name), 16)
             if getattr(self, name) > maximum:
                 raise ValueError(f"{name} exceeds its advertised ring capacity")
+        for name in _STATUS_PIPELINE_U64_FIELDS:
+            _unsigned(name, getattr(self, name), 64)
+        for name in _STATUS_DIAGNOSTIC_U32_FIELDS:
+            _unsigned(name, getattr(self, name), 32)
+        extended_depth_limits = {
+            "adc_packet_ready_depth": constants.PACKET_READY_QUEUE_CAPACITY,
+            "gpio_packet_ready_depth": constants.PACKET_READY_QUEUE_CAPACITY,
+            "adc_packet_transmit_depth": constants.PACKET_TRANSMIT_QUEUE_CAPACITY,
+            "gpio_packet_transmit_depth": constants.PACKET_TRANSMIT_QUEUE_CAPACITY,
+            "adc_packet_ready_high_water": constants.PACKET_READY_QUEUE_CAPACITY,
+            "gpio_packet_ready_high_water": constants.PACKET_READY_QUEUE_CAPACITY,
+            "adc_packet_transmit_high_water": (
+                constants.PACKET_TRANSMIT_QUEUE_CAPACITY
+            ),
+            "gpio_packet_transmit_high_water": (
+                constants.PACKET_TRANSMIT_QUEUE_CAPACITY
+            ),
+            "packet_ready_high_water": constants.PACKET_READY_QUEUE_CAPACITY,
+            "packet_transmit_high_water": constants.PACKET_TRANSMIT_QUEUE_CAPACITY,
+            "usb_command_queue_depth": constants.COMMAND_QUEUE_CAPACITY,
+            "usb_response_queue_depth": constants.RESPONSE_QUEUE_CAPACITY,
+            "usb_lower_priority_queue_depth": (
+                constants.PACKET_TRANSMIT_QUEUE_CAPACITY
+            ),
+            "usb_command_queue_high_water": constants.COMMAND_QUEUE_CAPACITY,
+            "usb_response_queue_high_water": constants.RESPONSE_QUEUE_CAPACITY,
+            "usb_active_frame_bytes_sent": constants.DATA_FRAME_BYTES,
+        }
+        for name in _STATUS_QUEUE_U16_FIELDS:
+            _unsigned(name, getattr(self, name), 16)
+            if getattr(self, name) > extended_depth_limits[name]:
+                raise ValueError(f"{name} exceeds its advertised capacity")
         _unsigned(
             "gpio_processing_cpu_basis_points",
             self.gpio_processing_cpu_basis_points,
@@ -3223,6 +3826,13 @@ class Status:
             adc_packer_source_errors=self.adc_packer_source_errors,
             adc_packer_pipeline_errors=self.adc_packer_pipeline_errors,
             adc_packer_chronology_errors=self.adc_packer_chronology_errors,
+            **{
+                name: getattr(self, name)
+                for name in (
+                    *_STATUS_PIPELINE_U64_FIELDS,
+                    *_STATUS_DIAGNOSTIC_U32_FIELDS,
+                )
+            },
         )
 
     @property
@@ -3313,6 +3923,27 @@ class Status:
         )
         _pack_adc_metadata(payload, self, "STATUS_RESPONSE")
         _pack_adc_acquisition_status(payload, self)
+        for name in _STATUS_PIPELINE_U64_FIELDS:
+            struct.pack_into(
+                "<Q",
+                payload,
+                getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
+                getattr(self, name),
+            )
+        for name in _STATUS_DIAGNOSTIC_U32_FIELDS:
+            struct.pack_into(
+                "<I",
+                payload,
+                getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
+                getattr(self, name),
+            )
+        for name in _STATUS_QUEUE_U16_FIELDS:
+            struct.pack_into(
+                "<H",
+                payload,
+                getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
+                getattr(self, name),
+            )
         return bytes(payload)
 
     @classmethod
@@ -3339,6 +3970,25 @@ class Status:
             payload_bytes,
             constants.STATUS_RESPONSE_GPIO_HARDWARE_ERRORS_OFFSET,
         )
+        extended: dict[str, int] = {}
+        for name in _STATUS_PIPELINE_U64_FIELDS:
+            extended[name] = struct.unpack_from(
+                "<Q",
+                payload_bytes,
+                getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
+            )[0]
+        for name in _STATUS_DIAGNOSTIC_U32_FIELDS:
+            extended[name] = struct.unpack_from(
+                "<I",
+                payload_bytes,
+                getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
+            )[0]
+        for name in _STATUS_QUEUE_U16_FIELDS:
+            extended[name] = struct.unpack_from(
+                "<H",
+                payload_bytes,
+                getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
+            )[0]
         return cls(
             device_state=constants.DeviceState(
                 payload_bytes[constants.STATUS_RESPONSE_DEVICE_STATE_OFFSET]
@@ -3397,6 +4047,7 @@ class Status:
             gpio_start_errors=errors[6],
             gpio_stop_errors=errors[7],
             gpio_stale_dma_completions=errors[8],
+            **extended,  # type: ignore[arg-type]
             **_unpack_adc_metadata(payload_bytes, "STATUS_RESPONSE"),
             **_unpack_adc_acquisition_status(payload_bytes),
         )
@@ -3413,6 +4064,61 @@ class FirmwareCounters:
     parser_errors: int = 0
     transport_errors: int = 0
     stats_generation: int = 1
+    adc_frames_generated: int = 0
+    adc_items_generated: int = 0
+    adc_frames_framed_pipeline: int = 0
+    adc_items_framed_pipeline: int = 0
+    adc_items_emitted: int = 0
+    adc_frames_transmitted: int = 0
+    adc_items_transmitted_pipeline: int = 0
+    adc_frames_dropped: int = 0
+    gpio_frames_generated: int = 0
+    gpio_items_generated: int = 0
+    gpio_frames_framed_pipeline: int = 0
+    gpio_items_framed_pipeline: int = 0
+    gpio_items_emitted: int = 0
+    gpio_frames_transmitted: int = 0
+    gpio_items_transmitted_pipeline: int = 0
+    gpio_frames_dropped: int = 0
+    adc_payload_bytes_produced: int = 0
+    adc_payload_bytes_framed: int = 0
+    adc_payload_bytes_emitted: int = 0
+    adc_payload_bytes_transmitted: int = 0
+    adc_payload_bytes_dropped: int = 0
+    adc_framed_bytes_framed: int = 0
+    adc_framed_bytes_emitted: int = 0
+    adc_framed_bytes_transmitted: int = 0
+    gpio_payload_bytes_produced: int = 0
+    gpio_payload_bytes_framed: int = 0
+    gpio_payload_bytes_emitted: int = 0
+    gpio_payload_bytes_transmitted: int = 0
+    gpio_payload_bytes_dropped: int = 0
+    gpio_framed_bytes_framed: int = 0
+    gpio_framed_bytes_emitted: int = 0
+    gpio_framed_bytes_transmitted: int = 0
+    packet_frames_promoted: int = 0
+    packet_fairness_deferrals: int = 0
+    packet_accounted_frame_skew: int = 0
+    data_payload_bytes_transmitted: int = 0
+    data_framed_bytes_transmitted: int = 0
+    packet_pool_exhaustions: int = 0
+    packet_invalid_operations: int = 0
+    packet_encoding_rejections: int = 0
+    packet_ready_queue_rejections: int = 0
+    packet_transmit_queue_rejections: int = 0
+    commands_accepted: int = 0
+    commands_rejected: int = 0
+    bad_checksums: int = 0
+    bad_lengths: int = 0
+    bad_types: int = 0
+    bad_versions: int = 0
+    timeouts: int = 0
+    partial_usb_writes: int = 0
+    state_errors: int = 0
+    usb_short_capacity_deferrals: int = 0
+    usb_rx_stall_events: int = 0
+    usb_tx_stall_events: int = 0
+    usb_io_errors: int = 0
     gpio_samples_captured: int = 0
     gpio_samples_packed: int = 0
     gpio_samples_framed: int = 0
@@ -3497,6 +4203,10 @@ class FirmwareCounters:
             "gpio_stale_dma_completions",
         ):
             _unsigned(name, getattr(self, name), 32)
+        for name in _STATUS_PIPELINE_U64_FIELDS:
+            _unsigned(name, getattr(self, name), 64)
+        for name in _STATUS_DIAGNOSTIC_U32_FIELDS:
+            _unsigned(name, getattr(self, name), 32)
         _unsigned(
             "gpio_processing_cpu_basis_points",
             self.gpio_processing_cpu_basis_points,
@@ -3523,7 +4233,18 @@ class FirmwareCounters:
 
     @property
     def has_loss(self) -> bool:
-        return self.items_dropped > 0 or self.adc_acquisition.has_loss
+        return bool(
+            self.items_dropped
+            or self.adc_frames_dropped
+            or self.gpio_frames_dropped
+            or self.adc_payload_bytes_dropped
+            or self.gpio_payload_bytes_dropped
+            or self.packet_pool_exhaustions
+            or self.packet_encoding_rejections
+            or self.packet_ready_queue_rejections
+            or self.packet_transmit_queue_rejections
+            or self.adc_acquisition.has_loss
+        )
 
 
 @dataclass(frozen=True, slots=True)

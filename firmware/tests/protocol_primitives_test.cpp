@@ -395,6 +395,46 @@ void testGoldenEncode(const std::string &fixture_directory,
   status.gpio_frames_emitted = 1U;
   status.stats_generation = 2U;
   status.gpio_processing_cpu_basis_points = 1234U;
+  status.streams[0].frames_generated = 1U;
+  status.streams[0].items_generated = 1012U;
+  status.streams[0].frames_framed = 1U;
+  status.streams[0].items_framed = 1012U;
+  status.streams[0].items_emitted = 1012U;
+  status.streams[0].frames_transmitted = 1U;
+  status.streams[0].items_transmitted = 1012U;
+  status.streams[0].payload_bytes_produced = 4048U;
+  status.streams[0].payload_bytes_framed = 4048U;
+  status.streams[0].payload_bytes_emitted = 4048U;
+  status.streams[0].payload_bytes_transmitted = 4048U;
+  status.streams[0].framed_bytes_framed = 4096U;
+  status.streams[0].framed_bytes_emitted = 4096U;
+  status.streams[0].framed_bytes_transmitted = 4096U;
+  status.streams[0].packet_ready_high_water = 1U;
+  status.streams[0].packet_transmit_high_water = 1U;
+  status.streams[1].frames_generated = 1U;
+  status.streams[1].items_generated = 4048U;
+  status.streams[1].frames_framed = 1U;
+  status.streams[1].items_framed = 4048U;
+  status.streams[1].items_emitted = 4048U;
+  status.streams[1].frames_transmitted = 1U;
+  status.streams[1].items_transmitted = 4048U;
+  status.streams[1].payload_bytes_produced = 4048U;
+  status.streams[1].payload_bytes_framed = 4048U;
+  status.streams[1].payload_bytes_emitted = 4048U;
+  status.streams[1].payload_bytes_transmitted = 4048U;
+  status.streams[1].framed_bytes_framed = 4096U;
+  status.streams[1].framed_bytes_emitted = 4096U;
+  status.streams[1].framed_bytes_transmitted = 4096U;
+  status.streams[1].packet_ready_high_water = 1U;
+  status.streams[1].packet_transmit_high_water = 1U;
+  status.packet.ready_high_water = 2U;
+  status.packet.transmit_high_water = 2U;
+  status.packet.frames_promoted = 2U;
+  status.packet.data_payload_bytes_transmitted = 8096U;
+  status.packet.data_framed_bytes_transmitted = 8192U;
+  status.diagnostics.commands_accepted = 4U;
+  status.usb.command_queue_high_water = 1U;
+  status.usb.response_queue_high_water = 1U;
   expect(wire::encodeStatusResponse(
              request(constants::CommandKind::kGetStatus, 4U), 7U, status,
              response)
