@@ -187,7 +187,7 @@
     "xbar_active_edge": 1,
     "edma_channel": 2,
     "dmamux_source": 30,
-    "edma_priority": 2,
+    "edma_priority": 0,
     "semantics": "Physical protocol-v1 GPIO mode accepts GPIO alone or alongside the ADC stream under the one shared hardware schedule. One packed payload byte represents D6 through D13 as bits 0 through 7. Raw DMA and packed CPU rings are fixed-capacity and every frame timestamp is derived from its source sample index relative to one START epoch."
   },
   "combined_acquisition": {
@@ -198,7 +198,7 @@
     "dma_alignment_bytes": 32,
     "adc_dma_ring_bytes": 16256,
     "adc_edma_channels": [0, 1],
-    "adc_edma_priorities": [0, 1],
+    "adc_edma_priorities": [2, 1],
     "adc_dmamux_sources": [24, 88],
     "adc_dma_irq_priority": 48,
     "gpio_dma_irq_priority": 64,
@@ -1560,7 +1560,7 @@
           "gpio_xbar_output": 0,
           "gpio_edma_channel": 2,
           "gpio_dmamux_source": 30,
-          "gpio_edma_priority": 2,
+          "gpio_edma_priority": 0,
           "gpio_xbar_active_edge": 1,
           "adc_code_min": 0,
           "adc_code_max": 4095,
@@ -1646,7 +1646,7 @@
           "adc_dma_ring_depth": 4,
           "adc_pair_bytes": 4,
           "adc_edma_channels": [0, 1],
-          "adc_edma_priorities": [0, 1],
+          "adc_edma_priorities": [2, 1],
           "adc_dmamux_sources": [24, 88],
           "adc_dma_irq_priority": 48,
           "gpio_dma_irq_priority": 64,
@@ -2091,7 +2091,7 @@
           "xbar_output": 0,
           "edma_channel": 2,
           "dmamux_source": 30,
-          "edma_priority": 2,
+          "edma_priority": 0,
           "tcd_soff": 0
         }
       }
@@ -2146,7 +2146,7 @@
           "tcd_citer_configured": 4048,
           "tcd_biter_configured": 4048,
           "tcd_csr_configured": 18,
-          "edma_priority_configured": 2,
+          "edma_priority_configured": 0,
           "analysis_sample_limit": 256
         }
       }

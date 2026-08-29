@@ -140,16 +140,15 @@ before making a physical analog-timing claim.
 All eDMA channels must be below 32, all DMAMUX sources below 128, and neither
 set may contain duplicates. Pinned core macros are asserted against all three
 source numbers. Acquisition code must bind these exact channels rather than
-use an unconstrained first-free allocator. ADC0/ADC1 retain the reset-unique
-fixed priority values 0/1, use NVIC priority 48, and each own five 32-byte
+use an unconstrained first-free allocator. ADC0/ADC1 use fixed priority values
+2/1, above GPIO's priority 0, use NVIC priority 48, and each own five 32-byte
 scatter/gather TCDs. Channel 0 reads `ADC1_R0` and channel 1 reads `ADC2_R0`;
 both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012`, and
 `DOFF=4` for consumer buffers. Both completion IRQs and the production
-ADC_ETC error IRQ share priority 48. Both completion lines dispatch one shared
-handler that acknowledges all captured DMA flags before serialized ownership
-work. A single converter completion remains incomplete until its matching
-generation arrives, while simultaneously visible flags are consumed in fixed
-ADC0-to-ADC1 order.
+ADC_ETC error IRQ share priority 48. Only the later ADC1 completion line
+dispatches; after a bounded flag-reconciliation wait, its handler consumes both
+converters as one generation barrier in fixed ADC0-to-ADC1 order. ADC0's NVIC
+line remains reserved but masked.
 
 ## Queue and per-loop bounds
 

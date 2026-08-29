@@ -131,7 +131,7 @@ invalid production contract from compiling.
 | XBAR | Input/output range and unique output rejection; repeated input fan-out allowed | GPIO output 0; ADC outputs 103/107 |
 | ADC_ETC | Queue/peripheral range and uniqueness | Queue 0/ADC1 and queue 4/ADC2 |
 | eDMA/DMAMUX | Range plus unique channel/source rejection | ADC 0/24, ADC 1/88, GPIO 2/30 |
-| DMA arbitration | Distinct fixed channel priorities | ADC 0/1, GPIO 2 |
+| DMA arbitration | Distinct fixed priorities; larger numeric value wins | ADC0 2, ADC1 1, GPIO 0 |
 | NVIC priorities | Complete logical allocation, equal ADC generation/error priority, ADC before GPIO | production ADC 48; GPIO 64 |
 | BOOT diagnostic poll | Bounded ITCM status observation while all interrupts are briefly masked | ADC_ETC completion/error IRQs remain disabled; production ownership is untouched |
 | DMA memory | Nonzero power-of-two alignment, unique use, RAM1/RAM2 budgets, DMA destinations in OCRAM | ADC/raw-GPIO rings, sinks, and TCD banks in RAM2 |

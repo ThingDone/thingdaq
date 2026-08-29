@@ -57,7 +57,7 @@ class GpioClockDiagnosticModelTests(unittest.TestCase):
         self.assertEqual(1_000_000.0, result.measured_rate_hz)
         self.assertEqual(0, result.count_error)
         self.assertEqual(
-            (0, 56, 0, 2, 30, 2),
+            (0, 56, 0, 2, 30, 0),
             (
                 result.pit_channel,
                 result.xbar_input,

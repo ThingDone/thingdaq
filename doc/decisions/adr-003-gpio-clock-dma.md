@@ -127,7 +127,9 @@ in every production window while the independently timed DWT window covered
 hardware/eDMA errors.
 
 eDMA channels 0 and 1 remain reserved for ADC1 and ADC2 through DMAMUX sources
-24 and 88. GPIO owns fixed channel 2 at priority 2 and DMAMUX source 30. The
+24 and 88. GPIO owns fixed channel 2 and DMAMUX source 30. Its production
+priority is 0, below paired ADC priorities 2/1, so the continuous 4 MHz request
+cannot delay either converter-result transfer past the paired boundary. The
 isolated diagnostic transfers one fixed sentinel word into another word in a
 dedicated 32-byte-aligned OCRAM cache line; it does not remap or sample a pad.
 The physical adapter uses the budgeted four-buffer OCRAM ring and fixed-width

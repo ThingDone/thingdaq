@@ -107,7 +107,8 @@ The implemented DMA adapter writes ADC0 halfwords at pair offset 0 and ADC1
 halfwords at pair offset 2, both with a four-byte destination stride. Channel
 0 reads `ADC1_R0` through DMAMUX source 24 and channel 1 reads `ADC2_R0`
 through source 88. Both use 16-bit source/destination attributes, two-byte
-minor transfers, equal 1,012-result major loops, fixed priorities 0/1, major
+minor transfers, equal 1,012-result major loops, fixed priorities 2/1 above
+GPIO priority 0, major
 completion interrupts, and five scatter/gather descriptors per channel.
 
 Four 4,064-byte cache-line-aligned OCRAM buffers each contain 1,012 native
@@ -131,14 +132,13 @@ schedule exhaustion, and rejected stale interrupts have independent counters.
 Complete corrupt blocks and partial STOP work contribute exact discarded-pair
 counts.
 
-Both channel TCDs retain `INTMAJOR`, and both equal-priority NVIC lines dispatch
-one shared handler. It snapshots and acknowledges every visible `DMA_INT` bit
-before ownership work, then consumes captured completions in ADC0-to-ADC1
-order. A lone completion advances only its converter and remains incomplete in
-`PairCaptureRing` until the partner interrupt arrives; the buffer becomes
-ready only after both generations match. This removes any requirement for the
-two independently timed hardware flags to be simultaneous while preventing a
-long first completion path from coalescing the partner interrupt.
+Both channel TCDs retain `INTMAJOR`, but only the later ADC1 NVIC line
+dispatches. Numeric eDMA priority 2 is highest, so the earlier ADC0 result runs
+ahead of ADC1 at priority 1; continuous GPIO traffic runs at priority 0. The
+ADC1 handler waits at most 10 us for both visible `DMA_INT` bits, then consumes
+the generation in ADC0-to-ADC1 order. An incomplete pair faults before software
+ownership can advance, while a matching pair is the only path that makes the
+buffer ready.
 
 Normal STOP first waits for both live channels to enter the first quarter of
 the same DMA generation, then atomically sets `DREQ` on both active TCDs while

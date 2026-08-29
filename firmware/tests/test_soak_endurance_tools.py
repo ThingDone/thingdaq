@@ -792,9 +792,7 @@ class AcceleratedCampaignTests(unittest.TestCase):
         )
         cleanup = result["cleanup"]["pre_stop_status"]
         self.assertEqual(constants.DeviceState.RUNNING, cleanup["state"])
-        self.assertEqual(
-            1, cleanup["nonzero_errors"]["packet_pool_exhaustions"]
-        )
+        self.assertEqual(1, cleanup["nonzero_errors"]["packet_pool_exhaustions"])
         self.assertIn("packet_owned_high_water", cleanup["queues"])
         self.assertEqual(0, active["parser"]["errors"])
         self.assertIn("maximum_receive_gap_seconds", active)

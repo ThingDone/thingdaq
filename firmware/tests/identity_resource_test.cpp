@@ -356,7 +356,7 @@ static_assert(teensy_daq::board::kAdcDmaRingBytes == 16256U);
 static_assert(teensy_daq::board::kAdcDmaOverflowSinkBytes == 32U);
 static_assert(teensy_daq::board::kAdcDmaDescriptorCount == 5U);
 static_assert(teensy_daq::board::kAdcDmaDescriptorBytes == 320U);
-static_assert(teensy_daq::board::kAdcEdmaPriorities[0] == 0U);
+static_assert(teensy_daq::board::kAdcEdmaPriorities[0] == 2U);
 static_assert(teensy_daq::board::kAdcEdmaPriorities[1] == 1U);
 static_assert(teensy_daq::board::kAdcEdmaIrqPriority == 48U);
 static_assert(teensy_daq::board::kGpioRawDmaOverflowSinkBytes == 32U);
@@ -387,7 +387,7 @@ static_assert(teensy_daq::board::kDmamuxXbar1Request1Source == 31U);
 static_assert(teensy_daq::board::kDmamuxXbar1Request2Source == 94U);
 static_assert(teensy_daq::board::kDmamuxXbar1Request3Source == 95U);
 static_assert(teensy_daq::board::kGpioDmamuxSource == 30U);
-static_assert(teensy_daq::board::kGpioEdmaPriority == 2U);
+static_assert(teensy_daq::board::kGpioEdmaPriority == 0U);
 static_assert(teensy_daq::board::kGpioEdmaIrqPriority == 64U);
 static_assert(teensy_daq::capabilities::kMetadata.supported_stream_mask == 3U);
 static_assert((teensy_daq::capabilities::kMetadata.capability_bits &

@@ -3334,15 +3334,11 @@ class SoakRunner:
                     status,
                     allow_physical_stop_tail=False,
                 ),
-                "queues": {
-                    name: status.values[name] for name in QUEUE_FIELDS
-                },
+                "queues": {name: status.values[name] for name in QUEUE_FIELDS},
                 "latency_seconds": latency,
             }
         except Exception as error:  # noqa: BLE001 - best-effort remote evidence
-            self.cleanup["pre_stop_status"] = (
-                f"{type(error).__name__}: {error}"
-            )
+            self.cleanup["pre_stop_status"] = f"{type(error).__name__}: {error}"
         if self.clock.monotonic() >= self.hard_deadline:
             self.cleanup["stop"] = "unavailable"
             return

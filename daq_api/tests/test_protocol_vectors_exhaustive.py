@@ -109,7 +109,7 @@ def _info_payload() -> bytes:
     payload[66 : 66 + len(build_id)] = build_id
     struct.pack_into("<BBBBH", payload, 98, 8, 4, 4, 0, 3)
     struct.pack_into("<IIIH", payload, 104, 4048, 64768, 16256, 200)
-    struct.pack_into("<BBBBBBBB", payload, 120, 0, 56, 0, 2, 30, 2, 1, 0)
+    struct.pack_into("<BBBBBBBB", payload, 120, 0, 56, 0, 2, 30, 0, 1, 0)
     struct.pack_into(
         "<HHBBBBHHHBBH",
         payload,
@@ -131,7 +131,7 @@ def _info_payload() -> bytes:
     struct.pack_into("<IIIIII", payload, 156, 150_000_000, 37_500_000, 10_000, 0, 0, 0)
     _pack_adc_trigger_reference(payload, 180)
     struct.pack_into("<BBHHHHHI", payload, 324, 0, 0, 63, 4048, 1012, 4048, 0, 8096)
-    payload[340:350] = bytes((4, 4, 0, 1, 0, 1, 24, 88, 48, 64))
+    payload[340:350] = bytes((4, 4, 0, 1, 2, 1, 24, 88, 48, 64))
     struct.pack_into(
         "<HIHHHHHBBII",
         payload,
@@ -289,7 +289,7 @@ def _gpio_clock_diagnostic_payload() -> bytes:
     ):
         struct.pack_into("<I", payload, 84 + 4 * offset, value)
     struct.pack_into("<HHHH", payload, 124, 4112, 8208, 8, 0x0202)
-    struct.pack_into("<BBBBBBH", payload, 132, 0, 56, 0, 2, 30, 2, 0)
+    struct.pack_into("<BBBBBBH", payload, 132, 0, 56, 0, 2, 30, 0, 0)
     return bytes(payload)
 
 
@@ -337,7 +337,7 @@ def _gpio_capture_diagnostic_payload() -> bytes:
         4048,
         4048,
         18,
-        2,
+        0,
         0,
         256,
     )

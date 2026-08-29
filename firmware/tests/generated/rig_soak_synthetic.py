@@ -80,7 +80,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate_sha256": "68b92240f0823e52d0fb71fcb9cf1b686876753d59d784baacbe171a80f4f530",
   "generator_schema_version": 1,
   "mode": "synthetic",
-  "validator_sha256": "7504f4323e216839bd6398f5787fc7682fd7fc1e371157fdf6bd0fb11d469cd0"
+  "validator_sha256": "4df6e31ae1e27dcf639b3dd121f7da54cef7373f9af875e69ef8546b2832d527"
 }
 """
 )
@@ -3340,15 +3340,11 @@ class SoakRunner:
                     status,
                     allow_physical_stop_tail=False,
                 ),
-                "queues": {
-                    name: status.values[name] for name in QUEUE_FIELDS
-                },
+                "queues": {name: status.values[name] for name in QUEUE_FIELDS},
                 "latency_seconds": latency,
             }
         except Exception as error:  # noqa: BLE001 - best-effort remote evidence
-            self.cleanup["pre_stop_status"] = (
-                f"{type(error).__name__}: {error}"
-            )
+            self.cleanup["pre_stop_status"] = f"{type(error).__name__}: {error}"
         if self.clock.monotonic() >= self.hard_deadline:
             self.cleanup["stop"] = "unavailable"
             return

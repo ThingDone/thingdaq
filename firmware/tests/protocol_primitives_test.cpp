@@ -547,7 +547,7 @@ void testGoldenEncode(const std::string &fixture_directory,
   gpio_clock_response.xbar_output = 0U;
   gpio_clock_response.edma_channel = 2U;
   gpio_clock_response.dmamux_source = 30U;
-  gpio_clock_response.edma_priority = 2U;
+  gpio_clock_response.edma_priority = 0U;
   expect(wire::encodeGpioClockDiagnosticResponse(
              gpio_clock, 0U, gpio_clock_response, response)
              .ok(),
@@ -586,7 +586,7 @@ void testGoldenEncode(const std::string &fixture_directory,
   gpio_capture_response.tcd_citer_configured = 4048U;
   gpio_capture_response.tcd_biter_configured = 4048U;
   gpio_capture_response.tcd_csr_configured = 18U;
-  gpio_capture_response.edma_priority_configured = 2U;
+  gpio_capture_response.edma_priority_configured = 0U;
   expect(wire::encodeGpioCaptureDiagnosticResponse(
              gpio_capture, 0U, gpio_capture_response, response)
              .ok(),

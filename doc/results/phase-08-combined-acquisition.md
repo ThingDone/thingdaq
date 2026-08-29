@@ -161,9 +161,12 @@ non-overlapping:
 The accepted metadata retained the shared resource contract in
 [[Acquisition-Pipeline]]: D6-D13 map to the packed GPIO byte; PIT0/XBAR input
 56/DMAMUX 30/eDMA 2 drive the 4 MHz GPIO path; chained PIT1/XBAR input 57 feeds
-ADC_ETC queues 0/4 through XBAR outputs 103/107 and eDMA 0/1. ADC eDMA
-priorities 0/1 remain above GPIO priority 2, with ADC/GPIO IRQ priorities
-48/64. Each stream covers the same 8,096 ticks per 4,096-byte frame.
+ADC_ETC queues 0/4 through XBAR outputs 103/107 and eDMA 0/1. At the time of
+this result, ADC eDMA priorities were 0/1 and GPIO priority was 2, with
+ADC/GPIO IRQ priorities 48/64. The earlier text incorrectly described the ADC
+channels as higher: NXP fixed arbitration treats the larger numeric value as
+higher priority. Phase 11 corrects production arbitration to ADC0/ADC1/GPIO
+2/1/0. Each stream covers the same 8,096 ticks per 4,096-byte frame.
 
 ## Sequential accepted jobs
 

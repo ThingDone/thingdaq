@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: ee82cb67adee1cbe763c07f85dbf4639c8fdfe5d0703d8f270a7863cf871858c
+// Source SHA-256: b8fe28ecdeb48b1238594d23a74efbda865a99b518a561614de2d8e92a6a4333
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace teensy_daq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "ee82cb67adee1cbe763c07f85dbf4639c8fdfe5d0703d8f270a7863cf871858c";
+inline constexpr char kSourceSha256[] = "b8fe28ecdeb48b1238594d23a74efbda865a99b518a561614de2d8e92a6a4333";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -35,7 +35,7 @@ inline constexpr std::uint16_t kAdcPairsPerBuffer = 1012U;
 inline constexpr std::uint8_t kAdcPairBytes = 4U;
 inline constexpr std::uint32_t kAdcDmaRingBytes = 16256U;
 inline constexpr std::uint8_t kAdcEdmaChannels[] = {0U, 1U};
-inline constexpr std::uint8_t kAdcEdmaPriorities[] = {0U, 1U};
+inline constexpr std::uint8_t kAdcEdmaPriorities[] = {2U, 1U};
 inline constexpr std::uint8_t kAdcDmamuxSources[] = {24U, 88U};
 inline constexpr std::uint8_t kAdcDmaIrqPriority = 48U;
 inline constexpr std::uint8_t kGpioDmaIrqPriority = 64U;
@@ -78,7 +78,7 @@ inline constexpr std::uint8_t kGpioXbarOutput = 0U;
 inline constexpr std::uint8_t kGpioXbarActiveEdge = 1U;
 inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
 inline constexpr std::uint8_t kGpioDmamuxSource = 30U;
-inline constexpr std::uint8_t kGpioEdmaPriority = 2U;
+inline constexpr std::uint8_t kGpioEdmaPriority = 0U;
 inline constexpr std::uint32_t kGpioCaptureDiagnosticAnalysisSamples = 256U;
 inline constexpr std::uint8_t kAdcPrimaryResolutionBits = 12U;
 inline constexpr std::uint8_t kAdcFallbackResolutionBits = 10U;
