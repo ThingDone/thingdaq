@@ -80,7 +80,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate_sha256": "32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656",
   "generator_schema_version": 1,
   "mode": "control-stress",
-  "validator_sha256": "c75ecab3a6a25b0d06bfeb453423bed45242c08b1e0608fc5f280e3d59de66f2"
+  "validator_sha256": "acfe54307aea6d92d087997dc63d2c93cbdf63e9fe1bd25fc8db2a5eb91fc7cd"
 }
 """
 )
@@ -99,8 +99,8 @@ SYNTHETIC_SERIAL_READ_BYTES = 64 * 1024
 PHYSICAL_SERIAL_READ_BYTES = 16 * 1024
 STARTUP_DRAIN_SECONDS = 0.25
 REOPEN_SETTLE_SECONDS = 0.25
-EXPECTED_NEGATIVE_REOPEN_SECONDS = 0.25
-EXPECTED_NEGATIVE_REOPEN_DEADLINE_SECONDS = 4.0
+EXPECTED_NEGATIVE_STALL_SECONDS = 0.25
+EXPECTED_NEGATIVE_STALL_DEADLINE_SECONDS = 1.0
 SYNC_ATTEMPTS = 4
 SYNC_DEADLINE_SECONDS = 0.75
 COMMAND_DEADLINE_SECONDS = 0.5
@@ -349,23 +349,6 @@ class FrameParser:
     @property
     def errors(self) -> int:
         return self.header_errors + self.checksum_errors + self.payload_errors
-
-    def bytes_to_frame_boundary(self) -> int:
-        """Return the exact byte count needed to finish the retained frame."""
-
-        buffered = self._buffered_bytes()
-        if buffered == 0:
-            return 0
-        if buffered < HEADER_SIZE:
-            return HEADER_SIZE - buffered
-        fields = HEADER.unpack_from(self.buffer, self.scan_start)
-        total_length = self._validate_header(fields)
-        require(
-            buffered < total_length,
-            "parser",
-            "parser retained an already-complete frame",
-        )
-        return total_length - buffered
 
     def feed(self, data: bytes) -> list[Frame]:
         incoming = bytes(data)
@@ -720,42 +703,6 @@ class SerialLink:
             )
             on_data(frame)
         return len(chunk)
-
-    def align_to_frame_boundary(
-        self,
-        on_data: Callable[[Frame], None],
-        *,
-        hard_deadline: float,
-    ) -> int:
-        """Finish only the retained frame without consuming a following frame."""
-
-        aligned_bytes = 0
-        while self.parser.buffer:
-            if self.clock.monotonic() >= hard_deadline:
-                raise DeadlineExpired("partial frame did not finish before deadline")
-            requested = self.parser.bytes_to_frame_boundary()
-            require(requested > 0, "parser", "invalid frame-boundary read size")
-            chunk = bytes(self.port.read(requested))
-            require(
-                len(chunk) <= requested,
-                "transport",
-                f"serial read returned {len(chunk)} bytes for a {requested}-byte read",
-            )
-            self.maximum_read_bytes = max(self.maximum_read_bytes, len(chunk))
-            if not chunk:
-                continue
-            before_errors = self.parser.errors
-            frames = self.parser.feed(chunk)
-            self._raise_new_parser_error(before_errors)
-            for frame in frames:
-                require(
-                    frame.kind in DATA_KINDS,
-                    "protocol",
-                    f"unsolicited response 0x{frame.kind:02x}",
-                )
-                on_data(frame)
-            aligned_bytes += len(chunk)
-        return aligned_bytes
 
     def drain_until_quiet(
         self,
@@ -2909,7 +2856,7 @@ def reconcile_final_status(
         and validator.adc.gap_flag_frames > 0
         and validator.gpio.gap_flag_frames > 0,
         "expected_negative_loss",
-        "named CDC pressure subcase did not induce flagged loss in both streams",
+        "named read-stall subcase did not induce flagged loss in both streams",
     )
     require(
         status.adc_frames_evicted == validator.adc.missing_frames
@@ -2918,7 +2865,7 @@ def reconcile_final_status(
         and status.packet_pool_exhaustions == missing_total
         and status.packet_capacity_drops_without_evictable_frame == 0,
         "expected_negative_loss",
-        "named CDC pressure loss does not exactly match eviction counters",
+        "named read-stall pressure loss does not exactly match eviction counters",
     )
     return {
         "adc_frames": validator.adc.missing_frames,
@@ -3182,118 +3129,76 @@ class SoakRunner:
         self.reopen_count += 1
         emit_event("cdc_reopened", count=self.reopen_count)
 
-    def reopen_running_with_expected_pressure(
+    def stall_running_with_expected_pressure(
         self,
         validator: StreamValidator,
-    ) -> tuple[SerialLink, dict[str, object], list[float]]:
-        """Reopen one live CDC session and retain exact named-loss evidence."""
+    ) -> dict[str, object]:
+        """Pause host reads in one live session and retain named-loss evidence."""
 
-        port = self.port
-        old_link = self.link
-        if port is None or old_link is None:
-            raise SoakFailure("control", "cannot live-reopen a closed session")
-        alignment_started = self.clock.monotonic()
-        boundary_alignment_bytes = old_link.align_to_frame_boundary(
-            validator.accept,
-            hard_deadline=min(
-                self.hard_deadline,
-                alignment_started + COMMAND_DEADLINE_SECONDS,
-            ),
-        )
-        boundary_alignment_elapsed = self.clock.monotonic() - alignment_started
-        require(
-            not old_link.parser.buffer,
-            "parser",
-            "live CDC close was not aligned to a complete frame boundary",
-        )
-        old_parser = {
-            "bytes_received": old_link.parser.bytes_received,
-            "frames_decoded": old_link.parser.frames_decoded,
-            "bytes_discarded": old_link.parser.bytes_discarded,
-            "errors": old_link.parser.errors,
-            "buffered_bytes": len(old_link.parser.buffer),
-            "boundary_alignment_bytes": boundary_alignment_bytes,
-            "boundary_alignment_elapsed_seconds": boundary_alignment_elapsed,
+        link = self.link
+        if self.port is None or link is None:
+            raise SoakFailure("control", "cannot stall a closed serial session")
+        parser_before = {
+            "bytes_received": link.parser.bytes_received,
+            "frames_decoded": link.parser.frames_decoded,
+            "bytes_discarded": link.parser.bytes_discarded,
+            "errors": link.parser.errors,
+            "buffered_bytes": len(link.parser.buffer),
         }
         emit_event(
             "expected_negative_subcase_begin",
-            subcase="cdc_close_reopen_pressure",
+            subcase="serial_read_stall_pressure",
             expected_device_state="RUNNING",
-            pause_seconds=EXPECTED_NEGATIVE_REOPEN_SECONDS,
+            expected="no host serial reads",
             run_id=validator.run_id,
+            stall_seconds=EXPECTED_NEGATIVE_STALL_SECONDS,
         )
         started = self.clock.monotonic()
-        port.close()
-        self.port = None
-        self.link = None
-        self.clock.sleep(EXPECTED_NEGATIVE_REOPEN_SECONDS)
-        self._check_budget("live CDC reopen", reserve=8.0)
-
-        reopened_port = self.port_factory()
-        reopened_link = SerialLink(
-            reopened_port,
-            self.clock,
-            read_bytes=self.settings.serial_read_bytes,
-        )
-        reopened_link.accepted_requests = old_link.accepted_requests
-        reopened_link.discarded_data_frames = old_link.discarded_data_frames
-        reopened_link.stale_responses = old_link.stale_responses
-        reopened_link.maximum_read_bytes = old_link.maximum_read_bytes
-        self.port = reopened_port
-        self.link = reopened_link
-        info, latencies = synchronize(
-            reopened_link,
-            hard_deadline=self.hard_deadline,
-            on_data=validator.accept,
-            expected_run_id=validator.run_id,
-        )
-        validate_info_identity(
-            info,
-            self.settings,
-            expected_state=STATE_RUNNING,
-            expected_source=validator.source,
-        )
-        require(
-            self.identity is not None
-            and stable_identity(info) == stable_identity(self.identity),
-            "identity",
-            "identity changed during live CDC reopen",
-        )
-        require(
-            reopened_link.parser.bytes_discarded == 0,
-            "parser",
-            "live CDC reopen exposed an invalid partial wire fragment",
-        )
+        self.clock.sleep(EXPECTED_NEGATIVE_STALL_SECONDS)
         elapsed = self.clock.monotonic() - started
+        self._check_budget("serial read stall", reserve=8.0)
+        parser_after = {
+            "bytes_received": link.parser.bytes_received,
+            "frames_decoded": link.parser.frames_decoded,
+            "bytes_discarded": link.parser.bytes_discarded,
+            "errors": link.parser.errors,
+            "buffered_bytes": len(link.parser.buffer),
+        }
         require(
-            elapsed <= EXPECTED_NEGATIVE_REOPEN_DEADLINE_SECONDS,
-            "latency_violation",
-            f"live CDC reopen {elapsed:.6f}s exceeds "
-            f"{EXPECTED_NEGATIVE_REOPEN_DEADLINE_SECONDS:.6f}s",
+            parser_after == parser_before,
+            "expected_negative_loss",
+            "serial parser changed during the intentional no-read interval",
         )
-        self.reopen_count += 1
+        require(
+            elapsed >= EXPECTED_NEGATIVE_STALL_SECONDS,
+            "latency_violation",
+            f"serial read stall {elapsed:.6f}s ended before its planned interval",
+        )
+        require(
+            elapsed <= EXPECTED_NEGATIVE_STALL_DEADLINE_SECONDS,
+            "latency_violation",
+            f"serial read stall {elapsed:.6f}s exceeds "
+            f"{EXPECTED_NEGATIVE_STALL_DEADLINE_SECONDS:.6f}s",
+        )
         evidence: dict[str, object] = {
-            "name": "cdc_close_reopen_pressure",
+            "name": "serial_read_stall_pressure",
             "result": "pending",
             "run_id": validator.run_id,
             "expected_device_state": "RUNNING",
-            "pause_seconds": EXPECTED_NEGATIVE_REOPEN_SECONDS,
+            "stall_seconds": EXPECTED_NEGATIVE_STALL_SECONDS,
             "elapsed_seconds": elapsed,
-            "old_session_parser": old_parser,
-            "new_session_parser": {
-                "bytes_discarded": reopened_link.parser.bytes_discarded,
-                "errors": reopened_link.parser.errors,
-                "buffered_bytes": len(reopened_link.parser.buffer),
-            },
+            "transport_session": "continuous",
+            "parser_before": parser_before,
+            "parser_after": parser_after,
         }
         emit_event(
-            "expected_negative_subcase_reopened",
-            subcase="cdc_close_reopen_pressure",
+            "expected_negative_subcase_stall_complete",
+            subcase="serial_read_stall_pressure",
             elapsed_seconds=elapsed,
             run_id=validator.run_id,
             state="RUNNING",
         )
-        return reopened_link, evidence, latencies
+        return evidence
 
     def run_epoch(
         self,
@@ -3489,7 +3394,7 @@ class SoakRunner:
                 and now >= timed_started_at + min(2.0, measured_seconds / 3.0)
             ):
                 require(
-                    expected_negative_subcase == "cdc_close_reopen_pressure",
+                    expected_negative_subcase == "serial_read_stall_pressure",
                     "configuration",
                     f"unknown expected negative subcase {expected_negative_subcase!r}",
                 )
@@ -3498,12 +3403,10 @@ class SoakRunner:
                     and previous_status.adc_frames_dropped == 0
                     and previous_status.gpio_frames_dropped == 0,
                     "expected_negative_loss",
-                    "live CDC pressure baseline was not zero-loss",
+                    "serial read-stall pressure baseline was not zero-loss",
                 )
                 assert previous_status is not None
-                link, negative_evidence, reopen_latencies = (
-                    self.reopen_running_with_expected_pressure(validator)
-                )
+                negative_evidence = self.stall_running_with_expected_pressure(validator)
                 negative_evidence["baseline"] = {
                     "stats_generation": previous_status.stats_generation,
                     "adc_frames_generated": previous_status.adc_frames_generated,
@@ -3512,9 +3415,6 @@ class SoakRunner:
                     "gpio_frames_dropped": previous_status.gpio_frames_dropped,
                     "device_state": previous_status.device_state,
                 }
-                for reopen_latency in reopen_latencies:
-                    epoch_command_latency.add(reopen_latency)
-                    self.command_latency.add(reopen_latency)
                 next_status_at = self.clock.monotonic()
                 continue
             if now >= next_status_at:
@@ -3791,7 +3691,7 @@ class SoakRunner:
                     warmup_seconds=min(0.25, self.settings.warmup_seconds),
                     previous_run_id=previous_run_id,
                     expected_negative_subcase=(
-                        "cdc_close_reopen_pressure" if epoch_index == 1 else None
+                        "serial_read_stall_pressure" if epoch_index == 1 else None
                     ),
                 )
                 self.epochs.append(report)
@@ -3814,7 +3714,7 @@ class SoakRunner:
             ]
             require(
                 len(negative_subcases) == 1
-                and negative_subcases[0].get("name") == "cdc_close_reopen_pressure"
+                and negative_subcases[0].get("name") == "serial_read_stall_pressure"
                 and negative_subcases[0].get("result") == "PASS",
                 "expected_negative_loss",
                 "control campaign did not complete exactly one named loss subcase",
