@@ -44,6 +44,15 @@ DEFAULT_MAX_QUEUED_BLOCKS = 512
 class ReaderError(RuntimeError):
     """Base error for background reader and request operations."""
 
+    def __init__(self, message: str, cause: BaseException | None = None) -> None:
+        super().__init__(message)
+        self.cause = cause
+        self.reader_counters: ReaderCounters | None = None
+        self.parser_counters: ParserCounters | None = None
+        # The public TeensyDAQ facade fills this with its last firmware and
+        # loss snapshot before re-raising a terminal reader error.
+        self.evidence: object | None = None
+
 
 class ReaderNotStartedError(ReaderError):
     """An operation needs :meth:`BackgroundReader.start` first."""
@@ -74,16 +83,14 @@ class DeviceDisconnectedError(ReaderError):
     """The device transport disappeared while the reader was active."""
 
     def __init__(self, message: str, cause: BaseException | None = None) -> None:
-        super().__init__(message)
-        self.cause = cause
+        super().__init__(message, cause)
 
 
 class ReaderProtocolError(ReaderError):
     """A decoded message or parser operation violated reader invariants."""
 
     def __init__(self, message: str, cause: BaseException | None = None) -> None:
-        super().__init__(message)
-        self.cause = cause
+        super().__init__(message, cause)
 
 
 class PendingRequestLimitError(ReaderError):
@@ -296,6 +303,13 @@ class BackgroundReader:
     def pending_count(self) -> int:
         with self._condition:
             return len(self._pending)
+
+    @property
+    def terminal_error(self) -> ReaderError | None:
+        """Terminal thread failure, including its captured counter evidence."""
+
+        with self._condition:
+            return self._terminal_error
 
     @property
     def read_buffer_size(self) -> int:
@@ -611,13 +625,17 @@ class BackgroundReader:
         if thread is not None and thread is not current_thread():
             thread.join(self._shutdown_timeout)
             if thread.is_alive():
-                raise ReaderShutdownError(
+                shutdown_error = ReaderShutdownError(
                     f"reader thread did not stop within {self._shutdown_timeout:g} seconds"
                 )
+                self._attach_evidence(shutdown_error)
+                raise shutdown_error
         if transport_error is not None:
-            raise ReaderShutdownError(
+            shutdown_error = ReaderShutdownError(
                 f"transport close failed: {transport_error}"
-            ) from transport_error
+            )
+            self._attach_evidence(shutdown_error)
+            raise shutdown_error from transport_error
 
     def __enter__(self) -> BackgroundReader:  # noqa: PYI034
         return self.start()
@@ -971,9 +989,14 @@ class BackgroundReader:
                 if disconnected:
                     self._disconnects += 1
                 self._fail_all_pending_locked(error)
+                self._attach_evidence(error)
             self._stream_active = False
             self._stop_event.set()
             self._condition.notify_all()
+
+    def _attach_evidence(self, error: ReaderError) -> None:
+        error.reader_counters = self.counters
+        error.parser_counters = self._parser.counters
 
     def _fail_all_pending_locked(self, error: ReaderError) -> None:
         pending_requests = tuple(self._pending.values())

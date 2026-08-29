@@ -102,6 +102,8 @@ class FakeCdcStream final : public usb::CdcByteStream {
   explicit FakeCdcStream(std::vector<std::uint8_t> input = {})
       : input_(std::move(input)) {}
 
+  bool sessionOpen() const override { return session_open; }
+
   usb::IoCount available() override {
     if (!available_plan.empty()) {
       const usb::IoCount result = available_plan.front();
@@ -155,6 +157,7 @@ class FakeCdcStream final : public usb::CdcByteStream {
 
   bool inputEmpty() const { return input_offset_ == input_.size(); }
 
+  bool session_open = true;
   std::size_t max_read_size = std::numeric_limits<std::size_t>::max();
   usb::IoCount writable_limit = std::numeric_limits<usb::IoCount>::max();
   std::deque<usb::IoCount> available_plan{};
@@ -271,6 +274,7 @@ void testIncrementalReceiveAndBackpressure() {
   stats::Statistics statistics{};
   usb::CdcTransport transport(stream, statistics);
   std::vector<std::uint32_t> request_ids{};
+  std::vector<std::uint32_t> rejected_ids{};
   bool observed_full_queue = false;
 
   for (std::size_t iteration = 0U;
@@ -288,11 +292,23 @@ void testIncrementalReceiveAndBackpressure() {
 
     wire::ParsedCommand command{};
     while (transport.takeCommand(command)) {
-      request_ids.push_back(command.request.request_id);
-      expect(transport.queueResponse(
-                 pingResponse(command.request.request_id,
-                              command.request.nonce)),
-             "reserve exactly one response for each dequeued command");
+      if (command.rejected()) {
+        rejected_ids.push_back(command.rejected_request_id);
+        wire::ControlFrame rejection{};
+        expect(wire::encodeRejectedFrameResponse(
+                   command.rejected_request_id, command.rejected_kind,
+                   command.rejected_version, command.rejection_error,
+                   rejection)
+                       .ok() &&
+                   transport.queueResponse(rejection),
+               "reserve one explicit response for a rejected command");
+      } else {
+        request_ids.push_back(command.request.request_id);
+        expect(transport.queueResponse(
+                   pingResponse(command.request.request_id,
+                                command.request.nonce)),
+               "reserve exactly one response for each dequeued command");
+      }
       transport.serviceTransmit();
     }
   }
@@ -301,6 +317,8 @@ void testIncrementalReceiveAndBackpressure() {
   expect(request_ids ==
              std::vector<std::uint32_t>({1U, 2U, 3U, 4U, 5U, 6U}),
          "complete commands retain FIFO order across queue backpressure");
+  expect(rejected_ids == std::vector<std::uint32_t>({90U}),
+         "an identifiable malformed command receives one queued rejection");
   expect(observed_full_queue,
          "command input applies backpressure at the fixed queue depth");
   const usb::TransportSnapshot snapshot = transport.snapshot();
@@ -311,9 +329,67 @@ void testIncrementalReceiveAndBackpressure() {
              statistics.snapshot().bad_checksums == 1U &&
              statistics.snapshot().parser_errors == 1U,
          "parser rejection deltas reach firmware statistics exactly once");
-  expect(snapshot.commands_queued == 6U &&
-             snapshot.commands_dequeued == 6U,
-         "transport command counters are exact");
+  expect(snapshot.commands_queued == 7U &&
+             snapshot.commands_dequeued == 7U &&
+             snapshot.rejected_commands_queued == 1U,
+         "transport command and rejection counters are exact");
+}
+
+void testDtrSessionBoundariesAreBounded() {
+  const wire::CommandFrame abandoned = pingRequest(70U, 700U);
+  const wire::CommandFrame valid = pingRequest(71U, 710U);
+  constexpr std::size_t prefix_size = constants::kHeaderSize + 3U;
+  std::vector<std::uint8_t> input(abandoned.data(),
+                                  abandoned.data() + prefix_size);
+  append(input, bytes(valid));
+
+  FakeCdcStream stream(std::move(input));
+  stream.read_plan = {static_cast<usb::IoCount>(prefix_size), 0};
+  stats::Statistics statistics{};
+  usb::CdcTransport transport(stream, statistics);
+
+  const usb::ServiceReport partial = transport.serviceReceive();
+  expect(partial.stalled && transport.takeSessionStarted() &&
+             !transport.takeSessionStarted() &&
+             transport.snapshot().parser.buffered_bytes == prefix_size,
+         "the initial DTR-open session retains one bounded truncated prefix");
+
+  stream.session_open = false;
+  const usb::ServiceReport closed = transport.serviceReceive();
+  expect(closed.bytes_read == 0U && closed.bytes_processed == 0U &&
+             transport.snapshot().parser.buffered_bytes == 0U &&
+             !transport.takeSessionStarted(),
+         "DTR close abandons pending receive bytes without waiting");
+
+  stream.session_open = true;
+  const usb::ServiceReport reopened = transport.serviceReceive();
+  wire::ParsedCommand command{};
+  expect(reopened.commands_queued == 1U && transport.takeSessionStarted() &&
+             !transport.takeSessionStarted() &&
+             transport.takeCommand(command) && !command.rejected() &&
+             command.request.request_id == 71U &&
+             command.request.nonce == 710U,
+         "DTR reopen starts a new session and cannot splice the old prefix");
+
+  expect(transport.queueResponse(pingResponse(71U, 710U)),
+         "the reopened command reserves a response");
+  stream.write_plan = {7, 0};
+  const usb::ServiceReport stalled = transport.serviceTransmit();
+  expect(stalled.stalled && stalled.bytes_written == 7U &&
+             transport.snapshot().active_frame_is_response,
+         "a response can stall partway through an open session");
+
+  stream.session_open = false;
+  const usb::ServiceReport shutdown = transport.serviceTransmit();
+  const usb::TransportSnapshot snapshot = transport.snapshot();
+  expect(shutdown.bytes_written == 0U &&
+             snapshot.response_queue_depth == 0U &&
+             snapshot.active_frame_size == 0U &&
+             snapshot.session_open_events == 2U &&
+             snapshot.session_close_events == 2U &&
+             snapshot.session_responses_abandoned == 1U &&
+             !snapshot.session_open,
+         "DTR close bounds shutdown and records an abandoned partial response");
 }
 
 void testZeroReadAndResponseReservation() {
@@ -547,6 +623,7 @@ int main() {
   testFixedQueueBoundaries();
   testUsbIdentity();
   testIncrementalReceiveAndBackpressure();
+  testDtrSessionBoundariesAreBounded();
   testZeroReadAndResponseReservation();
   testPartialAndZeroWritesPreserveFrames();
   testResponsePriorityAndActiveFrameOwnership();

@@ -616,6 +616,12 @@ class BackgroundReaderTests(unittest.TestCase):
             self.assertFalse(request_thread.is_alive())
             self.assertEqual(1, len(failures))
             self.assertIsInstance(failures[0], DeviceDisconnectedError)
+            disconnect = failures[0]
+            assert isinstance(disconnect, DeviceDisconnectedError)
+            self.assertIsNotNone(disconnect.reader_counters)
+            self.assertIsNotNone(disconnect.parser_counters)
+            assert disconnect.reader_counters is not None
+            self.assertEqual(1, disconnect.reader_counters.disconnects)
             self.assertEqual(0, reader.pending_count)
             self.assertEqual(1, reader.counters.disconnects)
 
@@ -642,8 +648,15 @@ class BackgroundReaderTests(unittest.TestCase):
             self.assertFalse(request_thread.is_alive())
             self.assertEqual(1, len(failures))
             self.assertIsInstance(failures[0], ReaderProtocolError)
-            with self.assertRaises(ReaderProtocolError):
+            parser_failure = failures[0]
+            assert isinstance(parser_failure, ReaderProtocolError)
+            self.assertIsNotNone(parser_failure.reader_counters)
+            self.assertIsNotNone(parser_failure.parser_counters)
+            assert parser_failure.reader_counters is not None
+            self.assertEqual(1, parser_failure.reader_counters.protocol_failures)
+            with self.assertRaises(ReaderProtocolError) as repeated:
                 reader.request(FrameKind.INFO_REQUEST)
+            self.assertIs(repeated.exception, parser_failure)
             self.assertEqual(1, reader.counters.protocol_failures)
             self.assertEqual(0, reader.pending_count)
         finally:

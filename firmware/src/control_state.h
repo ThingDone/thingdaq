@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 
 #include "firmware_capabilities.h"
@@ -8,6 +10,8 @@
 #include "statistics.h"
 
 namespace teensy_daq::control {
+
+inline constexpr std::size_t kRecentRequestIdWindow = 16U;
 
 // IDLE has no applied acquisition profile. Protocol v1 represents that state
 // with the original zero-stream hardware-shaped placeholder; CONFIGURE no
@@ -123,6 +127,11 @@ class ControlState {
   // cancels an unconsumed START event, and signals STOP when work may exist.
   bool recoverToIdle();
 
+  // Request identifiers are unique only within one CDC host session. DTR
+  // reopen clears this bounded replay window without changing acquisition
+  // state, run identity, configuration, or counters.
+  void beginHostSession();
+
   DispatchResult dispatch(
       const protocol::Request &request, protocol::ControlFrame &response,
       DispatchReadiness readiness = DispatchReadiness{});
@@ -176,6 +185,7 @@ class ControlState {
                          protocol::Result encoding,
                          protocol::ControlFrame &response);
   protocol::InfoResponse infoResponse() const;
+  bool rememberRequestId(std::uint32_t request_id);
 
   protocol_v1::DeviceState state_ = protocol_v1::DeviceState::kBoot;
   protocol::Configuration configuration_ = kIdleConfiguration;
@@ -184,6 +194,9 @@ class ControlState {
   std::uint32_t hardware_serial_ = 0U;
   protocol::AdcInitializationMetadata adc_metadata_{};
   std::uint8_t pending_event_mask_ = 0U;
+  std::array<std::uint32_t, kRecentRequestIdWindow> recent_request_ids_{};
+  std::size_t recent_request_count_ = 0U;
+  std::size_t next_request_slot_ = 0U;
   stats::Statistics statistics_{};
 };
 
@@ -203,6 +216,7 @@ static_assert(kPhysicalCombinedConfiguration.stream_mask == 3U);
 static_assert(kPhysicalCombinedConfiguration.source ==
               protocol_v1::Source::kHardware);
 static_assert(capabilities::kSupportedStreamMask == 3U);
+static_assert(kRecentRequestIdWindow >= 2U);
 static_assert(ControlState::nextRunId(0U) == 1U);
 static_assert(ControlState::nextRunId(0xFFFFFFFFU) == 1U);
 static_assert(ControlState::isLegalTransition(

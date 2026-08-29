@@ -72,12 +72,22 @@ struct usb_string_descriptor_struct usb_string_product_name = {
 
 namespace teensy_daq::usb {
 
+bool TeensyCdcByteStream::sessionOpen() const {
+  return (usb_cdc_line_rtsdtr & USB_SERIAL_DTR) != 0U;
+}
+
 IoCount TeensyCdcByteStream::available() {
+  if (!sessionOpen()) {
+    return 0;
+  }
   return static_cast<IoCount>(usb_serial_available());
 }
 
 IoCount TeensyCdcByteStream::read(std::uint8_t *destination,
                                   std::size_t capacity) {
+  if (!sessionOpen()) {
+    return 0;
+  }
   if (destination == nullptr || capacity == 0U ||
       capacity > std::numeric_limits<std::uint32_t>::max()) {
     return -1;
@@ -87,11 +97,17 @@ IoCount TeensyCdcByteStream::read(std::uint8_t *destination,
 }
 
 IoCount TeensyCdcByteStream::availableForWrite() {
+  if (!sessionOpen()) {
+    return 0;
+  }
   return static_cast<IoCount>(usb_serial_write_buffer_free());
 }
 
 IoCount TeensyCdcByteStream::write(const std::uint8_t *source,
                                    std::size_t size) {
+  if (!sessionOpen()) {
+    return 0;
+  }
   if (source == nullptr || size == 0U ||
       size > std::numeric_limits<std::uint32_t>::max()) {
     return -1;

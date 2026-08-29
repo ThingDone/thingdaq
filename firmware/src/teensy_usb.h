@@ -23,6 +23,7 @@ bool parseDecimalHardwareSerial(const std::uint16_t *code_units,
 
 class TeensyCdcByteStream final : public CdcByteStream {
  public:
+  bool sessionOpen() const override;
   IoCount available() override;
   IoCount read(std::uint8_t *destination, std::size_t capacity) override;
   IoCount availableForWrite() override;

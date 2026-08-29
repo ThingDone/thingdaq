@@ -220,6 +220,14 @@ struct Request {
 struct ParsedCommand {
   CommandFrame frame{};
   Request request{};
+  protocol_v1::ErrorCode rejection_error = protocol_v1::ErrorCode::kOk;
+  std::uint32_t rejected_request_id = 0U;
+  std::uint8_t rejected_kind = 0U;
+  std::uint8_t rejected_version = 0U;
+
+  constexpr bool rejected() const {
+    return rejection_error != protocol_v1::ErrorCode::kOk;
+  }
 };
 
 Result decodeRequest(ByteView input, Request &request);
@@ -759,16 +767,29 @@ struct ParserCounters {
 struct FeedResult {
   std::size_t consumed = 0U;
   bool command_ready = false;
+  bool rejection_ready = false;
 };
 
 class IncrementalCommandParser {
  public:
   FeedResult feed(ByteView input, ParsedCommand &command);
   void reset();
+  // Drop only session-local partial bytes while retaining lifetime parser
+  // diagnostics. A DTR close/open boundary must not splice two hosts into one
+  // command, but it must not erase evidence about the prior session either.
+  void resetSession();
   ParserCounters counters() const;
 
  private:
-  bool drain(ParsedCommand &command);
+  enum class DrainResult : std::uint8_t {
+    kNone,
+    kCommand,
+    kRejection,
+  };
+
+  DrainResult drain(ParsedCommand &command);
+  bool describeRejection(const Result &failure,
+                         ParsedCommand &command) const;
   std::size_t findMagic() const;
   std::size_t partialMagicSuffix() const;
   void discard(std::size_t count);

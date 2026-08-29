@@ -2,6 +2,7 @@
 type: reference
 title: Teensy DAQ Python Package
 created: 2026-08-27
+updated: 2026-08-29
 tags:
   - teensy-daq
   - python
@@ -176,6 +177,40 @@ is discarded by the incremental parser. Physical targets must be Teensy
 4.0/i.MX RT1062 firmware version 0.3.0 or newer with a nonzero serial and a
 `tdaq-` source build ID. `ExpectedDeviceIdentity` adds exact firmware, build,
 and serial pins when a particular artifact is required.
+
+### Reopen policy and recovery evidence
+
+Every synchronized open resolves device state explicitly. The default
+`SessionRecoveryPolicy.ADOPT` preserves CONFIGURED state and, for an existing
+RUNNING epoch, obtains STATUS, activates the reader with the reported run and
+checksum, and treats the first complete frame from each enabled source as the
+new host's continuity anchor. Pre-attachment loss is not fabricated as a
+sequence-zero gap; it remains visible in the firmware STATUS counters. Select
+`STOP` when a new process must force a known IDLE boundary instead:
+
+```python
+from teensy_daq import SessionRecoveryPolicy, TeensyDAQ
+
+adopted = TeensyDAQ.open(
+    hardware_serial=12345670,
+    session_policy=SessionRecoveryPolicy.ADOPT,
+)
+adopted.close(stop=False)  # deliberately leave the device state unchanged
+
+with TeensyDAQ.open(
+    hardware_serial=12345670,
+    session_policy=SessionRecoveryPolicy.STOP,
+) as stopped:
+    assert stopped.state.name == "IDLE"
+```
+
+Command deadlines raise `CommandTimeoutError` with an immutable
+`RecoveryEvidence` snapshot. Terminal `DeviceDisconnectedError` and
+`ReaderProtocolError` retain both reader/parser counter snapshots and the same
+facade evidence when surfaced through `TeensyDAQ`. `close()` always attempts a
+bounded reader/transport shutdown even if STOP fails; a resulting
+`DAQShutdownError` preserves both failures plus the last identity, state, run,
+STATUS, host counters, parser counters, and observed loss/telemetry evidence.
 
 ## Phase 03 control-only API and CLI
 

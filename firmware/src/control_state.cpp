@@ -64,6 +64,13 @@ bool ControlState::recoverToIdle() {
   return true;
 }
 
+TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.host_session")
+void ControlState::beginHostSession() {
+  recent_request_ids_ = {};
+  recent_request_count_ = 0U;
+  next_request_slot_ = 0U;
+}
+
 TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.dispatch")
 DispatchResult ControlState::dispatch(const protocol::Request &request,
                                       protocol::ControlFrame &response,
@@ -73,6 +80,10 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
     return {DispatchStatus::kNoResponse,
             protocol_v1::ErrorCode::kInvalidState,
             protocol::Result::success()};
+  }
+  if (!rememberRequestId(request.request_id)) {
+    return reject(request, protocol_v1::ErrorCode::kInvalidRequestId,
+                  response);
   }
 
   switch (request.kind) {
@@ -287,6 +298,23 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
           protocol::Result::failure(
               protocol_v1::ErrorCode::kUnknownFrameKind,
               protocol::ValidationIssue::kBadKind)};
+}
+
+bool ControlState::rememberRequestId(std::uint32_t request_id) {
+  if (request_id == 0U) {
+    return false;
+  }
+  for (std::size_t index = 0U; index < recent_request_count_; ++index) {
+    if (recent_request_ids_[index] == request_id) {
+      return false;
+    }
+  }
+  recent_request_ids_[next_request_slot_] = request_id;
+  next_request_slot_ = (next_request_slot_ + 1U) % recent_request_ids_.size();
+  if (recent_request_count_ < recent_request_ids_.size()) {
+    ++recent_request_count_;
+  }
+  return true;
 }
 
 PendingEvents ControlState::takePendingEvents() {

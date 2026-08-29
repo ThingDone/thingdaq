@@ -18,6 +18,11 @@ class CdcByteStream {
  public:
   virtual ~CdcByteStream() = default;
 
+  // Portable fakes and transports without a control-line concept are always
+  // open. The Teensy adapter overrides this with the CDC DTR state so the
+  // runtime can recognize host-session boundaries without ever waiting for a
+  // host to appear.
+  virtual bool sessionOpen() const { return true; }
   virtual IoCount available() = 0;
   virtual IoCount read(std::uint8_t *destination, std::size_t capacity) = 0;
   virtual IoCount availableForWrite() = 0;
@@ -69,6 +74,7 @@ struct TransportSnapshot {
   std::uint32_t tx_available_calls = 0U;
   std::uint32_t tx_write_calls = 0U;
   std::uint32_t commands_queued = 0U;
+  std::uint32_t rejected_commands_queued = 0U;
   std::uint32_t commands_dequeued = 0U;
   std::uint32_t responses_queued = 0U;
   std::uint32_t responses_completed = 0U;
@@ -90,6 +96,10 @@ struct TransportSnapshot {
   std::uint32_t tx_byte_budget_exhaustions = 0U;
   std::uint32_t tx_call_budget_exhaustions = 0U;
   std::uint32_t io_errors = 0U;
+  std::uint32_t session_open_events = 0U;
+  std::uint32_t session_close_events = 0U;
+  std::uint32_t session_commands_abandoned = 0U;
+  std::uint32_t session_responses_abandoned = 0U;
   std::size_t command_queue_depth = 0U;
   std::size_t response_queue_depth = 0U;
   std::size_t lower_priority_queue_depth = 0U;
@@ -101,6 +111,7 @@ struct TransportSnapshot {
   std::size_t max_write_request_bytes = 0U;
   bool active_frame_is_response = false;
   bool command_awaiting_response = false;
+  bool session_open = true;
   protocol::ParserCounters parser{};
 };
 
@@ -208,6 +219,10 @@ class CdcTransport {
   // for a command it already took. Normal dispatch must always queue one.
   bool abandonResponseReservation();
 
+  // Consume the edge raised when CDC DTR enters a new open session. Runtime
+  // uses this to reset only session-scoped duplicate-request history.
+  bool takeSessionStarted();
+
   constexpr std::size_t commandQueueDepth() const {
     return command_queue_.size();
   }
@@ -234,6 +249,9 @@ class CdcTransport {
   };
 
   bool processPendingReceive(ServiceReport &report);
+  void updateSessionState();
+  void handleSessionTransition(bool observed_open);
+  void resetSessionQueues();
   void publishParserDelta();
   FrameSelection selectTransmitFrame();
   void completeTransmitFrame(ActiveFrame kind);
@@ -258,6 +276,9 @@ class CdcTransport {
   std::size_t command_queue_high_water_ = 0U;
   std::size_t response_queue_high_water_ = 0U;
   bool command_awaiting_response_ = false;
+  bool session_state_initialized_ = false;
+  bool session_open_ = true;
+  bool session_started_pending_ = false;
   protocol::ParserCounters published_parser_counters_{};
   TransportSnapshot counters_{};
 };

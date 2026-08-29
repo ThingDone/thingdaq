@@ -797,6 +797,20 @@ void testParser(const std::string &fixture_directory) {
   bad_checksum.back() ^= 1U;
   corruptions.push_back(bad_checksum);
 
+  wire::IncrementalCommandParser rejection_parser{};
+  wire::ParsedCommand rejected{};
+  const wire::FeedResult rejection = rejection_parser.feed(
+      {bad_checksum.data(), bad_checksum.size()}, rejected);
+  expect(rejection.consumed == bad_checksum.size() &&
+             !rejection.command_ready && rejection.rejection_ready &&
+             rejected.rejected() && rejected.rejected_request_id == 1U &&
+             rejected.rejected_kind == static_cast<std::uint8_t>(
+                                           constants::FrameKind::kInfoRequest) &&
+             rejected.rejected_version == constants::kProtocolVersion &&
+             rejected.rejection_error ==
+                 constants::ErrorCode::kChecksumMismatch,
+         "an identifiable malformed frame exposes bounded rejection metadata");
+
   std::vector<std::uint8_t> stream{0x00U, 0xEFU, 0x00U, 0xBEU, 0xADU};
   for (const auto &candidate : corruptions) {
     stream.insert(stream.end(), candidate.begin(), candidate.end());
@@ -823,6 +837,22 @@ void testParser(const std::string &fixture_directory) {
   expect(counters.buffered_bytes == 0U &&
              counters.high_water_mark <= wire::kCommandParserStorageBytes,
          "parser storage remains bounded");
+
+  const std::vector<std::uint8_t> status =
+      readFixture(fixture_directory, "get-status-request.bin");
+  std::vector<std::uint8_t> garbage(8192U, 0xA5U);
+  garbage.insert(garbage.end(), info.begin(), info.end());
+  garbage.insert(garbage.end(), status.begin(), status.end());
+  wire::IncrementalCommandParser garbage_parser{};
+  std::vector<std::uint32_t> recovered_after_garbage{};
+  feedAll(garbage_parser, garbage, recovered_after_garbage);
+  expect(recovered_after_garbage ==
+             std::vector<std::uint32_t>({1U, 4U}) &&
+             garbage_parser.counters().bytes_discarded >= 8192U &&
+             garbage_parser.counters().buffered_bytes == 0U &&
+             garbage_parser.counters().high_water_mark <=
+                 wire::kCommandParserStorageBytes,
+         "long garbage remains bounded and recovers to INFO then STATUS");
 
   wire::IncrementalCommandParser partial_parser{};
   wire::ParsedCommand command{};

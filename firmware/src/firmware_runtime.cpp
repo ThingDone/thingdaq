@@ -25,6 +25,9 @@ bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
 LoopReport FirmwareRuntime::service() {
   LoopReport report{};
   report.receive = transport_.serviceReceive();
+  if (transport_.takeSessionStarted()) {
+    control_.beginHostSession();
+  }
   // Preserve per-epoch queue high-water marks before takeCommand() removes the
   // newly received request.  This lightweight transport-only observation
   // replaces the former complete data-path snapshot at this point.
@@ -36,98 +39,114 @@ LoopReport FirmwareRuntime::service() {
   bool response_ready = false;
   if (transport_.takeCommand(command)) {
     report.command_dispatched = true;
-    // STATUS must include receive-queue activity from this visit and every
-    // completed data-path operation.  Refresh it on demand instead of paying
-    // for the complete telemetry traversal on every command-free loop.
-    if (command.request.kind == protocol_v1::CommandKind::kGetStatus) {
-      publishPacketStatistics();
-    }
-    control::DispatchReadiness readiness{};
-    benchmark::RunResult benchmark_result{};
-    gpio_clock::RunResult gpio_clock_result{};
-    gpio_diagnostic::RunResult gpio_capture_result{};
-    protocol::GpioCaptureDiagnosticResponse gpio_capture_response{};
-    if (command.request.kind == protocol_v1::CommandKind::kConfigure) {
-      readiness.configuration_ready = dataPathQuiescent();
-      if (readiness.configuration_ready &&
-          acquisition::Controller::isExecutableConfiguration(
-              command.request.configuration)) {
-        readiness.configuration_ready = acquisition_controller_.readyForStart(
-            command.request.configuration,
-            control::ControlState::nextRunId(control_.runId()));
-      }
-    } else if (command.request.kind == protocol_v1::CommandKind::kStart) {
-      readiness.start_ready = dataPathQuiescent();
-      if (readiness.start_ready &&
-          acquisition::Controller::isExecutableConfiguration(
-              control_.appliedConfiguration())) {
-        readiness.start_ready = acquisition_controller_.readyForStart(
-            control_.appliedConfiguration(),
-            control::ControlState::nextRunId(control_.runId()));
-      }
-    } else if (command.request.kind ==
-                   protocol_v1::CommandKind::kChecksumBenchmark &&
-               control_.state() == protocol_v1::DeviceState::kIdle &&
-               checksum_benchmark_ != nullptr) {
-      benchmark_result =
-          checksum_benchmark_->run(command.request.checksum_benchmark);
-      if (benchmark_result.ok()) {
-        readiness.checksum_benchmark_response = &benchmark_result.response;
-        readiness.checksum_benchmark_error = protocol_v1::ErrorCode::kOk;
-      } else if (benchmark_result.status ==
-                 benchmark::RunStatus::kInvalidRequest) {
-        readiness.checksum_benchmark_error =
-            protocol_v1::ErrorCode::kInvalidPayload;
+    if (command.rejected()) {
+      report.rejected_command_dispatched = true;
+      const protocol::Result encoded = protocol::encodeRejectedFrameResponse(
+          command.rejected_request_id, command.rejected_kind,
+          command.rejected_version, command.rejection_error, response);
+      if (encoded.ok()) {
+        response_ready = true;
       } else {
-        readiness.checksum_benchmark_error =
-            protocol_v1::ErrorCode::kInternalError;
+        report.internal_error = true;
+        control_.statistics().recordTransportError();
+        report.response_reservation_abandoned =
+            transport_.abandonResponseReservation();
       }
-    } else if (command.request.kind ==
-                   protocol_v1::CommandKind::kGpioClockDiagnostic &&
-               control_.state() == protocol_v1::DeviceState::kIdle &&
-               gpio_clock_diagnostic_ != nullptr && dataPathQuiescent()) {
-      gpio_clock_result = gpio_clock_diagnostic_->run(
-          command.request.gpio_clock_diagnostic);
-      if (gpio_clock_result.ok()) {
-        readiness.gpio_clock_response = &gpio_clock_result.response;
-        readiness.gpio_clock_error = protocol_v1::ErrorCode::kOk;
-      } else if (gpio_clock_result.status ==
-                 gpio_clock::RunStatus::kInvalidRequest) {
-        readiness.gpio_clock_error = protocol_v1::ErrorCode::kInvalidPayload;
-      } else {
-        readiness.gpio_clock_error = protocol_v1::ErrorCode::kInternalError;
-      }
-    } else if (command.request.kind ==
-                   protocol_v1::CommandKind::kGpioClockDiagnostic &&
-               control_.state() == protocol_v1::DeviceState::kIdle &&
-               !dataPathQuiescent()) {
-      readiness.gpio_clock_error = protocol_v1::ErrorCode::kBusy;
-    } else if (command.request.kind ==
-                   protocol_v1::CommandKind::kGpioCaptureDiagnostic &&
-               control_.state() == protocol_v1::DeviceState::kIdle &&
-               gpio_capture_diagnostic_ != nullptr && dataPathQuiescent()) {
-      gpio_capture_result = gpio_capture_diagnostic_->run();
-      if (gpio_capture_result.ok()) {
-        gpio_capture_response = gpioDiagnosticResponse(
-            *gpio_capture_diagnostic_, gpio_capture_result.snapshot);
-        readiness.gpio_capture_response = &gpio_capture_response;
-        readiness.gpio_capture_error = protocol_v1::ErrorCode::kOk;
-      } else {
-        readiness.gpio_capture_error =
-            protocol_v1::ErrorCode::kInternalError;
-      }
-    } else if (command.request.kind ==
-                   protocol_v1::CommandKind::kGpioCaptureDiagnostic &&
-               control_.state() == protocol_v1::DeviceState::kIdle &&
-               !dataPathQuiescent()) {
-      readiness.gpio_capture_error = protocol_v1::ErrorCode::kBusy;
-    }
-    const control::DispatchResult dispatched =
-        control_.dispatch(command.request, response, readiness);
-    if (dispatched.responseReady()) {
-      response_ready = true;
     } else {
-      recoverResponsePath(command.request, response, false, report);
+      // STATUS must include receive-queue activity from this visit and every
+      // completed data-path operation. Refresh it on demand instead of paying
+      // for the complete telemetry traversal on every command-free loop.
+      if (command.request.kind == protocol_v1::CommandKind::kGetStatus) {
+        publishPacketStatistics();
+      }
+      control::DispatchReadiness readiness{};
+      benchmark::RunResult benchmark_result{};
+      gpio_clock::RunResult gpio_clock_result{};
+      gpio_diagnostic::RunResult gpio_capture_result{};
+      protocol::GpioCaptureDiagnosticResponse gpio_capture_response{};
+      if (command.request.kind == protocol_v1::CommandKind::kConfigure) {
+        readiness.configuration_ready = dataPathQuiescent();
+        if (readiness.configuration_ready &&
+            acquisition::Controller::isExecutableConfiguration(
+                command.request.configuration)) {
+          readiness.configuration_ready =
+              acquisition_controller_.readyForStart(
+                  command.request.configuration,
+                  control::ControlState::nextRunId(control_.runId()));
+        }
+      } else if (command.request.kind == protocol_v1::CommandKind::kStart) {
+        readiness.start_ready = dataPathQuiescent();
+        if (readiness.start_ready &&
+            acquisition::Controller::isExecutableConfiguration(
+                control_.appliedConfiguration())) {
+          readiness.start_ready = acquisition_controller_.readyForStart(
+              control_.appliedConfiguration(),
+              control::ControlState::nextRunId(control_.runId()));
+        }
+      } else if (command.request.kind ==
+                     protocol_v1::CommandKind::kChecksumBenchmark &&
+                 control_.state() == protocol_v1::DeviceState::kIdle &&
+                 checksum_benchmark_ != nullptr) {
+        benchmark_result =
+            checksum_benchmark_->run(command.request.checksum_benchmark);
+        if (benchmark_result.ok()) {
+          readiness.checksum_benchmark_response = &benchmark_result.response;
+          readiness.checksum_benchmark_error = protocol_v1::ErrorCode::kOk;
+        } else if (benchmark_result.status ==
+                   benchmark::RunStatus::kInvalidRequest) {
+          readiness.checksum_benchmark_error =
+              protocol_v1::ErrorCode::kInvalidPayload;
+        } else {
+          readiness.checksum_benchmark_error =
+              protocol_v1::ErrorCode::kInternalError;
+        }
+      } else if (command.request.kind ==
+                     protocol_v1::CommandKind::kGpioClockDiagnostic &&
+                 control_.state() == protocol_v1::DeviceState::kIdle &&
+                 gpio_clock_diagnostic_ != nullptr && dataPathQuiescent()) {
+        gpio_clock_result = gpio_clock_diagnostic_->run(
+            command.request.gpio_clock_diagnostic);
+        if (gpio_clock_result.ok()) {
+          readiness.gpio_clock_response = &gpio_clock_result.response;
+          readiness.gpio_clock_error = protocol_v1::ErrorCode::kOk;
+        } else if (gpio_clock_result.status ==
+                   gpio_clock::RunStatus::kInvalidRequest) {
+          readiness.gpio_clock_error = protocol_v1::ErrorCode::kInvalidPayload;
+        } else {
+          readiness.gpio_clock_error = protocol_v1::ErrorCode::kInternalError;
+        }
+      } else if (command.request.kind ==
+                     protocol_v1::CommandKind::kGpioClockDiagnostic &&
+                 control_.state() == protocol_v1::DeviceState::kIdle &&
+                 !dataPathQuiescent()) {
+        readiness.gpio_clock_error = protocol_v1::ErrorCode::kBusy;
+      } else if (command.request.kind ==
+                     protocol_v1::CommandKind::kGpioCaptureDiagnostic &&
+                 control_.state() == protocol_v1::DeviceState::kIdle &&
+                 gpio_capture_diagnostic_ != nullptr && dataPathQuiescent()) {
+        gpio_capture_result = gpio_capture_diagnostic_->run();
+        if (gpio_capture_result.ok()) {
+          gpio_capture_response = gpioDiagnosticResponse(
+              *gpio_capture_diagnostic_, gpio_capture_result.snapshot);
+          readiness.gpio_capture_response = &gpio_capture_response;
+          readiness.gpio_capture_error = protocol_v1::ErrorCode::kOk;
+        } else {
+          readiness.gpio_capture_error =
+              protocol_v1::ErrorCode::kInternalError;
+        }
+      } else if (command.request.kind ==
+                     protocol_v1::CommandKind::kGpioCaptureDiagnostic &&
+                 control_.state() == protocol_v1::DeviceState::kIdle &&
+                 !dataPathQuiescent()) {
+        readiness.gpio_capture_error = protocol_v1::ErrorCode::kBusy;
+      }
+      const control::DispatchResult dispatched =
+          control_.dispatch(command.request, response, readiness);
+      if (dispatched.responseReady()) {
+        response_ready = true;
+      } else {
+        recoverResponsePath(command.request, response, false, report);
+      }
     }
   }
 

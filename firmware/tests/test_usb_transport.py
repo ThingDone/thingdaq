@@ -96,7 +96,7 @@ class FirmwareUsbTransportTests(unittest.TestCase):
         self.assertIn("kUsbTxCallsPerVisit", portable_source)
         self.assertIn("LowerPriorityFrameSource", portable_source)
 
-    def test_teensy_adapter_uses_core_identity_without_dtr_gating(self) -> None:
+    def test_teensy_adapter_observes_dtr_without_waiting_for_it(self) -> None:
         adapter = (FIRMWARE_SOURCE / "teensy_usb.cpp").read_text(encoding="utf-8")
         sketch = (FIRMWARE_DIRECTORY / "firmware.ino").read_text(encoding="utf-8")
 
@@ -106,7 +106,9 @@ class FirmwareUsbTransportTests(unittest.TestCase):
         self.assertIn("usb_serial_read(", adapter)
         self.assertIn("usb_serial_write_buffer_free()", adapter)
         self.assertIn("usb_serial_write(", adapter)
-        self.assertNotIn("usb_cdc_line_rtsdtr", adapter)
+        self.assertIn("TeensyCdcByteStream::sessionOpen()", adapter)
+        self.assertIn("usb_cdc_line_rtsdtr", adapter)
+        self.assertIn("USB_SERIAL_DTR", adapter)
         self.assertNotIn("while (!Serial", sketch)
         self.assertNotIn("Serial.begin(115200)", sketch)
         self.assertNotIn("Serial.print", sketch)

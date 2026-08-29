@@ -2,7 +2,7 @@
 type: reference
 title: System Overview
 created: 2026-08-27
-updated: 2026-08-28
+updated: 2026-08-29
 tags:
   - teensy-daq
   - architecture
@@ -92,9 +92,10 @@ units, so enumeration and protocol identity cannot silently diverge.
 Native USB initialization happens before Arduino `setup()`. The sketch does
 not call `Serial.begin()`, wait for `Serial`/DTR, or place a startup banner in
 the framed command stream. It therefore completes bounded BOOT work even when
-no host enumerates or opens the port. The Teensy adapter uses the core's direct
-CDC available/read/write-capacity/write functions and never gates command
-service on the host-open boolean.
+no host enumerates or opens the port. The Teensy adapter samples the core DTR
+bit but never waits for it: while DTR is low, its direct CDC
+available/read/write-capacity/write methods return immediately and the main
+loop continues acquisition and loss accounting.
 
 ## Bounded CDC transport
 
@@ -104,7 +105,11 @@ enter a four-entry FIFO. A command can leave that FIFO only when one of the
 four complete-response slots is reserved, preventing a valid request from
 being consumed and then losing its response to queue pressure. Parser
 rejection deltas are projected into the shared firmware statistics exactly
-once.
+once. An identifiable malformed header or complete frame also enters this
+bounded queue as rejection metadata and receives one checksummed
+`ERROR_RESPONSE`; no command handler sees it. Garbage search retains at most a
+partial magic suffix, so long noise and adversarial declared lengths cannot
+grow parser storage beyond its fixed command-frame buffer.
 
 Receive and transmit service calls process at most 1,024 and 2,048 bytes,
 respectively, and each performs at most eight core read or write calls. A zero
@@ -121,8 +126,17 @@ and call totals, partial/zero operations, I/O errors, budget exhaustion, and
 current/consecutive/maximum stall counts. It also counts the last-resort
 abandonment of a reserved response slot, which releases command backpressure
 only after the runtime cannot encode either the requested response or a typed
-INTERNAL_ERROR. Normal no-host backpressure is a stall, not a blocking wait or
-a fabricated transport failure.
+INTERNAL_ERROR. Endpoint backpressure while DTR is open is a stall, not an
+unbounded wait; while DTR is low the endpoint is not called at all.
+
+DTR edges define host-session boundaries. A close immediately abandons
+session-local receive fragments, queued commands, reservations, and queued or
+partially emitted command responses while retaining lifetime parser, loss, and
+transport counters. It never clears acquisition state or a partially emitted
+data frame. A reopen starts a fresh bounded duplicate-request window, so a new
+host can begin again at request ID 1 and recover by INFO/STATUS without joining
+command bytes from the prior host. Session open/close and abandoned-work counts
+remain available in the transport snapshot.
 
 ## Complete-frame packet pipeline
 
@@ -186,9 +200,13 @@ Every `loop()` calls one portable runtime service step in this fixed order:
    one 2,048-byte core buffer per call and avoiding intentional sub-512-byte
    data chunks except exact frame tails.
 
-Valid typed rejections such as INVALID_STATE or UNSUPPORTED_CONFIGURATION are
-normal protocol outcomes and leave the prior state atomic. A response encoding
-or queue-invariant failure is an internal fault: the runtime clears an
+Valid typed rejections such as INVALID_STATE, INVALID_REQUEST_ID, or
+UNSUPPORTED_CONFIGURATION are normal protocol outcomes and leave the prior
+state atomic. INFO and STOP are idempotent when sent with fresh IDs; a repeated
+START receives INVALID_STATE. CONFIGURE encodes and preflights its requested
+resources before committing state, so any validation, readiness, or encoding
+failure retains the complete prior configuration. A response encoding or
+queue-invariant failure is an internal fault: the runtime clears an
 unconsumed START event, signals STOP if work could exist, drops the applied
 configuration, and returns to IDLE while retaining run/build/statistics
 provenance. It attempts a typed INTERNAL_ERROR response before abandoning the

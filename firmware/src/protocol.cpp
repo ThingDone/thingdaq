@@ -3333,8 +3333,10 @@ FeedResult IncrementalCommandParser::feed(ByteView input,
     buffer_[buffered_++] = input.data[result.consumed++];
     saturatingIncrement(counters_.bytes_received);
     updateHighWater();
-    if (drain(command)) {
-      result.command_ready = true;
+    const DrainResult drained = drain(command);
+    if (drained != DrainResult::kNone) {
+      result.command_ready = drained == DrainResult::kCommand;
+      result.rejection_ready = drained == DrainResult::kRejection;
       return result;
     }
   }
@@ -3348,6 +3350,14 @@ void IncrementalCommandParser::reset() {
   counters_ = {};
 }
 
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.parser_session_reset")
+void IncrementalCommandParser::resetSession() {
+  if (buffered_ != 0U) {
+    discard(buffered_);
+  }
+  resynchronizing_ = false;
+}
+
 ParserCounters IncrementalCommandParser::counters() const {
   ParserCounters result = counters_;
   result.buffered_bytes = buffered_;
@@ -3355,35 +3365,44 @@ ParserCounters IncrementalCommandParser::counters() const {
 }
 
 TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.command_parser_drain")
-bool IncrementalCommandParser::drain(ParsedCommand &command) {
+IncrementalCommandParser::DrainResult IncrementalCommandParser::drain(
+    ParsedCommand &command) {
   while (true) {
     const std::size_t magic_at = findMagic();
     if (magic_at == kNotFound) {
       const std::size_t retained = partialMagicSuffix();
       discard(buffered_ - retained);
-      return false;
+      return DrainResult::kNone;
     }
     if (magic_at != 0U) {
       discard(magic_at);
     }
     if (buffered_ < protocol_v1::kHeaderSize) {
-      return false;
+      return DrainResult::kNone;
     }
     FrameHeader header{};
     Result result = decodeHeader({buffer_.data(), buffered_}, header, true);
     if (!result.ok()) {
       recordFailure(result);
+      const bool rejection_ready = describeRejection(result, command);
       discard(1U);
+      if (rejection_ready) {
+        return DrainResult::kRejection;
+      }
       continue;
     }
     if (buffered_ < header.total_length) {
-      return false;
+      return DrainResult::kNone;
     }
     Request request{};
     result = decodeRequest({buffer_.data(), header.total_length}, request);
     if (!result.ok()) {
       recordFailure(result);
+      const bool rejection_ready = describeRejection(result, command);
       discard(1U);
+      if (rejection_ready) {
+        return DrainResult::kRejection;
+      }
       continue;
     }
     if (!command.frame.setSize(header.total_length)) {
@@ -3401,8 +3420,32 @@ bool IncrementalCommandParser::drain(ParsedCommand &command) {
     buffered_ -= header.total_length;
     saturatingIncrement(counters_.commands_accepted);
     resynchronizing_ = false;
-    return true;
+    return DrainResult::kCommand;
   }
+}
+
+TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.parser_rejection")
+bool IncrementalCommandParser::describeRejection(
+    const Result &failure, ParsedCommand &command) const {
+  if (failure.ok() || buffered_ < protocol_v1::kHeaderSize) {
+    return false;
+  }
+  std::uint32_t request_id = 0U;
+  if (!loadU32({buffer_.data(), buffered_},
+               protocol_v1::kHeaderRequestIdOffset, request_id) ||
+      request_id == 0U) {
+    return false;
+  }
+
+  ParsedCommand rejected{};
+  rejected.rejection_error = failure.error;
+  rejected.rejected_request_id = request_id;
+  rejected.rejected_kind =
+      buffer_[protocol_v1::kHeaderKindOffset];
+  rejected.rejected_version =
+      buffer_[protocol_v1::kHeaderVersionOffset];
+  command = rejected;
+  return true;
 }
 
 std::size_t IncrementalCommandParser::findMagic() const {

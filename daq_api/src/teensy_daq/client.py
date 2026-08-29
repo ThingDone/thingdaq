@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable, Iterator
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from enum import Enum
 from threading import RLock
 from time import sleep
 from types import TracebackType
@@ -74,6 +75,32 @@ StreamItem: TypeAlias = DataBlock | LossReport
 SerialTransportFactory: TypeAlias = Callable[[str], ByteTransport]
 
 
+class SessionRecoveryPolicy(str, Enum):
+    """How a newly opened host session handles existing device state."""
+
+    ADOPT = "adopt"
+    STOP = "stop"
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryEvidence:
+    """Last trustworthy host/firmware evidence retained on recovery errors."""
+
+    identity: DeviceIdentitySnapshot | None
+    state: constants.DeviceState | None
+    configuration: DAQConfiguration | None
+    run_id: int
+    last_status: Status | None
+    host_counters: HostCounters
+    reader_counters: ReaderCounters
+    parser_counters: ParserCounters
+    observed_stream_gaps: int
+    observed_host_queue_losses: int
+    observed_stream_anomalies: int
+    protocol_telemetry_errors: int
+    telemetry_errors: tuple[str, ...]
+
+
 def _decimal_hardware_serial(value: str | None) -> int | None:
     if value is None or not value.isascii() or not value.isdecimal():
         return None
@@ -92,11 +119,37 @@ class DAQClosedError(TeensyDAQError):
 class CommandTimeoutError(TeensyDAQError):
     """A bounded command exchange ended without its correlated response."""
 
-    def __init__(self, error: RequestTimeoutError) -> None:
+    def __init__(
+        self,
+        error: RequestTimeoutError,
+        evidence: RecoveryEvidence | None = None,
+    ) -> None:
         super().__init__(str(error))
         self.command = error.kind
         self.request_id = error.request_id
         self.timeout = error.timeout
+        self.evidence = evidence
+
+
+class DAQShutdownError(TeensyDAQError):
+    """Bounded STOP or reader/transport shutdown failed during close."""
+
+    def __init__(
+        self,
+        *,
+        stop_error: BaseException | None,
+        reader_error: BaseException | None,
+        evidence: RecoveryEvidence,
+    ) -> None:
+        failures = []
+        if stop_error is not None:
+            failures.append(f"STOP failed: {stop_error}")
+        if reader_error is not None:
+            failures.append(f"reader shutdown failed: {reader_error}")
+        super().__init__("; ".join(failures) or "DAQ shutdown failed")
+        self.stop_error = stop_error
+        self.reader_error = reader_error
+        self.evidence = evidence
 
 
 class BlockTimeoutError(TeensyDAQError):
@@ -270,6 +323,7 @@ class TeensyDAQ:
         operation_byte_budget: int | None = None,
         expected_identity: ExpectedDeviceIdentity | None = None,
         reopened_identity: DeviceIdentitySnapshot | None = None,
+        session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
     ) -> None:
         if not isinstance(strict, bool):
             raise TypeError("strict must be a boolean")
@@ -287,6 +341,10 @@ class TeensyDAQ:
             reopened_identity, DeviceIdentitySnapshot
         ):
             raise TypeError("reopened_identity must be DeviceIdentitySnapshot")
+        try:
+            selected_session_policy = SessionRecoveryPolicy(session_policy)
+        except (TypeError, ValueError) as error:
+            raise ValueError("session_policy must be 'adopt' or 'stop'") from error
 
         self._transport = transport
         self._strict = strict
@@ -295,6 +353,8 @@ class TeensyDAQ:
         self._block_timeout = float(block_timeout)
         self._expected_identity = expected_identity
         self._reopened_identity = reopened_identity
+        self._session_policy = selected_session_policy
+        self._session_policy_applied = False
         self._verified_identity: DeviceIdentitySnapshot | None = None
         self._reader = BackgroundReader(
             transport,
@@ -317,6 +377,7 @@ class TeensyDAQ:
         self._expected_sequence: dict[constants.FrameKind, int] = {}
         self._expected_ticks: dict[constants.FrameKind, int] = {}
         self._previous_sequence: dict[constants.FrameKind, int] = {}
+        self._unanchored_streams: set[constants.FrameKind] = set()
         self._inferred_missing_frames: dict[constants.FrameKind, int] = {}
         self._inferred_missing_items: dict[constants.FrameKind, int] = {}
         self._loss_stats_generation: int | None = None
@@ -360,6 +421,7 @@ class TeensyDAQ:
         idle_sleep: float = 0.001,
         operation_byte_budget: int | None = None,
         expected_identity: ExpectedDeviceIdentity | None = None,
+        session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
     ) -> TeensyDAQ:
@@ -451,6 +513,7 @@ class TeensyDAQ:
             operation_byte_budget=operation_byte_budget,
             expected_identity=expected_identity,
             reopened_identity=reopened_identity,
+            session_policy=session_policy,
         )
         try:
             daq.synchronize(
@@ -483,6 +546,7 @@ class TeensyDAQ:
         shutdown_timeout: float = 1.0,
         idle_sleep: float = 0.001,
         expected_identity: ExpectedDeviceIdentity | None = None,
+        session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
     ) -> TeensyDAQ:
@@ -506,6 +570,7 @@ class TeensyDAQ:
             shutdown_timeout=shutdown_timeout,
             idle_sleep=idle_sleep,
             expected_identity=expected_identity,
+            session_policy=session_policy,
             synchronization_attempts=synchronization_attempts,
             synchronization_retry_delay=synchronization_retry_delay,
         )
@@ -525,6 +590,10 @@ class TeensyDAQ:
     @property
     def strict(self) -> bool:
         return self._strict
+
+    @property
+    def session_policy(self) -> SessionRecoveryPolicy:
+        return self._session_policy
 
     @property
     def state(self) -> constants.DeviceState | None:
@@ -674,7 +743,7 @@ class TeensyDAQ:
                         )
                     else:
                         self._verified_identity = identity
-                        return info
+                        return self._apply_session_policy(info)
 
                 if attempt + 1 < attempts and retry_delay:
                     sleep(float(retry_delay))
@@ -684,6 +753,44 @@ class TeensyDAQ:
             raise DeviceSynchronizationError(
                 f"only one valid INFO response arrived in {attempts} attempts"
             )
+
+    def _apply_session_policy(self, info: DeviceInfo) -> DeviceInfo:
+        """Resolve pre-existing CONFIGURED/RUNNING state exactly once."""
+
+        if self._session_policy_applied:
+            return info
+
+        if info.device_state is constants.DeviceState.IDLE:
+            self._session_policy_applied = True
+            return info
+
+        if self._session_policy is SessionRecoveryPolicy.STOP:
+            self.stop()
+            refreshed, _ = self._read_info()
+            self._session_policy_applied = True
+            return refreshed
+
+        if info.device_state is constants.DeviceState.RUNNING:
+            status = self.status()
+            if status.device_state is constants.DeviceState.RUNNING:
+                configuration = self._configuration
+                if configuration is None or self._run_id == 0:
+                    raise DeviceSynchronizationError(
+                        "RUNNING session probe omitted configuration or run identity"
+                    )
+                self._reader.activate_run(
+                    self._run_id,
+                    configuration.data_checksum_algorithm,
+                )
+                self._initialize_stream_expectations(
+                    configuration,
+                    epoch_start=False,
+                )
+                self._loss_stats_generation = status.stats_generation
+                self._reset_loss_observations()
+
+        self._session_policy_applied = True
+        return info
 
     def info(self) -> DeviceInfo:
         """Return validated identity/capabilities in every post-boot state."""
@@ -969,6 +1076,9 @@ class TeensyDAQ:
             raise UnexpectedMessageError(
                 "the active stream stopped while waiting for a block"
             ) from error
+        except (DeviceDisconnectedError, ReaderProtocolError) as error:
+            error.evidence = self._recovery_evidence()
+            raise
 
         with self._lock:
             self._ensure_open()
@@ -1138,6 +1248,7 @@ class TeensyDAQ:
         with self._lock:
             if self._closed:
                 return
+            last_status_before_shutdown = self._last_status
             stop_error: BaseException | None = None
             if (
                 stop
@@ -1152,14 +1263,34 @@ class TeensyDAQ:
                     self.stop()
                 except BaseException as error:  # noqa: BLE001 - close regardless
                     stop_error = error
+            reader_error: BaseException | None = None
             try:
                 self._reader.close()
+            except BaseException as error:  # noqa: BLE001 - preserve both failures
+                reader_error = error
             finally:
                 self._closed = True
                 self._pending_items.clear()
                 self._clear_stream_expectations()
-            if stop_error is not None:
-                raise stop_error
+            if stop_error is not None or reader_error is not None:
+                evidence = self._recovery_evidence()
+                if (
+                    evidence.last_status is None
+                    and last_status_before_shutdown is not None
+                ):
+                    evidence = replace(
+                        evidence,
+                        last_status=last_status_before_shutdown,
+                    )
+                if stop_error is not None and not isinstance(stop_error, Exception):
+                    raise stop_error
+                if reader_error is not None and not isinstance(reader_error, Exception):
+                    raise reader_error
+                raise DAQShutdownError(
+                    stop_error=stop_error,
+                    reader_error=reader_error,
+                    evidence=evidence,
+                )
 
     def __enter__(self) -> TeensyDAQ:  # noqa: PYI034
         self._ensure_open()
@@ -1195,9 +1326,12 @@ class TeensyDAQ:
                 timeout=self._command_timeout if timeout is None else timeout,
             )
         except RequestTimeoutError as error:
-            raise CommandTimeoutError(error) from error
+            raise CommandTimeoutError(error, self._recovery_evidence()) from error
         except ReaderClosedError as error:
             raise DAQClosedError("TeensyDAQ is closed") from error
+        except (DeviceDisconnectedError, ReaderProtocolError) as error:
+            error.evidence = self._recovery_evidence()
+            raise
         if not response.ok:
             raise DeviceCommandError(kind, response.error_code, response.request_id)
         expected_kind = constants.REQUEST_RESPONSE_KIND[kind]
@@ -1293,23 +1427,32 @@ class TeensyDAQ:
     def _initialize_stream_expectations(
         self,
         configuration: DAQConfiguration,
+        *,
+        epoch_start: bool = True,
     ) -> None:
         self._clear_stream_expectations()
         if configuration.stream_mask & constants.StreamMask.ADC:
-            self._expected_sequence[constants.FrameKind.ADC_DATA] = 0
-            self._expected_ticks[constants.FrameKind.ADC_DATA] = 0
-            self._inferred_missing_frames[constants.FrameKind.ADC_DATA] = 0
-            self._inferred_missing_items[constants.FrameKind.ADC_DATA] = 0
+            kind = constants.FrameKind.ADC_DATA
+            self._expected_sequence[kind] = 0
+            self._expected_ticks[kind] = 0
+            self._inferred_missing_frames[kind] = 0
+            self._inferred_missing_items[kind] = 0
+            if not epoch_start:
+                self._unanchored_streams.add(kind)
         if configuration.stream_mask & constants.StreamMask.GPIO:
-            self._expected_sequence[constants.FrameKind.GPIO_DATA] = 0
-            self._expected_ticks[constants.FrameKind.GPIO_DATA] = 0
-            self._inferred_missing_frames[constants.FrameKind.GPIO_DATA] = 0
-            self._inferred_missing_items[constants.FrameKind.GPIO_DATA] = 0
+            kind = constants.FrameKind.GPIO_DATA
+            self._expected_sequence[kind] = 0
+            self._expected_ticks[kind] = 0
+            self._inferred_missing_frames[kind] = 0
+            self._inferred_missing_items[kind] = 0
+            if not epoch_start:
+                self._unanchored_streams.add(kind)
 
     def _clear_stream_expectations(self, *, preserve_inferred: bool = False) -> None:
         self._expected_sequence.clear()
         self._expected_ticks.clear()
         self._previous_sequence.clear()
+        self._unanchored_streams.clear()
         if not preserve_inferred:
             self._inferred_missing_frames.clear()
             self._inferred_missing_items.clear()
@@ -1374,6 +1517,16 @@ class TeensyDAQ:
                 raise UnexpectedMessageError(
                     f"ADC_DATA contradicts advertised ADC metadata: {error}"
                 ) from error
+
+        if kind in self._unanchored_streams:
+            # An explicit ADOPT attaches in the middle of an existing run.
+            # The first complete frame is the new host's continuity anchor;
+            # pre-attachment loss remains visible in the preserved STATUS
+            # counters instead of being fabricated as a sequence-zero gap.
+            self._unanchored_streams.remove(kind)
+            self._advance_expectation(kind, block)
+            self._validate_clean_block(block)
+            return block
 
         continuity = analyze_stream_continuity(
             block,
@@ -1689,20 +1842,37 @@ class TeensyDAQ:
         if self._closed:
             raise DAQClosedError("TeensyDAQ is closed")
         if not self._reader.is_running:
-            counters = self._reader.counters
-            if counters.disconnects:
-                raise DeviceDisconnectedError("device reader is disconnected")
-            if counters.protocol_failures:
-                raise ReaderProtocolError("device reader terminated on protocol error")
+            terminal = self._reader.terminal_error
+            if terminal is not None:
+                terminal.evidence = self._recovery_evidence()
+                raise terminal
             raise DAQClosedError("TeensyDAQ reader is not running")
         if not self._transport.is_open:
             raise DAQClosedError("TeensyDAQ transport is closed")
+
+    def _recovery_evidence(self) -> RecoveryEvidence:
+        return RecoveryEvidence(
+            identity=self._verified_identity,
+            state=self._state,
+            configuration=self._configuration,
+            run_id=self._run_id,
+            last_status=self._last_status,
+            host_counters=self.host_counters,
+            reader_counters=self._reader.counters,
+            parser_counters=self._reader.parser_counters,
+            observed_stream_gaps=self._observed_stream_gaps,
+            observed_host_queue_losses=self._observed_host_queue_losses,
+            observed_stream_anomalies=self._observed_stream_anomalies,
+            protocol_telemetry_errors=self._protocol_telemetry_errors,
+            telemetry_errors=tuple(sorted(self._telemetry_error_messages)),
+        )
 
 
 __all__ = [
     "BlockTimeoutError",
     "CommandTimeoutError",
     "DAQClosedError",
+    "DAQShutdownError",
     "DAQStateError",
     "DataBlock",
     "DeviceCapabilityError",
@@ -1712,6 +1882,8 @@ __all__ = [
     "HostBufferFullError",
     "LossReport",
     "MultipleDevicesFoundError",
+    "RecoveryEvidence",
+    "SessionRecoveryPolicy",
     "StreamItem",
     "TeensyDAQ",
     "TeensyDAQError",

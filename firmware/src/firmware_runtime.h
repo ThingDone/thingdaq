@@ -27,6 +27,7 @@ struct LoopReport : acquisition::Report {
       synthetic::OperationStatus::kNotRunning;
   synthetic::ServiceReport synthetic{};
   bool command_dispatched = false;
+  bool rejected_command_dispatched = false;
   bool response_queued = false;
   bool recovered_to_idle = false;
   bool response_reservation_abandoned = false;

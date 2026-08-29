@@ -2,6 +2,13 @@
 
 #include <limits>
 
+#if defined(__IMXRT1062__)
+#define TEENSY_DAQ_USB_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define TEENSY_DAQ_USB_COLD_CODE(section_name)
+#endif
+
 namespace teensy_daq::usb {
 namespace {
 
@@ -59,6 +66,11 @@ bool responseKind(protocol_v1::FrameKind kind) {
 
 ServiceReport CdcTransport::serviceReceive() {
   ServiceReport report{};
+  updateSessionState();
+  if (!session_open_) {
+    publishParserDelta();
+    return report;
+  }
   bool stalled = false;
 
   while (report.bytes_processed < board::kUsbRxBudgetBytesPerLoop) {
@@ -143,6 +155,7 @@ ServiceReport CdcTransport::serviceReceive() {
   return report;
 }
 
+TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.command_receive")
 bool CdcTransport::processPendingReceive(ServiceReport &report) {
   if (rx_pending_offset_ >= rx_pending_size_) {
     rx_pending_offset_ = 0U;
@@ -178,12 +191,15 @@ bool CdcTransport::processPendingReceive(ServiceReport &report) {
     rx_pending_size_ = 0U;
   }
 
-  if (fed.command_ready) {
+  if (fed.command_ready || fed.rejection_ready) {
     if (!command_queue_.push(command)) {
       recordIoError();
       return false;
     }
     saturatingIncrement(counters_.commands_queued);
+    if (fed.rejection_ready) {
+      saturatingIncrement(counters_.rejected_commands_queued);
+    }
     ++report.commands_queued;
     if (command_queue_.size() > command_queue_high_water_) {
       command_queue_high_water_ = command_queue_.size();
@@ -194,6 +210,10 @@ bool CdcTransport::processPendingReceive(ServiceReport &report) {
 
 ServiceReport CdcTransport::serviceTransmit() {
   ServiceReport report{};
+  updateSessionState();
+  if (!session_open_) {
+    return report;
+  }
   bool stalled = false;
 
   while (report.bytes_written < board::kUsbTxBudgetBytesPerVisit) {
@@ -347,6 +367,7 @@ bool CdcTransport::takeCommand(protocol::ParsedCommand &command) {
   return true;
 }
 
+TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.response_queue")
 bool CdcTransport::queueResponse(const protocol::ControlFrame &response) {
   protocol::DecodedFrame decoded{};
   if (response.size() == 0U ||
@@ -365,6 +386,7 @@ bool CdcTransport::queueResponse(const protocol::ControlFrame &response) {
   return true;
 }
 
+TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.response_abandon")
 bool CdcTransport::abandonResponseReservation() {
   if (!command_awaiting_response_) {
     return false;
@@ -373,6 +395,12 @@ bool CdcTransport::abandonResponseReservation() {
   saturatingIncrement(counters_.response_reservations_abandoned);
   recordIoError();
   return true;
+}
+
+bool CdcTransport::takeSessionStarted() {
+  const bool started = session_started_pending_;
+  session_started_pending_ = false;
+  return started;
 }
 
 bool CdcTransport::hasPendingTransmission() const {
@@ -394,6 +422,7 @@ TransportSnapshot CdcTransport::snapshot() const {
   result.pending_rx_bytes = rx_pending_size_ - rx_pending_offset_;
   result.active_frame_bytes_sent = tx_offset_;
   result.command_awaiting_response = command_awaiting_response_;
+  result.session_open = session_open_;
   if (active_frame_ == ActiveFrame::kResponse) {
     const protocol::ControlFrame *response = response_queue_.front();
     result.active_frame_size = response == nullptr ? 0U : response->size();
@@ -403,6 +432,62 @@ TransportSnapshot CdcTransport::snapshot() const {
   }
   result.parser = parser_.counters();
   return result;
+}
+
+void CdcTransport::updateSessionState() {
+  const bool observed_open = stream_.sessionOpen();
+  if (session_state_initialized_ && observed_open == session_open_) {
+    return;
+  }
+  handleSessionTransition(observed_open);
+}
+
+TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.session_transition")
+void CdcTransport::handleSessionTransition(bool observed_open) {
+  if (!session_state_initialized_) {
+    session_state_initialized_ = true;
+    session_open_ = observed_open;
+    if (observed_open) {
+      session_started_pending_ = true;
+      saturatingIncrement(counters_.session_open_events);
+    }
+    return;
+  }
+  session_open_ = observed_open;
+  resetSessionQueues();
+  if (observed_open) {
+    session_started_pending_ = true;
+    saturatingIncrement(counters_.session_open_events);
+  } else {
+    session_started_pending_ = false;
+    saturatingIncrement(counters_.session_close_events);
+  }
+}
+
+TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.session_reset")
+void CdcTransport::resetSessionQueues() {
+  saturatingAdd(
+      counters_.session_commands_abandoned,
+      static_cast<std::uint32_t>(command_queue_.size()));
+  command_queue_.clear();
+  if (command_awaiting_response_) {
+    saturatingIncrement(counters_.session_commands_abandoned);
+    saturatingIncrement(counters_.response_reservations_abandoned);
+    command_awaiting_response_ = false;
+  }
+
+  saturatingAdd(
+      counters_.session_responses_abandoned,
+      static_cast<std::uint32_t>(response_queue_.size()));
+  response_queue_.clear();
+  if (active_frame_ == ActiveFrame::kResponse) {
+    active_frame_ = ActiveFrame::kNone;
+    tx_offset_ = 0U;
+  }
+
+  rx_pending_offset_ = 0U;
+  rx_pending_size_ = 0U;
+  parser_.resetSession();
 }
 
 void CdcTransport::publishParserDelta() {
@@ -498,3 +583,5 @@ void CdcTransport::recordTxStall() {
 }
 
 }  // namespace teensy_daq::usb
+
+#undef TEENSY_DAQ_USB_COLD_CODE

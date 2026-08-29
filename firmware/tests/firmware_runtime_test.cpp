@@ -941,25 +941,29 @@ void testCompleteControlPlane() {
          "STATUS-PING-STOP-RESET-INFO stops synthetic production in clean IDLE");
 
   const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
-  expect(frames.size() == 8U,
-         "one complete response is emitted for every valid request");
-  if (frames.size() != 8U) {
+  expect(frames.size() == 9U,
+         "every valid or identifiable malformed request receives one response");
+  if (frames.size() != 9U) {
     return;
   }
 
-  const std::array<constants::FrameKind, 8U> expected_kinds{
+  const std::array<constants::FrameKind, 9U> expected_kinds{
       constants::FrameKind::kInfoResponse,
       constants::FrameKind::kConfigureResponse,
       constants::FrameKind::kStartResponse,
+      constants::FrameKind::kErrorResponse,
       constants::FrameKind::kGetStatusResponse,
       constants::FrameKind::kPingResponse,
       constants::FrameKind::kStopResponse,
       constants::FrameKind::kResetStatsResponse,
       constants::FrameKind::kInfoResponse,
   };
+  const std::array<std::uint32_t, 9U> expected_request_ids{
+      1U, 2U, 3U, 90U, 4U, 5U, 6U, 7U, 8U,
+  };
   for (std::size_t index = 0U; index < frames.size(); ++index) {
     expect(frames[index].header.kind == expected_kinds[index] &&
-               frames[index].header.request_id == index + 1U,
+               frames[index].header.request_id == expected_request_ids[index],
            "response order, type, and echoed request ID are deterministic");
   }
 
@@ -1012,7 +1016,19 @@ void testCompleteControlPlane() {
                  3U,
          "INFO advertises physical GPIO, diagnostics, and synthetic mode");
 
-  const wire::DecodedFrame &status = frames[3];
+  const wire::DecodedFrame &rejection = frames[3];
+  expect(responseError(rejection) ==
+                 constants::ErrorCode::kChecksumMismatch &&
+             rejection.payload
+                     .data[constants::kErrorResponseRejectedKindOffset] ==
+                 static_cast<std::uint8_t>(
+                     constants::FrameKind::kPingRequest) &&
+             rejection.payload
+                     .data[constants::kErrorResponseRejectedVersionOffset] ==
+                 identity::kProtocolVersion,
+         "bad-checksum requests are rejected explicitly without dispatch");
+
+  const wire::DecodedFrame &status = frames[4];
   expect(status.header.run_id == 1U &&
              status.payload.data[constants::kStatusResponseDeviceStateOffset] ==
                  static_cast<std::uint8_t>(constants::DeviceState::kRunning) &&
@@ -1026,12 +1042,12 @@ void testCompleteControlPlane() {
              value32 == 1U,
          "RUNNING STATUS projects the synthetic profile and parser recovery");
   std::uint64_t echoed_nonce = 0U;
-  expect(wire::loadU64(frames[4].payload,
+  expect(wire::loadU64(frames[5].payload,
                        constants::kPingResponseNonceOffset, echoed_nonce) &&
              echoed_nonce == nonce,
          "PING survives the complete receive-dispatch-transmit path");
-  expect(frames[7].header.run_id == 1U &&
-             frames[7]
+  expect(frames[8].header.run_id == 1U &&
+             frames[8]
                      .payload.data[constants::kInfoResponseDeviceStateOffset] ==
                  static_cast<std::uint8_t>(constants::DeviceState::kIdle),
          "final INFO proves retained run provenance and clean IDLE");
@@ -1044,8 +1060,9 @@ void testCompleteControlPlane() {
              statistics.transport_errors == 0U,
          "RESET_STATS clears shared runtime diagnostics then counts itself");
   expect(transport.parser.bad_checksums == 1U &&
-             transport.commands_dequeued == 8U &&
-             transport.responses_completed == 8U &&
+             transport.commands_dequeued == 9U &&
+             transport.rejected_commands_queued == 1U &&
+             transport.responses_completed == 9U &&
              transport.response_reservations_abandoned == 0U,
          "transport lifetime diagnostics account for parser recovery and I/O");
 }

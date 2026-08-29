@@ -856,6 +856,63 @@ void testConfigurationReadinessBusyIsAtomic() {
   expect(state.dispatch(configureRequest(51U), response).commandAccepted() &&
              state.state() == constants::DeviceState::kConfigured,
          "CONFIGURE applies after the prior queue becomes quiescent");
+
+  const wire::Configuration retained = state.appliedConfiguration();
+  wire::Configuration replacement = retained;
+  replacement.data_checksum_algorithm =
+      constants::ChecksumAlgorithm::kCrc32c;
+  const control::DispatchResult rollback = state.dispatch(
+      configureRequest(52U, replacement), response, draining);
+  expect(rollback.responseReady() && !rollback.commandAccepted(),
+         "resource failure rejects reconfiguration after a prior success");
+  expectTypedResponse(response, constants::FrameKind::kConfigureResponse, 52U,
+                      constants::ErrorCode::kBusy,
+                      "resource-failed reconfiguration");
+  const wire::Configuration after = state.appliedConfiguration();
+  expect(state.state() == constants::DeviceState::kConfigured &&
+             state.hasConfiguration() &&
+             after.stream_mask == retained.stream_mask &&
+             after.source == retained.source &&
+             after.data_checksum_algorithm ==
+                 retained.data_checksum_algorithm &&
+             after.data_frame_bytes == retained.data_frame_bytes &&
+             state.takePendingEvents().mask == 0U,
+         "failed CONFIGURE preserves the complete prior configuration");
+}
+
+void testDuplicateRequestIdsAreSessionScopedAndAtomic() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(67U), "duplicate-ID test completes BOOT");
+
+  expect(state.dispatch(configureRequest(100U), response).commandAccepted(),
+         "the first request ID applies its configuration");
+  const wire::Configuration retained = state.appliedConfiguration();
+  wire::Configuration replacement = retained;
+  replacement.stream_mask =
+      static_cast<std::uint8_t>(constants::StreamMask::kAdc);
+  const control::DispatchResult duplicate =
+      state.dispatch(configureRequest(100U, replacement), response);
+  expect(duplicate.responseReady() && !duplicate.commandAccepted(),
+         "a replayed request ID receives one typed rejection");
+  expectTypedResponse(response, constants::FrameKind::kConfigureResponse, 100U,
+                      constants::ErrorCode::kInvalidRequestId,
+                      "duplicate CONFIGURE");
+  const wire::Configuration after_duplicate = state.appliedConfiguration();
+  expect(state.state() == constants::DeviceState::kConfigured &&
+             after_duplicate.stream_mask == retained.stream_mask &&
+             after_duplicate.source == retained.source &&
+             after_duplicate.data_checksum_algorithm ==
+                 retained.data_checksum_algorithm &&
+             after_duplicate.data_frame_bytes == retained.data_frame_bytes,
+         "duplicate CONFIGURE cannot partially mutate retained state");
+
+  state.beginHostSession();
+  expect(state.dispatch(request(constants::CommandKind::kInfo, 100U), response)
+             .commandAccepted() &&
+             state.state() == constants::DeviceState::kConfigured &&
+             state.hasConfiguration(),
+         "a new host session clears replay history without clearing device state");
 }
 
 void testRecoverableFaultReturnsIdle() {
@@ -992,6 +1049,7 @@ int main() {
   testChecksumBenchmarkIsIdleAndAcquisitionAtomic();
   testGpioClockDiagnosticIsIdleAndAcquisitionAtomic();
   testConfigurationReadinessBusyIsAtomic();
+  testDuplicateRequestIdsAreSessionScopedAndAtomic();
   testRecoverableFaultReturnsIdle();
   testStatisticsDetailAndSaturation();
 

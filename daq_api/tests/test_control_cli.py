@@ -9,8 +9,11 @@ from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 from teensy_daq import (
+    ADCBlock,
     Capability,
+    CommandTimeoutError,
     DAQConfiguration,
+    DAQShutdownError,
     DAQStateError,
     DeviceCapabilityError,
     DeviceDisconnectedError,
@@ -21,11 +24,13 @@ from teensy_daq import (
     InMemoryTransport,
     SerialPortBusyError,
     SerialPortCandidate,
+    SessionRecoveryPolicy,
     SimulatedDevice,
     Source,
     Status,
     StreamMask,
     TeensyDAQ,
+    TransportDisconnectedError,
     TransportTimeoutError,
     decode_frame,
 )
@@ -63,6 +68,33 @@ class ChangingIdentityDevice(SimulatedDevice):
         self.info_count += 1
         self._build_id = f"control-simulator-{self.info_count}"
         return super()._handle_info(request)
+
+
+class DropStatusTransport(InMemoryTransport):
+    """Accept selected STATUS requests without returning their response."""
+
+    drop_status = False
+
+    def write(self, data: bytes | bytearray | memoryview) -> int:
+        wire = bytes(data)
+        request = decode_frame(wire)
+        if self.drop_status and request.header.kind is FrameKind.GET_STATUS_REQUEST:
+            with self._lock:
+                self._require_open()
+                self.device.receive(wire)
+            return len(wire)
+        return super().write(wire)
+
+
+class FailingCloseTransport(InMemoryTransport):
+    """Close deterministically, then report an injected adapter failure."""
+
+    fail_close = False
+
+    def close(self) -> None:
+        super().close()
+        if self.fail_close:
+            raise TransportDisconnectedError("injected close failure")
 
 
 class Phase03ControlProfileTests(unittest.TestCase):
@@ -133,6 +165,69 @@ class Phase03ControlProfileTests(unittest.TestCase):
         stopped.stop()
         stopped.close(stop=False)
         self.assertEqual(DeviceState.IDLE, device.state)
+
+    def test_reopen_explicitly_adopts_or_stops_an_existing_run(self) -> None:
+        device = SimulatedDevice()
+        owner = TeensyDAQ.open(InMemoryTransport(device))
+        owner.configure(adc=True, gpio=False, source=Source.SYNTHETIC)
+        run_id = owner.start()
+        first = owner.read_block(timeout=0.5)
+        self.assertIsInstance(first, ADCBlock)
+        assert isinstance(first, ADCBlock)
+        self.assertEqual(0, first.sequence)
+        owner.close(stop=False)
+
+        adopted = TeensyDAQ.open(
+            InMemoryTransport(device),
+            session_policy=SessionRecoveryPolicy.ADOPT,
+        )
+        self.assertEqual(DeviceState.RUNNING, adopted.state)
+        self.assertEqual(run_id, adopted.run_id)
+        continued = adopted.read_block(timeout=0.5)
+        self.assertIsInstance(continued, ADCBlock)
+        assert isinstance(continued, ADCBlock)
+        self.assertEqual(1, continued.sequence)
+        adopted.close(stop=False)
+
+        stopped = TeensyDAQ.open(
+            InMemoryTransport(device),
+            session_policy=SessionRecoveryPolicy.STOP,
+        )
+        self.assertEqual(DeviceState.IDLE, stopped.state)
+        self.assertEqual(DeviceState.IDLE, device.state)
+        self.assertIsNone(stopped.configuration)
+        stopped.close(stop=False)
+
+    def test_timeout_and_shutdown_failures_preserve_recovery_evidence(self) -> None:
+        timeout_transport = DropStatusTransport(SimulatedDevice(control_only=True))
+        timed = TeensyDAQ.open(timeout_transport, command_timeout=0.01)
+        timeout_transport.drop_status = True
+        with self.assertRaises(CommandTimeoutError) as timeout_context:
+            timed.status()
+        timeout_evidence = timeout_context.exception.evidence
+        self.assertIsNotNone(timeout_evidence)
+        assert timeout_evidence is not None
+        self.assertIsNotNone(timeout_evidence.identity)
+        self.assertEqual(DeviceState.IDLE, timeout_evidence.state)
+        self.assertEqual(1, timeout_evidence.host_counters.request_timeouts)
+        self.assertEqual(1, timeout_evidence.reader_counters.request_timeouts)
+        timed.close(stop=False)
+
+        close_transport = FailingCloseTransport(SimulatedDevice(control_only=True))
+        closing = TeensyDAQ.open(close_transport)
+        closing.configure_control_only()
+        closing.start()
+        last_status = closing.status()
+        close_transport.fail_close = True
+        with self.assertRaises(DAQShutdownError) as shutdown_context:
+            closing.close()
+        shutdown = shutdown_context.exception
+        self.assertFalse(closing.is_open)
+        self.assertIsNotNone(shutdown.reader_error)
+        self.assertIsNone(shutdown.stop_error)
+        self.assertIsNotNone(shutdown.evidence.identity)
+        self.assertEqual(DeviceState.IDLE, shutdown.evidence.state)
+        self.assertEqual(last_status, shutdown.evidence.last_status)
 
 
 class SynchronizationAndIdentityTests(unittest.TestCase):
