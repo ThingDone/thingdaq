@@ -12,6 +12,7 @@ import sys
 import time
 import unittest
 from contextlib import redirect_stdout
+from itertools import pairwise
 from pathlib import Path
 from types import ModuleType
 from typing import TypedDict
@@ -214,6 +215,9 @@ class PhysicalCombinedDevice(SimulatedDevice):
         adc_framed = adc_frames * constants.DATA_FRAME_BYTES
         gpio_framed = gpio_frames * constants.DATA_FRAME_BYTES
         any_frames = bool(adc_frames or gpio_frames)
+        stopped = self._state is constants.DeviceState.IDLE and any_frames
+        adc_stop_tail = 37 if stopped else 0
+        gpio_stop_tail = 149 if stopped else 0
         return Status(
             device_state=self._state,
             stream_mask=(
@@ -229,13 +233,16 @@ class PhysicalCombinedDevice(SimulatedDevice):
             ),
             adc_frames_emitted=adc_frames,
             gpio_frames_emitted=gpio_frames,
+            adc_items_dropped=adc_stop_tail,
+            gpio_items_dropped=gpio_stop_tail,
             stats_generation=self._stats_generation,
             commands_accepted=self.commands_accepted,
-            gpio_samples_captured=gpio_items,
+            gpio_samples_captured=gpio_items + gpio_stop_tail,
             gpio_samples_packed=gpio_items,
             gpio_samples_framed=gpio_items,
             gpio_samples_transmitted=gpio_items,
             gpio_dma_major_loops=gpio_frames,
+            gpio_raw_samples_lost=gpio_stop_tail,
             gpio_raw_ready_high_water=1 if gpio_frames else 0,
             gpio_packed_ready_high_water=1 if gpio_frames else 0,
             gpio_processing_cpu_basis_points=500 if gpio_frames else 0,
@@ -247,10 +254,13 @@ class PhysicalCombinedDevice(SimulatedDevice):
             adc_buffers_completed=adc_frames,
             adc_buffers_acquired=adc_frames,
             adc_buffers_released=adc_frames,
-            adc_pairs_captured=adc_items,
+            adc_pairs_captured=adc_items + adc_stop_tail,
             adc_pairs_delivered=adc_items,
             adc_pairs_framed=adc_items,
             adc_pairs_transmitted=adc_items,
+            adc_raw_pairs_lost=adc_stop_tail,
+            adc_stop_pairs_discarded=adc_stop_tail,
+            adc_incomplete_buffers=1 if stopped else 0,
             adc_raw_ready_high_water=1 if adc_frames else 0,
             adc_frames_generated=adc_frames,
             adc_items_generated=adc_items,
@@ -486,6 +496,30 @@ class CombinedRigTests(unittest.TestCase):
         self.assertEqual(0, parser.errors)
         status = rig.decode_status(decoded[1])
         self.assertEqual(143, len(status.values))
+        previous = rig.StatusSnapshot(
+            values={
+                **status.values,
+                "commands_accepted": 10,
+                "gpio_processing_cpu_basis_points": 8_000,
+            },
+            adc_metadata=status.adc_metadata,
+            adc_resolution_bits=status.adc_resolution_bits,
+            adc_container_bytes=status.adc_container_bytes,
+        )
+        current = rig.StatusSnapshot(
+            values={
+                **status.values,
+                "commands_accepted": 9,
+                "gpio_processing_cpu_basis_points": 100,
+            },
+            adc_metadata=status.adc_metadata,
+            adc_resolution_bits=status.adc_resolution_bits,
+            adc_container_bytes=status.adc_container_bytes,
+        )
+        self.assertEqual(
+            {"commands_accepted": (10, 9)},
+            current.regressions_from(previous),
+        )
         status.values["gpio_raw_samples_lost"] = 4_048
         with self.assertRaisesRegex(
             rig.ProtocolFailure,
@@ -560,6 +594,9 @@ class CombinedRigTests(unittest.TestCase):
         self.assertEqual(1, validator.adc.frames)
         self.assertEqual(1, validator.gpio.frames)
         self.assertEqual((150.0, 350.0), validator.means())
+        self.assertEqual(0, validator.gpio_payload_and)
+        self.assertEqual(0xFF, validator.gpio_payload_or)
+        self.assertEqual(rig.GPIO_SAMPLES_PER_FRAME - 1, validator.gpio_transitions)
         with redirect_stdout(io.StringIO()):
             self.assertTrue(validator.grade_analog_fixture(rig.Evidence()))
 
@@ -583,6 +620,21 @@ class CombinedRigTests(unittest.TestCase):
         wrong_pin = json.dumps(declaration).replace('"pin": "A1"', '"pin": "A2"')
         with self.assertRaisesRegex(ValueError, "must declare pin A1"):
             rig.load_fixture_stimulus(wrong_pin)
+
+    def test_bulk_gpio_transition_counter_matches_scalar_reference(self) -> None:
+        patterns = (
+            bytes(rig.GPIO_SAMPLES_PER_FRAME),
+            b"\x00\xff" * (rig.GPIO_SAMPLES_PER_FRAME // 2),
+            bytes(range(256)) * 15 + bytes(range(208)),
+            bytes((index * 73 + index // 11) & 0xFF for index in range(4048)),
+        )
+        for payload in patterns:
+            expected = sum(left != right for left, right in pairwise(payload))
+            with self.subTest(expected=expected):
+                self.assertEqual(
+                    expected,
+                    rig.count_adjacent_byte_transitions(payload),
+                )
 
     def test_full_program_configures_combined_streams_and_reconciles_all_counters(
         self,

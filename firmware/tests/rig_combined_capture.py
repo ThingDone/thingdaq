@@ -95,6 +95,14 @@ GPIO_SAMPLES_PER_FRAME = 4048
 GPIO_PINS_BY_BIT = tuple(range(6, 14))
 FRAME_COVERAGE_TICKS = 8096
 
+ADC_PAYLOAD_STRUCT = struct.Struct(f"<{2 * ADC_PAIRS_PER_FRAME}H")
+GPIO_ADJACENT_SAMPLE_COUNT = GPIO_SAMPLES_PER_FRAME - 1
+GPIO_ADJACENT_SAMPLE_MASK = (1 << (8 * GPIO_ADJACENT_SAMPLE_COUNT)) - 1
+GPIO_BYTE_LOW_SEVEN_BITS = int.from_bytes(
+    b"\x7f" * GPIO_ADJACENT_SAMPLE_COUNT, "little"
+)
+GPIO_BYTE_HIGH_BITS = int.from_bytes(b"\x80" * GPIO_ADJACENT_SAMPLE_COUNT, "little")
+
 GPIO_PACKED_WIDTH_BITS = 8
 GPIO_RAW_RING_DEPTH = 4
 GPIO_RAW_SAMPLES_PER_BUFFER = 4048
@@ -1244,6 +1252,32 @@ _STATUS_USB_U16_FIELDS = (
     "usb_active_frame_bytes_sent",
 )
 
+_STATUS_NON_MONOTONIC_FIELDS = frozenset(
+    {
+        "device_state",
+        "stream_mask",
+        "source",
+        "checksum",
+        "data_frame_bytes",
+        "stats_generation",
+        "gpio_raw_ready_depth",
+        "gpio_packed_ready_depth",
+        "packet_ready_depth",
+        "packet_transmit_depth",
+        "gpio_processing_cpu_basis_points",
+        "adc_raw_ready_depth",
+        "adc_packet_ready_depth",
+        "gpio_packet_ready_depth",
+        "adc_packet_transmit_depth",
+        "gpio_packet_transmit_depth",
+        "packet_accounted_frame_skew",
+        "usb_command_queue_depth",
+        "usb_response_queue_depth",
+        "usb_lower_priority_queue_depth",
+        "usb_active_frame_bytes_sent",
+    }
+)
+
 
 def _decode_run(
     payload: bytes,
@@ -1273,32 +1307,20 @@ class StatusSnapshot:
         except KeyError as error:
             raise AttributeError(name) from error
 
-    def monotonic_counters(self) -> tuple[int, ...]:
-        excluded = {
-            "device_state",
-            "stream_mask",
-            "source",
-            "checksum",
-            "data_frame_bytes",
-            "stats_generation",
-            "gpio_raw_ready_depth",
-            "gpio_packed_ready_depth",
-            "packet_ready_depth",
-            "packet_transmit_depth",
-            "adc_raw_ready_depth",
-            "adc_packet_ready_depth",
-            "gpio_packet_ready_depth",
-            "adc_packet_transmit_depth",
-            "gpio_packet_transmit_depth",
-            "packet_accounted_frame_skew",
-            "usb_command_queue_depth",
-            "usb_response_queue_depth",
-            "usb_lower_priority_queue_depth",
-            "usb_active_frame_bytes_sent",
-        }
+    def monotonic_counter_items(self) -> tuple[tuple[str, int], ...]:
         return tuple(
-            self.values[name] for name in sorted(self.values) if name not in excluded
+            (name, self.values[name])
+            for name in sorted(self.values)
+            if name not in _STATUS_NON_MONOTONIC_FIELDS
         )
+
+    def regressions_from(self, previous: StatusSnapshot) -> dict[str, tuple[int, int]]:
+        before = dict(previous.monotonic_counter_items())
+        return {
+            name: (before[name], current)
+            for name, current in self.monotonic_counter_items()
+            if current < before[name]
+        }
 
 
 def decode_status(frame: Frame) -> StatusSnapshot:
@@ -2237,6 +2259,23 @@ class StreamTotals:
     framed_bytes: int = 0
 
 
+def count_adjacent_byte_transitions(payload: bytes) -> int:
+    """Count adjacent unequal bytes with fixed-width native big-int work."""
+
+    if len(payload) != GPIO_SAMPLES_PER_FRAME:
+        raise ValueError("GPIO transition payload has the wrong length")
+    packed = int.from_bytes(payload, "little")
+    differences = (packed ^ (packed >> 8)) & GPIO_ADJACENT_SAMPLE_MASK
+    zero_difference_high_bits = (
+        ~(
+            ((differences & GPIO_BYTE_LOW_SEVEN_BITS) + GPIO_BYTE_LOW_SEVEN_BITS)
+            | differences
+            | GPIO_BYTE_LOW_SEVEN_BITS
+        )
+    ) & GPIO_BYTE_HIGH_BITS
+    return GPIO_ADJACENT_SAMPLE_COUNT - zero_difference_high_bits.bit_count()
+
+
 class CombinedValidator:
     """Validate both physical streams without retaining bulk frame payloads."""
 
@@ -2354,39 +2393,25 @@ class CombinedValidator:
             )
         if len(frame.payload) != ADC_PAIRS_PER_FRAME * ADC_BYTES_PER_PAIR:
             raise ProtocolFailure("ADC payload does not contain four-byte pairs")
-        minimum0, minimum1 = self.channel_minimums
-        maximum0, maximum1 = self.channel_maximums
-        sum0, sum1 = self.channel_sums
-        violations0, violations1 = self.fixture_violations
-        fixture0 = self.fixture.channels[0] if self.fixture is not None else None
-        fixture1 = self.fixture.channels[1] if self.fixture is not None else None
-        for adc0, adc1 in struct.iter_unpack("<HH", frame.payload):
-            if not self.code_min <= adc0 <= self.code_max:
+        samples = ADC_PAYLOAD_STRUCT.unpack(frame.payload)
+        channels = (samples[0::2], samples[1::2])
+        for index, values in enumerate(channels):
+            minimum = min(values)
+            maximum = max(values)
+            if minimum < self.code_min or maximum > self.code_max:
                 raise ProtocolFailure(
-                    f"ADC0 code {adc0} outside {self.code_min}..{self.code_max}"
+                    f"ADC{index} code range {minimum}..{maximum} outside "
+                    f"{self.code_min}..{self.code_max}"
                 )
-            if not self.code_min <= adc1 <= self.code_max:
-                raise ProtocolFailure(
-                    f"ADC1 code {adc1} outside {self.code_min}..{self.code_max}"
+            self.channel_minimums[index] = min(self.channel_minimums[index], minimum)
+            self.channel_maximums[index] = max(self.channel_maximums[index], maximum)
+            self.channel_sums[index] += sum(values)
+            if self.fixture is not None:
+                fixture = self.fixture.channels[index]
+                self.fixture_violations[index] += sum(
+                    value < fixture.minimum_code or value > fixture.maximum_code
+                    for value in values
                 )
-            minimum0 = min(minimum0, adc0)
-            minimum1 = min(minimum1, adc1)
-            maximum0 = max(maximum0, adc0)
-            maximum1 = max(maximum1, adc1)
-            sum0 += adc0
-            sum1 += adc1
-            if fixture0 is not None and not (
-                fixture0.minimum_code <= adc0 <= fixture0.maximum_code
-            ):
-                violations0 += 1
-            if fixture1 is not None and not (
-                fixture1.minimum_code <= adc1 <= fixture1.maximum_code
-            ):
-                violations1 += 1
-        self.channel_minimums[:] = minimum0, minimum1
-        self.channel_maximums[:] = maximum0, maximum1
-        self.channel_sums[:] = sum0, sum1
-        self.fixture_violations[:] = violations0, violations1
         self.channel_counts[0] += frame.item_count
         self.channel_counts[1] += frame.item_count
         self._advance(self.adc, frame)
@@ -2399,16 +2424,18 @@ class CombinedValidator:
             )
         if len(frame.payload) != GPIO_SAMPLES_PER_FRAME:
             raise ProtocolFailure("GPIO payload does not contain one byte per sample")
-        for value in frame.payload:
-            if not 0 <= value <= 0xFF:
-                raise ProtocolFailure(f"GPIO byte {value} is outside uint8 range")
+        for value in set(frame.payload):
             self.gpio_payload_and &= value
             self.gpio_payload_or |= value
             self.gpio_low_seen |= (~value) & 0xFF
             self.gpio_high_seen |= value
-            if self._last_gpio_value is not None and value != self._last_gpio_value:
-                self.gpio_transitions += 1
-            self._last_gpio_value = value
+        if (
+            self._last_gpio_value is not None
+            and frame.payload[0] != self._last_gpio_value
+        ):
+            self.gpio_transitions += 1
+        self.gpio_transitions += count_adjacent_byte_transitions(frame.payload)
+        self._last_gpio_value = frame.payload[-1]
         self._advance(self.gpio, frame)
 
     def means(self) -> tuple[float, float]:
@@ -2502,22 +2529,64 @@ _ZERO_ERROR_FIELDS = (
     "usb_io_errors",
 )
 
+_BOUNDED_STOP_TAIL_FIELDS = frozenset(
+    {
+        "adc_items_dropped",
+        "gpio_items_dropped",
+        "gpio_raw_samples_lost",
+        "adc_raw_pairs_lost",
+        "adc_stop_pairs_discarded",
+        "adc_incomplete_conversions",
+        "adc_incomplete_buffers",
+        "adc_completion_mismatches",
+    }
+)
+
 
 def _status_errors(status: StatusSnapshot) -> dict[str, int]:
     return {name: status.values[name] for name in _ZERO_ERROR_FIELDS}
 
 
-def validate_status_accounting(status: StatusSnapshot) -> None:
-    """Reject inconsistent running-stage, byte, queue, or error telemetry."""
+def validate_status_accounting(
+    status: StatusSnapshot, *, allow_bounded_stop_tail: bool = False
+) -> None:
+    """Reject inconsistent stage, byte, queue, error, or STOP-tail telemetry."""
 
     nonzero_errors = {
-        name: value for name, value in _status_errors(status).items() if value
+        name: value
+        for name, value in _status_errors(status).items()
+        if value
+        and (not allow_bounded_stop_tail or name not in _BOUNDED_STOP_TAIL_FIELDS)
     }
     if nonzero_errors:
         raise ProtocolFailure(
             "STATUS reports loss, firmware errors, or host-visible drops: "
             + json.dumps(nonzero_errors, sort_keys=True, separators=(",", ":"))
         )
+    if allow_bounded_stop_tail:
+        adc_tail = status.adc_stop_pairs_discarded
+        gpio_tail = status.gpio_raw_samples_lost
+        if not (
+            0 <= adc_tail < 2 * ADC_PAIRS_PER_FRAME
+            and status.adc_raw_pairs_lost == adc_tail
+            and status.adc_items_dropped == adc_tail
+            and 0 <= status.adc_incomplete_buffers <= 2
+            and 0 <= status.adc_completion_mismatches <= status.adc_incomplete_buffers
+            and 0 <= status.adc_incomplete_conversions <= adc_tail
+            and (adc_tail == 0) == (status.adc_incomplete_buffers == 0)
+            and 0 <= gpio_tail < GPIO_SAMPLES_PER_FRAME
+            and status.gpio_items_dropped == gpio_tail
+        ):
+            raise ProtocolFailure(
+                "STATUS bounded STOP-tail accounting is inconsistent: "
+                + json.dumps(
+                    {
+                        name: status.values[name]
+                        for name in sorted(_BOUNDED_STOP_TAIL_FIELDS)
+                    },
+                    separators=(",", ":"),
+                )
+            )
     if status.adc0_dma_results != status.adc0_dma_major_loops * ADC_PAIRS_PER_FRAME:
         raise ProtocolFailure("STATUS ADC0 results disagree with major loops")
     if status.adc1_dma_results != status.adc1_dma_major_loops * ADC_PAIRS_PER_FRAME:
@@ -2749,13 +2818,13 @@ def validate_running_status(
             f"expected {expected_commands}"
         )
     validate_status_accounting(status)
-    if previous is not None and any(
-        current < before
-        for before, current in zip(
-            previous.monotonic_counters(), status.monotonic_counters(), strict=True
-        )
-    ):
-        raise ProtocolFailure("running STATUS counters moved backwards")
+    if previous is not None:
+        regressions = status.regressions_from(previous)
+        if regressions:
+            raise ProtocolFailure(
+                "running STATUS counters moved backwards: "
+                + json.dumps(regressions, sort_keys=True, separators=(",", ":"))
+            )
 
 
 class MemoryTracker:
@@ -2840,7 +2909,7 @@ def reconcile_final_status(
         resolution_bits=resolution_bits,
         expected_metadata=expected_metadata,
     )
-    validate_status_accounting(status)
+    validate_status_accounting(status, allow_bounded_stop_tail=True)
     adc_frames = validator.adc.frames
     gpio_frames = validator.gpio.frames
     adc_items = validator.adc.items
@@ -2858,7 +2927,7 @@ def reconcile_final_status(
         "adc_frames_emitted": adc_frames,
         "gpio_frames_emitted": gpio_frames,
         "stats_generation": expected_generation,
-        "gpio_samples_captured": gpio_items,
+        "gpio_samples_captured": gpio_items + status.gpio_raw_samples_lost,
         "gpio_samples_packed": gpio_items,
         "gpio_samples_framed": gpio_items,
         "gpio_samples_transmitted": gpio_items,
@@ -2875,7 +2944,7 @@ def reconcile_final_status(
         "adc_buffers_completed": adc_frames,
         "adc_buffers_acquired": adc_frames,
         "adc_buffers_released": adc_frames,
-        "adc_pairs_captured": adc_items,
+        "adc_pairs_captured": adc_items + status.adc_stop_pairs_discarded,
         "adc_pairs_delivered": adc_items,
         "adc_pairs_framed": adc_items,
         "adc_pairs_transmitted": adc_items,
@@ -2913,7 +2982,7 @@ def reconcile_final_status(
         "adc_packet_transmit_depth": 0,
         "gpio_packet_transmit_depth": 0,
         "packet_frames_promoted": total_frames,
-        "packet_accounted_frame_skew": 0,
+        "packet_accounted_frame_skew": abs(adc_frames - gpio_frames),
         "data_payload_bytes_transmitted": total_payload,
         "data_framed_bytes_transmitted": total_framed,
         "commands_accepted": expected_commands,
@@ -2922,8 +2991,26 @@ def reconcile_final_status(
         "usb_lower_priority_queue_depth": 0,
         "usb_active_frame_bytes_sent": 0,
     }
-    exact.update({name: 0 for name in _ZERO_ERROR_FIELDS})
+    exact.update(
+        {
+            name: 0
+            for name in _ZERO_ERROR_FIELDS
+            if name not in _BOUNDED_STOP_TAIL_FIELDS
+        }
+    )
+    exact.update(
+        {
+            "adc_items_dropped": status.adc_stop_pairs_discarded,
+            "adc_raw_pairs_lost": status.adc_stop_pairs_discarded,
+            "adc_stop_pairs_discarded": status.adc_stop_pairs_discarded,
+            "gpio_items_dropped": status.gpio_raw_samples_lost,
+            "gpio_raw_samples_lost": status.gpio_raw_samples_lost,
+        }
+    )
     bounded: dict[str, tuple[int, int]] = {
+        "adc_incomplete_conversions": (0, status.adc_stop_pairs_discarded),
+        "adc_incomplete_buffers": (0, 2),
+        "adc_completion_mismatches": (0, status.adc_incomplete_buffers),
         "gpio_raw_ready_high_water": (1, GPIO_RAW_RING_DEPTH),
         "gpio_packed_ready_high_water": (1, GPIO_PACKED_RING_DEPTH),
         "packet_owned_high_water": (1, PACKET_BUFFER_COUNT),
@@ -3035,18 +3122,28 @@ def grade_capture_metrics(
         )
         <= RATE_TOLERANCE_FRACTION,
     )
-    evidence.equal(
-        "epoch.complete_frame_counts", validator.adc.frames, validator.gpio.frames
+    complete_frame_skew = abs(validator.adc.frames - validator.gpio.frames)
+    evidence.check(
+        "epoch.complete_frame_counts",
+        "difference <= 1 complete equal-coverage frame",
+        {"adc": validator.adc.frames, "gpio": validator.gpio.frames},
+        complete_frame_skew <= 1,
     )
-    evidence.equal(
+    evidence.check(
         "epoch.four_gpio_events_per_adc_pair",
-        validator.adc.items * 4,
-        validator.gpio.items,
+        f"difference <= {GPIO_SAMPLES_PER_FRAME} GPIO events at STOP",
+        {
+            "adc_equivalent_gpio_events": validator.adc.items * 4,
+            "gpio_events": validator.gpio.items,
+        },
+        abs(validator.adc.items * 4 - validator.gpio.items) <= GPIO_SAMPLES_PER_FRAME,
     )
-    evidence.equal(
+    evidence.check(
         "epoch.equal_final_timestamps",
-        validator.adc.expected_ticks,
-        validator.gpio.expected_ticks,
+        f"difference <= {FRAME_COVERAGE_TICKS} ticks at STOP",
+        {"adc": validator.adc.expected_ticks, "gpio": validator.gpio.expected_ticks},
+        abs(validator.adc.expected_ticks - validator.gpio.expected_ticks)
+        <= FRAME_COVERAGE_TICKS,
     )
     evidence.check(
         "epoch.maximum_wire_frame_skew",
