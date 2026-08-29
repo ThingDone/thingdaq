@@ -165,6 +165,8 @@ struct Snapshot {
   std::uint32_t stale_dma_completions = 0U;
   bool running = false;
   bool quiescent = true;
+  bool hardware_prepared = false;
+  bool faulted = false;
 };
 
 enum class StartStatus : std::uint8_t {
@@ -181,7 +183,16 @@ enum class StartStatus : std::uint8_t {
 class HardwareCapture : public RawWordSource {
  public:
   virtual StartStatus inspectStart() = 0;
+  // Configure the raw ring, cache ownership, eDMA, DMAMUX, XBAR request, and
+  // input-safe GPIO mapping while leaving the common PIT0 source stopped.
+  virtual StartStatus prepare() = 0;
+  // Standalone GPIO convenience path: prepare(), then enable PIT0.
   virtual StartStatus start() = 0;
+  // Combined STOP calls this only after the common PIT/ADC_ETC source has
+  // stopped. Complete raw buffers remain drainable and partial work is
+  // accounted exactly.
+  virtual StopReport stopAfterTriggers() = 0;
+  // Standalone GPIO STOP retains its accepted complete-boundary policy.
   virtual StopReport stop() = 0;
   virtual Snapshot rawSnapshot() = 0;
 };

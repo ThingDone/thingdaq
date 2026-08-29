@@ -29,13 +29,13 @@ publishes telemetry for physical acquisition. `FirmwareRuntime` retains the
 control protocol, synthetic source, common packet pool, and USB scheduler but
 no longer owns per-peripheral lifecycle state or sequencing.
 
-The controller preserves the accepted ADC-only and GPIO-only behavior. Its
-read-only audit already evaluates an ADC-plus-GPIO request as one atomic
-resource plan, but [[Protocol-V1]] still rejects combined physical CONFIGURE
-and the controller fails closed if combined execution reaches `start()`. The
-next Phase 08 task must add one shared hardware arm/stop sequence before that
-capability is enabled. This document therefore records a composition audit and
-controller boundary, not combined-stream hardware acceptance.
+The controller preserves the accepted ADC-only and GPIO-only behavior and now
+executes an ADC-plus-GPIO request as one atomic internal resource transaction.
+It owns one run ID, one 8 MHz epoch, and one shared hardware schedule across
+both paths. [[Protocol-V1]] still rejects combined physical CONFIGURE until the
+later Phase 08 capability/configuration task exposes the mode and its complete
+metadata. This is therefore implementation evidence for deterministic
+combined lifecycle behavior, not combined-stream physical acceptance.
 
 ## Evidence reinspected
 
@@ -82,11 +82,31 @@ schedule owner rather than two independently started timer owners:
 
 GPIO and ADC do not compete for XBAR outputs, ADC_ETC queues, DMAMUX sources,
 or eDMA channels. They do share PIT0 configuration and enable state. The ADC
-trigger adapter already configures the complete stopped PIT0/PIT1 schedule and
-reuses `gpio_dma_route_teensy.h` for the 24 MHz root. The GPIO adapter still
-configures/enables PIT0 internally for its accepted standalone mode. Combined
-START must split GPIO DMA preparation from timer enable and let the controller
-enable this one schedule only after both engines are armed.
+trigger adapter configures the complete stopped PIT0/PIT1 schedule and reuses
+`gpio_dma_route_teensy.h` for the 24 MHz root. GPIO standalone operation keeps
+its `prepare`-then-PIT0-start convenience path. Combined operation uses the
+split GPIO `prepare()` path, which configures the raw ring, cache ownership,
+eDMA channel 2, DMAMUX 30, XBAR output 0, and input-safe pin mapping while
+leaving PIT0 stopped. The ADC trigger scheduler is then the only schedule
+owner.
+
+The documented combined START commit order is:
+
+1. validate the full fixed physical configuration and perform read-only
+   resource inspection for both paths;
+2. reserve the controller run ID, stream mask, and epoch after verifying the
+   common packet epoch;
+3. reset both packers to that run ID and epoch;
+4. reset and prime the ADC paired-DMA ring and channels 0/1;
+5. reset and prime the GPIO raw-DMA ring and channel 2, including XBAR/DMAMUX,
+   while PIT0 remains stopped;
+6. reload and clear PIT0/PIT1, enable ADC_ETC queues, enable chained PIT1, and
+   enable PIT0 last to commit the shared schedule.
+
+Every failure before the final commit unwinds all owners prepared so far,
+stops common packet production, and clears the reserved run identity. A failed
+final arm performs trigger cleanup before the controller quiesces GPIO DMA,
+ADC DMA, both packers, and the packet epoch.
 
 ## Compile-time conflict contract
 
@@ -118,19 +138,23 @@ collision.
 `Controller::inspect(configuration, next_run_id)` performs no arm, route,
 cache, DMA, or timer write. For every requested physical source it checks:
 
-1. the complete static contract above;
-2. controller active/draining state;
-3. presence of the capture, packer, and trigger components;
-4. stopped/ready ADC trigger evidence;
-5. packer quiescence;
-6. each target facade's read-only `inspectStart()` result.
+1. a recognized hardware-only stream profile, exact fixed frame size, and
+   supported data checksum;
+2. a nonzero prospective run ID and the complete static contract above;
+3. controller active, draining, and start-reservation state;
+4. presence of the capture, packer, and trigger components;
+5. stopped/ready ADC trigger evidence;
+6. packer quiescence;
+7. each target facade's read-only `inspectStart()` result.
 
 The target facade checks cover live PIT/ADC_ETC activity and ADC conversion
 state, eDMA request bits, ADC DMA enables, DMAMUX enables, the GPIO XBAR request
 state, raw-ring quiescence, and nonzero ADC epoch. A resource-busy result is
 projected into the existing per-source conflict counter. For a combined plan,
-both engine inspections always run and either failure rejects the whole audit;
-there is no first-source reservation or partial hardware mutation to roll back.
+both engine inspections always run and either failure rejects the whole audit
+before the controller reserves or mutates an owner. Immediately before START,
+the controller also verifies that packet production already owns the same run
+ID and requested checksum.
 
 ## Controller ownership
 
@@ -146,8 +170,8 @@ ControlState START event
     -> response-first CDC transport
 ```
 
-For currently supported single-source runs, the controller preserves these
-invariants:
+For single-source and internally executable combined runs, the controller
+preserves these invariants:
 
 - one nonzero run ID is the DMA ownership epoch and packet run identity;
 - packer and DMA storage are armed before a source trigger is enabled;
@@ -155,11 +179,22 @@ invariants:
   tears down DMA;
 - GPIO STOP retains its accepted complete-boundary behavior and restores input
   safety;
-- complete old-run work drains before packet production stops;
+- combined STOP and fault disable the shared PIT/ADC_ETC source first, quiesce
+  GPIO DMA and restore GPIO inputs, then quiesce ADC DMA;
+- complete old-run raw and packed work drains before packet production stops,
+  while the capture rings account for and discard only an incomplete active
+  DMA buffer;
 - CONFIGURE/START remain busy until raw, packed, packet, and USB ownership are
   quiescent;
 - raw and packer telemetry is published only when its run ID matches the
   current statistics generation.
+
+The run identity remains reserved through the complete-frame drain and is
+cleared only when both source paths are quiescent. Hardware capture faults and
+packer source/pipeline faults enter the same source-first stop path. The
+runtime then returns protocol state to IDLE and consumes the generated STOP
+event in the same cooperative visit, making cleanup retryable without exposing
+a stale RUNNING state.
 
 The physical report is now a base of the cooperative runtime report, so all
 existing status flags and lifecycle tests remain source compatible while the
@@ -179,16 +214,21 @@ DMA or interrupt timestamp defines sample time.
 Thus four GPIO samples cover one ADC pair period, and ADC1 retains its nominal
 four-tick phase. These are hardware-schedule relationships from
 [[ADR-004-ADC-Trigger-DMA]], not measurements of external pad propagation or
-analog aperture.
+analog aperture. Compile-time assertions require equal ADC/GPIO frame
+coverage, the 4:1 GPIO-to-pair period ratio, and the ADC1 half-period phase.
+Packers derive each frame timestamp from source completion counters plus the
+single START epoch; no ISR entry time participates in a sample timestamp.
 
 ## Buffer and cache composition
 
 The controller adds no payload storage. It reuses the four-buffer ADC pair
 ring, four-buffer raw GPIO ring, four-buffer packed GPIO ring, isolated sinks,
 and the common 200-frame packet pool documented in [[Firmware-Resource-Map]].
-The compile-time budget remains 449,440 bytes of RAM1 and 491,072 bytes of RAM2;
-the accepted Phase 07 linker result left 36,608 bytes for RAM1 locals/stack and
-20,800 bytes of RAM2 heap headroom.
+The exact pinned combined-lifecycle image uses 454,944 bytes of RAM1 variables,
+32,728 bytes of RAM1 code, 40 bytes of alignment padding, and leaves 36,576
+bytes for locals/stack. It uses 503,488 bytes of RAM2 variables and leaves
+20,800 bytes of heap headroom. Cold controller lifecycle paths remain in flash
+so the additional orchestration does not consume another 32 KiB ITCM block.
 
 DMA and CPU ownership remain local to the existing ring state machines. The
 controller never receives a mutable DMA pointer and never performs cache
@@ -198,10 +238,9 @@ cooperative packet or USB layers.
 
 ## Remaining combined-enablement work
 
-Before combined hardware CONFIGURE can be advertised, the controller must gain
-one prepare/arm transaction that reserves all components, primes both packers
-and all three DMA channels, configures GPIO routing without starting PIT0, and
-then enables the common PIT0/PIT1 schedule once. STOP/fault handling must
-disable source triggers first and drain/discard only complete work according to
-policy. That work belongs to the next Phase 08 task and must retain the atomic
-audit described here.
+Combined hardware lifecycle is implemented behind the current protocol gate.
+The remaining Phase 08 work is to integrate bounded fair packet/USB scheduling,
+expose combined configuration/capability and complete telemetry, implement host
+alignment, expand adversarial tests, and run the physical combined acceptance
+campaign. Until those gates pass, firmware must not advertise combined
+physical acquisition as an accepted capability.

@@ -41,6 +41,8 @@ enum class Conflict : std::uint32_t {
   kAdcCaptureUnavailable = 1U << 15U,
   kGpioPackerBusy = 1U << 16U,
   kGpioCaptureUnavailable = 1U << 17U,
+  kInvalidConfiguration = 1U << 18U,
+  kInvalidRunId = 1U << 19U,
 };
 
 constexpr std::uint32_t conflictBit(Conflict conflict) {
@@ -88,6 +90,7 @@ struct Report {
   adc_packer::OperationStatus adc_packer_start_status =
       adc_packer::OperationStatus::kNotRunning;
   bool gpio_capture_started = false;
+  bool gpio_capture_prepared = false;
   bool gpio_capture_stopped = false;
   bool gpio_packer_started = false;
   bool gpio_packer_stopped = false;
@@ -100,13 +103,17 @@ struct Report {
   bool adc_trigger_stopped = false;
   bool packet_production_stopped = false;
   bool physical_drain_pending = false;
+  bool physical_fault_detected = false;
   bool internal_error = false;
+  std::uint32_t run_id = 0U;
+  std::uint64_t epoch_ticks = 0U;
 };
 
 // The sole physical-acquisition orchestrator. It composes the proven Phase 06
 // and Phase 07 engines without owning their storage, performs one read-only
-// all-resource audit, and preserves the accepted single-source lifecycle. The
-// next phase increment extends this boundary with combined arm/stop order.
+// all-resource audit, and preserves the accepted single-source lifecycle.
+// Combined mode prepares all three fixed DMA channels before enabling the
+// ADC_ETC/PIT1/PIT0 schedule exactly once.
 class Controller {
  public:
   constexpr Controller(
@@ -145,6 +152,8 @@ class Controller {
   constexpr std::uint8_t activeStreamMask() const {
     return physical_stream_mask_;
   }
+  constexpr std::uint32_t activeRunId() const { return physical_run_id_; }
+  constexpr std::uint64_t epochTicks() const { return physical_epoch_ticks_; }
 
   static constexpr Profile profileFor(
       const protocol::Configuration &configuration) {
@@ -175,17 +184,26 @@ class Controller {
            profile == Profile::kCombined;
   }
 
-  // Protocol V1 deliberately advertises the individual physical profiles
-  // until the shared combined arm/stop sequence is implemented.
   static constexpr bool isExecutableConfiguration(
       const protocol::Configuration &configuration) {
     const Profile profile = profileFor(configuration);
-    return profile == Profile::kAdc || profile == Profile::kGpio;
+    return profile == Profile::kAdc || profile == Profile::kGpio ||
+           profile == Profile::kCombined;
   }
 
  private:
   bool stopAdcPath(Report &report);
+  bool stopCombinedPaths(Report &report);
+  void rollbackStart(Profile profile, Report &report);
+  void serviceAdcPath(Report &report, bool draining);
+  void serviceGpioPath(Report &report, bool draining);
+  bool adcPathDrained(Report &report);
+  bool gpioPathDrained(Report &report);
+  bool activePathFaulted() const;
+  void clearRunState();
   static void addStaticContractConflicts(Audit &audit);
+  static bool completeConfigurationValid(
+      const protocol::Configuration &configuration);
 
   stats::Statistics &statistics_;
   packet::PacketBufferPipeline &packet_pipeline_;
@@ -196,10 +214,24 @@ class Controller {
   adc_capture::HardwareCapture *adc_capture_ = nullptr;
   adc_packer::AdcFramePacker *adc_packer_ = nullptr;
   std::uint8_t physical_stream_mask_ = 0U;
+  std::uint32_t physical_run_id_ = 0U;
+  std::uint64_t physical_epoch_ticks_ = 0U;
   bool physical_run_active_ = false;
   bool physical_drain_pending_ = false;
+  bool physical_start_pending_ = false;
 };
 
 static_assert(board::kAcquisitionResourceContract.valid());
+static_assert(protocol_v1::kGpioSamplesPerFrame *
+                      protocol_v1::kGpioSamplePeriodTicks ==
+                  protocol_v1::kAdcPairsPerFrame *
+                      protocol_v1::kAdcPairPeriodTicks,
+              "combined ADC/GPIO frames must cover the same epoch interval");
+static_assert(4U * protocol_v1::kGpioSamplePeriodTicks ==
+                  protocol_v1::kAdcPairPeriodTicks,
+              "four GPIO samples must cover one ADC pair period");
+static_assert(protocol_v1::kAdc1PhaseTicks * 2U ==
+                  protocol_v1::kAdcPairPeriodTicks,
+              "ADC1 must retain the nominal half-period phase");
 
 }  // namespace teensy_daq::acquisition

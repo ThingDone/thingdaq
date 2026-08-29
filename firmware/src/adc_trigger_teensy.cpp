@@ -380,6 +380,15 @@ class TeensyPlatform final : public Platform {
         (IMXRT_ADC2.GS & ADC_GS_ADACT) != 0U) {
       return false;
     }
+    // Every run begins from freshly loaded stopped counters. Neither a stale
+    // PIT flag nor the terminal counter state from BOOT diagnostics or a
+    // previous acquisition defines the new run epoch.
+    masterPit().TCTRL = 0U;
+    pairPit().TCTRL = PIT_TCTRL_CHN;
+    masterPit().TFLG = PIT_TFLG_TIF;
+    pairPit().TFLG = PIT_TFLG_TIF;
+    masterPit().LDVAL = protocol_v1::kAdcTriggerGpioMasterPitLoad;
+    pairPit().LDVAL = protocol_v1::kAdcTriggerPairPitLoad;
     ADC_ETC_DONE0_1_IRQ = kDone0Mask | kDone1Mask;
     ADC_ETC_DONE2_ERR_IRQ = kTriggerErrorMask;
     if (completion_diagnostic) {

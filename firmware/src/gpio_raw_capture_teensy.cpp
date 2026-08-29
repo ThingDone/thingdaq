@@ -98,6 +98,7 @@ RawCaptureRing g_ring{g_gpio_raw_dma_buffers, g_gpio_raw_dma_overflow_sink,
                       g_cache, g_critical};
 TeensyRawCapture g_facade{};
 bool g_hardware_running = false;
+bool g_hardware_prepared = false;
 bool g_faulted = false;
 std::uint32_t g_resource_conflicts = 0U;
 std::uint32_t g_start_errors = 0U;
@@ -273,7 +274,7 @@ bool waitForCompleteStopBoundary() {
 
 TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
 StartStatus inspectHardwareStart() {
-  if (g_hardware_running) {
+  if (g_hardware_prepared || g_hardware_running) {
     return StartStatus::kAlreadyRunning;
   }
   if (resourcesBusy()) {
@@ -283,8 +284,27 @@ StartStatus inspectHardwareStart() {
                                      : StartStatus::kNotQuiescent;
 }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
-StartStatus startHardware() {
+bool preparedHardwareValid() {
+  const IMXRT_PIT_CHANNEL_t &pit =
+      IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
+  const IMXRT_DMA_TCD_t &tcd = gpio_dma_route::edmaTcd();
+  return pit.LDVAL == kProductionPitLoad && pit.TCTRL == 0U &&
+         gpio_dma_route::selectedOutputBusy() &&
+         gpio_dma_route::edmaRequestBusy() &&
+         *gpio_dma_route::dmamuxChannelRegister() ==
+             gpio_dma_route::kDmamuxConfiguration &&
+         tcd.SADDR == &GPIO2_PSR && tcd.ATTR == kTcdAttributes &&
+         tcd.NBYTES_MLNO == sizeof(std::uint32_t) &&
+         tcd.CITER_ELINKNO == protocol_v1::kGpioSamplesPerFrame &&
+         tcd.BITER_ELINKNO == protocol_v1::kGpioSamplesPerFrame &&
+         tcd.CSR == kTcdControl &&
+         hardwareDestinationMatches(g_ring.snapshot().active_destination) &&
+         (GPIO2_GDIR & board::kGpio2PsrCaptureMask) == 0U &&
+         (IOMUXC_GPR_GPR27 & board::kGpio7ToGpio2Gpr27ClearMask) == 0U;
+}
+
+TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_prepare")
+StartStatus prepareHardware() {
   const StartStatus readiness = inspectHardwareStart();
   if (readiness != StartStatus::kOk) {
     if (readiness == StartStatus::kResourceBusy) {
@@ -318,20 +338,63 @@ StartStatus startHardware() {
   NVIC_CLEAR_PENDING(IRQ_DMA_CH2);
   NVIC_ENABLE_IRQ(IRQ_DMA_CH2);
   gpio_dma_route::enableEdmaRequest();
+  g_hardware_prepared = true;
+  g_hardware_running = true;
+  gpio_dma_route::barrier();
+
+  if (!preparedHardwareValid()) {
+    disableHardware();
+    NVIC_DISABLE_IRQ(IRQ_DMA_CH2);
+    DMA_CINT = board::kGpioEdmaChannel;
+    DMA_CERR = board::kGpioEdmaChannel;
+    DMA_CDNE = board::kGpioEdmaChannel;
+    forceSafeInputs();
+    g_hardware_running = false;
+    g_hardware_prepared = false;
+    (void)g_ring.stop(0U);
+    g_faulted = true;
+    saturatingIncrement(g_start_errors);
+    return StartStatus::kHardwareError;
+  }
+
   g_resource_conflicts = 0U;
   g_start_errors = 0U;
   g_stop_errors = 0U;
   g_stale_dma_completions = 0U;
   g_faulted = false;
-  g_hardware_running = true;
-  gpio_dma_route::barrier();
+  return StartStatus::kOk;
+}
+
+TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
+StartStatus startHardware() {
+  const StartStatus prepared = prepareHardware();
+  if (prepared != StartStatus::kOk) {
+    return prepared;
+  }
   IMXRT_PIT_CHANNELS[board::kGpioPitChannel].TCTRL = PIT_TCTRL_TEN;
+  gpio_dma_route::barrier();
+  if ((IMXRT_PIT_CHANNELS[board::kGpioPitChannel].TCTRL & PIT_TCTRL_TEN) ==
+      0U) {
+    disableHardware();
+    NVIC_DISABLE_IRQ(IRQ_DMA_CH2);
+    g_hardware_running = false;
+    g_hardware_prepared = false;
+    (void)g_ring.stop(0U);
+    forceSafeInputs();
+    g_faulted = true;
+    saturatingIncrement(g_start_errors);
+    return StartStatus::kHardwareError;
+  }
   return StartStatus::kOk;
 }
 
 TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_stop")
-StopReport stopHardware() {
-  const bool boundary_stop_requested = g_hardware_running && !g_faulted;
+StopReport stopHardwareImpl(bool preserve_complete_boundary) {
+  IMXRT_PIT_CHANNEL_t &pit =
+      IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
+  const bool source_was_stopped = (pit.TCTRL & PIT_TCTRL_TEN) == 0U;
+  const bool boundary_stop_requested =
+      preserve_complete_boundary && g_hardware_running && !g_faulted;
   const bool boundary_stop_completed =
       boundary_stop_requested && waitForCompleteStopBoundary();
   const std::uint32_t primask = readPrimask();
@@ -359,6 +422,7 @@ StopReport stopHardware() {
   DMA_CDNE = board::kGpioEdmaChannel;
   forceSafeInputs();
   g_hardware_running = false;
+  g_hardware_prepared = false;
   if ((primask & 1U) == 0U) {
     __enable_irq();
   }
@@ -372,7 +436,22 @@ StopReport stopHardware() {
       report.status != OperationStatus::kNotRunning) {
     saturatingIncrement(g_stop_errors);
   }
+  if (!preserve_complete_boundary && !source_was_stopped) {
+    saturatingIncrement(g_stop_errors);
+    if (report.status == OperationStatus::kOk) {
+      report.status = OperationStatus::kInvalidCompletion;
+    }
+  }
   return report;
+}
+
+TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_stop")
+StopReport stopHardware() { return stopHardwareImpl(true); }
+
+TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(
+    ".flashmem.gpio_raw.target_stop_after_triggers")
+StopReport stopHardwareAfterTriggers() {
+  return stopHardwareImpl(false);
 }
 
 TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_snapshot")
@@ -383,6 +462,8 @@ HardwareSnapshot hardwareSnapshot() {
   value.ring.start_errors = g_start_errors;
   value.ring.stop_errors = g_stop_errors;
   value.ring.stale_dma_completions = g_stale_dma_completions;
+  value.ring.hardware_prepared = g_hardware_prepared;
+  value.ring.faulted = g_faulted;
   value.gpr27 = IOMUXC_GPR_GPR27;
   value.gpio2_gdir = GPIO2_GDIR;
   value.gpio2_psr = GPIO2_PSR;
@@ -411,7 +492,13 @@ HardwareSnapshot hardwareSnapshot() {
 
 StartStatus TeensyRawCapture::inspectStart() { return inspectHardwareStart(); }
 
+StartStatus TeensyRawCapture::prepare() { return prepareHardware(); }
+
 StartStatus TeensyRawCapture::start() { return startHardware(); }
+
+StopReport TeensyRawCapture::stopAfterTriggers() {
+  return stopHardwareAfterTriggers();
+}
 
 StopReport TeensyRawCapture::stop() { return stopHardware(); }
 
@@ -429,6 +516,8 @@ Snapshot TeensyRawCapture::rawSnapshot() {
   value.start_errors = g_start_errors;
   value.stop_errors = g_stop_errors;
   value.stale_dma_completions = g_stale_dma_completions;
+  value.hardware_prepared = g_hardware_prepared;
+  value.faulted = g_faulted;
   return value;
 }
 

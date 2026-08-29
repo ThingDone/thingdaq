@@ -256,16 +256,30 @@ void testDeterministicArmStopOrderAndOwnedConflict() {
       ADC_ETC_CTRL_TRIG_ENABLE(enable_mask);
   const std::size_t etc_arm =
       writeIndex(fake_imxrt::adc_etc.CTRL, enabled_control);
+  const std::size_t master_flag_reset = writeIndex(
+      fake_imxrt::pit_channels[v1::kAdcTriggerGpioMasterPitChannel].TFLG,
+      PIT_TFLG_TIF);
+  const std::size_t pair_flag_reset = writeIndex(
+      fake_imxrt::pit_channels[v1::kAdcTriggerPairPitChannel].TFLG,
+      PIT_TFLG_TIF);
+  const std::size_t master_reload = writeIndex(
+      fake_imxrt::pit_channels[v1::kAdcTriggerGpioMasterPitChannel].LDVAL,
+      v1::kAdcTriggerGpioMasterPitLoad);
+  const std::size_t pair_reload = writeIndex(
+      fake_imxrt::pit_channels[v1::kAdcTriggerPairPitChannel].LDVAL,
+      v1::kAdcTriggerPairPitLoad);
   const std::size_t pair_arm = writeIndex(
       fake_imxrt::pit_channels[v1::kAdcTriggerPairPitChannel].TCTRL,
       PIT_TCTRL_CHN | PIT_TCTRL_TEN);
   const std::size_t master_arm = writeIndex(
       fake_imxrt::pit_channels[v1::kAdcTriggerGpioMasterPitChannel].TCTRL,
       PIT_TCTRL_TEN);
-  expect(etc_arm < pair_arm && pair_arm < master_arm &&
+  expect(master_flag_reset < etc_arm && pair_flag_reset < etc_arm &&
+             master_reload < etc_arm && pair_reload < etc_arm &&
+             etc_arm < pair_arm && pair_arm < master_arm &&
              (static_cast<std::uint32_t>(ADC_ETC_CTRL) & 0xFFU) ==
                  enable_mask,
-         "arm enables only queues 0/4 before chained PIT1 and master PIT0");
+         "arm reloads the epoch, enables queues 0/4, then chained PIT1 and master PIT0");
 
   fake_imxrt::clearRegisterWrites();
   expect(platform.stop(), "trigger stop reaches verified stopped state");

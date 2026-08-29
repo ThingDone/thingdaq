@@ -166,10 +166,12 @@ class PortableSourceBoundaryTests(unittest.TestCase):
         boundary = adapter.index("bool waitForCompleteStopBoundary()")
         dreq = adapter.index("DMA_TCD_CSR_DREQ", boundary)
         wait = adapter.index("DMA_ERQ & gpio_dma_route::kEdmaChannelMask", dreq)
-        stop = adapter.index("StopReport stopHardware()", wait)
+        stop = adapter.index("StopReport stopHardwareImpl", wait)
         request = adapter.index("waitForCompleteStopBoundary()", stop)
         disable = adapter.index("disableHardware();", request)
         partial = adapter.index("activeSamples()", disable)
+        standalone = adapter.index("StopReport stopHardware()", partial)
+        combined = adapter.index("StopReport stopHardwareAfterTriggers()", standalone)
 
         self.assertLess(boundary, dreq)
         self.assertLess(dreq, wait)
@@ -178,6 +180,8 @@ class PortableSourceBoundaryTests(unittest.TestCase):
         self.assertLess(disable, partial)
         self.assertIn("kStopBoundaryTimeoutCycles", adapter[boundary:stop])
         self.assertIn("partial_samples != 0U", adapter[stop:])
+        self.assertIn("stopHardwareImpl(true)", adapter[standalone:combined])
+        self.assertIn("stopHardwareImpl(false)", adapter[combined:])
 
     def test_adc_stop_finishes_both_dma_channels_before_trigger_shutdown(self) -> None:
         adapter = _source(FIRMWARE_SOURCE / "adc_dma_capture_teensy.cpp")

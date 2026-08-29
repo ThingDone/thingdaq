@@ -32,7 +32,9 @@ struct HardwareSnapshot {
 class TeensyRawCapture final : public HardwareCapture {
  public:
   StartStatus inspectStart() override;
+  StartStatus prepare() override;
   StartStatus start() override;
+  StopReport stopAfterTriggers() override;
   StopReport stop() override;
   AcquireResult acquireReady() override;
   OperationStatus release(const BufferHandle &handle) override;

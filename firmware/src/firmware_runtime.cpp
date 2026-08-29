@@ -139,6 +139,17 @@ LoopReport FirmwareRuntime::service() {
   // pacing ISR is installed.
   report.synthetic = synthetic_source_.service(now_ticks, packet_pipeline_);
   acquisition_controller_.service(report);
+  if (report.physical_fault_detected &&
+      control_.state() != protocol_v1::DeviceState::kIdle) {
+    report.recovered_to_idle = control_.recoverToIdle();
+    if (!report.recovered_to_idle) {
+      report.internal_error = true;
+    }
+    // The controller has already initiated fail-safe source teardown. Consume
+    // ControlState's STOP signal in the same visit so a failed trigger cleanup
+    // is retried without leaving the externally visible state RUNNING.
+    applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
+  }
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
   publishPacketStatistics();

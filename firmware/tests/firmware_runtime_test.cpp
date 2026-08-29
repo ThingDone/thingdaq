@@ -24,6 +24,7 @@ namespace board = teensy_daq::board;
 namespace constants = teensy_daq::protocol_v1;
 namespace control = teensy_daq::control;
 namespace gpio_clock = teensy_daq::gpio_clock;
+namespace gpio_capture = teensy_daq::gpio_capture;
 namespace gpio_packer = teensy_daq::gpio_packer;
 namespace identity = teensy_daq::identity;
 namespace packet = teensy_daq::packet;
@@ -367,7 +368,7 @@ class LifecycleTriggerPlatform final : public adc_trigger::Platform {
   bool armFromStopped(bool completion_diagnostic) override {
     operations_.push_back(completion_diagnostic ? "diagnostic_arm"
                                                 : "trigger_arm");
-    return true;
+    return arm_ok;
   }
   std::array<std::uint32_t, 2U> completionCounts() override {
     return {1U, 1U};
@@ -379,9 +380,12 @@ class LifecycleTriggerPlatform final : public adc_trigger::Platform {
   std::uint32_t triggerErrorCount() override { return 0U; }
   bool stop() override {
     operations_.push_back("trigger_stop");
-    return true;
+    return stop_ok;
   }
   adc_trigger::HardwareEvidence evidence() override { return {}; }
+
+  bool arm_ok = true;
+  bool stop_ok = true;
 
  private:
   std::vector<std::string> &operations_;
@@ -406,10 +410,12 @@ class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
     }
     operations_.push_back("dma_prepare");
     epoch_ = epoch;
+    snapshot_.progress = {};
     snapshot_.epoch = epoch;
     snapshot_.running = true;
     snapshot_.quiescent = false;
     snapshot_.hardware_prepared = true;
+    snapshot_.faulted = false;
     return adc_capture::StartStatus::kOk;
   }
 
@@ -429,7 +435,7 @@ class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
 
   bool stopAtBoundaryBeforeTriggers() override {
     operations_.push_back("dma_boundary_stop");
-    return true;
+    return !snapshot_.faulted;
   }
 
   std::size_t serviceOwnership() override { return 0U; }
@@ -494,6 +500,8 @@ class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
     snapshot_.progress.pairs_captured += constants::kAdcPairsPerFrame;
   }
 
+  void fault() { snapshot_.faulted = true; }
+
   std::uint32_t inspect_calls = 0U;
 
  private:
@@ -507,14 +515,156 @@ class LifecycleAdcCapture final : public adc_capture::HardwareCapture {
   bool leased_ = false;
 };
 
+class LifecycleGpioCapture final : public gpio_capture::HardwareCapture {
+ public:
+  explicit LifecycleGpioCapture(std::vector<std::string> &operations)
+      : operations_(operations) {}
+
+  gpio_capture::StartStatus inspectStart() override {
+    ++inspect_calls;
+    return snapshot_.quiescent ? gpio_capture::StartStatus::kOk
+                               : gpio_capture::StartStatus::kNotQuiescent;
+  }
+
+  gpio_capture::StartStatus prepare() override {
+    operations_.push_back("gpio_dma_prepare");
+    if (prepare_status != gpio_capture::StartStatus::kOk) {
+      return prepare_status;
+    }
+    if (!snapshot_.quiescent) {
+      return gpio_capture::StartStatus::kNotQuiescent;
+    }
+    snapshot_.progress = {};
+    snapshot_.running = true;
+    snapshot_.quiescent = false;
+    snapshot_.hardware_prepared = true;
+    snapshot_.faulted = false;
+    return gpio_capture::StartStatus::kOk;
+  }
+
+  gpio_capture::StartStatus start() override {
+    const gpio_capture::StartStatus prepared = prepare();
+    if (prepared == gpio_capture::StartStatus::kOk) {
+      operations_.push_back("gpio_trigger_start");
+    }
+    return prepared;
+  }
+
+  gpio_capture::StopReport stopAfterTriggers() override {
+    operations_.push_back("gpio_dma_stop");
+    return finishStop();
+  }
+
+  gpio_capture::StopReport stop() override {
+    operations_.push_back("gpio_boundary_stop");
+    return finishStop();
+  }
+
+  gpio_capture::AcquireResult acquireReady() override {
+    if (!ready_ || leased_) {
+      return {};
+    }
+    leased_ = true;
+    snapshot_.ready_depth = 0U;
+    snapshot_.packing_depth = 1U;
+    ++snapshot_.progress.buffers_acquired;
+    snapshot_.progress.samples_delivered += constants::kGpioSamplesPerFrame;
+    gpio_capture::BufferHandle handle{};
+    handle.words = buffer_.words.data();
+    handle.first_sample = first_sample_;
+    handle.sample_count = constants::kGpioSamplesPerFrame;
+    handle.lease = lease_;
+    handle.buffer_index = 0U;
+    return {gpio_capture::OperationStatus::kOk, handle};
+  }
+
+  gpio_capture::OperationStatus release(
+      const gpio_capture::BufferHandle &handle) override {
+    if (!leased_ || handle.words != buffer_.words.data() ||
+        handle.lease != lease_) {
+      return gpio_capture::OperationStatus::kInvalidHandle;
+    }
+    leased_ = false;
+    ready_ = false;
+    snapshot_.packing_depth = 0U;
+    ++snapshot_.progress.buffers_released;
+    snapshot_.quiescent = !snapshot_.running;
+    return gpio_capture::OperationStatus::kOk;
+  }
+
+  gpio_capture::Snapshot rawSnapshot() override { return snapshot_; }
+
+  void publish(std::uint64_t first_sample) {
+    first_sample_ = first_sample;
+    ++lease_;
+    if (lease_ == 0U) {
+      ++lease_;
+    }
+    for (std::size_t sample = 0U; sample < buffer_.words.size(); ++sample) {
+      const std::uint8_t logical = static_cast<std::uint8_t>(sample);
+      std::uint32_t raw = 0U;
+      for (std::size_t bit = 0U;
+           bit < board::countOf(board::kGpioMappingsByPackedBit); ++bit) {
+        if ((logical & static_cast<std::uint8_t>(1U << bit)) != 0U) {
+          raw |= std::uint32_t{1U}
+                 << board::kGpioMappingsByPackedBit[bit].gpio2_bit;
+        }
+      }
+      buffer_.words[sample] = raw;
+    }
+    ready_ = true;
+    snapshot_.quiescent = false;
+    snapshot_.ready_depth = 1U;
+    snapshot_.progress.ready_high_water = 1U;
+    ++snapshot_.progress.major_loops_completed;
+    ++snapshot_.progress.buffers_completed;
+    snapshot_.progress.samples_captured += constants::kGpioSamplesPerFrame;
+  }
+
+  void fault() { snapshot_.faulted = true; }
+
+  gpio_capture::StartStatus prepare_status =
+      gpio_capture::StartStatus::kOk;
+  std::uint32_t inspect_calls = 0U;
+
+ private:
+  gpio_capture::StopReport finishStop() {
+    gpio_capture::StopReport report{};
+    if (!snapshot_.running && !snapshot_.hardware_prepared) {
+      return report;
+    }
+    snapshot_.running = false;
+    snapshot_.hardware_prepared = false;
+    snapshot_.quiescent = !ready_ && !leased_;
+    report.status = gpio_capture::OperationStatus::kOk;
+    report.ready_buffers_to_drain = ready_ ? 1U : 0U;
+    report.packing_buffers_to_release = leased_ ? 1U : 0U;
+    return report;
+  }
+
+  std::vector<std::string> &operations_;
+  gpio_capture::RawBuffer buffer_{};
+  gpio_capture::Snapshot snapshot_{};
+  std::uint64_t first_sample_ = 0U;
+  std::uint32_t lease_ = 0U;
+  bool ready_ = false;
+  bool leased_ = false;
+};
+
 class AuditGpioCapture final : public teensy_daq::gpio_capture::HardwareCapture {
  public:
   teensy_daq::gpio_capture::StartStatus inspectStart() override {
     ++inspect_calls;
     return inspect_status;
   }
+  teensy_daq::gpio_capture::StartStatus prepare() override {
+    return inspect_status;
+  }
   teensy_daq::gpio_capture::StartStatus start() override {
     return inspect_status;
+  }
+  teensy_daq::gpio_capture::StopReport stopAfterTriggers() override {
+    return {};
   }
   teensy_daq::gpio_capture::StopReport stop() override { return {}; }
   teensy_daq::gpio_capture::AcquireResult acquireReady() override {
@@ -1090,8 +1240,8 @@ void testAcquisitionControllerAuditsBothPhysicalEnginesAtomically() {
       static_cast<std::uint8_t>(constants::StreamMask::kAdc) |
       static_cast<std::uint8_t>(constants::StreamMask::kGpio);
   expect(acquisition::Controller::isHardwareConfiguration(combined) &&
-             !acquisition::Controller::isExecutableConfiguration(combined),
-         "combined hardware is auditable but remains disabled in Protocol V1");
+             acquisition::Controller::isExecutableConfiguration(combined),
+         "combined hardware is auditable and executable behind the protocol gate");
   const acquisition::Audit ready = controller.inspect(combined, 1U);
   expect(ready.ready() && ready.contract.valid() &&
              ready.profile == acquisition::Profile::kCombined &&
@@ -1102,11 +1252,23 @@ void testAcquisitionControllerAuditsBothPhysicalEnginesAtomically() {
              adc_capture.inspect_calls == 1U &&
              gpio_capture.inspect_calls == 1U && operations.empty(),
          "combined preflight audits both engines without arming hardware");
-  acquisition::Report blocked_start{};
-  expect(!controller.start(combined, 1U, 0U, blocked_start) &&
-             blocked_start.internal_error &&
-             blocked_start.packet_production_stopped && operations.empty(),
-         "combined execution fails closed without touching physical hardware");
+
+  const std::uint32_t adc_inspections_before_invalid =
+      adc_capture.inspect_calls;
+  const std::uint32_t gpio_inspections_before_invalid =
+      gpio_capture.inspect_calls;
+  wire::Configuration invalid = combined;
+  invalid.data_frame_bytes = constants::kDataFrameBytes - 1U;
+  const acquisition::Audit invalid_configuration =
+      controller.inspect(invalid, 2U);
+  const acquisition::Audit invalid_run = controller.inspect(combined, 0U);
+  expect(invalid_configuration.has(
+             acquisition::Conflict::kInvalidConfiguration) &&
+             invalid_run.has(acquisition::Conflict::kInvalidRunId) &&
+             adc_capture.inspect_calls == adc_inspections_before_invalid &&
+             gpio_capture.inspect_calls == gpio_inspections_before_invalid &&
+             operations.empty(),
+         "combined preflight rejects the full configuration and run identity before target inspection");
 
   gpio_capture.inspect_status =
       teensy_daq::gpio_capture::StartStatus::kResourceBusy;
@@ -1127,6 +1289,223 @@ void testAcquisitionControllerAuditsBothPhysicalEnginesAtomically() {
              absent.has(acquisition::Conflict::kGpioComponentsMissing) &&
              !absent.ready(),
          "combined preflight fails closed when either engine is absent");
+}
+
+void testCombinedControllerUsesOneEpochAndDeterministicLifecycle() {
+  packet::OwnedPacketBufferStorage packet_storage{};
+  packet::PacketBufferPipeline packet_pipeline{packet_storage};
+  teensy_daq::stats::Statistics statistics{};
+  std::vector<std::string> operations{};
+  ReadyAdcPlatform adc_platform{};
+  adc::Initializer adc_initializer{adc_platform};
+  LifecycleTriggerPlatform trigger_platform{operations};
+  adc_trigger::Scheduler trigger_scheduler{trigger_platform};
+  LifecycleAdcCapture adc_capture{operations};
+  adc_packer::AdcFramePacker adc_frame_packer{adc_capture};
+  LifecycleGpioCapture gpio_capture{operations};
+  gpio_packer::PackedBufferStorage gpio_storage{};
+  gpio_packer::GpioBatchPacker gpio_frame_packer{gpio_capture, gpio_storage};
+  acquisition::Controller controller{
+      statistics, packet_pipeline, &gpio_capture, &gpio_frame_packer,
+      &adc_initializer, &trigger_scheduler, &adc_capture, &adc_frame_packer};
+
+  wire::Configuration combined = control::kPhysicalAdcConfiguration;
+  combined.stream_mask =
+      static_cast<std::uint8_t>(constants::StreamMask::kAdc) |
+      static_cast<std::uint8_t>(constants::StreamMask::kGpio);
+  combined.data_checksum_algorithm = constants::ChecksumAlgorithm::kCrc32c;
+  expect(controller.initialize().trigger.error_flags == 0U,
+         "combined lifecycle completes the bounded trigger BOOT gate");
+  operations.clear();
+
+  constexpr std::uint32_t kRunOne = 41U;
+  constexpr std::uint64_t kEpochOne = 0x123456789ABCULL;
+  expect(packet_pipeline.startRun(kRunOne,
+                                  combined.data_checksum_algorithm) ==
+                 packet::OperationStatus::kOk,
+         "combined lifecycle reserves one packet epoch");
+  acquisition::Report started{};
+  expect(controller.start(combined, kRunOne, kEpochOne, started) &&
+             started.adc_packer_started && started.gpio_packer_started &&
+             started.adc_capture_prepared &&
+             started.gpio_capture_prepared &&
+             started.gpio_capture_started && started.adc_trigger_armed &&
+             controller.active() && controller.activeRunId() == kRunOne &&
+             controller.epochTicks() == kEpochOne &&
+             controller.activeStreamMask() == combined.stream_mask &&
+             operations ==
+                 std::vector<std::string>{"dma_prepare", "gpio_dma_prepare",
+                                          "trigger_arm"},
+         "combined START prepares ADC then GPIO DMA before one common trigger arm");
+  const adc_packer::Snapshot adc_started =
+      adc_frame_packer.snapshot(packet_pipeline);
+  const gpio_packer::Snapshot gpio_started =
+      gpio_frame_packer.snapshot(packet_pipeline);
+  expect(adc_started.run_id == kRunOne && gpio_started.run_id == kRunOne &&
+             adc_started.start_epoch_ticks == kEpochOne &&
+             gpio_started.start_epoch_ticks == kEpochOne &&
+             adc_started.next_source_pair == 0U &&
+             gpio_started.next_source_sample == 0U,
+         "both physical packers snapshot the same run ID and 8 MHz epoch");
+
+  adc_capture.publish(0U);
+  gpio_capture.publish(0U);
+  acquisition::Report serviced{};
+  controller.service(serviced);
+  expect(serviced.adc_packer.frames_framed == 1U &&
+             serviced.gpio_packer.frames_framed == 1U,
+         "one equal-coverage ADC/GPIO interval is framed from hardware counters");
+  const packet::PipelineSnapshot first_interval = packet_pipeline.snapshot();
+  expect(first_interval.sources[packet::streamIndex(packet::Stream::kAdc)]
+                     .frames_framed == 1U &&
+             first_interval.sources[packet::streamIndex(packet::Stream::kGpio)]
+                     .frames_framed == 1U,
+         "combined sources retain independent frame sequences");
+  expect(packet_pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+         "the common packet owner promotes both first-interval frames");
+  for (std::size_t frame = 0U; frame < 2U; ++frame) {
+    wire::DecodedFrame decoded{};
+    expect(wire::decodeFrame(packet_pipeline.frontFrame(), decoded).ok() &&
+               decoded.header.run_id == kRunOne &&
+               decoded.header.sequence == 0U &&
+               decoded.header.first_sample_ticks == 0U &&
+               (decoded.header.flags & static_cast<std::uint16_t>(
+                                           constants::FrameFlag::kEpochStart)) !=
+                   0U,
+           "each source begins at relative tick zero without ISR timestamping");
+    packet_pipeline.releaseFrontFrame();
+  }
+
+  adc_capture.publish(constants::kAdcPairsPerFrame);
+  gpio_capture.publish(constants::kGpioSamplesPerFrame);
+  acquisition::Report stopped{};
+  expect(controller.stop(stopped) && stopped.physical_drain_pending &&
+             stopped.adc_trigger_stopped && stopped.gpio_capture_stopped &&
+             stopped.adc_capture_stopped &&
+             operations ==
+                 std::vector<std::string>{
+                     "dma_prepare", "gpio_dma_prepare", "trigger_arm",
+                     "trigger_stop", "gpio_dma_stop", "dma_stop"},
+         "combined STOP disables the common source before GPIO and ADC DMA");
+  acquisition::Report drained{};
+  controller.service(drained);
+  expect(!controller.active() && !controller.drainPending() &&
+             drained.packet_production_stopped &&
+             drained.packet_stop.ready_frames_to_drain == 2U &&
+             adc_frame_packer.readyForStart() &&
+             gpio_frame_packer.readyForStart(),
+         "combined STOP retains only complete unsent frames and drains both packers");
+  expect(packet_pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+         "both complete STOP-boundary frames remain transportable");
+  for (std::size_t frame = 0U; frame < 2U; ++frame) {
+    wire::DecodedFrame decoded{};
+    const bool valid =
+        wire::decodeFrame(packet_pipeline.frontFrame(), decoded).ok();
+    const std::uint64_t expected_ticks =
+        decoded.header.kind == constants::FrameKind::kAdcData
+            ? constants::kAdcPairsPerFrame *
+                  constants::kAdcPairPeriodTicks
+            : constants::kGpioSamplesPerFrame *
+                  constants::kGpioSamplePeriodTicks;
+    expect(valid && decoded.header.run_id == kRunOne &&
+               decoded.header.sequence == 1U &&
+               decoded.header.first_sample_ticks == expected_ticks,
+           "complete STOP frames preserve equal run-relative coverage");
+    packet_pipeline.releaseFrontFrame();
+  }
+  expect(packet_pipeline.readyForStart() && controller.quiescent() &&
+             controller.activeRunId() == 0U && controller.epochTicks() == 0U,
+         "the complete combined run returns every owner to reusable IDLE");
+
+  constexpr std::uint32_t kFaultRun = 42U;
+  expect(packet_pipeline.startRun(kFaultRun,
+                                  combined.data_checksum_algorithm) ==
+                 packet::OperationStatus::kOk,
+         "a fresh packet epoch starts after the combined drain");
+  acquisition::Report restarted{};
+  expect(controller.start(combined, kFaultRun, kEpochOne + 1U, restarted),
+         "a second combined run starts without stale ownership");
+  const adc_packer::Snapshot adc_restarted =
+      adc_frame_packer.snapshot(packet_pipeline);
+  const gpio_packer::Snapshot gpio_restarted =
+      gpio_frame_packer.snapshot(packet_pipeline);
+  const packet::PipelineSnapshot packet_restarted =
+      packet_pipeline.snapshot();
+  expect(adc_restarted.run_id == kFaultRun &&
+             gpio_restarted.run_id == kFaultRun &&
+             adc_restarted.start_epoch_ticks == kEpochOne + 1U &&
+             gpio_restarted.start_epoch_ticks == kEpochOne + 1U &&
+             adc_restarted.next_source_pair == 0U &&
+             gpio_restarted.next_source_sample == 0U &&
+             adc_restarted.service_calls == 0U &&
+             gpio_restarted.service_calls == 0U &&
+             packet_restarted.run_id == kFaultRun &&
+             packet_restarted.ready_queue_depth == 0U &&
+             packet_restarted.transmit_queue_depth == 0U &&
+             packet_restarted.sources[packet::streamIndex(packet::Stream::kAdc)]
+                     .next_sequence == 0U &&
+             packet_restarted.sources[packet::streamIndex(packet::Stream::kGpio)]
+                     .next_sequence == 0U &&
+             adc_capture.rawSnapshot().progress.buffers_completed == 0U &&
+             gpio_capture.rawSnapshot().progress.buffers_completed == 0U,
+         "a new run resets source counters, sequences, queues, and packer generations");
+  operations.clear();
+  gpio_capture.fault();
+  acquisition::Report faulted{};
+  controller.service(faulted);
+  expect(faulted.physical_fault_detected && faulted.internal_error &&
+             faulted.packet_production_stopped && !controller.active() &&
+             !controller.drainPending() && controller.quiescent() &&
+             packet_pipeline.readyForStart() &&
+             operations ==
+                 std::vector<std::string>{"trigger_stop", "gpio_dma_stop",
+                                          "dma_stop"},
+         "a combined source fault stops the common schedule first and returns reusable IDLE");
+}
+
+void testCombinedStartRollsBackEveryPreparedOwner() {
+  packet::OwnedPacketBufferStorage packet_storage{};
+  packet::PacketBufferPipeline packet_pipeline{packet_storage};
+  teensy_daq::stats::Statistics statistics{};
+  std::vector<std::string> operations{};
+  ReadyAdcPlatform adc_platform{};
+  adc::Initializer adc_initializer{adc_platform};
+  LifecycleTriggerPlatform trigger_platform{operations};
+  adc_trigger::Scheduler trigger_scheduler{trigger_platform};
+  LifecycleAdcCapture adc_capture{operations};
+  adc_packer::AdcFramePacker adc_frame_packer{adc_capture};
+  LifecycleGpioCapture gpio_capture{operations};
+  gpio_packer::PackedBufferStorage gpio_storage{};
+  gpio_packer::GpioBatchPacker gpio_frame_packer{gpio_capture, gpio_storage};
+  acquisition::Controller controller{
+      statistics, packet_pipeline, &gpio_capture, &gpio_frame_packer,
+      &adc_initializer, &trigger_scheduler, &adc_capture, &adc_frame_packer};
+  wire::Configuration combined = control::kPhysicalAdcConfiguration;
+  combined.stream_mask =
+      static_cast<std::uint8_t>(constants::StreamMask::kAdc) |
+      static_cast<std::uint8_t>(constants::StreamMask::kGpio);
+  expect(controller.initialize().trigger.error_flags == 0U,
+         "rollback fixture completes the trigger BOOT gate");
+  operations.clear();
+  gpio_capture.prepare_status = gpio_capture::StartStatus::kHardwareError;
+  expect(packet_pipeline.startRun(51U,
+                                  combined.data_checksum_algorithm) ==
+                 packet::OperationStatus::kOk,
+         "rollback fixture reserves the packet epoch");
+
+  acquisition::Report failed{};
+  expect(!controller.start(combined, 51U, 9000U, failed) &&
+             failed.internal_error && failed.adc_packer_started &&
+             failed.gpio_packer_started && failed.adc_capture_prepared &&
+             !failed.gpio_capture_prepared && failed.adc_capture_stopped &&
+             failed.adc_packer_stopped && failed.gpio_packer_stopped &&
+             failed.packet_production_stopped && !controller.active() &&
+             !controller.drainPending() && controller.quiescent() &&
+             packet_pipeline.readyForStart() &&
+             operations ==
+                 std::vector<std::string>{"dma_prepare", "gpio_dma_prepare",
+                                          "dma_stop"},
+         "a GPIO prepare failure rolls ADC, both packers, and packet ownership back atomically");
 }
 
 void testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs() {
@@ -1422,6 +1801,8 @@ int main() {
   testStartupSchedulingJitterFitsPacketPool();
   testStopDrainGatesNextStartAndPreventsStaleRunData();
   testAcquisitionControllerAuditsBothPhysicalEnginesAtomically();
+  testCombinedControllerUsesOneEpochAndDeterministicLifecycle();
+  testCombinedStartRollsBackEveryPreparedOwner();
   testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs();
   testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState();
   testGpioClockRoundTripPreservesIdleAcquisitionState();
