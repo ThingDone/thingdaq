@@ -31,7 +31,16 @@ from .discovery import (
     enumerate_candidates,
 )
 from .identity import ExpectedDeviceIdentity
-from .models import ADCBlock, DAQConfiguration, DeviceInfo, GPIOBlock, Status, StreamGap
+from .models import (
+    ADCBlock,
+    DAQConfiguration,
+    DeviceInfo,
+    GPIOBlock,
+    HostQueueLoss,
+    Status,
+    StreamAnomaly,
+    StreamGap,
+)
 from .protocol import ProtocolError
 from .reader import DeviceDisconnectedError, ReaderError, ReaderProtocolError
 from .transport import (
@@ -456,6 +465,8 @@ def _run_monitor(
         adc_bytes = 0
         gpio_bytes = 0
         gaps = 0
+        host_queue_losses = 0
+        stream_anomalies = 0
         last_status: Status | None = None
 
         while monotonic() < deadline:
@@ -474,6 +485,8 @@ def _run_monitor(
                     f"sample elapsed_s={sampled_at - started_at:.3f} "
                     f"adc_payload_Bps={adc_rate:.0f} "
                     f"gpio_payload_Bps={gpio_rate:.0f} gaps={gaps} "
+                    f"host_queue_losses={host_queue_losses} "
+                    f"stream_anomalies={stream_anomalies} "
                     f"packet_ready_hwm={last_status.packet_ready_high_water} "
                     f"packet_transmit_hwm={last_status.packet_transmit_high_water} "
                     f"host_block_queue_hwm={reader.block_queue_high_water} "
@@ -500,6 +513,10 @@ def _run_monitor(
                 continue
             if isinstance(item, StreamGap):
                 gaps += 1
+            elif isinstance(item, HostQueueLoss):
+                host_queue_losses += 1
+            elif isinstance(item, StreamAnomaly):
+                stream_anomalies += item.occurrences
             elif isinstance(item, ADCBlock):
                 adc_bytes += len(item.payload_view)
             elif isinstance(item, GPIOBlock):
@@ -515,6 +532,8 @@ def _run_monitor(
             f"summary elapsed_s={elapsed:.3f} "
             f"adc_payload_Bps={adc_bytes / elapsed:.0f} "
             f"gpio_payload_Bps={gpio_bytes / elapsed:.0f} gaps={gaps} "
+            f"host_queue_losses={host_queue_losses} "
+            f"stream_anomalies={stream_anomalies} "
             f"packet_ready_hwm={last_status.packet_ready_high_water} "
             f"packet_transmit_hwm={last_status.packet_transmit_high_water} "
             f"host_block_queue_hwm={reader.block_queue_high_water} "

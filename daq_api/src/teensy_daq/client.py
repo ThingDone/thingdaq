@@ -37,15 +37,20 @@ from .models import (
     DeviceCapabilities,
     DeviceInfo,
     FirmwareCounters,
+    FirmwareLossEvidence,
     GPIOBlock,
     GpioCaptureDiagnosticResult,
     GpioClockDiagnosticRequest,
     GpioClockDiagnosticResult,
     HostCounters,
+    HostQueueLoss,
     LossCounters,
     ResponseValue,
     Status,
+    StreamAnomaly,
+    StreamAnomalyReason,
     StreamGap,
+    analyze_stream_continuity,
 )
 from .protocol import ParserCounters
 from .reader import (
@@ -64,7 +69,8 @@ from .synthetic import SyntheticPatternError, validate_synthetic_block
 from .transport import ByteTransport, InMemoryTransport, SerialTransport
 
 DataBlock: TypeAlias = ADCBlock | GPIOBlock
-StreamItem: TypeAlias = DataBlock | StreamGap
+LossReport: TypeAlias = StreamGap | HostQueueLoss | StreamAnomaly
+StreamItem: TypeAlias = DataBlock | LossReport
 SerialTransportFactory: TypeAlias = Callable[[str], ByteTransport]
 
 
@@ -197,6 +203,35 @@ class UnexpectedStreamGapError(TeensyDAQError):
         self.block = block
 
 
+class UnexpectedHostQueueLossError(TeensyDAQError):
+    """Strict mode observed decoded application-queue eviction."""
+
+    def __init__(self, loss: HostQueueLoss) -> None:
+        super().__init__(
+            f"unexpected host {loss.kind.name} queue loss in run {loss.run_id}: "
+            f"{loss.dropped_blocks} block(s), {loss.dropped_items} item(s), "
+            f"policy={loss.policy.value}"
+        )
+        self.loss = loss
+
+
+class UnexpectedStreamAnomalyError(TeensyDAQError):
+    """Strict mode observed duplicate, reordered, stale, or bad-time data."""
+
+    def __init__(
+        self,
+        anomaly: StreamAnomaly,
+        block: DataBlock | None = None,
+    ) -> None:
+        super().__init__(
+            f"unexpected {anomaly.kind.name} {anomaly.reason.value} frame "
+            f"in run {anomaly.observed_run_id} at sequence "
+            f"{anomaly.observed_sequence}"
+        )
+        self.anomaly = anomaly
+        self.block = block
+
+
 class UnexpectedStreamValidationError(UnexpectedMessageError):
     """Strict validation found corrupt data or a nonzero health counter."""
 
@@ -212,11 +247,11 @@ class HostBufferFullError(TeensyDAQError):
 class TeensyDAQ:
     """State-aware synchronous DAQ API over one :class:`BackgroundReader`.
 
-    ``strict=False`` is the production policy: :meth:`blocks` emits a
-    :class:`StreamGap` immediately before the current block and keeps the live
-    stream moving. ``strict=True`` raises :class:`UnexpectedStreamGapError`
-    with both models attached. Host queue drops and firmware gap/overrun flags
-    remain independently attributed in every gap and counter snapshot.
+    ``strict=False`` is the production policy: :meth:`blocks` emits typed
+    stream gaps, anomalies, and host queue losses while keeping the live stream
+    moving. ``strict=True`` raises the corresponding typed exception. Host
+    queue eviction never supplies firmware attribution, and firmware flags and
+    cumulative counters remain independent evidence on each stream gap.
     """
 
     def __init__(
@@ -281,11 +316,19 @@ class TeensyDAQ:
         self._run_id = 0
         self._expected_sequence: dict[constants.FrameKind, int] = {}
         self._expected_ticks: dict[constants.FrameKind, int] = {}
-        self._last_host_queue_drops = 0
-        self._unattributed_host_queue_drops = 0
+        self._previous_sequence: dict[constants.FrameKind, int] = {}
+        self._inferred_missing_frames: dict[constants.FrameKind, int] = {}
+        self._inferred_missing_items: dict[constants.FrameKind, int] = {}
+        self._loss_stats_generation: int | None = None
         self._observed_stream_gaps = 0
+        self._observed_host_queue_losses = 0
+        self._observed_stream_anomalies = 0
+        self._protocol_telemetry_errors = 0
+        self._telemetry_error_messages: set[str] = set()
+        self._host_loss_baseline = HostCounters()
         self._stream_parser_error_baseline = 0
         self._stream_host_drop_baseline = 0
+        self._stream_loss_report_drop_baseline = 0
         self._closed = False
         self._reader.start()
 
@@ -533,6 +576,54 @@ class TeensyDAQ:
             request_timeouts=reader.request_timeouts,
             protocol_failures=reader.protocol_failures,
             disconnects=reader.disconnects,
+            adc_block_queue_drops=reader.adc_block_queue_drops,
+            gpio_block_queue_drops=reader.gpio_block_queue_drops,
+            adc_item_queue_drops=reader.adc_item_queue_drops,
+            gpio_item_queue_drops=reader.gpio_item_queue_drops,
+            loss_report_queue_drops=reader.loss_report_queue_drops,
+        )
+
+    def _host_counters_since_loss_baseline(self) -> HostCounters:
+        current = self.host_counters
+        baseline = self._host_loss_baseline
+
+        def delta(name: str) -> int:
+            value = getattr(current, name)
+            previous = getattr(baseline, name)
+            if value < previous:
+                raise ReaderProtocolError(f"host counter {name} moved backwards")
+            return value - previous
+
+        return HostCounters(
+            parser_corruption_events=delta("parser_corruption_events"),
+            parser_resynchronizations=delta("parser_resynchronizations"),
+            host_block_queue_drops=delta("host_block_queue_drops"),
+            host_event_queue_drops=delta("host_event_queue_drops"),
+            stale_blocks_discarded=delta("stale_blocks_discarded"),
+            boundary_blocks_discarded=delta("boundary_blocks_discarded"),
+            late_responses=delta("late_responses"),
+            request_timeouts=delta("request_timeouts"),
+            protocol_failures=delta("protocol_failures"),
+            disconnects=delta("disconnects"),
+            adc_block_queue_drops=delta("adc_block_queue_drops"),
+            gpio_block_queue_drops=delta("gpio_block_queue_drops"),
+            adc_item_queue_drops=delta("adc_item_queue_drops"),
+            gpio_item_queue_drops=delta("gpio_item_queue_drops"),
+            loss_report_queue_drops=delta("loss_report_queue_drops"),
+        )
+
+    def _reset_loss_observations(self) -> None:
+        self._observed_stream_gaps = 0
+        self._observed_host_queue_losses = 0
+        self._observed_stream_anomalies = 0
+        self._protocol_telemetry_errors = 0
+        self._telemetry_error_messages.clear()
+        self._host_loss_baseline = self.host_counters
+        self._stream_host_drop_baseline = (
+            self._host_loss_baseline.host_block_queue_drops
+        )
+        self._stream_loss_report_drop_baseline = (
+            self._host_loss_baseline.loss_report_queue_drops
         )
 
     def synchronize(
@@ -685,7 +776,8 @@ class TeensyDAQ:
         with self._lock:
             self._require_verified_identity()
             self._require_state("start", constants.DeviceState.CONFIGURED)
-            host_drop_baseline = self._reader.counters.host_block_queue_drops
+            host_baseline = self.host_counters
+            parser_error_baseline = self._reader.parser_counters.corruption_events
             response = self._command(constants.FrameKind.START_REQUEST)
             if not isinstance(response.value, DAQConfiguration):
                 raise UnexpectedMessageError(
@@ -698,13 +790,18 @@ class TeensyDAQ:
             self._run_id = response.run_id
             self._pending_items.clear()
             self._initialize_stream_expectations(response.value)
-            self._last_host_queue_drops = host_drop_baseline
-            self._stream_host_drop_baseline = host_drop_baseline
-            self._stream_parser_error_baseline = (
-                self._reader.parser_counters.corruption_events
+            self._host_loss_baseline = host_baseline
+            self._stream_host_drop_baseline = host_baseline.host_block_queue_drops
+            self._stream_loss_report_drop_baseline = (
+                host_baseline.loss_report_queue_drops
             )
-            self._unattributed_host_queue_drops = 0
+            self._stream_parser_error_baseline = parser_error_baseline
             self._observed_stream_gaps = 0
+            self._observed_host_queue_losses = 0
+            self._observed_stream_anomalies = 0
+            self._protocol_telemetry_errors = 0
+            self._telemetry_error_messages.clear()
+            self._loss_stats_generation = None
             self._last_status = None
             return self._run_id
 
@@ -757,6 +854,9 @@ class TeensyDAQ:
                 raise UnexpectedMessageError(
                     "RESET_STATS response has no nonzero generation"
                 )
+            self._clear_stream_expectations()
+            self._loss_stats_generation = response.value
+            self._reset_loss_observations()
             self._last_status = None
             return response.value
 
@@ -834,8 +934,7 @@ class TeensyDAQ:
             self._state = constants.DeviceState.IDLE
             self._configuration = None
             self._run_id = response.run_id
-            self._expected_sequence.clear()
-            self._expected_ticks.clear()
+            self._clear_stream_expectations(preserve_inferred=True)
             self._pending_items.clear()
             self._last_status = None
             return constants.DeviceState.IDLE
@@ -863,7 +962,7 @@ class TeensyDAQ:
                 return self._pending_items.popleft()
 
         try:
-            block = self._reader.get_block(timeout=selected_timeout)
+            reader_item = self._reader.get_stream_item(timeout=selected_timeout)
         except QueueWaitTimeoutError as error:
             raise BlockTimeoutError(error.timeout) from error
         except StreamStoppedError as error:
@@ -873,7 +972,11 @@ class TeensyDAQ:
 
         with self._lock:
             self._ensure_open()
-            return self._process_block(block)
+            if isinstance(reader_item, HostQueueLoss):
+                return self._process_host_queue_loss(reader_item)
+            if isinstance(reader_item, StreamAnomaly):
+                return self._process_reader_anomaly(reader_item)
+            return self._process_block(reader_item)
 
     def blocks(
         self,
@@ -902,13 +1005,35 @@ class TeensyDAQ:
 
         if refresh:
             firmware = self.status().counters
+            firmware_observed = True
         else:
             status = self._last_status
             firmware = status.counters if status is not None else FirmwareCounters()
+            firmware_observed = status is not None
+        counter_errors = (
+            self._counter_reconciliation_errors(firmware) if firmware_observed else ()
+        )
+        new_errors = tuple(
+            error
+            for error in counter_errors
+            if error not in self._telemetry_error_messages
+        )
+        if new_errors:
+            self._telemetry_error_messages.update(new_errors)
+            self._protocol_telemetry_errors += len(new_errors)
+        if self._strict and counter_errors:
+            raise UnexpectedStreamValidationError(
+                "protocol_telemetry",
+                "; ".join(counter_errors),
+            )
         return LossCounters(
             firmware=firmware,
-            host=self.host_counters,
+            host=self._host_counters_since_loss_baseline(),
             observed_stream_gaps=self._observed_stream_gaps,
+            observed_host_queue_losses=self._observed_host_queue_losses,
+            observed_stream_anomalies=self._observed_stream_anomalies,
+            protocol_telemetry_errors=self._protocol_telemetry_errors,
+            telemetry_errors=tuple(sorted(self._telemetry_error_messages)),
         )
 
     def validate_stream_health(self, status: Status | None = None) -> Status:
@@ -925,6 +1050,12 @@ class TeensyDAQ:
             snapshot = self.status() if status is None else status
             if not isinstance(snapshot, Status):
                 raise TypeError("status must be a Status snapshot")
+            counter_errors = self._counter_reconciliation_errors(snapshot.counters)
+            if counter_errors:
+                raise UnexpectedStreamValidationError(
+                    "protocol_telemetry",
+                    "; ".join(counter_errors),
+                )
             parser_errors = (
                 self._reader.parser_counters.corruption_events
                 - self._stream_parser_error_baseline
@@ -942,6 +1073,23 @@ class TeensyDAQ:
                 raise UnexpectedStreamValidationError(
                     "host_queue_drops",
                     f"dropped {host_drops} decoded block(s)",
+                )
+            loss_report_drops = (
+                self._reader.counters.loss_report_queue_drops
+                - self._stream_loss_report_drop_baseline
+            )
+            if loss_report_drops:
+                raise UnexpectedStreamValidationError(
+                    "loss_report_queue_drops",
+                    "bounded host loss-report storage discarded "
+                    f"{loss_report_drops} report(s)",
+                )
+            if self._protocol_telemetry_errors:
+                raise UnexpectedStreamValidationError(
+                    "protocol_telemetry",
+                    "observed "
+                    f"{self._protocol_telemetry_errors} continuity/evidence "
+                    "disagreement(s)",
                 )
             if snapshot.adc_items_dropped or snapshot.gpio_items_dropped:
                 raise UnexpectedStreamValidationError(
@@ -1009,8 +1157,7 @@ class TeensyDAQ:
             finally:
                 self._closed = True
                 self._pending_items.clear()
-                self._expected_sequence.clear()
-                self._expected_ticks.clear()
+                self._clear_stream_expectations()
             if stop_error is not None:
                 raise stop_error
 
@@ -1078,9 +1225,15 @@ class TeensyDAQ:
                 "firmware identity changed during the open session"
             )
 
+        previous_run_id = self._run_id
         self._device_info = info
         self._state = info.device_state
         self._run_id = response.run_id
+        if previous_run_id != response.run_id:
+            self._clear_stream_expectations()
+            self._pending_items.clear()
+            self._loss_stats_generation = None
+            self._reset_loss_observations()
         if info.device_state is constants.DeviceState.IDLE:
             self._configuration = None
         else:
@@ -1141,20 +1294,38 @@ class TeensyDAQ:
         self,
         configuration: DAQConfiguration,
     ) -> None:
-        self._expected_sequence.clear()
-        self._expected_ticks.clear()
+        self._clear_stream_expectations()
         if configuration.stream_mask & constants.StreamMask.ADC:
             self._expected_sequence[constants.FrameKind.ADC_DATA] = 0
             self._expected_ticks[constants.FrameKind.ADC_DATA] = 0
+            self._inferred_missing_frames[constants.FrameKind.ADC_DATA] = 0
+            self._inferred_missing_items[constants.FrameKind.ADC_DATA] = 0
         if configuration.stream_mask & constants.StreamMask.GPIO:
             self._expected_sequence[constants.FrameKind.GPIO_DATA] = 0
             self._expected_ticks[constants.FrameKind.GPIO_DATA] = 0
+            self._inferred_missing_frames[constants.FrameKind.GPIO_DATA] = 0
+            self._inferred_missing_items[constants.FrameKind.GPIO_DATA] = 0
+
+    def _clear_stream_expectations(self, *, preserve_inferred: bool = False) -> None:
+        self._expected_sequence.clear()
+        self._expected_ticks.clear()
+        self._previous_sequence.clear()
+        if not preserve_inferred:
+            self._inferred_missing_frames.clear()
+            self._inferred_missing_items.clear()
+
+    def _observe_loss_stats_generation(self, observed: int) -> str | None:
+        if self._loss_stats_generation is None:
+            self._loss_stats_generation = observed
+            return None
+        if self._loss_stats_generation == observed:
+            return None
+        return (
+            "firmware statistics generation changed within the active run: "
+            f"expected {self._loss_stats_generation}, observed {observed}"
+        )
 
     def _process_block(self, block: DataBlock) -> StreamItem:
-        if block.run_id != self._run_id:
-            raise UnexpectedMessageError(
-                f"stale data run {block.run_id}; active run is {self._run_id}"
-            )
         kind = (
             constants.FrameKind.ADC_DATA
             if isinstance(block, ADCBlock)
@@ -1165,18 +1336,21 @@ class TeensyDAQ:
                 f"received disabled {kind.name} stream for the active configuration"
             )
 
+        configuration = self._configuration
+        if configuration is None:
+            raise UnexpectedMessageError(
+                f"{kind.name} arrived without an active configuration"
+            )
+        if block.source is not configuration.source:
+            raise UnexpectedMessageError(
+                f"{kind.name} source flag disagrees with the active configuration"
+            )
+
         if isinstance(block, ADCBlock):
-            configuration = self._configuration
             info = self._device_info
-            if configuration is None or info is None:
+            if info is None:
                 raise UnexpectedMessageError(
                     "ADC_DATA arrived without active configuration/INFO metadata"
-                )
-            expected_synthetic = configuration.source is constants.Source.SYNTHETIC
-            wire_synthetic = bool(block.flags & constants.FrameFlag.SYNTHETIC)
-            if wire_synthetic != expected_synthetic:
-                raise UnexpectedMessageError(
-                    "ADC_DATA source flag disagrees with the active configuration"
                 )
             acquisition: AdcAcquisitionStatus | None = None
             status = self._last_status
@@ -1201,60 +1375,299 @@ class TeensyDAQ:
                     f"ADC_DATA contradicts advertised ADC metadata: {error}"
                 ) from error
 
-        total_host_drops = self._reader.counters.host_block_queue_drops
-        if total_host_drops < self._last_host_queue_drops:
-            raise ReaderProtocolError("host queue-drop counter moved backwards")
-        self._unattributed_host_queue_drops += (
-            total_host_drops - self._last_host_queue_drops
+        continuity = analyze_stream_continuity(
+            block,
+            expected_sequence=self._expected_sequence[kind],
+            expected_first_sample_ticks=self._expected_ticks[kind],
+            active_run_id=self._run_id,
+            previous_sequence=self._previous_sequence.get(kind),
         )
-        self._last_host_queue_drops = total_host_drops
-
-        try:
-            gap = StreamGap.from_expected(
-                block,
-                expected_sequence=self._expected_sequence[kind],
-                expected_first_sample_ticks=self._expected_ticks[kind],
-                host_queue_drops=self._unattributed_host_queue_drops,
-            )
-        except ValueError as error:
-            raise UnexpectedMessageError(
-                f"{kind.name} sequence/timestamp continuity is invalid: {error}"
-            ) from error
-
-        self._expected_sequence[kind] = (block.sequence + 1) & constants.UINT32_MAX
-        self._expected_ticks[kind] = block.end_tick_exclusive
-        if gap is None:
-            if self._strict:
-                parser_errors = (
-                    self._reader.parser_counters.corruption_events
-                    - self._stream_parser_error_baseline
-                )
-                if parser_errors:
-                    raise UnexpectedStreamValidationError(
-                        "parser_errors",
-                        f"observed {parser_errors} new rejected frame candidate(s)",
-                    )
-                if (
-                    self._configuration is not None
-                    and self._configuration.source is constants.Source.SYNTHETIC
-                ):
-                    try:
-                        validate_synthetic_block(block)
-                    except SyntheticPatternError as error:
-                        raise UnexpectedStreamValidationError(
-                            "synthetic_pattern",
-                            str(error),
-                        ) from error
+        if continuity is None:
+            self._advance_expectation(kind, block)
+            self._validate_clean_block(block)
             return block
 
+        if isinstance(continuity, StreamAnomaly):
+            anomaly = self._finalize_anomaly_evidence(continuity)
+            self._observed_stream_anomalies += anomaly.occurrences
+            self._protocol_telemetry_errors += anomaly.occurrences
+            self._telemetry_error_messages.add(
+                f"{anomaly.kind.name} {anomaly.reason.value} at run/sequence "
+                f"{anomaly.observed_run_id}/{anomaly.observed_sequence}"
+            )
+            retain_block = anomaly.reason not in {
+                StreamAnomalyReason.DUPLICATE,
+                StreamAnomalyReason.REORDERED,
+                StreamAnomalyReason.STALE_RUN,
+            }
+            if retain_block:
+                self._advance_expectation(kind, block)
+            if self._strict:
+                raise UnexpectedStreamAnomalyError(anomaly, block)
+            if retain_block:
+                self._pending_items.append(block)
+            return anomaly
+
+        self._inferred_missing_frames[kind] += continuity.missing_frames
+        self._inferred_missing_items[kind] += continuity.missing_items
+        gap = self._finalize_gap_evidence(continuity)
+        self._advance_expectation(kind, block)
         if isinstance(block, ADCBlock):
             block = replace(block, gap=gap)
-        self._unattributed_host_queue_drops -= gap.host_queue_drops
         self._observed_stream_gaps += 1
+        evidence = gap.firmware_evidence
+        if evidence is not None and not evidence.consistent:
+            self._protocol_telemetry_errors += 1
+            self._telemetry_error_messages.update(evidence.errors)
         if self._strict:
             raise UnexpectedStreamGapError(gap, block)
         self._pending_items.append(block)
         return gap
+
+    def _advance_expectation(
+        self,
+        kind: constants.FrameKind,
+        block: DataBlock,
+    ) -> None:
+        self._previous_sequence[kind] = block.sequence
+        self._expected_sequence[kind] = (block.sequence + 1) & constants.UINT32_MAX
+        self._expected_ticks[kind] = block.end_tick_exclusive
+
+    def _validate_clean_block(self, block: DataBlock) -> None:
+        if not self._strict:
+            return
+        parser_errors = (
+            self._reader.parser_counters.corruption_events
+            - self._stream_parser_error_baseline
+        )
+        if parser_errors:
+            raise UnexpectedStreamValidationError(
+                "parser_errors",
+                f"observed {parser_errors} new rejected frame candidate(s)",
+            )
+        if (
+            self._configuration is not None
+            and self._configuration.source is constants.Source.SYNTHETIC
+        ):
+            try:
+                validate_synthetic_block(block)
+            except SyntheticPatternError as error:
+                raise UnexpectedStreamValidationError(
+                    "synthetic_pattern",
+                    str(error),
+                ) from error
+
+    def _finalize_gap_evidence(self, gap: StreamGap) -> StreamGap:
+        evidence = self._firmware_evidence(
+            gap.kind,
+            gap.source,
+            gap.firmware_evidence,
+        )
+        return replace(gap, firmware_evidence=evidence)
+
+    def _finalize_anomaly_evidence(
+        self,
+        anomaly: StreamAnomaly,
+    ) -> StreamAnomaly:
+        evidence = self._firmware_evidence(
+            anomaly.kind,
+            anomaly.source,
+            anomaly.firmware_evidence,
+        )
+        return replace(anomaly, firmware_evidence=evidence)
+
+    def _firmware_evidence(
+        self,
+        kind: constants.FrameKind,
+        source: constants.Source,
+        base: FirmwareLossEvidence | None,
+    ) -> FirmwareLossEvidence:
+        inferred_frames = self._inferred_missing_frames.get(kind, 0)
+        inferred_items = self._inferred_missing_items.get(kind, 0)
+        gap_before = False if base is None else base.gap_before
+        overrun_before = False if base is None else base.overrun_before
+        flags_match = True if base is None else base.flags_match
+        errors = [] if base is None else list(base.errors)
+        stats_generation: int | None = None
+        dropped_frames: int | None = None
+        dropped_items: int | None = None
+        dropped_bytes: int | None = None
+        counters_match: bool | None = None
+        try:
+            status = self.status()
+        except (
+            CommandTimeoutError,
+            DeviceCommandError,
+            UnexpectedMessageError,
+        ) as error:
+            errors.append(f"firmware loss counters unavailable: {error}")
+        else:
+            stats_generation = status.stats_generation
+            generation_error = self._observe_loss_stats_generation(stats_generation)
+            if generation_error is not None:
+                errors.append(generation_error)
+            if kind is constants.FrameKind.ADC_DATA:
+                dropped_frames = status.adc_frames_dropped
+                dropped_items = status.adc_items_dropped
+                dropped_bytes = status.adc_payload_bytes_dropped
+                expected_bytes = inferred_items * constants.ADC_BYTES_PER_PAIR
+            else:
+                dropped_frames = status.gpio_frames_dropped
+                dropped_items = status.gpio_items_dropped
+                dropped_bytes = status.gpio_payload_bytes_dropped
+                expected_bytes = inferred_items
+            items_per_frame = (
+                constants.ADC_PAIRS_PER_FRAME
+                if kind is constants.FrameKind.ADC_DATA
+                else constants.GPIO_SAMPLES_PER_FRAME
+            )
+            bytes_per_item = (
+                constants.ADC_BYTES_PER_PAIR
+                if kind is constants.FrameKind.ADC_DATA
+                else 1
+            )
+            counter_units_match = (
+                dropped_items == dropped_frames * items_per_frame
+                and dropped_bytes == dropped_items * bytes_per_item
+            )
+            if (
+                dropped_frames == inferred_frames
+                and dropped_items == inferred_items
+                and dropped_bytes == expected_bytes
+                and counter_units_match
+            ):
+                counters_match = True
+            elif (
+                dropped_frames >= inferred_frames
+                and dropped_items >= inferred_items
+                and dropped_bytes >= expected_bytes
+                and counter_units_match
+            ):
+                # STATUS may cover later frames already drained by the reader
+                # but not yet consumed by the application. Preserve the
+                # ahead-of-consumer evidence without declaring a false error;
+                # loss_counters() requires exact equality at reconciliation.
+                counters_match = None
+            else:
+                counters_match = False
+                errors.append(
+                    f"{kind.name} cumulative loss counters disagree: "
+                    f"host inferred frames/items/bytes="
+                    f"{inferred_frames}/{inferred_items}/{expected_bytes}, "
+                    f"firmware reported {dropped_frames}/{dropped_items}/"
+                    f"{dropped_bytes}"
+                )
+
+        return FirmwareLossEvidence(
+            source=source,
+            gap_before=gap_before,
+            overrun_before=overrun_before,
+            stats_generation=stats_generation,
+            cumulative_dropped_frames=dropped_frames,
+            cumulative_dropped_items=dropped_items,
+            cumulative_dropped_bytes=dropped_bytes,
+            expected_cumulative_frames=inferred_frames,
+            expected_cumulative_items=inferred_items,
+            flags_match=flags_match,
+            counters_match=counters_match,
+            errors=tuple(errors),
+        )
+
+    def _counter_reconciliation_errors(
+        self,
+        firmware: FirmwareCounters,
+    ) -> tuple[str, ...]:
+        errors: list[str] = []
+        generation_error = self._observe_loss_stats_generation(
+            firmware.stats_generation
+        )
+        if generation_error is not None:
+            errors.append(generation_error)
+        for kind, inferred_items in self._inferred_missing_items.items():
+            inferred_frames = self._inferred_missing_frames[kind]
+            if kind is constants.FrameKind.ADC_DATA:
+                actual_frames = firmware.adc_frames_dropped
+                actual_items = firmware.adc_items_dropped
+                actual_bytes = firmware.adc_payload_bytes_dropped
+                expected_bytes = inferred_items * constants.ADC_BYTES_PER_PAIR
+            else:
+                actual_frames = firmware.gpio_frames_dropped
+                actual_items = firmware.gpio_items_dropped
+                actual_bytes = firmware.gpio_payload_bytes_dropped
+                expected_bytes = inferred_items
+            if (
+                actual_frames != inferred_frames
+                or actual_items != inferred_items
+                or actual_bytes != expected_bytes
+            ):
+                errors.append(
+                    f"{kind.name} cumulative loss counters disagree: host "
+                    f"inferred frames/items/bytes={inferred_frames}/"
+                    f"{inferred_items}/{expected_bytes}, firmware reported "
+                    f"{actual_frames}/{actual_items}/{actual_bytes}"
+                )
+        return tuple(errors)
+
+    def _process_host_queue_loss(self, loss: HostQueueLoss) -> StreamItem:
+        kind = loss.kind
+        configuration = self._configuration
+        range_valid = (
+            configuration is not None
+            and kind in self._expected_sequence
+            and loss.run_id == self._run_id
+            and loss.source is configuration.source
+            and loss.contiguous
+            and loss.first_sequence == self._expected_sequence[kind]
+            and loss.first_sample_ticks == self._expected_ticks[kind]
+        )
+        if not range_valid:
+            anomaly = StreamAnomaly(
+                reason=StreamAnomalyReason.HOST_QUEUE_RANGE_INCONSISTENT,
+                kind=kind,
+                source=loss.source,
+                active_run_id=self._run_id,
+                observed_run_id=loss.run_id,
+                expected_sequence=self._expected_sequence.get(kind),
+                observed_sequence=loss.first_sequence,
+                expected_first_sample_ticks=self._expected_ticks.get(kind),
+                observed_first_sample_ticks=loss.first_sample_ticks,
+            )
+            self._observed_stream_anomalies += 1
+            self._protocol_telemetry_errors += 1
+            self._telemetry_error_messages.add(
+                f"{kind.name} host queue range is inconsistent with the "
+                "application continuity baseline"
+            )
+            self._observed_host_queue_losses += 1
+            if kind in self._expected_sequence and loss.run_id == self._run_id:
+                self._previous_sequence[kind] = loss.last_sequence
+                self._expected_sequence[kind] = (
+                    loss.last_sequence + 1
+                ) & constants.UINT32_MAX
+                self._expected_ticks[kind] = loss.end_sample_ticks
+            if self._strict:
+                raise UnexpectedStreamAnomalyError(anomaly)
+            self._pending_items.append(loss)
+            return anomaly
+
+        self._previous_sequence[kind] = loss.last_sequence
+        self._expected_sequence[kind] = (loss.last_sequence + 1) & constants.UINT32_MAX
+        self._expected_ticks[kind] = loss.end_sample_ticks
+        self._observed_host_queue_losses += 1
+        if self._strict:
+            raise UnexpectedHostQueueLossError(loss)
+        return loss
+
+    def _process_reader_anomaly(self, anomaly: StreamAnomaly) -> StreamAnomaly:
+        self._observed_stream_anomalies += anomaly.occurrences
+        self._protocol_telemetry_errors += anomaly.occurrences
+        self._telemetry_error_messages.add(
+            f"{anomaly.kind.name} {anomaly.reason.value} at run/sequence "
+            f"{anomaly.observed_run_id}/{anomaly.observed_sequence}"
+        )
+        if self._strict:
+            raise UnexpectedStreamAnomalyError(anomaly)
+        return anomaly
 
     def _queue_block(self, block: DataBlock) -> None:
         """Compatibility hook for tests that inject an already decoded block."""
@@ -1297,11 +1710,14 @@ __all__ = [
     "DeviceIdentityMismatchError",
     "DeviceSynchronizationError",
     "HostBufferFullError",
+    "LossReport",
     "MultipleDevicesFoundError",
     "StreamItem",
     "TeensyDAQ",
     "TeensyDAQError",
+    "UnexpectedHostQueueLossError",
     "UnexpectedMessageError",
+    "UnexpectedStreamAnomalyError",
     "UnexpectedStreamGapError",
     "UnexpectedStreamValidationError",
 ]

@@ -44,7 +44,7 @@ facade itself always starts one `BackgroundReader`; the simulator does not use
 a second command decoder or direct-read shortcut:
 
 ```python
-from teensy_daq import ADCBlock, StreamGap, TeensyDAQ
+from teensy_daq import ADCBlock, HostQueueLoss, StreamAnomaly, StreamGap, TeensyDAQ
 
 with TeensyDAQ.simulated(read_chunk_size=47) as daq:
     info = daq.info()
@@ -53,7 +53,11 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
 
     for item in daq.blocks(4):  # four data blocks, plus any gap events
         if isinstance(item, StreamGap):
-            print("loss", item.origin, item.missing_items)
+            print("device loss", item.stream, item.missing_items)
+        elif isinstance(item, HostQueueLoss):
+            print("application loss", item.stream, item.dropped_items)
+        elif isinstance(item, StreamAnomaly):
+            print("protocol telemetry", item.stream, item.reason)
         elif isinstance(item, ADCBlock):
             print(run_id, item.sequence, item.pair(0))
 
@@ -66,8 +70,9 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
 `AdcTriggerMetadata`, `AdcAcquisitionStatus`, `AdcBlockMetadata`,
 `DAQConfiguration`, `Status`, `ADCBlock`, `GPIOBlock`,
 `GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
-`GpioCaptureDiagnosticResult`, `StreamGap`, `FirmwareCounters`, `HostCounters`,
-`LossCounters`, `NominalEpoch`, `AlignedInterval`, and `AlignmentLoss` validate
+`GpioCaptureDiagnosticResult`, `StreamGap`, `HostQueueLoss`, `StreamAnomaly`,
+`FirmwareLossEvidence`, `FirmwareCounters`, `HostCounters`, `LossCounters`,
+`NominalEpoch`, `AlignedInterval`, and `AlignmentLoss` validate
 their values when constructed. The Phase 01 names
 `Info`, `Configuration`, `AdcBlock`, and `GpioBlock` remain aliases. INFO,
 GET_STATUS, and STOP are legal in every post-boot state; CONFIGURE and
@@ -255,25 +260,38 @@ those live counters. If a RUNNING STATUS has been polled, subsequently
 delivered ADC blocks retain that immutable snapshot as `block.acquisition`;
 otherwise it is `None` rather than fabricated per-frame evidence.
 
-Production mode is the default. A sequence, timestamp, or firmware-flagged
-discontinuity causes `blocks()` to emit `StreamGap` immediately before the
-current data block and then continue. `strict=True` instead raises
-`UnexpectedStreamGapError`, with both the gap and current block attached. For
-ADC data, the following block also retains the same `StreamGap` in
-`block.gap`, including in production mode where the gap event is yielded first.
-`StreamGap.origin` never infers firmware loss from a host queue eviction:
-firmware `GAP_BEFORE`/`OVERRUN_BEFORE`, host queue-drop attribution, and an
-otherwise observed discontinuity remain separate. `loss_counters()` combines
-an explicit `FirmwareCounters` and `HostCounters` snapshot without adding the
-two domains together.
+Production mode is the default. Each ADC/GPIO source owns an independent
+run/sequence/timestamp baseline. A forward discontinuity causes `blocks()` to
+emit `StreamGap` immediately before the current data block and then continue.
+The report carries the acquisition source, run, expected/observed sequences,
+missing tick interval, sequence- and timestamp-inferred item counts, frame
+flags, statistics generation, and cumulative firmware block/item/byte
+counters. Sequence and timestamp inferences must agree; `GAP_BEFORE`,
+`OVERRUN_BEFORE`, and cumulative STATUS values are retained verbatim and any
+disagreement appears in `FirmwareLossEvidence.errors` and
+`LossCounters.telemetry_errors`.
+
+Duplicates, reordered frames, stale-run frames, flag-only gaps, and
+timestamp-inconsistent frames are distinct `StreamAnomaly` values; duplicate,
+reordered, and stale data are reported but not delivered as application data.
+Decoded application-queue eviction is never converted into a `StreamGap`:
+`HostQueueLoss` reports the exact source, run, first/last sequence, time range,
+complete block count, logical item count, and `DROP_OLDEST_COMPLETE` policy.
+The serial reader continues draining while these bounded reports accumulate.
+`strict=True` raises `UnexpectedStreamGapError`,
+`UnexpectedStreamAnomalyError`, or `UnexpectedHostQueueLossError` promptly
+with the typed report attached. START, RESET_STATS, run changes/reconnects, and
+modular uint32 sequence wrap reset or advance the appropriate baselines without
+joining epochs.
 
 ## Optional bounded ADC/GPIO alignment
 
 Raw delivery remains the primary path: `read_block()` and `blocks()` expose
-each typed `ADCBlock`, `GPIOBlock`, and `StreamGap` as soon as the application
-consumes it. Applications that need equal-time cross-stream records can feed
-those same objects into `TimestampAligner` without changing reader ownership
-or constructing a combined payload:
+each typed block or loss/anomaly report as soon as the application consumes it.
+Applications that need equal-time cross-stream records feed data blocks and
+`StreamGap` values into `TimestampAligner`, while handling `HostQueueLoss` and
+`StreamAnomaly` as application/control evidence without constructing a
+combined payload:
 
 ```python
 from teensy_daq import AlignedInterval, AlignmentLoss, TimestampAligner
@@ -335,11 +353,12 @@ wake blocked callers and cancel outstanding requests with typed exceptions.
 
 Both decoded queues use a **drop-oldest complete item** policy when full. The
 newest data therefore remains visible during consumer stalls. The
-`host_block_queue_drops` and `host_event_queue_drops` reader counters describe
-only those local Python queue evictions: they never include firmware sequence
-gaps, `GAP_BEFORE`/`OVERRUN_BEFORE` flags, or the firmware counters returned by
-GET_STATUS. `stale_blocks_discarded` separately records blocks rejected because
-their run ID is not the active START epoch.
+`host_block_queue_drops` and per-source block/item counters describe only those
+local Python evictions: they never include firmware sequence gaps,
+`GAP_BEFORE`/`OVERRUN_BEFORE` flags, or firmware GET_STATUS counters. A bounded
+coalescing report queue preserves exact `HostQueueLoss` units independently of
+the data queue. `stale_blocks_discarded` counts rejected run identities and the
+facade also emits a typed `STALE_RUN` anomaly before returning current-run data.
 
 Hardware-capable transports may implement `readinto(buffer)`. The reader
 detects that optional extension and repeatedly fills one fixed 64 KiB

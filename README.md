@@ -553,10 +553,14 @@ optional diagnostics through the same background reader for serial hardware
 and the in-memory simulator. `TeensyDAQ.gpio_clock_diagnostic()` returns a
 typed, read-only register/count result after identity, capability, and IDLE
 checks; the simulator rejects it rather than fabricate hardware evidence. The
-stream models preserve raw ADC converter identity and packed GPIO data;
-production iterators emit visible `StreamGap` events, strict mode raises on any
-gap, and firmware versus host queue-loss counters remain separate. NumPy is
-not required.
+stream models preserve raw ADC converter identity and packed GPIO data.
+Production iterators emit firmware-reconciled `StreamGap`, typed
+duplicate/reorder/stale/timestamp `StreamAnomaly`, and exact per-source
+`HostQueueLoss` events while continuing to drain; strict mode raises the
+corresponding typed exception. Sequence/timestamp inference, frame flags, and
+cumulative firmware block/item/byte counters remain independently visible,
+and START/RESET/reconnect/wrap boundaries cannot join runs. NumPy is not
+required.
 
 The Phase 04 streaming path uses one reusable 64 KiB receive buffer whenever a
 transport offers `readinto`, retains bounded decoded queues (512 data frames by

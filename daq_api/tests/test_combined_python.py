@@ -33,6 +33,7 @@ from teensy_daq import (
     FrameFlag,
     FrameKind,
     GPIOBlock,
+    HostQueueLoss,
     IncrementalFrameParser,
     InMemoryTransport,
     LossOrigin,
@@ -362,19 +363,24 @@ class CombinedGapPolicyTests(unittest.TestCase):
             losses = daq.loss_counters()
             reader = daq.reader_counters
 
-        gaps = tuple(item for item in items if isinstance(item, StreamGap))
+        host_losses = tuple(item for item in items if isinstance(item, HostQueueLoss))
         blocks = tuple(
             item for item in items if isinstance(item, (ADCBlock, GPIOBlock))
         )
-        self.assertEqual(2, len(gaps))
+        self.assertEqual(2, len(host_losses))
         self.assertEqual(2, len(blocks))
         self.assertEqual(
             {FrameKind.ADC_DATA, FrameKind.GPIO_DATA},
-            {gap.kind for gap in gaps},
+            {loss.kind for loss in host_losses},
         )
-        self.assertTrue(all(gap.origin is LossOrigin.HOST_QUEUE for gap in gaps))
-        self.assertTrue(all(not gap.firmware_reported for gap in gaps))
-        self.assertEqual(4, sum(gap.host_queue_drops for gap in gaps))
+        self.assertTrue(
+            all(loss.origin is LossOrigin.HOST_QUEUE for loss in host_losses)
+        )
+        self.assertEqual(4, sum(loss.dropped_blocks for loss in host_losses))
+        self.assertEqual(
+            2 * constants.ADC_PAIRS_PER_FRAME + 2 * constants.GPIO_SAMPLES_PER_FRAME,
+            sum(loss.dropped_items for loss in host_losses),
+        )
         self.assertEqual(2, reader.adc_block_queue_drops)
         self.assertEqual(2, reader.gpio_block_queue_drops)
         self.assertEqual(4, losses.host.host_block_queue_drops)

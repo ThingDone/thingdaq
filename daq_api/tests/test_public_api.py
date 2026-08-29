@@ -23,6 +23,7 @@ from teensy_daq import (
     FrameFlag,
     FrameKind,
     HostCounters,
+    HostQueueLoss,
     InMemoryTransport,
     LossCounters,
     LossOrigin,
@@ -34,6 +35,7 @@ from teensy_daq import (
     StreamGap,
     StreamMask,
     TeensyDAQ,
+    UnexpectedHostQueueLossError,
     UnexpectedStreamGapError,
     decode_frame,
     encode_frame,
@@ -303,17 +305,21 @@ class PublicGapPolicyTests(unittest.TestCase):
                 self.fail("reader did not account for the injected queue evictions")
 
             items = list(daq.blocks(1))
-            self.assertEqual([StreamGap, ADCBlock], [type(item) for item in items])
-            gap = items[0]
-            assert isinstance(gap, StreamGap)
-            self.assertEqual(LossOrigin.HOST_QUEUE, gap.origin)
-            self.assertFalse(gap.firmware_reported)
-            self.assertFalse(gap.firmware_overrun)
-            self.assertEqual(2, gap.host_queue_drops)
+            self.assertEqual([HostQueueLoss, ADCBlock], [type(item) for item in items])
+            loss = items[0]
+            assert isinstance(loss, HostQueueLoss)
+            self.assertEqual(LossOrigin.HOST_QUEUE, loss.origin)
+            self.assertEqual(2, loss.dropped_blocks)
+            self.assertEqual(2 * constants.ADC_PAIRS_PER_FRAME, loss.dropped_items)
             self.assertEqual(2, daq.host_counters.host_block_queue_drops)
+            self.assertEqual(
+                2 * constants.ADC_PAIRS_PER_FRAME,
+                daq.host_counters.adc_item_queue_drops,
+            )
             counters = daq.loss_counters()
             self.assertEqual(0, counters.firmware.items_dropped)
             self.assertEqual(2, counters.host.host_block_queue_drops)
+            self.assertEqual(1, counters.observed_host_queue_losses)
 
     def test_strict_host_queue_loss_raises_without_firmware_attribution(self) -> None:
         transport = StartBurstTransport()
@@ -331,19 +337,19 @@ class PublicGapPolicyTests(unittest.TestCase):
             else:
                 self.fail("reader did not account for the injected queue evictions")
 
-            with self.assertRaises(UnexpectedStreamGapError) as raised:
+            with self.assertRaises(UnexpectedHostQueueLossError) as raised:
                 daq.read_block()
 
-            gap = raised.exception.gap
-            self.assertEqual(LossOrigin.HOST_QUEUE, gap.origin)
-            self.assertFalse(gap.firmware_reported)
-            self.assertFalse(gap.firmware_overrun)
-            self.assertEqual(2, gap.host_queue_drops)
-            self.assertEqual(2, raised.exception.block.sequence)
+            loss = raised.exception.loss
+            self.assertEqual(LossOrigin.HOST_QUEUE, loss.origin)
+            self.assertEqual(2, loss.dropped_blocks)
+            self.assertEqual(0, loss.first_sequence)
+            self.assertEqual(1, loss.last_sequence)
             counters = daq.loss_counters()
             self.assertEqual(0, counters.firmware.items_dropped)
             self.assertEqual(2, counters.host.host_block_queue_drops)
-            self.assertEqual(1, counters.observed_stream_gaps)
+            self.assertEqual(0, counters.observed_stream_gaps)
+            self.assertEqual(1, counters.observed_host_queue_losses)
 
 
 if __name__ == "__main__":

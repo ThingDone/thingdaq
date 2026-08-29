@@ -15,7 +15,9 @@ from .models import (
     CommandResponse,
     DAQConfiguration,
     GpioBlock,
+    HostQueueLoss,
     ResponseValue,
+    StreamAnomaly,
     decode_message,
 )
 from .protocol import (
@@ -33,6 +35,8 @@ from .transport import (
 )
 
 DataBlock: TypeAlias = AdcBlock | GpioBlock
+ReaderStreamReport: TypeAlias = HostQueueLoss | StreamAnomaly
+ReaderStreamItem: TypeAlias = DataBlock | ReaderStreamReport
 ReaderEvent: TypeAlias = Frame
 DEFAULT_MAX_QUEUED_BLOCKS = 512
 
@@ -141,6 +145,10 @@ class ReaderCounters:
     gpio_stale_blocks_discarded: int = 0
     adc_boundary_blocks_discarded: int = 0
     gpio_boundary_blocks_discarded: int = 0
+    adc_item_queue_drops: int = 0
+    gpio_item_queue_drops: int = 0
+    queued_loss_reports: int = 0
+    loss_report_queue_drops: int = 0
 
 
 @dataclass(slots=True)
@@ -163,8 +171,9 @@ class BackgroundReader:
     overall deadline, and responses are matched solely by their echoed request
     ID. Data blocks and non-response frames use separate bounded queues. When a
     queue fills, the oldest complete decoded item is discarded so the newest
-    stream state remains visible; the corresponding ``host_*_queue_drops``
-    counter is incremented independently of every firmware loss signal.
+    stream state remains visible; exact source block/item units are retained in
+    a separate bounded/coalesced loss-report queue and the corresponding
+    ``host_*_queue_drops`` counter remains independent of firmware loss.
     """
 
     def __init__(
@@ -209,6 +218,7 @@ class BackgroundReader:
         self._max_pending_requests = max_pending_requests
         self._max_queued_blocks = max_queued_blocks
         self._max_queued_events = max_queued_events
+        self._max_stream_reports = max(2, max_queued_events)
         self._request_timeout = float(request_timeout)
         self._queue_timeout = float(queue_timeout)
         self._shutdown_timeout = float(shutdown_timeout)
@@ -221,6 +231,7 @@ class BackgroundReader:
         self._stop_event = Event()
         self._pending: dict[int, _PendingRequest] = {}
         self._blocks: deque[DataBlock] = deque()
+        self._stream_reports: deque[ReaderStreamReport] = deque()
         self._events: deque[ReaderEvent] = deque()
         self._next_request_id = 1
         self._active_run_id = 0
@@ -253,6 +264,9 @@ class BackgroundReader:
         self._gpio_frames_received = 0
         self._adc_block_queue_drops = 0
         self._gpio_block_queue_drops = 0
+        self._adc_item_queue_drops = 0
+        self._gpio_item_queue_drops = 0
+        self._loss_report_queue_drops = 0
         self._adc_stale_blocks_discarded = 0
         self._gpio_stale_blocks_discarded = 0
         self._adc_boundary_blocks_discarded = 0
@@ -328,6 +342,10 @@ class BackgroundReader:
                 gpio_stale_blocks_discarded=self._gpio_stale_blocks_discarded,
                 adc_boundary_blocks_discarded=(self._adc_boundary_blocks_discarded),
                 gpio_boundary_blocks_discarded=(self._gpio_boundary_blocks_discarded),
+                adc_item_queue_drops=self._adc_item_queue_drops,
+                gpio_item_queue_drops=self._gpio_item_queue_drops,
+                queued_loss_reports=len(self._stream_reports),
+                loss_report_queue_drops=self._loss_report_queue_drops,
             )
 
     def start(self) -> BackgroundReader:
@@ -473,6 +491,51 @@ class BackgroundReader:
                     raise ReaderClosedError("background reader is closed")
             return self._blocks.popleft()
 
+    def get_stream_item(
+        self,
+        *,
+        timeout: float | None = None,
+    ) -> ReaderStreamItem:
+        """Return a loss report before the oldest retained application block.
+
+        This facade-facing operation preserves :meth:`get_block` for callers
+        that intentionally consume only decoded blocks. Loss reports use their
+        own bounded/coalesced queue and therefore never stop serial draining.
+        """
+
+        selected_timeout = self._resolve_timeout(timeout, self._queue_timeout)
+        deadline = monotonic() + selected_timeout
+        with self._condition:
+            self._require_live_locked()
+            if not self._stream_reports and not self._blocks and self._stream_active:
+                request_stream_frame = getattr(
+                    self._transport,
+                    "request_stream_frame",
+                    None,
+                )
+                if callable(request_stream_frame):
+                    try:
+                        request_stream_frame()
+                    except TransportError as error:
+                        raise DeviceDisconnectedError(
+                            "simulated stream request failed",
+                            error,
+                        ) from error
+            while not self._stream_reports and not self._blocks:
+                if self._terminal_error is not None:
+                    raise self._terminal_error
+                if not self._stream_active:
+                    raise StreamStoppedError("acquisition stream is not active")
+                remaining = deadline - monotonic()
+                if remaining <= 0 or not self._condition.wait(remaining):
+                    self._queue_wait_timeouts += 1
+                    raise QueueWaitTimeoutError("stream", selected_timeout)
+                if self._closed:
+                    raise ReaderClosedError("background reader is closed")
+            if self._stream_reports:
+                return self._stream_reports.popleft()
+            return self._blocks.popleft()
+
     def get_event(self, *, timeout: float | None = None) -> ReaderEvent:
         """Return the oldest non-response, non-data frame using a bounded wait."""
 
@@ -533,6 +596,7 @@ class BackgroundReader:
                 ReaderClosedError("background reader was closed")
             )
             self._blocks.clear()
+            self._stream_reports.clear()
             self._events.clear()
             self._stream_active = False
             self._condition.notify_all()
@@ -731,6 +795,14 @@ class BackgroundReader:
                     self._adc_stale_blocks_discarded += 1
                 else:
                     self._gpio_stale_blocks_discarded += 1
+                if self._stream_active:
+                    self._enqueue_stream_report_locked(
+                        StreamAnomaly.stale_run(
+                            block,
+                            active_run_id=self._active_run_id,
+                        )
+                    )
+                    self._condition.notify_all()
                 return
             if block.checksum_algorithm != self._active_checksum_algorithm:
                 raise ReaderProtocolError(
@@ -740,17 +812,62 @@ class BackgroundReader:
                 )
             if len(self._blocks) >= self._max_queued_blocks:
                 dropped = self._blocks.popleft()
+                self._enqueue_stream_report_locked(HostQueueLoss.from_block(dropped))
                 self._host_block_queue_drops += 1
                 if isinstance(dropped, AdcBlock):
                     self._adc_block_queue_drops += 1
+                    self._adc_item_queue_drops += dropped.item_count
                 else:
                     self._gpio_block_queue_drops += 1
+                    self._gpio_item_queue_drops += dropped.item_count
             self._blocks.append(block)
             self._block_queue_high_water = max(
                 self._block_queue_high_water,
                 len(self._blocks),
             )
             self._condition.notify_all()
+
+    def _enqueue_stream_report_locked(self, report: ReaderStreamReport) -> None:
+        """Coalesce same-source reports before using bounded report storage."""
+
+        for index in range(len(self._stream_reports) - 1, -1, -1):
+            existing = self._stream_reports[index]
+            if isinstance(existing, HostQueueLoss) and isinstance(
+                report, HostQueueLoss
+            ):
+                if (
+                    existing.kind is report.kind
+                    and existing.source is report.source
+                    and existing.run_id == report.run_id
+                ):
+                    self._stream_reports[index] = existing.aggregated_with(report)
+                    return
+            elif isinstance(existing, StreamAnomaly) and isinstance(
+                report, StreamAnomaly
+            ):
+                try:
+                    self._stream_reports[index] = existing.merged_with(report)
+                except ValueError:
+                    continue
+                return
+
+        if len(self._stream_reports) >= self._max_stream_reports:
+            anomaly_index = next(
+                (
+                    index
+                    for index, queued in enumerate(self._stream_reports)
+                    if isinstance(queued, StreamAnomaly)
+                ),
+                None,
+            )
+            if anomaly_index is None:
+                # At most one active-run HostQueueLoss exists per source, so a
+                # two-entry all-host queue is already exact and complete.
+                self._loss_report_queue_drops += 1
+                return
+            del self._stream_reports[anomaly_index]
+            self._loss_report_queue_drops += 1
+        self._stream_reports.append(report)
 
     def _dispatch_event(self, event: ReaderEvent) -> None:
         with self._condition:
@@ -879,6 +996,7 @@ class BackgroundReader:
             )
         self._record_boundary_blocks_locked()
         self._blocks.clear()
+        self._stream_reports.clear()
         self._active_run_id = run_id
         self._active_checksum_algorithm = checksum_algorithm
         self._stream_active = True
@@ -887,6 +1005,7 @@ class BackgroundReader:
     def _deactivate_stream_locked(self) -> None:
         self._record_boundary_blocks_locked()
         self._blocks.clear()
+        self._stream_reports.clear()
         self._stream_active = False
         self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
         self._condition.notify_all()
@@ -946,6 +1065,8 @@ __all__ = [
     "ReaderNotStartedError",
     "ReaderProtocolError",
     "ReaderShutdownError",
+    "ReaderStreamItem",
+    "ReaderStreamReport",
     "RequestTimeoutError",
     "StreamStoppedError",
 ]

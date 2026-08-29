@@ -640,6 +640,8 @@ class BoundedQueueLossAccountingTests(unittest.TestCase):
         self.assertEqual(0, losses.firmware.gpio_items_dropped)
         self.assertEqual(0, losses.host.host_block_queue_drops)
         self.assertEqual(0, losses.observed_stream_gaps)
+        self.assertEqual(1, losses.protocol_telemetry_errors)
+        self.assertTrue(losses.telemetry_errors)
 
 
 class StreamingPerformanceGuardTests(unittest.TestCase):

@@ -4261,6 +4261,11 @@ class HostCounters:
     request_timeouts: int = 0
     protocol_failures: int = 0
     disconnects: int = 0
+    adc_block_queue_drops: int = 0
+    gpio_block_queue_drops: int = 0
+    adc_item_queue_drops: int = 0
+    gpio_item_queue_drops: int = 0
+    loss_report_queue_drops: int = 0
 
     def __post_init__(self) -> None:
         for name in self.__dataclass_fields__:
@@ -4278,6 +4283,10 @@ class LossCounters:
     firmware: FirmwareCounters
     host: HostCounters
     observed_stream_gaps: int = 0
+    observed_host_queue_losses: int = 0
+    observed_stream_anomalies: int = 0
+    protocol_telemetry_errors: int = 0
+    telemetry_errors: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.firmware, FirmwareCounters):
@@ -4285,6 +4294,13 @@ class LossCounters:
         if not isinstance(self.host, HostCounters):
             raise TypeError("host must be HostCounters")
         _nonnegative("observed_stream_gaps", self.observed_stream_gaps)
+        _nonnegative("observed_host_queue_losses", self.observed_host_queue_losses)
+        _nonnegative("observed_stream_anomalies", self.observed_stream_anomalies)
+        _nonnegative("protocol_telemetry_errors", self.protocol_telemetry_errors)
+        errors = tuple(self.telemetry_errors)
+        if any(not isinstance(error, str) or not error for error in errors):
+            raise ValueError("telemetry_errors must contain nonempty strings")
+        object.__setattr__(self, "telemetry_errors", errors)
 
     @property
     def has_loss(self) -> bool:
@@ -4292,6 +4308,9 @@ class LossCounters:
             self.firmware.has_loss
             or self.host.has_queue_loss
             or self.observed_stream_gaps > 0
+            or self.observed_host_queue_losses > 0
+            or self.observed_stream_anomalies > 0
+            or self.protocol_telemetry_errors > 0
         )
 
 
@@ -4893,6 +4912,91 @@ class LossOrigin(Enum):
     MIXED = "mixed"
 
 
+class HostQueuePolicy(Enum):
+    """Bounded decoded-queue policy responsible for application-side loss."""
+
+    DROP_OLDEST_COMPLETE = "drop_oldest_complete"
+
+
+class StreamAnomalyReason(Enum):
+    """Typed non-gap continuity failures observed on a decoded data stream."""
+
+    DUPLICATE = "duplicate"
+    REORDERED = "reordered"
+    STALE_RUN = "stale_run"
+    TIMESTAMP_INCONSISTENT = "timestamp_inconsistent"
+    FIRMWARE_EVIDENCE_MISMATCH = "firmware_evidence_mismatch"
+    HOST_QUEUE_RANGE_INCONSISTENT = "host_queue_range_inconsistent"
+
+
+@dataclass(frozen=True, slots=True)
+class FirmwareLossEvidence:
+    """Frame flags and cumulative STATUS evidence for one loss observation.
+
+    Counter fields are ``None`` until a STATUS response was available.  The
+    expected cumulative values are host inferences for the active statistics
+    generation; they are never overwritten with the firmware values when the
+    two disagree.
+    """
+
+    source: constants.Source
+    gap_before: bool
+    overrun_before: bool
+    stats_generation: int | None = None
+    cumulative_dropped_frames: int | None = None
+    cumulative_dropped_items: int | None = None
+    cumulative_dropped_bytes: int | None = None
+    expected_cumulative_frames: int = 0
+    expected_cumulative_items: int = 0
+    flags_match: bool = True
+    counters_match: bool | None = None
+    errors: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if isinstance(self.source, bool):
+            raise TypeError("firmware loss source is invalid")
+        try:
+            source = constants.Source(self.source)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("firmware loss source is invalid") from exc
+        object.__setattr__(self, "source", source)
+        if not isinstance(self.gap_before, bool) or not isinstance(
+            self.overrun_before, bool
+        ):
+            raise TypeError("firmware loss flags must be booleans")
+        if self.overrun_before and not self.gap_before:
+            raise ValueError("firmware overrun evidence requires GAP_BEFORE")
+        for name in (
+            "stats_generation",
+            "cumulative_dropped_frames",
+            "cumulative_dropped_items",
+            "cumulative_dropped_bytes",
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                _nonnegative(name, value)
+        if self.stats_generation == 0:
+            raise ValueError("firmware statistics generation must be nonzero")
+        _nonnegative("expected_cumulative_frames", self.expected_cumulative_frames)
+        _nonnegative("expected_cumulative_items", self.expected_cumulative_items)
+        if not isinstance(self.flags_match, bool):
+            raise TypeError("flags_match must be a boolean")
+        if self.counters_match is not None and not isinstance(
+            self.counters_match, bool
+        ):
+            raise TypeError("counters_match must be a boolean or None")
+        errors = tuple(self.errors)
+        if any(not isinstance(error, str) or not error for error in errors):
+            raise ValueError("firmware evidence errors must be nonempty strings")
+        object.__setattr__(self, "errors", errors)
+
+    @property
+    def consistent(self) -> bool:
+        """Whether every available flag and counter check agrees."""
+
+        return self.flags_match and self.counters_match is not False and not self.errors
+
+
 @dataclass(frozen=True, slots=True)
 class StreamGap:
     """A measured stream gap in logical pairs (ADC) or snapshots (GPIO)."""
@@ -4908,6 +5012,9 @@ class StreamGap:
     firmware_reported: bool = False
     firmware_overrun: bool = False
     host_queue_drops: int = 0
+    source: constants.Source = constants.Source.HARDWARE
+    sequence_inferred_items: int | None = None
+    firmware_evidence: FirmwareLossEvidence | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.kind, bool):
@@ -4938,6 +5045,34 @@ class StreamGap:
             raise TypeError("firmware gap markers must be booleans")
         if self.firmware_overrun and not self.firmware_reported:
             raise ValueError("firmware overrun attribution requires a gap marker")
+        if isinstance(self.source, bool):
+            raise TypeError("stream gap source is invalid")
+        try:
+            source = constants.Source(self.source)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("stream gap source is invalid") from exc
+        object.__setattr__(self, "source", source)
+        sequence_items = self.sequence_inferred_items
+        if sequence_items is None:
+            sequence_items = self.missing_frames * self.items_per_frame
+            object.__setattr__(self, "sequence_inferred_items", sequence_items)
+        _nonnegative("sequence_inferred_items", sequence_items)
+        if sequence_items != self.missing_items:
+            raise ValueError(
+                "sequence and timestamp imply different missing item counts"
+            )
+        if self.firmware_evidence is not None:
+            if not isinstance(self.firmware_evidence, FirmwareLossEvidence):
+                raise TypeError(
+                    "firmware_evidence must be FirmwareLossEvidence or None"
+                )
+            if self.firmware_evidence.source is not source:
+                raise ValueError("firmware evidence source disagrees with stream gap")
+            if (
+                self.firmware_evidence.gap_before != self.firmware_reported
+                or self.firmware_evidence.overrun_before != self.firmware_overrun
+            ):
+                raise ValueError("firmware evidence flags disagree with stream gap")
         sequence_after_gap = (
             self.expected_sequence + self.missing_frames
         ) & constants.UINT32_MAX
@@ -4957,6 +5092,34 @@ class StreamGap:
             if self.kind is constants.FrameKind.ADC_DATA
             else constants.GPIO_SAMPLE_PERIOD_TICKS
         )
+
+    @property
+    def items_per_frame(self) -> int:
+        return (
+            constants.ADC_PAIRS_PER_FRAME
+            if self.kind is constants.FrameKind.ADC_DATA
+            else constants.GPIO_SAMPLES_PER_FRAME
+        )
+
+    @property
+    def stream(self) -> constants.StreamMask:
+        return (
+            constants.StreamMask.ADC
+            if self.kind is constants.FrameKind.ADC_DATA
+            else constants.StreamMask.GPIO
+        )
+
+    @property
+    def previous_sequence(self) -> int:
+        return (self.expected_sequence - 1) & constants.UINT32_MAX
+
+    @property
+    def missing_start_ticks(self) -> int:
+        return self.expected_first_sample_ticks
+
+    @property
+    def missing_end_ticks(self) -> int:
+        return self.observed_first_sample_ticks
 
     @property
     def missing_duration_ticks(self) -> int:
@@ -5009,9 +5172,29 @@ class StreamGap:
         if tick_delta % period:
             raise ValueError("stream timestamp gap is not sample-period aligned")
         missing_items = tick_delta // period
+        sequence_inferred_items = missing_frames * current.item_count
+        if sequence_inferred_items != missing_items:
+            raise ValueError(
+                "sequence and timestamp imply different missing item counts"
+            )
         firmware_reported = bool(current.flags & constants.FrameFlag.GAP_BEFORE)
         if missing_frames == 0 and missing_items == 0 and not firmware_reported:
             return None
+        source = current.source
+        flag_errors: list[str] = []
+        if bool(missing_items) != firmware_reported:
+            flag_errors.append(
+                "GAP_BEFORE does not match the inferred stream discontinuity"
+            )
+        evidence = FirmwareLossEvidence(
+            source=source,
+            gap_before=firmware_reported,
+            overrun_before=bool(current.flags & constants.FrameFlag.OVERRUN_BEFORE),
+            expected_cumulative_frames=missing_frames,
+            expected_cumulative_items=missing_items,
+            flags_match=not flag_errors,
+            errors=tuple(flag_errors),
+        )
         return cls(
             kind=kind,
             run_id=current.run_id,
@@ -5024,6 +5207,9 @@ class StreamGap:
             firmware_reported=firmware_reported,
             firmware_overrun=bool(current.flags & constants.FrameFlag.OVERRUN_BEFORE),
             host_queue_drops=min(host_queue_drops, missing_frames),
+            source=source,
+            sequence_inferred_items=sequence_inferred_items,
+            firmware_evidence=evidence,
         )
 
     @classmethod
@@ -5045,6 +5231,453 @@ class StreamGap:
             expected_sequence=expected_sequence,
             expected_first_sample_ticks=expected_ticks,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class StreamAnomaly:
+    """Typed duplicate, reorder, stale-run, or timestamp telemetry report."""
+
+    reason: StreamAnomalyReason
+    kind: constants.FrameKind
+    source: constants.Source
+    active_run_id: int
+    observed_run_id: int
+    observed_sequence: int
+    observed_first_sample_ticks: int
+    expected_sequence: int | None = None
+    expected_first_sample_ticks: int | None = None
+    sequence_inferred_items: int | None = None
+    timestamp_inferred_items: int | None = None
+    firmware_evidence: FirmwareLossEvidence | None = None
+    occurrences: int = 1
+
+    def __post_init__(self) -> None:
+        if any(
+            isinstance(value, bool) for value in (self.reason, self.kind, self.source)
+        ):
+            raise TypeError("stream anomaly metadata is invalid")
+        try:
+            reason = StreamAnomalyReason(self.reason)
+            kind = constants.FrameKind(self.kind)
+            source = constants.Source(self.source)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("stream anomaly metadata is invalid") from exc
+        if kind not in {
+            constants.FrameKind.ADC_DATA,
+            constants.FrameKind.GPIO_DATA,
+        }:
+            raise ValueError("stream anomalies require an ADC or GPIO data kind")
+        object.__setattr__(self, "reason", reason)
+        object.__setattr__(self, "kind", kind)
+        object.__setattr__(self, "source", source)
+        _unsigned("active_run_id", self.active_run_id, 32)
+        _unsigned("observed_run_id", self.observed_run_id, 32)
+        if self.active_run_id == 0 or self.observed_run_id == 0:
+            raise ValueError("stream anomalies require nonzero run identities")
+        _unsigned("observed_sequence", self.observed_sequence, 32)
+        _unsigned("observed_first_sample_ticks", self.observed_first_sample_ticks, 64)
+        for name, bits in (
+            ("expected_sequence", 32),
+            ("expected_first_sample_ticks", 64),
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                _unsigned(name, value, bits)
+        for name in ("sequence_inferred_items", "timestamp_inferred_items"):
+            value = getattr(self, name)
+            if value is not None:
+                _nonnegative(name, value)
+        _nonnegative("occurrences", self.occurrences)
+        if self.occurrences == 0:
+            raise ValueError("stream anomaly occurrences must be positive")
+        if self.firmware_evidence is not None:
+            if not isinstance(self.firmware_evidence, FirmwareLossEvidence):
+                raise TypeError(
+                    "firmware_evidence must be FirmwareLossEvidence or None"
+                )
+            if self.firmware_evidence.source is not source:
+                raise ValueError("firmware evidence source disagrees with anomaly")
+
+    @property
+    def run_id(self) -> int:
+        return self.observed_run_id
+
+    @property
+    def stream(self) -> constants.StreamMask:
+        return (
+            constants.StreamMask.ADC
+            if self.kind is constants.FrameKind.ADC_DATA
+            else constants.StreamMask.GPIO
+        )
+
+    @classmethod
+    def stale_run(
+        cls,
+        block: ADCBlock | GPIOBlock,
+        *,
+        active_run_id: int,
+    ) -> StreamAnomaly:
+        kind = (
+            constants.FrameKind.ADC_DATA
+            if isinstance(block, ADCBlock)
+            else constants.FrameKind.GPIO_DATA
+        )
+        return cls(
+            reason=StreamAnomalyReason.STALE_RUN,
+            kind=kind,
+            source=block.source,
+            active_run_id=active_run_id,
+            observed_run_id=block.run_id,
+            observed_sequence=block.sequence,
+            observed_first_sample_ticks=block.first_sample_ticks,
+            firmware_evidence=FirmwareLossEvidence(
+                source=block.source,
+                gap_before=bool(block.flags & constants.FrameFlag.GAP_BEFORE),
+                overrun_before=bool(block.flags & constants.FrameFlag.OVERRUN_BEFORE),
+            ),
+        )
+
+    def merged_with(self, other: StreamAnomaly) -> StreamAnomaly:
+        """Coalesce repeated stale reports while retaining the newest evidence."""
+
+        if (
+            self.reason is not other.reason
+            or self.kind is not other.kind
+            or self.source is not other.source
+            or self.active_run_id != other.active_run_id
+            or self.observed_run_id != other.observed_run_id
+        ):
+            raise ValueError("cannot merge unrelated stream anomalies")
+        return dataclass_replace(
+            other,
+            occurrences=self.occurrences + other.occurrences,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class HostQueueLoss:
+    """Exact decoded application-queue eviction, separate from firmware loss."""
+
+    kind: constants.FrameKind
+    source: constants.Source
+    run_id: int
+    first_sequence: int
+    last_sequence: int
+    first_sample_ticks: int
+    end_sample_ticks: int
+    dropped_blocks: int
+    dropped_items: int
+    policy: HostQueuePolicy = HostQueuePolicy.DROP_OLDEST_COMPLETE
+    firmware_gap_blocks: int = 0
+    firmware_overrun_blocks: int = 0
+    contiguous: bool = True
+
+    def __post_init__(self) -> None:
+        if any(
+            isinstance(value, bool) for value in (self.kind, self.source, self.policy)
+        ):
+            raise TypeError("host queue loss metadata is invalid")
+        try:
+            kind = constants.FrameKind(self.kind)
+            source = constants.Source(self.source)
+            policy = HostQueuePolicy(self.policy)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("host queue loss metadata is invalid") from exc
+        if kind not in {
+            constants.FrameKind.ADC_DATA,
+            constants.FrameKind.GPIO_DATA,
+        }:
+            raise ValueError("host queue loss requires an ADC or GPIO data kind")
+        object.__setattr__(self, "kind", kind)
+        object.__setattr__(self, "source", source)
+        object.__setattr__(self, "policy", policy)
+        _unsigned("run_id", self.run_id, 32)
+        _unsigned("first_sequence", self.first_sequence, 32)
+        _unsigned("last_sequence", self.last_sequence, 32)
+        _unsigned("first_sample_ticks", self.first_sample_ticks, 64)
+        _unsigned("end_sample_ticks", self.end_sample_ticks, 64)
+        for name in (
+            "dropped_blocks",
+            "dropped_items",
+            "firmware_gap_blocks",
+            "firmware_overrun_blocks",
+        ):
+            _nonnegative(name, getattr(self, name))
+        if self.run_id == 0 or self.dropped_blocks == 0 or self.dropped_items == 0:
+            raise ValueError("host queue loss requires a nonempty active run range")
+        if self.dropped_items != self.dropped_blocks * self.items_per_block:
+            raise ValueError("host queue block and item counts disagree")
+        if self.firmware_gap_blocks > self.dropped_blocks:
+            raise ValueError("host queue gap evidence exceeds dropped blocks")
+        if self.firmware_overrun_blocks > self.firmware_gap_blocks:
+            raise ValueError("host queue overrun evidence requires gap evidence")
+        if not isinstance(self.contiguous, bool):
+            raise TypeError("host queue range continuity must be a boolean")
+        if self.contiguous:
+            expected_last = (
+                self.first_sequence + self.dropped_blocks - 1
+            ) & constants.UINT32_MAX
+            if self.last_sequence != expected_last:
+                raise ValueError("contiguous host queue range has a sequence hole")
+            expected_end = (
+                self.first_sample_ticks + self.dropped_items * self.item_period_ticks
+            ) & constants.UINT64_MAX
+            if self.end_sample_ticks != expected_end:
+                raise ValueError("contiguous host queue range has a timestamp hole")
+
+    @property
+    def stream(self) -> constants.StreamMask:
+        return (
+            constants.StreamMask.ADC
+            if self.kind is constants.FrameKind.ADC_DATA
+            else constants.StreamMask.GPIO
+        )
+
+    @property
+    def item_period_ticks(self) -> int:
+        return (
+            constants.ADC_PAIR_PERIOD_TICKS
+            if self.kind is constants.FrameKind.ADC_DATA
+            else constants.GPIO_SAMPLE_PERIOD_TICKS
+        )
+
+    @property
+    def items_per_block(self) -> int:
+        return (
+            constants.ADC_PAIRS_PER_FRAME
+            if self.kind is constants.FrameKind.ADC_DATA
+            else constants.GPIO_SAMPLES_PER_FRAME
+        )
+
+    @property
+    def origin(self) -> LossOrigin:
+        return LossOrigin.HOST_QUEUE
+
+    @property
+    def host_queue_drops(self) -> int:
+        """Compatibility alias for the exact dropped block count."""
+
+        return self.dropped_blocks
+
+    @property
+    def missing_frames(self) -> int:
+        return self.dropped_blocks
+
+    @property
+    def missing_items(self) -> int:
+        return self.dropped_items
+
+    @classmethod
+    def from_block(cls, block: ADCBlock | GPIOBlock) -> HostQueueLoss:
+        kind = (
+            constants.FrameKind.ADC_DATA
+            if isinstance(block, ADCBlock)
+            else constants.FrameKind.GPIO_DATA
+        )
+        return cls(
+            kind=kind,
+            source=block.source,
+            run_id=block.run_id,
+            first_sequence=block.sequence,
+            last_sequence=block.sequence,
+            first_sample_ticks=block.first_sample_ticks,
+            end_sample_ticks=block.end_tick_exclusive,
+            dropped_blocks=1,
+            dropped_items=block.item_count,
+            firmware_gap_blocks=int(bool(block.flags & constants.FrameFlag.GAP_BEFORE)),
+            firmware_overrun_blocks=int(
+                bool(block.flags & constants.FrameFlag.OVERRUN_BEFORE)
+            ),
+        )
+
+    def can_merge(self, other: HostQueueLoss) -> bool:
+        return (
+            self.kind is other.kind
+            and self.source is other.source
+            and self.run_id == other.run_id
+            and other.first_sequence
+            == ((self.last_sequence + 1) & constants.UINT32_MAX)
+            and other.first_sample_ticks == self.end_sample_ticks
+        )
+
+    def merged_with(self, other: HostQueueLoss) -> HostQueueLoss:
+        """Coalesce one same-source contiguous eviction without losing units."""
+
+        if not self.can_merge(other):
+            raise ValueError("cannot merge noncontiguous host queue losses")
+        return HostQueueLoss(
+            kind=self.kind,
+            source=self.source,
+            run_id=self.run_id,
+            first_sequence=self.first_sequence,
+            last_sequence=other.last_sequence,
+            first_sample_ticks=self.first_sample_ticks,
+            end_sample_ticks=other.end_sample_ticks,
+            dropped_blocks=self.dropped_blocks + other.dropped_blocks,
+            dropped_items=self.dropped_items + other.dropped_items,
+            policy=self.policy,
+            firmware_gap_blocks=(self.firmware_gap_blocks + other.firmware_gap_blocks),
+            firmware_overrun_blocks=(
+                self.firmware_overrun_blocks + other.firmware_overrun_blocks
+            ),
+        )
+
+    def aggregated_with(self, other: HostQueueLoss) -> HostQueueLoss:
+        """Boundedly retain exact units for noncontiguous same-source loss."""
+
+        if (
+            self.kind is not other.kind
+            or self.source is not other.source
+            or self.run_id != other.run_id
+        ):
+            raise ValueError("cannot aggregate unrelated host queue losses")
+        if self.can_merge(other) and self.contiguous and other.contiguous:
+            return self.merged_with(other)
+        return HostQueueLoss(
+            kind=self.kind,
+            source=self.source,
+            run_id=self.run_id,
+            first_sequence=self.first_sequence,
+            last_sequence=other.last_sequence,
+            first_sample_ticks=self.first_sample_ticks,
+            end_sample_ticks=other.end_sample_ticks,
+            dropped_blocks=self.dropped_blocks + other.dropped_blocks,
+            dropped_items=self.dropped_items + other.dropped_items,
+            policy=self.policy,
+            firmware_gap_blocks=(self.firmware_gap_blocks + other.firmware_gap_blocks),
+            firmware_overrun_blocks=(
+                self.firmware_overrun_blocks + other.firmware_overrun_blocks
+            ),
+            contiguous=False,
+        )
+
+
+def analyze_stream_continuity(
+    current: ADCBlock | GPIOBlock,
+    *,
+    expected_sequence: int,
+    expected_first_sample_ticks: int,
+    active_run_id: int,
+    previous_sequence: int | None = None,
+) -> StreamGap | StreamAnomaly | None:
+    """Classify one frame without conflating forward loss with other failures.
+
+    ``previous_sequence`` is explicit so sequence ``UINT32_MAX`` at a fresh
+    epoch is reordered, while the same value after a delivered wrap is a true
+    duplicate.
+    """
+
+    _unsigned("expected_sequence", expected_sequence, 32)
+    _unsigned("expected_first_sample_ticks", expected_first_sample_ticks, 64)
+    _unsigned("active_run_id", active_run_id, 32)
+    if previous_sequence is not None:
+        _unsigned("previous_sequence", previous_sequence, 32)
+        if expected_sequence != ((previous_sequence + 1) & constants.UINT32_MAX):
+            raise ValueError("previous and expected stream sequences disagree")
+    kind = (
+        constants.FrameKind.ADC_DATA
+        if isinstance(current, ADCBlock)
+        else constants.FrameKind.GPIO_DATA
+    )
+    evidence = FirmwareLossEvidence(
+        source=current.source,
+        gap_before=bool(current.flags & constants.FrameFlag.GAP_BEFORE),
+        overrun_before=bool(current.flags & constants.FrameFlag.OVERRUN_BEFORE),
+    )
+    if current.run_id != active_run_id:
+        return StreamAnomaly.stale_run(current, active_run_id=active_run_id)
+
+    sequence_delta = (current.sequence - expected_sequence) & constants.UINT32_MAX
+    tick_delta = (
+        current.first_sample_ticks - expected_first_sample_ticks
+    ) & constants.UINT64_MAX
+    period = (
+        current.pair_period_ticks
+        if isinstance(current, ADCBlock)
+        else constants.GPIO_SAMPLE_PERIOD_TICKS
+    )
+    if sequence_delta > constants.UINT32_MAX // 2:
+        reason = (
+            StreamAnomalyReason.DUPLICATE
+            if previous_sequence is not None and current.sequence == previous_sequence
+            else StreamAnomalyReason.REORDERED
+        )
+        if evidence.gap_before:
+            evidence = dataclass_replace(
+                evidence,
+                flags_match=False,
+                errors=("firmware marked a gap on a duplicate or reordered frame",),
+            )
+        return StreamAnomaly(
+            reason=reason,
+            kind=kind,
+            source=current.source,
+            active_run_id=active_run_id,
+            observed_run_id=current.run_id,
+            expected_sequence=expected_sequence,
+            observed_sequence=current.sequence,
+            expected_first_sample_ticks=expected_first_sample_ticks,
+            observed_first_sample_ticks=current.first_sample_ticks,
+            firmware_evidence=evidence,
+        )
+
+    sequence_items = sequence_delta * current.item_count
+    timestamp_items: int | None = None
+    if tick_delta <= constants.UINT64_MAX // 2 and tick_delta % period == 0:
+        timestamp_items = tick_delta // period
+    if timestamp_items is None or timestamp_items != sequence_items:
+        sequence_implies_gap = sequence_delta > 0
+        if evidence.gap_before != sequence_implies_gap:
+            evidence = dataclass_replace(
+                evidence,
+                flags_match=False,
+                errors=(
+                    "GAP_BEFORE does not match the sequence-inferred stream discontinuity",
+                ),
+            )
+        return StreamAnomaly(
+            reason=StreamAnomalyReason.TIMESTAMP_INCONSISTENT,
+            kind=kind,
+            source=current.source,
+            active_run_id=active_run_id,
+            observed_run_id=current.run_id,
+            expected_sequence=expected_sequence,
+            observed_sequence=current.sequence,
+            expected_first_sample_ticks=expected_first_sample_ticks,
+            observed_first_sample_ticks=current.first_sample_ticks,
+            sequence_inferred_items=sequence_items,
+            timestamp_inferred_items=timestamp_items,
+            firmware_evidence=evidence,
+        )
+
+    firmware_reported = evidence.gap_before
+    if sequence_delta == 0:
+        if not firmware_reported:
+            return None
+        return StreamAnomaly(
+            reason=StreamAnomalyReason.FIRMWARE_EVIDENCE_MISMATCH,
+            kind=kind,
+            source=current.source,
+            active_run_id=active_run_id,
+            observed_run_id=current.run_id,
+            expected_sequence=expected_sequence,
+            observed_sequence=current.sequence,
+            expected_first_sample_ticks=expected_first_sample_ticks,
+            observed_first_sample_ticks=current.first_sample_ticks,
+            sequence_inferred_items=0,
+            timestamp_inferred_items=0,
+            firmware_evidence=dataclass_replace(
+                evidence,
+                flags_match=False,
+                errors=("firmware marked a gap where continuity is complete",),
+            ),
+        )
+
+    return StreamGap.from_expected(
+        current,
+        expected_sequence=expected_sequence,
+        expected_first_sample_ticks=expected_first_sample_ticks,
+    )
 
 
 ResponseValue = (
@@ -5153,6 +5786,7 @@ __all__ = [
     "DeviceCapabilities",
     "DeviceInfo",
     "FirmwareCounters",
+    "FirmwareLossEvidence",
     "GPIOBlock",
     "GpioBlock",
     "GpioCaptureDiagnosticResult",
@@ -5160,12 +5794,17 @@ __all__ = [
     "GpioClockDiagnosticRequest",
     "GpioClockDiagnosticResult",
     "HostCounters",
+    "HostQueueLoss",
+    "HostQueuePolicy",
     "Info",
     "LossCounters",
     "LossOrigin",
     "ResponseValue",
     "Status",
+    "StreamAnomaly",
+    "StreamAnomalyReason",
     "StreamGap",
+    "analyze_stream_continuity",
     "decode_message",
     "decode_response",
     "extract_gpio_channel",

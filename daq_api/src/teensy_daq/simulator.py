@@ -166,6 +166,10 @@ class SimulatedDevice:
         gpio_payload_bytes = self._gpio_frames_emitted * constants.DATA_PAYLOAD_BYTES
         adc_framed_bytes = self._adc_frames_emitted * constants.DATA_FRAME_BYTES
         gpio_framed_bytes = self._gpio_frames_emitted * constants.DATA_FRAME_BYTES
+        adc_frames_dropped = self._adc_items_dropped // constants.ADC_PAIRS_PER_FRAME
+        gpio_frames_dropped = (
+            self._gpio_items_dropped // constants.GPIO_SAMPLES_PER_FRAME
+        )
         return Status(
             device_state=self._state,
             stream_mask=(
@@ -202,6 +206,7 @@ class SimulatedDevice:
             adc_items_emitted=adc_items,
             adc_frames_transmitted=self._adc_frames_emitted,
             adc_items_transmitted_pipeline=adc_items,
+            adc_frames_dropped=adc_frames_dropped,
             gpio_frames_generated=self._gpio_frames_emitted,
             gpio_items_generated=gpio_items,
             gpio_frames_framed_pipeline=self._gpio_frames_emitted,
@@ -209,10 +214,14 @@ class SimulatedDevice:
             gpio_items_emitted=gpio_items,
             gpio_frames_transmitted=self._gpio_frames_emitted,
             gpio_items_transmitted_pipeline=gpio_items,
+            gpio_frames_dropped=gpio_frames_dropped,
             adc_payload_bytes_produced=adc_payload_bytes,
             adc_payload_bytes_framed=adc_payload_bytes,
             adc_payload_bytes_emitted=adc_payload_bytes,
             adc_payload_bytes_transmitted=adc_payload_bytes,
+            adc_payload_bytes_dropped=(
+                self._adc_items_dropped * constants.ADC_BYTES_PER_PAIR
+            ),
             adc_framed_bytes_framed=adc_framed_bytes,
             adc_framed_bytes_emitted=adc_framed_bytes,
             adc_framed_bytes_transmitted=adc_framed_bytes,
@@ -220,6 +229,7 @@ class SimulatedDevice:
             gpio_payload_bytes_framed=gpio_payload_bytes,
             gpio_payload_bytes_emitted=gpio_payload_bytes,
             gpio_payload_bytes_transmitted=gpio_payload_bytes,
+            gpio_payload_bytes_dropped=self._gpio_items_dropped,
             gpio_framed_bytes_framed=gpio_framed_bytes,
             gpio_framed_bytes_emitted=gpio_framed_bytes,
             gpio_framed_bytes_transmitted=gpio_framed_bytes,

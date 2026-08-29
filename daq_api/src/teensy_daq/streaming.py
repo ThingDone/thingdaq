@@ -17,7 +17,7 @@ from .client import (
     TeensyDAQ,
     UnexpectedStreamValidationError,
 )
-from .models import ADCBlock, GPIOBlock, Status, StreamGap
+from .models import ADCBlock, GPIOBlock, HostQueueLoss, Status, StreamAnomaly, StreamGap
 from .protocol import ParserCounters
 from .reader import ReaderCounters
 from .synthetic import SyntheticPatternError, validate_synthetic_block
@@ -208,7 +208,7 @@ class SyntheticStreamValidator:
         self._stats_generation: int | None = None
 
     def validate(self, item: StreamItem) -> ADCBlock | GPIOBlock:
-        """Validate and account one block, rejecting all gap events."""
+        """Validate and account one block, rejecting every typed loss report."""
 
         if isinstance(item, StreamGap):
             self._fail(
@@ -216,8 +216,20 @@ class SyntheticStreamValidator:
                 f"{item.kind.name} sequence {item.observed_sequence} follows "
                 f"{item.missing_frames} missing frame(s)",
             )
+        if isinstance(item, HostQueueLoss):
+            self._fail(
+                "host_queue_loss",
+                f"{item.kind.name} lost {item.dropped_blocks} decoded block(s) "
+                f"under {item.policy.value}",
+            )
+        if isinstance(item, StreamAnomaly):
+            self._fail(
+                "stream_anomaly",
+                f"{item.kind.name} {item.reason.value} at sequence "
+                f"{item.observed_sequence}",
+            )
         if not isinstance(item, (ADCBlock, GPIOBlock)):
-            raise TypeError("stream validation requires a block or StreamGap")
+            raise TypeError("stream validation requires a block or typed loss report")
         block = item
         kind = (
             constants.FrameKind.ADC_DATA
