@@ -24,6 +24,7 @@ from firmware.tests.test_soak_endurance_tools import (
     ACCELERATED_ADC_PAIR_RATE_HZ,
     ACCELERATED_GPIO_SAMPLE_RATE_HZ,
     ACCELERATED_PAYLOAD_BYTES_PER_SECOND,
+    ALLOWED_WINDOWS_IMPORTS,
     AcceleratedSerial,
     AcceleratedSoakDevice,
     VirtualClock,
@@ -1064,6 +1065,149 @@ class WindowsOneHourProfileTests(unittest.TestCase):
 
 
 class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
+    def test_entry_paths_match_memory_and_release_grading_behavior(self) -> None:
+        mib = 1024**2
+        current_bytes = 64 * mib
+        peak_bytes = 72 * mib
+        entry_paths = (
+            ("windows-standalone", WINDOWS),
+            ("installed-package", installed_soak),
+        )
+        configurations = []
+        behaviors = []
+
+        for expected_entry_point, module in entry_paths:
+            with self.subTest(entry_point=expected_entry_point):
+                configuration = dict(module.GENERATED_CONFIG)
+                self.assertEqual(
+                    expected_entry_point,
+                    configuration.pop("entry_point"),
+                )
+                configurations.append(configuration)
+
+                counters_type = module._WindowsProcessMemoryCounters
+                counters_size = ctypes.sizeof(counters_type)
+                native_calls: list[tuple[object, int, int]] = []
+
+                def get_process_memory_info(
+                    process: object,
+                    counters_pointer: object,
+                    structure_size: int,
+                    counter_type: type[ctypes.Structure] = counters_type,
+                    calls: list[tuple[object, int, int]] = native_calls,
+                ) -> int:
+                    counters = ctypes.cast(
+                        counters_pointer,
+                        ctypes.POINTER(counter_type),
+                    ).contents
+                    calls.append((process, structure_size, counters.cb))
+                    counters.WorkingSetSize = current_bytes
+                    counters.PeakWorkingSetSize = peak_bytes
+                    return 1
+
+                api = module._WindowsProcessMemoryApi(
+                    get_current_process=lambda: 0xCAFE,
+                    get_process_memory_info=get_process_memory_info,
+                )
+                tracing = StableTracemalloc()
+                with (
+                    patch.object(module.sys, "platform", "win32"),
+                    patch.object(module, "_WINDOWS_PROCESS_MEMORY_API", api),
+                    patch.object(module, "tracemalloc", tracing),
+                    patch.object(
+                        module,
+                        "_available_process_memory_bytes",
+                        return_value=512 * mib,
+                    ),
+                ):
+                    native_memory = module._windows_process_memory_bytes()
+                    tracker = module.MemoryTracker()
+                    tracker.begin_streaming()
+                    tracker.sample_streaming(checkpoint=True)
+                    tracker.end_streaming()
+                    memory = tracker.summary()
+
+                with patch.object(module, "_WINDOWS_PROCESS_MEMORY_API", None):
+                    unavailable_memory = module._windows_process_memory_bytes()
+
+                process_rss = memory["process_rss"]
+                release = _attached_windows_report(
+                    module,
+                    host={"system": "Windows", "sys_platform": "win32"},
+                    process_rss=process_rss,
+                )["windows"]
+                unavailable = _attached_windows_report(
+                    module,
+                    host={"system": "Windows", "sys_platform": "win32"},
+                    process_rss={
+                        "baseline_bytes": None,
+                        "peak_bytes": None,
+                        "growth_bytes": None,
+                    },
+                )["windows"]
+                diagnostic_override = _attached_windows_report(
+                    module,
+                    host={"system": "Windows", "sys_platform": "win32"},
+                    process_rss=process_rss,
+                    diagnostic_identity_override=True,
+                )["windows"]
+
+                def grading(windows: dict[str, object]) -> dict[str, object]:
+                    return {
+                        name: windows[name]
+                        for name in (
+                            "profile",
+                            "release_eligible",
+                            "release_requirements",
+                            "diagnostic_identity_override",
+                            "validation_reasons",
+                        )
+                    }
+
+                behaviors.append(
+                    {
+                        "native_memory": native_memory,
+                        "native_calls": native_calls,
+                        "unavailable_memory": unavailable_memory,
+                        "memory": memory,
+                        "release": grading(release),
+                        "unavailable": grading(unavailable),
+                        "diagnostic_override": grading(diagnostic_override),
+                    }
+                )
+
+        self.assertEqual(configurations[0], configurations[1])
+        self.assertEqual(behaviors[0], behaviors[1])
+        behavior = behaviors[0]
+        self.assertEqual((current_bytes, peak_bytes), behavior["native_memory"])
+        self.assertIsNone(behavior["unavailable_memory"])
+        self.assertTrue(
+            all(
+                call == (0xCAFE, counters_size, counters_size)
+                for call in behavior["native_calls"]
+            )
+        )
+        self.assertEqual(
+            {
+                "baseline_bytes": current_bytes,
+                "final_bytes": current_bytes,
+                "maximum_current_bytes": current_bytes,
+                "peak_bytes": peak_bytes,
+                "growth_bytes": 0,
+            },
+            behavior["memory"]["process_rss"],
+        )
+        self.assertEqual(4, behavior["memory"]["sample_count"])
+        self.assertEqual(4, len(behavior["memory"]["bounded_checkpoints"]))
+        self.assertEqual("release", behavior["release"]["profile"])
+        self.assertTrue(behavior["release"]["release_eligible"])
+        self.assertFalse(behavior["unavailable"]["release_eligible"])
+        self.assertEqual(
+            "diagnostic-identity-override",
+            behavior["diagnostic_override"]["profile"],
+        )
+        self.assertFalse(behavior["diagnostic_override"]["release_eligible"])
+
     def test_release_requirements_fail_closed_and_preserve_entry_point_parity(
         self,
     ) -> None:
@@ -1795,7 +1939,38 @@ class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
     def test_standalone_and_installed_validators_are_byte_conformant(self) -> None:
         result = conformance.check_conformance()
         self.assertEqual("PASS", result["result"])
-        self.assertTrue(all(result["checks"].values()))
+        self.assertEqual(
+            {
+                "normalized_implementation_bytes_identical": True,
+                "protocol_command_fixtures_identical": True,
+                "fragmented_frame_transcript_identical": True,
+                "metrics_identical": True,
+                "fixture_grades_identical": True,
+            },
+            result["checks"],
+        )
+        self.assertEqual(
+            ["windows-standalone", "installed-package"],
+            result["entry_points"],
+        )
+        self.assertEqual(
+            {
+                "valid": {"result": "PASS", "failure_category": None},
+                "checksum_corruption": {
+                    "result": "FAIL",
+                    "failure_category": "checksum_corruption",
+                },
+                "pattern_error": {
+                    "result": "FAIL",
+                    "failure_category": "pattern_error",
+                },
+                "source_gap": {
+                    "result": "FAIL",
+                    "failure_category": "source_gap",
+                },
+            },
+            result["grades"],
+        )
         self.assertEqual(
             WINDOWS.soak_conformance_vector(),
             installed_soak.soak_conformance_vector(),
@@ -1824,6 +1999,9 @@ class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
                 imports.update(alias.name.split(".", 1)[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.module is not None:
                 imports.add(node.module.split(".", 1)[0])
+        self.assertEqual(ALLOWED_WINDOWS_IMPORTS, imports)
+        self.assertIn("ctypes", sys.stdlib_module_names)
+        self.assertIn("ctypes", imports)
         self.assertEqual({"serial"}, imports - sys.stdlib_module_names)
         self.assertTrue(
             {
@@ -1835,15 +2013,18 @@ class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
             }.issubset(imports)
         )
         for forbidden in (
+            "aiohttp",
+            "daq_api",
+            "firmware",
+            "ftplib",
+            "http",
             "numpy",
-            "teensy_daq",
-            "firmware.soak",
             "requests",
             "socket",
-            "urllib",
-            "http",
             "subprocess",
-            "aiohttp",
+            "teensy_daq",
+            "tools",
+            "urllib",
         ):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, imports)
