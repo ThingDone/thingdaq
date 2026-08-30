@@ -614,6 +614,23 @@ teensy-daq-soak --smoke --mode synthetic `
   --hardware-serial 20512460 --output teensy-daq-smoke
 ```
 
+Both entry paths embed and verify the deterministic Phase 11 release contract
+from `firmware/soak/validation-manifest.json`. Normal execution refuses every
+firmware/device INFO mismatch, including a different hardware serial, build,
+version, capability mask, rate, phase, pin map, frame size, or resolution. A
+COM number is discovery metadata and is never treated as persistent identity.
+
+For diagnosis only, `--diagnostic-identity-override` permits a different
+parseable identity (and permits `--hardware-serial` to select a different
+unit). The console, JSON, and Markdown all mark such a run as non-release, list
+the mismatched INFO fields, and force `release_eligible` to `false` even if the
+stream itself passes:
+
+```powershell
+teensy-daq-soak --diagnostic-identity-override `
+  --hardware-serial 12345670 --smoke --output non-release-diagnostic
+```
+
 Use the bounded offline self-check to verify command encoding, fragmented frame
 parsing, formula validation, rate/latency metrics, and deterministic fixture
 grading without opening a COM port:

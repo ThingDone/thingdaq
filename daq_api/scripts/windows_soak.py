@@ -81,8 +81,341 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "entry_point": "windows-standalone",
   "generator_schema_version": 1,
   "mode": "physical-combined",
-  "validator_sha256": "3e337210fa70da2361e85981fd833d05d7b99266f9d89adfc40c9e4aaade0d21",
-  "windows_driver_sha256": "4f1d07d776b2d5440110029ed82a9a3ea0060d69e301b0b3f8c25b0573b2ff5c",
+  "validation_manifest": {
+    "accepted_evidence": {
+      "candidate_freeze_sha256": "b285449f1a7af391d5210189f87a0c01f7d28acc7c4f608a7ba3ade70c3b77a9",
+      "candidate_semantic_sha256": "32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656",
+      "firmware_build_manifest_sha256": "6741c3fe10c44b8d7ff5666ddfd9a6eba2147c584e687e34794a1165e9af384b",
+      "protocol_contract_sha256": "a5993a8afe9b8b42b951ed6ec3dbd2ca84b3271e4302f717e56ee3b9dcb69676",
+      "reproducible_build_count": 2,
+      "reproducible_hex_size_bytes": 357214
+    },
+    "acquisition": {
+      "adc1_phase_nanoseconds": 500,
+      "adc1_phase_ticks": 4,
+      "adc_container_bits": 16,
+      "adc_pair_period_ticks": 8,
+      "adc_pair_rate_hz": 1000000,
+      "adc_pins_by_pair_position": {
+        "adc0": 14,
+        "adc1": 15
+      },
+      "adc_resolution_bits": 12,
+      "adc_trigger_ipg_clock_hz": 150000000,
+      "adc_trigger_phase_ipg_cycles": 75,
+      "gpio_pins_by_bit": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "gpio_sample_period_ticks": 2,
+      "gpio_sample_rate_hz": 4000000,
+      "timestamp_hz": 8000000
+    },
+    "capabilities": {
+      "bits": 511,
+      "names": [
+        "ADC_STREAM",
+        "GPIO_STREAM",
+        "HARDWARE_SOURCE",
+        "SYNTHETIC_SOURCE",
+        "RESET_STATS",
+        "PING",
+        "CHECKSUM_BENCHMARK",
+        "GPIO_CLOCK_DIAGNOSTIC",
+        "GPIO_CAPTURE_DIAGNOSTIC"
+      ],
+      "supported_checksum_mask": 14,
+      "supported_configuration_mask": 63,
+      "supported_source_mask": 3,
+      "supported_stream_mask": 3
+    },
+    "expected_info": {
+      "adc1_phase_ticks": 4,
+      "adc_container_bytes": 2,
+      "adc_dma_ring_depth": 8,
+      "adc_pair_bytes": 4,
+      "adc_pair_period_ticks": 8,
+      "adc_pair_rate_hz": 1000000,
+      "adc_pairs_per_frame": 1012,
+      "adc_resolution_bits": 12,
+      "board_id": 1,
+      "build_id": "tdaq-a0dc150fd48a6e9b",
+      "capability_bits": 511,
+      "command_queue_capacity": 4,
+      "data_checksum_algorithm": 1,
+      "data_frame_bytes": 4096,
+      "data_payload_bytes": 4048,
+      "firmware_version": [
+        0,
+        7,
+        0
+      ],
+      "frame_coverage_ticks": 8096,
+      "gpio_pin_count": 8,
+      "gpio_pin_map": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "gpio_sample_period_ticks": 2,
+      "gpio_sample_rate_hz": 4000000,
+      "gpio_samples_per_frame": 4048,
+      "hardware_serial": 20512460,
+      "max_control_frame_bytes": 1280,
+      "mcu_id": 1,
+      "nominal_framed_bytes_per_second_per_stream": 4047431,
+      "nominal_payload_bytes_per_second_per_stream": 4000000,
+      "packet_buffer_count": 200,
+      "packet_ready_queue_capacity": 200,
+      "packet_transmit_queue_capacity": 200,
+      "protocol_version": 1,
+      "response_queue_capacity": 4,
+      "supported_checksum_mask": 14,
+      "supported_configuration_mask": 63,
+      "supported_source_mask": 3,
+      "supported_stream_mask": 3,
+      "timestamp_hz": 8000000
+    },
+    "firmware": {
+      "build_id": "tdaq-a0dc150fd48a6e9b",
+      "exported_hex": {
+        "name": "firmware.ino.hex",
+        "sha256": "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
+        "size_bytes": 357214
+      },
+      "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+      "source_id": "a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba",
+      "version": [
+        0,
+        7,
+        0
+      ]
+    },
+    "kind": "teensy-daq-release-validation",
+    "protocol": {
+      "byte_order": "little",
+      "checksum": {
+        "algorithm": 1,
+        "name": "ADLER32",
+        "parameters": {
+          "coverage": "all 44 header bytes followed by every payload byte, starting at magic offset 0 and excluding all 4 trailer bytes",
+          "initial_value": 1,
+          "modulus": 65521,
+          "trailer_byte_order": "little",
+          "width_bits": 32
+        }
+      },
+      "frames": {
+        "adc_pairs_per_frame": 1012,
+        "data_frame_bytes": 4096,
+        "frame_coverage_ticks": 8096,
+        "gpio_samples_per_frame": 4048,
+        "header_bytes": 44,
+        "max_control_frame_bytes": 1280,
+        "payload_bytes": 4048,
+        "trailer_bytes": 4
+      },
+      "version": 1
+    },
+    "related": [
+      "[[Phase-11-Soak-Evidence]]"
+    ],
+    "release_policy": {
+      "hardware_serial_is_stable_identity": true,
+      "identity_override_option": "--diagnostic-identity-override",
+      "identity_override_results_are_release_eligible": false,
+      "mutable_com_port_is_identity": false
+    },
+    "required_zero": {
+      "final_idle_gauges": [
+        "packet_ready_depth",
+        "packet_transmit_depth",
+        "packet_owned_depth",
+        "adc_packet_filling_depth",
+        "gpio_packet_filling_depth",
+        "adc_packet_ready_depth",
+        "gpio_packet_ready_depth",
+        "adc_packet_transmit_depth",
+        "gpio_packet_transmit_depth",
+        "usb_command_queue_depth",
+        "usb_response_queue_depth",
+        "usb_lower_priority_queue_depth",
+        "usb_active_frame_bytes_sent",
+        "usb_active_frame_size"
+      ],
+      "firmware_during_stream_fields": [
+        "adc_items_dropped",
+        "gpio_items_dropped",
+        "parser_errors",
+        "transport_errors",
+        "gpio_raw_samples_lost",
+        "gpio_packer_samples_dropped",
+        "gpio_raw_ring_overruns",
+        "gpio_hardware_errors",
+        "gpio_raw_invariant_errors",
+        "gpio_packer_source_errors",
+        "gpio_packer_pipeline_errors",
+        "gpio_packer_chronology_errors",
+        "gpio_resource_conflicts",
+        "gpio_start_errors",
+        "gpio_stop_errors",
+        "gpio_stale_dma_completions",
+        "adc_raw_pairs_lost",
+        "adc_stop_pairs_discarded",
+        "adc_incomplete_conversions",
+        "adc_overwritten_conversions",
+        "adc_raw_ring_overruns",
+        "adc_incomplete_buffers",
+        "adc_etc_error_events",
+        "adc_etc_error_flags",
+        "adc_dma_error_events",
+        "adc_completion_mismatches",
+        "adc_destination_mismatches",
+        "adc_schedule_exhaustions",
+        "adc_raw_invariant_errors",
+        "adc_stale_completions",
+        "adc_resource_conflicts",
+        "adc_start_errors",
+        "adc_stop_errors",
+        "adc_stale_interrupts",
+        "adc_packer_source_errors",
+        "adc_packer_pipeline_errors",
+        "adc_packer_chronology_errors",
+        "adc_frames_dropped",
+        "gpio_frames_dropped",
+        "adc_payload_bytes_dropped",
+        "gpio_payload_bytes_dropped",
+        "packet_pool_exhaustions",
+        "packet_invalid_operations",
+        "packet_encoding_rejections",
+        "packet_ready_queue_rejections",
+        "packet_transmit_queue_rejections",
+        "commands_rejected",
+        "bad_checksums",
+        "bad_lengths",
+        "bad_types",
+        "bad_versions",
+        "timeouts",
+        "state_errors",
+        "usb_io_errors",
+        "bad_flags",
+        "bad_payloads",
+        "bad_request_ids",
+        "response_queue_rejections",
+        "response_reservations_abandoned",
+        "packet_pressure_evictions",
+        "packet_capacity_drops_without_evictable_frame",
+        "adc_frames_evicted",
+        "adc_frames_evicted_after_promotion",
+        "gpio_frames_evicted",
+        "gpio_frames_evicted_after_promotion",
+        "adc_frames_dropped_after_framing",
+        "adc_frames_dropped_after_promotion",
+        "gpio_frames_dropped_after_framing",
+        "gpio_frames_dropped_after_promotion"
+      ],
+      "firmware_final_fields": [
+        "parser_errors",
+        "transport_errors",
+        "gpio_packer_samples_dropped",
+        "gpio_raw_ring_overruns",
+        "gpio_hardware_errors",
+        "gpio_raw_invariant_errors",
+        "gpio_packer_source_errors",
+        "gpio_packer_pipeline_errors",
+        "gpio_packer_chronology_errors",
+        "gpio_resource_conflicts",
+        "gpio_start_errors",
+        "gpio_stop_errors",
+        "gpio_stale_dma_completions",
+        "adc_overwritten_conversions",
+        "adc_raw_ring_overruns",
+        "adc_etc_error_events",
+        "adc_etc_error_flags",
+        "adc_dma_error_events",
+        "adc_destination_mismatches",
+        "adc_schedule_exhaustions",
+        "adc_raw_invariant_errors",
+        "adc_stale_completions",
+        "adc_resource_conflicts",
+        "adc_start_errors",
+        "adc_stop_errors",
+        "adc_stale_interrupts",
+        "adc_packer_source_errors",
+        "adc_packer_pipeline_errors",
+        "adc_packer_chronology_errors",
+        "adc_frames_dropped",
+        "gpio_frames_dropped",
+        "adc_payload_bytes_dropped",
+        "gpio_payload_bytes_dropped",
+        "packet_pool_exhaustions",
+        "packet_invalid_operations",
+        "packet_encoding_rejections",
+        "packet_ready_queue_rejections",
+        "packet_transmit_queue_rejections",
+        "commands_rejected",
+        "bad_checksums",
+        "bad_lengths",
+        "bad_types",
+        "bad_versions",
+        "timeouts",
+        "state_errors",
+        "usb_io_errors",
+        "bad_flags",
+        "bad_payloads",
+        "bad_request_ids",
+        "response_queue_rejections",
+        "response_reservations_abandoned",
+        "packet_pressure_evictions",
+        "packet_capacity_drops_without_evictable_frame",
+        "adc_frames_evicted",
+        "adc_frames_evicted_after_promotion",
+        "gpio_frames_evicted",
+        "gpio_frames_evicted_after_promotion",
+        "adc_frames_dropped_after_framing",
+        "adc_frames_dropped_after_promotion",
+        "gpio_frames_dropped_after_framing",
+        "gpio_frames_dropped_after_promotion"
+      ],
+      "host_parser_fields": [
+        "bytes_discarded",
+        "errors",
+        "buffered_bytes"
+      ],
+      "host_stream_fields": [
+        "adc_missing_frames",
+        "gpio_missing_frames",
+        "adc_gap_flag_frames",
+        "gpio_gap_flag_frames"
+      ],
+      "physical_stop_tail_bounded_fields": [
+        "adc_items_dropped",
+        "gpio_items_dropped",
+        "gpio_raw_samples_lost",
+        "adc_raw_pairs_lost",
+        "adc_stop_pairs_discarded",
+        "adc_incomplete_conversions",
+        "adc_incomplete_buffers",
+        "adc_completion_mismatches"
+      ],
+      "required_value": 0
+    },
+    "schema_version": 1
+  },
+  "validation_manifest_sha256": "d6da65261b17b91409da59a5a0f8f47182a26d2d2a5637ac68b4cf902413b260",
+  "validator_sha256": "bde658a05069032dc6e65bf3bf86f9b040961d62870422e709ecd955b638da34",
+  "windows_driver_sha256": "2e9e64fd15c9f1bc0014e94e46587977d2b6e8d10173021f489dffbe895f061a",
   "windows_profile_sha256": "adb14bdcad996888cee26ddc08f0a7eda29d50894b11d60a08d6535ef7452412"
 }
 """
@@ -1306,6 +1639,33 @@ _PHYSICAL_STOP_TAIL_FIELDS = frozenset(
         "adc_completion_mismatches",
     }
 )
+_MANIFEST_HOST_PARSER_ZERO_FIELDS = (
+    "bytes_discarded",
+    "errors",
+    "buffered_bytes",
+)
+_MANIFEST_HOST_STREAM_ZERO_FIELDS = (
+    "adc_missing_frames",
+    "gpio_missing_frames",
+    "adc_gap_flag_frames",
+    "gpio_gap_flag_frames",
+)
+_MANIFEST_FINAL_IDLE_ZERO_GAUGES = (
+    "packet_ready_depth",
+    "packet_transmit_depth",
+    "packet_owned_depth",
+    "adc_packet_filling_depth",
+    "gpio_packet_filling_depth",
+    "adc_packet_ready_depth",
+    "gpio_packet_ready_depth",
+    "adc_packet_transmit_depth",
+    "gpio_packet_transmit_depth",
+    "usb_command_queue_depth",
+    "usb_response_queue_depth",
+    "usb_lower_priority_queue_depth",
+    "usb_active_frame_bytes_sent",
+    "usb_active_frame_size",
+)
 
 
 def _decode_run(
@@ -1437,6 +1797,220 @@ class RuntimeSettings:
     serial_read_bytes: int
     candidate_sha256: str
     validator_sha256: str
+    validation_manifest_sha256: str | None
+    expected_info: dict[str, object]
+    diagnostic_identity_override: bool
+
+
+def _string_list(value: object, name: str) -> list[str]:
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in value
+    ):
+        raise SoakFailure("configuration", f"{name} must be a list of strings")
+    if len(value) != len(set(value)):
+        raise SoakFailure("configuration", f"{name} contains duplicates")
+    return list(value)
+
+
+def _sha256_string(value: object, name: str) -> str:
+    result = _string(value, name)
+    require(
+        len(result) == 64
+        and result == result.lower()
+        and all(character in "0123456789abcdef" for character in result),
+        "configuration",
+        f"{name} must be lowercase SHA-256",
+    )
+    return result
+
+
+def _expected_info_contract(
+    *,
+    protocol_version: int,
+    hardware_serial: int,
+    firmware_version: tuple[int, int, int],
+    board_id: int,
+    mcu_id: int,
+    build_id: str,
+    checksum_algorithm: int,
+) -> dict[str, object]:
+    return {
+        "protocol_version": protocol_version,
+        "hardware_serial": hardware_serial,
+        "firmware_version": list(firmware_version),
+        "board_id": board_id,
+        "mcu_id": mcu_id,
+        "build_id": build_id,
+        "supported_stream_mask": EXPECTED_STREAM_MASK,
+        "supported_source_mask": EXPECTED_SOURCE_MASK,
+        "supported_checksum_mask": EXPECTED_CHECKSUM_MASK,
+        "capability_bits": EXPECTED_CAPABILITIES,
+        "timestamp_hz": TIMESTAMP_HZ,
+        "data_frame_bytes": DATA_FRAME_BYTES,
+        "max_control_frame_bytes": MAX_CONTROL_FRAME_BYTES,
+        "adc_pair_rate_hz": ADC_PAIR_RATE_HZ,
+        "gpio_sample_rate_hz": GPIO_SAMPLE_RATE_HZ,
+        "adc_pair_period_ticks": ADC_PAIR_PERIOD_TICKS,
+        "adc1_phase_ticks": ADC1_PHASE_TICKS,
+        "gpio_sample_period_ticks": GPIO_SAMPLE_PERIOD_TICKS,
+        "adc_resolution_bits": ADC_RESOLUTION_BITS,
+        "adc_container_bytes": 2,
+        "gpio_pin_count": len(GPIO_PINS_BY_BIT),
+        "data_checksum_algorithm": checksum_algorithm,
+        "gpio_pin_map": list(GPIO_PINS_BY_BIT),
+        "supported_configuration_mask": EXPECTED_CONFIGURATION_MASK,
+        "data_payload_bytes": DATA_PAYLOAD_BYTES,
+        "adc_pairs_per_frame": ADC_PAIRS_PER_FRAME,
+        "gpio_samples_per_frame": GPIO_SAMPLES_PER_FRAME,
+        "frame_coverage_ticks": FRAME_COVERAGE_TICKS,
+        "adc_dma_ring_depth": ADC_RAW_RING_DEPTH,
+        "adc_pair_bytes": ADC_BYTES_PER_PAIR,
+        "packet_buffer_count": PACKET_BUFFER_COUNT,
+        "packet_ready_queue_capacity": PACKET_QUEUE_CAPACITY,
+        "packet_transmit_queue_capacity": PACKET_QUEUE_CAPACITY,
+        "command_queue_capacity": COMMAND_QUEUE_CAPACITY,
+        "response_queue_capacity": RESPONSE_QUEUE_CAPACITY,
+        "nominal_payload_bytes_per_second_per_stream": 4_000_000,
+        "nominal_framed_bytes_per_second_per_stream": 4_047_431,
+    }
+
+
+def _validation_manifest(
+    config: Mapping[str, object],
+    *,
+    candidate_sha256: str,
+    expected_info: Mapping[str, object],
+    firmware_version: tuple[int, int, int],
+    build_id: str,
+    source_id: str,
+    artifact_name: str,
+    artifact_sha256: str,
+    fqbn: str,
+) -> tuple[dict[str, object] | None, str | None]:
+    raw_manifest = config.get("validation_manifest")
+    raw_sha256 = config.get("validation_manifest_sha256")
+    if raw_manifest is None:
+        require(
+            raw_sha256 is None,
+            "configuration",
+            "validation manifest digest exists without a manifest",
+        )
+        return None, None
+    manifest = dict(_mapping(raw_manifest, "validation_manifest"))
+    manifest_sha256 = _sha256_string(raw_sha256, "validation_manifest_sha256")
+    encoded = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    require(
+        hashlib.sha256(encoded).hexdigest() == manifest_sha256,
+        "configuration",
+        "embedded validation manifest SHA-256 mismatch",
+    )
+    require(
+        manifest.get("schema_version") == 1
+        and manifest.get("kind") == "teensy-daq-release-validation",
+        "configuration",
+        "unsupported validation manifest schema/kind",
+    )
+    related = _string_list(manifest.get("related"), "validation_manifest.related")
+    require(
+        "[[Phase-11-Soak-Evidence]]" in related,
+        "configuration",
+        "validation manifest is not linked to Phase 11 evidence",
+    )
+    evidence = _mapping(
+        manifest.get("accepted_evidence"),
+        "validation_manifest.accepted_evidence",
+    )
+    require(
+        evidence.get("candidate_semantic_sha256") == candidate_sha256
+        and evidence.get("reproducible_build_count") == 2,
+        "configuration",
+        "validation manifest does not identify the accepted candidate freeze",
+    )
+    for name in (
+        "candidate_freeze_sha256",
+        "firmware_build_manifest_sha256",
+        "protocol_contract_sha256",
+    ):
+        _sha256_string(evidence.get(name), f"validation_manifest.{name}")
+
+    manifest_firmware = _mapping(
+        manifest.get("firmware"), "validation_manifest.firmware"
+    )
+    exported_hex = _mapping(
+        manifest_firmware.get("exported_hex"),
+        "validation_manifest.firmware.exported_hex",
+    )
+    require(
+        manifest_firmware.get("version") == list(firmware_version)
+        and manifest_firmware.get("build_id") == build_id
+        and manifest_firmware.get("source_id") == source_id
+        and manifest_firmware.get("fqbn") == fqbn
+        and exported_hex.get("name") == artifact_name
+        and exported_hex.get("sha256") == artifact_sha256,
+        "configuration",
+        "validation manifest firmware/HEX identity disagrees with the candidate",
+    )
+    hex_size = exported_hex.get("size_bytes")
+    if not isinstance(hex_size, int) or isinstance(hex_size, bool) or hex_size <= 0:
+        raise SoakFailure("configuration", "validation manifest HEX size is invalid")
+    manifest_expected = dict(
+        _mapping(manifest.get("expected_info"), "validation_manifest.expected_info")
+    )
+    require(
+        manifest_expected == dict(expected_info),
+        "configuration",
+        "validation manifest INFO contract disagrees with the validator",
+    )
+
+    required_zero = _mapping(
+        manifest.get("required_zero"), "validation_manifest.required_zero"
+    )
+    require(
+        required_zero.get("required_value") == 0,
+        "configuration",
+        "validation manifest zero policy is invalid",
+    )
+    zero_lists = {
+        "host_parser_fields": list(_MANIFEST_HOST_PARSER_ZERO_FIELDS),
+        "host_stream_fields": list(_MANIFEST_HOST_STREAM_ZERO_FIELDS),
+        "firmware_during_stream_fields": list(_ZERO_ERROR_FIELDS),
+        "firmware_final_fields": [
+            name
+            for name in _ZERO_ERROR_FIELDS
+            if name not in _PHYSICAL_STOP_TAIL_FIELDS
+        ],
+        "final_idle_gauges": list(_MANIFEST_FINAL_IDLE_ZERO_GAUGES),
+    }
+    for name, expected in zero_lists.items():
+        actual = _string_list(
+            required_zero.get(name), f"validation_manifest.required_zero.{name}"
+        )
+        require(
+            actual == expected,
+            "configuration",
+            f"validation manifest {name} disagrees with the validator",
+        )
+    stop_tail = _string_list(
+        required_zero.get("physical_stop_tail_bounded_fields"),
+        "validation_manifest.required_zero.physical_stop_tail_bounded_fields",
+    )
+    require(
+        set(stop_tail) == set(_PHYSICAL_STOP_TAIL_FIELDS),
+        "configuration",
+        "validation manifest physical STOP-tail policy disagrees with the validator",
+    )
+    policy = _mapping(
+        manifest.get("release_policy"), "validation_manifest.release_policy"
+    )
+    require(
+        policy.get("identity_override_option") == "--diagnostic-identity-override"
+        and policy.get("identity_override_results_are_release_eligible") is False
+        and policy.get("hardware_serial_is_stable_identity") is True
+        and policy.get("mutable_com_port_is_identity") is False,
+        "configuration",
+        "validation manifest release/identity policy is invalid",
+    )
+    return manifest, manifest_sha256
 
 
 def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSettings:
@@ -1530,6 +2104,44 @@ def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSet
         "configuration",
         "build ID does not derive from the source ID",
     )
+    artifact_name = _string(artifact.get("name"), "artifact.name")
+    fqbn = _string(board.get("fqbn"), "board.fqbn")
+    hardware_serial = _integer(
+        board.get("hardware_serial"), "board.hardware_serial", minimum=1
+    )
+    board_id = _integer(board.get("board_id"), "board.board_id", minimum=1)
+    mcu_id = _integer(board.get("mcu_id"), "board.mcu_id", minimum=1)
+    candidate_sha256 = _string(config.get("candidate_sha256"), "candidate_sha256")
+    expected_info = _expected_info_contract(
+        protocol_version=protocol_version,
+        hardware_serial=hardware_serial,
+        firmware_version=version,
+        board_id=board_id,
+        mcu_id=mcu_id,
+        build_id=build_id,
+        checksum_algorithm=checksum_algorithm,
+    )
+    _manifest, validation_manifest_sha256 = _validation_manifest(
+        config,
+        candidate_sha256=candidate_sha256,
+        expected_info=expected_info,
+        firmware_version=version,
+        build_id=build_id,
+        source_id=source_id,
+        artifact_name=artifact_name,
+        artifact_sha256=artifact_sha256,
+        fqbn=fqbn,
+    )
+    diagnostic_identity_override = config.get("diagnostic_identity_override", False)
+    if not isinstance(diagnostic_identity_override, bool):
+        raise SoakFailure(
+            "configuration", "diagnostic_identity_override must be boolean"
+        )
+    require(
+        not diagnostic_identity_override or validation_manifest_sha256 is not None,
+        "configuration",
+        "diagnostic identity override requires a release validation manifest",
+    )
     return RuntimeSettings(
         mode=mode,
         protocol_version=protocol_version,
@@ -1538,14 +2150,12 @@ def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSet
         firmware_version=version,
         build_id=build_id,
         source_id=source_id,
-        artifact_name=_string(artifact.get("name"), "artifact.name"),
+        artifact_name=artifact_name,
         artifact_sha256=artifact_sha256,
-        fqbn=_string(board.get("fqbn"), "board.fqbn"),
-        hardware_serial=_integer(
-            board.get("hardware_serial"), "board.hardware_serial", minimum=1
-        ),
-        board_id=_integer(board.get("board_id"), "board.board_id", minimum=1),
-        mcu_id=_integer(board.get("mcu_id"), "board.mcu_id", minimum=1),
+        fqbn=fqbn,
+        hardware_serial=hardware_serial,
+        board_id=board_id,
+        mcu_id=mcu_id,
         measured_duration_seconds=measured,
         warmup_seconds=warmup,
         status_interval_seconds=status_interval,
@@ -1567,9 +2177,43 @@ def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSet
             if mode == "synthetic"
             else PHYSICAL_SERIAL_READ_BYTES
         ),
-        candidate_sha256=_string(config.get("candidate_sha256"), "candidate_sha256"),
+        candidate_sha256=candidate_sha256,
         validator_sha256=_string(config.get("validator_sha256"), "validator_sha256"),
+        validation_manifest_sha256=validation_manifest_sha256,
+        expected_info=expected_info,
+        diagnostic_identity_override=diagnostic_identity_override,
     )
+
+
+def _identity_json_value(value: object) -> object:
+    return list(value) if isinstance(value, tuple) else value
+
+
+def info_identity_mismatches(
+    info: Mapping[str, object],
+    settings: RuntimeSettings,
+) -> dict[str, dict[str, object]]:
+    expected_info = (
+        settings.expected_info
+        if settings.validation_manifest_sha256 is not None
+        else _expected_info_contract(
+            protocol_version=settings.protocol_version,
+            hardware_serial=settings.hardware_serial,
+            firmware_version=settings.firmware_version,
+            board_id=settings.board_id,
+            mcu_id=settings.mcu_id,
+            build_id=settings.build_id,
+            checksum_algorithm=settings.checksum_algorithm,
+        )
+    )
+    return {
+        name: {
+            "expected": expected,
+            "actual": _identity_json_value(info.get(name)),
+        }
+        for name, expected in expected_info.items()
+        if _identity_json_value(info.get(name)) != expected
+    }
 
 
 def validate_info_identity(
@@ -1579,52 +2223,9 @@ def validate_info_identity(
     expected_state: int | None = None,
     expected_source: int | None = None,
 ) -> None:
-    expected = {
-        "protocol_version": settings.protocol_version,
-        "hardware_serial": settings.hardware_serial,
-        "firmware_version": settings.firmware_version,
-        "board_id": settings.board_id,
-        "mcu_id": settings.mcu_id,
-        "build_id": settings.build_id,
-        "supported_stream_mask": EXPECTED_STREAM_MASK,
-        "supported_source_mask": EXPECTED_SOURCE_MASK,
-        "supported_checksum_mask": EXPECTED_CHECKSUM_MASK,
-        "capability_bits": EXPECTED_CAPABILITIES,
-        "timestamp_hz": TIMESTAMP_HZ,
-        "data_frame_bytes": DATA_FRAME_BYTES,
-        "max_control_frame_bytes": MAX_CONTROL_FRAME_BYTES,
-        "adc_pair_rate_hz": ADC_PAIR_RATE_HZ,
-        "gpio_sample_rate_hz": GPIO_SAMPLE_RATE_HZ,
-        "adc_pair_period_ticks": ADC_PAIR_PERIOD_TICKS,
-        "adc1_phase_ticks": ADC1_PHASE_TICKS,
-        "gpio_sample_period_ticks": GPIO_SAMPLE_PERIOD_TICKS,
-        "adc_resolution_bits": ADC_RESOLUTION_BITS,
-        "adc_container_bytes": 2,
-        "gpio_pin_count": len(GPIO_PINS_BY_BIT),
-        "data_checksum_algorithm": settings.checksum_algorithm,
-        "gpio_pin_map": GPIO_PINS_BY_BIT,
-        "supported_configuration_mask": EXPECTED_CONFIGURATION_MASK,
-        "data_payload_bytes": DATA_PAYLOAD_BYTES,
-        "adc_pairs_per_frame": ADC_PAIRS_PER_FRAME,
-        "gpio_samples_per_frame": GPIO_SAMPLES_PER_FRAME,
-        "frame_coverage_ticks": FRAME_COVERAGE_TICKS,
-        "adc_dma_ring_depth": ADC_RAW_RING_DEPTH,
-        "adc_pair_bytes": ADC_BYTES_PER_PAIR,
-        "packet_buffer_count": PACKET_BUFFER_COUNT,
-        "packet_ready_queue_capacity": PACKET_QUEUE_CAPACITY,
-        "packet_transmit_queue_capacity": PACKET_QUEUE_CAPACITY,
-        "command_queue_capacity": COMMAND_QUEUE_CAPACITY,
-        "response_queue_capacity": RESPONSE_QUEUE_CAPACITY,
-        "nominal_payload_bytes_per_second_per_stream": 4_000_000,
-        "nominal_framed_bytes_per_second_per_stream": 4_047_431,
-    }
-    mismatches = {
-        name: {"expected": value, "actual": info.get(name)}
-        for name, value in expected.items()
-        if info.get(name) != value
-    }
+    mismatches = info_identity_mismatches(info, settings)
     require(
-        not mismatches,
+        not mismatches or settings.diagnostic_identity_override,
         "identity",
         "INFO identity/capability mismatch: "
         + json.dumps(mismatches, sort_keys=True, separators=(",", ":")),
@@ -3843,6 +4444,9 @@ class SoakRunner:
                 "sha256": _program_sha256(),
                 "validator_sha256": self.settings.validator_sha256,
                 "candidate_sha256": self.settings.candidate_sha256,
+                "validation_manifest_sha256": (
+                    self.settings.validation_manifest_sha256
+                ),
                 "python": sys.version.split()[0],
                 "serial_read_bytes": self.settings.serial_read_bytes,
             },
@@ -3863,6 +4467,7 @@ class SoakRunner:
             "hardware_serial": self.settings.hardware_serial,
             "board_id": self.settings.board_id,
             "mcu_id": self.settings.mcu_id,
+            "validation_manifest_sha256": (self.settings.validation_manifest_sha256),
         }
 
     def _observed_identity(self) -> dict[str, object] | None:
@@ -4013,6 +4618,9 @@ class SoakRunner:
                 "sha256": _program_sha256(),
                 "validator_sha256": self.settings.validator_sha256,
                 "candidate_sha256": self.settings.candidate_sha256,
+                "validation_manifest_sha256": (
+                    self.settings.validation_manifest_sha256
+                ),
                 "python": sys.version.split()[0],
                 "serial_read_bytes": self.settings.serial_read_bytes,
             },
@@ -4121,7 +4729,7 @@ from pathlib import Path
 from serial.tools import list_ports
 
 
-WINDOWS_REPORT_SCHEMA_VERSION = 1
+WINDOWS_REPORT_SCHEMA_VERSION = 2
 WINDOWS_DEFAULT_DURATION_SECONDS = 3_600.0
 WINDOWS_SMOKE_DURATION_SECONDS = 10.0
 WINDOWS_MAXIMUM_DURATION_SECONDS = 86_400.0
@@ -4173,6 +4781,7 @@ class WindowsProbeResult:
 
     candidate: WindowsPortCandidate
     observed_identity: dict[str, object] | None
+    identity_mismatches: dict[str, dict[str, object]]
     latency_seconds: list[float]
     failure: dict[str, str] | None
     close: dict[str, object]
@@ -4185,7 +4794,9 @@ class WindowsProbeResult:
         return {
             "candidate": self.candidate.as_dict(),
             "result": "PASS" if self.passed else "FAIL",
+            "release_identity_match": not self.identity_mismatches,
             "observed_identity": self.observed_identity,
+            "identity_mismatches": self.identity_mismatches,
             "info_latency_seconds": self.latency_seconds,
             "failure": self.failure,
             "close": self.close,
@@ -4428,24 +5039,11 @@ def open_windows_serial(
     return BoundedWindowsSerial(port_name, attempt.port)
 
 
-def _observed_probe_identity(info: Mapping[str, object]) -> dict[str, object]:
-    names = (
-        "protocol_version",
-        "hardware_serial",
-        "firmware_version",
-        "board_id",
-        "mcu_id",
-        "build_id",
-        "supported_stream_mask",
-        "supported_source_mask",
-        "supported_checksum_mask",
-        "supported_configuration_mask",
-        "capability_bits",
-    )
-    result = {name: info[name] for name in names}
-    if isinstance(result["firmware_version"], tuple):
-        result["firmware_version"] = list(result["firmware_version"])
-    return result
+def _observed_probe_identity(
+    info: Mapping[str, object],
+    expected_info: Mapping[str, object],
+) -> dict[str, object]:
+    return {name: _identity_json_value(info.get(name)) for name in expected_info}
 
 
 def probe_windows_candidate(
@@ -4460,6 +5058,7 @@ def probe_windows_candidate(
 
     port: BoundedWindowsSerial | None = None
     info: dict[str, object] | None = None
+    identity_mismatches: dict[str, dict[str, object]] = {}
     latencies: list[float] = []
     failure: dict[str, str] | None = None
     try:
@@ -4476,6 +5075,7 @@ def probe_windows_candidate(
             raise DeadlineExpired("insufficient discovery budget for startup drain")
         link.drain_startup(STARTUP_DRAIN_SECONDS)
         info, latencies = synchronize(link, hard_deadline=discovery_deadline)
+        identity_mismatches = info_identity_mismatches(info, settings)
         validate_info_identity(info, settings, expected_state=STATE_IDLE)
         usb_serial = candidate.serial_number
         if usb_serial is not None and usb_serial.isascii() and usb_serial.isdecimal():
@@ -4514,10 +5114,11 @@ def probe_windows_candidate(
     return WindowsProbeResult(
         candidate=candidate,
         observed_identity=(
-            _observed_probe_identity(info)
+            _observed_probe_identity(info, settings.expected_info)
             if failure is None and info is not None
             else None
         ),
+        identity_mismatches=identity_mismatches,
         latency_seconds=latencies,
         failure=failure,
         close=close,
@@ -4540,6 +5141,7 @@ def probe_windows_candidates(
                 WindowsProbeResult(
                     candidate=candidate,
                     observed_identity=None,
+                    identity_mismatches={},
                     latency_seconds=[],
                     failure={
                         "category": "timeout",
@@ -4564,7 +5166,12 @@ def probe_windows_candidates(
             clock=clock,
         )
         if result.passed:
-            print(f"  {candidate.port}: matching Teensy DAQ", flush=True)
+            match = (
+                "matching release identity"
+                if not result.identity_mismatches
+                else "accepted only by diagnostic identity override"
+            )
+            print(f"  {candidate.port}: Teensy DAQ, {match}", flush=True)
         else:
             assert result.failure is not None
             print(
@@ -4620,7 +5227,12 @@ class WindowsPortFactory:
         return [port.close_summary() for port in self.opened]
 
 
-def windows_runtime_settings(mode: str, duration: float) -> RuntimeSettings:
+def windows_runtime_settings(
+    mode: str,
+    duration: float,
+    *,
+    diagnostic_identity_override: bool = False,
+) -> RuntimeSettings:
     """Apply only duration/source choices to the pinned generated candidate."""
 
     config = json.loads(json.dumps(GENERATED_CONFIG))
@@ -4649,6 +5261,7 @@ def windows_runtime_settings(mode: str, duration: float) -> RuntimeSettings:
         }
     )
     config["mode"] = internal_mode
+    config["diagnostic_identity_override"] = diagnostic_identity_override
     return load_settings(config)
 
 
@@ -4954,6 +5567,14 @@ def build_windows_parser() -> argparse.ArgumentParser:
         help="limit probing to this plausible enumerated COM port",
     )
     parser.add_argument(
+        "--diagnostic-identity-override",
+        action="store_true",
+        help=(
+            "allow a nonmatching firmware/device identity for diagnosis; every "
+            "result is prominently marked non-release"
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("teensy-daq-windows-soak"),
@@ -5008,6 +5629,7 @@ def _expected_settings(settings: RuntimeSettings) -> dict[str, object]:
         "hardware_serial": settings.hardware_serial,
         "board_id": settings.board_id,
         "mcu_id": settings.mcu_id,
+        "validation_manifest_sha256": settings.validation_manifest_sha256,
     }
 
 
@@ -5053,31 +5675,58 @@ def windows_failure_result(
             "candidate_sha256": (
                 settings.candidate_sha256 if settings is not None else None
             ),
+            "validation_manifest_sha256": (
+                settings.validation_manifest_sha256 if settings is not None else None
+            ),
             "python": sys.version.split()[0],
         },
         "completed_utc": datetime.now(timezone.utc).isoformat(),
     }
 
 
-def _windows_validation_reasons(result: Mapping[str, object]) -> list[str]:
+def _windows_validation_reasons(
+    result: Mapping[str, object],
+    *,
+    diagnostic_identity_override: bool,
+    identity_mismatches: Mapping[str, object],
+) -> list[str]:
+    reasons: list[str] = []
+    if diagnostic_identity_override:
+        reasons.append(
+            "NON-RELEASE: --diagnostic-identity-override was supplied; this "
+            "result cannot support a release claim"
+        )
+        if identity_mismatches:
+            reasons.append(
+                "the observed INFO identity/capabilities differ from the pinned "
+                "Phase 11 validation manifest"
+            )
     if result.get("result") != "PASS":
         failure = result.get("failure")
         if isinstance(failure, Mapping):
-            return [
-                (
-                    f"{failure.get('category', 'failure')}: "
-                    f"{failure.get('message', 'no detail')}"
-                )
-            ]
-        return ["validation did not pass"]
-    return [
-        "COM metadata and two stable INFO responses matched the pinned identity",
-        "every decoded frame passed structure and Adler-32 validation",
-        "run IDs, independent sequences, timestamps, counts, and rates reconciled",
-        "live and final STATUS counters and bounded queue depths reconciled",
-        "command latency and bounded host memory evidence passed",
-        "STOP reached IDLE and the serial close completed within its deadline",
-    ]
+            reasons.append(
+                f"{failure.get('category', 'failure')}: "
+                f"{failure.get('message', 'no detail')}"
+            )
+            return reasons
+        reasons.append("validation did not pass")
+        return reasons
+    reasons.extend(
+        [
+            (
+                "COM metadata and two stable INFO responses matched the pinned identity"
+                if not identity_mismatches
+                else "COM metadata and two stable INFO responses identified one stable "
+                "diagnostic device"
+            ),
+            "every decoded frame passed structure and Adler-32 validation",
+            "run IDs, independent sequences, timestamps, counts, and rates reconciled",
+            "live and final STATUS counters and bounded queue depths reconciled",
+            "command latency and bounded host memory evidence passed",
+            "STOP reached IDLE and the serial close completed within its deadline",
+        ]
+    )
+    return reasons
 
 
 def attach_windows_evidence(
@@ -5090,11 +5739,41 @@ def attach_windows_evidence(
     selected: WindowsPortCandidate | None,
     lifecycle: list[dict[str, object]],
 ) -> None:
-    release_profile = arguments.mode == "combined" and duration == 3_600.0
+    diagnostic_override = bool(arguments.diagnostic_identity_override)
+    selected_probe = next(
+        (
+            probe
+            for probe in probes
+            if selected is not None and probe.candidate == selected and probe.passed
+        ),
+        None,
+    )
+    identity_mismatches = (
+        selected_probe.identity_mismatches if selected_probe is not None else {}
+    )
+    release_identity_match = selected_probe is not None and not identity_mismatches
+    release_profile = (
+        arguments.mode == "combined" and duration == 3_600.0 and not diagnostic_override
+    )
+    generated_manifest = GENERATED_CONFIG.get("validation_manifest")
+    manifest_map = generated_manifest if isinstance(generated_manifest, Mapping) else {}
     result["report_schema_version"] = WINDOWS_REPORT_SCHEMA_VERSION
     result["windows"] = {
-        "profile": "release" if release_profile else "diagnostic",
-        "release_eligible": release_profile and result.get("result") == "PASS",
+        "profile": (
+            "diagnostic-identity-override"
+            if diagnostic_override
+            else ("release" if release_profile else "diagnostic")
+        ),
+        "release_eligible": (
+            release_profile
+            and release_identity_match
+            and result.get("result") == "PASS"
+        ),
+        "diagnostic_identity_override": {
+            "requested": diagnostic_override,
+            "release_eligible": False if diagnostic_override else None,
+            "identity_mismatches": identity_mismatches,
+        },
         "requested_mode": arguments.mode,
         "requested_duration_seconds": duration,
         "smoke": bool(arguments.smoke),
@@ -5109,6 +5788,7 @@ def attach_windows_evidence(
             "candidates": [candidate.as_dict() for candidate in candidates],
             "probes": [probe.as_dict() for probe in probes],
             "selected": selected.as_dict() if selected is not None else None,
+            "selected_release_identity_match": release_identity_match,
         },
         "serial_lifecycle": lifecycle,
         "generation": {
@@ -5118,8 +5798,21 @@ def attach_windows_evidence(
             ),
             "windows_driver_sha256": GENERATED_CONFIG.get("windows_driver_sha256"),
             "windows_profile_sha256": GENERATED_CONFIG.get("windows_profile_sha256"),
+            "validation_manifest_sha256": GENERATED_CONFIG.get(
+                "validation_manifest_sha256"
+            ),
         },
-        "validation_reasons": _windows_validation_reasons(result),
+        "validation_manifest": {
+            "schema_version": manifest_map.get("schema_version"),
+            "kind": manifest_map.get("kind"),
+            "related": manifest_map.get("related"),
+            "semantic_sha256": GENERATED_CONFIG.get("validation_manifest_sha256"),
+        },
+        "validation_reasons": _windows_validation_reasons(
+            result,
+            diagnostic_identity_override=diagnostic_override,
+            identity_mismatches=identity_mismatches,
+        ),
     }
 
 
@@ -5170,6 +5863,33 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
     )
     windows = result.get("windows")
     windows_map = windows if isinstance(windows, Mapping) else {}
+    override = windows_map.get("diagnostic_identity_override")
+    override_map = override if isinstance(override, Mapping) else {}
+    override_requested = override_map.get("requested") is True
+    raw_mismatches = override_map.get("identity_mismatches")
+    mismatch_map = raw_mismatches if isinstance(raw_mismatches, Mapping) else {}
+    mismatch_lines = [
+        (
+            f"| {_markdown_cell(name)} | "
+            f"{_markdown_cell(values.get('expected'))} | "
+            f"{_markdown_cell(values.get('actual'))} |"
+        )
+        for name, raw_values in sorted(mismatch_map.items())
+        for values in ([raw_values] if isinstance(raw_values, Mapping) else [{}])
+    ] or ["| None | n/a | n/a |"]
+    override_warning = (
+        [
+            "> [!WARNING]",
+            (
+                "> `--diagnostic-identity-override` was supplied. This report is "
+                "**NON-RELEASE** regardless of PASS/FAIL; it does not validate the "
+                "accepted Phase 11 firmware/device identity."
+            ),
+            "",
+        ]
+        if override_requested
+        else []
+    )
     discovery = windows_map.get("com_discovery")
     discovery_map = discovery if isinstance(discovery, Mapping) else {}
     selected = discovery_map.get("selected")
@@ -5235,10 +5955,12 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
             "",
             "# Teensy DAQ Windows soak report",
             "",
+            *override_warning,
             "## Outcome",
             "",
             (
-                f"**{_markdown_cell(result.get('result'))}** — "
+                f"**{_markdown_cell(result.get('result'))}"
+                f"{' (NON-RELEASE DIAGNOSTIC)' if override_requested else ''}** — "
                 f"{_markdown_cell(failure_map.get('category', 'all checks passed'))}: "
                 f"{_markdown_cell(failure_map.get('message', 'validation completed'))}"
             ),
@@ -5249,6 +5971,7 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
             "| --- | --- |",
             f"| Profile | {_markdown_cell(windows_map.get('profile'))} |",
             f"| Release eligible | {_markdown_cell(windows_map.get('release_eligible'))} |",
+            f"| Diagnostic identity override | {_markdown_cell(override_requested)} |",
             f"| Mode | {_markdown_cell(result.get('mode'))} |",
             f"| Requested duration (s) | {_markdown_cell(windows_map.get('requested_duration_seconds'))} |",
             f"| Completed UTC | {_markdown_cell(completed)} |",
@@ -5270,6 +5993,13 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
             f"| Build ID | {_markdown_cell(observed_map.get('build_id'))} |",
             f"| Expected source ID | {_markdown_cell(expected_map.get('source_id'))} |",
             f"| Expected HEX SHA-256 | {_markdown_cell(expected_map.get('artifact_sha256'))} |",
+            f"| Validation manifest SHA-256 | {_markdown_cell(expected_map.get('validation_manifest_sha256'))} |",
+            "",
+            "## Release identity comparison",
+            "",
+            "| INFO field | Expected | Actual |",
+            "| --- | --- | --- |",
+            *mismatch_lines,
             "",
             "## Rates, latency, and memory",
             "",
@@ -5407,13 +6137,26 @@ def main(argv: list[str] | None = None) -> int:
     factory: WindowsPortFactory | None = None
     exit_code = 2
     try:
-        settings = windows_runtime_settings(arguments.mode, duration)
+        settings = windows_runtime_settings(
+            arguments.mode,
+            duration,
+            diagnostic_identity_override=arguments.diagnostic_identity_override,
+        )
+        if arguments.diagnostic_identity_override:
+            print(
+                "WARNING: diagnostic identity override enabled; every outcome is "
+                "NON-RELEASE and cannot validate the Phase 11 candidate identity",
+                flush=True,
+            )
         requested_serial = (
             settings.hardware_serial
             if arguments.hardware_serial is None
             else arguments.hardware_serial
         )
-        if requested_serial != settings.hardware_serial:
+        if (
+            requested_serial != settings.hardware_serial
+            and not arguments.diagnostic_identity_override
+        ):
             raise SoakFailure(
                 "identity",
                 f"this release validator is pinned to hardware serial "
@@ -5496,7 +6239,12 @@ def main(argv: list[str] | None = None) -> int:
     failure = result.get("failure")
     failure_map = failure if isinstance(failure, Mapping) else {}
     if result.get("result") == "PASS":
-        print(f"PASS | JSON {json_path} | Markdown {markdown_path}", flush=True)
+        pass_label = (
+            "PASS (NON-RELEASE DIAGNOSTIC IDENTITY OVERRIDE)"
+            if arguments.diagnostic_identity_override
+            else "PASS"
+        )
+        print(f"{pass_label} | JSON {json_path} | Markdown {markdown_path}", flush=True)
     else:
         print(
             f"FAIL {failure_map.get('category', 'validation')}: "

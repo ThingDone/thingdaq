@@ -30,9 +30,16 @@ Windows paths perform metadata-first, identity-pinned COM discovery.
 ## Candidate and generation
 
 `firmware/soak/candidate.json` pins the expected firmware, protocol, board,
-artifact, duration, and deadline identity. Regenerate all three Phase 11 rig
-programs, `daq_api/scripts/windows_soak.py`, and
-`daq_api/src/teensy_daq/soak.py` with:
+artifact, duration, and deadline identity. The generator verifies it against
+the accepted two-build `firmware/soak/candidate-freeze.json`, derives the
+complete release contract from `protocol/protocol-v1.json` and the canonical
+validator, and writes `firmware/soak/validation-manifest.json`. The manifest is
+path- and credential-free, links to [[Phase-11-Soak-Evidence]], and records the
+exact firmware/HEX identity, checksum parameters, INFO capabilities,
+rates/phases/pins, frame layout, resolution, and required zero counters.
+
+Regenerate that manifest, all three Phase 11 rig programs,
+`daq_api/scripts/windows_soak.py`, and `daq_api/src/teensy_daq/soak.py` with:
 
 ```bash
 .venv/bin/python firmware/tools/generate_soak_programs.py
@@ -77,6 +84,7 @@ handoff at the path shown below:
 | Synthetic | `rig_soak_synthetic.py` | One 600-second combined synthetic epoch after warm-up |
 | Physical combined | `rig_soak_physical_combined.py` | One 600-second combined hardware epoch after warm-up |
 | Control stress | `rig_soak_control_stress.py` | A 600-second campaign of alternating bounded hardware/synthetic epochs and periodic CDC reopens |
+| Release validation manifest | `firmware/soak/validation-manifest.json` | Deterministic Phase 11 candidate, protocol, INFO, acquisition, frame, and zero-counter contract embedded into both Windows paths |
 | Windows handoff | `daq_api/scripts/windows_soak.py` | One identity-pinned 3600-second physical-combined epoch by default, with shorter diagnostic and synthetic options |
 | Installed Windows handoff | `teensy-daq-soak` → `teensy_daq.soak:main` | The same options and report schema, executed from the installed package implementation |
 
@@ -97,6 +105,20 @@ their deterministic metrics and PASS/FAIL categories differ. A normal installed
 run accepts the same `--mode`, `--duration`/`--smoke`, `--hardware-serial`,
 `--port`, `--output`, `--discovery-timeout`, and `--open-timeout` options as the
 standalone path and writes the same JSON/structured-Markdown report schema.
+Both programs validate the embedded manifest digest before opening a COM port.
+The default path rejects any INFO field that differs from the manifest, and a
+COM number is recorded only as mutable discovery evidence rather than device
+identity.
+
+`--diagnostic-identity-override` is the sole escape hatch for deliberately
+testing a different parseable device or firmware identity. It must be supplied
+explicitly; without it, even one build, hardware-serial, version, capability,
+rate, phase, pin-map, frame-size, or resolution mismatch is rejected before
+stream grading. With it, the mismatches are retained in JSON and Markdown,
+stdout prints a warning, the report profile becomes
+`diagnostic-identity-override`, and `release_eligible` is always `false` even
+when every stream check passes. It cannot convert diagnostic evidence into a
+release result.
 
 Each Phase 11 rig program has a 780-second internal deadline and records the
 service's 900-second container limit, leaving 120 seconds for bounded STOP,

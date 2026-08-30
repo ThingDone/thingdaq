@@ -1297,6 +1297,33 @@ _PHYSICAL_STOP_TAIL_FIELDS = frozenset(
         "adc_completion_mismatches",
     }
 )
+_MANIFEST_HOST_PARSER_ZERO_FIELDS = (
+    "bytes_discarded",
+    "errors",
+    "buffered_bytes",
+)
+_MANIFEST_HOST_STREAM_ZERO_FIELDS = (
+    "adc_missing_frames",
+    "gpio_missing_frames",
+    "adc_gap_flag_frames",
+    "gpio_gap_flag_frames",
+)
+_MANIFEST_FINAL_IDLE_ZERO_GAUGES = (
+    "packet_ready_depth",
+    "packet_transmit_depth",
+    "packet_owned_depth",
+    "adc_packet_filling_depth",
+    "gpio_packet_filling_depth",
+    "adc_packet_ready_depth",
+    "gpio_packet_ready_depth",
+    "adc_packet_transmit_depth",
+    "gpio_packet_transmit_depth",
+    "usb_command_queue_depth",
+    "usb_response_queue_depth",
+    "usb_lower_priority_queue_depth",
+    "usb_active_frame_bytes_sent",
+    "usb_active_frame_size",
+)
 
 
 def _decode_run(
@@ -1428,6 +1455,220 @@ class RuntimeSettings:
     serial_read_bytes: int
     candidate_sha256: str
     validator_sha256: str
+    validation_manifest_sha256: str | None
+    expected_info: dict[str, object]
+    diagnostic_identity_override: bool
+
+
+def _string_list(value: object, name: str) -> list[str]:
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in value
+    ):
+        raise SoakFailure("configuration", f"{name} must be a list of strings")
+    if len(value) != len(set(value)):
+        raise SoakFailure("configuration", f"{name} contains duplicates")
+    return list(value)
+
+
+def _sha256_string(value: object, name: str) -> str:
+    result = _string(value, name)
+    require(
+        len(result) == 64
+        and result == result.lower()
+        and all(character in "0123456789abcdef" for character in result),
+        "configuration",
+        f"{name} must be lowercase SHA-256",
+    )
+    return result
+
+
+def _expected_info_contract(
+    *,
+    protocol_version: int,
+    hardware_serial: int,
+    firmware_version: tuple[int, int, int],
+    board_id: int,
+    mcu_id: int,
+    build_id: str,
+    checksum_algorithm: int,
+) -> dict[str, object]:
+    return {
+        "protocol_version": protocol_version,
+        "hardware_serial": hardware_serial,
+        "firmware_version": list(firmware_version),
+        "board_id": board_id,
+        "mcu_id": mcu_id,
+        "build_id": build_id,
+        "supported_stream_mask": EXPECTED_STREAM_MASK,
+        "supported_source_mask": EXPECTED_SOURCE_MASK,
+        "supported_checksum_mask": EXPECTED_CHECKSUM_MASK,
+        "capability_bits": EXPECTED_CAPABILITIES,
+        "timestamp_hz": TIMESTAMP_HZ,
+        "data_frame_bytes": DATA_FRAME_BYTES,
+        "max_control_frame_bytes": MAX_CONTROL_FRAME_BYTES,
+        "adc_pair_rate_hz": ADC_PAIR_RATE_HZ,
+        "gpio_sample_rate_hz": GPIO_SAMPLE_RATE_HZ,
+        "adc_pair_period_ticks": ADC_PAIR_PERIOD_TICKS,
+        "adc1_phase_ticks": ADC1_PHASE_TICKS,
+        "gpio_sample_period_ticks": GPIO_SAMPLE_PERIOD_TICKS,
+        "adc_resolution_bits": ADC_RESOLUTION_BITS,
+        "adc_container_bytes": 2,
+        "gpio_pin_count": len(GPIO_PINS_BY_BIT),
+        "data_checksum_algorithm": checksum_algorithm,
+        "gpio_pin_map": list(GPIO_PINS_BY_BIT),
+        "supported_configuration_mask": EXPECTED_CONFIGURATION_MASK,
+        "data_payload_bytes": DATA_PAYLOAD_BYTES,
+        "adc_pairs_per_frame": ADC_PAIRS_PER_FRAME,
+        "gpio_samples_per_frame": GPIO_SAMPLES_PER_FRAME,
+        "frame_coverage_ticks": FRAME_COVERAGE_TICKS,
+        "adc_dma_ring_depth": ADC_RAW_RING_DEPTH,
+        "adc_pair_bytes": ADC_BYTES_PER_PAIR,
+        "packet_buffer_count": PACKET_BUFFER_COUNT,
+        "packet_ready_queue_capacity": PACKET_QUEUE_CAPACITY,
+        "packet_transmit_queue_capacity": PACKET_QUEUE_CAPACITY,
+        "command_queue_capacity": COMMAND_QUEUE_CAPACITY,
+        "response_queue_capacity": RESPONSE_QUEUE_CAPACITY,
+        "nominal_payload_bytes_per_second_per_stream": 4_000_000,
+        "nominal_framed_bytes_per_second_per_stream": 4_047_431,
+    }
+
+
+def _validation_manifest(
+    config: Mapping[str, object],
+    *,
+    candidate_sha256: str,
+    expected_info: Mapping[str, object],
+    firmware_version: tuple[int, int, int],
+    build_id: str,
+    source_id: str,
+    artifact_name: str,
+    artifact_sha256: str,
+    fqbn: str,
+) -> tuple[dict[str, object] | None, str | None]:
+    raw_manifest = config.get("validation_manifest")
+    raw_sha256 = config.get("validation_manifest_sha256")
+    if raw_manifest is None:
+        require(
+            raw_sha256 is None,
+            "configuration",
+            "validation manifest digest exists without a manifest",
+        )
+        return None, None
+    manifest = dict(_mapping(raw_manifest, "validation_manifest"))
+    manifest_sha256 = _sha256_string(raw_sha256, "validation_manifest_sha256")
+    encoded = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    require(
+        hashlib.sha256(encoded).hexdigest() == manifest_sha256,
+        "configuration",
+        "embedded validation manifest SHA-256 mismatch",
+    )
+    require(
+        manifest.get("schema_version") == 1
+        and manifest.get("kind") == "teensy-daq-release-validation",
+        "configuration",
+        "unsupported validation manifest schema/kind",
+    )
+    related = _string_list(manifest.get("related"), "validation_manifest.related")
+    require(
+        "[[Phase-11-Soak-Evidence]]" in related,
+        "configuration",
+        "validation manifest is not linked to Phase 11 evidence",
+    )
+    evidence = _mapping(
+        manifest.get("accepted_evidence"),
+        "validation_manifest.accepted_evidence",
+    )
+    require(
+        evidence.get("candidate_semantic_sha256") == candidate_sha256
+        and evidence.get("reproducible_build_count") == 2,
+        "configuration",
+        "validation manifest does not identify the accepted candidate freeze",
+    )
+    for name in (
+        "candidate_freeze_sha256",
+        "firmware_build_manifest_sha256",
+        "protocol_contract_sha256",
+    ):
+        _sha256_string(evidence.get(name), f"validation_manifest.{name}")
+
+    manifest_firmware = _mapping(
+        manifest.get("firmware"), "validation_manifest.firmware"
+    )
+    exported_hex = _mapping(
+        manifest_firmware.get("exported_hex"),
+        "validation_manifest.firmware.exported_hex",
+    )
+    require(
+        manifest_firmware.get("version") == list(firmware_version)
+        and manifest_firmware.get("build_id") == build_id
+        and manifest_firmware.get("source_id") == source_id
+        and manifest_firmware.get("fqbn") == fqbn
+        and exported_hex.get("name") == artifact_name
+        and exported_hex.get("sha256") == artifact_sha256,
+        "configuration",
+        "validation manifest firmware/HEX identity disagrees with the candidate",
+    )
+    hex_size = exported_hex.get("size_bytes")
+    if not isinstance(hex_size, int) or isinstance(hex_size, bool) or hex_size <= 0:
+        raise SoakFailure("configuration", "validation manifest HEX size is invalid")
+    manifest_expected = dict(
+        _mapping(manifest.get("expected_info"), "validation_manifest.expected_info")
+    )
+    require(
+        manifest_expected == dict(expected_info),
+        "configuration",
+        "validation manifest INFO contract disagrees with the validator",
+    )
+
+    required_zero = _mapping(
+        manifest.get("required_zero"), "validation_manifest.required_zero"
+    )
+    require(
+        required_zero.get("required_value") == 0,
+        "configuration",
+        "validation manifest zero policy is invalid",
+    )
+    zero_lists = {
+        "host_parser_fields": list(_MANIFEST_HOST_PARSER_ZERO_FIELDS),
+        "host_stream_fields": list(_MANIFEST_HOST_STREAM_ZERO_FIELDS),
+        "firmware_during_stream_fields": list(_ZERO_ERROR_FIELDS),
+        "firmware_final_fields": [
+            name
+            for name in _ZERO_ERROR_FIELDS
+            if name not in _PHYSICAL_STOP_TAIL_FIELDS
+        ],
+        "final_idle_gauges": list(_MANIFEST_FINAL_IDLE_ZERO_GAUGES),
+    }
+    for name, expected in zero_lists.items():
+        actual = _string_list(
+            required_zero.get(name), f"validation_manifest.required_zero.{name}"
+        )
+        require(
+            actual == expected,
+            "configuration",
+            f"validation manifest {name} disagrees with the validator",
+        )
+    stop_tail = _string_list(
+        required_zero.get("physical_stop_tail_bounded_fields"),
+        "validation_manifest.required_zero.physical_stop_tail_bounded_fields",
+    )
+    require(
+        set(stop_tail) == set(_PHYSICAL_STOP_TAIL_FIELDS),
+        "configuration",
+        "validation manifest physical STOP-tail policy disagrees with the validator",
+    )
+    policy = _mapping(
+        manifest.get("release_policy"), "validation_manifest.release_policy"
+    )
+    require(
+        policy.get("identity_override_option") == "--diagnostic-identity-override"
+        and policy.get("identity_override_results_are_release_eligible") is False
+        and policy.get("hardware_serial_is_stable_identity") is True
+        and policy.get("mutable_com_port_is_identity") is False,
+        "configuration",
+        "validation manifest release/identity policy is invalid",
+    )
+    return manifest, manifest_sha256
 
 
 def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSettings:
@@ -1521,6 +1762,44 @@ def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSet
         "configuration",
         "build ID does not derive from the source ID",
     )
+    artifact_name = _string(artifact.get("name"), "artifact.name")
+    fqbn = _string(board.get("fqbn"), "board.fqbn")
+    hardware_serial = _integer(
+        board.get("hardware_serial"), "board.hardware_serial", minimum=1
+    )
+    board_id = _integer(board.get("board_id"), "board.board_id", minimum=1)
+    mcu_id = _integer(board.get("mcu_id"), "board.mcu_id", minimum=1)
+    candidate_sha256 = _string(config.get("candidate_sha256"), "candidate_sha256")
+    expected_info = _expected_info_contract(
+        protocol_version=protocol_version,
+        hardware_serial=hardware_serial,
+        firmware_version=version,
+        board_id=board_id,
+        mcu_id=mcu_id,
+        build_id=build_id,
+        checksum_algorithm=checksum_algorithm,
+    )
+    _manifest, validation_manifest_sha256 = _validation_manifest(
+        config,
+        candidate_sha256=candidate_sha256,
+        expected_info=expected_info,
+        firmware_version=version,
+        build_id=build_id,
+        source_id=source_id,
+        artifact_name=artifact_name,
+        artifact_sha256=artifact_sha256,
+        fqbn=fqbn,
+    )
+    diagnostic_identity_override = config.get("diagnostic_identity_override", False)
+    if not isinstance(diagnostic_identity_override, bool):
+        raise SoakFailure(
+            "configuration", "diagnostic_identity_override must be boolean"
+        )
+    require(
+        not diagnostic_identity_override or validation_manifest_sha256 is not None,
+        "configuration",
+        "diagnostic identity override requires a release validation manifest",
+    )
     return RuntimeSettings(
         mode=mode,
         protocol_version=protocol_version,
@@ -1529,14 +1808,12 @@ def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSet
         firmware_version=version,
         build_id=build_id,
         source_id=source_id,
-        artifact_name=_string(artifact.get("name"), "artifact.name"),
+        artifact_name=artifact_name,
         artifact_sha256=artifact_sha256,
-        fqbn=_string(board.get("fqbn"), "board.fqbn"),
-        hardware_serial=_integer(
-            board.get("hardware_serial"), "board.hardware_serial", minimum=1
-        ),
-        board_id=_integer(board.get("board_id"), "board.board_id", minimum=1),
-        mcu_id=_integer(board.get("mcu_id"), "board.mcu_id", minimum=1),
+        fqbn=fqbn,
+        hardware_serial=hardware_serial,
+        board_id=board_id,
+        mcu_id=mcu_id,
         measured_duration_seconds=measured,
         warmup_seconds=warmup,
         status_interval_seconds=status_interval,
@@ -1558,9 +1835,43 @@ def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSet
             if mode == "synthetic"
             else PHYSICAL_SERIAL_READ_BYTES
         ),
-        candidate_sha256=_string(config.get("candidate_sha256"), "candidate_sha256"),
+        candidate_sha256=candidate_sha256,
         validator_sha256=_string(config.get("validator_sha256"), "validator_sha256"),
+        validation_manifest_sha256=validation_manifest_sha256,
+        expected_info=expected_info,
+        diagnostic_identity_override=diagnostic_identity_override,
     )
+
+
+def _identity_json_value(value: object) -> object:
+    return list(value) if isinstance(value, tuple) else value
+
+
+def info_identity_mismatches(
+    info: Mapping[str, object],
+    settings: RuntimeSettings,
+) -> dict[str, dict[str, object]]:
+    expected_info = (
+        settings.expected_info
+        if settings.validation_manifest_sha256 is not None
+        else _expected_info_contract(
+            protocol_version=settings.protocol_version,
+            hardware_serial=settings.hardware_serial,
+            firmware_version=settings.firmware_version,
+            board_id=settings.board_id,
+            mcu_id=settings.mcu_id,
+            build_id=settings.build_id,
+            checksum_algorithm=settings.checksum_algorithm,
+        )
+    )
+    return {
+        name: {
+            "expected": expected,
+            "actual": _identity_json_value(info.get(name)),
+        }
+        for name, expected in expected_info.items()
+        if _identity_json_value(info.get(name)) != expected
+    }
 
 
 def validate_info_identity(
@@ -1570,52 +1881,9 @@ def validate_info_identity(
     expected_state: int | None = None,
     expected_source: int | None = None,
 ) -> None:
-    expected = {
-        "protocol_version": settings.protocol_version,
-        "hardware_serial": settings.hardware_serial,
-        "firmware_version": settings.firmware_version,
-        "board_id": settings.board_id,
-        "mcu_id": settings.mcu_id,
-        "build_id": settings.build_id,
-        "supported_stream_mask": EXPECTED_STREAM_MASK,
-        "supported_source_mask": EXPECTED_SOURCE_MASK,
-        "supported_checksum_mask": EXPECTED_CHECKSUM_MASK,
-        "capability_bits": EXPECTED_CAPABILITIES,
-        "timestamp_hz": TIMESTAMP_HZ,
-        "data_frame_bytes": DATA_FRAME_BYTES,
-        "max_control_frame_bytes": MAX_CONTROL_FRAME_BYTES,
-        "adc_pair_rate_hz": ADC_PAIR_RATE_HZ,
-        "gpio_sample_rate_hz": GPIO_SAMPLE_RATE_HZ,
-        "adc_pair_period_ticks": ADC_PAIR_PERIOD_TICKS,
-        "adc1_phase_ticks": ADC1_PHASE_TICKS,
-        "gpio_sample_period_ticks": GPIO_SAMPLE_PERIOD_TICKS,
-        "adc_resolution_bits": ADC_RESOLUTION_BITS,
-        "adc_container_bytes": 2,
-        "gpio_pin_count": len(GPIO_PINS_BY_BIT),
-        "data_checksum_algorithm": settings.checksum_algorithm,
-        "gpio_pin_map": GPIO_PINS_BY_BIT,
-        "supported_configuration_mask": EXPECTED_CONFIGURATION_MASK,
-        "data_payload_bytes": DATA_PAYLOAD_BYTES,
-        "adc_pairs_per_frame": ADC_PAIRS_PER_FRAME,
-        "gpio_samples_per_frame": GPIO_SAMPLES_PER_FRAME,
-        "frame_coverage_ticks": FRAME_COVERAGE_TICKS,
-        "adc_dma_ring_depth": ADC_RAW_RING_DEPTH,
-        "adc_pair_bytes": ADC_BYTES_PER_PAIR,
-        "packet_buffer_count": PACKET_BUFFER_COUNT,
-        "packet_ready_queue_capacity": PACKET_QUEUE_CAPACITY,
-        "packet_transmit_queue_capacity": PACKET_QUEUE_CAPACITY,
-        "command_queue_capacity": COMMAND_QUEUE_CAPACITY,
-        "response_queue_capacity": RESPONSE_QUEUE_CAPACITY,
-        "nominal_payload_bytes_per_second_per_stream": 4_000_000,
-        "nominal_framed_bytes_per_second_per_stream": 4_047_431,
-    }
-    mismatches = {
-        name: {"expected": value, "actual": info.get(name)}
-        for name, value in expected.items()
-        if info.get(name) != value
-    }
+    mismatches = info_identity_mismatches(info, settings)
     require(
-        not mismatches,
+        not mismatches or settings.diagnostic_identity_override,
         "identity",
         "INFO identity/capability mismatch: "
         + json.dumps(mismatches, sort_keys=True, separators=(",", ":")),
@@ -3834,6 +4102,9 @@ class SoakRunner:
                 "sha256": _program_sha256(),
                 "validator_sha256": self.settings.validator_sha256,
                 "candidate_sha256": self.settings.candidate_sha256,
+                "validation_manifest_sha256": (
+                    self.settings.validation_manifest_sha256
+                ),
                 "python": sys.version.split()[0],
                 "serial_read_bytes": self.settings.serial_read_bytes,
             },
@@ -3854,6 +4125,7 @@ class SoakRunner:
             "hardware_serial": self.settings.hardware_serial,
             "board_id": self.settings.board_id,
             "mcu_id": self.settings.mcu_id,
+            "validation_manifest_sha256": (self.settings.validation_manifest_sha256),
         }
 
     def _observed_identity(self) -> dict[str, object] | None:
@@ -4004,6 +4276,9 @@ class SoakRunner:
                 "sha256": _program_sha256(),
                 "validator_sha256": self.settings.validator_sha256,
                 "candidate_sha256": self.settings.candidate_sha256,
+                "validation_manifest_sha256": (
+                    self.settings.validation_manifest_sha256
+                ),
                 "python": sys.version.split()[0],
                 "serial_read_bytes": self.settings.serial_read_bytes,
             },

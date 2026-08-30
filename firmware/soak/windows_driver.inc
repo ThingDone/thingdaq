@@ -8,7 +8,7 @@ from pathlib import Path
 from serial.tools import list_ports
 
 
-WINDOWS_REPORT_SCHEMA_VERSION = 1
+WINDOWS_REPORT_SCHEMA_VERSION = 2
 WINDOWS_DEFAULT_DURATION_SECONDS = 3_600.0
 WINDOWS_SMOKE_DURATION_SECONDS = 10.0
 WINDOWS_MAXIMUM_DURATION_SECONDS = 86_400.0
@@ -60,6 +60,7 @@ class WindowsProbeResult:
 
     candidate: WindowsPortCandidate
     observed_identity: dict[str, object] | None
+    identity_mismatches: dict[str, dict[str, object]]
     latency_seconds: list[float]
     failure: dict[str, str] | None
     close: dict[str, object]
@@ -72,7 +73,9 @@ class WindowsProbeResult:
         return {
             "candidate": self.candidate.as_dict(),
             "result": "PASS" if self.passed else "FAIL",
+            "release_identity_match": not self.identity_mismatches,
             "observed_identity": self.observed_identity,
+            "identity_mismatches": self.identity_mismatches,
             "info_latency_seconds": self.latency_seconds,
             "failure": self.failure,
             "close": self.close,
@@ -315,24 +318,11 @@ def open_windows_serial(
     return BoundedWindowsSerial(port_name, attempt.port)
 
 
-def _observed_probe_identity(info: Mapping[str, object]) -> dict[str, object]:
-    names = (
-        "protocol_version",
-        "hardware_serial",
-        "firmware_version",
-        "board_id",
-        "mcu_id",
-        "build_id",
-        "supported_stream_mask",
-        "supported_source_mask",
-        "supported_checksum_mask",
-        "supported_configuration_mask",
-        "capability_bits",
-    )
-    result = {name: info[name] for name in names}
-    if isinstance(result["firmware_version"], tuple):
-        result["firmware_version"] = list(result["firmware_version"])
-    return result
+def _observed_probe_identity(
+    info: Mapping[str, object],
+    expected_info: Mapping[str, object],
+) -> dict[str, object]:
+    return {name: _identity_json_value(info.get(name)) for name in expected_info}
 
 
 def probe_windows_candidate(
@@ -347,6 +337,7 @@ def probe_windows_candidate(
 
     port: BoundedWindowsSerial | None = None
     info: dict[str, object] | None = None
+    identity_mismatches: dict[str, dict[str, object]] = {}
     latencies: list[float] = []
     failure: dict[str, str] | None = None
     try:
@@ -363,6 +354,7 @@ def probe_windows_candidate(
             raise DeadlineExpired("insufficient discovery budget for startup drain")
         link.drain_startup(STARTUP_DRAIN_SECONDS)
         info, latencies = synchronize(link, hard_deadline=discovery_deadline)
+        identity_mismatches = info_identity_mismatches(info, settings)
         validate_info_identity(info, settings, expected_state=STATE_IDLE)
         usb_serial = candidate.serial_number
         if usb_serial is not None and usb_serial.isascii() and usb_serial.isdecimal():
@@ -401,10 +393,11 @@ def probe_windows_candidate(
     return WindowsProbeResult(
         candidate=candidate,
         observed_identity=(
-            _observed_probe_identity(info)
+            _observed_probe_identity(info, settings.expected_info)
             if failure is None and info is not None
             else None
         ),
+        identity_mismatches=identity_mismatches,
         latency_seconds=latencies,
         failure=failure,
         close=close,
@@ -427,6 +420,7 @@ def probe_windows_candidates(
                 WindowsProbeResult(
                     candidate=candidate,
                     observed_identity=None,
+                    identity_mismatches={},
                     latency_seconds=[],
                     failure={
                         "category": "timeout",
@@ -451,7 +445,12 @@ def probe_windows_candidates(
             clock=clock,
         )
         if result.passed:
-            print(f"  {candidate.port}: matching Teensy DAQ", flush=True)
+            match = (
+                "matching release identity"
+                if not result.identity_mismatches
+                else "accepted only by diagnostic identity override"
+            )
+            print(f"  {candidate.port}: Teensy DAQ, {match}", flush=True)
         else:
             assert result.failure is not None
             print(
@@ -507,7 +506,12 @@ class WindowsPortFactory:
         return [port.close_summary() for port in self.opened]
 
 
-def windows_runtime_settings(mode: str, duration: float) -> RuntimeSettings:
+def windows_runtime_settings(
+    mode: str,
+    duration: float,
+    *,
+    diagnostic_identity_override: bool = False,
+) -> RuntimeSettings:
     """Apply only duration/source choices to the pinned generated candidate."""
 
     config = json.loads(json.dumps(GENERATED_CONFIG))
@@ -536,6 +540,7 @@ def windows_runtime_settings(mode: str, duration: float) -> RuntimeSettings:
         }
     )
     config["mode"] = internal_mode
+    config["diagnostic_identity_override"] = diagnostic_identity_override
     return load_settings(config)
 
 
@@ -841,6 +846,14 @@ def build_windows_parser() -> argparse.ArgumentParser:
         help="limit probing to this plausible enumerated COM port",
     )
     parser.add_argument(
+        "--diagnostic-identity-override",
+        action="store_true",
+        help=(
+            "allow a nonmatching firmware/device identity for diagnosis; every "
+            "result is prominently marked non-release"
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("teensy-daq-windows-soak"),
@@ -895,6 +908,7 @@ def _expected_settings(settings: RuntimeSettings) -> dict[str, object]:
         "hardware_serial": settings.hardware_serial,
         "board_id": settings.board_id,
         "mcu_id": settings.mcu_id,
+        "validation_manifest_sha256": settings.validation_manifest_sha256,
     }
 
 
@@ -940,31 +954,58 @@ def windows_failure_result(
             "candidate_sha256": (
                 settings.candidate_sha256 if settings is not None else None
             ),
+            "validation_manifest_sha256": (
+                settings.validation_manifest_sha256 if settings is not None else None
+            ),
             "python": sys.version.split()[0],
         },
         "completed_utc": datetime.now(timezone.utc).isoformat(),
     }
 
 
-def _windows_validation_reasons(result: Mapping[str, object]) -> list[str]:
+def _windows_validation_reasons(
+    result: Mapping[str, object],
+    *,
+    diagnostic_identity_override: bool,
+    identity_mismatches: Mapping[str, object],
+) -> list[str]:
+    reasons: list[str] = []
+    if diagnostic_identity_override:
+        reasons.append(
+            "NON-RELEASE: --diagnostic-identity-override was supplied; this "
+            "result cannot support a release claim"
+        )
+        if identity_mismatches:
+            reasons.append(
+                "the observed INFO identity/capabilities differ from the pinned "
+                "Phase 11 validation manifest"
+            )
     if result.get("result") != "PASS":
         failure = result.get("failure")
         if isinstance(failure, Mapping):
-            return [
-                (
-                    f"{failure.get('category', 'failure')}: "
-                    f"{failure.get('message', 'no detail')}"
-                )
-            ]
-        return ["validation did not pass"]
-    return [
-        "COM metadata and two stable INFO responses matched the pinned identity",
-        "every decoded frame passed structure and Adler-32 validation",
-        "run IDs, independent sequences, timestamps, counts, and rates reconciled",
-        "live and final STATUS counters and bounded queue depths reconciled",
-        "command latency and bounded host memory evidence passed",
-        "STOP reached IDLE and the serial close completed within its deadline",
-    ]
+            reasons.append(
+                f"{failure.get('category', 'failure')}: "
+                f"{failure.get('message', 'no detail')}"
+            )
+            return reasons
+        reasons.append("validation did not pass")
+        return reasons
+    reasons.extend(
+        [
+            (
+                "COM metadata and two stable INFO responses matched the pinned identity"
+                if not identity_mismatches
+                else "COM metadata and two stable INFO responses identified one stable "
+                "diagnostic device"
+            ),
+            "every decoded frame passed structure and Adler-32 validation",
+            "run IDs, independent sequences, timestamps, counts, and rates reconciled",
+            "live and final STATUS counters and bounded queue depths reconciled",
+            "command latency and bounded host memory evidence passed",
+            "STOP reached IDLE and the serial close completed within its deadline",
+        ]
+    )
+    return reasons
 
 
 def attach_windows_evidence(
@@ -977,11 +1018,41 @@ def attach_windows_evidence(
     selected: WindowsPortCandidate | None,
     lifecycle: list[dict[str, object]],
 ) -> None:
-    release_profile = arguments.mode == "combined" and duration == 3_600.0
+    diagnostic_override = bool(arguments.diagnostic_identity_override)
+    selected_probe = next(
+        (
+            probe
+            for probe in probes
+            if selected is not None and probe.candidate == selected and probe.passed
+        ),
+        None,
+    )
+    identity_mismatches = (
+        selected_probe.identity_mismatches if selected_probe is not None else {}
+    )
+    release_identity_match = selected_probe is not None and not identity_mismatches
+    release_profile = (
+        arguments.mode == "combined" and duration == 3_600.0 and not diagnostic_override
+    )
+    generated_manifest = GENERATED_CONFIG.get("validation_manifest")
+    manifest_map = generated_manifest if isinstance(generated_manifest, Mapping) else {}
     result["report_schema_version"] = WINDOWS_REPORT_SCHEMA_VERSION
     result["windows"] = {
-        "profile": "release" if release_profile else "diagnostic",
-        "release_eligible": release_profile and result.get("result") == "PASS",
+        "profile": (
+            "diagnostic-identity-override"
+            if diagnostic_override
+            else ("release" if release_profile else "diagnostic")
+        ),
+        "release_eligible": (
+            release_profile
+            and release_identity_match
+            and result.get("result") == "PASS"
+        ),
+        "diagnostic_identity_override": {
+            "requested": diagnostic_override,
+            "release_eligible": False if diagnostic_override else None,
+            "identity_mismatches": identity_mismatches,
+        },
         "requested_mode": arguments.mode,
         "requested_duration_seconds": duration,
         "smoke": bool(arguments.smoke),
@@ -996,6 +1067,7 @@ def attach_windows_evidence(
             "candidates": [candidate.as_dict() for candidate in candidates],
             "probes": [probe.as_dict() for probe in probes],
             "selected": selected.as_dict() if selected is not None else None,
+            "selected_release_identity_match": release_identity_match,
         },
         "serial_lifecycle": lifecycle,
         "generation": {
@@ -1005,8 +1077,21 @@ def attach_windows_evidence(
             ),
             "windows_driver_sha256": GENERATED_CONFIG.get("windows_driver_sha256"),
             "windows_profile_sha256": GENERATED_CONFIG.get("windows_profile_sha256"),
+            "validation_manifest_sha256": GENERATED_CONFIG.get(
+                "validation_manifest_sha256"
+            ),
         },
-        "validation_reasons": _windows_validation_reasons(result),
+        "validation_manifest": {
+            "schema_version": manifest_map.get("schema_version"),
+            "kind": manifest_map.get("kind"),
+            "related": manifest_map.get("related"),
+            "semantic_sha256": GENERATED_CONFIG.get("validation_manifest_sha256"),
+        },
+        "validation_reasons": _windows_validation_reasons(
+            result,
+            diagnostic_identity_override=diagnostic_override,
+            identity_mismatches=identity_mismatches,
+        ),
     }
 
 
@@ -1057,6 +1142,33 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
     )
     windows = result.get("windows")
     windows_map = windows if isinstance(windows, Mapping) else {}
+    override = windows_map.get("diagnostic_identity_override")
+    override_map = override if isinstance(override, Mapping) else {}
+    override_requested = override_map.get("requested") is True
+    raw_mismatches = override_map.get("identity_mismatches")
+    mismatch_map = raw_mismatches if isinstance(raw_mismatches, Mapping) else {}
+    mismatch_lines = [
+        (
+            f"| {_markdown_cell(name)} | "
+            f"{_markdown_cell(values.get('expected'))} | "
+            f"{_markdown_cell(values.get('actual'))} |"
+        )
+        for name, raw_values in sorted(mismatch_map.items())
+        for values in ([raw_values] if isinstance(raw_values, Mapping) else [{}])
+    ] or ["| None | n/a | n/a |"]
+    override_warning = (
+        [
+            "> [!WARNING]",
+            (
+                "> `--diagnostic-identity-override` was supplied. This report is "
+                "**NON-RELEASE** regardless of PASS/FAIL; it does not validate the "
+                "accepted Phase 11 firmware/device identity."
+            ),
+            "",
+        ]
+        if override_requested
+        else []
+    )
     discovery = windows_map.get("com_discovery")
     discovery_map = discovery if isinstance(discovery, Mapping) else {}
     selected = discovery_map.get("selected")
@@ -1122,10 +1234,12 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
             "",
             "# Teensy DAQ Windows soak report",
             "",
+            *override_warning,
             "## Outcome",
             "",
             (
-                f"**{_markdown_cell(result.get('result'))}** — "
+                f"**{_markdown_cell(result.get('result'))}"
+                f"{' (NON-RELEASE DIAGNOSTIC)' if override_requested else ''}** — "
                 f"{_markdown_cell(failure_map.get('category', 'all checks passed'))}: "
                 f"{_markdown_cell(failure_map.get('message', 'validation completed'))}"
             ),
@@ -1136,6 +1250,7 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
             "| --- | --- |",
             f"| Profile | {_markdown_cell(windows_map.get('profile'))} |",
             f"| Release eligible | {_markdown_cell(windows_map.get('release_eligible'))} |",
+            f"| Diagnostic identity override | {_markdown_cell(override_requested)} |",
             f"| Mode | {_markdown_cell(result.get('mode'))} |",
             f"| Requested duration (s) | {_markdown_cell(windows_map.get('requested_duration_seconds'))} |",
             f"| Completed UTC | {_markdown_cell(completed)} |",
@@ -1157,6 +1272,13 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
             f"| Build ID | {_markdown_cell(observed_map.get('build_id'))} |",
             f"| Expected source ID | {_markdown_cell(expected_map.get('source_id'))} |",
             f"| Expected HEX SHA-256 | {_markdown_cell(expected_map.get('artifact_sha256'))} |",
+            f"| Validation manifest SHA-256 | {_markdown_cell(expected_map.get('validation_manifest_sha256'))} |",
+            "",
+            "## Release identity comparison",
+            "",
+            "| INFO field | Expected | Actual |",
+            "| --- | --- | --- |",
+            *mismatch_lines,
             "",
             "## Rates, latency, and memory",
             "",
@@ -1294,13 +1416,26 @@ def main(argv: list[str] | None = None) -> int:
     factory: WindowsPortFactory | None = None
     exit_code = 2
     try:
-        settings = windows_runtime_settings(arguments.mode, duration)
+        settings = windows_runtime_settings(
+            arguments.mode,
+            duration,
+            diagnostic_identity_override=arguments.diagnostic_identity_override,
+        )
+        if arguments.diagnostic_identity_override:
+            print(
+                "WARNING: diagnostic identity override enabled; every outcome is "
+                "NON-RELEASE and cannot validate the Phase 11 candidate identity",
+                flush=True,
+            )
         requested_serial = (
             settings.hardware_serial
             if arguments.hardware_serial is None
             else arguments.hardware_serial
         )
-        if requested_serial != settings.hardware_serial:
+        if (
+            requested_serial != settings.hardware_serial
+            and not arguments.diagnostic_identity_override
+        ):
             raise SoakFailure(
                 "identity",
                 f"this release validator is pinned to hardware serial "
@@ -1383,7 +1518,12 @@ def main(argv: list[str] | None = None) -> int:
     failure = result.get("failure")
     failure_map = failure if isinstance(failure, Mapping) else {}
     if result.get("result") == "PASS":
-        print(f"PASS | JSON {json_path} | Markdown {markdown_path}", flush=True)
+        pass_label = (
+            "PASS (NON-RELEASE DIAGNOSTIC IDENTITY OVERRIDE)"
+            if arguments.diagnostic_identity_override
+            else "PASS"
+        )
+        print(f"{pass_label} | JSON {json_path} | Markdown {markdown_path}", flush=True)
     else:
         print(
             f"FAIL {failure_map.get('category', 'validation')}: "

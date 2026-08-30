@@ -1,4 +1,4 @@
-"""Phase 11 endurance-generator, validator, and result-aggregator tests."""
+"""Phase 11/12 endurance generator, validator, and result-aggregator tests."""
 
 from __future__ import annotations
 
@@ -893,23 +893,52 @@ class SoakGeneratorTests(unittest.TestCase):
         candidate = generator.load_object(generator.CANDIDATE_PATH)
         source = generator.VALIDATOR_PATH.read_text(encoding="utf-8")
         driver = generator.WINDOWS_DRIVER_PATH.read_text(encoding="utf-8")
+        freeze_bytes = generator.CANDIDATE_FREEZE_PATH.read_bytes()
+        protocol_bytes = generator.PROTOCOL_PATH.read_bytes()
+        manifest_arguments = (
+            candidate,
+            generator.load_object(generator.PROTOCOL_PATH),
+            generator.load_object(generator.CANDIDATE_FREEZE_PATH),
+            source,
+        )
+        manifest_keywords = {
+            "candidate_freeze_sha256": generator.sha256_bytes(freeze_bytes),
+            "protocol_contract_sha256": generator.sha256_bytes(protocol_bytes),
+        }
+        manifest = generator.build_validation_manifest(
+            *manifest_arguments,
+            **manifest_keywords,
+        )
+        self.assertEqual(
+            manifest,
+            generator.build_validation_manifest(
+                *manifest_arguments,
+                **manifest_keywords,
+            ),
+        )
         first = generator.render_programs(source, candidate)
         second = generator.render_programs(source, candidate)
         self.assertEqual(first, second)
         self.assertEqual(set(generator.OUTPUTS.values()), set(first))
-        first_windows = generator.render_windows_program(source, driver, candidate)
-        second_windows = generator.render_windows_program(source, driver, candidate)
+        first_windows = generator.render_windows_program(
+            source, driver, candidate, manifest
+        )
+        second_windows = generator.render_windows_program(
+            source, driver, candidate, manifest
+        )
         self.assertEqual(first_windows, second_windows)
         first_package = generator.render_windows_program(
             source,
             driver,
             candidate,
+            manifest,
             entry_point="installed-package",
         )
         second_package = generator.render_windows_program(
             source,
             driver,
             candidate,
+            manifest,
             entry_point="installed-package",
         )
         self.assertEqual(first_package, second_package)
@@ -918,6 +947,7 @@ class SoakGeneratorTests(unittest.TestCase):
             output_directory = Path(raw)
             windows_output = output_directory / "windows_soak.py"
             package_output = output_directory / "package_soak.py"
+            validation_manifest_output = output_directory / "validation-manifest.json"
             generated_output = io.StringIO()
             with redirect_stdout(generated_output):
                 generated_exit = generator.main(
@@ -930,6 +960,8 @@ class SoakGeneratorTests(unittest.TestCase):
                         str(windows_output),
                         "--package-output",
                         str(package_output),
+                        "--validation-manifest-output",
+                        str(validation_manifest_output),
                     ]
                 )
             digests_before = {
@@ -949,6 +981,8 @@ class SoakGeneratorTests(unittest.TestCase):
                         str(windows_output),
                         "--package-output",
                         str(package_output),
+                        "--validation-manifest-output",
+                        str(validation_manifest_output),
                     ]
                 )
             digests_after = {
@@ -959,7 +993,58 @@ class SoakGeneratorTests(unittest.TestCase):
         self.assertEqual(0, generated_exit, generated_output.getvalue())
         self.assertEqual(0, checked_exit, checked_output.getvalue())
         self.assertEqual(digests_before, digests_after)
-        self.assertEqual(5, len(digests_before))
+        self.assertEqual(6, len(digests_before))
+
+    def test_validation_manifest_is_complete_and_contains_no_local_identity(
+        self,
+    ) -> None:
+        manifest = generator.load_object(generator.VALIDATION_MANIFEST_PATH)
+        self.assertEqual(1, manifest["schema_version"])
+        self.assertEqual(
+            ["[[Phase-11-Soak-Evidence]]"],
+            manifest["related"],
+        )
+        self.assertEqual("tdaq-a0dc150fd48a6e9b", manifest["firmware"]["build_id"])
+        self.assertEqual(
+            "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
+            manifest["firmware"]["exported_hex"]["sha256"],
+        )
+        self.assertEqual(
+            {"algorithm": 1, "name": "ADLER32"},
+            {
+                name: manifest["protocol"]["checksum"][name]
+                for name in ("algorithm", "name")
+            },
+        )
+        self.assertEqual(500, manifest["acquisition"]["adc1_phase_nanoseconds"])
+        self.assertEqual(
+            {"adc0": 14, "adc1": 15},
+            manifest["acquisition"]["adc_pins_by_pair_position"],
+        )
+        self.assertEqual(
+            list(range(6, 14)), manifest["acquisition"]["gpio_pins_by_bit"]
+        )
+        self.assertEqual(4096, manifest["protocol"]["frames"]["data_frame_bytes"])
+        self.assertEqual(12, manifest["acquisition"]["adc_resolution_bits"])
+        self.assertGreater(
+            len(manifest["required_zero"]["firmware_during_stream_fields"]),
+            50,
+        )
+        self.assertFalse(
+            manifest["release_policy"]["identity_override_results_are_release_eligible"]
+        )
+        encoded = json.dumps(manifest, sort_keys=True)
+        for forbidden in (
+            "/home/",
+            "\\\\Users\\\\",
+            ".maestro/",
+            "COM1",
+            "COM10",
+            "credential",
+            "api_key",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, encoded)
 
     def test_standalone_and_installed_entry_paths_pass_conformance_gate(self) -> None:
         result = conformance.check_conformance()
@@ -1045,6 +1130,12 @@ class SoakGeneratorTests(unittest.TestCase):
             "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
             settings.artifact_sha256,
         )
+        manifest = generator.load_object(generator.VALIDATION_MANIFEST_PATH)
+        self.assertEqual(manifest, windows.GENERATED_CONFIG["validation_manifest"])
+        self.assertEqual(
+            generator.sha256_bytes(generator.canonical_json_bytes(manifest)),
+            settings.validation_manifest_sha256,
+        )
 
         installed = _load_module(
             generator.PACKAGE_OUTPUT_PATH,
@@ -1057,6 +1148,103 @@ class SoakGeneratorTests(unittest.TestCase):
             windows.soak_conformance_vector(),
             installed.soak_conformance_vector(),
         )
+
+    def test_identity_override_is_explicit_and_always_non_release(self) -> None:
+        windows = _load_module(
+            generator.WINDOWS_OUTPUT_PATH,
+            "generated_windows_soak_identity_override",
+        )
+        strict = windows.windows_runtime_settings("combined", 3_600.0)
+        observed = dict(strict.expected_info)
+        observed["firmware_version"] = tuple(observed["firmware_version"])
+        observed["gpio_pin_map"] = tuple(observed["gpio_pin_map"])
+        observed["build_id"] = "tdaq-diagnostic-other"
+        observed.update(
+            {
+                "device_state": windows.STATE_IDLE,
+                "applied_stream_mask": windows.STREAM_NONE,
+                "applied_source": windows.SOURCE_HARDWARE,
+            }
+        )
+        with self.assertRaises(windows.SoakFailure) as caught:
+            windows.validate_info_identity(
+                observed,
+                strict,
+                expected_state=windows.STATE_IDLE,
+            )
+        self.assertEqual("identity", caught.exception.category)
+
+        override = windows.windows_runtime_settings(
+            "combined",
+            3_600.0,
+            diagnostic_identity_override=True,
+        )
+        windows.validate_info_identity(
+            observed,
+            override,
+            expected_state=windows.STATE_IDLE,
+        )
+        mismatches = windows.info_identity_mismatches(observed, override)
+        self.assertEqual("tdaq-a0dc150fd48a6e9b", mismatches["build_id"]["expected"])
+        self.assertEqual("tdaq-diagnostic-other", mismatches["build_id"]["actual"])
+
+        candidate = windows.WindowsPortCandidate(
+            port="COM10",
+            vid=windows.TEENSY_USB_SERIAL_VID,
+            pid=windows.TEENSY_USB_SERIAL_PID,
+            serial_number=str(override.hardware_serial),
+            product=windows.TEENSY_DAQ_PRODUCT,
+            manufacturer="PJRC",
+            location="fixture-location",
+            interface="CDC",
+            description="Teensy DAQ",
+        )
+        probe = windows.WindowsProbeResult(
+            candidate=candidate,
+            observed_identity=windows._observed_probe_identity(
+                observed, override.expected_info
+            ),
+            identity_mismatches=mismatches,
+            latency_seconds=[0.001],
+            failure=None,
+            close={
+                "attempted": True,
+                "completed": True,
+                "timed_out": False,
+                "error": None,
+            },
+        )
+        result = windows.windows_failure_result(
+            windows.SoakFailure("fixture", "replaced below"),
+            settings=override,
+            mode="combined",
+        )
+        result["result"] = "PASS"
+        result["failure"] = None
+        result["observed_identity"] = probe.observed_identity
+        arguments = windows.build_windows_parser().parse_args(
+            ["--diagnostic-identity-override", "--output", "unused"]
+        )
+        arguments.hardware_serial = override.hardware_serial
+        windows.attach_windows_evidence(
+            result,
+            arguments=arguments,
+            duration=3_600.0,
+            candidates=(candidate,),
+            probes=(probe,),
+            selected=candidate,
+            lifecycle=[],
+        )
+        self.assertEqual("PASS", result["result"])
+        self.assertEqual("diagnostic-identity-override", result["windows"]["profile"])
+        self.assertFalse(result["windows"]["release_eligible"])
+        self.assertEqual(
+            mismatches,
+            result["windows"]["diagnostic_identity_override"]["identity_mismatches"],
+        )
+        markdown = windows.render_windows_markdown(result)
+        self.assertIn("**NON-RELEASE**", markdown)
+        self.assertIn("tdaq-diagnostic-other", markdown)
 
     def test_windows_metadata_filter_and_failure_reports_are_structured(self) -> None:
         windows = _load_module(
