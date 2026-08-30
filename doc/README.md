@@ -9,6 +9,7 @@ tags:
 related:
   - '[[Evidence-Index]]'
   - '[[Phase-11-Soak-Evidence]]'
+  - '[[Phase-12-Windows-Handoff]]'
   - '[[Quickstart]]'
   - '[[soak-harness]]'
   - '[[Python-API]]'
@@ -101,8 +102,11 @@ double-bracket document links so the project can be explored as a graph.
   [[Phase-10-Package-Workflows]].
   The final autonomous release-candidate decision, complete accepted/excluded
   job lineage, cross-run trends, conservation equations, and reproducible
-  post-campaign gate are consolidated in [[Phase-11-Soak-Evidence]]. Use
-  [[Evidence-Index]] as the cross-phase result and ADR map.
+  post-campaign gate are consolidated in [[Phase-11-Soak-Evidence]]. The
+  unpublished identity-pinned Windows artifacts, hashes, packaging evidence,
+  report interpretation, non-gating status, and later user procedure are in
+  [[Phase-12-Windows-Handoff]]. Use [[Evidence-Index]] as the cross-phase
+  result and ADR map.
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`

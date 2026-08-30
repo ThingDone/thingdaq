@@ -125,6 +125,11 @@ documented in the [soak harness guide](doc/guides/soak-harness.md). Both embed
 the deterministic `firmware/soak/validation-manifest.json` contract; a
 different INFO identity is rejected unless the explicit diagnostic override is
 used, and override reports are always non-release.
+The unpublished artifacts, exact hashes, local packaging results, diagnostic
+fixture smoke, report interpretation, and user procedure are consolidated in
+the [Phase 12 Windows handoff](doc/results/phase-12-windows-handoff.md). That
+handoff explicitly leaves Windows physical-combined and externally stimulated
+analog/digital evidence pending.
 
 Those runs used unstimulated A0/A1 and no declared external digital stimulus.
 They do not establish analog accuracy, analog bandwidth, true aperture timing,
@@ -137,6 +142,7 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 - [Documentation index](doc/README.md)
 - [Evidence index](doc/results/evidence-index.md)
 - [Phase 11 autonomous soak evidence](doc/results/phase-11-soak-evidence.md)
+- [Phase 12 Windows validation handoff](doc/results/phase-12-windows-handoff.md)
 - [Quickstart](doc/guides/quickstart.md)
 - [Autonomous soak harness](doc/guides/soak-harness.md)
 - [Python API architecture](doc/architecture/python-api.md)

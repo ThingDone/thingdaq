@@ -9,6 +9,7 @@ tags:
   - release-candidate
 related:
   - '[[Phase-11-Soak-Evidence]]'
+  - '[[Phase-12-Windows-Handoff]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -64,6 +65,30 @@ GPIO transitions, or Windows-host behavior. A service incident could be
 retried once; no such incident occurred. Product/test failures were excluded,
 fixed, rebuilt when needed, and restarted from run one.
 
+## Phase 12 Windows handoff (non-gating)
+
+[[Phase-12-Windows-Handoff]] packages the accepted identity for the user's
+later Windows check without changing the Phase 11 autonomous decision. The
+unpublished standalone script, equivalent installed command, deterministic
+manifest, universal wheel, and source distribution passed their generation,
+conformance, packaging, clean-install, fault-fixture, and accelerated one-hour
+gates. A final 10-second full-rate synthetic virtual-device smoke passed on
+Linux and was correctly marked diagnostic and non-release.
+
+| Handoff authority | Exact value |
+| --- | --- |
+| Standalone validator | SHA-256 `6604d1ec4900fdfbeec74b5b98413b9e7a28879261b1774e20aad6584ef1757d` |
+| Validation manifest | File SHA-256 `3da1727a886876848a405aca4a538fccdc6f1c39c4086c17a5c0e7ebc78ee7d5`; semantic SHA-256 `d6da65261b17b91409da59a5a0f8f47182a26d2d2a5637ac68b4cf902413b260` |
+| Universal wheel | 226,018 bytes; SHA-256 `d9141177503a588338ea1e5d7eb50ba78d1f38f0e482babda4eebf4da3e8da88` |
+| Source distribution | 245,003 bytes; SHA-256 `244d0837a6144d797af0c85a88d25b7164d0745cd788e69eb1417f32c4c43660` |
+| Final simulated smoke | PASS; 10.000958 seconds, 79,919,664 payload bytes, `release_eligible: false` |
+| Windows physical-combined result | Pending user-supplied JSON and Markdown reports |
+
+No Windows-host behavior or externally stimulated analog/digital behavior is
+accepted by the Phase 12 preparation evidence. Those claim limits and the
+exact report interpretation rules are explicit in
+[[Phase-12-Windows-Handoff]].
+
 ## Accepted Phase 11 job register
 
 | Mode | Job ID | UTC interval | Measured seconds |
@@ -118,6 +143,7 @@ repair are in [[Phase-11-Soak-Evidence]].
 | 09 | [[Phase-09-Loss-Recovery]] |
 | 10 | [[Phase-10-Package-Local-Gate]], [[Phase-10-Package-Workflows]] |
 | 11 | [[Phase-11-Soak-Evidence]] |
+| 12 | [[Phase-12-Windows-Handoff]] |
 
 ## Architecture decisions
 
@@ -128,6 +154,7 @@ repair are in [[Phase-11-Soak-Evidence]].
 | [[ADR-003-GPIO-Clock-DMA]] | Exact-rate GPIO trigger/DMA/packing path graded by physical and control epochs. |
 | [[ADR-004-ADC-Trigger-DMA]] | Paired ADC trigger, completion, descriptor, and DMA resource contract graded by physical and control epochs. |
 
-No public-release tag or package publication is part of this index. The future
-Windows result may be linked here when it exists, but it does not alter the
-autonomous PASS recorded above.
+No public-release tag or package publication is part of this index. The Phase
+12 handoff is ready, but the future Windows result may be called complete and
+linked here only after its reports exist; it does not alter the autonomous PASS
+recorded above.
