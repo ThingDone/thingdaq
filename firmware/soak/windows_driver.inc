@@ -1,5 +1,6 @@
 # <soak-cli>
 import argparse  # noqa: I001 - generated driver imports follow the canonical core
+import ctypes
 import platform
 import re
 import threading
@@ -23,6 +24,110 @@ TEENSY_DAQ_PRODUCT = "Teensy DAQ"
 WINDOWS_PORT_PATTERN = re.compile(r"(?i)^COM([1-9][0-9]*)$")
 SOAK_CONFORMANCE_SCHEMA_VERSION = 1
 SOAK_CONFORMANCE_PREFIX = "SOAK_CONFORMANCE "
+
+
+class _WindowsProcessMemoryCounters(ctypes.Structure):
+    """Windows ``PROCESS_MEMORY_COUNTERS`` with architecture-sized fields."""
+
+    _fields_ = [
+        ("cb", ctypes.c_uint32),
+        ("PageFaultCount", ctypes.c_uint32),
+        ("PeakWorkingSetSize", ctypes.c_size_t),
+        ("WorkingSetSize", ctypes.c_size_t),
+        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+        ("PagefileUsage", ctypes.c_size_t),
+        ("PeakPagefileUsage", ctypes.c_size_t),
+    ]
+
+
+@dataclass(frozen=True)
+class _WindowsProcessMemoryApi:
+    """Mockable pair of native calls needed for process-memory evidence."""
+
+    get_current_process: Callable[[], object]
+    get_process_memory_info: Callable[[object, object, int], object]
+
+
+def _load_windows_process_memory_api() -> _WindowsProcessMemoryApi | None:
+    """Load and type the dependency-free Windows process-memory API once."""
+
+    dll_loader = getattr(ctypes, "WinDLL", None)
+    if dll_loader is None:
+        return None
+    try:
+        kernel32 = dll_loader("kernel32", use_last_error=True)
+        psapi = dll_loader("psapi", use_last_error=True)
+        get_current_process = kernel32.GetCurrentProcess
+        get_current_process.argtypes = []
+        get_current_process.restype = ctypes.c_void_p
+        get_process_memory_info = psapi.GetProcessMemoryInfo
+        get_process_memory_info.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(_WindowsProcessMemoryCounters),
+            ctypes.c_uint32,
+        ]
+        get_process_memory_info.restype = ctypes.c_int
+    except Exception:  # noqa: BLE001 - optional native evidence fails closed
+        return None
+    return _WindowsProcessMemoryApi(
+        get_current_process=get_current_process,
+        get_process_memory_info=get_process_memory_info,
+    )
+
+
+_WINDOWS_PROCESS_MEMORY_API = (
+    _load_windows_process_memory_api() if sys.platform == "win32" else None
+)
+_canonical_current_rss_bytes = _current_rss_bytes
+_canonical_peak_rss_bytes = _peak_rss_bytes
+
+
+def _windows_process_memory_bytes(
+    api: _WindowsProcessMemoryApi | None = None,
+) -> tuple[int, int] | None:
+    """Return validated current/peak working-set bytes from one native call."""
+
+    selected_api = _WINDOWS_PROCESS_MEMORY_API if api is None else api
+    if selected_api is None:
+        return None
+    counters = _WindowsProcessMemoryCounters()
+    structure_size = ctypes.sizeof(counters)
+    counters.cb = structure_size
+    try:
+        process = selected_api.get_current_process()
+        if process is None or process == 0:
+            return None
+        succeeded = selected_api.get_process_memory_info(
+            process,
+            ctypes.byref(counters),
+            structure_size,
+        )
+    except Exception:  # noqa: BLE001 - optional native evidence fails closed
+        return None
+    if not succeeded or counters.cb != structure_size:
+        return None
+    current_bytes = int(counters.WorkingSetSize)
+    peak_bytes = int(counters.PeakWorkingSetSize)
+    if current_bytes < 0 or peak_bytes < current_bytes:
+        return None
+    return current_bytes, peak_bytes
+
+
+def _current_rss_bytes() -> int | None:  # type: ignore[no-redef]
+    if sys.platform != "win32":
+        return _canonical_current_rss_bytes()
+    memory = _windows_process_memory_bytes()
+    return memory[0] if memory is not None else None
+
+
+def _peak_rss_bytes() -> int | None:  # type: ignore[no-redef]
+    if sys.platform != "win32":
+        return _canonical_peak_rss_bytes()
+    memory = _windows_process_memory_bytes()
+    return memory[1] if memory is not None else None
 
 
 @dataclass(frozen=True)
