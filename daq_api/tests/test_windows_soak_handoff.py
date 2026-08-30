@@ -1123,6 +1123,295 @@ class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
             )
         self.assertEqual(graded[0], graded[1])
 
+    def test_release_classification_matrix(self) -> None:
+        mib = 1024**2
+        native_windows: dict[str, object] = {
+            "system": "Windows",
+            "sys_platform": "win32",
+        }
+        complete_rss: dict[str, object] = {
+            "baseline_bytes": 64 * mib,
+            "peak_bytes": 72 * mib,
+            "growth_bytes": 8 * mib,
+        }
+        requirement_names = (
+            "physical_combined_mode",
+            "exact_3600_second_duration",
+            "non_smoke",
+            "diagnostic_identity_override_disabled",
+            "native_windows_host",
+            "overall_pass",
+            "exact_manifest_device_identity",
+            "process_rss_baseline_valid",
+            "process_rss_peak_valid",
+            "process_rss_growth_valid",
+            "process_rss_growth_within_limit",
+        )
+
+        def classification_case(
+            name: str,
+            *,
+            reason: str,
+            host: dict[str, object] = native_windows,
+            process_rss: dict[str, object] = complete_rss,
+            duration: float = WINDOWS.WINDOWS_DEFAULT_DURATION_SECONDS,
+            mode: str = "combined",
+            smoke: bool = False,
+            diagnostic_identity_override: bool = False,
+            overall_pass: bool = True,
+            exact_identity: bool = True,
+            profile: str = "release",
+            release_eligible: bool = False,
+            failed_requirements: frozenset[str] = frozenset(),
+        ) -> SimpleNamespace:
+            return SimpleNamespace(**locals())
+
+        non_release_profile_reason = (
+            "exact 3,600-second non-smoke physical-combined run"
+        )
+        host_cases: tuple[tuple[str, dict[str, object]], ...] = (
+            ("linux", {"system": "Linux", "sys_platform": "linux"}),
+            ("macos", {"system": "Darwin", "sys_platform": "darwin"}),
+            ("unknown", {"system": None, "sys_platform": None}),
+        )
+        cases: tuple[SimpleNamespace, ...] = (
+            classification_case(
+                "native-windows-release",
+                release_eligible=True,
+                reason="complete numeric process-RSS evidence remained within",
+            ),
+            *(
+                classification_case(
+                    f"{name}-host",
+                    host=host,
+                    profile="diagnostic",
+                    failed_requirements=frozenset({"native_windows_host"}),
+                    reason="native Windows host identity",
+                )
+                for name, host in host_cases
+            ),
+            classification_case(
+                "missing-rss",
+                process_rss={
+                    "baseline_bytes": 64 * mib,
+                    "peak_bytes": 72 * mib,
+                },
+                failed_requirements=frozenset(
+                    {
+                        "process_rss_growth_valid",
+                        "process_rss_growth_within_limit",
+                    }
+                ),
+                reason="process-RSS evidence is unavailable",
+            ),
+            classification_case(
+                "malformed-rss",
+                process_rss={
+                    "baseline_bytes": "64 MiB",
+                    "peak_bytes": 72 * mib,
+                    "growth_bytes": 8 * mib,
+                },
+                failed_requirements=frozenset({"process_rss_baseline_valid"}),
+                reason="process-RSS evidence is invalid",
+            ),
+            classification_case(
+                "negative-rss",
+                process_rss={
+                    "baseline_bytes": -1,
+                    "peak_bytes": 72 * mib,
+                    "growth_bytes": 8 * mib,
+                },
+                failed_requirements=frozenset({"process_rss_baseline_valid"}),
+                reason="process-RSS evidence is invalid",
+            ),
+            classification_case(
+                "non-finite-rss",
+                process_rss={
+                    "baseline_bytes": 64 * mib,
+                    "peak_bytes": float("inf"),
+                    "growth_bytes": 8 * mib,
+                },
+                failed_requirements=frozenset({"process_rss_peak_valid"}),
+                reason="process-RSS evidence is invalid",
+            ),
+            classification_case(
+                "over-limit-rss",
+                process_rss={
+                    "baseline_bytes": 64 * mib,
+                    "peak_bytes": 100 * mib,
+                    "growth_bytes": WINDOWS.MAX_RSS_GROWTH_BYTES + 1,
+                },
+                failed_requirements=frozenset({"process_rss_growth_within_limit"}),
+                reason="process-RSS growth",
+            ),
+            classification_case(
+                "short-duration",
+                duration=3_599.0,
+                profile="diagnostic",
+                failed_requirements=frozenset({"exact_3600_second_duration"}),
+                reason=non_release_profile_reason,
+            ),
+            classification_case(
+                "smoke",
+                smoke=True,
+                profile="diagnostic",
+                failed_requirements=frozenset({"non_smoke"}),
+                reason=non_release_profile_reason,
+            ),
+            classification_case(
+                "synthetic",
+                mode="synthetic",
+                profile="diagnostic",
+                failed_requirements=frozenset({"physical_combined_mode"}),
+                reason=non_release_profile_reason,
+            ),
+            classification_case(
+                "identity-mismatch",
+                exact_identity=False,
+                failed_requirements=frozenset({"exact_manifest_device_identity"}),
+                reason="exact validation-manifest and device identity evidence",
+            ),
+            classification_case(
+                "overall-fail",
+                overall_pass=False,
+                failed_requirements=frozenset({"overall_pass"}),
+                reason="intentional fixture failure",
+            ),
+            classification_case(
+                "diagnostic-identity-override",
+                diagnostic_identity_override=True,
+                profile="diagnostic-identity-override",
+                failed_requirements=frozenset(
+                    {"diagnostic_identity_override_disabled"}
+                ),
+                reason="--diagnostic-identity-override was supplied",
+            ),
+        )
+
+        for case in cases:
+            with self.subTest(classification=case.name):
+                result = _attached_windows_report(
+                    WINDOWS,
+                    host=dict(case.host),
+                    process_rss=case.process_rss,
+                    duration=case.duration,
+                    mode=case.mode,
+                    smoke=case.smoke,
+                    diagnostic_identity_override=(case.diagnostic_identity_override),
+                    overall_pass=case.overall_pass,
+                    exact_identity=case.exact_identity,
+                )
+                windows = result["windows"]
+                requirements = windows["release_requirements"]
+                expected_requirements = {
+                    name: name not in case.failed_requirements
+                    for name in requirement_names
+                }
+
+                self.assertEqual(requirement_names, tuple(requirements))
+                self.assertEqual(expected_requirements, requirements)
+                self.assertEqual(case.profile, windows["profile"])
+                self.assertEqual(
+                    case.release_eligible,
+                    windows["release_eligible"],
+                )
+                self.assertEqual(
+                    all(requirements.values()),
+                    windows["release_eligible"],
+                )
+                self.assertTrue(
+                    any(
+                        case.reason in reason
+                        for reason in windows["validation_reasons"]
+                    )
+                )
+                if case.name == "native-windows-release":
+                    self.assertEqual("PASS", result["result"])
+                    self.assertEqual("physical-combined", result["mode"])
+
+    def test_release_grading_agrees_across_json_and_markdown_reports(self) -> None:
+        process_rss: dict[str, object] = {
+            "baseline_bytes": 64 * 1024**2,
+            "peak_bytes": 72 * 1024**2,
+            "growth_bytes": 8 * 1024**2,
+        }
+        cases: tuple[tuple[str, dict[str, object], str, bool], ...] = (
+            (
+                "release",
+                {"system": "Windows", "sys_platform": "win32"},
+                "release",
+                True,
+            ),
+            (
+                "diagnostic",
+                {"system": "Linux", "sys_platform": "linux"},
+                "diagnostic",
+                False,
+            ),
+        )
+        with tempfile.TemporaryDirectory(
+            prefix="windows-release-matrix-",
+            dir=ROOT,
+        ) as raw:
+            output_directory = Path(raw)
+            for name, host, expected_profile, expected_eligible in cases:
+                result = _attached_windows_report(
+                    WINDOWS,
+                    host=host,
+                    process_rss=dict(process_rss),
+                )
+                base = output_directory / name
+                json_path, markdown_path = WINDOWS.write_windows_reports(base, result)
+                json_report = json.loads(json_path.read_text(encoding="utf-8"))
+                markdown = markdown_path.read_text(encoding="utf-8")
+                embedded_report = json.loads(
+                    markdown.split("```json\n", 1)[1].split("\n```", 1)[0]
+                )
+                expected_grading = {
+                    key: result["windows"][key]
+                    for key in (
+                        "profile",
+                        "release_eligible",
+                        "release_requirements",
+                    )
+                }
+
+                with self.subTest(report=name):
+                    self.assertEqual(result, json_report)
+                    self.assertEqual(json_report, embedded_report)
+                    self.assertEqual(
+                        expected_grading,
+                        {key: json_report["windows"][key] for key in expected_grading},
+                    )
+                    self.assertEqual(
+                        expected_grading,
+                        {
+                            key: embedded_report["windows"][key]
+                            for key in expected_grading
+                        },
+                    )
+                    self.assertEqual(
+                        all(expected_grading["release_requirements"].values()),
+                        expected_grading["release_eligible"],
+                    )
+                    self.assertEqual(expected_profile, expected_grading["profile"])
+                    self.assertEqual(
+                        expected_eligible,
+                        expected_grading["release_eligible"],
+                    )
+                    self.assertIn(
+                        f"| Profile | {expected_profile} |",
+                        markdown,
+                    )
+                    self.assertIn(
+                        f"| Release eligible | {expected_eligible} |",
+                        markdown,
+                    )
+                    self.assertEqual(
+                        WINDOWS.render_windows_markdown(json_report),
+                        markdown,
+                    )
+
     def test_release_profile_requires_one_native_windows_host_snapshot(self) -> None:
         process_rss = {
             "baseline_bytes": 64 * 1024**2,
