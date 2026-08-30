@@ -597,6 +597,37 @@ if any, were discarded from its percentile window. `frame_count=` is an
 alternative deterministic bound for offline simulator checks; real acceptance
 soaks normally use `duration=`.
 
+## Identity-pinned Windows soak command
+
+The installed distribution includes `teensy-daq-soak`, an identity-pinned
+Windows COM-port validator equivalent to the standalone
+`scripts/windows_soak.py` handoff. The console script executes the generated
+implementation packaged as `teensy_daq.soak`; it does not locate or import the
+repository script. Both paths accept the same operational arguments and write
+the same complete JSON plus structured-Markdown report schema:
+
+```powershell
+teensy-daq-soak --duration 3600 --mode combined `
+  --output teensy-daq-windows-soak
+
+teensy-daq-soak --smoke --mode synthetic `
+  --hardware-serial 20512460 --output teensy-daq-smoke
+```
+
+Use the bounded offline self-check to verify command encoding, fragmented frame
+parsing, formula validation, rate/latency metrics, and deterministic fixture
+grading without opening a COM port:
+
+```powershell
+teensy-daq-soak --conformance-check
+```
+
+Repository validation additionally runs
+`firmware/tools/check_soak_conformance.py` to compare the installed and
+standalone implementations byte-for-byte outside role metadata and against the
+golden protocol fixtures. See [[soak-harness]] and
+[[Phase-11-Soak-Evidence]] for the accepted identity and claim boundaries.
+
 ## Metadata-first device discovery
 
 Discovery never opens unrelated serial ports. `enumerate_candidates()` uses

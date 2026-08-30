@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate deterministic standalone rig and Windows soak programs."""
+"""Generate deterministic rig and standalone/installed Windows soak programs."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ WINDOWS_DRIVER_PATH = REPOSITORY_ROOT / "firmware/soak/windows_driver.inc"
 CANDIDATE_PATH = REPOSITORY_ROOT / "firmware/soak/candidate.json"
 OUTPUT_DIRECTORY = REPOSITORY_ROOT / "firmware/tests/generated"
 WINDOWS_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/scripts/windows_soak.py"
+PACKAGE_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/src/teensy_daq/soak.py"
 OUTPUTS = {
     "synthetic": "rig_soak_synthetic.py",
     "physical-combined": "rig_soak_physical_combined.py",
@@ -195,8 +196,13 @@ def render_windows_program(
     validator_source: str,
     driver_source: str,
     candidate: Mapping[str, Any],
+    *,
+    entry_point: str = "windows-standalone",
 ) -> str:
-    """Render the pinned one-hour Windows handoff from the canonical core."""
+    """Render one pinned Windows entry path from the canonical core."""
+
+    if entry_point not in {"windows-standalone", "installed-package"}:
+        raise GenerationError(f"unsupported Windows entry point {entry_point!r}")
 
     if len(CONFIG_BLOCK.findall(validator_source)) != 1:
         raise GenerationError(
@@ -224,7 +230,7 @@ def render_windows_program(
     driver_sha = sha256_bytes(driver_source.encode("utf-8"))
     config = {
         "mode": "physical-combined",
-        "entry_point": "windows-standalone",
+        "entry_point": entry_point,
         "generator_schema_version": 1,
         "candidate": windows_candidate,
         "candidate_sha256": candidate_sha,
@@ -357,6 +363,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="checked standalone Windows script output path",
     )
     parser.add_argument(
+        "--package-output",
+        type=Path,
+        default=PACKAGE_OUTPUT_PATH,
+        help="checked installed-package soak implementation output path",
+    )
+    parser.add_argument(
         "--build-manifest",
         type=Path,
         help="refresh candidate build/source fields from this manifest",
@@ -407,6 +419,12 @@ def main(argv: list[str] | None = None) -> int:
             driver_source,
             candidate,
         )
+        package_rendered = render_windows_program(
+            validator_source,
+            driver_source,
+            candidate,
+            entry_point="installed-package",
+        )
         changed = write_or_check(
             rendered,
             args.output_directory,
@@ -416,6 +434,13 @@ def main(argv: list[str] | None = None) -> int:
             write_path_or_check(
                 args.windows_output,
                 windows_rendered,
+                check=args.check,
+            )
+        )
+        changed.extend(
+            write_path_or_check(
+                args.package_output,
+                package_rendered,
                 check=args.check,
             )
         )
@@ -433,7 +458,9 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "action": action,
                 "candidate_sha256": sha256_bytes(canonical_json_bytes(candidate)),
-                "outputs": sorted([*rendered, str(args.windows_output)]),
+                "outputs": sorted(
+                    [*rendered, str(args.windows_output), str(args.package_output)]
+                ),
                 "updated": changed,
             },
             sort_keys=True,

@@ -89,11 +89,12 @@ class PackageConfigurationTests(unittest.TestCase):
         )
         self.assertFalse(any(item.startswith("twine") for item in extras["dev"]))
 
-    def test_control_and_demo_console_entry_points_are_installed(self) -> None:
+    def test_control_demo_and_soak_console_entry_points_are_installed(self) -> None:
         scripts = self.pyproject["project"]["scripts"]
 
         self.assertEqual("teensy_daq.cli:main", scripts["teensy-daq"])
         self.assertEqual("teensy_daq.demo:main", scripts["teensy-daq-demo"])
+        self.assertEqual("teensy_daq.soak:main", scripts["teensy-daq-soak"])
 
     def test_runtime_package_data_is_an_explicit_typed_only_allowlist(self) -> None:
         setuptools = self.pyproject["tool"]["setuptools"]

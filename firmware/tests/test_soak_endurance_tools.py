@@ -28,6 +28,7 @@ from firmware.tests.test_rig_combined_capture import (
     _ready_metadata,
 )
 from firmware.tools import aggregate_soak_results as aggregator
+from firmware.tools import check_soak_conformance as conformance
 from firmware.tools import generate_soak_programs as generator
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -899,10 +900,24 @@ class SoakGeneratorTests(unittest.TestCase):
         first_windows = generator.render_windows_program(source, driver, candidate)
         second_windows = generator.render_windows_program(source, driver, candidate)
         self.assertEqual(first_windows, second_windows)
+        first_package = generator.render_windows_program(
+            source,
+            driver,
+            candidate,
+            entry_point="installed-package",
+        )
+        second_package = generator.render_windows_program(
+            source,
+            driver,
+            candidate,
+            entry_point="installed-package",
+        )
+        self.assertEqual(first_package, second_package)
 
         with tempfile.TemporaryDirectory(prefix="soak-generation-", dir=ROOT) as raw:
             output_directory = Path(raw)
             windows_output = output_directory / "windows_soak.py"
+            package_output = output_directory / "package_soak.py"
             generated_output = io.StringIO()
             with redirect_stdout(generated_output):
                 generated_exit = generator.main(
@@ -913,6 +928,8 @@ class SoakGeneratorTests(unittest.TestCase):
                         str(output_directory),
                         "--windows-output",
                         str(windows_output),
+                        "--package-output",
+                        str(package_output),
                     ]
                 )
             digests_before = {
@@ -930,6 +947,8 @@ class SoakGeneratorTests(unittest.TestCase):
                         str(output_directory),
                         "--windows-output",
                         str(windows_output),
+                        "--package-output",
+                        str(package_output),
                     ]
                 )
             digests_after = {
@@ -940,7 +959,38 @@ class SoakGeneratorTests(unittest.TestCase):
         self.assertEqual(0, generated_exit, generated_output.getvalue())
         self.assertEqual(0, checked_exit, checked_output.getvalue())
         self.assertEqual(digests_before, digests_after)
-        self.assertEqual(4, len(digests_before))
+        self.assertEqual(5, len(digests_before))
+
+    def test_standalone_and_installed_entry_paths_pass_conformance_gate(self) -> None:
+        result = conformance.check_conformance()
+
+        self.assertEqual("PASS", result["result"])
+        self.assertEqual(
+            ["windows-standalone", "installed-package"],
+            result["entry_points"],
+        )
+        checks = result["checks"]
+        self.assertIsInstance(checks, dict)
+        assert isinstance(checks, dict)
+        self.assertTrue(all(checks.values()))
+        self.assertEqual(
+            {
+                "valid": {"result": "PASS", "failure_category": None},
+                "checksum_corruption": {
+                    "result": "FAIL",
+                    "failure_category": "checksum_corruption",
+                },
+                "pattern_error": {
+                    "result": "FAIL",
+                    "failure_category": "pattern_error",
+                },
+                "source_gap": {
+                    "result": "FAIL",
+                    "failure_category": "source_gap",
+                },
+            },
+            result["grades"],
+        )
 
     def test_each_generated_program_imports_in_isolation_without_numpy(self) -> None:
         for mode, filename in generator.OUTPUTS.items():
@@ -994,6 +1044,18 @@ class SoakGeneratorTests(unittest.TestCase):
         self.assertEqual(
             "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
             settings.artifact_sha256,
+        )
+
+        installed = _load_module(
+            generator.PACKAGE_OUTPUT_PATH,
+            "generated_installed_soak_contract",
+        )
+        installed_settings = installed.load_settings()
+        self.assertEqual("installed-package", installed.GENERATED_CONFIG["entry_point"])
+        self.assertEqual(vars(settings), vars(installed_settings))
+        self.assertEqual(
+            windows.soak_conformance_vector(),
+            installed.soak_conformance_vector(),
         )
 
     def test_windows_metadata_filter_and_failure_reports_are_structured(self) -> None:

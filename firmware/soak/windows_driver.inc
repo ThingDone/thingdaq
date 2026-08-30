@@ -21,6 +21,8 @@ TEENSY_USB_SERIAL_VID = 0x16C0
 TEENSY_USB_SERIAL_PID = 0x0483
 TEENSY_DAQ_PRODUCT = "Teensy DAQ"
 WINDOWS_PORT_PATTERN = re.compile(r"(?i)^COM([1-9][0-9]*)$")
+SOAK_CONFORMANCE_SCHEMA_VERSION = 1
+SOAK_CONFORMANCE_PREFIX = "SOAK_CONFORMANCE "
 
 
 @dataclass(frozen=True)
@@ -537,6 +539,227 @@ def windows_runtime_settings(mode: str, duration: float) -> RuntimeSettings:
     return load_settings(config)
 
 
+class _ConformanceClock:
+    """Deterministic clock used only by the bounded entry-point self-check."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def perf_counter(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def _conformance_payload(kind: int, first_sample_ticks: int) -> bytes:
+    if kind == ADC_DATA:
+        start_pair = first_sample_ticks // ADC_PAIR_PERIOD_TICKS
+        offset = (start_pair * ADC_BYTES_PER_PAIR) % len(ADC_PATTERN)
+        return ADC_PATTERN_DOUBLE[offset : offset + DATA_PAYLOAD_BYTES]
+    start_sample = first_sample_ticks // GPIO_SAMPLE_PERIOD_TICKS
+    offset = start_sample & 0xFF
+    return GPIO_PATTERN_EXPANDED[offset : offset + DATA_PAYLOAD_BYTES]
+
+
+def _conformance_data_frame(
+    kind: int,
+    *,
+    sequence: int = 0,
+    gap_before: bool = False,
+    corrupt_checksum: bool = False,
+    corrupt_pattern: bool = False,
+) -> bytes:
+    first_sample_ticks = sequence * FRAME_COVERAGE_TICKS
+    flags = FLAG_SYNTHETIC
+    if sequence == 0:
+        flags |= FLAG_EPOCH_START
+    if gap_before:
+        flags |= FLAG_GAP_BEFORE | FLAG_OVERRUN_BEFORE
+    payload = bytearray(_conformance_payload(kind, first_sample_ticks))
+    if corrupt_pattern:
+        payload[17] ^= 0x01
+    item_count = ADC_PAIRS_PER_FRAME if kind == ADC_DATA else GPIO_SAMPLES_PER_FRAME
+    header = HEADER.pack(
+        MAGIC,
+        PROTOCOL_VERSION,
+        kind,
+        flags,
+        HEADER_SIZE,
+        CHECKSUM_ADLER32,
+        0,
+        DATA_FRAME_BYTES,
+        DATA_PAYLOAD_BYTES,
+        7,
+        sequence,
+        0,
+        first_sample_ticks,
+        item_count,
+    )
+    body = header + payload
+    wire = bytearray(body + TRAILER.pack(adler32(body)))
+    if corrupt_checksum:
+        wire[HEADER_SIZE + 29] ^= 0x80
+    return bytes(wire)
+
+
+def _conformance_grade(transcript: bytes) -> dict[str, object]:
+    parser = FrameParser(maximum_input_bytes=DATA_FRAME_BYTES)
+    clock = _ConformanceClock()
+    validator = StreamValidator(
+        7,
+        SOURCE_SYNTHETIC,
+        CHECKSUM_ADLER32,
+        clock,
+    )
+    pattern = (1, 7, 31, 257, DATA_FRAME_BYTES, 17)
+    offset = 0
+    chunk_index = 0
+    try:
+        while offset < len(transcript):
+            chunk_bytes = pattern[chunk_index % len(pattern)]
+            chunk_index += 1
+            chunk = transcript[offset : offset + chunk_bytes]
+            offset += len(chunk)
+            before_errors = parser.errors
+            frames = parser.feed(chunk)
+            if parser.errors != before_errors:
+                category = "checksum_corruption" if parser.checksum_errors else "parser"
+                raise SoakFailure(
+                    category,
+                    "fixture transcript contains rejected wire bytes",
+                )
+            for frame in frames:
+                validator.accept(frame)
+        require(not parser.buffer, "parser", "fixture transcript ended mid-frame")
+        require(
+            validator.adc.frames == 1 and validator.gpio.frames == 1,
+            "source_gap",
+            "fixture transcript did not contain one frame from each stream",
+        )
+        elapsed_seconds = FRAME_COVERAGE_TICKS / TIMESTAMP_HZ
+        metrics = {
+            "elapsed_seconds": elapsed_seconds,
+            "adc_pair_rate_hz": validator.adc.items / elapsed_seconds,
+            "gpio_sample_rate_hz": validator.gpio.items / elapsed_seconds,
+            "payload_bytes_per_second": (
+                validator.adc.payload_bytes + validator.gpio.payload_bytes
+            )
+            / elapsed_seconds,
+            "framed_bytes_per_second": (
+                validator.adc.framed_bytes + validator.gpio.framed_bytes
+            )
+            / elapsed_seconds,
+        }
+        for name, target in (
+            ("adc_pair_rate_hz", ADC_PAIR_RATE_HZ),
+            ("gpio_sample_rate_hz", GPIO_SAMPLE_RATE_HZ),
+            (
+                "payload_bytes_per_second",
+                TARGET_COMBINED_PAYLOAD_BYTES_PER_SECOND,
+            ),
+        ):
+            value = metrics[name]
+            require(
+                abs(value - target) / target <= RATE_TOLERANCE_FRACTION,
+                "rate",
+                f"fixture {name} is outside the accepted tolerance",
+            )
+        return {
+            "result": "PASS",
+            "failure_category": None,
+            "parser": {
+                "bytes_received": parser.bytes_received,
+                "frames_decoded": parser.frames_decoded,
+                "bytes_discarded": parser.bytes_discarded,
+                "errors": parser.errors,
+                "buffered_bytes": len(parser.buffer),
+                "high_water_bytes": parser.high_water_bytes,
+            },
+            "frames": {
+                "adc": validator.adc.frames,
+                "gpio": validator.gpio.frames,
+                "maximum_skew": validator.maximum_frame_skew,
+            },
+            "metrics": metrics,
+        }
+    except SoakFailure as error:
+        return {
+            "result": "FAIL",
+            "failure_category": error.category,
+            "parser": {
+                "bytes_received": parser.bytes_received,
+                "frames_decoded": parser.frames_decoded,
+                "bytes_discarded": parser.bytes_discarded,
+                "errors": parser.errors,
+                "buffered_bytes": len(parser.buffer),
+                "high_water_bytes": parser.high_water_bytes,
+            },
+        }
+
+
+def soak_conformance_vector() -> dict[str, object]:
+    """Return deterministic command, frame, metric, and grading evidence."""
+
+    configuration = CONFIGURATION.pack(
+        STREAM_BOTH,
+        SOURCE_SYNTHETIC,
+        CHECKSUM_ADLER32,
+        0,
+        DATA_FRAME_BYTES,
+    )
+    command_inputs = (
+        (INFO_REQUEST, 1, b""),
+        (CONFIGURE_REQUEST, 2, configuration),
+        (START_REQUEST, 3, b""),
+        (GET_STATUS_REQUEST, 4, b""),
+        (STOP_REQUEST, 5, b""),
+        (RESET_STATS_REQUEST, 6, b""),
+    )
+    commands = [
+        {
+            "kind": kind,
+            "request_id": request_id,
+            "size_bytes": len(wire),
+            "sha256": hashlib.sha256(wire).hexdigest(),
+        }
+        for kind, request_id, payload in command_inputs
+        for wire in (encode_request(kind, request_id, payload),)
+    ]
+    adc = _conformance_data_frame(ADC_DATA)
+    gpio = _conformance_data_frame(GPIO_DATA)
+    valid = adc + gpio
+    latency = BoundedLatency()
+    for sample in (0.001, 0.010, 0.050, 0.095, 0.099):
+        latency.add(sample)
+    grades = {
+        "valid": _conformance_grade(valid),
+        "checksum_corruption": _conformance_grade(
+            _conformance_data_frame(ADC_DATA, corrupt_checksum=True) + gpio
+        ),
+        "pattern_error": _conformance_grade(
+            _conformance_data_frame(ADC_DATA, corrupt_pattern=True) + gpio
+        ),
+        "source_gap": _conformance_grade(
+            adc + _conformance_data_frame(GPIO_DATA, sequence=2, gap_before=True)
+        ),
+    }
+    return {
+        "schema_version": SOAK_CONFORMANCE_SCHEMA_VERSION,
+        "commands": commands,
+        "frames": {
+            "transcript_bytes": len(valid),
+            "transcript_sha256": hashlib.sha256(valid).hexdigest(),
+            "chunk_pattern": [1, 7, 31, 257, DATA_FRAME_BYTES, 17],
+        },
+        "latency": latency.summary(),
+        "grades": grades,
+    }
+
+
 def _positive_duration(value: str) -> float:
     try:
         duration = float(value)
@@ -573,10 +796,21 @@ def _hardware_serial(value: str) -> int:
 
 
 def build_windows_parser() -> argparse.ArgumentParser:
+    implementation = (
+        "Installed-package"
+        if GENERATED_CONFIG.get("entry_point") == "installed-package"
+        else "Standalone"
+    )
     parser = argparse.ArgumentParser(
         description=(
-            "Standalone, release-identity-pinned Teensy DAQ Windows soak validator"
+            f"{implementation}, release-identity-pinned Teensy DAQ Windows soak "
+            "validator"
         )
+    )
+    parser.add_argument(
+        "--conformance-check",
+        action="store_true",
+        help="run the bounded deterministic protocol/validator self-check and exit",
     )
     parser.add_argument(
         "--mode",
@@ -1040,6 +1274,16 @@ def _windows_emit_event(name: str, **fields: object) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = build_windows_parser().parse_args(argv)
+    if arguments.conformance_check:
+        print(
+            SOAK_CONFORMANCE_PREFIX
+            + json.dumps(
+                soak_conformance_vector(),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
     duration = (
         WINDOWS_SMOKE_DURATION_SECONDS if arguments.smoke else float(arguments.duration)
     )

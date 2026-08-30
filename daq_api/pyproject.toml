@@ -31,6 +31,7 @@ classifiers = [
 [project.scripts]
 teensy-daq = "teensy_daq.cli:main"
 teensy-daq-demo = "teensy_daq.demo:main"
+teensy-daq-soak = "teensy_daq.soak:main"
 
 [project.optional-dependencies]
 numpy = [

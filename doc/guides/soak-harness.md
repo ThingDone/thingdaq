@@ -16,20 +16,23 @@ related:
 
 # Autonomous soak harness
 
-Phase 11 and the Windows handoff use one canonical validator and generated
-standalone programs. Edit `firmware/soak/validator.py` or
+Phase 11 and both Windows entry paths use one canonical validator and generated
+implementations. Edit `firmware/soak/validator.py` or
 `firmware/soak/windows_driver.inc`, never a generated program directly. The
 generated files contain the complete protocol implementation because neither
 the remote container nor the standalone Windows handoff requires a repository
 checkout or installed package; both need only the standard library and
-PySerial. Remote programs obtain their sole device endpoint from `SERIAL_PORT`,
-while the Windows script performs metadata-first, identity-pinned COM discovery.
+PySerial. The installed command executes its generated implementation inside
+the `teensy_daq` package rather than importing the standalone script. Remote
+programs obtain their sole device endpoint from `SERIAL_PORT`, while both
+Windows paths perform metadata-first, identity-pinned COM discovery.
 
 ## Candidate and generation
 
 `firmware/soak/candidate.json` pins the expected firmware, protocol, board,
 artifact, duration, and deadline identity. Regenerate all three Phase 11 rig
-programs plus `daq_api/scripts/windows_soak.py` with:
+programs, `daq_api/scripts/windows_soak.py`, and
+`daq_api/src/teensy_daq/soak.py` with:
 
 ```bash
 .venv/bin/python firmware/tools/generate_soak_programs.py
@@ -75,6 +78,25 @@ handoff at the path shown below:
 | Physical combined | `rig_soak_physical_combined.py` | One 600-second combined hardware epoch after warm-up |
 | Control stress | `rig_soak_control_stress.py` | A 600-second campaign of alternating bounded hardware/synthetic epochs and periodic CDC reopens |
 | Windows handoff | `daq_api/scripts/windows_soak.py` | One identity-pinned 3600-second physical-combined epoch by default, with shorter diagnostic and synthetic options |
+| Installed Windows handoff | `teensy-daq-soak` → `teensy_daq.soak:main` | The same options and report schema, executed from the installed package implementation |
+
+The two Windows paths differ only in role-specific generated metadata. Prove
+their shared command bytes against protocol fixtures and exercise identical
+fragmented success/corruption/pattern/gap transcripts through both parsers,
+validators, metric calculations, and graders with:
+
+```bash
+.venv/bin/python firmware/tools/check_soak_conformance.py --pretty
+py daq_api\scripts\windows_soak.py --conformance-check
+teensy-daq-soak --conformance-check
+```
+
+The repository gate fails if implementation bytes outside the generated
+metadata differ, either path disagrees with the golden request/data frames, or
+their deterministic metrics and PASS/FAIL categories differ. A normal installed
+run accepts the same `--mode`, `--duration`/`--smoke`, `--hardware-serial`,
+`--port`, `--output`, `--discovery-timeout`, and `--open-timeout` options as the
+standalone path and writes the same JSON/structured-Markdown report schema.
 
 Each Phase 11 rig program has a 780-second internal deadline and records the
 service's 900-second container limit, leaving 120 seconds for bounded STOP,

@@ -120,6 +120,8 @@ reproducibility gate are in the
 [Phase 11 soak evidence](doc/results/phase-11-soak-evidence.md) and the
 [cross-phase evidence index](doc/results/evidence-index.md). A later Windows
 run is additive evidence and is not a prerequisite for that autonomous PASS.
+The identity-pinned standalone and installed `teensy-daq-soak` entry paths are
+documented in the [soak harness guide](doc/guides/soak-harness.md).
 
 Those runs used unstimulated A0/A1 and no declared external digital stimulus.
 They do not establish analog accuracy, analog bandwidth, true aperture timing,

@@ -78,7 +78,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
     }
   },
   "candidate_sha256": "32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656",
-  "entry_point": "windows-standalone",
+  "entry_point": "installed-package",
   "generator_schema_version": 1,
   "mode": "physical-combined",
   "validator_sha256": "3e337210fa70da2361e85981fd833d05d7b99266f9d89adfc40c9e4aaade0d21",

@@ -243,6 +243,7 @@ class DistributionArtifactTests(unittest.TestCase):
             {
                 "teensy-daq": "teensy_daq.cli:main",
                 "teensy-daq-demo": "teensy_daq.demo:main",
+                "teensy-daq-soak": "teensy_daq.soak:main",
             },
             dict(parser["console_scripts"]),
         )
@@ -269,6 +270,13 @@ class DistributionArtifactTests(unittest.TestCase):
                     "'--parser-chunk-size','31']))"
                 ),
                 "PASS      validated 1 ADC + 1 GPIO frames",
+            ),
+            (
+                (
+                    "from teensy_daq.soak import main; "
+                    "raise SystemExit(main(['--conformance-check']))"
+                ),
+                'SOAK_CONFORMANCE {"commands":',
             ),
         )
         wheel_import_guard = (
