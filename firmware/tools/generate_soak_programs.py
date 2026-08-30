@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate deterministic standalone Phase 11 rig soak programs."""
+"""Generate deterministic standalone rig and Windows soak programs."""
 
 from __future__ import annotations
 
@@ -15,8 +15,10 @@ from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 VALIDATOR_PATH = REPOSITORY_ROOT / "firmware/soak/validator.py"
+WINDOWS_DRIVER_PATH = REPOSITORY_ROOT / "firmware/soak/windows_driver.inc"
 CANDIDATE_PATH = REPOSITORY_ROOT / "firmware/soak/candidate.json"
 OUTPUT_DIRECTORY = REPOSITORY_ROOT / "firmware/tests/generated"
+WINDOWS_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/scripts/windows_soak.py"
 OUTPUTS = {
     "synthetic": "rig_soak_synthetic.py",
     "physical-combined": "rig_soak_physical_combined.py",
@@ -24,6 +26,10 @@ OUTPUTS = {
 }
 CONFIG_BLOCK = re.compile(
     r"^# <soak-generated-config>\n.*?^# </soak-generated-config>$",
+    re.MULTILINE | re.DOTALL,
+)
+CLI_BLOCK = re.compile(
+    r"^# <soak-cli>\n.*?^# </soak-cli>$",
     re.MULTILINE | re.DOTALL,
 )
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -185,6 +191,65 @@ def render_programs(
     return rendered
 
 
+def render_windows_program(
+    validator_source: str,
+    driver_source: str,
+    candidate: Mapping[str, Any],
+) -> str:
+    """Render the pinned one-hour Windows handoff from the canonical core."""
+
+    if len(CONFIG_BLOCK.findall(validator_source)) != 1:
+        raise GenerationError(
+            "canonical validator must contain exactly one generated-config block"
+        )
+    if len(CLI_BLOCK.findall(validator_source)) != 1:
+        raise GenerationError("canonical validator must contain one soak CLI block")
+    if len(CLI_BLOCK.findall(driver_source)) != 1:
+        raise GenerationError("Windows driver must contain one soak CLI block")
+
+    windows_candidate = json.loads(json.dumps(candidate))
+    soak = require_mapping(windows_candidate, "soak")
+    soak.update(
+        {
+            "measured_duration_seconds": 3_600.0,
+            "status_interval_seconds": 1.0,
+            "info_interval_seconds": 30.0,
+            "hard_deadline_seconds": 3_691.0,
+            "service_container_limit_seconds": 3_721.0,
+        }
+    )
+    candidate_sha = sha256_bytes(canonical_json_bytes(candidate))
+    windows_profile_sha = sha256_bytes(canonical_json_bytes(windows_candidate))
+    validator_sha = sha256_bytes(validator_source.encode("utf-8"))
+    driver_sha = sha256_bytes(driver_source.encode("utf-8"))
+    config = {
+        "mode": "physical-combined",
+        "entry_point": "windows-standalone",
+        "generator_schema_version": 1,
+        "candidate": windows_candidate,
+        "candidate_sha256": candidate_sha,
+        "validator_sha256": validator_sha,
+        "windows_driver_sha256": driver_sha,
+        "windows_profile_sha256": windows_profile_sha,
+    }
+    encoded = json.dumps(config, indent=2, sort_keys=True)
+    config_block = (
+        "# <soak-generated-config>\n"
+        "GENERATED_CONFIG: dict[str, object] = json.loads(\n"
+        '    r"""\n'
+        f"{encoded}\n"
+        '"""\n'
+        ")\n"
+        "# </soak-generated-config>"
+    )
+    rendered = CONFIG_BLOCK.sub(lambda _match: config_block, validator_source, count=1)
+    return CLI_BLOCK.sub(
+        lambda _match: driver_source.rstrip("\n"),
+        rendered,
+        count=1,
+    )
+
+
 def _manifest_artifact(
     manifest: Mapping[str, Any],
     artifact_name: str,
@@ -265,11 +330,32 @@ def write_or_check(
     return changed
 
 
+def write_path_or_check(path: Path, expected: str, *, check: bool) -> list[str]:
+    actual = path.read_text(encoding="utf-8") if path.is_file() else None
+    if actual == expected:
+        return []
+    try:
+        display = path.relative_to(REPOSITORY_ROOT).as_posix()
+    except ValueError:
+        display = str(path)
+    if not check:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(expected, encoding="utf-8")
+        path.chmod(0o755)
+    return [display]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail on output drift")
     parser.add_argument("--candidate", type=Path, default=CANDIDATE_PATH)
     parser.add_argument("--output-directory", type=Path, default=OUTPUT_DIRECTORY)
+    parser.add_argument(
+        "--windows-output",
+        type=Path,
+        default=WINDOWS_OUTPUT_PATH,
+        help="checked standalone Windows script output path",
+    )
     parser.add_argument(
         "--build-manifest",
         type=Path,
@@ -314,11 +400,24 @@ def main(argv: list[str] | None = None) -> int:
                 write_candidate(args.candidate, candidate)
         validate_candidate(candidate)
         validator_source = VALIDATOR_PATH.read_text(encoding="utf-8")
+        driver_source = WINDOWS_DRIVER_PATH.read_text(encoding="utf-8")
         rendered = render_programs(validator_source, candidate)
+        windows_rendered = render_windows_program(
+            validator_source,
+            driver_source,
+            candidate,
+        )
         changed = write_or_check(
             rendered,
             args.output_directory,
             check=args.check,
+        )
+        changed.extend(
+            write_path_or_check(
+                args.windows_output,
+                windows_rendered,
+                check=args.check,
+            )
         )
     except (GenerationError, OSError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
@@ -334,7 +433,7 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "action": action,
                 "candidate_sha256": sha256_bytes(canonical_json_bytes(candidate)),
-                "outputs": sorted(rendered),
+                "outputs": sorted([*rendered, str(args.windows_output)]),
                 "updated": changed,
             },
             sort_keys=True,

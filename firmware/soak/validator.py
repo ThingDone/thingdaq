@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Canonical, dependency-bounded Teensy DAQ endurance validator.
 
-``firmware/tools/generate_soak_programs.py`` replaces only the marked
-configuration block and writes three standalone rig programs.  Keep all wire,
-validation, deadline, cleanup, and result-schema logic in this file so a
-protocol repair cannot drift between soak modes.
+``firmware/tools/generate_soak_programs.py`` replaces only marked blocks and
+writes three standalone rig programs plus the checked Windows handoff script.
+Keep all wire, validation, deadline, cleanup, and result-schema logic in this
+file so a protocol repair cannot drift between entry points or soak modes.
 
-The generated programs run in the remote service's network-disabled Python
-3.13 container and intentionally import only the standard library and
-PySerial.  They read the serial endpoint exclusively from ``SERIAL_PORT``.
+Every generated program intentionally imports only the standard library and
+PySerial.  Remote-service programs read ``SERIAL_PORT``; the Windows handoff
+uses bounded metadata-first COM discovery supplied by its generated driver.
 """
 
 from __future__ import annotations
@@ -3439,9 +3439,23 @@ class SoakRunner:
                 )
                 previous_status = status
                 status_rollup.observe(status)
-                self.memory.sample_streaming(
-                    checkpoint=status_rollup.count % checkpoint_interval == 0
-                )
+                checkpoint = status_rollup.count % checkpoint_interval == 0
+                self.memory.sample_streaming(checkpoint=checkpoint)
+                if checkpoint:
+                    emit_event(
+                        "status_checkpoint",
+                        epoch=index,
+                        elapsed_seconds=(
+                            max(0.0, self.clock.monotonic() - timed_started_at)
+                            if timed_started_at is not None
+                            else 0.0
+                        ),
+                        planned_seconds=measured_seconds,
+                        adc_frames=validator.adc.frames,
+                        gpio_frames=validator.gpio.frames,
+                        status_count=status_rollup.count,
+                        parser_errors=link.parser.errors,
+                    )
                 next_status_at += self.settings.status_interval_seconds
                 while next_status_at <= self.clock.monotonic():
                     next_status_at += self.settings.status_interval_seconds
@@ -3866,18 +3880,25 @@ class SoakRunner:
     def attempt_cleanup(self) -> None:
         self.cleanup = {"attempted": True}
         link = self.link
-        if link is None or self.clock.monotonic() >= self.hard_deadline:
+        if link is None:
             self.cleanup["stop"] = "unavailable"
+            return
+        cleanup_deadline = min(
+            self.script_started_at + self.settings.service_container_limit_seconds,
+            self.clock.monotonic() + 2.0,
+        )
+        if self.clock.monotonic() >= cleanup_deadline:
+            self.cleanup["stop"] = "unavailable: total deadline expired"
             return
         try:
             frame, latency = link.exchange(
                 GET_STATUS_REQUEST,
                 timeout=min(
                     COMMAND_DEADLINE_SECONDS,
-                    max(0.01, self.hard_deadline - self.clock.monotonic()),
+                    max(0.01, cleanup_deadline - self.clock.monotonic()),
                 ),
                 on_data=lambda _frame: None,
-                hard_deadline=self.hard_deadline,
+                hard_deadline=cleanup_deadline,
             )
             status = decode_status(frame)
             self.cleanup["pre_stop_status"] = {
@@ -3896,7 +3917,7 @@ class SoakRunner:
             }
         except Exception as error:  # noqa: BLE001 - best-effort remote evidence
             self.cleanup["pre_stop_status"] = f"{type(error).__name__}: {error}"
-        if self.clock.monotonic() >= self.hard_deadline:
+        if self.clock.monotonic() >= cleanup_deadline:
             self.cleanup["stop"] = "unavailable"
             return
         try:
@@ -3904,10 +3925,10 @@ class SoakRunner:
                 STOP_REQUEST,
                 timeout=min(
                     COMMAND_DEADLINE_SECONDS,
-                    max(0.01, self.hard_deadline - self.clock.monotonic()),
+                    max(0.01, cleanup_deadline - self.clock.monotonic()),
                 ),
                 on_data=lambda _frame: None,
-                hard_deadline=self.hard_deadline,
+                hard_deadline=cleanup_deadline,
             )
             self.cleanup["stop"] = {
                 "response_flags": frame.flags,
@@ -3916,17 +3937,17 @@ class SoakRunner:
             }
         except Exception as error:  # noqa: BLE001 - best-effort remote evidence
             self.cleanup["stop"] = f"{type(error).__name__}: {error}"
-        if self.clock.monotonic() >= self.hard_deadline:
+        if self.clock.monotonic() >= cleanup_deadline:
             return
         try:
             frame, latency = link.exchange(
                 GET_STATUS_REQUEST,
                 timeout=min(
                     COMMAND_DEADLINE_SECONDS,
-                    max(0.01, self.hard_deadline - self.clock.monotonic()),
+                    max(0.01, cleanup_deadline - self.clock.monotonic()),
                 ),
                 on_data=lambda _frame: None,
-                hard_deadline=self.hard_deadline,
+                hard_deadline=cleanup_deadline,
             )
             status = decode_status(frame)
             self.cleanup["final_status"] = {
@@ -4081,6 +4102,7 @@ def run_generated(
         runner.close()
 
 
+# <soak-cli>
 def main() -> int:
     try:
         settings = load_settings()
@@ -4147,3 +4169,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+# </soak-cli>

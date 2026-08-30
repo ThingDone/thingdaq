@@ -11,21 +11,25 @@ related:
   - '[[Protocol-V1]]'
   - '[[Phase-09-Loss-Recovery]]'
   - '[[Phase-10-Package-Workflows]]'
+  - '[[Phase-11-Soak-Evidence]]'
 ---
 
 # Autonomous soak harness
 
-Phase 11 uses one canonical validator and generated standalone programs. Edit
-`firmware/soak/validator.py`, never one of the generated programs directly.
-The generated files contain the complete protocol implementation because the
-remote container has no repository checkout, no network, and only Python 3.13,
-the standard library, and PySerial. They obtain their sole device endpoint from
-`SERIAL_PORT`.
+Phase 11 and the Windows handoff use one canonical validator and generated
+standalone programs. Edit `firmware/soak/validator.py` or
+`firmware/soak/windows_driver.inc`, never a generated program directly. The
+generated files contain the complete protocol implementation because neither
+the remote container nor the standalone Windows handoff requires a repository
+checkout or installed package; both need only the standard library and
+PySerial. Remote programs obtain their sole device endpoint from `SERIAL_PORT`,
+while the Windows script performs metadata-first, identity-pinned COM discovery.
 
 ## Candidate and generation
 
 `firmware/soak/candidate.json` pins the expected firmware, protocol, board,
-artifact, duration, and deadline identity. Regenerate all three programs with:
+artifact, duration, and deadline identity. Regenerate all three Phase 11 rig
+programs plus `daq_api/scripts/windows_soak.py` with:
 
 ```bash
 .venv/bin/python firmware/tools/generate_soak_programs.py
@@ -61,18 +65,22 @@ recorded by that file. Every service submission must use that staged HEX and
 run `--check` immediately before preflight. The check fails closed on a
 changed, added, or removed protected file, candidate-identity drift, or staged
 artifact drift; any intentional edit therefore requires a new two-build freeze
-and restarts the consecutive-pass series. The soak generator emits these
-deterministic, executable programs under `firmware/tests/generated/`:
+and restarts the consecutive-pass series. The soak generator emits three
+deterministic rig programs under `firmware/tests/generated/` and the Windows
+handoff at the path shown below:
 
 | Mode | Generated program | Measured contract |
 | --- | --- | --- |
 | Synthetic | `rig_soak_synthetic.py` | One 600-second combined synthetic epoch after warm-up |
 | Physical combined | `rig_soak_physical_combined.py` | One 600-second combined hardware epoch after warm-up |
 | Control stress | `rig_soak_control_stress.py` | A 600-second campaign of alternating bounded hardware/synthetic epochs and periodic CDC reopens |
+| Windows handoff | `daq_api/scripts/windows_soak.py` | One identity-pinned 3600-second physical-combined epoch by default, with shorter diagnostic and synthetic options |
 
-Every program has a 780-second internal deadline and records the service's
-900-second container limit, leaving 120 seconds for bounded STOP, final STATUS,
-process teardown, and service cleanup.
+Each Phase 11 rig program has a 780-second internal deadline and records the
+service's 900-second container limit, leaving 120 seconds for bounded STOP,
+final STATUS, process teardown, and service cleanup. The Windows profile derives
+finite run and total deadlines from its selected duration and reserves bounded
+cleanup time separately.
 
 The control-stress program includes exactly one named
 `serial_read_stall_pressure` negative subcase in its first physical epoch. It

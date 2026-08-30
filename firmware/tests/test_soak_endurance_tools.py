@@ -53,6 +53,13 @@ ALLOWED_STANDALONE_IMPORTS = {
     "typing",
     "zlib",
 }
+ALLOWED_WINDOWS_IMPORTS = ALLOWED_STANDALONE_IMPORTS | {
+    "argparse",
+    "pathlib",
+    "platform",
+    "re",
+    "threading",
+}
 ACCELERATED_STREAM_STEP_SECONDS = 0.25
 ACCELERATED_ADC_PAIR_RATE_HZ = int(
     canonical_validator.ADC_PAIRS_PER_FRAME / (2 * ACCELERATED_STREAM_STEP_SECONDS)
@@ -884,13 +891,18 @@ class SoakGeneratorTests(unittest.TestCase):
     def test_generation_is_deterministic_and_check_mode_detects_no_drift(self) -> None:
         candidate = generator.load_object(generator.CANDIDATE_PATH)
         source = generator.VALIDATOR_PATH.read_text(encoding="utf-8")
+        driver = generator.WINDOWS_DRIVER_PATH.read_text(encoding="utf-8")
         first = generator.render_programs(source, candidate)
         second = generator.render_programs(source, candidate)
         self.assertEqual(first, second)
         self.assertEqual(set(generator.OUTPUTS.values()), set(first))
+        first_windows = generator.render_windows_program(source, driver, candidate)
+        second_windows = generator.render_windows_program(source, driver, candidate)
+        self.assertEqual(first_windows, second_windows)
 
         with tempfile.TemporaryDirectory(prefix="soak-generation-", dir=ROOT) as raw:
             output_directory = Path(raw)
+            windows_output = output_directory / "windows_soak.py"
             generated_output = io.StringIO()
             with redirect_stdout(generated_output):
                 generated_exit = generator.main(
@@ -899,6 +911,8 @@ class SoakGeneratorTests(unittest.TestCase):
                         str(generator.CANDIDATE_PATH),
                         "--output-directory",
                         str(output_directory),
+                        "--windows-output",
+                        str(windows_output),
                     ]
                 )
             digests_before = {
@@ -914,6 +928,8 @@ class SoakGeneratorTests(unittest.TestCase):
                         str(generator.CANDIDATE_PATH),
                         "--output-directory",
                         str(output_directory),
+                        "--windows-output",
+                        str(windows_output),
                     ]
                 )
             digests_after = {
@@ -924,7 +940,7 @@ class SoakGeneratorTests(unittest.TestCase):
         self.assertEqual(0, generated_exit, generated_output.getvalue())
         self.assertEqual(0, checked_exit, checked_output.getvalue())
         self.assertEqual(digests_before, digests_after)
-        self.assertEqual(3, len(digests_before))
+        self.assertEqual(4, len(digests_before))
 
     def test_each_generated_program_imports_in_isolation_without_numpy(self) -> None:
         for mode, filename in generator.OUTPUTS.items():
@@ -960,6 +976,99 @@ class SoakGeneratorTests(unittest.TestCase):
                     0, isolated.returncode, isolated.stdout + isolated.stderr
                 )
                 self.assertEqual(mode, isolated.stdout.strip())
+
+    def test_windows_program_is_standalone_and_pins_the_one_hour_profile(self) -> None:
+        path = generator.WINDOWS_OUTPUT_PATH
+        source = path.read_text(encoding="utf-8")
+        self.assertEqual(ALLOWED_WINDOWS_IMPORTS, _imports(source))
+        self.assertNotIn("numpy", source.lower())
+        self.assertNotIn("from teensy_daq", source)
+        self.assertNotIn("import teensy_daq", source)
+        windows = _load_module(path, "generated_windows_soak_contract")
+        settings = windows.load_settings()
+        self.assertEqual("windows-standalone", windows.GENERATED_CONFIG["entry_point"])
+        self.assertEqual("physical-combined", settings.mode)
+        self.assertEqual(3_600.0, settings.measured_duration_seconds)
+        self.assertEqual(20_512_460, settings.hardware_serial)
+        self.assertEqual("tdaq-a0dc150fd48a6e9b", settings.build_id)
+        self.assertEqual(
+            "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
+            settings.artifact_sha256,
+        )
+
+    def test_windows_metadata_filter_and_failure_reports_are_structured(self) -> None:
+        windows = _load_module(
+            generator.WINDOWS_OUTPUT_PATH,
+            "generated_windows_soak_metadata",
+        )
+
+        def metadata(
+            port: str,
+            vid: int,
+            pid: int,
+            *,
+            product: str | None,
+        ) -> object:
+            return type(
+                "PortMetadata",
+                (),
+                {
+                    "device": port,
+                    "vid": vid,
+                    "pid": pid,
+                    "serial_number": "20512460",
+                    "product": product,
+                    "manufacturer": "PJRC",
+                    "location": "1-2",
+                    "interface": "CDC",
+                    "description": product or "USB Serial",
+                },
+            )()
+
+        candidates = windows.enumerate_windows_candidates(
+            lambda: [
+                metadata("COM10", 0x16C0, 0x0483, product=None),
+                metadata("COM1", 0x16C0, 0x0483, product="Teensy DAQ"),
+                metadata("COM2", 0x1234, 0x5678, product="Unrelated"),
+                metadata("/dev/ttyACM0", 0x16C0, 0x0483, product="Teensy DAQ"),
+            ]
+        )
+        self.assertEqual(["COM1", "COM10"], [item.port for item in candidates])
+        self.assertEqual("Teensy DAQ", candidates[0].product)
+        self.assertIsNone(candidates[1].product)
+
+        settings = windows.windows_runtime_settings("combined", 10.0)
+        result = windows.windows_failure_result(
+            windows.SoakFailure("discovery", "fixture has no device"),
+            settings=settings,
+            mode="combined",
+        )
+        arguments = windows.build_windows_parser().parse_args(
+            ["--smoke", "--output", "unused"]
+        )
+        arguments.hardware_serial = settings.hardware_serial
+        windows.attach_windows_evidence(
+            result,
+            arguments=arguments,
+            duration=10.0,
+            candidates=candidates,
+            probes=(),
+            selected=None,
+            lifecycle=[],
+        )
+        with tempfile.TemporaryDirectory(prefix="windows-report-", dir=ROOT) as raw:
+            json_path, markdown_path = windows.write_windows_reports(
+                Path(raw) / "report",
+                result,
+            )
+            report = json.loads(json_path.read_text(encoding="utf-8"))
+            markdown = markdown_path.read_text(encoding="utf-8")
+        self.assertEqual("FAIL", report["result"])
+        self.assertEqual("discovery", report["failure"]["category"])
+        self.assertEqual(2, report["windows"]["com_discovery"]["candidate_count"])
+        self.assertTrue(markdown.startswith("---\ntype: report\n"))
+        self.assertIn("[[Phase-11-Soak-Evidence]]", markdown)
+        self.assertIn("## Complete machine-readable record", markdown)
 
     def test_generated_read_batches_preserve_physical_runner_cadence(self) -> None:
         expected = {

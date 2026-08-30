@@ -1,0 +1,1155 @@
+# <soak-cli>
+import argparse  # noqa: I001 - generated driver imports follow the canonical core
+import platform
+import re
+import threading
+from pathlib import Path
+
+from serial.tools import list_ports
+
+
+WINDOWS_REPORT_SCHEMA_VERSION = 1
+WINDOWS_DEFAULT_DURATION_SECONDS = 3_600.0
+WINDOWS_SMOKE_DURATION_SECONDS = 10.0
+WINDOWS_MAXIMUM_DURATION_SECONDS = 86_400.0
+WINDOWS_RUN_RESERVE_SECONDS = 90.0
+WINDOWS_CLEANUP_RESERVE_SECONDS = 30.0
+WINDOWS_DEFAULT_DISCOVERY_TIMEOUT_SECONDS = 15.0
+WINDOWS_DEFAULT_OPEN_TIMEOUT_SECONDS = 3.0
+WINDOWS_CLOSE_TIMEOUT_SECONDS = 1.0
+TEENSY_USB_SERIAL_VID = 0x16C0
+TEENSY_USB_SERIAL_PID = 0x0483
+TEENSY_DAQ_PRODUCT = "Teensy DAQ"
+WINDOWS_PORT_PATTERN = re.compile(r"(?i)^COM([1-9][0-9]*)$")
+
+
+@dataclass(frozen=True)
+class WindowsPortCandidate:
+    """One plausible Windows Teensy USB Serial endpoint."""
+
+    port: str
+    vid: int
+    pid: int
+    serial_number: str | None
+    product: str | None
+    manufacturer: str | None
+    location: str | None
+    interface: str | None
+    description: str | None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "port": self.port,
+            "vid": self.vid,
+            "pid": self.pid,
+            "vid_pid": f"{self.vid:04X}:{self.pid:04X}",
+            "serial_number": self.serial_number,
+            "product": self.product,
+            "manufacturer": self.manufacturer,
+            "location": self.location,
+            "interface": self.interface,
+            "description": self.description,
+        }
+
+
+@dataclass(frozen=True)
+class WindowsProbeResult:
+    """Bounded INFO-probe evidence for one plausible endpoint."""
+
+    candidate: WindowsPortCandidate
+    observed_identity: dict[str, object] | None
+    latency_seconds: list[float]
+    failure: dict[str, str] | None
+    close: dict[str, object]
+
+    @property
+    def passed(self) -> bool:
+        return self.failure is None and self.observed_identity is not None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "candidate": self.candidate.as_dict(),
+            "result": "PASS" if self.passed else "FAIL",
+            "observed_identity": self.observed_identity,
+            "info_latency_seconds": self.latency_seconds,
+            "failure": self.failure,
+            "close": self.close,
+        }
+
+
+def _optional_metadata(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _windows_port_number(port: str) -> int:
+    match = WINDOWS_PORT_PATTERN.fullmatch(port)
+    return int(match.group(1)) if match is not None else 0x7FFFFFFF
+
+
+def _windows_candidate_sort_key(
+    candidate: WindowsPortCandidate,
+) -> tuple[object, ...]:
+    if candidate.product == TEENSY_DAQ_PRODUCT:
+        product_rank = 0
+    elif candidate.product is None:
+        product_rank = 1
+    else:
+        product_rank = 2
+    return (
+        product_rank,
+        (candidate.serial_number or "").casefold(),
+        (candidate.location or "").casefold(),
+        _windows_port_number(candidate.port),
+        candidate.port.casefold(),
+    )
+
+
+def enumerate_windows_candidates(
+    port_enumerator: Callable[[], object] | None = None,
+) -> tuple[WindowsPortCandidate, ...]:
+    """Enumerate only matching Teensy USB Serial COM endpoints."""
+
+    enumerate_ports = port_enumerator or (
+        lambda: list_ports.comports(include_links=False)
+    )
+    candidates: list[WindowsPortCandidate] = []
+    seen: set[str] = set()
+    metadata_records = enumerate_ports()
+    if not isinstance(metadata_records, (list, tuple)):
+        raise SoakFailure("discovery", "COM enumerator did not return a sequence")
+    for metadata in metadata_records:
+        if (
+            getattr(metadata, "vid", None) != TEENSY_USB_SERIAL_VID
+            or getattr(metadata, "pid", None) != TEENSY_USB_SERIAL_PID
+        ):
+            continue
+        port = getattr(metadata, "device", None)
+        if not isinstance(port, str) or WINDOWS_PORT_PATTERN.fullmatch(port) is None:
+            continue
+        normalized = port.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        candidates.append(
+            WindowsPortCandidate(
+                port=port,
+                vid=TEENSY_USB_SERIAL_VID,
+                pid=TEENSY_USB_SERIAL_PID,
+                serial_number=_optional_metadata(
+                    getattr(metadata, "serial_number", None)
+                ),
+                product=_optional_metadata(getattr(metadata, "product", None)),
+                manufacturer=_optional_metadata(
+                    getattr(metadata, "manufacturer", None)
+                ),
+                location=_optional_metadata(getattr(metadata, "location", None)),
+                interface=_optional_metadata(getattr(metadata, "interface", None)),
+                description=_optional_metadata(getattr(metadata, "description", None)),
+            )
+        )
+    candidates.sort(key=_windows_candidate_sort_key)
+    return tuple(candidates)
+
+
+class _SerialOpenAttempt:
+    def __init__(self) -> None:
+        self.done = threading.Event()
+        self.lock = threading.Lock()
+        self.cancelled = False
+        self.port: SerialPort | None = None
+        self.error: BaseException | None = None
+
+
+def _close_raw_serial(port: SerialPort) -> None:
+    try:
+        port.close()
+    except BaseException:  # noqa: BLE001 - late open cleanup is best effort
+        return
+
+
+class BoundedWindowsSerial:
+    """Map PySerial failures and make close attempts time-bounded."""
+
+    def __init__(self, port_name: str, raw_port: SerialPort) -> None:
+        self.port_name = port_name
+        self.raw_port = raw_port
+        self.close_attempted = False
+        self.close_completed = False
+        self.close_timed_out = False
+        self.close_error: str | None = None
+
+    def read(self, size: int = 1) -> bytes:
+        try:
+            return bytes(self.raw_port.read(size))
+        except (serial.SerialException, OSError) as error:
+            raise SoakFailure(
+                "disconnect",
+                f"{self.port_name} read failed: {type(error).__name__}: {error}",
+            ) from error
+
+    def write(self, data: bytes) -> int | None:
+        try:
+            return self.raw_port.write(data)
+        except serial.SerialTimeoutException as error:
+            raise DeadlineExpired(
+                f"{self.port_name} write timed out: {error}"
+            ) from error
+        except (serial.SerialException, OSError) as error:
+            raise SoakFailure(
+                "disconnect",
+                f"{self.port_name} write failed: {type(error).__name__}: {error}",
+            ) from error
+
+    def close(self) -> None:
+        if self.close_attempted:
+            return
+        self.close_attempted = True
+        completed = threading.Event()
+        errors: list[str] = []
+
+        def close_worker() -> None:
+            try:
+                self.raw_port.close()
+            except BaseException as error:  # noqa: BLE001 - retained as evidence
+                errors.append(f"{type(error).__name__}: {error}")
+            finally:
+                completed.set()
+
+        threading.Thread(
+            target=close_worker,
+            name="teensy-daq-serial-close",
+            daemon=True,
+        ).start()
+        self.close_completed = completed.wait(WINDOWS_CLOSE_TIMEOUT_SECONDS)
+        self.close_timed_out = not self.close_completed
+        self.close_error = errors[0] if errors else None
+
+    def close_summary(self) -> dict[str, object]:
+        return {
+            "attempted": self.close_attempted,
+            "completed": self.close_completed,
+            "timed_out": self.close_timed_out,
+            "error": self.close_error,
+        }
+
+
+def open_windows_serial(
+    port_name: str,
+    *,
+    open_timeout_seconds: float,
+) -> BoundedWindowsSerial:
+    """Open a COM endpoint without allowing the calling thread to hang."""
+
+    attempt = _SerialOpenAttempt()
+
+    def open_worker() -> None:
+        opened: SerialPort | None = None
+        error: BaseException | None = None
+        try:
+            opened = serial.Serial(
+                port=port_name,
+                baudrate=BAUD_RATE,
+                timeout=SERIAL_READ_TIMEOUT_SECONDS,
+                write_timeout=SERIAL_WRITE_TIMEOUT_SECONDS,
+            )
+            try:
+                opened.dtr = True  # type: ignore[attr-defined]
+            except (AttributeError, OSError, serial.SerialException):
+                pass
+        except BaseException as caught:  # noqa: BLE001 - transferred to caller
+            error = caught
+        close_late_port: SerialPort | None = None
+        with attempt.lock:
+            if attempt.cancelled:
+                close_late_port = opened
+            else:
+                attempt.port = opened
+                attempt.error = error
+        attempt.done.set()
+        if close_late_port is not None:
+            threading.Thread(
+                target=_close_raw_serial,
+                args=(close_late_port,),
+                name="teensy-daq-late-open-close",
+                daemon=True,
+            ).start()
+
+    threading.Thread(
+        target=open_worker,
+        name="teensy-daq-serial-open",
+        daemon=True,
+    ).start()
+    if not attempt.done.wait(open_timeout_seconds):
+        opened_after_timeout: SerialPort | None
+        with attempt.lock:
+            attempt.cancelled = True
+            opened_after_timeout = attempt.port
+            attempt.port = None
+        if opened_after_timeout is not None:
+            threading.Thread(
+                target=_close_raw_serial,
+                args=(opened_after_timeout,),
+                name="teensy-daq-open-timeout-close",
+                daemon=True,
+            ).start()
+        raise DeadlineExpired(
+            f"serial open for {port_name} exceeded {open_timeout_seconds:g} seconds"
+        )
+    if attempt.error is not None:
+        error = attempt.error
+        category = (
+            "timeout"
+            if isinstance(error, serial.SerialTimeoutException)
+            else "serial_open"
+        )
+        raise SoakFailure(
+            category,
+            f"could not open {port_name}: {type(error).__name__}: {error}",
+        ) from error
+    if attempt.port is None:
+        raise SoakFailure(
+            "serial_open", f"serial open for {port_name} returned no port"
+        )
+    return BoundedWindowsSerial(port_name, attempt.port)
+
+
+def _observed_probe_identity(info: Mapping[str, object]) -> dict[str, object]:
+    names = (
+        "protocol_version",
+        "hardware_serial",
+        "firmware_version",
+        "board_id",
+        "mcu_id",
+        "build_id",
+        "supported_stream_mask",
+        "supported_source_mask",
+        "supported_checksum_mask",
+        "supported_configuration_mask",
+        "capability_bits",
+    )
+    result = {name: info[name] for name in names}
+    if isinstance(result["firmware_version"], tuple):
+        result["firmware_version"] = list(result["firmware_version"])
+    return result
+
+
+def probe_windows_candidate(
+    candidate: WindowsPortCandidate,
+    settings: RuntimeSettings,
+    *,
+    discovery_deadline: float,
+    open_timeout_seconds: float,
+    clock: Clock = time,
+) -> WindowsProbeResult:
+    """Perform a bounded, read-only, exact-identity INFO probe."""
+
+    port: BoundedWindowsSerial | None = None
+    info: dict[str, object] | None = None
+    latencies: list[float] = []
+    failure: dict[str, str] | None = None
+    try:
+        remaining = discovery_deadline - clock.monotonic()
+        if remaining <= 0:
+            raise DeadlineExpired("Windows COM discovery total deadline expired")
+        port = open_windows_serial(
+            candidate.port,
+            open_timeout_seconds=min(open_timeout_seconds, remaining),
+        )
+        link = SerialLink(port, clock, read_bytes=settings.serial_read_bytes)
+        remaining = discovery_deadline - clock.monotonic()
+        if remaining <= STARTUP_DRAIN_SECONDS:
+            raise DeadlineExpired("insufficient discovery budget for startup drain")
+        link.drain_startup(STARTUP_DRAIN_SECONDS)
+        info, latencies = synchronize(link, hard_deadline=discovery_deadline)
+        validate_info_identity(info, settings, expected_state=STATE_IDLE)
+        usb_serial = candidate.serial_number
+        if usb_serial is not None and usb_serial.isascii() and usb_serial.isdecimal():
+            require(
+                int(usb_serial, 10) == info["hardware_serial"],
+                "identity",
+                "USB descriptor serial disagrees with INFO hardware serial",
+            )
+    except BaseException as error:
+        if isinstance(error, KeyboardInterrupt):
+            raise
+        failure = {
+            "category": error.category if isinstance(error, SoakFailure) else "probe",
+            "type": type(error).__name__,
+            "message": str(error),
+        }
+    finally:
+        if port is not None:
+            port.close()
+    close: dict[str, object]
+    if port is not None:
+        close = port.close_summary()
+    else:
+        close = {
+            "attempted": False,
+            "completed": False,
+            "timed_out": False,
+            "error": None,
+        }
+    if failure is None and (close["timed_out"] or close["error"] is not None):
+        failure = {
+            "category": "cleanup",
+            "type": "SerialCloseError",
+            "message": f"probe close did not complete cleanly: {close}",
+        }
+    return WindowsProbeResult(
+        candidate=candidate,
+        observed_identity=(
+            _observed_probe_identity(info)
+            if failure is None and info is not None
+            else None
+        ),
+        latency_seconds=latencies,
+        failure=failure,
+        close=close,
+    )
+
+
+def probe_windows_candidates(
+    candidates: tuple[WindowsPortCandidate, ...],
+    settings: RuntimeSettings,
+    *,
+    discovery_timeout_seconds: float,
+    open_timeout_seconds: float,
+    clock: Clock = time,
+) -> tuple[WindowsProbeResult, ...]:
+    deadline = clock.monotonic() + discovery_timeout_seconds
+    results: list[WindowsProbeResult] = []
+    for candidate in candidates:
+        if clock.monotonic() >= deadline:
+            results.append(
+                WindowsProbeResult(
+                    candidate=candidate,
+                    observed_identity=None,
+                    latency_seconds=[],
+                    failure={
+                        "category": "timeout",
+                        "type": "DeadlineExpired",
+                        "message": "not probed before the discovery total deadline",
+                    },
+                    close={
+                        "attempted": False,
+                        "completed": False,
+                        "timed_out": False,
+                        "error": None,
+                    },
+                )
+            )
+            continue
+        print(f"Probing {candidate.port}...", flush=True)
+        result = probe_windows_candidate(
+            candidate,
+            settings,
+            discovery_deadline=deadline,
+            open_timeout_seconds=open_timeout_seconds,
+            clock=clock,
+        )
+        if result.passed:
+            print(f"  {candidate.port}: matching Teensy DAQ", flush=True)
+        else:
+            assert result.failure is not None
+            print(
+                f"  {candidate.port}: rejected "
+                f"({result.failure['category']}: {result.failure['message']})",
+                flush=True,
+            )
+        results.append(result)
+    return tuple(results)
+
+
+def select_windows_candidate(
+    probes: tuple[WindowsProbeResult, ...],
+    *,
+    hardware_serial: int,
+) -> WindowsPortCandidate:
+    matching = [
+        probe.candidate
+        for probe in probes
+        if probe.passed
+        and probe.observed_identity is not None
+        and probe.observed_identity.get("hardware_serial") == hardware_serial
+    ]
+    if not matching:
+        raise SoakFailure(
+            "discovery",
+            f"no plausible COM port passed the exact identity probe for hardware "
+            f"serial {hardware_serial}",
+        )
+    return min(matching, key=_windows_candidate_sort_key)
+
+
+class WindowsPortFactory:
+    def __init__(
+        self,
+        candidate: WindowsPortCandidate,
+        *,
+        open_timeout_seconds: float,
+    ) -> None:
+        self.candidate = candidate
+        self.open_timeout_seconds = open_timeout_seconds
+        self.opened: list[BoundedWindowsSerial] = []
+
+    def __call__(self) -> SerialPort:
+        port = open_windows_serial(
+            self.candidate.port,
+            open_timeout_seconds=self.open_timeout_seconds,
+        )
+        self.opened.append(port)
+        return port
+
+    def summary(self) -> list[dict[str, object]]:
+        return [port.close_summary() for port in self.opened]
+
+
+def windows_runtime_settings(mode: str, duration: float) -> RuntimeSettings:
+    """Apply only duration/source choices to the pinned generated candidate."""
+
+    config = json.loads(json.dumps(GENERATED_CONFIG))
+    if not isinstance(config, dict):
+        raise SoakFailure("configuration", "generated config is not an object")
+    candidate = _mapping(config.get("candidate"), "candidate")
+    soak = candidate.get("soak")
+    if not isinstance(soak, dict):
+        raise SoakFailure("configuration", "candidate.soak is not an object")
+    internal_mode = "physical-combined" if mode == "combined" else "synthetic"
+    status_interval = max(1.0, duration / 3_500.0)
+    info_interval = max(30.0, duration / 400.0, status_interval)
+    warmup = _number(soak.get("warmup_seconds"), "soak.warmup_seconds")
+    soak.update(
+        {
+            "measured_duration_seconds": duration,
+            "status_interval_seconds": status_interval,
+            "info_interval_seconds": info_interval,
+            "hard_deadline_seconds": (duration + warmup + WINDOWS_RUN_RESERVE_SECONDS),
+            "service_container_limit_seconds": (
+                duration
+                + warmup
+                + WINDOWS_RUN_RESERVE_SECONDS
+                + WINDOWS_CLEANUP_RESERVE_SECONDS
+            ),
+        }
+    )
+    config["mode"] = internal_mode
+    return load_settings(config)
+
+
+def _positive_duration(value: str) -> float:
+    try:
+        duration = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("duration must be numeric") from error
+    if (
+        not math.isfinite(duration)
+        or not 1.0 <= duration <= WINDOWS_MAXIMUM_DURATION_SECONDS
+    ):
+        raise argparse.ArgumentTypeError("duration must be between 1 and 86400 seconds")
+    return duration
+
+
+def _positive_timeout(value: str) -> float:
+    try:
+        timeout = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("timeout must be numeric") from error
+    if not math.isfinite(timeout) or not 0.1 <= timeout <= 300.0:
+        raise argparse.ArgumentTypeError("timeout must be between 0.1 and 300 seconds")
+    return timeout
+
+
+def _hardware_serial(value: str) -> int:
+    try:
+        result = int(value, 0)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(
+            "hardware serial must be decimal or 0x-prefixed hexadecimal"
+        ) from error
+    if not 1 <= result <= 0xFFFFFFFF:
+        raise argparse.ArgumentTypeError("hardware serial must be a nonzero uint32")
+    return result
+
+
+def build_windows_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Standalone, release-identity-pinned Teensy DAQ Windows soak validator"
+        )
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("combined", "synthetic"),
+        default="combined",
+        help="combined physical acquisition (default) or firmware synthetic source",
+    )
+    duration = parser.add_mutually_exclusive_group()
+    duration.add_argument(
+        "--duration",
+        type=_positive_duration,
+        default=WINDOWS_DEFAULT_DURATION_SECONDS,
+        metavar="SECONDS",
+        help="measured streaming duration (default: 3600)",
+    )
+    duration.add_argument(
+        "--smoke",
+        action="store_true",
+        help="run the same validation semantics for a 10-second diagnostic smoke",
+    )
+    parser.add_argument(
+        "--hardware-serial",
+        type=_hardware_serial,
+        help="select the pinned device deterministically across COM renumbering",
+    )
+    parser.add_argument(
+        "--port",
+        help="limit probing to this plausible enumerated COM port",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("teensy-daq-windows-soak"),
+        help="report path base; .json and .md are written (default shown)",
+    )
+    parser.add_argument(
+        "--discovery-timeout",
+        type=_positive_timeout,
+        default=WINDOWS_DEFAULT_DISCOVERY_TIMEOUT_SECONDS,
+        metavar="SECONDS",
+        help="total COM enumeration/probe deadline (default: 15)",
+    )
+    parser.add_argument(
+        "--open-timeout",
+        type=_positive_timeout,
+        default=WINDOWS_DEFAULT_OPEN_TIMEOUT_SECONDS,
+        metavar="SECONDS",
+        help="per-COM serial-open deadline (default: 3)",
+    )
+    return parser
+
+
+def windows_host_identity() -> dict[str, object]:
+    win32 = platform.win32_ver()
+    return {
+        "hostname": platform.node(),
+        "platform": platform.platform(),
+        "system": platform.system(),
+        "release": platform.release(),
+        "version": platform.version(),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+        "win32_version": list(win32),
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "pyserial_version": getattr(serial, "VERSION", None),
+        "sys_platform": sys.platform,
+    }
+
+
+def _expected_settings(settings: RuntimeSettings) -> dict[str, object]:
+    return {
+        "protocol_version": settings.protocol_version,
+        "checksum_algorithm": settings.checksum_algorithm,
+        "checksum_name": settings.checksum_name,
+        "firmware_version": list(settings.firmware_version),
+        "build_id": settings.build_id,
+        "source_id": settings.source_id,
+        "artifact_name": settings.artifact_name,
+        "artifact_sha256": settings.artifact_sha256,
+        "fqbn": settings.fqbn,
+        "hardware_serial": settings.hardware_serial,
+        "board_id": settings.board_id,
+        "mcu_id": settings.mcu_id,
+    }
+
+
+def windows_failure_result(
+    error: BaseException,
+    *,
+    settings: RuntimeSettings | None,
+    mode: str,
+) -> dict[str, object]:
+    message = str(error) or (
+        "interrupted by Ctrl+C" if isinstance(error, KeyboardInterrupt) else "no detail"
+    )
+    return {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "result": "FAIL",
+        "mode": "physical-combined" if mode == "combined" else "synthetic",
+        "failure": {
+            "category": error.category if isinstance(error, SoakFailure) else "program",
+            "type": type(error).__name__,
+            "message": message,
+        },
+        "expected": _expected_settings(settings) if settings is not None else None,
+        "observed_identity": None,
+        "timing": (
+            {
+                "measured_duration_seconds": settings.measured_duration_seconds,
+                "hard_deadline_seconds": settings.hard_deadline_seconds,
+                "service_container_limit_seconds": (
+                    settings.service_container_limit_seconds
+                ),
+            }
+            if settings is not None
+            else {}
+        ),
+        "metrics": {},
+        "epochs": [],
+        "cleanup": {"attempted": False, "normal_close": False},
+        "program": {
+            "sha256": _program_sha256(),
+            "validator_sha256": (
+                settings.validator_sha256 if settings is not None else None
+            ),
+            "candidate_sha256": (
+                settings.candidate_sha256 if settings is not None else None
+            ),
+            "python": sys.version.split()[0],
+        },
+        "completed_utc": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _windows_validation_reasons(result: Mapping[str, object]) -> list[str]:
+    if result.get("result") != "PASS":
+        failure = result.get("failure")
+        if isinstance(failure, Mapping):
+            return [
+                (
+                    f"{failure.get('category', 'failure')}: "
+                    f"{failure.get('message', 'no detail')}"
+                )
+            ]
+        return ["validation did not pass"]
+    return [
+        "COM metadata and two stable INFO responses matched the pinned identity",
+        "every decoded frame passed structure and Adler-32 validation",
+        "run IDs, independent sequences, timestamps, counts, and rates reconciled",
+        "live and final STATUS counters and bounded queue depths reconciled",
+        "command latency and bounded host memory evidence passed",
+        "STOP reached IDLE and the serial close completed within its deadline",
+    ]
+
+
+def attach_windows_evidence(
+    result: dict[str, object],
+    *,
+    arguments: argparse.Namespace,
+    duration: float,
+    candidates: tuple[WindowsPortCandidate, ...],
+    probes: tuple[WindowsProbeResult, ...],
+    selected: WindowsPortCandidate | None,
+    lifecycle: list[dict[str, object]],
+) -> None:
+    release_profile = arguments.mode == "combined" and duration == 3_600.0
+    result["report_schema_version"] = WINDOWS_REPORT_SCHEMA_VERSION
+    result["windows"] = {
+        "profile": "release" if release_profile else "diagnostic",
+        "release_eligible": release_profile and result.get("result") == "PASS",
+        "requested_mode": arguments.mode,
+        "requested_duration_seconds": duration,
+        "smoke": bool(arguments.smoke),
+        "requested_hardware_serial": arguments.hardware_serial,
+        "explicit_port": arguments.port,
+        "host": windows_host_identity(),
+        "com_discovery": {
+            "teensy_vid": TEENSY_USB_SERIAL_VID,
+            "teensy_pid": TEENSY_USB_SERIAL_PID,
+            "preferred_product": TEENSY_DAQ_PRODUCT,
+            "candidate_count": len(candidates),
+            "candidates": [candidate.as_dict() for candidate in candidates],
+            "probes": [probe.as_dict() for probe in probes],
+            "selected": selected.as_dict() if selected is not None else None,
+        },
+        "serial_lifecycle": lifecycle,
+        "generation": {
+            "entry_point": GENERATED_CONFIG.get("entry_point"),
+            "generator_schema_version": GENERATED_CONFIG.get(
+                "generator_schema_version"
+            ),
+            "windows_driver_sha256": GENERATED_CONFIG.get("windows_driver_sha256"),
+            "windows_profile_sha256": GENERATED_CONFIG.get("windows_profile_sha256"),
+        },
+        "validation_reasons": _windows_validation_reasons(result),
+    }
+
+
+def _mark_close_failure(
+    result: dict[str, object],
+    lifecycle: list[dict[str, object]],
+) -> bool:
+    failed = any(
+        not item.get("attempted")
+        or not item.get("completed")
+        or item.get("timed_out")
+        or item.get("error") is not None
+        for item in lifecycle
+    )
+    if not failed or result.get("result") != "PASS":
+        return failed
+    result["result"] = "FAIL"
+    result["failure"] = {
+        "category": "cleanup",
+        "type": "SerialCloseError",
+        "message": f"serial close did not complete cleanly: {lifecycle}",
+    }
+    cleanup = result.get("cleanup")
+    if isinstance(cleanup, dict):
+        cleanup["normal_close"] = False
+        cleanup["serial_lifecycle"] = lifecycle
+    return True
+
+
+def _markdown_cell(value: object) -> str:
+    if value is None:
+        return "n/a"
+    return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+
+def _metric(value: object, *, scale: float = 1.0, digits: int = 3) -> str:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return "n/a"
+    return f"{float(value) * scale:.{digits}f}"
+
+
+def render_windows_markdown(result: Mapping[str, object]) -> str:
+    completed = result.get("completed_utc")
+    created = (
+        str(completed)[:10]
+        if isinstance(completed, str) and len(completed) >= 10
+        else datetime.now(timezone.utc).date().isoformat()
+    )
+    windows = result.get("windows")
+    windows_map = windows if isinstance(windows, Mapping) else {}
+    discovery = windows_map.get("com_discovery")
+    discovery_map = discovery if isinstance(discovery, Mapping) else {}
+    selected = discovery_map.get("selected")
+    selected_map = selected if isinstance(selected, Mapping) else {}
+    host = windows_map.get("host")
+    host_map = host if isinstance(host, Mapping) else {}
+    expected = result.get("expected")
+    expected_map = expected if isinstance(expected, Mapping) else {}
+    observed = result.get("observed_identity")
+    observed_map = observed if isinstance(observed, Mapping) else {}
+    metrics = result.get("metrics")
+    metrics_map = metrics if isinstance(metrics, Mapping) else {}
+    latency = metrics_map.get("latency")
+    latency_map = latency if isinstance(latency, Mapping) else {}
+    status_latency = latency_map.get("status")
+    status_latency_map = status_latency if isinstance(status_latency, Mapping) else {}
+    command_latency = latency_map.get("all_commands")
+    command_latency_map = (
+        command_latency if isinstance(command_latency, Mapping) else {}
+    )
+    memory = metrics_map.get("memory")
+    memory_map = memory if isinstance(memory, Mapping) else {}
+    traced = memory_map.get("tracemalloc")
+    traced_map = traced if isinstance(traced, Mapping) else {}
+    rss = memory_map.get("process_rss")
+    rss_map = rss if isinstance(rss, Mapping) else {}
+    failure = result.get("failure")
+    failure_map = failure if isinstance(failure, Mapping) else {}
+    reasons = windows_map.get("validation_reasons")
+    reason_lines = (
+        [f"- {_markdown_cell(reason)}" for reason in reasons]
+        if isinstance(reasons, list)
+        else ["- Validation detail unavailable"]
+    )
+    epochs = result.get("epochs")
+    epoch = epochs[0] if isinstance(epochs, list) and epochs else {}
+    epoch_map = epoch if isinstance(epoch, Mapping) else {}
+    counters = epoch_map.get("final_counters")
+    counter_map = counters if isinstance(counters, Mapping) else {}
+    parser = epoch_map.get("parser")
+    parser_map = parser if isinstance(parser, Mapping) else {}
+    counter_lines = [
+        f"| {_markdown_cell(name)} | {_markdown_cell(value)} |"
+        for name, value in sorted(counter_map.items())
+    ] or ["| n/a | n/a |"]
+    raw_json = json.dumps(result, indent=2, sort_keys=True)
+    return "\n".join(
+        [
+            "---",
+            "type: report",
+            "title: Teensy DAQ Windows Soak Report",
+            f"created: {created}",
+            "tags:",
+            "  - teensy-daq",
+            "  - windows",
+            "  - soak-validation",
+            "related:",
+            "  - '[[Phase-11-Soak-Evidence]]'",
+            "  - '[[Quickstart]]'",
+            "  - '[[Hardware-Safety]]'",
+            "  - '[[Protocol-V1]]'",
+            "---",
+            "",
+            "# Teensy DAQ Windows soak report",
+            "",
+            "## Outcome",
+            "",
+            (
+                f"**{_markdown_cell(result.get('result'))}** — "
+                f"{_markdown_cell(failure_map.get('category', 'all checks passed'))}: "
+                f"{_markdown_cell(failure_map.get('message', 'validation completed'))}"
+            ),
+            "",
+            *reason_lines,
+            "",
+            "| Run property | Value |",
+            "| --- | --- |",
+            f"| Profile | {_markdown_cell(windows_map.get('profile'))} |",
+            f"| Release eligible | {_markdown_cell(windows_map.get('release_eligible'))} |",
+            f"| Mode | {_markdown_cell(result.get('mode'))} |",
+            f"| Requested duration (s) | {_markdown_cell(windows_map.get('requested_duration_seconds'))} |",
+            f"| Completed UTC | {_markdown_cell(completed)} |",
+            "",
+            "## Host, COM, and device identity",
+            "",
+            "| Identity | Value |",
+            "| --- | --- |",
+            f"| Hostname | {_markdown_cell(host_map.get('hostname'))} |",
+            f"| Platform | {_markdown_cell(host_map.get('platform'))} |",
+            f"| Python | {_markdown_cell(host_map.get('python_implementation'))} {_markdown_cell(host_map.get('python_version'))} |",
+            f"| PySerial | {_markdown_cell(host_map.get('pyserial_version'))} |",
+            f"| COM port | {_markdown_cell(selected_map.get('port'))} |",
+            f"| USB VID:PID | {_markdown_cell(selected_map.get('vid_pid'))} |",
+            f"| USB product | {_markdown_cell(selected_map.get('product'))} |",
+            f"| USB serial | {_markdown_cell(selected_map.get('serial_number'))} |",
+            f"| INFO hardware serial | {_markdown_cell(observed_map.get('hardware_serial'))} |",
+            f"| Firmware version | {_markdown_cell(observed_map.get('firmware_version'))} |",
+            f"| Build ID | {_markdown_cell(observed_map.get('build_id'))} |",
+            f"| Expected source ID | {_markdown_cell(expected_map.get('source_id'))} |",
+            f"| Expected HEX SHA-256 | {_markdown_cell(expected_map.get('artifact_sha256'))} |",
+            "",
+            "## Rates, latency, and memory",
+            "",
+            "| Metric | Value |",
+            "| --- | ---: |",
+            f"| Payload B/s | {_metric(metrics_map.get('payload_bytes_per_streaming_second'))} |",
+            f"| Framed B/s | {_metric(metrics_map.get('framed_bytes_per_streaming_second'))} |",
+            f"| ADC pairs/s | {_metric(metrics_map.get('adc_pair_rate_hz'))} |",
+            f"| GPIO samples/s | {_metric(metrics_map.get('gpio_sample_rate_hz'))} |",
+            f"| STATUS p99 (ms) | {_metric(status_latency_map.get('p99_seconds'), scale=1_000.0)} |",
+            f"| STATUS maximum (ms) | {_metric(status_latency_map.get('maximum_seconds'), scale=1_000.0)} |",
+            f"| Any-command maximum (ms) | {_metric(command_latency_map.get('maximum_seconds'), scale=1_000.0)} |",
+            f"| Tracemalloc growth (bytes) | {_markdown_cell(traced_map.get('growth_bytes'))} |",
+            f"| Process RSS growth (bytes) | {_markdown_cell(rss_map.get('growth_bytes'))} |",
+            f"| Parser bytes / frames | {_markdown_cell(parser_map.get('bytes_received'))} / {_markdown_cell(parser_map.get('frames_decoded'))} |",
+            f"| Parser errors / retained bytes | {_markdown_cell(parser_map.get('errors'))} / {_markdown_cell(parser_map.get('buffered_bytes'))} |",
+            "",
+            "## Final firmware counters",
+            "",
+            "| Counter | Value |",
+            "| --- | ---: |",
+            *counter_lines,
+            "",
+            "## Complete machine-readable record",
+            "",
+            "```json",
+            raw_json,
+            "```",
+            "",
+        ]
+    )
+
+
+def _report_paths(base: Path) -> tuple[Path, Path]:
+    if base.suffix.casefold() in {".json", ".md"}:
+        base = base.with_suffix("")
+    return Path(f"{base}.json"), Path(f"{base}.md")
+
+
+def _atomic_text_write(path: Path, contents: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    try:
+        with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(contents)
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def write_windows_reports(
+    base: Path,
+    result: dict[str, object],
+) -> tuple[Path, Path]:
+    json_path, markdown_path = _report_paths(base)
+    windows = result.get("windows")
+    if isinstance(windows, dict):
+        windows["reports"] = {
+            "json": str(json_path),
+            "markdown": str(markdown_path),
+        }
+    _atomic_text_write(
+        json_path,
+        json.dumps(result, indent=2, sort_keys=True) + "\n",
+    )
+    _atomic_text_write(markdown_path, render_windows_markdown(result))
+    return json_path, markdown_path
+
+
+def _windows_emit_event(name: str, **fields: object) -> None:
+    if name == "sync_retry":
+        print(
+            f"Synchronization retry {fields.get('attempt')}: {fields.get('error')}",
+            flush=True,
+        )
+    elif name == "synchronized":
+        print(
+            f"Identity synchronized in {fields.get('attempts')} attempt(s)", flush=True
+        )
+    elif name == "warmup_complete":
+        print("Warm-up complete; measured validation started", flush=True)
+    elif name == "status_checkpoint":
+        elapsed = fields.get("elapsed_seconds")
+        planned = fields.get("planned_seconds")
+        percent = (
+            min(100.0, 100.0 * float(elapsed) / float(planned))
+            if isinstance(elapsed, (int, float))
+            and isinstance(planned, (int, float))
+            and planned > 0
+            else 0.0
+        )
+        print(
+            f"Progress {percent:5.1f}% | "
+            f"ADC frames {fields.get('adc_frames')} | "
+            f"GPIO frames {fields.get('gpio_frames')} | "
+            f"STATUS {fields.get('status_count')}",
+            flush=True,
+        )
+    elif name == "epoch_complete":
+        measured = fields.get("measured_elapsed_seconds")
+        measured_seconds = (
+            float(measured)
+            if isinstance(measured, (int, float)) and not isinstance(measured, bool)
+            else 0.0
+        )
+        print(
+            f"Stream complete: {measured_seconds:.3f}s, "
+            f"{fields.get('payload_bytes')} payload bytes",
+            flush=True,
+        )
+
+
+def main(argv: list[str] | None = None) -> int:
+    arguments = build_windows_parser().parse_args(argv)
+    duration = (
+        WINDOWS_SMOKE_DURATION_SECONDS if arguments.smoke else float(arguments.duration)
+    )
+    settings: RuntimeSettings | None = None
+    candidates: tuple[WindowsPortCandidate, ...] = ()
+    probes: tuple[WindowsProbeResult, ...] = ()
+    selected: WindowsPortCandidate | None = None
+    factory: WindowsPortFactory | None = None
+    exit_code = 2
+    try:
+        settings = windows_runtime_settings(arguments.mode, duration)
+        requested_serial = (
+            settings.hardware_serial
+            if arguments.hardware_serial is None
+            else arguments.hardware_serial
+        )
+        if requested_serial != settings.hardware_serial:
+            raise SoakFailure(
+                "identity",
+                f"this release validator is pinned to hardware serial "
+                f"{settings.hardware_serial}; requested {requested_serial}",
+            )
+        arguments.hardware_serial = requested_serial
+        print(
+            f"Scanning for Teensy DAQ {TEENSY_USB_SERIAL_VID:04X}:"
+            f"{TEENSY_USB_SERIAL_PID:04X} COM ports...",
+            flush=True,
+        )
+        candidates = enumerate_windows_candidates()
+        if arguments.port is not None:
+            candidates = tuple(
+                candidate
+                for candidate in candidates
+                if candidate.port.casefold() == arguments.port.casefold()
+            )
+            if not candidates:
+                raise SoakFailure(
+                    "discovery",
+                    f"{arguments.port!r} is not an enumerated plausible Teensy COM port",
+                )
+        if not candidates:
+            raise SoakFailure(
+                "discovery",
+                "no COM ports matched Teensy USB Serial VID/PID metadata",
+            )
+        probes = probe_windows_candidates(
+            candidates,
+            settings,
+            discovery_timeout_seconds=arguments.discovery_timeout,
+            open_timeout_seconds=arguments.open_timeout,
+        )
+        selected = select_windows_candidate(
+            probes,
+            hardware_serial=requested_serial,
+        )
+        print(
+            f"Selected {selected.port} by INFO hardware serial {requested_serial}; "
+            f"starting {duration:g}s {arguments.mode} validation",
+            flush=True,
+        )
+        factory = WindowsPortFactory(
+            selected,
+            open_timeout_seconds=arguments.open_timeout,
+        )
+        global emit_event
+        emit_event = _windows_emit_event
+        exit_code, result = run_generated(settings, factory)
+        lifecycle = factory.summary()
+        if _mark_close_failure(result, lifecycle):
+            exit_code = 1
+    except BaseException as error:  # noqa: BLE001 - all exits receive reports
+        result = windows_failure_result(
+            error,
+            settings=settings,
+            mode=arguments.mode,
+        )
+        lifecycle = factory.summary() if factory is not None else []
+        exit_code = 130 if isinstance(error, KeyboardInterrupt) else 2
+    attach_windows_evidence(
+        result,
+        arguments=arguments,
+        duration=duration,
+        candidates=candidates,
+        probes=probes,
+        selected=selected,
+        lifecycle=lifecycle,
+    )
+    try:
+        json_path, markdown_path = write_windows_reports(arguments.output, result)
+    except BaseException as error:  # noqa: BLE001 - report failure must be explicit
+        print(
+            f"FAIL report_write: {type(error).__name__}: {error}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 3
+    failure = result.get("failure")
+    failure_map = failure if isinstance(failure, Mapping) else {}
+    if result.get("result") == "PASS":
+        print(f"PASS | JSON {json_path} | Markdown {markdown_path}", flush=True)
+    else:
+        print(
+            f"FAIL {failure_map.get('category', 'validation')}: "
+            f"{failure_map.get('message', 'no detail')} | "
+            f"JSON {json_path} | Markdown {markdown_path}",
+            flush=True,
+        )
+    return exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+# </soak-cli>
