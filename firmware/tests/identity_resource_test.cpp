@@ -270,8 +270,8 @@ static_assert(teensy_daq::control::kSyntheticConfiguration.stream_mask ==
               3U);
 static_assert(teensy_daq::control::kSyntheticConfiguration.source ==
               teensy_daq::protocol_v1::Source::kSynthetic);
-static_assert(teensy_daq::identity::kFirmwareVersion.major == 0U);
-static_assert(teensy_daq::identity::kFirmwareVersion.minor == 7U);
+static_assert(teensy_daq::identity::kFirmwareVersion.major == 1U);
+static_assert(teensy_daq::identity::kFirmwareVersion.minor == 0U);
 static_assert(teensy_daq::identity::kFirmwareVersion.patch == 0U);
 static_assert(teensy_daq::board::kAdc0Pin == 14U);
 static_assert(teensy_daq::board::kAdc1Pin == 15U);

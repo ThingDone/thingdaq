@@ -2,7 +2,7 @@
 type: reference
 title: Teensy DAQ Python Package
 created: 2026-08-27
-updated: 2026-08-29
+updated: 2026-08-30
 tags:
   - teensy-daq
   - python
@@ -44,12 +44,15 @@ See [[System-Overview]] for the package boundary and
 
 ## Distribution and publication boundary
 
-The host API uses pre-1.0 semantic versioning independent of the firmware
-semantic version and wire-protocol version. Its value is single-sourced in
-`teensy_daq._version`, exposed as `teensy_daq.__version__`, and consumed by the
-build metadata declared in `pyproject.toml`. The supported interpreter range
-is CPython 3.10 through 3.14; the base dependency is PySerial, NumPy is an
-explicit optional extra, and build/test/lint/type tools are development-only.
+The host API and firmware are versioned independently from the wire protocol;
+the current release candidate assigns semantic version `1.0.0` to both. The
+host value is single-sourced in `teensy_daq._version`, exposed as
+`teensy_daq.__version__`, and consumed by the build metadata declared in
+`pyproject.toml`. Firmware single-sources its value in
+`firmware/src/firmware_identity.h` and reports it through INFO. The supported
+interpreter range is CPython 3.10 through 3.14; the base dependency is PySerial,
+NumPy is an explicit optional extra, and build/test/lint/type tools are
+development-only.
 
 The package is fully typed and ships `py.typed`. Wheel contents are limited to
 the runtime Python modules, the generated protocol constants, that marker, and
