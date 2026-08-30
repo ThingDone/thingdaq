@@ -193,9 +193,14 @@ complete JSON after its summary tables.
 
 - `result: PASS` means the checks for the invoked profile passed. It does not
   by itself mean the report is release evidence.
-- `windows.profile: release` and `windows.release_eligible: true` require a
-  3,600-second combined run, no identity override, an exact manifest identity
-  match, and an overall PASS.
+- `windows.profile: release` requires an exact 3,600-second non-smoke combined
+  run, no identity override, and one host snapshot identifying native Windows
+  (`system: Windows` and `sys_platform: win32`).
+- `windows.release_eligible: true` is computed from every boolean in
+  `windows.release_requirements`. In addition to the release-profile
+  predicates, it requires an overall PASS, exact manifest/device identity, and
+  complete finite nonnegative process-RSS baseline, peak, and growth values;
+  RSS growth must not exceed 32 MiB.
 - `windows.profile: diagnostic`, a shorter duration, synthetic mode, or
   `release_eligible: false` is useful troubleshooting evidence only.
 - `diagnostic-identity-override.requested: true` is always non-release even if

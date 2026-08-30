@@ -415,7 +415,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   },
   "validation_manifest_sha256": "d6da65261b17b91409da59a5a0f8f47182a26d2d2a5637ac68b4cf902413b260",
   "validator_sha256": "bde658a05069032dc6e65bf3bf86f9b040961d62870422e709ecd955b638da34",
-  "windows_driver_sha256": "2e9e64fd15c9f1bc0014e94e46587977d2b6e8d10173021f489dffbe895f061a",
+  "windows_driver_sha256": "7fce45f23639949d215e26aa31a956399e8b4c2c65fa6303379a61868b0a5466",
   "windows_profile_sha256": "adb14bdcad996888cee26ddc08f0a7eda29d50894b11d60a08d6535ef7452412"
 }
 """
@@ -4721,6 +4721,7 @@ def run_generated(
 
 # <soak-cli>
 import argparse  # noqa: I001 - generated driver imports follow the canonical core
+import ctypes
 import platform
 import re
 import threading
@@ -4744,6 +4745,117 @@ TEENSY_DAQ_PRODUCT = "Teensy DAQ"
 WINDOWS_PORT_PATTERN = re.compile(r"(?i)^COM([1-9][0-9]*)$")
 SOAK_CONFORMANCE_SCHEMA_VERSION = 1
 SOAK_CONFORMANCE_PREFIX = "SOAK_CONFORMANCE "
+_WINDOWS_RELEASE_PROFILE_REQUIREMENTS = (
+    "physical_combined_mode",
+    "exact_3600_second_duration",
+    "non_smoke",
+    "diagnostic_identity_override_disabled",
+    "native_windows_host",
+)
+
+
+class _WindowsProcessMemoryCounters(ctypes.Structure):
+    """Windows ``PROCESS_MEMORY_COUNTERS`` with architecture-sized fields."""
+
+    _fields_ = [
+        ("cb", ctypes.c_uint32),
+        ("PageFaultCount", ctypes.c_uint32),
+        ("PeakWorkingSetSize", ctypes.c_size_t),
+        ("WorkingSetSize", ctypes.c_size_t),
+        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+        ("PagefileUsage", ctypes.c_size_t),
+        ("PeakPagefileUsage", ctypes.c_size_t),
+    ]
+
+
+@dataclass(frozen=True)
+class _WindowsProcessMemoryApi:
+    """Mockable pair of native calls needed for process-memory evidence."""
+
+    get_current_process: Callable[[], object]
+    get_process_memory_info: Callable[[object, object, int], object]
+
+
+def _load_windows_process_memory_api() -> _WindowsProcessMemoryApi | None:
+    """Load and type the dependency-free Windows process-memory API once."""
+
+    dll_loader = getattr(ctypes, "WinDLL", None)
+    if dll_loader is None:
+        return None
+    try:
+        kernel32 = dll_loader("kernel32", use_last_error=True)
+        psapi = dll_loader("psapi", use_last_error=True)
+        get_current_process = kernel32.GetCurrentProcess
+        get_current_process.argtypes = []
+        get_current_process.restype = ctypes.c_void_p
+        get_process_memory_info = psapi.GetProcessMemoryInfo
+        get_process_memory_info.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(_WindowsProcessMemoryCounters),
+            ctypes.c_uint32,
+        ]
+        get_process_memory_info.restype = ctypes.c_int
+    except Exception:  # noqa: BLE001 - optional native evidence fails closed
+        return None
+    return _WindowsProcessMemoryApi(
+        get_current_process=get_current_process,
+        get_process_memory_info=get_process_memory_info,
+    )
+
+
+_WINDOWS_PROCESS_MEMORY_API = (
+    _load_windows_process_memory_api() if sys.platform == "win32" else None
+)
+_canonical_current_rss_bytes = _current_rss_bytes
+_canonical_peak_rss_bytes = _peak_rss_bytes
+
+
+def _windows_process_memory_bytes(
+    api: _WindowsProcessMemoryApi | None = None,
+) -> tuple[int, int] | None:
+    """Return validated current/peak working-set bytes from one native call."""
+
+    selected_api = _WINDOWS_PROCESS_MEMORY_API if api is None else api
+    if selected_api is None:
+        return None
+    counters = _WindowsProcessMemoryCounters()
+    structure_size = ctypes.sizeof(counters)
+    counters.cb = structure_size
+    try:
+        process = selected_api.get_current_process()
+        if process is None or process == 0:
+            return None
+        succeeded = selected_api.get_process_memory_info(
+            process,
+            ctypes.byref(counters),
+            structure_size,
+        )
+    except Exception:  # noqa: BLE001 - optional native evidence fails closed
+        return None
+    if not succeeded or counters.cb != structure_size:
+        return None
+    current_bytes = int(counters.WorkingSetSize)
+    peak_bytes = int(counters.PeakWorkingSetSize)
+    if current_bytes < 0 or peak_bytes < current_bytes:
+        return None
+    return current_bytes, peak_bytes
+
+
+def _current_rss_bytes() -> int | None:  # type: ignore[no-redef]
+    if sys.platform != "win32":
+        return _canonical_current_rss_bytes()
+    memory = _windows_process_memory_bytes()
+    return memory[0] if memory is not None else None
+
+
+def _peak_rss_bytes() -> int | None:  # type: ignore[no-redef]
+    if sys.platform != "win32":
+        return _canonical_peak_rss_bytes()
+    memory = _windows_process_memory_bytes()
+    return memory[1] if memory is not None else None
 
 
 @dataclass(frozen=True)
@@ -5689,6 +5801,8 @@ def _windows_validation_reasons(
     *,
     diagnostic_identity_override: bool,
     identity_mismatches: Mapping[str, object],
+    release_requirements: Mapping[str, bool],
+    process_rss: Mapping[str, object],
 ) -> list[str]:
     reasons: list[str] = []
     if diagnostic_identity_override:
@@ -5701,6 +5815,51 @@ def _windows_validation_reasons(
                 "the observed INFO identity/capabilities differ from the pinned "
                 "Phase 11 validation manifest"
             )
+    if not release_requirements["native_windows_host"]:
+        reasons.append(
+            "NON-RELEASE: native Windows host identity is required "
+            '(system == "Windows" and sys_platform == "win32")'
+        )
+    if not all(
+        release_requirements[name]
+        for name in (
+            "physical_combined_mode",
+            "exact_3600_second_duration",
+            "non_smoke",
+        )
+    ):
+        reasons.append(
+            "NON-RELEASE: the release profile requires an exact 3,600-second "
+            "non-smoke physical-combined run"
+        )
+    rss_validity_requirements = (
+        "process_rss_baseline_valid",
+        "process_rss_peak_valid",
+        "process_rss_growth_valid",
+    )
+    if not all(release_requirements[name] for name in rss_validity_requirements):
+        rss_values = {
+            name: process_rss.get(name)
+            for name in ("baseline_bytes", "peak_bytes", "growth_bytes")
+        }
+        unavailable = any(value is None for value in rss_values.values())
+        reasons.append(
+            "NON-RELEASE: complete numeric process-RSS evidence is "
+            + ("unavailable" if unavailable else "invalid")
+            + "; baseline_bytes, peak_bytes, and growth_bytes must be finite "
+            "nonnegative numbers"
+        )
+    elif not release_requirements["process_rss_growth_within_limit"]:
+        reasons.append(
+            "NON-RELEASE: process-RSS growth "
+            f"{process_rss.get('growth_bytes')} exceeds "
+            f"{MAX_RSS_GROWTH_BYTES} bytes"
+        )
+    if not release_requirements["exact_manifest_device_identity"]:
+        reasons.append(
+            "NON-RELEASE: exact validation-manifest and device identity "
+            "evidence is required"
+        )
     if result.get("result") != "PASS":
         failure = result.get("failure")
         if isinstance(failure, Mapping):
@@ -5715,18 +5874,74 @@ def _windows_validation_reasons(
         [
             (
                 "COM metadata and two stable INFO responses matched the pinned identity"
-                if not identity_mismatches
+                if release_requirements["exact_manifest_device_identity"]
                 else "COM metadata and two stable INFO responses identified one stable "
                 "diagnostic device"
             ),
             "every decoded frame passed structure and Adler-32 validation",
             "run IDs, independent sequences, timestamps, counts, and rates reconciled",
             "live and final STATUS counters and bounded queue depths reconciled",
-            "command latency and bounded host memory evidence passed",
+            "command latency requirements passed",
             "STOP reached IDLE and the serial close completed within its deadline",
         ]
     )
+    if all(
+        release_requirements[name]
+        for name in (
+            *rss_validity_requirements,
+            "process_rss_growth_within_limit",
+        )
+    ):
+        reasons.append(
+            "complete numeric process-RSS evidence remained within its growth limit"
+        )
     return reasons
+
+
+def _is_nonnegative_finite_number(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and value >= 0
+        and (not isinstance(value, float) or math.isfinite(value))
+    )
+
+
+def _windows_release_requirements(
+    result: Mapping[str, object],
+    *,
+    arguments: argparse.Namespace,
+    duration: float,
+    host: Mapping[str, object],
+    exact_manifest_device_identity: bool,
+    process_rss: Mapping[str, object],
+) -> dict[str, bool]:
+    baseline = process_rss.get("baseline_bytes")
+    peak = process_rss.get("peak_bytes")
+    growth = process_rss.get("growth_bytes")
+    growth_valid = _is_nonnegative_finite_number(growth)
+    growth_within_limit = (
+        growth_valid
+        and isinstance(growth, (int, float))
+        and growth <= MAX_RSS_GROWTH_BYTES
+    )
+    return {
+        "physical_combined_mode": arguments.mode == "combined",
+        "exact_3600_second_duration": duration == WINDOWS_DEFAULT_DURATION_SECONDS,
+        "non_smoke": not bool(arguments.smoke),
+        "diagnostic_identity_override_disabled": not bool(
+            arguments.diagnostic_identity_override
+        ),
+        "native_windows_host": (
+            host.get("system") == "Windows" and host.get("sys_platform") == "win32"
+        ),
+        "overall_pass": result.get("result") == "PASS",
+        "exact_manifest_device_identity": exact_manifest_device_identity,
+        "process_rss_baseline_valid": _is_nonnegative_finite_number(baseline),
+        "process_rss_peak_valid": _is_nonnegative_finite_number(peak),
+        "process_rss_growth_valid": growth_valid,
+        "process_rss_growth_within_limit": growth_within_limit,
+    }
 
 
 def attach_windows_evidence(
@@ -5740,6 +5955,7 @@ def attach_windows_evidence(
     lifecycle: list[dict[str, object]],
 ) -> None:
     diagnostic_override = bool(arguments.diagnostic_identity_override)
+    host = windows_host_identity()
     selected_probe = next(
         (
             probe
@@ -5751,12 +5967,44 @@ def attach_windows_evidence(
     identity_mismatches = (
         selected_probe.identity_mismatches if selected_probe is not None else {}
     )
-    release_identity_match = selected_probe is not None and not identity_mismatches
-    release_profile = (
-        arguments.mode == "combined" and duration == 3_600.0 and not diagnostic_override
-    )
     generated_manifest = GENERATED_CONFIG.get("validation_manifest")
     manifest_map = generated_manifest if isinstance(generated_manifest, Mapping) else {}
+    manifest_expected = manifest_map.get("expected_info")
+    manifest_expected_map = (
+        manifest_expected if isinstance(manifest_expected, Mapping) else {}
+    )
+    expected = result.get("expected")
+    expected_map = expected if isinstance(expected, Mapping) else {}
+    program = result.get("program")
+    program_map = program if isinstance(program, Mapping) else {}
+    manifest_sha256 = GENERATED_CONFIG.get("validation_manifest_sha256")
+    release_identity_match = (
+        selected_probe is not None
+        and not identity_mismatches
+        and bool(manifest_expected_map)
+        and isinstance(manifest_sha256, str)
+        and len(manifest_sha256) == 64
+        and selected_probe.observed_identity == dict(manifest_expected_map)
+        and expected_map.get("validation_manifest_sha256") == manifest_sha256
+        and program_map.get("validation_manifest_sha256") == manifest_sha256
+    )
+    metrics = result.get("metrics")
+    metrics_map = metrics if isinstance(metrics, Mapping) else {}
+    memory = metrics_map.get("memory")
+    memory_map = memory if isinstance(memory, Mapping) else {}
+    process_rss_value = memory_map.get("process_rss")
+    process_rss = process_rss_value if isinstance(process_rss_value, Mapping) else {}
+    release_requirements = _windows_release_requirements(
+        result,
+        arguments=arguments,
+        duration=duration,
+        host=host,
+        exact_manifest_device_identity=release_identity_match,
+        process_rss=process_rss,
+    )
+    release_profile = all(
+        release_requirements[name] for name in _WINDOWS_RELEASE_PROFILE_REQUIREMENTS
+    )
     result["report_schema_version"] = WINDOWS_REPORT_SCHEMA_VERSION
     result["windows"] = {
         "profile": (
@@ -5764,11 +6012,8 @@ def attach_windows_evidence(
             if diagnostic_override
             else ("release" if release_profile else "diagnostic")
         ),
-        "release_eligible": (
-            release_profile
-            and release_identity_match
-            and result.get("result") == "PASS"
-        ),
+        "release_eligible": all(release_requirements.values()),
+        "release_requirements": release_requirements,
         "diagnostic_identity_override": {
             "requested": diagnostic_override,
             "release_eligible": False if diagnostic_override else None,
@@ -5779,7 +6024,7 @@ def attach_windows_evidence(
         "smoke": bool(arguments.smoke),
         "requested_hardware_serial": arguments.hardware_serial,
         "explicit_port": arguments.port,
-        "host": windows_host_identity(),
+        "host": host,
         "com_discovery": {
             "teensy_vid": TEENSY_USB_SERIAL_VID,
             "teensy_pid": TEENSY_USB_SERIAL_PID,
@@ -5812,6 +6057,8 @@ def attach_windows_evidence(
             result,
             diagnostic_identity_override=diagnostic_override,
             identity_mismatches=identity_mismatches,
+            release_requirements=release_requirements,
+            process_rss=process_rss,
         ),
     }
 

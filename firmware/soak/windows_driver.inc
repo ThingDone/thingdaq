@@ -24,6 +24,13 @@ TEENSY_DAQ_PRODUCT = "Teensy DAQ"
 WINDOWS_PORT_PATTERN = re.compile(r"(?i)^COM([1-9][0-9]*)$")
 SOAK_CONFORMANCE_SCHEMA_VERSION = 1
 SOAK_CONFORMANCE_PREFIX = "SOAK_CONFORMANCE "
+_WINDOWS_RELEASE_PROFILE_REQUIREMENTS = (
+    "physical_combined_mode",
+    "exact_3600_second_duration",
+    "non_smoke",
+    "diagnostic_identity_override_disabled",
+    "native_windows_host",
+)
 
 
 class _WindowsProcessMemoryCounters(ctypes.Structure):
@@ -1073,6 +1080,8 @@ def _windows_validation_reasons(
     *,
     diagnostic_identity_override: bool,
     identity_mismatches: Mapping[str, object],
+    release_requirements: Mapping[str, bool],
+    process_rss: Mapping[str, object],
 ) -> list[str]:
     reasons: list[str] = []
     if diagnostic_identity_override:
@@ -1085,6 +1094,51 @@ def _windows_validation_reasons(
                 "the observed INFO identity/capabilities differ from the pinned "
                 "Phase 11 validation manifest"
             )
+    if not release_requirements["native_windows_host"]:
+        reasons.append(
+            "NON-RELEASE: native Windows host identity is required "
+            '(system == "Windows" and sys_platform == "win32")'
+        )
+    if not all(
+        release_requirements[name]
+        for name in (
+            "physical_combined_mode",
+            "exact_3600_second_duration",
+            "non_smoke",
+        )
+    ):
+        reasons.append(
+            "NON-RELEASE: the release profile requires an exact 3,600-second "
+            "non-smoke physical-combined run"
+        )
+    rss_validity_requirements = (
+        "process_rss_baseline_valid",
+        "process_rss_peak_valid",
+        "process_rss_growth_valid",
+    )
+    if not all(release_requirements[name] for name in rss_validity_requirements):
+        rss_values = {
+            name: process_rss.get(name)
+            for name in ("baseline_bytes", "peak_bytes", "growth_bytes")
+        }
+        unavailable = any(value is None for value in rss_values.values())
+        reasons.append(
+            "NON-RELEASE: complete numeric process-RSS evidence is "
+            + ("unavailable" if unavailable else "invalid")
+            + "; baseline_bytes, peak_bytes, and growth_bytes must be finite "
+            "nonnegative numbers"
+        )
+    elif not release_requirements["process_rss_growth_within_limit"]:
+        reasons.append(
+            "NON-RELEASE: process-RSS growth "
+            f"{process_rss.get('growth_bytes')} exceeds "
+            f"{MAX_RSS_GROWTH_BYTES} bytes"
+        )
+    if not release_requirements["exact_manifest_device_identity"]:
+        reasons.append(
+            "NON-RELEASE: exact validation-manifest and device identity "
+            "evidence is required"
+        )
     if result.get("result") != "PASS":
         failure = result.get("failure")
         if isinstance(failure, Mapping):
@@ -1099,18 +1153,74 @@ def _windows_validation_reasons(
         [
             (
                 "COM metadata and two stable INFO responses matched the pinned identity"
-                if not identity_mismatches
+                if release_requirements["exact_manifest_device_identity"]
                 else "COM metadata and two stable INFO responses identified one stable "
                 "diagnostic device"
             ),
             "every decoded frame passed structure and Adler-32 validation",
             "run IDs, independent sequences, timestamps, counts, and rates reconciled",
             "live and final STATUS counters and bounded queue depths reconciled",
-            "command latency and bounded host memory evidence passed",
+            "command latency requirements passed",
             "STOP reached IDLE and the serial close completed within its deadline",
         ]
     )
+    if all(
+        release_requirements[name]
+        for name in (
+            *rss_validity_requirements,
+            "process_rss_growth_within_limit",
+        )
+    ):
+        reasons.append(
+            "complete numeric process-RSS evidence remained within its growth limit"
+        )
     return reasons
+
+
+def _is_nonnegative_finite_number(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and value >= 0
+        and (not isinstance(value, float) or math.isfinite(value))
+    )
+
+
+def _windows_release_requirements(
+    result: Mapping[str, object],
+    *,
+    arguments: argparse.Namespace,
+    duration: float,
+    host: Mapping[str, object],
+    exact_manifest_device_identity: bool,
+    process_rss: Mapping[str, object],
+) -> dict[str, bool]:
+    baseline = process_rss.get("baseline_bytes")
+    peak = process_rss.get("peak_bytes")
+    growth = process_rss.get("growth_bytes")
+    growth_valid = _is_nonnegative_finite_number(growth)
+    growth_within_limit = (
+        growth_valid
+        and isinstance(growth, (int, float))
+        and growth <= MAX_RSS_GROWTH_BYTES
+    )
+    return {
+        "physical_combined_mode": arguments.mode == "combined",
+        "exact_3600_second_duration": duration == WINDOWS_DEFAULT_DURATION_SECONDS,
+        "non_smoke": not bool(arguments.smoke),
+        "diagnostic_identity_override_disabled": not bool(
+            arguments.diagnostic_identity_override
+        ),
+        "native_windows_host": (
+            host.get("system") == "Windows" and host.get("sys_platform") == "win32"
+        ),
+        "overall_pass": result.get("result") == "PASS",
+        "exact_manifest_device_identity": exact_manifest_device_identity,
+        "process_rss_baseline_valid": _is_nonnegative_finite_number(baseline),
+        "process_rss_peak_valid": _is_nonnegative_finite_number(peak),
+        "process_rss_growth_valid": growth_valid,
+        "process_rss_growth_within_limit": growth_within_limit,
+    }
 
 
 def attach_windows_evidence(
@@ -1124,6 +1234,7 @@ def attach_windows_evidence(
     lifecycle: list[dict[str, object]],
 ) -> None:
     diagnostic_override = bool(arguments.diagnostic_identity_override)
+    host = windows_host_identity()
     selected_probe = next(
         (
             probe
@@ -1135,12 +1246,44 @@ def attach_windows_evidence(
     identity_mismatches = (
         selected_probe.identity_mismatches if selected_probe is not None else {}
     )
-    release_identity_match = selected_probe is not None and not identity_mismatches
-    release_profile = (
-        arguments.mode == "combined" and duration == 3_600.0 and not diagnostic_override
-    )
     generated_manifest = GENERATED_CONFIG.get("validation_manifest")
     manifest_map = generated_manifest if isinstance(generated_manifest, Mapping) else {}
+    manifest_expected = manifest_map.get("expected_info")
+    manifest_expected_map = (
+        manifest_expected if isinstance(manifest_expected, Mapping) else {}
+    )
+    expected = result.get("expected")
+    expected_map = expected if isinstance(expected, Mapping) else {}
+    program = result.get("program")
+    program_map = program if isinstance(program, Mapping) else {}
+    manifest_sha256 = GENERATED_CONFIG.get("validation_manifest_sha256")
+    release_identity_match = (
+        selected_probe is not None
+        and not identity_mismatches
+        and bool(manifest_expected_map)
+        and isinstance(manifest_sha256, str)
+        and len(manifest_sha256) == 64
+        and selected_probe.observed_identity == dict(manifest_expected_map)
+        and expected_map.get("validation_manifest_sha256") == manifest_sha256
+        and program_map.get("validation_manifest_sha256") == manifest_sha256
+    )
+    metrics = result.get("metrics")
+    metrics_map = metrics if isinstance(metrics, Mapping) else {}
+    memory = metrics_map.get("memory")
+    memory_map = memory if isinstance(memory, Mapping) else {}
+    process_rss_value = memory_map.get("process_rss")
+    process_rss = process_rss_value if isinstance(process_rss_value, Mapping) else {}
+    release_requirements = _windows_release_requirements(
+        result,
+        arguments=arguments,
+        duration=duration,
+        host=host,
+        exact_manifest_device_identity=release_identity_match,
+        process_rss=process_rss,
+    )
+    release_profile = all(
+        release_requirements[name] for name in _WINDOWS_RELEASE_PROFILE_REQUIREMENTS
+    )
     result["report_schema_version"] = WINDOWS_REPORT_SCHEMA_VERSION
     result["windows"] = {
         "profile": (
@@ -1148,11 +1291,8 @@ def attach_windows_evidence(
             if diagnostic_override
             else ("release" if release_profile else "diagnostic")
         ),
-        "release_eligible": (
-            release_profile
-            and release_identity_match
-            and result.get("result") == "PASS"
-        ),
+        "release_eligible": all(release_requirements.values()),
+        "release_requirements": release_requirements,
         "diagnostic_identity_override": {
             "requested": diagnostic_override,
             "release_eligible": False if diagnostic_override else None,
@@ -1163,7 +1303,7 @@ def attach_windows_evidence(
         "smoke": bool(arguments.smoke),
         "requested_hardware_serial": arguments.hardware_serial,
         "explicit_port": arguments.port,
-        "host": windows_host_identity(),
+        "host": host,
         "com_discovery": {
             "teensy_vid": TEENSY_USB_SERIAL_VID,
             "teensy_pid": TEENSY_USB_SERIAL_PID,
@@ -1196,6 +1336,8 @@ def attach_windows_evidence(
             result,
             diagnostic_identity_override=diagnostic_override,
             identity_mismatches=identity_mismatches,
+            release_requirements=release_requirements,
+            process_rss=process_rss,
         ),
     }
 

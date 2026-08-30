@@ -151,6 +151,108 @@ def _passing_probe(candidate: object, hardware_serial: int) -> object:
     )
 
 
+def _attached_windows_report(
+    module: ModuleType,
+    *,
+    host: dict[str, object],
+    process_rss: dict[str, object] | None,
+    duration: float = 3_600.0,
+    mode: str = "combined",
+    smoke: bool = False,
+    diagnostic_identity_override: bool = False,
+    overall_pass: bool = True,
+    exact_identity: bool = True,
+) -> dict[str, object]:
+    settings = module.windows_runtime_settings(
+        mode,
+        duration,
+        diagnostic_identity_override=diagnostic_identity_override,
+    )
+    manifest = module.GENERATED_CONFIG.get("validation_manifest")
+    if not isinstance(manifest, dict):
+        raise TypeError("generated validation manifest is unavailable")
+    expected_info = manifest.get("expected_info")
+    if not isinstance(expected_info, dict):
+        raise TypeError("generated validation manifest INFO contract is unavailable")
+    observed_identity = dict(expected_info)
+    identity_mismatches: dict[str, dict[str, object]] = {}
+    if not exact_identity:
+        observed_identity["build_id"] = "tdaq-diagnostic-other"
+        identity_mismatches["build_id"] = {
+            "expected": expected_info["build_id"],
+            "actual": observed_identity["build_id"],
+        }
+    candidate = module.WindowsPortCandidate(
+        port="COM10",
+        vid=module.TEENSY_USB_SERIAL_VID,
+        pid=module.TEENSY_USB_SERIAL_PID,
+        serial_number=str(settings.hardware_serial),
+        product=module.TEENSY_DAQ_PRODUCT,
+        manufacturer="PJRC",
+        location="fixture-location",
+        interface="CDC",
+        description="Teensy DAQ",
+    )
+    probe = module.WindowsProbeResult(
+        candidate=candidate,
+        observed_identity=observed_identity,
+        identity_mismatches=identity_mismatches,
+        latency_seconds=[0.001, 0.002],
+        failure=None,
+        close={
+            "attempted": True,
+            "completed": True,
+            "timed_out": False,
+            "error": None,
+        },
+    )
+    result = module.windows_failure_result(
+        module.SoakFailure("fixture", "intentional fixture failure"),
+        settings=settings,
+        mode=mode,
+    )
+    if overall_pass:
+        result.update(
+            {
+                "result": "PASS",
+                "failure": None,
+                "observed_identity": observed_identity,
+                "cleanup": {"attempted": False, "normal_close": True},
+            }
+        )
+    if process_rss is not None:
+        result["metrics"] = {"memory": {"process_rss": process_rss}}
+    parser_arguments = ["--mode", mode, "--output", "unused"]
+    if smoke:
+        parser_arguments.append("--smoke")
+    else:
+        parser_arguments.extend(("--duration", str(duration)))
+    if diagnostic_identity_override:
+        parser_arguments.append("--diagnostic-identity-override")
+    arguments = module.build_windows_parser().parse_args(parser_arguments)
+    arguments.hardware_serial = settings.hardware_serial
+    with patch.object(
+        module,
+        "windows_host_identity",
+        return_value=host,
+    ) as host_identity:
+        module.attach_windows_evidence(
+            result,
+            arguments=arguments,
+            duration=duration,
+            candidates=(candidate,),
+            probes=(probe,),
+            selected=candidate,
+            lifecycle=[],
+        )
+    if host_identity.call_count != 1:
+        raise AssertionError("host identity must be captured exactly once per report")
+    windows = result.get("windows")
+    if not isinstance(windows, dict) or windows.get("host") is not host:
+        raise AssertionError("grading and report must share one host identity snapshot")
+    return result
+
+
 def _failed_probe(candidate: object, message: str) -> object:
     return WINDOWS.WindowsProbeResult(
         candidate=candidate,
@@ -706,6 +808,247 @@ class WindowsOneHourProfileTests(unittest.TestCase):
 
 
 class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
+    def test_release_requirements_fail_closed_and_preserve_entry_point_parity(
+        self,
+    ) -> None:
+        host = {
+            "system": "Windows",
+            "sys_platform": "win32",
+            "snapshot": "one-call-fixture",
+        }
+        process_rss = {
+            "baseline_bytes": 64 * 1024**2,
+            "peak_bytes": 72 * 1024**2,
+            "growth_bytes": 8 * 1024**2,
+        }
+        expected_requirements = {
+            "physical_combined_mode",
+            "exact_3600_second_duration",
+            "non_smoke",
+            "diagnostic_identity_override_disabled",
+            "native_windows_host",
+            "overall_pass",
+            "exact_manifest_device_identity",
+            "process_rss_baseline_valid",
+            "process_rss_peak_valid",
+            "process_rss_growth_valid",
+            "process_rss_growth_within_limit",
+        }
+        reports = [
+            _attached_windows_report(
+                module,
+                host=dict(host),
+                process_rss=dict(process_rss),
+            )
+            for module in (WINDOWS, installed_soak)
+        ]
+        graded = []
+        for report in reports:
+            windows = report["windows"]
+            self.assertEqual("release", windows["profile"])
+            requirements = windows["release_requirements"]
+            self.assertEqual(expected_requirements, set(requirements))
+            self.assertTrue(all(requirements.values()))
+            self.assertTrue(windows["release_eligible"])
+            self.assertEqual(
+                all(requirements.values()),
+                windows["release_eligible"],
+            )
+            graded.append(
+                {
+                    name: windows[name]
+                    for name in (
+                        "profile",
+                        "release_eligible",
+                        "release_requirements",
+                        "validation_reasons",
+                    )
+                }
+            )
+        self.assertEqual(graded[0], graded[1])
+
+    def test_release_profile_requires_one_native_windows_host_snapshot(self) -> None:
+        process_rss = {
+            "baseline_bytes": 64 * 1024**2,
+            "peak_bytes": 65 * 1024**2,
+            "growth_bytes": 1024**2,
+        }
+        cases = (
+            ("native", {"system": "Windows", "sys_platform": "win32"}, True),
+            ("linux", {"system": "Linux", "sys_platform": "linux"}, False),
+            ("macos", {"system": "Darwin", "sys_platform": "darwin"}, False),
+            (
+                "wine-nonnative",
+                {"system": "Windows", "sys_platform": "linux"},
+                False,
+            ),
+            ("unknown", {"system": None, "sys_platform": None}, False),
+        )
+        for name, host, native in cases:
+            with self.subTest(host=name):
+                result = _attached_windows_report(
+                    WINDOWS,
+                    host=host,
+                    process_rss=dict(process_rss),
+                )
+                windows = result["windows"]
+                requirements = windows["release_requirements"]
+                self.assertEqual(native, requirements["native_windows_host"])
+                self.assertEqual(
+                    "release" if native else "diagnostic", windows["profile"]
+                )
+                self.assertEqual(native, windows["release_eligible"])
+                if not native:
+                    self.assertTrue(
+                        any(
+                            "native Windows host identity" in reason
+                            for reason in windows["validation_reasons"]
+                        )
+                    )
+
+    def test_invalid_process_rss_evidence_is_explicitly_non_release(self) -> None:
+        mib = 1024**2
+        cases = (
+            (
+                "unavailable",
+                {"baseline_bytes": 64 * mib, "peak_bytes": 72 * mib},
+                "process_rss_growth_valid",
+                "unavailable",
+            ),
+            (
+                "nonnumeric",
+                {
+                    "baseline_bytes": 64 * mib,
+                    "peak_bytes": "72 MiB",
+                    "growth_bytes": 8 * mib,
+                },
+                "process_rss_peak_valid",
+                "invalid",
+            ),
+            (
+                "boolean",
+                {
+                    "baseline_bytes": 64 * mib,
+                    "peak_bytes": 72 * mib,
+                    "growth_bytes": True,
+                },
+                "process_rss_growth_valid",
+                "invalid",
+            ),
+            (
+                "negative",
+                {
+                    "baseline_bytes": -1,
+                    "peak_bytes": 72 * mib,
+                    "growth_bytes": 8 * mib,
+                },
+                "process_rss_baseline_valid",
+                "invalid",
+            ),
+            (
+                "nan",
+                {
+                    "baseline_bytes": 64 * mib,
+                    "peak_bytes": float("nan"),
+                    "growth_bytes": 8 * mib,
+                },
+                "process_rss_peak_valid",
+                "invalid",
+            ),
+            (
+                "infinite",
+                {
+                    "baseline_bytes": 64 * mib,
+                    "peak_bytes": 72 * mib,
+                    "growth_bytes": float("inf"),
+                },
+                "process_rss_growth_valid",
+                "invalid",
+            ),
+            (
+                "over-limit",
+                {
+                    "baseline_bytes": 64 * mib,
+                    "peak_bytes": 100 * mib,
+                    "growth_bytes": WINDOWS.MAX_RSS_GROWTH_BYTES + 1,
+                },
+                "process_rss_growth_within_limit",
+                "exceeds",
+            ),
+        )
+        for name, process_rss, failed_requirement, reason_fragment in cases:
+            with self.subTest(evidence=name):
+                result = _attached_windows_report(
+                    WINDOWS,
+                    host={"system": "Windows", "sys_platform": "win32"},
+                    process_rss=process_rss,
+                )
+                self.assertEqual("PASS", result["result"])
+                windows = result["windows"]
+                self.assertEqual("release", windows["profile"])
+                self.assertFalse(windows["release_eligible"])
+                self.assertFalse(windows["release_requirements"][failed_requirement])
+                self.assertEqual(
+                    all(windows["release_requirements"].values()),
+                    windows["release_eligible"],
+                )
+                self.assertTrue(
+                    any(
+                        reason_fragment in reason
+                        for reason in windows["validation_reasons"]
+                    )
+                )
+
+    def test_short_diagnostic_pass_stays_pass_with_unavailable_rss(self) -> None:
+        result = _attached_windows_report(
+            WINDOWS,
+            host={"system": "Windows", "sys_platform": "win32"},
+            process_rss=None,
+            duration=WINDOWS.WINDOWS_SMOKE_DURATION_SECONDS,
+            smoke=True,
+        )
+        self.assertEqual("PASS", result["result"])
+        windows = result["windows"]
+        self.assertEqual("diagnostic", windows["profile"])
+        self.assertFalse(windows["release_eligible"])
+        self.assertFalse(windows["release_requirements"]["non_smoke"])
+        self.assertFalse(windows["release_requirements"]["exact_3600_second_duration"])
+        self.assertTrue(
+            any(
+                "process-RSS evidence is unavailable" in reason
+                for reason in windows["validation_reasons"]
+            )
+        )
+
+    def test_pass_and_exact_identity_are_independent_release_predicates(self) -> None:
+        process_rss = {
+            "baseline_bytes": 64 * 1024**2,
+            "peak_bytes": 65 * 1024**2,
+            "growth_bytes": 1024**2,
+        }
+        cases = (
+            ("failed-run", False, True, "overall_pass"),
+            (
+                "identity-mismatch",
+                True,
+                False,
+                "exact_manifest_device_identity",
+            ),
+        )
+        for name, overall_pass, exact_identity, failed_requirement in cases:
+            with self.subTest(requirement=name):
+                result = _attached_windows_report(
+                    WINDOWS,
+                    host={"system": "Windows", "sys_platform": "win32"},
+                    process_rss=dict(process_rss),
+                    overall_pass=overall_pass,
+                    exact_identity=exact_identity,
+                )
+                windows = result["windows"]
+                self.assertEqual("release", windows["profile"])
+                self.assertFalse(windows["release_eligible"])
+                self.assertFalse(windows["release_requirements"][failed_requirement])
+
     def assert_report_contract(self, base: Path) -> dict[str, object]:
         json_path = Path(f"{base}.json")
         markdown_path = Path(f"{base}.md")
@@ -735,6 +1078,7 @@ class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
         for name in (
             "profile",
             "release_eligible",
+            "release_requirements",
             "host",
             "com_discovery",
             "serial_lifecycle",

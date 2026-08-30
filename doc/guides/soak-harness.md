@@ -110,6 +110,19 @@ The default path rejects any INFO field that differs from the manifest, and a
 COM number is recorded only as mutable discovery evidence rather than device
 identity.
 
+The authoritative JSON records every release predicate under
+`windows.release_requirements`. A report is labeled `profile: release` only
+when `physical_combined_mode`, `exact_3600_second_duration`, `non_smoke`,
+`diagnostic_identity_override_disabled`, and `native_windows_host` are all
+`true`; native host identity requires both `system: Windows` and
+`sys_platform: win32` from one captured host snapshot. `release_eligible` is
+the conjunction of the complete mapping, which additionally requires an
+overall PASS, exact manifest/device identity, and finite nonnegative
+`baseline_bytes`, `peak_bytes`, and `growth_bytes` process-RSS evidence with
+growth no greater than 32 MiB. Missing, malformed, negative, non-finite, or
+over-limit RSS evidence fails closed as non-release without changing a useful
+diagnostic PASS into a runtime FAIL.
+
 `--diagnostic-identity-override` is the sole escape hatch for deliberately
 testing a different parseable device or firmware identity. It must be supplied
 explicitly; without it, even one build, hardware-serial, version, capability,

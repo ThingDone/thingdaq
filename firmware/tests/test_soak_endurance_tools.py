@@ -56,6 +56,7 @@ ALLOWED_STANDALONE_IMPORTS = {
 }
 ALLOWED_WINDOWS_IMPORTS = ALLOWED_STANDALONE_IMPORTS | {
     "argparse",
+    "ctypes",
     "pathlib",
     "platform",
     "re",
