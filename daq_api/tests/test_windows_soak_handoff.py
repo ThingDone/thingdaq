@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import ctypes
 import io
 import json
 import math
@@ -692,6 +693,261 @@ class WindowsWireAndFaultTests(unittest.TestCase):
                     self.assertTrue(port.close_summary()["completed"])
                 else:
                     self.assertTrue(port.closed)
+
+
+class WindowsProcessMemoryTests(unittest.TestCase):
+    def test_native_api_reports_exact_working_sets_and_fails_closed(self) -> None:
+        counters_type = WINDOWS._WindowsProcessMemoryCounters
+        counters_size = ctypes.sizeof(counters_type)
+        current_bytes = 73_400_320
+        peak_bytes = 91_226_112
+        calls: list[tuple[object, int, int]] = []
+
+        def populate_counters(
+            process: object,
+            counters_pointer: object,
+            structure_size: int,
+        ) -> int:
+            counters = ctypes.cast(
+                counters_pointer,
+                ctypes.POINTER(counters_type),
+            ).contents
+            calls.append((process, structure_size, counters.cb))
+            counters.WorkingSetSize = current_bytes
+            counters.PeakWorkingSetSize = peak_bytes
+            return 1
+
+        api = WINDOWS._WindowsProcessMemoryApi(
+            get_current_process=lambda: 0xCAFE,
+            get_process_memory_info=populate_counters,
+        )
+        with (
+            patch.object(WINDOWS.sys, "platform", "win32"),
+            patch.object(WINDOWS, "_WINDOWS_PROCESS_MEMORY_API", api),
+        ):
+            self.assertEqual(current_bytes, WINDOWS._current_rss_bytes())
+            self.assertEqual(peak_bytes, WINDOWS._peak_rss_bytes())
+
+        self.assertEqual(
+            [(0xCAFE, counters_size, counters_size)] * 2,
+            calls,
+        )
+        self.assertEqual(
+            [
+                ("cb", ctypes.c_uint32),
+                ("PageFaultCount", ctypes.c_uint32),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ],
+            counters_type._fields_,
+        )
+
+        def raise_os_error(*_arguments: object) -> object:
+            raise OSError("fixture API failure")
+
+        def memory_result(
+            *,
+            succeeded: int = 1,
+            current: int = current_bytes,
+            peak: int = peak_bytes,
+            reported_size: int = counters_size,
+        ) -> object:
+            def get_process_memory_info(
+                _process: object,
+                counters_pointer: object,
+                _structure_size: int,
+            ) -> int:
+                counters = ctypes.cast(
+                    counters_pointer,
+                    ctypes.POINTER(counters_type),
+                ).contents
+                counters.cb = reported_size
+                counters.WorkingSetSize = current
+                counters.PeakWorkingSetSize = peak
+                return succeeded
+
+            return get_process_memory_info
+
+        invalid_apis = (
+            (
+                "null-process",
+                WINDOWS._WindowsProcessMemoryApi(
+                    get_current_process=lambda: 0,
+                    get_process_memory_info=populate_counters,
+                ),
+            ),
+            (
+                "process-call-error",
+                WINDOWS._WindowsProcessMemoryApi(
+                    get_current_process=raise_os_error,
+                    get_process_memory_info=populate_counters,
+                ),
+            ),
+            (
+                "memory-call-error",
+                WINDOWS._WindowsProcessMemoryApi(
+                    get_current_process=lambda: 0xCAFE,
+                    get_process_memory_info=raise_os_error,
+                ),
+            ),
+            (
+                "memory-call-failed",
+                WINDOWS._WindowsProcessMemoryApi(
+                    get_current_process=lambda: 0xCAFE,
+                    get_process_memory_info=memory_result(succeeded=0),
+                ),
+            ),
+            (
+                "structure-size-mismatch",
+                WINDOWS._WindowsProcessMemoryApi(
+                    get_current_process=lambda: 0xCAFE,
+                    get_process_memory_info=memory_result(reported_size=0),
+                ),
+            ),
+            (
+                "peak-below-current",
+                WINDOWS._WindowsProcessMemoryApi(
+                    get_current_process=lambda: 0xCAFE,
+                    get_process_memory_info=memory_result(
+                        current=current_bytes,
+                        peak=current_bytes - 1,
+                    ),
+                ),
+            ),
+        )
+        for name, invalid_api in invalid_apis:
+            with self.subTest(failure=name):
+                self.assertIsNone(WINDOWS._windows_process_memory_bytes(invalid_api))
+
+        with patch.object(WINDOWS, "_WINDOWS_PROCESS_MEMORY_API", None):
+            self.assertIsNone(WINDOWS._windows_process_memory_bytes())
+
+    def test_non_windows_rss_delegates_without_native_api_calls(self) -> None:
+        with (
+            patch.object(WINDOWS.sys, "platform", "linux"),
+            patch.object(
+                WINDOWS,
+                "_canonical_current_rss_bytes",
+                return_value=111_222_333,
+            ) as current_rss,
+            patch.object(
+                WINDOWS,
+                "_canonical_peak_rss_bytes",
+                return_value=444_555_666,
+            ) as peak_rss,
+            patch.object(WINDOWS, "_windows_process_memory_bytes") as native_rss,
+        ):
+            self.assertEqual(111_222_333, WINDOWS._current_rss_bytes())
+            self.assertEqual(444_555_666, WINDOWS._peak_rss_bytes())
+
+        current_rss.assert_called_once_with()
+        peak_rss.assert_called_once_with()
+        native_rss.assert_not_called()
+
+    def test_memory_tracker_records_numeric_rss_with_bounded_evidence(self) -> None:
+        mib = 1024**2
+        current_samples = iter((64 * mib, 65 * mib, 66 * mib))
+        peak_samples = iter((70 * mib, 72 * mib, 74 * mib, 80 * mib))
+
+        def current_rss() -> int:
+            return next(current_samples, 66 * mib)
+
+        def peak_rss() -> int:
+            return next(peak_samples, 80 * mib)
+
+        tracing = StableTracemalloc()
+        streaming_samples = WINDOWS.MAX_COUNTER_SAMPLES + 3
+        with (
+            patch.object(WINDOWS, "tracemalloc", tracing),
+            patch.object(WINDOWS, "_current_rss_bytes", side_effect=current_rss),
+            patch.object(WINDOWS, "_peak_rss_bytes", side_effect=peak_rss),
+            patch.object(
+                WINDOWS,
+                "_available_process_memory_bytes",
+                return_value=512 * mib,
+            ),
+        ):
+            tracker = WINDOWS.MemoryTracker()
+            tracker.begin_streaming()
+            for _index in range(streaming_samples):
+                tracker.sample_streaming(checkpoint=True)
+            tracker.end_streaming()
+            memory = tracker.summary()
+
+        self.assertEqual(
+            {
+                "baseline_bytes": 64 * mib,
+                "final_bytes": 66 * mib,
+                "maximum_current_bytes": 66 * mib,
+                "peak_bytes": 80 * mib,
+                "growth_bytes": 10 * mib,
+            },
+            memory["process_rss"],
+        )
+        self.assertEqual(streaming_samples + 3, memory["sample_count"])
+        self.assertEqual(
+            streaming_samples,
+            memory["coverage"]["streaming_samples"],
+        )
+        self.assertEqual(1, memory["coverage"]["streaming_windows"])
+        self.assertEqual(
+            WINDOWS.MAX_COUNTER_SAMPLES,
+            len(memory["bounded_checkpoints"]),
+        )
+        self.assertTrue(tracing.is_tracing())
+
+    def test_unavailable_windows_rss_remains_none_and_is_not_release_eligible(
+        self,
+    ) -> None:
+        tracing = StableTracemalloc()
+        with (
+            patch.object(WINDOWS.sys, "platform", "win32"),
+            patch.object(WINDOWS, "_WINDOWS_PROCESS_MEMORY_API", None),
+            patch.object(WINDOWS, "tracemalloc", tracing),
+            patch.object(
+                WINDOWS,
+                "_available_process_memory_bytes",
+                return_value=None,
+            ),
+        ):
+            memory = WINDOWS.MemoryTracker().summary()
+
+        process_rss = memory["process_rss"]
+        self.assertEqual(
+            {
+                "baseline_bytes": None,
+                "final_bytes": None,
+                "maximum_current_bytes": None,
+                "peak_bytes": None,
+                "growth_bytes": None,
+            },
+            process_rss,
+        )
+        result = _attached_windows_report(
+            WINDOWS,
+            host={"system": "Windows", "sys_platform": "win32"},
+            process_rss=process_rss,
+        )
+        windows = result["windows"]
+        requirements = windows["release_requirements"]
+        self.assertEqual("PASS", result["result"])
+        self.assertEqual("release", windows["profile"])
+        self.assertFalse(windows["release_eligible"])
+        self.assertFalse(requirements["process_rss_baseline_valid"])
+        self.assertFalse(requirements["process_rss_peak_valid"])
+        self.assertFalse(requirements["process_rss_growth_valid"])
+        self.assertTrue(
+            any(
+                "process-RSS evidence is unavailable" in reason
+                for reason in windows["validation_reasons"]
+            )
+        )
 
 
 class WindowsOneHourProfileTests(unittest.TestCase):
