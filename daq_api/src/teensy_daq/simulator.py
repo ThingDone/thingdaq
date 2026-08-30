@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+from collections import deque
 
 from ._generated import protocol_constants as constants
 from .models import Configuration, Info, Status
@@ -16,6 +17,7 @@ _SUCCESS_PREFIX = _RESPONSE_PREFIX.pack(
     0,
     constants.ErrorCode.OK,
 )
+_RECENT_REQUEST_ID_WINDOW = 16
 
 
 class SimulatorError(RuntimeError):
@@ -72,8 +74,10 @@ class SimulatedDevice:
         self._gpio_items_dropped = 0
         self._parser_error_baseline = 0
         self._transport_errors = 0
+        self._bad_request_ids = 0
         self._stats_generation = 1
         self._next_stream_index = 0
+        self._recent_request_ids: deque[int] = deque(maxlen=_RECENT_REQUEST_ID_WINDOW)
         if auto_boot:
             self.finish_boot()
 
@@ -114,6 +118,12 @@ class SimulatedDevice:
             self._transport_errors + 1,
             constants.UINT32_MAX,
         )
+
+    def begin_host_session(self) -> None:
+        """Reset session-scoped parser and replay state without stopping a run."""
+
+        self._request_parser.reset_session()
+        self._recent_request_ids.clear()
 
     def receive(self, data: bytes | bytearray | memoryview) -> tuple[bytes, ...]:
         """Consume one bounded host-write chunk and return encoded responses."""
@@ -198,6 +208,7 @@ class SimulatedDevice:
             parser_errors=(self._request_parser.errors - self._parser_error_baseline)
             & constants.UINT32_MAX,
             transport_errors=self._transport_errors,
+            bad_request_ids=self._bad_request_ids,
             stats_generation=self._stats_generation,
             adc_frames_generated=self._adc_frames_emitted,
             adc_items_generated=adc_items,
@@ -250,6 +261,13 @@ class SimulatedDevice:
             )
         if self._state is constants.DeviceState.BOOT:
             return self._typed_error(request, constants.ErrorCode.INVALID_STATE)
+        if request.header.request_id in self._recent_request_ids:
+            self._bad_request_ids = min(
+                self._bad_request_ids + 1,
+                constants.UINT32_MAX,
+            )
+            return self._typed_error(request, constants.ErrorCode.INVALID_REQUEST_ID)
+        self._recent_request_ids.append(request.header.request_id)
 
         handlers = {
             constants.FrameKind.INFO_REQUEST: self._handle_info,
@@ -446,6 +464,7 @@ class SimulatedDevice:
         self._gpio_items_dropped = 0
         self._parser_error_baseline = self._request_parser.errors
         self._transport_errors = 0
+        self._bad_request_ids = 0
         self._stats_generation = (self._stats_generation + 1) & constants.UINT32_MAX
         if self._stats_generation == 0:
             self._stats_generation = 1

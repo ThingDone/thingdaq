@@ -48,6 +48,10 @@ class LowerPriorityFrameSource {
   // replaced by the source's pressure policy; afterward it must remain pinned
   // until releaseFrontFrame() observes the final byte.
   virtual void markFrontFrameStarted() {}
+  // A host-session boundary cannot carry a partially emitted frame into the
+  // next byte stream. Remove and loss-account the pinned front frame without
+  // treating it as transmitted.
+  virtual bool abortFrontFrame() = 0;
   virtual void releaseFrontFrame() = 0;
   virtual std::size_t queuedFrames() const = 0;
 };

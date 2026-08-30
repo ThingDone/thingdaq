@@ -113,6 +113,7 @@ class ScriptedSerialPeer:
         if responses_to_drop < 0:
             raise ValueError("responses_to_drop must be nonnegative")
         self.device = device if device is not None else RecordingSimulatedDevice()
+        self.device.begin_host_session()
         self._read_pattern = read_pattern
         self._write_pattern = write_pattern
         self._hold_responses = hold_responses

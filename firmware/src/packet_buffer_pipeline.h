@@ -344,6 +344,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   protocol::ByteView frontFrame() const override;
   bool prepareFrontFrame() override;
   void markFrontFrameStarted() override;
+  bool abortFrontFrame() override;
   void releaseFrontFrame() override;
   std::size_t queuedFrames() const override;
 

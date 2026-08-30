@@ -33,6 +33,8 @@ void expect(bool condition, const std::string &message) {
 
 class FakeCdcStream final : public usb::CdcByteStream {
  public:
+  bool sessionOpen() const override { return session_open; }
+
   usb::IoCount available() override { return 0; }
 
   usb::IoCount read(std::uint8_t *, std::size_t) override { return 0; }
@@ -56,6 +58,7 @@ class FakeCdcStream final : public usb::CdcByteStream {
 
   std::deque<usb::IoCount> write_plan{};
   std::vector<std::uint8_t> output{};
+  bool session_open = true;
 };
 
 packet::FinishFillResult fillAndFinish(packet::PacketBufferPipeline &pipeline,
@@ -325,6 +328,73 @@ void testTransportOwnershipSurvivesPartialWrites() {
            "partial writes preserve complete ordered wire frames");
     offset += constants::kDataFrameBytes;
   }
+}
+
+void testSessionBoundaryAbortsPartialDataFrame() {
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  expect(pipeline.startRun(13U, constants::kDefaultChecksumAlgorithm,
+                           packet::kAdcStreamMask) ==
+             packet::OperationStatus::kOk,
+         "start a single-stream session-boundary run");
+  const std::uint16_t epoch =
+      static_cast<std::uint16_t>(constants::FrameFlag::kEpochStart);
+  for (std::uint32_t sequence = 0U; sequence < 2U; ++sequence) {
+    packet::FillHandle handle{};
+    expect(fillAndFinish(
+               pipeline, packet::Stream::kAdc,
+               static_cast<std::uint64_t>(sequence) *
+                   constants::kFrameCoverageTicks,
+               sequence == 0U ? epoch : 0U, handle)
+               .ok(),
+           "prepare consecutive ADC frames across a CDC boundary");
+  }
+  expect(pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+         "promote both CDC-boundary frames");
+
+  FakeCdcStream stream{};
+  stream.write_plan = {37, 0};
+  stats::Statistics statistics{};
+  usb::CdcTransport transport{stream, statistics, &pipeline};
+  const usb::ServiceReport partial = transport.serviceTransmit();
+  expect(partial.stalled && partial.bytes_written == 37U &&
+             transport.snapshot().active_frame_bytes_sent == 37U,
+         "establish one pinned partial data frame in the old host session");
+
+  stream.session_open = false;
+  const usb::ServiceReport closed = transport.serviceTransmit();
+  packet::PipelineSnapshot after_close = pipeline.snapshot();
+  expect(closed.bytes_written == 0U &&
+             transport.snapshot().active_frame_size == 0U &&
+             pipeline.queuedFrames() == 1U &&
+             after_close.sources[0].frames_transmitted == 0U &&
+             after_close.sources[0].frames_dropped == 1U &&
+             after_close.sources[0].frames_dropped_after_framing == 1U &&
+             after_close.sources[0].frames_dropped_after_promotion == 1U &&
+             after_close.accounted_frame_skew == 2U,
+         "DTR close aborts and exactly loss-accounts the pinned old-session frame");
+
+  stream.output.clear();
+  stream.session_open = true;
+  const usb::ServiceReport reopened = transport.serviceTransmit();
+  wire::DecodedFrame successor{};
+  const std::uint16_t required_gap = static_cast<std::uint16_t>(
+      static_cast<std::uint16_t>(constants::FrameFlag::kGapBefore) |
+      static_cast<std::uint16_t>(constants::FrameFlag::kOverrunBefore));
+  expect(reopened.frames_completed == 1U &&
+             stream.output.size() == constants::kDataFrameBytes &&
+             wire::decodeFrame({stream.output.data(), stream.output.size()},
+                               successor)
+                 .ok() &&
+             successor.header.kind == constants::FrameKind::kAdcData &&
+             successor.header.sequence == 1U &&
+             (successor.header.flags & required_gap) == required_gap,
+         "the new host session starts at a complete checksummed gap-marked frame");
+  after_close = pipeline.snapshot();
+  expect(after_close.sources[0].frames_transmitted == 1U &&
+             after_close.sources[0].frames_dropped == 1U &&
+             pipeline.quiescent(),
+         "session abort and successor transmission conserve packet ownership");
 }
 
 void testFairPromotionKeepsNominalCoverageAligned() {
@@ -717,6 +787,7 @@ void testOldestCompletePressureEvictionKeepsLiveDataAndControlServiceable() {
 int main() {
   testAlignedFixedPoolAndFailureAccounting();
   testTransportOwnershipSurvivesPartialWrites();
+  testSessionBoundaryAbortsPartialDataFrame();
   testFairPromotionKeepsNominalCoverageAligned();
   testCombinedFairnessBoundsLeadAndCountsMissingCoverage();
   testPoolExhaustionIsBoundedAndSequenceVisible();

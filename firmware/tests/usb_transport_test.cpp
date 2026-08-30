@@ -187,6 +187,14 @@ class FakeLowerPrioritySource final : public usb::LowerPriorityFrameSource {
     }
   }
 
+  bool abortFrontFrame() override {
+    if (frames.empty()) {
+      return false;
+    }
+    frames.pop_front();
+    return true;
+  }
+
   std::size_t queuedFrames() const override { return frames.size(); }
 
   std::deque<std::vector<std::uint8_t>> frames{};

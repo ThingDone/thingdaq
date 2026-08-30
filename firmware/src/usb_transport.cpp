@@ -481,10 +481,14 @@ void CdcTransport::resetSessionQueues() {
       counters_.session_responses_abandoned,
       static_cast<std::uint32_t>(response_queue_.size()));
   response_queue_.clear();
-  if (active_frame_ == ActiveFrame::kResponse) {
-    active_frame_ = ActiveFrame::kNone;
-    tx_offset_ = 0U;
+  if (active_frame_ == ActiveFrame::kLowerPriority &&
+      (lower_priority_ == nullptr ||
+       !lower_priority_->abortFrontFrame())) {
+    recordIoError();
   }
+  active_frame_ = ActiveFrame::kNone;
+  active_lower_priority_frame_ = {};
+  tx_offset_ = 0U;
 
   rx_pending_offset_ = 0U;
   rx_pending_size_ = 0U;

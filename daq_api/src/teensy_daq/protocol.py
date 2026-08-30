@@ -1437,9 +1437,7 @@ class IncrementalFrameParser:
     def reset(self) -> None:
         """Discard pending bytes and reset parser counters."""
 
-        self._buffer.clear()
-        self._scan_start = 0
-        self._resynchronizing = False
+        self.reset_session()
         self.bytes_received = 0
         self.frames_decoded = 0
         self.corruption_events = 0
@@ -1449,6 +1447,13 @@ class IncrementalFrameParser:
         self.resynchronizations = 0
         self.bytes_discarded = 0
         self.high_water_mark = 0
+
+    def reset_session(self) -> None:
+        """Discard only partial wire state while retaining lifetime counters."""
+
+        self._buffer.clear()
+        self._scan_start = 0
+        self._resynchronizing = False
 
     def feed(self, chunk: BytesLike) -> list[Frame]:
         """Consume a chunk and return every complete valid frame it contains."""

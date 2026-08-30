@@ -546,6 +546,7 @@ class InMemoryTransport:
             raise TypeError("demand_driven must be a boolean")
 
         self.device = device if device is not None else SimulatedDevice()
+        self.device.begin_host_session()
         self._read_chunk_size = read_chunk_size
         self._write_chunk_size = write_chunk_size
         self._max_pending_bytes = max_pending_bytes
@@ -580,7 +581,19 @@ class InMemoryTransport:
                 self._require_open()
                 if not view:
                     return 0
+                # Preflight response capacity before the simulator can mutate
+                # command state. If N maximum-size responses fit, accepting at
+                # most N minimum-frame lengths can complete at most N requests,
+                # including when the first byte finishes a buffered partial one.
+                response_capacity = self._max_pending_bytes - len(self._pending)
+                response_slots = response_capacity // constants.MAX_CONTROL_FRAME_BYTES
+                if response_slots == 0:
+                    return 0
                 accepted = min(len(view), self.device.max_receive_bytes)
+                accepted = min(
+                    accepted,
+                    response_slots * constants.MIN_FRAME_BYTES,
+                )
                 if self._write_chunk_size is not None:
                     accepted = min(accepted, self._write_chunk_size)
                 previous_state = self.device.state

@@ -440,6 +440,32 @@ void PacketBufferPipeline::markFrontFrameStarted() {
   record.transmission_started = true;
 }
 
+TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.abort_front")
+bool PacketBufferPipeline::abortFrontFrame() {
+  BufferIndex buffer_index = kInvalidBufferIndex;
+  if (!transmit_queue_.pop(buffer_index) ||
+      buffer_index >= records_.size()) {
+    saturatingIncrement(invalid_operations_);
+    return false;
+  }
+
+  BufferRecord &record = records_[buffer_index];
+  if (record.state != BufferState::kTransmitting ||
+      !record.transmission_started || !validStream(record.stream)) {
+    saturatingIncrement(invalid_operations_);
+    recycle(buffer_index);
+    return false;
+  }
+  const std::size_t source_index = streamIndex(record.stream);
+  if (transmit_depth_by_source_[source_index] == 0U) {
+    saturatingIncrement(invalid_operations_);
+  } else {
+    --transmit_depth_by_source_[source_index];
+  }
+  dropBuffer(buffer_index, false);
+  return true;
+}
+
 void PacketBufferPipeline::releaseFrontFrame() {
   BufferIndex buffer_index = kInvalidBufferIndex;
   if (!transmit_queue_.pop(buffer_index) ||
@@ -602,11 +628,14 @@ std::uint64_t PacketBufferPipeline::accountedFrames(
   }
   std::uint64_t result = source_counters_[source_index].frames_emitted;
   saturatingAdd(result, source_counters_[source_index].frames_dropped);
-  const std::uint64_t evicted_after_promotion =
-      source_counters_[source_index].frames_evicted_after_promotion;
-  result = evicted_after_promotion >= result
+  // A promoted frame already contributes to frames_emitted. If it is later
+  // dropped for any reason (pressure eviction, session abort, or invariant
+  // recovery), subtract that classified drop so its coverage is counted once.
+  const std::uint64_t dropped_after_promotion =
+      source_counters_[source_index].frames_dropped_after_promotion;
+  result = dropped_after_promotion >= result
                ? 0U
-               : result - evicted_after_promotion;
+               : result - dropped_after_promotion;
   return result;
 }
 

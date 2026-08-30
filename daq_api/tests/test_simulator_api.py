@@ -86,6 +86,68 @@ class SimulatedDeviceTests(unittest.TestCase):
         self.assertTrue(info.value.supports_capability(Capability.PING))
         self.assertTrue(info.value.supports_capability(Capability.RESET_STATS))
 
+    def test_duplicate_request_ids_are_rejected_until_a_new_session(self) -> None:
+        device = SimulatedDevice()
+        request = encode_frame(FrameKind.INFO_REQUEST, request_id=7)
+
+        first = decode_response(decode_frame(device.receive(request)[0]))
+        duplicate = decode_response(decode_frame(device.receive(request)[0]))
+
+        self.assertTrue(first.ok)
+        self.assertFalse(duplicate.ok)
+        self.assertEqual(ErrorCode.INVALID_REQUEST_ID, duplicate.error_code)
+        self.assertEqual(1, device.status().bad_request_ids)
+
+        device.receive(request[:17])
+        device.begin_host_session()
+        reopened = decode_response(decode_frame(device.receive(request)[0]))
+        self.assertTrue(reopened.ok)
+        self.assertEqual(DeviceState.IDLE, device.state)
+
+    def test_in_memory_transport_preflights_batched_response_capacity(self) -> None:
+        device = SimulatedDevice()
+        transport = InMemoryTransport(
+            device,
+            max_pending_bytes=(
+                constants.DATA_FRAME_BYTES + constants.MAX_CONTROL_FRAME_BYTES
+            ),
+        )
+        configuration = Configuration(
+            stream_mask=StreamMask.ADC,
+            source=Source.SYNTHETIC,
+            data_checksum_algorithm=ChecksumAlgorithm.ADLER32,
+            data_frame_bytes=constants.DATA_FRAME_BYTES,
+        )
+        device.receive(
+            encode_frame(
+                FrameKind.CONFIGURE_REQUEST,
+                configuration.to_payload(),
+                request_id=1,
+            )
+        )
+        device.receive(encode_frame(FrameKind.START_REQUEST, request_id=2))
+        transport.request_stream_frame()
+        self.assertEqual(1, len(transport.read(1)))
+
+        first_request = encode_frame(FrameKind.GET_STATUS_REQUEST, request_id=3)
+        second_request = encode_frame(FrameKind.GET_STATUS_REQUEST, request_id=4)
+        batch = first_request + second_request
+        accepted = transport.write(batch)
+        self.assertEqual(constants.MIN_FRAME_BYTES, accepted)
+        self.assertEqual(0, transport.write(batch[accepted:]))
+
+        self.assertEqual(
+            constants.DATA_FRAME_BYTES - 1,
+            len(transport.read(constants.DATA_FRAME_BYTES - 1)),
+        )
+        first_response = decode_frame(transport.read(constants.MAX_CONTROL_FRAME_BYTES))
+        self.assertEqual(3, first_response.header.request_id)
+        self.assertEqual(len(second_request), transport.write(batch[accepted:]))
+        second_response = decode_frame(
+            transport.read(constants.MAX_CONTROL_FRAME_BYTES)
+        )
+        self.assertEqual(4, second_response.header.request_id)
+
 
 class TeensyDAQControlTests(unittest.TestCase):
     def test_info_status_and_stop_are_idempotent_over_partial_io(self) -> None:
