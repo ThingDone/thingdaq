@@ -11,7 +11,7 @@
       "artifact_sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769",
       "program_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
       "source_id": "ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85",
-      "build_id": "tdaq-ea010335c9b63bb7",
+      "build_id": "thingdaq-ea010335c9b63bb7",
       "client_started_utc": "2026-08-29T12:00:00+00:00",
       "client_completed_utc": "2026-08-29T12:10:45+00:00",
       "service_version": "phase-11-fixture",
@@ -25,7 +25,7 @@
       "expected": {
         "protocol_version": 1,
         "firmware_version": [0, 7, 0],
-        "build_id": "tdaq-ea010335c9b63bb7",
+        "build_id": "thingdaq-ea010335c9b63bb7",
         "source_id": "ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85",
         "artifact_sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769",
         "hardware_serial": 20512460,
@@ -35,7 +35,7 @@
       "observed_identity": {
         "protocol_version": 1,
         "firmware_version": [0, 7, 0],
-        "build_id": "tdaq-ea010335c9b63bb7",
+        "build_id": "thingdaq-ea010335c9b63bb7",
         "hardware_serial": 20512460,
         "board_id": 1,
         "mcu_id": 1

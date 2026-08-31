@@ -7,7 +7,7 @@ import struct
 import unittest
 from dataclasses import replace
 
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     AdcBlockMetadata,
     AdcCalibrationMetadata,
@@ -23,10 +23,10 @@ from teensy_daq import (
     Status,
     StreamGap,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     UnexpectedStreamValidationError,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 
 def _payload(*pairs: tuple[int, int]) -> bytes:
@@ -232,7 +232,7 @@ class PhysicalAdcBlockModelTests(unittest.TestCase):
 
     def test_production_gap_is_attached_to_the_following_adc_block(self) -> None:
         transport = InMemoryTransport(_GapFirstAdcDevice())
-        with TeensyDAQ.open(transport) as daq:
+        with ThingDAQ.open(transport) as daq:
             daq.configure(adc=True, gpio=False, source=Source.SYNTHETIC)
             run_id = daq.start()
             status = daq.status()
@@ -252,7 +252,7 @@ class PhysicalAdcBlockModelTests(unittest.TestCase):
             self.assertEqual(constants.ADC_PAIRS_PER_FRAME, gap.missing_items)
 
     def test_strict_hardware_path_accepts_varying_codes_without_a_pattern(self) -> None:
-        with TeensyDAQ.simulated(strict=True) as daq:
+        with ThingDAQ.simulated(strict=True) as daq:
             daq.configure(adc=True, gpio=False, source=Source.SYNTHETIC)
             run_id = daq.start()
             # Exercise the physical branch after the ordinary public lifecycle
@@ -312,7 +312,7 @@ class AdcAcquisitionStatusTests(unittest.TestCase):
         self.assertTrue(decoded.counters.has_loss)
 
     def test_strict_health_check_surfaces_physical_conversion_errors(self) -> None:
-        with TeensyDAQ.simulated(strict=True) as daq:
+        with ThingDAQ.simulated(strict=True) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             status = replace(daq.status(), adc_incomplete_conversions=1)

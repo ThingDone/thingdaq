@@ -2,7 +2,7 @@
 
 #include "gpio_batch_packer.h"
 
-namespace teensy_daq::gpio_packer {
+namespace thingdaq::gpio_packer {
 
 // Fixed OCRAM allocation used by the integrated physical GPIO owner. The
 // storage is CPU-owned and remains cached;
@@ -10,4 +10,4 @@ namespace teensy_daq::gpio_packer {
 PackedBufferStorage &teensyPackedBufferStorage();
 CycleCounter &teensyCycleCounter();
 
-}  // namespace teensy_daq::gpio_packer
+}  // namespace thingdaq::gpio_packer

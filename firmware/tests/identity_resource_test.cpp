@@ -8,27 +8,27 @@
 
 namespace {
 
-using teensy_daq::board::AdcConverterConfiguration;
-using teensy_daq::board::AdcEtcAllocation;
-using teensy_daq::board::AdcInputPad;
-using teensy_daq::board::EdmaAllocation;
-using teensy_daq::board::GpioPinMapping;
-using teensy_daq::board::InterruptAllocation;
-using teensy_daq::board::InterruptUse;
-using teensy_daq::board::MemoryAllocation;
-using teensy_daq::board::MemoryRegion;
-using teensy_daq::board::MemoryUse;
-using teensy_daq::board::PinAllocation;
-using teensy_daq::board::PitAllocation;
-using teensy_daq::board::ResourceOwner;
-using teensy_daq::board::XbarRoute;
+using thingdaq::board::AdcConverterConfiguration;
+using thingdaq::board::AdcEtcAllocation;
+using thingdaq::board::AdcInputPad;
+using thingdaq::board::EdmaAllocation;
+using thingdaq::board::GpioPinMapping;
+using thingdaq::board::InterruptAllocation;
+using thingdaq::board::InterruptUse;
+using thingdaq::board::MemoryAllocation;
+using thingdaq::board::MemoryRegion;
+using thingdaq::board::MemoryUse;
+using thingdaq::board::PinAllocation;
+using thingdaq::board::PitAllocation;
+using thingdaq::board::ResourceOwner;
+using thingdaq::board::XbarRoute;
 
 constexpr PinAllocation kConflictingPins[] = {
     {6U, ResourceOwner::kGpioCapture},
     {6U, ResourceOwner::kAdc0Capture},
 };
 constexpr PinAllocation kOutOfRangePin[] = {
-    {teensy_daq::board::kTeensy40DigitalPinCount,
+    {thingdaq::board::kTeensy40DigitalPinCount,
      ResourceOwner::kGpioCapture},
 };
 constexpr GpioPinMapping kDuplicateGpioBit[] = {
@@ -36,7 +36,7 @@ constexpr GpioPinMapping kDuplicateGpioBit[] = {
     {7U, 10U},
 };
 constexpr GpioPinMapping kOutOfRangeGpioBit[] = {
-    {6U, teensy_daq::board::kGpioPortBitCount},
+    {6U, thingdaq::board::kGpioPortBitCount},
 };
 constexpr GpioPinMapping kWrongGpioPinOrder[] = {
     {7U, 17U},
@@ -69,7 +69,7 @@ constexpr PitAllocation kConflictingPit[] = {
     {1U, ResourceOwner::kGpioCapture},
 };
 constexpr PitAllocation kOutOfRangePit[] = {
-    {teensy_daq::board::kPitChannelCount,
+    {thingdaq::board::kPitChannelCount,
      ResourceOwner::kAcquisitionClock},
 };
 constexpr XbarRoute kConflictingXbar[] = {
@@ -77,7 +77,7 @@ constexpr XbarRoute kConflictingXbar[] = {
     {57U, 103U, ResourceOwner::kAdc1Capture},
 };
 constexpr XbarRoute kOutOfRangeXbar[] = {
-    {teensy_daq::board::kXbarInputCount, 0U,
+    {thingdaq::board::kXbarInputCount, 0U,
      ResourceOwner::kAcquisitionClock},
 };
 constexpr AdcEtcAllocation kConflictingAdcEtc[] = {
@@ -85,7 +85,7 @@ constexpr AdcEtcAllocation kConflictingAdcEtc[] = {
     {0U, 2U, ResourceOwner::kAdc1Capture},
 };
 constexpr AdcEtcAllocation kOutOfRangeAdcEtc[] = {
-    {teensy_daq::board::kAdcEtcTriggerCount, 1U,
+    {thingdaq::board::kAdcEtcTriggerCount, 1U,
      ResourceOwner::kAdc0Capture},
 };
 constexpr EdmaAllocation kInvalidEdma[] = {
@@ -93,7 +93,7 @@ constexpr EdmaAllocation kInvalidEdma[] = {
     {0U, 88U, ResourceOwner::kAdc1Capture},
 };
 constexpr EdmaAllocation kOutOfRangeEdma[] = {
-    {teensy_daq::board::kEdmaChannelCount, 24U,
+    {thingdaq::board::kEdmaChannelCount, 24U,
      ResourceOwner::kAdc0Capture},
 };
 constexpr std::uint8_t kConflictingEdmaPriorities[] = {0U, 2U};
@@ -156,253 +156,253 @@ constexpr InterruptAllocation kReorderedInterrupts[] = {
      ResourceOwner::kAdc0Capture},
 };
 
-static_assert(teensy_daq::board::validPins(
-    teensy_daq::board::kPinAllocations));
-static_assert(teensy_daq::board::validGpioPinMappings(
-    teensy_daq::board::kGpioMappingsByPackedBit));
-static_assert(teensy_daq::board::gpioPinOrderMatches(
-    teensy_daq::board::kGpioMappingsByPackedBit,
-    teensy_daq::board::kGpioPinsByBit));
-static_assert(teensy_daq::board::validAdcConverterConfigurations(
-    teensy_daq::board::kAdcConverterConfigurations));
-static_assert(teensy_daq::board::validPitAllocations(
-    teensy_daq::board::kPitAllocations));
-static_assert(teensy_daq::board::validXbarRoutes(
-    teensy_daq::board::kXbarRoutes));
-static_assert(teensy_daq::board::validAdcEtcAllocations(
-    teensy_daq::board::kAdcEtcAllocations));
-static_assert(teensy_daq::board::validEdmaAllocations(
-    teensy_daq::board::kEdmaAllocations));
-static_assert(teensy_daq::board::validEdmaPriorities(
-    teensy_daq::board::kAdcEdmaPriorities,
-    teensy_daq::board::kGpioEdmaPriority));
-static_assert(teensy_daq::board::validMemoryAllocations(
-    teensy_daq::board::kMemoryAllocations));
-static_assert(teensy_daq::board::validInterruptAllocations(
-    teensy_daq::board::kInterruptAllocations));
-static_assert(teensy_daq::board::validAcquisitionMemoryRegions(
-    teensy_daq::board::kMemoryAllocations));
-static_assert(teensy_daq::board::kAcquisitionResourceContract.valid());
-static_assert(!teensy_daq::board::validPins(kConflictingPins));
-static_assert(!teensy_daq::board::validPins(kOutOfRangePin));
-static_assert(!teensy_daq::board::validGpioPinMappings(
+static_assert(thingdaq::board::validPins(
+    thingdaq::board::kPinAllocations));
+static_assert(thingdaq::board::validGpioPinMappings(
+    thingdaq::board::kGpioMappingsByPackedBit));
+static_assert(thingdaq::board::gpioPinOrderMatches(
+    thingdaq::board::kGpioMappingsByPackedBit,
+    thingdaq::board::kGpioPinsByBit));
+static_assert(thingdaq::board::validAdcConverterConfigurations(
+    thingdaq::board::kAdcConverterConfigurations));
+static_assert(thingdaq::board::validPitAllocations(
+    thingdaq::board::kPitAllocations));
+static_assert(thingdaq::board::validXbarRoutes(
+    thingdaq::board::kXbarRoutes));
+static_assert(thingdaq::board::validAdcEtcAllocations(
+    thingdaq::board::kAdcEtcAllocations));
+static_assert(thingdaq::board::validEdmaAllocations(
+    thingdaq::board::kEdmaAllocations));
+static_assert(thingdaq::board::validEdmaPriorities(
+    thingdaq::board::kAdcEdmaPriorities,
+    thingdaq::board::kGpioEdmaPriority));
+static_assert(thingdaq::board::validMemoryAllocations(
+    thingdaq::board::kMemoryAllocations));
+static_assert(thingdaq::board::validInterruptAllocations(
+    thingdaq::board::kInterruptAllocations));
+static_assert(thingdaq::board::validAcquisitionMemoryRegions(
+    thingdaq::board::kMemoryAllocations));
+static_assert(thingdaq::board::kAcquisitionResourceContract.valid());
+static_assert(!thingdaq::board::validPins(kConflictingPins));
+static_assert(!thingdaq::board::validPins(kOutOfRangePin));
+static_assert(!thingdaq::board::validGpioPinMappings(
     kDuplicateGpioBit));
-static_assert(!teensy_daq::board::validGpioPinMappings(
+static_assert(!thingdaq::board::validGpioPinMappings(
     kOutOfRangeGpioBit));
-static_assert(!teensy_daq::board::gpioPinOrderMatches(
-    kWrongGpioPinOrder, teensy_daq::board::kGpioPinsByBit));
-static_assert(!teensy_daq::board::validAdcConverterConfigurations(
+static_assert(!thingdaq::board::gpioPinOrderMatches(
+    kWrongGpioPinOrder, thingdaq::board::kGpioPinsByBit));
+static_assert(!thingdaq::board::validAdcConverterConfigurations(
     kIncompleteAdcConfiguration));
-static_assert(!teensy_daq::board::validAdcConverterConfigurations(
+static_assert(!thingdaq::board::validAdcConverterConfigurations(
     kWrongAdcQueue));
-static_assert(!teensy_daq::board::validAdcConverterConfigurations(
+static_assert(!thingdaq::board::validAdcConverterConfigurations(
     kConflictingAdcDma));
-static_assert(!teensy_daq::board::validPitAllocations(kConflictingPit));
-static_assert(!teensy_daq::board::validPitAllocations(kOutOfRangePit));
-static_assert(!teensy_daq::board::validXbarRoutes(kConflictingXbar));
-static_assert(!teensy_daq::board::validXbarRoutes(kOutOfRangeXbar));
+static_assert(!thingdaq::board::validPitAllocations(kConflictingPit));
+static_assert(!thingdaq::board::validPitAllocations(kOutOfRangePit));
+static_assert(!thingdaq::board::validXbarRoutes(kConflictingXbar));
+static_assert(!thingdaq::board::validXbarRoutes(kOutOfRangeXbar));
 static_assert(
-    !teensy_daq::board::validAdcEtcAllocations(kConflictingAdcEtc));
+    !thingdaq::board::validAdcEtcAllocations(kConflictingAdcEtc));
 static_assert(
-    !teensy_daq::board::validAdcEtcAllocations(kOutOfRangeAdcEtc));
-static_assert(!teensy_daq::board::validEdmaAllocations(kInvalidEdma));
-static_assert(!teensy_daq::board::validEdmaAllocations(kOutOfRangeEdma));
-static_assert(!teensy_daq::board::validEdmaPriorities(
+    !thingdaq::board::validAdcEtcAllocations(kOutOfRangeAdcEtc));
+static_assert(!thingdaq::board::validEdmaAllocations(kInvalidEdma));
+static_assert(!thingdaq::board::validEdmaAllocations(kOutOfRangeEdma));
+static_assert(!thingdaq::board::validEdmaPriorities(
     kConflictingEdmaPriorities, 2U));
 static_assert(
-    !teensy_daq::board::validMemoryAllocations(kConflictingMemory));
-static_assert(!teensy_daq::board::validMemoryAllocations(kMisalignedMemory));
-static_assert(!teensy_daq::board::validMemoryAllocations(kInvalidAlignment));
-static_assert(teensy_daq::board::validMemoryAllocations(kDmaRingInDtcm));
-static_assert(!teensy_daq::board::validAcquisitionMemoryRegions(
+    !thingdaq::board::validMemoryAllocations(kConflictingMemory));
+static_assert(!thingdaq::board::validMemoryAllocations(kMisalignedMemory));
+static_assert(!thingdaq::board::validMemoryAllocations(kInvalidAlignment));
+static_assert(thingdaq::board::validMemoryAllocations(kDmaRingInDtcm));
+static_assert(!thingdaq::board::validAcquisitionMemoryRegions(
     kDmaRingInDtcm));
-static_assert(teensy_daq::board::validMemoryAllocations(
+static_assert(thingdaq::board::validMemoryAllocations(
     kCacheUnsafePackedRing));
-static_assert(!teensy_daq::board::validAcquisitionMemoryRegions(
+static_assert(!thingdaq::board::validAcquisitionMemoryRegions(
     kCacheUnsafePackedRing));
-static_assert(!teensy_daq::board::validInterruptAllocations(
+static_assert(!thingdaq::board::validInterruptAllocations(
     kDuplicateInterruptUse));
-static_assert(!teensy_daq::board::validInterruptAllocations(
+static_assert(!thingdaq::board::validInterruptAllocations(
     kUnsafeInterruptPriority));
-static_assert(!teensy_daq::board::validInterruptAllocations(
+static_assert(!thingdaq::board::validInterruptAllocations(
     kWrongInterruptOwner));
-static_assert(teensy_daq::board::validInterruptAllocations(
+static_assert(thingdaq::board::validInterruptAllocations(
     kReorderedInterrupts));
-static_assert(teensy_daq::board::alignUp(4048U, 32U) == 4064U);
-static_assert(teensy_daq::board::kCommandParserCapacityBytes >=
-              teensy_daq::protocol::kCommandParserStorageBytes);
-static_assert(teensy_daq::board::kUsbRxScratchBytes >=
-              teensy_daq::protocol_v1::kMaxCommandFrameBytes);
-static_assert(teensy_daq::board::kCommandQueueDepth == 4U);
-static_assert(teensy_daq::board::kResponseQueueDepth == 4U);
-static_assert(teensy_daq::board::kPacketBufferPrimaryCount == 105U);
-static_assert(teensy_daq::board::kPacketBufferReserveCount == 95U);
-static_assert(teensy_daq::board::kPacketBufferCount == 200U);
-static_assert(teensy_daq::board::kPacketBufferPrimaryStorageBytes == 430080U);
-static_assert(teensy_daq::board::kPacketBufferReserveStorageBytes == 389120U);
-static_assert(teensy_daq::board::kPacketBufferStorageBytes == 819200U);
-static_assert(teensy_daq::board::kPacketReadyQueueDepth ==
-              teensy_daq::board::kPacketBufferCount);
-static_assert(teensy_daq::board::kPacketTransmitQueueDepth ==
-              teensy_daq::board::kPacketBufferCount);
-static_assert(teensy_daq::board::kPacketReadyIndexStorageBytes == 400U);
-static_assert(teensy_daq::board::kPacketTransmitIndexStorageBytes == 200U);
-static_assert(teensy_daq::board::kPacketIndexStorageBytes == 600U);
-static_assert(teensy_daq::board::kCombinedAcquisitionRam1BufferBytes ==
+static_assert(thingdaq::board::alignUp(4048U, 32U) == 4064U);
+static_assert(thingdaq::board::kCommandParserCapacityBytes >=
+              thingdaq::protocol::kCommandParserStorageBytes);
+static_assert(thingdaq::board::kUsbRxScratchBytes >=
+              thingdaq::protocol_v1::kMaxCommandFrameBytes);
+static_assert(thingdaq::board::kCommandQueueDepth == 4U);
+static_assert(thingdaq::board::kResponseQueueDepth == 4U);
+static_assert(thingdaq::board::kPacketBufferPrimaryCount == 105U);
+static_assert(thingdaq::board::kPacketBufferReserveCount == 95U);
+static_assert(thingdaq::board::kPacketBufferCount == 200U);
+static_assert(thingdaq::board::kPacketBufferPrimaryStorageBytes == 430080U);
+static_assert(thingdaq::board::kPacketBufferReserveStorageBytes == 389120U);
+static_assert(thingdaq::board::kPacketBufferStorageBytes == 819200U);
+static_assert(thingdaq::board::kPacketReadyQueueDepth ==
+              thingdaq::board::kPacketBufferCount);
+static_assert(thingdaq::board::kPacketTransmitQueueDepth ==
+              thingdaq::board::kPacketBufferCount);
+static_assert(thingdaq::board::kPacketReadyIndexStorageBytes == 400U);
+static_assert(thingdaq::board::kPacketTransmitIndexStorageBytes == 200U);
+static_assert(thingdaq::board::kPacketIndexStorageBytes == 600U);
+static_assert(thingdaq::board::kCombinedAcquisitionRam1BufferBytes ==
               440832U);
-static_assert(teensy_daq::board::kCombinedAcquisitionRam2BufferBytes ==
+static_assert(thingdaq::board::kCombinedAcquisitionRam2BufferBytes ==
               503648U);
 static_assert(
-    teensy_daq::board::kCombinedAcquisitionAndUsbRam2BufferBytes ==
+    thingdaq::board::kCombinedAcquisitionAndUsbRam2BufferBytes ==
     511840U);
-static_assert(teensy_daq::board::kReservedRam1Bytes <=
-              teensy_daq::board::kRam1BudgetBytes);
-static_assert(teensy_daq::board::kReservedRam2Bytes <=
-              teensy_daq::board::kRam2BudgetBytes);
-static_assert(teensy_daq::control::kIdleConfiguration.stream_mask ==
+static_assert(thingdaq::board::kReservedRam1Bytes <=
+              thingdaq::board::kRam1BudgetBytes);
+static_assert(thingdaq::board::kReservedRam2Bytes <=
+              thingdaq::board::kRam2BudgetBytes);
+static_assert(thingdaq::control::kIdleConfiguration.stream_mask ==
               0U);
-static_assert(teensy_daq::control::kIdleConfiguration.source ==
-              teensy_daq::protocol_v1::Source::kHardware);
+static_assert(thingdaq::control::kIdleConfiguration.source ==
+              thingdaq::protocol_v1::Source::kHardware);
 static_assert(
-    teensy_daq::control::kIdleConfiguration.data_frame_bytes ==
-    teensy_daq::protocol_v1::kDataFrameBytes);
-static_assert(teensy_daq::control::kSyntheticConfiguration.stream_mask ==
+    thingdaq::control::kIdleConfiguration.data_frame_bytes ==
+    thingdaq::protocol_v1::kDataFrameBytes);
+static_assert(thingdaq::control::kSyntheticConfiguration.stream_mask ==
               3U);
-static_assert(teensy_daq::control::kSyntheticConfiguration.source ==
-              teensy_daq::protocol_v1::Source::kSynthetic);
-static_assert(teensy_daq::identity::kFirmwareVersion.major == 1U);
-static_assert(teensy_daq::identity::kFirmwareVersion.minor == 0U);
-static_assert(teensy_daq::identity::kFirmwareVersion.patch == 0U);
-static_assert(teensy_daq::board::kAdc0Pin == 14U);
-static_assert(teensy_daq::board::kAdc1Pin == 15U);
-static_assert(teensy_daq::board::countOf(
-                  teensy_daq::board::kAdcConverterConfigurations) == 2U);
+static_assert(thingdaq::control::kSyntheticConfiguration.source ==
+              thingdaq::protocol_v1::Source::kSynthetic);
+static_assert(thingdaq::identity::kFirmwareVersion.major == 1U);
+static_assert(thingdaq::identity::kFirmwareVersion.minor == 0U);
+static_assert(thingdaq::identity::kFirmwareVersion.patch == 0U);
+static_assert(thingdaq::board::kAdc0Pin == 14U);
+static_assert(thingdaq::board::kAdc1Pin == 15U);
+static_assert(thingdaq::board::countOf(
+                  thingdaq::board::kAdcConverterConfigurations) == 2U);
 static_assert(
-    teensy_daq::board::kAdcConverterConfigurations[0].logical_converter ==
+    thingdaq::board::kAdcConverterConfigurations[0].logical_converter ==
         0U &&
-    teensy_daq::board::kAdcConverterConfigurations[0]
+    thingdaq::board::kAdcConverterConfigurations[0]
             .teensy_adc_library_module == 0U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].teensy_pin == 14U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].input_pad ==
+    thingdaq::board::kAdcConverterConfigurations[0].teensy_pin == 14U &&
+    thingdaq::board::kAdcConverterConfigurations[0].input_pad ==
         AdcInputPad::kGpioAdB1_02 &&
-    teensy_daq::board::kAdcConverterConfigurations[0].adc_peripheral == 1U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].input_channel == 7U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].adc_etc_trigger == 0U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].xbar_input == 57U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].xbar_output == 103U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].edma_channel == 0U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].dmamux_source == 24U &&
-    teensy_daq::board::kAdcConverterConfigurations[0].owner ==
+    thingdaq::board::kAdcConverterConfigurations[0].adc_peripheral == 1U &&
+    thingdaq::board::kAdcConverterConfigurations[0].input_channel == 7U &&
+    thingdaq::board::kAdcConverterConfigurations[0].adc_etc_trigger == 0U &&
+    thingdaq::board::kAdcConverterConfigurations[0].xbar_input == 57U &&
+    thingdaq::board::kAdcConverterConfigurations[0].xbar_output == 103U &&
+    thingdaq::board::kAdcConverterConfigurations[0].edma_channel == 0U &&
+    thingdaq::board::kAdcConverterConfigurations[0].dmamux_source == 24U &&
+    thingdaq::board::kAdcConverterConfigurations[0].owner ==
         ResourceOwner::kAdc0Capture);
 static_assert(
-    teensy_daq::board::kAdcConverterConfigurations[1].logical_converter ==
+    thingdaq::board::kAdcConverterConfigurations[1].logical_converter ==
         1U &&
-    teensy_daq::board::kAdcConverterConfigurations[1]
+    thingdaq::board::kAdcConverterConfigurations[1]
             .teensy_adc_library_module == 1U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].teensy_pin == 15U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].input_pad ==
+    thingdaq::board::kAdcConverterConfigurations[1].teensy_pin == 15U &&
+    thingdaq::board::kAdcConverterConfigurations[1].input_pad ==
         AdcInputPad::kGpioAdB1_03 &&
-    teensy_daq::board::kAdcConverterConfigurations[1].adc_peripheral == 2U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].input_channel == 8U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].adc_etc_trigger == 4U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].xbar_input == 57U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].xbar_output == 107U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].edma_channel == 1U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].dmamux_source == 88U &&
-    teensy_daq::board::kAdcConverterConfigurations[1].owner ==
+    thingdaq::board::kAdcConverterConfigurations[1].adc_peripheral == 2U &&
+    thingdaq::board::kAdcConverterConfigurations[1].input_channel == 8U &&
+    thingdaq::board::kAdcConverterConfigurations[1].adc_etc_trigger == 4U &&
+    thingdaq::board::kAdcConverterConfigurations[1].xbar_input == 57U &&
+    thingdaq::board::kAdcConverterConfigurations[1].xbar_output == 107U &&
+    thingdaq::board::kAdcConverterConfigurations[1].edma_channel == 1U &&
+    thingdaq::board::kAdcConverterConfigurations[1].dmamux_source == 88U &&
+    thingdaq::board::kAdcConverterConfigurations[1].owner ==
         ResourceOwner::kAdc1Capture);
-static_assert(teensy_daq::board::countOf(
-                  teensy_daq::board::kGpioMappingsByPackedBit) == 8U);
-static_assert(teensy_daq::board::kGpioMappingsByPackedBit[0].teensy_pin ==
+static_assert(thingdaq::board::countOf(
+                  thingdaq::board::kGpioMappingsByPackedBit) == 8U);
+static_assert(thingdaq::board::kGpioMappingsByPackedBit[0].teensy_pin ==
                   6U &&
-              teensy_daq::board::kGpioMappingsByPackedBit[0].gpio2_bit ==
+              thingdaq::board::kGpioMappingsByPackedBit[0].gpio2_bit ==
                   10U);
-static_assert(teensy_daq::board::kGpioMappingsByPackedBit[1].teensy_pin ==
+static_assert(thingdaq::board::kGpioMappingsByPackedBit[1].teensy_pin ==
                   7U &&
-              teensy_daq::board::kGpioMappingsByPackedBit[1].gpio2_bit ==
+              thingdaq::board::kGpioMappingsByPackedBit[1].gpio2_bit ==
                   17U);
-static_assert(teensy_daq::board::kGpioMappingsByPackedBit[2].teensy_pin ==
+static_assert(thingdaq::board::kGpioMappingsByPackedBit[2].teensy_pin ==
                   8U &&
-              teensy_daq::board::kGpioMappingsByPackedBit[2].gpio2_bit ==
+              thingdaq::board::kGpioMappingsByPackedBit[2].gpio2_bit ==
                   16U);
-static_assert(teensy_daq::board::kGpioMappingsByPackedBit[3].teensy_pin ==
+static_assert(thingdaq::board::kGpioMappingsByPackedBit[3].teensy_pin ==
                   9U &&
-              teensy_daq::board::kGpioMappingsByPackedBit[3].gpio2_bit ==
+              thingdaq::board::kGpioMappingsByPackedBit[3].gpio2_bit ==
                   11U);
-static_assert(teensy_daq::board::kGpioMappingsByPackedBit[4].teensy_pin ==
+static_assert(thingdaq::board::kGpioMappingsByPackedBit[4].teensy_pin ==
                   10U &&
-              teensy_daq::board::kGpioMappingsByPackedBit[4].gpio2_bit ==
+              thingdaq::board::kGpioMappingsByPackedBit[4].gpio2_bit ==
                   0U);
-static_assert(teensy_daq::board::kGpioMappingsByPackedBit[5].teensy_pin ==
+static_assert(thingdaq::board::kGpioMappingsByPackedBit[5].teensy_pin ==
                   11U &&
-              teensy_daq::board::kGpioMappingsByPackedBit[5].gpio2_bit ==
+              thingdaq::board::kGpioMappingsByPackedBit[5].gpio2_bit ==
                   2U);
-static_assert(teensy_daq::board::kGpioMappingsByPackedBit[6].teensy_pin ==
+static_assert(thingdaq::board::kGpioMappingsByPackedBit[6].teensy_pin ==
                   12U &&
-              teensy_daq::board::kGpioMappingsByPackedBit[6].gpio2_bit ==
+              thingdaq::board::kGpioMappingsByPackedBit[6].gpio2_bit ==
                   1U);
-static_assert(teensy_daq::board::kGpioMappingsByPackedBit[7].teensy_pin ==
+static_assert(thingdaq::board::kGpioMappingsByPackedBit[7].teensy_pin ==
                   13U &&
-              teensy_daq::board::kGpioMappingsByPackedBit[7].gpio2_bit ==
+              thingdaq::board::kGpioMappingsByPackedBit[7].gpio2_bit ==
                   3U);
-static_assert(teensy_daq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
-static_assert(teensy_daq::board::kGpio7ToGpio2Gpr27ClearMask ==
-              teensy_daq::board::kGpio2PsrCaptureMask);
-static_assert(teensy_daq::board::kReservedRam1Bytes == 450464U);
-static_assert(teensy_daq::board::kGpioRawDmaBufferBytes == 16192U);
-static_assert(teensy_daq::board::kGpioRawDmaRingBytes == 64768U);
-static_assert(teensy_daq::board::kAdcDmaBufferStrideBytes == 4064U);
-static_assert(teensy_daq::board::kAdcDmaRingBytes == 32512U);
-static_assert(teensy_daq::board::kAdcDmaOverflowSinkBytes == 32U);
-static_assert(teensy_daq::board::kAdcDmaPipelineDepth == 6U);
-static_assert(teensy_daq::board::kAdcDmaDescriptorCount == 12U);
-static_assert(teensy_daq::board::kAdcDmaDescriptorBytes == 768U);
-static_assert(teensy_daq::board::kAdcEdmaPriorities[0] == 2U);
-static_assert(teensy_daq::board::kAdcEdmaPriorities[1] == 1U);
-static_assert(teensy_daq::board::kAdcEdmaIrqPriority == 48U);
-static_assert(teensy_daq::board::kGpioRawDmaOverflowSinkBytes == 32U);
-static_assert(teensy_daq::board::kGpioRawDmaDescriptorCount == 5U);
-static_assert(teensy_daq::board::kGpioRawDmaDescriptorBytes == 160U);
-static_assert(teensy_daq::board::kGpioPackedRingDepth == 4U);
-static_assert(teensy_daq::board::kGpioPackedBufferStrideBytes == 4064U);
-static_assert(teensy_daq::board::kGpioPackerStateBudgetBytes == 2048U);
-static_assert(teensy_daq::board::kAdcPackerStateBudgetBytes == 512U);
-static_assert(teensy_daq::board::kReservedRam2Bytes == 507776U);
-static_assert(teensy_daq::board::kChecksumBenchmarkBufferBytes == 4096U);
-static_assert(teensy_daq::board::kGpioClockDiagnosticSinkBytes == 32U);
-static_assert(teensy_daq::board::kGpioPitChannel == 0U);
-static_assert(teensy_daq::board::kXbarPitTrigger0Input == 56U);
-static_assert(teensy_daq::board::kXbarPitTrigger1Input == 57U);
-static_assert(teensy_daq::board::kXbarPitTrigger2Input == 58U);
-static_assert(teensy_daq::board::kXbarPitTrigger3Input == 59U);
-static_assert(teensy_daq::board::kXbarDmaRequest30Output == 0U);
-static_assert(teensy_daq::board::kXbarDmaRequest31Output == 1U);
-static_assert(teensy_daq::board::kXbarDmaRequest94Output == 2U);
-static_assert(teensy_daq::board::kXbarDmaRequest95Output == 3U);
-static_assert(teensy_daq::board::kGpioXbarInput == 56U);
-static_assert(teensy_daq::board::kGpioXbarOutput == 0U);
-static_assert(teensy_daq::board::kGpioXbarActiveEdge == 1U);
-static_assert(teensy_daq::board::kGpioEdmaChannel == 2U);
-static_assert(teensy_daq::board::kDmamuxXbar1Request0Source == 30U);
-static_assert(teensy_daq::board::kDmamuxXbar1Request1Source == 31U);
-static_assert(teensy_daq::board::kDmamuxXbar1Request2Source == 94U);
-static_assert(teensy_daq::board::kDmamuxXbar1Request3Source == 95U);
-static_assert(teensy_daq::board::kGpioDmamuxSource == 30U);
-static_assert(teensy_daq::board::kGpioEdmaPriority == 0U);
-static_assert(teensy_daq::board::kGpioEdmaIrqPriority == 64U);
-static_assert(teensy_daq::capabilities::kMetadata.supported_stream_mask == 3U);
-static_assert((teensy_daq::capabilities::kMetadata.capability_bits &
-               teensy_daq::capabilities::kDataCapabilityMask) ==
-              teensy_daq::capabilities::kDataCapabilityMask);
-static_assert((teensy_daq::capabilities::kMetadata.capability_bits &
+static_assert(thingdaq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
+static_assert(thingdaq::board::kGpio7ToGpio2Gpr27ClearMask ==
+              thingdaq::board::kGpio2PsrCaptureMask);
+static_assert(thingdaq::board::kReservedRam1Bytes == 450464U);
+static_assert(thingdaq::board::kGpioRawDmaBufferBytes == 16192U);
+static_assert(thingdaq::board::kGpioRawDmaRingBytes == 64768U);
+static_assert(thingdaq::board::kAdcDmaBufferStrideBytes == 4064U);
+static_assert(thingdaq::board::kAdcDmaRingBytes == 32512U);
+static_assert(thingdaq::board::kAdcDmaOverflowSinkBytes == 32U);
+static_assert(thingdaq::board::kAdcDmaPipelineDepth == 6U);
+static_assert(thingdaq::board::kAdcDmaDescriptorCount == 12U);
+static_assert(thingdaq::board::kAdcDmaDescriptorBytes == 768U);
+static_assert(thingdaq::board::kAdcEdmaPriorities[0] == 2U);
+static_assert(thingdaq::board::kAdcEdmaPriorities[1] == 1U);
+static_assert(thingdaq::board::kAdcEdmaIrqPriority == 48U);
+static_assert(thingdaq::board::kGpioRawDmaOverflowSinkBytes == 32U);
+static_assert(thingdaq::board::kGpioRawDmaDescriptorCount == 5U);
+static_assert(thingdaq::board::kGpioRawDmaDescriptorBytes == 160U);
+static_assert(thingdaq::board::kGpioPackedRingDepth == 4U);
+static_assert(thingdaq::board::kGpioPackedBufferStrideBytes == 4064U);
+static_assert(thingdaq::board::kGpioPackerStateBudgetBytes == 2048U);
+static_assert(thingdaq::board::kAdcPackerStateBudgetBytes == 512U);
+static_assert(thingdaq::board::kReservedRam2Bytes == 507776U);
+static_assert(thingdaq::board::kChecksumBenchmarkBufferBytes == 4096U);
+static_assert(thingdaq::board::kGpioClockDiagnosticSinkBytes == 32U);
+static_assert(thingdaq::board::kGpioPitChannel == 0U);
+static_assert(thingdaq::board::kXbarPitTrigger0Input == 56U);
+static_assert(thingdaq::board::kXbarPitTrigger1Input == 57U);
+static_assert(thingdaq::board::kXbarPitTrigger2Input == 58U);
+static_assert(thingdaq::board::kXbarPitTrigger3Input == 59U);
+static_assert(thingdaq::board::kXbarDmaRequest30Output == 0U);
+static_assert(thingdaq::board::kXbarDmaRequest31Output == 1U);
+static_assert(thingdaq::board::kXbarDmaRequest94Output == 2U);
+static_assert(thingdaq::board::kXbarDmaRequest95Output == 3U);
+static_assert(thingdaq::board::kGpioXbarInput == 56U);
+static_assert(thingdaq::board::kGpioXbarOutput == 0U);
+static_assert(thingdaq::board::kGpioXbarActiveEdge == 1U);
+static_assert(thingdaq::board::kGpioEdmaChannel == 2U);
+static_assert(thingdaq::board::kDmamuxXbar1Request0Source == 30U);
+static_assert(thingdaq::board::kDmamuxXbar1Request1Source == 31U);
+static_assert(thingdaq::board::kDmamuxXbar1Request2Source == 94U);
+static_assert(thingdaq::board::kDmamuxXbar1Request3Source == 95U);
+static_assert(thingdaq::board::kGpioDmamuxSource == 30U);
+static_assert(thingdaq::board::kGpioEdmaPriority == 0U);
+static_assert(thingdaq::board::kGpioEdmaIrqPriority == 64U);
+static_assert(thingdaq::capabilities::kMetadata.supported_stream_mask == 3U);
+static_assert((thingdaq::capabilities::kMetadata.capability_bits &
+               thingdaq::capabilities::kDataCapabilityMask) ==
+              thingdaq::capabilities::kDataCapabilityMask);
+static_assert((thingdaq::capabilities::kMetadata.capability_bits &
                static_cast<std::uint32_t>(
-                   teensy_daq::protocol_v1::Capability::
+                   thingdaq::protocol_v1::Capability::
                        kGpioClockDiagnostic)) != 0U);
-static_assert(teensy_daq::capabilities::kMetadata.gpio_pin_count == 8U);
-static_assert(teensy_daq::identity::usbProductNameMatchesIdentity());
+static_assert(thingdaq::capabilities::kMetadata.gpio_pin_count == 8U);
+static_assert(thingdaq::identity::usbProductNameMatchesIdentity());
 
 }  // namespace
 
 int main() {
-  return teensy_daq::identity::kBuildId.front() == 't' ? 0 : 1;
+  return thingdaq::identity::kBuildId.front() == 't' ? 0 : 1;
 }

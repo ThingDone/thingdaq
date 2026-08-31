@@ -24,7 +24,7 @@ class FirmwareUsbTransportTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-usb-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-usb-") as directory:
             executable = Path(directory) / "usb-transport-test"
             compile_result = subprocess.run(
                 [

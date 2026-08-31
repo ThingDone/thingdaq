@@ -177,7 +177,7 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define ARM_DEMCR fake_imxrt::arm_demcr
 #define ARM_DWT_CTRL fake_imxrt::arm_dwt_ctrl
 #define ARM_DWT_CYCCNT fake_imxrt::arm_dwt_cyccnt
-#define TEENSY_DAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK() \
+#define THINGDAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK() \
   fake_imxrt::runAdcTriggerDiagnosticPollHook()
 
 #define CCM_CSCMR1_PERCLK_CLK_SEL (std::uint32_t{1U} << 6U)

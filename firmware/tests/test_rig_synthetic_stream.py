@@ -14,7 +14,7 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from teensy_daq import (
+from thingdaq import (
     BoardId,
     Capability,
     Info,
@@ -22,7 +22,7 @@ from teensy_daq import (
     SimulatedDevice,
     StreamMask,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG_SCRIPT = ROOT / "firmware" / "tests" / "rig_synthetic_stream.py"
@@ -49,13 +49,13 @@ class HardwareSyntheticDevice(SimulatedDevice):
     """Streaming simulator with the current synthetic-capable INFO identity."""
 
     def __init__(self) -> None:
-        super().__init__(build_id="tdaq-0123456789abcdef")
+        super().__init__(build_id="thingdaq-0123456789abcdef")
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
         configuration = self.configuration
         info = Info(
             device_state=self.state,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
             hardware_serial=12_345_670,
             firmware_version=(0, 7, 0),
             board_id=BoardId.TEENSY_40,
@@ -209,7 +209,8 @@ class RigScriptIndependenceTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("teensy_daq", source)
+        self.assertNotIn("import thingdaq", source)
+        self.assertNotIn("from thingdaq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
         self.assertIn('"SYNTHETIC_CAPTURE_SECONDS"', source)
@@ -399,7 +400,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             "SERIAL_PORT": "fake-rig-port",
             "SYNTHETIC_CAPTURE_SECONDS": "0.12",
             "SYNTHETIC_STATUS_INTERVAL_SECONDS": "0.02",
-            "EXPECTED_BUILD_ID": "tdaq-0123456789abcdef",
+            "EXPECTED_BUILD_ID": "thingdaq-0123456789abcdef",
             "EXPECTED_HARDWARE_SERIAL": "12345670",
         }
         with (

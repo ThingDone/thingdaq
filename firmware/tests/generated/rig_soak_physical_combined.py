@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Canonical, dependency-bounded Teensy DAQ endurance validator.
+"""Canonical, dependency-bounded ThingDAQ endurance validator.
 
 ``firmware/tools/generate_soak_programs.py`` replaces only marked blocks and
 writes three standalone rig programs plus the checked Windows handoff script.
@@ -52,7 +52,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
       "mcu_id": 1
     },
     "firmware": {
-      "build_id": "tdaq-a0dc150fd48a6e9b",
+      "build_id": "thingdaq-a0dc150fd48a6e9b",
       "source_id": "a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba",
       "version": [
         0,
@@ -1570,7 +1570,7 @@ def _validation_manifest(
     )
     require(
         manifest.get("schema_version") == 1
-        and manifest.get("kind") == "teensy-daq-release-validation",
+        and manifest.get("kind") == "thingdaq-release-validation",
         "configuration",
         "unsupported validation manifest schema/kind",
     )
@@ -1764,7 +1764,7 @@ def load_settings(config: Mapping[str, object] = GENERATED_CONFIG) -> RuntimeSet
     )
     build_id = _string(firmware.get("build_id"), "firmware.build_id")
     require(
-        build_id == f"tdaq-{source_id[:16]}",
+        build_id == f"thingdaq-{source_id[:16]}",
         "configuration",
         "build ID does not derive from the source ID",
     )

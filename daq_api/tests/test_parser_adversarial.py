@@ -9,8 +9,8 @@ import unittest
 import zlib
 from pathlib import Path
 
-from teensy_daq import IncrementalFrameParser
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq import IncrementalFrameParser
+from thingdaq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"

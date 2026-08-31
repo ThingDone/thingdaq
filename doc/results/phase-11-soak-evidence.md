@@ -3,7 +3,7 @@ type: report
 title: Phase 11 Autonomous Soak Evidence
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-11
   - endurance
   - hardware-validation
@@ -95,12 +95,12 @@ packer benchmark. It contains no credential and no bulk acquisition capture.
 | Protected tree | 240 files; SHA-256 `84636113d34bdadef466d94c6c44180d2e591f3dc99ed346b32a8bd3b4a15dbc` |
 | Candidate semantic SHA-256 | `32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656` |
 | Firmware source ID | `a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba` |
-| Firmware build ID | `tdaq-a0dc150fd48a6e9b` |
+| Firmware build ID | `thingdaq-a0dc150fd48a6e9b` |
 | Firmware / protocol / checksum | 0.7.0 / v1 / Adler-32 algorithm 1 |
 | Target | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
 | Board identity | Teensy 4.0 / i.MX RT1062, board ID 1, MCU ID 1, hardware serial `20512460` |
 | Package source tree | Git tree `36181ae8291d759e53f185dc7940e124656eab22` at the gate checkout |
-| Package version | private local distribution `teensy-daq-local` 0.10.0 |
+| Package version | private local distribution `thingdaq-local` 0.10.0 |
 | Soak service | `remote-firmware-testing` 1.0.0, API v1 |
 | Service-owned client | 1.0.0; SHA-256 `23115388d9a62384cca074ac976c24986d77bd98538713901db3ec810e5c84ec` |
 
@@ -163,10 +163,10 @@ record and build B independently reproduced it.
 
 | Build | Artifact | Bytes | Archive SHA-256 |
 | --- | --- | ---: | --- |
-| A | `teensy_daq_local-0.10.0-py3-none-any.whl` | 178,120 | `a086facfc564ae5d2a4c143556aa6a8487ff65f19eb2879b99a8d0d846153c31` |
-| B | `teensy_daq_local-0.10.0-py3-none-any.whl` | 178,120 | `a086facfc564ae5d2a4c143556aa6a8487ff65f19eb2879b99a8d0d846153c31` |
-| A | `teensy_daq_local-0.10.0.tar.gz` | 195,949 | `d537004ddd3af9e7ac1199d263c392082f25c946b66638a813acb26d718f7136` |
-| B | `teensy_daq_local-0.10.0.tar.gz` | 195,953 | `1f51a3eab60d627ab7751da50a7f20da6ba506894033b73b90fc710248e56f90` |
+| A | `thingdaq_local-0.10.0-py3-none-any.whl` | 178,120 | `a086facfc564ae5d2a4c143556aa6a8487ff65f19eb2879b99a8d0d846153c31` |
+| B | `thingdaq_local-0.10.0-py3-none-any.whl` | 178,120 | `a086facfc564ae5d2a4c143556aa6a8487ff65f19eb2879b99a8d0d846153c31` |
+| A | `thingdaq_local-0.10.0.tar.gz` | 195,949 | `d537004ddd3af9e7ac1199d263c392082f25c946b66638a813acb26d718f7136` |
+| B | `thingdaq_local-0.10.0.tar.gz` | 195,953 | `1f51a3eab60d627ab7751da50a7f20da6ba506894033b73b90fc710248e56f90` |
 
 | Normalized set | Members | Build A SHA-256 | Build B SHA-256 |
 | --- | ---: | --- | --- |

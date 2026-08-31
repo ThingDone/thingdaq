@@ -3,7 +3,7 @@ type: reference
 title: Calibration
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - calibration
   - adc
   - python
@@ -18,7 +18,7 @@ related:
 
 # Host-side ADC calibration
 
-Teensy DAQ preserves the received ADC0/A0 and ADC1/A1 codes exactly. Host
+ThingDAQ preserves the received ADC0/A0 and ADC1/A1 codes exactly. Host
 calibration is a separate, explicit view that converts each converter's raw
 codes to estimated volts at its Teensy input pin. It never rewrites a frame,
 replaces `ADCBlock.adc0` or `ADCBlock.adc1`, clamps an out-of-range result, or
@@ -46,7 +46,7 @@ nonzero fuse-derived hardware serial plus an optional, exact, case-sensitive
 Applying a record checks its serial, profile, 10/12-bit resolution, complete
 code range, and nominal input range before producing a value. A profiled record
 requires the caller to name that profile at application time. A block delivered
-by `TeensyDAQ` carries the INFO-reported hardware serial; a manually constructed
+by `ThingDAQ` carries the INFO-reported hardware serial; a manually constructed
 block has no trusted serial and requires an explicit one.
 
 The JSON database repeats schema version 1 at the document and record levels.
@@ -96,9 +96,9 @@ path outside the repository:
 from datetime import datetime, timezone
 from pathlib import Path
 
-from teensy_daq import (
+from thingdaq import (
     CalibrationRecord,
-    TeensyDAQ,
+    ThingDAQ,
     estimate_offset_gain,
     load_calibration,
     save_calibration,
@@ -119,11 +119,11 @@ record = CalibrationRecord(
     notes="Both pins driven from the same buffered source",
 )
 
-path = Path.home() / ".config" / "teensy-daq" / "calibration.json"
+path = Path.home() / ".config" / "thingdaq" / "calibration.json"
 save_calibration(path, record)  # the parent directory must already exist
 selected = load_calibration(path, serial, profile)
 
-with TeensyDAQ.open(hardware_serial=serial) as daq:
+with ThingDAQ.open(hardware_serial=serial) as daq:
     daq.configure(adc=True, gpio=False)
     daq.start()
     block = daq.read_block()

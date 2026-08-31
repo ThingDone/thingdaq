@@ -3,7 +3,7 @@ type: report
 title: Phase 12 Windows Validation Handoff
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-12
   - windows
   - packaging
@@ -23,7 +23,7 @@ related:
 ## Outcome and status
 
 The unpublished Windows handoff is ready for the user's later Windows run. The
-standalone `daq_api/scripts/windows_soak.py`, installed `teensy-daq-soak`
+standalone `daq_api/scripts/windows_soak.py`, installed `thingdaq-soak`
 command, and deterministic validation manifest encode the same accepted Phase
 11 identity and validation contract. Generation, conformance, packaging,
 clean-install, failure-fixture, and accelerated one-hour gates passed.
@@ -63,7 +63,7 @@ expectation all name the same source, build, protocol, and HEX identities.
 | Firmware version | 0.7.0 |
 | Protocol / checksum | v1 / Adler-32 algorithm 1 |
 | Source ID | `a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba` |
-| Build ID | `tdaq-a0dc150fd48a6e9b` |
+| Build ID | `thingdaq-a0dc150fd48a6e9b` |
 | Exported HEX | `firmware.ino.hex`, 357,214 bytes |
 | HEX SHA-256 | `0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a` |
 | Target | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
@@ -87,11 +87,11 @@ reserved on a package index.
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `daq_api/scripts/windows_soak.py` | 230,948 | `6604d1ec4900fdfbeec74b5b98413b9e7a28879261b1774e20aad6584ef1757d` |
-| `daq_api/src/teensy_daq/soak.py` | 230,947 | `33ae0942c2f75cc55c523afddd152b5fc9f5bdac4a6108a40f278a8fd60d9712` |
+| `daq_api/src/thingdaq/soak.py` | 230,947 | `33ae0942c2f75cc55c523afddd152b5fc9f5bdac4a6108a40f278a8fd60d9712` |
 | `firmware/soak/validation-manifest.json` | 9,751 | `3da1727a886876848a405aca4a538fccdc6f1c39c4086c17a5c0e7ebc78ee7d5` |
 | Validation-manifest canonical semantics | n/a | `d6da65261b17b91409da59a5a0f8f47182a26d2d2a5637ac68b4cf902413b260` |
-| `teensy_daq_local-0.10.0-py3-none-any.whl` | 226,018 | `d9141177503a588338ea1e5d7eb50ba78d1f38f0e482babda4eebf4da3e8da88` |
-| `teensy_daq_local-0.10.0.tar.gz` | 245,003 | `244d0837a6144d797af0c85a88d25b7164d0745cd788e69eb1417f32c4c43660` |
+| `thingdaq_local-0.10.0-py3-none-any.whl` | 226,018 | `d9141177503a588338ea1e5d7eb50ba78d1f38f0e482babda4eebf4da3e8da88` |
+| `thingdaq_local-0.10.0.tar.gz` | 245,003 | `244d0837a6144d797af0c85a88d25b7164d0745cd788e69eb1417f32c4c43660` |
 | Shared conformance vector | n/a | `5cb3ae36964d5ddce3a197ced3f93380fe8366c8dd0f880ef343f48465ecfa30` |
 
 The wheel has 30 members and the universal `py3-none-any` tag. The source
@@ -110,7 +110,7 @@ contract.
 
 | Contract area | Expected value |
 | --- | --- |
-| Firmware identity | Version 0.7.0, build `tdaq-a0dc150fd48a6e9b`, accepted source/HEX digests above |
+| Firmware identity | Version 0.7.0, build `thingdaq-a0dc150fd48a6e9b`, accepted source/HEX digests above |
 | Device identity | Hardware serial `20512460`, board ID 1, MCU ID 1 |
 | Protocol | Version 1, little-endian, 44-byte header, 4,048-byte payload, 4-byte trailer, 4,096-byte data frame |
 | Checksum | Adler-32 algorithm 1, initial value 1, modulus 65,521, 32-bit little-endian trailer over header and payload |
@@ -167,7 +167,7 @@ synchronization before the measured interval.
 | Host / transport | CPython 3.12.3 on Linux; virtual COM metadata and virtual serial device |
 | Requested profile | `--smoke --mode synthetic`, 10 measured seconds |
 | Grade / eligibility | PASS / `profile: diagnostic` / `release_eligible: false` |
-| Identity | Expected and observed build `tdaq-a0dc150fd48a6e9b`, hardware serial `20512460`, protocol v1 |
+| Identity | Expected and observed build `thingdaq-a0dc150fd48a6e9b`, hardware serial `20512460`, protocol v1 |
 | Measured time | 10.000958 seconds |
 | Timed ADC | 9,871 frames; 9,989,452 pairs; 998,849.510 pairs/s |
 | Timed GPIO | 9,872 frames; 39,961,856 samples; 3,995,802.802 samples/s |
@@ -230,21 +230,21 @@ Python and PySerial at runtime.
 ```powershell
 py -m pip install pyserial==3.5
 py daq_api\scripts\windows_soak.py --conformance-check
-py daq_api\scripts\windows_soak.py --duration 3600 --mode combined --output teensy-daq-windows-soak
+py daq_api\scripts\windows_soak.py --duration 3600 --mode combined --output thingdaq-windows-soak
 ```
 
 Or install the retained universal wheel and run the equivalent package entry
 point:
 
 ```powershell
-py -m pip install teensy_daq_local-0.10.0-py3-none-any.whl
-teensy-daq-soak --conformance-check
-teensy-daq-soak --duration 3600 --mode combined --output teensy-daq-windows-soak
+py -m pip install thingdaq_local-0.10.0-py3-none-any.whl
+thingdaq-soak --conformance-check
+thingdaq-soak --duration 3600 --mode combined --output thingdaq-windows-soak
 ```
 
 Use `--hardware-serial 20512460` when more than one matching Teensy is present.
-Retain both `teensy-daq-windows-soak.json` and
-`teensy-daq-windows-soak.md`; do not summarize the Windows run as passed until
+Retain both `thingdaq-windows-soak.json` and
+`thingdaq-windows-soak.md`; do not summarize the Windows run as passed until
 those reports exist and have been reviewed under the interpretation rules
 above. See [[soak-harness]] for all options and bounded-deadline behavior.
 

@@ -447,7 +447,7 @@ class SerialTransport:
 
         opener = Thread(
             target=open_port,
-            name="teensy-daq-serial-open",
+            name="thingdaq-serial-open",
             daemon=True,
         )
         opener.start()
@@ -496,7 +496,7 @@ class SerialTransport:
 
         worker = Thread(
             target=invoke,
-            name=f"teensy-daq-serial-{operation}",
+            name=f"thingdaq-serial-{operation}",
             daemon=True,
         )
         worker.start()

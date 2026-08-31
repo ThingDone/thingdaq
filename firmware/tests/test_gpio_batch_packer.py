@@ -60,7 +60,7 @@ class GpioBatchPackerTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-gpio-packer-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-gpio-packer-") as directory:
             executable = Path(directory) / "gpio-batch-packer-test"
             compiled = _compile(compiler, CPP_TEST, executable)
             self.assertEqual(0, compiled.returncode, compiled.stdout + compiled.stderr)
@@ -77,7 +77,7 @@ class GpioBatchPackerTests(unittest.TestCase):
             self.skipTest("g++ is required for the packing benchmark")
 
         with tempfile.TemporaryDirectory(
-            prefix="teensy-daq-gpio-pack-bench-"
+            prefix="thingdaq-gpio-pack-bench-"
         ) as directory:
             executable = Path(directory) / "gpio-batch-packer-benchmark"
             compiled = _compile(compiler, CPP_BENCHMARK, executable)

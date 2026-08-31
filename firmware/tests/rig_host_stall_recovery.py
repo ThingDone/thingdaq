@@ -1180,10 +1180,10 @@ def _grade_info(
     )
     evidence.check(
         "INFO build ID",
-        "tdaq-<16 lowercase hex>",
+        "thingdaq-<16 lowercase hex>",
         info["build_id"],
         isinstance(info["build_id"], str)
-        and re.fullmatch(r"tdaq-[0-9a-f]{16}", str(info["build_id"])) is not None,
+        and re.fullmatch(r"thingdaq-[0-9a-f]{16}", str(info["build_id"])) is not None,
     )
     if expected_build_id is not None:
         evidence.equal("pinned build ID", expected_build_id, info["build_id"])

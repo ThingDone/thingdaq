@@ -16,7 +16,7 @@ from functools import lru_cache
 from itertools import islice
 from statistics import median
 
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     AdcConverter,
     CommandResponse,
@@ -29,7 +29,7 @@ from teensy_daq import (
     Status,
     StreamMask,
     SyntheticStreamValidator,
-    TeensyDAQ,
+    ThingDAQ,
     decode_frame,
     decode_message,
     encode_frame,
@@ -40,8 +40,8 @@ from teensy_daq import (
     synthetic_gpio_byte,
     synthetic_gpio_payload,
 )
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.protocol import ParserCounters
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.protocol import ParserCounters
 
 TARGET_FRAMED_BYTES_PER_SECOND = (
     2
@@ -450,7 +450,7 @@ def _consume_corpus(
 
 
 def _wait_for_host_drops(
-    daq: TeensyDAQ,
+    daq: ThingDAQ,
     expected: int,
     *,
     timeout: float = 5.0,
@@ -502,7 +502,7 @@ class SustainedSyntheticCorrectnessTests(unittest.TestCase):
                     rate_multiplier=multiplier,
                     seed=seed,
                 )
-                with TeensyDAQ.open(
+                with ThingDAQ.open(
                     transport,
                     max_buffered_blocks=64,
                     idle_sleep=0.00001,
@@ -566,7 +566,7 @@ class BoundedQueueLossAccountingTests(unittest.TestCase):
             max_pending_bytes=2 * constants.DATA_FRAME_BYTES,
         )
         tracing_was_active = tracemalloc.is_tracing()
-        with TeensyDAQ.open(
+        with ThingDAQ.open(
             transport,
             max_buffered_blocks=queue_capacity,
             idle_sleep=0.00001,
@@ -625,7 +625,7 @@ class BoundedQueueLossAccountingTests(unittest.TestCase):
 
     def test_firmware_drop_counter_never_becomes_a_host_queue_drop(self) -> None:
         transport = InMemoryTransport(_FirmwareDropDevice())
-        with TeensyDAQ.open(transport, max_buffered_blocks=2) as daq:
+        with ThingDAQ.open(transport, max_buffered_blocks=2) as daq:
             daq.configure(adc=True, gpio=True)
             daq.start()
             blocks = tuple(daq.read_block() for _ in range(4))
@@ -683,7 +683,7 @@ class StreamingPerformanceGuardTests(unittest.TestCase):
 
         headrooms = [float(sample["headroom_ratio"]) for sample in samples]
         report = {
-            "schema": "teensy-daq-python-stream-benchmark-v1",
+            "schema": "thingdaq-python-stream-benchmark-v1",
             "python_implementation": platform.python_implementation(),
             "python_version": platform.python_version(),
             "platform": platform.platform(),

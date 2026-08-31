@@ -6,7 +6,7 @@ import struct
 import unittest
 from pathlib import Path
 
-from teensy_daq import (
+from thingdaq import (
     BenchmarkCacheState,
     BenchmarkMemoryRegion,
     BenchmarkVector,
@@ -24,7 +24,7 @@ from teensy_daq import (
     decode_response,
     encode_frame,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"

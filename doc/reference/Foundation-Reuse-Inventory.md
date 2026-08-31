@@ -3,7 +3,7 @@ type: research
 title: Foundation Reuse Inventory
 created: 2026-08-27
 tags:
-  - teensy-daq
+  - thingdaq
   - teensy-4-0
   - reuse-audit
   - foundation

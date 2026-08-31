@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     AlignedInterval,
     AlignmentLoss,
@@ -14,14 +14,14 @@ from teensy_daq import (
     Source,
     StreamGap,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     TimestampAligner,
     TimestampAlignmentError,
     align_by_timestamp,
     synthetic_adc_payload,
     synthetic_gpio_payload,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 
 def _flags(sequence: int, source: Source) -> FrameFlag:
@@ -130,7 +130,7 @@ class AlignedIntervalTests(unittest.TestCase):
 class TimestampAlignerTests(unittest.TestCase):
     def test_raw_facade_delivery_stays_immediate_and_independently_typed(self) -> None:
         aligner = TimestampAligner()
-        with TeensyDAQ.simulated() as daq:
+        with ThingDAQ.simulated() as daq:
             daq.configure(adc=True, gpio=True)
             daq.start()
 

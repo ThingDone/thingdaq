@@ -619,10 +619,10 @@ def grade_info(evidence: Evidence, info: dict[str, object]) -> None:
     build_id = info["build_id"]
     evidence.check(
         "INFO build_id",
-        "tdaq-<16 lowercase hex>",
+        "thingdaq-<16 lowercase hex>",
         build_id,
         isinstance(build_id, str)
-        and re.fullmatch(r"tdaq-[0-9a-f]{16}", build_id) is not None,
+        and re.fullmatch(r"thingdaq-[0-9a-f]{16}", build_id) is not None,
     )
 
 
@@ -857,7 +857,7 @@ def main() -> int:
         print("FAIL: SERIAL_PORT is required")
         return 2
     print(
-        f"Teensy DAQ Phase 03 rig smoke: port={port_name!r} "
+        f"ThingDAQ Phase 03 rig smoke: port={port_name!r} "
         f"baud={BAUD_RATE} protocol={PROTOCOL_VERSION}"
     )
     try:

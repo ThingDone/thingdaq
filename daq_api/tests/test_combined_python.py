@@ -20,7 +20,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import serial
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     AlignedInterval,
     AlignmentItem,
@@ -43,7 +43,7 @@ from teensy_daq import (
     Status,
     StreamGap,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     TimestampAligner,
     TimestampAlignmentError,
     UnexpectedStreamGapError,
@@ -57,8 +57,8 @@ from teensy_daq import (
     synthetic_gpio_payload,
     validate_synthetic_block,
 )
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.cli import CliExitCode, _execute, build_parser, main
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.cli import CliExitCode, _execute, build_parser, main
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_SOURCE = REPOSITORY_ROOT / "daq_api" / "src"
@@ -294,7 +294,7 @@ class _CombinedStartBurstTransport(InMemoryTransport):
 
 
 def _wait_for_host_drops(
-    daq: TeensyDAQ,
+    daq: ThingDAQ,
     expected: int,
     *,
     timeout: float = 1.0,
@@ -310,7 +310,7 @@ def _wait_for_host_drops(
 
 class CombinedGapPolicyTests(unittest.TestCase):
     def test_continuing_and_strict_modes_handle_one_combined_firmware_gap(self) -> None:
-        with TeensyDAQ.open(
+        with ThingDAQ.open(
             InMemoryTransport(_CombinedFirmwareGapDevice())
         ) as continuing:
             continuing.configure(adc=True, gpio=True)
@@ -336,7 +336,7 @@ class CombinedGapPolicyTests(unittest.TestCase):
         )
         self.assertEqual(0, losses.host.host_block_queue_drops)
 
-        with TeensyDAQ.open(
+        with ThingDAQ.open(
             InMemoryTransport(_CombinedFirmwareGapDevice()),
             strict=True,
         ) as strict:
@@ -355,7 +355,7 @@ class CombinedGapPolicyTests(unittest.TestCase):
 
     def test_combined_host_queue_loss_remains_separate_from_firmware_loss(self) -> None:
         transport = _CombinedStartBurstTransport()
-        with TeensyDAQ.open(transport, max_buffered_blocks=2) as daq:
+        with ThingDAQ.open(transport, max_buffered_blocks=2) as daq:
             daq.configure(adc=True, gpio=True)
             daq.start()
             _wait_for_host_drops(daq, 4)
@@ -601,7 +601,7 @@ class CombinedMixedStreamTests(unittest.TestCase):
                 return original_import(name, *args, **kwargs)
             builtins.__import__ = guarded_import
 
-            from teensy_daq import (
+            from thingdaq import (
                 ADCBlock, AlignedInterval, FrameFlag, GPIOBlock,
                 TimestampAligner, synthetic_adc_payload, synthetic_gpio_payload,
             )
@@ -799,7 +799,7 @@ def _summary_fields(output: str) -> dict[str, str]:
 class CombinedCliSerialTests(unittest.TestCase):
     def test_monitor_telemetry_and_cleanup_survive_partial_serial_io(self) -> None:
         peer = _PartialSerialPeer()
-        daq = TeensyDAQ.open(
+        daq = ThingDAQ.open(
             _serial_transport(peer),
             read_size=2_048,
             command_timeout=0.5,
@@ -818,7 +818,7 @@ class CombinedCliSerialTests(unittest.TestCase):
             ]
         )
         output = io.StringIO()
-        with patch("teensy_daq.cli._open_device", return_value=daq):
+        with patch("thingdaq.cli._open_device", return_value=daq):
             result = _execute(arguments, output)
 
         rendered = output.getvalue()
@@ -851,7 +851,7 @@ class CombinedCliSerialTests(unittest.TestCase):
         self,
     ) -> None:
         peer = _PartialSerialPeer(disconnect_after_data_frames=4)
-        daq = TeensyDAQ.open(
+        daq = ThingDAQ.open(
             _serial_transport(peer),
             read_size=1_024,
             command_timeout=0.5,
@@ -861,7 +861,7 @@ class CombinedCliSerialTests(unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
         with (
-            patch("teensy_daq.cli._open_device", return_value=daq),
+            patch("thingdaq.cli._open_device", return_value=daq),
             patch.object(daq, "stop", wraps=daq.stop) as stop,
             redirect_stdout(stdout),
             redirect_stderr(stderr),

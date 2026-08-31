@@ -9,7 +9,7 @@
 #include "protocol.h"
 #include "statistics.h"
 
-namespace teensy_daq::control {
+namespace thingdaq::control {
 
 inline constexpr std::size_t kRecentRequestIdWindow = 16U;
 
@@ -225,4 +225,4 @@ static_assert(ControlState::isLegalTransition(
 static_assert(!ControlState::isLegalTransition(
     protocol_v1::DeviceState::kIdle, protocol_v1::DeviceState::kRunning));
 
-}  // namespace teensy_daq::control
+}  // namespace thingdaq::control

@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import serial
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     BackgroundReader,
     ByteTransport,
@@ -30,12 +30,12 @@ from teensy_daq import (
     SimulatedDevice,
     Source,
     Status,
-    TeensyDAQ,
+    ThingDAQ,
     encode_frame,
     synthetic_adc_payload,
 )
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.models import ResponseValue
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.models import ResponseValue
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 1.0) -> None:
@@ -428,7 +428,7 @@ class AdversarialSerialReaderTests(unittest.TestCase):
             request_timeout=1.0,
         )
         reader.start()
-        reader_thread_name = f"teensy-daq-reader-{id(reader):x}"
+        reader_thread_name = f"thingdaq-reader-{id(reader):x}"
 
         def request(kind: FrameKind, payload: bytes = b"") -> None:
             try:
@@ -482,7 +482,7 @@ class Phase03ControlSerialIntegrationTests(unittest.TestCase):
             responses_to_drop=1,
         )
 
-        configured = TeensyDAQ.open(
+        configured = ThingDAQ.open(
             _serial_transport(first_peer),
             read_size=17,
             command_timeout=0.04,
@@ -510,7 +510,7 @@ class Phase03ControlSerialIntegrationTests(unittest.TestCase):
             read_pattern=(5, 1, 7),
             write_pattern=(0, 3, 1, 9),
         )
-        running = TeensyDAQ.open(
+        running = ThingDAQ.open(
             _serial_transport(second_peer),
             read_size=19,
             command_timeout=0.1,
@@ -528,7 +528,7 @@ class Phase03ControlSerialIntegrationTests(unittest.TestCase):
             read_pattern=(2, 13, 1),
             write_pattern=(2, 0, 7),
         )
-        reopened = TeensyDAQ.open(
+        reopened = ThingDAQ.open(
             _serial_transport(third_peer),
             read_size=23,
             command_timeout=0.1,
@@ -556,7 +556,7 @@ class Phase03ControlSerialIntegrationTests(unittest.TestCase):
         )
 
         with self.assertRaises(CommandTimeoutError):
-            TeensyDAQ.open(
+            ThingDAQ.open(
                 _serial_transport(peer),
                 command_timeout=0.02,
                 synchronization_attempts=3,
@@ -587,7 +587,7 @@ class _PublicTranscript:
 
 
 def _exercise_public_api(transport: ByteTransport) -> _PublicTranscript:
-    with TeensyDAQ.open(
+    with ThingDAQ.open(
         transport,
         read_size=97,
         command_timeout=1.0,

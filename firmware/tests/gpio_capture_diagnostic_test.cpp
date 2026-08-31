@@ -7,9 +7,9 @@
 
 namespace {
 
-namespace diagnostic = teensy_daq::gpio_diagnostic;
-namespace board = teensy_daq::board;
-namespace constants = teensy_daq::protocol_v1;
+namespace diagnostic = thingdaq::gpio_diagnostic;
+namespace board = thingdaq::board;
+namespace constants = thingdaq::protocol_v1;
 
 int failures = 0;
 

@@ -34,7 +34,7 @@ class SyntheticPipelineTests(unittest.TestCase):
             self.skipTest("g++ is required for portable firmware tests")
 
         with tempfile.TemporaryDirectory(
-            prefix="teensy-daq-synthetic-pipeline-"
+            prefix="thingdaq-synthetic-pipeline-"
         ) as directory:
             executable = Path(directory) / "synthetic-pipeline-test"
             compile_result = subprocess.run(
@@ -49,7 +49,7 @@ class SyntheticPipelineTests(unittest.TestCase):
                     "-pedantic",
                     "-fno-exceptions",
                     "-fno-rtti",
-                    "-DTEENSY_DAQ_TESTING=1",
+                    "-DTHINGDAQ_TESTING=1",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "synthetic_source.cpp"),

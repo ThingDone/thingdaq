@@ -29,7 +29,7 @@ class SimulatorInputError(SimulatorError):
 
 
 class SimulatedDevice:
-    """A bounded, deterministic Teensy DAQ protocol peer.
+    """A bounded, deterministic ThingDAQ protocol peer.
 
     The simulator consumes the same encoded request frames that future firmware
     will consume and produces ordinary encoded response/data frames.  It starts
@@ -41,7 +41,7 @@ class SimulatedDevice:
         *,
         auto_boot: bool = True,
         control_only: bool = False,
-        build_id: str = "teensy-daq-simulator-v1",
+        build_id: str = "thingdaq-simulator-v1",
         max_receive_bytes: int = constants.MAX_CONTROL_FRAME_BYTES,
         max_requests_per_receive: int = 8,
     ) -> None:

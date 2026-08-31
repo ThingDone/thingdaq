@@ -23,7 +23,7 @@ class PacketBufferPipelineTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-packets-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-packets-") as directory:
             executable = Path(directory) / "packet-buffer-pipeline-test"
             compile_result = subprocess.run(
                 [

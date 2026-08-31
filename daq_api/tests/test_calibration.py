@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from teensy_daq import (
+from thingdaq import (
     CALIBRATION_SCHEMA_VERSION,
     MAX_CALIBRATION_FILE_BYTES,
     ADCBlock,
@@ -31,7 +31,7 @@ from teensy_daq import (
     load_calibration,
     save_calibration,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 
 def _record(
@@ -140,12 +140,12 @@ class CalibrationPersistenceTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(CalibrationFormatError, "non-finite"):
             calibration_database_from_json(
-                '{"format":"teensy-daq-host-calibration",'
+                '{"format":"thingdaq-host-calibration",'
                 '"schema_version":1,"records":[],"extra":NaN}'
             )
         with self.assertRaisesRegex(CalibrationFormatError, "schema"):
             calibration_database_from_json(
-                '{"format":"teensy-daq-host-calibration",'
+                '{"format":"thingdaq-host-calibration",'
                 '"schema_version":1.0,"records":[]}'
             )
 
@@ -209,7 +209,7 @@ class CalibrationPersistenceTests(unittest.TestCase):
 
             with (
                 patch(
-                    "teensy_daq.calibration.os.replace",
+                    "thingdaq.calibration.os.replace",
                     side_effect=OSError("injected replace failure"),
                 ),
                 self.assertRaisesRegex(OSError, "injected replace failure"),
@@ -229,7 +229,7 @@ class CalibrationPersistenceTests(unittest.TestCase):
 
             with (
                 patch(
-                    "teensy_daq.calibration.os.fsync",
+                    "thingdaq.calibration.os.fsync",
                     side_effect=OSError("injected fsync failure"),
                 ),
                 self.assertRaisesRegex(OSError, "injected fsync failure"),

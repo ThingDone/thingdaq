@@ -55,7 +55,7 @@ class FirmwareIdentityResourceTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-cpp-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-cpp-") as directory:
             executable = Path(directory) / "identity-resource-test"
             compile_result = subprocess.run(
                 [

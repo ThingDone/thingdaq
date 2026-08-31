@@ -19,7 +19,7 @@ class AdcFramePackerTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-adc-packer-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-adc-packer-") as directory:
             executable = Path(directory) / "adc-frame-packer-test"
             compile_result = subprocess.run(
                 [

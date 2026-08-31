@@ -3,7 +3,7 @@ type: report
 title: Phase 10 Package Workflows
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-10
   - python-package
   - hardware-validation
@@ -56,7 +56,7 @@ Serial, `-O2`, and all warnings enabled. The target was
 `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std`. The resulting source
 fingerprint and build ID remained
 `ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85`
-and `tdaq-ea010335c9b63bb7`.
+and `thingdaq-ea010335c9b63bb7`.
 
 The new manifest binds the build to repository revision
 `f36f606b0691a289365d1d90f35b058a4da2e53e` and reports no changed firmware
@@ -89,10 +89,10 @@ no diff. The retained archives were rehashed before this report was written.
 
 | Build | Artifact | Bytes | Archive SHA-256 |
 | --- | --- | ---: | --- |
-| A | `teensy_daq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
-| B | `teensy_daq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
-| A | `teensy_daq_local-0.10.0.tar.gz` | 195,939 | `67285e6a10cd1d384e01e438f0b54ee12404e61924c646aa25ce538913e52f22` |
-| B | `teensy_daq_local-0.10.0.tar.gz` | 195,928 | `831be5170b8ed2f498724eaa1c4bc241d39ad0722861347eab6f80f498c5a420` |
+| A | `thingdaq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
+| B | `thingdaq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
+| A | `thingdaq_local-0.10.0.tar.gz` | 195,939 | `67285e6a10cd1d384e01e438f0b54ee12404e61924c646aa25ce538913e52f22` |
+| B | `thingdaq_local-0.10.0.tar.gz` | 195,928 | `831be5170b8ed2f498724eaa1c4bc241d39ad0722861347eab6f80f498c5a420` |
 
 The wheels are byte-identical and their 29 normalized members share digest
 `35c6ba0082be054b54ed851b5f2ed2b2707c1f0087964f1cf2437aaba5f76af3`.
@@ -131,7 +131,7 @@ copied into the working directory, or committed.
 | Hub port / rig serial port | 15 / transient `/dev/ttyACM0` |
 | Stable hardware serial | `20512460` (required exactly by the acceptance program) |
 | Protocol / firmware | protocol 1 / firmware 0.7.0 |
-| Build ID | `tdaq-ea010335c9b63bb7` (required exactly by the acceptance program) |
+| Build ID | `thingdaq-ea010335c9b63bb7` (required exactly by the acceptance program) |
 | Capability / configuration masks | `0x1ff` / `0x3f` |
 | Supported stream / source / checksum masks | `0x3` / `0x3` / `0x0e` |
 | Applied configuration | ADC + GPIO, physical hardware, Adler-32, 4,096-byte frames |
@@ -151,7 +151,7 @@ project package or generated constants, so its checks remain independent of
 the host implementation.
 
 1. Two synchronized INFO responses matched exactly. The program pinned serial
-   `20512460`, build ID `tdaq-ea010335c9b63bb7`, protocol v1, firmware 0.7.0,
+   `20512460`, build ID `thingdaq-ea010335c9b63bb7`, protocol v1, firmware 0.7.0,
    both stream/source profiles, all three checksums, fixed rates, 12-bit ADC
    metadata, A0/A1 and D6-D13 routes, trigger phase, DMA resources, and packet
    geometry.
@@ -238,7 +238,7 @@ The physical evidence matches the stable surface in [[Python-API]] and
   invariants used for serial selection, optional `ExpectedDeviceIdentity`
   pinning, and pre-CONFIGURE validation.
 - The accepted stream/source/checksum/rate/resolution values are exactly the
-  arguments supported by `TeensyDAQ.configure()`, and both CONFIGURE and START
+  arguments supported by `ThingDAQ.configure()`, and both CONFIGURE and START
   echoed the immutable applied `DAQConfiguration` expected by the facade.
 - The independent ADC/GPIO payload interpretation matches `ADCBlock.adc0`,
   `ADCBlock.adc1`, explicit ADC0-then-ADC1 interleaving, `GPIOBlock.samples`,

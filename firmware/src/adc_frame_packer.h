@@ -8,7 +8,7 @@
 #include "packet_buffer_pipeline.h"
 #include "statistics.h"
 
-namespace teensy_daq::adc_packer {
+namespace thingdaq::adc_packer {
 
 enum class OperationStatus : std::uint8_t {
   kOk,
@@ -110,4 +110,4 @@ static_assert(protocol_v1::kAdcPairPeriodTicks == 8U);
 static_assert(protocol_v1::kAdc1PhaseTicks == 4U);
 static_assert(sizeof(AdcFramePacker) <= board::kAdcPackerStateBudgetBytes);
 
-}  // namespace teensy_daq::adc_packer
+}  // namespace thingdaq::adc_packer

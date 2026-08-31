@@ -7,7 +7,7 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
-#define TEENSY_DAQ_ADC_TARGET_CODE(section_name) \
+#define THINGDAQ_ADC_TARGET_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 
 // Teensy startup calls analog_init() before C++ global construction. The core
@@ -17,10 +17,10 @@
 // independently bounded, reportable initializer below. Linking analogRead()
 // later will intentionally expose a duplicate hook instead of bypassing this
 // ownership boundary silently.
-extern "C" TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.defer_core")
+extern "C" THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.defer_core")
 void analog_init(void) {}
 
-namespace teensy_daq::adc {
+namespace thingdaq::adc {
 namespace {
 
 constexpr std::uint32_t kAdcClockGateMask =
@@ -67,7 +67,7 @@ void disableCommandSlots(IMXRT_ADCS_t &module) {
   module.HC7 = kDisabledChannel;
 }
 
-TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_slots")
+THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_slots")
 bool commandSlotsDisabled(const IMXRT_ADCS_t &module) {
   return module.HC0 == kDisabledChannel && module.HC1 == kDisabledChannel &&
          module.HC2 == kDisabledChannel && module.HC3 == kDisabledChannel &&
@@ -121,7 +121,7 @@ std::uint32_t configurationFor(const Settings &settings) {
 
 class TeensyPlatform final : public Platform {
  public:
-  TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_prepare")
+  THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_prepare")
   PrepareStatus prepareConverter(
       const board::AdcConverterConfiguration &route,
       const Settings &settings) override {
@@ -154,7 +154,7 @@ class TeensyPlatform final : public Platform {
     return PrepareStatus::kOk;
   }
 
-  TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_counter_begin")
+  THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_counter_begin")
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
     if (F_CPU_ACTUAL != protocol_v1::kAdcCalibrationCycleCounterHz) {
       frequency_hz = 0U;
@@ -162,7 +162,7 @@ class TeensyPlatform final : public Platform {
     }
     ARM_DEMCR |= ARM_DEMCR_TRCENA;
     ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
-#if defined(TEENSY_DAQ_HOST_REGISTER_TEST)
+#if defined(THINGDAQ_HOST_REGISTER_TEST)
     __asm__ volatile("" : : : "memory");
 #else
     __asm__ volatile("dsb\n\tisb" : : : "memory");
@@ -173,13 +173,13 @@ class TeensyPlatform final : public Platform {
     return ARM_DWT_CYCCNT != begin;
   }
 
-  TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_counter_read")
+  THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_counter_read")
   std::uint32_t readCycles() override {
     __asm__ volatile("" : : : "memory");
     return ARM_DWT_CYCCNT;
   }
 
-  TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_cal_start")
+  THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_cal_start")
   bool startCalibration(
       const board::AdcConverterConfiguration &route) override {
     IMXRT_ADCS_t *const module = moduleFor(route);
@@ -194,21 +194,21 @@ class TeensyPlatform final : public Platform {
     return true;
   }
 
-  TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_cal_active")
+  THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_cal_active")
   bool calibrationActive(
       const board::AdcConverterConfiguration &route) override {
     const IMXRT_ADCS_t *const module = moduleFor(route);
     return module != nullptr && (module->GC & ADC_GC_CAL) != 0U;
   }
 
-  TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_cal_failed")
+  THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_cal_failed")
   bool calibrationFailed(
       const board::AdcConverterConfiguration &route) override {
     const IMXRT_ADCS_t *const module = moduleFor(route);
     return module == nullptr || (module->GS & ADC_GS_CALF) != 0U;
   }
 
-  TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_verify")
+  THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_verify")
   bool verifyConverter(const board::AdcConverterConfiguration &route,
                        const Settings &settings) override {
     const IMXRT_ADCS_t *const module = moduleFor(route);
@@ -222,7 +222,7 @@ class TeensyPlatform final : public Platform {
            commandSlotsDisabled(*module);
   }
 
-  TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_abort")
+  THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_abort")
   void abortCalibration(
       const board::AdcConverterConfiguration &route) override {
     IMXRT_ADCS_t *const module = moduleFor(route);
@@ -238,7 +238,7 @@ Initializer g_initializer{g_platform};
 
 }  // namespace
 
-TEENSY_DAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_singleton")
+THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_singleton")
 Initializer &teensyInitializer() { return g_initializer; }
 
 static_assert(F_CPU == protocol_v1::kAdcCalibrationCycleCounterHz,
@@ -252,8 +252,8 @@ static_assert(board::kAdc1InputChannel == 8U);
 static_assert(protocol_v1::kAdcClockHz * protocol_v1::kAdcClockDivider ==
               protocol_v1::kAdcIpgClockHz);
 
-}  // namespace teensy_daq::adc
+}  // namespace thingdaq::adc
 
 #endif
 
-#undef TEENSY_DAQ_ADC_TARGET_CODE
+#undef THINGDAQ_ADC_TARGET_CODE

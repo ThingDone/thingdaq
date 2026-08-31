@@ -3,7 +3,7 @@ type: reference
 title: Autonomous Soak Harness
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - firmware
   - endurance
   - remote-testing
@@ -23,7 +23,7 @@ generated files contain the complete protocol implementation because neither
 the remote container nor the standalone Windows handoff requires a repository
 checkout or installed package; both need only the standard library and
 PySerial. The installed command executes its generated implementation inside
-the `teensy_daq` package rather than importing the standalone script. Remote
+the `thingdaq` package rather than importing the standalone script. Remote
 programs obtain their sole device endpoint from `SERIAL_PORT`, while both
 Windows paths perform metadata-first, identity-pinned COM discovery.
 
@@ -39,7 +39,7 @@ exact firmware/HEX identity, checksum parameters, INFO capabilities,
 rates/phases/pins, frame layout, resolution, and required zero counters.
 
 Regenerate that manifest, all three Phase 11 rig programs,
-`daq_api/scripts/windows_soak.py`, and `daq_api/src/teensy_daq/soak.py` with:
+`daq_api/scripts/windows_soak.py`, and `daq_api/src/thingdaq/soak.py` with:
 
 ```bash
 .venv/bin/python firmware/tools/generate_soak_programs.py
@@ -86,7 +86,7 @@ handoff at the path shown below:
 | Control stress | `rig_soak_control_stress.py` | A 600-second campaign of alternating bounded hardware/synthetic epochs and periodic CDC reopens |
 | Release validation manifest | `firmware/soak/validation-manifest.json` | Deterministic Phase 11 candidate, protocol, INFO, acquisition, frame, and zero-counter contract embedded into both Windows paths |
 | Windows handoff | `daq_api/scripts/windows_soak.py` | One identity-pinned 3600-second physical-combined epoch by default, with shorter diagnostic and synthetic options |
-| Installed Windows handoff | `teensy-daq-soak` → `teensy_daq.soak:main` | The same options and report schema, executed from the installed package implementation |
+| Installed Windows handoff | `thingdaq-soak` → `thingdaq.soak:main` | The same options and report schema, executed from the installed package implementation |
 
 The two Windows paths differ only in role-specific generated metadata. Prove
 their shared command bytes against protocol fixtures and exercise identical
@@ -96,7 +96,7 @@ validators, metric calculations, and graders with:
 ```bash
 .venv/bin/python firmware/tools/check_soak_conformance.py --pretty
 py daq_api\scripts\windows_soak.py --conformance-check
-teensy-daq-soak --conformance-check
+thingdaq-soak --conformance-check
 ```
 
 The repository gate fails if implementation bytes outside the generated
@@ -200,7 +200,7 @@ that the device cannot observe. The aggregator accepts a bundle shaped like:
     "artifact_sha256": "actual-uploaded-hex-sha256",
     "program_sha256": "actual-generated-program-sha256",
     "source_id": "firmware-source-id",
-    "build_id": "tdaq-source-prefix",
+    "build_id": "thingdaq-source-prefix",
     "client_started_utc": "2026-08-29T12:00:00+00:00",
     "client_completed_utc": "2026-08-29T12:11:00+00:00",
     "client_version": "1.0.0",

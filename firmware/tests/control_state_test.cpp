@@ -9,10 +9,10 @@
 
 namespace {
 
-namespace control = teensy_daq::control;
-namespace constants = teensy_daq::protocol_v1;
-namespace stats = teensy_daq::stats;
-namespace wire = teensy_daq::protocol;
+namespace control = thingdaq::control;
+namespace constants = thingdaq::protocol_v1;
+namespace stats = thingdaq::stats;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 
@@ -261,10 +261,14 @@ void testBootAndInfo() {
 
   const std::size_t build_offset = constants::kInfoResponseBuildIdOffset;
   expect(decoded.payload.data[build_offset] == 't' &&
-             decoded.payload.data[build_offset + 1U] == 'd' &&
-             decoded.payload.data[build_offset + 2U] == 'a' &&
-             decoded.payload.data[build_offset + 3U] == 'q' &&
-             decoded.payload.data[build_offset + 4U] == '-',
+             decoded.payload.data[build_offset + 1U] == 'h' &&
+             decoded.payload.data[build_offset + 2U] == 'i' &&
+             decoded.payload.data[build_offset + 3U] == 'n' &&
+             decoded.payload.data[build_offset + 4U] == 'g' &&
+             decoded.payload.data[build_offset + 5U] == 'd' &&
+             decoded.payload.data[build_offset + 6U] == 'a' &&
+             decoded.payload.data[build_offset + 7U] == 'q' &&
+             decoded.payload.data[build_offset + 8U] == '-',
          "INFO includes the centralized build identity");
 
   wire::Request repeated = info;

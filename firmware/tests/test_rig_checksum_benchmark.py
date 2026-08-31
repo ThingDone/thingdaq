@@ -17,7 +17,7 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from teensy_daq import (
+from thingdaq import (
     BoardId,
     Capability,
     Info,
@@ -25,7 +25,7 @@ from teensy_daq import (
     SimulatedDevice,
     StreamMask,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG_SCRIPT = ROOT / "firmware" / "tests" / "rig_checksum_benchmark.py"
@@ -52,7 +52,7 @@ class HardwareBenchmarkDevice(SimulatedDevice):
     """Streaming simulator with independently fabricated target measurements."""
 
     def __init__(self) -> None:
-        super().__init__(build_id="tdaq-0123456789abcdef")
+        super().__init__(build_id="thingdaq-0123456789abcdef")
         self.benchmark_requests: list[object] = []
         self.configured_checksums: list[int] = []
 
@@ -60,7 +60,7 @@ class HardwareBenchmarkDevice(SimulatedDevice):
         configuration = self.configuration
         info = Info(
             device_state=self.state,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
             hardware_serial=12_345_670,
             firmware_version=(0, 6, 0),
             board_id=BoardId.TEENSY_40,
@@ -271,7 +271,8 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("teensy_daq", source)
+        self.assertNotIn("import thingdaq", source)
+        self.assertNotIn("from thingdaq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
         self.assertIn('"CHECKSUM_CAPTURE_SECONDS"', source)
@@ -525,7 +526,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
             "CHECKSUM_STATUS_INTERVAL_SECONDS": "0.02",
             "CHECKSUM_BENCHMARK_BATCH_COUNT": "1",
             "CHECKSUM_BENCHMARK_ITERATIONS_PER_BATCH": "2",
-            "EXPECTED_BUILD_ID": "tdaq-0123456789abcdef",
+            "EXPECTED_BUILD_ID": "thingdaq-0123456789abcdef",
             "EXPECTED_HARDWARE_SERIAL": "12345670",
         }
         with (
@@ -597,7 +598,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
                 status_interval_seconds=0.02,
                 benchmark_batch_count=1,
                 benchmark_iterations_per_batch=2,
-                expected_build_id="tdaq-0123456789abcdef",
+                expected_build_id="thingdaq-0123456789abcdef",
                 expected_hardware_serial=12_345_670,
                 selected_checksum_algorithm=rig.CHECKSUM_CRC32C,
             )

@@ -5,13 +5,13 @@
 #include "checksum.h"
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_BENCHMARK_COLD_CODE(section_name) \
+#define THINGDAQ_BENCHMARK_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_BENCHMARK_COLD_CODE(section_name)
+#define THINGDAQ_BENCHMARK_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::benchmark {
+namespace thingdaq::benchmark {
 namespace {
 
 volatile std::uint32_t g_published_digest = 0U;
@@ -71,7 +71,7 @@ std::uint32_t mixDigest(std::uint32_t digest, std::uint32_t checksum_value,
 
 std::uint32_t publishedDigest() { return g_published_digest; }
 
-TEENSY_DAQ_BENCHMARK_COLD_CODE(".flashmem.checksum_benchmark.prepare_vector")
+THINGDAQ_BENCHMARK_COLD_CODE(".flashmem.checksum_benchmark.prepare_vector")
 bool Runner::prepareVector(const protocol::ChecksumBenchmarkRequest &request,
                            Buffer &buffer) {
   for (std::size_t index = 0U; index < buffer.bytes.size(); ++index) {
@@ -189,7 +189,7 @@ bool Runner::measureInvalidate(Buffer &buffer, std::size_t input_bytes,
   return true;
 }
 
-TEENSY_DAQ_BENCHMARK_COLD_CODE(".flashmem.checksum_benchmark.runner")
+THINGDAQ_BENCHMARK_COLD_CODE(".flashmem.checksum_benchmark.runner")
 RunResult Runner::run(const protocol::ChecksumBenchmarkRequest &request) {
   RunResult result{};
   result.response.request = request;
@@ -301,6 +301,6 @@ RunResult Runner::run(const protocol::ChecksumBenchmarkRequest &request) {
   return result;
 }
 
-}  // namespace teensy_daq::benchmark
+}  // namespace thingdaq::benchmark
 
-#undef TEENSY_DAQ_BENCHMARK_COLD_CODE
+#undef THINGDAQ_BENCHMARK_COLD_CODE

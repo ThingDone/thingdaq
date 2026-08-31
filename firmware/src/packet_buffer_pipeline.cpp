@@ -3,13 +3,13 @@
 #include <limits>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_PACKET_COLD_CODE(section_name) \
+#define THINGDAQ_PACKET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_PACKET_COLD_CODE(section_name)
+#define THINGDAQ_PACKET_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::packet {
+namespace thingdaq::packet {
 namespace {
 
 template <typename Integer>
@@ -32,7 +32,7 @@ Integer saturatingMultiply(Integer left, Integer right) {
   return left > maximum / right ? maximum : left * right;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.byte_counters")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.byte_counters")
 SourceByteCounters byteCounters(Stream stream,
                                 const SourceCounters &source) {
   SourceByteCounters result{};
@@ -63,7 +63,7 @@ SourceByteCounters byteCounters(Stream stream,
 
 }  // namespace
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.start")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.start")
 OperationStatus PacketBufferPipeline::startRun(
     std::uint32_t run_id,
     protocol_v1::ChecksumAlgorithm checksum_algorithm,
@@ -122,7 +122,7 @@ OperationStatus PacketBufferPipeline::startRun(
   return OperationStatus::kOk;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.stop")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.stop")
 StopReport PacketBufferPipeline::stopProduction() {
   StopReport report{};
   accepting_frames_ = false;
@@ -195,7 +195,7 @@ BeginFillResult PacketBufferPipeline::beginFill(Stream stream) {
   return result;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.source_drops")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.source_drops")
 OperationStatus PacketBufferPipeline::recordSourceFrameDrops(
     Stream stream, std::uint64_t frame_count) {
   if (!accepting_frames_ || run_id_ == 0U || !validStream(stream)) {
@@ -315,7 +315,7 @@ FinishFillResult PacketBufferPipeline::finishFill(
   return result;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.cancel")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.cancel")
 bool PacketBufferPipeline::cancelFill(const FillHandle &handle) {
   if (!handleMatches(handle)) {
     saturatingIncrement(invalid_operations_);
@@ -407,7 +407,7 @@ protocol::ByteView PacketBufferPipeline::frontFrame() const {
   return {storage_.frame(*buffer_index).data(), record.frame_size};
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.prepare_front")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.prepare_front")
 bool PacketBufferPipeline::prepareFrontFrame() {
   const BufferIndex *buffer_index = transmit_queue_.front();
   if (buffer_index == nullptr || *buffer_index >= records_.size()) {
@@ -424,7 +424,7 @@ bool PacketBufferPipeline::prepareFrontFrame() {
   return finalizeGapBefore(*buffer_index);
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.mark_front_started")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.mark_front_started")
 void PacketBufferPipeline::markFrontFrameStarted() {
   const BufferIndex *buffer_index = transmit_queue_.front();
   if (buffer_index == nullptr || *buffer_index >= records_.size()) {
@@ -440,7 +440,7 @@ void PacketBufferPipeline::markFrontFrameStarted() {
   record.transmission_started = true;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.abort_front")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.abort_front")
 bool PacketBufferPipeline::abortFrontFrame() {
   BufferIndex buffer_index = kInvalidBufferIndex;
   if (!transmit_queue_.pop(buffer_index) ||
@@ -528,7 +528,7 @@ bool PacketBufferPipeline::readyForStart() const {
   return !accepting_frames_ && quiescent();
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.snapshot")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.snapshot")
 PipelineSnapshot PacketBufferPipeline::snapshot() const {
   PipelineSnapshot result{};
   result.sources = source_counters_;
@@ -639,7 +639,7 @@ std::uint64_t PacketBufferPipeline::accountedFrames(
   return result;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.take_free")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.take_free")
 PacketBufferPipeline::BufferIndex PacketBufferPipeline::takeFreeBuffer() {
   for (std::size_t offset = 0U; offset < records_.size(); ++offset) {
     const std::size_t index = (next_free_search_ + offset) % records_.size();
@@ -662,7 +662,7 @@ PacketBufferPipeline::BufferIndex PacketBufferPipeline::takeFreeBuffer() {
   return kInvalidBufferIndex;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.select_eviction")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.select_eviction")
 PacketBufferPipeline::BufferIndex
 PacketBufferPipeline::oldestEvictableCompleteBuffer() const {
   BufferIndex oldest = kInvalidBufferIndex;
@@ -714,7 +714,7 @@ PacketBufferPipeline::oldestEvictableCompleteBuffer() const {
   return oldest;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.evict_complete")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.evict_complete")
 bool PacketBufferPipeline::evictCompleteBuffer(BufferIndex index) {
   if (index >= records_.size()) {
     saturatingIncrement(invalid_operations_);
@@ -753,7 +753,7 @@ bool PacketBufferPipeline::evictCompleteBuffer(BufferIndex index) {
   return true;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.drop_buffer")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.drop_buffer")
 void PacketBufferPipeline::dropBuffer(BufferIndex index,
                                       bool pressure_eviction) {
   if (index >= records_.size() ||
@@ -781,7 +781,7 @@ void PacketBufferPipeline::dropBuffer(BufferIndex index,
   recycle(index);
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.propagate_gap")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.propagate_gap")
 void PacketBufferPipeline::propagateGapAfter(
     const BufferRecord &dropped) {
   if (!validStream(dropped.stream)) {
@@ -829,7 +829,7 @@ void PacketBufferPipeline::markGapBefore(BufferIndex index) {
   record.gap_before_required = true;
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.finalize_gap")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.finalize_gap")
 bool PacketBufferPipeline::finalizeGapBefore(BufferIndex index) {
   if (index >= records_.size()) {
     return false;
@@ -882,7 +882,7 @@ void PacketBufferPipeline::recycle(BufferIndex index) {
   records_[index] = {};
 }
 
-TEENSY_DAQ_PACKET_COLD_CODE(".flashmem.packet.record_drop")
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.record_drop")
 void PacketBufferPipeline::recordDrop(Stream stream,
                                       std::uint32_t item_count) {
   if (!validStream(stream)) {
@@ -912,6 +912,6 @@ std::size_t PacketBufferPipeline::ownedBuffers() const {
   return owned;
 }
 
-#undef TEENSY_DAQ_PACKET_COLD_CODE
+#undef THINGDAQ_PACKET_COLD_CODE
 
-}  // namespace teensy_daq::packet
+}  // namespace thingdaq::packet

@@ -6,7 +6,7 @@
 
 #include "protocol.h"
 
-namespace teensy_daq::stats {
+namespace thingdaq::stats {
 
 struct StreamProgress {
   std::uint64_t frames_generated = 0U;
@@ -285,4 +285,4 @@ static_assert(Statistics::nextGeneration(0U) == 1U);
 static_assert(Statistics::nextGeneration(1U) == 2U);
 static_assert(Statistics::nextGeneration(0xFFFFFFFFU) == 1U);
 
-}  // namespace teensy_daq::stats
+}  // namespace thingdaq::stats

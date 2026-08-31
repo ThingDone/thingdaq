@@ -3,13 +3,13 @@
 #include <limits>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_USB_COLD_CODE(section_name) \
+#define THINGDAQ_USB_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_USB_COLD_CODE(section_name)
+#define THINGDAQ_USB_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::usb {
+namespace thingdaq::usb {
 namespace {
 
 template <typename Integer>
@@ -155,7 +155,7 @@ ServiceReport CdcTransport::serviceReceive() {
   return report;
 }
 
-TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.command_receive")
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.command_receive")
 bool CdcTransport::processPendingReceive(ServiceReport &report) {
   if (rx_pending_offset_ >= rx_pending_size_) {
     rx_pending_offset_ = 0U;
@@ -367,7 +367,7 @@ bool CdcTransport::takeCommand(protocol::ParsedCommand &command) {
   return true;
 }
 
-TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.response_queue")
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.response_queue")
 bool CdcTransport::queueResponse(const protocol::ControlFrame &response) {
   protocol::DecodedFrame decoded{};
   if (response.size() == 0U ||
@@ -386,7 +386,7 @@ bool CdcTransport::queueResponse(const protocol::ControlFrame &response) {
   return true;
 }
 
-TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.response_abandon")
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.response_abandon")
 bool CdcTransport::abandonResponseReservation() {
   if (!command_awaiting_response_) {
     return false;
@@ -411,7 +411,7 @@ bool CdcTransport::hasPendingTransmission() const {
          lower_priority_->frontFrame().size != 0U;
 }
 
-TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.snapshot")
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.snapshot")
 TransportSnapshot CdcTransport::snapshot() const {
   TransportSnapshot result = counters_;
   result.command_queue_depth = command_queue_.size();
@@ -443,7 +443,7 @@ void CdcTransport::updateSessionState() {
   handleSessionTransition(observed_open);
 }
 
-TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.session_transition")
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.session_transition")
 void CdcTransport::handleSessionTransition(bool observed_open) {
   if (!session_state_initialized_) {
     session_state_initialized_ = true;
@@ -465,7 +465,7 @@ void CdcTransport::handleSessionTransition(bool observed_open) {
   }
 }
 
-TEENSY_DAQ_USB_COLD_CODE(".flashmem.usb.session_reset")
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.session_reset")
 void CdcTransport::resetSessionQueues() {
   saturatingAdd(
       counters_.session_commands_abandoned,
@@ -593,6 +593,6 @@ void CdcTransport::recordTxStall() {
   }
 }
 
-}  // namespace teensy_daq::usb
+}  // namespace thingdaq::usb
 
-#undef TEENSY_DAQ_USB_COLD_CODE
+#undef THINGDAQ_USB_COLD_CODE

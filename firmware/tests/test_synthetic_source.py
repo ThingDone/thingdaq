@@ -23,7 +23,7 @@ class SyntheticSourceTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-synthetic-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-synthetic-") as directory:
             executable = Path(directory) / "synthetic-source-test"
             compile_result = subprocess.run(
                 [

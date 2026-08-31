@@ -6,7 +6,7 @@ import io
 import unittest
 from dataclasses import replace
 
-from teensy_daq import (
+from thingdaq import (
     ChecksumAlgorithm,
     DeviceState,
     EquationState,
@@ -16,8 +16,8 @@ from teensy_daq import (
     reconcile_run_counters,
     snapshot_firmware_faults,
 )
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.cli import _print_reconciliation
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.cli import _print_reconciliation
 
 
 def _adc_status(*, live: bool = False) -> Status:

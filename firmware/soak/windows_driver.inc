@@ -20,7 +20,7 @@ WINDOWS_DEFAULT_OPEN_TIMEOUT_SECONDS = 3.0
 WINDOWS_CLOSE_TIMEOUT_SECONDS = 1.0
 TEENSY_USB_SERIAL_VID = 0x16C0
 TEENSY_USB_SERIAL_PID = 0x0483
-TEENSY_DAQ_PRODUCT = "Teensy DAQ"
+THINGDAQ_PRODUCT = "ThingDAQ"
 WINDOWS_PORT_PATTERN = re.compile(r"(?i)^COM([1-9][0-9]*)$")
 SOAK_CONFORMANCE_SCHEMA_VERSION = 1
 SOAK_CONFORMANCE_PREFIX = "SOAK_CONFORMANCE "
@@ -206,7 +206,7 @@ def _windows_port_number(port: str) -> int:
 def _windows_candidate_sort_key(
     candidate: WindowsPortCandidate,
 ) -> tuple[object, ...]:
-    if candidate.product == TEENSY_DAQ_PRODUCT:
+    if candidate.product == THINGDAQ_PRODUCT:
         product_rank = 0
     elif candidate.product is None:
         product_rank = 1
@@ -334,7 +334,7 @@ class BoundedWindowsSerial:
 
         threading.Thread(
             target=close_worker,
-            name="teensy-daq-serial-close",
+            name="thingdaq-serial-close",
             daemon=True,
         ).start()
         self.close_completed = completed.wait(WINDOWS_CLOSE_TIMEOUT_SECONDS)
@@ -387,13 +387,13 @@ def open_windows_serial(
             threading.Thread(
                 target=_close_raw_serial,
                 args=(close_late_port,),
-                name="teensy-daq-late-open-close",
+                name="thingdaq-late-open-close",
                 daemon=True,
             ).start()
 
     threading.Thread(
         target=open_worker,
-        name="teensy-daq-serial-open",
+        name="thingdaq-serial-open",
         daemon=True,
     ).start()
     if not attempt.done.wait(open_timeout_seconds):
@@ -406,7 +406,7 @@ def open_windows_serial(
             threading.Thread(
                 target=_close_raw_serial,
                 args=(opened_after_timeout,),
-                name="teensy-daq-open-timeout-close",
+                name="thingdaq-open-timeout-close",
                 daemon=True,
             ).start()
         raise DeadlineExpired(
@@ -562,7 +562,7 @@ def probe_windows_candidates(
                 if not result.identity_mismatches
                 else "accepted only by diagnostic identity override"
             )
-            print(f"  {candidate.port}: Teensy DAQ, {match}", flush=True)
+            print(f"  {candidate.port}: ThingDAQ, {match}", flush=True)
         else:
             assert result.failure is not None
             print(
@@ -920,7 +920,7 @@ def build_windows_parser() -> argparse.ArgumentParser:
     )
     parser = argparse.ArgumentParser(
         description=(
-            f"{implementation}, release-identity-pinned Teensy DAQ Windows soak "
+            f"{implementation}, release-identity-pinned ThingDAQ Windows soak "
             "validator"
         )
     )
@@ -968,7 +968,7 @@ def build_windows_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("teensy-daq-windows-soak"),
+        default=Path("thingdaq-windows-soak"),
         help="report path base; .json and .md are written (default shown)",
     )
     parser.add_argument(
@@ -1307,7 +1307,7 @@ def attach_windows_evidence(
         "com_discovery": {
             "teensy_vid": TEENSY_USB_SERIAL_VID,
             "teensy_pid": TEENSY_USB_SERIAL_PID,
-            "preferred_product": TEENSY_DAQ_PRODUCT,
+            "preferred_product": THINGDAQ_PRODUCT,
             "candidate_count": len(candidates),
             "candidates": [candidate.as_dict() for candidate in candidates],
             "probes": [probe.as_dict() for probe in probes],
@@ -1466,10 +1466,10 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
         [
             "---",
             "type: report",
-            "title: Teensy DAQ Windows Soak Report",
+            "title: ThingDAQ Windows Soak Report",
             f"created: {created}",
             "tags:",
-            "  - teensy-daq",
+            "  - thingdaq",
             "  - windows",
             "  - soak-validation",
             "related:",
@@ -1479,7 +1479,7 @@ def render_windows_markdown(result: Mapping[str, object]) -> str:
             "  - '[[Protocol-V1]]'",
             "---",
             "",
-            "# Teensy DAQ Windows soak report",
+            "# ThingDAQ Windows soak report",
             "",
             *override_warning,
             "## Outcome",
@@ -1690,7 +1690,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         arguments.hardware_serial = requested_serial
         print(
-            f"Scanning for Teensy DAQ {TEENSY_USB_SERIAL_VID:04X}:"
+            f"Scanning for ThingDAQ {TEENSY_USB_SERIAL_VID:04X}:"
             f"{TEENSY_USB_SERIAL_PID:04X} COM ports...",
             flush=True,
         )

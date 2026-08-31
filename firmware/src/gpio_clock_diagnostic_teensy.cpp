@@ -12,10 +12,10 @@
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
 
-#define TEENSY_DAQ_GPIO_CLOCK_TARGET_CODE(section_name) \
+#define THINGDAQ_GPIO_CLOCK_TARGET_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 
-namespace teensy_daq::gpio_clock {
+namespace thingdaq::gpio_clock {
 
 struct alignas(board::kCacheLineBytes) DiagnosticBuffer {
   std::array<std::uint32_t,
@@ -46,7 +46,7 @@ void addError(protocol::GpioClockDiagnosticResponse &snapshot,
 
 class TeensyPlatform final : public Platform {
  public:
-  TEENSY_DAQ_GPIO_CLOCK_TARGET_CODE(".flashmem.gpio_clock.target")
+  THINGDAQ_GPIO_CLOCK_TARGET_CODE(".flashmem.gpio_clock.target")
   bool execute(const Plan &plan,
                protocol::GpioClockDiagnosticResponse &snapshot) override {
     IMXRT_PIT_CHANNEL_t &pit = IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
@@ -292,8 +292,8 @@ static_assert((board::kGpioXbarOutput == board::kXbarDmaRequest30Output &&
                board::kGpioDmamuxSource ==
                    board::kDmamuxXbar1Request3Source));
 
-}  // namespace teensy_daq::gpio_clock
+}  // namespace thingdaq::gpio_clock
 
-#undef TEENSY_DAQ_GPIO_CLOCK_TARGET_CODE
+#undef THINGDAQ_GPIO_CLOCK_TARGET_CODE
 
 #endif

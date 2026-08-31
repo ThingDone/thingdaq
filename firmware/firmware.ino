@@ -1,5 +1,5 @@
 /*
- * Teensy DAQ Phase 07 synchronized GPIO and dual-ADC runtime.
+ * ThingDAQ Phase 07 synchronized GPIO and dual-ADC runtime.
  *
  * Native USB and its chip-derived serial descriptor are initialized by the
  * pinned Teensy core before global C++ construction and setup(). The portable
@@ -18,34 +18,34 @@
 #include "src/teensy_usb.h"
 namespace {
 // Packet banks stay CPU-owned; the CDC core copies into its own DMA TX ring.
-teensy_daq::usb::TeensyCdcByteStream cdc_stream{};
-teensy_daq::packet::PacketBufferPrimaryStorage packet_storage_primary{};
-DMAMEM teensy_daq::packet::PacketBufferReserveStorage packet_storage_reserve{};
-teensy_daq::packet::PacketBufferStorage packet_storage{packet_storage_primary, packet_storage_reserve};
-teensy_daq::gpio_packer::GpioBatchPacker gpio_packer{
-    teensy_daq::gpio_capture::teensyRawCapture(),
-    teensy_daq::gpio_packer::teensyPackedBufferStorage(),
-    &teensy_daq::gpio_packer::teensyCycleCounter()};
-teensy_daq::adc_packer::AdcFramePacker adc_packer{
-    teensy_daq::adc_capture::teensyAdcDmaCapture()};
-teensy_daq::clock::TeensyTickClock tick_clock{};
-teensy_daq::runtime::FirmwareRuntime firmware_runtime{
+thingdaq::usb::TeensyCdcByteStream cdc_stream{};
+thingdaq::packet::PacketBufferPrimaryStorage packet_storage_primary{};
+DMAMEM thingdaq::packet::PacketBufferReserveStorage packet_storage_reserve{};
+thingdaq::packet::PacketBufferStorage packet_storage{packet_storage_primary, packet_storage_reserve};
+thingdaq::gpio_packer::GpioBatchPacker gpio_packer{
+    thingdaq::gpio_capture::teensyRawCapture(),
+    thingdaq::gpio_packer::teensyPackedBufferStorage(),
+    &thingdaq::gpio_packer::teensyCycleCounter()};
+thingdaq::adc_packer::AdcFramePacker adc_packer{
+    thingdaq::adc_capture::teensyAdcDmaCapture()};
+thingdaq::clock::TeensyTickClock tick_clock{};
+thingdaq::runtime::FirmwareRuntime firmware_runtime{
     cdc_stream, packet_storage, tick_clock,
-    teensy_daq::synthetic::Mode::kRealtime,
-    &teensy_daq::benchmark::teensyRunner(),
-    &teensy_daq::gpio_clock::teensyRunner(),
-    &teensy_daq::gpio_capture::teensyRawCapture(), &gpio_packer,
-    &teensy_daq::gpio_diagnostic::teensyRunner(),
-    &teensy_daq::adc::teensyInitializer(),
-    &teensy_daq::adc_trigger::teensyScheduler(),
-    &teensy_daq::adc_capture::teensyAdcDmaCapture(), &adc_packer};
+    thingdaq::synthetic::Mode::kRealtime,
+    &thingdaq::benchmark::teensyRunner(),
+    &thingdaq::gpio_clock::teensyRunner(),
+    &thingdaq::gpio_capture::teensyRawCapture(), &gpio_packer,
+    &thingdaq::gpio_diagnostic::teensyRunner(),
+    &thingdaq::adc::teensyInitializer(),
+    &thingdaq::adc_trigger::teensyScheduler(),
+    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer};
 }  // namespace
 
 void setup() {
   // Do not initialize the Arduino serial facade, wait for DTR, or emit a
   // banner. Both ADC modules are explicitly reconfigured and independently
   // calibrated under a DWT deadline before the bounded BOOT completion.
-  (void)firmware_runtime.begin(teensy_daq::usb::hardwareSerialNumber());
+  (void)firmware_runtime.begin(thingdaq::usb::hardwareSerialNumber());
 }
 
 void loop() {

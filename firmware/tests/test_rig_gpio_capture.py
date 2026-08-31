@@ -15,11 +15,11 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.models import Configuration, DeviceInfo, Status
-from teensy_daq.protocol import encode_frame
-from teensy_daq.simulator import SimulatedDevice
-from teensy_daq.synthetic import synthetic_gpio_payload
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.models import Configuration, DeviceInfo, Status
+from thingdaq.protocol import encode_frame
+from thingdaq.simulator import SimulatedDevice
+from thingdaq.synthetic import synthetic_gpio_payload
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG_SCRIPT = ROOT / "firmware" / "tests" / "rig_gpio_capture.py"
@@ -114,13 +114,13 @@ class PhysicalGpioDevice(SimulatedDevice):
     """Protocol peer with physical GPIO flags and exact Phase 06 metadata."""
 
     def __init__(self) -> None:
-        super().__init__(build_id="tdaq-0123456789abcdef")
+        super().__init__(build_id="thingdaq-0123456789abcdef")
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
         configuration = self.configuration
         info = DeviceInfo(
             device_state=self.state,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
             hardware_serial=12_345_670,
             firmware_version=(0, 7, 0),
             board_id=constants.BoardId.TEENSY_40,
@@ -338,7 +338,8 @@ class RigScriptIndependenceTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("teensy_daq", source)
+        self.assertNotIn("import thingdaq", source)
+        self.assertNotIn("from thingdaq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
         self.assertIn('"GPIO_CAPTURE_SECONDS"', source)
@@ -539,7 +540,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             "GPIO_LOW_RATE_HZ": "1000",
             "GPIO_LOW_RATE_EVENT_COUNT": "64",
             "GPIO_PRODUCTION_EVENT_COUNT": "8192",
-            "EXPECTED_BUILD_ID": "tdaq-0123456789abcdef",
+            "EXPECTED_BUILD_ID": "thingdaq-0123456789abcdef",
             "EXPECTED_HARDWARE_SERIAL": "12345670",
         }
         with (

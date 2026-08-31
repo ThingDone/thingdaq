@@ -7,7 +7,7 @@ safely wired Teensy 4.0; alignment does not claim external pad/aperture latency.
 from __future__ import annotations
 
 from _common import configure_exact, example_parser, open_example, print_applied
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     AlignedInterval,
     GPIOBlock,

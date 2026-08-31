@@ -9,7 +9,7 @@ from ._generated import protocol_constants as constants
 from .models import DeviceInfo
 
 PHASE03_MINIMUM_FIRMWARE_VERSION = (0, 3, 0)
-_PHYSICAL_BUILD_ID = re.compile(r"tdaq-[0-9a-f]{16}", re.ASCII)
+_PHYSICAL_BUILD_ID = re.compile(r"thingdaq-[0-9a-f]{16}", re.ASCII)
 
 
 class IdentityValidationError(ValueError):
@@ -142,7 +142,7 @@ def validate_device_identity(
             )
         if _PHYSICAL_BUILD_ID.fullmatch(snapshot.build_id) is None:
             raise IdentityValidationError(
-                "physical firmware build ID is not source-derived tdaq-<16 hex>"
+                "physical firmware build ID is not source-derived thingdaq-<16 hex>"
             )
         if snapshot.hardware_serial == 0:
             raise IdentityValidationError(

@@ -5,7 +5,7 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
-namespace teensy_daq::gpio_packer {
+namespace thingdaq::gpio_packer {
 
 PackedBufferStorage g_gpio_packed_buffers
     __attribute__((section(".dmabuffers"), used));
@@ -49,6 +49,6 @@ static_assert(alignof(PackedBufferStorage) == board::kCacheLineBytes);
 static_assert(F_CPU == protocol_v1::kGpioClockDwtHz,
               "GPIO processing profiling requires the pinned 600 MHz target");
 
-}  // namespace teensy_daq::gpio_packer
+}  // namespace thingdaq::gpio_packer
 
 #endif

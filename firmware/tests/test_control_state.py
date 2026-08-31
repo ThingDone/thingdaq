@@ -25,7 +25,7 @@ class FirmwareControlStateTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-control-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-control-") as directory:
             executable = Path(directory) / "control-state-test"
             compile_result = subprocess.run(
                 [

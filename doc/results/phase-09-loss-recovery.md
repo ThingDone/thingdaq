@@ -3,7 +3,7 @@ type: report
 title: Phase 09 Loss and Recovery Acceptance
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-09
   - loss-accounting
   - backpressure
@@ -108,7 +108,7 @@ commit identity `041a0f5cb66d23205be1d799dab801bb0b2bc75e` to the retained manif
 
 | Property | Value |
 | --- | --- |
-| Build ID | `tdaq-ea010335c9b63bb7` |
+| Build ID | `thingdaq-ea010335c9b63bb7` |
 | Source ID | `ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85` |
 | Clean source commit | `041a0f5cb66d23205be1d799dab801bb0b2bc75e` |
 | Reproducible timestamp | `2026-08-29T12:02:24Z` |

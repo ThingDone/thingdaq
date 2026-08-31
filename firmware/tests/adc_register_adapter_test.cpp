@@ -7,7 +7,7 @@
 
 #define ARDUINO_TEENSY40 1
 #define __IMXRT1062__ 1
-#define TEENSY_DAQ_HOST_REGISTER_TEST 1
+#define THINGDAQ_HOST_REGISTER_TEST 1
 
 // White-box inclusion is deliberate: this host executable exercises the
 // production register adapters themselves against the narrow fake i.MX RT1062
@@ -17,11 +17,11 @@
 
 namespace {
 
-namespace adc = teensy_daq::adc;
-namespace board = teensy_daq::board;
-namespace gpio_route = teensy_daq::gpio_dma_route;
-namespace trigger = teensy_daq::adc_trigger;
-namespace v1 = teensy_daq::protocol_v1;
+namespace adc = thingdaq::adc;
+namespace board = thingdaq::board;
+namespace gpio_route = thingdaq::gpio_dma_route;
+namespace trigger = thingdaq::adc_trigger;
+namespace v1 = thingdaq::protocol_v1;
 
 int failures = 0;
 

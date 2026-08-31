@@ -8,7 +8,7 @@ import unittest
 from collections.abc import Sequence
 from pathlib import Path
 
-from teensy_daq import (
+from thingdaq import (
     AdcBlock,
     AdcChannelView,
     AdcConverter,
@@ -34,7 +34,7 @@ from teensy_daq import (
     synthetic_gpio_byte,
     synthetic_gpio_payload,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"

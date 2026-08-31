@@ -4,7 +4,7 @@ title: Firmware Resource Map
 created: 2026-08-28
 updated: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - teensy-4-0
   - firmware
   - resource-ownership
@@ -44,7 +44,7 @@ packet/checksum queues without claiming physical acquisition resources. See
 | CPU | 600,000,000 Hz |
 | Core | `teensy:avr` 1.62.0; pinned compile macro `TEENSYDUINO=160` |
 | Toolchain | Arm GNU 15.2.1, GNU C++17 |
-| USB | USB Serial, `Teensy DAQ` product, legitimate Teensy `0x16C0:0x0483` VID/PID, core-generated chip serial |
+| USB | USB Serial, `ThingDAQ` product, legitimate Teensy `0x16C0:0x0483` VID/PID, core-generated chip serial |
 | Optimization | `o2std`, standard `-O2` |
 | Cache line | 32 bytes |
 | RAM1 / RAM2 budget | 512 KiB DTCM / 512 KiB OCRAM |

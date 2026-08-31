@@ -7,7 +7,7 @@
 #include "board_config.h"
 #include "generated/protocol_constants.h"
 
-namespace teensy_daq::adc {
+namespace thingdaq::adc {
 
 inline constexpr std::size_t kConverterCount = board::kLogicalAdcCount;
 inline constexpr std::uint32_t kCalibrationDeadlineCycles =
@@ -197,4 +197,4 @@ static_assert(conversionMode(protocol_v1::kAdcFallbackResolutionBits) == 1U);
 static_assert(defaultSnapshot().settings.container_bytes == 2U);
 static_assert(!defaultSnapshot().ready());
 
-}  // namespace teensy_daq::adc
+}  // namespace thingdaq::adc

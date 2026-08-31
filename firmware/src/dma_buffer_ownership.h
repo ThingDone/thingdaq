@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace teensy_daq::dma {
+namespace thingdaq::dma {
 
 // Shared cache and interrupt-serialization boundaries for DMA receive rings.
 // Target adapters provide the implementation; portable ownership cores never
@@ -27,4 +27,4 @@ class CriticalSection {
   virtual void exit(std::uint32_t token) = 0;
 };
 
-}  // namespace teensy_daq::dma
+}  // namespace thingdaq::dma

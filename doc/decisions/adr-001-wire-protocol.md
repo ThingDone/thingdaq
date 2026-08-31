@@ -4,7 +4,7 @@ title: 'ADR 001: Wire Protocol'
 created: 2026-08-27
 updated: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - decision
   - protocol
   - framing
@@ -24,7 +24,7 @@ the production data default under the fixed Phase 05 qualification policy.
 
 ## Context
 
-Teensy DAQ carries two continuous data streams and bidirectional control over
+ThingDAQ carries two continuous data streams and bidirectional control over
 USB CDC, which is a byte stream rather than a message transport. The host must
 recover from arbitrary read boundaries, leading garbage, corruption, stale
 bytes from a previous acquisition run, and reconnects. Firmware and Python

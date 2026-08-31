@@ -18,11 +18,11 @@ from types import ModuleType
 from typing import TypedDict
 from unittest.mock import patch
 
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.models import AdcTriggerMetadata, Configuration, DeviceInfo, Status
-from teensy_daq.protocol import encode_frame
-from teensy_daq.simulator import SimulatedDevice
-from teensy_daq.synthetic import synthetic_adc_payload, synthetic_gpio_payload
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.models import AdcTriggerMetadata, Configuration, DeviceInfo, Status
+from thingdaq.protocol import encode_frame
+from thingdaq.simulator import SimulatedDevice
+from thingdaq.synthetic import synthetic_adc_payload, synthetic_gpio_payload
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG_SCRIPT = ROOT / "firmware" / "tests" / "rig_combined_capture.py"
@@ -108,7 +108,7 @@ class PhysicalCombinedDevice(SimulatedDevice):
     """Physical-shaped combined peer with fully reconciled telemetry."""
 
     def __init__(self) -> None:
-        super().__init__(build_id="tdaq-0123456789abcdef")
+        super().__init__(build_id="thingdaq-0123456789abcdef")
         self.commands_accepted = 0
         self.trailing_data: list[bytes] = []
 
@@ -120,7 +120,7 @@ class PhysicalCombinedDevice(SimulatedDevice):
         configuration = self.configuration
         info = DeviceInfo(
             device_state=self.state,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
             hardware_serial=12_345_670,
             firmware_version=(0, 7, 0),
             board_id=constants.BoardId.TEENSY_40,
@@ -451,7 +451,7 @@ class CombinedRigTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("from teensy_daq", source)
+        self.assertNotIn("from thingdaq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
         self.assertIn("COMBINED_CAPTURE_SECONDS", source)
@@ -546,7 +546,7 @@ class CombinedRigTests(unittest.TestCase):
         self,
     ) -> None:
         declaration = {
-            "schema": "teensy-daq-adc-stimulus-v1",
+            "schema": "thingdaq-adc-stimulus-v1",
             "fixture_id": "divider-v1",
             "stimulus_id": "two-levels",
             "channels": {
@@ -688,7 +688,7 @@ class CombinedRigTests(unittest.TestCase):
             "COMBINED_CAPTURE_SECONDS": "0.14",
             "COMBINED_WARMUP_SECONDS": "0.02",
             "COMBINED_STATUS_INTERVAL_SECONDS": "0.02",
-            "EXPECTED_BUILD_ID": "tdaq-0123456789abcdef",
+            "EXPECTED_BUILD_ID": "thingdaq-0123456789abcdef",
             "EXPECTED_HARDWARE_SERIAL": "12345670",
         }
         with (

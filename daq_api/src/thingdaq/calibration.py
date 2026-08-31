@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from .models import ADCBlock, AdcChannelView, AdcConverter
 
 CALIBRATION_SCHEMA_VERSION = 1
-CALIBRATION_FILE_FORMAT = "teensy-daq-host-calibration"
+CALIBRATION_FILE_FORMAT = "thingdaq-host-calibration"
 MAX_CALIBRATION_FILE_BYTES = 1 << 20
 _RECORD_FIELDS = frozenset(
     {

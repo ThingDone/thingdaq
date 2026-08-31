@@ -3,7 +3,7 @@ type: report
 title: Phase 03 Control Plane Rig Acceptance
 created: 2026-08-28
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-03
   - firmware
   - control-plane
@@ -28,7 +28,7 @@ all 107 graded checks, kept every command within its one-second deadline, and
 finished in `IDLE` with zero parser and transport errors after statistics
 reset. No job retry was needed, and the two submissions never overlapped.
 
-The accepted candidate is build `tdaq-39300273210c1c89`, generated from
+The accepted candidate is build `thingdaq-39300273210c1c89`, generated from
 firmware source fingerprint
 `39300273210c1c89964c5c5cc56ae76ca7b6e800471d94acaa24f6b30de0ff5a`
 at Git revision `a5bd30c243a012680a93a77d22770db56cb00b58`. This is the
@@ -42,7 +42,7 @@ wire contract exercised here.
 | Current service-owned client | PASS: downloaded client/service version 1.0.0, exact source SHA-256 recorded below |
 | Sequential execution | PASS: job 2 was submitted only after job 1 completed and health returned to an empty queue |
 | Consecutive physical runs | PASS: 2 of 2, with no excluded or retried job between them |
-| Firmware/protocol/build identity | PASS: Teensy DAQ 0.3.0, protocol 1, `tdaq-39300273210c1c89` in both runs |
+| Firmware/protocol/build identity | PASS: ThingDAQ 0.3.0, protocol 1, `thingdaq-39300273210c1c89` in both runs |
 | Hardware identity | PASS: board ID 1, MCU ID 1, hardware serial 20512460 in both runs |
 | Command latency | PASS: all exchanges had a 1.000 s deadline; worst reported latency was 0.051104 s |
 | State and error cleanup | PASS: final `IDLE`, parser errors 0, transport errors 0, stale/interleaved responses 0 |
@@ -135,7 +135,7 @@ Both independent flash/reset runs produced the same acceptance sequence:
   synchronization succeeded with a throwaway response on attempt 1 and stable
   matching identity on attempt 2;
 - INFO reported protocol 1, firmware 0.3.0, build
-  `tdaq-39300273210c1c89`, hardware serial 20512460, board/MCU IDs 1/1, and
+  `thingdaq-39300273210c1c89`, hardware serial 20512460, board/MCU IDs 1/1, and
   the exact control-only capability and rate metadata;
 - PING echoed its 64-bit nonce, unsupported ADC configuration returned typed
   error 8 without leaving `IDLE`, and the zero-stream configuration moved

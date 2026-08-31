@@ -4,7 +4,7 @@
 
 #include "board_config.h"
 
-namespace teensy_daq::synthetic {
+namespace thingdaq::synthetic {
 namespace {
 
 template <typename Integer>
@@ -263,4 +263,4 @@ void SyntheticSource::fillGpio(protocol::MutableByteView payload,
   }
 }
 
-}  // namespace teensy_daq::synthetic
+}  // namespace thingdaq::synthetic

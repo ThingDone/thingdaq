@@ -11,11 +11,11 @@
 
 namespace {
 
-namespace board = teensy_daq::board;
-namespace constants = teensy_daq::protocol_v1;
-namespace packet = teensy_daq::packet;
-namespace synthetic = teensy_daq::synthetic;
-namespace wire = teensy_daq::protocol;
+namespace board = thingdaq::board;
+namespace constants = thingdaq::protocol_v1;
+namespace packet = thingdaq::packet;
+namespace synthetic = thingdaq::synthetic;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 

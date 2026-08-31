@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import argparse
 
-from teensy_daq import (
+from thingdaq import (
     ChecksumAlgorithm,
     DAQConfiguration,
     DeviceInfo,
     Source,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
 )
 
 EXPECTED_ADC_PAIR_RATE_HZ = 1_000_000
@@ -47,20 +47,20 @@ def example_parser(description: str) -> argparse.ArgumentParser:
     return parser
 
 
-def open_example(arguments: argparse.Namespace, *, strict: bool = False) -> TeensyDAQ:
+def open_example(arguments: argparse.Namespace, *, strict: bool = False) -> ThingDAQ:
     """Open a simulator by default, or an explicitly requested physical target."""
 
     if arguments.hardware_serial is not None and not arguments.real:
         raise ValueError("--hardware-serial requires --real")
     if arguments.real:
-        return TeensyDAQ.open(
+        return ThingDAQ.open(
             hardware_serial=arguments.hardware_serial,
             strict=strict,
         )
-    return TeensyDAQ.simulated(strict=strict)
+    return ThingDAQ.simulated(strict=strict)
 
 
-def require_info(daq: TeensyDAQ) -> DeviceInfo:
+def require_info(daq: ThingDAQ) -> DeviceInfo:
     info = daq.device_info
     if info is None:
         raise RuntimeError("open completed without a synchronized INFO response")
@@ -68,7 +68,7 @@ def require_info(daq: TeensyDAQ) -> DeviceInfo:
 
 
 def configure_exact(
-    daq: TeensyDAQ,
+    daq: ThingDAQ,
     arguments: argparse.Namespace,
     *,
     adc: bool,
@@ -88,7 +88,7 @@ def configure_exact(
     )
 
 
-def print_applied(daq: TeensyDAQ, configuration: DAQConfiguration) -> None:
+def print_applied(daq: ThingDAQ, configuration: DAQConfiguration) -> None:
     capabilities = daq.capabilities
     if capabilities is None:
         raise RuntimeError("applied configuration has no INFO capabilities")

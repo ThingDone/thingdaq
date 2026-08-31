@@ -8,7 +8,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     Capability,
     CommandTimeoutError,
@@ -29,12 +29,12 @@ from teensy_daq import (
     Source,
     Status,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     TransportDisconnectedError,
     TransportTimeoutError,
     decode_frame,
 )
-from teensy_daq.cli import CliExitCode, _execute, build_parser, main
+from thingdaq.cli import CliExitCode, _execute, build_parser, main
 
 
 class ResetNoiseTransport(InMemoryTransport):
@@ -126,7 +126,7 @@ class Phase03ControlProfileTests(unittest.TestCase):
             )
 
     def test_control_only_simulator_has_full_api_parity(self) -> None:
-        with TeensyDAQ.simulated(control_only=True) as daq:
+        with ThingDAQ.simulated(control_only=True) as daq:
             info = daq.device_info
             self.assertIsNotNone(info)
             assert info is not None
@@ -150,25 +150,25 @@ class Phase03ControlProfileTests(unittest.TestCase):
     def test_nonstopping_close_preserves_one_shot_cli_state(self) -> None:
         device = SimulatedDevice(control_only=True)
 
-        configured = TeensyDAQ.open(InMemoryTransport(device))
+        configured = ThingDAQ.open(InMemoryTransport(device))
         configured.configure_control_only()
         configured.close(stop=False)
         self.assertEqual(DeviceState.CONFIGURED, device.state)
 
-        running = TeensyDAQ.open(InMemoryTransport(device))
+        running = ThingDAQ.open(InMemoryTransport(device))
         run_id = running.start()
         running.close(stop=False)
         self.assertGreater(run_id, 0)
         self.assertEqual(DeviceState.RUNNING, device.state)
 
-        stopped = TeensyDAQ.open(InMemoryTransport(device))
+        stopped = ThingDAQ.open(InMemoryTransport(device))
         stopped.stop()
         stopped.close(stop=False)
         self.assertEqual(DeviceState.IDLE, device.state)
 
     def test_reopen_explicitly_adopts_or_stops_an_existing_run(self) -> None:
         device = SimulatedDevice()
-        owner = TeensyDAQ.open(InMemoryTransport(device))
+        owner = ThingDAQ.open(InMemoryTransport(device))
         owner.configure(adc=True, gpio=False, source=Source.SYNTHETIC)
         run_id = owner.start()
         first = owner.read_block(timeout=0.5)
@@ -177,7 +177,7 @@ class Phase03ControlProfileTests(unittest.TestCase):
         self.assertEqual(0, first.sequence)
         owner.close(stop=False)
 
-        adopted = TeensyDAQ.open(
+        adopted = ThingDAQ.open(
             InMemoryTransport(device),
             session_policy=SessionRecoveryPolicy.ADOPT,
         )
@@ -189,7 +189,7 @@ class Phase03ControlProfileTests(unittest.TestCase):
         self.assertEqual(1, continued.sequence)
         adopted.close(stop=False)
 
-        stopped = TeensyDAQ.open(
+        stopped = ThingDAQ.open(
             InMemoryTransport(device),
             session_policy=SessionRecoveryPolicy.STOP,
         )
@@ -200,7 +200,7 @@ class Phase03ControlProfileTests(unittest.TestCase):
 
     def test_timeout_and_shutdown_failures_preserve_recovery_evidence(self) -> None:
         timeout_transport = DropStatusTransport(SimulatedDevice(control_only=True))
-        timed = TeensyDAQ.open(timeout_transport, command_timeout=0.01)
+        timed = ThingDAQ.open(timeout_transport, command_timeout=0.01)
         timeout_transport.drop_status = True
         with self.assertRaises(CommandTimeoutError) as timeout_context:
             timed.status()
@@ -214,7 +214,7 @@ class Phase03ControlProfileTests(unittest.TestCase):
         timed.close(stop=False)
 
         close_transport = FailingCloseTransport(SimulatedDevice(control_only=True))
-        closing = TeensyDAQ.open(close_transport)
+        closing = ThingDAQ.open(close_transport)
         closing.configure_control_only()
         closing.start()
         last_status = closing.status()
@@ -234,7 +234,7 @@ class SynchronizationAndIdentityTests(unittest.TestCase):
     def test_open_retries_reset_noise_then_discards_one_valid_probe(self) -> None:
         transport = ResetNoiseTransport()
 
-        with TeensyDAQ.open(
+        with ThingDAQ.open(
             transport,
             command_timeout=0.02,
             synchronization_attempts=3,
@@ -252,11 +252,11 @@ class SynchronizationAndIdentityTests(unittest.TestCase):
         with self.assertRaisesRegex(
             DeviceIdentityMismatchError, "changed between synchronization"
         ):
-            TeensyDAQ.open(InMemoryTransport(changing))
+            ThingDAQ.open(InMemoryTransport(changing))
         self.assertEqual(DeviceState.IDLE, changing.state)
 
         with self.assertRaisesRegex(DeviceIdentityMismatchError, "build ID"):
-            TeensyDAQ.simulated(
+            ThingDAQ.simulated(
                 control_only=True,
                 expected_identity=ExpectedDeviceIdentity(build_id="wrong-build"),
             )
@@ -269,11 +269,11 @@ class ControlCliTests(unittest.TestCase):
             vid=0x16C0,
             pid=0x0483,
             serial_number="12345670",
-            product="Teensy DAQ",
+            product="ThingDAQ",
             location="1-2.3",
         )
         list_output = io.StringIO()
-        with patch("teensy_daq.cli.enumerate_candidates", return_value=(candidate,)):
+        with patch("thingdaq.cli.enumerate_candidates", return_value=(candidate,)):
             result = _execute(
                 argparse.Namespace(action="list"),
                 list_output,
@@ -284,7 +284,7 @@ class ControlCliTests(unittest.TestCase):
         self.assertIn("usb_serial=12345670", list_output.getvalue())
 
         for command, expected_text in (
-            ("probe", "build_id=teensy-daq-simulator-v1"),
+            ("probe", "build_id=thingdaq-simulator-v1"),
             ("status", "stats_generation=1"),
             ("reconcile", "conservation=PASS"),
             ("configure", "profile=SYNTHETIC_COMBINED"),
@@ -322,7 +322,7 @@ class ControlCliTests(unittest.TestCase):
         self.assertIn("final_state=IDLE", stdout.getvalue())
 
         device = SimulatedDevice()
-        daq = TeensyDAQ.open(InMemoryTransport(device))
+        daq = ThingDAQ.open(InMemoryTransport(device))
         arguments = build_parser().parse_args(
             [
                 "capture",
@@ -336,7 +336,7 @@ class ControlCliTests(unittest.TestCase):
             ]
         )
         with (
-            patch("teensy_daq.cli._open_device", return_value=daq),
+            patch("thingdaq.cli._open_device", return_value=daq),
             patch.object(
                 daq,
                 "read_block",
@@ -387,7 +387,7 @@ class ControlCliTests(unittest.TestCase):
                 stdout = io.StringIO()
                 stderr = io.StringIO()
                 with (
-                    patch("teensy_daq.cli._execute", side_effect=error),
+                    patch("thingdaq.cli._execute", side_effect=error),
                     redirect_stdout(stdout),
                     redirect_stderr(stderr),
                 ):

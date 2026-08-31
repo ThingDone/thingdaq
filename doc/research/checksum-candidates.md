@@ -3,7 +3,7 @@ type: research
 title: Checksum Candidates
 created: 2026-08-28
 tags:
-  - teensy-daq
+  - thingdaq
   - checksum
   - crc32c
   - teensy-4-0
@@ -208,7 +208,7 @@ and 101.200 ms of application retention plus 1.012 ms in the pinned USB core.
 Build manifest schema 6 verifies every placement and retains 36,032 RAM1 bytes
 for locals and stack.
 
-The final artifact `tdaq-b2d06f37e6cef9a7` then passed one candidate-isolated,
+The final artifact `thingdaq-b2d06f37e6cef9a7` then passed one candidate-isolated,
 strictly sequential 60-second campaign job for every advertised algorithm.
 Each on-device result comprises 14 profiles with four batches of 256 operations;
 the representative frame uses 4,092 covered bytes.

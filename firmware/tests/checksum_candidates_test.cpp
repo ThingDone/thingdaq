@@ -8,7 +8,7 @@
 
 namespace {
 
-namespace candidate = teensy_daq::checksum;
+namespace candidate = thingdaq::checksum;
 
 int failures = 0;
 

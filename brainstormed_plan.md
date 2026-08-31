@@ -1,4 +1,4 @@
-# Teensy DAQ brainstormed plan
+# ThingDAQ brainstormed plan
 
 > Status: working design notes, not a formal specification.
 >
@@ -835,7 +835,7 @@ For the pinned Teensy USB Serial mode, the core currently uses:
 
 The core declares USB manufacturer, product, and serial descriptors as weak
 symbols. Firmware can override the product descriptor with a name such as
-Teensy DAQ without patching the installed core:
+ThingDAQ without patching the installed core:
 
 /home/bill/.arduino15/packages/teensy/hardware/avr/1.62.0/cores/teensy4/usb_desc.c
 
@@ -851,7 +851,7 @@ and protocol probe avoids that issue for initial development.
 Suggested API:
 
 ~~~python
-devices = teensy_daq.discover(timeout=0.2)
+devices = thingdaq.discover(timeout=0.2)
 ~~~
 
 Each result should include:
@@ -867,7 +867,7 @@ Discovery behavior:
 
 - Enumeration-only filtering should be fast and non-invasive.
 - Only matching VID/PID candidates are opened.
-- Prefer matching product string Teensy DAQ.
+- Prefer matching product string ThingDAQ.
 - If Windows or another OS does not expose the product string reliably, fall
   back to probing only matching Teensy USB Serial candidates.
 - Bound every open, read, and probe.
@@ -885,10 +885,10 @@ An INFO probe should be compact and immediately answerable while IDLE.
 Possible public surface:
 
 ~~~python
-from teensy_daq import discover, TeensyDAQ
+from thingdaq import discover, ThingDAQ
 
 devices = discover()
-daq = TeensyDAQ.open(devices[0])
+daq = ThingDAQ.open(devices[0])
 info = daq.info()
 daq.configure(adc=True, gpio=True)
 daq.start()
@@ -1208,7 +1208,7 @@ Windows host and USB controller.
 One possible shape consistent with the firmware guide:
 
 ~~~text
-teensy_daq/
+thingdaq/
   firmware/
     firmware.ino
     acquisition_clock.cpp
@@ -1224,7 +1224,7 @@ teensy_daq/
     statistics.h
     usb_names.c
   src/
-    teensy_daq/
+    thingdaq/
       __init__.py
       discovery.py
       device.py
@@ -1327,7 +1327,7 @@ Recommended defaults are included so the formal planner has a starting point.
 | ADC payload | Direct interleaved uint16 pairs | Recommended |
 | GPIO wire bit order | D6 through D13 mapped to bits 0 through 7 | Recommended |
 | Drop policy | Drop oldest complete unsent block and remain live | Recommended |
-| USB identity | Existing Teensy VID/PID plus product name Teensy DAQ | Recommended |
+| USB identity | Existing Teensy VID/PID plus product name ThingDAQ | Recommended |
 | Host dependency | pyserial required, NumPy optional | Recommended |
 | Python style | Synchronous public API with background reader first | Recommended |
 | Calibration location | Host-side, keyed by device serial | Recommended initially |
@@ -1375,7 +1375,7 @@ README cleanup notes from the initial version:
 Local references:
 
 - Current project intent:
-  /home/bill/agents/teensy_daq/README.md
+  /home/bill/agents/thingdaq/README.md
 - Firmware build and rig guide:
   /home/bill/agents/fw_experiments/docs/guides/new-firmware-projects.md
 - Teensy ADC pin tables:
@@ -1420,7 +1420,7 @@ External references:
 If the formal planning agent needs one concise architecture to start from:
 
 1. Pin Teensy core 1.62.0 and exact Teensy 4.0 build options.
-2. Boot IDLE with USB product string Teensy DAQ.
+2. Boot IDLE with USB product string ThingDAQ.
 3. Discover by USB metadata, then verify with a bounded INFO exchange.
 4. Use a 24 MHz PIT schedule for exact 4 MHz GPIO and chained 1 MHz ADC
    triggers.

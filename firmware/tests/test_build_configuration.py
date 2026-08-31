@@ -23,7 +23,7 @@ class BuildConfigurationTests(unittest.TestCase):
     def test_helper_pins_the_complete_target_and_export_directory(self) -> None:
         identity = build_firmware.BuildIdentity(
             source_id="a" * 64,
-            build_id="tdaq-aaaaaaaaaaaaaaaa",
+            build_id="thingdaq-aaaaaaaaaaaaaaaa",
             timestamp_epoch=1_700_000_000,
             timestamp_utc="2023-11-14T22:13:20Z",
         )
@@ -59,12 +59,12 @@ class BuildConfigurationTests(unittest.TestCase):
         definitions = next(
             value for value in build_properties if value.startswith("build.flags.defs=")
         )
-        self.assertIn("-DTEENSY_DAQ_SOURCE_ID_WORD0=0x" + "a" * 16 + "ULL", definitions)
-        self.assertIn("-DTEENSY_DAQ_SOURCE_ID_WORD3=0x" + "a" * 16 + "ULL", definitions)
-        self.assertIn("-DTEENSY_DAQ_BUILD_EPOCH=1700000000ULL", definitions)
-        self.assertIn("-DTEENSY_DAQ_BUILD_YEAR=2023U", definitions)
-        self.assertIn("-DTEENSY_DAQ_BUILD_SECOND=20U", definitions)
-        self.assertIn("-DTEENSY_DAQ_OPTIMIZATION_O2STD=1", definitions)
+        self.assertIn("-DTHINGDAQ_SOURCE_ID_WORD0=0x" + "a" * 16 + "ULL", definitions)
+        self.assertIn("-DTHINGDAQ_SOURCE_ID_WORD3=0x" + "a" * 16 + "ULL", definitions)
+        self.assertIn("-DTHINGDAQ_BUILD_EPOCH=1700000000ULL", definitions)
+        self.assertIn("-DTHINGDAQ_BUILD_YEAR=2023U", definitions)
+        self.assertIn("-DTHINGDAQ_BUILD_SECOND=20U", definitions)
+        self.assertIn("-DTHINGDAQ_OPTIMIZATION_O2STD=1", definitions)
         linker_flags = next(
             value for value in build_properties if value.startswith("build.flags.ld=")
         )
@@ -100,18 +100,18 @@ class BuildConfigurationTests(unittest.TestCase):
     def test_checksum_table_provenance_requires_flash_residency(self) -> None:
         symbols = (
             "00000304 00000078 T "
-            "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)\n"
+            "thingdaq::checksum::adler32(unsigned char const*, unsigned int)\n"
             "0000037c 00000134 T "
-            "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)\n"
+            "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)\n"
             "000004b0 00000134 T "
-            "teensy_daq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)\n"
+            "thingdaq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)\n"
             "000005e4 00000054 T "
-            "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, "
+            "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, "
             "unsigned char const*, unsigned int, unsigned long&)\n"
             "60002000 00002000 u "
-            "teensy_daq::checksum::detail::kCrc32cTable\n"
+            "thingdaq::checksum::detail::kCrc32cTable\n"
             "60004000 00002000 u "
-            "teensy_daq::checksum::detail::kCrc32IsoHdlcTable"
+            "thingdaq::checksum::detail::kCrc32IsoHdlcTable"
         )
         resources = build_firmware.checksum_resource_usage(symbols)
 
@@ -132,9 +132,9 @@ class BuildConfigurationTests(unittest.TestCase):
     def test_benchmark_buffer_provenance_requires_real_regions(self) -> None:
         symbols = (
             "200012c0 00001000 B "
-            "teensy_daq::benchmark::g_checksum_benchmark_dtcm_buffer\n"
+            "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer\n"
             "20200000 00001000 B "
-            "teensy_daq::benchmark::g_checksum_benchmark_ocram_buffer"
+            "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
         )
         resources = build_firmware.benchmark_buffer_usage(symbols)
 
@@ -168,7 +168,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_gpio_clock_diagnostic_buffer_requires_isolated_ocram_line(self) -> None:
         symbols = (
-            "2025f000 00000020 B teensy_daq::gpio_clock::g_gpio_clock_diagnostic_buffer"
+            "2025f000 00000020 B thingdaq::gpio_clock::g_gpio_clock_diagnostic_buffer"
         )
         resource = build_firmware.gpio_clock_diagnostic_buffer_usage(symbols)
 
@@ -188,11 +188,11 @@ class BuildConfigurationTests(unittest.TestCase):
     def test_raw_gpio_dma_buffers_require_exact_aligned_ocram_storage(self) -> None:
         symbols = (
             "2025f020 0000fd00 B "
-            "teensy_daq::gpio_capture::g_gpio_raw_dma_buffers\n"
+            "thingdaq::gpio_capture::g_gpio_raw_dma_buffers\n"
             "2026ed20 00000020 B "
-            "teensy_daq::gpio_capture::g_gpio_raw_dma_overflow_sink\n"
+            "thingdaq::gpio_capture::g_gpio_raw_dma_overflow_sink\n"
             "2026ed40 000000a0 B "
-            "teensy_daq::gpio_capture::g_gpio_raw_dma_descriptors"
+            "thingdaq::gpio_capture::g_gpio_raw_dma_descriptors"
         )
         resources = build_firmware.gpio_raw_dma_buffer_usage(symbols)
 
@@ -213,11 +213,11 @@ class BuildConfigurationTests(unittest.TestCase):
     def test_adc_dma_buffers_require_exact_aligned_ocram_storage(self) -> None:
         symbols = (
             "20277000 00007f00 B "
-            "teensy_daq::adc_capture::g_adc_dma_buffers\n"
+            "thingdaq::adc_capture::g_adc_dma_buffers\n"
             "2027ef00 00000020 B "
-            "teensy_daq::adc_capture::g_adc_dma_overflow_sink\n"
+            "thingdaq::adc_capture::g_adc_dma_overflow_sink\n"
             "2027ef20 00000300 B "
-            "teensy_daq::adc_capture::g_adc_dma_descriptors"
+            "thingdaq::adc_capture::g_adc_dma_descriptors"
         )
         resources = build_firmware.adc_dma_buffer_usage(symbols)
 
@@ -236,7 +236,7 @@ class BuildConfigurationTests(unittest.TestCase):
             build_firmware.adc_dma_buffer_usage(symbols.splitlines()[0])
 
     def test_packed_gpio_ring_requires_exact_aligned_ocram_storage(self) -> None:
-        symbols = "2026ede0 00003f80 B teensy_daq::gpio_packer::g_gpio_packed_buffers"
+        symbols = "2026ede0 00003f80 B thingdaq::gpio_packer::g_gpio_packed_buffers"
         resource = build_firmware.gpio_packed_buffer_usage(symbols)
 
         self.assertEqual(16_256, resource["bytes"])
@@ -313,7 +313,7 @@ class BuildConfigurationTests(unittest.TestCase):
         )
 
     def test_source_fingerprint_is_path_aware_and_timestamp_independent(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-source-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-source-") as directory:
             root = Path(directory)
             first = root / "first.h"
             second = root / "second.h"

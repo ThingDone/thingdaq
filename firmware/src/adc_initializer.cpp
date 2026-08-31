@@ -3,13 +3,13 @@
 #include <array>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_ADC_INIT_COLD_CODE(section_name) \
+#define THINGDAQ_ADC_INIT_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_ADC_INIT_COLD_CODE(section_name)
+#define THINGDAQ_ADC_INIT_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::adc {
+namespace thingdaq::adc {
 namespace {
 
 constexpr protocol_v1::AdcInitializationError routeError(std::size_t index) {
@@ -53,7 +53,7 @@ void addError(Snapshot &snapshot,
 
 }  // namespace
 
-TEENSY_DAQ_ADC_INIT_COLD_CODE(".flashmem.adc_init.metadata")
+THINGDAQ_ADC_INIT_COLD_CODE(".flashmem.adc_init.metadata")
 protocol::AdcInitializationMetadata protocolMetadata(
     const Snapshot &snapshot) {
   protocol::AdcInitializationMetadata metadata{};
@@ -93,7 +93,7 @@ protocol::AdcInitializationMetadata protocolMetadata(
   return metadata;
 }
 
-TEENSY_DAQ_ADC_INIT_COLD_CODE(".flashmem.adc_init.initialize")
+THINGDAQ_ADC_INIT_COLD_CODE(".flashmem.adc_init.initialize")
 const Snapshot &Initializer::initialize() {
   snapshot_ = defaultSnapshot(gate_);
   std::array<bool, kConverterCount> route_valid{};
@@ -227,6 +227,6 @@ const Snapshot &Initializer::initialize() {
   return snapshot_;
 }
 
-}  // namespace teensy_daq::adc
+}  // namespace thingdaq::adc
 
-#undef TEENSY_DAQ_ADC_INIT_COLD_CODE
+#undef THINGDAQ_ADC_INIT_COLD_CODE

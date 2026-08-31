@@ -18,7 +18,7 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 import serial
-from teensy_daq import soak as installed_soak
+from thingdaq import soak as installed_soak
 
 from firmware.tests.test_soak_endurance_tools import (
     ACCELERATED_ADC_PAIR_RATE_HZ,
@@ -122,7 +122,7 @@ def _candidate(
     port: str,
     *,
     serial_number: str | None = None,
-    product: str | None = "Teensy DAQ",
+    product: str | None = "ThingDAQ",
 ) -> object:
     return WINDOWS.WindowsPortCandidate(
         port=port,
@@ -179,7 +179,7 @@ def _attached_windows_report(
     observed_identity = dict(expected_info)
     identity_mismatches: dict[str, dict[str, object]] = {}
     if not exact_identity:
-        observed_identity["build_id"] = "tdaq-diagnostic-other"
+        observed_identity["build_id"] = "thingdaq-diagnostic-other"
         identity_mismatches["build_id"] = {
             "expected": expected_info["build_id"],
             "actual": observed_identity["build_id"],
@@ -189,11 +189,11 @@ def _attached_windows_report(
         vid=module.TEENSY_USB_SERIAL_VID,
         pid=module.TEENSY_USB_SERIAL_PID,
         serial_number=str(settings.hardware_serial),
-        product=module.TEENSY_DAQ_PRODUCT,
+        product=module.THINGDAQ_PRODUCT,
         manufacturer="PJRC",
         location="fixture-location",
         interface="CDC",
-        description="Teensy DAQ",
+        description="ThingDAQ",
     )
     probe = module.WindowsProbeResult(
         candidate=candidate,
@@ -416,7 +416,7 @@ class WindowsDiscoveryTests(unittest.TestCase):
                 0x16C0,
                 0x0483,
                 serial_number=str(TARGET_HARDWARE_SERIAL),
-                product="Teensy DAQ",
+                product="ThingDAQ",
             ),
             _metadata(
                 "COM2",
@@ -437,13 +437,13 @@ class WindowsDiscoveryTests(unittest.TestCase):
                 0x16C0,
                 0x0483,
                 serial_number=str(TARGET_HARDWARE_SERIAL),
-                product="Teensy DAQ",
+                product="ThingDAQ",
             ),
         ]
         candidates = WINDOWS.enumerate_windows_candidates(lambda: records)
 
         self.assertEqual(["COM1", "COM10"], [item.port for item in candidates])
-        self.assertEqual("Teensy DAQ", candidates[0].product)
+        self.assertEqual("ThingDAQ", candidates[0].product)
         self.assertIsNone(candidates[1].product)
         probes = (
             _passing_probe(candidates[0], 11_111_111),
@@ -565,7 +565,7 @@ class WindowsWireAndFaultTests(unittest.TestCase):
             }
         )
         for field, value in (
-            ("build_id", "tdaq-wrong-build"),
+            ("build_id", "thingdaq-wrong-build"),
             ("supported_checksum_mask", 0),
             ("data_checksum_algorithm", 2),
         ):
@@ -1778,7 +1778,7 @@ class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
         ):
             self.assertIn(name, windows)
         self.assertTrue(markdown.startswith("---\ntype: report\n"))
-        self.assertIn("title: Teensy DAQ Windows Soak Report", markdown)
+        self.assertIn("title: ThingDAQ Windows Soak Report", markdown)
         self.assertIn("  - windows", markdown)
         for link in (
             "[[Phase-11-Soak-Evidence]]",
@@ -2022,16 +2022,16 @@ class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
             "requests",
             "socket",
             "subprocess",
-            "teensy_daq",
+            "thingdaq",
             "tools",
             "urllib",
         ):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, imports)
-        compile(source, r"C:\TeensyDAQ\windows_soak.py", "exec")
+        compile(source, r"C:\ThingDAQ\windows_soak.py", "exec")
         compile(
             source.replace("\n", "\r\n"),
-            r"C:\TeensyDAQ\windows_soak_crlf.py",
+            r"C:\ThingDAQ\windows_soak_crlf.py",
             "exec",
         )
         self.assertEqual(source, source.encode("utf-8").decode("utf-8"))

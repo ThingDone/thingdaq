@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import unittest
 
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     FrameFlag,
     FrameKind,
@@ -16,7 +16,7 @@ from teensy_daq import (
     StreamAnomaly,
     StreamAnomalyReason,
     StreamGap,
-    TeensyDAQ,
+    ThingDAQ,
     UnexpectedStreamAnomalyError,
     UnexpectedStreamGapError,
     analyze_stream_continuity,
@@ -24,7 +24,7 @@ from teensy_daq import (
     encode_frame,
     synthetic_adc_payload,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 
 def _adc(
@@ -285,7 +285,7 @@ class ContinuityClassificationTests(unittest.TestCase):
 
 class PublicLossRecoveryTests(unittest.TestCase):
     def test_duplicate_is_reported_then_discarded_in_continuing_mode(self) -> None:
-        with TeensyDAQ.open(InMemoryTransport(_DuplicateDevice())) as daq:
+        with ThingDAQ.open(InMemoryTransport(_DuplicateDevice())) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             first = daq.read_block()
@@ -301,7 +301,7 @@ class PublicLossRecoveryTests(unittest.TestCase):
         self.assertEqual(1, following.sequence)
 
     def test_duplicate_raises_promptly_in_strict_mode(self) -> None:
-        with TeensyDAQ.open(InMemoryTransport(_DuplicateDevice()), strict=True) as daq:
+        with ThingDAQ.open(InMemoryTransport(_DuplicateDevice()), strict=True) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             self.assertIsInstance(daq.read_block(), ADCBlock)
@@ -311,7 +311,7 @@ class PublicLossRecoveryTests(unittest.TestCase):
         self.assertEqual(StreamAnomalyReason.DUPLICATE, raised.exception.anomaly.reason)
 
     def test_stale_run_is_visible_without_entering_the_application_queue(self) -> None:
-        with TeensyDAQ.open(_StaleAfterStartTransport()) as daq:
+        with ThingDAQ.open(_StaleAfterStartTransport()) as daq:
             daq.configure(adc=True, gpio=False)
             run_id = daq.start()
             deadline = time.monotonic() + 1.0
@@ -333,7 +333,7 @@ class PublicLossRecoveryTests(unittest.TestCase):
         self.assertEqual(0, current.sequence)
 
     def test_counter_disagreement_remains_explicit_on_the_gap(self) -> None:
-        with TeensyDAQ.open(InMemoryTransport(_CounterMismatchDevice())) as daq:
+        with ThingDAQ.open(InMemoryTransport(_CounterMismatchDevice())) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             self.assertIsInstance(daq.read_block(), ADCBlock)
@@ -357,7 +357,7 @@ class PublicLossRecoveryTests(unittest.TestCase):
         self.assertEqual(1, losses.protocol_telemetry_errors)
 
     def test_strict_gap_exception_retains_counter_disagreement(self) -> None:
-        with TeensyDAQ.open(
+        with ThingDAQ.open(
             InMemoryTransport(_CounterMismatchDevice()), strict=True
         ) as daq:
             daq.configure(adc=True, gpio=False)
@@ -373,7 +373,7 @@ class PublicLossRecoveryTests(unittest.TestCase):
         self.assertTrue(evidence.errors)
 
     def test_new_start_and_reset_stats_do_not_join_run_baselines(self) -> None:
-        with TeensyDAQ.open(InMemoryTransport(_OneGapDevice())) as daq:
+        with ThingDAQ.open(InMemoryTransport(_OneGapDevice())) as daq:
             daq.configure(adc=True, gpio=False)
             first_run = daq.start()
             self.assertIsInstance(daq.read_block(), ADCBlock)
@@ -395,7 +395,7 @@ class PublicLossRecoveryTests(unittest.TestCase):
         self.assertFalse(second_losses.has_loss)
 
     def test_new_start_resets_cumulative_firmware_baseline(self) -> None:
-        with TeensyDAQ.open(InMemoryTransport(_OneGapDevice())) as daq:
+        with ThingDAQ.open(InMemoryTransport(_OneGapDevice())) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             self.assertIsInstance(daq.read_block(), ADCBlock)
@@ -436,7 +436,7 @@ class PublicLossRecoveryTests(unittest.TestCase):
                             self._pending.extend(wire)
                 return written
 
-        with TeensyDAQ.open(_BurstTransport(), max_buffered_blocks=1) as daq:
+        with ThingDAQ.open(_BurstTransport(), max_buffered_blocks=1) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             deadline = time.monotonic() + 1.0

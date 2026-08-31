@@ -2,8 +2,8 @@ include MANIFEST.in
 include LICENSE
 include README.md
 include pyproject.toml
-recursive-include src/teensy_daq *.py
-include src/teensy_daq/py.typed
+recursive-include src/thingdaq *.py
+include src/thingdaq/py.typed
 recursive-include examples *.py
 
 # Build only the installable runtime source. The canonical protocol JSON,

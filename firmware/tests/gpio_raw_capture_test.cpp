@@ -9,10 +9,10 @@
 
 namespace {
 
-namespace board = teensy_daq::board;
-namespace capture = teensy_daq::gpio_capture;
-namespace constants = teensy_daq::protocol_v1;
-namespace stats = teensy_daq::stats;
+namespace board = thingdaq::board;
+namespace capture = thingdaq::gpio_capture;
+namespace constants = thingdaq::protocol_v1;
+namespace stats = thingdaq::stats;
 
 int failures = 0;
 

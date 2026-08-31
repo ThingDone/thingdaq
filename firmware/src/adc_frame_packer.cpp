@@ -4,13 +4,13 @@
 #include <limits>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_ADC_PACKER_COLD_CODE(section_name) \
+#define THINGDAQ_ADC_PACKER_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_ADC_PACKER_COLD_CODE(section_name)
+#define THINGDAQ_ADC_PACKER_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::adc_packer {
+namespace thingdaq::adc_packer {
 namespace {
 
 template <typename Integer>
@@ -30,7 +30,7 @@ constexpr std::uint16_t flag(protocol_v1::FrameFlag value) {
 
 }  // namespace
 
-TEENSY_DAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.start")
+THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.start")
 OperationStatus AdcFramePacker::startRun(
     std::uint32_t run_id,
     protocol_v1::ChecksumAlgorithm checksum_algorithm,
@@ -62,7 +62,7 @@ OperationStatus AdcFramePacker::startRun(
   return OperationStatus::kOk;
 }
 
-TEENSY_DAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.stop")
+THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.stop")
 StopReport AdcFramePacker::stopProduction() {
   StopReport report{};
   running_ = false;
@@ -70,7 +70,7 @@ StopReport AdcFramePacker::stopProduction() {
   return report;
 }
 
-TEENSY_DAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.service")
+THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.service")
 ServiceReport AdcFramePacker::service(
     packet::PacketBufferPipeline &pipeline, std::size_t buffer_limit) {
   ServiceReport report{};
@@ -113,7 +113,7 @@ ServiceReport AdcFramePacker::service(
   return report;
 }
 
-TEENSY_DAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.snapshot")
+THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.snapshot")
 Snapshot AdcFramePacker::snapshot(
     const packet::PacketBufferPipeline &pipeline) const {
   Snapshot result{};
@@ -135,7 +135,7 @@ bool AdcFramePacker::pipelineMatches(
                           checksum_algorithm_);
 }
 
-TEENSY_DAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.consume")
+THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.consume")
 bool AdcFramePacker::consume(
     const adc_capture::BufferHandle &handle,
     packet::PacketBufferPipeline &pipeline, ServiceReport &report) {
@@ -218,7 +218,7 @@ bool AdcFramePacker::consume(
   return true;
 }
 
-TEENSY_DAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.raw_gap")
+THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.raw_gap")
 bool AdcFramePacker::projectRawGap(
     std::uint64_t pair_count,
     packet::PacketBufferPipeline &pipeline) {
@@ -253,6 +253,6 @@ stats::AdcPackerProgress AdcFramePacker::progress(
   return result;
 }
 
-}  // namespace teensy_daq::adc_packer
+}  // namespace thingdaq::adc_packer
 
-#undef TEENSY_DAQ_ADC_PACKER_COLD_CODE
+#undef THINGDAQ_ADC_PACKER_COLD_CODE

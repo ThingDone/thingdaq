@@ -1,4 +1,4 @@
-"""Stable synchronous API and typed data models for the Teensy DAQ project."""
+"""Stable synchronous API and typed data models for the ThingDAQ project."""
 
 from . import low_level as low_level
 from ._generated.protocol_constants import (
@@ -89,8 +89,8 @@ from .client import (
     RecoveryEvidence,
     SessionRecoveryPolicy,
     StreamItem,
-    TeensyDAQ,
-    TeensyDAQError,
+    ThingDAQ,
+    ThingDAQError,
     UnexpectedHostQueueLossError,
     UnexpectedMessageError,
     UnexpectedStreamAnomalyError,
@@ -109,9 +109,9 @@ from .diagnostics import (
 )
 from .discovery import (
     DEFAULT_DISCOVERY_TIMEOUT,
-    TEENSY_DAQ_PRODUCT,
     TEENSY_USB_SERIAL_PID,
     TEENSY_USB_SERIAL_VID,
+    THINGDAQ_PRODUCT,
     DeviceIdentity,
     DeviceNotFoundError,
     DiscoveredDevice,
@@ -251,9 +251,9 @@ __all__ = [
     "HOST_SUPPORTED_CHECKSUM_MASK",
     "MAX_CALIBRATION_FILE_BYTES",
     "PHASE03_MINIMUM_FIRMWARE_VERSION",
-    "TEENSY_DAQ_PRODUCT",
     "TEENSY_USB_SERIAL_PID",
     "TEENSY_USB_SERIAL_VID",
+    "THINGDAQ_PRODUCT",
     "ADCBlock",
     "AdcAcquisitionStatus",
     "AdcBlock",
@@ -403,8 +403,8 @@ __all__ = [
     "StreamStoppedError",
     "SyntheticPatternError",
     "SyntheticStreamValidator",
-    "TeensyDAQ",
-    "TeensyDAQError",
+    "ThingDAQ",
+    "ThingDAQError",
     "TimestampAligner",
     "TimestampAlignmentError",
     "Transport",

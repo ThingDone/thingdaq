@@ -11,7 +11,7 @@ from dataclasses import replace
 from typing import Literal
 from unittest.mock import patch
 
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     BackgroundReader,
     CommandResponse,
@@ -33,7 +33,7 @@ from teensy_daq import (
     StreamAnomalyReason,
     StreamGap,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     TransportClosedError,
     TransportDisconnectedError,
     UnexpectedStreamAnomalyError,
@@ -44,7 +44,7 @@ from teensy_daq import (
     reconcile_run_counters,
     synthetic_adc_payload,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 _Fault = Literal["missing", "duplicate", "reordered", "cross_run"]
 
@@ -194,7 +194,7 @@ class ContinuityModeMatrixTests(unittest.TestCase):
                     fault,
                     counters_agree=counters_agree,
                 )
-                with TeensyDAQ.open(InMemoryTransport(device)) as daq:
+                with ThingDAQ.open(InMemoryTransport(device)) as daq:
                     daq.configure(adc=True, gpio=False)
                     run_id = daq.start()
                     first = daq.read_block()
@@ -251,7 +251,7 @@ class ContinuityModeMatrixTests(unittest.TestCase):
                     fault,
                     counters_agree=counters_agree,
                 )
-                with TeensyDAQ.open(InMemoryTransport(device), strict=True) as daq:
+                with ThingDAQ.open(InMemoryTransport(device), strict=True) as daq:
                     daq.configure(adc=True, gpio=False)
                     daq.start()
                     self.assertIsInstance(daq.read_block(), ADCBlock)
@@ -282,7 +282,7 @@ class ContinuityModeMatrixTests(unittest.TestCase):
 class IndependentLossDomainTests(unittest.TestCase):
     def test_host_queue_loss_with_zero_firmware_loss(self) -> None:
         transport = _StartBurstTransport(SimulatedDevice(), burst_frames=3)
-        with TeensyDAQ.open(transport, max_buffered_blocks=2) as daq:
+        with ThingDAQ.open(transport, max_buffered_blocks=2) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             _wait_until(lambda: daq.reader_counters.adc_block_queue_drops == 1)
@@ -305,7 +305,7 @@ class IndependentLossDomainTests(unittest.TestCase):
 
     def test_firmware_loss_with_zero_host_queue_loss(self) -> None:
         device = _ContinuityFaultDevice("missing", counters_agree=True)
-        with TeensyDAQ.open(InMemoryTransport(device), max_buffered_blocks=4) as daq:
+        with ThingDAQ.open(InMemoryTransport(device), max_buffered_blocks=4) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             self.assertIsInstance(daq.read_block(), ADCBlock)
@@ -329,7 +329,7 @@ class IndependentLossDomainTests(unittest.TestCase):
     def test_firmware_and_host_queue_loss_remain_independently_exact(self) -> None:
         device = _ContinuityFaultDevice("missing", counters_agree=True)
         transport = _StartBurstTransport(device, burst_frames=3)
-        with TeensyDAQ.open(transport, max_buffered_blocks=2) as daq:
+        with ThingDAQ.open(transport, max_buffered_blocks=2) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             _wait_until(lambda: daq.reader_counters.adc_block_queue_drops == 1)
@@ -585,7 +585,7 @@ def _discovered(port: str, serial: int, info: DeviceInfo) -> DiscoveredDevice:
             vid=0x16C0,
             pid=0x0483,
             serial_number=str(serial),
-            product="Teensy DAQ",
+            product="ThingDAQ",
             manufacturer="PJRC",
             interface="CDC",
         ),
@@ -611,7 +611,7 @@ class ReconnectAndWrapRecoveryTests(unittest.TestCase):
             hardware_serial,
             _probe_info(device, request_id=0x7000_0001),
         )
-        initial = TeensyDAQ.open(
+        initial = ThingDAQ.open(
             initial_endpoint,
             serial_transport_factory=transport_factory,
             synchronization_retry_delay=0,
@@ -633,10 +633,10 @@ class ReconnectAndWrapRecoveryTests(unittest.TestCase):
 
         with (
             patch(
-                "teensy_daq.client.discover_devices",
+                "thingdaq.client.discover_devices",
                 return_value=(renamed_endpoint,),
             ),
-            TeensyDAQ.open(
+            ThingDAQ.open(
                 hardware_serial=hardware_serial,
                 serial_transport_factory=transport_factory,
                 session_policy=SessionRecoveryPolicy.ADOPT,

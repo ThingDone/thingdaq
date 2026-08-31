@@ -5,13 +5,13 @@
 #include "checksum.h"
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_PROTOCOL_COLD_CODE(section_name) \
+#define THINGDAQ_PROTOCOL_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_PROTOCOL_COLD_CODE(section_name)
+#define THINGDAQ_PROTOCOL_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::protocol {
+namespace thingdaq::protocol {
 namespace {
 
 constexpr std::size_t kNotFound = static_cast<std::size_t>(-1);
@@ -343,7 +343,7 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
   return false;
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.header_validation")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.header_validation")
 Result validateHeader(const FrameHeader &header, bool commands_only) {
   if (header.version != protocol_v1::kProtocolVersion) {
     return badVersion();
@@ -439,7 +439,7 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
   return Result::success();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.header_decode")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.header_decode")
 Result decodeHeader(ByteView input, FrameHeader &header, bool commands_only) {
   if (!input.valid() || input.size < protocol_v1::kHeaderSize) {
     return badLength();
@@ -589,7 +589,7 @@ struct AdcMetadataOffsets {
   std::size_t initialization_error_flags;
 };
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.adc_metadata_validation")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.adc_metadata_validation")
 Result validateAdcMetadata(ByteView payload,
                            const AdcMetadataOffsets &offsets) {
   const std::uint8_t resolution = payload.data[offsets.resolution_bits];
@@ -751,7 +751,7 @@ inline constexpr std::size_t kTriggerErrorCount = 136U;
 inline constexpr std::size_t kXbarSelections = 140U;
 }  // namespace adc_trigger_wire
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(
+THINGDAQ_PROTOCOL_COLD_CODE(
     ".flashmem.protocol.adc_trigger_metadata_validation")
 Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
   using namespace adc_trigger_wire;
@@ -860,7 +860,7 @@ Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
   return Result::success();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(
+THINGDAQ_PROTOCOL_COLD_CODE(
     ".flashmem.protocol.adc_trigger_metadata_encoding")
 void encodeAdcTriggerMetadata(MutableByteView payload, std::size_t base,
                               const AdcTriggerMetadata &trigger) {
@@ -1444,7 +1444,7 @@ Result decodeChecksumBenchmarkRequest(ByteView payload,
   return Result::success();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(
+THINGDAQ_PROTOCOL_COLD_CODE(
     ".flashmem.protocol.gpio_clock_diagnostic_request")
 Result decodeGpioClockDiagnosticRequest(
     ByteView payload, GpioClockDiagnosticRequest &request) {
@@ -1623,7 +1623,7 @@ Result validateChecksumBenchmarkResponse(ByteView payload) {
   return Result::success();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(
+THINGDAQ_PROTOCOL_COLD_CODE(
     ".flashmem.protocol.gpio_clock_diagnostic_validation")
 Result validateGpioClockDiagnosticResponse(ByteView payload) {
   GpioClockDiagnosticRequest request{};
@@ -1717,7 +1717,7 @@ Result validateGpioClockDiagnosticResponse(ByteView payload) {
   return Result::success();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(
+THINGDAQ_PROTOCOL_COLD_CODE(
     ".flashmem.protocol.gpio_capture_diagnostic_validation")
 Result validateGpioCaptureDiagnosticResponse(ByteView payload) {
   std::uint16_t reserved = 1U;
@@ -1789,7 +1789,7 @@ Result validateGpioCaptureDiagnosticResponse(ByteView payload) {
              : Result::success();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.payload_validation")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.payload_validation")
 Result validatePayload(const FrameHeader &header, ByteView payload) {
   if (!payload.valid() || payload.size != header.payload_length) {
     return badLength();
@@ -2111,7 +2111,7 @@ bool validChecksumBenchmarkRequest(const ChecksumBenchmarkRequest &request) {
          processed <= protocol_v1::kChecksumBenchmarkMaxProcessedBytes;
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(
+THINGDAQ_PROTOCOL_COLD_CODE(
     ".flashmem.protocol.gpio_clock_diagnostic_bounds")
 bool validGpioClockDiagnosticRequest(
     const GpioClockDiagnosticRequest &request) {
@@ -2223,7 +2223,7 @@ Result computeChecksum(protocol_v1::ChecksumAlgorithm algorithm, ByteView input,
              : unsupportedChecksum();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.frame_decode")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.frame_decode")
 Result decodeFrame(ByteView input, DecodedFrame &frame) {
   FrameHeader header{};
   Result result = decodeHeader(input, header, false);
@@ -2367,7 +2367,7 @@ Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
   return Result::success();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.request_decode")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.request_decode")
 Result decodeRequest(ByteView input, Request &request) {
   DecodedFrame frame{};
   Result result = decodeFrame(input, frame);
@@ -2416,7 +2416,7 @@ Result decodeRequest(ByteView input, Request &request) {
   return Result::success();
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.info_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.info_response")
 Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                           const InfoResponse &response, ControlFrame &output) {
   Result result = verifyRequestKind(request, protocol_v1::CommandKind::kInfo);
@@ -2631,7 +2631,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
       view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.configure_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.configure_response")
 Result encodeConfigureResponse(const Request &request, std::uint32_t run_id,
                                const Configuration &configuration,
                                ControlFrame &output) {
@@ -2649,7 +2649,7 @@ Result encodeConfigureResponse(const Request &request, std::uint32_t run_id,
                      view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.start_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.start_response")
 Result encodeStartResponse(const Request &request, std::uint32_t run_id,
                            const Configuration &configuration,
                            ControlFrame &output) {
@@ -2666,7 +2666,7 @@ Result encodeStartResponse(const Request &request, std::uint32_t run_id,
       view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.status_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.status_response")
 Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
                             const StatusResponse &response,
                             ControlFrame &output) {
@@ -3005,7 +3005,7 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
                      view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.stop_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.stop_response")
 Result encodeStopResponse(const Request &request, std::uint32_t run_id,
                           ControlFrame &output) {
   Result result = verifyRequestKind(request, protocol_v1::CommandKind::kStop);
@@ -3021,7 +3021,7 @@ Result encodeStopResponse(const Request &request, std::uint32_t run_id,
       view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.reset_stats_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.reset_stats_response")
 Result encodeResetStatsResponse(const Request &request, std::uint32_t run_id,
                                 std::uint32_t stats_generation,
                                 ControlFrame &output) {
@@ -3040,7 +3040,7 @@ Result encodeResetStatsResponse(const Request &request, std::uint32_t run_id,
                      view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.ping_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.ping_response")
 Result encodePingResponse(const Request &request, std::uint32_t run_id,
                           ControlFrame &output) {
   Result result = verifyRequestKind(request, protocol_v1::CommandKind::kPing);
@@ -3059,7 +3059,7 @@ Result encodePingResponse(const Request &request, std::uint32_t run_id,
 // Encoding this diagnostics-only response is not part of the measured loop or
 // the streaming hot path. Keep it in program Flash so adding a faster CRC does
 // not force another 32 KiB ITCM allocation block out of RAM1.
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.checksum_benchmark_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.checksum_benchmark_response")
 Result encodeChecksumBenchmarkResponse(
     const Request &request, std::uint32_t run_id,
     const ChecksumBenchmarkResponse &response, ControlFrame &output) {
@@ -3164,7 +3164,7 @@ Result encodeChecksumBenchmarkResponse(
       view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(
+THINGDAQ_PROTOCOL_COLD_CODE(
     ".flashmem.protocol.gpio_clock_diagnostic_response")
 Result encodeGpioClockDiagnosticResponse(
     const Request &request, std::uint32_t run_id,
@@ -3258,7 +3258,7 @@ Result encodeGpioClockDiagnosticResponse(
       view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(
+THINGDAQ_PROTOCOL_COLD_CODE(
     ".flashmem.protocol.gpio_capture_diagnostic_response")
 Result encodeGpioCaptureDiagnosticResponse(
     const Request &request, std::uint32_t run_id,
@@ -3347,7 +3347,7 @@ Result encodeGpioCaptureDiagnosticResponse(
       view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.typed_error_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.typed_error_response")
 Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
                                 protocol_v1::ErrorCode error,
                                 ControlFrame &output) {
@@ -3371,7 +3371,7 @@ Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
       view(payload), output);
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.rejected_frame_response")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.rejected_frame_response")
 Result encodeRejectedFrameResponse(std::uint32_t request_id,
                                    std::uint8_t rejected_kind,
                                    std::uint8_t rejected_version,
@@ -3425,7 +3425,7 @@ void IncrementalCommandParser::reset() {
   counters_ = {};
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.parser_session_reset")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.parser_session_reset")
 void IncrementalCommandParser::resetSession() {
   if (buffered_ != 0U) {
     discard(buffered_);
@@ -3439,7 +3439,7 @@ ParserCounters IncrementalCommandParser::counters() const {
   return result;
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.command_parser_drain")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.command_parser_drain")
 IncrementalCommandParser::DrainResult IncrementalCommandParser::drain(
     ParsedCommand &command) {
   while (true) {
@@ -3499,7 +3499,7 @@ IncrementalCommandParser::DrainResult IncrementalCommandParser::drain(
   }
 }
 
-TEENSY_DAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.parser_rejection")
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.parser_rejection")
 bool IncrementalCommandParser::describeRejection(
     const Result &failure, ParsedCommand &command) const {
   if (failure.ok() || buffered_ < protocol_v1::kHeaderSize) {
@@ -3619,6 +3619,6 @@ void IncrementalCommandParser::updateHighWater() {
   }
 }
 
-}  // namespace teensy_daq::protocol
+}  // namespace thingdaq::protocol
 
-#undef TEENSY_DAQ_PROTOCOL_COLD_CODE
+#undef THINGDAQ_PROTOCOL_COLD_CODE

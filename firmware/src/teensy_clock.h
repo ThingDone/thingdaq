@@ -4,7 +4,7 @@
 
 #include "synthetic_source.h"
 
-namespace teensy_daq::clock {
+namespace thingdaq::clock {
 
 // Thin hardware boundary for cooperative synthetic pacing. micros() is read
 // only from main-loop context; unsigned deltas extend its 32-bit wrap into a
@@ -19,4 +19,4 @@ class TeensyTickClock final : public synthetic::TickClock {
   bool initialized_ = false;
 };
 
-}  // namespace teensy_daq::clock
+}  // namespace thingdaq::clock

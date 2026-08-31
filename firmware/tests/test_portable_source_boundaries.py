@@ -215,8 +215,8 @@ class PortableSourceBoundaryTests(unittest.TestCase):
     ) -> None:
         adapter = _source(FIRMWARE_SOURCE / "adc_initializer_teensy.cpp")
 
-        hook = adapter.index('extern "C" TEENSY_DAQ_ADC_TARGET_CODE')
-        initializer = adapter.index("namespace teensy_daq::adc", hook)
+        hook = adapter.index('extern "C" THINGDAQ_ADC_TARGET_CODE')
+        initializer = adapter.index("namespace thingdaq::adc", hook)
         deferred_body = adapter[hook:initializer]
         self.assertIn("void analog_init(void) {}", deferred_body)
         self.assertNotIn("ADC1", deferred_body)

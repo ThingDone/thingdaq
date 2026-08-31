@@ -10,8 +10,8 @@
 
 namespace {
 
-namespace wire = teensy_daq::protocol;
-namespace constants = teensy_daq::protocol_v1;
+namespace wire = thingdaq::protocol;
+namespace constants = thingdaq::protocol_v1;
 
 int failures = 0;
 

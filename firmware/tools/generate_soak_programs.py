@@ -23,7 +23,7 @@ PROTOCOL_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
 VALIDATION_MANIFEST_PATH = REPOSITORY_ROOT / "firmware/soak/validation-manifest.json"
 OUTPUT_DIRECTORY = REPOSITORY_ROOT / "firmware/tests/generated"
 WINDOWS_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/scripts/windows_soak.py"
-PACKAGE_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/src/teensy_daq/soak.py"
+PACKAGE_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/src/thingdaq/soak.py"
 OUTPUTS = {
     "synthetic": "rig_soak_synthetic.py",
     "physical-combined": "rig_soak_physical_combined.py",
@@ -429,7 +429,7 @@ def build_validation_manifest(
 
     manifest = {
         "schema_version": VALIDATION_MANIFEST_SCHEMA_VERSION,
-        "kind": "teensy-daq-release-validation",
+        "kind": "thingdaq-release-validation",
         "related": [PHASE_11_EVIDENCE_LINK],
         "accepted_evidence": {
             **freeze_evidence,
@@ -533,7 +533,7 @@ def validate_candidate(candidate: Mapping[str, Any]) -> None:
         raise GenerationError("artifact.sha256 must be lowercase SHA-256")
     if not isinstance(source_id, str) or not SHA256_PATTERN.fullmatch(source_id):
         raise GenerationError("firmware.source_id must be lowercase SHA-256")
-    if firmware.get("build_id") != f"tdaq-{source_id[:16]}":
+    if firmware.get("build_id") != f"thingdaq-{source_id[:16]}":
         raise GenerationError("firmware.build_id must derive from firmware.source_id")
     version = firmware.get("version")
     if not (

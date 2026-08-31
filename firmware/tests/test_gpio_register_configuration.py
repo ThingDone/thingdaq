@@ -21,7 +21,7 @@ class GpioRegisterConfigurationTests(unittest.TestCase):
             self.skipTest("g++ is required for target-register adapter tests")
 
         with tempfile.TemporaryDirectory(
-            prefix="teensy-daq-gpio-registers-"
+            prefix="thingdaq-gpio-registers-"
         ) as directory:
             executable = Path(directory) / "gpio-register-configuration-test"
             compiled = subprocess.run(

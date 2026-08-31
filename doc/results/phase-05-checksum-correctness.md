@@ -3,7 +3,7 @@ type: report
 title: Phase 05 Checksum Correctness and Corruption
 created: 2026-08-28
 tags:
-  - teensy-daq
+  - thingdaq
   - checksum
   - corruption-testing
   - cross-language

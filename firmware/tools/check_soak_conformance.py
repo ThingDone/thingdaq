@@ -16,7 +16,7 @@ from types import ModuleType
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 STANDALONE_PATH = REPOSITORY_ROOT / "daq_api/scripts/windows_soak.py"
-INSTALLED_PATH = REPOSITORY_ROOT / "daq_api/src/teensy_daq/soak.py"
+INSTALLED_PATH = REPOSITORY_ROOT / "daq_api/src/thingdaq/soak.py"
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"
 CONFIG_BLOCK = re.compile(
     r"^# <soak-generated-config>\n.*?^# </soak-generated-config>$",
@@ -53,7 +53,7 @@ def _canonical_json_bytes(value: object) -> bytes:
 def _load_module(path: Path, role: str) -> ModuleType:
     if not path.is_file():
         raise ConformanceError(f"missing {role} implementation: {path}")
-    name = f"_teensy_daq_soak_conformance_{role.replace('-', '_')}"
+    name = f"_thingdaq_soak_conformance_{role.replace('-', '_')}"
     specification = importlib.util.spec_from_file_location(name, path)
     if specification is None or specification.loader is None:
         raise ConformanceError(f"could not load {role} implementation: {path}")

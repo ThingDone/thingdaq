@@ -27,8 +27,8 @@ from .client import (
     DeviceIdentityMismatchError,
     DeviceSynchronizationError,
     MultipleDevicesFoundError,
-    TeensyDAQ,
-    TeensyDAQError,
+    ThingDAQ,
+    ThingDAQError,
     UnexpectedHostQueueLossError,
     UnexpectedStreamAnomalyError,
     UnexpectedStreamGapError,
@@ -82,7 +82,7 @@ class CliExitCode(IntEnum):
     INTERRUPTED = 130
 
 
-class CaptureInterruptedError(TeensyDAQError):
+class CaptureInterruptedError(ThingDAQError):
     """A termination signal interrupted a bounded capture after safe cleanup."""
 
     def __init__(self, signal_name: str) -> None:
@@ -262,8 +262,8 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the public parser without opening serial hardware."""
 
     parser = argparse.ArgumentParser(
-        prog="teensy-daq",
-        description="Inspect and control Teensy DAQ protocol-v1 devices.",
+        prog="thingdaq",
+        description="Inspect and control ThingDAQ protocol-v1 devices.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -333,7 +333,7 @@ def _candidate_for_port(port: str) -> SerialPortCandidate | str:
     )
 
 
-def _open_device(arguments: argparse.Namespace) -> TeensyDAQ:
+def _open_device(arguments: argparse.Namespace) -> ThingDAQ:
     if arguments.timeout <= 0:
         raise ValueError("timeout must be positive")
     if arguments.sync_attempts < 2:
@@ -352,7 +352,7 @@ def _open_device(arguments: argparse.Namespace) -> TeensyDAQ:
     )
     strict = bool(getattr(arguments, "strict_loss", False))
     if arguments.simulate:
-        return TeensyDAQ.simulated(
+        return ThingDAQ.simulated(
             control_only=False,
             strict=strict,
             command_timeout=arguments.timeout,
@@ -368,7 +368,7 @@ def _open_device(arguments: argparse.Namespace) -> TeensyDAQ:
         device = _candidate_for_port(arguments.port)
     else:
         device = None
-    return TeensyDAQ.open(
+    return ThingDAQ.open(
         device,
         hardware_serial=(arguments.hardware_serial if device is None else None),
         expected_identity=expected,
@@ -402,7 +402,7 @@ def _source_names(mask: int) -> str:
 
 
 def _configuration_from_arguments(
-    daq: TeensyDAQ,
+    daq: ThingDAQ,
     arguments: argparse.Namespace,
 ) -> DAQConfiguration:
     stream_masks = {
@@ -501,7 +501,7 @@ def _capture_signal_handlers() -> Iterator[None]:
 
 
 def _capture_calibration(
-    daq: TeensyDAQ,
+    daq: ThingDAQ,
     arguments: argparse.Namespace,
 ) -> tuple[CalibrationRecord | None, int | None]:
     calibrated = arguments.adc_output == "calibrated"
@@ -842,7 +842,7 @@ def _configuration_details(
 
 
 def _run_monitor(
-    daq: TeensyDAQ,
+    daq: ThingDAQ,
     arguments: argparse.Namespace,
     output: TextIO,
 ) -> dict[str, object]:
@@ -1341,7 +1341,7 @@ def main(argv: list[str] | None = None) -> int:
         DiscoveryError,
         ProtocolError,
         ReaderError,
-        TeensyDAQError,
+        ThingDAQError,
         TransportError,
         TypeError,
         ValueError,

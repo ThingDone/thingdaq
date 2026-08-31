@@ -62,7 +62,7 @@
     "adc_pairs_per_frame": 1012,
     "adc_resolution_bits": 12,
     "board_id": 1,
-    "build_id": "tdaq-a0dc150fd48a6e9b",
+    "build_id": "thingdaq-a0dc150fd48a6e9b",
     "capability_bits": 511,
     "command_queue_capacity": 4,
     "data_checksum_algorithm": 1,
@@ -105,7 +105,7 @@
     "timestamp_hz": 8000000
   },
   "firmware": {
-    "build_id": "tdaq-a0dc150fd48a6e9b",
+    "build_id": "thingdaq-a0dc150fd48a6e9b",
     "exported_hex": {
       "name": "firmware.ino.hex",
       "sha256": "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
@@ -119,7 +119,7 @@
       0
     ]
   },
-  "kind": "teensy-daq-release-validation",
+  "kind": "thingdaq-release-validation",
   "protocol": {
     "byte_order": "little",
     "checksum": {

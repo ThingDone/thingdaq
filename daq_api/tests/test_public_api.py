@@ -6,7 +6,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     AdcConverter,
     BoardId,
@@ -34,13 +34,13 @@ from teensy_daq import (
     Status,
     StreamGap,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     UnexpectedHostQueueLossError,
     UnexpectedStreamGapError,
     decode_frame,
     encode_frame,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 
 class PhysicalInfoDevice(SimulatedDevice):
@@ -53,7 +53,7 @@ class PhysicalInfoDevice(SimulatedDevice):
     def _handle_info(self, request: Frame) -> bytes:
         info = DeviceInfo(
             device_state=self.state,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
             hardware_serial=self.hardware_serial,
             firmware_version=(0, 3, 0),
             board_id=BoardId.TEENSY_40,
@@ -132,7 +132,7 @@ class PublicModelTests(unittest.TestCase):
     def test_canonical_models_validate_and_preserve_phase01_alias_behavior(
         self,
     ) -> None:
-        with TeensyDAQ.simulated() as daq:
+        with ThingDAQ.simulated() as daq:
             info = daq.info()
             self.assertIsInstance(info, DeviceInfo)
             self.assertIsInstance(info.capabilities, DeviceCapabilities)
@@ -172,7 +172,7 @@ class PublicModelTests(unittest.TestCase):
             HostCounters(host_block_queue_drops=-1)
 
     def test_public_state_errors_are_explicit_before_illegal_commands(self) -> None:
-        with TeensyDAQ.simulated() as daq:
+        with ThingDAQ.simulated() as daq:
             with self.assertRaises(DAQStateError) as idle_start:
                 daq.start()
             self.assertEqual(DeviceState.IDLE, idle_start.exception.state)
@@ -194,13 +194,13 @@ class PublicOpenTests(unittest.TestCase):
             vid=0x16C0,
             pid=0x0483,
             serial_number=str(hardware_serial),
-            product="Teensy DAQ",
+            product="ThingDAQ",
         )
         discovered = DiscoveredDevice(
             candidate=candidate,
             info=DeviceInfo(
                 device_state=DeviceState.IDLE,
-                build_id="tdaq-0123456789abcdef",
+                build_id="thingdaq-0123456789abcdef",
                 hardware_serial=hardware_serial,
                 firmware_version=(0, 3, 0),
                 board_id=BoardId.TEENSY_40,
@@ -223,10 +223,10 @@ class PublicOpenTests(unittest.TestCase):
 
         with (
             patch(
-                "teensy_daq.client.discover_devices",
+                "thingdaq.client.discover_devices",
                 return_value=(discovered,),
             ),
-            TeensyDAQ.open(
+            ThingDAQ.open(
                 hardware_serial=hardware_serial,
                 serial_transport_factory=open_transport,
             ) as daq,
@@ -253,7 +253,7 @@ class PublicOpenTests(unittest.TestCase):
 class PublicGapPolicyTests(unittest.TestCase):
     def test_production_mode_emits_firmware_gap_then_current_block(self) -> None:
         transport = InMemoryTransport(FirmwareGapDevice())
-        with TeensyDAQ.open(transport) as daq:
+        with ThingDAQ.open(transport) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             items = list(daq.blocks(2))
@@ -276,7 +276,7 @@ class PublicGapPolicyTests(unittest.TestCase):
 
     def test_strict_mode_raises_with_gap_and_current_block_attached(self) -> None:
         transport = InMemoryTransport(FirmwareGapDevice())
-        with TeensyDAQ.open(transport, strict=True) as daq:
+        with ThingDAQ.open(transport, strict=True) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             self.assertIsInstance(daq.read_block(), ADCBlock)
@@ -294,7 +294,7 @@ class PublicGapPolicyTests(unittest.TestCase):
 
     def test_host_queue_loss_is_never_reported_as_firmware_loss(self) -> None:
         transport = StartBurstTransport()
-        with TeensyDAQ.open(transport, max_buffered_blocks=1) as daq:
+        with ThingDAQ.open(transport, max_buffered_blocks=1) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             for _ in range(1_000):
@@ -323,7 +323,7 @@ class PublicGapPolicyTests(unittest.TestCase):
 
     def test_strict_host_queue_loss_raises_without_firmware_attribution(self) -> None:
         transport = StartBurstTransport()
-        with TeensyDAQ.open(
+        with ThingDAQ.open(
             transport,
             strict=True,
             max_buffered_blocks=1,

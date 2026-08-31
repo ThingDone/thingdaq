@@ -3,7 +3,7 @@ type: report
 title: Phase 01 Synthetic Prototype Gate
 created: 2026-08-27
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-01
   - verification
   - synthetic-prototype
@@ -18,7 +18,7 @@ related:
 ## Result
 
 The complete autonomous Phase 01 gate passed on 2026-08-27 in
-`/home/bill/agents/teensy_daq`. The implementation revision under test was
+`/home/bill/agents/thingdaq`. The implementation revision under test was
 `5cd3e2d6d378b9e78ccb6b7b913acd086ac9faca`; this report and its documentation
 index entry were added after that implementation run.
 
@@ -45,7 +45,7 @@ for the generated wire contract.
 | --- | --- |
 | Host Python | Python 3.12.3 |
 | pip | 24.0 |
-| Installed distribution | `teensy-daq-local` 0.0.0, editable |
+| Installed distribution | `thingdaq-local` 0.0.0, editable |
 | PySerial | 3.5 |
 | Ruff | 0.16.5 |
 | MyPy | 2.3.1 |
@@ -75,8 +75,8 @@ The package build created both requested formats in the gitignored
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `teensy_daq_local-0.0.0-py3-none-any.whl` | 34,417 | `bde3b94c796fc4719875ba4dada3ccc418f92572678fcf72d9ab4e02bd866f93` |
-| `teensy_daq_local-0.0.0.tar.gz` | 41,539 | `e7cecbf938f330e80c44ecd4a669e2e1046514959f6e534688eadaac804225bf` |
+| `thingdaq_local-0.0.0-py3-none-any.whl` | 34,417 | `bde3b94c796fc4719875ba4dada3ccc418f92572678fcf72d9ab4e02bd866f93` |
+| `thingdaq_local-0.0.0.tar.gz` | 41,539 | `e7cecbf938f330e80c44ecd4a669e2e1046514959f6e534688eadaac804225bf` |
 
 ## Protocol regeneration and drift evidence
 
@@ -86,10 +86,10 @@ diff checks were empty.
 
 ```bash
 .venv/bin/python tools/generate_protocol.py
-git diff --exit-code -- daq_api/src/teensy_daq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h protocol/fixtures
+git diff --exit-code -- daq_api/src/thingdaq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h protocol/fixtures
 .venv/bin/python tools/generate_protocol.py
 .venv/bin/python tools/generate_protocol.py --check
-git diff --exit-code -- daq_api/src/teensy_daq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h protocol/fixtures
+git diff --exit-code -- daq_api/src/thingdaq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h protocol/fixtures
 ```
 
 Representative source and generated-output identities were:
@@ -110,9 +110,9 @@ Three parser boundaries were exercised with three ADC and three GPIO frames per
 run:
 
 ```bash
-.venv/bin/teensy-daq-demo --frame-count 3 --parser-chunk-size 1
-.venv/bin/teensy-daq-demo --frame-count 3 --parser-chunk-size 17
-.venv/bin/teensy-daq-demo --frame-count 3 --parser-chunk-size 4096
+.venv/bin/thingdaq-demo --frame-count 3 --parser-chunk-size 1
+.venv/bin/thingdaq-demo --frame-count 3 --parser-chunk-size 17
+.venv/bin/thingdaq-demo --frame-count 3 --parser-chunk-size 4096
 ```
 
 Every run reported `PASS` and the same validated acquisition facts:
@@ -142,7 +142,7 @@ The helper recorded this underlying compile command in its gitignored build
 manifest:
 
 ```bash
-/usr/local/bin/arduino-cli compile --fqbn teensy:avr:teensy40:usb=serial,speed=600,opt=o2std --export-binaries --output-dir /home/bill/agents/teensy_daq/firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std /home/bill/agents/teensy_daq/firmware
+/usr/local/bin/arduino-cli compile --fqbn teensy:avr:teensy40:usb=serial,speed=600,opt=o2std --export-binaries --output-dir /home/bill/agents/thingdaq/firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std /home/bill/agents/thingdaq/firmware
 ```
 
 | Exported artifact | Bytes | SHA-256 |

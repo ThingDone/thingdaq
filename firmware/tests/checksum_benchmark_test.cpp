@@ -9,9 +9,9 @@
 
 namespace {
 
-namespace benchmark = teensy_daq::benchmark;
-namespace constants = teensy_daq::protocol_v1;
-namespace protocol = teensy_daq::protocol;
+namespace benchmark = thingdaq::benchmark;
+namespace constants = thingdaq::protocol_v1;
+namespace protocol = thingdaq::protocol;
 
 int failures = 0;
 

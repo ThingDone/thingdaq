@@ -1,9 +1,9 @@
 ---
 type: reference
-title: Teensy DAQ Evidence Index
+title: ThingDAQ Evidence Index
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - evidence
   - validation
   - release-candidate
@@ -31,7 +31,7 @@ related:
   - '[[ADR-004-ADC-Trigger-DMA]]'
 ---
 
-# Teensy DAQ evidence index
+# ThingDAQ evidence index
 
 ## Current autonomous acceptance
 
@@ -44,7 +44,7 @@ firmware/distribution reproduction, and retained-evidence hashes.
 | --- | --- |
 | Gate checkout | `8517befc450d17e5684b4884c0ff69cd984046ad` |
 | Protected source tree | 240 files; SHA-256 `84636113d34bdadef466d94c6c44180d2e591f3dc99ed346b32a8bd3b4a15dbc` |
-| Source / build | `a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba` / `tdaq-a0dc150fd48a6e9b` |
+| Source / build | `a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba` / `thingdaq-a0dc150fd48a6e9b` |
 | Firmware / protocol / checksum | 0.7.0 / v1 / Adler-32 |
 | Accepted HEX | `0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a` |
 | Target / toolchain | Teensy 4.0 FQBN `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std`; Arduino CLI 1.4.1; Teensy core 1.62.0; Arm GNU 15.2.1 |

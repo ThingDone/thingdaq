@@ -17,11 +17,11 @@ from types import ModuleType
 from typing import TypedDict
 from unittest.mock import patch
 
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.models import AdcTriggerMetadata, Configuration, DeviceInfo, Status
-from teensy_daq.protocol import encode_frame
-from teensy_daq.simulator import SimulatedDevice
-from teensy_daq.synthetic import synthetic_adc_payload
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.models import AdcTriggerMetadata, Configuration, DeviceInfo, Status
+from thingdaq.protocol import encode_frame
+from thingdaq.simulator import SimulatedDevice
+from thingdaq.synthetic import synthetic_adc_payload
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG_SCRIPT = ROOT / "firmware" / "tests" / "rig_adc_capture.py"
@@ -107,7 +107,7 @@ def _device_info(
 ) -> DeviceInfo:
     return DeviceInfo(
         device_state=state,
-        build_id="tdaq-0123456789abcdef",
+        build_id="thingdaq-0123456789abcdef",
         hardware_serial=12_345_670,
         firmware_version=(0, 7, 0),
         board_id=constants.BoardId.TEENSY_40,
@@ -140,7 +140,7 @@ class PhysicalAdcDevice(SimulatedDevice):
     """Protocol peer with physical ADC flags and exact Phase 07 metadata."""
 
     def __init__(self) -> None:
-        super().__init__(build_id="tdaq-0123456789abcdef")
+        super().__init__(build_id="thingdaq-0123456789abcdef")
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
         info = _device_info(self.state, self.configuration)
@@ -327,7 +327,8 @@ class RigScriptIndependenceTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("teensy_daq", source)
+        self.assertNotIn("import thingdaq", source)
+        self.assertNotIn("from thingdaq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
         self.assertIn('"ADC_CAPTURE_SECONDS"', source)
@@ -401,7 +402,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
     def test_fixture_parser_is_strict_and_declares_analog_scope(self) -> None:
         self.assertIsNone(rig.load_fixture_stimulus(None))
         declaration = {
-            "schema": "teensy-daq-adc-stimulus-v1",
+            "schema": "thingdaq-adc-stimulus-v1",
             "fixture_id": "divider-v1",
             "stimulus_id": "midscale-dc",
             "channels": {
@@ -488,7 +489,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             resolution = rig.grade_info(
                 rig.Evidence(),
                 info,
-                expected_build_id="tdaq-0123456789abcdef",
+                expected_build_id="thingdaq-0123456789abcdef",
                 expected_hardware_serial=12_345_670,
             )
         self.assertEqual(12, resolution)
@@ -583,7 +584,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             "ADC_CAPTURE_SECONDS": "0.12",
             "ADC_STATUS_INTERVAL_SECONDS": "0.02",
             "ADC_REDUCED_CAPTURE_FRAMES": "2",
-            "EXPECTED_BUILD_ID": "tdaq-0123456789abcdef",
+            "EXPECTED_BUILD_ID": "thingdaq-0123456789abcdef",
             "EXPECTED_HARDWARE_SERIAL": "12345670",
         }
         with (

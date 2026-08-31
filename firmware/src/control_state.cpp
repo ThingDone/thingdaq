@@ -3,13 +3,13 @@
 #include <cstddef>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_CONTROL_COLD_CODE(section_name) \
+#define THINGDAQ_CONTROL_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_CONTROL_COLD_CODE(section_name)
+#define THINGDAQ_CONTROL_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::control {
+namespace thingdaq::control {
 namespace {
 
 constexpr std::uint8_t kKnownStreamMask =
@@ -28,7 +28,7 @@ constexpr bool capabilityEnabled(protocol_v1::Capability capability) {
 
 }  // namespace
 
-TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.boot")
+THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.boot")
 bool ControlState::completeBoot(
     std::uint32_t hardware_serial,
     const protocol::AdcInitializationMetadata &adc_metadata) {
@@ -64,14 +64,14 @@ bool ControlState::recoverToIdle() {
   return true;
 }
 
-TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.host_session")
+THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.host_session")
 void ControlState::beginHostSession() {
   recent_request_ids_ = {};
   recent_request_count_ = 0U;
   next_request_slot_ = 0U;
 }
 
-TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.dispatch")
+THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.dispatch")
 DispatchResult ControlState::dispatch(const protocol::Request &request,
                                       protocol::ControlFrame &response,
                                       DispatchReadiness readiness) {
@@ -329,7 +329,7 @@ PendingEvents ControlState::takePendingEvents() {
   return events;
 }
 
-TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.configuration_validation")
+THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.configuration_validation")
 protocol_v1::ErrorCode ControlState::validateConfiguration(
     const protocol::Configuration &configuration) {
   if ((configuration.stream_mask &
@@ -403,7 +403,7 @@ DispatchResult ControlState::encoded(const protocol::Request &request,
   return {DispatchStatus::kResponseReady, command_error, encoding};
 }
 
-TEENSY_DAQ_CONTROL_COLD_CODE(".flashmem.control.info_response")
+THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.info_response")
 protocol::InfoResponse ControlState::infoResponse() const {
   protocol::InfoResponse response{};
   response.device_state = state_;
@@ -471,6 +471,6 @@ protocol::InfoResponse ControlState::infoResponse() const {
   return response;
 }
 
-#undef TEENSY_DAQ_CONTROL_COLD_CODE
+#undef THINGDAQ_CONTROL_COLD_CODE
 
-}  // namespace teensy_daq::control
+}  // namespace thingdaq::control

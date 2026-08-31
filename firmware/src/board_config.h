@@ -5,7 +5,7 @@
 
 #if defined(ARDUINO) &&                                                   \
     (!defined(ARDUINO_TEENSY40) || !defined(__IMXRT1062__))
-#error "Teensy DAQ board resources require Teensy 4.0 / i.MX RT1062"
+#error "ThingDAQ board resources require Teensy 4.0 / i.MX RT1062"
 #endif
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -16,7 +16,7 @@
 #include "generated/protocol_constants.h"
 #include "protocol.h"
 
-namespace teensy_daq::board {
+namespace thingdaq::board {
 
 enum class ResourceOwner : std::uint8_t {
   kControlPlane,
@@ -1088,4 +1088,4 @@ static_assert(kDmamuxXbar1Request2Source == DMAMUX_SOURCE_XBAR1_2);
 static_assert(kDmamuxXbar1Request3Source == DMAMUX_SOURCE_XBAR1_3);
 #endif
 
-}  // namespace teensy_daq::board
+}  // namespace thingdaq::board

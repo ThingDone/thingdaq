@@ -16,10 +16,10 @@
 
 namespace {
 
-namespace constants = teensy_daq::protocol_v1;
-namespace stats = teensy_daq::stats;
-namespace usb = teensy_daq::usb;
-namespace wire = teensy_daq::protocol;
+namespace constants = thingdaq::protocol_v1;
+namespace stats = thingdaq::stats;
+namespace usb = thingdaq::usb;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 
@@ -239,7 +239,7 @@ void testFixedQueueBoundaries() {
 void testUsbIdentity() {
   static_assert(usb::kTeensyUsbSerialVendorId == 0x16C0U);
   static_assert(usb::kTeensyUsbSerialProductId == 0x0483U);
-  static_assert(teensy_daq::identity::usbProductNameMatchesIdentity());
+  static_assert(thingdaq::identity::usbProductNameMatchesIdentity());
 
   const std::array<std::uint16_t, 8U> serial{
       '1', '6', '7', '7', '7', '2', '1', '5',
@@ -289,14 +289,14 @@ void testIncrementalReceiveAndBackpressure() {
        iteration < 16U && request_ids.size() < 6U; ++iteration) {
     const usb::ServiceReport report = transport.serviceReceive();
     expect(report.bytes_processed <=
-               teensy_daq::board::kUsbRxBudgetBytesPerLoop,
+               thingdaq::board::kUsbRxBudgetBytesPerLoop,
            "receive work respects its byte budget");
-    expect(report.io_calls <= teensy_daq::board::kUsbRxCallsPerLoop,
+    expect(report.io_calls <= thingdaq::board::kUsbRxCallsPerLoop,
            "receive work respects its call budget");
     observed_full_queue =
         observed_full_queue ||
         transport.commandQueueDepth() ==
-            teensy_daq::board::kCommandQueueDepth;
+            thingdaq::board::kCommandQueueDepth;
 
     wire::ParsedCommand command{};
     while (transport.takeCommand(command)) {
@@ -331,7 +331,7 @@ void testIncrementalReceiveAndBackpressure() {
          "command input applies backpressure at the fixed queue depth");
   const usb::TransportSnapshot snapshot = transport.snapshot();
   expect(snapshot.command_queue_high_water ==
-             teensy_daq::board::kCommandQueueDepth,
+             thingdaq::board::kCommandQueueDepth,
          "command queue high-water is exposed");
   expect(snapshot.parser.bad_checksums == 1U &&
              statistics.snapshot().bad_checksums == 1U &&
@@ -416,7 +416,7 @@ void testZeroReadAndResponseReservation() {
          "receive retries make progress on a later loop");
 
   for (std::uint32_t request_id = 1U;
-       request_id <= teensy_daq::board::kResponseQueueDepth; ++request_id) {
+       request_id <= thingdaq::board::kResponseQueueDepth; ++request_id) {
     expect(transport.queueResponse(pingResponse(request_id, request_id)),
            "fill the complete response queue");
   }
@@ -446,7 +446,7 @@ void testZeroReadAndResponseReservation() {
   expect(snapshot.zero_length_read_events == 1U &&
              snapshot.rx_stall_events == 1U &&
              snapshot.response_queue_high_water ==
-                 teensy_daq::board::kResponseQueueDepth &&
+                 thingdaq::board::kResponseQueueDepth &&
              snapshot.response_queue_rejections == 2U &&
              snapshot.response_reservations_abandoned == 1U,
          "queue depth and receive-stall diagnostics are exposed");
@@ -556,14 +556,14 @@ void testTransmitBudgets() {
   usb::CdcTransport transport(stream, statistics, &lower);
 
   const usb::ServiceReport first = transport.serviceTransmit();
-  expect(first.bytes_written == teensy_daq::board::kUsbTxBudgetBytesPerVisit &&
+  expect(first.bytes_written == thingdaq::board::kUsbTxBudgetBytesPerVisit &&
              first.byte_budget_exhausted &&
              first.frames_completed == 2U && first.io_calls == 8U &&
              stream.write_requests.size() == 8U &&
              std::all_of(stream.write_requests.begin(),
                          stream.write_requests.end(), [](std::size_t request) {
                            return request ==
-                                  teensy_daq::board::kUsbTxMaxWriteBytes;
+                                  thingdaq::board::kUsbTxMaxWriteBytes;
                          }),
          "one loop fills the core TX ring in bounded USB-packet calls");
   expect(transport.snapshot().active_frame_bytes_sent == 0U &&
@@ -575,7 +575,7 @@ void testTransmitBudgets() {
          "the next bounded loop completes the remaining frame");
   const usb::TransportSnapshot large_snapshot = transport.snapshot();
   expect(large_snapshot.max_write_request_bytes ==
-             teensy_daq::board::kUsbTxMaxWriteBytes &&
+             thingdaq::board::kUsbTxMaxWriteBytes &&
              large_snapshot.tx_bytes_requested ==
                  3U * constants::kDataFrameBytes,
          "transport exposes exact large-write request telemetry");
@@ -600,17 +600,17 @@ void testTransmitBudgets() {
              call_limited_transport.snapshot().short_capacity_deferrals == 1U,
          "one-byte capacity is deferred instead of requested byte by byte");
   call_limited_stream.writable_limit = static_cast<usb::IoCount>(
-      teensy_daq::board::kUsbTxMinimumWriteBytes);
+      thingdaq::board::kUsbTxMinimumWriteBytes);
   const usb::ServiceReport recovered =
       call_limited_transport.serviceTransmit();
   expect(recovered.bytes_written ==
-                 teensy_daq::board::kUsbTxCallsPerVisit *
-                     teensy_daq::board::kUsbTxMinimumWriteBytes &&
-             recovered.io_calls == teensy_daq::board::kUsbTxCallsPerVisit &&
+                 thingdaq::board::kUsbTxCallsPerVisit *
+                     thingdaq::board::kUsbTxMinimumWriteBytes &&
+             recovered.io_calls == thingdaq::board::kUsbTxCallsPerVisit &&
              recovered.call_budget_exhausted &&
              !call_limited_stream.write_requests.empty() &&
              call_limited_stream.write_requests.front() ==
-                 teensy_daq::board::kUsbTxMinimumWriteBytes,
+                 thingdaq::board::kUsbTxMinimumWriteBytes,
          "recovered capacity remains bounded by USB-packet-sized call count");
 
   FakeLowerPrioritySource malformed_lower{};

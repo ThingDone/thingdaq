@@ -1,10 +1,10 @@
 ---
 type: reference
-title: Teensy DAQ Documentation Index
+title: ThingDAQ Documentation Index
 created: 2026-08-27
 updated: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - documentation
 related:
   - '[[Evidence-Index]]'
@@ -44,7 +44,7 @@ related:
   - '[[Phase-04-Synthetic-Streaming]]'
 ---
 
-# Teensy DAQ documentation
+# ThingDAQ documentation
 
 Every Markdown artifact below `doc/` begins with YAML front matter containing
 `type`, `title`, `created`, `tags`, and `related`. Related artifacts use

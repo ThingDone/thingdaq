@@ -18,7 +18,7 @@
 #include "statistics.h"
 #include "usb_transport.h"
 
-namespace teensy_daq::packet {
+namespace thingdaq::packet {
 
 struct PacketBufferPipelineTestAccess {
   static void setNextSequence(PacketBufferPipeline &pipeline, Stream stream,
@@ -27,20 +27,20 @@ struct PacketBufferPipelineTestAccess {
   }
 };
 
-}  // namespace teensy_daq::packet
+}  // namespace thingdaq::packet
 
 namespace {
 
-namespace adc_capture = teensy_daq::adc_capture;
-namespace adc_packer = teensy_daq::adc_packer;
-namespace board = teensy_daq::board;
-namespace constants = teensy_daq::protocol_v1;
-namespace gpio_capture = teensy_daq::gpio_capture;
-namespace gpio_packer = teensy_daq::gpio_packer;
-namespace packet = teensy_daq::packet;
-namespace stats = teensy_daq::stats;
-namespace usb = teensy_daq::usb;
-namespace wire = teensy_daq::protocol;
+namespace adc_capture = thingdaq::adc_capture;
+namespace adc_packer = thingdaq::adc_packer;
+namespace board = thingdaq::board;
+namespace constants = thingdaq::protocol_v1;
+namespace gpio_capture = thingdaq::gpio_capture;
+namespace gpio_packer = thingdaq::gpio_packer;
+namespace packet = thingdaq::packet;
+namespace stats = thingdaq::stats;
+namespace usb = thingdaq::usb;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 
@@ -51,7 +51,7 @@ void expect(bool condition, const std::string &message) {
   }
 }
 
-class TrackingCache final : public teensy_daq::dma::CacheMaintenance {
+class TrackingCache final : public thingdaq::dma::CacheMaintenance {
  public:
   void discardBeforeDmaWrite(void *address, std::size_t bytes) override {
     Record &record = findOrCreate(address, bytes);
@@ -122,7 +122,7 @@ class TrackingCache final : public teensy_daq::dma::CacheMaintenance {
 };
 
 class TrackingCriticalSection final
-    : public teensy_daq::dma::CriticalSection {
+    : public thingdaq::dma::CriticalSection {
  public:
   std::uint32_t enter() override {
     ++depth_;

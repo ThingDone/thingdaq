@@ -19,7 +19,7 @@ class GpioRawCaptureTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-gpio-raw-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-gpio-raw-") as directory:
             executable = Path(directory) / "gpio-raw-capture-test"
             compile_result = subprocess.run(
                 [

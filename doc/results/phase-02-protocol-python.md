@@ -3,7 +3,7 @@ type: report
 title: Phase 02 Protocol and Python Quality Gate
 created: 2026-08-28
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-02
   - protocol
   - python
@@ -20,7 +20,7 @@ related:
 ## Result
 
 The complete offline Phase 02 gate passed on 2026-08-28 in
-`/home/bill/agents/teensy_daq`. The implementation baseline at the start of the
+`/home/bill/agents/thingdaq`. The implementation baseline at the start of the
 gate was `a9f1856dd3107404de7d0a8ca060b8a39e3a124d`; this report and the two
 test-only quality-gate repairs are recorded by the following `MAESTRO` commit.
 
@@ -98,10 +98,10 @@ were empty after both generations:
 
 ```bash
 .venv/bin/python tools/generate_protocol.py
-git diff --exit-code -- daq_api/src/teensy_daq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h protocol/fixtures
+git diff --exit-code -- daq_api/src/thingdaq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h protocol/fixtures
 .venv/bin/python tools/generate_protocol.py
 .venv/bin/python tools/generate_protocol.py --check
-git diff --exit-code -- daq_api/src/teensy_daq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h protocol/fixtures
+git diff --exit-code -- daq_api/src/thingdaq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h protocol/fixtures
 ```
 
 Each generator invocation reported all 20 outputs current. Representative
@@ -156,23 +156,23 @@ wheel and its runtime dependency without editable source access:
 
 ```bash
 python -m build --wheel --outdir <wheelhouse> daq_api
-uv pip install --python <clean-python-3.11> <wheelhouse>/teensy_daq_local-0.0.0-py3-none-any.whl
-python -I -c 'import pathlib, teensy_daq; print(pathlib.Path(teensy_daq.__file__).resolve())'
+uv pip install --python <clean-python-3.11> <wheelhouse>/thingdaq_local-0.0.0-py3-none-any.whl
+python -I -c 'import pathlib, thingdaq; print(pathlib.Path(thingdaq.__file__).resolve())'
 ```
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `teensy_daq_local-0.0.0-py3-none-any.whl` | 59,879 | `06665a3566621fdbf9a4abbcfad2e0539fa7a760e112f47be1831ed7dd3471c8` |
+| `thingdaq_local-0.0.0-py3-none-any.whl` | 59,879 | `06665a3566621fdbf9a4abbcfad2e0539fa7a760e112f47be1831ed7dd3471c8` |
 
 The isolated import resolved inside the clean environment's
-`lib/python3.11/site-packages/teensy_daq/`, confirming a non-editable wheel
+`lib/python3.11/site-packages/thingdaq/`, confirming a non-editable wheel
 install. The installed console entry point then reran the [[Phase-01-Prototype]]
 flow through the current `BackgroundReader` and synchronous public API:
 
 ```bash
-teensy-daq-demo --frame-count 3 --parser-chunk-size 1
-teensy-daq-demo --frame-count 3 --parser-chunk-size 17
-teensy-daq-demo --frame-count 3 --parser-chunk-size 4096
+thingdaq-demo --frame-count 3 --parser-chunk-size 1
+thingdaq-demo --frame-count 3 --parser-chunk-size 17
+thingdaq-demo --frame-count 3 --parser-chunk-size 4096
 ```
 
 All three runs validated three ADC and three GPIO frames, independent sequence

@@ -8,7 +8,7 @@
 #include "protocol.h"
 #include "statistics.h"
 
-namespace teensy_daq::usb {
+namespace thingdaq::usb {
 
 // Signed counts let a board adapter distinguish a transient zero-length
 // operation from an actual backend error without exceptions or allocation.
@@ -299,4 +299,4 @@ static_assert(board::kUsbTxMinimumWriteBytes <=
 static_assert(board::kUsbTxMaxWriteBytes <=
               board::kUsbTxBudgetBytesPerVisit);
 
-}  // namespace teensy_daq::usb
+}  // namespace thingdaq::usb

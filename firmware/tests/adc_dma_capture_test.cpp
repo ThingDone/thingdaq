@@ -8,9 +8,9 @@
 
 namespace {
 
-namespace capture = teensy_daq::adc_capture;
-namespace board = teensy_daq::board;
-namespace constants = teensy_daq::protocol_v1;
+namespace capture = thingdaq::adc_capture;
+namespace board = thingdaq::board;
+namespace constants = thingdaq::protocol_v1;
 
 int failures = 0;
 

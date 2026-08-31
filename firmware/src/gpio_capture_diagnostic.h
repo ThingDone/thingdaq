@@ -6,7 +6,7 @@
 #include "board_config.h"
 #include "gpio_raw_capture.h"
 
-namespace teensy_daq::gpio_diagnostic {
+namespace thingdaq::gpio_diagnostic {
 
 // Fixture policy is build-time evidence, never a host-selected diagnostic
 // option. A remote request therefore cannot authorize output drive.
@@ -183,4 +183,4 @@ static_assert(kSweepValueCount == 256U);
 static_assert(kSweepSamplesPerValue > 1U);
 static_assert(board::kGpio2PsrCaptureMask == 0x00030C0FU);
 
-}  // namespace teensy_daq::gpio_diagnostic
+}  // namespace thingdaq::gpio_diagnostic

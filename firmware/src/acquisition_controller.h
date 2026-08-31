@@ -12,7 +12,7 @@
 #include "packet_buffer_pipeline.h"
 #include "statistics.h"
 
-namespace teensy_daq::acquisition {
+namespace thingdaq::acquisition {
 
 enum class Profile : std::uint8_t {
   kNone,
@@ -234,4 +234,4 @@ static_assert(protocol_v1::kAdc1PhaseTicks * 2U ==
                   protocol_v1::kAdcPairPeriodTicks,
               "ADC1 must retain the nominal half-period phase");
 
-}  // namespace teensy_daq::acquisition
+}  // namespace thingdaq::acquisition

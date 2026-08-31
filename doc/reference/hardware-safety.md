@@ -3,7 +3,7 @@ type: reference
 title: Hardware Safety
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - hardware-safety
   - teensy-4-0
   - adc

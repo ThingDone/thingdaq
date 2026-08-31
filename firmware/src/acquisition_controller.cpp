@@ -1,13 +1,13 @@
 #include "acquisition_controller.h"
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_ACQUISITION_COLD_CODE(section_name) \
+#define THINGDAQ_ACQUISITION_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_ACQUISITION_COLD_CODE(section_name)
+#define THINGDAQ_ACQUISITION_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::acquisition {
+namespace thingdaq::acquisition {
 namespace {
 
 constexpr std::uint8_t streamBit(protocol_v1::StreamMask stream) {
@@ -28,7 +28,7 @@ void addConflict(Audit &audit, Conflict conflict) {
 
 }  // namespace
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.initialize")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.initialize")
 protocol::AdcInitializationMetadata Controller::initialize() {
   protocol::AdcInitializationMetadata metadata{};
   bool converters_ready = false;
@@ -72,7 +72,7 @@ void Controller::addStaticContractConflicts(Audit &audit) {
   }
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(
+THINGDAQ_ACQUISITION_COLD_CODE(
     ".flashmem.acquisition.configuration_validation")
 bool Controller::completeConfigurationValid(
     const protocol::Configuration &configuration) {
@@ -84,7 +84,7 @@ bool Controller::completeConfigurationValid(
              configuration.data_checksum_algorithm);
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.inspect")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.inspect")
 Audit Controller::inspect(const protocol::Configuration &configuration,
                           std::uint32_t epoch) {
   Audit audit{};
@@ -148,7 +148,7 @@ Audit Controller::inspect(const protocol::Configuration &configuration,
   return audit;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.readiness")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.readiness")
 bool Controller::readyForStart(
     const protocol::Configuration &configuration, std::uint32_t epoch) {
   const Audit audit = inspect(configuration, epoch);
@@ -163,7 +163,7 @@ bool Controller::readyForStart(
   return audit.ready();
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.quiescence")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.quiescence")
 bool Controller::quiescent() const {
   if (physical_run_active_ || physical_drain_pending_ ||
       physical_start_pending_) {
@@ -185,7 +185,7 @@ bool Controller::quiescent() const {
   return adc_capture_ == nullptr || adc_capture_->rawSnapshot().quiescent;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.start")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.start")
 bool Controller::start(const protocol::Configuration &configuration,
                        std::uint32_t run_id, std::uint64_t epoch_ticks,
                        Report &report) {
@@ -300,7 +300,7 @@ bool Controller::start(const protocol::Configuration &configuration,
   return true;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.rollback")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.rollback")
 void Controller::rollbackStart(Profile profile, Report &report) {
   // arm() already invokes target cleanup when its final readback fails. If it
   // did commit, stop the one common source before either DMA path is touched.
@@ -331,7 +331,7 @@ void Controller::rollbackStart(Profile profile, Report &report) {
   clearRunState();
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.adc_stop")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.adc_stop")
 bool Controller::stopAdcPath(Report &report) {
   bool stop_error = false;
   report.adc_capture_boundary_stopped =
@@ -362,7 +362,7 @@ bool Controller::stopAdcPath(Report &report) {
   return true;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.combined_stop")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.combined_stop")
 bool Controller::stopCombinedPaths(Report &report) {
   // PIT0 is the source for GPIO eDMA and chained PIT1. Disable that source and
   // both ADC_ETC queues before quiescing any of the three DMA channels.
@@ -393,7 +393,7 @@ bool Controller::stopCombinedPaths(Report &report) {
   return true;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.stop")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.stop")
 bool Controller::stop(Report &report) {
   report.run_id = physical_run_id_;
   report.epoch_ticks = physical_epoch_ticks_;
@@ -434,7 +434,7 @@ bool Controller::stop(Report &report) {
   return true;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.adc_service")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.adc_service")
 void Controller::serviceAdcPath(Report &report, bool draining) {
   (void)adc_capture_->serviceOwnership();
   const std::size_t buffer_limit =
@@ -442,7 +442,7 @@ void Controller::serviceAdcPath(Report &report, bool draining) {
   report.adc_packer = adc_packer_->service(packet_pipeline_, buffer_limit);
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.gpio_service")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.gpio_service")
 void Controller::serviceGpioPath(Report &report, bool draining) {
   const std::size_t raw_limit =
       draining ? board::kGpioRawDmaRingDepth
@@ -454,7 +454,7 @@ void Controller::serviceGpioPath(Report &report, bool draining) {
       packet_pipeline_, raw_limit, frame_limit);
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.adc_drain")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.adc_drain")
 bool Controller::adcPathDrained(Report &report) {
   const adc_capture::Snapshot capture = adc_capture_->rawSnapshot();
   adc_packer::Snapshot packer = adc_packer_->snapshot(packet_pipeline_);
@@ -467,7 +467,7 @@ bool Controller::adcPathDrained(Report &report) {
   return capture.quiescent && packer.quiescent;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.gpio_drain")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.gpio_drain")
 bool Controller::gpioPathDrained(Report &report) {
   const gpio_capture::Snapshot capture = gpio_capture_->rawSnapshot();
   gpio_packer::Snapshot packer = gpio_packer_->snapshot(packet_pipeline_);
@@ -485,7 +485,7 @@ bool Controller::gpioPathDrained(Report &report) {
   return capture.quiescent && packer.quiescent;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.fault_check")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.fault_check")
 bool Controller::activePathFaulted() const {
   const std::uint8_t adc = streamBit(protocol_v1::StreamMask::kAdc);
   const std::uint8_t gpio = streamBit(protocol_v1::StreamMask::kGpio);
@@ -495,7 +495,7 @@ bool Controller::activePathFaulted() const {
           gpio_capture_ != nullptr && gpio_capture_->rawSnapshot().faulted);
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.clear")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.clear")
 void Controller::clearRunState() {
   physical_stream_mask_ = 0U;
   physical_run_id_ = 0U;
@@ -505,7 +505,7 @@ void Controller::clearRunState() {
   physical_start_pending_ = false;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.service")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.service")
 void Controller::service(Report &report) {
   report.run_id = physical_run_id_;
   report.epoch_ticks = physical_epoch_ticks_;
@@ -577,7 +577,7 @@ void Controller::service(Report &report) {
   report.physical_drain_pending = physical_drain_pending_;
 }
 
-TEENSY_DAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.statistics")
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.statistics")
 void Controller::publishStatistics(std::uint32_t run_id) {
   if (gpio_packer_ != nullptr) {
     const gpio_packer::Snapshot packed =
@@ -648,6 +648,6 @@ void Controller::publishStatistics(std::uint32_t run_id) {
   statistics_.publishAdcPacker(packed.progress);
 }
 
-#undef TEENSY_DAQ_ACQUISITION_COLD_CODE
+#undef THINGDAQ_ACQUISITION_COLD_CODE
 
-}  // namespace teensy_daq::acquisition
+}  // namespace thingdaq::acquisition

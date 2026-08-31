@@ -18,9 +18,9 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.models import Configuration, DeviceInfo, Status
-from teensy_daq.simulator import SimulatedDevice
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.models import Configuration, DeviceInfo, Status
+from thingdaq.simulator import SimulatedDevice
 
 from firmware.soak import validator as canonical_validator
 from firmware.tests.test_rig_combined_capture import (
@@ -1005,7 +1005,7 @@ class SoakGeneratorTests(unittest.TestCase):
             ["[[Phase-11-Soak-Evidence]]"],
             manifest["related"],
         )
-        self.assertEqual("tdaq-a0dc150fd48a6e9b", manifest["firmware"]["build_id"])
+        self.assertEqual("thingdaq-a0dc150fd48a6e9b", manifest["firmware"]["build_id"])
         self.assertEqual(
             "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
             manifest["firmware"]["exported_hex"]["sha256"],
@@ -1085,8 +1085,8 @@ class SoakGeneratorTests(unittest.TestCase):
             with self.subTest(mode=mode):
                 self.assertEqual(ALLOWED_STANDALONE_IMPORTS, _imports(source))
                 self.assertNotIn("numpy", source.lower())
-                self.assertNotIn("from teensy_daq", source)
-                self.assertNotIn("import teensy_daq", source)
+                self.assertNotIn("from thingdaq", source)
+                self.assertNotIn("import thingdaq", source)
                 isolated = subprocess.run(
                     [
                         sys.executable,
@@ -1118,15 +1118,15 @@ class SoakGeneratorTests(unittest.TestCase):
         source = path.read_text(encoding="utf-8")
         self.assertEqual(ALLOWED_WINDOWS_IMPORTS, _imports(source))
         self.assertNotIn("numpy", source.lower())
-        self.assertNotIn("from teensy_daq", source)
-        self.assertNotIn("import teensy_daq", source)
+        self.assertNotIn("from thingdaq", source)
+        self.assertNotIn("import thingdaq", source)
         windows = _load_module(path, "generated_windows_soak_contract")
         settings = windows.load_settings()
         self.assertEqual("windows-standalone", windows.GENERATED_CONFIG["entry_point"])
         self.assertEqual("physical-combined", settings.mode)
         self.assertEqual(3_600.0, settings.measured_duration_seconds)
         self.assertEqual(20_512_460, settings.hardware_serial)
-        self.assertEqual("tdaq-a0dc150fd48a6e9b", settings.build_id)
+        self.assertEqual("thingdaq-a0dc150fd48a6e9b", settings.build_id)
         self.assertEqual(
             "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
             settings.artifact_sha256,
@@ -1159,7 +1159,7 @@ class SoakGeneratorTests(unittest.TestCase):
         observed = dict(strict.expected_info)
         observed["firmware_version"] = tuple(observed["firmware_version"])
         observed["gpio_pin_map"] = tuple(observed["gpio_pin_map"])
-        observed["build_id"] = "tdaq-diagnostic-other"
+        observed["build_id"] = "thingdaq-diagnostic-other"
         observed.update(
             {
                 "device_state": windows.STATE_IDLE,
@@ -1186,19 +1186,21 @@ class SoakGeneratorTests(unittest.TestCase):
             expected_state=windows.STATE_IDLE,
         )
         mismatches = windows.info_identity_mismatches(observed, override)
-        self.assertEqual("tdaq-a0dc150fd48a6e9b", mismatches["build_id"]["expected"])
-        self.assertEqual("tdaq-diagnostic-other", mismatches["build_id"]["actual"])
+        self.assertEqual(
+            "thingdaq-a0dc150fd48a6e9b", mismatches["build_id"]["expected"]
+        )
+        self.assertEqual("thingdaq-diagnostic-other", mismatches["build_id"]["actual"])
 
         candidate = windows.WindowsPortCandidate(
             port="COM10",
             vid=windows.TEENSY_USB_SERIAL_VID,
             pid=windows.TEENSY_USB_SERIAL_PID,
             serial_number=str(override.hardware_serial),
-            product=windows.TEENSY_DAQ_PRODUCT,
+            product=windows.THINGDAQ_PRODUCT,
             manufacturer="PJRC",
             location="fixture-location",
             interface="CDC",
-            description="Teensy DAQ",
+            description="ThingDAQ",
         )
         probe = windows.WindowsProbeResult(
             candidate=candidate,
@@ -1245,7 +1247,7 @@ class SoakGeneratorTests(unittest.TestCase):
         )
         markdown = windows.render_windows_markdown(result)
         self.assertIn("**NON-RELEASE**", markdown)
-        self.assertIn("tdaq-diagnostic-other", markdown)
+        self.assertIn("thingdaq-diagnostic-other", markdown)
 
     def test_windows_metadata_filter_and_failure_reports_are_structured(self) -> None:
         windows = _load_module(
@@ -1279,13 +1281,13 @@ class SoakGeneratorTests(unittest.TestCase):
         candidates = windows.enumerate_windows_candidates(
             lambda: [
                 metadata("COM10", 0x16C0, 0x0483, product=None),
-                metadata("COM1", 0x16C0, 0x0483, product="Teensy DAQ"),
+                metadata("COM1", 0x16C0, 0x0483, product="ThingDAQ"),
                 metadata("COM2", 0x1234, 0x5678, product="Unrelated"),
-                metadata("/dev/ttyACM0", 0x16C0, 0x0483, product="Teensy DAQ"),
+                metadata("/dev/ttyACM0", 0x16C0, 0x0483, product="ThingDAQ"),
             ]
         )
         self.assertEqual(["COM1", "COM10"], [item.port for item in candidates])
-        self.assertEqual("Teensy DAQ", candidates[0].product)
+        self.assertEqual("ThingDAQ", candidates[0].product)
         self.assertIsNone(candidates[1].product)
 
         settings = windows.windows_runtime_settings("combined", 10.0)

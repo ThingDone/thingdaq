@@ -11,12 +11,12 @@
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
 
-#define TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(section_name) \
+#define THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
-#define TEENSY_DAQ_ADC_TRIGGER_TARGET_HOT_CODE \
+#define THINGDAQ_ADC_TRIGGER_TARGET_HOT_CODE \
   __attribute__((optimize("Os"), noinline, noipa, used))
 
-namespace teensy_daq::adc_trigger {
+namespace thingdaq::adc_trigger {
 namespace {
 
 constexpr std::uint32_t kTriggerEnableMask =
@@ -43,7 +43,7 @@ std::uint32_t g_done0_1_irq_final = 0U;
 std::uint32_t g_done2_err_irq_final = 0U;
 
 std::uint32_t readPrimask() {
-#if defined(TEENSY_DAQ_HOST_REGISTER_TEST)
+#if defined(THINGDAQ_HOST_REGISTER_TEST)
   return fake_imxrt::interrupts_enabled ? 0U : 1U;
 #else
   std::uint32_t value = 0U;
@@ -107,7 +107,7 @@ std::uint32_t chainConfiguration(std::size_t converter) {
          ADC_ETC_TRIG_CHAIN_CSEL0(protocol_v1::kAdcChannels[converter]);
 }
 
-TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
     ".flashmem.adc_trigger.target_capture_evidence")
 HardwareEvidence captureEvidence() {
   HardwareEvidence evidence{};
@@ -156,7 +156,7 @@ bool xbarValid() {
              protocol_v1::kAdcTriggerXbarInputs[1];
 }
 
-TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
     ".flashmem.adc_trigger.target_queues_valid")
 bool queuesValid() {
   if (ADC_ETC_CTRL != kAdcEtcControlConfiguration ||
@@ -198,7 +198,7 @@ void resetDiagnosticState() {
   restorePrimask(primask);
 }
 
-TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
     ".flashmem.adc_trigger.target_record_diagnostic_error")
 void recordDiagnosticError(std::uint32_t pending) {
   g_trigger_error_flags |= pending;
@@ -210,14 +210,14 @@ void recordDiagnosticError(std::uint32_t pending) {
 // Masking interrupts for this bounded BOOT-only window makes each DWT timestamp
 // describe when the hardware DONE bit becomes visible, rather than when NVIC
 // happens to dispatch two already-pending equal-priority handlers.
-TEENSY_DAQ_ADC_TRIGGER_TARGET_HOT_CODE
+THINGDAQ_ADC_TRIGGER_TARGET_HOT_CODE
 void captureCompletionStatusTransitions() {
   const std::uint32_t started = ARM_DWT_CYCCNT;
   std::uint32_t captured = 0U;
   for (std::uint32_t poll = 0U;
        poll < protocol_v1::kAdcTriggerDiagnosticPollLimit; ++poll) {
-#if defined(TEENSY_DAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK)
-    TEENSY_DAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK();
+#if defined(THINGDAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK)
+    THINGDAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK();
 #endif
     const std::uint32_t done_pending =
         ADC_ETC_DONE0_1_IRQ & (kDone0Mask | kDone1Mask);
@@ -252,7 +252,7 @@ void captureCompletionStatusTransitions() {
 
 class TeensyPlatform final : public Platform {
  public:
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_configure")
   ConfigureResult configureStopped() override {
     ConfigureResult result{};
@@ -361,7 +361,7 @@ class TeensyPlatform final : public Platform {
     return result;
   }
 
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_counter_begin")
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
     if (F_CPU_ACTUAL != protocol_v1::kAdcTriggerDwtClockHz) {
@@ -377,11 +377,11 @@ class TeensyPlatform final : public Platform {
     return ARM_DWT_CYCCNT != begin;
   }
 
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_counter_read")
   std::uint32_t readCycles() override { return ARM_DWT_CYCCNT; }
 
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_arm")
   bool armFromStopped(bool completion_diagnostic) override {
     if (!queuesValid() || !xbarValid() || !convertersHardwareTriggered() ||
@@ -442,7 +442,7 @@ class TeensyPlatform final : public Platform {
     return armed;
   }
 
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_completion_counts")
   std::array<std::uint32_t, kConverterCount> completionCounts() override {
     const std::uint32_t primask = readPrimask();
@@ -454,7 +454,7 @@ class TeensyPlatform final : public Platform {
   }
 
   std::array<std::uint32_t, kConverterCount>
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_completion_cycles")
   firstCompletionCycles() override {
     const std::uint32_t primask = readPrimask();
@@ -465,19 +465,19 @@ class TeensyPlatform final : public Platform {
     return result;
   }
 
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_error_flags")
   std::uint32_t triggerErrorFlags() override {
     return g_trigger_error_flags;
   }
 
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_error_count")
   std::uint32_t triggerErrorCount() override {
     return g_trigger_error_count;
   }
 
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_stop")
   bool stop() override {
     masterPit().TCTRL = 0U;
@@ -507,7 +507,7 @@ class TeensyPlatform final : public Platform {
            ((IMXRT_ADC1.GS | IMXRT_ADC2.GS) & ADC_GS_ADACT) == 0U;
   }
 
-  TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+  THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_evidence")
   HardwareEvidence evidence() override { return captureEvidence(); }
 };
@@ -517,7 +517,7 @@ Scheduler g_scheduler{g_platform};
 
 }  // namespace
 
-TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
     ".flashmem.adc_trigger.target_singleton")
 Scheduler &teensyScheduler() { return g_scheduler; }
 
@@ -530,9 +530,9 @@ static_assert(XBARA1_OUT_ADC_ETC_TRIG00 ==
 static_assert(XBARA1_OUT_ADC_ETC_TRIG10 ==
               protocol_v1::kAdcTriggerXbarOutputs[1]);
 
-}  // namespace teensy_daq::adc_trigger
+}  // namespace thingdaq::adc_trigger
 
 #endif
 
-#undef TEENSY_DAQ_ADC_TRIGGER_TARGET_COLD_CODE
-#undef TEENSY_DAQ_ADC_TRIGGER_TARGET_HOT_CODE
+#undef THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE
+#undef THINGDAQ_ADC_TRIGGER_TARGET_HOT_CODE

@@ -6,8 +6,8 @@
 
 #include "adc_trigger.h"
 
-namespace adc_trigger = teensy_daq::adc_trigger;
-namespace protocol_v1 = teensy_daq::protocol_v1;
+namespace adc_trigger = thingdaq::adc_trigger;
+namespace protocol_v1 = thingdaq::protocol_v1;
 
 namespace {
 
@@ -120,7 +120,7 @@ void testExactScheduleAndSuccessfulDiagnostic() {
           std::vector<std::string>{"configure", "counter", "arm", "stop"}));
   assert((platform.diagnostic_arms == std::vector<bool>{true}));
 
-  const teensy_daq::protocol::AdcTriggerMetadata metadata =
+  const thingdaq::protocol::AdcTriggerMetadata metadata =
       adc_trigger::protocolMetadata(snapshot);
   assert(metadata.configuration_flags == snapshot.configuration_flags);
   assert(metadata.initial_delays == snapshot.initial_delays);

@@ -9,10 +9,10 @@
 
 namespace {
 
-namespace adc = teensy_daq::adc;
-namespace board = teensy_daq::board;
-namespace wire = teensy_daq::protocol;
-namespace v1 = teensy_daq::protocol_v1;
+namespace adc = thingdaq::adc;
+namespace board = thingdaq::board;
+namespace wire = thingdaq::protocol;
+namespace v1 = thingdaq::protocol_v1;
 
 int failures = 0;
 

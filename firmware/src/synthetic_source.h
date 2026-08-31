@@ -7,7 +7,7 @@
 #include "packet_buffer_pipeline.h"
 #include "protocol.h"
 
-namespace teensy_daq::synthetic {
+namespace thingdaq::synthetic {
 
 // REALTIME is the production default: a frame is eligible only after all of
 // its logical samples have occurred at the advertised 8 MHz timeline.
@@ -163,4 +163,4 @@ static_assert(SyntheticSource::adc0Code(2048U) == 0U);
 static_assert(SyntheticSource::adc1Code(2048U) == 1U);
 static_assert(SyntheticSource::gpioByte(256U) == 0U);
 
-}  // namespace teensy_daq::synthetic
+}  // namespace thingdaq::synthetic

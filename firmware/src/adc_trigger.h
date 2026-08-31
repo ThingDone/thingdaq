@@ -7,7 +7,7 @@
 #include "generated/protocol_constants.h"
 #include "protocol.h"
 
-namespace teensy_daq::adc_trigger {
+namespace thingdaq::adc_trigger {
 
 inline constexpr std::size_t kConverterCount = 2U;
 inline constexpr std::uint16_t kRequiredConfigurationFlags =
@@ -163,4 +163,4 @@ static_assert(protocol_v1::kAdcTriggerQueues[0] !=
               protocol_v1::kAdcTriggerQueues[1]);
 static_assert(kDiagnosticDeadlineCycles == 1200000U);
 
-}  // namespace teensy_daq::adc_trigger
+}  // namespace thingdaq::adc_trigger

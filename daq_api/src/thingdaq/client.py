@@ -108,15 +108,15 @@ def _decimal_hardware_serial(value: str | None) -> int | None:
     return parsed if parsed <= constants.UINT32_MAX else None
 
 
-class TeensyDAQError(RuntimeError):
-    """Base error raised by the synchronous Teensy DAQ facade."""
+class ThingDAQError(RuntimeError):
+    """Base error raised by the synchronous ThingDAQ facade."""
 
 
-class DAQClosedError(TeensyDAQError):
-    """An operation was attempted after :meth:`TeensyDAQ.close`."""
+class DAQClosedError(ThingDAQError):
+    """An operation was attempted after :meth:`ThingDAQ.close`."""
 
 
-class CommandTimeoutError(TeensyDAQError):
+class CommandTimeoutError(ThingDAQError):
     """A bounded command exchange ended without its correlated response."""
 
     def __init__(
@@ -131,7 +131,7 @@ class CommandTimeoutError(TeensyDAQError):
         self.evidence = evidence
 
 
-class DAQShutdownError(TeensyDAQError):
+class DAQShutdownError(ThingDAQError):
     """Bounded STOP or reader/transport shutdown failed during close."""
 
     def __init__(
@@ -152,7 +152,7 @@ class DAQShutdownError(TeensyDAQError):
         self.evidence = evidence
 
 
-class BlockTimeoutError(TeensyDAQError):
+class BlockTimeoutError(ThingDAQError):
     """No decoded stream item arrived before the requested deadline."""
 
     def __init__(self, timeout: float) -> None:
@@ -160,7 +160,7 @@ class BlockTimeoutError(TeensyDAQError):
         self.timeout = timeout
 
 
-class DeviceCommandError(TeensyDAQError):
+class DeviceCommandError(ThingDAQError):
     """The device returned a typed protocol error for a command."""
 
     def __init__(
@@ -188,7 +188,7 @@ class DAQStateError(DeviceCommandError):
     ) -> None:
         state_name = "UNKNOWN" if state is None else state.name
         legal = ", ".join(item.name for item in sorted(allowed, key=int))
-        TeensyDAQError.__init__(
+        ThingDAQError.__init__(
             self,
             f"{operation} is not valid in {state_name}; expected {legal}",
         )
@@ -221,29 +221,29 @@ class DeviceCapabilityError(DeviceCommandError):
         command: constants.FrameKind = constants.FrameKind.CONFIGURE_REQUEST,
         error_code: constants.ErrorCode = constants.ErrorCode.UNSUPPORTED_CONFIGURATION,
     ) -> None:
-        TeensyDAQError.__init__(self, message)
+        ThingDAQError.__init__(self, message)
         self.command = command
         self.error_code = error_code
         self.request_id = 0
 
 
-class MultipleDevicesFoundError(TeensyDAQError):
+class MultipleDevicesFoundError(ThingDAQError):
     """Automatic open found more than one DAQ and needs a hardware serial."""
 
 
-class DeviceIdentityMismatchError(TeensyDAQError):
+class DeviceIdentityMismatchError(ThingDAQError):
     """INFO does not match the selected target or expected firmware image."""
 
 
-class DeviceSynchronizationError(TeensyDAQError):
+class DeviceSynchronizationError(ThingDAQError):
     """A bounded open did not produce two stable INFO responses."""
 
 
-class UnexpectedMessageError(TeensyDAQError):
+class UnexpectedMessageError(ThingDAQError):
     """A valid decoded message violates the active public-API operation."""
 
 
-class UnexpectedStreamGapError(TeensyDAQError):
+class UnexpectedStreamGapError(ThingDAQError):
     """Strict mode observed a stream gap instead of silently continuing."""
 
     def __init__(self, gap: StreamGap, block: DataBlock) -> None:
@@ -256,7 +256,7 @@ class UnexpectedStreamGapError(TeensyDAQError):
         self.block = block
 
 
-class UnexpectedHostQueueLossError(TeensyDAQError):
+class UnexpectedHostQueueLossError(ThingDAQError):
     """Strict mode observed decoded application-queue eviction."""
 
     def __init__(self, loss: HostQueueLoss) -> None:
@@ -268,7 +268,7 @@ class UnexpectedHostQueueLossError(TeensyDAQError):
         self.loss = loss
 
 
-class UnexpectedStreamAnomalyError(TeensyDAQError):
+class UnexpectedStreamAnomalyError(ThingDAQError):
     """Strict mode observed duplicate, reordered, stale, or bad-time data."""
 
     def __init__(
@@ -293,11 +293,11 @@ class UnexpectedStreamValidationError(UnexpectedMessageError):
         self.category = category
 
 
-class HostBufferFullError(TeensyDAQError):
+class HostBufferFullError(ThingDAQError):
     """The compatibility injection queue has no remaining bounded capacity."""
 
 
-class TeensyDAQ:
+class ThingDAQ:
     """State-aware synchronous DAQ API over one :class:`BackgroundReader`.
 
     ``strict=False`` is the production policy: :meth:`blocks` emits typed
@@ -424,7 +424,7 @@ class TeensyDAQ:
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
-    ) -> TeensyDAQ:
+    ) -> ThingDAQ:
         """Open a transport, discovered device, port, or selected serial number.
 
         With no ``device``, discovery is performed once. A lone result opens
@@ -445,7 +445,7 @@ class TeensyDAQ:
                 chosen = select_device(devices, hardware_serial=hardware_serial)
             elif not devices:
                 raise DeviceNotFoundError(
-                    "no compatible Teensy DAQ was discovered; check USB/serial "
+                    "no compatible ThingDAQ was discovered; check USB/serial "
                     "permissions and call discover() again"
                 )
             elif len(devices) > 1:
@@ -454,7 +454,7 @@ class TeensyDAQ:
                     for item in sorted(devices, key=lambda item: item.hardware_serial)
                 )
                 raise MultipleDevicesFoundError(
-                    "multiple Teensy DAQs were discovered; pass "
+                    "multiple ThingDAQs were discovered; pass "
                     f"hardware_serial=<serial> (available: {available_serials})"
                 )
             else:
@@ -557,7 +557,7 @@ class TeensyDAQ:
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
-    ) -> TeensyDAQ:
+    ) -> ThingDAQ:
         """Open the public API over the deterministic protocol simulator."""
 
         transport = InMemoryTransport(
@@ -728,7 +728,7 @@ class TeensyDAQ:
 
         with self._lock:
             first_identity: DeviceIdentitySnapshot | None = None
-            last_retryable: TeensyDAQError | None = None
+            last_retryable: ThingDAQError | None = None
             for attempt in range(attempts):
                 try:
                     info, identity = self._read_info()
@@ -1105,7 +1105,7 @@ class TeensyDAQ:
             if self._reader.active_run_id != self._run_id:
                 raise UnexpectedMessageError(
                     "block reads require a RUNNING epoch established by this "
-                    "TeensyDAQ instance"
+                    "ThingDAQ instance"
                 )
             if self._pending_items:
                 return self._pending_items.popleft()
@@ -1334,7 +1334,7 @@ class TeensyDAQ:
                     evidence=evidence,
                 )
 
-    def __enter__(self) -> TeensyDAQ:  # noqa: PYI034
+    def __enter__(self) -> ThingDAQ:  # noqa: PYI034
         self._ensure_open()
         return self
 
@@ -1370,7 +1370,7 @@ class TeensyDAQ:
         except RequestTimeoutError as error:
             raise CommandTimeoutError(error, self._recovery_evidence()) from error
         except ReaderClosedError as error:
-            raise DAQClosedError("TeensyDAQ is closed") from error
+            raise DAQClosedError("ThingDAQ is closed") from error
         except (DeviceDisconnectedError, ReaderProtocolError) as error:
             error.evidence = self._recovery_evidence()
             raise
@@ -1956,7 +1956,7 @@ class TeensyDAQ:
     def _ensure_open(self) -> None:
         if self._closed:
             raise DAQClosedError(
-                "TeensyDAQ is closed; open a new context-managed session"
+                "ThingDAQ is closed; open a new context-managed session"
             )
         if not self._reader.is_running:
             terminal = self._reader.terminal_error
@@ -1964,11 +1964,11 @@ class TeensyDAQ:
                 terminal.evidence = self._recovery_evidence()
                 raise terminal
             raise DAQClosedError(
-                "TeensyDAQ reader is not running; close this session and reopen"
+                "ThingDAQ reader is not running; close this session and reopen"
             )
         if not self._transport.is_open:
             raise DAQClosedError(
-                "TeensyDAQ transport is closed; rediscover the device and reopen"
+                "ThingDAQ transport is closed; rediscover the device and reopen"
             )
 
     def _recovery_evidence(self) -> RecoveryEvidence:
@@ -2006,8 +2006,8 @@ __all__ = [
     "RecoveryEvidence",
     "SessionRecoveryPolicy",
     "StreamItem",
-    "TeensyDAQ",
-    "TeensyDAQError",
+    "ThingDAQ",
+    "ThingDAQError",
     "UnexpectedHostQueueLossError",
     "UnexpectedMessageError",
     "UnexpectedStreamAnomalyError",

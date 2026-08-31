@@ -3,13 +3,13 @@
 #include <cstdint>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(section_name) \
+#define THINGDAQ_ADC_TRIGGER_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(section_name)
+#define THINGDAQ_ADC_TRIGGER_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::adc_trigger {
+namespace thingdaq::adc_trigger {
 namespace {
 
 void addError(Snapshot &snapshot, protocol_v1::AdcTriggerError error) {
@@ -20,7 +20,7 @@ std::uint32_t absoluteDifference(std::uint32_t left, std::uint32_t right) {
   return left >= right ? left - right : right - left;
 }
 
-TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(
+THINGDAQ_ADC_TRIGGER_COLD_CODE(
     ".flashmem.adc_trigger.capture_terminal_evidence")
 void captureTerminalEvidence(Platform &platform, Snapshot &snapshot) {
   snapshot.evidence = platform.evidence();
@@ -35,7 +35,7 @@ void captureTerminalEvidence(Platform &platform, Snapshot &snapshot) {
 
 }  // namespace
 
-TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.metadata")
+THINGDAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.metadata")
 protocol::AdcTriggerMetadata protocolMetadata(const Snapshot &snapshot) {
   protocol::AdcTriggerMetadata metadata{};
   metadata.configuration_flags = snapshot.configuration_flags;
@@ -69,7 +69,7 @@ protocol::AdcTriggerMetadata protocolMetadata(const Snapshot &snapshot) {
   return metadata;
 }
 
-TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.initialize")
+THINGDAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.initialize")
 const Snapshot &Scheduler::initialize(bool converters_ready) {
   snapshot_ = Snapshot{};
   running_ = false;
@@ -172,7 +172,7 @@ const Snapshot &Scheduler::initialize(bool converters_ready) {
   return snapshot_;
 }
 
-TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.arm")
+THINGDAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.arm")
 bool Scheduler::arm() {
   if (running_ || !snapshot_.ready()) {
     return false;
@@ -188,7 +188,7 @@ bool Scheduler::arm() {
   return true;
 }
 
-TEENSY_DAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.stop")
+THINGDAQ_ADC_TRIGGER_COLD_CODE(".flashmem.adc_trigger.stop")
 bool Scheduler::stop() {
   if (!running_) {
     return true;
@@ -200,6 +200,6 @@ bool Scheduler::stop() {
   return stopped;
 }
 
-}  // namespace teensy_daq::adc_trigger
+}  // namespace thingdaq::adc_trigger
 
-#undef TEENSY_DAQ_ADC_TRIGGER_COLD_CODE
+#undef THINGDAQ_ADC_TRIGGER_COLD_CODE

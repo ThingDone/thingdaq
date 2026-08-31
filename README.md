@@ -1,10 +1,11 @@
-# Teensy DAQ
+# ThingDAQ
 
-Teensy DAQ is a Teensy 4.0 firmware and typed Python API for synchronized,
-loss-visible acquisition of two phase-shifted ADC channels and eight packed
-digital inputs. The same public API runs against a deterministic in-memory
-simulator, so discovery, configuration, parsing, timestamps, calibration,
-alignment, loss handling, and cleanup can be developed without hardware.
+ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,
+loss-visible acquisition on the Teensy 4.0 platform. It captures two
+phase-shifted ADC channels and eight packed digital inputs. The same public API
+runs against a deterministic in-memory simulator, so discovery, configuration,
+parsing, timestamps, calibration, alignment, loss handling, and cleanup can be
+developed without hardware.
 
 > [!WARNING]
 > Read the [hardware-safety guide](doc/reference/hardware-safety.md) before
@@ -36,8 +37,8 @@ python3 -m venv .venv
 Run the complete deterministic demo or a bounded CLI capture:
 
 ```bash
-.venv/bin/teensy-daq-demo --frames 2
-.venv/bin/teensy-daq capture --simulate --duration 1 --strict-loss \
+.venv/bin/thingdaq-demo --frames 2
+.venv/bin/thingdaq capture --simulate --duration 1 --strict-loss \
   --gpio-channel D6 --gpio-channel D13
 ```
 
@@ -56,9 +57,9 @@ physical discovery by hardware serial, and lifecycle guidance.
 ## Minimal API
 
 ```python
-from teensy_daq import ADCBlock, GPIOBlock, Source, TeensyDAQ
+from thingdaq import ADCBlock, GPIOBlock, Source, ThingDAQ
 
-with TeensyDAQ.simulated(strict=True) as daq:
+with ThingDAQ.simulated(strict=True) as daq:
     applied = daq.configure(
         adc=True,
         gpio=True,
@@ -89,9 +90,9 @@ echo; a changed CONFIGURE or START echo is rejected.
 Metadata-only enumeration never opens candidate ports:
 
 ```bash
-.venv/bin/teensy-daq list
-.venv/bin/teensy-daq info --hardware-serial 20512460
-.venv/bin/teensy-daq monitor --hardware-serial 20512460 \
+.venv/bin/thingdaq list
+.venv/bin/thingdaq info --hardware-serial 20512460
+.venv/bin/thingdaq monitor --hardware-serial 20512460 \
   --streams both --source hardware --duration 10 --strict-loss
 ```
 
@@ -120,7 +121,7 @@ reproducibility gate are in the
 [Phase 11 soak evidence](doc/results/phase-11-soak-evidence.md) and the
 [cross-phase evidence index](doc/results/evidence-index.md). A later Windows
 run is additive evidence and is not a prerequisite for that autonomous PASS.
-The identity-pinned standalone and installed `teensy-daq-soak` entry paths are
+The identity-pinned standalone and installed `thingdaq-soak` entry paths are
 documented in the [soak harness guide](doc/guides/soak-harness.md). Both embed
 the deterministic `firmware/soak/validation-manifest.json` contract; a
 different INFO identity is rejected unless the explicit diagnostic override is
@@ -158,7 +159,7 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 
 - `firmware/`: Teensy 4.0 sketch, portable C++ components, build tooling, and
   host-compiled firmware tests.
-- `daq_api/`: installable `teensy_daq` package, CLI, simulator, examples, and
+- `daq_api/`: installable `thingdaq` package, CLI, simulator, examples, and
   Python tests.
 - `protocol/`: canonical machine-readable contract and cross-language golden
   frames.
@@ -171,18 +172,21 @@ Common local gates:
 .venv/bin/python tools/generate_protocol.py --check
 .venv/bin/python -m ruff format --check daq_api firmware tools
 .venv/bin/python -m ruff check daq_api firmware tools
-.venv/bin/python -m mypy daq_api/src/teensy_daq
+.venv/bin/python -m mypy daq_api/src/thingdaq
 .venv/bin/python -m pytest
 python3 firmware/tools/build_firmware.py
 ```
 
-## Private distribution boundary
+## Distribution and trademark boundary
 
-The distribution name in `daq_api/pyproject.toml` is a replaceable local
-placeholder and the package is marked `Private :: Do Not Upload`. `Teensy®` is
-a PJRC trademark; naming, trademark use, and index availability must be
-reviewed before any public package submission. Repository workflows must not
-reserve, upload, or publish this distribution.
+The distribution remains marked `Private :: Do Not Upload` until package-index
+availability and publication readiness are reviewed. Repository workflows must
+not reserve, upload, or publish it.
+
+ThingDAQ is an independent project and is not affiliated with or endorsed by
+PJRC.COM, LLC or SparkFun Electronics. Teensy® is a registered trademark of
+PJRC.COM, LLC. References to Teensy identify the supported hardware platform;
+they are not part of the ThingDAQ product name.
 
 ## License
 

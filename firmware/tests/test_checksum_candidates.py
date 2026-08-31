@@ -20,7 +20,7 @@ class ChecksumCandidateTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-checksum-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-checksum-") as directory:
             executable = Path(directory) / "checksum-candidates-test"
             compile_result = subprocess.run(
                 [

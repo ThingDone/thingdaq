@@ -3,13 +3,13 @@
 #include <limits>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_GPIO_CLOCK_COLD_CODE(section_name) \
+#define THINGDAQ_GPIO_CLOCK_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_GPIO_CLOCK_COLD_CODE(section_name)
+#define THINGDAQ_GPIO_CLOCK_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::gpio_clock {
+namespace thingdaq::gpio_clock {
 namespace {
 
 constexpr std::uint32_t absoluteDifference(std::uint32_t left,
@@ -19,7 +19,7 @@ constexpr std::uint32_t absoluteDifference(std::uint32_t left,
 
 }  // namespace
 
-TEENSY_DAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.plan")
+THINGDAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.plan")
 Plan makePlan(const protocol::GpioClockDiagnosticRequest &request) {
   Plan plan{};
   if (!protocol::validGpioClockDiagnosticRequest(request)) {
@@ -38,7 +38,7 @@ Plan makePlan(const protocol::GpioClockDiagnosticRequest &request) {
   return plan;
 }
 
-TEENSY_DAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.runner")
+THINGDAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.runner")
 RunResult Runner::run(
     const protocol::GpioClockDiagnosticRequest &request) {
   RunResult result{};
@@ -118,6 +118,6 @@ static_assert(2U * protocol_v1::kGpioClockMaxEventCount +
                       protocol_v1::kGpioClockDuplicateGuardEvents <=
                   std::numeric_limits<std::int16_t>::max());
 
-}  // namespace teensy_daq::gpio_clock
+}  // namespace thingdaq::gpio_clock
 
-#undef TEENSY_DAQ_GPIO_CLOCK_COLD_CODE
+#undef THINGDAQ_GPIO_CLOCK_COLD_CODE

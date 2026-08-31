@@ -14,7 +14,7 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from teensy_daq import (
+from thingdaq import (
     BoardId,
     Capability,
     Info,
@@ -50,13 +50,13 @@ class PhysicalControlDevice(SimulatedDevice):
     def __init__(self) -> None:
         super().__init__(
             control_only=True,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
         )
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
         info = Info(
             device_state=self.state,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
             hardware_serial=12_345_670,
             firmware_version=(0, 3, 0),
             board_id=BoardId.TEENSY_40,
@@ -145,7 +145,8 @@ class RigScriptIndependenceTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("teensy_daq", source)
+        self.assertNotIn("import thingdaq", source)
+        self.assertNotIn("from thingdaq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
 

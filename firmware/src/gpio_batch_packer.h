@@ -9,7 +9,7 @@
 #include "packet_buffer_pipeline.h"
 #include "statistics.h"
 
-namespace teensy_daq::gpio_packer {
+namespace thingdaq::gpio_packer {
 
 inline constexpr const char kBatchAlgorithmName[] =
     "shift-mask-unrolled-4";
@@ -248,4 +248,4 @@ static_assert(board::kGpioMappingsByPackedBit[5].gpio2_bit == 2U);
 static_assert(board::kGpioMappingsByPackedBit[6].gpio2_bit == 1U);
 static_assert(board::kGpioMappingsByPackedBit[7].gpio2_bit == 3U);
 
-}  // namespace teensy_daq::gpio_packer
+}  // namespace thingdaq::gpio_packer

@@ -3,7 +3,7 @@
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
 #include <Arduino.h>
 
-namespace teensy_daq::clock {
+namespace thingdaq::clock {
 
 std::uint64_t TeensyTickClock::nowTicks() {
   const std::uint32_t current = static_cast<std::uint32_t>(micros());
@@ -18,5 +18,5 @@ std::uint64_t TeensyTickClock::nowTicks() {
   return elapsed_microseconds_ * 8U;
 }
 
-}  // namespace teensy_daq::clock
+}  // namespace thingdaq::clock
 #endif

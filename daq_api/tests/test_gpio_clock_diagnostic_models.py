@@ -6,7 +6,7 @@ import struct
 import unittest
 from pathlib import Path
 
-from teensy_daq import (
+from thingdaq import (
     Capability,
     DeviceCapabilityError,
     ErrorCode,
@@ -16,12 +16,12 @@ from teensy_daq import (
     GpioClockDiagnosticResult,
     GpioClockError,
     SimulatedDevice,
-    TeensyDAQ,
+    ThingDAQ,
     decode_frame,
     decode_response,
     encode_frame,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"
@@ -154,7 +154,7 @@ class GpioClockDiagnosticModelTests(unittest.TestCase):
         self.assertEqual(ErrorCode.UNSUPPORTED_CONFIGURATION, response.error_code)
         self.assertEqual(before, device.status())
 
-        with TeensyDAQ.simulated() as daq:
+        with ThingDAQ.simulated() as daq:
             info = daq.info()
             self.assertFalse(info.supports_capability(Capability.GPIO_CLOCK_DIAGNOSTIC))
             with self.assertRaises(DeviceCapabilityError):

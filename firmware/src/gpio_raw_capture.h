@@ -8,7 +8,7 @@
 #include "dma_buffer_ownership.h"
 #include "statistics.h"
 
-namespace teensy_daq::gpio_capture {
+namespace thingdaq::gpio_capture {
 
 inline constexpr std::uint8_t kOverflowDestination =
     static_cast<std::uint8_t>(board::kGpioRawDmaRingDepth);
@@ -287,4 +287,4 @@ static_assert(kRawWordDiagnosticMaxSamples <
               protocol_v1::kGpioSamplesPerFrame);
 static_assert(kRawWordDiagnosticBytesPerSample == 4U);
 
-}  // namespace teensy_daq::gpio_capture
+}  // namespace thingdaq::gpio_capture

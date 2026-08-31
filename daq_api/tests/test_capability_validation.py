@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from teensy_daq import (
+from thingdaq import (
     ChecksumAlgorithm,
     DAQConfiguration,
     DeviceCapabilityError,
@@ -13,7 +13,7 @@ from teensy_daq import (
     SimulatedDevice,
     Source,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     UnexpectedMessageError,
     decode_frame,
 )
@@ -66,7 +66,7 @@ class RewritingStartDevice(SimulatedDevice):
 class CapabilityDrivenConfigurationTests(unittest.TestCase):
     def test_exact_rate_and_resolution_requirements_are_sent_and_echoed(self) -> None:
         transport = CountingTransport()
-        with TeensyDAQ.open(transport) as daq:
+        with ThingDAQ.open(transport) as daq:
             applied = daq.configure(
                 adc=True,
                 gpio=True,
@@ -84,7 +84,7 @@ class CapabilityDrivenConfigurationTests(unittest.TestCase):
 
     def test_unsupported_requirements_fail_before_configure_is_written(self) -> None:
         transport = CountingTransport()
-        with TeensyDAQ.open(transport) as daq:
+        with ThingDAQ.open(transport) as daq:
             cases = (
                 ({"adc_pair_rate_hz": 999_999}, "ADC pair rate"),
                 ({"gpio_sample_rate_hz": 3_999_999}, "GPIO sample rate"),
@@ -118,7 +118,7 @@ class CapabilityDrivenConfigurationTests(unittest.TestCase):
 
     def test_configure_and_start_reject_changed_applied_echoes(self) -> None:
         with (
-            TeensyDAQ.open(InMemoryTransport(RewritingConfigureDevice())) as daq,
+            ThingDAQ.open(InMemoryTransport(RewritingConfigureDevice())) as daq,
             self.assertRaisesRegex(
                 UnexpectedMessageError,
                 "CONFIGURE applied configuration differs",
@@ -130,7 +130,7 @@ class CapabilityDrivenConfigurationTests(unittest.TestCase):
                 source=Source.SYNTHETIC,
             )
 
-        with TeensyDAQ.open(InMemoryTransport(RewritingStartDevice())) as daq:
+        with ThingDAQ.open(InMemoryTransport(RewritingStartDevice())) as daq:
             daq.configure(
                 adc=True,
                 gpio=False,

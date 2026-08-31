@@ -5,7 +5,7 @@
 
 #include "adc_dma_capture.h"
 
-namespace teensy_daq::adc_capture {
+namespace thingdaq::adc_capture {
 
 struct HardwareChannelSnapshot {
   std::uint32_t dmamux_chcfg = 0U;
@@ -59,4 +59,4 @@ class TeensyAdcDmaCapture final : public HardwareCapture {
 // Singleton backed by fixed eDMA channels 0/1 and cache-line-aligned OCRAM.
 TeensyAdcDmaCapture &teensyAdcDmaCapture();
 
-}  // namespace teensy_daq::adc_capture
+}  // namespace thingdaq::adc_capture

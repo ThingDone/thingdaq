@@ -12,12 +12,12 @@
 
 namespace {
 
-namespace capture = teensy_daq::gpio_capture;
-namespace constants = teensy_daq::protocol_v1;
-namespace packet = teensy_daq::packet;
-namespace packer = teensy_daq::gpio_packer;
-namespace stats = teensy_daq::stats;
-namespace wire = teensy_daq::protocol;
+namespace capture = thingdaq::gpio_capture;
+namespace constants = thingdaq::protocol_v1;
+namespace packet = thingdaq::packet;
+namespace packer = thingdaq::gpio_packer;
+namespace stats = thingdaq::stats;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 
@@ -30,11 +30,11 @@ void expect(bool condition, const std::string &message) {
 
 constexpr std::uint32_t rawWord(std::uint8_t packed,
                                 std::uint32_t unrelated = 0U) {
-  std::uint32_t word = unrelated & ~teensy_daq::board::kGpio2PsrCaptureMask;
+  std::uint32_t word = unrelated & ~thingdaq::board::kGpio2PsrCaptureMask;
   for (std::size_t bit = 0U; bit < 8U; ++bit) {
     if ((packed & (std::uint8_t{1U} << bit)) != 0U) {
       word |= std::uint32_t{1U}
-              << teensy_daq::board::kGpioMappingsByPackedBit[bit].gpio2_bit;
+              << thingdaq::board::kGpioMappingsByPackedBit[bit].gpio2_bit;
     }
   }
   return word;
@@ -79,7 +79,7 @@ class FakeRawSource final : public capture::RawWordSource {
     result.handle.lease = static_cast<std::uint32_t>(next_batch_ + 1U);
     result.handle.buffer_index =
         static_cast<std::uint8_t>(next_batch_ %
-                                  teensy_daq::board::kGpioRawDmaRingDepth);
+                                  thingdaq::board::kGpioRawDmaRingDepth);
     result.status = capture::OperationStatus::kOk;
     return result;
   }
@@ -336,10 +336,10 @@ void testPackedRingPressureStaysBoundedAndVisible() {
          "start packed-pressure packer epoch");
 
   const packer::ServiceReport filled = gpio.service(fixture.pipeline, 5U, 0U);
-  expect(filled.frames_packed == teensy_daq::board::kGpioPackedRingDepth &&
+  expect(filled.frames_packed == thingdaq::board::kGpioPackedRingDepth &&
              filled.frames_dropped == 1U &&
              gpio.snapshot(fixture.pipeline).ready_depth ==
-                 teensy_daq::board::kGpioPackedRingDepth,
+                 thingdaq::board::kGpioPackedRingDepth,
          "fixed packed ring drops a complete fifth frame without allocation");
   const packer::ServiceReport drained = gpio.service(fixture.pipeline, 0U, 4U);
   expect(drained.frames_framed == 4U,
@@ -370,7 +370,7 @@ void testPackedRingPressureStaysBoundedAndVisible() {
              snapshot.progress.packer_drop_samples_projected == 4048U &&
              snapshot.progress.samples_dropped == 4048U &&
              snapshot.ready_high_water ==
-                 teensy_daq::board::kGpioPackedRingDepth,
+                 thingdaq::board::kGpioPackedRingDepth,
          "pressure counters and high-water mark are exact");
   gpio.stopProduction();
   fixture.pipeline.stopProduction();

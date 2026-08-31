@@ -3,7 +3,7 @@ type: report
 title: Phase 10 Package Local Gate
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-10
   - python-package
   - clean-install
@@ -60,10 +60,10 @@ the sdist first and then built the wheel from that sdist.
 
 | Build | Artifact | Bytes | Archive SHA-256 |
 | --- | --- | ---: | --- |
-| A | `teensy_daq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
-| B | `teensy_daq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
-| A | `teensy_daq_local-0.10.0.tar.gz` | 195,939 | `67285e6a10cd1d384e01e438f0b54ee12404e61924c646aa25ce538913e52f22` |
-| B | `teensy_daq_local-0.10.0.tar.gz` | 195,928 | `831be5170b8ed2f498724eaa1c4bc241d39ad0722861347eab6f80f498c5a420` |
+| A | `thingdaq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
+| B | `thingdaq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
+| A | `thingdaq_local-0.10.0.tar.gz` | 195,939 | `67285e6a10cd1d384e01e438f0b54ee12404e61924c646aa25ce538913e52f22` |
+| B | `thingdaq_local-0.10.0.tar.gz` | 195,928 | `831be5170b8ed2f498724eaa1c4bc241d39ad0722861347eab6f80f498c5a420` |
 
 The two wheel containers are byte-for-byte identical. The gzip-wrapped sdist
 containers are not byte-identical, so their distinct sizes and hashes are
@@ -104,7 +104,7 @@ A separate fresh CPython 3.12.3 environment installed the source distribution
 with `[dev,numpy]`. It resolved PySerial 3.5, NumPy 2.5.2, pytest 9.1.1, Ruff
 0.16.5, MyPy 2.3.1, `build` 1.6.0, and the declared type stubs; `pip check`,
 isolated import, both console workflows, the full demo, and all nine examples
-passed. Strict MyPy consumer snippets imported `TeensyDAQ` and the optional
+passed. Strict MyPy consumer snippets imported `ThingDAQ` and the optional
 `ADCArrayView` from both the wheel and sdist installs, proving the installed
 PEP 561 marker and annotations are usable without an editable source tree.
 
@@ -125,12 +125,12 @@ the host was Linux 6.17.0-35-generic x86-64.
 .venv/bin/python tools/generate_protocol.py --check
 .venv/bin/python -m ruff format --check daq_api firmware tools
 .venv/bin/python -m ruff check daq_api firmware tools
-.venv/bin/python -m mypy daq_api/src/teensy_daq
+.venv/bin/python -m mypy daq_api/src/thingdaq
 .venv/bin/python -m pytest -q
 
 <clean-numpy-sdist-python> -m ruff format --check daq_api firmware tools
 <clean-numpy-sdist-python> -m ruff check daq_api firmware tools
-<clean-numpy-sdist-python> -m mypy daq_api/src/teensy_daq
+<clean-numpy-sdist-python> -m mypy daq_api/src/thingdaq
 <clean-numpy-sdist-python> -m pytest -q
 ```
 

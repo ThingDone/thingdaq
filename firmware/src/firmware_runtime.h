@@ -12,7 +12,7 @@
 #include "synthetic_source.h"
 #include "usb_transport.h"
 
-namespace teensy_daq::runtime {
+namespace thingdaq::runtime {
 
 struct LoopReport : acquisition::Report {
   usb::ServiceReport receive{};
@@ -128,4 +128,4 @@ class FirmwareRuntime {
   std::size_t transport_response_queue_high_water_ = 0U;
 };
 
-}  // namespace teensy_daq::runtime
+}  // namespace thingdaq::runtime

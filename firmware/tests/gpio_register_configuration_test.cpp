@@ -12,9 +12,9 @@
 
 namespace {
 
-namespace board = teensy_daq::board;
-namespace capture = teensy_daq::gpio_capture;
-namespace route = teensy_daq::gpio_dma_route;
+namespace board = thingdaq::board;
+namespace capture = thingdaq::gpio_capture;
+namespace route = thingdaq::gpio_dma_route;
 
 int failures = 0;
 

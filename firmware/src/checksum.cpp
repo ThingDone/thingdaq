@@ -3,20 +3,20 @@
 #include <array>
 #include <cstring>
 
-namespace teensy_daq::checksum {
+namespace thingdaq::checksum {
 namespace detail {
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(section_name) \
+#define THINGDAQ_CHECKSUM_TABLE_STORAGE(section_name) \
   __attribute__((section(section_name), used))
-#define TEENSY_DAQ_CHECKSUM_CODE_STORAGE(section_name) \
+#define THINGDAQ_CHECKSUM_CODE_STORAGE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
-#define TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE __attribute__((optimize("O3")))
+#define THINGDAQ_CHECKSUM_CRC_OPTIMIZE __attribute__((optimize("O3")))
 #else
-#define TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(section_name)
-#define TEENSY_DAQ_CHECKSUM_CODE_STORAGE(section_name) \
+#define THINGDAQ_CHECKSUM_TABLE_STORAGE(section_name)
+#define THINGDAQ_CHECKSUM_CODE_STORAGE(section_name) \
   __attribute__((noinline))
-#define TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE
+#define THINGDAQ_CHECKSUM_CRC_OPTIMIZE
 #endif
 
 using ReflectedCrcTable =
@@ -43,10 +43,10 @@ constexpr ReflectedCrcTable makeReflectedCrcTable(std::uint32_t polynomial) {
 }
 
 extern const ReflectedCrcTable kCrc32cTable
-    TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(".progmem.checksum.crc32c") =
+    THINGDAQ_CHECKSUM_TABLE_STORAGE(".progmem.checksum.crc32c") =
         makeReflectedCrcTable(kCrc32cReflectedPolynomial);
 extern const ReflectedCrcTable kCrc32IsoHdlcTable
-    TEENSY_DAQ_CHECKSUM_TABLE_STORAGE(".progmem.checksum.crc32_iso_hdlc") =
+    THINGDAQ_CHECKSUM_TABLE_STORAGE(".progmem.checksum.crc32_iso_hdlc") =
         makeReflectedCrcTable(kCrc32IsoHdlcReflectedPolynomial);
 
 template <const ReflectedCrcTable &Table>
@@ -93,7 +93,7 @@ std::uint32_t reflectedCrc32(const std::uint8_t *data, std::size_t size) {
 
 }  // namespace detail
 
-TEENSY_DAQ_CHECKSUM_CODE_STORAGE(".text.checksum.adler32")
+THINGDAQ_CHECKSUM_CODE_STORAGE(".text.checksum.adler32")
 std::uint32_t adler32(const std::uint8_t *data, std::size_t size) {
   // RFC 1950/zlib's NMAX bound keeps both sums inside uint32_t while moving
   // division out of the per-byte high-rate framing loop.
@@ -118,19 +118,19 @@ std::uint32_t adler32(const std::uint8_t *data, std::size_t size) {
   return (second << 16U) | first;
 }
 
-TEENSY_DAQ_CHECKSUM_CODE_STORAGE(".text.checksum.crc32c")
-TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE
+THINGDAQ_CHECKSUM_CODE_STORAGE(".text.checksum.crc32c")
+THINGDAQ_CHECKSUM_CRC_OPTIMIZE
 std::uint32_t crc32c(const std::uint8_t *data, std::size_t size) {
   return detail::reflectedCrc32<detail::kCrc32cTable>(data, size);
 }
 
-TEENSY_DAQ_CHECKSUM_CODE_STORAGE(".text.checksum.crc32_iso_hdlc")
-TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE
+THINGDAQ_CHECKSUM_CODE_STORAGE(".text.checksum.crc32_iso_hdlc")
+THINGDAQ_CHECKSUM_CRC_OPTIMIZE
 std::uint32_t crc32IsoHdlc(const std::uint8_t *data, std::size_t size) {
   return detail::reflectedCrc32<detail::kCrc32IsoHdlcTable>(data, size);
 }
 
-TEENSY_DAQ_CHECKSUM_CODE_STORAGE(".text.checksum.dispatch")
+THINGDAQ_CHECKSUM_CODE_STORAGE(".text.checksum.dispatch")
 bool compute(Algorithm algorithm, const std::uint8_t *data, std::size_t size,
              std::uint32_t &result) {
   if (data == nullptr && size != 0U) {
@@ -150,8 +150,8 @@ bool compute(Algorithm algorithm, const std::uint8_t *data, std::size_t size,
   return false;
 }
 
-}  // namespace teensy_daq::checksum
+}  // namespace thingdaq::checksum
 
-#undef TEENSY_DAQ_CHECKSUM_CODE_STORAGE
-#undef TEENSY_DAQ_CHECKSUM_CRC_OPTIMIZE
-#undef TEENSY_DAQ_CHECKSUM_TABLE_STORAGE
+#undef THINGDAQ_CHECKSUM_CODE_STORAGE
+#undef THINGDAQ_CHECKSUM_CRC_OPTIMIZE
+#undef THINGDAQ_CHECKSUM_TABLE_STORAGE

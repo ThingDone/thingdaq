@@ -6,7 +6,7 @@
 
 #include "generated/protocol_constants.h"
 
-namespace teensy_daq::protocol {
+namespace thingdaq::protocol {
 
 struct ByteView {
   const std::uint8_t *data = nullptr;
@@ -842,4 +842,4 @@ static_assert(protocol_v1::kMaxCommandFrameBytes <=
 static_assert(kCommandParserStorageBytes ==
               protocol_v1::kMaxCommandFrameBytes + 3U);
 
-}  // namespace teensy_daq::protocol
+}  // namespace thingdaq::protocol

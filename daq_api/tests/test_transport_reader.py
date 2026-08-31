@@ -8,7 +8,7 @@ import unittest
 from collections.abc import Callable
 
 import serial
-from teensy_daq import (
+from thingdaq import (
     BackgroundReader,
     ByteTransport,
     CommandResponse,
@@ -36,8 +36,8 @@ from teensy_daq import (
     encode_frame,
     synthetic_adc_payload,
 )
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.models import ResponseValue
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.models import ResponseValue
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 1.0) -> None:

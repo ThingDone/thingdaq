@@ -29,9 +29,7 @@ class SoakCandidateFreezeTests(unittest.TestCase):
         self.assertIn("firmware/soak/validator.py", relative)
         self.assertIn("firmware/tests/generated/rig_soak_synthetic.py", relative)
         self.assertIn("firmware/src/generated/protocol_constants.h", relative)
-        self.assertIn(
-            "daq_api/src/teensy_daq/_generated/protocol_constants.py", relative
-        )
+        self.assertIn("daq_api/src/thingdaq/_generated/protocol_constants.py", relative)
         self.assertIn("protocol/fixtures/manifest.json", relative)
         self.assertIn("firmware/tools/freeze_soak_candidate.py", relative)
         self.assertFalse(any("__pycache__" in path for path in relative))
@@ -96,7 +94,7 @@ class SoakCandidateFreezeTests(unittest.TestCase):
                     "artifact_name": "firmware.hex",
                     "artifact_sha256": "a" * 64,
                     "source_id": "b" * 64,
-                    "build_id": "tdaq-bbbbbbbbbbbbbbbb",
+                    "build_id": "thingdaq-bbbbbbbbbbbbbbbb",
                     "fqbn": "test:fqbn",
                 },
                 "protected": {
@@ -152,7 +150,7 @@ class SoakCandidateFreezeTests(unittest.TestCase):
             "target": {"fqbn": "test:fqbn"},
             "source": {
                 "source_id": "b" * 64,
-                "build_id": "tdaq-bbbbbbbbbbbbbbbb",
+                "build_id": "thingdaq-bbbbbbbbbbbbbbbb",
                 "firmware_inputs_clean": True,
                 "firmware_input_changes": [],
             },
@@ -181,7 +179,7 @@ class SoakCandidateFreezeTests(unittest.TestCase):
                                 },
                                 "firmware": {
                                     "source_id": "b" * 64,
-                                    "build_id": "tdaq-bbbbbbbbbbbbbbbb",
+                                    "build_id": "thingdaq-bbbbbbbbbbbbbbbb",
                                 },
                                 "board": {"fqbn": "test:fqbn"},
                             }

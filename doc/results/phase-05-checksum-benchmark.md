@@ -3,7 +3,7 @@ type: report
 title: Phase 05 Checksum Benchmark
 created: 2026-08-28
 tags:
-  - teensy-daq
+  - thingdaq
   - checksum
   - benchmark
   - hardware-validation
@@ -42,7 +42,7 @@ queue exhaustion was observed, and every command remained inside the
 | --- | --- |
 | Selected algorithm | PASS: standard Adler-32, checksum ID 1 |
 | Local regressions | PASS: generated contract, format/lint, typing, complete Python/host-C++ suite, package build, and pinned target build |
-| Artifact identity | PASS: one `tdaq-c98936587626449d` image and one HEX SHA-256 in all three jobs |
+| Artifact identity | PASS: one `thingdaq-c98936587626449d` image and one HEX SHA-256 in all three jobs |
 | Consecutive physical runs | PASS: 3/3, strictly sequential after healthy empty-queue preflights |
 | Target benchmark stability | PASS: one Q16.16-unit hot/cold cycles-per-byte range, fixed digest and cold-cache setup count |
 | Stream correctness | PASS: every frame/trailer/pattern/sequence/timestamp checked; all error fields zero |
@@ -84,7 +84,7 @@ optimization attributes.
 
 | Build property | Value |
 | --- | --- |
-| Build ID / source ID | `tdaq-c98936587626449d` / `c98936587626449dc934385cfc98645d6902cea9fb8b573b29b633ec13795340` |
+| Build ID / source ID | `thingdaq-c98936587626449d` / `c98936587626449dc934385cfc98645d6902cea9fb8b573b29b633ec13795340` |
 | Deterministic build timestamp | `2026-08-28T16:09:02Z` |
 | HEX | 184,397 bytes; SHA-256 `5bc66a481495b8df342c7500ff2daa053acc63ccea322ddc7b337ff6e0beff96` |
 | ELF | 825,012 bytes; SHA-256 `b2f65833c0e0b049cf1ed215fd0a3981779f41ef6b868d96cdbe6936bf41853b` |

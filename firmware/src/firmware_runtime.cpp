@@ -1,13 +1,13 @@
 #include "firmware_runtime.h"
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_RUNTIME_COLD_CODE(section_name) \
+#define THINGDAQ_RUNTIME_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_RUNTIME_COLD_CODE(section_name)
+#define THINGDAQ_RUNTIME_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::runtime {
+namespace thingdaq::runtime {
 namespace {
 
 std::uint32_t counterDelta(std::uint32_t current, std::uint32_t baseline) {
@@ -16,7 +16,7 @@ std::uint32_t counterDelta(std::uint32_t current, std::uint32_t baseline) {
 
 }  // namespace
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.begin")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.begin")
 bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
   return control_.completeBoot(hardware_serial,
                                acquisition_controller_.initialize());
@@ -208,7 +208,7 @@ LoopReport FirmwareRuntime::service() {
   return report;
 }
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.physical_fault")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.physical_fault")
 void FirmwareRuntime::recoverPhysicalFault(std::uint64_t now_ticks,
                                            LoopReport &report) {
   report.recovered_to_idle = control_.recoverToIdle();
@@ -221,7 +221,7 @@ void FirmwareRuntime::recoverPhysicalFault(std::uint64_t now_ticks,
   applyPendingEvents(control_.takePendingEvents(), now_ticks, report);
 }
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.pending_events")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.pending_events")
 void FirmwareRuntime::applyPendingEvents(
     const control::PendingEvents &events, std::uint64_t now_ticks,
     LoopReport &report) {
@@ -283,7 +283,7 @@ void FirmwareRuntime::applyPendingEvents(
   }
 }
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.publish_statistics")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.publish_statistics")
 void FirmwareRuntime::publishPacketStatistics() {
   const bool data_generation_active =
       packet_stats_generation_ != 0U &&
@@ -402,7 +402,7 @@ void FirmwareRuntime::publishPacketStatistics() {
   control_.statistics().publishUsb(usb);
 }
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.reset_transport_statistics")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.reset_transport_statistics")
 void FirmwareRuntime::resetTransportStatisticsEpoch() {
   transport_stats_baseline_ = transport_.snapshot();
   transport_command_queue_high_water_ =
@@ -411,7 +411,7 @@ void FirmwareRuntime::resetTransportStatisticsEpoch() {
       transport_stats_baseline_.response_queue_depth;
 }
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.observe_transport_queues")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.observe_transport_queues")
 void FirmwareRuntime::observeTransportQueueDepths() {
   const usb::TransportSnapshot transport = transport_.snapshot();
   if (transport.command_queue_depth > transport_command_queue_high_water_) {
@@ -422,13 +422,13 @@ void FirmwareRuntime::observeTransportQueueDepths() {
   }
 }
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.quiescence")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.quiescence")
 bool FirmwareRuntime::dataPathQuiescent() const {
   return packet_pipeline_.quiescent() && !synthetic_source_.running() &&
          acquisition_controller_.quiescent();
 }
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.gpio_diagnostic_response")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.gpio_diagnostic_response")
 protocol::GpioCaptureDiagnosticResponse
 FirmwareRuntime::gpioDiagnosticResponse(
     const gpio_diagnostic::Runner &runner,
@@ -512,7 +512,7 @@ FirmwareRuntime::gpioDiagnosticResponse(
   return response;
 }
 
-TEENSY_DAQ_RUNTIME_COLD_CODE(".flashmem.runtime.response_recovery")
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.response_recovery")
 void FirmwareRuntime::recoverResponsePath(
     const protocol::Request &request, protocol::ControlFrame &response,
     bool transport_already_recorded, LoopReport &report) {
@@ -535,6 +535,6 @@ void FirmwareRuntime::recoverResponsePath(
       transport_.abandonResponseReservation();
 }
 
-#undef TEENSY_DAQ_RUNTIME_COLD_CODE
+#undef THINGDAQ_RUNTIME_COLD_CODE
 
-}  // namespace teensy_daq::runtime
+}  // namespace thingdaq::runtime

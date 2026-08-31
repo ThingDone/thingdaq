@@ -21,11 +21,11 @@ Linker output sections
 Demangled nm --print-size records
 20002ac0 00069000 b (anonymous namespace)::packet_storage_primary
 20200000 0005f000 b (anonymous namespace)::packet_storage_reserve
-2025f000 00000300 B teensy_daq::adc_capture::g_adc_dma_descriptors
-2025f300 00000020 B teensy_daq::adc_capture::g_adc_dma_overflow_sink
-2025f320 00007f00 B teensy_daq::adc_capture::g_adc_dma_buffers
-20268220 00003f80 B teensy_daq::gpio_packer::g_gpio_packed_buffers
-2026c1c0 000000a0 B teensy_daq::gpio_capture::g_gpio_raw_dma_descriptors
-2026c260 00000020 B teensy_daq::gpio_capture::g_gpio_raw_dma_overflow_sink
-2026c280 0000fd00 B teensy_daq::gpio_capture::g_gpio_raw_dma_buffers
+2025f000 00000300 B thingdaq::adc_capture::g_adc_dma_descriptors
+2025f300 00000020 B thingdaq::adc_capture::g_adc_dma_overflow_sink
+2025f320 00007f00 B thingdaq::adc_capture::g_adc_dma_buffers
+20268220 00003f80 B thingdaq::gpio_packer::g_gpio_packed_buffers
+2026c1c0 000000a0 B thingdaq::gpio_capture::g_gpio_raw_dma_descriptors
+2026c260 00000020 B thingdaq::gpio_capture::g_gpio_raw_dma_overflow_sink
+2026c280 0000fd00 B thingdaq::gpio_capture::g_gpio_raw_dma_buffers
 2027d000 00002000 b txbuffer

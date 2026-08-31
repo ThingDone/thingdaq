@@ -9,7 +9,7 @@ import unittest
 from dataclasses import dataclass
 from pathlib import Path
 
-from teensy_daq import compute_checksum, decode_frame, encode_frame
+from thingdaq import compute_checksum, decode_frame, encode_frame
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"

@@ -2,7 +2,7 @@
 
 #include "gpio_raw_capture.h"
 
-namespace teensy_daq::gpio_capture {
+namespace thingdaq::gpio_capture {
 
 struct HardwareSnapshot {
   Snapshot ring{};
@@ -44,4 +44,4 @@ class TeensyRawCapture final : public HardwareCapture {
 
 TeensyRawCapture &teensyRawCapture();
 
-}  // namespace teensy_daq::gpio_capture
+}  // namespace thingdaq::gpio_capture

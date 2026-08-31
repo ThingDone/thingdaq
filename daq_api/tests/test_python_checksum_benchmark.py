@@ -5,20 +5,20 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from teensy_daq import (
+from thingdaq import (
     HOST_SUPPORTED_CHECKSUM_ALGORITHMS,
     ADCBlock,
     ChecksumAlgorithm,
     DeviceState,
     Status,
-    TeensyDAQ,
+    ThingDAQ,
     UnsupportedChecksumError,
     checksum_backend,
     compute_checksum,
 )
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.checksum import _compute_checksum_fallback
-from teensy_daq.checksum_benchmark import (
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.checksum import _compute_checksum_fallback
+from thingdaq.checksum_benchmark import (
     HostChecksumBenchmarkResult,
     benchmark_checksum_throughput,
     benchmark_report,
@@ -55,7 +55,7 @@ class PythonChecksumBackendTests(unittest.TestCase):
 
     def test_missing_backend_fails_with_the_wire_algorithm_id(self) -> None:
         with (
-            patch("teensy_daq.protocol.compute_checksum_value", return_value=None),
+            patch("thingdaq.protocol.compute_checksum_value", return_value=None),
             self.assertRaisesRegex(
                 UnsupportedChecksumError,
                 "unsupported checksum algorithm 2",
@@ -95,7 +95,7 @@ class PythonChecksumBenchmarkTests(unittest.TestCase):
             self.assertGreater(result.validation.minimum_bytes_per_second, 0)
 
         report = benchmark_report(results)
-        self.assertEqual("teensy-daq-python-checksum-benchmark-v1", report["schema"])
+        self.assertEqual("thingdaq-python-checksum-benchmark-v1", report["schema"])
         self.assertFalse(report["performance_is_wire_compatibility"])
 
         with self.assertRaisesRegex(ValueError, "batch_count"):
@@ -117,7 +117,7 @@ class ChecksumMetadataTests(unittest.TestCase):
         for algorithm in sorted(HOST_SUPPORTED_CHECKSUM_ALGORITHMS, key=int):
             with (
                 self.subTest(algorithm=algorithm.name),
-                TeensyDAQ.simulated() as daq,
+                ThingDAQ.simulated() as daq,
             ):
                 self.assertEqual(
                     constants.DEFAULT_CHECKSUM_ALGORITHM,

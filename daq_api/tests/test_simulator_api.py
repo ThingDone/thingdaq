@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from teensy_daq import (
+from thingdaq import (
     AdcBlock,
     ByteTransport,
     Capability,
@@ -22,7 +22,7 @@ from teensy_daq import (
     SimulatorInputError,
     Source,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     TransportClosedError,
     UnexpectedMessageError,
     decode_frame,
@@ -32,7 +32,7 @@ from teensy_daq import (
     synthetic_adc1_code,
     synthetic_gpio_byte,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 
 class SimulatedDeviceTests(unittest.TestCase):
@@ -149,10 +149,10 @@ class SimulatedDeviceTests(unittest.TestCase):
         self.assertEqual(4, second_response.header.request_id)
 
 
-class TeensyDAQControlTests(unittest.TestCase):
+class ThingDAQControlTests(unittest.TestCase):
     def test_info_status_and_stop_are_idempotent_over_partial_io(self) -> None:
         transport = InMemoryTransport(read_chunk_size=5, write_chunk_size=2)
-        daq = TeensyDAQ.open(transport, read_size=11)
+        daq = ThingDAQ.open(transport, read_size=11)
 
         first_info = daq.info()
         second_info = daq.info()
@@ -178,7 +178,7 @@ class TeensyDAQControlTests(unittest.TestCase):
     def test_configuration_is_atomic_and_simulator_rejects_hardware_source(
         self,
     ) -> None:
-        with TeensyDAQ.simulated() as daq:
+        with ThingDAQ.simulated() as daq:
             applied = daq.configure(adc=True, gpio=False)
             self.assertEqual(StreamMask.ADC, applied.stream_mask)
             self.assertEqual(Source.SYNTHETIC, applied.source)
@@ -214,7 +214,7 @@ class TeensyDAQControlTests(unittest.TestCase):
                 self.assertEqual(checksum, daq.status().data_checksum_algorithm)
 
     def test_start_rejects_reentry_and_allocates_monotonic_run_ids(self) -> None:
-        with TeensyDAQ.simulated() as daq:
+        with ThingDAQ.simulated() as daq:
             daq.configure()
             first_run = daq.start()
 
@@ -230,7 +230,7 @@ class TeensyDAQControlTests(unittest.TestCase):
             self.assertEqual(first_run + 1, second_run)
 
     def test_state_transitions_and_queries_are_stable_in_every_state(self) -> None:
-        with TeensyDAQ.simulated(read_chunk_size=7, write_chunk_size=3) as daq:
+        with ThingDAQ.simulated(read_chunk_size=7, write_chunk_size=3) as daq:
             idle_info = daq.info()
             self.assertEqual(DeviceState.IDLE, idle_info.device_state)
             self.assertEqual(daq.status(), daq.status())
@@ -264,10 +264,10 @@ class TeensyDAQControlTests(unittest.TestCase):
             self.assertIsNone(daq.configuration)
 
 
-class TeensyDAQStreamingTests(unittest.TestCase):
+class ThingDAQStreamingTests(unittest.TestCase):
     def test_every_advertised_checksum_streams_through_the_shared_codec(self) -> None:
         for checksum in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
-            with self.subTest(checksum=checksum.name), TeensyDAQ.simulated() as daq:
+            with self.subTest(checksum=checksum.name), ThingDAQ.simulated() as daq:
                 applied = daq.configure(
                     Configuration(
                         stream_mask=StreamMask.ADC,
@@ -285,7 +285,7 @@ class TeensyDAQStreamingTests(unittest.TestCase):
                 daq.stop()
 
     def test_active_run_identity_rejects_stale_data_blocks(self) -> None:
-        with TeensyDAQ.simulated() as daq:
+        with ThingDAQ.simulated() as daq:
             daq.configure(adc=True, gpio=False)
             active_run = daq.start()
             stale = AdcBlock(
@@ -303,7 +303,7 @@ class TeensyDAQStreamingTests(unittest.TestCase):
         self,
     ) -> None:
         transport = InMemoryTransport(read_chunk_size=17, write_chunk_size=3)
-        with TeensyDAQ.open(transport, read_size=31) as daq:
+        with ThingDAQ.open(transport, read_size=31) as daq:
             daq.configure(adc=True, gpio=True)
             run_id = daq.start()
             blocks = list(daq.blocks(4))
@@ -384,7 +384,7 @@ class TeensyDAQStreamingTests(unittest.TestCase):
 
         with (
             self.assertRaisesRegex(RuntimeError, "user failure"),
-            TeensyDAQ.open(transport) as daq,
+            ThingDAQ.open(transport) as daq,
         ):
             daq.configure()
             daq.start()
@@ -398,7 +398,7 @@ class TeensyDAQStreamingTests(unittest.TestCase):
     def test_context_manager_stops_and_closes_after_success(self) -> None:
         transport = InMemoryTransport(read_chunk_size=13, write_chunk_size=5)
 
-        with TeensyDAQ.open(transport, read_size=17) as daq:
+        with ThingDAQ.open(transport, read_size=17) as daq:
             daq.configure()
             daq.start()
             self.assertIsInstance(daq.read_block(), AdcBlock)

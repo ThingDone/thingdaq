@@ -19,7 +19,7 @@ class AdcDmaCaptureTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-adc-dma-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-adc-dma-") as directory:
             executable = Path(directory) / "adc-dma-capture-test"
             compile_result = subprocess.run(
                 [
@@ -122,7 +122,7 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "constexpr std::size_t kPairDispatchConverter = 1U",
             "static_assert(kDmaPipelineDepth == 6U)",
             "attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr)",
-            'TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")',
+            'THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")',
             "NVIC_DISABLE_IRQ(IRQ_DMA_CH0)",
             "NVIC_ENABLE_IRQ(IRQ_DMA_CH1)",
             "recordAdcEtcError",

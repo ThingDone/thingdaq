@@ -16,18 +16,18 @@ import unittest
 from collections.abc import Iterable
 from pathlib import Path
 
-from teensy_daq import (
+from thingdaq import (
     ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
     GPIOBlock,
     IncrementalFrameParser,
-    TeensyDAQ,
+    ThingDAQ,
     UnsupportedChecksumError,
     compute_checksum,
     decode_frame,
     encode_frame,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIRMWARE_SOURCE = REPOSITORY_ROOT / "firmware/src"
@@ -156,7 +156,7 @@ class CrossLanguageChecksumCorrectnessTests(unittest.TestCase):
                 expected.extend(struct.pack("<I", reference))
 
         with tempfile.TemporaryDirectory(
-            prefix="teensy-daq-checksum-correctness-"
+            prefix="thingdaq-checksum-correctness-"
         ) as directory:
             temporary = Path(directory)
             executable = temporary / "checksum-correctness-test"
@@ -368,7 +368,7 @@ class ChecksumNegotiationRegressionTests(unittest.TestCase):
     def test_each_negotiated_algorithm_survives_a_complete_configuration_run(
         self,
     ) -> None:
-        with TeensyDAQ.simulated() as daq:
+        with ThingDAQ.simulated() as daq:
             for algorithm in ALGORITHMS:
                 with self.subTest(algorithm=algorithm.name):
                     applied = daq.configure(

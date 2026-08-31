@@ -6,9 +6,9 @@
 
 namespace {
 
-namespace clock_diagnostic = teensy_daq::gpio_clock;
-namespace constants = teensy_daq::protocol_v1;
-namespace wire = teensy_daq::protocol;
+namespace clock_diagnostic = thingdaq::gpio_clock;
+namespace constants = thingdaq::protocol_v1;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 

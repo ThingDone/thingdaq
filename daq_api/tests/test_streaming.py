@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from teensy_daq import (
+from thingdaq import (
     ADCBlock,
     DeviceState,
     FrameKind,
@@ -12,7 +12,7 @@ from teensy_daq import (
     InMemoryTransport,
     SimulatedDevice,
     SyntheticPatternError,
-    TeensyDAQ,
+    ThingDAQ,
     UnexpectedStreamValidationError,
     decode_frame,
     encode_frame,
@@ -22,7 +22,7 @@ from teensy_daq import (
     validate_synthetic_adc_payload,
     validate_synthetic_gpio_payload,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 
 class FormulaCorruptDevice(SimulatedDevice):
@@ -117,7 +117,7 @@ class SyntheticPayloadValidationTests(unittest.TestCase):
 class StrictStreamingTests(unittest.TestCase):
     def test_strict_facade_rejects_a_formula_error_with_valid_framing(self) -> None:
         transport = InMemoryTransport(FormulaCorruptDevice())
-        with TeensyDAQ.open(transport, strict=True) as daq:
+        with ThingDAQ.open(transport, strict=True) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             with self.assertRaises(UnexpectedStreamValidationError) as raised:
@@ -127,7 +127,7 @@ class StrictStreamingTests(unittest.TestCase):
 
     def test_explicit_health_check_rejects_firmware_transport_errors(self) -> None:
         transport = InMemoryTransport()
-        with TeensyDAQ.open(transport, strict=True) as daq:
+        with ThingDAQ.open(transport, strict=True) as daq:
             daq.configure(adc=True, gpio=False)
             daq.start()
             self.assertIsInstance(daq.read_block(), ADCBlock)
@@ -149,7 +149,7 @@ class SyntheticSoakTests(unittest.TestCase):
             read_chunk_size=19,
             write_chunk_size=2,
         )
-        with TeensyDAQ.open(transport) as daq:
+        with ThingDAQ.open(transport) as daq:
             with self.assertRaises(UnexpectedStreamValidationError) as raised:
                 run_synthetic_soak(
                     daq,
@@ -164,7 +164,7 @@ class SyntheticSoakTests(unittest.TestCase):
 
     def test_soak_reports_rates_latency_queues_memory_and_exact_counters(self) -> None:
         transport = RecordingReadIntoTransport()
-        with TeensyDAQ.open(transport, read_size=64 * 1024) as daq:
+        with ThingDAQ.open(transport, read_size=64 * 1024) as daq:
             metrics = run_synthetic_soak(
                 daq,
                 frame_count=6,

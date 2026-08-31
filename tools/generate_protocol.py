@@ -16,7 +16,7 @@ from typing import Any
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
 PYTHON_OUTPUT_PATH = (
-    REPOSITORY_ROOT / "daq_api/src/teensy_daq/_generated/protocol_constants.py"
+    REPOSITORY_ROOT / "daq_api/src/thingdaq/_generated/protocol_constants.py"
 )
 CPP_OUTPUT_PATH = REPOSITORY_ROOT / "firmware/src/generated/protocol_constants.h"
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"
@@ -1132,7 +1132,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         "#include <cstddef>",
         "#include <cstdint>",
         "",
-        "namespace teensy_daq::protocol_v1 {",
+        "namespace thingdaq::protocol_v1 {",
         "",
         f'inline constexpr char kSourceSha256[] = "{source_sha256}";',
         f"inline constexpr std::uint32_t kMagic = 0x{int(contract['magic']):08X}U;",
@@ -1667,7 +1667,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             "              kDataPayloadBytes);",
             "static_assert(kGpioSamplesPerFrame == kDataPayloadBytes);",
             "",
-            "}  // namespace teensy_daq::protocol_v1",
+            "}  // namespace thingdaq::protocol_v1",
             "",
         ]
     )

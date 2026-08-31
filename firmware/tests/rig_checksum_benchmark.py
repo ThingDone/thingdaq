@@ -1343,9 +1343,11 @@ def validate_info(
     build_id = info["build_id"]
     if (
         not isinstance(build_id, str)
-        or re.fullmatch(r"tdaq-[0-9a-f]{16}", build_id) is None
+        or re.fullmatch(r"thingdaq-[0-9a-f]{16}", build_id) is None
     ):
-        raise ProtocolFailure("INFO build ID does not match tdaq-<16 lowercase hex>")
+        raise ProtocolFailure(
+            "INFO build ID does not match thingdaq-<16 lowercase hex>"
+        )
     if expected_build_id is not None and build_id != expected_build_id:
         raise ProtocolFailure(
             f"INFO build ID is {build_id}; expected {expected_build_id}"

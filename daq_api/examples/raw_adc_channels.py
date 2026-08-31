@@ -14,7 +14,7 @@ from _common import (
     print_target,
     require_info,
 )
-from teensy_daq import ADCBlock
+from thingdaq import ADCBlock
 
 
 def main() -> int:

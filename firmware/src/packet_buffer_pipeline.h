@@ -8,9 +8,9 @@
 #include "protocol.h"
 #include "usb_transport.h"
 
-namespace teensy_daq::packet {
+namespace thingdaq::packet {
 
-#if defined(TEENSY_DAQ_TESTING)
+#if defined(THINGDAQ_TESTING)
 struct PacketBufferPipelineTestAccess;
 #endif
 
@@ -374,7 +374,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   PipelineSnapshot snapshot() const;
 
  private:
-#if defined(TEENSY_DAQ_TESTING)
+#if defined(THINGDAQ_TESTING)
   friend struct PacketBufferPipelineTestAccess;
 #endif
 
@@ -466,4 +466,4 @@ static_assert(protocol_v1::kDataFrameBytes % board::kCacheLineBytes == 0U);
 static_assert(sizeof(PacketBufferPipeline) <=
               board::kPacketPipelineStateBudgetBytes);
 
-}  // namespace teensy_daq::packet
+}  // namespace thingdaq::packet

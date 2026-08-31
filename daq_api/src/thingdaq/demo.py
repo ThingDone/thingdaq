@@ -1,4 +1,4 @@
-"""Executable, entirely offline demonstration of the public Teensy DAQ API."""
+"""Executable, entirely offline demonstration of the public ThingDAQ API."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 from typing import TextIO
 
 from ._generated import protocol_constants as constants
-from .client import TeensyDAQ, TeensyDAQError
+from .client import ThingDAQ, ThingDAQError
 from .models import (
     AdcBlock,
     AdcConverter,
@@ -266,8 +266,8 @@ def run_demo(
     if output is None:
         output = sys.stdout
 
-    print("=== Teensy DAQ // OFFLINE SYNTHETIC FLIGHT ===", file=output)
-    with TeensyDAQ.simulated(
+    print("=== ThingDAQ // OFFLINE SYNTHETIC FLIGHT ===", file=output)
+    with ThingDAQ.simulated(
         read_chunk_size=parser_chunk_size,
         read_size=parser_chunk_size,
     ) as daq:
@@ -435,7 +435,7 @@ def run_demo(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the Teensy DAQ synthetic prototype entirely offline and validate "
+            "Run the ThingDAQ synthetic prototype entirely offline and validate "
             "every sample."
         )
     )
@@ -475,7 +475,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             frame_count=arguments.frame_count,
             parser_chunk_size=arguments.parser_chunk_size,
         )
-    except (DemoValidationError, TeensyDAQError) as exc:
+    except (DemoValidationError, ThingDAQError) as exc:
         print(f"FAIL      {exc}", file=sys.stderr)
         return 1
     return 0

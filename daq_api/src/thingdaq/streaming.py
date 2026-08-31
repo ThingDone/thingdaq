@@ -14,7 +14,7 @@ from ._generated import protocol_constants as constants
 from .client import (
     BlockTimeoutError,
     StreamItem,
-    TeensyDAQ,
+    ThingDAQ,
     UnexpectedStreamValidationError,
 )
 from .models import ADCBlock, GPIOBlock, HostQueueLoss, Status, StreamAnomaly, StreamGap
@@ -660,7 +660,7 @@ def _reconcile(
 
 
 def _wait_for_final_status(
-    daq: TeensyDAQ,
+    daq: ThingDAQ,
     recorder: _LatencyRecorder,
     baseline: ReaderCounters,
     *,
@@ -707,7 +707,7 @@ def _wait_for_final_status(
 
 
 def run_synthetic_soak(
-    daq: TeensyDAQ,
+    daq: ThingDAQ,
     *,
     duration: float | None = None,
     frame_count: int | None = None,

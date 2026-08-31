@@ -2,7 +2,7 @@
 
 #include <limits>
 
-namespace teensy_daq::usb {
+namespace thingdaq::usb {
 
 bool parseDecimalHardwareSerial(const std::uint16_t *code_units,
                                 std::size_t code_unit_count,
@@ -33,7 +33,7 @@ bool parseDecimalHardwareSerial(const std::uint16_t *code_units,
   return true;
 }
 
-}  // namespace teensy_daq::usb
+}  // namespace thingdaq::usb
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
 
@@ -42,35 +42,33 @@ bool parseDecimalHardwareSerial(const std::uint16_t *code_units,
 #include <usb_names.h>
 #include <usb_serial.h>
 
-static_assert(VENDOR_ID == teensy_daq::usb::kTeensyUsbSerialVendorId,
+static_assert(VENDOR_ID == thingdaq::usb::kTeensyUsbSerialVendorId,
               "pinned Teensy USB Serial VID changed");
-static_assert(PRODUCT_ID == teensy_daq::usb::kTeensyUsbSerialProductId,
+static_assert(PRODUCT_ID == thingdaq::usb::kTeensyUsbSerialProductId,
               "pinned Teensy USB Serial PID changed");
-static_assert(teensy_daq::identity::kUsbProductNameUtf16.size() == 10U);
+static_assert(thingdaq::identity::kUsbProductNameUtf16.size() == 8U);
 
 // usb_desc.c publishes this symbol as a weak alias. Supplying the strong
 // project definition changes only descriptor index 2. The core's weak serial
 // symbol and usb_init_serialnumber() remain untouched and chip-derived.
 extern "C" {
 struct usb_string_descriptor_struct usb_string_product_name = {
-    2U + teensy_daq::identity::kUsbProductNameUtf16.size() * 2U,
-    teensy_daq::usb::kUsbStringDescriptorType,
+    2U + thingdaq::identity::kUsbProductNameUtf16.size() * 2U,
+    thingdaq::usb::kUsbStringDescriptorType,
     {
-        teensy_daq::identity::kUsbProductNameUtf16[0],
-        teensy_daq::identity::kUsbProductNameUtf16[1],
-        teensy_daq::identity::kUsbProductNameUtf16[2],
-        teensy_daq::identity::kUsbProductNameUtf16[3],
-        teensy_daq::identity::kUsbProductNameUtf16[4],
-        teensy_daq::identity::kUsbProductNameUtf16[5],
-        teensy_daq::identity::kUsbProductNameUtf16[6],
-        teensy_daq::identity::kUsbProductNameUtf16[7],
-        teensy_daq::identity::kUsbProductNameUtf16[8],
-        teensy_daq::identity::kUsbProductNameUtf16[9],
+        thingdaq::identity::kUsbProductNameUtf16[0],
+        thingdaq::identity::kUsbProductNameUtf16[1],
+        thingdaq::identity::kUsbProductNameUtf16[2],
+        thingdaq::identity::kUsbProductNameUtf16[3],
+        thingdaq::identity::kUsbProductNameUtf16[4],
+        thingdaq::identity::kUsbProductNameUtf16[5],
+        thingdaq::identity::kUsbProductNameUtf16[6],
+        thingdaq::identity::kUsbProductNameUtf16[7],
     },
 };
 }
 
-namespace teensy_daq::usb {
+namespace thingdaq::usb {
 
 bool TeensyCdcByteStream::sessionOpen() const {
   return (usb_cdc_line_rtsdtr & USB_SERIAL_DTR) != 0U;
@@ -129,6 +127,6 @@ std::uint32_t hardwareSerialNumber() {
              : 0U;
 }
 
-}  // namespace teensy_daq::usb
+}  // namespace thingdaq::usb
 
 #endif

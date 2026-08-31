@@ -1,4 +1,4 @@
-"""Metadata-first discovery for physical Teensy DAQ serial devices."""
+"""Metadata-first discovery for physical ThingDAQ serial devices."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .transport import ByteTransport, SerialTransport
 
 TEENSY_USB_SERIAL_VID = 0x16C0
 TEENSY_USB_SERIAL_PID = 0x0483
-TEENSY_DAQ_PRODUCT = "Teensy DAQ"
+THINGDAQ_PRODUCT = "ThingDAQ"
 DEFAULT_DISCOVERY_TIMEOUT = 0.2
 
 
@@ -95,7 +95,7 @@ class SerialPortCandidate:
     def preferred_product(self) -> bool:
         """Whether enumeration reported the expected project product string."""
 
-        return self.product == TEENSY_DAQ_PRODUCT
+        return self.product == THINGDAQ_PRODUCT
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,7 +180,7 @@ def _optional_text(value: str | None) -> str | None:
 
 
 def _product_rank(product: str | None) -> int:
-    if product == TEENSY_DAQ_PRODUCT:
+    if product == THINGDAQ_PRODUCT:
         return 0
     if product is None:
         return 1
@@ -203,7 +203,7 @@ def enumerate_candidates(
     """Return matching Teensy USB Serial metadata without opening any port.
 
     All ``0x16C0:0x0483`` ports remain plausible because product strings may be
-    missing or cached by the operating system. Exact ``Teensy DAQ`` product
+    missing or cached by the operating system. Exact ``ThingDAQ`` product
     matches are ordered first, followed by missing and then other product
     strings. No nonmatching VID/PID is returned or opened by :func:`discover`.
     """
@@ -432,7 +432,7 @@ def select_device(
     ]
     if not matches:
         raise DeviceNotFoundError(
-            f"no discovered Teensy DAQ has hardware serial {hardware_serial!r}; "
+            f"no discovered ThingDAQ has hardware serial {hardware_serial!r}; "
             "perform a fresh discover() scan and verify USB/serial permissions"
         )
     return min(matches, key=lambda device: _candidate_sort_key(device.candidate))
@@ -440,9 +440,9 @@ def select_device(
 
 __all__ = [
     "DEFAULT_DISCOVERY_TIMEOUT",
-    "TEENSY_DAQ_PRODUCT",
     "TEENSY_USB_SERIAL_PID",
     "TEENSY_USB_SERIAL_VID",
+    "THINGDAQ_PRODUCT",
     "DeviceIdentity",
     "DeviceNotFoundError",
     "DiscoveredDevice",

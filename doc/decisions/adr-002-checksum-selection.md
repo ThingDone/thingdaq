@@ -3,7 +3,7 @@ type: analysis
 title: 'ADR 002: Checksum Selection'
 created: 2026-08-28
 tags:
-  - teensy-daq
+  - thingdaq
   - decision
   - checksum
   - crc32c
@@ -71,7 +71,7 @@ high water, so this decision does not invent one.
 
 The conservative throughput and CPU columns use the slower cold-invalidated
 OCRAM representative-frame result. All jobs used artifact
-`tdaq-b2d06f37e6cef9a7` on Teensy serial 20512460.
+`thingdaq-b2d06f37e6cef9a7` on Teensy serial 20512460.
 
 | Candidate | Job ID | Cross-language / hardware safe | Cold MB/s ≥ 81 | Cold CPU ≤ 10% | 60 s zero-loss stream | Result before latency gate |
 | --- | --- | --- | ---: | ---: | --- | --- |

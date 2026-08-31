@@ -16,10 +16,10 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.models import Configuration, Info, Status
-from teensy_daq.protocol import encode_frame
-from teensy_daq.synthetic import synthetic_adc_payload, synthetic_gpio_payload
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.models import Configuration, Info, Status
+from thingdaq.protocol import encode_frame
+from thingdaq.synthetic import synthetic_adc_payload, synthetic_gpio_payload
 
 ROOT = Path(__file__).resolve().parents[2]
 HOST_SCRIPT = ROOT / "firmware" / "tests" / "rig_host_stall_recovery.py"
@@ -401,7 +401,7 @@ class FakeRecoveryDevice:
         configuration = self.configuration
         return Info(
             device_state=self.state,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
             hardware_serial=12_345_670,
             firmware_version=(0, 9, 0),
             board_id=constants.BoardId.TEENSY_40,
@@ -686,7 +686,8 @@ class RigIndependenceAndCodecTests(unittest.TestCase):
                     imports.add(node.module.split(".", 1)[0])
             with self.subTest(script=path.name):
                 self.assertEqual(allowed, imports)
-                self.assertNotIn("teensy_daq", source)
+                self.assertNotIn("import thingdaq", source)
+                self.assertNotIn("from thingdaq", source)
                 self.assertNotIn("protocol-v1.json", source)
                 self.assertIn('os.environ.get("SERIAL_PORT")', source)
 
@@ -768,7 +769,7 @@ class RigProgramFlowTests(unittest.TestCase):
                 os.environ,
                 {
                     "BASELINE_FRAMES_PER_SOURCE": "2",
-                    "EXPECTED_BUILD_ID": "tdaq-0123456789abcdef",
+                    "EXPECTED_BUILD_ID": "thingdaq-0123456789abcdef",
                     "EXPECTED_HARDWARE_SERIAL": "12345670",
                     "RECOVERY_DEADLINE_SECONDS": "2",
                     "SERIAL_PORT": "fake-host-stall",
@@ -806,7 +807,7 @@ class RigProgramFlowTests(unittest.TestCase):
                 os.environ,
                 {
                     "CONTROL_RECOVERY_CYCLES": "100",
-                    "EXPECTED_BUILD_ID": "tdaq-0123456789abcdef",
+                    "EXPECTED_BUILD_ID": "thingdaq-0123456789abcdef",
                     "EXPECTED_HARDWARE_SERIAL": "12345670",
                     "REOPEN_DEADLINE_SECONDS": "2",
                     "REOPEN_PAUSE_SECONDS": "0",

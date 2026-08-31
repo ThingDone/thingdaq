@@ -83,7 +83,7 @@ class DocumentationIntegrityTests(unittest.TestCase):
                     action="compile",
                 ):
                     compile(code, f"{document}:{line}", "exec")
-                if "TeensyDAQ.simulated" in code:
+                if "ThingDAQ.simulated" in code:
                     runnable.append((document, line, code))
 
         self.assertEqual(3, len(runnable))

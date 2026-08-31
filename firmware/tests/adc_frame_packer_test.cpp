@@ -9,11 +9,11 @@
 
 namespace {
 
-namespace capture = teensy_daq::adc_capture;
-namespace packer = teensy_daq::adc_packer;
-namespace packet = teensy_daq::packet;
-namespace v1 = teensy_daq::protocol_v1;
-namespace wire = teensy_daq::protocol;
+namespace capture = thingdaq::adc_capture;
+namespace packer = thingdaq::adc_packer;
+namespace packet = thingdaq::packet;
+namespace v1 = thingdaq::protocol_v1;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 

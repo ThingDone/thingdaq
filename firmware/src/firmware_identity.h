@@ -9,63 +9,63 @@
 // The repository build helper supplies numeric provenance macros. Numeric
 // values survive both Arduino's sketch-discovery preprocessor and its normal
 // compiler recipe without tool-specific string-quote behavior.
-#if defined(ARDUINO) && !defined(TEENSY_DAQ_SOURCE_ID_WORD0)
+#if defined(ARDUINO) && !defined(THINGDAQ_SOURCE_ID_WORD0)
 #error "build firmware with firmware/tools/build_firmware.py"
 #endif
-#if defined(ARDUINO) && !defined(TEENSY_DAQ_SOURCE_ID_WORD1)
+#if defined(ARDUINO) && !defined(THINGDAQ_SOURCE_ID_WORD1)
 #error "build firmware with firmware/tools/build_firmware.py"
 #endif
-#if defined(ARDUINO) && !defined(TEENSY_DAQ_SOURCE_ID_WORD2)
+#if defined(ARDUINO) && !defined(THINGDAQ_SOURCE_ID_WORD2)
 #error "build firmware with firmware/tools/build_firmware.py"
 #endif
-#if defined(ARDUINO) && !defined(TEENSY_DAQ_SOURCE_ID_WORD3)
+#if defined(ARDUINO) && !defined(THINGDAQ_SOURCE_ID_WORD3)
 #error "build firmware with firmware/tools/build_firmware.py"
 #endif
-#if defined(ARDUINO) && !defined(TEENSY_DAQ_BUILD_EPOCH)
+#if defined(ARDUINO) && !defined(THINGDAQ_BUILD_EPOCH)
 #error "build firmware with firmware/tools/build_firmware.py"
 #endif
 #if defined(ARDUINO) &&                                                \
-    (!defined(TEENSY_DAQ_BUILD_YEAR) ||                               \
-     !defined(TEENSY_DAQ_BUILD_MONTH) ||                              \
-     !defined(TEENSY_DAQ_BUILD_DAY) ||                                \
-     !defined(TEENSY_DAQ_BUILD_HOUR) ||                               \
-     !defined(TEENSY_DAQ_BUILD_MINUTE) ||                             \
-     !defined(TEENSY_DAQ_BUILD_SECOND))
+    (!defined(THINGDAQ_BUILD_YEAR) ||                               \
+     !defined(THINGDAQ_BUILD_MONTH) ||                              \
+     !defined(THINGDAQ_BUILD_DAY) ||                                \
+     !defined(THINGDAQ_BUILD_HOUR) ||                               \
+     !defined(THINGDAQ_BUILD_MINUTE) ||                             \
+     !defined(THINGDAQ_BUILD_SECOND))
 #error "build firmware with firmware/tools/build_firmware.py"
 #endif
 
-#ifndef TEENSY_DAQ_SOURCE_ID_WORD0
-#define TEENSY_DAQ_SOURCE_ID_WORD0 0ULL
+#ifndef THINGDAQ_SOURCE_ID_WORD0
+#define THINGDAQ_SOURCE_ID_WORD0 0ULL
 #endif
-#ifndef TEENSY_DAQ_SOURCE_ID_WORD1
-#define TEENSY_DAQ_SOURCE_ID_WORD1 0ULL
+#ifndef THINGDAQ_SOURCE_ID_WORD1
+#define THINGDAQ_SOURCE_ID_WORD1 0ULL
 #endif
-#ifndef TEENSY_DAQ_SOURCE_ID_WORD2
-#define TEENSY_DAQ_SOURCE_ID_WORD2 0ULL
+#ifndef THINGDAQ_SOURCE_ID_WORD2
+#define THINGDAQ_SOURCE_ID_WORD2 0ULL
 #endif
-#ifndef TEENSY_DAQ_SOURCE_ID_WORD3
-#define TEENSY_DAQ_SOURCE_ID_WORD3 0ULL
+#ifndef THINGDAQ_SOURCE_ID_WORD3
+#define THINGDAQ_SOURCE_ID_WORD3 0ULL
 #endif
-#ifndef TEENSY_DAQ_BUILD_EPOCH
-#define TEENSY_DAQ_BUILD_EPOCH 0ULL
+#ifndef THINGDAQ_BUILD_EPOCH
+#define THINGDAQ_BUILD_EPOCH 0ULL
 #endif
-#ifndef TEENSY_DAQ_BUILD_YEAR
-#define TEENSY_DAQ_BUILD_YEAR 1970U
+#ifndef THINGDAQ_BUILD_YEAR
+#define THINGDAQ_BUILD_YEAR 1970U
 #endif
-#ifndef TEENSY_DAQ_BUILD_MONTH
-#define TEENSY_DAQ_BUILD_MONTH 1U
+#ifndef THINGDAQ_BUILD_MONTH
+#define THINGDAQ_BUILD_MONTH 1U
 #endif
-#ifndef TEENSY_DAQ_BUILD_DAY
-#define TEENSY_DAQ_BUILD_DAY 1U
+#ifndef THINGDAQ_BUILD_DAY
+#define THINGDAQ_BUILD_DAY 1U
 #endif
-#ifndef TEENSY_DAQ_BUILD_HOUR
-#define TEENSY_DAQ_BUILD_HOUR 0U
+#ifndef THINGDAQ_BUILD_HOUR
+#define THINGDAQ_BUILD_HOUR 0U
 #endif
-#ifndef TEENSY_DAQ_BUILD_MINUTE
-#define TEENSY_DAQ_BUILD_MINUTE 0U
+#ifndef THINGDAQ_BUILD_MINUTE
+#define THINGDAQ_BUILD_MINUTE 0U
 #endif
-#ifndef TEENSY_DAQ_BUILD_SECOND
-#define TEENSY_DAQ_BUILD_SECOND 0U
+#ifndef THINGDAQ_BUILD_SECOND
+#define THINGDAQ_BUILD_SECOND 0U
 #endif
 
 // Fail closed when an Arduino build bypasses the exact Teensy 4.0 target. The
@@ -73,33 +73,33 @@
 // these preprocessor checks prevent a copied sketch from silently degrading.
 #if defined(ARDUINO)
 #if !defined(ARDUINO_TEENSY40)
-#error "Teensy DAQ supports only ARDUINO_TEENSY40"
+#error "ThingDAQ supports only ARDUINO_TEENSY40"
 #endif
 #if !defined(__IMXRT1062__)
-#error "Teensy DAQ requires the i.MX RT1062"
+#error "ThingDAQ requires the i.MX RT1062"
 #endif
 #if !defined(F_CPU) || F_CPU != 600000000
-#error "Teensy DAQ requires the 600 MHz CPU menu option"
+#error "ThingDAQ requires the 600 MHz CPU menu option"
 #endif
 #if !defined(USB_SERIAL)
-#error "Teensy DAQ requires the USB Serial menu option"
+#error "ThingDAQ requires the USB Serial menu option"
 #endif
 #if !defined(TEENSYDUINO) || TEENSYDUINO != 160
 #error "unexpected Teensy core compile identity"
 #endif
 #if __cplusplus < 201703L
-#error "Teensy DAQ requires the pinned core's GNU C++17 mode"
+#error "ThingDAQ requires the pinned core's GNU C++17 mode"
 #endif
-#if !defined(TEENSY_DAQ_OPTIMIZATION_O2STD) || \
-    TEENSY_DAQ_OPTIMIZATION_O2STD != 1
-#error "Teensy DAQ requires the validated standard -O2 build"
+#if !defined(THINGDAQ_OPTIMIZATION_O2STD) || \
+    THINGDAQ_OPTIMIZATION_O2STD != 1
+#error "ThingDAQ requires the validated standard -O2 build"
 #endif
 #if __GNUC__ != 15 || __GNUC_MINOR__ != 2
-#error "Teensy DAQ requires Arm GNU 15.2.1"
+#error "ThingDAQ requires Arm GNU 15.2.1"
 #endif
 #endif
 
-namespace teensy_daq::identity {
+namespace thingdaq::identity {
 
 struct SemanticVersion {
   std::uint8_t major;
@@ -107,9 +107,9 @@ struct SemanticVersion {
   std::uint8_t patch;
 };
 
-inline constexpr char kProductName[] = "Teensy DAQ";
-inline constexpr std::array<std::uint16_t, 10U> kUsbProductNameUtf16{
-    'T', 'e', 'e', 'n', 's', 'y', ' ', 'D', 'A', 'Q',
+inline constexpr char kProductName[] = "ThingDAQ";
+inline constexpr std::array<std::uint16_t, 8U> kUsbProductNameUtf16{
+    'T', 'h', 'i', 'n', 'g', 'D', 'A', 'Q',
 };
 inline constexpr char kBoardName[] = "Teensy 4.0";
 inline constexpr char kMcuName[] = "NXP i.MX RT1062";
@@ -129,7 +129,7 @@ inline constexpr protocol_v1::BoardId kBoardId =
 inline constexpr protocol_v1::McuId kMcuId =
     protocol_v1::McuId::kImxrt1062;
 inline constexpr std::uint64_t kBuildTimestampEpoch =
-    static_cast<std::uint64_t>(TEENSY_DAQ_BUILD_EPOCH);
+    static_cast<std::uint64_t>(THINGDAQ_BUILD_EPOCH);
 
 constexpr bool usbProductNameMatchesIdentity() {
   if (sizeof(kProductName) != kUsbProductNameUtf16.size() + 1U) {
@@ -156,10 +156,10 @@ constexpr char hexDigit(std::uint8_t value) {
 
 constexpr std::array<char, 65U> makeSourceId() {
   constexpr std::uint64_t words[] = {
-      TEENSY_DAQ_SOURCE_ID_WORD0,
-      TEENSY_DAQ_SOURCE_ID_WORD1,
-      TEENSY_DAQ_SOURCE_ID_WORD2,
-      TEENSY_DAQ_SOURCE_ID_WORD3,
+      THINGDAQ_SOURCE_ID_WORD0,
+      THINGDAQ_SOURCE_ID_WORD1,
+      THINGDAQ_SOURCE_ID_WORD2,
+      THINGDAQ_SOURCE_ID_WORD3,
   };
   std::array<char, 65U> result{};
   std::size_t output = 0U;
@@ -174,11 +174,13 @@ constexpr std::array<char, 65U> makeSourceId() {
   return result;
 }
 
-constexpr std::array<char, 22U> makeBuildId(
+constexpr std::array<char, 26U> makeBuildId(
     const std::array<char, 65U> &source_id) {
-  std::array<char, 22U> result{'t', 'd', 'a', 'q', '-'};
+  std::array<char, 26U> result{
+      't', 'h', 'i', 'n', 'g', 'd', 'a', 'q', '-',
+  };
   for (std::size_t index = 0U; index < 16U; ++index) {
-    result[index + 5U] = source_id[index];
+    result[index + 9U] = source_id[index];
   }
   return result;
 }
@@ -188,12 +190,12 @@ constexpr char decimalDigit(std::uint32_t value) {
 }
 
 constexpr std::array<char, 21U> makeBuildTimestampUtc() {
-  constexpr std::uint32_t year = TEENSY_DAQ_BUILD_YEAR;
-  constexpr std::uint32_t month = TEENSY_DAQ_BUILD_MONTH;
-  constexpr std::uint32_t day = TEENSY_DAQ_BUILD_DAY;
-  constexpr std::uint32_t hour = TEENSY_DAQ_BUILD_HOUR;
-  constexpr std::uint32_t minute = TEENSY_DAQ_BUILD_MINUTE;
-  constexpr std::uint32_t second = TEENSY_DAQ_BUILD_SECOND;
+  constexpr std::uint32_t year = THINGDAQ_BUILD_YEAR;
+  constexpr std::uint32_t month = THINGDAQ_BUILD_MONTH;
+  constexpr std::uint32_t day = THINGDAQ_BUILD_DAY;
+  constexpr std::uint32_t hour = THINGDAQ_BUILD_HOUR;
+  constexpr std::uint32_t minute = THINGDAQ_BUILD_MINUTE;
+  constexpr std::uint32_t second = THINGDAQ_BUILD_SECOND;
   return {
       decimalDigit(year / 1000U), decimalDigit(year / 100U),
       decimalDigit(year / 10U),   decimalDigit(year),
@@ -243,22 +245,22 @@ static_assert(stringLength(kBuildId) > 0U &&
               "build ID must fit INFO's NUL-terminated 32-byte field");
 static_assert(stringLength(kBuildTimestampUtc) == 20U,
               "build timestamp must use YYYY-MM-DDTHH:MM:SSZ");
-static_assert(TEENSY_DAQ_BUILD_YEAR >= 1970U &&
-                  TEENSY_DAQ_BUILD_YEAR <= 9999U,
+static_assert(THINGDAQ_BUILD_YEAR >= 1970U &&
+                  THINGDAQ_BUILD_YEAR <= 9999U,
               "build timestamp year is outside the supported range");
-static_assert(TEENSY_DAQ_BUILD_MONTH >= 1U &&
-                  TEENSY_DAQ_BUILD_MONTH <= 12U,
+static_assert(THINGDAQ_BUILD_MONTH >= 1U &&
+                  THINGDAQ_BUILD_MONTH <= 12U,
               "build timestamp month is invalid");
-static_assert(TEENSY_DAQ_BUILD_DAY >= 1U && TEENSY_DAQ_BUILD_DAY <= 31U,
+static_assert(THINGDAQ_BUILD_DAY >= 1U && THINGDAQ_BUILD_DAY <= 31U,
               "build timestamp day is invalid");
-static_assert(TEENSY_DAQ_BUILD_HOUR <= 23U,
+static_assert(THINGDAQ_BUILD_HOUR <= 23U,
               "build timestamp hour is invalid");
-static_assert(TEENSY_DAQ_BUILD_MINUTE <= 59U,
+static_assert(THINGDAQ_BUILD_MINUTE <= 59U,
               "build timestamp minute is invalid");
-static_assert(TEENSY_DAQ_BUILD_SECOND <= 59U,
+static_assert(THINGDAQ_BUILD_SECOND <= 59U,
               "build timestamp second is invalid");
 static_assert(kSourceId.back() == '\0');
 static_assert(kBuildId.back() == '\0');
 static_assert(kBuildTimestampUtc.back() == '\0');
 
-}  // namespace teensy_daq::identity
+}  // namespace thingdaq::identity

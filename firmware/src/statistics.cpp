@@ -3,13 +3,13 @@
 #include <limits>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_STATISTICS_COLD_CODE(section_name) \
+#define THINGDAQ_STATISTICS_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_STATISTICS_COLD_CODE(section_name)
+#define THINGDAQ_STATISTICS_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::stats {
+namespace thingdaq::stats {
 namespace {
 
 template <typename Integer>
@@ -117,31 +117,31 @@ void Statistics::recordAdcStopError() {
   saturatingAdd(counters_.adc_capture.stop_errors, std::uint32_t{1U});
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(
+THINGDAQ_STATISTICS_COLD_CODE(
     ".flashmem.statistics.legacy_adc_emitted")
 void Statistics::recordAdcFrameEmitted(std::uint64_t count) {
   saturatingAdd(counters_.adc_frames_emitted, count);
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(
+THINGDAQ_STATISTICS_COLD_CODE(
     ".flashmem.statistics.legacy_gpio_emitted")
 void Statistics::recordGpioFrameEmitted(std::uint64_t count) {
   saturatingAdd(counters_.gpio_frames_emitted, count);
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(
+THINGDAQ_STATISTICS_COLD_CODE(
     ".flashmem.statistics.legacy_adc_dropped")
 void Statistics::recordAdcItemsDropped(std::uint64_t count) {
   saturatingAdd(counters_.adc_items_dropped, count);
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(
+THINGDAQ_STATISTICS_COLD_CODE(
     ".flashmem.statistics.legacy_gpio_dropped")
 void Statistics::recordGpioItemsDropped(std::uint64_t count) {
   saturatingAdd(counters_.gpio_items_dropped, count);
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_data")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_data")
 void Statistics::publishDataPath(const DataPathProgress &progress) {
   counters_.data_path = progress;
   counters_.adc_frames_emitted = progress.adc.frames_emitted;
@@ -150,7 +150,7 @@ void Statistics::publishDataPath(const DataPathProgress &progress) {
   refreshDataProjection();
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_adc_capture")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_adc_capture")
 void Statistics::publishAdcCapture(const AdcCaptureProgress &progress) {
   const AdcCaptureProgress previous = counters_.adc_capture;
   counters_.adc_capture = progress;
@@ -181,13 +181,13 @@ void Statistics::publishAdcCapture(const AdcCaptureProgress &progress) {
   refreshDataProjection();
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_adc_packer")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_adc_packer")
 void Statistics::publishAdcPacker(const AdcPackerProgress &progress) {
   counters_.adc_packer = progress;
   refreshDataProjection();
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_gpio_capture")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_gpio_capture")
 void Statistics::publishGpioRawCapture(
     const GpioRawCaptureProgress &progress) {
   const GpioRawCaptureProgress previous = counters_.gpio_raw_capture;
@@ -207,23 +207,23 @@ void Statistics::publishGpioRawCapture(
   refreshDataProjection();
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_gpio_packer")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_gpio_packer")
 void Statistics::publishGpioPacker(const GpioPackerProgress &progress) {
   counters_.gpio_packer = progress;
   refreshDataProjection();
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_packet_queues")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_packet_queues")
 void Statistics::publishPacketQueues(const PacketQueueProgress &progress) {
   counters_.packet_queue = progress;
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_usb")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_usb")
 void Statistics::publishUsb(const UsbProgress &progress) {
   counters_.usb = progress;
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.refresh_projection")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.refresh_projection")
 void Statistics::refreshDataProjection() {
   const std::uint64_t unprojected_adc_loss = subtractFloor(
       counters_.adc_capture.pairs_lost,
@@ -242,7 +242,7 @@ void Statistics::refreshDataProjection() {
       unprojected_packer_loss);
 }
 
-TEENSY_DAQ_STATISTICS_COLD_CODE(".flashmem.statistics.wire_status")
+THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.wire_status")
 protocol::StatusResponse Statistics::wireStatus(
     protocol_v1::DeviceState state,
     const protocol::Configuration &configuration) const {
@@ -490,6 +490,6 @@ protocol::StatusResponse Statistics::wireStatus(
   return response;
 }
 
-}  // namespace teensy_daq::stats
+}  // namespace thingdaq::stats
 
-#undef TEENSY_DAQ_STATISTICS_COLD_CODE
+#undef THINGDAQ_STATISTICS_COLD_CODE

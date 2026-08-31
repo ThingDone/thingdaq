@@ -6,7 +6,7 @@
 #include "firmware_identity.h"
 #include "usb_transport.h"
 
-namespace teensy_daq::usb {
+namespace thingdaq::usb {
 
 inline constexpr std::uint16_t kTeensyUsbSerialVendorId = 0x16C0U;
 inline constexpr std::uint16_t kTeensyUsbSerialProductId = 0x0483U;
@@ -34,4 +34,4 @@ std::uint32_t hardwareSerialNumber();
 
 #endif
 
-}  // namespace teensy_daq::usb
+}  // namespace thingdaq::usb

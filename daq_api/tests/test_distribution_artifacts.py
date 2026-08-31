@@ -17,7 +17,7 @@ from email.parser import Parser
 from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
-from teensy_daq import __version__
+from thingdaq import __version__
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 TEXT_MEMBER_SUFFIXES = {".cfg", ".md", ".py", ".toml", ".txt"}
@@ -92,9 +92,9 @@ class DistributionArtifactTests(unittest.TestCase):
             "captures/bulk-capture.bin": "bulk capture sentinel\n",
             "credentials/pypi-token.txt": "credential sentinel\n",
             "dist/old-build.whl": "old build sentinel\n",
-            "src/teensy_daq/captures/raw.npy": "bulk array sentinel\n",
-            "src/teensy_daq/credentials/operator.pem": "credential sentinel\n",
-            "src/teensy_daq/local-calibration.json": '{"local": true}\n',
+            "src/thingdaq/captures/raw.npy": "bulk array sentinel\n",
+            "src/thingdaq/credentials/operator.pem": "credential sentinel\n",
+            "src/thingdaq/local-calibration.json": '{"local": true}\n',
         }
         for relative, contents in bait.items():
             path = source / relative
@@ -162,11 +162,11 @@ class DistributionArtifactTests(unittest.TestCase):
     def test_wheel_contains_exact_runtime_sources_and_typed_marker(self) -> None:
         expected_runtime = {
             path.relative_to(PACKAGE_ROOT / "src").as_posix()
-            for path in (PACKAGE_ROOT / "src/teensy_daq").rglob("*.py")
+            for path in (PACKAGE_ROOT / "src/thingdaq").rglob("*.py")
         }
-        expected_runtime.add("teensy_daq/py.typed")
+        expected_runtime.add("thingdaq/py.typed")
         observed_runtime = {
-            name for name in self.wheel_files if name.startswith("teensy_daq/")
+            name for name in self.wheel_files if name.startswith("thingdaq/")
         }
 
         self.assertEqual(expected_runtime, observed_runtime)
@@ -177,9 +177,9 @@ class DistributionArtifactTests(unittest.TestCase):
     def test_sdist_contains_runtime_and_all_examples_but_not_tests(self) -> None:
         expected_runtime = {
             "src/" + path.relative_to(PACKAGE_ROOT / "src").as_posix()
-            for path in (PACKAGE_ROOT / "src/teensy_daq").rglob("*.py")
+            for path in (PACKAGE_ROOT / "src/thingdaq").rglob("*.py")
         }
-        expected_runtime.add("src/teensy_daq/py.typed")
+        expected_runtime.add("src/thingdaq/py.typed")
         expected_examples = {
             path.relative_to(PACKAGE_ROOT).as_posix()
             for path in (PACKAGE_ROOT / "examples").glob("*.py")
@@ -218,7 +218,7 @@ class DistributionArtifactTests(unittest.TestCase):
 
         for metadata in (wheel_metadata, sdist_metadata):
             with self.subTest(archive=metadata["Name"]):
-                self.assertEqual("teensy-daq-local", metadata["Name"])
+                self.assertEqual("thingdaq-local", metadata["Name"])
                 self.assertEqual(__version__, metadata["Version"])
                 self.assertEqual("<3.15,>=3.10", metadata["Requires-Python"])
                 self.assertIn(
@@ -257,9 +257,9 @@ class DistributionArtifactTests(unittest.TestCase):
         parser.read_string(self.wheel_files[entry_points_name].decode("utf-8"))
         self.assertEqual(
             {
-                "teensy-daq": "teensy_daq.cli:main",
-                "teensy-daq-demo": "teensy_daq.demo:main",
-                "teensy-daq-soak": "teensy_daq.soak:main",
+                "thingdaq": "thingdaq.cli:main",
+                "thingdaq-demo": "thingdaq.demo:main",
+                "thingdaq-soak": "thingdaq.soak:main",
             },
             dict(parser["console_scripts"]),
         )
@@ -274,14 +274,14 @@ class DistributionArtifactTests(unittest.TestCase):
         cases = (
             (
                 (
-                    "from teensy_daq.cli import main; "
+                    "from thingdaq.cli import main; "
                     "raise SystemExit(main(['info', '--simulate', '--json']))"
                 ),
                 '"device_state":"IDLE"',
             ),
             (
                 (
-                    "from teensy_daq.demo import main; "
+                    "from thingdaq.demo import main; "
                     "raise SystemExit(main(['--frame-count','1',"
                     "'--parser-chunk-size','31']))"
                 ),
@@ -289,15 +289,15 @@ class DistributionArtifactTests(unittest.TestCase):
             ),
             (
                 (
-                    "from teensy_daq.soak import main; "
+                    "from thingdaq.soak import main; "
                     "raise SystemExit(main(['--conformance-check']))"
                 ),
                 'SOAK_CONFORMANCE {"commands":',
             ),
         )
         wheel_import_guard = (
-            "import teensy_daq; "
-            "assert '.whl/' in teensy_daq.__file__.replace('\\\\', '/'); "
+            "import thingdaq; "
+            "assert '.whl/' in thingdaq.__file__.replace('\\\\', '/'); "
         )
         for program, expected in cases:
             with self.subTest(expected=expected):

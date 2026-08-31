@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 from unittest.mock import patch
 
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"

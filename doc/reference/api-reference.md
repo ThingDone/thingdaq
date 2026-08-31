@@ -3,7 +3,7 @@ type: reference
 title: API Reference
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - python
   - api
   - reference
@@ -19,14 +19,14 @@ related:
 # Python API reference
 
 This page describes the stable synchronous user surface. Import normal
-operations and immutable models from `teensy_daq`; use
-`teensy_daq.low_level` only for protocol tooling that intentionally owns raw
+operations and immutable models from `thingdaq`; use
+`thingdaq.low_level` only for protocol tooling that intentionally owns raw
 frames, parsers, readers, or byte transports.
 
 ## Entry points
 
 ```python
-from teensy_daq import TeensyDAQ, discover, enumerate_candidates, select_device
+from thingdaq import ThingDAQ, discover, enumerate_candidates, select_device
 ```
 
 | Entry point | Behavior |
@@ -34,10 +34,10 @@ from teensy_daq import TeensyDAQ, discover, enumerate_candidates, select_device
 | `enumerate_candidates()` | Metadata-only VID/PID filter; opens no ports |
 | `discover(timeout=...)` | Bounded read-only INFO probe of plausible candidates |
 | `select_device(devices, hardware_serial=...)` | Selects stable INFO/USB serial identity, never a cached port path |
-| `TeensyDAQ.open(...)` | Opens transport/device/port/discovered target or performs discovery; synchronizes stable INFO |
-| `TeensyDAQ.simulated(...)` | Opens the deterministic protocol peer through `InMemoryTransport` |
+| `ThingDAQ.open(...)` | Opens transport/device/port/discovered target or performs discovery; synchronizes stable INFO |
+| `ThingDAQ.simulated(...)` | Opens the deterministic protocol peer through `InMemoryTransport` |
 
-`TeensyDAQ.open(hardware_serial=N)` is the recommended physical selection.
+`ThingDAQ.open(hardware_serial=N)` is the recommended physical selection.
 `expected_identity=ExpectedDeviceIdentity(...)` can additionally pin exact
 firmware/build/board/MCU/protocol identity. `session_policy="adopt"` is the
 default; use `"stop"` to force an existing CONFIGURED/RUNNING device to IDLE.
@@ -251,7 +251,7 @@ available.
 
 ## CLI and examples
 
-The `teensy-daq` console script provides metadata-only `list`, INFO (`info` or
+The `thingdaq` console script provides metadata-only `list`, INFO (`info` or
 `probe`), STATUS, reconciliation, configure/start/stop/reset, and bounded
 monitor/capture commands. `--json` emits one machine-readable document.
 Capture can select raw or explicitly calibrated ADC previews, selected GPIO

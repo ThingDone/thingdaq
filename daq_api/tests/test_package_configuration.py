@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import tomllib
-from teensy_daq import __version__
+from thingdaq import __version__
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT_PATH = PACKAGE_ROOT / "pyproject.toml"
@@ -16,7 +16,7 @@ MANIFEST_PATH = PACKAGE_ROOT / "MANIFEST.in"
 PACKAGE_README_PATH = PACKAGE_ROOT / "README.md"
 PACKAGE_LICENSE_PATH = PACKAGE_ROOT / "LICENSE"
 REPOSITORY_LICENSE_PATH = PACKAGE_ROOT.parent / "LICENSE"
-TYPED_MARKER_PATH = PACKAGE_ROOT / "src/teensy_daq/py.typed"
+TYPED_MARKER_PATH = PACKAGE_ROOT / "src/thingdaq/py.typed"
 
 
 class PackageConfigurationTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class PackageConfigurationTests(unittest.TestCase):
         self.assertNotIn("version", project)
         self.assertEqual(["version"], project["dynamic"])
         self.assertEqual(
-            "teensy_daq._version.__version__",
+            "thingdaq._version.__version__",
             dynamic["version"]["attr"],
         )
         self.assertIsNotNone(
@@ -94,9 +94,9 @@ class PackageConfigurationTests(unittest.TestCase):
     def test_control_demo_and_soak_console_entry_points_are_installed(self) -> None:
         scripts = self.pyproject["project"]["scripts"]
 
-        self.assertEqual("teensy_daq.cli:main", scripts["teensy-daq"])
-        self.assertEqual("teensy_daq.demo:main", scripts["teensy-daq-demo"])
-        self.assertEqual("teensy_daq.soak:main", scripts["teensy-daq-soak"])
+        self.assertEqual("thingdaq.cli:main", scripts["thingdaq"])
+        self.assertEqual("thingdaq.demo:main", scripts["thingdaq-demo"])
+        self.assertEqual("thingdaq.soak:main", scripts["thingdaq-soak"])
 
     def test_runtime_package_data_is_an_explicit_typed_only_allowlist(self) -> None:
         setuptools = self.pyproject["tool"]["setuptools"]
@@ -104,7 +104,7 @@ class PackageConfigurationTests(unittest.TestCase):
         self.assertFalse(setuptools["include-package-data"])
         self.assertEqual(
             ["py.typed"],
-            setuptools["package-data"]["teensy_daq"],
+            setuptools["package-data"]["thingdaq"],
         )
         excluded_data = setuptools["exclude-package-data"]["*"]
         for pattern in (".env", "*.bin", "*.json", "*.key", "captures/*"):
@@ -115,8 +115,8 @@ class PackageConfigurationTests(unittest.TestCase):
     def test_source_manifest_excludes_non_runtime_inputs(self) -> None:
         manifest = MANIFEST_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("recursive-include src/teensy_daq *.py", manifest)
-        self.assertIn("include src/teensy_daq/py.typed", manifest)
+        self.assertIn("recursive-include src/thingdaq *.py", manifest)
+        self.assertIn("include src/thingdaq/py.typed", manifest)
         self.assertIn("recursive-include examples *.py", manifest)
         for excluded in (
             "prune tests",
@@ -139,7 +139,7 @@ class PackageConfigurationTests(unittest.TestCase):
         self.assertEqual(repository_license, package_license)
         self.assertIn("Copyright (c) 2026 THING DONE LLC", package_license)
         self.assertIn("Teensy®", readme)
-        self.assertIn("before any PyPI submission", readme)
+        self.assertIn("publication readiness require review", readme)
         self.assertIn("Do not reserve, upload, or publish", readme)
 
 

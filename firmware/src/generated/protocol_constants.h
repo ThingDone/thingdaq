@@ -1,13 +1,13 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: a5993a8afe9b8b42b951ed6ec3dbd2ca84b3271e4302f717e56ee3b9dcb69676
+// Source SHA-256: 014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
 
-namespace teensy_daq::protocol_v1 {
+namespace thingdaq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "a5993a8afe9b8b42b951ed6ec3dbd2ca84b3271e4302f717e56ee3b9dcb69676";
+inline constexpr char kSourceSha256[] = "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -1146,4 +1146,4 @@ static_assert(kAdcPairsPerFrame * kAdcBytesPerPair ==
               kDataPayloadBytes);
 static_assert(kGpioSamplesPerFrame == kDataPayloadBytes);
 
-}  // namespace teensy_daq::protocol_v1
+}  // namespace thingdaq::protocol_v1

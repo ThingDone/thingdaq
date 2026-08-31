@@ -8,7 +8,7 @@
 #include "board_config.h"
 #include "dma_buffer_ownership.h"
 
-namespace teensy_daq::adc_capture {
+namespace thingdaq::adc_capture {
 
 inline constexpr std::size_t kConverterCount = board::kLogicalAdcCount;
 inline constexpr std::uint8_t kAllConvertersMask =
@@ -332,4 +332,4 @@ static_assert(alignof(PairBufferStorage) == board::kCacheLineBytes);
 static_assert(sizeof(PairOverflowSink) == board::kAdcDmaOverflowSinkBytes);
 static_assert(alignof(PairOverflowSink) == board::kCacheLineBytes);
 
-}  // namespace teensy_daq::adc_capture
+}  // namespace thingdaq::adc_capture

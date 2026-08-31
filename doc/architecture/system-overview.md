@@ -4,7 +4,7 @@ title: System Overview
 created: 2026-08-27
 updated: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - architecture
   - firmware-control-plane
 related:
@@ -16,7 +16,7 @@ related:
 
 # System overview
 
-Teensy DAQ has three independently testable areas:
+ThingDAQ has three independently testable areas:
 
 - `firmware/` owns the Teensy 4.0 sketch boundary, portable C++ modules,
   repository-local build tooling, and host-compiled firmware tests.
@@ -82,7 +82,7 @@ resolved menu property equals `-O2`.
 ## USB identity and boot contract
 
 The project supplies the strong `usb_string_product_name` descriptor expected
-by the pinned core, encoded as UTF-16 `Teensy DAQ`. It does not replace the
+by the pinned core, encoded as UTF-16 `ThingDAQ`. It does not replace the
 manufacturer, serial descriptor, VID, or PID: USB Serial remains PJRC's
 legitimate `0x16C0:0x0483`, and `usb_init_serialnumber()` still derives the
 decimal serial string from the i.MX RT1062 fuse. The adapter exposes INFO's
@@ -233,7 +233,7 @@ commands.
 `firmware/tools/build_firmware.py` hashes stable relative paths and bytes for
 `firmware/firmware.ino`, every non-hidden file under `firmware/src/`, and
 `protocol/protocol-v1.json`. The full lowercase SHA-256 is the source ID. The
-wire-safe build ID is `tdaq-` followed by the first 16 source-ID digits and is
+wire-safe build ID is `thingdaq-` followed by the first 16 source-ID digits and is
 therefore well inside INFO's 31-ASCII-byte limit.
 
 Build metadata never uses C/C++ `__DATE__` or `__TIME__`. Its UTC timestamp is:
@@ -321,7 +321,7 @@ counted twice in the aggregate dropped-pair total.
 
 ## Host architecture
 
-The Python package exposes one synchronous `TeensyDAQ` facade over a minimal
+The Python package exposes one synchronous `ThingDAQ` facade over a minimal
 `ByteTransport` interface. `InMemoryTransport` and `SimulatedDevice` exercise
 that exact byte boundary, including partial reads and writes. `SerialTransport`
 implements bounded PySerial I/O, while `BackgroundReader` owns incremental
@@ -345,11 +345,11 @@ retries remain explicitly bounded, and a hot-reused path or changed image
 fails closed before any state-changing operation.
 
 `DAQConfiguration.control_only()` and
-`TeensyDAQ.configure_control_only()` remain available for probing Phase 03
+`ThingDAQ.configure_control_only()` remain available for probing Phase 03
 images; current firmware rejects that legacy profile in favor of nonempty
-synthetic or GPIO-only physical acquisition. `TeensyDAQ.simulated(control_only=True)` continues to
+synthetic or GPIO-only physical acquisition. `ThingDAQ.simulated(control_only=True)` continues to
 exercise the older schema. The
-`teensy-daq` command-line entry point lists candidates, probes identity, prints
+`thingdaq` command-line entry point lists candidates, probes identity, prints
 status, configures the advertised physical GPIO profile (with a legacy
 control-only fallback), starts, stops, and resets safe counters. Its one-shot
 configure/start commands deliberately close the PySerial handle without STOP

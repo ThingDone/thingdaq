@@ -6,7 +6,7 @@ import threading
 import unittest
 from dataclasses import dataclass
 
-from teensy_daq import (
+from thingdaq import (
     BoardId,
     ByteTransport,
     DeviceNotFoundError,
@@ -108,7 +108,7 @@ class DisconnectingProbeTransport(InfoProbeTransport):
 
 
 def _physical_info(
-    hardware_serial: int, build_id: str = "tdaq-0123456789abcdef"
+    hardware_serial: int, build_id: str = "thingdaq-0123456789abcdef"
 ) -> Info:
     return Info(
         device_state=DeviceState.IDLE,
@@ -124,7 +124,7 @@ def _candidate(
     port: str,
     hardware_serial: int,
     *,
-    product: str | None = "Teensy DAQ",
+    product: str | None = "ThingDAQ",
 ) -> FakePortMetadata:
     return FakePortMetadata(
         device=port,
@@ -246,7 +246,7 @@ class DiscoveryTests(unittest.TestCase):
                 0x9999,
                 0x0001,
                 serial_number="0",
-                product="Teensy DAQ",
+                product="ThingDAQ",
             ),
             _candidate("COM1", 101),
             _candidate("COM2", 102),
@@ -289,7 +289,7 @@ class DiscoveryTests(unittest.TestCase):
             [101, 104, 106], [device.hardware_serial for device in devices]
         )
         self.assertEqual(
-            ["Teensy DAQ", None, "USB Serial"],
+            ["ThingDAQ", None, "USB Serial"],
             [device.product for device in devices],
         )
         self.assertEqual(1, len(transports["COM3"].writes))

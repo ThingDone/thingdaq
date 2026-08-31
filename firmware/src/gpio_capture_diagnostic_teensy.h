@@ -2,7 +2,7 @@
 
 #include "gpio_capture_diagnostic.h"
 
-namespace teensy_daq::gpio_diagnostic {
+namespace thingdaq::gpio_diagnostic {
 
 // The registered Port 15 documentation identifies the board and upload path
 // but contains no machine-readable pin-safety, loopback, or stimulus record.
@@ -24,4 +24,4 @@ static_assert(kRegisteredTeensyFixture.metadata_kind ==
 static_assert(kRegisteredTeensyFixture.drive_safety ==
               DriveSafety::kUnspecified);
 
-}  // namespace teensy_daq::gpio_diagnostic
+}  // namespace thingdaq::gpio_diagnostic

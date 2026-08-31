@@ -14,9 +14,9 @@ from unittest.mock import patch
 
 import serial
 import tomllib
-from teensy_daq import DeviceState, InMemoryTransport, TeensyDAQ
-from teensy_daq.demo import main, run_demo
-from teensy_daq.models import AdcChannelView
+from thingdaq import DeviceState, InMemoryTransport, ThingDAQ
+from thingdaq.demo import main, run_demo
+from thingdaq.models import AdcChannelView
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,9 +25,9 @@ class OfflineDemoTests(unittest.TestCase):
     def test_demo_validates_both_streams_with_tiny_parser_chunks(self) -> None:
         output = io.StringIO()
         transport = InMemoryTransport(read_chunk_size=7)
-        daq = TeensyDAQ.open(transport, read_size=7)
+        daq = ThingDAQ.open(transport, read_size=7)
 
-        with patch.object(TeensyDAQ, "simulated", return_value=daq):
+        with patch.object(ThingDAQ, "simulated", return_value=daq):
             run_demo(frame_count=2, parser_chunk_size=7, output=output)
 
         transcript = output.getvalue()
@@ -51,10 +51,10 @@ class OfflineDemoTests(unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
         transport = InMemoryTransport(read_chunk_size=13)
-        daq = TeensyDAQ.open(transport, read_size=13)
+        daq = ThingDAQ.open(transport, read_size=13)
 
         with (
-            patch.object(TeensyDAQ, "simulated", return_value=daq),
+            patch.object(ThingDAQ, "simulated", return_value=daq),
             patch.object(AdcChannelView, "__getitem__", return_value=4095),
             redirect_stdout(stdout),
             redirect_stderr(stderr),
@@ -112,7 +112,7 @@ class OfflineDemoTests(unittest.TestCase):
             [
                 sys.executable,
                 "-m",
-                "teensy_daq.demo",
+                "thingdaq.demo",
                 "--frame-count",
                 "1",
                 "--parser-chunk-size",
@@ -130,8 +130,8 @@ class OfflineDemoTests(unittest.TestCase):
         with (PACKAGE_ROOT / "pyproject.toml").open("rb") as pyproject_file:
             pyproject = tomllib.load(pyproject_file)
         self.assertEqual(
-            "teensy_daq.demo:main",
-            pyproject["project"]["scripts"]["teensy-daq-demo"],
+            "thingdaq.demo:main",
+            pyproject["project"]["scripts"]["thingdaq-demo"],
         )
 
 

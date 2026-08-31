@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from collections.abc import Sequence
 
-from teensy_daq import (
+from thingdaq import (
     BoardId,
     Capability,
     ConfigurationProfile,
@@ -22,12 +22,12 @@ from teensy_daq import (
     SimulatedDevice,
     Source,
     StreamMask,
-    TeensyDAQ,
+    ThingDAQ,
     UnexpectedStreamGapError,
     decode_frame,
     encode_frame,
 )
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq._generated import protocol_constants as constants
 
 
 class GpioGapDevice(SimulatedDevice):
@@ -135,7 +135,7 @@ class GPIOBlockTests(unittest.TestCase):
 
     def test_strict_mode_reports_gpio_gap_with_current_block_attached(self) -> None:
         transport = InMemoryTransport(GpioGapDevice())
-        with TeensyDAQ.open(transport, strict=True) as daq:
+        with ThingDAQ.open(transport, strict=True) as daq:
             daq.configure(adc=False, gpio=True, source=Source.SYNTHETIC)
             daq.start()
             first = daq.read_block()
@@ -166,7 +166,7 @@ class GPIOBlockTests(unittest.TestCase):
     ) -> None:
         physical = DeviceInfo(
             device_state=DeviceState.IDLE,
-            build_id="tdaq-0123456789abcdef",
+            build_id="thingdaq-0123456789abcdef",
             hardware_serial=12_345_670,
             firmware_version=(0, 7, 0),
             board_id=BoardId.TEENSY_40,

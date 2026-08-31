@@ -115,7 +115,7 @@ class CombinedAcquisitionTests(unittest.TestCase):
             self.skipTest("g++ is required for portable firmware tests")
 
         with tempfile.TemporaryDirectory(
-            prefix="teensy-daq-combined-acquisition-"
+            prefix="thingdaq-combined-acquisition-"
         ) as directory:
             executable = Path(directory) / "combined-acquisition-test"
             compiled = subprocess.run(
@@ -132,7 +132,7 @@ class CombinedAcquisitionTests(unittest.TestCase):
                     "-pedantic",
                     "-fno-exceptions",
                     "-fno-rtti",
-                    "-DTEENSY_DAQ_TESTING=1",
+                    "-DTHINGDAQ_TESTING=1",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "adc_dma_capture.cpp"),

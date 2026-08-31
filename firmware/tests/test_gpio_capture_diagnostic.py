@@ -20,7 +20,7 @@ class GpioCaptureDiagnosticTests(unittest.TestCase):
             self.skipTest("g++ is required for portable firmware tests")
 
         with tempfile.TemporaryDirectory(
-            prefix="teensy-daq-gpio-diagnostic-"
+            prefix="thingdaq-gpio-diagnostic-"
         ) as directory:
             executable = Path(directory) / "gpio-capture-diagnostic-test"
             compile_result = subprocess.run(

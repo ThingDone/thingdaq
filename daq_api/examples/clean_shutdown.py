@@ -7,7 +7,7 @@ safely wired Teensy 4.0 and demonstrates the same bounded cleanup sequence.
 from __future__ import annotations
 
 from _common import configure_exact, example_parser, open_example
-from teensy_daq import ADCBlock, DeviceState
+from thingdaq import ADCBlock, DeviceState
 
 
 def main() -> int:

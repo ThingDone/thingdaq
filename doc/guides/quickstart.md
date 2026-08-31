@@ -3,7 +3,7 @@ type: reference
 title: Quickstart
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - quickstart
   - python
   - simulator
@@ -17,7 +17,7 @@ related:
   - '[[Protocol-V1]]'
 ---
 
-# Teensy DAQ quickstart
+# ThingDAQ quickstart
 
 Start with the simulator. It uses the real protocol encoder, parser,
 background reader, immutable block models, checksums, timestamps, loss policy,
@@ -48,8 +48,8 @@ and pure-Python parity.
 Run the complete offline flight and a short strict-loss CLI capture:
 
 ```bash
-.venv/bin/teensy-daq-demo --frames 2
-.venv/bin/teensy-daq capture --simulate --duration 1 --strict-loss \
+.venv/bin/thingdaq-demo --frames 2
+.venv/bin/thingdaq capture --simulate --duration 1 --strict-loss \
   --gpio-channel D6 --gpio-channel D13
 ```
 
@@ -88,9 +88,9 @@ path, and must not be reused for a physical device. See [[Calibration]].
 ## Minimal Python lifecycle
 
 ```python
-from teensy_daq import ADCBlock, GPIOBlock, Source, TeensyDAQ
+from thingdaq import ADCBlock, GPIOBlock, Source, ThingDAQ
 
-with TeensyDAQ.simulated(strict=True) as daq:
+with ThingDAQ.simulated(strict=True) as daq:
     info = daq.info()
     applied = daq.configure(
         adc=True,
@@ -140,7 +140,7 @@ The CLI exposes the same preflight and then prints the applied body plus active
 fixed-rate metadata:
 
 ```bash
-.venv/bin/teensy-daq configure --simulate --streams both \
+.venv/bin/thingdaq configure --simulate --streams both \
   --source synthetic --checksum adler32 \
   --adc-pair-rate-hz 1000000 --gpio-sample-rate-hz 4000000 \
   --adc-resolution-bits 12
@@ -152,7 +152,7 @@ Metadata-only enumeration lists plausible PJRC USB Serial endpoints without
 opening them:
 
 ```bash
-.venv/bin/teensy-daq list
+.venv/bin/thingdaq list
 ```
 
 `discover()` then opens only matching candidates for a short read-only INFO
@@ -160,15 +160,15 @@ probe. A `DiscoveredDevice.port` is a current endpoint, not identity. Select by
 the stable nonzero fuse-derived INFO `hardware_serial`:
 
 ```python
-from teensy_daq import TeensyDAQ, discover, select_device
+from thingdaq import ThingDAQ, discover, select_device
 
 devices = discover(timeout=0.2)
 selected = select_device(devices, hardware_serial=20512460)
-with TeensyDAQ.open(selected) as daq:
+with ThingDAQ.open(selected) as daq:
     print(daq.device_info.build_id)
 ```
 
-`TeensyDAQ.open(hardware_serial=20512460)` performs a fresh scan, chooses the
+`ThingDAQ.open(hardware_serial=20512460)` performs a fresh scan, chooses the
 current endpoint, reopens it, and requires stable repeated INFO identity before
 any mutating command. Multiple devices without an explicit serial fail with an
 actionable selection error. See [[Python-API]] for adopt-versus-stop behavior

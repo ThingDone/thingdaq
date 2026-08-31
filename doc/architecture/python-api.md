@@ -3,7 +3,7 @@ type: reference
 title: Python API
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - python
   - architecture
   - lifecycle
@@ -20,17 +20,17 @@ related:
 
 # Python API architecture
 
-The public host boundary is the synchronous, typed `TeensyDAQ` facade plus
-immutable data/evidence models exported from `teensy_daq`. Normal callers do
+The public host boundary is the synchronous, typed `ThingDAQ` facade plus
+immutable data/evidence models exported from `thingdaq`. Normal callers do
 not construct frames, own request IDs, run a parser, or coordinate a reader
 thread. Those expert primitives remain available in the explicitly named
-`teensy_daq.low_level` namespace.
+`thingdaq.low_level` namespace.
 
 ## Layering
 
 ```mermaid
 flowchart LR
-    U[Application or CLI] --> F[TeensyDAQ facade]
+    U[Application or CLI] --> F[ThingDAQ facade]
     F --> C[Capability and lifecycle checks]
     F --> R[BackgroundReader]
     R --> P[Protocol-v1 parser and models]
@@ -55,10 +55,10 @@ failed/busy/incompatible candidates, and returns `DiscoveredDevice` snapshots.
 
 A port path is transient. Stable selection uses INFO's nonzero, fuse-derived
 `hardware_serial`; the USB decimal serial is cross-checked when available.
-`TeensyDAQ.open()` reopens the selected current endpoint and requires two
+`ThingDAQ.open()` reopens the selected current endpoint and requires two
 identity-equal INFO responses through its own reader before mutation. Physical
 identity must be Teensy 4.0/i.MX RT1062, protocol v1, firmware at least 0.3.0,
-nonzero serial, and a source-derived `tdaq-<16 hex>` build ID.
+nonzero serial, and a source-derived `thingdaq-<16 hex>` build ID.
 `ExpectedDeviceIdentity` optionally pins exact serial, firmware, build, board,
 MCU, and protocol values.
 
@@ -78,7 +78,7 @@ counter evidence.
 - physical pin/resource/layout metadata; and
 - optional diagnostics and RESET/PING capability bits.
 
-Before sending CONFIGURE, `TeensyDAQ.configure()` requires a legal local state
+Before sending CONFIGURE, `ThingDAQ.configure()` requires a legal local state
 and rejects any requested stream, source, checksum, or exact profile absent
 from INFO. Optional `adc_pair_rate_hz`, `gpio_sample_rate_hz`, and
 `adc_resolution_bits` keywords are exact capability requirements. They are
@@ -112,7 +112,7 @@ RESET_STATS require IDLE/CONFIGURED; START requires CONFIGURED; block reads
 require the RUNNING epoch activated by that facade. Diagnostics apply their
 own capability and quiescence restrictions.
 
-`TeensyDAQ` is a typed context manager. Normal exit attempts STOP when the
+`ThingDAQ` is a typed context manager. Normal exit attempts STOP when the
 device is CONFIGURED/RUNNING, then terminates the background reader and closes
 the transport under finite bounds. Exceptional exit preserves the body error
 while still attempting cleanup. `close(stop=False)` is explicit advanced

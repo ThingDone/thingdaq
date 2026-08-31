@@ -290,7 +290,7 @@ def benchmark_report(
     """Wrap measurements with reproducibility metadata."""
 
     return {
-        "schema": "teensy-daq-python-checksum-benchmark-v1",
+        "schema": "thingdaq-python-checksum-benchmark-v1",
         "python_implementation": platform.python_implementation(),
         "python_version": platform.python_version(),
         "platform": platform.platform(),

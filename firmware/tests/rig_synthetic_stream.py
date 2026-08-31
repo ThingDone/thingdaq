@@ -982,10 +982,10 @@ def grade_info(
     if expected_build_id is None:
         evidence.check(
             "identity.build_id",
-            "tdaq-<16 lowercase hex>",
+            "thingdaq-<16 lowercase hex>",
             build_id,
             isinstance(build_id, str)
-            and re.fullmatch(r"tdaq-[0-9a-f]{16}", build_id) is not None,
+            and re.fullmatch(r"thingdaq-[0-9a-f]{16}", build_id) is not None,
         )
     else:
         evidence.equal("identity.build_id", expected_build_id, build_id)

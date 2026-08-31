@@ -19,7 +19,7 @@ class GpioClockDiagnosticTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-gpio-clock-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-gpio-clock-") as directory:
             executable = Path(directory) / "gpio-clock-diagnostic-test"
             compile_result = subprocess.run(
                 [

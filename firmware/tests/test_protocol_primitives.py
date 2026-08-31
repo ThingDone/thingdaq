@@ -9,8 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from teensy_daq import decode_frame, decode_response, encode_frame
-from teensy_daq._generated import protocol_constants as constants
+from thingdaq import decode_frame, decode_response, encode_frame
+from thingdaq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIRMWARE_SOURCE = REPOSITORY_ROOT / "firmware/src"
@@ -26,7 +26,7 @@ class ProtocolPrimitiveTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-protocol-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-protocol-") as directory:
             executable = Path(directory) / "protocol-primitives-test"
             compile_result = subprocess.run(
                 [

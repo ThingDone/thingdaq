@@ -7,7 +7,7 @@
 #include "board_config.h"
 #include "protocol.h"
 
-namespace teensy_daq::benchmark {
+namespace thingdaq::benchmark {
 
 inline constexpr std::size_t kBufferBytes = protocol_v1::kDataFrameBytes;
 inline constexpr std::size_t kWorkingRamBytes = 2U * kBufferBytes;
@@ -85,4 +85,4 @@ class Runner {
 // observable and prevent a whole benchmark loop from being folded away.
 std::uint32_t publishedDigest();
 
-}  // namespace teensy_daq::benchmark
+}  // namespace thingdaq::benchmark

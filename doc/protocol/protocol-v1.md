@@ -4,7 +4,7 @@ title: Protocol V1
 created: 2026-08-27
 updated: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - protocol
   - wire-format
   - usb-cdc
@@ -23,7 +23,7 @@ related:
 
 # Protocol v1
 
-This document is the normative human-readable Teensy DAQ v1 wire contract.
+This document is the normative human-readable ThingDAQ v1 wire contract.
 The authoritative machine-readable values live in
 `protocol/protocol-v1.json`; generated Python and C++ files must never be
 edited directly. The framing rationale is recorded in

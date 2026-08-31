@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace teensy_daq::checksum {
+namespace thingdaq::checksum {
 
 // Candidate identities are intentionally independent of protocol wire IDs.
 // Protocol negotiation maps enabled wire algorithms to this narrow interface.
@@ -66,4 +66,4 @@ inline constexpr std::size_t implementationCodeBytes(Algorithm algorithm) {
 bool compute(Algorithm algorithm, const std::uint8_t *data, std::size_t size,
              std::uint32_t &result);
 
-}  // namespace teensy_daq::checksum
+}  // namespace thingdaq::checksum

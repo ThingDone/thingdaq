@@ -46,15 +46,15 @@ SOURCE_DATE_EPOCH_MAX = 253_402_300_799  # 9999-12-31T23:59:59Z
 PROGRAM_FLASH_START = 0x60000000
 PROGRAM_FLASH_END = 0x60200000
 CHECKSUM_TABLE_SYMBOLS = {
-    "CRC32C": "teensy_daq::checksum::detail::kCrc32cTable",
-    "CRC32_ISO_HDLC": "teensy_daq::checksum::detail::kCrc32IsoHdlcTable",
+    "CRC32C": "thingdaq::checksum::detail::kCrc32cTable",
+    "CRC32_ISO_HDLC": "thingdaq::checksum::detail::kCrc32IsoHdlcTable",
 }
 CHECKSUM_TABLE_BYTES = 8 * 256 * 4
 CHECKSUM_CODE_SYMBOLS = {
-    "ADLER32": "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)",
-    "CRC32C": "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)",
+    "ADLER32": "thingdaq::checksum::adler32(unsigned char const*, unsigned int)",
+    "CRC32C": "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)",
     "CRC32_ISO_HDLC": (
-        "teensy_daq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)"
+        "thingdaq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)"
     ),
 }
 CHECKSUM_CODE_BYTES = {
@@ -63,17 +63,17 @@ CHECKSUM_CODE_BYTES = {
     "CRC32_ISO_HDLC": 308,
 }
 CHECKSUM_DISPATCH_SYMBOL = (
-    "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, "
+    "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, "
     "unsigned char const*, unsigned int, unsigned long&)"
 )
 BENCHMARK_BUFFER_SYMBOLS = {
     "DTCM_PACKET": (
-        "teensy_daq::benchmark::g_checksum_benchmark_dtcm_buffer",
+        "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer",
         0x20000000,
         0x20200000,
     ),
     "OCRAM_DMA": (
-        "teensy_daq::benchmark::g_checksum_benchmark_ocram_buffer",
+        "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer",
         0x20200000,
         0x20280000,
     ),
@@ -96,41 +96,41 @@ PACKET_BUFFER_SYMBOLS = {
 }
 PACKET_BUFFER_ALIGNMENT = 32
 GPIO_CLOCK_DIAGNOSTIC_BUFFER_SYMBOL = (
-    "teensy_daq::gpio_clock::g_gpio_clock_diagnostic_buffer"
+    "thingdaq::gpio_clock::g_gpio_clock_diagnostic_buffer"
 )
 GPIO_CLOCK_DIAGNOSTIC_BUFFER_BYTES = 32
 GPIO_CLOCK_DIAGNOSTIC_BUFFER_ALIGNMENT = 32
 GPIO_RAW_DMA_BUFFER_SYMBOLS = {
     "RING": (
-        "teensy_daq::gpio_capture::g_gpio_raw_dma_buffers",
+        "thingdaq::gpio_capture::g_gpio_raw_dma_buffers",
         4 * 4048 * 4,
     ),
     "OVERFLOW_SINK": (
-        "teensy_daq::gpio_capture::g_gpio_raw_dma_overflow_sink",
+        "thingdaq::gpio_capture::g_gpio_raw_dma_overflow_sink",
         32,
     ),
     "DESCRIPTORS": (
-        "teensy_daq::gpio_capture::g_gpio_raw_dma_descriptors",
+        "thingdaq::gpio_capture::g_gpio_raw_dma_descriptors",
         5 * 32,
     ),
 }
 GPIO_RAW_DMA_BUFFER_ALIGNMENT = 32
 ADC_DMA_BUFFER_SYMBOLS = {
     "RING": (
-        "teensy_daq::adc_capture::g_adc_dma_buffers",
+        "thingdaq::adc_capture::g_adc_dma_buffers",
         8 * 4_064,
     ),
     "OVERFLOW_SINK": (
-        "teensy_daq::adc_capture::g_adc_dma_overflow_sink",
+        "thingdaq::adc_capture::g_adc_dma_overflow_sink",
         32,
     ),
     "DESCRIPTORS": (
-        "teensy_daq::adc_capture::g_adc_dma_descriptors",
+        "thingdaq::adc_capture::g_adc_dma_descriptors",
         2 * 12 * 32,
     ),
 }
 ADC_DMA_BUFFER_ALIGNMENT = 32
-GPIO_PACKED_BUFFER_SYMBOL = "teensy_daq::gpio_packer::g_gpio_packed_buffers"
+GPIO_PACKED_BUFFER_SYMBOL = "thingdaq::gpio_packer::g_gpio_packed_buffers"
 GPIO_PACKED_BUFFER_BYTES = 4 * 4064
 GPIO_PACKED_BUFFER_ALIGNMENT = 32
 OCRAM_START = 0x20200000
@@ -319,7 +319,7 @@ def build_identity(environment: Mapping[str, str] | None = None) -> BuildIdentit
     )
     return BuildIdentity(
         source_id=source_id,
-        build_id=f"tdaq-{source_id[:16]}",
+        build_id=f"thingdaq-{source_id[:16]}",
         timestamp_epoch=epoch,
         timestamp_utc=timestamp,
     )
@@ -335,7 +335,7 @@ def identity_definitions(base_definitions: str, identity: BuildIdentity) -> str:
     if not identity.build_id.isascii() or not 0 < len(identity.build_id) < 32:
         raise BuildError("build ID must fit the protocol's 31-byte ASCII limit")
     timestamp = datetime.fromtimestamp(identity.timestamp_epoch, tz=timezone.utc)
-    expected_build_id = f"tdaq-{identity.source_id[:16]}"
+    expected_build_id = f"thingdaq-{identity.source_id[:16]}"
     expected_timestamp = timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
     if identity.build_id != expected_build_id:
         raise BuildError("build ID must be derived from the source ID")
@@ -346,17 +346,17 @@ def identity_definitions(base_definitions: str, identity: BuildIdentity) -> str:
     )
     identity_macros = (
         *(
-            f"-DTEENSY_DAQ_SOURCE_ID_WORD{index}=0x{word}ULL"
+            f"-DTHINGDAQ_SOURCE_ID_WORD{index}=0x{word}ULL"
             for index, word in enumerate(source_words)
         ),
-        f"-DTEENSY_DAQ_BUILD_EPOCH={identity.timestamp_epoch}ULL",
-        f"-DTEENSY_DAQ_BUILD_YEAR={timestamp.year}U",
-        f"-DTEENSY_DAQ_BUILD_MONTH={timestamp.month}U",
-        f"-DTEENSY_DAQ_BUILD_DAY={timestamp.day}U",
-        f"-DTEENSY_DAQ_BUILD_HOUR={timestamp.hour}U",
-        f"-DTEENSY_DAQ_BUILD_MINUTE={timestamp.minute}U",
-        f"-DTEENSY_DAQ_BUILD_SECOND={timestamp.second}U",
-        "-DTEENSY_DAQ_OPTIMIZATION_O2STD=1",
+        f"-DTHINGDAQ_BUILD_EPOCH={identity.timestamp_epoch}ULL",
+        f"-DTHINGDAQ_BUILD_YEAR={timestamp.year}U",
+        f"-DTHINGDAQ_BUILD_MONTH={timestamp.month}U",
+        f"-DTHINGDAQ_BUILD_DAY={timestamp.day}U",
+        f"-DTHINGDAQ_BUILD_HOUR={timestamp.hour}U",
+        f"-DTHINGDAQ_BUILD_MINUTE={timestamp.minute}U",
+        f"-DTHINGDAQ_BUILD_SECOND={timestamp.second}U",
+        "-DTHINGDAQ_OPTIMIZATION_O2STD=1",
     )
     return " ".join((base_definitions, *identity_macros))
 

@@ -1499,7 +1499,7 @@ def load_fixture_stimulus(raw: str | None) -> FixtureStimulus | None:
         )
     if set(value) != {"schema", "fixture_id", "stimulus_id", "channels"}:
         raise ValueError("ADC fixture stimulus contains missing or unknown fields")
-    if value["schema"] != "teensy-daq-adc-stimulus-v1":
+    if value["schema"] != "thingdaq-adc-stimulus-v1":
         raise ValueError("ADC fixture stimulus schema is unsupported")
     fixture_id = value["fixture_id"]
     stimulus_id = value["stimulus_id"]
@@ -1993,10 +1993,10 @@ def grade_info(
     build_id = info["build_id"]
     evidence.check(
         "identity.build_id",
-        expected_build_id or "tdaq-<16 lowercase hex>",
+        expected_build_id or "thingdaq-<16 lowercase hex>",
         build_id,
         isinstance(build_id, str)
-        and re.fullmatch(r"tdaq-[0-9a-f]{16}", build_id) is not None
+        and re.fullmatch(r"thingdaq-[0-9a-f]{16}", build_id) is not None
         and (expected_build_id is None or build_id == expected_build_id),
     )
     hardware_serial = _info_int(info, "hardware_serial")

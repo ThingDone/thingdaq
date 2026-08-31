@@ -9,15 +9,15 @@
 
 namespace {
 
-namespace constants = teensy_daq::protocol_v1;
-namespace packer = teensy_daq::gpio_packer;
+namespace constants = thingdaq::protocol_v1;
+namespace packer = thingdaq::gpio_packer;
 
 constexpr std::uint32_t rawWord(std::uint8_t packed) {
   std::uint32_t word = 0U;
   for (std::size_t bit = 0U; bit < 8U; ++bit) {
     if ((packed & (std::uint8_t{1U} << bit)) != 0U) {
       word |= std::uint32_t{1U}
-              << teensy_daq::board::kGpioMappingsByPackedBit[bit].gpio2_bit;
+              << thingdaq::board::kGpioMappingsByPackedBit[bit].gpio2_bit;
     }
   }
   return word;
@@ -54,7 +54,7 @@ int main() {
   const auto started = std::chrono::steady_clock::now();
   for (std::size_t iteration = 0U; iteration < iterations; ++iteration) {
     source[iteration % source.size()] ^=
-        std::uint32_t{1U} << teensy_daq::board::kGpioMappingsByPackedBit[0]
+        std::uint32_t{1U} << thingdaq::board::kGpioMappingsByPackedBit[0]
                                   .gpio2_bit;
     if (packer::packGpio2Batch(source.data(), source.size(), output.data(),
                                output.size()) != output.size()) {

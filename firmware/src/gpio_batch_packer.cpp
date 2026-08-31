@@ -4,13 +4,13 @@
 #include <limits>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_GPIO_PACKER_COLD_CODE(section_name) \
+#define THINGDAQ_GPIO_PACKER_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_GPIO_PACKER_COLD_CODE(section_name)
+#define THINGDAQ_GPIO_PACKER_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::gpio_packer {
+namespace thingdaq::gpio_packer {
 namespace {
 
 template <typename Integer>
@@ -65,7 +65,7 @@ std::size_t packGpio2Batch(const std::uint32_t *source,
   return sample_count;
 }
 
-TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.start")
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.start")
 OperationStatus GpioBatchPacker::startRun(
     std::uint32_t run_id,
     protocol_v1::ChecksumAlgorithm checksum_algorithm,
@@ -122,7 +122,7 @@ OperationStatus GpioBatchPacker::startRun(
   return OperationStatus::kOk;
 }
 
-TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.stop")
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.stop")
 StopReport GpioBatchPacker::stopProduction() {
   StopReport report{};
   running_ = false;
@@ -215,7 +215,7 @@ ServiceReport GpioBatchPacker::service(
   return report;
 }
 
-TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.snapshot")
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.snapshot")
 Snapshot GpioBatchPacker::snapshot(
     const packet::PacketBufferPipeline &pipeline) const {
   Snapshot result{};
@@ -249,7 +249,7 @@ Snapshot GpioBatchPacker::snapshot(
   return result;
 }
 
-TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.quiescent")
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.quiescent")
 bool GpioBatchPacker::quiescent() const {
   return !running_ && filling_buffer_ == kInvalidBuffer &&
          ready_queue_.empty() && countState(BufferState::kFilling) == 0U &&
@@ -258,7 +258,7 @@ bool GpioBatchPacker::quiescent() const {
          pending_dropped_frames_ == 0U;
 }
 
-TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.ready")
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.ready")
 bool GpioBatchPacker::readyForStart() const { return quiescent(); }
 
 std::uint32_t GpioBatchPacker::beginProfile() {
@@ -285,7 +285,7 @@ void GpioBatchPacker::finishProfile(std::uint32_t started_at) {
   profile_last_cycle_ = finished_at;
 }
 
-TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.profile")
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.profile")
 std::uint16_t GpioBatchPacker::processingCpuBasisPoints() const {
   if (!processing_profile_active_ || processing_elapsed_cycles_ == 0U) {
     return 0U;
@@ -352,7 +352,7 @@ bool GpioBatchPacker::consume(const gpio_capture::BufferHandle &handle,
 // Raw-gap recovery is an exceptional path. Keep it in program Flash so the
 // dual-ADC completion ISRs retain deterministic ITCM residency without
 // crossing the linker allocator's next 32 KiB RAM1 code block.
-TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.raw_gap")
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.raw_gap")
 void GpioBatchPacker::accountRawGap(std::uint64_t sample_count,
                                     ServiceReport &report) {
   if (sample_count == 0U) {
@@ -679,7 +679,7 @@ std::size_t GpioBatchPacker::countState(BufferState state) const {
   return count;
 }
 
-TEENSY_DAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.progress")
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.progress")
 stats::GpioPackerProgress GpioBatchPacker::progress(
     const packet::PacketBufferPipeline &pipeline) const {
   stats::GpioPackerProgress result = progress_;
@@ -709,6 +709,6 @@ stats::GpioPackerProgress GpioBatchPacker::progress(
   return result;
 }
 
-}  // namespace teensy_daq::gpio_packer
+}  // namespace thingdaq::gpio_packer
 
-#undef TEENSY_DAQ_GPIO_PACKER_COLD_CODE
+#undef THINGDAQ_GPIO_PACKER_COLD_CODE

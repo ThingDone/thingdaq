@@ -6,7 +6,7 @@
 
 #include "board_config.h"
 
-namespace teensy_daq::gpio_dma_route {
+namespace thingdaq::gpio_dma_route {
 
 inline constexpr std::uint32_t kPerclkMask =
     CCM_CSCMR1_PERCLK_CLK_SEL | CCM_CSCMR1_PERCLK_PODF(0x3FU);
@@ -45,7 +45,7 @@ inline constexpr std::uint32_t kDmamuxConfiguration =
     DMAMUX_CHCFG_ENBL | board::kGpioDmamuxSource;
 
 inline void barrier() {
-#if defined(TEENSY_DAQ_HOST_REGISTER_TEST)
+#if defined(THINGDAQ_HOST_REGISTER_TEST)
   __asm__ volatile("" : : : "memory");
 #else
   __asm__ volatile("dsb\n\tisb" : : : "memory");
@@ -158,6 +158,6 @@ inline void disableEdmaRequest() {
   *dmamuxChannelRegister() = 0U;
 }
 
-}  // namespace teensy_daq::gpio_dma_route
+}  // namespace thingdaq::gpio_dma_route
 
 #endif

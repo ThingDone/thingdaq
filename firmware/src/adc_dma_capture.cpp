@@ -3,13 +3,13 @@
 #include <limits>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_ADC_DMA_COLD_CODE(section_name) \
+#define THINGDAQ_ADC_DMA_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_ADC_DMA_COLD_CODE(section_name)
+#define THINGDAQ_ADC_DMA_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::adc_capture {
+namespace thingdaq::adc_capture {
 namespace {
 
 template <typename Integer>
@@ -39,7 +39,7 @@ std::uint64_t absoluteDifference(std::uint64_t left,
 
 }  // namespace
 
-TEENSY_DAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.prime")
+THINGDAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.prime")
 PrimeResult PairCaptureRing::prime(std::uint32_t epoch,
                                    std::uint32_t initial_generation,
                                    std::uint64_t first_pair) {
@@ -108,7 +108,7 @@ PrimeResult PairCaptureRing::prime(std::uint32_t epoch,
   return result;
 }
 
-TEENSY_DAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.reserve")
+THINGDAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.reserve")
 ReservationResult PairCaptureRing::reserveGeneration(
     std::uint32_t epoch, std::uint32_t generation) {
   ReservationResult result{};
@@ -271,7 +271,7 @@ void PairCaptureRing::recordDmaError(std::uint32_t epoch,
   markGenerationInvalid(next_completion_generations_[converter]);
 }
 
-TEENSY_DAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.acquire")
+THINGDAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.acquire")
 AcquireResult PairCaptureRing::acquireReady() {
   (void)serviceDiscarded();
   AcquireResult result{};
@@ -313,7 +313,7 @@ AcquireResult PairCaptureRing::acquireReady() {
   return result;
 }
 
-TEENSY_DAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.release")
+THINGDAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.release")
 OperationStatus PairCaptureRing::release(const BufferHandle &handle) {
   std::uint32_t token = critical_.enter();
   if (!handleMatches(handle, BufferState::kReading)) {
@@ -340,7 +340,7 @@ OperationStatus PairCaptureRing::release(const BufferHandle &handle) {
   return OperationStatus::kOk;
 }
 
-TEENSY_DAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.service_discarded")
+THINGDAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.service_discarded")
 std::size_t PairCaptureRing::serviceDiscarded(std::size_t limit) {
   std::size_t serviced = 0U;
   while (serviced < limit) {
@@ -374,7 +374,7 @@ std::size_t PairCaptureRing::serviceDiscarded(std::size_t limit) {
   return serviced;
 }
 
-TEENSY_DAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.stop")
+THINGDAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.stop")
 StopReport PairCaptureRing::stop(
     const std::array<ChannelStopState, kConverterCount> &channels) {
   StopReport report{};
@@ -477,7 +477,7 @@ StopReport PairCaptureRing::stop(
   return report;
 }
 
-TEENSY_DAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.snapshot")
+THINGDAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.snapshot")
 Snapshot PairCaptureRing::snapshot() {
   Snapshot value{};
   const std::uint32_t token = critical_.enter();
@@ -738,6 +738,6 @@ void PairCaptureRing::noteInvariantError() {
   saturatingIncrement(progress_.invariant_errors);
 }
 
-}  // namespace teensy_daq::adc_capture
+}  // namespace thingdaq::adc_capture
 
-#undef TEENSY_DAQ_ADC_DMA_COLD_CODE
+#undef THINGDAQ_ADC_DMA_COLD_CODE

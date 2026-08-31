@@ -9,7 +9,7 @@
             "bytes": 768,
             "range_end_exclusive": "0x20280000",
             "range_start": "0x20200000",
-            "symbol": "teensy_daq::adc_capture::g_adc_dma_descriptors",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_descriptors",
             "symbol_type": "B"
           },
           "OVERFLOW_SINK": {
@@ -18,7 +18,7 @@
             "bytes": 32,
             "range_end_exclusive": "0x20280000",
             "range_start": "0x20200000",
-            "symbol": "teensy_daq::adc_capture::g_adc_dma_overflow_sink",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_overflow_sink",
             "symbol_type": "B"
           },
           "RING": {
@@ -27,7 +27,7 @@
             "bytes": 32512,
             "range_end_exclusive": "0x20280000",
             "range_start": "0x20200000",
-            "symbol": "teensy_daq::adc_capture::g_adc_dma_buffers",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_buffers",
             "symbol_type": "B"
           }
         },
@@ -41,7 +41,7 @@
             "bytes": 4096,
             "range_end_exclusive": "0x20200000",
             "range_start": "0x20000000",
-            "symbol": "teensy_daq::benchmark::g_checksum_benchmark_dtcm_buffer",
+            "symbol": "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer",
             "symbol_type": "B"
           },
           "OCRAM_DMA": {
@@ -50,7 +50,7 @@
             "bytes": 4096,
             "range_end_exclusive": "0x20280000",
             "range_start": "0x20200000",
-            "symbol": "teensy_daq::benchmark::g_checksum_benchmark_ocram_buffer",
+            "symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer",
             "symbol_type": "B"
           }
         },
@@ -60,7 +60,7 @@
         "algorithms": {
           "ADLER32": {
             "code_address": "0x00001000",
-            "code_symbol": "teensy_daq::checksum::adler32(unsigned char const*, unsigned int)",
+            "code_symbol": "thingdaq::checksum::adler32(unsigned char const*, unsigned int)",
             "code_symbol_type": "T",
             "implementation": "arithmetic (no lookup table)",
             "implementation_code_bytes": 120,
@@ -70,11 +70,11 @@
           "CRC32C": {
             "address": "0x600124ac",
             "code_address": "0x00001078",
-            "code_symbol": "teensy_daq::checksum::crc32c(unsigned char const*, unsigned int)",
+            "code_symbol": "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)",
             "code_symbol_type": "T",
             "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
             "implementation_code_bytes": 308,
-            "symbol": "teensy_daq::checksum::detail::kCrc32cTable",
+            "symbol": "thingdaq::checksum::detail::kCrc32cTable",
             "symbol_type": "R",
             "table_flash_bytes": 8192,
             "table_ram_bytes": 0
@@ -82,11 +82,11 @@
           "CRC32_ISO_HDLC": {
             "address": "0x600104ac",
             "code_address": "0x000011ac",
-            "code_symbol": "teensy_daq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
+            "code_symbol": "thingdaq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
             "code_symbol_type": "T",
             "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
             "implementation_code_bytes": 308,
-            "symbol": "teensy_daq::checksum::detail::kCrc32IsoHdlcTable",
+            "symbol": "thingdaq::checksum::detail::kCrc32IsoHdlcTable",
             "symbol_type": "R",
             "table_flash_bytes": 8192,
             "table_ram_bytes": 0
@@ -96,7 +96,7 @@
         "shared_dispatch": {
           "address": "0x000012e0",
           "code_bytes": 84,
-          "symbol": "teensy_daq::checksum::compute(teensy_daq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
+          "symbol": "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
           "symbol_type": "T"
         },
         "total_implementation_code_bytes": 736,
@@ -109,7 +109,7 @@
         "bytes": 32,
         "range_end_exclusive": "0x20280000",
         "range_start": "0x20200000",
-        "symbol": "teensy_daq::gpio_clock::g_gpio_clock_diagnostic_buffer",
+        "symbol": "thingdaq::gpio_clock::g_gpio_clock_diagnostic_buffer",
         "symbol_type": "B"
       },
       "gpio_packed_buffers": {
@@ -121,7 +121,7 @@
         "range_end_exclusive": "0x20280000",
         "range_start": "0x20200000",
         "stride_bytes": 4064,
-        "symbol": "teensy_daq::gpio_packer::g_gpio_packed_buffers",
+        "symbol": "thingdaq::gpio_packer::g_gpio_packed_buffers",
         "symbol_type": "B"
       },
       "gpio_raw_dma_buffers": {
@@ -132,7 +132,7 @@
             "bytes": 160,
             "range_end_exclusive": "0x20280000",
             "range_start": "0x20200000",
-            "symbol": "teensy_daq::gpio_capture::g_gpio_raw_dma_descriptors",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_descriptors",
             "symbol_type": "B"
           },
           "OVERFLOW_SINK": {
@@ -141,7 +141,7 @@
             "bytes": 32,
             "range_end_exclusive": "0x20280000",
             "range_start": "0x20200000",
-            "symbol": "teensy_daq::gpio_capture::g_gpio_raw_dma_overflow_sink",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_overflow_sink",
             "symbol_type": "B"
           },
           "RING": {
@@ -150,7 +150,7 @@
             "bytes": 64768,
             "range_end_exclusive": "0x20280000",
             "range_start": "0x20200000",
-            "symbol": "teensy_daq::gpio_capture::g_gpio_raw_dma_buffers",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_buffers",
             "symbol_type": "B"
           }
         },
@@ -207,7 +207,7 @@
       }
     },
     "source": {
-      "build_id": "tdaq-a0dc150fd48a6e9b",
+      "build_id": "thingdaq-a0dc150fd48a6e9b",
       "firmware_input_changes": [],
       "firmware_inputs_clean": true,
       "git_commit": "26d1035c6723fae5872f9207121e4d5eed99d20f",
@@ -286,7 +286,7 @@
   "candidate": {
     "artifact_name": "firmware.ino.hex",
     "artifact_sha256": "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
-    "build_id": "tdaq-a0dc150fd48a6e9b",
+    "build_id": "thingdaq-a0dc150fd48a6e9b",
     "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
     "path": "firmware/soak/candidate.json",
     "sha256": "32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656",
@@ -363,122 +363,122 @@
         "size_bytes": 1914
       },
       {
-        "path": "daq_api/src/teensy_daq/__init__.py",
+        "path": "daq_api/src/thingdaq/__init__.py",
         "sha256": "4547e4eb03f179903a03596a68bd630bc18b7ab122c603711e5b3f2d74d8c703",
         "size_bytes": 11161
       },
       {
-        "path": "daq_api/src/teensy_daq/_generated/__init__.py",
+        "path": "daq_api/src/thingdaq/_generated/__init__.py",
         "sha256": "c3db3c6a037cd541d49ed722d8e9fb58e22fc1905d97c164c390b2535d6575e3",
         "size_bytes": 75
       },
       {
-        "path": "daq_api/src/teensy_daq/_generated/protocol_constants.py",
+        "path": "daq_api/src/thingdaq/_generated/protocol_constants.py",
         "sha256": "2e9d68abcf0e7fc439ae2129ab26bc5e1c9988b2721899dd9e0e0478ea8fb113",
         "size_bytes": 51173
       },
       {
-        "path": "daq_api/src/teensy_daq/_version.py",
+        "path": "daq_api/src/thingdaq/_version.py",
         "sha256": "b61384aefea9f7d6fca64e8065a3483d9d2737186784fea0a5135bdbd3f42961",
         "size_bytes": 122
       },
       {
-        "path": "daq_api/src/teensy_daq/alignment.py",
+        "path": "daq_api/src/thingdaq/alignment.py",
         "sha256": "9953954083a48d93fc05ccbf047ed1954036ffe4a105f947da1b8889522236a8",
         "size_bytes": 30092
       },
       {
-        "path": "daq_api/src/teensy_daq/calibration.py",
+        "path": "daq_api/src/thingdaq/calibration.py",
         "sha256": "46e5f01f6763fbe16d126cc4c738be89215d01ed56a235acf89ed4341ea36003",
         "size_bytes": 31734
       },
       {
-        "path": "daq_api/src/teensy_daq/checksum.py",
+        "path": "daq_api/src/thingdaq/checksum.py",
         "sha256": "9f3a519b784bd39b6419748544cf887e57055878ae784982c133e90017fdec00",
         "size_bytes": 7247
       },
       {
-        "path": "daq_api/src/teensy_daq/checksum_benchmark.py",
+        "path": "daq_api/src/thingdaq/checksum_benchmark.py",
         "sha256": "008c90006592dbdce27f9f40069719e4878d8fcd42ff3ccaf7cda6e487fbd546",
         "size_bytes": 12997
       },
       {
-        "path": "daq_api/src/teensy_daq/cli.py",
+        "path": "daq_api/src/thingdaq/cli.py",
         "sha256": "95ca70deae1c42d5a23b20a73734eb6e23340885a03f1cce64231bb3f3a65ce3",
         "size_bytes": 51645
       },
       {
-        "path": "daq_api/src/teensy_daq/client.py",
+        "path": "daq_api/src/thingdaq/client.py",
         "sha256": "95accfcf79687c724a81088ef2ea804774a1fbc528be59dbea7b05bf07a73290",
         "size_bytes": 82295
       },
       {
-        "path": "daq_api/src/teensy_daq/demo.py",
+        "path": "daq_api/src/thingdaq/demo.py",
         "sha256": "f8d0d7ccf29db8e166af2b04ac913281bdb2bed67ef1c01b6e7fcb79da5b3378",
         "size_bytes": 16852
       },
       {
-        "path": "daq_api/src/teensy_daq/diagnostics.py",
+        "path": "daq_api/src/thingdaq/diagnostics.py",
         "sha256": "234ba87f3e46d27c08ed2243d65e7d98850468a61c836211e6b4a799dd519837",
         "size_bytes": 44924
       },
       {
-        "path": "daq_api/src/teensy_daq/discovery.py",
+        "path": "daq_api/src/thingdaq/discovery.py",
         "sha256": "da869f25a290aa7fab02945723e9b254f10e863031acb3b4938ca33842fc32d0",
         "size_bytes": 14794
       },
       {
-        "path": "daq_api/src/teensy_daq/identity.py",
+        "path": "daq_api/src/thingdaq/identity.py",
         "sha256": "fdfb725c97fb002ec84fbbe56e60965977a3599992cbb696dc0731ef86f54d2d",
         "size_bytes": 6740
       },
       {
-        "path": "daq_api/src/teensy_daq/low_level.py",
+        "path": "daq_api/src/thingdaq/low_level.py",
         "sha256": "d5eaa023a01ddb1f12dc710b90535c2192b8a4bf99c566a57a2a94d0b7e6f6b3",
         "size_bytes": 2480
       },
       {
-        "path": "daq_api/src/teensy_daq/models.py",
+        "path": "daq_api/src/thingdaq/models.py",
         "sha256": "959c027f3037b4ee1b86fffbacb6ff448634f9d101ee3b21d7e2269a8aba8c6f",
         "size_bytes": 248191
       },
       {
-        "path": "daq_api/src/teensy_daq/numpy.py",
+        "path": "daq_api/src/thingdaq/numpy.py",
         "sha256": "aafba524ab1772b30381bb070429b325bc7bb8c1f5831d66c7a0cd8b0d4292f8",
         "size_bytes": 21423
       },
       {
-        "path": "daq_api/src/teensy_daq/protocol.py",
+        "path": "daq_api/src/thingdaq/protocol.py",
         "sha256": "e8e3bca1431a86971070497f58cfc68f303d38efef3aa72767e8da13cd74417a",
         "size_bytes": 62238
       },
       {
-        "path": "daq_api/src/teensy_daq/py.typed",
+        "path": "daq_api/src/thingdaq/py.typed",
         "sha256": "668396440b0ff6e0d4181321df529989ac0b692df022c6c81fdf2adbb8276206",
         "size_bytes": 72
       },
       {
-        "path": "daq_api/src/teensy_daq/reader.py",
+        "path": "daq_api/src/thingdaq/reader.py",
         "sha256": "85db35d721952e342f6b56bcbe9f3e6606fc25592b568485d969102b7f0c403e",
         "size_bytes": 42605
       },
       {
-        "path": "daq_api/src/teensy_daq/simulator.py",
+        "path": "daq_api/src/thingdaq/simulator.py",
         "sha256": "e6369c6084cec24f3a79be55eab79219b90aa96144b760972fa1583194159761",
         "size_bytes": 22746
       },
       {
-        "path": "daq_api/src/teensy_daq/streaming.py",
+        "path": "daq_api/src/thingdaq/streaming.py",
         "sha256": "41c4cfab1cf62a3f5a1a57eab6099ad4badc4849a3b4371f14539643bfe43e1f",
         "size_bytes": 34550
       },
       {
-        "path": "daq_api/src/teensy_daq/synthetic.py",
+        "path": "daq_api/src/thingdaq/synthetic.py",
         "sha256": "1c0dea74d05c50111c699edaf7ff70cb4dcbcdedf8345f3f6e99621cfa66e311",
         "size_bytes": 8719
       },
       {
-        "path": "daq_api/src/teensy_daq/transport.py",
+        "path": "daq_api/src/thingdaq/transport.py",
         "sha256": "c7436fd4b355fd9b2d237799ac30575d1f83135dcbb6796eb9d3c912d73db146",
         "size_bytes": 24161
       },

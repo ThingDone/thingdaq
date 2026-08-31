@@ -3,7 +3,7 @@ type: report
 title: Phase 08 Combined Acquisition Acceptance
 created: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - phase-08
   - combined-acquisition
   - adc
@@ -24,7 +24,7 @@ related:
 ## Outcome
 
 The complete Phase 08 gate passed on 2026-08-29. Clean build
-`tdaq-25b8d210adb6e4ac` first passed the full local correctness, memory, map,
+`thingdaq-25b8d210adb6e4ac` first passed the full local correctness, memory, map,
 packaging, and throughput gate. That exact HEX then ran a 5-second full-rate
 synthetic regression followed strictly sequentially by 10-second and
 60-second physical combined-acquisition jobs on Teensy 4.0 hardware serial
@@ -115,8 +115,8 @@ The package artifacts were:
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `teensy_daq_local-0.0.0-py3-none-any.whl` | `9607ec39be83e239a9d660d3059cf18bd4757b72fa26f7e632f3c0fa780d8cc9` |
-| `teensy_daq_local-0.0.0.tar.gz` | `874f05ba9575c0ebdc74ca3b8b5b7f575126f9406307622f727d6a9f486a81f3` |
+| `thingdaq_local-0.0.0-py3-none-any.whl` | `9607ec39be83e239a9d660d3059cf18bd4757b72fa26f7e632f3c0fa780d8cc9` |
+| `thingdaq_local-0.0.0.tar.gz` | `874f05ba9575c0ebdc74ca3b8b5b7f575126f9406307622f727d6a9f486a81f3` |
 
 ## Accepted firmware artifact and map
 
@@ -125,7 +125,7 @@ The image was compiled from clean firmware inputs at commit
 
 | Property | Value |
 | --- | --- |
-| Build ID / source ID | `tdaq-25b8d210adb6e4ac` / `25b8d210adb6e4acb0caf9f0ad7b399a22a8e7904d49d5f9ba0d546bd8765ffa` |
+| Build ID / source ID | `thingdaq-25b8d210adb6e4ac` / `25b8d210adb6e4acb0caf9f0ad7b399a22a8e7904d49d5f9ba0d546bd8765ffa` |
 | Reproducible timestamp | `2026-08-29T08:23:17Z` |
 | FQBN | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
 | Target/toolchain | Teensy core 1.62.0; Arduino CLI 1.4.1; Arm GNU 15.2.1; 600 MHz; USB Serial; standard `-O2`; warnings `all` |
@@ -181,7 +181,7 @@ the soak. No accepted jobs overlapped.
 | 3 | Physical combined soak | `be3e20b9-2958-4730-a88a-fbc900ca461a` | `08:25:38Z`-`08:26:49Z` | 60.000697 s / 352 | PASS |
 
 Every job pinned protocol 1, firmware 0.7.0, build
-`tdaq-25b8d210adb6e4ac`, Teensy 4.0/i.MX RT1062, hardware serial 20512460,
+`thingdaq-25b8d210adb6e4ac`, Teensy 4.0/i.MX RT1062, hardware serial 20512460,
 4,096-byte frames, and Adler-32.
 
 ## Rates, layout, and common epoch

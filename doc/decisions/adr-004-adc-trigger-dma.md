@@ -4,7 +4,7 @@ title: 'ADR 004: ADC Trigger and DMA'
 created: 2026-08-28
 updated: 2026-08-29
 tags:
-  - teensy-daq
+  - thingdaq
   - decision
   - adc
   - adc-etc

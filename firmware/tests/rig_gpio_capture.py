@@ -1251,10 +1251,10 @@ def grade_info(
     build_id = info["build_id"]
     evidence.check(
         "identity.build_id",
-        expected_build_id or "tdaq-<16 lowercase hex>",
+        expected_build_id or "thingdaq-<16 lowercase hex>",
         build_id,
         isinstance(build_id, str)
-        and re.fullmatch(r"tdaq-[0-9a-f]{16}", build_id) is not None
+        and re.fullmatch(r"thingdaq-[0-9a-f]{16}", build_id) is not None
         and (expected_build_id is None or build_id == expected_build_id),
     )
     hardware_serial = info["hardware_serial"]

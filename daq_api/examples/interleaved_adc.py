@@ -9,7 +9,7 @@ from __future__ import annotations
 from itertools import islice
 
 from _common import configure_exact, example_parser, open_example, print_applied
-from teensy_daq import ADCBlock
+from thingdaq import ADCBlock
 
 
 def main() -> int:

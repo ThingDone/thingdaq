@@ -1,5 +1,5 @@
 {
-  "name": "teensy-daq",
+  "name": "thingdaq",
   "protocol_version": 1,
   "byte_order": "little",
   "magic": 3735928559,

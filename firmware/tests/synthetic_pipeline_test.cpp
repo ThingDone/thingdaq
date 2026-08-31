@@ -16,7 +16,7 @@
 #include "synthetic_source.h"
 #include "usb_transport.h"
 
-namespace teensy_daq::packet {
+namespace thingdaq::packet {
 
 struct PacketBufferPipelineTestAccess {
   static void setNextSequence(PacketBufferPipeline &pipeline, Stream stream,
@@ -25,17 +25,17 @@ struct PacketBufferPipelineTestAccess {
   }
 };
 
-}  // namespace teensy_daq::packet
+}  // namespace thingdaq::packet
 
 namespace {
 
-namespace board = teensy_daq::board;
-namespace constants = teensy_daq::protocol_v1;
-namespace packet = teensy_daq::packet;
-namespace stats = teensy_daq::stats;
-namespace synthetic = teensy_daq::synthetic;
-namespace usb = teensy_daq::usb;
-namespace wire = teensy_daq::protocol;
+namespace board = thingdaq::board;
+namespace constants = thingdaq::protocol_v1;
+namespace packet = thingdaq::packet;
+namespace stats = thingdaq::stats;
+namespace synthetic = thingdaq::synthetic;
+namespace usb = thingdaq::usb;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 

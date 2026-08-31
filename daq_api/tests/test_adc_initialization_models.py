@@ -5,9 +5,9 @@ from __future__ import annotations
 import unittest
 from typing import TypedDict
 
-from teensy_daq import AdcTriggerMetadata, DeviceInfo, Status
-from teensy_daq._generated import protocol_constants as constants
-from teensy_daq.protocol import FrameValidationError
+from thingdaq import AdcTriggerMetadata, DeviceInfo, Status
+from thingdaq._generated import protocol_constants as constants
+from thingdaq.protocol import FrameValidationError
 
 READY_FLAGS = (
     constants.AdcConfigurationFlag.INITIALIZED
@@ -47,7 +47,7 @@ class AdcInitializationModelTests(unittest.TestCase):
         )
         info = DeviceInfo(
             device_state=constants.DeviceState.IDLE,
-            build_id="tdaq-adc-trigger",
+            build_id="thingdaq-adc-trigger",
             adc_trigger=trigger,
         )
 
@@ -121,7 +121,7 @@ class AdcInitializationModelTests(unittest.TestCase):
         }
         info = DeviceInfo(
             device_state=constants.DeviceState.IDLE,
-            build_id="tdaq-adc-init",
+            build_id="thingdaq-adc-init",
             **metadata,
         )
         status = Status(
@@ -146,7 +146,7 @@ class AdcInitializationModelTests(unittest.TestCase):
         ) | constants.AdcConfigurationFlag.FALLBACK_10_BIT
         info = DeviceInfo(
             device_state=constants.DeviceState.IDLE,
-            build_id="tdaq-adc-fallback",
+            build_id="thingdaq-adc-fallback",
             adc_resolution_bits=10,
             adc_code_max=1023,
             adc_conversion_mode=1,
@@ -204,7 +204,7 @@ class AdcInitializationModelTests(unittest.TestCase):
         payload = bytearray(
             DeviceInfo(
                 device_state=constants.DeviceState.IDLE,
-                build_id="tdaq-adc-primary",
+                build_id="thingdaq-adc-primary",
             ).to_payload()
         )
         payload[constants.INFO_RESPONSE_ADC_RESOLUTION_BITS_OFFSET] = 10

@@ -4,7 +4,7 @@
 
 #include "protocol.h"
 
-namespace teensy_daq::gpio_clock {
+namespace thingdaq::gpio_clock {
 
 constexpr std::uint32_t errorBit(protocol_v1::GpioClockError error) {
   return static_cast<std::uint32_t>(error);
@@ -59,4 +59,4 @@ class Runner {
   Platform &platform_;
 };
 
-}  // namespace teensy_daq::gpio_clock
+}  // namespace thingdaq::gpio_clock

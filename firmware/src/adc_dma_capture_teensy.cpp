@@ -13,10 +13,10 @@
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
 
-#define TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(section_name) \
+#define THINGDAQ_ADC_DMA_TARGET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 
-namespace teensy_daq::adc_capture {
+namespace thingdaq::adc_capture {
 
 struct alignas(board::kCacheLineBytes) DescriptorBank {
   std::array<std::array<IMXRT_DMA_TCD_t, board::kAdcDmaDescriptorCount>,
@@ -33,7 +33,7 @@ DescriptorBank g_adc_dma_descriptors
 
 namespace {
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.allocations")
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.allocations")
 void *retainDmaAllocations() {
   __asm__ volatile(""
                    :
@@ -103,12 +103,12 @@ void saturatingIncrement(Integer &value) {
 
 class TeensyCacheMaintenance final : public CacheMaintenance {
  public:
-  TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.cache_discard")
+  THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.cache_discard")
   void discardBeforeDmaWrite(void *address, std::size_t bytes) override {
     arm_dcache_delete(address, static_cast<std::uint32_t>(bytes));
   }
 
-  TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.cache_invalidate")
+  THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.cache_invalidate")
   void invalidateBeforeCpuRead(void *address, std::size_t bytes) override {
     arm_dcache_delete(address, static_cast<std::uint32_t>(bytes));
   }
@@ -116,14 +116,14 @@ class TeensyCacheMaintenance final : public CacheMaintenance {
 
 class TeensyCriticalSection final : public CriticalSection {
  public:
-  TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.critical_enter")
+  THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.critical_enter")
   std::uint32_t enter() override {
     const std::uint32_t primask = readPrimask();
     __disable_irq();
     return primask;
   }
 
-  TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.critical_exit")
+  THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.critical_exit")
   void exit(std::uint32_t token) override { restorePrimask(token); }
 };
 
@@ -373,7 +373,7 @@ void syncPublishedPipelineState() {
                          g_pipeline_destinations[1]};
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.descriptor_flush")
 void flushDescriptor(std::size_t converter, std::uint32_t generation) {
   IMXRT_DMA_TCD_t &descriptor =
@@ -382,7 +382,7 @@ void flushDescriptor(std::size_t converter, std::uint32_t generation) {
   arm_dcache_flush(&descriptor, sizeof(descriptor));
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_append")
 bool appendFutureGeneration() {
   const std::uint32_t latest_generation =
@@ -450,7 +450,7 @@ bool configuredHardwareValid() {
   return true;
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_complete")
 bool processInferredPairCompletion() {
   const std::uint32_t completed_generation = g_pipeline_generations[0];
@@ -482,7 +482,7 @@ bool processInferredPairCompletion() {
   return appendFutureGeneration();
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_wait")
 std::size_t waitForAlignedPipeline() {
   const std::uint32_t started = ARM_DWT_CYCCNT;
@@ -497,7 +497,7 @@ std::size_t waitForAlignedPipeline() {
   return kInvalidPipelineIndex;
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_service")
 bool servicePendingDmaPair() {
   if (!g_hardware_prepared) {
@@ -537,7 +537,7 @@ bool servicePendingDmaPair() {
   return false;
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_isr")
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.pair_isr")
 void adcPairDmaIsr() {
   // Six generation-indexed descriptors are prelinked ahead of hardware.
   // DADDR plus DLASTSGA identifies the active generation when as many as four
@@ -548,7 +548,7 @@ void adcPairDmaIsr() {
   __asm__ volatile("dsb" : : : "memory");
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")
 void adcEtcErrorIsr() {
   const std::uint32_t pending = ADC_ETC_DONE2_ERR_IRQ & kAdcEtcErrorMask;
   if (pending == 0U) {
@@ -611,7 +611,7 @@ std::uint32_t activeMinorPairs(std::size_t converter) {
   return static_cast<std::uint32_t>(biter - citer);
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.target_stop_boundary")
 bool waitForCompleteStopBoundary() {
   if (!g_hardware_prepared || g_faulted) {
@@ -665,7 +665,7 @@ bool waitForCompleteStopBoundary() {
   return completed;
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_inspect")
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_inspect")
 StartStatus inspectHardwareStart(std::uint32_t epoch) {
   if (epoch == 0U) {
     return StartStatus::kInvalidEpoch;
@@ -680,7 +680,7 @@ StartStatus inspectHardwareStart(std::uint32_t epoch) {
                                      : StartStatus::kNotQuiescent;
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_prepare")
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_prepare")
 StartStatus prepareHardware(std::uint32_t epoch) {
   const StartStatus readiness = inspectHardwareStart(epoch);
   if (readiness != StartStatus::kOk) {
@@ -780,7 +780,7 @@ StartStatus prepareHardware(std::uint32_t epoch) {
   return StartStatus::kOk;
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_stop")
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_stop")
 StopReport stopHardwareAfterTriggers() {
   StopReport report{};
   if (!g_hardware_prepared) {
@@ -824,7 +824,7 @@ StopReport stopHardwareAfterTriggers() {
   return report;
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_snapshot")
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_snapshot")
 HardwareSnapshot hardwareSnapshot() {
   HardwareSnapshot value{};
   const std::uint32_t primask = readPrimask();
@@ -917,7 +917,7 @@ HardwareSnapshot TeensyAdcDmaCapture::snapshot() {
   return hardwareSnapshot();
 }
 
-TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.facade")
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.facade")
 TeensyAdcDmaCapture &teensyAdcDmaCapture() { return g_facade; }
 
 static_assert(sizeof(IMXRT_DMA_TCD_t) == board::kEdmaTcdBytes);
@@ -943,8 +943,8 @@ static_assert(kPairDispatchConverter == 1U);
 static_assert(kDmaPipelineDepth == 6U);
 static_assert(kDmaAlignmentWaitCycles == 6000U);
 
-}  // namespace teensy_daq::adc_capture
+}  // namespace thingdaq::adc_capture
 
-#undef TEENSY_DAQ_ADC_DMA_TARGET_COLD_CODE
+#undef THINGDAQ_ADC_DMA_TARGET_COLD_CODE
 
 #endif

@@ -49,7 +49,7 @@ class ReaderError(RuntimeError):
         self.cause = cause
         self.reader_counters: ReaderCounters | None = None
         self.parser_counters: ParserCounters | None = None
-        # The public TeensyDAQ facade fills this with its last firmware and
+        # The public ThingDAQ facade fills this with its last firmware and
         # loss snapshot before re-raising a terminal reader error.
         self.evidence: object | None = None
 
@@ -376,7 +376,7 @@ class BackgroundReader:
                 raise DeviceDisconnectedError("transport is not open")
             self._thread = Thread(
                 target=self._reader_loop,
-                name=f"teensy-daq-reader-{id(self):x}",
+                name=f"thingdaq-reader-{id(self):x}",
                 daemon=False,
             )
             self._started = True

@@ -13,24 +13,24 @@
 
 namespace {
 
-namespace app = teensy_daq::runtime;
-namespace acquisition = teensy_daq::acquisition;
-namespace adc = teensy_daq::adc;
-namespace adc_capture = teensy_daq::adc_capture;
-namespace adc_packer = teensy_daq::adc_packer;
-namespace adc_trigger = teensy_daq::adc_trigger;
-namespace benchmark = teensy_daq::benchmark;
-namespace board = teensy_daq::board;
-namespace constants = teensy_daq::protocol_v1;
-namespace control = teensy_daq::control;
-namespace gpio_clock = teensy_daq::gpio_clock;
-namespace gpio_capture = teensy_daq::gpio_capture;
-namespace gpio_packer = teensy_daq::gpio_packer;
-namespace identity = teensy_daq::identity;
-namespace packet = teensy_daq::packet;
-namespace synthetic = teensy_daq::synthetic;
-namespace usb = teensy_daq::usb;
-namespace wire = teensy_daq::protocol;
+namespace app = thingdaq::runtime;
+namespace acquisition = thingdaq::acquisition;
+namespace adc = thingdaq::adc;
+namespace adc_capture = thingdaq::adc_capture;
+namespace adc_packer = thingdaq::adc_packer;
+namespace adc_trigger = thingdaq::adc_trigger;
+namespace benchmark = thingdaq::benchmark;
+namespace board = thingdaq::board;
+namespace constants = thingdaq::protocol_v1;
+namespace control = thingdaq::control;
+namespace gpio_clock = thingdaq::gpio_clock;
+namespace gpio_capture = thingdaq::gpio_capture;
+namespace gpio_packer = thingdaq::gpio_packer;
+namespace identity = thingdaq::identity;
+namespace packet = thingdaq::packet;
+namespace synthetic = thingdaq::synthetic;
+namespace usb = thingdaq::usb;
+namespace wire = thingdaq::protocol;
 
 int failures = 0;
 
@@ -684,43 +684,43 @@ class LifecycleGpioCapture final : public gpio_capture::HardwareCapture {
   bool leased_ = false;
 };
 
-class AuditGpioCapture final : public teensy_daq::gpio_capture::HardwareCapture {
+class AuditGpioCapture final : public thingdaq::gpio_capture::HardwareCapture {
  public:
-  teensy_daq::gpio_capture::StartStatus inspectStart() override {
+  thingdaq::gpio_capture::StartStatus inspectStart() override {
     ++inspect_calls;
     return inspect_status;
   }
-  teensy_daq::gpio_capture::StartStatus prepare() override {
+  thingdaq::gpio_capture::StartStatus prepare() override {
     return inspect_status;
   }
-  teensy_daq::gpio_capture::StartStatus start() override {
+  thingdaq::gpio_capture::StartStatus start() override {
     return inspect_status;
   }
-  teensy_daq::gpio_capture::StopReport stopAfterTriggers() override {
+  thingdaq::gpio_capture::StopReport stopAfterTriggers() override {
     return {};
   }
-  teensy_daq::gpio_capture::StopReport stop() override { return {}; }
-  teensy_daq::gpio_capture::AcquireResult acquireReady() override {
+  thingdaq::gpio_capture::StopReport stop() override { return {}; }
+  thingdaq::gpio_capture::AcquireResult acquireReady() override {
     return {};
   }
-  teensy_daq::gpio_capture::OperationStatus release(
-      const teensy_daq::gpio_capture::BufferHandle &) override {
-    return teensy_daq::gpio_capture::OperationStatus::kInvalidHandle;
+  thingdaq::gpio_capture::OperationStatus release(
+      const thingdaq::gpio_capture::BufferHandle &) override {
+    return thingdaq::gpio_capture::OperationStatus::kInvalidHandle;
   }
-  teensy_daq::gpio_capture::Snapshot rawSnapshot() override {
+  thingdaq::gpio_capture::Snapshot rawSnapshot() override {
     return snapshot;
   }
 
-  teensy_daq::gpio_capture::StartStatus inspect_status =
-      teensy_daq::gpio_capture::StartStatus::kOk;
-  teensy_daq::gpio_capture::Snapshot snapshot{};
+  thingdaq::gpio_capture::StartStatus inspect_status =
+      thingdaq::gpio_capture::StartStatus::kOk;
+  thingdaq::gpio_capture::Snapshot snapshot{};
   std::uint32_t inspect_calls = 0U;
 };
 
 struct CombinedControllerFixture {
   packet::OwnedPacketBufferStorage packet_storage{};
   packet::PacketBufferPipeline packet_pipeline{packet_storage};
-  teensy_daq::stats::Statistics statistics{};
+  thingdaq::stats::Statistics statistics{};
   std::vector<std::string> operations{};
   ReadyAdcPlatform adc_platform{};
   adc::Initializer adc_initializer{adc_platform};
@@ -1055,7 +1055,7 @@ void testCompleteControlPlane() {
                  static_cast<std::uint8_t>(constants::DeviceState::kIdle),
          "final INFO proves retained run provenance and clean IDLE");
 
-  const teensy_daq::stats::Snapshot statistics = firmware.statistics().snapshot();
+  const thingdaq::stats::Snapshot statistics = firmware.statistics().snapshot();
   const usb::TransportSnapshot transport = firmware.transportSnapshot();
   expect(statistics.generation == 3U &&
              statistics.commands_accepted == 2U &&
@@ -1140,7 +1140,7 @@ void testSyntheticDataCountersReachStatus() {
       emptyRequest(constants::FrameKind::kGetStatusRequest, 103U));
   expect(drain(firmware, stream).quiescent,
          "STATUS is serviced while the paced source waits for its deadline");
-  const teensy_daq::stats::Snapshot native_counters =
+  const thingdaq::stats::Snapshot native_counters =
       firmware.statistics().snapshot();
   expect(native_counters.data_path.adc.items_generated ==
                  constants::kAdcPairsPerFrame &&
@@ -1469,7 +1469,7 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
 void testAcquisitionControllerAuditsBothPhysicalEnginesAtomically() {
   packet::OwnedPacketBufferStorage packet_storage{};
   packet::PacketBufferPipeline packet_pipeline{packet_storage};
-  teensy_daq::stats::Statistics statistics{};
+  thingdaq::stats::Statistics statistics{};
   std::vector<std::string> operations{};
   ReadyAdcPlatform adc_platform{};
   adc::Initializer adc_initializer{adc_platform};
@@ -1506,7 +1506,7 @@ void testAcquisitionControllerAuditsBothPhysicalEnginesAtomically() {
              ready.adc_inspected && ready.gpio_inspected &&
              ready.adc_capture_status == adc_capture::StartStatus::kOk &&
              ready.gpio_capture_status ==
-                 teensy_daq::gpio_capture::StartStatus::kOk &&
+                 thingdaq::gpio_capture::StartStatus::kOk &&
              adc_capture.inspect_calls == 1U &&
              gpio_capture.inspect_calls == 1U && operations.empty(),
          "combined preflight audits both engines without arming hardware");
@@ -1529,7 +1529,7 @@ void testAcquisitionControllerAuditsBothPhysicalEnginesAtomically() {
          "combined preflight rejects the full configuration and run identity before target inspection");
 
   gpio_capture.inspect_status =
-      teensy_daq::gpio_capture::StartStatus::kResourceBusy;
+      thingdaq::gpio_capture::StartStatus::kResourceBusy;
   const acquisition::Audit conflict = controller.inspect(combined, 2U);
   expect(!conflict.ready() &&
              conflict.has(acquisition::Conflict::kGpioCaptureUnavailable) &&
@@ -1552,7 +1552,7 @@ void testAcquisitionControllerAuditsBothPhysicalEnginesAtomically() {
 void testCombinedControllerUsesOneEpochAndDeterministicLifecycle() {
   packet::OwnedPacketBufferStorage packet_storage{};
   packet::PacketBufferPipeline packet_pipeline{packet_storage};
-  teensy_daq::stats::Statistics statistics{};
+  thingdaq::stats::Statistics statistics{};
   std::vector<std::string> operations{};
   ReadyAdcPlatform adc_platform{};
   adc::Initializer adc_initializer{adc_platform};
@@ -1726,7 +1726,7 @@ void testCombinedControllerUsesOneEpochAndDeterministicLifecycle() {
 void testCombinedStartRollsBackEveryPreparedOwner() {
   packet::OwnedPacketBufferStorage packet_storage{};
   packet::PacketBufferPipeline packet_pipeline{packet_storage};
-  teensy_daq::stats::Statistics statistics{};
+  thingdaq::stats::Statistics statistics{};
   std::vector<std::string> operations{};
   ReadyAdcPlatform adc_platform{};
   adc::Initializer adc_initializer{adc_platform};
@@ -2110,7 +2110,7 @@ void testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState() {
       stream, packet_storage, clock, synthetic::Mode::kRealtime,
       &checksum_benchmark};
   expect(firmware.begin(9876U), "benchmark runtime completes BOOT");
-  const teensy_daq::stats::Snapshot before =
+  const thingdaq::stats::Snapshot before =
       firmware.statistics().snapshot();
 
   stream.appendInput(checksumBenchmarkRequest(301U));
@@ -2137,7 +2137,7 @@ void testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState() {
                raw_cycles == 104U && net_cycles == 100U,
            "runtime transports calibrated on-device cycle fields unchanged");
   }
-  const teensy_daq::stats::Snapshot after =
+  const thingdaq::stats::Snapshot after =
       firmware.statistics().snapshot();
   expect(after.generation == before.generation &&
              after.adc_frames_emitted == before.adc_frames_emitted &&
@@ -2163,7 +2163,7 @@ void testGpioClockRoundTripPreservesIdleAcquisitionState() {
       stream, packet_storage, clock, synthetic::Mode::kRealtime, nullptr,
       &diagnostic};
   expect(firmware.begin(9877U), "GPIO clock runtime completes BOOT");
-  const teensy_daq::stats::Snapshot before =
+  const thingdaq::stats::Snapshot before =
       firmware.statistics().snapshot();
 
   stream.appendInput(gpioClockDiagnosticRequest(302U, 1000000U, 4096U));
@@ -2203,7 +2203,7 @@ void testGpioClockRoundTripPreservesIdleAcquisitionState() {
                dma_samples == 4096U && error_flags == 0U,
            "runtime transports exact rate, counts, and hardware status");
   }
-  const teensy_daq::stats::Snapshot after =
+  const thingdaq::stats::Snapshot after =
       firmware.statistics().snapshot();
   expect(platform.calls == 1U && platform.observed.pit_load_value == 23U &&
              after.generation == before.generation &&

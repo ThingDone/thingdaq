@@ -1,10 +1,10 @@
 ---
 type: reference
-title: Teensy DAQ Python Package
+title: ThingDAQ Python Package
 created: 2026-08-27
 updated: 2026-08-30
 tags:
-  - teensy-daq
+  - thingdaq
   - python
   - package
   - local-development
@@ -21,12 +21,12 @@ related:
   - '[[NumPy-Integration]]'
 ---
 
-# Teensy DAQ Python package
+# ThingDAQ Python package
 
 This directory contains the private, local-development Python distribution for
-the Teensy DAQ host API. The single authoritative installable distribution name
+the ThingDAQ host API. The single authoritative installable distribution name
 is `[project].name` in `pyproject.toml`, while the stable import package is
-`teensy_daq`.
+`thingdaq`.
 
 Start with [[Quickstart]], read [[Hardware-Safety]] before connecting signals,
 and use [[API-Reference]] for the stable public surface.
@@ -46,8 +46,8 @@ See [[System-Overview]] for the package boundary and
 
 The host API and firmware are versioned independently from the wire protocol;
 the current release candidate assigns semantic version `1.0.0` to both. The
-host value is single-sourced in `teensy_daq._version`, exposed as
-`teensy_daq.__version__`, and consumed by the build metadata declared in
+host value is single-sourced in `thingdaq._version`, exposed as
+`thingdaq.__version__`, and consumed by the build metadata declared in
 `pyproject.toml`. Firmware single-sources its value in
 `firmware/src/firmware_identity.h` and reports it through INFO. The supported
 interpreter range is CPython 3.10 through 3.14; the base dependency is PySerial,
@@ -62,13 +62,15 @@ Python examples. Tests, captures, firmware
 builds, credentials, local calibration records, the canonical protocol JSON,
 the generator, and golden fixtures are deliberately excluded. The latter three
 are repository validation inputs, not runtime inputs: installed code uses the
-tracked `teensy_daq._generated.protocol_constants` module.
+tracked `thingdaq._generated.protocol_constants` module.
 
-The local distribution remains marked `Private :: Do Not Upload`. PJRC presents
-the hardware under the registered `Teensy®` name at
-https://www.pjrc.com/teensy/. Trademark usage and package-index naming require
-review, and `[project].name` may need replacement, before any PyPI submission.
-Do not reserve, upload, or publish this distribution from repository workflows.
+The local distribution remains marked `Private :: Do Not Upload`; package-index
+availability and publication readiness require review before any PyPI
+submission. Do not reserve, upload, or publish this distribution from
+repository workflows. ThingDAQ is independent and is not affiliated with or
+endorsed by PJRC.COM, LLC or SparkFun Electronics. Teensy® is a registered
+trademark of PJRC.COM, LLC and identifies the supported hardware platform, not
+the ThingDAQ product name.
 The distribution declares the SPDX `MIT` license expression and includes the
 project license in both wheel and source-distribution artifacts.
 
@@ -88,7 +90,7 @@ state, and `SOURCE_DATE_EPOCH`.
 
 ## Synchronous public and simulator API
 
-The synchronous `TeensyDAQ` facade operates on a small `ByteTransport`
+The synchronous `ThingDAQ` facade operates on a small `ByteTransport`
 interface. `InMemoryTransport` connects that facade to `SimulatedDevice`
 through encoded protocol-v1 bytes, including arbitrary partial read/write
 boundaries. `SerialTransport` implements the same interface over PySerial, so
@@ -97,9 +99,9 @@ facade itself always starts one `BackgroundReader`; the simulator does not use
 a second command decoder or direct-read shortcut:
 
 ```python
-from teensy_daq import ADCBlock, HostQueueLoss, StreamAnomaly, StreamGap, TeensyDAQ
+from thingdaq import ADCBlock, HostQueueLoss, StreamAnomaly, StreamGap, ThingDAQ
 
-with TeensyDAQ.simulated(read_chunk_size=47) as daq:
+with ThingDAQ.simulated(read_chunk_size=47) as daq:
     info = daq.info()
     applied = daq.configure(
         adc=True,
@@ -125,13 +127,13 @@ with TeensyDAQ.simulated(read_chunk_size=47) as daq:
     generation = daq.reset_stats()  # valid after STOP, or while CONFIGURED
 ```
 
-`TeensyDAQ.open(...)` and `TeensyDAQ.simulated(...)` return the same typed
+`ThingDAQ.open(...)` and `ThingDAQ.simulated(...)` return the same typed
 context manager. Exiting it attempts bounded STOP when needed, closes the
 reader/transport deterministically, and preserves typed shutdown evidence.
-Normal applications import the facade and immutable models from `teensy_daq`.
+Normal applications import the facade and immutable models from `thingdaq`.
 Raw frames, parsers, the background reader, and byte transports remain
 available for protocol tooling under the explicitly expert-only
-`teensy_daq.low_level` namespace; existing root imports remain stable for
+`thingdaq.low_level` namespace; existing root imports remain stable for
 compatibility.
 
 CONFIGURE is capability-driven. The facade rejects unsupported stream, source,
@@ -196,7 +198,7 @@ no pass/fail speed field because host-specific performance is not a wire
 compatibility decision:
 
 ```bash
-python -m teensy_daq.checksum_benchmark --algorithms all
+python -m thingdaq.checksum_benchmark --algorithms all
 ```
 
 On firmware 0.6.0 or newer, the target-only clock diagnostic returns one
@@ -204,7 +206,7 @@ read-only register/count snapshot without starting acquisition or touching a
 GPIO pad:
 
 ```python
-with TeensyDAQ.open(hardware_serial=12345670) as daq:
+with ThingDAQ.open(hardware_serial=12345670) as daq:
     evidence = daq.gpio_clock_diagnostic(rate_hz=4_000_000, event_count=8192)
     if not evidence.healthy:
         raise RuntimeError(evidence.hardware_error_flags)
@@ -225,9 +227,9 @@ aligned rings, frame sizes, queue capacities, and checksum. STATUS exposes all
 per-source/shared stage, byte, queue, firmware-diagnostic, and USB counters:
 
 ```python
-from teensy_daq import Source, TeensyDAQ
+from thingdaq import Source, ThingDAQ
 
-with TeensyDAQ.open(hardware_serial=12345670) as daq:
+with ThingDAQ.open(hardware_serial=12345670) as daq:
     evidence = daq.gpio_capture_diagnostic()
     applied = daq.configure(adc=True, gpio=True, source=Source.HARDWARE)
     run_id = daq.start()
@@ -248,18 +250,18 @@ selected port is INFO-probed again so hot re-enumeration cannot silently open a
 different unit:
 
 ```python
-from teensy_daq import ExpectedDeviceIdentity, TeensyDAQ, discover
+from thingdaq import ExpectedDeviceIdentity, ThingDAQ, discover
 
 devices = discover(timeout=0.2)
-with TeensyDAQ.open(devices[0]) as daq:
+with ThingDAQ.open(devices[0]) as daq:
     print(daq.device_info.hardware_serial)
 
 expected = ExpectedDeviceIdentity(
     hardware_serial=12345670,
     firmware_version=(0, 3, 0),
-    build_id="tdaq-39300273210c1c89",
+    build_id="thingdaq-39300273210c1c89",
 )
-with TeensyDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
+with ThingDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
     print(daq.device_info.build_id)
 ```
 
@@ -269,7 +271,7 @@ board/MCU pair, and hardware serial. INFO timeouts plus typed BOOT/BUSY replies
 are retried only within the configured attempt bound; unframed CDC reset noise
 is discarded by the incremental parser. Physical targets must be Teensy
 4.0/i.MX RT1062 firmware version 0.3.0 or newer with a nonzero serial and a
-`tdaq-` source build ID. `ExpectedDeviceIdentity` adds exact firmware, build,
+`thingdaq-` source build ID. `ExpectedDeviceIdentity` adds exact firmware, build,
 and serial pins when a particular artifact is required.
 
 ### Reopen policy and recovery evidence
@@ -283,15 +285,15 @@ sequence-zero gap; it remains visible in the firmware STATUS counters. Select
 `STOP` when a new process must force a known IDLE boundary instead:
 
 ```python
-from teensy_daq import SessionRecoveryPolicy, TeensyDAQ
+from thingdaq import SessionRecoveryPolicy, ThingDAQ
 
-adopted = TeensyDAQ.open(
+adopted = ThingDAQ.open(
     hardware_serial=12345670,
     session_policy=SessionRecoveryPolicy.ADOPT,
 )
 adopted.close(stop=False)  # deliberately leave the device state unchanged
 
-with TeensyDAQ.open(
+with ThingDAQ.open(
     hardware_serial=12345670,
     session_policy=SessionRecoveryPolicy.STOP,
 ) as stopped:
@@ -301,7 +303,7 @@ with TeensyDAQ.open(
 Command deadlines raise `CommandTimeoutError` with an immutable
 `RecoveryEvidence` snapshot. Terminal `DeviceDisconnectedError` and
 `ReaderProtocolError` retain both reader/parser counter snapshots and the same
-facade evidence when surfaced through `TeensyDAQ`. `close()` always attempts a
+facade evidence when surfaced through `ThingDAQ`. `close()` always attempts a
 bounded reader/transport shutdown even if STOP fails; a resulting
 `DAQShutdownError` preserves both failures plus the last identity, state, run,
 STATUS, host counters, parser counters, and observed loss/telemetry evidence.
@@ -314,7 +316,7 @@ explicit method so this milestone profile cannot be confused with a disabled
 or unsupported acquisition request:
 
 ```python
-with TeensyDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
+with ThingDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
     applied = daq.configure_control_only()
     run_id = daq.start()
     running = daq.status()
@@ -322,24 +324,24 @@ with TeensyDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq
     generation = daq.reset_stats()
 ```
 
-`TeensyDAQ.simulated(control_only=True)` exercises the identical zero-stream
+`ThingDAQ.simulated(control_only=True)` exercises the identical zero-stream
 CONFIGURE/START/STATUS/STOP/RESET_STATS schemas without serial hardware. The
 default simulator retains its synthetic ADC/GPIO behavior.
 
-The installed `teensy-daq` command exposes bounded one-shot hardware controls:
+The installed `thingdaq` command exposes bounded one-shot hardware controls:
 
 ```bash
-teensy-daq list
-teensy-daq probe --hardware-serial 12345670 --expect-build-id tdaq-39300273210c1c89
-teensy-daq status --hardware-serial 12345670
-teensy-daq configure --hardware-serial 12345670 --streams both --source hardware
-teensy-daq start --hardware-serial 12345670
-teensy-daq stop --hardware-serial 12345670
-teensy-daq reset-stats --hardware-serial 12345670
-teensy-daq reconcile --hardware-serial 12345670
-teensy-daq monitor --hardware-serial 12345670 --streams both --source hardware --duration 10
-teensy-daq capture --simulate --streams both --source synthetic --duration 2 --strict-loss --gpio-channel D6 --gpio-channel D13
-teensy-daq info --simulate --json
+thingdaq list
+thingdaq probe --hardware-serial 12345670 --expect-build-id thingdaq-39300273210c1c89
+thingdaq status --hardware-serial 12345670
+thingdaq configure --hardware-serial 12345670 --streams both --source hardware
+thingdaq start --hardware-serial 12345670
+thingdaq stop --hardware-serial 12345670
+thingdaq reset-stats --hardware-serial 12345670
+thingdaq reconcile --hardware-serial 12345670
+thingdaq monitor --hardware-serial 12345670 --streams both --source hardware --duration 10
+thingdaq capture --simulate --streams both --source synthetic --duration 2 --strict-loss --gpio-channel D6 --gpio-channel D13
+thingdaq info --simulate --json
 ```
 
 `list` uses VID/PID metadata and opens nothing. Every other command performs
@@ -370,7 +372,7 @@ views and can be repeated. Set `--sample-limit 0` for telemetry only.
 Calibrated preview is opt-in and requires an explicit user path:
 
 ```bash
-teensy-daq capture --hardware-serial 12345670 --streams adc --source hardware \
+thingdaq capture --hardware-serial 12345670 --streams adc --source hardware \
   --adc-output calibrated --calibration /explicit/path/calibration.json \
   --analog-front-end-profile buffered-input --duration 10 --strict-loss --json
 ```
@@ -422,7 +424,7 @@ increase either input's analog bandwidth. GPIO payloads remain packed, and
 `block.channel(pin)` lazily extracts D6-D13 without an eager eightfold Boolean
 expansion. None of these operations imports or requires NumPy.
 
-The optional `teensy_daq.numpy` module vectorizes the same models without
+The optional `thingdaq.numpy` module vectorizes the same models without
 changing that baseline. `block.as_numpy().pairs` is a read-only, zero-copy
 `(1012, 2)` `<u2` view in ADC0/ADC1 order, and a GPIO block's corresponding
 `packed` view is read-only, zero-copy `uint8`. Explicit methods generate
@@ -485,7 +487,7 @@ Applications that need equal-time cross-stream records feed data blocks and
 combined payload:
 
 ```python
-from teensy_daq import AlignedInterval, AlignmentLoss, TimestampAligner
+from thingdaq import AlignedInterval, AlignmentLoss, TimestampAligner
 
 aligner = TimestampAligner(max_pending_intervals=8)
 
@@ -573,9 +575,9 @@ counters without changing production `loss_counters()` behavior.
 For a complete bounded run, use the reusable soak layer:
 
 ```python
-from teensy_daq import TeensyDAQ, run_synthetic_soak
+from thingdaq import ThingDAQ, run_synthetic_soak
 
-with TeensyDAQ.open(hardware_serial=12345670, strict=True) as daq:
+with ThingDAQ.open(hardware_serial=12345670, strict=True) as daq:
     metrics = run_synthetic_soak(
         daq,
         duration=10.0,
@@ -602,19 +604,19 @@ soaks normally use `duration=`.
 
 ## Identity-pinned Windows soak command
 
-The installed distribution includes `teensy-daq-soak`, an identity-pinned
+The installed distribution includes `thingdaq-soak`, an identity-pinned
 Windows COM-port validator equivalent to the standalone
 `scripts/windows_soak.py` handoff. The console script executes the generated
-implementation packaged as `teensy_daq.soak`; it does not locate or import the
+implementation packaged as `thingdaq.soak`; it does not locate or import the
 repository script. Both paths accept the same operational arguments and write
 the same complete JSON plus structured-Markdown report schema:
 
 ```powershell
-teensy-daq-soak --duration 3600 --mode combined `
-  --output teensy-daq-windows-soak
+thingdaq-soak --duration 3600 --mode combined `
+  --output thingdaq-windows-soak
 
-teensy-daq-soak --smoke --mode synthetic `
-  --hardware-serial 20512460 --output teensy-daq-smoke
+thingdaq-soak --smoke --mode synthetic `
+  --hardware-serial 20512460 --output thingdaq-smoke
 ```
 
 Both entry paths embed and verify the deterministic Phase 11 release contract
@@ -630,7 +632,7 @@ the mismatched INFO fields, and force `release_eligible` to `false` even if the
 stream itself passes:
 
 ```powershell
-teensy-daq-soak --diagnostic-identity-override `
+thingdaq-soak --diagnostic-identity-override `
   --hardware-serial 12345670 --smoke --output non-release-diagnostic
 ```
 
@@ -639,7 +641,7 @@ parsing, formula validation, rate/latency metrics, and deterministic fixture
 grading without opening a COM port:
 
 ```powershell
-teensy-daq-soak --conformance-check
+thingdaq-soak --conformance-check
 ```
 
 Repository validation additionally runs
@@ -653,7 +655,7 @@ golden protocol fixtures. See [[soak-harness]] and
 Discovery never opens unrelated serial ports. `enumerate_candidates()` uses
 PySerial metadata only, filters for the Teensy USB Serial VID/PID
 `0x16C0:0x0483`, preserves the port path, USB serial, product, manufacturer,
-location, interface, and description, and orders the exact `Teensy DAQ`
+location, interface, and description, and orders the exact `ThingDAQ`
 product string first. Matching VID/PID entries with missing, default, or cached
 product strings remain candidates so platform metadata quirks do not hide a
 DAQ.
@@ -667,7 +669,7 @@ again, and `DeviceIdentity` plus `select_device()` use the hardware serial
 rather than treating a COM number or `/dev` path as persistent identity:
 
 ```python
-from teensy_daq import discover, enumerate_candidates, select_device
+from thingdaq import discover, enumerate_candidates, select_device
 
 candidates = enumerate_candidates()  # metadata only; opens nothing
 devices = discover(timeout=0.2)
@@ -688,6 +690,6 @@ counters, and the clean IDLE landing. Every sample is checked and a mismatch
 returns a nonzero exit status:
 
 ```bash
-python -m teensy_daq.demo --frame-count 2 --parser-chunk-size 17
-teensy-daq-demo --frame-count 2 --parser-chunk-size 17
+python -m thingdaq.demo --frame-count 2 --parser-chunk-size 17
+thingdaq-demo --frame-count 2 --parser-chunk-size 17
 ```

@@ -41,7 +41,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-runtime-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-runtime-") as directory:
             executable = Path(directory) / "firmware-runtime-test"
             compile_result = subprocess.run(
                 [

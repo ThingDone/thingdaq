@@ -3,13 +3,13 @@
 #include <limits>
 
 #if defined(__IMXRT1062__)
-#define TEENSY_DAQ_GPIO_RAW_COLD_CODE(section_name) \
+#define THINGDAQ_GPIO_RAW_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 #else
-#define TEENSY_DAQ_GPIO_RAW_COLD_CODE(section_name)
+#define THINGDAQ_GPIO_RAW_COLD_CODE(section_name)
 #endif
 
-namespace teensy_daq::gpio_capture {
+namespace thingdaq::gpio_capture {
 namespace {
 
 template <typename Integer>
@@ -29,7 +29,7 @@ constexpr bool isBufferDestination(std::uint8_t destination) {
 
 }  // namespace
 
-TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.diagnostic_acquire")
+THINGDAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.diagnostic_acquire")
 RawWordDiagnosticAcquireResult BoundedRawWordDiagnostic::acquire(
     std::uint32_t sample_limit) {
   RawWordDiagnosticAcquireResult result{};
@@ -59,7 +59,7 @@ RawWordDiagnosticAcquireResult BoundedRawWordDiagnostic::acquire(
   return result;
 }
 
-TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.diagnostic_release")
+THINGDAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.diagnostic_release")
 OperationStatus BoundedRawWordDiagnostic::release(
     const RawWordDiagnosticLease &lease) {
   if (!lease.valid()) {
@@ -68,7 +68,7 @@ OperationStatus BoundedRawWordDiagnostic::release(
   return source_.release(lease.owner);
 }
 
-TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.prime")
+THINGDAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.prime")
 PrimeResult RawCaptureRing::prime() {
   PrimeResult result{};
   const std::uint32_t token = critical_.enter();
@@ -184,7 +184,7 @@ MajorLoopResult RawCaptureRing::onMajorLoopComplete() {
   return result;
 }
 
-TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.acquire")
+THINGDAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.acquire")
 AcquireResult RawCaptureRing::acquireReady() {
   AcquireResult result{};
   const std::uint32_t token = critical_.enter();
@@ -226,7 +226,7 @@ AcquireResult RawCaptureRing::acquireReady() {
   return result;
 }
 
-TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.release")
+THINGDAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.release")
 OperationStatus RawCaptureRing::release(const BufferHandle &handle) {
   std::uint32_t token = critical_.enter();
   if (!handleMatches(handle, BufferState::kPacking)) {
@@ -254,7 +254,7 @@ OperationStatus RawCaptureRing::release(const BufferHandle &handle) {
   return OperationStatus::kOk;
 }
 
-TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.stop")
+THINGDAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.stop")
 StopReport RawCaptureRing::stop(std::uint32_t active_samples) {
   StopReport report{};
   if (active_samples > protocol_v1::kGpioSamplesPerFrame) {
@@ -329,7 +329,7 @@ void RawCaptureRing::recordHardwareError() {
   critical_.exit(token);
 }
 
-TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.snapshot")
+THINGDAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.snapshot")
 Snapshot RawCaptureRing::snapshot() {
   Snapshot value{};
   const std::uint32_t token = critical_.enter();
@@ -349,7 +349,7 @@ Snapshot RawCaptureRing::snapshot() {
   return value;
 }
 
-TEENSY_DAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.quiescent")
+THINGDAQ_GPIO_RAW_COLD_CODE(".flashmem.gpio_raw.quiescent")
 bool RawCaptureRing::quiescent() {
   const std::uint32_t token = critical_.enter();
   const bool value = !running_ && allBuffersFree();
@@ -443,6 +443,6 @@ void RawCaptureRing::noteInvariantError() {
   saturatingIncrement(invariant_errors_);
 }
 
-}  // namespace teensy_daq::gpio_capture
+}  // namespace thingdaq::gpio_capture
 
-#undef TEENSY_DAQ_GPIO_RAW_COLD_CODE
+#undef THINGDAQ_GPIO_RAW_COLD_CODE

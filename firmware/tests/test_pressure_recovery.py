@@ -40,7 +40,7 @@ class FirmwarePressureRecoveryTests(unittest.TestCase):
             self.skipTest("g++ is required for portable firmware tests")
 
         with tempfile.TemporaryDirectory(
-            prefix="teensy-daq-pressure-recovery-"
+            prefix="thingdaq-pressure-recovery-"
         ) as directory:
             executable = Path(directory) / "pressure-recovery-test"
             compiled = subprocess.run(
@@ -56,7 +56,7 @@ class FirmwarePressureRecoveryTests(unittest.TestCase):
                     "-pedantic",
                     "-fno-exceptions",
                     "-fno-rtti",
-                    "-DTEENSY_DAQ_TESTING=1",
+                    "-DTHINGDAQ_TESTING=1",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
                     *(str(FIRMWARE_SOURCE / source) for source in PRODUCTION_SOURCES),

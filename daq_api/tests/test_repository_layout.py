@@ -12,7 +12,7 @@ REQUIRED_DIRECTORIES = (
     "firmware/src",
     "firmware/tools",
     "firmware/tests",
-    "daq_api/src/teensy_daq",
+    "daq_api/src/thingdaq",
     "daq_api/tests",
     "doc/architecture",
     "doc/guides",
@@ -45,7 +45,7 @@ class RepositoryLayoutTests(unittest.TestCase):
         )
         self.assertTrue(pyproject["project"]["name"])
         self.assertTrue(
-            (REPOSITORY_ROOT / "daq_api/src/teensy_daq/__init__.py").is_file()
+            (REPOSITORY_ROOT / "daq_api/src/thingdaq/__init__.py").is_file()
         )
 
     def test_doc_markdown_has_required_yaml_front_matter(self) -> None:

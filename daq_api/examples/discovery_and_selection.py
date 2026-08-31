@@ -7,11 +7,11 @@ attached Teensy 4.0 and may require ``--hardware-serial`` when several exist.
 from __future__ import annotations
 
 from _common import example_parser, open_example, print_target, require_info
-from teensy_daq import TeensyDAQ, discover, select_device
+from thingdaq import ThingDAQ, discover, select_device
 
 
 def main() -> int:
-    parser = example_parser("Discover a Teensy DAQ and select its stable serial")
+    parser = example_parser("Discover a ThingDAQ and select its stable serial")
     arguments = parser.parse_args()
 
     if not arguments.real:
@@ -41,7 +41,7 @@ def main() -> int:
         raise RuntimeError(
             "connect exactly one compatible device or pass --hardware-serial"
         )
-    with TeensyDAQ.open(selected) as daq:
+    with ThingDAQ.open(selected) as daq:
         print_target(arguments, require_info(daq))
     return 0
 

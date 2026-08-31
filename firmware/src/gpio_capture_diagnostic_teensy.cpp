@@ -12,10 +12,10 @@
 #include "gpio_batch_packer.h"
 #include "gpio_raw_capture_teensy.h"
 
-#define TEENSY_DAQ_GPIO_DIAGNOSTIC_TARGET_CODE(section_name) \
+#define THINGDAQ_GPIO_DIAGNOSTIC_TARGET_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 
-namespace teensy_daq::gpio_diagnostic {
+namespace thingdaq::gpio_diagnostic {
 namespace {
 
 constexpr std::uint32_t kDiagnosticTimeoutCycles =
@@ -113,7 +113,7 @@ void analyze(const gpio_capture::RawWordDiagnosticLease &lease,
 
 class TeensyPlatform final : public Platform {
  public:
-  TEENSY_DAQ_GPIO_DIAGNOSTIC_TARGET_CODE(
+  THINGDAQ_GPIO_DIAGNOSTIC_TARGET_CODE(
       ".flashmem.gpio_diagnostic.target")
   bool execute(const Plan &plan, Snapshot &snapshot) override {
     snapshot.mode = plan.mode;
@@ -217,8 +217,8 @@ static_assert(board::kGpioEdmaChannel == 2U);
 static_assert(board::kGpioPitChannel == 0U);
 static_assert(kDiagnosticTimeoutCycles == 6000000U);
 
-}  // namespace teensy_daq::gpio_diagnostic
+}  // namespace thingdaq::gpio_diagnostic
 
-#undef TEENSY_DAQ_GPIO_DIAGNOSTIC_TARGET_CODE
+#undef THINGDAQ_GPIO_DIAGNOSTIC_TARGET_CODE
 
 #endif

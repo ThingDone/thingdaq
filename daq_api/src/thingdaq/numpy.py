@@ -1,6 +1,6 @@
 """Optional NumPy views and vectorized transforms for DAQ data blocks.
 
-Importing :mod:`teensy_daq` never imports NumPy.  This module is loaded only
+Importing :mod:`thingdaq` never imports NumPy.  This module is loaded only
 when a caller imports it explicitly or calls ``ADCBlock.as_numpy()`` or
 ``GPIOBlock.as_numpy()``.
 """

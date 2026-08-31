@@ -19,7 +19,7 @@ class AdcInitializerTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-adc-init-") as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-adc-init-") as directory:
             executable = Path(directory) / "adc-initializer-test"
             compiled = subprocess.run(
                 [

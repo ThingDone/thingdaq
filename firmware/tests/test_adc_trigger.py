@@ -19,7 +19,7 @@ class AdcTriggerTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="teensy-daq-adc-trigger-") as path:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-adc-trigger-") as path:
             executable = Path(path) / "adc-trigger-test"
             compile_result = subprocess.run(
                 [

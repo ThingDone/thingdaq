@@ -10,7 +10,7 @@
 
 namespace {
 
-namespace checksum = teensy_daq::checksum;
+namespace checksum = thingdaq::checksum;
 
 constexpr std::array<checksum::Algorithm, 3U> kAlgorithms{
     checksum::Algorithm::kAdler32,

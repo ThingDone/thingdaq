@@ -13,10 +13,10 @@
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
 
-#define TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(section_name) \
+#define THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 
-namespace teensy_daq::gpio_capture {
+namespace thingdaq::gpio_capture {
 
 struct alignas(board::kCacheLineBytes) DescriptorBank {
   std::array<IMXRT_DMA_TCD_t, board::kGpioRawDmaDescriptorCount>
@@ -32,7 +32,7 @@ DescriptorBank g_gpio_raw_dma_descriptors
 
 namespace {
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.allocations")
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.allocations")
 void *retainDmaAllocations() {
   __asm__ volatile(""
                    :
@@ -64,12 +64,12 @@ std::uint32_t readPrimask() {
 
 class TeensyCacheMaintenance final : public CacheMaintenance {
  public:
-  TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.cache_discard")
+  THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.cache_discard")
   void discardBeforeDmaWrite(void *address, std::size_t bytes) override {
     arm_dcache_delete(address, static_cast<std::uint32_t>(bytes));
   }
 
-  TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.cache_invalidate")
+  THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.cache_invalidate")
   void invalidateBeforeCpuRead(void *address, std::size_t bytes) override {
     arm_dcache_delete(address, static_cast<std::uint32_t>(bytes));
   }
@@ -77,14 +77,14 @@ class TeensyCacheMaintenance final : public CacheMaintenance {
 
 class TeensyCriticalSection final : public CriticalSection {
  public:
-  TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.critical_enter")
+  THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.critical_enter")
   std::uint32_t enter() override {
     const std::uint32_t primask = readPrimask();
     __disable_irq();
     return primask;
   }
 
-  TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.critical_exit")
+  THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.critical_exit")
   void exit(std::uint32_t token) override {
     if ((token & 1U) == 0U) {
       __enable_irq();
@@ -272,7 +272,7 @@ bool waitForCompleteStopBoundary() {
   return (DMA_ERQ & gpio_dma_route::kEdmaChannelMask) == 0U;
 }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
 StartStatus inspectHardwareStart() {
   if (g_hardware_prepared || g_hardware_running) {
     return StartStatus::kAlreadyRunning;
@@ -303,7 +303,7 @@ bool preparedHardwareValid() {
          (IOMUXC_GPR_GPR27 & board::kGpio7ToGpio2Gpr27ClearMask) == 0U;
 }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_prepare")
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_prepare")
 StartStatus prepareHardware() {
   const StartStatus readiness = inspectHardwareStart();
   if (readiness != StartStatus::kOk) {
@@ -365,7 +365,7 @@ StartStatus prepareHardware() {
   return StartStatus::kOk;
 }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
 StartStatus startHardware() {
   const StartStatus prepared = prepareHardware();
   if (prepared != StartStatus::kOk) {
@@ -388,7 +388,7 @@ StartStatus startHardware() {
   return StartStatus::kOk;
 }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_stop")
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_stop")
 StopReport stopHardwareImpl(bool preserve_complete_boundary) {
   IMXRT_PIT_CHANNEL_t &pit =
       IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
@@ -445,16 +445,16 @@ StopReport stopHardwareImpl(bool preserve_complete_boundary) {
   return report;
 }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_stop")
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_stop")
 StopReport stopHardware() { return stopHardwareImpl(true); }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(
     ".flashmem.gpio_raw.target_stop_after_triggers")
 StopReport stopHardwareAfterTriggers() {
   return stopHardwareImpl(false);
 }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_snapshot")
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_snapshot")
 HardwareSnapshot hardwareSnapshot() {
   HardwareSnapshot value{};
   value.ring = g_ring.snapshot();
@@ -525,7 +525,7 @@ HardwareSnapshot TeensyRawCapture::snapshot() {
   return hardwareSnapshot();
 }
 
-TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.facade")
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.facade")
 TeensyRawCapture &teensyRawCapture() {
   return g_facade;
 }
@@ -543,8 +543,8 @@ static_assert(kStopBoundaryTimeoutCycles == 6000000U);
 static_assert(board::kGpioEdmaChannel == 2U);
 static_assert(board::kGpioEdmaPriority == 0U);
 
-}  // namespace teensy_daq::gpio_capture
+}  // namespace thingdaq::gpio_capture
 
-#undef TEENSY_DAQ_GPIO_RAW_TARGET_COLD_CODE
+#undef THINGDAQ_GPIO_RAW_TARGET_COLD_CODE
 
 #endif

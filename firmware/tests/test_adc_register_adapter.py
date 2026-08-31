@@ -20,9 +20,7 @@ class AdcRegisterAdapterTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for target-register adapter tests")
 
-        with tempfile.TemporaryDirectory(
-            prefix="teensy-daq-adc-registers-"
-        ) as directory:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-adc-registers-") as directory:
             executable = Path(directory) / "adc-register-adapter-test"
             compiled = subprocess.run(
                 [

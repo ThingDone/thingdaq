@@ -6,7 +6,7 @@
 #include "firmware_identity.h"
 #include "generated/protocol_constants.h"
 
-namespace teensy_daq::capabilities {
+namespace thingdaq::capabilities {
 
 struct CapabilityMetadata {
   std::uint8_t protocol_version;
@@ -176,4 +176,4 @@ static_assert(kMetadata.max_command_frame_bytes <=
 static_assert(kMetadata.gpio_sample_rate_hz ==
               protocol_v1::kGpioClockProductionRateHz,
               "diagnostic rates must not weaken the production GPIO rate");
-}  // namespace teensy_daq::capabilities
+}  // namespace thingdaq::capabilities

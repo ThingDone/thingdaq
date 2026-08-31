@@ -12,19 +12,19 @@ from pathlib import Path
 from typing import get_type_hints
 from unittest.mock import patch
 
-import teensy_daq
-from teensy_daq import (
+import thingdaq
+from thingdaq import (
     CalibrationRecord,
     ConverterCalibration,
     DeviceState,
     InMemoryTransport,
     SerialPortCandidate,
     SimulatedDevice,
-    TeensyDAQ,
+    ThingDAQ,
     low_level,
     save_calibration,
 )
-from teensy_daq.cli import CaptureInterruptedError, CliExitCode, build_parser, main
+from thingdaq.cli import CaptureInterruptedError, CliExitCode, build_parser, main
 
 
 def _calibration_record() -> CalibrationRecord:
@@ -43,21 +43,21 @@ def _calibration_record() -> CalibrationRecord:
 
 class PublicNamespaceTests(unittest.TestCase):
     def test_root_exports_are_explicit_and_low_level_access_is_named(self) -> None:
-        self.assertIn("__version__", teensy_daq.__all__)
-        self.assertIn("low_level", teensy_daq.__all__)
-        self.assertIs(teensy_daq.Frame, low_level.Frame)
-        self.assertIs(teensy_daq.BackgroundReader, low_level.BackgroundReader)
-        self.assertIs(teensy_daq.SerialTransport, low_level.SerialTransport)
+        self.assertIn("__version__", thingdaq.__all__)
+        self.assertIn("low_level", thingdaq.__all__)
+        self.assertIs(thingdaq.Frame, low_level.Frame)
+        self.assertIs(thingdaq.BackgroundReader, low_level.BackgroundReader)
+        self.assertIs(thingdaq.SerialTransport, low_level.SerialTransport)
         self.assertIs(
-            teensy_daq.FrameKind,
+            thingdaq.FrameKind,
             low_level.protocol_constants.FrameKind,
         )
 
     def test_facade_context_manager_is_typed_and_closes_deterministically(self) -> None:
-        hints = get_type_hints(TeensyDAQ.__enter__)
-        self.assertIs(TeensyDAQ, hints["return"])
+        hints = get_type_hints(ThingDAQ.__enter__)
+        self.assertIs(ThingDAQ, hints["return"])
 
-        daq = TeensyDAQ.simulated()
+        daq = ThingDAQ.simulated()
         with daq as entered:
             self.assertIs(daq, entered)
             self.assertTrue(daq.is_open)
@@ -66,7 +66,7 @@ class PublicNamespaceTests(unittest.TestCase):
     def test_phase10_exports_and_return_annotations_are_stable(self) -> None:
         required_exports = {
             "__version__",
-            "TeensyDAQ",
+            "ThingDAQ",
             "DeviceCapabilities",
             "DAQConfiguration",
             "ADCBlock",
@@ -89,86 +89,84 @@ class PublicNamespaceTests(unittest.TestCase):
             "UnexpectedMessageError",
             "low_level",
         }
-        exported = teensy_daq.__all__
+        exported = thingdaq.__all__
 
         self.assertEqual(len(exported), len(set(exported)))
         self.assertTrue(required_exports.issubset(exported))
         for name in required_exports:
             with self.subTest(name=name):
-                self.assertTrue(hasattr(teensy_daq, name))
+                self.assertTrue(hasattr(thingdaq, name))
 
         method_returns = {
-            TeensyDAQ.__enter__: TeensyDAQ,
-            TeensyDAQ.open: TeensyDAQ,
-            TeensyDAQ.simulated: TeensyDAQ,
-            TeensyDAQ.info: teensy_daq.DeviceInfo,
-            TeensyDAQ.configure: teensy_daq.DAQConfiguration,
-            TeensyDAQ.start: int,
-            TeensyDAQ.status: teensy_daq.Status,
-            TeensyDAQ.stop: DeviceState,
+            ThingDAQ.__enter__: ThingDAQ,
+            ThingDAQ.open: ThingDAQ,
+            ThingDAQ.simulated: ThingDAQ,
+            ThingDAQ.info: thingdaq.DeviceInfo,
+            ThingDAQ.configure: thingdaq.DAQConfiguration,
+            ThingDAQ.start: int,
+            ThingDAQ.status: thingdaq.Status,
+            ThingDAQ.stop: DeviceState,
         }
         for method, expected in method_returns.items():
             with self.subTest(method=method.__name__):
                 self.assertIs(expected, get_type_hints(method)["return"])
         self.assertIs(
-            teensy_daq.ConverterCalibration,
-            get_type_hints(teensy_daq.estimate_offset_gain)["return"],
+            thingdaq.ConverterCalibration,
+            get_type_hints(thingdaq.estimate_offset_gain)["return"],
         )
         self.assertIs(
-            teensy_daq.CalibratedAdcChannels,
+            thingdaq.CalibratedAdcChannels,
             get_type_hints(
-                teensy_daq.calibrated_channels,
-                localns={"ADCBlock": teensy_daq.ADCBlock},
+                thingdaq.calibrated_channels,
+                localns={"ADCBlock": thingdaq.ADCBlock},
             )["return"],
         )
 
     def test_documented_exception_hierarchy_is_stable(self) -> None:
         facade_errors = (
-            teensy_daq.DAQClosedError,
-            teensy_daq.CommandTimeoutError,
-            teensy_daq.DAQShutdownError,
-            teensy_daq.BlockTimeoutError,
-            teensy_daq.DeviceCommandError,
-            teensy_daq.MultipleDevicesFoundError,
-            teensy_daq.DeviceIdentityMismatchError,
-            teensy_daq.DeviceSynchronizationError,
-            teensy_daq.UnexpectedMessageError,
-            teensy_daq.UnexpectedStreamGapError,
-            teensy_daq.UnexpectedHostQueueLossError,
-            teensy_daq.UnexpectedStreamAnomalyError,
+            thingdaq.DAQClosedError,
+            thingdaq.CommandTimeoutError,
+            thingdaq.DAQShutdownError,
+            thingdaq.BlockTimeoutError,
+            thingdaq.DeviceCommandError,
+            thingdaq.MultipleDevicesFoundError,
+            thingdaq.DeviceIdentityMismatchError,
+            thingdaq.DeviceSynchronizationError,
+            thingdaq.UnexpectedMessageError,
+            thingdaq.UnexpectedStreamGapError,
+            thingdaq.UnexpectedHostQueueLossError,
+            thingdaq.UnexpectedStreamAnomalyError,
         )
         for error_type in facade_errors:
             with self.subTest(error=error_type.__name__):
-                self.assertTrue(issubclass(error_type, teensy_daq.TeensyDAQError))
+                self.assertTrue(issubclass(error_type, thingdaq.ThingDAQError))
 
-        self.assertTrue(
-            issubclass(teensy_daq.DAQStateError, teensy_daq.DeviceCommandError)
-        )
+        self.assertTrue(issubclass(thingdaq.DAQStateError, thingdaq.DeviceCommandError))
         self.assertTrue(
             issubclass(
-                teensy_daq.DeviceCapabilityError,
-                teensy_daq.DeviceCommandError,
+                thingdaq.DeviceCapabilityError,
+                thingdaq.DeviceCommandError,
             )
         )
         self.assertTrue(
             issubclass(
-                teensy_daq.UnexpectedStreamValidationError,
-                teensy_daq.UnexpectedMessageError,
+                thingdaq.UnexpectedStreamValidationError,
+                thingdaq.UnexpectedMessageError,
             )
         )
         self.assertTrue(
-            issubclass(teensy_daq.DeviceNotFoundError, teensy_daq.DiscoveryError)
+            issubclass(thingdaq.DeviceNotFoundError, thingdaq.DiscoveryError)
         )
         self.assertTrue(
             issubclass(
-                teensy_daq.CalibrationFormatError,
-                teensy_daq.CalibrationError,
+                thingdaq.CalibrationFormatError,
+                thingdaq.CalibrationError,
             )
         )
         self.assertTrue(
             issubclass(
-                teensy_daq.CalibrationMismatchError,
-                teensy_daq.CalibrationError,
+                thingdaq.CalibrationMismatchError,
+                thingdaq.CalibrationError,
             )
         )
 
@@ -241,12 +239,12 @@ class JsonCliLifecycleTests(unittest.TestCase):
             vid=0x16C0,
             pid=0x0483,
             serial_number="12345670",
-            product="Teensy DAQ",
+            product="ThingDAQ",
         )
         stdout = io.StringIO()
         with (
-            patch("teensy_daq.cli.enumerate_candidates", return_value=(candidate,)),
-            patch("teensy_daq.cli._open_device") as open_device,
+            patch("thingdaq.cli.enumerate_candidates", return_value=(candidate,)),
+            patch("thingdaq.cli._open_device") as open_device,
             redirect_stdout(stdout),
         ):
             exit_code = main(["list", "--json"])
@@ -357,11 +355,11 @@ class JsonCliLifecycleTests(unittest.TestCase):
 
     def test_interrupt_error_stops_and_closes_before_json_diagnostic(self) -> None:
         device = SimulatedDevice()
-        daq = TeensyDAQ.open(InMemoryTransport(device))
+        daq = ThingDAQ.open(InMemoryTransport(device))
         stdout = io.StringIO()
         stderr = io.StringIO()
         with (
-            patch("teensy_daq.cli._open_device", return_value=daq),
+            patch("thingdaq.cli._open_device", return_value=daq),
             patch.object(
                 daq,
                 "read_block",

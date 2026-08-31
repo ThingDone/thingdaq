@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from teensy_daq import ADCBlock, ChecksumAlgorithm, GPIOBlock, TeensyDAQ
+from thingdaq import ADCBlock, ChecksumAlgorithm, GPIOBlock, ThingDAQ
 
 
 def main() -> int:
     print("example=simulator physical_required=false deterministic=true")
-    with TeensyDAQ.simulated(strict=True) as daq:
+    with ThingDAQ.simulated(strict=True) as daq:
         applied = daq.configure(
             adc=True,
             gpio=True,
