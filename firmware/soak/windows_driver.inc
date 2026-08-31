@@ -920,8 +920,7 @@ def build_windows_parser() -> argparse.ArgumentParser:
     )
     parser = argparse.ArgumentParser(
         description=(
-            f"{implementation}, release-identity-pinned ThingDAQ Windows soak "
-            "validator"
+            f"{implementation}, release-identity-pinned ThingDAQ Windows soak validator"
         )
     )
     parser.add_argument(
