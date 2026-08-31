@@ -180,6 +180,11 @@ python3 firmware/tools/build_firmware.py
 
 The distribution name in `daq_api/pyproject.toml` is a replaceable local
 placeholder and the package is marked `Private :: Do Not Upload`. `Teensy®` is
-a PJRC trademark; naming, trademark use, index availability, and the absence of
-a repository license must be reviewed before any public package submission.
-Repository workflows must not reserve, upload, or publish this distribution.
+a PJRC trademark; naming, trademark use, and index availability must be
+reviewed before any public package submission. Repository workflows must not
+reserve, upload, or publish this distribution.
+
+## License
+
+This project is available under the [MIT License](LICENSE).
+Copyright (c) 2026 THING DONE LLC.

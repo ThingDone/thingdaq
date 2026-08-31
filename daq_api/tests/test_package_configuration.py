@@ -14,6 +14,8 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT_PATH = PACKAGE_ROOT / "pyproject.toml"
 MANIFEST_PATH = PACKAGE_ROOT / "MANIFEST.in"
 PACKAGE_README_PATH = PACKAGE_ROOT / "README.md"
+PACKAGE_LICENSE_PATH = PACKAGE_ROOT / "LICENSE"
+REPOSITORY_LICENSE_PATH = PACKAGE_ROOT.parent / "LICENSE"
 TYPED_MARKER_PATH = PACKAGE_ROOT / "src/teensy_daq/py.typed"
 
 
@@ -126,12 +128,16 @@ class PackageConfigurationTests(unittest.TestCase):
             with self.subTest(excluded=excluded):
                 self.assertIn(excluded, manifest)
 
-    def test_unlicensed_private_package_records_publication_boundary(self) -> None:
+    def test_mit_license_and_private_publication_boundary_are_explicit(self) -> None:
         project = self.pyproject["project"]
         readme = PACKAGE_README_PATH.read_text(encoding="utf-8")
+        package_license = PACKAGE_LICENSE_PATH.read_text(encoding="utf-8")
+        repository_license = REPOSITORY_LICENSE_PATH.read_text(encoding="utf-8")
 
-        self.assertNotIn("license", project)
-        self.assertNotIn("license-files", project)
+        self.assertEqual("MIT", project["license"])
+        self.assertEqual(["LICENSE"], project["license-files"])
+        self.assertEqual(repository_license, package_license)
+        self.assertIn("Copyright (c) 2026 THING DONE LLC", package_license)
         self.assertIn("Teensy®", readme)
         self.assertIn("before any PyPI submission", readme)
         self.assertIn("Do not reserve, upload, or publish", readme)

@@ -11,6 +11,8 @@ name = "teensy-daq-local"
 dynamic = ["version"]
 description = "Typed local Python API for Teensy DAQ acquisition hardware"
 readme = { file = "README.md", content-type = "text/markdown" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10,<3.15"
 dependencies = [
     "pyserial>=3.5",

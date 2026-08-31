@@ -188,10 +188,26 @@ class DistributionArtifactTests(unittest.TestCase):
         self.assertTrue(expected_runtime.issubset(self.sdist_files))
         self.assertTrue(expected_examples.issubset(self.sdist_files))
         self.assertTrue(
-            {"MANIFEST.in", "README.md", "pyproject.toml", "PKG-INFO"}.issubset(
-                self.sdist_files
-            )
+            {
+                "LICENSE",
+                "MANIFEST.in",
+                "README.md",
+                "pyproject.toml",
+                "PKG-INFO",
+            }.issubset(self.sdist_files)
         )
+
+    def test_license_is_included_in_both_distribution_formats(self) -> None:
+        expected = (PACKAGE_ROOT / "LICENSE").read_bytes()
+        wheel_license_names = [
+            name
+            for name in self.wheel_files
+            if name.endswith(".dist-info/licenses/LICENSE")
+        ]
+
+        self.assertEqual(1, len(wheel_license_names))
+        self.assertEqual(expected, self.wheel_files[wheel_license_names[0]])
+        self.assertEqual(expected, self.sdist_files["LICENSE"])
 
     def test_archive_metadata_matches_private_typed_project(self) -> None:
         wheel_metadata_name = next(
@@ -222,7 +238,7 @@ class DistributionArtifactTests(unittest.TestCase):
                     {"dev", "numpy"}, set(metadata.get_all("Provides-Extra"))
                 )
                 self.assertIsNone(metadata.get("License"))
-                self.assertIsNone(metadata.get("License-Expression"))
+                self.assertEqual("MIT", metadata.get("License-Expression"))
 
         wheel_descriptor_name = next(
             name for name in self.wheel_files if name.endswith(".dist-info/WHEEL")

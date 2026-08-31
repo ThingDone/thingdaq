@@ -69,8 +69,8 @@ the hardware under the registered `Teensy®` name at
 https://www.pjrc.com/teensy/. Trademark usage and package-index naming require
 review, and `[project].name` may need replacement, before any PyPI submission.
 Do not reserve, upload, or publish this distribution from repository workflows.
-No license metadata is declared because this repository currently has no
-license file.
+The distribution declares the SPDX `MIT` license expression and includes the
+project license in both wheel and source-distribution artifacts.
 
 Build both local artifacts from the repository root with a source-derived,
 fixed archive epoch:
