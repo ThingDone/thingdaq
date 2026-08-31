@@ -43,7 +43,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "candidate": {
     "artifact": {
       "name": "firmware.ino.hex",
-      "sha256": "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a"
+      "sha256": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3"
     },
     "board": {
       "board_id": 1,
@@ -52,11 +52,11 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
       "mcu_id": 1
     },
     "firmware": {
-      "build_id": "thingdaq-a0dc150fd48a6e9b",
-      "source_id": "a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba",
+      "build_id": "thingdaq-e27556de5b898f28",
+      "source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673",
       "version": [
+        1,
         0,
-        7,
         0
       ]
     },
@@ -77,18 +77,18 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
       "warmup_seconds": 1.0
     }
   },
-  "candidate_sha256": "32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656",
+  "candidate_sha256": "f204f12db742e0fa8ba84f9e798c3be564cfdb7f6904e93e129463317aef5a41",
   "entry_point": "windows-standalone",
   "generator_schema_version": 1,
   "mode": "physical-combined",
   "validation_manifest": {
     "accepted_evidence": {
-      "candidate_freeze_sha256": "b285449f1a7af391d5210189f87a0c01f7d28acc7c4f608a7ba3ade70c3b77a9",
-      "candidate_semantic_sha256": "32dcf73bc99f5abc53935901baa4f14103df339e1aafbe71ef3330f3b79d8656",
-      "firmware_build_manifest_sha256": "6741c3fe10c44b8d7ff5666ddfd9a6eba2147c584e687e34794a1165e9af384b",
-      "protocol_contract_sha256": "a5993a8afe9b8b42b951ed6ec3dbd2ca84b3271e4302f717e56ee3b9dcb69676",
+      "candidate_freeze_sha256": "b62dda8892b1e69110db848769083e428c35c241a5b25f00ac46629cea784e4c",
+      "candidate_semantic_sha256": "f204f12db742e0fa8ba84f9e798c3be564cfdb7f6904e93e129463317aef5a41",
+      "firmware_build_manifest_sha256": "d24bca9eba23ccffa11470f1cdd60f37fcc34fdde3522a2080b6953275e0d9cd",
+      "protocol_contract_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
       "reproducible_build_count": 2,
-      "reproducible_hex_size_bytes": 357214
+      "reproducible_hex_size_bytes": 357227
     },
     "acquisition": {
       "adc1_phase_nanoseconds": 500,
@@ -145,15 +145,15 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
       "adc_pairs_per_frame": 1012,
       "adc_resolution_bits": 12,
       "board_id": 1,
-      "build_id": "thingdaq-a0dc150fd48a6e9b",
+      "build_id": "thingdaq-e27556de5b898f28",
       "capability_bits": 511,
       "command_queue_capacity": 4,
       "data_checksum_algorithm": 1,
       "data_frame_bytes": 4096,
       "data_payload_bytes": 4048,
       "firmware_version": [
+        1,
         0,
-        7,
         0
       ],
       "frame_coverage_ticks": 8096,
@@ -188,17 +188,17 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
       "timestamp_hz": 8000000
     },
     "firmware": {
-      "build_id": "thingdaq-a0dc150fd48a6e9b",
+      "build_id": "thingdaq-e27556de5b898f28",
       "exported_hex": {
         "name": "firmware.ino.hex",
-        "sha256": "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
-        "size_bytes": 357214
+        "sha256": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
+        "size_bytes": 357227
       },
       "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
-      "source_id": "a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba",
+      "source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673",
       "version": [
+        1,
         0,
-        7,
         0
       ]
     },
@@ -413,10 +413,10 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
     },
     "schema_version": 1
   },
-  "validation_manifest_sha256": "d6da65261b17b91409da59a5a0f8f47182a26d2d2a5637ac68b4cf902413b260",
-  "validator_sha256": "bde658a05069032dc6e65bf3bf86f9b040961d62870422e709ecd955b638da34",
-  "windows_driver_sha256": "7fce45f23639949d215e26aa31a956399e8b4c2c65fa6303379a61868b0a5466",
-  "windows_profile_sha256": "adb14bdcad996888cee26ddc08f0a7eda29d50894b11d60a08d6535ef7452412"
+  "validation_manifest_sha256": "206393e3934de4cfb20e4950a7363a7b2e4cdd8c716163abea48cf894291385a",
+  "validator_sha256": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
+  "windows_driver_sha256": "00fb7514ee6d469c84616bf98e11be37fce9f61b766a722560e4bba80c19f760",
+  "windows_profile_sha256": "452a02849a51c44322f4a8278dbcc83a4e4d63fdc7792e76adb7ed689e4378da"
 }
 """
 )
