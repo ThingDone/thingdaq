@@ -292,9 +292,9 @@
     "sha256": "f204f12db742e0fa8ba84f9e798c3be564cfdb7f6904e93e129463317aef5a41",
     "source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673"
   },
-  "created_utc": "2026-08-31T19:32:34+00:00",
+  "created_utc": "2026-08-31T19:47:39+00:00",
   "protected": {
-    "base_git_commit": "eef627fd42c2f22dfca2bd331cd6f7cd9d707c06",
+    "base_git_commit": "503b58e9674d56723c0499ec5514334d728eee99",
     "file_count": 242,
     "files": [
       {
@@ -304,7 +304,7 @@
       },
       {
         "path": "daq_api/README.md",
-        "sha256": "16a64905169dfc17233ca8d715a682a36ae152ab83f87753d70d6785d0c45cfd",
+        "sha256": "9ebd9d7a92b8880110744636f2aa03eac58a17c63f7d90d8263ea03e1529d77b",
         "size_bytes": 33936
       },
       {
@@ -1508,7 +1508,7 @@
         "size_bytes": 87692
       }
     ],
-    "tree_sha256": "76e718ae8502051a2f3a6d15ae0cf0073bd3765bf1010d0328c06ac12896d530"
+    "tree_sha256": "1d17a981f27438c8092996a70dcdadaec84c7cdd587e7dffc29b658d3059e6f9"
   },
   "reproducibility": {
     "artifacts": [
@@ -1542,30 +1542,30 @@
   },
   "schema_version": 1,
   "staged": {
-    "directory": ".maestro/playbooks/Working/thingdaq-rename-candidate-00003/frozen",
+    "directory": ".maestro/playbooks/Working/thingdaq-rename-candidate-00004/frozen",
     "files": [
       {
-        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00003/frozen/build-manifest.json",
+        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00004/frozen/build-manifest.json",
         "sha256": "d24bca9eba23ccffa11470f1cdd60f37fcc34fdde3522a2080b6953275e0d9cd",
         "size_bytes": 12733
       },
       {
-        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00003/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00004/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00003/frozen/firmware.ino.elf",
+        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00004/frozen/firmware.ino.elf",
         "sha256": "b3ae54862e9f6360b3623614bdf69c6aaf9fdf2476dda65829b49514d3fbaa4c",
         "size_bytes": 1805372
       },
       {
-        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00003/frozen/firmware.ino.hex",
+        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00004/frozen/firmware.ino.hex",
         "sha256": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
         "size_bytes": 357227
       },
       {
-        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00003/frozen/firmware.ino.map",
+        "path": ".maestro/playbooks/Working/thingdaq-rename-candidate-00004/frozen/firmware.ino.map",
         "sha256": "8566e88fd27f3fef07ae0ada3bca928a545851f6e0eb3d509dbec71df2f3ff44",
         "size_bytes": 828461
       }

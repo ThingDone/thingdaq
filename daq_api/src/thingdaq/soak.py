@@ -83,7 +83,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
   "mode": "physical-combined",
   "validation_manifest": {
     "accepted_evidence": {
-      "candidate_freeze_sha256": "b62dda8892b1e69110db848769083e428c35c241a5b25f00ac46629cea784e4c",
+      "candidate_freeze_sha256": "c67706d4b52dab9f8c4c77bcde31956b616fb9df3fbb04165f0d7e8e3f57388e",
       "candidate_semantic_sha256": "f204f12db742e0fa8ba84f9e798c3be564cfdb7f6904e93e129463317aef5a41",
       "firmware_build_manifest_sha256": "d24bca9eba23ccffa11470f1cdd60f37fcc34fdde3522a2080b6953275e0d9cd",
       "protocol_contract_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
@@ -413,7 +413,7 @@ GENERATED_CONFIG: dict[str, object] = json.loads(
     },
     "schema_version": 1
   },
-  "validation_manifest_sha256": "206393e3934de4cfb20e4950a7363a7b2e4cdd8c716163abea48cf894291385a",
+  "validation_manifest_sha256": "7f29743f94795d22fc61f2009fabd2200608afc142d204d339ce8c14ce437350",
   "validator_sha256": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
   "windows_driver_sha256": "00fb7514ee6d469c84616bf98e11be37fce9f61b766a722560e4bba80c19f760",
   "windows_profile_sha256": "452a02849a51c44322f4a8278dbcc83a4e4d63fdc7792e76adb7ed689e4378da"

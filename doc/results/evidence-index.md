@@ -45,14 +45,14 @@ serve as release acceptance for ThingDAQ 1.0.
 
 | Authority | Exact value |
 | --- | --- |
-| Freeze base commit | `eef627fd42c2f22dfca2bd331cd6f7cd9d707c06` |
-| Protected source tree | 242 files; SHA-256 `76e718ae8502051a2f3a6d15ae0cf0073bd3765bf1010d0328c06ac12896d530` |
+| Freeze base commit | `503b58e9674d56723c0499ec5514334d728eee99` |
+| Protected source tree | 242 files; SHA-256 `1d17a981f27438c8092996a70dcdadaec84c7cdd587e7dffc29b658d3059e6f9` |
 | Source / build | `e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673` / `thingdaq-e27556de5b898f28` |
 | Firmware / protocol / checksum | 1.0.0 / v1 / Adler-32 |
 | Frozen HEX | 357,227 bytes; SHA-256 `da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3` |
 | Reproducible build manifests | Two byte-identical manifests; SHA-256 `d24bca9eba23ccffa11470f1cdd60f37fcc34fdde3522a2080b6953275e0d9cd` |
-| Candidate freeze | SHA-256 `b62dda8892b1e69110db848769083e428c35c241a5b25f00ac46629cea784e4c` |
-| Validation manifest | SHA-256 `3192c08dcc990b2be1423dbbf47bc22f577d1ea6a7005f8c10af98abbe535c49` |
+| Candidate freeze | SHA-256 `c67706d4b52dab9f8c4c77bcde31956b616fb9df3fbb04165f0d7e8e3f57388e` |
+| Validation manifest | SHA-256 `0ea256df7166479883ea1bbe81d308c5bda333139b36bac5d3276a704fdf3c9a` |
 | Local validation | 416 passed, 7 dependency skips, 14,081 subtests; Ruff, MyPy, protocol/soak generation, freeze verification, and pinned firmware build PASS |
 | Physical/Windows acceptance | Pending for the renamed 1.0.0 identity |
 
