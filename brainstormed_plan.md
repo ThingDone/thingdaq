@@ -1375,7 +1375,7 @@ README cleanup notes from the initial version:
 Local references:
 
 - Current project intent:
-  /home/bill/agents/thingdaq/README.md
+  `README.md` in this repository
 - Firmware build and rig guide:
   /home/bill/agents/fw_experiments/docs/guides/new-firmware-projects.md
 - Teensy ADC pin tables:

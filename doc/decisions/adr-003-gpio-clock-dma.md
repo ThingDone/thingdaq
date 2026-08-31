@@ -121,7 +121,7 @@ NXP PIT arithmetic is `period = LDVAL + 1` clocks, so six 24 MHz clocks are
 `db75db1e-45c0-4f66-a09a-bb4adee26b77` verified the clock selector, divider,
 rising-edge request mode (`XBARA1_CTRL0=0x0005`), event/sample ratio, and
 elapsed 600 MHz DWT cycles at 1 kHz, 1 MHz, and three consecutive 4 MHz
-windows each. The final `thingdaq-e5da045334978b23` image captured 8,192 samples
+windows each. The final pre-rename `tdaq-e5da045334978b23` image captured 8,192 samples
 in every production window while the independently timed DWT window covered
 8,193 boundaries, within the explicit one-event tolerance, with zero
 hardware/eDMA errors.

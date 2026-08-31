@@ -2,6 +2,7 @@
 type: reference
 title: ThingDAQ Evidence Index
 created: 2026-08-29
+updated: 2026-08-31
 tags:
   - thingdaq
   - evidence
@@ -33,18 +34,44 @@ related:
 
 # ThingDAQ evidence index
 
-## Current autonomous acceptance
+## Current ThingDAQ 1.0 candidate
 
-[[Phase-11-Soak-Evidence]] is the current autonomous release-candidate
-decision. It records the exact identity, complete 26-job lineage, metrics and
-trends, acceptance equations, retry policy, fixture limits, final local gate,
-firmware/distribution reproduction, and retained-evidence hashes.
+The rename is a breaking identity boundary. The current candidate has fresh
+ThingDAQ namespaces, commands, USB product text, generated validators, and a
+byte-identical two-build firmware freeze. Local software, protocol, packaging,
+and firmware-build gates pass. No physical or Windows acquisition campaign has
+run against this renamed binary, so the historical Phase 11 PASS does not
+serve as release acceptance for ThingDAQ 1.0.
+
+| Authority | Exact value |
+| --- | --- |
+| Freeze base commit | `eef627fd42c2f22dfca2bd331cd6f7cd9d707c06` |
+| Protected source tree | 242 files; SHA-256 `76e718ae8502051a2f3a6d15ae0cf0073bd3765bf1010d0328c06ac12896d530` |
+| Source / build | `e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673` / `thingdaq-e27556de5b898f28` |
+| Firmware / protocol / checksum | 1.0.0 / v1 / Adler-32 |
+| Frozen HEX | 357,227 bytes; SHA-256 `da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3` |
+| Reproducible build manifests | Two byte-identical manifests; SHA-256 `d24bca9eba23ccffa11470f1cdd60f37fcc34fdde3522a2080b6953275e0d9cd` |
+| Candidate freeze | SHA-256 `b62dda8892b1e69110db848769083e428c35c241a5b25f00ac46629cea784e4c` |
+| Validation manifest | SHA-256 `3192c08dcc990b2be1423dbbf47bc22f577d1ea6a7005f8c10af98abbe535c49` |
+| Local validation | 416 passed, 7 dependency skips, 14,081 subtests; Ruff, MyPy, protocol/soak generation, freeze verification, and pinned firmware build PASS |
+| Physical/Windows acceptance | Pending for the renamed 1.0.0 identity |
+
+Use [[soak-harness]] to generate and run new evidence against this identity.
+Do not compare a current report to the hashes in the historical sections
+below.
+
+## Historical autonomous acceptance (superseded identity)
+
+[[Phase-11-Soak-Evidence]] records the autonomous decision for the pre-rename
+0.7.0 candidate. It preserves the exact identity, complete 26-job lineage,
+metrics and trends, acceptance equations, retry policy, fixture limits, final
+local gate, firmware/distribution reproduction, and retained-evidence hashes.
 
 | Authority | Exact value |
 | --- | --- |
 | Gate checkout | `8517befc450d17e5684b4884c0ff69cd984046ad` |
 | Protected source tree | 240 files; SHA-256 `84636113d34bdadef466d94c6c44180d2e591f3dc99ed346b32a8bd3b4a15dbc` |
-| Source / build | `a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba` / `thingdaq-a0dc150fd48a6e9b` |
+| Source / build | `a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba` / `tdaq-a0dc150fd48a6e9b` |
 | Firmware / protocol / checksum | 0.7.0 / v1 / Adler-32 |
 | Accepted HEX | `0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a` |
 | Target / toolchain | Teensy 4.0 FQBN `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std`; Arduino CLI 1.4.1; Teensy core 1.62.0; Arm GNU 15.2.1 |
@@ -52,8 +79,8 @@ firmware/distribution reproduction, and retained-evidence hashes.
 | Release aggregate | 6 accepted, 20 excluded, 0 infrastructure incidents; SHA-256 `3a9d0064b143e49073776a1270c0b6dab2b1a3ad960533d635db2d7f08321696` |
 | Worst accepted latency | STATUS p99 9.116 ms; STATUS/any-command maximum 59.672 ms |
 | Accepted data | 3,605.008125 measured seconds; 28,595,177,248 payload bytes |
-| Current wheel record | 178,120 bytes; SHA-256 `a086facfc564ae5d2a4c143556aa6a8487ff65f19eb2879b99a8d0d846153c31` |
-| Current normalized distributions | wheel `d496b9a0c8e11181cea1c356ee8c278fe69db381424d25c9015bf868167dbdaa`; sdist `297fa155bfb905a5984764edcf954ab7536c99b42c77f70b7fa8cbadf48807d0` |
+| Historical wheel record | 178,120 bytes; SHA-256 `a086facfc564ae5d2a4c143556aa6a8487ff65f19eb2879b99a8d0d846153c31` |
+| Historical normalized distributions | wheel `d496b9a0c8e11181cea1c356ee8c278fe69db381424d25c9015bf868167dbdaa`; sdist `297fa155bfb905a5984764edcf954ab7536c99b42c77f70b7fa8cbadf48807d0` |
 
 The detailed equations and limits are in [[Phase-11-Soak-Evidence]]. In short,
 every stage conserved produced/framed/emitted/transmitted/dropped frames,
@@ -65,15 +92,16 @@ GPIO transitions, or Windows-host behavior. A service incident could be
 retried once; no such incident occurred. Product/test failures were excluded,
 fixed, rebuilt when needed, and restarted from run one.
 
-## Phase 12 Windows handoff (non-gating)
+## Historical Phase 12 Windows handoff (superseded)
 
-[[Phase-12-Windows-Handoff]] packages the accepted identity for the user's
-later Windows check without changing the Phase 11 autonomous decision. The
-unpublished standalone script, equivalent installed command, deterministic
-manifest, universal wheel, and source distribution passed their generation,
-conformance, packaging, clean-install, fault-fixture, and accelerated one-hour
-gates. A final 10-second full-rate synthetic virtual-device smoke passed on
-Linux and was correctly marked diagnostic and non-release.
+[[Phase-12-Windows-Handoff]] records the unpublished handoff prepared for the
+same pre-rename identity. Its standalone script, installed command,
+deterministic manifest, universal wheel, and source distribution passed their
+generation, conformance, packaging, clean-install, fault-fixture, and
+accelerated one-hour gates. A final 10-second full-rate synthetic
+virtual-device smoke passed on Linux and was correctly marked diagnostic and
+non-release. Those files and hashes do not describe the current ThingDAQ
+sources.
 
 | Handoff authority | Exact value |
 | --- | --- |
@@ -82,7 +110,7 @@ Linux and was correctly marked diagnostic and non-release.
 | Universal wheel | 226,018 bytes; SHA-256 `d9141177503a588338ea1e5d7eb50ba78d1f38f0e482babda4eebf4da3e8da88` |
 | Source distribution | 245,003 bytes; SHA-256 `244d0837a6144d797af0c85a88d25b7164d0745cd788e69eb1417f32c4c43660` |
 | Final simulated smoke | PASS; 10.000958 seconds, 79,919,664 payload bytes, `release_eligible: false` |
-| Windows physical-combined result | Pending user-supplied JSON and Markdown reports |
+| Windows physical-combined result | Never run for this superseded handoff |
 
 No Windows-host behavior or externally stimulated analog/digital behavior is
 accepted by the Phase 12 preparation evidence. Those claim limits and the
@@ -154,7 +182,7 @@ repair are in [[Phase-11-Soak-Evidence]].
 | [[ADR-003-GPIO-Clock-DMA]] | Exact-rate GPIO trigger/DMA/packing path graded by physical and control epochs. |
 | [[ADR-004-ADC-Trigger-DMA]] | Paired ADC trigger, completion, descriptor, and DMA resource contract graded by physical and control epochs. |
 
-No public-release tag or package publication is part of this index. The Phase
-12 handoff is ready, but the future Windows result may be called complete and
-linked here only after its reports exist; it does not alter the autonomous PASS
-recorded above.
+No public-release tag or package publication is part of this index. A new
+ThingDAQ physical or Windows result may be linked here only after it uses the
+current 1.0.0 candidate and its generated validation manifest; it cannot be
+backfilled into the historical Phase 11 or Phase 12 records.

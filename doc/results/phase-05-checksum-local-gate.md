@@ -88,7 +88,7 @@ The clean build helper compiled every enabled implementation through the exact
 
 | Property | Value |
 | --- | --- |
-| Build ID | `thingdaq-7749b6add37edd5b` |
+| Build ID | `tdaq-7749b6add37edd5b` |
 | Source fingerprint | `7749b6add37edd5b49cfb15a40140b050ab71235e32651473a2005aa5ef6a24e` |
 | Firmware inputs | Clean; no generated drift |
 | FQBN | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
@@ -116,7 +116,7 @@ shared dispatch. Each CRC uses one 1,024-byte table in a distinct
 
 For a like-for-like baseline, the same pinned helper rebuilt detached revision
 `bd0638f` from the accepted [[Phase-04-Synthetic-Streaming]] result. That clean
-baseline reproduced build ID `thingdaq-9fb124f80183ed61` and its recorded resource
+baseline reproduced build ID `tdaq-9fb124f80183ed61` and its recorded resource
 summary. The temporary worktree was removed after its manifest and map were
 copied into the ignored evidence directory.
 

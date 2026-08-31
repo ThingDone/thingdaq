@@ -2,6 +2,7 @@
 type: report
 title: Phase 12 Windows Validation Handoff
 created: 2026-08-29
+updated: 2026-08-31
 tags:
   - thingdaq
   - phase-12
@@ -20,13 +21,19 @@ related:
 
 # Phase 12 Windows validation handoff
 
+> [!IMPORTANT]
+> This handoff is a historical record for the pre-rename 0.7.0 candidate. Its
+> hashes do not match the current ThingDAQ files, and its planned Windows run
+> was never performed. Generate a new handoff from the current 1.0.0 freeze by
+> following [[soak-harness]].
+
 ## Outcome and status
 
-The unpublished Windows handoff is ready for the user's later Windows run. The
-standalone `daq_api/scripts/windows_soak.py`, installed `thingdaq-soak`
-command, and deterministic validation manifest encode the same accepted Phase
-11 identity and validation contract. Generation, conformance, packaging,
-clean-install, failure-fixture, and accelerated one-hour gates passed.
+The unpublished Windows handoff was ready for a later Windows run against the
+historical Phase 11 identity. Its standalone validator, installed command, and
+deterministic validation manifest encoded that same accepted identity and
+validation contract. Generation, conformance, packaging, clean-install,
+failure-fixture, and accelerated one-hour gates passed before the rename.
 
 The final pre-handoff check also passed a 10-second, full-rate synthetic stream
 through the exact standalone validator core using a virtual serial device and
@@ -34,23 +41,22 @@ clock. That diagnostic ran on Linux, not Windows, and its report correctly says
 `profile: diagnostic` and `release_eligible: false`.
 
 > [!IMPORTANT]
-> Phase 12 does not replace or reopen the autonomous acceptance in
-> [[Phase-11-Soak-Evidence]]. The future Windows run is additive evidence and
-> is not a gate on that PASS. No Windows-host result, new physical-hardware
+> Phase 12 did not replace or reopen the historical autonomous acceptance in
+> [[Phase-11-Soak-Evidence]]. No Windows-host result, new physical-hardware
 > result, analog accuracy/aperture result, or externally stimulated D6-D13
-> result is claimed here.
+> result was produced from this handoff.
 
 | Evidence layer | Status | Meaning |
 | --- | --- | --- |
-| Phase 11 autonomous campaign | PASS, release-candidate authority | Accepted two synthetic, three physical-combined, and one control-stress 600-second job on one immutable firmware identity. |
-| Phase 12 implementation/build | PASS, unpublished | The standalone/package validators, manifest, distributions, and local gates are ready for handoff. |
+| Phase 11 autonomous campaign | PASS, historical authority | Accepted two synthetic, three physical-combined, and one control-stress 600-second job on one immutable pre-rename firmware identity. |
+| Phase 12 implementation/build | PASS, historical and unpublished | The standalone/package validators, manifest, distributions, and local gates were ready for handoff. |
 | Final Phase 12 fixture smoke | PASS, diagnostic only | Exact standalone validation logic passed a 10-second full-rate synthetic virtual-device stream on Linux. |
-| Windows 3,600-second physical-combined run | Pending user evidence | Run later on Windows with the accepted Teensy attached; retain both generated reports. |
+| Windows 3,600-second physical-combined run | Not performed | The handoff was superseded by the ThingDAQ rename. |
 | Externally stimulated analog/digital validation | Not performed | Requires separately documented safe signal-generator/logic-analyzer work if those claims are desired. |
 
 ## Accepted immutable identity recheck
 
-The final recheck compared the checked build output with the Phase 11 frozen
+The final historical recheck compared the checked build output with the Phase 11 frozen
 artifact at
 `.maestro/playbooks/Working/phase-11-soak-candidate-00018/frozen/firmware.ino.hex`.
 Both files are 357,214 bytes, both hash to the accepted digest below, and a
@@ -63,7 +69,7 @@ expectation all name the same source, build, protocol, and HEX identities.
 | Firmware version | 0.7.0 |
 | Protocol / checksum | v1 / Adler-32 algorithm 1 |
 | Source ID | `a0dc150fd48a6e9b62c614fe487d533f6c7c90bee6c7d5cd3c9f8e985e0b49ba` |
-| Build ID | `thingdaq-a0dc150fd48a6e9b` |
+| Build ID | `tdaq-a0dc150fd48a6e9b` |
 | Exported HEX | `firmware.ino.hex`, 357,214 bytes |
 | HEX SHA-256 | `0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a` |
 | Target | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
@@ -73,7 +79,9 @@ expectation all name the same source, build, protocol, and HEX identities.
 | Frozen build-manifest SHA-256 | `6741c3fe10c44b8d7ff5666ddfd9a6eba2147c584e687e34794a1165e9af384b` |
 | Accepted-soak aggregate SHA-256 | `3a9d0064b143e49073776a1270c0b6dab2b1a3ad960533d635db2d7f08321696` |
 
-The hardware serial is the stable device selector across COM renumbering. A
+The `tdaq-*` build ID above is retained exactly as emitted by the tested
+firmware; it is not the current project namespace. The hardware serial is the
+stable device selector across COM renumbering. A
 mutable name such as `COM10` is discovery evidence only and is never accepted
 as release identity.
 
@@ -86,12 +94,12 @@ reserved on a package index.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `daq_api/scripts/windows_soak.py` | 230,948 | `6604d1ec4900fdfbeec74b5b98413b9e7a28879261b1774e20aad6584ef1757d` |
-| `daq_api/src/thingdaq/soak.py` | 230,947 | `33ae0942c2f75cc55c523afddd152b5fc9f5bdac4a6108a40f278a8fd60d9712` |
-| `firmware/soak/validation-manifest.json` | 9,751 | `3da1727a886876848a405aca4a538fccdc6f1c39c4086c17a5c0e7ebc78ee7d5` |
+| Pre-rename standalone validator | 230,948 | `6604d1ec4900fdfbeec74b5b98413b9e7a28879261b1774e20aad6584ef1757d` |
+| Pre-rename installed validator | 230,947 | `33ae0942c2f75cc55c523afddd152b5fc9f5bdac4a6108a40f278a8fd60d9712` |
+| Pre-rename validation manifest | 9,751 | `3da1727a886876848a405aca4a538fccdc6f1c39c4086c17a5c0e7ebc78ee7d5` |
 | Validation-manifest canonical semantics | n/a | `d6da65261b17b91409da59a5a0f8f47182a26d2d2a5637ac68b4cf902413b260` |
-| `thingdaq_local-0.10.0-py3-none-any.whl` | 226,018 | `d9141177503a588338ea1e5d7eb50ba78d1f38f0e482babda4eebf4da3e8da88` |
-| `thingdaq_local-0.10.0.tar.gz` | 245,003 | `244d0837a6144d797af0c85a88d25b7164d0745cd788e69eb1417f32c4c43660` |
+| Pre-rename wheel, version 0.10.0 | 226,018 | `d9141177503a588338ea1e5d7eb50ba78d1f38f0e482babda4eebf4da3e8da88` |
+| Pre-rename source distribution, version 0.10.0 | 245,003 | `244d0837a6144d797af0c85a88d25b7164d0745cd788e69eb1417f32c4c43660` |
 | Shared conformance vector | n/a | `5cb3ae36964d5ddce3a197ced3f93380fe8366c8dd0f880ef343f48465ecfa30` |
 
 The wheel has 30 members and the universal `py3-none-any` tag. The source
@@ -110,7 +118,7 @@ contract.
 
 | Contract area | Expected value |
 | --- | --- |
-| Firmware identity | Version 0.7.0, build `thingdaq-a0dc150fd48a6e9b`, accepted source/HEX digests above |
+| Firmware identity | Version 0.7.0, build `tdaq-a0dc150fd48a6e9b`, accepted source/HEX digests above |
 | Device identity | Hardware serial `20512460`, board ID 1, MCU ID 1 |
 | Protocol | Version 1, little-endian, 44-byte header, 4,048-byte payload, 4-byte trailer, 4,096-byte data frame |
 | Checksum | Adler-32 algorithm 1, initial value 1, modulus 65,521, 32-bit little-endian trailer over header and payload |
@@ -153,8 +161,8 @@ every exit path.
 
 ## Final simulated full-rate smoke
 
-The last pre-handoff smoke exercised the checked
-`daq_api/scripts/windows_soak.py` module, including its runtime settings,
+The last pre-handoff smoke exercised the checked pre-rename standalone
+validator, including its runtime settings,
 serial parser, INFO synchronization, CONFIGURE/START/STATUS/STOP sequence,
 stream validator, counter reconciliation, grading, JSON writer, and Markdown
 writer. A virtual PySerial-shaped peer supplied the accepted INFO identity and
@@ -167,7 +175,7 @@ synchronization before the measured interval.
 | Host / transport | CPython 3.12.3 on Linux; virtual COM metadata and virtual serial device |
 | Requested profile | `--smoke --mode synthetic`, 10 measured seconds |
 | Grade / eligibility | PASS / `profile: diagnostic` / `release_eligible: false` |
-| Identity | Expected and observed build `thingdaq-a0dc150fd48a6e9b`, hardware serial `20512460`, protocol v1 |
+| Identity | Expected and observed build `tdaq-a0dc150fd48a6e9b`, hardware serial `20512460`, protocol v1 |
 | Measured time | 10.000958 seconds |
 | Timed ADC | 9,871 frames; 9,989,452 pairs; 998,849.510 pairs/s |
 | Timed GPIO | 9,872 frames; 39,961,856 samples; 3,995,802.802 samples/s |
@@ -221,11 +229,14 @@ end-to-end counters. With unstimulated A0/A1 and D6-D13, it still cannot prove
 analog accuracy, noise, bandwidth, source-impedance performance, true aperture
 separation, or externally changing digital inputs.
 
-## Windows handoff procedure
+## Replacement procedure for the current ThingDAQ candidate
 
-Read [[Quickstart]] and [[Hardware-Safety]], attach the Teensy programmed with
-the accepted HEX, and use either entry path. The standalone path needs only
-Python and PySerial at runtime.
+Do not use the historical artifact hashes above for a new run. First verify the
+current candidate freeze and generated soak programs as described in
+[[soak-harness]], program the staged current HEX, and build the current 1.0.0
+wheel if the installed entry path is needed. Read [[Quickstart]] and
+[[Hardware-Safety]] before attaching the supported board. The standalone path
+needs only Python and PySerial at runtime.
 
 ```powershell
 py -m pip install pyserial==3.5
@@ -237,7 +248,7 @@ Or install the retained universal wheel and run the equivalent package entry
 point:
 
 ```powershell
-py -m pip install thingdaq_local-0.10.0-py3-none-any.whl
+py -m pip install thingdaq_local-1.0.0-py3-none-any.whl
 thingdaq-soak --conformance-check
 thingdaq-soak --duration 3600 --mode combined --output thingdaq-windows-soak
 ```
@@ -246,6 +257,8 @@ Use `--hardware-serial 20512460` when more than one matching Teensy is present.
 Retain both `thingdaq-windows-soak.json` and
 `thingdaq-windows-soak.md`; do not summarize the Windows run as passed until
 those reports exist and have been reviewed under the interpretation rules
-above. See [[soak-harness]] for all options and bounded-deadline behavior.
+above. Record it as new ThingDAQ 1.0 evidence rather than amending the
+historical Phase 11 decision. See [[soak-harness]] for all options and
+bounded-deadline behavior.
 
 No task-associated images were present; zero images were analyzed.

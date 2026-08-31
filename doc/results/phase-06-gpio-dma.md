@@ -21,7 +21,7 @@ related:
 ## Outcome
 
 The complete Phase 06 gate passed on 2026-08-28. A clean Teensy 4.0 build,
-`thingdaq-e8096e0fd6ce3963`, completed a bounded diagnostic job, a 10-second
+`tdaq-e8096e0fd6ce3963`, completed a bounded diagnostic job, a 10-second
 4 MHz smoke, and a 60-second 4 MHz GPIO-only stream, strictly sequentially on
 hardware serial 20512460. Each accepted job ran the 1 kHz and 4 MHz clock/DMA
 diagnostics, the fail-closed capture/mapping diagnostic, and a physical GPIO
@@ -120,7 +120,7 @@ The build helper compiled clean firmware inputs at commit
 
 | Property | Value |
 | --- | --- |
-| Build ID / source ID | `thingdaq-e8096e0fd6ce3963` / `e8096e0fd6ce39634243ab71b47c6af4347dfbf342e97bb131d98275e3be67d3` |
+| Build ID / source ID | `tdaq-e8096e0fd6ce3963` / `e8096e0fd6ce39634243ab71b47c6af4347dfbf342e97bb131d98275e3be67d3` |
 | Reproducible timestamp | `2026-08-28T21:09:09Z` |
 | FQBN | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
 | Target/toolchain | Teensy core 1.62.0; Arduino CLI 1.4.1; Arm GNU 15.2.1; 600 MHz; USB Serial; standard `-O2`; warnings `all` |
@@ -170,7 +170,7 @@ No accepted submissions overlapped.
 | 2 | 10-second 4 MHz smoke | `df081800-42a3-4ef8-9f9a-4634468b5e56` | `21:10:26Z`-`21:10:48Z` | 10.024555 s / 238 | PASS |
 | 3 | 60-second 4 MHz GPIO-only soak | `fce7911f-7a8a-4a18-ae5f-06f6be20fbd2` | `21:11:03Z`-`21:12:16Z` | 60.005941 s / 238 | PASS |
 
-Each job independently pinned build ID `thingdaq-e8096e0fd6ce3963`, protocol 1,
+Each job independently pinned build ID `tdaq-e8096e0fd6ce3963`, protocol 1,
 firmware 0.7.0, Teensy 4.0/i.MX RT1062, and hardware serial 20512460.
 
 ## Clock, route, and safe mapping evidence
@@ -274,7 +274,7 @@ The final wheel and source archive were also built successfully and retained in
 | `ce64e2fd-014c-4d9c-88cf-b2b410519c41` | Superseded image exposed immediate-STOP partial-tail loss; short 1-second host rate window was also biased by START/STOP boundary traffic |
 
 None contributes to acceptance. The complete final sequence used only the
-clean `thingdaq-e8096e0fd6ce3963` artifact and passed without retries.
+clean `tdaq-e8096e0fd6ce3963` artifact and passed without retries.
 
 ## Limitations
 

@@ -103,34 +103,40 @@ before deterministic reader/transport shutdown.
 
 ## Validation scope
 
-The accepted Teensy 4.0 campaign includes a 60-second combined physical run at
-the nominal ADC/GPIO rates with zero complete-frame or payload loss, deliberate
-host-stall loss/recovery checks, malformed-control recovery, repeated lifecycle
-cycles, and CDC close/reopen recovery. Exact evidence is in
+The recorded pre-rename Teensy 4.0 campaigns include a 60-second combined
+physical run at the nominal ADC/GPIO rates with zero complete-frame or payload
+loss, deliberate host-stall loss/recovery checks, malformed-control recovery,
+repeated lifecycle cycles, and CDC close/reopen recovery. Exact historical
+evidence is in
 [Phase 08](doc/results/phase-08-combined-acquisition.md) and
 [Phase 09](doc/results/phase-09-loss-recovery.md). The reproducible package
 matrix and final byte-matched real-device workflow are recorded in the
 [Phase 10 local gate](doc/results/phase-10-package-local-gate.md) and
 [Phase 10 physical workflow](doc/results/phase-10-package-workflows.md).
 
-The autonomous release-candidate gate adds two 10-minute synthetic runs, three
-10-minute physical-combined runs, and one 10-minute alternating control-stress
-run on one immutable artifact. The six-job decision, complete exclusion
-lineage, conservation equations, fixture limits, and post-campaign
-reproducibility gate are in the
+The historical autonomous release-candidate gate added two 10-minute synthetic
+runs, three 10-minute physical-combined runs, and one 10-minute alternating
+control-stress run on one immutable pre-rename artifact. The six-job decision,
+complete exclusion lineage, conservation equations, fixture limits, and
+post-campaign reproducibility gate are in the
 [Phase 11 soak evidence](doc/results/phase-11-soak-evidence.md) and the
-[cross-phase evidence index](doc/results/evidence-index.md). A later Windows
-run is additive evidence and is not a prerequisite for that autonomous PASS.
+[cross-phase evidence index](doc/results/evidence-index.md). The prepared
+Phase 12 Windows handoff for that artifact is now historical and superseded.
+
+ThingDAQ firmware 1.0.0 has a fresh byte-identical two-build freeze, current
+generated validators, and passing local software/build gates. Because the USB
+identity, firmware build ID, host namespace, and packaging identity changed,
+the earlier physical results are engineering history rather than release
+acceptance for the renamed binary. A fresh physical campaign remains pending.
 The identity-pinned standalone and installed `thingdaq-soak` entry paths are
 documented in the [soak harness guide](doc/guides/soak-harness.md). Both embed
 the deterministic `firmware/soak/validation-manifest.json` contract; a
 different INFO identity is rejected unless the explicit diagnostic override is
 used, and override reports are always non-release.
-The unpublished artifacts, exact hashes, local packaging results, diagnostic
-fixture smoke, report interpretation, and user procedure are consolidated in
-the [Phase 12 Windows handoff](doc/results/phase-12-windows-handoff.md). That
-handoff explicitly leaves Windows physical-combined and externally stimulated
-analog/digital evidence pending.
+The superseded artifacts, exact hashes, local packaging results, diagnostic
+fixture smoke, and report interpretation for the earlier candidate remain in
+the [Phase 12 Windows handoff](doc/results/phase-12-windows-handoff.md). Use
+the current soak harness guide—not those historical hashes—for a new run.
 
 Those runs used unstimulated A0/A1 and no declared external digital stimulus.
 They do not establish analog accuracy, analog bandwidth, true aperture timing,

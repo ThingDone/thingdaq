@@ -258,8 +258,8 @@ with ThingDAQ.open(devices[0]) as daq:
 
 expected = ExpectedDeviceIdentity(
     hardware_serial=12345670,
-    firmware_version=(0, 3, 0),
-    build_id="thingdaq-39300273210c1c89",
+    firmware_version=(1, 0, 0),
+    build_id="thingdaq-e27556de5b898f28",
 )
 with ThingDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
     print(daq.device_info.build_id)
@@ -332,7 +332,7 @@ The installed `thingdaq` command exposes bounded one-shot hardware controls:
 
 ```bash
 thingdaq list
-thingdaq probe --hardware-serial 12345670 --expect-build-id thingdaq-39300273210c1c89
+thingdaq probe --hardware-serial 12345670 --expect-build-id thingdaq-e27556de5b898f28
 thingdaq status --hardware-serial 12345670
 thingdaq configure --hardware-serial 12345670 --streams both --source hardware
 thingdaq start --hardware-serial 12345670

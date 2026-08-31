@@ -21,7 +21,7 @@ related:
 ## Outcome
 
 The complete Phase 07 gate passed on 2026-08-28. Clean build
-`thingdaq-5eb59f8fd8b9d65f` ran a bounded trigger/DMA diagnostic, a 10-second
+`tdaq-5eb59f8fd8b9d65f` ran a bounded trigger/DMA diagnostic, a 10-second
 full-rate smoke, and a 60-second ADC-only soak strictly sequentially on Teensy
 4.0 hardware serial 20512460. Each accepted job independently verified the
 firmware and board identity, both calibrations, the PIT/XBAR/ADC_ETC register
@@ -122,7 +122,7 @@ The exact image was compiled from clean firmware inputs at commit
 
 | Property | Value |
 | --- | --- |
-| Build ID / source ID | `thingdaq-5eb59f8fd8b9d65f` / `5eb59f8fd8b9d65f55513aa0c26625c6afeec1c9b78837206a655ff05d165b38` |
+| Build ID / source ID | `tdaq-5eb59f8fd8b9d65f` / `5eb59f8fd8b9d65f55513aa0c26625c6afeec1c9b78837206a655ff05d165b38` |
 | Reproducible timestamp | `2026-08-29T02:03:54Z` |
 | FQBN | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
 | Target/toolchain | Teensy core 1.62.0; Arduino CLI 1.4.1; Arm GNU 15.2.1; 600 MHz; USB Serial; standard `-O2`; warnings `all` |
@@ -145,7 +145,7 @@ accepted jobs. The staged upload tree contained exactly one HEX.
 
 The comparison baseline is rebuilt Phase 06 commit
 `9166bab527af4f43f6b7de5dfca0cc073b7cdeb5`, build
-`thingdaq-e8096e0fd6ce3963`.
+`tdaq-e8096e0fd6ce3963`.
 
 | Resource | Phase 06 | Accepted Phase 07 | Delta |
 | --- | ---: | ---: | ---: |
@@ -180,7 +180,7 @@ the soak. Service API version was 1.0.0. No accepted jobs overlapped.
 | 3 | 60-second 1 MS/s-per-converter soak | `464b9c80-f04e-4408-8a80-fc97a6cc0ac6` | `02:14:20Z`-`02:15:31Z` | 60.011482 s / 174 | PASS |
 
 Every program pinned protocol 1, firmware 0.7.0, build
-`thingdaq-5eb59f8fd8b9d65f`, Teensy 4.0/i.MX RT1062, and hardware serial 20512460.
+`tdaq-5eb59f8fd8b9d65f`, Teensy 4.0/i.MX RT1062, and hardware serial 20512460.
 Before its timed epoch, each job also ran a bounded production-schedule capture
 and stopped cleanly: 40, 40, and 39 complete frames with matched DMA loops and
 zero loss.

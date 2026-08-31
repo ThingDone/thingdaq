@@ -24,6 +24,9 @@ background reader, immutable block models, checksums, timestamps, loss policy,
 and public lifecycle without opening a serial port. Move to `--real` only after
 reading [[Hardware-Safety]] and checking the attached signals.
 
+ThingDAQ is the software/product name. Teensy 4.0 references below identify
+the supported hardware platform, not a ThingDAQ model or affiliation.
+
 ## Install for repository development
 
 From the repository root:

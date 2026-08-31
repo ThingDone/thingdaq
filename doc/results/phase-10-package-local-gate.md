@@ -60,10 +60,10 @@ the sdist first and then built the wheel from that sdist.
 
 | Build | Artifact | Bytes | Archive SHA-256 |
 | --- | --- | ---: | --- |
-| A | `thingdaq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
-| B | `thingdaq_local-0.10.0-py3-none-any.whl` | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
-| A | `thingdaq_local-0.10.0.tar.gz` | 195,939 | `67285e6a10cd1d384e01e438f0b54ee12404e61924c646aa25ce538913e52f22` |
-| B | `thingdaq_local-0.10.0.tar.gz` | 195,928 | `831be5170b8ed2f498724eaa1c4bc241d39ad0722861347eab6f80f498c5a420` |
+| A | pre-rename wheel, version 0.10.0 | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
+| B | pre-rename wheel, version 0.10.0 | 178,111 | `47759ba1a74d7465f8c06ffb40e2656778701245a6285b193ced04deb818f7d3` |
+| A | pre-rename source distribution, version 0.10.0 | 195,939 | `67285e6a10cd1d384e01e438f0b54ee12404e61924c646aa25ce538913e52f22` |
+| B | pre-rename source distribution, version 0.10.0 | 195,928 | `831be5170b8ed2f498724eaa1c4bc241d39ad0722861347eab6f80f498c5a420` |
 
 The two wheel containers are byte-for-byte identical. The gzip-wrapped sdist
 containers are not byte-identical, so their distinct sizes and hashes are

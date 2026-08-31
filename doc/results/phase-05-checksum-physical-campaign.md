@@ -25,7 +25,7 @@ related:
 The candidate-isolated physical checksum campaign passed on 2026-08-28 for
 Adler-32, CRC-32C, and CRC-32/ISO-HDLC. The three accepted jobs ran strictly
 sequentially on Teensy 4.0 serial 20512460 and flashed the same clean artifact,
-`thingdaq-b2d06f37e6cef9a7`. Each job first ran the complete on-device candidate
+`tdaq-b2d06f37e6cef9a7`. Each job first ran the complete on-device candidate
 microbenchmark and then sustained a 60-second full-rate ADC/GPIO synthetic
 stream using that candidate.
 
@@ -82,7 +82,7 @@ attribute; the rest of the image retains the pinned standard `-O2` contract.
 
 | Property | Value |
 | --- | --- |
-| Build ID | `thingdaq-b2d06f37e6cef9a7` |
+| Build ID | `tdaq-b2d06f37e6cef9a7` |
 | Firmware-input commit | `06930e2e5815d80365f43a5ac5e276c8af1bae70` |
 | Firmware inputs | Clean; no generated drift |
 | HEX SHA-256 | `d6ed1b5a69082b023e90951541a3d3b876f67118e8b2d2fc751f46724813e89e` |

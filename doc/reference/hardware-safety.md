@@ -19,7 +19,7 @@ related:
   - '[[Phase-09-Loss-Recovery]]'
 ---
 
-# Teensy 4.0 hardware safety
+# ThingDAQ hardware safety for Teensy 4.0
 
 > [!CAUTION]
 > This project targets Teensy 4.0 / i.MX RT1062 only. Treat A0/A1 and D6-D13

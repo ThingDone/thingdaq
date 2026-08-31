@@ -21,12 +21,12 @@ related:
 ## Result
 
 The complete offline Phase 03 gate passed on 2026-08-28 in
-`/home/bill/agents/thingdaq`. The implementation revision at the start of the
+the repository root. The implementation revision at the start of the
 gate was `59e9f9630685681b23b3aa2f9bfc5a3d92720c15`; this report and the build
-gate repair are recorded by the following `MAESTRO` commit. The exact firmware
+gate repair are recorded by the following commit. The exact firmware
 input fingerprint is
 `39300273210c1c89964c5c5cc56ae76ca7b6e800471d94acaa24f6b30de0ff5a`,
-which produces build ID `thingdaq-39300273210c1c89`.
+which produces build ID `tdaq-39300273210c1c89`.
 
 The gate used generated protocol assets, the Python simulator/fake serial
 peers, host-compiled portable C++ executables, and a compile-only Teensy build.
@@ -187,7 +187,7 @@ Arm `objcopy` decoded the exported ELF and Intel HEX independently. The two raw
 images compared byte for byte and both had SHA-256
 `ec93d7ea00be3b7a5ea09335bb5b52fefaa9e148af7d4f7eeac42690477ebef8`.
 Inspection of the HEX-derived bytes found ASCII build ID
-`thingdaq-39300273210c1c89` and UTF-16LE product name `ThingDAQ`. The map places
+`tdaq-39300273210c1c89` and UTF-16LE product name `ThingDAQ`. The map places
 the build ID in the production control object, the strong product descriptor
 in `teensy_usb.cpp`, and the serial descriptor in the untouched Teensy core.
 Together, the manifest, HEX inspection, and map inspection bind the candidate

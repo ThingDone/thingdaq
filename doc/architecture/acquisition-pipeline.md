@@ -446,7 +446,8 @@ cooperative packet or USB layers.
 
 Combined hardware lifecycle, capability/configuration negotiation, telemetry,
 bounded host monitoring, adversarial firmware/Python coverage, and the
-self-contained rig are complete. Exact build `thingdaq-25b8d210adb6e4ac` passed a
+self-contained rig are complete. Exact pre-rename build
+`tdaq-25b8d210adb6e4ac` passed a
 5-second synthetic regression followed sequentially by 10-second and
 60-second physical campaigns at approximately 4 MB/s per source. The accepted
 jobs proved common-epoch ratios, zero live or complete-frame loss, bounded

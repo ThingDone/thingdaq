@@ -42,7 +42,7 @@ the validated host totals. See [[Protocol-V1]] for the wire invariants and
 | --- | --- |
 | Live service preflight | PASS: healthy worker, Docker, and hub; normal coordinator; queue depth 0 |
 | Sequential smoke then soak | PASS: accepted smoke completed at `10:54:28Z`; soak submission began at `10:54:41Z` after a fresh empty-queue health check |
-| Firmware/build/hardware identity | PASS: firmware 0.4.0, protocol 1, `thingdaq-9fb124f80183ed61`, serial 20512460 in both jobs |
+| Firmware/build/hardware identity | PASS: firmware 0.4.0, protocol 1, `tdaq-9fb124f80183ed61`, serial 20512460 in both jobs |
 | ADC and GPIO payload rates | PASS: +0.1451% per source in the smoke and +0.0237% per source in the soak |
 | Wire and synthetic correctness | PASS: every checksum, formula, sequence, timestamp, run ID, item count, and flag validated |
 | Firmware and host loss | PASS: zero ADC/GPIO drops, gap/overrun flags, parser errors, transport errors, stale responses, or host queue drops |
@@ -86,7 +86,7 @@ with 80 buffers owned, confirms zero exhaustion/drop, then drains to zero.
 
 | Build property | Accepted value |
 | --- | --- |
-| Build ID | `thingdaq-9fb124f80183ed61` |
+| Build ID | `tdaq-9fb124f80183ed61` |
 | Firmware source fingerprint | `9fb124f80183ed6161dbcadc2758feaaf2a25a54b8e4678484a392086e5980b4` |
 | Firmware-input Git revision | `e3f93de74c85e7441f2db20b559bd48f34e263b8` |
 | Reproducible build timestamp | `2026-08-28T10:53:10Z` |
@@ -209,12 +209,12 @@ Only the final smoke/soak pair above is accepted.
 
 | Excluded job | Candidate | Diagnostic result and repair |
 | --- | --- | --- |
-| `9c64c033-3c95-45ca-abff-14f0a555dbbe` | 16-frame `thingdaq-5dcbdd7741f93361` | First live STATUS exposed one dropped GPIO frame; expanded the startup scheduling reserve and added a native stall regression. |
-| `073c7860-dca0-4721-b25f-278c49c5966d` | 32-frame `thingdaq-ece399a4744dc360` | Rig false negative compared a STATUS snapshot with newer frames from the same 64 KiB read; validation now uses the pre-request receive floor. |
-| `d6984e90-f28e-44e1-af0d-01ca8513d04b` | 32-frame `thingdaq-ece399a4744dc360` | Genuine GPIO gap flag at sequence 4,626 showed that one batch of scheduling margin was insufficient. |
-| `cda77c5d-ea69-446f-874c-f829c054c8fc` | 64-frame `thingdaq-f0c60e4b4ae2deb7` | Genuine ADC gap flag at sequence 4,622; added post-failure timing and final STATUS diagnostics. |
-| `0a1c4593-9ccd-46a2-9e5b-5249b51a0653` | 64-frame `thingdaq-f0c60e4b4ae2deb7` | Ten-second diagnostic passed, but it is not paired with the accepted candidate because the following soak failed. |
-| `2e691c60-99d8-4ada-a4c9-6289a4559910` | 64-frame `thingdaq-f0c60e4b4ae2deb7` | Soak measured a 39.8081 ms receive pause and exact losses of four ADC plus five GPIO frames, with parser/transport errors zero; expanded to the final six-batch reserve. |
+| `9c64c033-3c95-45ca-abff-14f0a555dbbe` | 16-frame `tdaq-5dcbdd7741f93361` | First live STATUS exposed one dropped GPIO frame; expanded the startup scheduling reserve and added a native stall regression. |
+| `073c7860-dca0-4721-b25f-278c49c5966d` | 32-frame `tdaq-ece399a4744dc360` | Rig false negative compared a STATUS snapshot with newer frames from the same 64 KiB read; validation now uses the pre-request receive floor. |
+| `d6984e90-f28e-44e1-af0d-01ca8513d04b` | 32-frame `tdaq-ece399a4744dc360` | Genuine GPIO gap flag at sequence 4,626 showed that one batch of scheduling margin was insufficient. |
+| `cda77c5d-ea69-446f-874c-f829c054c8fc` | 64-frame `tdaq-f0c60e4b4ae2deb7` | Genuine ADC gap flag at sequence 4,622; added post-failure timing and final STATUS diagnostics. |
+| `0a1c4593-9ccd-46a2-9e5b-5249b51a0653` | 64-frame `tdaq-f0c60e4b4ae2deb7` | Ten-second diagnostic passed, but it is not paired with the accepted candidate because the following soak failed. |
+| `2e691c60-99d8-4ada-a4c9-6289a4559910` | 64-frame `tdaq-f0c60e4b4ae2deb7` | Soak measured a 39.8081 ms receive pause and exact losses of four ADC plus five GPIO frames, with parser/transport errors zero; expanded to the final six-batch reserve. |
 
 The repair sequence is preserved in commits `0eb59f0`, `eb7b504`, `7b6ffbf`,
 `041fc9b`, and `e3f93de`. The final local gate reports all 20 generated

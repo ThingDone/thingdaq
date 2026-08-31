@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Documentation Index
 created: 2026-08-27
-updated: 2026-08-29
+updated: 2026-08-31
 tags:
   - thingdaq
   - documentation
@@ -49,6 +49,22 @@ related:
 Every Markdown artifact below `doc/` begins with YAML front matter containing
 `type`, `title`, `created`, `tags`, and `related`. Related artifacts use
 double-bracket document links so the project can be explored as a graph.
+
+## Project identity and evidence provenance
+
+ThingDAQ (Thing Done DAQ) is the project and product name. It supports the
+Teensy® 4.0 hardware platform but is independent of and not endorsed by
+PJRC.COM, LLC or SparkFun Electronics; Teensy is a registered trademark of
+PJRC.COM, LLC. Hardware references are descriptive and do not form part of the
+ThingDAQ name.
+
+Result reports predate the rename unless they explicitly identify the current
+1.0.0 candidate. Their `tdaq-*` build IDs are immutable values emitted by the
+tested firmware and are retained verbatim for evidence integrity. Reusable
+commands, source paths, Python names, and prose use current ThingDAQ naming;
+consult the recorded commit when reproducing a historical artifact byte for
+byte. [[Evidence-Index]] separates current local validation from historical
+physical acceptance.
 
 ## Organization
 
@@ -100,13 +116,12 @@ double-bracket document links so the project can be explored as a graph.
   sequential identity/capability, physical combined-stream, live STATUS, raw
   interpretation, clean STOP, and counter-reconciliation gate are recorded in
   [[Phase-10-Package-Workflows]].
-  The final autonomous release-candidate decision, complete accepted/excluded
+  The historical autonomous release-candidate decision, complete accepted/excluded
   job lineage, cross-run trends, conservation equations, and reproducible
   post-campaign gate are consolidated in [[Phase-11-Soak-Evidence]]. The
-  unpublished identity-pinned Windows artifacts, hashes, packaging evidence,
-  report interpretation, non-gating status, and later user procedure are in
-  [[Phase-12-Windows-Handoff]]. Use [[Evidence-Index]] as the cross-phase
-  result and ADR map.
+  superseded identity-pinned Windows artifacts, hashes, packaging evidence,
+  and report interpretation are in [[Phase-12-Windows-Handoff]]. Use
+  [[Evidence-Index]] for the current-candidate boundary and cross-phase map.
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`

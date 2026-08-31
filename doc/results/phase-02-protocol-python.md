@@ -20,9 +20,9 @@ related:
 ## Result
 
 The complete offline Phase 02 gate passed on 2026-08-28 in
-`/home/bill/agents/thingdaq`. The implementation baseline at the start of the
+the repository root. The implementation baseline at the start of the
 gate was `a9f1856dd3107404de7d0a8ca060b8a39e3a124d`; this report and the two
-test-only quality-gate repairs are recorded by the following `MAESTRO` commit.
+test-only quality-gate repairs are recorded by the following commit.
 
 The gate used generated fixtures, fake serial peers, the in-memory simulator,
 and clean local Python environments. It did not enumerate or open a physical
@@ -156,13 +156,13 @@ wheel and its runtime dependency without editable source access:
 
 ```bash
 python -m build --wheel --outdir <wheelhouse> daq_api
-uv pip install --python <clean-python-3.11> <wheelhouse>/thingdaq_local-0.0.0-py3-none-any.whl
+uv pip install --python <clean-python-3.11> <wheelhouse>/<pre-rename-wheel>
 python -I -c 'import pathlib, thingdaq; print(pathlib.Path(thingdaq.__file__).resolve())'
 ```
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `thingdaq_local-0.0.0-py3-none-any.whl` | 59,879 | `06665a3566621fdbf9a4abbcfad2e0539fa7a760e112f47be1831ed7dd3471c8` |
+| Pre-rename wheel, version 0.0.0 | 59,879 | `06665a3566621fdbf9a4abbcfad2e0539fa7a760e112f47be1831ed7dd3471c8` |
 
 The isolated import resolved inside the clean environment's
 `lib/python3.11/site-packages/thingdaq/`, confirming a non-editable wheel
