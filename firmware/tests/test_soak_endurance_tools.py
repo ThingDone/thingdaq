@@ -1005,9 +1005,9 @@ class SoakGeneratorTests(unittest.TestCase):
             ["[[Phase-11-Soak-Evidence]]"],
             manifest["related"],
         )
-        self.assertEqual("thingdaq-a0dc150fd48a6e9b", manifest["firmware"]["build_id"])
+        self.assertEqual("thingdaq-e27556de5b898f28", manifest["firmware"]["build_id"])
         self.assertEqual(
-            "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
+            "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
             manifest["firmware"]["exported_hex"]["sha256"],
         )
         self.assertEqual(
@@ -1126,9 +1126,9 @@ class SoakGeneratorTests(unittest.TestCase):
         self.assertEqual("physical-combined", settings.mode)
         self.assertEqual(3_600.0, settings.measured_duration_seconds)
         self.assertEqual(20_512_460, settings.hardware_serial)
-        self.assertEqual("thingdaq-a0dc150fd48a6e9b", settings.build_id)
+        self.assertEqual("thingdaq-e27556de5b898f28", settings.build_id)
         self.assertEqual(
-            "0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a",
+            "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
             settings.artifact_sha256,
         )
         manifest = generator.load_object(generator.VALIDATION_MANIFEST_PATH)
@@ -1187,7 +1187,7 @@ class SoakGeneratorTests(unittest.TestCase):
         )
         mismatches = windows.info_identity_mismatches(observed, override)
         self.assertEqual(
-            "thingdaq-a0dc150fd48a6e9b", mismatches["build_id"]["expected"]
+            "thingdaq-e27556de5b898f28", mismatches["build_id"]["expected"]
         )
         self.assertEqual("thingdaq-diagnostic-other", mismatches["build_id"]["actual"])
 

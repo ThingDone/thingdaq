@@ -48,6 +48,12 @@ EXCLUDED_DIRECTORY_NAMES = {
     "build",
     "dist",
 }
+EXCLUDED_REPOSITORY_PATHS = {
+    # This generated package entry point embeds the validation manifest, which
+    # records the candidate-freeze digest. Protecting it here would make the
+    # freeze hash its own transitive input. Generator --check covers its bytes.
+    "daq_api/src/thingdaq/soak.py",
+}
 REQUIRED_ARTIFACT_SUFFIXES = {".elf", ".hex", ".map"}
 SHA256_LENGTH = 64
 LOCK_SCHEMA_VERSION = 1
@@ -116,13 +122,31 @@ def repository_path(path: Path, *, root: Path = REPOSITORY_ROOT) -> str:
 def _is_excluded(path: Path, *, root: Path) -> bool:
     relative = path.relative_to(root)
     return (
-        any(
+        relative.as_posix() in EXCLUDED_REPOSITORY_PATHS
+        or any(
             part in EXCLUDED_DIRECTORY_NAMES
             or part.endswith(".egg-info")
             or part.startswith(".")
             for part in relative.parts
         )
         or path.suffix == ".pyc"
+    )
+
+
+def _is_protected_repository_path(relative: str) -> bool:
+    """Return whether a Git-status path belongs to the protected input set."""
+
+    selected = Path(relative)
+    if relative in EXCLUDED_REPOSITORY_PATHS or any(
+        part in EXCLUDED_DIRECTORY_NAMES
+        or part.endswith(".egg-info")
+        or part.startswith(".")
+        for part in selected.parts
+    ):
+        return False
+    return any(
+        selected == Path(protected) or Path(protected) in selected.parents
+        for protected in PROTECTED_INPUTS
     )
 
 
@@ -325,7 +349,7 @@ def current_git_commit(*, root: Path = REPOSITORY_ROOT) -> str:
 
 
 def require_clean_protected_inputs(*, root: Path = REPOSITORY_ROOT) -> None:
-    """Refuse to freeze uncommitted source or generated changes."""
+    """Refuse to freeze uncommitted changes to actual protected inputs."""
 
     result = subprocess.run(
         [
@@ -347,11 +371,10 @@ def require_clean_protected_inputs(*, root: Path = REPOSITORY_ROOT) -> None:
     )
     if result.returncode:
         raise FreezeError("could not inspect protected Git state")
-    permitted = "firmware/soak/candidate-freeze.json"
     changes = []
     for line in result.stdout.splitlines():
         path = line[3:].split(" -> ")[-1]
-        if path != permitted:
+        if _is_protected_repository_path(path):
             changes.append(line)
     if changes:
         raise FreezeError(

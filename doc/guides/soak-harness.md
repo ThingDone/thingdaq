@@ -69,10 +69,13 @@ second build into the campaign's dedicated working directory:
 
 `firmware/soak/candidate-freeze.json` records both manifest hashes, every
 exported artifact hash, the inspected memory/resource sections, and a
-path-aware hash of all package, protocol, firmware, harness, generated, test,
-and example inputs. The accepted artifacts live under the ignored staged path
-recorded by that file. Every service submission must use that staged HEX and
-run `--check` immediately before preflight. The check fails closed on a
+path-aware hash of all protocol, firmware, harness, test, example, and package
+inputs. The generated installed entry point is excluded from that tree because
+it embeds the freeze digest; `generate_soak_programs.py --check` independently
+enforces its exact bytes and avoids a circular hash dependency. The accepted
+artifacts live under the ignored staged path recorded by the freeze. Every
+service submission must use that staged HEX and run both freeze and generator
+checks immediately before preflight. The freeze check fails closed on a
 changed, added, or removed protected file, candidate-identity drift, or staged
 artifact drift; any intentional edit therefore requires a new two-build freeze
 and restarts the consecutive-pass series. The soak generator emits three

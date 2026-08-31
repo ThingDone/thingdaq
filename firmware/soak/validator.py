@@ -44,7 +44,7 @@ GENERATED_CONFIG: dict[str, object] = {
         "schema_version": 1,
         "artifact": {
             "name": "firmware.ino.hex",
-            "sha256": "6bb2c355ed59e3dc59109de9fc954daeb8440329996a3b5efbaf65f15781e769",
+            "sha256": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
         },
         "board": {
             "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
@@ -53,10 +53,10 @@ GENERATED_CONFIG: dict[str, object] = {
             "mcu_id": 1,
         },
         "firmware": {
-            "version": [0, 7, 0],
-            "build_id": "thingdaq-ea010335c9b63bb7",
+            "version": [1, 0, 0],
+            "build_id": "thingdaq-e27556de5b898f28",
             "source_id": (
-                "ea010335c9b63bb7008e7c18fc911ac87df69ebdeacfdde27f5bb54a12f4fa85"
+                "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673"
             ),
         },
         "protocol": {
