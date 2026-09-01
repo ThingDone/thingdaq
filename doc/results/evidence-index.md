@@ -92,23 +92,26 @@ GPIO transitions, or Windows-host behavior. A service incident could be
 retried once; no such incident occurred. Product/test failures were excluded,
 fixed, rebuilt when needed, and restarted from run one.
 
-## Historical Phase 12 Windows handoff (superseded)
+## Historical Phase 12 handoff and release-grading hardening (superseded)
 
-[[Phase-12-Windows-Handoff]] records the unpublished handoff prepared for the
-same pre-rename identity. Its standalone script, installed command,
+[[Phase-12-Windows-Handoff]] records the corrected unpublished handoff prepared
+for the same pre-rename identity. Its standalone validator, installed command,
 deterministic manifest, universal wheel, and source distribution passed their
 generation, conformance, packaging, clean-install, fault-fixture, and
-accelerated one-hour gates. A final 10-second full-rate synthetic
-virtual-device smoke passed on Linux and was correctly marked diagnostic and
-non-release. Those files and hashes do not describe the current ThingDAQ
-sources.
+accelerated one-hour gates. The retained
+`.maestro/playbooks/Working/phase-12-windows-release-grading-00001/windows-release-grading-evidence.md`
+records the native Windows RSS and fail-closed eligibility hardening. A
+10-second full-rate synthetic virtual-device smoke passed on Linux and was
+correctly marked diagnostic and non-release. Those files and hashes do not
+describe the current ThingDAQ sources.
 
 | Handoff authority | Exact value |
 | --- | --- |
-| Standalone validator | SHA-256 `6604d1ec4900fdfbeec74b5b98413b9e7a28879261b1774e20aad6584ef1757d` |
+| Standalone validator | 240,272 bytes; SHA-256 `3553336f6f2a26b86de45c0100dd06e104e3fcca17ec80f82a5bef28a4445730` |
 | Validation manifest | File SHA-256 `3da1727a886876848a405aca4a538fccdc6f1c39c4086c17a5c0e7ebc78ee7d5`; semantic SHA-256 `d6da65261b17b91409da59a5a0f8f47182a26d2d2a5637ac68b4cf902413b260` |
-| Universal wheel | 226,018 bytes; SHA-256 `d9141177503a588338ea1e5d7eb50ba78d1f38f0e482babda4eebf4da3e8da88` |
-| Source distribution | 245,003 bytes; SHA-256 `244d0837a6144d797af0c85a88d25b7164d0745cd788e69eb1417f32c4c43660` |
+| Universal wheel | 228,020 bytes; SHA-256 `4a80428ddab575718bba0eb50fc976451c0b216f32f6c9d5b3331930214f12ff` |
+| Source distribution | 246,984 bytes; SHA-256 `5b6723897e3f0f3059a6aa2be5ef11b3a38e0524410994aaab958a33b65d3c69` |
+| Release grading | Native Windows host plus complete numeric bounded RSS evidence required; conformance SHA-256 `5cb3ae36964d5ddce3a197ced3f93380fe8366c8dd0f880ef343f48465ecfa30` |
 | Final simulated smoke | PASS; 10.000958 seconds, 79,919,664 payload bytes, `release_eligible: false` |
 | Windows physical-combined result | Never run for this superseded handoff |
 

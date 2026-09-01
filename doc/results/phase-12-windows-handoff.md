@@ -29,11 +29,14 @@ related:
 
 ## Outcome and status
 
-The unpublished Windows handoff was ready for a later Windows run against the
-historical Phase 11 identity. Its standalone validator, installed command, and
-deterministic validation manifest encoded that same accepted identity and
-validation contract. Generation, conformance, packaging, clean-install,
-failure-fixture, and accelerated one-hour gates passed before the rename.
+The corrected unpublished Windows handoff was ready for a later Windows run
+against the historical Phase 11 identity. Its pre-rename standalone and
+installed validators plus deterministic validation manifest encoded that same
+accepted identity and fail-closed validation contract. Generation,
+conformance, packaging, clean-install, failure-fixture, and accelerated
+one-hour gates passed. The dated release-grading hardening addendum below
+superseded the original Phase 12 artifacts at the time; both sets are now
+historical after the ThingDAQ rename.
 
 The final pre-handoff check also passed a 10-second, full-rate synthetic stream
 through the exact standalone validator core using a virtual serial device and
@@ -85,12 +88,14 @@ stable device selector across COM renumbering. A
 mutable name such as `COM10` is discovery evidence only and is never accepted
 as release identity.
 
-## Handoff artifacts and hashes
+## Original handoff artifacts and hashes (historical)
 
-The distributions were built from checkout
+The original distributions were built from checkout
 `00957d02c2e72161b752b2bd562962b48f3c595f` with
 `SOURCE_DATE_EPOCH=1788051352`. Nothing was uploaded, tagged, released, or
-reserved on a package index.
+reserved on a package index. These hashes preserve the initial Phase 12 record
+but are superseded for future testing by the corrected artifacts in the
+hardening addendum immediately below.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -108,6 +113,61 @@ six generated outputs byte for byte and matched the checked repository files.
 The standalone imports only the Python standard library and PySerial; it does
 not import the package, NumPy, repository code, a network client, or a rig
 service at runtime.
+
+## 2026-08-29 release-grading hardening addendum
+
+> [!IMPORTANT]
+> These corrected artifacts superseded the original historical handoff by
+> adding native Windows RSS sampling and fail-closed release eligibility. They
+> are themselves superseded by ThingDAQ 1.0 and must not be used for a current
+> run.
+
+The hardening build was produced from checkout
+`1b5d96dd263b3ba791545d56fd1687fde820dbad` with fixed
+`SOURCE_DATE_EPOCH=1788057661`. The artifacts and complete machine-readable
+evidence are retained under
+`.maestro/playbooks/Working/phase-12-windows-release-grading-00001/`; see its
+`windows-release-grading-evidence.md` and
+`windows-release-grading-evidence.json`. Nothing was uploaded, tagged,
+released, pushed, or reserved on a package index.
+
+| Corrected artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Pre-rename standalone validator | 240,272 | `3553336f6f2a26b86de45c0100dd06e104e3fcca17ec80f82a5bef28a4445730` |
+| Pre-rename installed validator | 240,271 | `6762390e5d779c705acbff9e9e7acce48da7870a91cb324b50958cf798a3bbe0` |
+| Pre-rename validation manifest | 9,751 | `3da1727a886876848a405aca4a538fccdc6f1c39c4086c17a5c0e7ebc78ee7d5` |
+| Pre-rename wheel, version 0.10.0 | 228,020 | `4a80428ddab575718bba0eb50fc976451c0b216f32f6c9d5b3331930214f12ff` |
+| Pre-rename source distribution, version 0.10.0 | 246,984 | `5b6723897e3f0f3059a6aa2be5ef11b3a38e0524410994aaab958a33b65d3c69` |
+| Shared normalized implementation | n/a | `329528555c452a8e17569971702245e6af5d5a964f504bf16b9ee953e440b816` |
+| Shared conformance vector | n/a | `5cb3ae36964d5ddce3a197ced3f93380fe8366c8dd0f880ef343f48465ecfa30` |
+
+Two independent builds produced byte-identical wheels. Their extracted source
+distribution paths and bytes also matched exactly. Fresh standalone, wheel,
+and source-distribution environments contained only PySerial 3.5 plus the
+package where applicable; isolated imports, `pip check`, conformance,
+simulator INFO, and one-frame-per-stream demos passed with NumPy and
+development dependencies absent.
+
+The corrected Windows-native sampler uses standard-library `ctypes` with
+`GetCurrentProcess` and `GetProcessMemoryInfo` to record current and peak
+working-set bytes at bounded memory checkpoints. A report is release eligible
+only when every boolean in `windows.release_requirements` is true: the exact
+3,600-second non-smoke physical-combined profile, identity override disabled,
+native Windows host identity, overall PASS, exact manifest/device identity,
+valid numeric baseline/peak/growth RSS evidence, and growth no greater than 32
+MiB. Non-Windows hosts and unavailable, malformed, negative, non-finite, or
+over-limit memory evidence produce explicit non-release reasons.
+
+Automated gates passed 413 tests with 7 expected skips and 14,078 subtests,
+including 22 focused Windows tests and 74 subtests. The rebuilt firmware kept
+build ID `tdaq-a0dc150fd48a6e9b`; its 357,214-byte HEX remained byte-identical
+to the accepted frozen Phase 11 artifact with SHA-256
+`0716cffb11c551bf77dd8a9bca062c6155bb2e40036ad8d82eaf1be4588d743a`.
+These Linux-hosted automated tests and Windows mocks validate grading logic;
+they are not a Windows-host, USB-controller, attached-device, analog-quality,
+aperture, or externally stimulated GPIO result. The planned Windows smoke and
+3,600-second physical-combined run were not performed before this handoff was
+superseded.
 
 ## Expected validation manifest
 

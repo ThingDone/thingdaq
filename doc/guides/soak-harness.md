@@ -126,6 +126,16 @@ growth no greater than 32 MiB. Missing, malformed, negative, non-finite, or
 over-limit RSS evidence fails closed as non-release without changing a useful
 diagnostic PASS into a runtime FAIL.
 
+On native Windows, the bounded `MemoryTracker` checkpoints obtain current and
+peak process working-set bytes through a dependency-free `ctypes` wrapper over
+`GetCurrentProcess` and `GetProcessMemoryInfo`. The wrapper validates the
+`PROCESS_MEMORY_COUNTERS` structure and returns unavailable evidence rather
+than zero when the native API cannot be loaded or called. The report's
+`windows.validation_reasons` then identifies a non-native host, unavailable or
+invalid RSS fields, or RSS growth above 32 MiB explicitly; these are
+release-evidence failures, not automatic runtime failures for an otherwise
+useful diagnostic run.
+
 `--diagnostic-identity-override` is the sole escape hatch for deliberately
 testing a different parseable device or firmware identity. It must be supplied
 explicitly; without it, even one build, hardware-serial, version, capability,
