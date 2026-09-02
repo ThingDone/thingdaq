@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Evidence Index
 created: 2026-08-29
-updated: 2026-08-31
+updated: 2026-09-02
 tags:
   - thingdaq
   - evidence
@@ -30,6 +30,8 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[ADR-007-Experimental-Aux-Input-Bank]]'
+  - '[[Aux-Input-Prototype]]'
 ---
 
 # ThingDAQ evidence index
@@ -59,6 +61,24 @@ serve as release acceptance for ThingDAQ 1.0.
 Use [[soak-harness]] to generate and run new evidence against this identity.
 Do not compare a current report to the hashes in the historical sections
 below.
+
+## Experimental auxiliary-input prototype
+
+[[Aux-Input-Prototype]] records the isolated `experiment/aux-input-bank`
+protocol, Python, simulator, and portable-host-C++ gate. All four exact rate
+profiles and both GPIO widths passed deterministic sample, timestamp,
+configuration, alignment, and conservation checks. Two full-rate parser runs
+retained at least 1.949990 times the analytic 12.189723 MB/s framed-load
+hypothesis, and two dual-bank packer runs retained at least 215.368 times the
+8 MB/s GPIO payload target. The pinned default 600 MHz firmware still builds
+without upload, while all 27 protocol-v1 source/generated/fixture paths remain
+byte-identical to the immutable baseline.
+
+This is not target-register, live-USB, external-stimulus, pad-mapping,
+electrical, ADC-performance, or signal-integrity evidence. The full-rate
+12 MB/s payload and `3084000000/253` framed B/s values remain analytic load
+hypotheses until the Phase 06 target and physical campaign; no clock, RLE, or
+output branch combination was tested.
 
 ## Historical autonomous acceptance (superseded identity)
 

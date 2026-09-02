@@ -39,6 +39,7 @@ related:
   - '[[ADR-004-ADC-Trigger-DMA]]'
   - '[[ADR-007-Experimental-Aux-Input-Bank]]'
   - '[[Experiment-Baseline]]'
+  - '[[Aux-Input-Prototype]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -94,7 +95,8 @@ physical acceptance.
 - `research/` records evidence gathered before implementation or selection,
   beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
-  beginning with the immutable [[Experiment-Baseline]] and including
+  beginning with the immutable [[Experiment-Baseline]], the isolated
+  simulator/host [[Aux-Input-Prototype]] validation, and including
   [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
   by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical

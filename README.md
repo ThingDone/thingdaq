@@ -66,6 +66,8 @@ Run the isolated auxiliary-input workload matrix entirely offline:
 The optional output prefix writes temporary shared-schema JSON and structured
 Markdown. The printed 12 MB/s full-combined payload and protocol-framed byte
 rates are analytic load hypotheses, not physical USB acceptance.
+The validated two-run simulator/host result is retained in the
+[auxiliary-input prototype evidence](doc/results/experiments/aux-input-prototype.md).
 
 All examples default to the simulator. A script touches hardware only when
 `--real` is present:
