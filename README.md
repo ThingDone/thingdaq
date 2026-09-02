@@ -42,6 +42,20 @@ Run the complete deterministic demo or a bounded CLI capture:
   --gpio-channel D6 --gpio-channel D13
 ```
 
+Run the isolated RAW-versus-adaptive-RLE simulator demonstration. It exercises
+constant, long-hold, sparse-transition, slowly changing, alternating, and
+deterministic high-entropy ADC/GPIO workloads, requires byte-identical decoded
+samples, and prints exact payload/wire ratios and fallback counts:
+
+```bash
+.venv/bin/python daq_api/examples/rle_compression.py
+```
+
+Add `--output .maestro/rle-demo` to write temporary JSON and structured
+Markdown through the shared experiment reporter. Those artifacts are labeled
+`simulated` and make no firmware, USB, electrical, or physical-performance
+claim.
+
 Run the autonomous experiment baseline from a clean checkout. This exercises
 the maximum-rate simulator profile, compiles the exact pinned 600 MHz firmware
 without uploading it, and writes validated JSON and structured Markdown:

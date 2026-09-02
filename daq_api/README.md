@@ -188,8 +188,12 @@ frame size after the checksum and entire canonical record stream pass. The
 diagnostics retain the exact encoded payload and expose both payload and
 complete-frame byte counts. A v1 or non-capable peer raises
 `DeviceCapabilityError` instead of changing the requested encoding. The
-built-in simulator remains protocol v1 at this checkpoint and therefore
-rejects explicit RLE; its experimental v2 source patterns are a separate phase.
+built-in `ThingDAQ.simulated()` surface remains protocol v1 and continues to
+reject explicit RLE. The separate `ThingDAQ.simulated_experimental()` surface
+models protocol-v2 capability/configuration negotiation and delegates every
+data frame to the exact adaptive encoder. It provides deterministic constant,
+long-hold, sparse-transition, slowly changing, alternating, and high-entropy
+ADC/GPIO patterns without changing the stable simulator formulas or defaults.
 
 The same negotiation is available to bounded CLI acquisition commands:
 
@@ -198,18 +202,32 @@ thingdaq configure --hardware-serial 12345670 --encoding rle-auto
 thingdaq monitor --hardware-serial 12345670 --encoding rle-auto --duration 5
 ```
 
+Run every experimental pattern through both RAW and `RLE_AUTO`, require exact
+decoded equality, and print per-stream payload/wire bytes, run counts, fallback
+counts, and ratios with one no-hardware command:
+
+```bash
+python examples/rle_compression.py
+python examples/rle_compression.py --output ../.maestro/rle-demo
+```
+
+The optional output prefix produces a temporary `.json`/`.md` pair using the
+shared experiment reporter. Its evidence level is explicitly `simulated`; it
+does not promote the result to firmware, USB, rig, or physical evidence.
+
 ## Runnable workflows
 
-The nine scripts in `examples/` cover discovery/serial selection, raw ADC
+The ten scripts in `examples/` cover discovery/serial selection, raw ADC
 channels, explicit interleaving, optional calibration, packed/selected GPIO,
 combined timestamp alignment, live STATUS/loss handling, standalone simulator
-use, and explicit clean shutdown. Every script's no-argument path uses the
-simulator. Physical access is opt-in via `--real`; calibration additionally
-requires an explicit user-owned path:
+use, experimental RLE comparison, and explicit clean shutdown. Every script's
+no-argument path uses the simulator. Physical access is opt-in via `--real`;
+calibration additionally requires an explicit user-owned path:
 
 ```bash
 python examples/raw_adc_channels.py
 python examples/combined_alignment.py
+python examples/rle_compression.py
 python examples/status_and_loss.py
 python examples/raw_adc_channels.py --real --hardware-serial 20512460
 ```

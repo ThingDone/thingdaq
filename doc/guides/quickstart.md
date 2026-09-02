@@ -15,6 +15,7 @@ related:
   - '[[Calibration]]'
   - '[[NumPy-Integration]]'
   - '[[Protocol-V1]]'
+  - '[[ADR-006-Experimental-RLE-Streaming]]'
 ---
 
 # ThingDAQ quickstart
@@ -75,6 +76,7 @@ path is opt-in and clearly represents a physical-device operation.
 | Combined timestamp alignment | `.venv/bin/python daq_api/examples/combined_alignment.py` | Safe A0/A1 and D6-D13 inputs |
 | Live STATUS and loss handling | `.venv/bin/python daq_api/examples/status_and_loss.py` | Safe inputs; performs a short physical combined capture |
 | Standalone simulator lifecycle | `.venv/bin/python daq_api/examples/simulator.py` | None; this example intentionally has no `--real` path |
+| Experimental RAW versus adaptive RLE | `.venv/bin/python daq_api/examples/rle_compression.py` | None; this example intentionally has no `--real` path |
 | Explicit clean shutdown | `.venv/bin/python daq_api/examples/clean_shutdown.py` | Safe A0/A1 input; demonstrates STOP in `finally` |
 
 For example:
@@ -87,6 +89,32 @@ For example:
 The calibration example's simulator coefficients are illustrative and exist
 only in memory. They are not a personal calibration, do not touch a default
 path, and must not be reused for a physical device. See [[Calibration]].
+
+## Compare experimental adaptive RLE
+
+The compression example runs the constant, long-hold, sparse-transition,
+slowly changing, alternating, and deterministic high-entropy patterns through
+separate RAW and `RLE_AUTO` simulator sessions. It requires byte-identical
+decoded ADC/GPIO payloads and prints frame counts, raw/encoded payload and wire
+bytes, run counts, per-frame fallback counts, and exact ratios:
+
+```bash
+.venv/bin/python daq_api/examples/rle_compression.py
+```
+
+An output prefix asks the shared experiment reporter to emit temporary JSON and
+structured Markdown:
+
+```bash
+.venv/bin/python daq_api/examples/rle_compression.py \
+  --output .maestro/rle-demo
+```
+
+The report labels its execution evidence `simulated`. It does not claim target
+firmware timing, live USB behavior, electrical behavior, or physical signal
+quality. The ordinary `ThingDAQ.simulated()` path remains protocol v1 with its
+original formulas; pattern controls exist only on the explicitly experimental
+surface described by [[ADR-006-Experimental-RLE-Streaming]].
 
 ## Minimal Python lifecycle
 

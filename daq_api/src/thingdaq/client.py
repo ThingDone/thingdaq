@@ -66,7 +66,11 @@ from .reader import (
     RequestTimeoutError,
     StreamStoppedError,
 )
-from .simulator import SimulatedDevice
+from .simulator import (
+    ExperimentalSimulatedDevice,
+    ExperimentalSourcePattern,
+    SimulatedDevice,
+)
 from .synthetic import SyntheticPatternError, validate_synthetic_block
 from .transport import ByteTransport, InMemoryTransport, SerialTransport
 
@@ -363,6 +367,7 @@ class ThingDAQ:
         self._reopened_identity = reopened_identity
         self._session_policy = selected_session_policy
         self._encoding = selected_encoding
+        self._simulation_block_validator: Callable[[DataBlock], None] | None = None
         self._session_policy_applied = False
         self._verified_identity: DeviceIdentitySnapshot | None = None
         self._reader = BackgroundReader(
@@ -645,6 +650,79 @@ class ThingDAQ:
             synchronization_attempts=synchronization_attempts,
             synchronization_retry_delay=synchronization_retry_delay,
         )
+
+    @classmethod
+    def simulated_experimental(
+        cls,
+        *,
+        encoding: v2_constants.ConfigurationEncoding | int,
+        adc_pattern: ExperimentalSourcePattern | str = (
+            ExperimentalSourcePattern.CONSTANT
+        ),
+        gpio_pattern: ExperimentalSourcePattern | str = (
+            ExperimentalSourcePattern.CONSTANT
+        ),
+        read_chunk_size: int | None = None,
+        write_chunk_size: int | None = None,
+        stream_interval: float | None = None,
+        strict: bool = False,
+        read_size: int = 64 * 1024,
+        max_buffered_blocks: int = DEFAULT_MAX_QUEUED_BLOCKS,
+        max_buffered_events: int = 32,
+        max_pending_requests: int = 32,
+        command_timeout: float = 1.0,
+        block_timeout: float = 1.0,
+        shutdown_timeout: float = 1.0,
+        idle_sleep: float = 0.001,
+        expected_identity: ExpectedDeviceIdentity | None = None,
+        session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
+        synchronization_attempts: int = 4,
+        synchronization_retry_delay: float = 0.05,
+    ) -> ThingDAQ:
+        """Open the isolated adaptive-RLE simulator experiment.
+
+        This explicit surface is the only public simulator API that accepts
+        source-pattern controls or advertises protocol-v2 ``RLE_STREAMING``.
+        Selecting ``RAW`` still runs protocol v1, which lets demonstrations
+        compare the same logical workload without changing stable defaults.
+        """
+
+        if isinstance(encoding, bool):
+            raise TypeError("encoding must be RAW or RLE_AUTO")
+        try:
+            selected_encoding = v2_constants.ConfigurationEncoding(encoding)
+        except (TypeError, ValueError) as error:
+            raise ValueError("encoding must be RAW or RLE_AUTO") from error
+        device = ExperimentalSimulatedDevice(
+            encoding=selected_encoding,
+            adc_pattern=adc_pattern,
+            gpio_pattern=gpio_pattern,
+        )
+        transport = InMemoryTransport(
+            device=device,
+            read_chunk_size=read_chunk_size,
+            write_chunk_size=write_chunk_size,
+            stream_interval=stream_interval,
+        )
+        daq = cls.open(
+            transport,
+            strict=strict,
+            read_size=read_size,
+            max_buffered_blocks=max_buffered_blocks,
+            max_buffered_events=max_buffered_events,
+            max_pending_requests=max_pending_requests,
+            command_timeout=command_timeout,
+            block_timeout=block_timeout,
+            shutdown_timeout=shutdown_timeout,
+            idle_sleep=idle_sleep,
+            expected_identity=expected_identity,
+            session_policy=session_policy,
+            encoding=selected_encoding,
+            synchronization_attempts=synchronization_attempts,
+            synchronization_retry_delay=synchronization_retry_delay,
+        )
+        daq._simulation_block_validator = device.validate_block
+        return daq
 
     @property
     def transport(self) -> ByteTransport:
@@ -1834,7 +1912,8 @@ class ThingDAQ:
             and self._configuration.source is constants.Source.SYNTHETIC
         ):
             try:
-                validate_synthetic_block(block)
+                validator = self._simulation_block_validator or validate_synthetic_block
+                validator(block)
             except SyntheticPatternError as error:
                 raise UnexpectedStreamValidationError(
                     "synthetic_pattern",

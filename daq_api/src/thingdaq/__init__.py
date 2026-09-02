@@ -230,7 +230,13 @@ from .reader import (
     RequestTimeoutError,
     StreamStoppedError,
 )
-from .simulator import SimulatedDevice, SimulatorError, SimulatorInputError
+from .simulator import (
+    ExperimentalSimulatedDevice,
+    ExperimentalSourcePattern,
+    SimulatedDevice,
+    SimulatorError,
+    SimulatorInputError,
+)
 from .streaming import (
     CommandLatencyDistribution,
     CounterReconciliation,
@@ -359,6 +365,8 @@ __all__ = [
     "EquationState",
     "ErrorCode",
     "ExpectedDeviceIdentity",
+    "ExperimentalSimulatedDevice",
+    "ExperimentalSourcePattern",
     "FirmwareCounters",
     "FirmwareFault",
     "FirmwareFaultSnapshot",
