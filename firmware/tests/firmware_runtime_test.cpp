@@ -244,7 +244,7 @@ class FakeTickClock final : public synthetic::TickClock {
 class FakeBenchmarkPlatform final : public benchmark::Platform {
  public:
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    frequency_hz = constants::kChecksumBenchmarkCycleCounterHz;
+    frequency_hz = identity::kExpectedDwtHz;
     pair_count_ = 0U;
     pair_open_ = false;
     return true;
@@ -287,7 +287,7 @@ class FakeGpioClockPlatform final : public gpio_clock::Platform {
                wire::GpioClockDiagnosticResponse &snapshot) override {
     ++calls;
     observed = plan;
-    snapshot.dwt_counter_hz = constants::kGpioClockDwtHz;
+    snapshot.dwt_counter_hz = identity::kExpectedDwtHz;
     snapshot.dwt_elapsed_cycles = plan.measurement_cycles;
     snapshot.tcd_biter = plan.tcd_major_count;
     snapshot.tcd_citer_final = static_cast<std::uint16_t>(
@@ -315,7 +315,7 @@ class ReadyAdcPlatform final : public adc::Platform {
     return adc::PrepareStatus::kOk;
   }
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    frequency_hz = constants::kAdcCalibrationCycleCounterHz;
+    frequency_hz = identity::kExpectedDwtHz;
     return true;
   }
   std::uint32_t readCycles() override {
@@ -357,7 +357,7 @@ class LifecycleTriggerPlatform final : public adc_trigger::Platform {
     return result;
   }
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    frequency_hz = constants::kAdcTriggerDwtClockHz;
+    frequency_hz = identity::kExpectedDwtHz;
     return true;
   }
   std::uint32_t readCycles() override {
@@ -374,7 +374,9 @@ class LifecycleTriggerPlatform final : public adc_trigger::Platform {
     return {1U, 1U};
   }
   std::array<std::uint32_t, 2U> firstCompletionCycles() override {
-    return {100U, 400U};
+    return {100U,
+            static_cast<std::uint32_t>(
+                100U + identity::kAdcCompletionExpectedDwtCycles)};
   }
   std::uint32_t triggerErrorFlags() override { return 0U; }
   std::uint32_t triggerErrorCount() override { return 0U; }

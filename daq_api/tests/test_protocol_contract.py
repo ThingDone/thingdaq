@@ -66,6 +66,78 @@ class ProtocolContractTests(unittest.TestCase):
         self.assertEqual(adc_ticks, gpio_ticks)
         self.assertEqual(8096, adc_ticks)
 
+    def test_generated_clock_profiles_match_the_exact_canonical_contract(self) -> None:
+        clock_contract = self.contract["clock_profiles"]
+        self.assertEqual("PRODUCTION_600_MHZ", clock_contract["default"])
+        self.assertIs(
+            constants.DEFAULT_CLOCK_PROFILE,
+            constants.ClockProfile.PRODUCTION_600_MHZ,
+        )
+        expected = {
+            "PRODUCTION_600_MHZ": (
+                0,
+                600_000_000,
+                150_000_000,
+                37_500_000,
+                24_000_000,
+                600_000_000,
+                1_250,
+                75,
+                300,
+                120,
+            ),
+            "EXPERIMENTAL_528_MHZ": (
+                1,
+                528_000_000,
+                132_000_000,
+                33_000_000,
+                24_000_000,
+                528_000_000,
+                1_175,
+                66,
+                264,
+                106,
+            ),
+        }
+        self.assertEqual(set(expected), set(constants.ClockProfile.__members__))
+        self.assertEqual(2, len(clock_contract["profiles"]))
+        for record in clock_contract["profiles"]:
+            name = record["name"]
+            profile = constants.ClockProfile[name]
+            generated = constants.CLOCK_PROFILE_SPECS[profile]
+            with self.subTest(profile=name):
+                self.assertEqual(expected[name][0], profile.value)
+                self.assertEqual(expected[name][1:], tuple(generated))
+                self.assertEqual(
+                    expected[name],
+                    (
+                        record["value"],
+                        record["cpu_hz"],
+                        record["ipg_hz"],
+                        record["adc_hz"],
+                        record["pit_hz"],
+                        record["dwt_hz"],
+                        record["core_voltage_target_mv"],
+                        record["phase_ipg_cycles"],
+                        record["phase_dwt_cycles"],
+                        record["phase_tolerance_dwt_cycles"],
+                    ),
+                )
+                self.assertEqual(4, generated.ipg_hz // generated.adc_hz)
+                self.assertEqual(
+                    generated.phase_dwt_cycles,
+                    generated.phase_ipg_cycles * generated.dwt_hz // generated.ipg_hz,
+                )
+                self.assertEqual(
+                    500,
+                    generated.phase_ipg_cycles * 1_000_000_000 // generated.ipg_hz,
+                )
+
+        self.assertEqual(-40_000, constants.TEMPERATURE_MIN_MILLIDEGREES_CELSIUS)
+        self.assertEqual(150_000, constants.TEMPERATURE_MAX_MILLIDEGREES_CELSIUS)
+        self.assertEqual(128, constants.TEMPERATURE_POLL_LIMIT)
+        self.assertEqual(50, constants.TEMPERATURE_DEADLINE_US)
+
     def test_selected_default_bootstrap_and_retained_checksum_ids_are_stable(
         self,
     ) -> None:

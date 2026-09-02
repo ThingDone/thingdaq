@@ -510,16 +510,58 @@ class BuildConfigurationTests(unittest.TestCase):
                 properties = self._resolved_properties(profile)
                 build_firmware.validate_build_properties(properties, profile)
 
-                properties["build.fcpu"] = "720000000"
-                with self.assertRaisesRegex(build_firmware.BuildError, "build.fcpu"):
-                    build_firmware.validate_build_properties(properties, profile)
-
-                properties = self._resolved_properties(profile)
-                properties["recipe.cpp.o.pattern"] = properties[
-                    "recipe.cpp.o.pattern"
-                ].replace(f"-DF_CPU={profile.cpu_hz}", "-DF_CPU=720000000")
-                with self.assertRaisesRegex(build_firmware.BuildError, "F_CPU"):
-                    build_firmware.validate_build_properties(properties, profile)
+                mutations = {
+                    "build.fcpu": (
+                        "build.fcpu",
+                        lambda value: value.__setitem__("build.fcpu", "720000000"),
+                    ),
+                    "board": (
+                        "build.board",
+                        lambda value: value.__setitem__("build.board", "TEENSY41"),
+                    ),
+                    "USB": (
+                        "build.usbtype",
+                        lambda value: value.__setitem__("build.usbtype", "USB_MTPDISK"),
+                    ),
+                    "optimization": (
+                        "build.flags.optimize",
+                        lambda value: value.__setitem__("build.flags.optimize", "-O3"),
+                    ),
+                    "F_CPU": (
+                        "F_CPU",
+                        lambda value, selected_profile=profile: value.__setitem__(
+                            "recipe.cpp.o.pattern",
+                            value["recipe.cpp.o.pattern"].replace(
+                                f"-DF_CPU={selected_profile.cpu_hz}",
+                                "-DF_CPU=720000000",
+                            ),
+                        ),
+                    ),
+                    "recipe USB": (
+                        "USB_SERIAL",
+                        lambda value: value.__setitem__(
+                            "recipe.c.o.pattern",
+                            value["recipe.c.o.pattern"].replace(
+                                "-DUSB_SERIAL", "-DUSB_MTPDISK"
+                            ),
+                        ),
+                    ),
+                    "recipe optimization": (
+                        "missing -O2",
+                        lambda value: value.__setitem__(
+                            "recipe.S.o.pattern",
+                            value["recipe.S.o.pattern"].replace("-O2", "-O3"),
+                        ),
+                    ),
+                }
+                for label, (diagnostic, mutate) in mutations.items():
+                    contradictory = self._resolved_properties(profile)
+                    mutate(contradictory)
+                    with (
+                        self.subTest(profile=name, contradiction=label),
+                        self.assertRaisesRegex(build_firmware.BuildError, diagnostic),
+                    ):
+                        build_firmware.validate_build_properties(contradictory, profile)
 
     def test_profile_selection_and_cli_default_fail_closed(self) -> None:
         self.assertEqual("600", build_firmware.parse_args([]).cpu_profile)
@@ -608,6 +650,30 @@ class BuildConfigurationTests(unittest.TestCase):
         ] = 150_000_000
         with self.assertRaisesRegex(build_firmware.BuildError, "target mismatch"):
             build_firmware.validate_profile_manifest(contradictory_clock)
+
+        crossed_fqbn = deepcopy(candidate)
+        crossed_fqbn["target"]["fqbn"] = production["target"]["fqbn"]  # type: ignore[index]
+        with self.assertRaisesRegex(build_firmware.BuildError, "target mismatch"):
+            build_firmware.validate_profile_manifest(crossed_fqbn)
+
+        crossed_output = deepcopy(candidate)
+        crossed_output["output_directory"] = production["output_directory"]
+        with self.assertRaisesRegex(build_firmware.BuildError, "not isolated"):
+            build_firmware.validate_profile_manifest(crossed_output)
+
+        same_variant_hash = deepcopy(candidate)
+        for artifact in same_variant_hash["artifacts"]:  # type: ignore[index]
+            if artifact["path"].endswith((".bin", ".elf", ".hex")):
+                matching = next(  # type: ignore[arg-type]
+                    item
+                    for item in production["artifacts"]
+                    if item["path"] == artifact["path"]
+                )
+                artifact["sha256"] = matching["sha256"]
+        with self.assertRaisesRegex(
+            build_firmware.BuildError, "profile-specific artifact did not vary"
+        ):
+            build_firmware.validate_profile_parity(production, same_variant_hash)
 
     def test_sketch_boot_is_independent_of_host_open_and_has_no_banner(self) -> None:
         sketch = (REPOSITORY_ROOT / "firmware/firmware.ino").read_text(encoding="utf-8")

@@ -50,7 +50,22 @@ static_assert(thingdaq::identity::kAdcCompletionToleranceDwtCycles == {tolerance
 static_assert(thingdaq::identity::kAdcPrimaryConversionTimePicoseconds == {conversion_time_ps}U);
 static_assert(thingdaq::identity::kAdcPrimaryConversionMarginPicoseconds == {conversion_margin_ps}U);
 static_assert(thingdaq::identity::kGpioClockMaximumMeasurementCycles == {cpu_hz // 10}U);
+static_assert(thingdaq::identity::divideCeil(0U, 7U) == 0U);
+static_assert(thingdaq::identity::divideCeil(1U, 3U) == 1U);
+static_assert(thingdaq::identity::divideCeil(3U, 3U) == 1U);
+static_assert(thingdaq::identity::divideCeil(4U, 3U) == 2U);
+static_assert(thingdaq::identity::dwtCyclesForNanoseconds(1U) == 1U);
+static_assert(thingdaq::identity::dwtCyclesForNanoseconds(500U) == {completion_cycles}U);
+static_assert(thingdaq::identity::dwtCyclesForNanoseconds(200U) == {tolerance_cycles}U);
+static_assert(thingdaq::identity::dwtCyclesForMicroseconds(1U) == {cpu_hz // 1_000_000}U);
 static_assert(thingdaq::identity::dwtCyclesForMicroseconds(10000U) == {cpu_hz // 100}U);
+static_assert(static_cast<unsigned long long>(thingdaq::identity::kAdcNominalPhaseIpgCycles) *
+                  thingdaq::identity::kExpectedDwtHz /
+                  thingdaq::identity::kExpectedIpgHz ==
+              thingdaq::identity::kAdcCompletionExpectedDwtCycles);
+static_assert(static_cast<unsigned long long>(thingdaq::identity::kAdcNominalPhaseIpgCycles) *
+                  1000000000ULL /
+                  thingdaq::identity::kExpectedIpgHz == 500U);
 static_assert(thingdaq::identity::runtimeClocksMatchProfile(
     {cpu_hz}U, {bus_hz}U));
 static_assert(!thingdaq::identity::runtimeClocksMatchProfile(
@@ -59,6 +74,10 @@ static_assert(thingdaq::identity::runtimeAcquisitionClocksMatchProfile(
     {cpu_hz}U, {bus_hz}U, 24000000U, {adc_hz}U, 4U));
 static_assert(!thingdaq::identity::runtimeAcquisitionClocksMatchProfile(
     {cpu_hz}U, {bus_hz}U, 24000000U, {adc_hz - 1}U, 4U));
+static_assert(!thingdaq::identity::runtimeAcquisitionClocksMatchProfile(
+    {cpu_hz}U, {bus_hz}U, 23999999U, {adc_hz}U, 4U));
+static_assert(!thingdaq::identity::runtimeAcquisitionClocksMatchProfile(
+    {cpu_hz}U, {bus_hz}U, 24000000U, {adc_hz}U, 3U));
 """
                 result = subprocess.run(
                     [
@@ -100,6 +119,33 @@ static_assert(!thingdaq::identity::runtimeAcquisitionClocksMatchProfile(
         )
         self.assertNotEqual(0, invalid.returncode)
         self.assertIn("explicit 600 or 528 MHz", invalid.stderr)
+
+        contradictory_profiles = (
+            (600, 528_000_000, 132_000_000, "invalid ThingDAQ 600 MHz"),
+            (528, 600_000_000, 150_000_000, "invalid ThingDAQ 528 MHz"),
+        )
+        for profile, cpu_hz, bus_hz, diagnostic in contradictory_profiles:
+            with self.subTest(profile=profile, contradictory_cpu_hz=cpu_hz):
+                contradictory = subprocess.run(
+                    [
+                        compiler,
+                        "-std=c++17",
+                        "-fsyntax-only",
+                        f"-I{FIRMWARE_SOURCE}",
+                        f"-DTHINGDAQ_CPU_PROFILE_MHZ={profile}",
+                        f"-DTHINGDAQ_EXPECTED_CPU_HZ={cpu_hz}",
+                        f"-DTHINGDAQ_EXPECTED_BUS_HZ={bus_hz}",
+                        "-x",
+                        "c++",
+                        "-",
+                    ],
+                    input='#include "firmware_identity.h"\n',
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                )
+                self.assertNotEqual(0, contradictory.returncode)
+                self.assertIn(diagnostic, contradictory.stderr)
 
     def test_board_registry_rejects_unsupported_arduino_targets(self) -> None:
         compiler = shutil.which("g++")

@@ -44,62 +44,71 @@ class FirmwareRuntimeTests(unittest.TestCase):
             self.skipTest("g++ is required for portable firmware tests")
 
         with tempfile.TemporaryDirectory(prefix="thingdaq-runtime-") as directory:
-            executable = Path(directory) / "firmware-runtime-test"
-            compile_result = subprocess.run(
-                [
-                    compiler,
-                    "-std=c++17",
-                    "-Wall",
-                    "-Wextra",
-                    "-Werror",
-                    "-Wconversion",
-                    "-Wsign-conversion",
-                    "-pedantic",
-                    "-fno-exceptions",
-                    "-fno-rtti",
-                    f"-I{FIRMWARE_SOURCE}",
-                    str(CPP_TEST),
-                    str(FIRMWARE_SOURCE / "acquisition_controller.cpp"),
-                    str(FIRMWARE_SOURCE / "firmware_runtime.cpp"),
-                    str(FIRMWARE_SOURCE / "clock_health.cpp"),
-                    str(FIRMWARE_SOURCE / "adc_initializer.cpp"),
-                    str(FIRMWARE_SOURCE / "adc_trigger.cpp"),
-                    str(FIRMWARE_SOURCE / "adc_frame_packer.cpp"),
-                    str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
-                    str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
-                    str(FIRMWARE_SOURCE / "control_state.cpp"),
-                    str(FIRMWARE_SOURCE / "usb_transport.cpp"),
-                    str(FIRMWARE_SOURCE / "statistics.cpp"),
-                    str(FIRMWARE_SOURCE / "protocol.cpp"),
-                    str(FIRMWARE_SOURCE / "checksum.cpp"),
-                    str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_clock_diagnostic.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_raw_capture.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_batch_packer.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_capture_diagnostic.cpp"),
-                    "-o",
-                    str(executable),
-                ],
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertEqual(
-                0,
-                compile_result.returncode,
-                compile_result.stdout + compile_result.stderr,
-            )
-            run_result = subprocess.run(
-                [str(executable)],
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertEqual(
-                0,
-                run_result.returncode,
-                run_result.stdout + run_result.stderr,
-            )
+            for profile, cpu_hz, bus_hz in (
+                (600, 600_000_000, 150_000_000),
+                (528, 528_000_000, 132_000_000),
+            ):
+                with self.subTest(profile=profile):
+                    executable = Path(directory) / f"firmware-runtime-test-{profile}"
+                    compile_result = subprocess.run(
+                        [
+                            compiler,
+                            "-std=c++17",
+                            "-Wall",
+                            "-Wextra",
+                            "-Werror",
+                            "-Wconversion",
+                            "-Wsign-conversion",
+                            "-pedantic",
+                            "-fno-exceptions",
+                            "-fno-rtti",
+                            f"-DTHINGDAQ_CPU_PROFILE_MHZ={profile}",
+                            f"-DTHINGDAQ_EXPECTED_CPU_HZ={cpu_hz}",
+                            f"-DTHINGDAQ_EXPECTED_BUS_HZ={bus_hz}",
+                            f"-I{FIRMWARE_SOURCE}",
+                            str(CPP_TEST),
+                            str(FIRMWARE_SOURCE / "acquisition_controller.cpp"),
+                            str(FIRMWARE_SOURCE / "firmware_runtime.cpp"),
+                            str(FIRMWARE_SOURCE / "clock_health.cpp"),
+                            str(FIRMWARE_SOURCE / "adc_initializer.cpp"),
+                            str(FIRMWARE_SOURCE / "adc_trigger.cpp"),
+                            str(FIRMWARE_SOURCE / "adc_frame_packer.cpp"),
+                            str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
+                            str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
+                            str(FIRMWARE_SOURCE / "control_state.cpp"),
+                            str(FIRMWARE_SOURCE / "usb_transport.cpp"),
+                            str(FIRMWARE_SOURCE / "statistics.cpp"),
+                            str(FIRMWARE_SOURCE / "protocol.cpp"),
+                            str(FIRMWARE_SOURCE / "checksum.cpp"),
+                            str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
+                            str(FIRMWARE_SOURCE / "gpio_clock_diagnostic.cpp"),
+                            str(FIRMWARE_SOURCE / "gpio_raw_capture.cpp"),
+                            str(FIRMWARE_SOURCE / "gpio_batch_packer.cpp"),
+                            str(FIRMWARE_SOURCE / "gpio_capture_diagnostic.cpp"),
+                            "-o",
+                            str(executable),
+                        ],
+                        capture_output=True,
+                        check=False,
+                        text=True,
+                    )
+                    self.assertEqual(
+                        0,
+                        compile_result.returncode,
+                        compile_result.stdout + compile_result.stderr,
+                    )
+                    run_result = subprocess.run(
+                        [str(executable)],
+                        capture_output=True,
+                        check=False,
+                        text=True,
+                        timeout=30,
+                    )
+                    self.assertEqual(
+                        0,
+                        run_result.returncode,
+                        run_result.stdout + run_result.stderr,
+                    )
 
     def test_runtime_is_portable_and_sketch_stays_thin(self) -> None:
         runtime_source = "\n".join(

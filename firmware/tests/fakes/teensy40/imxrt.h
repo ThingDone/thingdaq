@@ -135,6 +135,8 @@ inline IMXRT_ADC_ETC_t adc_etc{};
 inline volatile std::uint32_t arm_demcr = 0U;
 inline volatile std::uint32_t arm_dwt_ctrl = 0U;
 inline volatile std::uint32_t arm_dwt_cyccnt = 0U;
+inline volatile std::uint32_t tempmon_tempsense0 = 0U;
+inline volatile std::uint32_t hw_ocotp_ana1 = 0U;
 inline std::array<void (*)(void), 160U> interrupt_vectors{};
 inline std::array<std::uint8_t, 160U> interrupt_priorities{};
 inline std::array<bool, 160U> interrupt_enabled{};
@@ -177,6 +179,8 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define ARM_DEMCR fake_imxrt::arm_demcr
 #define ARM_DWT_CTRL fake_imxrt::arm_dwt_ctrl
 #define ARM_DWT_CYCCNT fake_imxrt::arm_dwt_cyccnt
+#define TEMPMON_TEMPSENSE0 fake_imxrt::tempmon_tempsense0
+#define HW_OCOTP_ANA1 fake_imxrt::hw_ocotp_ana1
 #define THINGDAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK() \
   fake_imxrt::runAdcTriggerDiagnosticPollHook()
 
@@ -262,6 +266,9 @@ inline void runAdcTriggerDiagnosticPollHook() {
 
 #define ARM_DEMCR_TRCENA (std::uint32_t{1U} << 24U)
 #define ARM_DWT_CTRL_CYCCNTENA (std::uint32_t{1U} << 0U)
+#define TEMPMON_CTRL0_POWER_DOWN (std::uint32_t{1U} << 0U)
+#define TEMPMON_CTRL0_MEASURE_TEMP (std::uint32_t{1U} << 1U)
+#define TEMPMON_CTRL0_FINISHED (std::uint32_t{1U} << 2U)
 
 #define XBARA1_IN_PIT_TRIGGER0 56U
 #define XBARA1_IN_PIT_TRIGGER1 57U

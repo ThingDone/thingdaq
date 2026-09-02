@@ -73,9 +73,13 @@ void testFiniteValidSample() {
          "bounded service-cycle utilization is valid");
   expect(sample.temperature_millidegrees_celsius == 42125,
          "temperature preserves integer milli-degrees");
-  expect(sample.acquisition_service_utilization_basis_points == 2500U,
+  const std::uint32_t interval_cycles =
+      thingdaq::identity::kExpectedDwtHz / 1000U;
+  expect(sample.acquisition_service_utilization_basis_points ==
+             150000U * 10000U / interval_cycles,
          "acquisition cycles become basis points");
-  expect(sample.usb_service_utilization_basis_points == 1000U,
+  expect(sample.usb_service_utilization_basis_points ==
+             60000U * 10000U / interval_cycles,
          "USB cycles become basis points");
   expect(sample.error_flags == 0U, "valid sample has no health error");
 }
@@ -83,7 +87,8 @@ void testFiniteValidSample() {
 void testExplicitUnavailableAndMismatchState() {
   FakeHardware hardware{};
   hardware.cycle_counter_available = false;
-  hardware.readback.cpu_clock_hz = 528000000U;
+  hardware.readback.cpu_clock_hz =
+      thingdaq::identity::kExpectedCpuHz - 1U;
   hardware.readback.dwt_clock_hz = 0U;
   hardware.readback.temperature_status = TemperatureStatus::kNotReady;
   hardware.readback.temperature_millidegrees_celsius = 999999;
