@@ -1,4 +1,4 @@
-"""Offline verification for the independent Phase 03 rig acceptance script."""
+"""Offline verification for the independent ThingDAQ 1.0 basic rig script."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import sys
 import time
 import unittest
 from contextlib import redirect_stdout
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
@@ -17,9 +18,12 @@ from unittest.mock import patch
 from thingdaq import (
     BoardId,
     Capability,
+    ConfigurationProfile,
+    GpioCaptureDiagnosticFlag,
     Info,
     McuId,
     SimulatedDevice,
+    Source,
     StreamMask,
 )
 
@@ -44,38 +48,72 @@ def _load_rig_script() -> ModuleType:
 rig = _load_rig_script()
 
 
-class PhysicalControlDevice(SimulatedDevice):
-    """Control-only simulator with the exact physical Phase 03 INFO identity."""
+class ProductionControlDevice(SimulatedDevice):
+    """Simulator with the production 1.0 control and capability identity."""
 
     def __init__(self) -> None:
         super().__init__(
-            control_only=True,
+            control_only=False,
             build_id="thingdaq-0123456789abcdef",
         )
 
     def _handle_info(self, request):  # type: ignore[no-untyped-def]
+        configuration = self.configuration
         info = Info(
             device_state=self.state,
             build_id="thingdaq-0123456789abcdef",
             hardware_serial=12_345_670,
-            firmware_version=(0, 3, 0),
+            firmware_version=(1, 0, 0),
             board_id=BoardId.TEENSY_40,
             mcu_id=McuId.IMXRT1062,
-            supported_stream_mask=StreamMask.NONE,
-            supported_source_mask=1,
-            supported_configuration_mask=0,
+            supported_stream_mask=StreamMask.ADC | StreamMask.GPIO,
+            supported_source_mask=0b11,
+            supported_configuration_mask=(
+                ConfigurationProfile.HARDWARE_ADC
+                | ConfigurationProfile.HARDWARE_GPIO
+                | ConfigurationProfile.HARDWARE_COMBINED
+                | ConfigurationProfile.SYNTHETIC_ADC
+                | ConfigurationProfile.SYNTHETIC_GPIO
+                | ConfigurationProfile.SYNTHETIC_COMBINED
+            ),
+            applied_stream_mask=(
+                configuration.stream_mask
+                if configuration is not None
+                else StreamMask.NONE
+            ),
+            applied_source=(
+                configuration.source if configuration is not None else Source.HARDWARE
+            ),
             capability_bits=(
-                Capability.HARDWARE_SOURCE | Capability.RESET_STATS | Capability.PING
+                Capability.ADC_STREAM
+                | Capability.GPIO_STREAM
+                | Capability.HARDWARE_SOURCE
+                | Capability.SYNTHETIC_SOURCE
+                | Capability.RESET_STATS
+                | Capability.PING
+                | Capability.CHECKSUM_BENCHMARK
+                | Capability.GPIO_CLOCK_DIAGNOSTIC
+                | Capability.GPIO_CAPTURE_DIAGNOSTIC
+            ),
+            gpio_capture_diagnostic_flags=(
+                GpioCaptureDiagnosticFlag.AVAILABLE
+                | GpioCaptureDiagnosticFlag.DECLARATION_VALID
             ),
         )
         return self._success_response(request, info.to_payload())
+
+    def status(self):  # type: ignore[no-untyped-def]
+        status = super().status()
+        if self.configuration is None:
+            return replace(status, source=Source.HARDWARE)
+        return status
 
 
 class FakeRigSerial:
     """PySerial-shaped physical peer with startup noise and partial I/O."""
 
     def __init__(self) -> None:
-        self.device = PhysicalControlDevice()
+        self.device = ProductionControlDevice()
         self.timeout = 0.001
         self.write_timeout = 0.1
         self.is_open = True
@@ -193,7 +231,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
             exit_code = rig.main()
 
         self.assertEqual(0, exit_code, output.getvalue())
-        self.assertIn("PASS: Phase 03 identity", output.getvalue())
+        self.assertIn("PASS: ThingDAQ 1.0 identity", output.getvalue())
         self.assertIn("invalid CONFIGURE error", output.getvalue())
         self.assertIn("final parser_errors", output.getvalue())
         self.assertFalse(fake.is_open)

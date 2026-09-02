@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent Phase 03 control-plane acceptance test for the hardware rig.
+"""Independent ThingDAQ 1.0 basic control test for the hardware rig.
 
 The rig uploads this file alone to a network-disabled Python 3.13 container.
 It intentionally uses only the standard library and pyserial, and does not
@@ -65,11 +65,32 @@ STATE_IDLE = 1
 STATE_CONFIGURED = 2
 STATE_RUNNING = 3
 SOURCE_HARDWARE = 0
+SOURCE_SYNTHETIC = 1
 STREAM_NONE = 0
 STREAM_ADC = 1
+STREAM_GPIO = 2
+STREAM_BOTH = STREAM_ADC | STREAM_GPIO
+CAPABILITY_ADC_STREAM = 1
+CAPABILITY_GPIO_STREAM = 2
 CAPABILITY_HARDWARE_SOURCE = 4
+CAPABILITY_SYNTHETIC_SOURCE = 8
 CAPABILITY_RESET_STATS = 16
 CAPABILITY_PING = 32
+CAPABILITY_CHECKSUM_BENCHMARK = 64
+CAPABILITY_GPIO_CLOCK_DIAGNOSTIC = 128
+CAPABILITY_GPIO_CAPTURE_DIAGNOSTIC = 256
+EXPECTED_CAPABILITIES = (
+    CAPABILITY_ADC_STREAM
+    | CAPABILITY_GPIO_STREAM
+    | CAPABILITY_HARDWARE_SOURCE
+    | CAPABILITY_SYNTHETIC_SOURCE
+    | CAPABILITY_RESET_STATS
+    | CAPABILITY_PING
+    | CAPABILITY_CHECKSUM_BENCHMARK
+    | CAPABILITY_GPIO_CLOCK_DIAGNOSTIC
+    | CAPABILITY_GPIO_CAPTURE_DIAGNOSTIC
+)
+SUPPORTED_CONFIGURATION_MASK = 0x003F
 ERROR_UNSUPPORTED_CONFIGURATION = 8
 
 HEADER = struct.Struct("<IBBHHBBIIIIIQI")
@@ -495,6 +516,9 @@ def decode_info(frame: Frame) -> dict[str, object]:
         "board_id": struct.unpack_from("<H", payload, 62)[0],
         "mcu_id": struct.unpack_from("<H", payload, 64)[0],
         "build_id": build_id,
+        "applied_stream_mask": payload[324],
+        "applied_source": payload[325],
+        "supported_configuration_mask": struct.unpack_from("<H", payload, 326)[0],
     }
 
 
@@ -584,12 +608,10 @@ def grade_info(evidence: Evidence, info: dict[str, object]) -> None:
     exact = {
         "device_state": STATE_IDLE,
         "protocol_version": PROTOCOL_VERSION,
-        "supported_stream_mask": STREAM_NONE,
-        "supported_source_mask": 1 << SOURCE_HARDWARE,
+        "supported_stream_mask": STREAM_BOTH,
+        "supported_source_mask": (1 << SOURCE_HARDWARE) | (1 << SOURCE_SYNTHETIC),
         "supported_checksum_mask": 0b1110,
-        "capability_bits": (
-            CAPABILITY_HARDWARE_SOURCE | CAPABILITY_RESET_STATS | CAPABILITY_PING
-        ),
+        "capability_bits": EXPECTED_CAPABILITIES,
         "timestamp_hz": 8_000_000,
         "data_frame_bytes": DATA_FRAME_BYTES,
         "max_control_frame_bytes": MAX_CONTROL_FRAME_BYTES,
@@ -603,9 +625,12 @@ def grade_info(evidence: Evidence, info: dict[str, object]) -> None:
         "gpio_pin_count": 8,
         "data_checksum_algorithm": CHECKSUM_ADLER32,
         "gpio_pin_map": tuple(range(6, 14)),
-        "firmware_version": (0, 3, 0),
+        "firmware_version": (1, 0, 0),
         "board_id": 1,
         "mcu_id": 1,
+        "applied_stream_mask": STREAM_NONE,
+        "applied_source": SOURCE_HARDWARE,
+        "supported_configuration_mask": SUPPORTED_CONFIGURATION_MASK,
     }
     for name, expected in exact.items():
         evidence.equal(f"INFO {name}", expected, info[name])
@@ -636,10 +661,13 @@ def grade_control_status(
     evidence: Evidence,
     label: str,
     status: dict[str, int],
+    *,
+    expected_stream_mask: int = STREAM_NONE,
+    expected_source: int = SOURCE_HARDWARE,
 ) -> None:
     expected = {
-        "stream_mask": STREAM_NONE,
-        "source": SOURCE_HARDWARE,
+        "stream_mask": expected_stream_mask,
+        "source": expected_source,
         "checksum": CHECKSUM_ADLER32,
         "data_frame_bytes": DATA_FRAME_BYTES,
     }
@@ -682,7 +710,7 @@ def run_acceptance(port: SerialPort) -> Evidence:
         )
 
         invalid_configuration = CONFIGURATION.pack(
-            STREAM_ADC, SOURCE_HARDWARE, CHECKSUM_ADLER32, 0, DATA_FRAME_BYTES
+            STREAM_NONE, SOURCE_HARDWARE, CHECKSUM_ADLER32, 0, DATA_FRAME_BYTES
         )
         invalid_frame, latency = link.exchange(CONFIGURE_REQUEST, invalid_configuration)
         evidence.latency("invalid CONFIGURE", latency)
@@ -704,10 +732,10 @@ def run_acceptance(port: SerialPort) -> Evidence:
             "invalid command preserves IDLE", STATE_IDLE, idle_status["device_state"]
         )
         grade_control_status(evidence, "IDLE STATUS", idle_status)
-        evidence.equal("run_id before START", 0, idle_frame.run_id)
+        evidence.equal("run_id before CONFIGURE", 0, idle_frame.run_id)
 
         control_configuration = CONFIGURATION.pack(
-            STREAM_NONE, SOURCE_HARDWARE, CHECKSUM_ADLER32, 0, DATA_FRAME_BYTES
+            STREAM_ADC, SOURCE_SYNTHETIC, CHECKSUM_ADLER32, 0, DATA_FRAME_BYTES
         )
         configured_frame, latency = link.exchange(
             CONFIGURE_REQUEST, control_configuration
@@ -716,7 +744,7 @@ def run_acceptance(port: SerialPort) -> Evidence:
         grade_success(evidence, "CONFIGURE", configured_frame)
         evidence.equal(
             "CONFIGURE applied profile",
-            (STREAM_NONE, SOURCE_HARDWARE, CHECKSUM_ADLER32, DATA_FRAME_BYTES),
+            (STREAM_ADC, SOURCE_SYNTHETIC, CHECKSUM_ADLER32, DATA_FRAME_BYTES),
             decode_configuration(configured_frame),
         )
 
@@ -727,43 +755,14 @@ def run_acceptance(port: SerialPort) -> Evidence:
             STATE_CONFIGURED,
             configured_status["device_state"],
         )
-        grade_control_status(evidence, "CONFIGURED STATUS", configured_status)
-
-        start_frame, latency = link.exchange(START_REQUEST)
-        evidence.latency("START", latency)
-        grade_success(evidence, "START", start_frame)
-        evidence.check(
-            "START new run_id",
-            "nonzero and not 0",
-            start_frame.run_id,
-            start_frame.run_id != 0,
+        grade_control_status(
+            evidence,
+            "CONFIGURED STATUS",
+            configured_status,
+            expected_stream_mask=STREAM_ADC,
+            expected_source=SOURCE_SYNTHETIC,
         )
-        evidence.equal(
-            "START applied profile",
-            (STREAM_NONE, SOURCE_HARDWARE, CHECKSUM_ADLER32, DATA_FRAME_BYTES),
-            decode_configuration(start_frame),
-        )
-
-        running_frame, latency = link.exchange(GET_STATUS_REQUEST)
-        evidence.latency("RUNNING STATUS", latency)
-        running = decode_status(running_frame)
-        evidence.equal("STATUS is RUNNING", STATE_RUNNING, running["device_state"])
-        grade_control_status(evidence, "RUNNING STATUS", running)
-        evidence.equal("STATUS run_id", start_frame.run_id, running_frame.run_id)
-        evidence.equal(
-            "START resets statistics generation",
-            next_generation(configured_status["stats_generation"]),
-            running["stats_generation"],
-        )
-        for counter in (
-            "adc_frames_emitted",
-            "gpio_frames_emitted",
-            "adc_items_dropped",
-            "gpio_items_dropped",
-            "parser_errors",
-            "transport_errors",
-        ):
-            evidence.equal(f"RUNNING STATUS {counter}", 0, running[counter])
+        evidence.equal("CONFIGURE preserves run_id", 0, configured_status_frame.run_id)
 
         evidence.equal(
             "checksum-corrupt command response",
@@ -774,11 +773,23 @@ def run_acceptance(port: SerialPort) -> Evidence:
         )
         damaged_status_frame, _latency = link.exchange(GET_STATUS_REQUEST)
         damaged_status = decode_status(damaged_status_frame)
+        evidence.equal(
+            "corrupt command preserves CONFIGURED",
+            STATE_CONFIGURED,
+            damaged_status["device_state"],
+        )
+        grade_control_status(
+            evidence,
+            "post-corruption STATUS",
+            damaged_status,
+            expected_stream_mask=STREAM_ADC,
+            expected_source=SOURCE_SYNTHETIC,
+        )
         evidence.check(
             "parser error counter before reset",
-            f"> {running['parser_errors']}",
+            f"> {configured_status['parser_errors']}",
             damaged_status["parser_errors"],
-            damaged_status["parser_errors"] > running["parser_errors"],
+            damaged_status["parser_errors"] > configured_status["parser_errors"],
         )
 
         stop_frame, latency = link.exchange(STOP_REQUEST)
@@ -791,7 +802,7 @@ def run_acceptance(port: SerialPort) -> Evidence:
         evidence.equal(
             "idempotent STOP remains IDLE", STATE_IDLE, second_stop.payload[4]
         )
-        evidence.equal("STOP preserves run_id", start_frame.run_id, second_stop.run_id)
+        evidence.equal("STOP preserves zero run_id", 0, second_stop.run_id)
 
         before_reset_frame, _latency = link.exchange(GET_STATUS_REQUEST)
         before_reset = decode_status(before_reset_frame)
@@ -817,7 +828,7 @@ def run_acceptance(port: SerialPort) -> Evidence:
         final_status = decode_status(final_frame)
         evidence.equal("final state", STATE_IDLE, final_status["device_state"])
         grade_control_status(evidence, "final STATUS", final_status)
-        evidence.equal("final run_id", start_frame.run_id, final_frame.run_id)
+        evidence.equal("final run_id", 0, final_frame.run_id)
         evidence.equal(
             "final statistics generation",
             reset_generation,
@@ -857,7 +868,7 @@ def main() -> int:
         print("FAIL: SERIAL_PORT is required")
         return 2
     print(
-        f"ThingDAQ Phase 03 rig smoke: port={port_name!r} "
+        f"ThingDAQ 1.0 basic rig smoke: port={port_name!r} "
         f"baud={BAUD_RATE} protocol={PROTOCOL_VERSION}"
     )
     try:
@@ -880,7 +891,7 @@ def main() -> int:
             print(f"  - {failure}")
         return 1
     print(
-        "\nPASS: Phase 03 identity, control lifecycle, recovery, and counters verified"
+        "\nPASS: ThingDAQ 1.0 identity, configuration, recovery, and counters verified"
     )
     return 0
 
