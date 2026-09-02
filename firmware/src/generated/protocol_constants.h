@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222
+// Source SHA-256: 4bf3ce7074766f54bf7c7f279d926d9fcc122584ce20715d190d444ae4206abb
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222";
+inline constexpr char kSourceSha256[] = "4bf3ce7074766f54bf7c7f279d926d9fcc122584ce20715d190d444ae4206abb";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -17,7 +17,7 @@ inline constexpr std::size_t kMinFrameBytes = 48U;
 inline constexpr std::size_t kDataFrameBytes = 4096U;
 inline constexpr std::size_t kMaxDataFrameBytes = 4096U;
 inline constexpr std::size_t kDataPayloadBytes = 4048U;
-inline constexpr std::size_t kMaxControlFrameBytes = 1280U;
+inline constexpr std::size_t kMaxControlFrameBytes = 1364U;
 inline constexpr std::size_t kMaxControlPayloadBytes =
     kMaxControlFrameBytes - kHeaderSize - kTrailerSize;
 inline constexpr std::size_t kMaxCommandFrameBytes = 56U;
@@ -29,6 +29,10 @@ inline constexpr std::uint32_t kAdc1PhaseTicks = 4U;
 inline constexpr std::uint32_t kGpioSampleRateHz = 4000000U;
 inline constexpr std::uint32_t kGpioSamplePeriodTicks = 2U;
 inline constexpr std::uint32_t kFrameCoverageTicks = 8096U;
+inline constexpr std::int32_t kTemperatureMinMillidegreesCelsius = -40000;
+inline constexpr std::int32_t kTemperatureMaxMillidegreesCelsius = 150000;
+inline constexpr std::uint32_t kTemperaturePollLimit = 128U;
+inline constexpr std::uint32_t kTemperatureDeadlineUs = 50U;
 inline constexpr std::uint16_t kSupportedConfigurationMask = 63U;
 inline constexpr std::uint8_t kAdcDmaRingDepth = 8U;
 inline constexpr std::uint16_t kAdcPairsPerBuffer = 1012U;
@@ -237,6 +241,39 @@ enum class ConfigurationProfile : std::uint16_t {
   kSyntheticCombined = 32U,
 };
 
+enum class ClockProfile : std::uint8_t {
+  kProduction600Mhz = 0U,
+  kExperimental528Mhz = 1U,
+};
+
+enum class TemperatureStatus : std::uint8_t {
+  kUnavailable = 0U,
+  kValid = 1U,
+  kNotReady = 2U,
+  kInvalidCalibration = 3U,
+  kOutOfRange = 4U,
+};
+
+enum class ClockHealthFlag : std::uint16_t {
+  kClocksValid = 1U,
+  kTemperatureValid = 2U,
+  kUtilizationValid = 4U,
+};
+
+enum class ClockHealthError : std::uint32_t {
+  kCpuClockMismatch = 1U,
+  kIpgClockMismatch = 2U,
+  kAdcClockMismatch = 4U,
+  kPitClockMismatch = 8U,
+  kDwtUnavailable = 16U,
+  kPhaseMismatch = 32U,
+  kTemperatureUnavailable = 64U,
+  kTemperatureNotReady = 128U,
+  kTemperatureCalibrationInvalid = 256U,
+  kTemperatureOutOfRange = 512U,
+  kUtilizationUnavailable = 1024U,
+};
+
 enum class Capability : std::uint32_t {
   kAdcStream = 1U,
   kGpioStream = 2U,
@@ -412,6 +449,51 @@ enum class AdcTriggerError : std::uint32_t {
   kCleanupFailed = 16384U,
 };
 
+struct ClockProfileSpec {
+  ClockProfile profile;
+  std::uint32_t cpu_hz;
+  std::uint32_t ipg_hz;
+  std::uint32_t adc_hz;
+  std::uint32_t pit_hz;
+  std::uint32_t dwt_hz;
+  std::uint16_t core_voltage_target_mv;
+  std::uint16_t phase_ipg_cycles;
+  std::uint16_t phase_dwt_cycles;
+  std::uint16_t phase_tolerance_dwt_cycles;
+};
+
+inline constexpr ClockProfileSpec kProduction600MhzClockProfile{
+    ClockProfile::kProduction600Mhz,
+    600000000U,
+    150000000U,
+    37500000U,
+    24000000U,
+    600000000U,
+    1250U,
+    75U,
+    300U,
+    120U,
+};
+inline constexpr ClockProfileSpec kExperimental528MhzClockProfile{
+    ClockProfile::kExperimental528Mhz,
+    528000000U,
+    132000000U,
+    33000000U,
+    24000000U,
+    528000000U,
+    1175U,
+    66U,
+    264U,
+    106U,
+};
+
+inline constexpr ClockProfile kDefaultClockProfile =
+    ClockProfile::kProduction600Mhz;
+
+constexpr const ClockProfileSpec &clockProfileSpec(ClockProfile profile) {
+  return profile == ClockProfile::kExperimental528Mhz ? kExperimental528MhzClockProfile : kProduction600MhzClockProfile;
+}
+
 inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
@@ -420,6 +502,8 @@ inline constexpr std::uint32_t kSupportedChecksumMask = 14U;
 inline constexpr std::uint16_t kKnownFrameFlagMask = 32783U;
 inline constexpr std::uint32_t kKnownCapabilityMask = 511U;
 inline constexpr std::uint16_t kKnownConfigurationProfileMask = 63U;
+inline constexpr std::uint16_t kKnownClockHealthFlagMask = 7U;
+inline constexpr std::uint32_t kKnownClockHealthErrorMask = 2047U;
 inline constexpr std::uint32_t kKnownGpioClockErrorMask = 32767U;
 inline constexpr std::uint32_t kKnownGpioCaptureDiagnosticFlagMask = 511U;
 inline constexpr std::uint32_t kKnownGpioCaptureErrorMask = 65535U;
@@ -445,7 +529,7 @@ inline constexpr std::size_t kResponsePrefixPayloadSize = 4U;
 inline constexpr std::size_t kResponsePrefixResponseStatusOffset = 0U;
 inline constexpr std::size_t kResponsePrefixReservedOffset = 1U;
 inline constexpr std::size_t kResponsePrefixErrorCodeOffset = 2U;
-inline constexpr std::size_t kInfoResponsePayloadSize = 376U;
+inline constexpr std::size_t kInfoResponsePayloadSize = 408U;
 inline constexpr std::size_t kInfoResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kInfoResponseReserved0Offset = 1U;
 inline constexpr std::size_t kInfoResponseErrorCodeOffset = 2U;
@@ -602,6 +686,18 @@ inline constexpr std::size_t kInfoResponseCommandQueueCapacityOffset = 366U;
 inline constexpr std::size_t kInfoResponseResponseQueueCapacityOffset = 367U;
 inline constexpr std::size_t kInfoResponseNominalPayloadBytesPerSecondPerStreamOffset = 368U;
 inline constexpr std::size_t kInfoResponseNominalFramedBytesPerSecondPerStreamOffset = 372U;
+inline constexpr std::size_t kInfoResponseClockProfileOffset = 376U;
+inline constexpr std::size_t kInfoResponseReserved9Offset = 377U;
+inline constexpr std::size_t kInfoResponseCoreVoltageTargetMvOffset = 378U;
+inline constexpr std::size_t kInfoResponseCpuClockHzOffset = 380U;
+inline constexpr std::size_t kInfoResponseIpgClockHzOffset = 384U;
+inline constexpr std::size_t kInfoResponseProfileAdcClockHzOffset = 388U;
+inline constexpr std::size_t kInfoResponsePitClockHzOffset = 392U;
+inline constexpr std::size_t kInfoResponseDwtClockHzOffset = 396U;
+inline constexpr std::size_t kInfoResponsePhaseIpgCyclesOffset = 400U;
+inline constexpr std::size_t kInfoResponsePhaseDwtCyclesOffset = 402U;
+inline constexpr std::size_t kInfoResponsePhaseToleranceDwtCyclesOffset = 404U;
+inline constexpr std::size_t kInfoResponseReserved10Offset = 406U;
 inline constexpr std::size_t kConfigureResponsePayloadSize = 12U;
 inline constexpr std::size_t kConfigureResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kConfigureResponseReserved0Offset = 1U;
@@ -611,7 +707,7 @@ inline constexpr std::size_t kConfigureResponseSourceOffset = 5U;
 inline constexpr std::size_t kConfigureResponseDataChecksumAlgorithmOffset = 6U;
 inline constexpr std::size_t kConfigureResponseReserved1Offset = 7U;
 inline constexpr std::size_t kConfigureResponseDataFrameBytesOffset = 8U;
-inline constexpr std::size_t kStatusResponsePayloadSize = 1228U;
+inline constexpr std::size_t kStatusResponsePayloadSize = 1316U;
 inline constexpr std::size_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::size_t kStatusResponseErrorCodeOffset = 2U;
@@ -876,6 +972,35 @@ inline constexpr std::size_t kStatusResponseAdcRawGapPairsOffset = 1196U;
 inline constexpr std::size_t kStatusResponseAdcRawDropPairsProjectedOffset = 1204U;
 inline constexpr std::size_t kStatusResponseGpioRawDropSamplesProjectedOffset = 1212U;
 inline constexpr std::size_t kStatusResponseGpioPackerDropSamplesProjectedOffset = 1220U;
+inline constexpr std::size_t kStatusResponseHealthSampleSequenceOffset = 1228U;
+inline constexpr std::size_t kStatusResponseHealthSampleTicksOffset = 1232U;
+inline constexpr std::size_t kStatusResponseClockProfileOffset = 1240U;
+inline constexpr std::size_t kStatusResponseTemperatureStatusOffset = 1241U;
+inline constexpr std::size_t kStatusResponseClockHealthFlagsOffset = 1242U;
+inline constexpr std::size_t kStatusResponseCoreVoltageTargetMvOffset = 1244U;
+inline constexpr std::size_t kStatusResponsePhaseIpgCyclesOffset = 1246U;
+inline constexpr std::size_t kStatusResponsePhaseDwtCyclesOffset = 1248U;
+inline constexpr std::size_t kStatusResponseReserved4Offset = 1250U;
+inline constexpr std::size_t kStatusResponseRuntimeCpuClockHzOffset = 1252U;
+inline constexpr std::size_t kStatusResponseRuntimeIpgClockHzOffset = 1256U;
+inline constexpr std::size_t kStatusResponseRuntimeAdcClockHzOffset = 1260U;
+inline constexpr std::size_t kStatusResponseRuntimePitClockHzOffset = 1264U;
+inline constexpr std::size_t kStatusResponseRuntimeDwtClockHzOffset = 1268U;
+inline constexpr std::size_t kStatusResponseTemperatureMillidegreesCelsiusOffset = 1272U;
+inline constexpr std::size_t kStatusResponseAcquisitionServiceUtilizationBasisPointsOffset = 1276U;
+inline constexpr std::size_t kStatusResponseUsbServiceUtilizationBasisPointsOffset = 1278U;
+inline constexpr std::size_t kStatusResponseHealthAdcRawReadyHighWaterOffset = 1280U;
+inline constexpr std::size_t kStatusResponseHealthGpioRawReadyHighWaterOffset = 1282U;
+inline constexpr std::size_t kStatusResponseHealthPacketOwnedHighWaterOffset = 1284U;
+inline constexpr std::size_t kStatusResponseHealthUsbCommandQueueHighWaterOffset = 1286U;
+inline constexpr std::size_t kStatusResponseHealthUsbResponseQueueHighWaterOffset = 1288U;
+inline constexpr std::size_t kStatusResponseReserved5Offset = 1290U;
+inline constexpr std::size_t kStatusResponseClockHealthErrorFlagsOffset = 1292U;
+inline constexpr std::size_t kStatusResponseTemperatureErrorCountOffset = 1296U;
+inline constexpr std::size_t kStatusResponseClockMismatchCountOffset = 1300U;
+inline constexpr std::size_t kStatusResponseServiceCounterErrorCountOffset = 1304U;
+inline constexpr std::size_t kStatusResponseHealthAdcTriggerErrorCountOffset = 1308U;
+inline constexpr std::size_t kStatusResponseHealthAdcHardwareErrorCountOffset = 1312U;
 inline constexpr std::size_t kStopResponsePayloadSize = 8U;
 inline constexpr std::size_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStopResponseReserved0Offset = 1U;

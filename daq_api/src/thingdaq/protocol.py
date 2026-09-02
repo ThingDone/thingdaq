@@ -793,6 +793,16 @@ def _adc_offset(prefix: str, field: str) -> int:
     return int(getattr(constants, f"{prefix}_ADC{separator}{field}_OFFSET"))
 
 
+def _clock_profile_spec(payload: bytes, prefix: str) -> constants.ClockProfileSpec:
+    try:
+        profile = constants.ClockProfile(
+            payload[int(getattr(constants, f"{prefix}_CLOCK_PROFILE_OFFSET"))]
+        )
+        return constants.CLOCK_PROFILE_SPECS[profile]
+    except (ValueError, KeyError) as exc:
+        raise FrameValidationError("clock profile identity is unknown") from exc
+
+
 def _validate_adc_metadata_payload(payload: bytes, prefix: str) -> None:
     def u16(field: str) -> int:
         return int(struct.unpack_from("<H", payload, _adc_offset(prefix, field))[0])
@@ -800,6 +810,7 @@ def _validate_adc_metadata_payload(payload: bytes, prefix: str) -> None:
     def u32(field: str) -> int:
         return int(struct.unpack_from("<I", payload, _adc_offset(prefix, field))[0])
 
+    profile = _clock_profile_spec(payload, prefix)
     resolution = payload[_adc_offset(prefix, "RESOLUTION_BITS")]
     if resolution not in {
         constants.ADC_PRIMARY_RESOLUTION_BITS,
@@ -856,8 +867,8 @@ def _validate_adc_metadata_payload(payload: bytes, prefix: str) -> None:
         or u16("REFERENCE_MV_NOMINAL") != constants.ADC_REFERENCE_MV_NOMINAL
         or u16("INPUT_MIN_MV_NOMINAL") != constants.ADC_INPUT_MIN_MV_NOMINAL
         or u16("INPUT_MAX_MV_NOMINAL") != constants.ADC_INPUT_MAX_MV_NOMINAL
-        or u32("IPG_CLOCK_HZ") != constants.ADC_IPG_CLOCK_HZ
-        or u32("CLOCK_HZ") != constants.ADC_CLOCK_HZ
+        or u32("IPG_CLOCK_HZ") != profile.ipg_hz
+        or u32("CLOCK_HZ") != profile.adc_hz
         or u32("CALIBRATION_DEADLINE_US") != constants.ADC_CALIBRATION_DEADLINE_US
     ):
         raise FrameValidationError("ADC metadata reports incompatible v1 values")
@@ -920,6 +931,40 @@ def _validate_info_payload(payload: bytes) -> None:
         != 0
     ):
         raise FrameValidationError("INFO GPIO metadata reserved fields must be zero")
+    if (
+        payload[constants.INFO_RESPONSE_RESERVED_9_OFFSET] != 0
+        or struct.unpack_from(
+            "<H", payload, constants.INFO_RESPONSE_RESERVED_10_OFFSET
+        )[0]
+        != 0
+    ):
+        raise FrameValidationError("INFO clock-profile reserved fields must be zero")
+    profile = _clock_profile_spec(payload, "INFO_RESPONSE")
+    profile_u32 = {
+        constants.INFO_RESPONSE_CPU_CLOCK_HZ_OFFSET: profile.cpu_hz,
+        constants.INFO_RESPONSE_IPG_CLOCK_HZ_OFFSET: profile.ipg_hz,
+        constants.INFO_RESPONSE_PROFILE_ADC_CLOCK_HZ_OFFSET: profile.adc_hz,
+        constants.INFO_RESPONSE_PIT_CLOCK_HZ_OFFSET: profile.pit_hz,
+        constants.INFO_RESPONSE_DWT_CLOCK_HZ_OFFSET: profile.dwt_hz,
+    }
+    profile_u16 = {
+        constants.INFO_RESPONSE_CORE_VOLTAGE_TARGET_MV_OFFSET: (
+            profile.core_voltage_target_mv
+        ),
+        constants.INFO_RESPONSE_PHASE_IPG_CYCLES_OFFSET: profile.phase_ipg_cycles,
+        constants.INFO_RESPONSE_PHASE_DWT_CYCLES_OFFSET: profile.phase_dwt_cycles,
+        constants.INFO_RESPONSE_PHASE_TOLERANCE_DWT_CYCLES_OFFSET: (
+            profile.phase_tolerance_dwt_cycles
+        ),
+    }
+    if any(
+        struct.unpack_from("<I", payload, offset)[0] != expected
+        for offset, expected in profile_u32.items()
+    ) or any(
+        struct.unpack_from("<H", payload, offset)[0] != expected
+        for offset, expected in profile_u16.items()
+    ):
+        raise FrameValidationError("INFO clocks contradict its selected profile")
     try:
         device_state = constants.DeviceState(
             payload[constants.INFO_RESPONSE_DEVICE_STATE_OFFSET]
@@ -1143,6 +1188,35 @@ def _validate_status_payload(payload: bytes) -> None:
         > 10_000
     ):
         raise FrameValidationError("STATUS GPIO processing CPU exceeds 100%")
+    if (
+        struct.unpack_from("<H", payload, constants.STATUS_RESPONSE_RESERVED_4_OFFSET)[
+            0
+        ]
+        != 0
+        or struct.unpack_from(
+            "<H", payload, constants.STATUS_RESPONSE_RESERVED_5_OFFSET
+        )[0]
+        != 0
+    ):
+        raise FrameValidationError("STATUS clock-health reserved fields must be zero")
+    profile = _clock_profile_spec(payload, "STATUS_RESPONSE")
+    if (
+        struct.unpack_from(
+            "<H",
+            payload,
+            constants.STATUS_RESPONSE_CORE_VOLTAGE_TARGET_MV_OFFSET,
+        )[0]
+        != profile.core_voltage_target_mv
+        or struct.unpack_from(
+            "<H", payload, constants.STATUS_RESPONSE_PHASE_IPG_CYCLES_OFFSET
+        )[0]
+        != profile.phase_ipg_cycles
+        or struct.unpack_from(
+            "<H", payload, constants.STATUS_RESPONSE_PHASE_DWT_CYCLES_OFFSET
+        )[0]
+        != profile.phase_dwt_cycles
+    ):
+        raise FrameValidationError("STATUS clocks contradict its selected profile")
     depth_limits = {
         constants.STATUS_RESPONSE_GPIO_RAW_READY_DEPTH_OFFSET: (
             constants.GPIO_RAW_RING_DEPTH

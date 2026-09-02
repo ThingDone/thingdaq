@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 
 from ._generated import protocol_constants as constants
-from .models import DeviceInfo
+from .models import ClockProfileMetadata, DeviceInfo
 
 PHASE03_MINIMUM_FIRMWARE_VERSION = (0, 3, 0)
 _PHYSICAL_BUILD_ID = re.compile(r"thingdaq-[0-9a-f]{16}", re.ASCII)
@@ -26,6 +26,7 @@ class DeviceIdentitySnapshot:
     hardware_serial: int
     board_id: constants.BoardId
     mcu_id: constants.McuId
+    clock_profile: ClockProfileMetadata
 
     @classmethod
     def from_info(cls, info: DeviceInfo) -> DeviceIdentitySnapshot:
@@ -38,6 +39,7 @@ class DeviceIdentitySnapshot:
             hardware_serial=info.hardware_serial,
             board_id=info.board_id,
             mcu_id=info.mcu_id,
+            clock_profile=info.clock_profile,
         )
 
 
@@ -50,6 +52,7 @@ class ExpectedDeviceIdentity:
     build_id: str | None = None
     board_id: constants.BoardId | None = None
     mcu_id: constants.McuId | None = None
+    clock_profile: ClockProfileMetadata | None = None
     protocol_version: int = constants.PROTOCOL_VERSION
 
     def __post_init__(self) -> None:
@@ -87,6 +90,10 @@ class ExpectedDeviceIdentity:
             raise TypeError("expected board ID must be a BoardId")
         if self.mcu_id is not None and not isinstance(self.mcu_id, constants.McuId):
             raise TypeError("expected MCU ID must be an McuId")
+        if self.clock_profile is not None and not isinstance(
+            self.clock_profile, ClockProfileMetadata
+        ):
+            raise TypeError("expected clock profile must be ClockProfileMetadata")
 
     @classmethod
     def from_info(cls, info: DeviceInfo) -> ExpectedDeviceIdentity:
@@ -99,6 +106,7 @@ class ExpectedDeviceIdentity:
             hardware_serial=info.hardware_serial,
             board_id=info.board_id,
             mcu_id=info.mcu_id,
+            clock_profile=info.clock_profile,
         )
 
 
@@ -164,6 +172,7 @@ def validate_device_identity(
     require("hardware serial", expected.hardware_serial, snapshot.hardware_serial)
     require("board ID", expected.board_id, snapshot.board_id)
     require("MCU ID", expected.mcu_id, snapshot.mcu_id)
+    require("clock profile", expected.clock_profile, snapshot.clock_profile)
     return snapshot
 
 

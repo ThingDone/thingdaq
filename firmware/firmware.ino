@@ -10,6 +10,7 @@
 #include "src/adc_initializer_teensy.h"
 #include "src/adc_trigger_teensy.h"
 #include "src/checksum_benchmark_teensy.h"
+#include "src/clock_health_teensy.h"
 #include "src/gpio_clock_diagnostic_teensy.h"
 #include "src/gpio_capture_diagnostic_teensy.h"
 #include "src/gpio_raw_capture_teensy.h"
@@ -29,6 +30,8 @@ thingdaq::gpio_packer::GpioBatchPacker gpio_packer{
 thingdaq::adc_packer::AdcFramePacker adc_packer{
     thingdaq::adc_capture::teensyAdcDmaCapture()};
 thingdaq::clock::TeensyTickClock tick_clock{};
+thingdaq::clock_health::Monitor clock_health_monitor{
+    thingdaq::clock_health::teensyHardware()};
 thingdaq::runtime::FirmwareRuntime firmware_runtime{
     cdc_stream, packet_storage, tick_clock,
     thingdaq::synthetic::Mode::kRealtime,
@@ -38,7 +41,8 @@ thingdaq::runtime::FirmwareRuntime firmware_runtime{
     &thingdaq::gpio_diagnostic::teensyRunner(),
     &thingdaq::adc::teensyInitializer(),
     &thingdaq::adc_trigger::teensyScheduler(),
-    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer};
+    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer,
+    &clock_health_monitor};
 }  // namespace
 void setup() {
   // Do not initialize the Arduino serial facade, wait for DTR, or emit a

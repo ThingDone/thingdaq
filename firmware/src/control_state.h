@@ -110,6 +110,7 @@ struct DispatchReadiness {
       nullptr;
   protocol_v1::ErrorCode gpio_capture_error =
       protocol_v1::ErrorCode::kUnsupportedConfiguration;
+  const protocol::ClockHealthSample *clock_health_sample = nullptr;
 };
 
 class ControlState {

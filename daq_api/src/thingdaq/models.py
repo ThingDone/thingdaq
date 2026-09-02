@@ -155,6 +155,72 @@ _ALL_CONFIGURATION_PROFILES = constants.ConfigurationProfile(
 
 
 @dataclass(frozen=True, slots=True)
+class ClockProfileMetadata:
+    """Exact selected CPU/bus/acquisition clock and voltage-target contract."""
+
+    profile: constants.ClockProfile = constants.DEFAULT_CLOCK_PROFILE
+    core_voltage_target_mv: int = (
+        constants.DEFAULT_CLOCK_PROFILE_SPEC.core_voltage_target_mv
+    )
+    cpu_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.cpu_hz
+    ipg_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.ipg_hz
+    adc_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.adc_hz
+    pit_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.pit_hz
+    dwt_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.dwt_hz
+    phase_ipg_cycles: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.phase_ipg_cycles
+    phase_dwt_cycles: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.phase_dwt_cycles
+    phase_tolerance_dwt_cycles: int = (
+        constants.DEFAULT_CLOCK_PROFILE_SPEC.phase_tolerance_dwt_cycles
+    )
+
+    def __post_init__(self) -> None:
+        if isinstance(self.profile, bool):
+            raise TypeError("clock profile must be a generated ClockProfile")
+        try:
+            profile = constants.ClockProfile(self.profile)
+            expected = constants.CLOCK_PROFILE_SPECS[profile]
+        except (TypeError, ValueError, KeyError) as exc:
+            raise ValueError("clock profile identity is unknown") from exc
+        actual = (
+            self.cpu_clock_hz,
+            self.ipg_clock_hz,
+            self.adc_clock_hz,
+            self.pit_clock_hz,
+            self.dwt_clock_hz,
+            self.core_voltage_target_mv,
+            self.phase_ipg_cycles,
+            self.phase_dwt_cycles,
+            self.phase_tolerance_dwt_cycles,
+        )
+        if any(
+            not isinstance(value, int) or isinstance(value, bool) for value in actual
+        ):
+            raise TypeError("clock profile metadata must contain integer values")
+        if actual != tuple(expected):
+            raise ValueError("advertised clocks contradict the selected clock profile")
+        object.__setattr__(self, "profile", profile)
+
+    @classmethod
+    def for_profile(cls, profile: constants.ClockProfile | int) -> ClockProfileMetadata:
+        """Build the exact generated metadata for one known profile."""
+
+        selected = constants.ClockProfile(profile)
+        spec = constants.CLOCK_PROFILE_SPECS[selected]
+        return cls(
+            profile=selected,
+            core_voltage_target_mv=spec.core_voltage_target_mv,
+            cpu_clock_hz=spec.cpu_hz,
+            ipg_clock_hz=spec.ipg_hz,
+            adc_clock_hz=spec.adc_hz,
+            pit_clock_hz=spec.pit_hz,
+            dwt_clock_hz=spec.dwt_hz,
+            phase_ipg_cycles=spec.phase_ipg_cycles,
+            phase_dwt_cycles=spec.phase_dwt_cycles,
+            phase_tolerance_dwt_cycles=spec.phase_tolerance_dwt_cycles,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class AdcTriggerMetadata:
     """Observable 1 MHz ADC_ETC schedule and completion-timing evidence.
 
@@ -222,10 +288,8 @@ class AdcTriggerMetadata:
 
         fixed_scalars = (
             ("pit_clock_hz", constants.ADC_TRIGGER_PIT_CLOCK_HZ),
-            ("dwt_clock_hz", constants.ADC_TRIGGER_DWT_CLOCK_HZ),
             ("gpio_master_rate_hz", constants.ADC_TRIGGER_GPIO_MASTER_RATE_HZ),
             ("pair_rate_hz", constants.ADC_TRIGGER_PAIR_RATE_HZ),
-            ("ipg_clock_hz", constants.ADC_TRIGGER_IPG_CLOCK_HZ),
             (
                 "gpio_master_pit_channel",
                 constants.ADC_TRIGGER_GPIO_MASTER_PIT_CHANNEL,
@@ -235,15 +299,6 @@ class AdcTriggerMetadata:
             ("pair_pit_load", constants.ADC_TRIGGER_PAIR_PIT_LOAD),
             ("predivider", constants.ADC_TRIGGER_PREDIVIDER),
             ("chain_length", constants.ADC_TRIGGER_CHAIN_LENGTH),
-            ("phase_ipg_cycles", constants.ADC_TRIGGER_PHASE_IPG_CYCLES),
-            (
-                "completion_expected_delta_cycles",
-                constants.ADC_COMPLETION_EXPECTED_DWT_CYCLES,
-            ),
-            (
-                "completion_tolerance_cycles",
-                constants.ADC_COMPLETION_TOLERANCE_DWT_CYCLES,
-            ),
         )
         if any(
             not isinstance(getattr(self, name), int)
@@ -257,14 +312,30 @@ class AdcTriggerMetadata:
             ("xbar_inputs", constants.ADC_TRIGGER_XBAR_INPUTS),
             ("xbar_outputs", constants.ADC_TRIGGER_XBAR_OUTPUTS),
             ("trigger_queues", constants.ADC_TRIGGER_QUEUES),
-            ("initial_delays", constants.ADC_TRIGGER_INITIAL_DELAYS),
-            ("effective_delays", constants.ADC_TRIGGER_EFFECTIVE_DELAYS),
         )
         for name, expected in fixed_pairs:
             values = tuple(getattr(self, name))
             if values != expected:
                 raise ValueError("ADC trigger routes/delays are incompatible")
             object.__setattr__(self, name, values)
+
+        initial_delays = tuple(self.initial_delays)
+        effective_delays = tuple(self.effective_delays)
+        matching_profiles = tuple(
+            profile
+            for profile, spec in constants.CLOCK_PROFILE_SPECS.items()
+            if self.dwt_clock_hz == spec.dwt_hz
+            and self.ipg_clock_hz == spec.ipg_hz
+            and self.phase_ipg_cycles == spec.phase_ipg_cycles
+            and self.completion_expected_delta_cycles == spec.phase_dwt_cycles
+            and self.completion_tolerance_cycles == spec.phase_tolerance_dwt_cycles
+            and initial_delays == (0, spec.phase_ipg_cycles)
+            and effective_delays == (1, spec.phase_ipg_cycles + 1)
+        )
+        if len(matching_profiles) != 1:
+            raise ValueError("ADC trigger timing contradicts every clock profile")
+        object.__setattr__(self, "initial_delays", initial_delays)
+        object.__setattr__(self, "effective_delays", effective_delays)
 
         for name in (
             "trigger_ctrl_configured",
@@ -329,6 +400,248 @@ class AdcTriggerMetadata:
 
         return self.completion_delta_cycles * 1_000_000_000 / self.dwt_clock_hz
 
+    @property
+    def clock_profile(self) -> constants.ClockProfile:
+        """Return the unique generated clock profile used by this schedule."""
+
+        return next(
+            profile
+            for profile, spec in constants.CLOCK_PROFILE_SPECS.items()
+            if self.dwt_clock_hz == spec.dwt_hz
+            and self.ipg_clock_hz == spec.ipg_hz
+            and self.phase_ipg_cycles == spec.phase_ipg_cycles
+            and self.completion_expected_delta_cycles == spec.phase_dwt_cycles
+            and self.completion_tolerance_cycles == spec.phase_tolerance_dwt_cycles
+        )
+
+
+_CLOCK_HEALTH_CLOCK_ERRORS = (
+    constants.ClockHealthError.CPU_CLOCK_MISMATCH
+    | constants.ClockHealthError.IPG_CLOCK_MISMATCH
+    | constants.ClockHealthError.ADC_CLOCK_MISMATCH
+    | constants.ClockHealthError.PIT_CLOCK_MISMATCH
+    | constants.ClockHealthError.DWT_UNAVAILABLE
+    | constants.ClockHealthError.PHASE_MISMATCH
+)
+_CLOCK_HEALTH_TEMPERATURE_ERRORS = {
+    constants.TemperatureStatus.UNAVAILABLE: (
+        constants.ClockHealthError.TEMPERATURE_UNAVAILABLE
+    ),
+    constants.TemperatureStatus.NOT_READY: (
+        constants.ClockHealthError.TEMPERATURE_NOT_READY
+    ),
+    constants.TemperatureStatus.INVALID_CALIBRATION: (
+        constants.ClockHealthError.TEMPERATURE_CALIBRATION_INVALID
+    ),
+    constants.TemperatureStatus.OUT_OF_RANGE: (
+        constants.ClockHealthError.TEMPERATURE_OUT_OF_RANGE
+    ),
+}
+_CLOCK_HEALTH_TEMPERATURE_ERROR_MASK = (
+    constants.ClockHealthError.TEMPERATURE_UNAVAILABLE
+    | constants.ClockHealthError.TEMPERATURE_NOT_READY
+    | constants.ClockHealthError.TEMPERATURE_CALIBRATION_INVALID
+    | constants.ClockHealthError.TEMPERATURE_OUT_OF_RANGE
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ClockHealthSample:
+    """One finite clock, temperature, load, queue, and error snapshot."""
+
+    sample_sequence: int = 1
+    sample_ticks: int = 0
+    clock_profile: ClockProfileMetadata = ClockProfileMetadata()
+    temperature_status: constants.TemperatureStatus = (
+        constants.TemperatureStatus.UNAVAILABLE
+    )
+    flags: constants.ClockHealthFlag = constants.ClockHealthFlag.CLOCKS_VALID
+    runtime_cpu_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.cpu_hz
+    runtime_ipg_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.ipg_hz
+    runtime_adc_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.adc_hz
+    runtime_pit_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.pit_hz
+    runtime_dwt_clock_hz: int = constants.DEFAULT_CLOCK_PROFILE_SPEC.dwt_hz
+    temperature_millidegrees_celsius: int | None = None
+    acquisition_service_utilization_basis_points: int | None = None
+    usb_service_utilization_basis_points: int | None = None
+    adc_raw_ready_high_water: int = 0
+    gpio_raw_ready_high_water: int = 0
+    packet_owned_high_water: int = 0
+    usb_command_queue_high_water: int = 0
+    usb_response_queue_high_water: int = 0
+    error_flags: constants.ClockHealthError = (
+        constants.ClockHealthError.TEMPERATURE_UNAVAILABLE
+        | constants.ClockHealthError.UTILIZATION_UNAVAILABLE
+    )
+    temperature_error_count: int = 0
+    clock_mismatch_count: int = 0
+    service_counter_error_count: int = 0
+    adc_trigger_error_count: int = 0
+    adc_hardware_error_count: int = 0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.clock_profile, ClockProfileMetadata):
+            raise TypeError("clock_profile must be ClockProfileMetadata")
+        if isinstance(self.temperature_status, bool) or isinstance(self.flags, bool):
+            raise TypeError("clock health contains an unknown enum value")
+        if isinstance(self.error_flags, bool):
+            raise TypeError("clock health contains an unknown error flag")
+        try:
+            temperature_status = constants.TemperatureStatus(self.temperature_status)
+            flags = constants.ClockHealthFlag(self.flags)
+            errors = constants.ClockHealthError(self.error_flags)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("clock health contains an unknown enum value") from exc
+        if int(flags) & ~constants.KNOWN_CLOCK_HEALTH_FLAG_MASK:
+            raise ValueError("clock health contains reserved validity flags")
+        if int(errors) & ~constants.KNOWN_CLOCK_HEALTH_ERROR_MASK:
+            raise ValueError("clock health contains reserved error flags")
+
+        _unsigned("health sample sequence", self.sample_sequence, 32)
+        if self.sample_sequence == 0:
+            raise ValueError("health sample sequence must be nonzero")
+        _unsigned("health sample ticks", self.sample_ticks, 64)
+        for name in (
+            "runtime_cpu_clock_hz",
+            "runtime_ipg_clock_hz",
+            "runtime_adc_clock_hz",
+            "runtime_pit_clock_hz",
+            "runtime_dwt_clock_hz",
+        ):
+            _unsigned(name, getattr(self, name), 32)
+
+        spec = constants.CLOCK_PROFILE_SPECS[self.clock_profile.profile]
+        runtime_clocks = (
+            self.runtime_cpu_clock_hz,
+            self.runtime_ipg_clock_hz,
+            self.runtime_adc_clock_hz,
+            self.runtime_pit_clock_hz,
+            self.runtime_dwt_clock_hz,
+        )
+        expected_clocks = (
+            spec.cpu_hz,
+            spec.ipg_hz,
+            spec.adc_hz,
+            spec.pit_hz,
+            spec.dwt_hz,
+        )
+        clock_error_bits = (
+            constants.ClockHealthError.CPU_CLOCK_MISMATCH,
+            constants.ClockHealthError.IPG_CLOCK_MISMATCH,
+            constants.ClockHealthError.ADC_CLOCK_MISMATCH,
+            constants.ClockHealthError.PIT_CLOCK_MISMATCH,
+            constants.ClockHealthError.DWT_UNAVAILABLE,
+        )
+        if any(
+            (actual != expected) != bool(errors & error_bit)
+            for actual, expected, error_bit in zip(
+                runtime_clocks, expected_clocks, clock_error_bits, strict=True
+            )
+        ):
+            raise ValueError("runtime clock values and error flags contradict")
+        clock_errors = errors & _CLOCK_HEALTH_CLOCK_ERRORS
+        if flags & constants.ClockHealthFlag.CLOCKS_VALID:
+            if runtime_clocks != expected_clocks or clock_errors:
+                raise ValueError(
+                    "runtime clocks contradict the selected advertised profile"
+                )
+        elif runtime_clocks == expected_clocks and not clock_errors:
+            raise ValueError("invalid runtime clocks require an explicit error")
+
+        temperature_valid = bool(flags & constants.ClockHealthFlag.TEMPERATURE_VALID)
+        if temperature_valid:
+            if temperature_status is not constants.TemperatureStatus.VALID:
+                raise ValueError("valid temperature flag requires VALID status")
+            temperature = self.temperature_millidegrees_celsius
+            if (
+                not isinstance(temperature, int)
+                or isinstance(temperature, bool)
+                or not constants.TEMPERATURE_MIN_MILLIDEGREES_CELSIUS
+                <= temperature
+                <= constants.TEMPERATURE_MAX_MILLIDEGREES_CELSIUS
+            ):
+                raise ValueError("temperature is not a finite bounded integer value")
+            if errors & _CLOCK_HEALTH_TEMPERATURE_ERROR_MASK:
+                raise ValueError("valid temperature cannot carry a sensor error")
+        else:
+            if temperature_status is constants.TemperatureStatus.VALID:
+                raise ValueError("VALID temperature status requires a valid sample")
+            if self.temperature_millidegrees_celsius is not None:
+                raise ValueError("unavailable temperature must be represented by None")
+            required_error = _CLOCK_HEALTH_TEMPERATURE_ERRORS[temperature_status]
+            if not errors & required_error:
+                raise ValueError("unavailable temperature requires an explicit error")
+
+        utilization_valid = bool(flags & constants.ClockHealthFlag.UTILIZATION_VALID)
+        utilizations = (
+            self.acquisition_service_utilization_basis_points,
+            self.usb_service_utilization_basis_points,
+        )
+        if utilization_valid:
+            if errors & constants.ClockHealthError.UTILIZATION_UNAVAILABLE:
+                raise ValueError("valid utilization cannot be marked unavailable")
+            if any(
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or not 0 <= value <= 10_000
+                for value in utilizations
+            ):
+                raise ValueError("service utilization must be 0..10000 basis points")
+        elif (
+            utilizations != (None, None)
+            or not errors & constants.ClockHealthError.UTILIZATION_UNAVAILABLE
+        ):
+            raise ValueError("unavailable utilization requires None and an error")
+
+        high_water_limits = {
+            "adc_raw_ready_high_water": constants.ADC_DMA_RING_DEPTH,
+            "gpio_raw_ready_high_water": constants.GPIO_RAW_RING_DEPTH,
+            "packet_owned_high_water": constants.PACKET_BUFFER_COUNT,
+            "usb_command_queue_high_water": constants.COMMAND_QUEUE_CAPACITY,
+            "usb_response_queue_high_water": constants.RESPONSE_QUEUE_CAPACITY,
+        }
+        for name, maximum in high_water_limits.items():
+            value = getattr(self, name)
+            _unsigned(name, value, 16)
+            if value > maximum:
+                raise ValueError(f"{name} exceeds its advertised capacity")
+        for name in (
+            "temperature_error_count",
+            "clock_mismatch_count",
+            "service_counter_error_count",
+            "adc_trigger_error_count",
+            "adc_hardware_error_count",
+        ):
+            _unsigned(name, getattr(self, name), 32)
+
+        object.__setattr__(self, "temperature_status", temperature_status)
+        object.__setattr__(self, "flags", flags)
+        object.__setattr__(self, "error_flags", errors)
+
+    @property
+    def temperature_celsius(self) -> float | None:
+        """Return the valid sensor sample in degrees Celsius, if available."""
+
+        if self.temperature_millidegrees_celsius is None:
+            return None
+        return self.temperature_millidegrees_celsius / 1000
+
+    @property
+    def acquisition_service_utilization(self) -> float | None:
+        """Return acquisition service utilization as a fraction."""
+
+        if self.acquisition_service_utilization_basis_points is None:
+            return None
+        return self.acquisition_service_utilization_basis_points / 10_000
+
+    @property
+    def usb_service_utilization(self) -> float | None:
+        """Return USB service utilization as a fraction."""
+
+        if self.usb_service_utilization_basis_points is None:
+            return None
+        return self.usb_service_utilization_basis_points / 10_000
+
 
 def _unsigned(name: str, value: int, bits: int) -> None:
     if (
@@ -377,8 +690,17 @@ def _normalize_adc_metadata(value: Any) -> None:
     """Validate and normalize the common INFO/STATUS ADC metadata fields."""
 
     resolution = value.adc_resolution_bits
+    clock_profile = getattr(value, "clock_profile", None)
+    if clock_profile is None and isinstance(
+        getattr(value, "clock_health", None), ClockHealthSample
+    ):
+        clock_profile = value.clock_health.clock_profile
+    if not isinstance(clock_profile, ClockProfileMetadata):
+        raise TypeError("clock_profile metadata is required for ADC validation")
     if not isinstance(value.adc_trigger, AdcTriggerMetadata):
         raise TypeError("adc_trigger must be AdcTriggerMetadata")
+    if value.adc_trigger.clock_profile is not clock_profile.profile:
+        raise ValueError("ADC trigger timing contradicts the selected clock profile")
     if resolution not in (
         constants.ADC_PRIMARY_RESOLUTION_BITS,
         constants.ADC_FALLBACK_RESOLUTION_BITS,
@@ -431,8 +753,8 @@ def _normalize_adc_metadata(value: Any) -> None:
         ("adc_input_max_mv_nominal", constants.ADC_INPUT_MAX_MV_NOMINAL),
         ("adc_sample_time_adck", constants.ADC_SAMPLE_TIME_ADCK),
         ("adc_conversion_mode", expected_mode),
-        ("adc_ipg_clock_hz", constants.ADC_IPG_CLOCK_HZ),
-        ("adc_clock_hz", constants.ADC_CLOCK_HZ),
+        ("adc_ipg_clock_hz", clock_profile.ipg_clock_hz),
+        ("adc_clock_hz", clock_profile.adc_clock_hz),
         ("adc_calibration_deadline_us", constants.ADC_CALIBRATION_DEADLINE_US),
     )
     if any(
@@ -1042,6 +1364,161 @@ def _unpack_adc_trigger_metadata(payload: bytes, prefix: str) -> AdcTriggerMetad
             u16("ADC0_TRIGGER_XBAR_SEL_CONFIGURED"),
             u16("ADC1_TRIGGER_XBAR_SEL_CONFIGURED"),
         ),
+    )
+
+
+def _pack_clock_profile_metadata(
+    payload: bytearray, profile: ClockProfileMetadata
+) -> None:
+    payload[constants.INFO_RESPONSE_CLOCK_PROFILE_OFFSET] = int(profile.profile)
+    struct.pack_into(
+        "<HIIIIIHHH",
+        payload,
+        constants.INFO_RESPONSE_CORE_VOLTAGE_TARGET_MV_OFFSET,
+        profile.core_voltage_target_mv,
+        profile.cpu_clock_hz,
+        profile.ipg_clock_hz,
+        profile.adc_clock_hz,
+        profile.pit_clock_hz,
+        profile.dwt_clock_hz,
+        profile.phase_ipg_cycles,
+        profile.phase_dwt_cycles,
+        profile.phase_tolerance_dwt_cycles,
+    )
+
+
+def _unpack_clock_profile_metadata(payload: bytes) -> ClockProfileMetadata:
+    values = struct.unpack_from(
+        "<HIIIIIHHH",
+        payload,
+        constants.INFO_RESPONSE_CORE_VOLTAGE_TARGET_MV_OFFSET,
+    )
+    return ClockProfileMetadata(
+        profile=constants.ClockProfile(
+            payload[constants.INFO_RESPONSE_CLOCK_PROFILE_OFFSET]
+        ),
+        core_voltage_target_mv=values[0],
+        cpu_clock_hz=values[1],
+        ipg_clock_hz=values[2],
+        adc_clock_hz=values[3],
+        pit_clock_hz=values[4],
+        dwt_clock_hz=values[5],
+        phase_ipg_cycles=values[6],
+        phase_dwt_cycles=values[7],
+        phase_tolerance_dwt_cycles=values[8],
+    )
+
+
+def _pack_clock_health(payload: bytearray, health: ClockHealthSample) -> None:
+    profile = health.clock_profile
+    struct.pack_into(
+        "<IQBBHHHHH",
+        payload,
+        constants.STATUS_RESPONSE_HEALTH_SAMPLE_SEQUENCE_OFFSET,
+        health.sample_sequence,
+        health.sample_ticks,
+        int(profile.profile),
+        int(health.temperature_status),
+        int(health.flags),
+        profile.core_voltage_target_mv,
+        profile.phase_ipg_cycles,
+        profile.phase_dwt_cycles,
+        0,
+    )
+    struct.pack_into(
+        "<IIIIIiHHHHHHHHIIIIII",
+        payload,
+        constants.STATUS_RESPONSE_RUNTIME_CPU_CLOCK_HZ_OFFSET,
+        health.runtime_cpu_clock_hz,
+        health.runtime_ipg_clock_hz,
+        health.runtime_adc_clock_hz,
+        health.runtime_pit_clock_hz,
+        health.runtime_dwt_clock_hz,
+        health.temperature_millidegrees_celsius or 0,
+        health.acquisition_service_utilization_basis_points or 0,
+        health.usb_service_utilization_basis_points or 0,
+        health.adc_raw_ready_high_water,
+        health.gpio_raw_ready_high_water,
+        health.packet_owned_high_water,
+        health.usb_command_queue_high_water,
+        health.usb_response_queue_high_water,
+        0,
+        int(health.error_flags),
+        health.temperature_error_count,
+        health.clock_mismatch_count,
+        health.service_counter_error_count,
+        health.adc_trigger_error_count,
+        health.adc_hardware_error_count,
+    )
+
+
+def _unpack_clock_health(payload: bytes) -> ClockHealthSample:
+    sample_sequence, sample_ticks = struct.unpack_from(
+        "<IQ", payload, constants.STATUS_RESPONSE_HEALTH_SAMPLE_SEQUENCE_OFFSET
+    )
+    profile_id = constants.ClockProfile(
+        payload[constants.STATUS_RESPONSE_CLOCK_PROFILE_OFFSET]
+    )
+    generated_profile = ClockProfileMetadata.for_profile(profile_id)
+    core_voltage, phase_ipg, phase_dwt = struct.unpack_from(
+        "<HHH", payload, constants.STATUS_RESPONSE_CORE_VOLTAGE_TARGET_MV_OFFSET
+    )
+    profile = ClockProfileMetadata(
+        profile=profile_id,
+        core_voltage_target_mv=core_voltage,
+        cpu_clock_hz=generated_profile.cpu_clock_hz,
+        ipg_clock_hz=generated_profile.ipg_clock_hz,
+        adc_clock_hz=generated_profile.adc_clock_hz,
+        pit_clock_hz=generated_profile.pit_clock_hz,
+        dwt_clock_hz=generated_profile.dwt_clock_hz,
+        phase_ipg_cycles=phase_ipg,
+        phase_dwt_cycles=phase_dwt,
+        phase_tolerance_dwt_cycles=(generated_profile.phase_tolerance_dwt_cycles),
+    )
+    temperature_status = constants.TemperatureStatus(
+        payload[constants.STATUS_RESPONSE_TEMPERATURE_STATUS_OFFSET]
+    )
+    flags = constants.ClockHealthFlag(
+        struct.unpack_from(
+            "<H", payload, constants.STATUS_RESPONSE_CLOCK_HEALTH_FLAGS_OFFSET
+        )[0]
+    )
+    runtime = struct.unpack_from(
+        "<IIIIIiHHHHHHHHIIIIII",
+        payload,
+        constants.STATUS_RESPONSE_RUNTIME_CPU_CLOCK_HZ_OFFSET,
+    )
+    return ClockHealthSample(
+        sample_sequence=sample_sequence,
+        sample_ticks=sample_ticks,
+        clock_profile=profile,
+        temperature_status=temperature_status,
+        flags=flags,
+        runtime_cpu_clock_hz=runtime[0],
+        runtime_ipg_clock_hz=runtime[1],
+        runtime_adc_clock_hz=runtime[2],
+        runtime_pit_clock_hz=runtime[3],
+        runtime_dwt_clock_hz=runtime[4],
+        temperature_millidegrees_celsius=(
+            runtime[5] if flags & constants.ClockHealthFlag.TEMPERATURE_VALID else None
+        ),
+        acquisition_service_utilization_basis_points=(
+            runtime[6] if flags & constants.ClockHealthFlag.UTILIZATION_VALID else None
+        ),
+        usb_service_utilization_basis_points=(
+            runtime[7] if flags & constants.ClockHealthFlag.UTILIZATION_VALID else None
+        ),
+        adc_raw_ready_high_water=runtime[8],
+        gpio_raw_ready_high_water=runtime[9],
+        packet_owned_high_water=runtime[10],
+        usb_command_queue_high_water=runtime[11],
+        usb_response_queue_high_water=runtime[12],
+        error_flags=constants.ClockHealthError(runtime[14]),
+        temperature_error_count=runtime[15],
+        clock_mismatch_count=runtime[16],
+        service_counter_error_count=runtime[17],
+        adc_trigger_error_count=runtime[18],
+        adc_hardware_error_count=runtime[19],
     )
 
 
@@ -2320,6 +2797,7 @@ class DeviceCapabilities:
     supported_source_mask: int
     supported_checksum_mask: int
     capability_bits: constants.Capability
+    clock_profile: ClockProfileMetadata = ClockProfileMetadata()
     supported_configuration_mask: constants.ConfigurationProfile = (
         _ALL_CONFIGURATION_PROFILES
     )
@@ -2418,6 +2896,8 @@ class DeviceCapabilities:
     )
 
     def __post_init__(self) -> None:
+        if not isinstance(self.clock_profile, ClockProfileMetadata):
+            raise TypeError("clock_profile must be ClockProfileMetadata")
         if isinstance(self.supported_stream_mask, bool) or isinstance(
             self.capability_bits, bool
         ):
@@ -2702,6 +3182,7 @@ class DeviceInfo:
 
     device_state: constants.DeviceState
     build_id: str
+    clock_profile: ClockProfileMetadata = ClockProfileMetadata()
     hardware_serial: int = 0
     firmware_version: tuple[int, int, int] = (0, 0, 0)
     board_id: constants.BoardId = constants.BoardId.SIMULATOR
@@ -2820,6 +3301,8 @@ class DeviceInfo:
     )
 
     def __post_init__(self) -> None:
+        if not isinstance(self.clock_profile, ClockProfileMetadata):
+            raise TypeError("clock_profile must be ClockProfileMetadata")
         if not isinstance(self.device_state, constants.DeviceState):
             raise TypeError("device_state must be a DeviceState")
         if not isinstance(self.board_id, constants.BoardId):
@@ -2926,6 +3409,7 @@ class DeviceInfo:
             supported_source_mask=self.supported_source_mask,
             supported_checksum_mask=self.supported_checksum_mask,
             capability_bits=self.capability_bits,
+            clock_profile=self.clock_profile,
             supported_configuration_mask=self.supported_configuration_mask,
             protocol_version=self.protocol_version,
             timestamp_hz=self.timestamp_hz,
@@ -3209,6 +3693,7 @@ class DeviceInfo:
             self.nominal_payload_bytes_per_second_per_stream,
             self.nominal_framed_bytes_per_second_per_stream,
         )
+        _pack_clock_profile_metadata(payload, self.clock_profile)
         return bytes(payload)
 
     @classmethod
@@ -3460,6 +3945,7 @@ class DeviceInfo:
                 payload_bytes,
                 constants.INFO_RESPONSE_NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM_OFFSET,
             )[0],
+            clock_profile=_unpack_clock_profile_metadata(payload_bytes),
             **_unpack_adc_metadata(payload_bytes, "INFO_RESPONSE"),
         )
 
@@ -3476,6 +3962,7 @@ class Status:
     stream_mask: constants.StreamMask
     source: constants.Source
     data_checksum_algorithm: constants.ChecksumAlgorithm
+    clock_health: ClockHealthSample = ClockHealthSample()
     data_frame_bytes: int = constants.DATA_FRAME_BYTES
     adc_frames_emitted: int = 0
     gpio_frames_emitted: int = 0
@@ -3694,6 +4181,8 @@ class Status:
     adc_cache_cpu_invalidations: int = 0
 
     def __post_init__(self) -> None:
+        if not isinstance(self.clock_health, ClockHealthSample):
+            raise TypeError("clock_health must be ClockHealthSample")
         if any(
             isinstance(value, bool)
             for value in (
@@ -4078,6 +4567,7 @@ class Status:
                 getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
                 getattr(self, name),
             )
+        _pack_clock_health(payload, self.clock_health)
         return bytes(payload)
 
     @classmethod
@@ -4181,6 +4671,7 @@ class Status:
             gpio_start_errors=errors[6],
             gpio_stop_errors=errors[7],
             gpio_stale_dma_completions=errors[8],
+            clock_health=_unpack_clock_health(payload_bytes),
             **extended,  # type: ignore[arg-type]
             **_unpack_adc_metadata(payload_bytes, "STATUS_RESPONSE"),
             **_unpack_adc_acquisition_status(payload_bytes),

@@ -1245,6 +1245,47 @@ Result validateInfo(ByteView payload) {
       return badPayload();
     }
   }
+  if (payload.data[protocol_v1::kInfoResponseClockProfileOffset] !=
+          static_cast<std::uint8_t>(identity::kClockProfile) ||
+      payload.data[protocol_v1::kInfoResponseReserved9Offset] != 0U ||
+      !loadU16(payload,
+               protocol_v1::kInfoResponseCoreVoltageTargetMvOffset,
+               value16) ||
+      value16 != identity::kCoreVoltageTargetMv ||
+      !loadU16(payload, protocol_v1::kInfoResponsePhaseIpgCyclesOffset,
+               value16) ||
+      value16 != identity::kAdcNominalPhaseIpgCycles ||
+      !loadU16(payload, protocol_v1::kInfoResponsePhaseDwtCyclesOffset,
+               value16) ||
+      value16 != identity::kAdcCompletionExpectedDwtCycles ||
+      !loadU16(
+          payload,
+          protocol_v1::kInfoResponsePhaseToleranceDwtCyclesOffset,
+          value16) ||
+      value16 != identity::kAdcCompletionToleranceDwtCycles ||
+      !loadU16(payload, protocol_v1::kInfoResponseReserved10Offset,
+               value16) ||
+      value16 != 0U) {
+    return badPayload();
+  }
+  const std::size_t profile_clock_offsets[] = {
+      protocol_v1::kInfoResponseCpuClockHzOffset,
+      protocol_v1::kInfoResponseIpgClockHzOffset,
+      protocol_v1::kInfoResponseProfileAdcClockHzOffset,
+      protocol_v1::kInfoResponsePitClockHzOffset,
+      protocol_v1::kInfoResponseDwtClockHzOffset,
+  };
+  const std::uint32_t profile_clock_expected[] = {
+      identity::kExpectedCpuHz, identity::kExpectedIpgHz,
+      identity::kExpectedAdcClockHz, identity::kExpectedPitHz,
+      identity::kExpectedDwtHz,
+  };
+  for (std::size_t index = 0U; index < 5U; ++index) {
+    if (!loadU32(payload, profile_clock_offsets[index], value32) ||
+        value32 != profile_clock_expected[index]) {
+      return badPayload();
+    }
+  }
   return Result::success();
 }
 
@@ -1405,9 +1446,204 @@ Result validateStatus(ByteView payload) {
   if (!adc_result.ok()) {
     return adc_result;
   }
-  return validateAdcTriggerMetadata(
+  const Result trigger_result = validateAdcTriggerMetadata(
       payload,
       protocol_v1::kStatusResponseAdcTriggerConfigurationFlagsOffset);
+  if (!trigger_result.ok()) {
+    return trigger_result;
+  }
+
+  std::uint32_t sample_sequence = 0U;
+  std::uint16_t health_flags = 0U;
+  std::uint32_t health_errors = 0U;
+  if (!loadU32(payload,
+               protocol_v1::kStatusResponseHealthSampleSequenceOffset,
+               sample_sequence) ||
+      sample_sequence == 0U ||
+      payload.data[protocol_v1::kStatusResponseClockProfileOffset] !=
+          static_cast<std::uint8_t>(identity::kClockProfile) ||
+      !loadU16(payload, protocol_v1::kStatusResponseClockHealthFlagsOffset,
+               health_flags) ||
+      (health_flags & ~protocol_v1::kKnownClockHealthFlagMask) != 0U ||
+      !loadU32(payload,
+               protocol_v1::kStatusResponseClockHealthErrorFlagsOffset,
+               health_errors) ||
+      (health_errors & ~protocol_v1::kKnownClockHealthErrorMask) != 0U ||
+      !loadU16(payload,
+               protocol_v1::kStatusResponseCoreVoltageTargetMvOffset,
+               depth) ||
+      depth != identity::kCoreVoltageTargetMv ||
+      !loadU16(payload, protocol_v1::kStatusResponsePhaseIpgCyclesOffset,
+               depth) ||
+      depth != identity::kAdcNominalPhaseIpgCycles ||
+      !loadU16(payload, protocol_v1::kStatusResponsePhaseDwtCyclesOffset,
+               depth) ||
+      depth != identity::kAdcCompletionExpectedDwtCycles ||
+      !loadU16(payload, protocol_v1::kStatusResponseReserved4Offset,
+               depth) ||
+      depth != 0U ||
+      !loadU16(payload, protocol_v1::kStatusResponseReserved5Offset,
+               depth) ||
+      depth != 0U) {
+    return badPayload();
+  }
+
+  constexpr std::uint16_t kClocksValid = static_cast<std::uint16_t>(
+      protocol_v1::ClockHealthFlag::kClocksValid);
+  constexpr std::uint16_t kTemperatureValid = static_cast<std::uint16_t>(
+      protocol_v1::ClockHealthFlag::kTemperatureValid);
+  constexpr std::uint16_t kUtilizationValid = static_cast<std::uint16_t>(
+      protocol_v1::ClockHealthFlag::kUtilizationValid);
+  constexpr std::uint32_t kClockErrorMask =
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kCpuClockMismatch) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kIpgClockMismatch) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kAdcClockMismatch) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kPitClockMismatch) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kDwtUnavailable) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kPhaseMismatch);
+  const std::size_t runtime_clock_offsets[] = {
+      protocol_v1::kStatusResponseRuntimeCpuClockHzOffset,
+      protocol_v1::kStatusResponseRuntimeIpgClockHzOffset,
+      protocol_v1::kStatusResponseRuntimeAdcClockHzOffset,
+      protocol_v1::kStatusResponseRuntimePitClockHzOffset,
+      protocol_v1::kStatusResponseRuntimeDwtClockHzOffset,
+  };
+  const std::uint32_t runtime_clock_expected[] = {
+      identity::kExpectedCpuHz, identity::kExpectedIpgHz,
+      identity::kExpectedAdcClockHz, identity::kExpectedPitHz,
+      identity::kExpectedDwtHz,
+  };
+  const std::uint32_t runtime_clock_error_bits[] = {
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kCpuClockMismatch),
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kIpgClockMismatch),
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kAdcClockMismatch),
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kPitClockMismatch),
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kDwtUnavailable),
+  };
+  bool runtime_clocks_match = true;
+  for (std::size_t index = 0U; index < 5U; ++index) {
+    if (!loadU32(payload, runtime_clock_offsets[index], value)) {
+      return badPayload();
+    }
+    if ((value != runtime_clock_expected[index]) !=
+        ((health_errors & runtime_clock_error_bits[index]) != 0U)) {
+      return badPayload();
+    }
+    runtime_clocks_match =
+        runtime_clocks_match && value == runtime_clock_expected[index];
+  }
+  if (((health_flags & kClocksValid) != 0U) !=
+          (runtime_clocks_match && (health_errors & kClockErrorMask) == 0U)) {
+    return badPayload();
+  }
+
+  const std::uint8_t temperature_status =
+      payload.data[protocol_v1::kStatusResponseTemperatureStatusOffset];
+  if (temperature_status > static_cast<std::uint8_t>(
+                               protocol_v1::TemperatureStatus::kOutOfRange) ||
+      !loadU32(
+          payload,
+          protocol_v1::kStatusResponseTemperatureMillidegreesCelsiusOffset,
+          value)) {
+    return badPayload();
+  }
+  const std::int64_t signed_temperature =
+      value <= 0x7FFFFFFFU
+          ? static_cast<std::int64_t>(value)
+          : static_cast<std::int64_t>(value) - 0x100000000LL;
+  const bool temperature_is_valid =
+      temperature_status ==
+          static_cast<std::uint8_t>(protocol_v1::TemperatureStatus::kValid) &&
+      signed_temperature >=
+          protocol_v1::kTemperatureMinMillidegreesCelsius &&
+      signed_temperature <=
+          protocol_v1::kTemperatureMaxMillidegreesCelsius;
+  constexpr std::uint32_t kTemperatureErrorMask =
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureUnavailable) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureNotReady) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureCalibrationInvalid) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureOutOfRange);
+  const std::uint32_t expected_temperature_error[] = {
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureUnavailable),
+      0U,
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureNotReady),
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureCalibrationInvalid),
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureOutOfRange),
+  };
+  if (((health_flags & kTemperatureValid) != 0U) != temperature_is_valid ||
+      (!temperature_is_valid && value != 0U) ||
+      (temperature_is_valid &&
+       (health_errors & kTemperatureErrorMask) != 0U) ||
+      (!temperature_is_valid &&
+       (temperature_status == static_cast<std::uint8_t>(
+                                  protocol_v1::TemperatureStatus::kValid) ||
+        (health_errors & expected_temperature_error[temperature_status]) ==
+            0U))) {
+    return badPayload();
+  }
+
+  std::uint16_t acquisition_utilization = 0U;
+  std::uint16_t usb_utilization = 0U;
+  if (!loadU16(
+          payload,
+          protocol_v1::
+              kStatusResponseAcquisitionServiceUtilizationBasisPointsOffset,
+          acquisition_utilization) ||
+      !loadU16(
+          payload,
+          protocol_v1::kStatusResponseUsbServiceUtilizationBasisPointsOffset,
+          usb_utilization) ||
+      acquisition_utilization > 10000U || usb_utilization > 10000U ||
+      (((health_flags & kUtilizationValid) != 0U) ==
+       ((health_errors & static_cast<std::uint32_t>(
+                             protocol_v1::ClockHealthError::
+                                 kUtilizationUnavailable)) != 0U)) ||
+      ((health_flags & kUtilizationValid) == 0U &&
+       (acquisition_utilization != 0U || usb_utilization != 0U))) {
+    return badPayload();
+  }
+  const std::size_t health_high_water_offsets[] = {
+      protocol_v1::kStatusResponseHealthAdcRawReadyHighWaterOffset,
+      protocol_v1::kStatusResponseHealthGpioRawReadyHighWaterOffset,
+      protocol_v1::kStatusResponseHealthPacketOwnedHighWaterOffset,
+      protocol_v1::kStatusResponseHealthUsbCommandQueueHighWaterOffset,
+      protocol_v1::kStatusResponseHealthUsbResponseQueueHighWaterOffset,
+  };
+  const std::uint16_t health_high_water_limits[] = {
+      protocol_v1::kAdcDmaRingDepth, protocol_v1::kGpioRawRingDepth,
+      protocol_v1::kPacketBufferCount, protocol_v1::kCommandQueueCapacity,
+      protocol_v1::kResponseQueueCapacity,
+  };
+  for (std::size_t index = 0U; index < 5U; ++index) {
+    if (!loadU16(payload, health_high_water_offsets[index], depth) ||
+        depth > health_high_water_limits[index]) {
+      return badPayload();
+    }
+  }
+  if (!loadU16(payload, protocol_v1::kStatusResponseReserved5Offset, depth) ||
+      depth != 0U) {
+    return badPayload();
+  }
+  return Result::success();
 }
 
 Result decodeChecksumBenchmarkRequest(ByteView payload,
@@ -2641,6 +2877,26 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
       bytes,
       protocol_v1::kInfoResponseNominalFramedBytesPerSecondPerStreamOffset,
       response.nominal_framed_bytes_per_second_per_stream);
+  payload[protocol_v1::kInfoResponseClockProfileOffset] =
+      static_cast<std::uint8_t>(response.clock_profile.profile);
+  storeU16(bytes, protocol_v1::kInfoResponseCoreVoltageTargetMvOffset,
+           response.clock_profile.core_voltage_target_mv);
+  storeU32(bytes, protocol_v1::kInfoResponseCpuClockHzOffset,
+           response.clock_profile.cpu_clock_hz);
+  storeU32(bytes, protocol_v1::kInfoResponseIpgClockHzOffset,
+           response.clock_profile.ipg_clock_hz);
+  storeU32(bytes, protocol_v1::kInfoResponseProfileAdcClockHzOffset,
+           response.clock_profile.adc_clock_hz);
+  storeU32(bytes, protocol_v1::kInfoResponsePitClockHzOffset,
+           response.clock_profile.pit_clock_hz);
+  storeU32(bytes, protocol_v1::kInfoResponseDwtClockHzOffset,
+           response.clock_profile.dwt_clock_hz);
+  storeU16(bytes, protocol_v1::kInfoResponsePhaseIpgCyclesOffset,
+           response.clock_profile.phase_ipg_cycles);
+  storeU16(bytes, protocol_v1::kInfoResponsePhaseDwtCyclesOffset,
+           response.clock_profile.phase_dwt_cycles);
+  storeU16(bytes, protocol_v1::kInfoResponsePhaseToleranceDwtCyclesOffset,
+           response.clock_profile.phase_tolerance_dwt_cycles);
   return encodeFrame(
       responseFields(protocol_v1::FrameKind::kInfoResponse, request, run_id),
       view(payload), output);
@@ -3015,6 +3271,75 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
   encodeAdcTriggerMetadata(
       bytes, protocol_v1::kStatusResponseAdcTriggerConfigurationFlagsOffset,
       response.adc.trigger);
+  const ClockHealthSample &health = response.clock_health;
+  storeU32(bytes, protocol_v1::kStatusResponseHealthSampleSequenceOffset,
+           health.sample_sequence);
+  storeU64(bytes, protocol_v1::kStatusResponseHealthSampleTicksOffset,
+           health.sample_ticks);
+  payload[protocol_v1::kStatusResponseClockProfileOffset] =
+      static_cast<std::uint8_t>(health.profile);
+  payload[protocol_v1::kStatusResponseTemperatureStatusOffset] =
+      static_cast<std::uint8_t>(health.temperature_status);
+  storeU16(bytes, protocol_v1::kStatusResponseClockHealthFlagsOffset,
+           health.flags);
+  storeU16(bytes, protocol_v1::kStatusResponseCoreVoltageTargetMvOffset,
+           health.core_voltage_target_mv);
+  storeU16(bytes, protocol_v1::kStatusResponsePhaseIpgCyclesOffset,
+           health.phase_ipg_cycles);
+  storeU16(bytes, protocol_v1::kStatusResponsePhaseDwtCyclesOffset,
+           health.phase_dwt_cycles);
+  storeU32(bytes, protocol_v1::kStatusResponseRuntimeCpuClockHzOffset,
+           health.runtime_cpu_clock_hz);
+  storeU32(bytes, protocol_v1::kStatusResponseRuntimeIpgClockHzOffset,
+           health.runtime_ipg_clock_hz);
+  storeU32(bytes, protocol_v1::kStatusResponseRuntimeAdcClockHzOffset,
+           health.runtime_adc_clock_hz);
+  storeU32(bytes, protocol_v1::kStatusResponseRuntimePitClockHzOffset,
+           health.runtime_pit_clock_hz);
+  storeU32(bytes, protocol_v1::kStatusResponseRuntimeDwtClockHzOffset,
+           health.runtime_dwt_clock_hz);
+  storeU32(bytes,
+           protocol_v1::kStatusResponseTemperatureMillidegreesCelsiusOffset,
+           static_cast<std::uint32_t>(
+               health.temperature_millidegrees_celsius));
+  storeU16(
+      bytes,
+      protocol_v1::kStatusResponseAcquisitionServiceUtilizationBasisPointsOffset,
+      health.acquisition_service_utilization_basis_points);
+  storeU16(bytes,
+           protocol_v1::kStatusResponseUsbServiceUtilizationBasisPointsOffset,
+           health.usb_service_utilization_basis_points);
+  storeU16(bytes,
+           protocol_v1::kStatusResponseHealthAdcRawReadyHighWaterOffset,
+           health.adc_raw_ready_high_water);
+  storeU16(bytes,
+           protocol_v1::kStatusResponseHealthGpioRawReadyHighWaterOffset,
+           health.gpio_raw_ready_high_water);
+  storeU16(bytes,
+           protocol_v1::kStatusResponseHealthPacketOwnedHighWaterOffset,
+           health.packet_owned_high_water);
+  storeU16(
+      bytes,
+      protocol_v1::kStatusResponseHealthUsbCommandQueueHighWaterOffset,
+      health.usb_command_queue_high_water);
+  storeU16(
+      bytes,
+      protocol_v1::kStatusResponseHealthUsbResponseQueueHighWaterOffset,
+      health.usb_response_queue_high_water);
+  storeU32(bytes, protocol_v1::kStatusResponseClockHealthErrorFlagsOffset,
+           health.error_flags);
+  storeU32(bytes, protocol_v1::kStatusResponseTemperatureErrorCountOffset,
+           health.temperature_error_count);
+  storeU32(bytes, protocol_v1::kStatusResponseClockMismatchCountOffset,
+           health.clock_mismatch_count);
+  storeU32(bytes, protocol_v1::kStatusResponseServiceCounterErrorCountOffset,
+           health.service_counter_error_count);
+  storeU32(bytes,
+           protocol_v1::kStatusResponseHealthAdcTriggerErrorCountOffset,
+           health.adc_trigger_error_count);
+  storeU32(bytes,
+           protocol_v1::kStatusResponseHealthAdcHardwareErrorCountOffset,
+           health.adc_hardware_error_count);
   return encodeFrame(responseFields(protocol_v1::FrameKind::kGetStatusResponse,
                                     request, run_id),
                      view(payload), output);

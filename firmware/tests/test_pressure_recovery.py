@@ -26,6 +26,7 @@ PRODUCTION_SOURCES = (
     "protocol.cpp",
     "checksum.cpp",
     "checksum_benchmark.cpp",
+    "clock_health.cpp",
     "gpio_clock_diagnostic.cpp",
     "gpio_raw_capture.cpp",
     "gpio_batch_packer.cpp",

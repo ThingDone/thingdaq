@@ -51,6 +51,7 @@ EXPECTED_HARDWARE_INCLUDE_OWNERS = {
         "core_pins.h",
         "imxrt.h",
     },
+    FIRMWARE_SOURCE / "clock_health_teensy.cpp": {"imxrt.h"},
     FIRMWARE_SOURCE / "gpio_clock_diagnostic_teensy.cpp": {
         "core_pins.h",
         "imxrt.h",

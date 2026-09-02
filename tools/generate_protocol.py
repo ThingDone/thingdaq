@@ -27,12 +27,14 @@ INTEGER_FORMATS = {
     "u16": "H",
     "u32": "I",
     "u64": "Q",
+    "i32": "i",
 }
 INTEGER_WIDTHS = {
     "u8": 1,
     "u16": 2,
     "u32": 4,
     "u64": 8,
+    "i32": 4,
 }
 
 
@@ -130,11 +132,13 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
 
     scalar_types = contract["scalar_types"]
     if set(scalar_types) != set(INTEGER_WIDTHS):
-        raise ContractError("scalar type table must define u8, u16, u32, and u64")
+        raise ContractError("scalar type table must define u8, u16, u32, u64, and i32")
     for name, width in INTEGER_WIDTHS.items():
         scalar = scalar_types[name]
-        if int(scalar["width"]) != width or scalar["signed"] is not False:
-            raise ContractError(f"{name} must be an unsigned {width}-byte scalar")
+        expected_signed = name.startswith("i")
+        if int(scalar["width"]) != width or scalar["signed"] is not expected_signed:
+            sign = "signed" if expected_signed else "unsigned"
+            raise ContractError(f"{name} must be a {sign} {width}-byte scalar")
 
     header = contract["header"]
     header_size = int(header["size"])
@@ -185,6 +189,89 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     )
     if adc_coverage != gpio_coverage:
         raise ContractError("ADC and GPIO frames must cover equal nominal time")
+
+    clock_profiles = contract["clock_profiles"]
+    profile_entries = clock_profiles["profiles"]
+    profile_values = enum_map(contract["enums"]["clock_profile"])
+    validate_enum_width("clock_profile", contract["enums"]["clock_profile"], 8)
+    if {
+        str(profile["name"]): int(profile["value"]) for profile in profile_entries
+    } != profile_values:
+        raise ContractError("clock profile records and enum identities disagree")
+    if str(clock_profiles["default"]) != "PRODUCTION_600_MHZ":
+        raise ContractError("the 600 MHz production profile must remain the default")
+    expected_profiles = {
+        "PRODUCTION_600_MHZ": (
+            600_000_000,
+            150_000_000,
+            37_500_000,
+            24_000_000,
+            600_000_000,
+            1250,
+            75,
+            300,
+            120,
+        ),
+        "EXPERIMENTAL_528_MHZ": (
+            528_000_000,
+            132_000_000,
+            33_000_000,
+            24_000_000,
+            528_000_000,
+            1175,
+            66,
+            264,
+            106,
+        ),
+    }
+    if set(profile_values) != set(expected_profiles):
+        raise ContractError(
+            "clock profile registry must contain exactly 600 and 528 MHz"
+        )
+    if profile_values != {
+        "PRODUCTION_600_MHZ": 0,
+        "EXPERIMENTAL_528_MHZ": 1,
+    }:
+        raise ContractError("clock profile wire IDs must remain stable")
+    profile_by_name = {str(profile["name"]): profile for profile in profile_entries}
+    for name, expected in expected_profiles.items():
+        profile = profile_by_name[name]
+        actual = tuple(
+            int(profile[field])
+            for field in (
+                "cpu_hz",
+                "ipg_hz",
+                "adc_hz",
+                "pit_hz",
+                "dwt_hz",
+                "core_voltage_target_mv",
+                "phase_ipg_cycles",
+                "phase_dwt_cycles",
+                "phase_tolerance_dwt_cycles",
+            )
+        )
+        if actual != expected:
+            raise ContractError(f"{name} clock contract is not the pinned profile")
+        cpu_hz, ipg_hz, adc_hz, pit_hz, dwt_hz, _, phase_ipg, phase_dwt, _ = actual
+        if (
+            ipg_hz != adc_hz * 4
+            or dwt_hz != cpu_hz
+            or pit_hz % int(timing["gpio_sample_rate_hz"])
+            or phase_ipg * dwt_hz != phase_dwt * ipg_hz
+            or phase_ipg * int(timing["timestamp_hz"])
+            != int(timing["adc1_phase_ticks"]) * ipg_hz
+        ):
+            raise ContractError(f"{name} clock/phase arithmetic is inconsistent")
+    minimum_temperature = int(clock_profiles["temperature_min_millidegrees_celsius"])
+    maximum_temperature = int(clock_profiles["temperature_max_millidegrees_celsius"])
+    if (
+        not -(1 << 31) <= minimum_temperature < maximum_temperature < (1 << 31)
+        or int(clock_profiles["temperature_poll_limit"]) <= 0
+        or int(clock_profiles["temperature_deadline_us"]) <= 0
+    ):
+        raise ContractError(
+            "clock-health temperature bounds must be finite and bounded"
+        )
 
     combined = contract["combined_acquisition"]
     profile_values = enum_map(contract["enums"]["configuration_profile"])
@@ -417,6 +504,14 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         value == 0 or value & (value - 1) for value in gpio_clock_error_values.values()
     ):
         raise ContractError("every GPIO clock error must be one nonzero bit")
+    for enum_name, bits in (
+        ("clock_health_flag", 16),
+        ("clock_health_error", 32),
+    ):
+        values = enum_map(contract["enums"][enum_name])
+        validate_enum_width(enum_name, contract["enums"][enum_name], bits)
+        if any(value == 0 or value & (value - 1) for value in values.values()):
+            raise ContractError(f"every {enum_name} value must be one nonzero bit")
     for enum_name in (
         "adc_configuration_flag",
         "adc_initialization_error",
@@ -463,6 +558,17 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
             int(schema["size"]),
             schema["fields"],
         )
+    for kind in contract["frame_kinds"]:
+        if kind["class"] in {"response", "error_response"}:
+            response_bytes = (
+                header_size
+                + int(schemas[str(kind["payload_schema"])]["size"])
+                + trailer_size
+            )
+            if response_bytes > max_control_frame_bytes:
+                raise ContractError(
+                    f"{kind['name']} exceeds the bounded control-frame size"
+                )
     for kind in contract["frame_kinds"]:
         for schema_key in ("payload_schema", "error_payload_schema"):
             if schema_key in kind and kind[schema_key] not in schemas:
@@ -527,6 +633,10 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         "device_state": 8,
         "stream_mask": 8,
         "configuration_profile": 16,
+        "clock_profile": 8,
+        "temperature_status": 8,
+        "clock_health_flag": 16,
+        "clock_health_error": 32,
         "source": 8,
         "board_id": 16,
         "mcu_id": 16,
@@ -605,6 +715,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
     adc_initialization = contract["adc_initialization"]
     adc_trigger = contract["adc_trigger"]
+    clock_profiles = contract["clock_profiles"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -638,6 +749,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         "from __future__ import annotations",
         "",
         "from enum import IntEnum, IntFlag",
+        "from typing import NamedTuple",
         "",
         f'SOURCE_SHA256 = "{source_sha256}"',
         f"MAGIC = 0x{int(contract['magic']):08X}",
@@ -662,6 +774,16 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"GPIO_SAMPLE_RATE_HZ = {int(timing['gpio_sample_rate_hz'])}",
         f"GPIO_SAMPLE_PERIOD_TICKS = {int(timing['gpio_sample_period_ticks'])}",
         f"FRAME_COVERAGE_TICKS = {coverage_ticks}",
+        (
+            "TEMPERATURE_MIN_MILLIDEGREES_CELSIUS = "
+            f"{int(clock_profiles['temperature_min_millidegrees_celsius'])}"
+        ),
+        (
+            "TEMPERATURE_MAX_MILLIDEGREES_CELSIUS = "
+            f"{int(clock_profiles['temperature_max_millidegrees_celsius'])}"
+        ),
+        f"TEMPERATURE_POLL_LIMIT = {int(clock_profiles['temperature_poll_limit'])}",
+        f"TEMPERATURE_DEADLINE_US = {int(clock_profiles['temperature_deadline_us'])}",
         f"SUPPORTED_CONFIGURATION_MASK = {int(combined['supported_configuration_mask'])}",
         f"ADC_DMA_RING_DEPTH = {int(combined['adc_dma_ring_depth'])}",
         f"ADC_PAIRS_PER_BUFFER = {int(combined['adc_pairs_per_buffer'])}",
@@ -815,6 +937,26 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             include_none=True,
         )
     )
+    lines.extend(python_enum("ClockProfile", contract["enums"]["clock_profile"]))
+    lines.extend(
+        python_enum("TemperatureStatus", contract["enums"]["temperature_status"])
+    )
+    lines.extend(
+        python_enum(
+            "ClockHealthFlag",
+            contract["enums"]["clock_health_flag"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
+    lines.extend(
+        python_enum(
+            "ClockHealthError",
+            contract["enums"]["clock_health_error"],
+            base="IntFlag",
+            include_none=True,
+        )
+    )
     lines.extend(
         python_enum(
             "Capability",
@@ -906,6 +1048,55 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
 
     lines.extend(
         [
+            "class ClockProfileSpec(NamedTuple):",
+            "    cpu_hz: int",
+            "    ipg_hz: int",
+            "    adc_hz: int",
+            "    pit_hz: int",
+            "    dwt_hz: int",
+            "    core_voltage_target_mv: int",
+            "    phase_ipg_cycles: int",
+            "    phase_dwt_cycles: int",
+            "    phase_tolerance_dwt_cycles: int",
+            "",
+            "",
+            "CLOCK_PROFILE_SPECS: dict[ClockProfile, ClockProfileSpec] = {",
+        ]
+    )
+    for profile in clock_profiles["profiles"]:
+        lines.extend(
+            [
+                f"    ClockProfile.{profile['name']}: ClockProfileSpec(",
+                f"        cpu_hz={int(profile['cpu_hz'])},",
+                f"        ipg_hz={int(profile['ipg_hz'])},",
+                f"        adc_hz={int(profile['adc_hz'])},",
+                f"        pit_hz={int(profile['pit_hz'])},",
+                f"        dwt_hz={int(profile['dwt_hz'])},",
+                (
+                    "        core_voltage_target_mv="
+                    f"{int(profile['core_voltage_target_mv'])},"
+                ),
+                f"        phase_ipg_cycles={int(profile['phase_ipg_cycles'])},",
+                f"        phase_dwt_cycles={int(profile['phase_dwt_cycles'])},",
+                (
+                    "        phase_tolerance_dwt_cycles="
+                    f"{int(profile['phase_tolerance_dwt_cycles'])},"
+                ),
+                "    ),",
+            ]
+        )
+    lines.extend(
+        [
+            "}",
+            (f"DEFAULT_CLOCK_PROFILE = ClockProfile.{clock_profiles['default']}"),
+            "DEFAULT_CLOCK_PROFILE_SPEC = CLOCK_PROFILE_SPECS[DEFAULT_CLOCK_PROFILE]",
+            "",
+            "",
+        ]
+    )
+
+    lines.extend(
+        [
             f"BOOTSTRAP_CHECKSUM_ALGORITHM = ChecksumAlgorithm.{bootstrap_checksum}",
             f"DEFAULT_CHECKSUM_ALGORITHM = ChecksumAlgorithm.{default_checksum}",
             "SUPPORTED_CHECKSUM_ALGORITHMS = frozenset(",
@@ -935,6 +1126,20 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             sum(
                 int(entry["value"])
                 for entry in contract["enums"]["configuration_profile"]
+            )
+        )
+    )
+    lines.append(
+        "KNOWN_CLOCK_HEALTH_FLAG_MASK = "
+        + str(
+            sum(int(entry["value"]) for entry in contract["enums"]["clock_health_flag"])
+        )
+    )
+    lines.append(
+        "KNOWN_CLOCK_HEALTH_ERROR_MASK = "
+        + str(
+            sum(
+                int(entry["value"]) for entry in contract["enums"]["clock_health_error"]
             )
         )
     )
@@ -1108,6 +1313,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     gpio_capture_diagnostic = contract["gpio_capture_diagnostic"]
     adc_initialization = contract["adc_initialization"]
     adc_trigger = contract["adc_trigger"]
+    clock_profiles = contract["clock_profiles"]
     layouts = contract["data_layouts"]
     kinds = contract["frame_kinds"]
     commands = contract["command_kinds"]
@@ -1174,6 +1380,24 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             f"{int(timing['gpio_sample_period_ticks'])}U;"
         ),
         f"inline constexpr std::uint32_t kFrameCoverageTicks = {coverage_ticks}U;",
+        (
+            "inline constexpr std::int32_t "
+            "kTemperatureMinMillidegreesCelsius = "
+            f"{int(clock_profiles['temperature_min_millidegrees_celsius'])};"
+        ),
+        (
+            "inline constexpr std::int32_t "
+            "kTemperatureMaxMillidegreesCelsius = "
+            f"{int(clock_profiles['temperature_max_millidegrees_celsius'])};"
+        ),
+        (
+            "inline constexpr std::uint32_t kTemperaturePollLimit = "
+            f"{int(clock_profiles['temperature_poll_limit'])}U;"
+        ),
+        (
+            "inline constexpr std::uint32_t kTemperatureDeadlineUs = "
+            f"{int(clock_profiles['temperature_deadline_us'])}U;"
+        ),
         f"inline constexpr std::uint16_t kSupportedConfigurationMask = {int(combined['supported_configuration_mask'])}U;",
         f"inline constexpr std::uint8_t kAdcDmaRingDepth = {int(combined['adc_dma_ring_depth'])}U;",
         f"inline constexpr std::uint16_t kAdcPairsPerBuffer = {int(combined['adc_pairs_per_buffer'])}U;",
@@ -1389,6 +1613,30 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             contract["enums"]["configuration_profile"],
         )
     )
+    lines.extend(
+        cpp_enum("ClockProfile", "std::uint8_t", contract["enums"]["clock_profile"])
+    )
+    lines.extend(
+        cpp_enum(
+            "TemperatureStatus",
+            "std::uint8_t",
+            contract["enums"]["temperature_status"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "ClockHealthFlag",
+            "std::uint16_t",
+            contract["enums"]["clock_health_flag"],
+        )
+    )
+    lines.extend(
+        cpp_enum(
+            "ClockHealthError",
+            "std::uint32_t",
+            contract["enums"]["clock_health_error"],
+        )
+    )
     lines.extend(cpp_enum("Capability", "std::uint32_t", capabilities))
     lines.extend(cpp_enum("Source", "std::uint8_t", contract["enums"]["source"]))
     lines.extend(cpp_enum("BoardId", "std::uint16_t", contract["enums"]["board_id"]))
@@ -1488,6 +1736,61 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
 
     lines.extend(
         [
+            "struct ClockProfileSpec {",
+            "  ClockProfile profile;",
+            "  std::uint32_t cpu_hz;",
+            "  std::uint32_t ipg_hz;",
+            "  std::uint32_t adc_hz;",
+            "  std::uint32_t pit_hz;",
+            "  std::uint32_t dwt_hz;",
+            "  std::uint16_t core_voltage_target_mv;",
+            "  std::uint16_t phase_ipg_cycles;",
+            "  std::uint16_t phase_dwt_cycles;",
+            "  std::uint16_t phase_tolerance_dwt_cycles;",
+            "};",
+            "",
+        ]
+    )
+    profile_constant_names: list[str] = []
+    for profile in clock_profiles["profiles"]:
+        constant_name = f"k{snake_to_pascal(str(profile['name']))}ClockProfile"
+        profile_constant_names.append(constant_name)
+        enum_name = snake_to_pascal(str(profile["name"]))
+        lines.extend(
+            [
+                f"inline constexpr ClockProfileSpec {constant_name}{{",
+                f"    ClockProfile::k{enum_name},",
+                f"    {int(profile['cpu_hz'])}U,",
+                f"    {int(profile['ipg_hz'])}U,",
+                f"    {int(profile['adc_hz'])}U,",
+                f"    {int(profile['pit_hz'])}U,",
+                f"    {int(profile['dwt_hz'])}U,",
+                f"    {int(profile['core_voltage_target_mv'])}U,",
+                f"    {int(profile['phase_ipg_cycles'])}U,",
+                f"    {int(profile['phase_dwt_cycles'])}U,",
+                f"    {int(profile['phase_tolerance_dwt_cycles'])}U,",
+                "};",
+            ]
+        )
+    default_profile_name = snake_to_pascal(str(clock_profiles["default"]))
+    lines.extend(
+        [
+            "",
+            "inline constexpr ClockProfile kDefaultClockProfile =",
+            f"    ClockProfile::k{default_profile_name};",
+            "",
+            "constexpr const ClockProfileSpec &clockProfileSpec(ClockProfile profile) {",
+            (
+                "  return profile == ClockProfile::kExperimental528Mhz ? "
+                f"{profile_constant_names[1]} : {profile_constant_names[0]};"
+            ),
+            "}",
+            "",
+        ]
+    )
+
+    lines.extend(
+        [
             "inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =",
             f"    ChecksumAlgorithm::k{bootstrap_checksum};",
             "inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =",
@@ -1512,6 +1815,22 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
                 sum(
                     int(entry["value"])
                     for entry in contract["enums"]["configuration_profile"]
+                )
+            )
+            + "U;",
+            "inline constexpr std::uint16_t kKnownClockHealthFlagMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["clock_health_flag"]
+                )
+            )
+            + "U;",
+            "inline constexpr std::uint32_t kKnownClockHealthErrorMask = "
+            + str(
+                sum(
+                    int(entry["value"])
+                    for entry in contract["enums"]["clock_health_error"]
                 )
             )
             + "U;",

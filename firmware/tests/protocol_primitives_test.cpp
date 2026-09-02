@@ -437,6 +437,16 @@ void testGoldenEncode(const std::string &fixture_directory,
   status.usb.response_queue_high_water = 1U;
   status.usb.responses_queued = 3U;
   status.usb.responses_completed = 3U;
+  status.clock_health.sample_ticks = 8096U;
+  status.clock_health.temperature_status =
+      constants::TemperatureStatus::kValid;
+  status.clock_health.flags = constants::kKnownClockHealthFlagMask;
+  status.clock_health.temperature_millidegrees_celsius = 42125;
+  status.clock_health.acquisition_service_utilization_basis_points = 1234U;
+  status.clock_health.usb_service_utilization_basis_points = 567U;
+  status.clock_health.usb_command_queue_high_water = 1U;
+  status.clock_health.usb_response_queue_high_water = 1U;
+  status.clock_health.error_flags = 0U;
   expect(wire::encodeStatusResponse(
              request(constants::CommandKind::kGetStatus, 4U), 7U, status,
              response)
@@ -446,6 +456,30 @@ void testGoldenEncode(const std::string &fixture_directory,
               readFixture(fixture_directory, "get-status-response.bin"),
               "STATUS response golden");
   writeFrame(response_directory, "get-status-response.bin", response);
+  wire::StatusResponse invalid_health = status;
+  invalid_health.clock_health.temperature_status =
+      constants::TemperatureStatus::kUnavailable;
+  invalid_health.clock_health.flags = static_cast<std::uint16_t>(
+      invalid_health.clock_health.flags &
+      ~static_cast<std::uint16_t>(
+          constants::ClockHealthFlag::kTemperatureValid));
+  invalid_health.clock_health.temperature_millidegrees_celsius = 0;
+  expect(!wire::encodeStatusResponse(
+              request(constants::CommandKind::kGetStatus, 4U), 7U,
+              invalid_health, response)
+              .ok(),
+         "STATUS rejects unavailable temperature without explicit error");
+  invalid_health = status;
+  invalid_health.clock_health.runtime_cpu_clock_hz = 528000000U;
+  invalid_health.clock_health.flags = static_cast<std::uint16_t>(
+      invalid_health.clock_health.flags &
+      ~static_cast<std::uint16_t>(
+          constants::ClockHealthFlag::kClocksValid));
+  expect(!wire::encodeStatusResponse(
+              request(constants::CommandKind::kGetStatus, 4U), 7U,
+              invalid_health, response)
+              .ok(),
+         "STATUS rejects runtime clock mismatch without matching error");
   expect(wire::encodeStopResponse(
              request(constants::CommandKind::kStop, 5U), 7U, response)
              .ok(),

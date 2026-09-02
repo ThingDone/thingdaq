@@ -515,6 +515,34 @@ class AcceleratedSoakDevice(PhysicalCombinedDevice):
         self.adc_gap_pending = False
         self.gpio_gap_pending = False
 
+    def _fit_frozen_control_contract(self, wire: bytes) -> bytes:
+        """Trim only additive control tails for the frozen Phase 11 harness."""
+
+        kind = wire[constants.HEADER_KIND_OFFSET]
+        expected = self.rig.SUCCESS_PAYLOAD_SIZE.get(kind)
+        payload_length = struct.unpack_from(
+            "<I", wire, constants.HEADER_PAYLOAD_LENGTH_OFFSET
+        )[0]
+        if expected is None or payload_length <= expected:
+            return wire
+
+        result = bytearray(
+            wire[: constants.HEADER_SIZE]
+            + wire[constants.HEADER_SIZE : constants.HEADER_SIZE + expected]
+            + bytes(constants.TRAILER_SIZE)
+        )
+        struct.pack_into(
+            "<I", result, constants.HEADER_TOTAL_LENGTH_OFFSET, len(result)
+        )
+        struct.pack_into("<I", result, constants.HEADER_PAYLOAD_LENGTH_OFFSET, expected)
+        struct.pack_into(
+            "<I",
+            result,
+            len(result) - constants.TRAILER_SIZE,
+            canonical_validator.adler32(result[: -constants.TRAILER_SIZE]),
+        )
+        return bytes(result)
+
     def _reset_counters(self) -> None:
         super()._reset_counters()
         self.pressure_adc_frames = 0
@@ -594,12 +622,22 @@ class AcceleratedSoakDevice(PhysicalCombinedDevice):
         struct.pack_into(
             "<I",
             response,
+            constants.HEADER_SIZE
+            + constants.INFO_RESPONSE_MAX_CONTROL_FRAME_BYTES_OFFSET,
+            self.rig.MAX_CONTROL_FRAME_BYTES,
+        )
+        struct.pack_into(
+            "<I",
+            response,
             len(response) - constants.TRAILER_SIZE,
             canonical_validator.adler32(response[: -constants.TRAILER_SIZE]),
         )
         if self.state is constants.DeviceState.RUNNING:
             self.commands_accepted += 1
-        return bytes(response)
+        return self._fit_frozen_control_contract(bytes(response))
+
+    def _handle_status(self, request):  # type: ignore[no-untyped-def]
+        return self._fit_frozen_control_contract(super()._handle_status(request))
 
     def _handle_configure(self, request):  # type: ignore[no-untyped-def]
         configuration = Configuration.from_payload(request.payload)

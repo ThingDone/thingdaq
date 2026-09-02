@@ -1,6 +1,7 @@
 #include "control_state.h"
 
 #include <cstddef>
+#include <limits>
 
 #if defined(__IMXRT1062__)
 #define THINGDAQ_CONTROL_COLD_CODE(section_name) \
@@ -24,6 +25,37 @@ constexpr bool knownSource(protocol_v1::Source source) {
 constexpr bool capabilityEnabled(protocol_v1::Capability capability) {
   return (capabilities::kCapabilityBits &
           capabilities::capabilityBit(capability)) != 0U;
+}
+
+std::uint32_t boundedAdcHardwareErrorCount(
+    const protocol::StatusResponse &status) {
+  std::uint64_t total = 0U;
+  const auto add = [&total](std::uint64_t value) {
+    total += value > std::numeric_limits<std::uint32_t>::max()
+                 ? std::numeric_limits<std::uint32_t>::max()
+                 : value;
+  };
+  add(status.adc_incomplete_conversions);
+  add(status.adc_overwritten_conversions);
+  add(status.adc_raw_ring_overruns);
+  add(status.adc_incomplete_buffers);
+  add(status.adc_etc_error_events);
+  add(status.adc_dma_error_events);
+  add(status.adc_completion_mismatches);
+  add(status.adc_destination_mismatches);
+  add(status.adc_schedule_exhaustions);
+  add(status.adc_raw_invariant_errors);
+  add(status.adc_stale_completions);
+  add(status.adc_resource_conflicts);
+  add(status.adc_start_errors);
+  add(status.adc_stop_errors);
+  add(status.adc_stale_interrupts);
+  add(status.adc_packer_source_errors);
+  add(status.adc_packer_pipeline_errors);
+  add(status.adc_packer_chronology_errors);
+  return total > std::numeric_limits<std::uint32_t>::max()
+             ? std::numeric_limits<std::uint32_t>::max()
+             : static_cast<std::uint32_t>(total);
 }
 
 }  // namespace
@@ -165,6 +197,32 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
       protocol::StatusResponse status =
           statistics_.wireStatus(state_, appliedConfiguration());
       status.adc = adc_metadata_;
+      if (readiness.clock_health_sample != nullptr) {
+        status.clock_health = *readiness.clock_health_sample;
+      }
+      status.clock_health.adc_raw_ready_high_water =
+          status.adc_raw_ready_high_water;
+      status.clock_health.gpio_raw_ready_high_water =
+          status.gpio_raw_ready_high_water;
+      status.clock_health.packet_owned_high_water =
+          status.packet_owned_high_water;
+      status.clock_health.usb_command_queue_high_water =
+          status.usb.command_queue_high_water;
+      status.clock_health.usb_response_queue_high_water =
+          status.usb.response_queue_high_water;
+      status.clock_health.adc_trigger_error_count =
+          status.adc.trigger.trigger_error_count;
+      if (status.adc.trigger.error_flags != 0U ||
+          status.adc.trigger.trigger_error_count != 0U) {
+        status.clock_health.flags = static_cast<std::uint16_t>(
+            status.clock_health.flags &
+            ~static_cast<std::uint16_t>(
+                protocol_v1::ClockHealthFlag::kClocksValid));
+        status.clock_health.error_flags |= static_cast<std::uint32_t>(
+            protocol_v1::ClockHealthError::kPhaseMismatch);
+      }
+      status.clock_health.adc_hardware_error_count =
+          boundedAdcHardwareErrorCount(status);
       return encoded(request, protocol_v1::ErrorCode::kOk,
                      protocol::encodeStatusResponse(request, run_id_, status,
                                                     response),

@@ -17,6 +17,8 @@ PORTABLE_SOURCES = (
     FIRMWARE_SOURCE / "acquisition_controller.cpp",
     FIRMWARE_SOURCE / "firmware_runtime.h",
     FIRMWARE_SOURCE / "firmware_runtime.cpp",
+    FIRMWARE_SOURCE / "clock_health.h",
+    FIRMWARE_SOURCE / "clock_health.cpp",
     FIRMWARE_SOURCE / "adc_initializer.h",
     FIRMWARE_SOURCE / "adc_initializer.cpp",
     FIRMWARE_SOURCE / "adc_trigger.h",
@@ -59,6 +61,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "acquisition_controller.cpp"),
                     str(FIRMWARE_SOURCE / "firmware_runtime.cpp"),
+                    str(FIRMWARE_SOURCE / "clock_health.cpp"),
                     str(FIRMWARE_SOURCE / "adc_initializer.cpp"),
                     str(FIRMWARE_SOURCE / "adc_trigger.cpp"),
                     str(FIRMWARE_SOURCE / "adc_frame_packer.cpp"),
@@ -130,7 +133,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
         self.assertIn("hardwareSerialNumber()", sketch)
         self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("Serial.", sketch)
-        self.assertLessEqual(len(sketch.splitlines()), 55)
+        self.assertLessEqual(len(sketch.splitlines()), 62)
 
 
 if __name__ == "__main__":

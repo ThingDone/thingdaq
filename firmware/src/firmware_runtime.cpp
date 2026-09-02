@@ -16,15 +16,52 @@ std::uint32_t counterDelta(std::uint32_t current, std::uint32_t baseline) {
 
 }  // namespace
 
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.constructor")
+FirmwareRuntime::FirmwareRuntime(
+    usb::CdcByteStream &stream,
+    packet::PacketBufferStorage &packet_storage,
+    synthetic::TickClock &clock, synthetic::Mode source_mode,
+    benchmark::Runner *checksum_benchmark,
+    gpio_clock::Runner *gpio_clock_diagnostic,
+    gpio_capture::HardwareCapture *gpio_capture,
+    gpio_packer::GpioBatchPacker *gpio_packer,
+    gpio_diagnostic::Runner *gpio_capture_diagnostic,
+    adc::Initializer *adc_initializer,
+    adc_trigger::Scheduler *adc_trigger_scheduler,
+    adc_capture::HardwareCapture *adc_capture,
+    adc_packer::AdcFramePacker *adc_packer,
+    clock_health::Monitor *clock_health_monitor)
+    : control_{},
+      packet_pipeline_{packet_storage},
+      synthetic_source_{source_mode},
+      clock_(clock),
+      transport_{stream, control_.statistics(), &packet_pipeline_},
+      acquisition_controller_{
+          control_.statistics(), packet_pipeline_, gpio_capture, gpio_packer,
+          adc_initializer, adc_trigger_scheduler, adc_capture, adc_packer},
+      checksum_benchmark_(checksum_benchmark),
+      gpio_clock_diagnostic_(gpio_clock_diagnostic),
+      gpio_capture_diagnostic_(gpio_capture_diagnostic),
+      clock_health_monitor_(clock_health_monitor) {}
+
 THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.begin")
 bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
+  if (clock_health_monitor_ != nullptr) {
+    (void)clock_health_monitor_->begin(clock_.nowTicks());
+  }
   return control_.completeBoot(hardware_serial,
                                acquisition_controller_.initialize());
 }
 
 LoopReport FirmwareRuntime::service() {
   LoopReport report{};
+  if (clock_health_monitor_ != nullptr) {
+    clock_health_monitor_->beginUsbService();
+  }
   report.receive = transport_.serviceReceive();
+  if (clock_health_monitor_ != nullptr) {
+    clock_health_monitor_->endUsbService();
+  }
   if (transport_.takeSessionStarted()) {
     control_.beginHostSession();
   }
@@ -60,6 +97,12 @@ LoopReport FirmwareRuntime::service() {
         publishPacketStatistics();
       }
       control::DispatchReadiness readiness{};
+      protocol::ClockHealthSample clock_health_sample{};
+      if (command.request.kind == protocol_v1::CommandKind::kGetStatus &&
+          clock_health_monitor_ != nullptr) {
+        clock_health_sample = clock_health_monitor_->sample(now_ticks);
+        readiness.clock_health_sample = &clock_health_sample;
+      }
       if (command.request.kind ==
           protocol_v1::CommandKind::kResetStats) {
         readiness.statistics_reset_ready =
@@ -185,6 +228,9 @@ LoopReport FirmwareRuntime::service() {
   // stay in this bounded cooperative path. Newly due work is promoted and
   // offered to CDC during the same visit. The production clock is polled; no
   // pacing ISR is installed.
+  if (clock_health_monitor_ != nullptr) {
+    clock_health_monitor_->beginAcquisitionService();
+  }
   report.synthetic = synthetic_source_.service(now_ticks, packet_pipeline_);
   acquisition_controller_.service(report);
   if (report.physical_fault_detected &&
@@ -196,7 +242,15 @@ LoopReport FirmwareRuntime::service() {
   // so ADC/GPIO completions cannot be hidden behind USB catch-up work.
   report.packet_promotion_before_second_acquisition =
       packet_pipeline_.serviceReadyFrames();
+  if (clock_health_monitor_ != nullptr) {
+    clock_health_monitor_->endAcquisitionService();
+    clock_health_monitor_->beginUsbService();
+  }
   report.transmit_before_second_acquisition = transport_.serviceTransmit();
+  if (clock_health_monitor_ != nullptr) {
+    clock_health_monitor_->endUsbService();
+    clock_health_monitor_->beginAcquisitionService();
+  }
 
   acquisition_controller_.service(report);
   if (report.physical_fault_detected &&
@@ -204,7 +258,14 @@ LoopReport FirmwareRuntime::service() {
     recoverPhysicalFault(now_ticks, report);
   }
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
+  if (clock_health_monitor_ != nullptr) {
+    clock_health_monitor_->endAcquisitionService();
+    clock_health_monitor_->beginUsbService();
+  }
   report.transmit = transport_.serviceTransmit();
+  if (clock_health_monitor_ != nullptr) {
+    clock_health_monitor_->endUsbService();
+  }
   return report;
 }
 

@@ -5,6 +5,7 @@
 
 #include "acquisition_controller.h"
 #include "checksum_benchmark.h"
+#include "clock_health.h"
 #include "control_state.h"
 #include "gpio_capture_diagnostic.h"
 #include "gpio_clock_diagnostic.h"
@@ -55,18 +56,8 @@ class FirmwareRuntime {
                   adc::Initializer *adc_initializer = nullptr,
                   adc_trigger::Scheduler *adc_trigger_scheduler = nullptr,
                   adc_capture::HardwareCapture *adc_capture = nullptr,
-                  adc_packer::AdcFramePacker *adc_packer = nullptr)
-      : control_{},
-        packet_pipeline_{packet_storage},
-        synthetic_source_{source_mode},
-        clock_(clock),
-        transport_{stream, control_.statistics(), &packet_pipeline_},
-        acquisition_controller_{
-            control_.statistics(), packet_pipeline_, gpio_capture, gpio_packer,
-            adc_initializer, adc_trigger_scheduler, adc_capture, adc_packer},
-        checksum_benchmark_(checksum_benchmark),
-        gpio_clock_diagnostic_(gpio_clock_diagnostic),
-        gpio_capture_diagnostic_(gpio_capture_diagnostic) {}
+                  adc_packer::AdcFramePacker *adc_packer = nullptr,
+                  clock_health::Monitor *clock_health_monitor = nullptr);
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -122,6 +113,7 @@ class FirmwareRuntime {
   benchmark::Runner *checksum_benchmark_ = nullptr;
   gpio_clock::Runner *gpio_clock_diagnostic_ = nullptr;
   gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
+  clock_health::Monitor *clock_health_monitor_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
   usb::TransportSnapshot transport_stats_baseline_{};
   std::size_t transport_command_queue_high_water_ = 0U;

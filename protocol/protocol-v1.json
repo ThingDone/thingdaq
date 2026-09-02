@@ -7,7 +7,8 @@
     "u8": {"width": 1, "signed": false},
     "u16": {"width": 2, "signed": false},
     "u32": {"width": 4, "signed": false},
-    "u64": {"width": 8, "signed": false}
+    "u64": {"width": 8, "signed": false},
+    "i32": {"width": 4, "signed": true}
   },
   "compatibility": {
     "unknown_version": "reject the candidate before interpreting its payload and make no state change",
@@ -46,7 +47,7 @@
   "limits": {
     "data_frame_bytes": 4096,
     "max_data_frame_bytes": 4096,
-    "max_control_frame_bytes": 1280,
+    "max_control_frame_bytes": 1364,
     "max_command_frame_bytes": 56,
     "max_command_payload_bytes": 8,
     "min_frame_bytes": 48
@@ -149,6 +150,42 @@
     "adc1_phase_ticks": 4,
     "gpio_sample_rate_hz": 4000000,
     "gpio_sample_period_ticks": 2
+  },
+  "clock_profiles": {
+    "default": "PRODUCTION_600_MHZ",
+    "temperature_min_millidegrees_celsius": -40000,
+    "temperature_max_millidegrees_celsius": 150000,
+    "temperature_poll_limit": 128,
+    "temperature_deadline_us": 50,
+    "profiles": [
+      {
+        "name": "PRODUCTION_600_MHZ",
+        "value": 0,
+        "cpu_hz": 600000000,
+        "ipg_hz": 150000000,
+        "adc_hz": 37500000,
+        "pit_hz": 24000000,
+        "dwt_hz": 600000000,
+        "core_voltage_target_mv": 1250,
+        "phase_ipg_cycles": 75,
+        "phase_dwt_cycles": 300,
+        "phase_tolerance_dwt_cycles": 120
+      },
+      {
+        "name": "EXPERIMENTAL_528_MHZ",
+        "value": 1,
+        "cpu_hz": 528000000,
+        "ipg_hz": 132000000,
+        "adc_hz": 33000000,
+        "pit_hz": 24000000,
+        "dwt_hz": 528000000,
+        "core_voltage_target_mv": 1175,
+        "phase_ipg_cycles": 66,
+        "phase_dwt_cycles": 264,
+        "phase_tolerance_dwt_cycles": 106
+      }
+    ],
+    "semantics": "INFO advertises the exact selected build profile after CPU/IPG boot validation. STATUS reports bounded runtime readbacks and never waits beyond both the finite TEMPMON poll and DWT deadline. Missing temperature or utilization evidence is explicit rather than fabricated."
   },
   "checksum_benchmark": {
     "cycle_counter_hz": 600000000,
@@ -567,6 +604,35 @@
       {"name": "SYNTHETIC_GPIO", "value": 16},
       {"name": "SYNTHETIC_COMBINED", "value": 32}
     ],
+    "clock_profile": [
+      {"name": "PRODUCTION_600_MHZ", "value": 0},
+      {"name": "EXPERIMENTAL_528_MHZ", "value": 1}
+    ],
+    "temperature_status": [
+      {"name": "UNAVAILABLE", "value": 0},
+      {"name": "VALID", "value": 1},
+      {"name": "NOT_READY", "value": 2},
+      {"name": "INVALID_CALIBRATION", "value": 3},
+      {"name": "OUT_OF_RANGE", "value": 4}
+    ],
+    "clock_health_flag": [
+      {"name": "CLOCKS_VALID", "value": 1},
+      {"name": "TEMPERATURE_VALID", "value": 2},
+      {"name": "UTILIZATION_VALID", "value": 4}
+    ],
+    "clock_health_error": [
+      {"name": "CPU_CLOCK_MISMATCH", "value": 1},
+      {"name": "IPG_CLOCK_MISMATCH", "value": 2},
+      {"name": "ADC_CLOCK_MISMATCH", "value": 4},
+      {"name": "PIT_CLOCK_MISMATCH", "value": 8},
+      {"name": "DWT_UNAVAILABLE", "value": 16},
+      {"name": "PHASE_MISMATCH", "value": 32},
+      {"name": "TEMPERATURE_UNAVAILABLE", "value": 64},
+      {"name": "TEMPERATURE_NOT_READY", "value": 128},
+      {"name": "TEMPERATURE_CALIBRATION_INVALID", "value": 256},
+      {"name": "TEMPERATURE_OUT_OF_RANGE", "value": 512},
+      {"name": "UTILIZATION_UNAVAILABLE", "value": 1024}
+    ],
     "capability_bits": [
       {"name": "ADC_STREAM", "value": 1},
       {"name": "GPIO_STREAM", "value": 2},
@@ -764,7 +830,7 @@
       ]
     },
     "info_response": {
-      "size": 376,
+      "size": 408,
       "fields": [
         {"name": "response_status", "offset": 0, "type": "u8"},
         {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
@@ -916,7 +982,19 @@
         {"name": "command_queue_capacity", "offset": 366, "type": "u8"},
         {"name": "response_queue_capacity", "offset": 367, "type": "u8"},
         {"name": "nominal_payload_bytes_per_second_per_stream", "offset": 368, "type": "u32"},
-        {"name": "nominal_framed_bytes_per_second_per_stream", "offset": 372, "type": "u32"}
+        {"name": "nominal_framed_bytes_per_second_per_stream", "offset": 372, "type": "u32"},
+        {"name": "clock_profile", "offset": 376, "type": "u8"},
+        {"name": "reserved_9", "offset": 377, "type": "u8", "required": 0},
+        {"name": "core_voltage_target_mv", "offset": 378, "type": "u16"},
+        {"name": "cpu_clock_hz", "offset": 380, "type": "u32"},
+        {"name": "ipg_clock_hz", "offset": 384, "type": "u32"},
+        {"name": "profile_adc_clock_hz", "offset": 388, "type": "u32"},
+        {"name": "pit_clock_hz", "offset": 392, "type": "u32"},
+        {"name": "dwt_clock_hz", "offset": 396, "type": "u32"},
+        {"name": "phase_ipg_cycles", "offset": 400, "type": "u16"},
+        {"name": "phase_dwt_cycles", "offset": 402, "type": "u16"},
+        {"name": "phase_tolerance_dwt_cycles", "offset": 404, "type": "u16"},
+        {"name": "reserved_10", "offset": 406, "type": "u16", "required": 0}
       ]
     },
     "configure_response": {
@@ -933,7 +1011,7 @@
       ]
     },
     "status_response": {
-      "size": 1228,
+      "size": 1316,
       "fields": [
         {"name": "response_status", "offset": 0, "type": "u8"},
         {"name": "reserved", "offset": 1, "type": "u8", "required": 0},
@@ -1198,7 +1276,36 @@
         {"name": "adc_raw_gap_pairs", "offset": 1196, "type": "u64"},
         {"name": "adc_raw_drop_pairs_projected", "offset": 1204, "type": "u64"},
         {"name": "gpio_raw_drop_samples_projected", "offset": 1212, "type": "u64"},
-        {"name": "gpio_packer_drop_samples_projected", "offset": 1220, "type": "u64"}
+        {"name": "gpio_packer_drop_samples_projected", "offset": 1220, "type": "u64"},
+        {"name": "health_sample_sequence", "offset": 1228, "type": "u32"},
+        {"name": "health_sample_ticks", "offset": 1232, "type": "u64"},
+        {"name": "clock_profile", "offset": 1240, "type": "u8"},
+        {"name": "temperature_status", "offset": 1241, "type": "u8"},
+        {"name": "clock_health_flags", "offset": 1242, "type": "u16"},
+        {"name": "core_voltage_target_mv", "offset": 1244, "type": "u16"},
+        {"name": "phase_ipg_cycles", "offset": 1246, "type": "u16"},
+        {"name": "phase_dwt_cycles", "offset": 1248, "type": "u16"},
+        {"name": "reserved_4", "offset": 1250, "type": "u16", "required": 0},
+        {"name": "runtime_cpu_clock_hz", "offset": 1252, "type": "u32"},
+        {"name": "runtime_ipg_clock_hz", "offset": 1256, "type": "u32"},
+        {"name": "runtime_adc_clock_hz", "offset": 1260, "type": "u32"},
+        {"name": "runtime_pit_clock_hz", "offset": 1264, "type": "u32"},
+        {"name": "runtime_dwt_clock_hz", "offset": 1268, "type": "u32"},
+        {"name": "temperature_millidegrees_celsius", "offset": 1272, "type": "i32"},
+        {"name": "acquisition_service_utilization_basis_points", "offset": 1276, "type": "u16"},
+        {"name": "usb_service_utilization_basis_points", "offset": 1278, "type": "u16"},
+        {"name": "health_adc_raw_ready_high_water", "offset": 1280, "type": "u16"},
+        {"name": "health_gpio_raw_ready_high_water", "offset": 1282, "type": "u16"},
+        {"name": "health_packet_owned_high_water", "offset": 1284, "type": "u16"},
+        {"name": "health_usb_command_queue_high_water", "offset": 1286, "type": "u16"},
+        {"name": "health_usb_response_queue_high_water", "offset": 1288, "type": "u16"},
+        {"name": "reserved_5", "offset": 1290, "type": "u16", "required": 0},
+        {"name": "clock_health_error_flags", "offset": 1292, "type": "u32"},
+        {"name": "temperature_error_count", "offset": 1296, "type": "u32"},
+        {"name": "clock_mismatch_count", "offset": 1300, "type": "u32"},
+        {"name": "service_counter_error_count", "offset": 1304, "type": "u32"},
+        {"name": "health_adc_trigger_error_count", "offset": 1308, "type": "u32"},
+        {"name": "health_adc_hardware_error_count", "offset": 1312, "type": "u32"}
       ]
     },
     "stop_response": {
@@ -1528,7 +1635,7 @@
           "capability_bits": 511,
           "timestamp_hz": 8000000,
           "data_frame_bytes": 4096,
-          "max_control_frame_bytes": 1280,
+          "max_control_frame_bytes": 1364,
           "adc_pair_rate_hz": 1000000,
           "gpio_sample_rate_hz": 4000000,
           "adc_pair_period_ticks": 8,
@@ -1660,7 +1767,17 @@
           "command_queue_capacity": 4,
           "response_queue_capacity": 4,
           "nominal_payload_bytes_per_second_per_stream": 4000000,
-          "nominal_framed_bytes_per_second_per_stream": 4047431
+          "nominal_framed_bytes_per_second_per_stream": 4047431,
+          "clock_profile": 0,
+          "core_voltage_target_mv": 1250,
+          "cpu_clock_hz": 600000000,
+          "ipg_clock_hz": 150000000,
+          "profile_adc_clock_hz": 37500000,
+          "pit_clock_hz": 24000000,
+          "dwt_clock_hz": 600000000,
+          "phase_ipg_cycles": 75,
+          "phase_dwt_cycles": 300,
+          "phase_tolerance_dwt_cycles": 120
         }
       }
     },
@@ -1965,7 +2082,34 @@
           "adc_raw_gap_pairs": 0,
           "adc_raw_drop_pairs_projected": 0,
           "gpio_raw_drop_samples_projected": 0,
-          "gpio_packer_drop_samples_projected": 0
+          "gpio_packer_drop_samples_projected": 0,
+          "health_sample_sequence": 1,
+          "health_sample_ticks": 8096,
+          "clock_profile": 0,
+          "temperature_status": 1,
+          "clock_health_flags": 7,
+          "core_voltage_target_mv": 1250,
+          "phase_ipg_cycles": 75,
+          "phase_dwt_cycles": 300,
+          "runtime_cpu_clock_hz": 600000000,
+          "runtime_ipg_clock_hz": 150000000,
+          "runtime_adc_clock_hz": 37500000,
+          "runtime_pit_clock_hz": 24000000,
+          "runtime_dwt_clock_hz": 600000000,
+          "temperature_millidegrees_celsius": 42125,
+          "acquisition_service_utilization_basis_points": 1234,
+          "usb_service_utilization_basis_points": 567,
+          "health_adc_raw_ready_high_water": 0,
+          "health_gpio_raw_ready_high_water": 0,
+          "health_packet_owned_high_water": 0,
+          "health_usb_command_queue_high_water": 1,
+          "health_usb_response_queue_high_water": 1,
+          "clock_health_error_flags": 0,
+          "temperature_error_count": 0,
+          "clock_mismatch_count": 0,
+          "service_counter_error_count": 0,
+          "health_adc_trigger_error_count": 0,
+          "health_adc_hardware_error_count": 0
         }
       }
     },

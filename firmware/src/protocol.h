@@ -352,6 +352,58 @@ struct AdcInitializationMetadata {
   AdcTriggerMetadata trigger{};
 };
 
+struct ClockProfileMetadata {
+  protocol_v1::ClockProfile profile = identity::kClockProfile;
+  std::uint16_t core_voltage_target_mv = identity::kCoreVoltageTargetMv;
+  std::uint32_t cpu_clock_hz = identity::kExpectedCpuHz;
+  std::uint32_t ipg_clock_hz = identity::kExpectedIpgHz;
+  std::uint32_t adc_clock_hz = identity::kExpectedAdcClockHz;
+  std::uint32_t pit_clock_hz = identity::kExpectedPitHz;
+  std::uint32_t dwt_clock_hz = identity::kExpectedDwtHz;
+  std::uint16_t phase_ipg_cycles = identity::kAdcNominalPhaseIpgCycles;
+  std::uint16_t phase_dwt_cycles = static_cast<std::uint16_t>(
+      identity::kAdcCompletionExpectedDwtCycles);
+  std::uint16_t phase_tolerance_dwt_cycles = static_cast<std::uint16_t>(
+      identity::kAdcCompletionToleranceDwtCycles);
+};
+
+struct ClockHealthSample {
+  std::uint32_t sample_sequence = 1U;
+  std::uint64_t sample_ticks = 0U;
+  protocol_v1::ClockProfile profile = identity::kClockProfile;
+  protocol_v1::TemperatureStatus temperature_status =
+      protocol_v1::TemperatureStatus::kUnavailable;
+  std::uint16_t flags = static_cast<std::uint16_t>(
+      protocol_v1::ClockHealthFlag::kClocksValid);
+  std::uint16_t core_voltage_target_mv = identity::kCoreVoltageTargetMv;
+  std::uint16_t phase_ipg_cycles = identity::kAdcNominalPhaseIpgCycles;
+  std::uint16_t phase_dwt_cycles = static_cast<std::uint16_t>(
+      identity::kAdcCompletionExpectedDwtCycles);
+  std::uint32_t runtime_cpu_clock_hz = identity::kExpectedCpuHz;
+  std::uint32_t runtime_ipg_clock_hz = identity::kExpectedIpgHz;
+  std::uint32_t runtime_adc_clock_hz = identity::kExpectedAdcClockHz;
+  std::uint32_t runtime_pit_clock_hz = identity::kExpectedPitHz;
+  std::uint32_t runtime_dwt_clock_hz = identity::kExpectedDwtHz;
+  std::int32_t temperature_millidegrees_celsius = 0;
+  std::uint16_t acquisition_service_utilization_basis_points = 0U;
+  std::uint16_t usb_service_utilization_basis_points = 0U;
+  std::uint16_t adc_raw_ready_high_water = 0U;
+  std::uint16_t gpio_raw_ready_high_water = 0U;
+  std::uint16_t packet_owned_high_water = 0U;
+  std::uint16_t usb_command_queue_high_water = 0U;
+  std::uint16_t usb_response_queue_high_water = 0U;
+  std::uint32_t error_flags =
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kTemperatureUnavailable) |
+      static_cast<std::uint32_t>(
+          protocol_v1::ClockHealthError::kUtilizationUnavailable);
+  std::uint32_t temperature_error_count = 0U;
+  std::uint32_t clock_mismatch_count = 0U;
+  std::uint32_t service_counter_error_count = 0U;
+  std::uint32_t adc_trigger_error_count = 0U;
+  std::uint32_t adc_hardware_error_count = 0U;
+};
+
 struct InfoResponse {
   protocol_v1::DeviceState device_state = protocol_v1::DeviceState::kIdle;
   std::uint8_t supported_stream_mask = 0U;
@@ -439,6 +491,7 @@ struct InfoResponse {
       protocol_v1::kNominalPayloadBytesPerSecondPerStream;
   std::uint32_t nominal_framed_bytes_per_second_per_stream =
       protocol_v1::kNominalFramedBytesPerSecondPerStream;
+  ClockProfileMetadata clock_profile{};
 };
 
 struct StreamTelemetry {
@@ -614,6 +667,7 @@ struct StatusResponse {
   PacketTelemetry packet{};
   FirmwareDiagnosticTelemetry diagnostics{};
   UsbTelemetry usb{};
+  ClockHealthSample clock_health{};
 };
 
 struct ChecksumBenchmarkResponse {

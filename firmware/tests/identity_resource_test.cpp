@@ -355,7 +355,7 @@ static_assert(thingdaq::board::kGpioMappingsByPackedBit[7].teensy_pin ==
 static_assert(thingdaq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
 static_assert(thingdaq::board::kGpio7ToGpio2Gpr27ClearMask ==
               thingdaq::board::kGpio2PsrCaptureMask);
-static_assert(thingdaq::board::kReservedRam1Bytes == 450464U);
+static_assert(thingdaq::board::kReservedRam1Bytes == 450800U);
 static_assert(thingdaq::board::kGpioRawDmaBufferBytes == 16192U);
 static_assert(thingdaq::board::kGpioRawDmaRingBytes == 64768U);
 static_assert(thingdaq::board::kAdcDmaBufferStrideBytes == 4064U);

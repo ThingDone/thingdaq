@@ -962,6 +962,17 @@ class ThingDAQ:
             if not isinstance(response.value, Status):
                 raise UnexpectedMessageError("STATUS response has no Status value")
             status = response.value
+            info = self._device_info
+            if info is not None and status.clock_health.clock_profile != (
+                info.clock_profile
+            ):
+                raise UnexpectedMessageError(
+                    "STATUS clock profile contradicts synchronized INFO"
+                )
+            if not status.clock_health.flags & constants.ClockHealthFlag.CLOCKS_VALID:
+                raise UnexpectedMessageError(
+                    "STATUS reports runtime clocks that contradict its profile"
+                )
             self._state = status.device_state
             self._run_id = response.run_id
             self._last_status = status

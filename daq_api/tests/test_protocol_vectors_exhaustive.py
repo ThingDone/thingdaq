@@ -88,7 +88,7 @@ def _pack_adc_trigger_reference(payload: bytearray, base: int) -> None:
 
 
 def _info_payload() -> bytes:
-    payload = bytearray(376)
+    payload = bytearray(408)
     struct.pack_into("<BBHBBBB", payload, 0, 0, 0, 0, 1, 1, 3, 3)
     struct.pack_into(
         "<IIIIIII",
@@ -98,7 +98,7 @@ def _info_payload() -> bytes:
         0x1FF,
         8_000_000,
         4_096,
-        1_280,
+        1_364,
         1_000_000,
         4_000_000,
     )
@@ -148,11 +148,28 @@ def _info_payload() -> bytes:
         4_000_000,
         4_047_431,
     )
+    struct.pack_into(
+        "<BBHIIIIIHHHH",
+        payload,
+        376,
+        0,
+        0,
+        1250,
+        600_000_000,
+        150_000_000,
+        37_500_000,
+        24_000_000,
+        600_000_000,
+        75,
+        300,
+        120,
+        0,
+    )
     return bytes(payload)
 
 
 def _status_payload() -> bytes:
-    payload = bytearray(1228)
+    payload = bytearray(1316)
     struct.pack_into(
         "<BBHBBBBIQQQQIII",
         payload,
@@ -242,6 +259,40 @@ def _status_payload() -> bytes:
     struct.pack_into("<18I", payload, 892, 0, 0, 0, 0, 0, 4, *([0] * 12))
     struct.pack_into("<6H", payload, 964, 0, 0, 0, 1, 1, 0)
     struct.pack_into("<4I", payload, 1008, 3, 3, 0, 0)
+    struct.pack_into(
+        "<IQBBHHHHHIIIIIiHHHHHHHHIIIIII",
+        payload,
+        1228,
+        1,
+        8096,
+        0,
+        1,
+        7,
+        1250,
+        75,
+        300,
+        0,
+        600_000_000,
+        150_000_000,
+        37_500_000,
+        24_000_000,
+        600_000_000,
+        42_125,
+        1234,
+        567,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    )
     return bytes(payload)
 
 

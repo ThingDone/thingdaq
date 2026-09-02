@@ -156,29 +156,38 @@ inline constexpr char kBoardName[] = "Teensy 4.0";
 inline constexpr char kMcuName[] = "NXP i.MX RT1062";
 inline constexpr char kCpuArchitecture[] = "Arm Cortex-M7";
 inline constexpr std::uint16_t kCpuProfileMhz = THINGDAQ_CPU_PROFILE_MHZ;
+#if THINGDAQ_CPU_PROFILE_MHZ == 600U
+inline constexpr protocol_v1::ClockProfile kClockProfile =
+    protocol_v1::ClockProfile::kProduction600Mhz;
+#else
+inline constexpr protocol_v1::ClockProfile kClockProfile =
+    protocol_v1::ClockProfile::kExperimental528Mhz;
+#endif
+inline constexpr const protocol_v1::ClockProfileSpec &kClockProfileSpec =
+    protocol_v1::clockProfileSpec(kClockProfile);
 inline constexpr std::uint32_t kExpectedCpuHz = THINGDAQ_EXPECTED_CPU_HZ;
 inline constexpr std::uint32_t kExpectedBusHz = THINGDAQ_EXPECTED_BUS_HZ;
 inline constexpr std::uint32_t kExpectedDwtHz = kExpectedCpuHz;
 inline constexpr std::uint32_t kExpectedIpgHz = kExpectedBusHz;
-inline constexpr std::uint32_t kExpectedPitHz =
-    protocol_v1::kGpioClockPitHz;
+inline constexpr std::uint32_t kExpectedPitHz = kClockProfileSpec.pit_hz;
+inline constexpr std::uint16_t kCoreVoltageTargetMv =
+    kClockProfileSpec.core_voltage_target_mv;
 inline constexpr std::uint32_t kExpectedGpioSampleRateHz =
     protocol_v1::kGpioClockProductionRateHz;
 inline constexpr std::uint32_t kExpectedAdcPairRateHz =
     protocol_v1::kAdcTriggerPairRateHz;
 inline constexpr std::uint8_t kExpectedAdcClockDivider =
     protocol_v1::kAdcClockDivider;
-inline constexpr std::uint32_t kExpectedAdcClockHz =
-    kExpectedIpgHz / kExpectedAdcClockDivider;
+inline constexpr std::uint32_t kExpectedAdcClockHz = kClockProfileSpec.adc_hz;
 inline constexpr std::uint32_t kAdcNominalPhaseNanoseconds = 500U;
 inline constexpr std::uint16_t kAdcNominalPhaseIpgCycles =
-    static_cast<std::uint16_t>(kExpectedIpgHz / 2000000U);
+    kClockProfileSpec.phase_ipg_cycles;
 inline constexpr std::array<std::uint16_t, 2U> kAdcTriggerInitialDelays{
     0U, kAdcNominalPhaseIpgCycles};
 inline constexpr std::array<std::uint16_t, 2U> kAdcTriggerEffectiveDelays{
     1U, static_cast<std::uint16_t>(kAdcNominalPhaseIpgCycles + 1U)};
 inline constexpr std::uint32_t kAdcCompletionExpectedDwtCycles =
-    kExpectedDwtHz / 2000000U;
+    kClockProfileSpec.phase_dwt_cycles;
 inline constexpr std::uint32_t kAdcCompletionToleranceNanoseconds = 200U;
 inline constexpr std::uint32_t kAdcPrimaryConversionHalfAdckCycles = 65U;
 inline constexpr std::uint32_t kAdcPairPeriodPicoseconds = 1000000U;
@@ -204,7 +213,7 @@ constexpr std::uint32_t dwtCyclesForNanoseconds(
 }
 
 inline constexpr std::uint32_t kAdcCompletionToleranceDwtCycles =
-    dwtCyclesForNanoseconds(kAdcCompletionToleranceNanoseconds);
+    kClockProfileSpec.phase_tolerance_dwt_cycles;
 inline constexpr std::uint32_t kAdcPrimaryConversionTimePicoseconds =
     divideCeil(
         static_cast<std::uint64_t>(kAdcPrimaryConversionHalfAdckCycles) *
@@ -355,6 +364,9 @@ constexpr bool isLowerHexString(const std::array<char, N> &value) {
 
 static_assert(kProtocolVersion == 1U);
 static_assert(kCpuProfileMhz == 600U || kCpuProfileMhz == 528U);
+static_assert(kClockProfileSpec.cpu_hz == kExpectedCpuHz);
+static_assert(kClockProfileSpec.ipg_hz == kExpectedIpgHz);
+static_assert(kClockProfileSpec.dwt_hz == kExpectedDwtHz);
 static_assert(runtimeClocksMatchProfile(kExpectedCpuHz, kExpectedBusHz));
 static_assert(runtimeAcquisitionClocksMatchProfile(
     kExpectedCpuHz, kExpectedBusHz, kExpectedPitHz, kExpectedAdcClockHz,

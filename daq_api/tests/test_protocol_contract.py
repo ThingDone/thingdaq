@@ -193,11 +193,12 @@ class ProtocolContractTests(unittest.TestCase):
                 "u16": {"width": 2, "signed": False},
                 "u32": {"width": 4, "signed": False},
                 "u64": {"width": 8, "signed": False},
+                "i32": {"width": 4, "signed": True},
             },
             self.contract["scalar_types"],
         )
-        self.assertEqual(376, constants.INFO_RESPONSE_PAYLOAD_SIZE)
-        self.assertEqual(1228, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(408, constants.INFO_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(1316, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(8, constants.RESET_STATS_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(8, constants.PING_REQUEST_PAYLOAD_SIZE)
         self.assertEqual(12, constants.PING_RESPONSE_PAYLOAD_SIZE)

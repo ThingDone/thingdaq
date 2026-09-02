@@ -6,7 +6,7 @@ import struct
 from collections import deque
 
 from ._generated import protocol_constants as constants
-from .models import Configuration, Info, Status
+from .models import ClockHealthSample, Configuration, Info, Status
 from .protocol import Frame, IncrementalFrameParser, encode_frame
 from .synthetic import synthetic_adc_payload, synthetic_gpio_payload
 
@@ -201,6 +201,17 @@ class SimulatedDevice:
                 if configuration is not None
                 else constants.DEFAULT_CHECKSUM_ALGORITHM
             ),
+            clock_health=ClockHealthSample(
+                sample_sequence=1,
+                sample_ticks=max(self._adc_first_ticks, self._gpio_first_ticks),
+                flags=(
+                    constants.ClockHealthFlag.CLOCKS_VALID
+                    | constants.ClockHealthFlag.UTILIZATION_VALID
+                ),
+                acquisition_service_utilization_basis_points=0,
+                usb_service_utilization_basis_points=0,
+                error_flags=constants.ClockHealthError.TEMPERATURE_UNAVAILABLE,
+            ),
             adc_frames_emitted=self._adc_frames_emitted,
             gpio_frames_emitted=self._gpio_frames_emitted,
             adc_items_dropped=self._adc_items_dropped,
@@ -338,7 +349,11 @@ class SimulatedDevice:
                     else constants.Source.SYNTHETIC
                 )
             ),
-            data_checksum_algorithm=self.status().data_checksum_algorithm,
+            data_checksum_algorithm=(
+                configuration.data_checksum_algorithm
+                if configuration is not None
+                else constants.DEFAULT_CHECKSUM_ALGORITHM
+            ),
             capability_bits=capability_bits,
         )
         return self._success_response(request, info.to_payload())
