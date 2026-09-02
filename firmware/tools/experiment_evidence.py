@@ -1818,9 +1818,11 @@ def _validate_content_policy(value: object, location: str = "report") -> None:
             _raise(
                 ReportValidationError, location, "contains credential-shaped content"
             )
-        if CREDENTIAL_OPTION_PATTERN.search(value) or re.search(
-            r"\bBearer\s+\S", value, re.IGNORECASE
-        ) or "PRIVATE KEY-----" in value:
+        if (
+            CREDENTIAL_OPTION_PATTERN.search(value)
+            or re.search(r"\bBearer\s+\S", value, re.IGNORECASE)
+            or "PRIVATE KEY-----" in value
+        ):
             _raise(
                 ReportValidationError, location, "contains credential-shaped content"
             )
