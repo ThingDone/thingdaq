@@ -40,16 +40,16 @@
       "id": "identity_complete",
       "observed": {
         "baseline_branch": "experiment/baseline-2026-09-01",
-        "baseline_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+        "baseline_commit": "becb45360afef2ae8375c4ce4a32061d47cb6570",
         "branch": "main",
         "protocol_contract_path": "protocol/protocol-v1.json",
         "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
         "protocol_version": 1,
         "repository": "https://github.com/ThingDone/thingdaq.git",
         "source_clean": true,
-        "source_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+        "source_commit": "becb45360afef2ae8375c4ce4a32061d47cb6570",
         "source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673",
-        "source_tree": "78da91a8ecd9642b4efd695c65feeafea422314a",
+        "source_tree": "0a1a41ce828269ca01294defc05c74ccb5c3f588",
         "toolchains": [
           {
             "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
@@ -101,7 +101,7 @@
         "firmware-build"
       ],
       "expected": {
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "27ebd95e21a2057c332167f4c528e9d5fa42b3c6d7e99fb5262bbe0a449b1882",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "7ecbe73a973ab12d45199300301aba784e905305d963fa11ba4ceba41fd5d56e",
         "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "b3ae54862e9f6360b3623614bdf69c6aaf9fdf2476dda65829b49514d3fbaa4c",
         "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
@@ -109,7 +109,7 @@
       },
       "id": "artifact_hashes_verified",
       "observed": {
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "27ebd95e21a2057c332167f4c528e9d5fa42b3c6d7e99fb5262bbe0a449b1882",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "7ecbe73a973ab12d45199300301aba784e905305d963fa11ba4ceba41fd5d56e",
         "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "b3ae54862e9f6360b3623614bdf69c6aaf9fdf2476dda65829b49514d3fbaa4c",
         "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
@@ -360,7 +360,7 @@
     {
       "kind": "firmware-build-manifest",
       "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
-      "sha256": "27ebd95e21a2057c332167f4c528e9d5fa42b3c6d7e99fb5262bbe0a449b1882",
+      "sha256": "7ecbe73a973ab12d45199300301aba784e905305d963fa11ba4ceba41fd5d56e",
       "size_bytes": 12733
     },
     {
@@ -440,7 +440,7 @@
         "user_input": false
       },
       "firmware_build_id": "thingdaq-e27556de5b898f28",
-      "firmware_source_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+      "firmware_source_commit": "becb45360afef2ae8375c4ce4a32061d47cb6570",
       "firmware_source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673",
       "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
       "host_architecture": "x86_64",
@@ -449,7 +449,7 @@
       "inputs": [
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
-          "sha256": "27ebd95e21a2057c332167f4c528e9d5fa42b3c6d7e99fb5262bbe0a449b1882"
+          "sha256": "7ecbe73a973ab12d45199300301aba784e905305d963fa11ba4ceba41fd5d56e"
         },
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
@@ -948,16 +948,16 @@
   "experiment_id": "baseline",
   "identity": {
     "baseline_branch": "experiment/baseline-2026-09-01",
-    "baseline_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+    "baseline_commit": "becb45360afef2ae8375c4ce4a32061d47cb6570",
     "branch": "main",
     "protocol_contract_path": "protocol/protocol-v1.json",
     "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
     "protocol_version": 1,
     "repository": "https://github.com/ThingDone/thingdaq.git",
     "source_clean": true,
-    "source_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+    "source_commit": "becb45360afef2ae8375c4ce4a32061d47cb6570",
     "source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673",
-    "source_tree": "78da91a8ecd9642b4efd695c65feeafea422314a",
+    "source_tree": "0a1a41ce828269ca01294defc05c74ccb5c3f588",
     "toolchains": [
       {
         "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
