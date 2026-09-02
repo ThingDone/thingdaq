@@ -26,6 +26,24 @@
 #define CORE_PIN12_BITMASK (1UL << CORE_PIN12_BIT)
 #define CORE_PIN13_BITMASK (1UL << CORE_PIN13_BIT)
 
+#define CORE_PIN16_BIT 23U
+#define CORE_PIN17_BIT 22U
+#define CORE_PIN18_BIT 17U
+#define CORE_PIN19_BIT 16U
+#define CORE_PIN20_BIT 26U
+#define CORE_PIN21_BIT 27U
+#define CORE_PIN22_BIT 24U
+#define CORE_PIN23_BIT 25U
+
+#define CORE_PIN16_BITMASK (1UL << CORE_PIN16_BIT)
+#define CORE_PIN17_BITMASK (1UL << CORE_PIN17_BIT)
+#define CORE_PIN18_BITMASK (1UL << CORE_PIN18_BIT)
+#define CORE_PIN19_BITMASK (1UL << CORE_PIN19_BIT)
+#define CORE_PIN20_BITMASK (1UL << CORE_PIN20_BIT)
+#define CORE_PIN21_BITMASK (1UL << CORE_PIN21_BIT)
+#define CORE_PIN22_BITMASK (1UL << CORE_PIN22_BIT)
+#define CORE_PIN23_BITMASK (1UL << CORE_PIN23_BIT)
+
 // The ADC target-adapter tests intentionally compile the production Teensy
 // register code on the host. Keep these symbols limited to the exact A0/A1,
 // clock, and interrupt surface used by those adapters.

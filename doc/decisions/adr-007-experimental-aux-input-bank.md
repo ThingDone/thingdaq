@@ -2,6 +2,7 @@
 type: analysis
 title: 'ADR 007: Experimental Auxiliary Input Bank'
 created: 2026-09-02
+updated: 2026-09-02
 tags:
   - thingdaq
   - decision
@@ -200,6 +201,54 @@ count agree. A stale completion is never paired with a newer bank. Exact skew,
 overrun, cancellation, rollback, and STOP-tail counters are deferred to the
 portable joiner and target implementation; this ADR fixes their required
 semantics, not an unmeasured capacity claim.
+
+### Target registry and linked-memory checkpoint
+
+The target registry now reserves D16-D23 under one auxiliary-capture owner,
+GPIO1 bits `23,22,17,16,26,27,24,25`, PIT0 fan-out from XBARA1 input 56 to
+outputs 0 and 1, DMAMUX sources 30 and 31, and eDMA channels 2 and 3. Because
+outputs 0 and 1 share selector register 0, their independent read-modify-write
+masks are `0x00FF` and `0xFF00`; a paired update uses `0xFFFF`. Compile-time
+validation rejects duplicate pins, GPIO port/bits, XBAR outputs, DMA
+channels/sources, IRQs/vectors, physical allocations, and overlapping logical
+views.
+
+The linked target keeps the v1 200-frame packet pool. INPUT uses two disjoint
+32,384-byte raw-ring views over the existing 64,768-byte GPIO allocation, and
+both GPIO layouts continue to use the same four 4,064-byte packed-buffer
+strides. The new state leases 992 bytes from the existing 4,096-byte OCRAM
+checksum scratch; checksum benchmarking is IDLE-only and the lease is
+INPUT-acquisition-only.
+
+| INPUT workspace view | Physical symbol / offset | Bytes | Owner |
+| --- | --- | ---: | --- |
+| Paired join state | `g_checksum_benchmark_ocram_buffer + 0` | 768 | GPIO join |
+| Auxiliary TCD bank | `g_checksum_benchmark_ocram_buffer + 768` | 160 | Auxiliary GPIO capture |
+| Primary INPUT pressure sink | `g_checksum_benchmark_ocram_buffer + 928` | 32 | GPIO capture |
+| Auxiliary pressure sink | `g_checksum_benchmark_ocram_buffer + 960` | 32 | Auxiliary GPIO capture |
+
+The inspected image placed that physical scratch at `0x20267220`, kept the
+105-frame DTCM bank at `0x20001EC0` and the 95-frame OCRAM bank at
+`0x20200000`, and linked `.bss.dma` over
+`0x20200000..0x2027F000`. The Teensy summary retained 33,344 RAM1 bytes for
+locals/stack and the required 4,096-byte RAM2 heap floor. Manifest schema 11
+cross-checks those section bounds, all 13 physical managed allocations, the
+four non-overlapping workspace views, and rejects an undocumented packet
+capacity change.
+
+With 200 packet frames, the exact complete two-stream retention is:
+
+| Profile | `DISABLED` | `INPUT` | `INPUT` single stream |
+| --- | ---: | ---: | ---: |
+| `ADC_1MHZ_GPIO_4MHZ` | 101.200 ms | 50.600 ms | 101.200 ms |
+| `ADC_500KHZ_GPIO_2MHZ` | 202.400 ms | 101.200 ms | 202.400 ms |
+| `ADC_250KHZ_GPIO_1MHZ` | 404.800 ms | 202.400 ms | 404.800 ms |
+| `ADC_125KHZ_GPIO_500KHZ` | 809.600 ms | 404.800 ms | 809.600 ms |
+
+INPUT eDMA arbitration is fixed in descending order as ADC0 `3`, ADC1 `2`,
+primary GPIO `1`, and auxiliary GPIO `0`; auxiliary channel 3 owns IRQ 3,
+vector 19, at NVIC priority 64. This is only an eDMA service order. It does not
+promise pad-level simultaneity, which remains a target-measurement question.
 
 ## Consequences
 

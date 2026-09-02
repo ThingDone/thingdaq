@@ -12,6 +12,7 @@
 
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
+#include "gpio_dual_bank_capture.h"
 
 #define THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
@@ -94,7 +95,8 @@ class TeensyCriticalSection final : public CriticalSection {
 
 TeensyCacheMaintenance g_cache{};
 TeensyCriticalSection g_critical{};
-RawCaptureRing g_ring{g_gpio_raw_dma_buffers, g_gpio_raw_dma_overflow_sink,
+RawCaptureRing g_ring{g_gpio_raw_dma_buffers,
+                      g_gpio_raw_dma_overflow_sink,
                       g_cache, g_critical};
 TeensyRawCapture g_facade{};
 bool g_hardware_running = false;
@@ -176,10 +178,12 @@ void configureDescriptors(const PrimeResult &prime) {
   for (std::uint8_t destination = 0U;
        destination <= kOverflowDestination; ++destination) {
     configureDescriptor(
-        g_gpio_raw_dma_descriptors.descriptors[destination], destination);
+        g_gpio_raw_dma_descriptors.descriptors[destination],
+        destination);
   }
   copyDescriptorToHardware(
-      g_gpio_raw_dma_descriptors.descriptors[prime.active_destination],
+      g_gpio_raw_dma_descriptors
+          .descriptors[prime.active_destination],
       descriptorAddress(prime.queued_destination));
   arm_dcache_flush_delete(&g_gpio_raw_dma_descriptors,
                           sizeof(g_gpio_raw_dma_descriptors));

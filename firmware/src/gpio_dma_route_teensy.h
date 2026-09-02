@@ -36,7 +36,7 @@ inline constexpr std::uint16_t kXbarSelectedConfigurationMask =
 inline constexpr std::uint16_t kXbarSelectedConfiguration =
     kXbarSelectedStatus | kXbarSelectedEdge | kXbarSelectedDmaEnable;
 inline constexpr std::uint16_t kXbarSelectionMask =
-    kXbarUsesHighByte ? 0xFF00U : 0x00FFU;
+    board::kGpioXbarSelectionMask;
 inline constexpr std::uint8_t kXbarSelectionShift =
     kXbarUsesHighByte ? 8U : 0U;
 inline constexpr std::uint32_t kEdmaChannelMask =

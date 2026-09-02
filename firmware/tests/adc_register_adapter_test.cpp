@@ -404,12 +404,12 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
   const std::uint32_t trigger_enable_mask =
       (std::uint32_t{1U} << v1::kAdcTriggerQueues[0]) |
       (std::uint32_t{1U} << v1::kAdcTriggerQueues[1]);
-  expect(board::countOf(board::kPinAllocations) == 10U &&
+  expect(board::countOf(board::kPinAllocations) == 18U &&
              board::countOf(board::kPitAllocations) == 2U &&
-             board::countOf(board::kXbarRoutes) == 3U &&
+             board::countOf(board::kXbarRoutes) == 4U &&
              board::countOf(board::kAdcEtcAllocations) == 2U &&
-             board::countOf(board::kEdmaAllocations) == 3U &&
-             board::countOf(board::kInterruptAllocations) == 4U &&
+             board::countOf(board::kEdmaAllocations) == 4U &&
+             board::countOf(board::kInterruptAllocations) == 5U &&
              board::kAcquisitionResourceContract.valid(),
          "the target registry allocates the complete combined resource set");
   expect(selectedXbarInput(board::kGpioXbarOutput) ==

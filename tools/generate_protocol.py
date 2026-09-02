@@ -2257,6 +2257,11 @@ def render_cpp_v2(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             f"inline constexpr std::uint8_t kAuxGpioXbarOutput = {int(resources['auxiliary_xbar_output'])}U;",
             f"inline constexpr std::uint8_t kAuxGpioDmamuxSource = {int(resources['auxiliary_dmamux_source'])}U;",
             f"inline constexpr std::uint8_t kAuxGpioEdmaChannel = {int(resources['auxiliary_edma_channel'])}U;",
+            "inline constexpr std::uint8_t kInputModeEdmaPriorities[] = {"
+            + ", ".join(
+                f"{int(value)}U" for value in resources["enabled_mode_edma_priorities"]
+            )
+            + "};",
             f"inline constexpr std::uint8_t kAuxGpioRawRingDepth = {int(resources['raw_ring_depth_per_bank'])}U;",
             f"inline constexpr std::uint8_t kGpioRawWordBytesPerBank = {int(resources['raw_word_bytes_per_bank'])}U;",
             "inline constexpr bool kPairedGpioJoinRequired = true;",

@@ -1273,6 +1273,7 @@ inline constexpr std::uint32_t kAuxGpioCaptureMask = 0x0FC30000U;
 inline constexpr std::uint8_t kAuxGpioXbarOutput = 1U;
 inline constexpr std::uint8_t kAuxGpioDmamuxSource = 31U;
 inline constexpr std::uint8_t kAuxGpioEdmaChannel = 3U;
+inline constexpr std::uint8_t kInputModeEdmaPriorities[] = {3U, 2U, 1U, 0U};
 inline constexpr std::uint8_t kAuxGpioRawRingDepth = 4U;
 inline constexpr std::uint8_t kGpioRawWordBytesPerBank = 4U;
 inline constexpr bool kPairedGpioJoinRequired = true;

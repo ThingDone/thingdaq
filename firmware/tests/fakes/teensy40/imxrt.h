@@ -282,6 +282,10 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define DMAMUX_SOURCE_XBAR1_3 95U
 
 using IRQ_NUMBER_t = std::uint8_t;
+inline constexpr IRQ_NUMBER_t IRQ_DMA_CH0 = 0U;
+inline constexpr IRQ_NUMBER_t IRQ_DMA_CH1 = 1U;
+inline constexpr IRQ_NUMBER_t IRQ_DMA_CH2 = 2U;
+inline constexpr IRQ_NUMBER_t IRQ_DMA_CH3 = 3U;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC0 = 118U;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC1 = 119U;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC_ERR = 121U;

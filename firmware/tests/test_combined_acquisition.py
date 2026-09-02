@@ -72,6 +72,8 @@ def _combined_spans(linker_map: str) -> tuple[list[Span], dict[str, Any]]:
     packet = build_firmware.packet_buffer_usage(linker_map)
     adc = build_firmware.adc_dma_buffer_usage(linker_map)
     gpio_raw = build_firmware.gpio_raw_dma_buffer_usage(linker_map)
+    auxiliary_workspace = build_firmware.auxiliary_input_workspace_usage(linker_map)
+    gpio_join = build_firmware.gpio_paired_join_state_usage(linker_map)
     gpio_packed = build_firmware.gpio_packed_buffer_usage(linker_map)
     usb_tx_record = build_firmware.parse_nm_symbols(linker_map).get("txbuffer")
     if usb_tx_record is None:
@@ -96,6 +98,10 @@ def _combined_spans(linker_map: str) -> tuple[list[Span], dict[str, Any]]:
             _span(f"gpio-raw:{name}", allocation)
             for name, allocation in gpio_raw["allocations"].items()
         ),
+        *(
+            _span(f"gpio-input-workspace:{name}", allocation)
+            for name, allocation in auxiliary_workspace["views"].items()
+        ),
         _span("gpio-packed:RING", gpio_packed),
         _span("usb:TX", usb_tx),
     ]
@@ -103,6 +109,8 @@ def _combined_spans(linker_map: str) -> tuple[list[Span], dict[str, Any]]:
         "packet": packet,
         "adc": adc,
         "gpio_raw": gpio_raw,
+        "auxiliary_workspace": auxiliary_workspace,
+        "gpio_join": gpio_join,
         "gpio_packed": gpio_packed,
         "usb_tx": usb_tx,
     }
@@ -163,6 +171,8 @@ class CombinedAcquisitionTests(unittest.TestCase):
         linker_map = MAP_FIXTURE.read_text(encoding="utf-8")
         memory = build_firmware.parse_memory_usage(linker_map)
         build_firmware.validate_memory_headroom(memory)
+        linked_memory = build_firmware.linker_map_memory_usage(linker_map, memory)
+        managed_memory = build_firmware.managed_memory_usage(linker_map)
         regions = _memory_regions(linker_map)
         spans, resources = _combined_spans(linker_map)
 
@@ -184,19 +194,28 @@ class CombinedAcquisitionTests(unittest.TestCase):
             resources["packet"]["banks"]["OCRAM_RESERVE"]["bytes"]
             + resources["adc"]["total_bytes"]
             + resources["gpio_raw"]["total_bytes"]
+            + resources["auxiliary_workspace"]["active_bytes"]
             + resources["gpio_packed"]["bytes"]
         )
         self.assertEqual(430_080, ram1_buffer_bytes)
-        self.assertEqual(503_648, ram2_buffer_bytes)
+        self.assertEqual(504_640, ram2_buffer_bytes)
         self.assertEqual(8_192, resources["usb_tx"]["bytes"])
         self.assertLessEqual(ram1_buffer_bytes, regions["DTCM"][1] - regions["DTCM"][0])
         ram2_and_usb_bytes = ram2_buffer_bytes + resources["usb_tx"]["bytes"]
-        self.assertEqual(511_840, ram2_and_usb_bytes)
+        self.assertEqual(512_832, ram2_and_usb_bytes)
         self.assertLessEqual(
             ram2_and_usb_bytes,
             regions["RAM"][1] - regions["RAM"][0],
         )
         self.assertGreaterEqual(memory["ram1"]["free_for_locals_bytes"], 32_768)
+        self.assertEqual(4_096, memory["ram2"]["free_for_heap_bytes"])
+        self.assertEqual("passed", managed_memory["overlap_check"])
+        self.assertEqual(13, managed_memory["allocation_count"])
+        self.assertEqual(4_096, linked_memory["ram2_actual_free_for_heap_bytes"])
+        self.assertEqual(
+            32_384,
+            resources["gpio_raw"]["mode_views"]["INPUT"]["PRIMARY"]["RING"]["bytes"],
+        )
 
         dma_start, dma_end = _section(linker_map, ".bss.dma")
         self.assertEqual(regions["RAM"][0], dma_start)
@@ -217,6 +236,20 @@ class CombinedAcquisitionTests(unittest.TestCase):
         ]
         with self.assertRaisesRegex(AssertionError, "overlaps"):
             _assert_disjoint(conflicting)
+
+        packed_address = next(
+            int(allocation["address"], 16)
+            for allocation in build_firmware.managed_memory_usage(linker_map)[
+                "allocations"
+            ]
+            if allocation["owner"] == "gpio_packed_storage"
+        )
+        overlapping_map = linker_map.replace(
+            f"{packed_address:08x} 00003f80",
+            "2025f000 00003f80",
+        )
+        with self.assertRaisesRegex(build_firmware.BuildError, "overlaps"):
+            build_firmware.managed_memory_usage(overlapping_map)
 
 
 if __name__ == "__main__":

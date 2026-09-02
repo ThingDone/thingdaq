@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "board_config.h"
 #include "dma_buffer_ownership.h"
 #include "generated/protocol_v2_constants.h"
 #include "statistics.h"
@@ -320,8 +321,13 @@ static_assert(sizeof(RawBlock) == kSamplesPerBlock * sizeof(std::uint32_t));
 static_assert(alignof(RawBlock) == 32U);
 static_assert(sizeof(PairedRawStorage) ==
               kBankCount * kRingDepth * sizeof(RawBlock));
+static_assert(sizeof(PairedRawStorage) == board::kGpioRawDmaRingBytes,
+              "paired and legacy GPIO layouts must share one physical ring");
 static_assert(alignof(PairedRawStorage) == 32U);
 static_assert(sizeof(PairedOverflowSink) == 64U);
 static_assert(alignof(PairedOverflowSink) == 32U);
+static_assert(sizeof(DualBankCaptureRing) <=
+              board::kGpioPairedJoinStateBudgetBytes,
+              "paired join state exceeds its fixed OCRAM reservation");
 
 }  // namespace thingdaq::gpio_join
