@@ -47,7 +47,38 @@ class ClockExperimentReportTests(unittest.TestCase):
         self.assertEqual("PASS", records["dual-profile-local-gate"]["result"])
         physical = records["physical-campaign"]
         self.assertEqual("INCONCLUSIVE", physical["result"])
+        self.assertEqual(
+            "clock-528mhz-physical-campaign-00003", physical["campaign_id"]
+        )
+        self.assertEqual(
+            "073fff540d685ed32f0e1aff5d7b12935b6b9c7b8d0aef0fce0b80c077d9cb33",
+            physical["campaign_index_sha256"],
+        )
+        self.assertTrue(physical["current_physical_conclusions_source"])
+        self.assertEqual("UNOBSERVED_BEFORE_PROGRAMMING", physical["hardware_serial"])
+        self.assertIsNone(physical["observed_hardware_serial"])
+        self.assertFalse(
+            physical["hardware_serial_policy"]["historical_serial_is_acceptance_rule"]
+        )
         self.assertFalse(physical["scope_limitations"]["physical_data_collected"])
+        self.assertEqual([], physical["accepted_runs"])
+        self.assertEqual(
+            "UNAVAILABLE_NO_ACCEPTED_RUN",
+            physical["physical_measurements"]["status"],
+        )
+        for field in (
+            "measurement_duration_seconds",
+            "adc_pair_rate_hz",
+            "gpio_sample_rate_hz",
+            "complete_frame_loss",
+            "command_latency_p99_milliseconds",
+            "acquisition_service_utilization_ratio",
+            "usb_service_utilization_ratio",
+            "queue_high_water",
+            "process_peak_rss_growth_bytes",
+        ):
+            with self.subTest(field=field):
+                self.assertIsNone(physical["physical_measurements"][field])
         self.assertEqual(
             [],
             physical["physical_measurements"][
@@ -56,6 +87,10 @@ class ClockExperimentReportTests(unittest.TestCase):
         )
         self.assertIsNone(
             physical["physical_measurements"]["abba_temperature_statistics"]
+        )
+        self.assertFalse(physical["cleanup"]["runner_cleanup_applicable"])
+        self.assertTrue(
+            physical["cleanup"]["service_healthy_and_queue_empty_after_each_job"]
         )
         self.assertFalse(
             any(metric["evidence_level"] == "rig" for metric in normalized["metrics"])
@@ -90,12 +125,36 @@ class ClockExperimentReportTests(unittest.TestCase):
         )
         self.assertEqual(
             {
-                "3828ce14-97f8-436b-a979-03ea0a634316",
-                "1debfc21-6999-494f-9c36-1995990e8f36",
-                "b65cacb4-1161-424f-a03c-1ad38b85c272",
+                "653e1775-53b6-41ce-94a1-5f8457dca224",
+                "af097495-abab-450a-9f46-802fecf3addb",
             },
             {str(attempt["job_id"]) for attempt in physical["attempts"]},
         )
+        self.assertEqual(
+            {
+                "clock-528mhz-physical-campaign-00001",
+                "clock-528mhz-physical-campaign-00002",
+            },
+            {
+                str(campaign["campaign_id"])
+                for campaign in physical["superseded_campaigns"]
+            },
+        )
+        self.assertTrue(
+            all(
+                campaign["use_for_current_conclusions"] is False
+                for campaign in physical["superseded_campaigns"]
+            )
+        )
+        profile_artifacts: dict[str, dict[str, Any]] = physical["profile_artifacts"]
+        self.assertEqual(
+            "thingdaq-e1364ec283663ec2", profile_artifacts["600"]["build_id"]
+        )
+        self.assertEqual(
+            "thingdaq-3842de65930ac76d", profile_artifacts["528"]["build_id"]
+        )
+        self.assertTrue(profile_artifacts["600"]["submitted"])
+        self.assertFalse(profile_artifacts["528"]["submitted"])
         self.assertEqual(
             "INCONCLUSIVE",
             physical["decisions"]["performance_compatibility"]["result"],

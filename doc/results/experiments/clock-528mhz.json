@@ -8,7 +8,11 @@
       "expected": true,
       "id": "schema_valid",
       "observed": {
+        "campaign_00003_hash": true,
+        "campaign_00003_internal_consistency": true,
+        "campaign_00003_schema": true,
         "content_policy": true,
+        "current_physical_conclusions_use_only_campaign_00003": true,
         "hashes": true,
         "matrix": true,
         "normalized_report": true
@@ -168,17 +172,21 @@
         "firmware_idle_cleanup": null,
         "firmware_programmed": false,
         "hardware_enumerated": false,
+        "historical_serial_acceptance_rule": false,
         "info": null,
+        "observed_hardware_serial": null,
+        "program_success": null,
+        "runner_output_bytes": 0,
         "running_status": null,
         "start": null,
         "stop": null,
-        "valid_job_ids": [
-          "1debfc21-6999-494f-9c36-1995990e8f36",
-          "b65cacb4-1161-424f-a03c-1ad38b85c272"
+        "submitted_job_ids": [
+          "653e1775-53b6-41ce-94a1-5f8457dca224",
+          "af097495-abab-450a-9f46-802fecf3addb"
         ]
       },
       "operator": "all",
-      "reason": "The board never enumerated, so the firmware lifecycle did not start.",
+      "reason": "Neither fresh campaign-00003 job enumerated the replacement board, so the firmware lifecycle did not start.",
       "required_evidence_levels": [
         "simulated",
         "rig"
@@ -193,6 +201,7 @@
       "expected": true,
       "id": "stream_health",
       "observed": {
+        "accepted_run_count": 0,
         "acquisition_service_utilization_ratio": null,
         "adc_pair_rate_hz": null,
         "cache_errors": null,
@@ -203,13 +212,15 @@
         "gpio_sample_rate_hz": null,
         "measurement_duration_seconds": null,
         "parser_errors": null,
+        "process_peak_rss_growth_bytes": null,
+        "queue_high_water": null,
         "sequence_gaps": null,
         "transport_errors": null,
         "trigger_errors": null,
         "usb_service_utilization_ratio": null
       },
       "operator": "all",
-      "reason": "No physical stream began, so rates, loss, and error counters were not observed.",
+      "reason": "Campaign 00003 produced no accepted physical stream, so rate, loss, error, latency, load, queue, and memory values were rejected as missing rather than inferred.",
       "required_evidence_levels": [
         "simulated",
         "rig"
@@ -229,7 +240,7 @@
         "host_counters": null
       },
       "operator": "exact_conservation",
-      "reason": "No physical counters were emitted because the runner never started.",
+      "reason": "No campaign-00003 physical counters were emitted because the runner never started.",
       "required_evidence_levels": [
         "simulated",
         "rig"
@@ -251,7 +262,7 @@
         "service_queue_depth_after_attempts": 0
       },
       "operator": "lte",
-      "reason": "Firmware and host acquisition queues were never instantiated for a run.",
+      "reason": "Firmware and host acquisition queues were never instantiated for a campaign-00003 run.",
       "required_evidence_levels": [
         "simulated",
         "rig"
@@ -266,6 +277,7 @@
       "expected": true,
       "id": "final_idle_cleanup",
       "observed": {
+        "firmware_cleanup_applicable": false,
         "firmware_gauges": null,
         "firmware_idle_confirmed": null,
         "firmware_stop_attempted": false,
@@ -273,7 +285,7 @@
         "service_recovered_after_each_attempt": true
       },
       "operator": "all",
-      "reason": "No firmware session existed to STOP or query for IDLE; only service recovery was observable.",
+      "reason": "No campaign-00003 firmware session existed to STOP or query for IDLE; only service recovery was observable.",
       "required_evidence_levels": [
         "simulated",
         "rig"
@@ -559,50 +571,97 @@
       "toolchain_identity": "CPython 3.12.3"
     },
     {
+      "accepted_runs": [],
       "attempts": [
         {
-          "classification": "submission-configuration",
-          "counted_as_retry": false,
-          "firmware_programmed": false,
-          "job_id": "3828ce14-97f8-436b-a979-03ea0a634316",
-          "power_on_reached": false,
-          "runner_started": false,
-          "sequence": 1,
-          "service_target": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
-          "stage": "smoke-600"
-        },
-        {
-          "classification": "infrastructure-board-unavailable",
+          "accepted_as_experiment_evidence": false,
+          "classification": "infrastructure_board_unavailable",
+          "cleanup": {
+            "final_idle_confirmed": false,
+            "reason": "No firmware session existed to stop because the runner never started.",
+            "service_idle_confirmed": true,
+            "stop_attempted": false
+          },
+          "client_exit_code": 156,
+          "client_finished_utc": "2026-09-02T23:18:54Z",
+          "client_log": {
+            "path": "smoke-600-client.log",
+            "sha256": "cd293f6db2c02ca05288f385fc4b9464f1e8c10a79e7efa41094f8f2f45a32d3"
+          },
+          "client_started_utc": "2026-09-02T23:18:33Z",
           "counted_as_retry": false,
           "enumeration_deadline_seconds": 20,
           "firmware_programmed": false,
-          "hardware_enumerated": false,
-          "job_id": "1debfc21-6999-494f-9c36-1995990e8f36",
-          "power_on_reached": true,
+          "hardware_serial": null,
+          "job_id": "653e1775-53b6-41ce-94a1-5f8457dca224",
+          "port_powered": true,
+          "program_success": null,
+          "runner_output_bytes": 0,
           "runner_started": false,
-          "sequence": 2,
+          "sequence": 1,
+          "service_exit_code": -100,
+          "service_result": {
+            "path": "smoke-600-service-result.json",
+            "sha256": "e124619833b511130a4cc4c55589ca2128682a636785181ea0bf05aaa30dca24"
+          },
           "service_target": "teensy:avr:teensy40",
           "stage": "smoke-600"
         },
         {
-          "classification": "infrastructure-board-unavailable",
+          "accepted_as_experiment_evidence": false,
+          "classification": "infrastructure_board_unavailable",
+          "cleanup": {
+            "final_idle_confirmed": false,
+            "reason": "No firmware session existed to stop because the runner never started.",
+            "service_idle_confirmed": true,
+            "stop_attempted": false
+          },
+          "client_exit_code": 156,
+          "client_finished_utc": "2026-09-02T23:19:33Z",
+          "client_log": {
+            "path": "smoke-600-attempt2-client.log",
+            "sha256": "ddfe612d09624cf4a9202d0b2b85a8244ac2a559aed670a6babd5a2a434b6d85"
+          },
+          "client_started_utc": "2026-09-02T23:19:12Z",
           "counted_as_retry": true,
           "enumeration_deadline_seconds": 20,
           "firmware_programmed": false,
-          "hardware_enumerated": false,
-          "job_id": "b65cacb4-1161-424f-a03c-1ad38b85c272",
-          "power_on_reached": true,
+          "hardware_serial": null,
+          "job_id": "af097495-abab-450a-9f46-802fecf3addb",
+          "port_powered": true,
+          "program_success": null,
+          "runner_output_bytes": 0,
           "runner_started": false,
-          "sequence": 3,
+          "sequence": 2,
+          "service_exit_code": -100,
+          "service_result": {
+            "path": "smoke-600-attempt2-service-result.json",
+            "sha256": "57baa9c62f981439eb673c082d9b37b6f82e083165b124a6532d6d52fd6dbfd4"
+          },
           "service_target": "teensy:avr:teensy40",
           "stage": "smoke-600"
         }
       ],
-      "campaign_index_sha256": "95f44f7cc43adde286166c267a594e196dcfa2e2c1da8caee56a38685fb4acf3",
+      "campaign_ancestry": {
+        "baseline_branch": "experiment/baseline-2026-09-01",
+        "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
+        "baseline_is_ancestor": true,
+        "candidate_branch": "experiment/clock-528mhz",
+        "candidate_equal_to_remote_at_preflight": true,
+        "candidate_head_at_preflight": "ff1eecb65e23d4377fd2e0ca4cb7934bd37f4a63",
+        "candidate_tree_at_preflight": "83f14b89c26eb970339e8cd1d7e8398def649528",
+        "firmware_artifact_checkpoint": "6f484996217520896fcedeee69f5568a4d747104",
+        "previous_report_checkpoint": "ff1eecb65e23d4377fd2e0ca4cb7934bd37f4a63",
+        "runner_checkpoint": "919f7069607d9d2c3a38bfd40e983736e6748cdd"
+      },
+      "campaign_id": "clock-528mhz-physical-campaign-00003",
+      "campaign_index_path": ".maestro/playbooks/2026-09-01-Teensydaq/Working/clock-528mhz-physical-campaign-00003/campaign-index.json",
+      "campaign_index_sha256": "073fff540d685ed32f0e1aff5d7b12935b6b9c7b8d0aef0fce0b80c077d9cb33",
       "campaign_plan": {
         "campaign_steady_state_seconds": 600.0,
         "campaign_warmup_seconds": 10.0,
-        "sequence": [
+        "checksum_algorithm": "ADLER32",
+        "planned_sequence": [
           "smoke-600",
           "smoke-528",
           "campaign-600-A1",
@@ -613,7 +672,21 @@
         "smoke_steady_state_seconds": 10.0,
         "smoke_warmup_seconds": 1.0,
         "status_interval_seconds": 0.5,
+        "submitted_sequence": [
+          "smoke-600-attempt1",
+          "smoke-600-attempt2"
+        ],
         "validation_semantics": "physical-combined-clock-comparison-v1"
+      },
+      "campaign_state": "COMPLETE_INCONCLUSIVE",
+      "cleanup": {
+        "reason": "No submitted job reached firmware programming or runner startup, so no firmware session existed to stop; both service jobs completed and the service returned healthy with an empty queue.",
+        "runner_cleanup_applicable": false,
+        "runner_final_idle_confirmed": false,
+        "runner_stop_attempted": false,
+        "runner_stop_succeeded": false,
+        "service_completed_all_submitted_jobs": true,
+        "service_healthy_and_queue_empty_after_each_job": true
       },
       "command": {
         "argv": [
@@ -625,14 +698,15 @@
         "serial_hardware": true,
         "user_input": false
       },
+      "current_physical_conclusions_source": true,
       "decisions": {
         "performance_compatibility": {
-          "reason": "No physical acquisition window ran.",
+          "reason": "Campaign 00003 produced no accepted physical acquisition window, so rate, loss, error, latency, load, queue, memory, and counter evidence is absent rather than passing or failing.",
           "result": "INCONCLUSIVE"
         },
         "thermal_benefit": {
           "aggregate_confidence_interval_must_exclude_zero": true,
-          "reason": "No ABBA temperature trace exists.",
+          "reason": "Campaign 00003 produced no ABBA temperature trace or paired statistic.",
           "required_paired_median_advantage_celsius": 2.0,
           "result": "INCONCLUSIVE"
         }
@@ -651,20 +725,40 @@
         "smoke_600": "INCONCLUSIVE",
         "thermal_benefit": "INCONCLUSIVE"
       },
-      "hardware_serial": 20512460,
+      "hardware_serial": "UNOBSERVED_BEFORE_PROGRAMMING",
+      "hardware_serial_policy": {
+        "discovery_outcome": "UNOBSERVABLE_BEFORE_PROGRAMMING",
+        "expected_serial_sent_to_first_smoke": null,
+        "first_programmed_smoke_requires_nonzero_uint32": true,
+        "historical_serial_is_acceptance_rule": false,
+        "prior_serial_difference_is_non_grading": true,
+        "stability_across_accepted_00003_jobs_required": true
+      },
       "id": "physical-campaign",
       "infrastructure_incidents": [
         {
-          "classification": "board-unavailable",
+          "classification": "replacement_board_unavailable",
           "job_ids": [
-            "1debfc21-6999-494f-9c36-1995990e8f36",
-            "b65cacb4-1161-424f-a03c-1ad38b85c272"
+            "653e1775-53b6-41ce-94a1-5f8457dca224",
+            "af097495-abab-450a-9f46-802fecf3addb"
           ],
-          "reason": "The Teensy did not enumerate after bounded power-on in either valid attempt.",
+          "program_success": false,
+          "reason": "The Teensy target did not enumerate within the service's fixed 20-second bound after hub-port power-on in either fresh 600 MHz smoke attempt.",
+          "retry_budget_exhausted": true,
+          "runner_output_nonempty": false,
+          "serial_observed": false,
           "service_recovered_after_each_attempt": true
         }
       ],
       "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_528.opt_o2std/build-manifest.json",
+          "sha256": "aff214c09c60212b5eb7ee29a1dba1ff4535cc2a653e5e07fce579094c1b2e6d"
+        },
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_528.opt_o2std/firmware.ino.hex",
+          "sha256": "3f2987f5d2c35637a79f5a74950f44e38575a6c715b6e476aa8a37e13fb437f0"
+        },
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
           "sha256": "8ec8818c7660801254278914db7a0c4331542f9784e11c1a3c5667d5378e24af"
@@ -682,12 +776,36 @@
           "sha256": "cbb02e1a73474a9b0df6d8b02d042d0abc549e8c1a0a5e4851c253599b2d3a60"
         }
       ],
-      "job_id": "1debfc21-6999-494f-9c36-1995990e8f36",
+      "job_id": "653e1775-53b6-41ce-94a1-5f8457dca224",
       "level": "rig",
-      "method": "Credential-safe service preflight followed by strictly sequential bounded smoke submissions, with one infrastructure retry and automatic service recovery checks; later stages were not submitted after the prerequisite smoke remained inconclusive.",
+      "method": "Validated campaign 00003 only: credential-safe service preflight, two strictly sequential bounded replacement-board smoke submissions, one permitted infrastructure retry, programming and runner proof checks, and automatic service recovery checks. Later stages were not submitted after the prerequisite smoke remained inconclusive.",
+      "not_run": [
+        {
+          "reason": "The prerequisite 600 MHz smoke did not program or run after the one permitted infrastructure retry.",
+          "stage": "smoke-528"
+        },
+        {
+          "reason": "Both fresh profile smokes did not pass every non-serial check.",
+          "stage": "campaign-600-A1"
+        },
+        {
+          "reason": "Both fresh profile smokes did not pass every non-serial check.",
+          "stage": "campaign-528-B1"
+        },
+        {
+          "reason": "Both fresh profile smokes did not pass every non-serial check.",
+          "stage": "campaign-528-B2"
+        },
+        {
+          "reason": "Both fresh profile smokes did not pass every non-serial check.",
+          "stage": "campaign-600-A2"
+        }
+      ],
+      "observed_hardware_serial": null,
       "physical_measurements": {
         "abba_temperature_statistics": null,
         "abba_temperature_trace_millidegrees_celsius": [],
+        "accepted_run_count": 0,
         "acquisition_service_utilization_ratio": null,
         "adc_pair_rate_hz": null,
         "cache_errors": null,
@@ -696,30 +814,76 @@
         "complete_frame_loss": null,
         "counter_conservation": null,
         "dma_errors": null,
+        "firmware_memory_health": null,
         "gpio_sample_rate_hz": null,
         "measurement_duration_seconds": null,
         "parser_errors": null,
+        "phase_errors": null,
+        "process_peak_rss_growth_bytes": null,
         "queue_high_water": null,
+        "sequence_gaps": null,
+        "status": "UNAVAILABLE_NO_ACCEPTED_RUN",
         "transport_errors": null,
         "trigger_errors": null,
         "usb_service_utilization_ratio": null
       },
-      "reason": "The stable comparison board did not enumerate within the fixed 20-second power-on bound in the initial valid 600 MHz smoke or its one allowed infrastructure retry; firmware was not programmed and the runner never started.",
+      "profile_artifacts": {
+        "528": {
+          "build_id": "thingdaq-3842de65930ac76d",
+          "fqbn": "teensy:avr:teensy40:usb=serial,speed=528,opt=o2std",
+          "hex_sha256": "3f2987f5d2c35637a79f5a74950f44e38575a6c715b6e476aa8a37e13fb437f0",
+          "manifest_sha256": "aff214c09c60212b5eb7ee29a1dba1ff4535cc2a653e5e07fce579094c1b2e6d",
+          "service_target": "teensy:avr:teensy40",
+          "source_id": "e1364ec283663ec2e7629e5cc2fed9e1de004bfc8afba49d7017ed4da70023b1",
+          "submitted": false,
+          "validated_against_branch": true
+        },
+        "600": {
+          "build_id": "thingdaq-e1364ec283663ec2",
+          "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+          "hex_sha256": "ae4602195e6b2c63bb70b826a85ca7f4aee898e750384d1ea3b3e4e7921cb0aa",
+          "manifest_sha256": "8ec8818c7660801254278914db7a0c4331542f9784e11c1a3c5667d5378e24af",
+          "service_target": "teensy:avr:teensy40",
+          "source_id": "e1364ec283663ec2e7629e5cc2fed9e1de004bfc8afba49d7017ed4da70023b1",
+          "submitted": true,
+          "validated_against_branch": true
+        }
+      },
+      "programming_proof": {
+        "advertised_build_and_profile_observed": false,
+        "classification": "INFRASTRUCTURE_FAILURE_BEFORE_PROGRAMMING",
+        "hardware_serial_observed": false,
+        "nonempty_runner_output_observed": false,
+        "passed": false,
+        "program_success_observed": false,
+        "required": {
+          "exact_advertised_build_and_profile": true,
+          "nonempty_runner_output": true,
+          "program_success": true,
+          "stable_observed_replacement_board_serial": true
+        }
+      },
+      "reason": "The fresh replacement Teensy did not enumerate within the fixed 20-second power-on bound in either 600 MHz prerequisite attempt; neither job programmed firmware or started the runner, so the replacement serial and all physical measurements were unobservable.",
       "result": "INCONCLUSIVE",
       "retry_policy": {
+        "campaign_job_timeout_seconds": 900,
+        "enumeration_timeout_seconds": 20,
         "http_request_timeout_seconds": 10,
         "infrastructure_retries_used": 1,
-        "job_timeout_seconds": 180,
         "maximum_infrastructure_retries_per_stage": 1,
-        "overlapping_jobs": false
+        "overlapping_jobs": false,
+        "smoke_job_timeout_seconds": 180
       },
       "scope_limitations": {
         "ambient_temperature_controlled": false,
+        "bulk_acquisition_data_retained": false,
         "core_voltage_rail_measured": false,
         "electrical_power_measured": false,
         "part_lifetime_claim_supported": false,
+        "performance_comparison_possible": false,
         "physical_aperture_measured": false,
-        "physical_data_collected": false
+        "physical_data_collected": false,
+        "thermal_comparison_possible": false
       },
       "service_preflight": {
         "api_version": "v1",
@@ -731,9 +895,25 @@
         "queue_depth": 0,
         "service_healthy": true,
         "service_target": "teensy:avr:teensy40",
-        "service_version": "1.0.0",
+        "service_version": "1.2.0",
         "worker_alive": true
-      }
+      },
+      "superseded_campaigns": [
+        {
+          "campaign_id": "clock-528mhz-physical-campaign-00001",
+          "campaign_index_sha256": "95f44f7cc43adde286166c267a594e196dcfa2e2c1da8caee56a38685fb4acf3",
+          "preserved_unchanged": true,
+          "tree_sha256_before_and_after": "6ef85dbc49a160ae4a5baebca540a9ae6fccce20d7f2e57dcb4313759266cd0b",
+          "use_for_current_conclusions": false
+        },
+        {
+          "campaign_id": "clock-528mhz-physical-campaign-00002",
+          "campaign_index_sha256": "2dc1290caf8972cbaf10a505f2720149b40fad1c716028e8d850fe6c5cf811cd",
+          "preserved_unchanged": true,
+          "tree_sha256_before_and_after": "73624d97356acd2556ea3039f7df6d0fbd0f9ef9ade10066f995a38c52d5f288",
+          "use_for_current_conclusions": false
+        }
+      ]
     }
   ],
   "experiment_id": "clock-528mhz",
@@ -977,7 +1157,7 @@
       "value": 4
     }
   ],
-  "reason": "The exact 600 MHz and 528 MHz profiles passed the complete local gate, but the comparison board did not enumerate in either bounded valid 600 MHz smoke attempt, so no physical performance or thermal comparison was possible.",
+  "reason": "The exact 600 MHz and 528 MHz profiles passed the complete local gate, but replacement-board campaign 00003 could not program or start either bounded 600 MHz smoke attempt, so its hardware serial and every physical performance and thermal measurement remained unobservable.",
   "related": [
     "[[ADR-003-GPIO-Clock-DMA]]",
     "[[ADR-004-ADC-Trigger-DMA]]",
@@ -989,6 +1169,6 @@
   ],
   "result": "INCONCLUSIVE",
   "schema_version": 1,
-  "summary": "The exact production 600 MHz and experimental 528 MHz no-upload builds passed deterministic local validation with a common firmware source identity, identical allocatable target layout, identical memory use, and unchanged nominal 1 MHz ADC-pair and 4 MHz GPIO schedules. The rig, performance-compatibility, and thermal-benefit levels remain **INCONCLUSIVE** because the Teensy did not enumerate during either bounded valid 600 MHz smoke attempt.\n\n### Exact profile evidence\n\nThe 600 MHz control uses `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std`, build `thingdaq-e1364ec283663ec2`, and HEX SHA-256 `ae4602195e6b2c63bb70b826a85ca7f4aee898e750384d1ea3b3e4e7921cb0aa`; its CPU/IPG/ADC/PIT/DWT clocks are 600/150/37.5/24/600 MHz, its nominal phase is 75 IPG cycles or 300 DWT cycles, and its conservative 12-bit conversion time/margin is 866,667/133,333 ps. The 528 MHz candidate uses `teensy:avr:teensy40:usb=serial,speed=528,opt=o2std`, build `thingdaq-3842de65930ac76d`, and HEX SHA-256 `3f2987f5d2c35637a79f5a74950f44e38575a6c715b6e476aa8a37e13fb437f0`; its clocks are 528/132/33/24/528 MHz, its nominal phase is 66 IPG cycles or 264 DWT cycles, and its conversion time/margin is 984,849/15,151 ps. The profile voltage values, 1,250 mV and 1,175 mV respectively, are core targets rather than measured rails.\n\n### Physical campaign disposition\n\nSubmission `3828ce14-97f8-436b-a979-03ea0a634316` was excluded before power-on because an option-qualified FQBN is not a service target. The corrected 600 MHz smoke submissions `1debfc21-6999-494f-9c36-1995990e8f36` and `b65cacb4-1161-424f-a03c-1ad38b85c272` reached bounded power-on but the board did not enumerate within 20 seconds. The service recovered to healthy, normal, queue-depth-zero state after each attempt. The prerequisite 600 MHz smoke therefore remained inconclusive; the 528 MHz smoke and planned 600/528/528/600 ABBA endurance sequence were not run. No physical rate, loss, latency, service-load, queue, temperature-trace, or temperature-statistic value was observed or inferred.\n\n### Claim boundary\n\nThe experiment does not demonstrate performance compatibility or thermal benefit. On-chip temperature would not establish ambient temperature, electrical power, junction characterization, physical ADC aperture, or part lifetime; none of those quantities was measured. The isolated profile result also does not establish compatibility with changes from any other experiment branch.",
+  "summary": "The exact production 600 MHz and experimental 528 MHz no-upload builds passed deterministic local validation with a common firmware source identity, identical allocatable target layout, identical memory use, and unchanged nominal 1 MHz ADC-pair and 4 MHz GPIO schedules. The fresh replacement-board rig, performance-compatibility, and thermal-benefit levels remain **INCONCLUSIVE** because campaign `clock-528mhz-physical-campaign-00003` stopped before firmware programming in both bounded 600 MHz prerequisite attempts.\n\n### Exact profile evidence\n\nThe 600 MHz control uses `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std`, build `thingdaq-e1364ec283663ec2`, and HEX SHA-256 `ae4602195e6b2c63bb70b826a85ca7f4aee898e750384d1ea3b3e4e7921cb0aa`; its CPU/IPG/ADC/PIT/DWT clocks are 600/150/37.5/24/600 MHz, its nominal phase is 75 IPG cycles or 300 DWT cycles, and its conservative 12-bit conversion time/margin is 866,667/133,333 ps. The 528 MHz candidate uses `teensy:avr:teensy40:usb=serial,speed=528,opt=o2std`, build `thingdaq-3842de65930ac76d`, and HEX SHA-256 `3f2987f5d2c35637a79f5a74950f44e38575a6c715b6e476aa8a37e13fb437f0`; its clocks are 528/132/33/24/528 MHz, its nominal phase is 66 IPG cycles or 264 DWT cycles, and its conversion time/margin is 984,849/15,151 ps. The profile voltage values, 1,250 mV and 1,175 mV respectively, are core targets rather than measured rails.\n\n### Replacement-board campaign disposition\n\nFresh 600 MHz smoke jobs `653e1775-53b6-41ce-94a1-5f8457dca224` and `af097495-abab-450a-9f46-802fecf3addb` each powered service hub port 15, but the replacement Teensy did not enumerate within the fixed 20-second bound. Both service jobs ended before programming with exit `-100`, `program_success` unavailable, and zero runner-output bytes; the service recovered to healthy, normal, queue-depth-zero state after each attempt. No historical hardware serial was supplied as an expectation or acceptance rule. Because no target was programmed, the replacement board's required nonzero serial was unobservable rather than mismatched. The 528 MHz smoke and planned 600/528/528/600 ABBA endurance sequence were not submitted. Consequently every physical rate, loss, latency, service-load, queue, memory, temperature-trace, and temperature-statistic field is explicitly null or empty, and no rig metric is inferred.\n\nOnly campaign `00003` supplies the current physical conclusion. Campaigns `00001` and `00002` remain immutable superseded history and contribute no current measurement or grade. Performance compatibility and thermal benefit are graded separately and both remain **INCONCLUSIVE**.\n\n### Claim boundary\n\nThe experiment does not demonstrate performance compatibility or thermal benefit. On-chip temperature would not establish ambient temperature, electrical power, junction characterization, physical ADC aperture, or part lifetime; none of those quantities was measured. The isolated profile result also does not establish compatibility with changes from any other experiment branch.",
   "title": "ThingDAQ 528 MHz Clock Experiment"
 }
