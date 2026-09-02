@@ -12,6 +12,7 @@ from types import TracebackType
 from typing import Literal, TypeAlias
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .discovery import (
     DEFAULT_DISCOVERY_TIMEOUT,
@@ -324,6 +325,9 @@ class ThingDAQ:
         expected_identity: ExpectedDeviceIdentity | None = None,
         reopened_identity: DeviceIdentitySnapshot | None = None,
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
+        encoding: v2_constants.ConfigurationEncoding | int = (
+            v2_constants.ConfigurationEncoding.RAW
+        ),
     ) -> None:
         if not isinstance(strict, bool):
             raise TypeError("strict must be a boolean")
@@ -345,6 +349,10 @@ class ThingDAQ:
             selected_session_policy = SessionRecoveryPolicy(session_policy)
         except (TypeError, ValueError) as error:
             raise ValueError("session_policy must be 'adopt' or 'stop'") from error
+        try:
+            selected_encoding = v2_constants.ConfigurationEncoding(encoding)
+        except (TypeError, ValueError) as error:
+            raise ValueError("encoding must be RAW or RLE_AUTO") from error
 
         self._transport = transport
         self._strict = strict
@@ -354,6 +362,7 @@ class ThingDAQ:
         self._expected_identity = expected_identity
         self._reopened_identity = reopened_identity
         self._session_policy = selected_session_policy
+        self._encoding = selected_encoding
         self._session_policy_applied = False
         self._verified_identity: DeviceIdentitySnapshot | None = None
         self._reader = BackgroundReader(
@@ -366,6 +375,7 @@ class ThingDAQ:
             queue_timeout=block_timeout,
             shutdown_timeout=shutdown_timeout,
             idle_sleep=idle_sleep,
+            encoding=selected_encoding,
         )
         self._lock = RLock()
         self._pending_items: deque[StreamItem] = deque()
@@ -422,6 +432,9 @@ class ThingDAQ:
         operation_byte_budget: int | None = None,
         expected_identity: ExpectedDeviceIdentity | None = None,
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
+        encoding: v2_constants.ConfigurationEncoding | int = (
+            v2_constants.ConfigurationEncoding.RAW
+        ),
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
     ) -> ThingDAQ:
@@ -432,6 +445,16 @@ class ThingDAQ:
         COM or ``/dev`` path is never treated as device identity. Every open
         performs INFO through the same reader used for subsequent operations.
         """
+
+        try:
+            selected_encoding = v2_constants.ConfigurationEncoding(encoding)
+        except (TypeError, ValueError) as error:
+            raise ValueError("encoding must be RAW or RLE_AUTO") from error
+        selected_protocol_version = (
+            v2_constants.PROTOCOL_VERSION
+            if selected_encoding is v2_constants.ConfigurationEncoding.RLE_AUTO
+            else constants.PROTOCOL_VERSION
+        )
 
         if device is not None and hardware_serial is not None:
             raise ValueError("pass either device or hardware_serial, not both")
@@ -503,8 +526,25 @@ class ThingDAQ:
                     "selected hardware serial conflicts with expected_identity"
                 )
             expected_identity = replace(
-                expected_identity or ExpectedDeviceIdentity(),
+                expected_identity
+                or ExpectedDeviceIdentity(
+                    protocol_version=selected_protocol_version,
+                ),
                 hardware_serial=expected_serial,
+            )
+        if (
+            expected_identity is not None
+            and expected_identity.protocol_version != selected_protocol_version
+        ):
+            raise DeviceCapabilityError(
+                "requested encoding requires protocol "
+                f"{selected_protocol_version}, but expected_identity pins protocol "
+                f"{expected_identity.protocol_version}"
+            )
+        if reopened_identity is not None:
+            reopened_identity = replace(
+                reopened_identity,
+                protocol_version=selected_protocol_version,
             )
 
         daq = cls(
@@ -522,6 +562,7 @@ class ThingDAQ:
             expected_identity=expected_identity,
             reopened_identity=reopened_identity,
             session_policy=session_policy,
+            encoding=selected_encoding,
         )
         try:
             daq.synchronize(
@@ -529,11 +570,21 @@ class ThingDAQ:
                 retry_delay=synchronization_retry_delay,
             )
             return daq
-        except BaseException:
+        except BaseException as error:
             try:
                 daq.close(stop=False)
             except Exception:  # noqa: BLE001, S110 - preserve opening failure
                 pass
+            if selected_encoding is v2_constants.ConfigurationEncoding.RLE_AUTO and (
+                isinstance(error, CommandTimeoutError)
+                or (
+                    isinstance(error, DeviceCommandError)
+                    and error.error_code is constants.ErrorCode.UNSUPPORTED_VERSION
+                )
+            ):
+                raise DeviceCapabilityError(
+                    "device did not provide protocol-v2 INFO; RLE_AUTO is unavailable"
+                ) from error
             raise
 
     @classmethod
@@ -555,11 +606,22 @@ class ThingDAQ:
         idle_sleep: float = 0.001,
         expected_identity: ExpectedDeviceIdentity | None = None,
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
+        encoding: v2_constants.ConfigurationEncoding | int = (
+            v2_constants.ConfigurationEncoding.RAW
+        ),
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
     ) -> ThingDAQ:
         """Open the public API over the deterministic protocol simulator."""
 
+        try:
+            selected_encoding = v2_constants.ConfigurationEncoding(encoding)
+        except (TypeError, ValueError) as error:
+            raise ValueError("encoding must be RAW or RLE_AUTO") from error
+        if selected_encoding is v2_constants.ConfigurationEncoding.RLE_AUTO:
+            raise DeviceCapabilityError(
+                "the protocol-v1 simulator does not advertise RLE_STREAMING"
+            )
         transport = InMemoryTransport(
             device=SimulatedDevice(control_only=control_only),
             read_chunk_size=read_chunk_size,
@@ -579,6 +641,7 @@ class ThingDAQ:
             idle_sleep=idle_sleep,
             expected_identity=expected_identity,
             session_policy=session_policy,
+            encoding=selected_encoding,
             synchronization_attempts=synchronization_attempts,
             synchronization_retry_delay=synchronization_retry_delay,
         )
@@ -602,6 +665,12 @@ class ThingDAQ:
     @property
     def session_policy(self) -> SessionRecoveryPolicy:
         return self._session_policy
+
+    @property
+    def encoding(self) -> v2_constants.ConfigurationEncoding:
+        """Explicit session encoding; RAW sessions retain protocol v1."""
+
+        return self._encoding
 
     @property
     def state(self) -> constants.DeviceState | None:
@@ -750,6 +819,16 @@ class ThingDAQ:
                             "firmware identity changed between synchronization probes"
                         )
                     else:
+                        if (
+                            self._encoding
+                            is v2_constants.ConfigurationEncoding.RLE_AUTO
+                            and not info.supports_capability(
+                                v2_constants.Capability.RLE_STREAMING
+                            )
+                        ):
+                            raise DeviceCapabilityError(
+                                "protocol-v2 INFO does not advertise RLE_STREAMING"
+                            )
                         self._verified_identity = identity
                         return self._apply_session_policy(info)
 
@@ -789,6 +868,7 @@ class ThingDAQ:
                 self._reader.activate_run(
                     self._run_id,
                     configuration.data_checksum_algorithm,
+                    configuration.encoding,
                 )
                 self._initialize_stream_expectations(
                     configuration,
@@ -816,6 +896,9 @@ class ThingDAQ:
         source: constants.Source | int | None = None,
         checksum_algorithm: constants.ChecksumAlgorithm
         | int = constants.DEFAULT_CHECKSUM_ALGORITHM,
+        encoding: v2_constants.ConfigurationEncoding | int = (
+            v2_constants.ConfigurationEncoding.RAW
+        ),
         adc_pair_rate_hz: int | None = None,
         gpio_sample_rate_hz: int | None = None,
         adc_resolution_bits: int | None = None,
@@ -844,6 +927,8 @@ class ThingDAQ:
                     raise TypeError("source must be HARDWARE, SYNTHETIC, or None")
                 if isinstance(checksum_algorithm, bool):
                     raise TypeError("checksum_algorithm must be a checksum enum or ID")
+                if isinstance(encoding, bool):
+                    raise TypeError("encoding must be RAW or RLE_AUTO")
                 stream_mask = constants.StreamMask.NONE
                 if adc:
                     stream_mask |= constants.StreamMask.ADC
@@ -851,6 +936,7 @@ class ThingDAQ:
                     stream_mask |= constants.StreamMask.GPIO
                 capabilities = self.capabilities
                 selected_checksum = constants.ChecksumAlgorithm(checksum_algorithm)
+                selected_encoding = v2_constants.ConfigurationEncoding(encoding)
                 if source is None:
                     if stream_mask is constants.StreamMask.NONE:
                         source = constants.Source.HARDWARE
@@ -866,6 +952,7 @@ class ThingDAQ:
                                 stream_mask=stream_mask,
                                 source=candidate,
                                 data_checksum_algorithm=selected_checksum,
+                                encoding=selected_encoding,
                             )
                             if capabilities.supports_configuration(
                                 candidate_configuration
@@ -876,6 +963,7 @@ class ThingDAQ:
                     stream_mask=stream_mask,
                     source=constants.Source(source),
                     data_checksum_algorithm=selected_checksum,
+                    encoding=selected_encoding,
                 )
             elif not isinstance(configuration, DAQConfiguration):
                 raise TypeError("configuration must be DAQConfiguration")
@@ -973,6 +1061,11 @@ class ThingDAQ:
                     source=status.source,
                     data_checksum_algorithm=status.data_checksum_algorithm,
                     data_frame_bytes=status.data_frame_bytes,
+                    encoding=(
+                        self._configuration.encoding
+                        if self._configuration is not None
+                        else self._encoding
+                    ),
                 )
             return status
 
@@ -1389,7 +1482,15 @@ class ThingDAQ:
             raise UnexpectedMessageError("INFO response has no DeviceInfo value")
         info = response.value
         try:
-            identity = validate_device_identity(info, self._expected_identity)
+            identity = validate_device_identity(
+                info,
+                self._expected_identity,
+                host_protocol_version=(
+                    v2_constants.PROTOCOL_VERSION
+                    if self._encoding is v2_constants.ConfigurationEncoding.RLE_AUTO
+                    else constants.PROTOCOL_VERSION
+                ),
+            )
         except IdentityValidationError as error:
             raise DeviceIdentityMismatchError(str(error)) from error
         if self._reopened_identity is not None and identity != self._reopened_identity:
@@ -1440,6 +1541,14 @@ class ThingDAQ:
         gpio_sample_rate_hz: int | None,
         adc_resolution_bits: int | None,
     ) -> None:
+        if configuration.encoding is not self._encoding:
+            if configuration.encoding is v2_constants.ConfigurationEncoding.RLE_AUTO:
+                raise DeviceCapabilityError(
+                    "RLE_AUTO requires opening an explicit protocol-v2 RLE session"
+                )
+            raise DeviceCapabilityError(
+                "a protocol-v2 RLE session cannot silently change intent to RAW"
+            )
         requirements = (
             ("adc_pair_rate_hz", adc_pair_rate_hz),
             ("gpio_sample_rate_hz", gpio_sample_rate_hz),
@@ -1475,6 +1584,13 @@ class ThingDAQ:
             raise DeviceSynchronizationError(
                 "CONFIGURE capability validation requires a synchronized INFO"
             )
+        if configuration.encoding is v2_constants.ConfigurationEncoding.RLE_AUTO:
+            if capabilities.protocol_version != v2_constants.PROTOCOL_VERSION:
+                raise DeviceCapabilityError(
+                    "RLE_AUTO requires a protocol-v2 INFO response"
+                )
+            if not capabilities.supports(v2_constants.Capability.RLE_STREAMING):
+                raise DeviceCapabilityError("device does not advertise RLE_STREAMING")
         unsupported_streams = int(configuration.stream_mask) & ~int(
             capabilities.supported_stream_mask
         )

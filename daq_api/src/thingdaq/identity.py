@@ -105,6 +105,8 @@ class ExpectedDeviceIdentity:
 def validate_device_identity(
     info: DeviceInfo,
     expected: ExpectedDeviceIdentity | None = None,
+    *,
+    host_protocol_version: int = constants.PROTOCOL_VERSION,
 ) -> DeviceIdentitySnapshot:
     """Validate protocol/target/build identity and any caller-supplied pins.
 
@@ -114,11 +116,17 @@ def validate_device_identity(
     API tests remain valid.
     """
 
+    if (
+        not isinstance(host_protocol_version, int)
+        or isinstance(host_protocol_version, bool)
+        or not 0 <= host_protocol_version <= 0xFF
+    ):
+        raise ValueError("host protocol version must be an unsigned byte")
     snapshot = DeviceIdentitySnapshot.from_info(info)
-    if snapshot.protocol_version != constants.PROTOCOL_VERSION:
+    if snapshot.protocol_version != host_protocol_version:
         raise IdentityValidationError(
             f"protocol version {snapshot.protocol_version} is incompatible with "
-            f"host protocol {constants.PROTOCOL_VERSION}"
+            f"host protocol {host_protocol_version}"
         )
 
     physical = (

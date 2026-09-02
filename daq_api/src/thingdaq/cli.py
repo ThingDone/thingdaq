@@ -17,6 +17,7 @@ from types import FrameType
 from typing import TextIO
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .calibration import CalibrationError, CalibrationRecord, load_calibration
 from .client import (
     BlockTimeoutError,
@@ -179,6 +180,12 @@ def _add_connection_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="use the in-memory synthetic-stream simulator",
     )
+    parser.add_argument(
+        "--encoding",
+        choices=("raw", "rle-auto"),
+        default="raw",
+        help="wire encoding; rle-auto explicitly negotiates protocol v2",
+    )
 
 
 def _add_acquisition_arguments(parser: argparse.ArgumentParser) -> None:
@@ -263,7 +270,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="thingdaq",
-        description="Inspect and control ThingDAQ protocol-v1 devices.",
+        description=(
+            "Inspect and control ThingDAQ protocol-v1 devices and the opt-in "
+            "protocol-v2 RLE experiment."
+        ),
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -345,10 +355,18 @@ def _open_device(arguments: argparse.Namespace) -> ThingDAQ:
     ):
         raise ValueError("--simulate cannot be combined with a hardware target")
 
+    encoding = v2_constants.ConfigurationEncoding[
+        getattr(arguments, "encoding", "raw").replace("-", "_").upper()
+    ]
     expected = ExpectedDeviceIdentity(
         hardware_serial=arguments.hardware_serial,
         firmware_version=arguments.expect_firmware,
         build_id=arguments.expect_build_id,
+        protocol_version=(
+            v2_constants.PROTOCOL_VERSION
+            if encoding is v2_constants.ConfigurationEncoding.RLE_AUTO
+            else constants.PROTOCOL_VERSION
+        ),
     )
     strict = bool(getattr(arguments, "strict_loss", False))
     if arguments.simulate:
@@ -359,6 +377,7 @@ def _open_device(arguments: argparse.Namespace) -> ThingDAQ:
             block_timeout=arguments.timeout,
             shutdown_timeout=arguments.timeout,
             expected_identity=expected,
+            encoding=encoding,
             synchronization_attempts=arguments.sync_attempts,
             synchronization_retry_delay=arguments.sync_retry_delay,
         )
@@ -382,6 +401,7 @@ def _open_device(arguments: argparse.Namespace) -> ThingDAQ:
         command_timeout=arguments.timeout,
         block_timeout=arguments.timeout,
         shutdown_timeout=arguments.timeout,
+        encoding=encoding,
         synchronization_attempts=arguments.sync_attempts,
         synchronization_retry_delay=arguments.sync_retry_delay,
     )
@@ -418,6 +438,9 @@ def _configuration_from_arguments(
     }
     stream_mask = stream_masks[arguments.streams]
     checksum = checksum_algorithms[arguments.checksum]
+    encoding = v2_constants.ConfigurationEncoding[
+        arguments.encoding.replace("-", "_").upper()
+    ]
     source = (
         None if arguments.source is None else constants.Source[arguments.source.upper()]
     )
@@ -426,6 +449,7 @@ def _configuration_from_arguments(
         gpio=bool(stream_mask & constants.StreamMask.GPIO),
         source=source,
         checksum_algorithm=checksum,
+        encoding=encoding,
         adc_pair_rate_hz=arguments.adc_pair_rate_hz,
         gpio_sample_rate_hz=arguments.gpio_sample_rate_hz,
         adc_resolution_bits=arguments.adc_resolution_bits,
@@ -800,6 +824,7 @@ def _print_configuration(
     )
     print(f"source={configuration.source.name}", file=output)
     print(f"checksum={configuration.data_checksum_algorithm.name}", file=output)
+    print(f"encoding={configuration.encoding.name}", file=output)
     print(f"data_frame_bytes={configuration.data_frame_bytes}", file=output)
     if (
         capabilities is not None
@@ -825,6 +850,7 @@ def _configuration_details(
         "stream_mask": configuration.stream_mask,
         "source": configuration.source,
         "data_checksum_algorithm": configuration.data_checksum_algorithm,
+        "encoding": configuration.encoding,
         "data_frame_bytes": configuration.data_frame_bytes,
     }
     if (

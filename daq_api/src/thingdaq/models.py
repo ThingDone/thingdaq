@@ -11,6 +11,7 @@ from enum import Enum, IntEnum
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .protocol import Frame, FrameValidationError
 
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
         CalibrationRecord,
     )
     from .numpy import ADCArrayView, GPIOArrayView
+    from .protocol_v2 import EncodingDiagnostics
 
 _CONFIGURATION = struct.Struct("<BBBBI")
 _CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
@@ -1242,6 +1244,9 @@ class DAQConfiguration:
         constants.DEFAULT_CHECKSUM_ALGORITHM
     )
     data_frame_bytes: int = constants.DATA_FRAME_BYTES
+    encoding: v2_constants.ConfigurationEncoding = (
+        v2_constants.ConfigurationEncoding.RAW
+    )
 
     def __post_init__(self) -> None:
         if any(
@@ -1250,6 +1255,7 @@ class DAQConfiguration:
                 self.stream_mask,
                 self.source,
                 self.data_checksum_algorithm,
+                self.encoding,
             )
         ):
             raise ValueError("configuration contains an unknown enum value")
@@ -1257,11 +1263,13 @@ class DAQConfiguration:
             stream_mask = constants.StreamMask(self.stream_mask)
             source = constants.Source(self.source)
             checksum = constants.ChecksumAlgorithm(self.data_checksum_algorithm)
+            encoding = v2_constants.ConfigurationEncoding(self.encoding)
         except (TypeError, ValueError) as exc:
             raise ValueError("configuration contains an unknown enum value") from exc
         object.__setattr__(self, "stream_mask", stream_mask)
         object.__setattr__(self, "source", source)
         object.__setattr__(self, "data_checksum_algorithm", checksum)
+        object.__setattr__(self, "encoding", encoding)
         valid_streams = constants.StreamMask.ADC | constants.StreamMask.GPIO
         if int(stream_mask) & ~int(valid_streams):
             raise ValueError("configuration stream mask contains unknown bits")
@@ -1272,6 +1280,10 @@ class DAQConfiguration:
             raise ValueError(
                 "the zero-stream control profile requires the hardware source"
             )
+        if stream_mask == constants.StreamMask.NONE and encoding is not (
+            v2_constants.ConfigurationEncoding.RAW
+        ):
+            raise ValueError("the zero-stream control profile requires RAW encoding")
         if checksum is constants.ChecksumAlgorithm.NONE_RESERVED:
             raise ValueError("configuration cannot select checksum ID zero")
         if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
@@ -1336,6 +1348,7 @@ class DAQConfiguration:
             source=constants.Source.HARDWARE,
             data_checksum_algorithm=constants.DEFAULT_CHECKSUM_ALGORITHM,
             data_frame_bytes=constants.DATA_FRAME_BYTES,
+            encoding=v2_constants.ConfigurationEncoding.RAW,
         )
 
     def to_payload(self) -> bytes:
@@ -1345,28 +1358,41 @@ class DAQConfiguration:
             int(self.stream_mask),
             int(self.source),
             int(self.data_checksum_algorithm),
-            0,
+            int(self.encoding),
             self.data_frame_bytes,
         )
 
     @classmethod
-    def from_payload(cls, payload: bytes | bytearray | memoryview) -> DAQConfiguration:
+    def from_payload(
+        cls,
+        payload: bytes | bytearray | memoryview,
+        *,
+        protocol_version: int = constants.PROTOCOL_VERSION,
+    ) -> DAQConfiguration:
         """Decode the eight-byte CONFIGURE request/applied-configuration body."""
 
         payload_bytes = bytes(payload)
         if len(payload_bytes) != constants.CONFIGURE_REQUEST_PAYLOAD_SIZE:
             raise FrameValidationError("configuration body must be eight bytes")
-        raw_streams, raw_source, raw_checksum, reserved, frame_bytes = (
+        raw_streams, raw_source, raw_checksum, raw_encoding, frame_bytes = (
             _CONFIGURATION.unpack(payload_bytes)
         )
-        if reserved != 0:
+        if protocol_version == constants.PROTOCOL_VERSION and raw_encoding != 0:
             raise FrameValidationError("configuration reserved byte must be zero")
+        if protocol_version not in {
+            constants.PROTOCOL_VERSION,
+            v2_constants.PROTOCOL_VERSION,
+        }:
+            raise FrameValidationError(
+                f"unsupported configuration protocol version {protocol_version}"
+            )
         try:
             return cls(
                 stream_mask=constants.StreamMask(raw_streams),
                 source=constants.Source(raw_source),
                 data_checksum_algorithm=constants.ChecksumAlgorithm(raw_checksum),
                 data_frame_bytes=frame_bytes,
+                encoding=v2_constants.ConfigurationEncoding(raw_encoding),
             )
         except ValueError as exc:
             raise FrameValidationError(str(exc)) from exc
@@ -2319,7 +2345,7 @@ class DeviceCapabilities:
     supported_stream_mask: constants.StreamMask
     supported_source_mask: int
     supported_checksum_mask: int
-    capability_bits: constants.Capability
+    capability_bits: constants.Capability | v2_constants.Capability
     supported_configuration_mask: constants.ConfigurationProfile = (
         _ALL_CONFIGURATION_PROFILES
     )
@@ -2422,9 +2448,24 @@ class DeviceCapabilities:
             self.capability_bits, bool
         ):
             raise TypeError("capabilities contain an unknown enum value")
+        if (
+            not isinstance(self.protocol_version, int)
+            or isinstance(self.protocol_version, bool)
+            or self.protocol_version
+            not in {
+                constants.PROTOCOL_VERSION,
+                v2_constants.PROTOCOL_VERSION,
+            }
+        ):
+            raise ValueError("capabilities use an unsupported protocol version")
+        capability_type = (
+            v2_constants.Capability
+            if self.protocol_version == v2_constants.PROTOCOL_VERSION
+            else constants.Capability
+        )
         try:
             stream_mask = constants.StreamMask(self.supported_stream_mask)
-            capability_bits = constants.Capability(self.capability_bits)
+            capability_bits = capability_type(self.capability_bits)
             configuration_mask = constants.ConfigurationProfile(
                 self.supported_configuration_mask
             )
@@ -2467,8 +2508,13 @@ class DeviceCapabilities:
         _unsigned("supported_checksum_mask", self.supported_checksum_mask, 32)
         if self.supported_checksum_mask != constants.SUPPORTED_CHECKSUM_MASK:
             raise ValueError("supported checksum mask is incompatible with protocol v1")
-        if int(capability_bits) & ~constants.KNOWN_CAPABILITY_MASK:
-            raise ValueError("capability mask contains reserved protocol-v1 bits")
+        known_capability_mask = (
+            v2_constants.KNOWN_CAPABILITY_MASK
+            if self.protocol_version == v2_constants.PROTOCOL_VERSION
+            else constants.KNOWN_CAPABILITY_MASK
+        )
+        if int(capability_bits) & ~known_capability_mask:
+            raise ValueError("capability mask contains reserved protocol bits")
         if int(configuration_mask) & ~constants.KNOWN_CONFIGURATION_PROFILE_MASK:
             raise ValueError("configuration profile mask contains reserved bits")
         if bool(stream_mask) != bool(configuration_mask):
@@ -2548,7 +2594,6 @@ class DeviceCapabilities:
             )
 
         fixed_values = (
-            (self.protocol_version, constants.PROTOCOL_VERSION),
             (self.timestamp_hz, constants.TIMESTAMP_HZ),
             (self.data_frame_bytes, constants.DATA_FRAME_BYTES),
             (self.max_control_frame_bytes, constants.MAX_CONTROL_FRAME_BYTES),
@@ -2612,7 +2657,7 @@ class DeviceCapabilities:
             or actual != expected
             for actual, expected in fixed_values
         ):
-            raise ValueError("INFO capabilities are incompatible with protocol v1")
+            raise ValueError("INFO capabilities are incompatible with its protocol")
         if gpio_pin_map != constants.GPIO_PINS_BY_BIT:
             raise ValueError("GPIO bit order must remain D6 through D13")
         if (
@@ -2669,8 +2714,18 @@ class DeviceCapabilities:
             return (
                 self.supported_stream_mask is constants.StreamMask.NONE
                 and self.supports_source(constants.Source.HARDWARE)
+                and configuration.encoding is v2_constants.ConfigurationEncoding.RAW
             )
-        return bool(self.supported_configuration_mask & configuration.profile)
+        profile_supported = bool(
+            self.supported_configuration_mask & configuration.profile
+        )
+        if configuration.encoding is v2_constants.ConfigurationEncoding.RAW:
+            return profile_supported
+        return (
+            profile_supported
+            and self.protocol_version == v2_constants.PROTOCOL_VERSION
+            and self.supports(v2_constants.Capability.RLE_STREAMING)
+        )
 
     @property
     def supported_checksum_algorithms(
@@ -2684,21 +2739,34 @@ class DeviceCapabilities:
             if self.supports_checksum(algorithm)
         )
 
-    def supports(self, capability: constants.Capability | int) -> bool:
+    def supports(
+        self,
+        capability: constants.Capability | v2_constants.Capability | int,
+    ) -> bool:
         """Return whether every requested capability bit is advertised."""
 
+        capability_type = (
+            v2_constants.Capability
+            if self.protocol_version == v2_constants.PROTOCOL_VERSION
+            else constants.Capability
+        )
+        known_capability_mask = (
+            v2_constants.KNOWN_CAPABILITY_MASK
+            if self.protocol_version == v2_constants.PROTOCOL_VERSION
+            else constants.KNOWN_CAPABILITY_MASK
+        )
         try:
-            selected = constants.Capability(capability)
+            selected = capability_type(capability)
         except (TypeError, ValueError) as exc:
             raise ValueError("capability contains an unknown bit") from exc
-        if int(selected) & ~constants.KNOWN_CAPABILITY_MASK:
-            raise ValueError("capability contains a reserved protocol-v1 bit")
+        if int(selected) & ~known_capability_mask:
+            raise ValueError("capability contains a reserved protocol bit")
         return self.capability_bits & selected == selected
 
 
 @dataclass(frozen=True, slots=True)
 class DeviceInfo:
-    """Identity and fixed protocol-v1 capabilities returned by INFO."""
+    """Identity and fixed protocol-v1/v2 capabilities returned by INFO."""
 
     device_state: constants.DeviceState
     build_id: str
@@ -2719,7 +2787,7 @@ class DeviceInfo:
     data_checksum_algorithm: constants.ChecksumAlgorithm = (
         constants.DEFAULT_CHECKSUM_ALGORITHM
     )
-    capability_bits: constants.Capability = (
+    capability_bits: constants.Capability | v2_constants.Capability = (
         constants.Capability.ADC_STREAM
         | constants.Capability.GPIO_STREAM
         | constants.Capability.HARDWARE_SOURCE
@@ -2818,6 +2886,9 @@ class DeviceInfo:
     nominal_framed_bytes_per_second_per_stream: int = (
         constants.NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM
     )
+    configuration_encoding: v2_constants.ConfigurationEncoding = (
+        v2_constants.ConfigurationEncoding.RAW
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(self.device_state, constants.DeviceState):
@@ -2861,6 +2932,22 @@ class DeviceInfo:
         if not capabilities.supports_checksum(data_checksum):
             raise ValueError("INFO selected checksum is not advertised")
         object.__setattr__(self, "data_checksum_algorithm", data_checksum)
+        try:
+            configuration_encoding = v2_constants.ConfigurationEncoding(
+                self.configuration_encoding
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("INFO applied encoding is unknown") from exc
+        if (
+            self.protocol_version == constants.PROTOCOL_VERSION
+            and configuration_encoding is not v2_constants.ConfigurationEncoding.RAW
+        ):
+            raise ValueError("protocol-v1 INFO can only describe RAW encoding")
+        object.__setattr__(
+            self,
+            "configuration_encoding",
+            configuration_encoding,
+        )
         object.__setattr__(
             self,
             "supported_stream_mask",
@@ -2906,6 +2993,7 @@ class DeviceInfo:
                 stream_mask=applied_streams,
                 source=applied_source,
                 data_checksum_algorithm=data_checksum,
+                encoding=configuration_encoding,
             )
             if not capabilities.supports_configuration(applied):
                 raise ValueError("INFO applied configuration is not advertised")
@@ -3015,6 +3103,7 @@ class DeviceInfo:
             stream_mask=self.applied_stream_mask,
             source=self.applied_source,
             data_checksum_algorithm=self.data_checksum_algorithm,
+            encoding=self.configuration_encoding,
         )
 
     @property
@@ -3047,7 +3136,10 @@ class DeviceInfo:
 
         return self.capabilities.supports_checksum(algorithm)
 
-    def supports_capability(self, capability: constants.Capability | int) -> bool:
+    def supports_capability(
+        self,
+        capability: constants.Capability | v2_constants.Capability | int,
+    ) -> bool:
         """Return whether INFO advertises every bit in ``capability``."""
 
         return self.capabilities.supports(capability)
@@ -4627,6 +4719,7 @@ class ADCBlock:
     )
     metadata: AdcBlockMetadata = dataclass_field(default_factory=AdcBlockMetadata)
     gap: StreamGap | None = None
+    encoding_diagnostics: EncodingDiagnostics | None = None
 
     def __post_init__(self) -> None:
         _unsigned("run_id", self.run_id, 32)
@@ -4687,6 +4780,17 @@ class ADCBlock:
                 or self.gap.observed_first_sample_ticks != self.first_sample_ticks
             ):
                 raise ValueError("ADC gap metadata does not describe this block")
+        if self.encoding_diagnostics is not None:
+            from .protocol_v2 import EncodingDiagnostics
+
+            if not isinstance(self.encoding_diagnostics, EncodingDiagnostics):
+                raise TypeError(
+                    "ADC encoding diagnostics must be EncodingDiagnostics or None"
+                )
+            if self.encoding_diagnostics.decoded_bytes != len(payload):
+                raise ValueError(
+                    "ADC encoding diagnostics disagree with the logical payload"
+                )
 
     @classmethod
     def from_frame(cls, frame: Frame) -> ADCBlock:
@@ -4966,6 +5070,7 @@ class GPIOBlock:
     checksum_algorithm: constants.ChecksumAlgorithm = (
         constants.DEFAULT_CHECKSUM_ALGORITHM
     )
+    encoding_diagnostics: EncodingDiagnostics | None = None
 
     def __post_init__(self) -> None:
         _unsigned("run_id", self.run_id, 32)
@@ -4994,6 +5099,17 @@ class GPIOBlock:
         object.__setattr__(self, "checksum_algorithm", checksum)
         if len(payload) != constants.GPIO_DATA_PAYLOAD_SIZE:
             raise ValueError("GPIO blocks require exactly 4048 packed samples")
+        if self.encoding_diagnostics is not None:
+            from .protocol_v2 import EncodingDiagnostics
+
+            if not isinstance(self.encoding_diagnostics, EncodingDiagnostics):
+                raise TypeError(
+                    "GPIO encoding diagnostics must be EncodingDiagnostics or None"
+                )
+            if self.encoding_diagnostics.decoded_bytes != len(payload):
+                raise ValueError(
+                    "GPIO encoding diagnostics disagree with the logical payload"
+                )
 
     @classmethod
     def from_frame(cls, frame: Frame) -> GPIOBlock:

@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Python Package
 created: 2026-08-27
-updated: 2026-08-30
+updated: 2026-09-02
 tags:
   - thingdaq
   - python
@@ -17,6 +17,7 @@ related:
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
+  - '[[ADR-006-Experimental-RLE-Streaming]]'
   - '[[Calibration]]'
   - '[[NumPy-Integration]]'
 ---
@@ -143,6 +144,59 @@ do not alter the fixed eight-byte protocol body. The successful device echo
 must equal the request, and START must repeat that same applied configuration.
 CLI human/JSON output reports the echoed body plus active fixed ADC/GPIO rate
 and resolution metadata.
+
+### Experimental protocol-v2 RLE client
+
+[[ADR-006-Experimental-RLE-Streaming]] adds an isolated, explicit client path.
+`RAW` remains the configuration and CLI default and continues to use protocol
+v1 byte-for-byte. A caller must select `RLE_AUTO` both while opening the
+session and while configuring it; the host then requests v2 INFO and requires
+the generated `RLE_STREAMING` capability before it sends CONFIGURE:
+
+```python
+from thingdaq import ConfigurationEncoding, Source, ThingDAQ
+
+with ThingDAQ.open(
+    hardware_serial=12345670,
+    encoding=ConfigurationEncoding.RLE_AUTO,
+) as daq:
+    daq.configure(
+        adc=True,
+        gpio=True,
+        source=Source.HARDWARE,
+        encoding=ConfigurationEncoding.RLE_AUTO,
+    )
+    daq.start()
+    block = daq.read_block()
+    diagnostics = block.encoding_diagnostics
+    if diagnostics is not None:
+        print(
+            diagnostics.frame_encoding.name,
+            diagnostics.encoded_bytes,
+            diagnostics.decoded_bytes,
+            diagnostics.run_count,
+            diagnostics.savings,
+            diagnostics.raw_fallback_reason,
+        )
+```
+
+The negotiated run may mix `RAW` and `RLE` frames. Each produces the existing
+`ADCBlock` or `GPIOBlock` logical payload, so sequence, timestamp, gap, and
+alignment behavior is unchanged. Raw payloads retain the ordinary borrowed
+bytes object; compressed payloads allocate only the generated fixed logical
+frame size after the checksum and entire canonical record stream pass. The
+diagnostics retain the exact encoded payload and expose both payload and
+complete-frame byte counts. A v1 or non-capable peer raises
+`DeviceCapabilityError` instead of changing the requested encoding. The
+built-in simulator remains protocol v1 at this checkpoint and therefore
+rejects explicit RLE; its experimental v2 source patterns are a separate phase.
+
+The same negotiation is available to bounded CLI acquisition commands:
+
+```bash
+thingdaq configure --hardware-serial 12345670 --encoding rle-auto
+thingdaq monitor --hardware-serial 12345670 --encoding rle-auto --duration 5
+```
 
 ## Runnable workflows
 
@@ -536,8 +590,10 @@ unwritten suffix within the command's overall deadline. Its default 64 KiB
 reads are deliberately larger than USB packets because USB CDC is one byte
 stream, not a packet-preserving message API.
 
-`BackgroundReader` owns exactly one `IncrementalFrameParser`. One non-daemon
-thread continuously feeds arbitrary read chunks into it, matches concurrent
+`BackgroundReader` owns exactly one incremental parser: the unchanged v1
+parser for default RAW sessions or the bounded v2 parser for explicit
+`RLE_AUTO`. One non-daemon thread continuously feeds arbitrary read chunks
+into it, matches concurrent
 responses by echoed request ID, and separates decoded ADC/GPIO blocks from
 other non-response frames. Pending requests, block queues, and event queues are
 all bounded. Request timeout removes the pending entry; an eventual unmatched

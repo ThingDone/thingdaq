@@ -10,6 +10,7 @@ from types import TracebackType
 from typing import Literal, TypeAlias
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .models import (
     AdcBlock,
     CommandResponse,
@@ -25,6 +26,12 @@ from .protocol import (
     IncrementalFrameParser,
     ParserCounters,
     encode_frame,
+)
+from .protocol_v2 import (
+    IncrementalV2FrameParser,
+    V2Frame,
+    decode_v2_message,
+    encode_v2_frame,
 )
 from .transport import (
     ByteTransport,
@@ -196,6 +203,9 @@ class BackgroundReader:
         shutdown_timeout: float = 1.0,
         idle_sleep: float = 0.001,
         parser: IncrementalFrameParser | None = None,
+        encoding: v2_constants.ConfigurationEncoding | int = (
+            v2_constants.ConfigurationEncoding.RAW
+        ),
     ) -> None:
         integer_limits = {
             "read_size": read_size,
@@ -219,6 +229,15 @@ class BackgroundReader:
             for value in deadlines.values()
         ):
             raise ValueError("reader timeouts must be positive")
+        try:
+            selected_encoding = v2_constants.ConfigurationEncoding(encoding)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("reader encoding must be RAW or RLE_AUTO") from exc
+        if (
+            selected_encoding is v2_constants.ConfigurationEncoding.RLE_AUTO
+            and parser is not None
+        ):
+            raise ValueError("a custom v1 parser cannot be used for an RLE session")
 
         self._transport = transport
         self._read_size = read_size
@@ -230,7 +249,17 @@ class BackgroundReader:
         self._queue_timeout = float(queue_timeout)
         self._shutdown_timeout = float(shutdown_timeout)
         self._idle_sleep = float(idle_sleep)
-        self._parser = parser if parser is not None else IncrementalFrameParser()
+        self._session_encoding = selected_encoding
+        self._protocol_version = (
+            v2_constants.PROTOCOL_VERSION
+            if selected_encoding is v2_constants.ConfigurationEncoding.RLE_AUTO
+            else constants.PROTOCOL_VERSION
+        )
+        self._parser: IncrementalFrameParser | IncrementalV2FrameParser = (
+            IncrementalV2FrameParser()
+            if self._protocol_version == v2_constants.PROTOCOL_VERSION
+            else (parser if parser is not None else IncrementalFrameParser())
+        )
         self._read_buffer = bytearray(read_size)
 
         self._condition = Condition(RLock())
@@ -243,6 +272,7 @@ class BackgroundReader:
         self._next_request_id = 1
         self._active_run_id = 0
         self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
+        self._active_configuration_encoding = selected_encoding
         self._stream_active = False
         self._thread: Thread | None = None
         self._started = False
@@ -414,11 +444,18 @@ class BackgroundReader:
                 deadline=monotonic() + selected_timeout,
                 timeout=selected_timeout,
             )
-            wire = encode_frame(
-                selected_kind,
-                payload,
-                request_id=request_id,
-            )
+            if self._protocol_version == v2_constants.PROTOCOL_VERSION:
+                wire = encode_v2_frame(
+                    selected_kind,
+                    payload,
+                    request_id=request_id,
+                )
+            else:
+                wire = encode_frame(
+                    selected_kind,
+                    payload,
+                    request_id=request_id,
+                )
             self._pending[request_id] = pending
             self._pending_request_high_water = max(
                 self._pending_request_high_water,
@@ -574,6 +611,9 @@ class BackgroundReader:
         checksum_algorithm: constants.ChecksumAlgorithm = (
             constants.DEFAULT_CHECKSUM_ALGORITHM
         ),
+        encoding: v2_constants.ConfigurationEncoding | int = (
+            v2_constants.ConfigurationEncoding.RAW
+        ),
     ) -> None:
         """Establish an externally learned run identity and clear old blocks."""
 
@@ -587,9 +627,19 @@ class BackgroundReader:
             raise ValueError("active checksum algorithm is not supported") from exc
         if selected_checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
             raise ValueError("active checksum algorithm is not supported")
+        try:
+            selected_encoding = v2_constants.ConfigurationEncoding(encoding)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("active encoding must be RAW or RLE_AUTO") from exc
+        if selected_encoding is not self._session_encoding:
+            raise ValueError("active encoding differs from the reader session")
         with self._condition:
             self._require_live_locked()
-            self._activate_run_locked(run_id, selected_checksum)
+            self._activate_run_locked(
+                run_id,
+                selected_checksum,
+                selected_encoding,
+            )
 
     def deactivate_stream(self) -> None:
         """Cancel block waiters and discard blocks at a deliberate boundary."""
@@ -731,7 +781,13 @@ class BackgroundReader:
                 if self._stop_event.is_set():
                     return
                 try:
-                    message = decode_message(frame)
+                    if isinstance(frame, V2Frame):
+                        message = decode_v2_message(
+                            frame,
+                            negotiated_encoding=(self._active_configuration_encoding),
+                        )
+                    else:
+                        message = decode_message(frame)
                     with self._condition:
                         self._frames_received += 1
                     if isinstance(message, CommandResponse):
@@ -789,6 +845,7 @@ class BackgroundReader:
                         self._activate_run_locked(
                             response.run_id,
                             response.value.data_checksum_algorithm,
+                            response.value.encoding,
                         )
                 elif response.ok and response.kind is constants.FrameKind.STOP_RESPONSE:
                     self._deactivate_stream_locked()
@@ -1010,6 +1067,7 @@ class BackgroundReader:
         self,
         run_id: int,
         checksum_algorithm: constants.ChecksumAlgorithm,
+        encoding: v2_constants.ConfigurationEncoding,
     ) -> None:
         if run_id == 0:
             raise ReaderProtocolError("successful START established run ID zero")
@@ -1017,11 +1075,16 @@ class BackgroundReader:
             raise ReaderProtocolError(
                 "successful START selected an unsupported checksum algorithm"
             )
+        if encoding is not self._session_encoding:
+            raise ReaderProtocolError(
+                "successful START selected an encoding outside this session"
+            )
         self._record_boundary_blocks_locked()
         self._blocks.clear()
         self._stream_reports.clear()
         self._active_run_id = run_id
         self._active_checksum_algorithm = checksum_algorithm
+        self._active_configuration_encoding = encoding
         self._stream_active = True
         self._condition.notify_all()
 
@@ -1031,6 +1094,7 @@ class BackgroundReader:
         self._stream_reports.clear()
         self._stream_active = False
         self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
+        self._active_configuration_encoding = self._session_encoding
         self._condition.notify_all()
 
     def _record_boundary_blocks_locked(self) -> None:

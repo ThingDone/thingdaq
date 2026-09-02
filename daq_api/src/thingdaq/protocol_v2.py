@@ -1,19 +1,35 @@
-"""Experimental protocol-v2 envelope, RLE validation, and bounded parsing.
+"""Experimental protocol-v2 framing, bounded RLE, and typed decoding.
 
-This module deliberately validates encoded frames without expanding their RLE
-payloads. The typed logical-item codec and negotiated public API are layered on
-top in the next prototype stage.
+Protocol v2 is deliberately isolated from the default protocol-v1 path.  Its
+parser validates the transmitted checksum and the complete canonical record
+stream before :func:`decode_v2_data_block` allocates the fixed-size logical
+payload exposed through the existing :class:`~thingdaq.models.ADCBlock` and
+:class:`~thingdaq.models.GPIOBlock` models.
 """
 
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from enum import Enum
+from typing import TypeAlias
 
 from ._generated import protocol_constants as v1_constants
 from ._generated import protocol_v2_constants as constants
-from ._incremental import BoundedIncrementalParser, BytesLike, ParserCounters
+from ._incremental import BoundedIncrementalParser, BytesLike
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS, compute_checksum_value
+from .models import (
+    ADCBlock,
+    CommandResponse,
+    DAQConfiguration,
+    DeviceInfo,
+    GPIOBlock,
+    ResponseValue,
+    decode_message,
+)
+from .protocol import Frame as V1Frame
+from .protocol import FrameHeader as V1FrameHeader
+from .protocol import ParserCounters
 
 _HEADER = struct.Struct(constants.HEADER_STRUCT_FORMAT)
 _TRAILER = struct.Struct("<I")
@@ -78,6 +94,116 @@ class V2RLEValidationError(V2FrameValidationError):
         super().__init__(message, reason=reason)
 
 
+class V2EncodingNotNegotiatedError(V2FrameValidationError):
+    """A data-frame selector is incompatible with the active configuration."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, reason="encoding_not_negotiated")
+
+
+class RawFallbackReason(str, Enum):
+    """Why a decoded v2 frame used the raw selector."""
+
+    NOT_REQUESTED = "not_requested"
+    RLE_NOT_SMALLER = "rle_not_smaller"
+
+
+@dataclass(frozen=True, slots=True)
+class EncodingDiagnostics:
+    """Per-frame wire/decoded byte evidence retained on a logical block."""
+
+    negotiated_encoding: constants.ConfigurationEncoding
+    frame_encoding: constants.FrameEncoding
+    encoded_payload: bytes
+    decoded_bytes: int
+    run_count: int
+    raw_fallback_reason: RawFallbackReason | None
+
+    def __post_init__(self) -> None:
+        try:
+            negotiated = constants.ConfigurationEncoding(self.negotiated_encoding)
+            selected = constants.FrameEncoding(self.frame_encoding)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "encoding diagnostics contain an unknown selector"
+            ) from exc
+        if not isinstance(self.encoded_payload, (bytes, bytearray, memoryview)):
+            raise TypeError("encoded payload must be bytes-like")
+        try:
+            encoded_payload = bytes(self.encoded_payload)
+        except (TypeError, ValueError) as exc:
+            raise TypeError("encoded payload must be bytes-like") from exc
+        if (
+            not isinstance(self.decoded_bytes, int)
+            or isinstance(self.decoded_bytes, bool)
+            or self.decoded_bytes <= 0
+        ):
+            raise ValueError("decoded byte count must be positive")
+        if (
+            not isinstance(self.run_count, int)
+            or isinstance(self.run_count, bool)
+            or self.run_count <= 0
+        ):
+            raise ValueError("run count must be positive")
+        fallback_reason: RawFallbackReason | None
+        if self.raw_fallback_reason is None:
+            fallback_reason = None
+        else:
+            try:
+                fallback_reason = RawFallbackReason(self.raw_fallback_reason)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("raw fallback reason is unknown") from exc
+        if selected is constants.FrameEncoding.RLE:
+            if negotiated is not constants.ConfigurationEncoding.RLE_AUTO:
+                raise ValueError("RLE diagnostics require RLE_AUTO negotiation")
+            if fallback_reason is not None:
+                raise ValueError("an RLE frame cannot have a raw fallback reason")
+        else:
+            expected_reason = (
+                RawFallbackReason.NOT_REQUESTED
+                if negotiated is constants.ConfigurationEncoding.RAW
+                else RawFallbackReason.RLE_NOT_SMALLER
+            )
+            if fallback_reason is not expected_reason:
+                raise ValueError(
+                    "RAW frame reason disagrees with the negotiated encoding"
+                )
+        object.__setattr__(self, "negotiated_encoding", negotiated)
+        object.__setattr__(self, "frame_encoding", selected)
+        object.__setattr__(self, "encoded_payload", encoded_payload)
+        object.__setattr__(self, "raw_fallback_reason", fallback_reason)
+
+    @property
+    def encoded_bytes(self) -> int:
+        """Number of transmitted payload bytes, excluding the fixed envelope."""
+
+        return len(self.encoded_payload)
+
+    @property
+    def savings(self) -> int:
+        """Payload and complete-wire bytes saved relative to the raw frame."""
+
+        return self.decoded_bytes - self.encoded_bytes
+
+    @property
+    def encoded_frame_bytes(self) -> int:
+        """Complete transmitted bytes including the fixed header and trailer."""
+
+        return self.encoded_bytes + constants.HEADER_SIZE + constants.TRAILER_SIZE
+
+    @property
+    def raw_frame_bytes(self) -> int:
+        """Complete bytes the same logical frame uses with RAW encoding."""
+
+        return self.decoded_bytes + constants.HEADER_SIZE + constants.TRAILER_SIZE
+
+    @property
+    def encoded_payload_view(self) -> memoryview:
+        """Zero-copy read-only view of the exact transmitted payload."""
+
+        return memoryview(self.encoded_payload)
+
+
 @dataclass(frozen=True, slots=True)
 class V2FrameHeader:
     """Decoded protocol-v2 header fields."""
@@ -138,6 +264,212 @@ class V2Frame:
         return memoryview(self.payload)
 
 
+V2DataBlock: TypeAlias = ADCBlock | GPIOBlock
+V2DecodedMessage: TypeAlias = V2DataBlock | CommandResponse[ResponseValue] | V1Frame
+
+
+def _unsigned(name: str, value: int, bits: int) -> int:
+    if (
+        not isinstance(value, int)
+        or isinstance(value, bool)
+        or not 0 <= value < (1 << bits)
+    ):
+        raise V2FrameValidationError(f"{name} must be an unsigned {bits}-bit value")
+    return value
+
+
+def _byte_view(data: BytesLike, *, name: str) -> memoryview:
+    if not isinstance(data, (bytes, bytearray, memoryview)):
+        raise TypeError(f"{name} must be bytes-like")
+    try:
+        return memoryview(data).cast("B")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a contiguous byte buffer") from exc
+
+
+def _owned_bytes(data: BytesLike, *, name: str) -> bytes:
+    view = _byte_view(data, name=name)
+    try:
+        return view.tobytes()
+    finally:
+        view.release()
+
+
+def _validated_codec_shape(
+    *,
+    item_size: int,
+    item_count: int,
+    max_items: int,
+) -> None:
+    for name, value in (
+        ("item_size", item_size),
+        ("item_count", item_count),
+        ("max_items", max_items),
+    ):
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+    if item_count > max_items:
+        raise V2RLEValidationError(
+            "decoded item count exceeds the advertised frame bound",
+            "decoded_count_overflow",
+        )
+    if item_count > constants.RLE_RUN_LENGTH_MAX:
+        raise V2RLEValidationError(
+            "one frame cannot encode its item count in a u16 run",
+            "decoded_count_overflow",
+        )
+
+
+def count_rle_runs(
+    decoded_payload: BytesLike,
+    *,
+    item_size: int,
+    max_items: int,
+) -> int:
+    """Count canonical runs in a bounded raw logical-item payload."""
+
+    if not isinstance(item_size, int) or isinstance(item_size, bool) or item_size <= 0:
+        raise ValueError("item_size must be a positive integer")
+    if not isinstance(max_items, int) or isinstance(max_items, bool) or max_items <= 0:
+        raise ValueError("max_items must be a positive integer")
+    view = _byte_view(decoded_payload, name="decoded payload")
+    try:
+        if len(view) == 0 or len(view) % item_size:
+            raise V2RLEValidationError(
+                "decoded payload ends inside a logical item",
+                "truncated_item",
+            )
+        item_count = len(view) // item_size
+        _validated_codec_shape(
+            item_size=item_size,
+            item_count=item_count,
+            max_items=max_items,
+        )
+        runs = 1
+        previous = bytes(view[:item_size])
+        for offset in range(item_size, len(view), item_size):
+            item = bytes(view[offset : offset + item_size])
+            if item != previous:
+                runs += 1
+                previous = item
+        return runs
+    finally:
+        view.release()
+
+
+def encode_rle_payload(
+    decoded_payload: BytesLike,
+    *,
+    item_size: int,
+    max_items: int,
+) -> bytes:
+    """Encode complete logical items into canonical frame-local RLE records.
+
+    The input view is scanned once and output growth is bounded by
+    ``max_items * (item_size + 2)``.  ThingDAQ data-frame callers use the much
+    tighter generated adaptive-selection limit before putting this result on
+    the wire.
+    """
+
+    if not isinstance(item_size, int) or isinstance(item_size, bool) or item_size <= 0:
+        raise ValueError("item_size must be a positive integer")
+    if not isinstance(max_items, int) or isinstance(max_items, bool) or max_items <= 0:
+        raise ValueError("max_items must be a positive integer")
+    view = _byte_view(decoded_payload, name="decoded payload")
+    try:
+        if len(view) == 0 or len(view) % item_size:
+            raise V2RLEValidationError(
+                "decoded payload ends inside a logical item",
+                "truncated_item",
+            )
+        item_count = len(view) // item_size
+        _validated_codec_shape(
+            item_size=item_size,
+            item_count=item_count,
+            max_items=max_items,
+        )
+        encoded = bytearray()
+        previous = bytes(view[:item_size])
+        run_length = 1
+        for offset in range(item_size, len(view), item_size):
+            item = bytes(view[offset : offset + item_size])
+            if item == previous:
+                run_length += 1
+                continue
+            encoded.extend(struct.pack("<H", run_length))
+            encoded.extend(previous)
+            previous = item
+            run_length = 1
+        encoded.extend(struct.pack("<H", run_length))
+        encoded.extend(previous)
+        return bytes(encoded)
+    finally:
+        view.release()
+
+
+def decode_rle_payload(
+    encoded_payload: BytesLike,
+    *,
+    item_size: int,
+    item_count: int,
+    max_items: int,
+) -> bytes:
+    """Validate fully, then expand into one fixed, advertised-size buffer."""
+
+    _validated_codec_shape(
+        item_size=item_size,
+        item_count=item_count,
+        max_items=max_items,
+    )
+    view = _byte_view(encoded_payload, name="encoded payload")
+    try:
+        record_size = item_size + 2
+        if len(view) == 0 or len(view) % record_size:
+            raise V2RLEValidationError(
+                "RLE payload ends inside a logical item",
+                "truncated_item",
+            )
+
+        decoded_count = 0
+        previous: bytes | None = None
+        for offset in range(0, len(view), record_size):
+            run_length = struct.unpack_from("<H", view, offset)[0]
+            if run_length == 0:
+                raise V2RLEValidationError("RLE run length is zero", "zero_run")
+            if run_length > item_count - decoded_count:
+                raise V2RLEValidationError(
+                    "RLE decoded count exceeds the advertised item bound",
+                    "decoded_count_overflow",
+                )
+            item = bytes(view[offset + 2 : offset + record_size])
+            if item == previous:
+                raise V2RLEValidationError(
+                    "adjacent RLE records contain the same logical item",
+                    "adjacent_equal_runs",
+                )
+            decoded_count += run_length
+            previous = item
+        if decoded_count != item_count:
+            raise V2RLEValidationError(
+                "RLE run lengths do not sum to the advertised item count",
+                "count_mismatch",
+            )
+
+        # Allocation is based solely on the already bounded header count.  A
+        # second pass means no partially decoded payload can escape validation.
+        decoded = bytearray(item_count * item_size)
+        write_offset = 0
+        for offset in range(0, len(view), record_size):
+            run_length = struct.unpack_from("<H", view, offset)[0]
+            item = bytes(view[offset + 2 : offset + record_size])
+            byte_count = run_length * item_size
+            decoded[write_offset : write_offset + byte_count] = item * run_length
+            write_offset += byte_count
+        return bytes(decoded)
+    finally:
+        view.release()
+
+
 def _v1_checksum_algorithm(
     algorithm: constants.ChecksumAlgorithm,
 ) -> v1_constants.ChecksumAlgorithm:
@@ -164,6 +496,168 @@ def compute_v2_checksum(
     if result is None:
         raise V2UnsupportedChecksumError(int(selected))
     return int(result)
+
+
+def encode_v2_frame(
+    kind: constants.FrameKind | v1_constants.FrameKind | int,
+    payload: BytesLike = b"",
+    *,
+    flags: constants.FrameFlag | v1_constants.FrameFlag | int = (
+        constants.FrameFlag.NONE
+    ),
+    checksum_algorithm: (
+        constants.ChecksumAlgorithm | v1_constants.ChecksumAlgorithm | int | None
+    ) = None,
+    encoding: constants.FrameEncoding | int = constants.FrameEncoding.RAW,
+    run_id: int = 0,
+    sequence: int = 0,
+    request_id: int = 0,
+    first_sample_ticks: int = 0,
+    item_count: int = 0,
+) -> bytes:
+    """Encode one validated protocol-v2 frame and its transmitted checksum."""
+
+    try:
+        selected_kind = constants.FrameKind(kind)
+    except (TypeError, ValueError) as exc:
+        raise V2FrameValidationError(
+            f"unknown frame kind {int(kind)}",
+            reason="unknown_frame_kind",
+            error_code=constants.ErrorCode.UNKNOWN_FRAME_KIND,
+        ) from exc
+    try:
+        selected_encoding = constants.FrameEncoding(encoding)
+    except (TypeError, ValueError) as exc:
+        raise V2FrameValidationError(
+            f"illegal frame encoding selector {int(encoding)}",
+            reason="illegal_selector",
+        ) from exc
+    if checksum_algorithm is None:
+        selected_checksum = (
+            constants.DEFAULT_CHECKSUM_ALGORITHM
+            if selected_kind in _DATA_KINDS
+            else constants.BOOTSTRAP_CHECKSUM_ALGORITHM
+        )
+    else:
+        try:
+            selected_checksum = constants.ChecksumAlgorithm(checksum_algorithm)
+        except (TypeError, ValueError) as exc:
+            raise V2UnsupportedChecksumError(int(checksum_algorithm)) from exc
+    payload_bytes = _owned_bytes(payload, name="payload")
+    header = V2FrameHeader(
+        kind=selected_kind,
+        flags=constants.FrameFlag(_unsigned("flags", int(flags), 16)),
+        checksum_algorithm=selected_checksum,
+        encoding=selected_encoding,
+        total_length=(
+            constants.HEADER_SIZE + len(payload_bytes) + constants.TRAILER_SIZE
+        ),
+        payload_length=len(payload_bytes),
+        run_id=_unsigned("run_id", run_id, 32),
+        sequence=_unsigned("sequence", sequence, 32),
+        request_id=_unsigned("request_id", request_id, 32),
+        first_sample_ticks=_unsigned(
+            "first_sample_ticks",
+            first_sample_ticks,
+            64,
+        ),
+        item_count=_unsigned("item_count", item_count, 32),
+    )
+    _validate_v2_header(header)
+    run_count = _validate_v2_payload(header, payload_bytes)
+    body = header.to_bytes() + payload_bytes
+    checksum = compute_v2_checksum(body, selected_checksum)
+    return V2Frame(
+        header=header,
+        payload=payload_bytes,
+        checksum=checksum,
+        run_count=run_count,
+    ).to_bytes()
+
+
+def _data_shape(
+    kind: constants.FrameKind,
+) -> tuple[int, int, int]:
+    if kind is constants.FrameKind.ADC_DATA:
+        return (
+            constants.ADC_BYTES_PER_PAIR,
+            constants.ADC_PAIRS_PER_FRAME,
+            constants.ADC_RLE_MAX_SELECTED_PAYLOAD_BYTES,
+        )
+    if kind is constants.FrameKind.GPIO_DATA:
+        return (
+            1,
+            constants.GPIO_SAMPLES_PER_FRAME,
+            constants.GPIO_RLE_MAX_SELECTED_PAYLOAD_BYTES,
+        )
+    raise TypeError("kind must be ADC_DATA or GPIO_DATA")
+
+
+def encode_v2_data_frame(
+    kind: constants.FrameKind | v1_constants.FrameKind | int,
+    decoded_payload: BytesLike,
+    *,
+    configuration_encoding: constants.ConfigurationEncoding | int = (
+        constants.ConfigurationEncoding.RAW
+    ),
+    flags: constants.FrameFlag | v1_constants.FrameFlag | int = (
+        constants.FrameFlag.NONE
+    ),
+    checksum_algorithm: (
+        constants.ChecksumAlgorithm | v1_constants.ChecksumAlgorithm | int
+    ) = constants.DEFAULT_CHECKSUM_ALGORITHM,
+    run_id: int,
+    sequence: int,
+    first_sample_ticks: int,
+) -> bytes:
+    """Encode one fixed logical data frame with strict adaptive raw fallback."""
+
+    try:
+        selected_kind = constants.FrameKind(kind)
+    except (TypeError, ValueError) as exc:
+        raise TypeError("kind must be ADC_DATA or GPIO_DATA") from exc
+    item_size, item_count, max_selected_payload = _data_shape(selected_kind)
+    try:
+        negotiated = constants.ConfigurationEncoding(configuration_encoding)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("configuration encoding must be RAW or RLE_AUTO") from exc
+    raw_payload = _owned_bytes(decoded_payload, name="decoded payload")
+    if len(raw_payload) != constants.DATA_PAYLOAD_BYTES:
+        raise V2FrameValidationError(
+            f"{selected_kind.name} requires {constants.DATA_PAYLOAD_BYTES} raw bytes",
+            reason="invalid_length",
+            error_code=constants.ErrorCode.INVALID_LENGTH,
+        )
+
+    selected_payload = raw_payload
+    selected_frame_encoding = constants.FrameEncoding.RAW
+    if negotiated is constants.ConfigurationEncoding.RLE_AUTO:
+        rle_payload = encode_rle_payload(
+            raw_payload,
+            item_size=item_size,
+            max_items=item_count,
+        )
+        if len(rle_payload) < len(raw_payload):
+            if len(rle_payload) > max_selected_payload:  # pragma: no cover - math guard
+                raise V2FrameValidationError(
+                    "selected RLE payload exceeds the generated frame bound",
+                    reason="invalid_length",
+                    error_code=constants.ErrorCode.INVALID_LENGTH,
+                )
+            selected_payload = rle_payload
+            selected_frame_encoding = constants.FrameEncoding.RLE
+
+    return encode_v2_frame(
+        selected_kind,
+        selected_payload,
+        flags=flags,
+        checksum_algorithm=checksum_algorithm,
+        encoding=selected_frame_encoding,
+        run_id=run_id,
+        sequence=sequence,
+        first_sample_ticks=first_sample_ticks,
+        item_count=item_count,
+    )
 
 
 def _decode_v2_header(data: BytesLike, offset: int = 0) -> V2FrameHeader:
@@ -519,7 +1013,7 @@ def _validate_v2_payload(header: V2FrameHeader, payload: bytes) -> int | None:
 def decode_v2_frame(data: BytesLike) -> V2Frame:
     """Decode exactly one v2 frame without allocating its decoded item count."""
 
-    frame_bytes = bytes(data)
+    frame_bytes = _owned_bytes(data, name="frame")
     header = _decode_v2_header(frame_bytes)
     if len(frame_bytes) != header.total_length:
         raise V2FrameValidationError(
@@ -542,6 +1036,200 @@ def decode_v2_frame(data: BytesLike) -> V2Frame:
         checksum=observed_checksum,
         run_count=run_count,
     )
+
+
+def decode_v2_data_block(
+    frame: V2Frame,
+    *,
+    negotiated_encoding: constants.ConfigurationEncoding | int,
+) -> V2DataBlock:
+    """Decode one validated data envelope into the existing logical model.
+
+    RAW payload bytes are handed directly to the block model.  RLE payloads
+    undergo a second full record-validation pass before the single bounded
+    expansion allocation is returned.
+    """
+
+    if frame.header.kind not in _DATA_KINDS:
+        raise TypeError("frame is not ADC_DATA or GPIO_DATA")
+    try:
+        negotiated = constants.ConfigurationEncoding(negotiated_encoding)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("negotiated encoding must be RAW or RLE_AUTO") from exc
+    if (
+        frame.header.encoding is constants.FrameEncoding.RLE
+        and negotiated is not constants.ConfigurationEncoding.RLE_AUTO
+    ):
+        raise V2EncodingNotNegotiatedError(
+            "an RLE frame arrived during a RAW-configured run"
+        )
+
+    item_size, item_count, _ = _data_shape(frame.header.kind)
+    if frame.header.encoding is constants.FrameEncoding.RLE:
+        decoded_payload = decode_rle_payload(
+            frame.payload,
+            item_size=item_size,
+            item_count=item_count,
+            max_items=item_count,
+        )
+        run_count = frame.run_count
+        if run_count is None:  # pragma: no cover - V2Frame decoder invariant
+            raise V2RLEValidationError(
+                "validated RLE frame omitted its run count",
+                "count_mismatch",
+            )
+        fallback_reason = None
+    else:
+        # ``bytes(existing_bytes)`` in each block model retains this exact
+        # immutable object, preserving the v1 zero-copy raw-payload behavior.
+        decoded_payload = frame.payload
+        run_count = count_rle_runs(
+            decoded_payload,
+            item_size=item_size,
+            max_items=item_count,
+        )
+        fallback_reason = (
+            RawFallbackReason.NOT_REQUESTED
+            if negotiated is constants.ConfigurationEncoding.RAW
+            else RawFallbackReason.RLE_NOT_SMALLER
+        )
+    diagnostics = EncodingDiagnostics(
+        negotiated_encoding=negotiated,
+        frame_encoding=frame.header.encoding,
+        encoded_payload=frame.payload,
+        decoded_bytes=len(decoded_payload),
+        run_count=run_count,
+        raw_fallback_reason=fallback_reason,
+    )
+    flags = v1_constants.FrameFlag(int(frame.header.flags))
+    checksum_algorithm = v1_constants.ChecksumAlgorithm(
+        int(frame.header.checksum_algorithm)
+    )
+    if frame.header.kind is constants.FrameKind.ADC_DATA:
+        return ADCBlock(
+            run_id=frame.header.run_id,
+            sequence=frame.header.sequence,
+            first_sample_ticks=frame.header.first_sample_ticks,
+            payload=decoded_payload,
+            flags=flags,
+            checksum_algorithm=checksum_algorithm,
+            encoding_diagnostics=diagnostics,
+        )
+    return GPIOBlock(
+        run_id=frame.header.run_id,
+        sequence=frame.header.sequence,
+        first_sample_ticks=frame.header.first_sample_ticks,
+        payload=decoded_payload,
+        flags=flags,
+        checksum_algorithm=checksum_algorithm,
+        encoding_diagnostics=diagnostics,
+    )
+
+
+def _v1_compatible_control_frame(frame: V2Frame) -> V1Frame:
+    """Translate a checksummed v2 control frame for the shared model decoder."""
+
+    if frame.header.kind in _DATA_KINDS:
+        raise TypeError("data frames require the bounded v2 data decoder")
+    payload = bytearray(frame.payload)
+    response_ok = bool(payload) and payload[0] == int(constants.ResponseStatus.OK)
+    if frame.header.kind is constants.FrameKind.INFO_RESPONSE and response_ok:
+        payload[constants.INFO_RESPONSE_PROTOCOL_VERSION_OFFSET] = (
+            v1_constants.PROTOCOL_VERSION
+        )
+        capability_bits = struct.unpack_from(
+            "<I",
+            payload,
+            constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET,
+        )[0]
+        struct.pack_into(
+            "<I",
+            payload,
+            constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET,
+            capability_bits & v1_constants.KNOWN_CAPABILITY_MASK,
+        )
+    elif frame.header.kind is constants.FrameKind.CONFIGURE_REQUEST:
+        payload[constants.CONFIGURE_REQUEST_ENCODING_OFFSET] = 0
+    elif (
+        frame.header.kind
+        in {
+            constants.FrameKind.CONFIGURE_RESPONSE,
+            constants.FrameKind.START_RESPONSE,
+        }
+        and response_ok
+    ):
+        payload[constants.CONFIGURE_RESPONSE_ENCODING_OFFSET] = 0
+
+    header = V1FrameHeader(
+        kind=v1_constants.FrameKind(int(frame.header.kind)),
+        flags=v1_constants.FrameFlag(int(frame.header.flags)),
+        checksum_algorithm=v1_constants.ChecksumAlgorithm(
+            int(frame.header.checksum_algorithm)
+        ),
+        total_length=frame.header.total_length,
+        payload_length=frame.header.payload_length,
+        run_id=frame.header.run_id,
+        sequence=frame.header.sequence,
+        request_id=frame.header.request_id,
+        first_sample_ticks=frame.header.first_sample_ticks,
+        item_count=frame.header.item_count,
+    )
+    return V1Frame(header=header, payload=bytes(payload), checksum=frame.checksum)
+
+
+def decode_v2_message(
+    frame: V2Frame,
+    *,
+    negotiated_encoding: constants.ConfigurationEncoding | int = (
+        constants.ConfigurationEncoding.RAW
+    ),
+) -> V2DecodedMessage:
+    """Decode a v2 frame through the shared typed v1 logical models."""
+
+    try:
+        negotiated = constants.ConfigurationEncoding(negotiated_encoding)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("negotiated encoding must be RAW or RLE_AUTO") from exc
+    if frame.header.kind in _DATA_KINDS:
+        return decode_v2_data_block(frame, negotiated_encoding=negotiated)
+
+    message = decode_message(_v1_compatible_control_frame(frame))
+    if not isinstance(message, CommandResponse) or not message.ok:
+        return message
+    value = message.value
+    if frame.header.kind is constants.FrameKind.INFO_RESPONSE:
+        if not isinstance(value, DeviceInfo):  # pragma: no cover - shared invariant
+            raise V2FrameValidationError("INFO response omitted typed device info")
+        capability_bits = struct.unpack_from(
+            "<I",
+            frame.payload,
+            constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET,
+        )[0]
+        advertised = constants.Capability(capability_bits)
+        value = replace(
+            value,
+            protocol_version=constants.PROTOCOL_VERSION,
+            capability_bits=advertised,
+            configuration_encoding=(
+                negotiated
+                if advertised & constants.Capability.RLE_STREAMING
+                else constants.ConfigurationEncoding.RAW
+            ),
+        )
+    elif frame.header.kind in {
+        constants.FrameKind.CONFIGURE_RESPONSE,
+        constants.FrameKind.START_RESPONSE,
+    }:
+        if not isinstance(value, DAQConfiguration):  # pragma: no cover
+            raise V2FrameValidationError(
+                "configuration response omitted its typed configuration"
+            )
+        raw_encoding = frame.payload[constants.CONFIGURE_RESPONSE_ENCODING_OFFSET]
+        value = replace(
+            value,
+            encoding=constants.ConfigurationEncoding(raw_encoding),
+        )
+    return replace(message, value=value)
 
 
 def _decode_buffered_v2_frame(
@@ -593,12 +1281,35 @@ class IncrementalV2FrameParser(BoundedIncrementalParser[V2FrameHeader, V2Frame])
             checksum_error=V2ChecksumMismatchError,
         )
 
+    @property
+    def counters(self) -> ParserCounters:
+        """Return the stable public parser-counter snapshot type."""
+
+        shared = super().counters
+        return ParserCounters(
+            bytes_received=shared.bytes_received,
+            frames_decoded=shared.frames_decoded,
+            corruption_events=shared.corruption_events,
+            header_errors=shared.header_errors,
+            checksum_errors=shared.checksum_errors,
+            payload_errors=shared.payload_errors,
+            resynchronizations=shared.resynchronizations,
+            bytes_discarded=shared.bytes_discarded,
+            buffered_bytes=shared.buffered_bytes,
+            high_water_mark=shared.high_water_mark,
+        )
+
 
 __all__ = [
     "MAX_V2_BUFFERED_BYTES",
+    "EncodingDiagnostics",
     "IncrementalV2FrameParser",
     "ParserCounters",
+    "RawFallbackReason",
     "V2ChecksumMismatchError",
+    "V2DataBlock",
+    "V2DecodedMessage",
+    "V2EncodingNotNegotiatedError",
     "V2Frame",
     "V2FrameHeader",
     "V2FrameValidationError",
@@ -606,5 +1317,12 @@ __all__ = [
     "V2RLEValidationError",
     "V2UnsupportedChecksumError",
     "compute_v2_checksum",
+    "count_rle_runs",
+    "decode_rle_payload",
+    "decode_v2_data_block",
     "decode_v2_frame",
+    "decode_v2_message",
+    "encode_rle_payload",
+    "encode_v2_data_frame",
+    "encode_v2_frame",
 ]

@@ -2,6 +2,7 @@
 type: reference
 title: API Reference
 created: 2026-08-29
+updated: 2026-09-02
 tags:
   - thingdaq
   - python
@@ -11,6 +12,7 @@ related:
   - '[[Quickstart]]'
   - '[[Python-API]]'
   - '[[Protocol-V1]]'
+  - '[[ADR-006-Experimental-RLE-Streaming]]'
   - '[[Calibration]]'
   - '[[NumPy-Integration]]'
   - '[[Hardware-Safety]]'
@@ -41,6 +43,7 @@ from thingdaq import ThingDAQ, discover, enumerate_candidates, select_device
 `expected_identity=ExpectedDeviceIdentity(...)` can additionally pin exact
 firmware/build/board/MCU/protocol identity. `session_policy="adopt"` is the
 default; use `"stop"` to force an existing CONFIGURED/RUNNING device to IDLE.
+`encoding=ConfigurationEncoding.RAW` is the default and retains protocol v1.
 
 Both constructors return a typed context manager. `close()` normally attempts
 STOP before deterministic shutdown. `close(stop=False)` deliberately preserves
@@ -111,6 +114,27 @@ stream/source/profile/checksum/rate/resolution selections raise
 `DAQConfiguration` is the exact device echo. A changed echo raises
 `UnexpectedMessageError` while retaining the observed state for cleanup.
 
+The experimental [[ADR-006-Experimental-RLE-Streaming]] path requires an
+explicit, matching encoding at session open and CONFIGURE:
+
+```python
+with ThingDAQ.open(
+    hardware_serial=12345670,
+    encoding=ConfigurationEncoding.RLE_AUTO,
+) as daq:
+    applied = daq.configure(
+        adc=True,
+        gpio=True,
+        source=Source.HARDWARE,
+        encoding=ConfigurationEncoding.RLE_AUTO,
+    )
+```
+
+The v2 INFO response must advertise `V2Capability.RLE_STREAMING`; otherwise
+the host raises `DeviceCapabilityError` before CONFIGURE. A negotiated run may
+mix raw and RLE data frames. Both decode to the existing block types and retain
+logical item counts, timestamps, continuity, and alignment behavior.
+
 `daq.start()` requires CONFIGURED, verifies the echoed applied configuration,
 activates a new nonzero run ID, and returns it. `daq.stop()` is idempotent in
 IDLE/CONFIGURED/RUNNING and returns `DeviceState.IDLE`. `daq.configuration`,
@@ -154,6 +178,7 @@ Important properties and methods:
 | `calibrated_channels(record, ...)` | Explicit lazy voltage channel views |
 | `calibrated_interleaved(record, ...)` | Explicit timestamped voltage samples |
 | `as_numpy()` | Lazy optional NumPy integration |
+| `encoding_diagnostics` | Optional v2 selector, encoded/decoded byte counts, run count, savings, exact encoded payload, and raw-fallback reason |
 
 For pair `i`, ADC0 is at `t0 + 8i` ticks and ADC1 at `t0 + 8i + 4` ticks.
 `AdcSample` includes `pair_index`, `converter`, `pin`, `code`, and
@@ -173,6 +198,7 @@ Important properties and methods:
 | `sample_ticks(i)` / `sample_seconds(i)` | Nominal time at `t0 + 2i` ticks |
 | `channel(pin)` | Lazy Boolean view for exactly one D6-D13 pin |
 | `as_numpy()` | Optional zero-copy packed array and selected-channel operations |
+| `encoding_diagnostics` | Optional v2 selector, encoded/decoded byte counts, run count, savings, exact encoded payload, and raw-fallback reason |
 
 The bit map is fixed: D6 through D13 occupy bits 0 through 7. There is no eager
 eight-channel expansion.
