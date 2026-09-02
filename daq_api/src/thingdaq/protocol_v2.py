@@ -48,6 +48,34 @@ _RESPONSE_PREFIX = struct.Struct("<BBH")
 _DATA_KINDS = frozenset({constants.FrameKind.ADC_DATA, constants.FrameKind.GPIO_DATA})
 _REQUEST_KINDS = frozenset(constants.REQUEST_RESPONSE_KIND)
 _TYPED_RESPONSE_KINDS = frozenset(constants.REQUEST_RESPONSE_KIND.values())
+_DATA_SHAPES_BY_KIND = {
+    constants.FrameKind.ADC_DATA: frozenset(
+        (
+            int(layout["adc_total_frame_bytes"]),
+            int(layout["adc_payload_bytes"]),
+            int(layout["adc_items_per_frame"]),
+        )
+        for layout in constants.AUX_BANK_LAYOUTS.values()
+    ),
+    constants.FrameKind.GPIO_DATA: frozenset(
+        (
+            int(layout["gpio_total_frame_bytes"]),
+            int(layout["gpio_payload_bytes"]),
+            int(layout["gpio_items_per_frame"]),
+        )
+        for layout in constants.AUX_BANK_LAYOUTS.values()
+    ),
+}
+_DATA_PERIODS_BY_KIND = {
+    constants.FrameKind.ADC_DATA: tuple(
+        int(profile["adc_pair_period_ticks"])
+        for profile in constants.RATE_PROFILE_TIMING.values()
+    ),
+    constants.FrameKind.GPIO_DATA: tuple(
+        int(profile["gpio_sample_period_ticks"])
+        for profile in constants.RATE_PROFILE_TIMING.values()
+    ),
+}
 _MAX_FRAME_BYTES = max(
     constants.MAX_DATA_FRAME_BYTES,
     constants.MAX_CONTROL_FRAME_BYTES,
@@ -284,37 +312,6 @@ def _decode_v2_header(data: BytesLike, offset: int = 0) -> V2FrameHeader:
     return header
 
 
-def _data_shapes(kind: constants.FrameKind) -> tuple[tuple[int, int, int], ...]:
-    if kind is constants.FrameKind.ADC_DATA:
-        return tuple(
-            (
-                int(layout["adc_total_frame_bytes"]),
-                int(layout["adc_payload_bytes"]),
-                int(layout["adc_items_per_frame"]),
-            )
-            for layout in constants.AUX_BANK_LAYOUTS.values()
-        )
-    return tuple(
-        (
-            int(layout["gpio_total_frame_bytes"]),
-            int(layout["gpio_payload_bytes"]),
-            int(layout["gpio_items_per_frame"]),
-        )
-        for layout in constants.AUX_BANK_LAYOUTS.values()
-    )
-
-
-def _valid_data_periods(kind: constants.FrameKind) -> frozenset[int]:
-    key = (
-        "adc_pair_period_ticks"
-        if kind is constants.FrameKind.ADC_DATA
-        else "gpio_sample_period_ticks"
-    )
-    return frozenset(
-        int(profile[key]) for profile in constants.RATE_PROFILE_TIMING.values()
-    )
-
-
 def _validate_v2_header(header: V2FrameHeader) -> None:
     if header.header_length != constants.HEADER_SIZE:
         raise V2FrameValidationError(
@@ -359,7 +356,7 @@ def _validate_v2_header(header: V2FrameHeader) -> None:
             header.payload_length,
             header.item_count,
         )
-        if observed_shape not in _data_shapes(header.kind):
+        if observed_shape not in _DATA_SHAPES_BY_KIND[header.kind]:
             raise V2FrameValidationError(
                 f"{header.kind.name} has no declared auxiliary-mode layout",
                 reason="invalid_length",
@@ -371,7 +368,7 @@ def _validate_v2_header(header: V2FrameHeader) -> None:
             )
         if not any(
             header.first_sample_ticks % period == 0
-            for period in _valid_data_periods(header.kind)
+            for period in _DATA_PERIODS_BY_KIND[header.kind]
         ):
             raise V2FrameValidationError(
                 "data timestamp is not aligned to any declared rate profile"

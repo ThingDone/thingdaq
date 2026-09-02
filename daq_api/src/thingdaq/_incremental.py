@@ -93,6 +93,7 @@ class BoundedIncrementalParser(Generic[HeaderT, FrameT]):
         self.max_buffered_bytes = max_frame_bytes + len(magic_bytes) - 1
         self._buffer = bytearray()
         self._scan_start = 0
+        self._pending_header: HeaderT | None = None
         self._resynchronizing = False
         self.bytes_received = 0
         self.frames_decoded = 0
@@ -158,6 +159,7 @@ class BoundedIncrementalParser(Generic[HeaderT, FrameT]):
 
         self._buffer.clear()
         self._scan_start = 0
+        self._pending_header = None
         self._resynchronizing = False
 
     def feed(self, chunk: BytesLike) -> list[FrameT]:
@@ -190,25 +192,28 @@ class BoundedIncrementalParser(Generic[HeaderT, FrameT]):
     def _drain(self) -> list[FrameT]:
         frames: list[FrameT] = []
         while True:
-            magic_at = self._buffer.find(self._magic_bytes, self._scan_start)
-            if magic_at < 0:
-                retained = _partial_magic_suffix_length(
-                    self._buffer,
-                    self._magic_bytes,
-                    self._scan_start,
-                )
-                self._discard(self.buffered_bytes - retained)
-                break
-            if magic_at > self._scan_start:
-                self._discard(magic_at - self._scan_start)
-            if self.buffered_bytes < self._header_size:
-                break
-            try:
-                header = self._decode_header(self._buffer, self._scan_start)
-            except self._validation_error:
-                self._record_corruption("header")
-                self._discard(1)
-                continue
+            header = self._pending_header
+            if header is None:
+                magic_at = self._buffer.find(self._magic_bytes, self._scan_start)
+                if magic_at < 0:
+                    retained = _partial_magic_suffix_length(
+                        self._buffer,
+                        self._magic_bytes,
+                        self._scan_start,
+                    )
+                    self._discard(self.buffered_bytes - retained)
+                    break
+                if magic_at > self._scan_start:
+                    self._discard(magic_at - self._scan_start)
+                if self.buffered_bytes < self._header_size:
+                    break
+                try:
+                    header = self._decode_header(self._buffer, self._scan_start)
+                except self._validation_error:
+                    self._record_corruption("header")
+                    self._discard(1)
+                    continue
+                self._pending_header = header
             if self.buffered_bytes < header.total_length:
                 break
             try:
@@ -221,6 +226,7 @@ class BoundedIncrementalParser(Generic[HeaderT, FrameT]):
                 self._record_corruption("payload")
                 self._discard(1)
                 continue
+            self._pending_header = None
             self._scan_start += header.total_length
             self.frames_decoded += 1
             self._resynchronizing = False
@@ -231,6 +237,7 @@ class BoundedIncrementalParser(Generic[HeaderT, FrameT]):
     def _discard(self, count: int) -> None:
         if count <= 0:
             return
+        self._pending_header = None
         if not self._resynchronizing:
             self._resynchronizing = True
             self.resynchronizations += 1
