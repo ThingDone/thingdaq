@@ -24,7 +24,7 @@ import struct
 import sys
 import time
 import zlib
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -1347,6 +1347,7 @@ class CaptureValidator:
         # intervening frame so endurance validation remains faster than the
         # 8 MB/s wire while still covering the complete sequence domain.
         full_frame = frame.sequence < 2 or frame.sequence % 64 == 0
+        offsets: Iterable[int]
         if full_frame:
             offsets = range(metrics.items_per_frame)
         else:
@@ -1957,6 +1958,7 @@ def validate_final_accounting(
     combined_logical = 0
     combined_framed = 0
     combined_frames = 0
+    combined_fallbacks = 0
     stream_result: dict[str, object] = {}
     for kind, metrics in capture.streams.items():
         prefix = metrics.name
@@ -2013,6 +2015,7 @@ def validate_final_accounting(
                 )
         elif fallback or metrics.rle_frames or status.values[f"{prefix}_encode_cycles"]:
             raise FirmwareFailure(f"{prefix} RAW mode performed RLE work")
+        combined_fallbacks += fallback
         stream_result[prefix] = {
             "encode_cycles": status.values[f"{prefix}_encode_cycles"],
             "fallback_frames": fallback,
@@ -2036,9 +2039,6 @@ def validate_final_accounting(
     if status.packet_accounted_frame_skew > 1:
         raise FirmwareFailure("final fair-scheduler skew exceeds one frame")
     total_cycles = status.adc_encode_cycles + status.gpio_encode_cycles
-    combined_fallbacks = sum(
-        int(stream["fallback_frames"]) for stream in stream_result.values()
-    )
     conservation_ranges = (
         (12, 120),
         (368, 516),
@@ -2540,12 +2540,15 @@ def result_payload(
     )
     combined = capture.combined_summary() if capture is not None else {}
     if capture is not None and execution.observed_seconds > 0:
+        logical_payload_bytes = combined["logical_payload_bytes"]
+        framed_bytes = combined["framed_bytes"]
+        assert logical_payload_bytes is not None
+        assert framed_bytes is not None
         combined["wall_logical_bytes_per_second"] = (
-            capture.combined_summary()["logical_payload_bytes"]
-            / execution.observed_seconds
+            logical_payload_bytes / execution.observed_seconds
         )
         combined["wall_framed_bytes_per_second"] = (
-            capture.combined_summary()["framed_bytes"] / execution.observed_seconds
+            framed_bytes / execution.observed_seconds
         )
     host = {
         "streams": streams,
@@ -2661,8 +2664,10 @@ def main() -> int:
             write_timeout=SERIAL_WRITE_TIMEOUT_SECONDS,
         )
     except Exception as error:  # noqa: BLE001 - explicit service classification
-        failure = ServiceFailure(f"serial open failed: {type(error).__name__}: {error}")
-        emit_result(result_payload(configuration, execution, None, failure))
+        open_failure = ServiceFailure(
+            f"serial open failed: {type(error).__name__}: {error}"
+        )
+        emit_result(result_payload(configuration, execution, None, open_failure))
         return 2
 
     link = SerialLink(port)
