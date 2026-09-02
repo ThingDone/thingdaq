@@ -26,7 +26,6 @@ STARTUP_DRAIN_SECONDS = 0.25
 SYNC_ATTEMPTS = 4
 SYNC_DEADLINE_SECONDS = 0.75
 COMMAND_DEADLINE_SECONDS = 1.0
-CORRUPT_SILENCE_SECONDS = 0.15
 
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
@@ -92,6 +91,7 @@ EXPECTED_CAPABILITIES = (
 )
 SUPPORTED_CONFIGURATION_MASK = 0x003F
 ERROR_UNSUPPORTED_CONFIGURATION = 8
+ERROR_CHECKSUM_MISMATCH = 12
 
 HEADER = struct.Struct("<IBBHHBBIIIIIQI")
 TRAILER = struct.Struct("<I")
@@ -394,20 +394,26 @@ class SerialLink:
                 )
             return frame, time.monotonic() - started
 
-    def send_corrupt_and_expect_silence(self, request_kind: int) -> bool:
+    def send_corrupt_and_expect_rejection(
+        self, request_kind: int
+    ) -> tuple[Frame, float]:
         request_id = self._allocate_request_id()
         wire = bytearray(encode_request(request_kind, request_id))
         wire[-1] ^= 0x80
-        deadline = time.monotonic() + COMMAND_DEADLINE_SECONDS
+        started = time.monotonic()
+        deadline = started + COMMAND_DEADLINE_SECONDS
         self._write_all(bytes(wire), deadline)
-        try:
-            frame = self._read_frame(time.monotonic() + CORRUPT_SILENCE_SECONDS)
-        except DeadlineExpired:
-            return True
-        raise ProtocolFailure(
-            "checksum-corrupt request unexpectedly produced response "
-            f"kind=0x{frame.kind:02x} request_id={frame.request_id}"
-        )
+        while True:
+            frame = self._read_frame(deadline)
+            if frame.request_id != request_id:
+                self.stale_frames += 1
+                continue
+            if frame.kind != ERROR_RESPONSE:
+                raise ProtocolFailure(
+                    "checksum-corrupt request expected a generic rejection, "
+                    f"received kind=0x{frame.kind:02x}"
+                )
+            return frame, time.monotonic() - started
 
     def _allocate_request_id(self) -> int:
         request_id = self.next_request_id
@@ -764,12 +770,27 @@ def run_acceptance(port: SerialPort) -> Evidence:
         )
         evidence.equal("CONFIGURE preserves run_id", 0, configured_status_frame.run_id)
 
+        corrupt_frame, latency = link.send_corrupt_and_expect_rejection(INFO_REQUEST)
+        evidence.latency("checksum-corrupt INFO rejection", latency)
+        status, error = response_prefix(corrupt_frame)
+        evidence.equal("checksum rejection response status", 1, status)
+        evidence.equal("checksum rejection error", ERROR_CHECKSUM_MISMATCH, error)
         evidence.equal(
-            "checksum-corrupt command response",
-            "silence",
-            "silence"
-            if link.send_corrupt_and_expect_silence(INFO_REQUEST)
-            else "response",
+            "checksum rejection error flag", RESPONSE_ERROR, corrupt_frame.flags
+        )
+        evidence.equal("checksum rejection run_id", 0, corrupt_frame.run_id)
+        evidence.equal(
+            "checksum rejection rejected kind", INFO_REQUEST, corrupt_frame.payload[4]
+        )
+        evidence.equal(
+            "checksum rejection rejected version",
+            PROTOCOL_VERSION,
+            corrupt_frame.payload[5],
+        )
+        evidence.equal(
+            "checksum rejection reserved fields",
+            b"\x00\x00\x00",
+            corrupt_frame.payload[1:2] + corrupt_frame.payload[6:8],
         )
         damaged_status_frame, _latency = link.exchange(GET_STATUS_REQUEST)
         damaged_status = decode_status(damaged_status_frame)

@@ -6,9 +6,11 @@ import ast
 import importlib.util
 import io
 import os
+import struct
 import sys
 import time
 import unittest
+import zlib
 from contextlib import redirect_stdout
 from dataclasses import replace
 from pathlib import Path
@@ -19,12 +21,16 @@ from thingdaq import (
     BoardId,
     Capability,
     ConfigurationProfile,
+    ErrorCode,
+    FrameFlag,
+    FrameKind,
     GpioCaptureDiagnosticFlag,
     Info,
     McuId,
     SimulatedDevice,
     Source,
     StreamMask,
+    encode_frame,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -124,6 +130,7 @@ class FakeRigSerial:
         self.write_index = 0
         self.read_counts: list[int] = []
         self.write_counts: list[int] = []
+        self.host_input = bytearray()
 
     def read(self, size: int = 1) -> bytes:
         if not self.is_open:
@@ -149,9 +156,42 @@ class FakeRigSerial:
         count = min(len(wire), limit)
         self.write_counts.append(count)
         if count:
-            for response in self.device.receive(wire[:count]):
+            chunk = wire[:count]
+            self.host_input.extend(chunk)
+            for response in self.device.receive(chunk):
                 self.pending.extend(response)
+            self._queue_parser_rejections()
         return count
+
+    def _queue_parser_rejections(self) -> None:
+        while len(self.host_input) >= rig.HEADER_SIZE:
+            total_length = struct.unpack_from("<I", self.host_input, 12)[0]
+            if len(self.host_input) < total_length:
+                return
+            wire = bytes(self.host_input[:total_length])
+            del self.host_input[:total_length]
+            expected = zlib.adler32(wire[: -rig.TRAILER_SIZE]) & 0xFFFFFFFF
+            actual = struct.unpack_from("<I", wire, len(wire) - rig.TRAILER_SIZE)[0]
+            if actual == expected:
+                continue
+            request_id = struct.unpack_from("<I", wire, 28)[0]
+            payload = struct.pack(
+                "<BBHBBH",
+                1,
+                0,
+                ErrorCode.CHECKSUM_MISMATCH,
+                wire[5],
+                wire[4],
+                0,
+            )
+            self.pending.extend(
+                encode_frame(
+                    FrameKind.ERROR_RESPONSE,
+                    payload,
+                    flags=FrameFlag.RESPONSE_ERROR,
+                    request_id=request_id,
+                )
+            )
 
     def close(self) -> None:
         self.is_open = False
@@ -223,7 +263,6 @@ class RigScriptIndependenceTests(unittest.TestCase):
             patch.object(rig, "STARTUP_DRAIN_SECONDS", 0.002),
             patch.object(rig, "SYNC_DEADLINE_SECONDS", 0.1),
             patch.object(rig, "COMMAND_DEADLINE_SECONDS", 0.2),
-            patch.object(rig, "CORRUPT_SILENCE_SECONDS", 0.002),
             patch.object(rig.serial, "Serial", return_value=fake),
             patch.dict(os.environ, {"SERIAL_PORT": "fake-rig-port"}),
             redirect_stdout(output),
@@ -233,6 +272,7 @@ class RigScriptIndependenceTests(unittest.TestCase):
         self.assertEqual(0, exit_code, output.getvalue())
         self.assertIn("PASS: ThingDAQ 1.0 identity", output.getvalue())
         self.assertIn("invalid CONFIGURE error", output.getvalue())
+        self.assertIn("checksum rejection error", output.getvalue())
         self.assertIn("final parser_errors", output.getvalue())
         self.assertFalse(fake.is_open)
         self.assertIn(0, fake.write_counts)

@@ -1058,13 +1058,16 @@ to claim that external transitions or driven mapping were validated.
 | 9 | `INVALID_REQUEST_ID` | Request ID is zero or conflicts with an outstanding request |
 | 10 | `BUSY` | Bounded request capacity is temporarily exhausted |
 | 11 | `INTERNAL_ERROR` | Device could not complete a valid command |
-| 12 | `CHECKSUM_MISMATCH` | Local parser/counter classification for a bad trailer |
+| 12 | `CHECKSUM_MISMATCH` | Parser classification and identifiable-frame rejection for a bad trailer |
 
-An envelope whose checksum cannot be verified is silently discarded and
-counted because none of its request fields can be trusted. Error code 12 is
-therefore normally reported through GET_STATUS rather than sent in response
-to the corrupt frame. Selecting an unsupported data algorithm inside an
-otherwise valid Adler-32 CONFIGURE request can safely return error code 6.
+An envelope whose checksum cannot be verified is discarded and counted; it is
+never dispatched to a command handler. If its complete fixed header contains a
+nonzero request ID, the ThingDAQ firmware returns a correlated generic
+`ERROR_RESPONSE` with `CHECKSUM_MISMATCH`, the rejected kind, and the rejected
+version. A receiver that cannot identify a usable request ID may discard the
+candidate without a response and expose the classification through GET_STATUS.
+Selecting an unsupported data algorithm inside an otherwise valid Adler-32
+CONFIGURE request can safely return error code 6.
 
 Unknown version, frame-kind/command-kind, checksum ID, reserved flag, or
 impossible-length candidates are rejected before their declared bodies are
