@@ -39,6 +39,7 @@ related:
   - '[[ADR-004-ADC-Trigger-DMA]]'
   - '[[ADR-006-Experimental-RLE-Streaming]]'
   - '[[Experiment-Baseline]]'
+  - '[[rle-prototype]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -93,7 +94,8 @@ physical acceptance.
 - `research/` records evidence gathered before implementation or selection,
   beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
-  beginning with the immutable [[Experiment-Baseline]] and including
+  beginning with the immutable [[Experiment-Baseline]], the isolated
+  host/simulator [[rle-prototype]] compression gate, and including
   [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
   by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical

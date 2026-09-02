@@ -67,6 +67,8 @@ It covers five GPIO and four ADC workloads, compares exact RAW and selected
 bounded peak allocations, and exits nonzero unless round trips, adaptive
 no-expansion, incompressible fallback, long-hold savings, and 1.25x per-stream
 decode headroom all pass. ADC ratios are reported without a savings threshold.
+The validated two-run host/simulator result is retained in the
+[RLE prototype evidence](doc/results/experiments/rle-prototype.md).
 
 Run the autonomous experiment baseline from a clean checkout. This exercises
 the maximum-rate simulator profile, compiles the exact pinned 600 MHz firmware

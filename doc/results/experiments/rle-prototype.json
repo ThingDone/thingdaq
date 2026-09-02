@@ -1,0 +1,2275 @@
+{
+  "acceptance": [
+    {
+      "description": "The matrix and report validate fail closed with no unknown state, level, metric, check, or limitation identifiers.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": true,
+      "id": "schema_valid",
+      "observed": {
+        "matrix": true,
+        "normalized_report": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Required Git, source, protocol, toolchain, branch, and baseline identities are present and syntactically valid.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": [
+        "repository",
+        "branch",
+        "baseline_branch",
+        "baseline_commit",
+        "source_commit",
+        "source_tree",
+        "source_clean",
+        "source_id",
+        "protocol_contract_path",
+        "protocol_version",
+        "protocol_sha256",
+        "toolchains"
+      ],
+      "id": "identity_complete",
+      "observed": {
+        "baseline_branch": "experiment/baseline-2026-09-01",
+        "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
+        "branch": "experiment/rle-streaming",
+        "protocol_contract_path": "protocol/protocol-v1.json",
+        "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "protocol_version": 1,
+        "repository": "https://github.com/ThingDone/thingdaq.git",
+        "source_clean": true,
+        "source_commit": "3aeefc435f1e1d020772670467ea60227ad7aeaa",
+        "source_id": "07df743de1619a41d55a929a693510e6497fa2d22783ac92ba84ad762e62b5dc",
+        "source_tree": "81417d52c6e57aa59c027ba8206716f48579b9f8",
+        "toolchains": [
+          {
+            "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+            "name": "arduino-cli",
+            "version": "1.4.1"
+          },
+          {
+            "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+            "name": "arm-none-eabi-g++",
+            "version": "15.2.1"
+          },
+          {
+            "identity": "CPython 3.12.3",
+            "name": "python",
+            "version": "3.12.3"
+          },
+          {
+            "identity": "teensy:avr 1.62.0",
+            "name": "teensy-core",
+            "version": "1.62.0"
+          }
+        ]
+      },
+      "operator": "present",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Tracked canonical evidence was generated from the declared clean source commit and tree.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": true,
+      "id": "provenance_clean",
+      "observed": true,
+      "operator": "eq",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every referenced input, firmware, map, manifest, and output artifact matches its declared SHA-256 and size.",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "expected": {
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "c30531ac1aef1a7dfcb555f2606f53169aacbae5fb8e7427b1b6cae170f6f816",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "d91c62fd205565c207cffcf5a3943701e2ae95d5e7fbc715331ce21ff0c4c3fc",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "109f3d151ee6f37f98def28d531ce320b04e67d3e1b2bace18fa22aaebc345d4",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "84b1731517a92c35195e05acfb34c6b5bea62ee0719e17b734e005bd0eda3457"
+      },
+      "id": "artifact_hashes_verified",
+      "observed": {
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "c30531ac1aef1a7dfcb555f2606f53169aacbae5fb8e7427b1b6cae170f6f816",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "d91c62fd205565c207cffcf5a3943701e2ae95d5e7fbc715331ce21ff0c4c3fc",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "109f3d151ee6f37f98def28d531ce320b04e67d3e1b2bace18fa22aaebc345d4",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "84b1731517a92c35195e05acfb34c6b5bea62ee0719e17b734e005bd0eda3457"
+      },
+      "operator": "hash_equal",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "The exact declared firmware profile compiles with the pinned toolchain without enumerating hardware or uploading firmware.",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "expected": true,
+      "id": "firmware_build_no_upload",
+      "observed": {
+        "compile_completed": true,
+        "exact_fqbn": true,
+        "firmware_inputs_clean": true,
+        "network_unused": true,
+        "serial_hardware_unused": true,
+        "upload_unused": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Two renders from identical normalized inputs are byte-identical JSON and Markdown.",
+      "evidence_ids": [
+        "evidence-framework",
+        "host-corpus-benchmark"
+      ],
+      "expected": {
+        "benchmark_normalized_run_1": "48af28678522ed58879db3aa01ad4e5b733f56b25a007d09f4e62301dfda531a",
+        "benchmark_normalized_run_2": "48af28678522ed58879db3aa01ad4e5b733f56b25a007d09f4e62301dfda531a",
+        "demo_run_1": "d958c5a9f59b57dbcf4638b4ab3413ee1f758694462a368f39f43d0c65558aee",
+        "demo_run_2": "d958c5a9f59b57dbcf4638b4ab3413ee1f758694462a368f39f43d0c65558aee",
+        "report_json": "byte-identical",
+        "report_markdown": "byte-identical"
+      },
+      "id": "deterministic_output",
+      "observed": {
+        "benchmark_normalized_run_1": "48af28678522ed58879db3aa01ad4e5b733f56b25a007d09f4e62301dfda531a",
+        "benchmark_normalized_run_2": "48af28678522ed58879db3aa01ad4e5b733f56b25a007d09f4e62301dfda531a",
+        "demo_run_1": "d958c5a9f59b57dbcf4638b4ab3413ee1f758694462a368f39f43d0c65558aee",
+        "demo_run_2": "d958c5a9f59b57dbcf4638b4ab3413ee1f758694462a368f39f43d0c65558aee",
+        "report_json": "byte-identical",
+        "report_markdown": "byte-identical"
+      },
+      "operator": "byte_equal",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "INFO, CONFIGURE, START, bounded data capture, STATUS, STOP, and cleanup complete in the declared order.",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "expected": true,
+      "id": "lifecycle_complete",
+      "observed": {
+        "bounded_capture": true,
+        "cleanup": true,
+        "configure": true,
+        "info": true,
+        "start": true,
+        "status": true,
+        "stop": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every validated synthetic ADC pair and GPIO sample matches the declared deterministic formula and chronology.",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "expected": "all RAW and RLE_AUTO logical blocks were byte-identical",
+      "id": "synthetic_formulas_exact",
+      "observed": "all RAW and RLE_AUTO logical blocks were byte-identical",
+      "operator": "eq",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Sequence gaps, loss, parser errors, transport errors, host-queue drops, and unexplained firmware errors are zero unless a named negative case declares and reconciles them.",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "expected": true,
+      "id": "stream_health",
+      "observed": {
+        "decoded_equality": true,
+        "firmware_drops_zero": true,
+        "host_queue_drops_zero": true,
+        "parser_errors_zero": true,
+        "sequence_gaps_zero": true,
+        "transport_errors_zero": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "All applicable frame, item, payload-byte, framed-byte, queue, loss, and source-stage equations are exact and nonsaturated.",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "expected": true,
+      "id": "counter_conservation",
+      "observed": {
+        "benchmark_frame_selection": {
+          "left": 72,
+          "right": 72
+        },
+        "benchmark_workload_round_trip": {
+          "left": 9,
+          "right": 9
+        },
+        "demo_frame_selection": {
+          "left": 24,
+          "right": 24
+        },
+        "demo_raw_payload": {
+          "left": 97152,
+          "right": 97152
+        }
+      },
+      "operator": "exact_conservation",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every observed queue depth and high-water value is at or below its same-artifact advertised capacity.",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "expected": 0,
+      "id": "queue_bounds",
+      "observed": 0,
+      "operator": "lte",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "STOP and final cleanup leave IDLE with every required ownership and transport gauge at zero.",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "expected": true,
+      "id": "final_idle_cleanup",
+      "observed": {
+        "device_idle": true,
+        "reader_closed": true,
+        "transport_closed": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every required limitation is explicit and no conclusion exceeds the evidence level that supports it.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": true,
+      "id": "claim_scope_complete",
+      "observed": {
+        "analog_performance_untested": true,
+        "build_is_not_target_runtime": true,
+        "compression_is_workload_dependent": true,
+        "cross_branch_combinations_untested": true,
+        "external_gpio_timing_untested": true,
+        "simulation_is_not_physical": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "state": "PASS"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "firmware-build-manifest",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+      "sha256": "c30531ac1aef1a7dfcb555f2606f53169aacbae5fb8e7427b1b6cae170f6f816",
+      "size_bytes": 12911
+    },
+    {
+      "kind": "firmware-eep",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep",
+      "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+      "size_bytes": 34
+    },
+    {
+      "kind": "firmware-elf",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf",
+      "sha256": "d91c62fd205565c207cffcf5a3943701e2ae95d5e7fbc715331ce21ff0c4c3fc",
+      "size_bytes": 1807828
+    },
+    {
+      "kind": "firmware-hex",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
+      "sha256": "109f3d151ee6f37f98def28d531ce320b04e67d3e1b2bace18fa22aaebc345d4",
+      "size_bytes": 357227
+    },
+    {
+      "kind": "firmware-map",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
+      "sha256": "84b1731517a92c35195e05acfb34c6b5bea62ee0719e17b734e005bd0eda3457",
+      "size_bytes": 828461
+    }
+  ],
+  "created": "2026-09-02",
+  "evidence": [
+    {
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/experiment_evidence.py",
+          "--report",
+          "doc/results/experiments/rle-prototype.json",
+          "--json-output",
+          "doc/results/experiments/rle-prototype.json",
+          "--markdown-output",
+          "doc/results/experiments/rle-prototype.md",
+          "--check"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "evidence-framework",
+      "inputs": [
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        },
+        {
+          "path": "firmware/tools/experiment_evidence.py",
+          "sha256": "c3c0fe5813c72bad3bf5f0b0eab3dc5823f97aca680defaade14710491e152e8"
+        }
+      ],
+      "level": "host",
+      "method": "Fail-closed shared schema validation, file/hash verification, normalization, and repeat rendering.",
+      "reason": null,
+      "render_repetitions": 2,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3"
+    },
+    {
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/build_firmware.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "firmware_build_id": "thingdaq-07df743de1619a41",
+      "firmware_inputs_clean": true,
+      "firmware_source_id": "07df743de1619a41d55a929a693510e6497fa2d22783ac92ba84ad762e62b5dc",
+      "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "firmware-build",
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+          "sha256": "c30531ac1aef1a7dfcb555f2606f53169aacbae5fb8e7427b1b6cae170f6f816"
+        },
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
+          "sha256": "84b1731517a92c35195e05acfb34c6b5bea62ee0719e17b734e005bd0eda3457"
+        },
+        {
+          "path": "firmware/tools/build_firmware.py",
+          "sha256": "61cbd926f714ee594a6a31e68c462efb241cab6840ed73ef92d3a8c30210ba71"
+        },
+        {
+          "path": "protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+        }
+      ],
+      "level": "host",
+      "memory_bytes": {
+        "flash_headroom": 1904644,
+        "flash_used": 126972,
+        "ram1_headroom": 34528,
+        "ram1_used": 489760,
+        "ram2_headroom": 4096,
+        "ram2_used": 520192
+      },
+      "method": "Pinned Teensy 4.0 no-upload compilation plus build-manifest, map, memory, and target-property validation.",
+      "reason": null,
+      "resolved_build_properties": {
+        "build.board": "TEENSY40",
+        "build.fcpu": "600000000",
+        "build.flags.optimize": "-O2",
+        "build.usbtype": "USB_SERIAL"
+      },
+      "result": "PASS",
+      "toolchain_identity": "Teensy core 1.62.0; Arm GNU 15.2.1; Arduino CLI 1.4.1"
+    },
+    {
+      "break_even": [
+        {
+          "complete_wire_bytes_at_maximum_selected_runs": 4092,
+          "logical_item_bytes": 4,
+          "logical_items_per_frame": 1012,
+          "maximum_selected_run_records": 674,
+          "minimum_average_run_items": {
+            "logical_items_numerator": 1012,
+            "reduced_denominator": 337,
+            "reduced_numerator": 506,
+            "run_records_denominator": 674,
+            "value": 1.5014836795252227
+          },
+          "minimum_uniform_integer_run_items": 2,
+          "payload_bytes_at_maximum_selected_runs": 4044,
+          "raw_complete_wire_bytes": 4096,
+          "raw_payload_bytes": 4048,
+          "rle_record_bytes": 6,
+          "stream": "ADC",
+          "strictly_smaller_selection": true
+        },
+        {
+          "complete_wire_bytes_at_maximum_selected_runs": 4095,
+          "logical_item_bytes": 1,
+          "logical_items_per_frame": 4048,
+          "maximum_selected_run_records": 1349,
+          "minimum_average_run_items": {
+            "logical_items_numerator": 4048,
+            "reduced_denominator": 1349,
+            "reduced_numerator": 4048,
+            "run_records_denominator": 1349,
+            "value": 3.000741289844329
+          },
+          "minimum_uniform_integer_run_items": 4,
+          "payload_bytes_at_maximum_selected_runs": 4047,
+          "raw_complete_wire_bytes": 4096,
+          "raw_payload_bytes": 4048,
+          "rle_record_bytes": 3,
+          "stream": "GPIO",
+          "strictly_smaller_selection": true
+        }
+      ],
+      "checks": [
+        [
+          {
+            "detail": "checks complete payloads and logical envelope fields",
+            "expected": "every RAW and RLE_AUTO decode equals the logical corpus",
+            "name": "perfect_round_trip_equality",
+            "observed": "all workloads equal",
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "uses exact per-frame payload and complete-wire byte counts",
+            "expected": "selected payload and complete wire bytes <= RAW per frame",
+            "name": "rle_auto_no_expansion",
+            "observed": "no expanded frames",
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "headroom uses the exact 4,048-byte / 8,096-tick logical denominator for one target stream",
+            "expected": {
+              "minimum_headroom": 1.25,
+              "minimum_logical_bytes_per_second": 5000000
+            },
+            "name": "decode_throughput_headroom",
+            "observed": {
+              "minimum_headroom": 1.5452727135551914,
+              "minimum_logical_bytes_per_second": 6181090.854220766,
+              "workload": "gpio-alternating-bytes"
+            },
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "isolated tracemalloc peaks include the returned wire or block",
+            "expected": {
+              "maximum_peak_bytes": 65536
+            },
+            "name": "bounded_peak_working_memory",
+            "observed": "all measured paths within bound",
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "the threshold is GPIO-only; ADC savings have no minimum",
+            "expected": {
+              "fallback_frames": 0,
+              "maximum_complete_wire_ratio": 0.25
+            },
+            "name": "strong_gpio_long_hold_savings",
+            "observed": {
+              "complete_wire_ratio": 0.018218994140625,
+              "fallback_frames": 0
+            },
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "covers alternating/pseudo-random GPIO and quantization/high-entropy ADC",
+            "expected": "every marked incompressible frame selects RAW",
+            "name": "incompressible_frames_fall_back_to_raw",
+            "observed": "all incompressible frames used RAW",
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "ADC compression remains workload-dependent evidence only",
+            "expected": "no ADC compression-ratio threshold",
+            "name": "adc_savings_observed_without_minimum",
+            "observed": {
+              "adc-constant-pairs": 0.01318359375,
+              "adc-high-entropy": 1.0,
+              "adc-independent-slow-channels": 0.31494140625,
+              "adc-quantization-noise": 1.0
+            },
+            "required": false,
+            "state": "PASS"
+          }
+        ],
+        [
+          {
+            "detail": "checks complete payloads and logical envelope fields",
+            "expected": "every RAW and RLE_AUTO decode equals the logical corpus",
+            "name": "perfect_round_trip_equality",
+            "observed": "all workloads equal",
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "uses exact per-frame payload and complete-wire byte counts",
+            "expected": "selected payload and complete wire bytes <= RAW per frame",
+            "name": "rle_auto_no_expansion",
+            "observed": "no expanded frames",
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "headroom uses the exact 4,048-byte / 8,096-tick logical denominator for one target stream",
+            "expected": {
+              "minimum_headroom": 1.25,
+              "minimum_logical_bytes_per_second": 5000000
+            },
+            "name": "decode_throughput_headroom",
+            "observed": {
+              "minimum_headroom": 1.3193939402632746,
+              "minimum_logical_bytes_per_second": 5277575.761053098,
+              "workload": "gpio-alternating-bytes"
+            },
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "isolated tracemalloc peaks include the returned wire or block",
+            "expected": {
+              "maximum_peak_bytes": 65536
+            },
+            "name": "bounded_peak_working_memory",
+            "observed": "all measured paths within bound",
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "the threshold is GPIO-only; ADC savings have no minimum",
+            "expected": {
+              "fallback_frames": 0,
+              "maximum_complete_wire_ratio": 0.25
+            },
+            "name": "strong_gpio_long_hold_savings",
+            "observed": {
+              "complete_wire_ratio": 0.018218994140625,
+              "fallback_frames": 0
+            },
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "covers alternating/pseudo-random GPIO and quantization/high-entropy ADC",
+            "expected": "every marked incompressible frame selects RAW",
+            "name": "incompressible_frames_fall_back_to_raw",
+            "observed": "all incompressible frames used RAW",
+            "required": true,
+            "state": "PASS"
+          },
+          {
+            "detail": "ADC compression remains workload-dependent evidence only",
+            "expected": "no ADC compression-ratio threshold",
+            "name": "adc_savings_observed_without_minimum",
+            "observed": {
+              "adc-constant-pairs": 0.01318359375,
+              "adc-high-entropy": 1.0,
+              "adc-independent-slow-channels": 0.31494140625,
+              "adc-quantization-noise": 1.0
+            },
+            "required": false,
+            "state": "PASS"
+          }
+        ]
+      ],
+      "command": {
+        "argv": [
+          "python",
+          "-m",
+          "thingdaq.rle_benchmark",
+          "--pretty"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "corpus_sha256": "5c5c4e251e45090e007bc0dac9d381df9414beb5c5382cb770c645f0144023b3",
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "host-corpus-benchmark",
+      "inputs": [
+        {
+          "path": "daq_api/src/thingdaq/_generated/protocol_v2_constants.py",
+          "sha256": "4d63e216b574426fa7d1312b7a1c30141262aafc629fd54c3ca17ecaed1a429c"
+        },
+        {
+          "path": "daq_api/src/thingdaq/protocol_v2.py",
+          "sha256": "1d3cdc4e7ca1c2a62a3d9abf92eee4d9488961c1c4ae080434c3597a2d4930a3"
+        },
+        {
+          "path": "daq_api/src/thingdaq/rle_benchmark.py",
+          "sha256": "06dda22c1fc0dc5a7efe14c2bf8566a1be6b14ddf403d1e1a4d2721e23576034"
+        },
+        {
+          "path": "daq_api/src/thingdaq/simulator.py",
+          "sha256": "5502689a06774aaccc8423069d535f9ccc84f4b5c0bbdf396dd9f66d2ac1da6e"
+        },
+        {
+          "path": "protocol/protocol-v2.json",
+          "sha256": "60d624a2a28095dc8ac49f748fb9352a3a940547a129cebc8e12bc1883fd6274"
+        }
+      ],
+      "level": "host",
+      "maximum_peak_bytes_by_run": [
+        33711,
+        33711
+      ],
+      "method": "Two executions of the production RAW/RLE_AUTO codec over the fixed nine-workload, 72-frame corpus.",
+      "normalized_sha256": "48af28678522ed58879db3aa01ad4e5b733f56b25a007d09f4e62301dfda531a",
+      "protocol_v2_sha256": "60d624a2a28095dc8ac49f748fb9352a3a940547a129cebc8e12bc1883fd6274",
+      "reason": null,
+      "repeat_count": 2,
+      "result": "PASS",
+      "run_output_sha256": [
+        "100ba2f436bcb4ff8aaf72e6323e6cc87b6ed287acdc2f6fbe3cda7b00a9415c",
+        "e316da5e9c5dce7ead72215f1b9c7d86f99ffef3b7d0580ab733cc41f975f1ad"
+      ],
+      "throughput": [
+        {
+          "limiting_workload": "adc-high-entropy",
+          "minimum_logical_bytes_per_second": 39828880.97481944,
+          "minimum_target_headroom": 9.957220243704858,
+          "path": "raw_encode",
+          "run": 1
+        },
+        {
+          "limiting_workload": "gpio-pseudo-random-bytes",
+          "minimum_logical_bytes_per_second": 3772978.487381777,
+          "minimum_target_headroom": 0.9432446218454442,
+          "path": "rle_auto_encode",
+          "run": 1
+        },
+        {
+          "limiting_workload": "gpio-pseudo-random-bytes",
+          "minimum_logical_bytes_per_second": 6094371.687918375,
+          "minimum_target_headroom": 1.5235929219795938,
+          "path": "raw_decode",
+          "run": 1
+        },
+        {
+          "limiting_workload": "gpio-alternating-bytes",
+          "minimum_logical_bytes_per_second": 6181090.854220766,
+          "minimum_target_headroom": 1.5452727135551914,
+          "path": "rle_auto_decode",
+          "run": 1
+        },
+        {
+          "limiting_workload": "adc-quantization-noise",
+          "minimum_logical_bytes_per_second": 40959654.43939119,
+          "minimum_target_headroom": 10.239913609847797,
+          "path": "raw_encode",
+          "run": 2
+        },
+        {
+          "limiting_workload": "gpio-pseudo-random-bytes",
+          "minimum_logical_bytes_per_second": 3439740.145489688,
+          "minimum_target_headroom": 0.859935036372422,
+          "path": "rle_auto_encode",
+          "run": 2
+        },
+        {
+          "limiting_workload": "gpio-long-digital-holds",
+          "minimum_logical_bytes_per_second": 6195371.93903505,
+          "minimum_target_headroom": 1.5488429847587624,
+          "path": "raw_decode",
+          "run": 2
+        },
+        {
+          "limiting_workload": "gpio-alternating-bytes",
+          "minimum_logical_bytes_per_second": 5277575.761053098,
+          "minimum_target_headroom": 1.3193939402632746,
+          "path": "rle_auto_decode",
+          "run": 2
+        }
+      ],
+      "toolchain_identity": "CPython 3.12.3 time.perf_counter",
+      "workloads": [
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 408,
+            "reduced_denominator": 4096,
+            "reduced_numerator": 51,
+            "value": 0.012451171875
+          },
+          "fallback_frames": 0,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 0,
+            "reduced_denominator": 1,
+            "reduced_numerator": 0,
+            "value": 0.0
+          },
+          "frames": 8,
+          "logical_items": 32384,
+          "name": "gpio-constant",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 24,
+            "reduced_denominator": 4048,
+            "reduced_numerator": 3,
+            "value": 0.0007411067193675889
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 8,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 8,
+                "run_length_items": 4048
+              }
+            ],
+            "logical_items": 32384,
+            "maximum_items": 4048,
+            "mean_items_per_run": {
+              "denominator": 8,
+              "numerator": 32384,
+              "reduced_denominator": 1,
+              "reduced_numerator": 4048,
+              "value": 4048.0
+            },
+            "median_items": 4048.0,
+            "minimum_items": 4048,
+            "p90_items": 4048,
+            "p99_items": 4048,
+            "run_count": 8
+          },
+          "selected_complete_wire_bytes": 408,
+          "selected_payload_bytes": 24,
+          "stream": "GPIO"
+        },
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 597,
+            "reduced_denominator": 32768,
+            "reduced_numerator": 597,
+            "value": 0.018218994140625
+          },
+          "fallback_frames": 0,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 0,
+            "reduced_denominator": 1,
+            "reduced_numerator": 0,
+            "value": 0.0
+          },
+          "frames": 8,
+          "logical_items": 32384,
+          "name": "gpio-long-digital-holds",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 213,
+            "reduced_denominator": 32384,
+            "reduced_numerator": 213,
+            "value": 0.006577322134387352
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 8,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 1,
+                "run_length_items": 48
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 96
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 128
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 144
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 176
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 192
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 224
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 240
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 272
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 288
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 320
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 336
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 368
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 416
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 464
+              },
+              {
+                "record_count": 56,
+                "run_length_items": 512
+              }
+            ],
+            "logical_items": 32384,
+            "maximum_items": 512,
+            "mean_items_per_run": {
+              "denominator": 71,
+              "numerator": 32384,
+              "reduced_denominator": 71,
+              "reduced_numerator": 32384,
+              "value": 456.11267605633805
+            },
+            "median_items": 512.0,
+            "minimum_items": 48,
+            "p90_items": 512,
+            "p99_items": 512,
+            "run_count": 71
+          },
+          "selected_complete_wire_bytes": 597,
+          "selected_payload_bytes": 213,
+          "stream": "GPIO"
+        },
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 432,
+            "reduced_denominator": 2048,
+            "reduced_numerator": 27,
+            "value": 0.01318359375
+          },
+          "fallback_frames": 0,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 0,
+            "reduced_denominator": 1,
+            "reduced_numerator": 0,
+            "value": 0.0
+          },
+          "frames": 8,
+          "logical_items": 32384,
+          "name": "gpio-sparse-single-bit-changes",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 48,
+            "reduced_denominator": 2024,
+            "reduced_numerator": 3,
+            "value": 0.0014822134387351778
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 8,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 1,
+                "run_length_items": 47
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 94
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 141
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 188
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 235
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 282
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 329
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 376
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 3672
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 3719
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 3766
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 3813
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 3860
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 3907
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 3954
+              },
+              {
+                "record_count": 1,
+                "run_length_items": 4001
+              }
+            ],
+            "logical_items": 32384,
+            "maximum_items": 4001,
+            "mean_items_per_run": {
+              "denominator": 16,
+              "numerator": 32384,
+              "reduced_denominator": 1,
+              "reduced_numerator": 2024,
+              "value": 2024.0
+            },
+            "median_items": 2024.0,
+            "minimum_items": 47,
+            "p90_items": 3954,
+            "p99_items": 4001,
+            "run_count": 16
+          },
+          "selected_complete_wire_bytes": 432,
+          "selected_payload_bytes": 48,
+          "stream": "GPIO"
+        },
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 32768,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "fallback_frames": 8,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 8,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "frames": 8,
+          "logical_items": 32384,
+          "name": "gpio-alternating-bytes",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 32384,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 0,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 32384,
+                "run_length_items": 1
+              }
+            ],
+            "logical_items": 32384,
+            "maximum_items": 1,
+            "mean_items_per_run": {
+              "denominator": 32384,
+              "numerator": 32384,
+              "reduced_denominator": 1,
+              "reduced_numerator": 1,
+              "value": 1.0
+            },
+            "median_items": 1.0,
+            "minimum_items": 1,
+            "p90_items": 1,
+            "p99_items": 1,
+            "run_count": 32384
+          },
+          "selected_complete_wire_bytes": 32768,
+          "selected_payload_bytes": 32384,
+          "stream": "GPIO"
+        },
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 32768,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "fallback_frames": 8,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 8,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "frames": 8,
+          "logical_items": 32384,
+          "name": "gpio-pseudo-random-bytes",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 32384,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 0,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 32108,
+                "run_length_items": 1
+              },
+              {
+                "record_count": 138,
+                "run_length_items": 2
+              }
+            ],
+            "logical_items": 32384,
+            "maximum_items": 2,
+            "mean_items_per_run": {
+              "denominator": 32246,
+              "numerator": 32384,
+              "reduced_denominator": 701,
+              "reduced_numerator": 704,
+              "value": 1.0042796005706134
+            },
+            "median_items": 1.0,
+            "minimum_items": 1,
+            "p90_items": 1,
+            "p99_items": 1,
+            "run_count": 32246
+          },
+          "selected_complete_wire_bytes": 32768,
+          "selected_payload_bytes": 32384,
+          "stream": "GPIO"
+        },
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 432,
+            "reduced_denominator": 2048,
+            "reduced_numerator": 27,
+            "value": 0.01318359375
+          },
+          "fallback_frames": 0,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 0,
+            "reduced_denominator": 1,
+            "reduced_numerator": 0,
+            "value": 0.0
+          },
+          "frames": 8,
+          "logical_items": 8096,
+          "name": "adc-constant-pairs",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 48,
+            "reduced_denominator": 2024,
+            "reduced_numerator": 3,
+            "value": 0.0014822134387351778
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 8,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 8,
+                "run_length_items": 1012
+              }
+            ],
+            "logical_items": 8096,
+            "maximum_items": 1012,
+            "mean_items_per_run": {
+              "denominator": 8,
+              "numerator": 8096,
+              "reduced_denominator": 1,
+              "reduced_numerator": 1012,
+              "value": 1012.0
+            },
+            "median_items": 1012.0,
+            "minimum_items": 1012,
+            "p90_items": 1012,
+            "p99_items": 1012,
+            "run_count": 8
+          },
+          "selected_complete_wire_bytes": 432,
+          "selected_payload_bytes": 48,
+          "stream": "ADC"
+        },
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 10320,
+            "reduced_denominator": 2048,
+            "reduced_numerator": 645,
+            "value": 0.31494140625
+          },
+          "fallback_frames": 0,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 0,
+            "reduced_denominator": 1,
+            "reduced_numerator": 0,
+            "value": 0.0
+          },
+          "frames": 8,
+          "logical_items": 8096,
+          "name": "adc-independent-slow-channels",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 9936,
+            "reduced_denominator": 88,
+            "reduced_numerator": 27,
+            "value": 0.3068181818181818
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 8,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 184,
+                "run_length_items": 1
+              },
+              {
+                "record_count": 184,
+                "run_length_items": 2
+              },
+              {
+                "record_count": 184,
+                "run_length_items": 3
+              },
+              {
+                "record_count": 184,
+                "run_length_items": 4
+              },
+              {
+                "record_count": 184,
+                "run_length_items": 5
+              },
+              {
+                "record_count": 184,
+                "run_length_items": 6
+              },
+              {
+                "record_count": 184,
+                "run_length_items": 7
+              },
+              {
+                "record_count": 368,
+                "run_length_items": 8
+              }
+            ],
+            "logical_items": 8096,
+            "maximum_items": 8,
+            "mean_items_per_run": {
+              "denominator": 1656,
+              "numerator": 8096,
+              "reduced_denominator": 9,
+              "reduced_numerator": 44,
+              "value": 4.888888888888889
+            },
+            "median_items": 5.0,
+            "minimum_items": 1,
+            "p90_items": 8,
+            "p99_items": 8,
+            "run_count": 1656
+          },
+          "selected_complete_wire_bytes": 10320,
+          "selected_payload_bytes": 9936,
+          "stream": "ADC"
+        },
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 32768,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "fallback_frames": 8,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 8,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "frames": 8,
+          "logical_items": 8096,
+          "name": "adc-quantization-noise",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 32384,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 0,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 7812,
+                "run_length_items": 1
+              },
+              {
+                "record_count": 139,
+                "run_length_items": 2
+              },
+              {
+                "record_count": 2,
+                "run_length_items": 3
+              }
+            ],
+            "logical_items": 8096,
+            "maximum_items": 3,
+            "mean_items_per_run": {
+              "denominator": 7953,
+              "numerator": 8096,
+              "reduced_denominator": 723,
+              "reduced_numerator": 736,
+              "value": 1.0179806362378976
+            },
+            "median_items": 1.0,
+            "minimum_items": 1,
+            "p90_items": 1,
+            "p99_items": 2,
+            "run_count": 7953
+          },
+          "selected_complete_wire_bytes": 32768,
+          "selected_payload_bytes": 32384,
+          "stream": "ADC"
+        },
+        {
+          "complete_wire_ratio": {
+            "denominator": 32768,
+            "numerator": 32768,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "fallback_frames": 8,
+          "fallback_frequency": {
+            "denominator": 8,
+            "numerator": 8,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "frames": 8,
+          "logical_items": 8096,
+          "name": "adc-high-entropy",
+          "no_expansion": true,
+          "payload_ratio": {
+            "denominator": 32384,
+            "numerator": 32384,
+            "reduced_denominator": 1,
+            "reduced_numerator": 1,
+            "value": 1.0
+          },
+          "raw_complete_wire_bytes": 32768,
+          "raw_payload_bytes": 32384,
+          "rle_frames": 0,
+          "round_trip_equal": true,
+          "run_length_distribution": {
+            "counts": [
+              {
+                "record_count": 8096,
+                "run_length_items": 1
+              }
+            ],
+            "logical_items": 8096,
+            "maximum_items": 1,
+            "mean_items_per_run": {
+              "denominator": 8096,
+              "numerator": 8096,
+              "reduced_denominator": 1,
+              "reduced_numerator": 1,
+              "value": 1.0
+            },
+            "median_items": 1.0,
+            "minimum_items": 1,
+            "p90_items": 1,
+            "p99_items": 1,
+            "run_count": 8096
+          },
+          "selected_complete_wire_bytes": 32768,
+          "selected_payload_bytes": 32384,
+          "stream": "ADC"
+        }
+      ]
+    },
+    {
+      "command": {
+        "argv": [
+          "python",
+          "-m",
+          "pytest",
+          "-q"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "complete": {
+        "expected_skips": 8,
+        "passed": 487,
+        "subtests": 14493
+      },
+      "focused": {
+        "expected_skips": 1,
+        "passed": 73,
+        "subtests": 1802
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "host-regression",
+      "inputs": [
+        {
+          "path": "daq_api/tests/test_documentation_integrity.py",
+          "sha256": "14cbc42a3805dabee6309e0f419c7ec9c6fb6ec43c4edf668509b5b744bcbda9"
+        },
+        {
+          "path": "daq_api/tests/test_repository_layout.py",
+          "sha256": "bd8d73db5429b2f9a8aafbc2f9e046e357c2bca733447e5da901a95e4a774989"
+        },
+        {
+          "path": "daq_api/tests/test_rle_codec_properties.py",
+          "sha256": "bc0071420cc11560a04b88e17d37d38bcaf9851eaf34f1655dcce1e149176361"
+        },
+        {
+          "path": "daq_api/tests/test_rle_end_to_end.py",
+          "sha256": "cad33ec1202dd20b9270a704934f6fbf73c9adbb1c67e7aea227de30d747ab52"
+        },
+        {
+          "path": "daq_api/tests/test_rle_simulator_benchmark_grading.py",
+          "sha256": "c92da02c2a40ae9e39032145b6eaedb21e24cfb8f577f7cd03f219724dcb2ec9"
+        },
+        {
+          "path": "tools/generate_protocol.py",
+          "sha256": "cd1ea3add531a0b35e3b1afcfb9029d74405e78dc49d98c3eb83f71cc7858850"
+        }
+      ],
+      "level": "host",
+      "method": "Protocol drift, focused RLE/docs, Ruff, MyPy, and complete Python/portable-host-C++ regression gates.",
+      "mypy": {
+        "checked_sources": 29,
+        "clean": true
+      },
+      "protocol_generated_outputs_current": 70,
+      "reason": null,
+      "result": "PASS",
+      "ruff": {
+        "checked_files": 140,
+        "format": true,
+        "lint": true
+      },
+      "toolchain_identity": "CPython 3.12.3; GNU g++ host wrappers"
+    },
+    {
+      "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
+      "byte_changes": [],
+      "checked_path_count": 27,
+      "combined_path_hash": "0a10b81bcda86971fa7d849a0f49408acc40ea55bfa13b31599b348063695455",
+      "command": {
+        "argv": [
+          "git",
+          "diff",
+          "--exit-code",
+          "experiment/baseline-2026-09-01",
+          "HEAD",
+          "--",
+          "protocol/protocol-v1.json",
+          "protocol/fixtures",
+          "daq_api/src/thingdaq/_generated/protocol_constants.py",
+          "firmware/src/generated/protocol_constants.h"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "default_firmware_changes_excluding_v2_constants": [],
+      "fixture_count": 23,
+      "fixture_tree": "58f3800a8450714f58ec486249521aacb68eb2e4",
+      "generated_output_count": 26,
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "protocol-v1-compatibility",
+      "inputs": [
+        {
+          "path": "daq_api/src/thingdaq/_generated/protocol_constants.py",
+          "sha256": "a5dc4cd73dd12e291c03d536c2937d14ad1d0ca84b9c8a2860ad2797fbf15961"
+        },
+        {
+          "path": "firmware/src/generated/protocol_constants.h",
+          "sha256": "9604390433f7d8227432d341ecc65b9292002797da9457937ed4d5d3cc096290"
+        },
+        {
+          "path": "protocol/fixtures/adc-data.bin",
+          "sha256": "31a14e47c224fe2b7ef4bda7153b7ea37ecb7905c2b3e9732eb2fcecff2efd6a"
+        },
+        {
+          "path": "protocol/fixtures/checksum-benchmark-request.bin",
+          "sha256": "95c062b0b6b8213c4a53278339f600ce86f67c7cdd64f0c485071a722b37602d"
+        },
+        {
+          "path": "protocol/fixtures/checksum-benchmark-response.bin",
+          "sha256": "968e404a1d835f71b000be629fead1e4b821dcc9b235e7a8a3901d6ef063af7b"
+        },
+        {
+          "path": "protocol/fixtures/configure-request.bin",
+          "sha256": "d78ac3972e6b7d049b6c764f835949d6098f104cce83595f1fcd7197c3b43cf9"
+        },
+        {
+          "path": "protocol/fixtures/configure-response.bin",
+          "sha256": "aabf46243e588eb0d7e534ec6fa408f6cb0565c49d8c989e5743f5e25c13c95c"
+        },
+        {
+          "path": "protocol/fixtures/error-response.bin",
+          "sha256": "d999ee9858397c7559bf937bb8c96e179e9cd7d158316f0ba4aac059c1efc47a"
+        },
+        {
+          "path": "protocol/fixtures/get-status-request.bin",
+          "sha256": "c656785ffd4c3fbc4970ed3d31b134039bab2bc29300f564c0352017d5c17706"
+        },
+        {
+          "path": "protocol/fixtures/get-status-response.bin",
+          "sha256": "fb1b9d1b471048f55a2c87b80bb436859e9aa6de4bf9c30d3031a0a694cab979"
+        },
+        {
+          "path": "protocol/fixtures/gpio-capture-diagnostic-request.bin",
+          "sha256": "33e8b9e6395b4c0e9ef2f48bc6695b1fc06b79f15d899e1bcfec86629f61e8a6"
+        },
+        {
+          "path": "protocol/fixtures/gpio-capture-diagnostic-response.bin",
+          "sha256": "ac24a6d9392364deefef376eda2e95cdc3fd51098d8a6d8231c0a7d9abd2d993"
+        },
+        {
+          "path": "protocol/fixtures/gpio-clock-diagnostic-request.bin",
+          "sha256": "7d5fb760c5f6ad97fceb2576e248c0f9cefec7923db55a4e2c3f910dac995c66"
+        },
+        {
+          "path": "protocol/fixtures/gpio-clock-diagnostic-response.bin",
+          "sha256": "25352e73531d85c93de82974718ae980caf53e22f8294db861184c55cd17af80"
+        },
+        {
+          "path": "protocol/fixtures/gpio-data.bin",
+          "sha256": "2b998c3d3c587d0f3e2dcb71a657912c5081e85c729aae5927d8c3120a310749"
+        },
+        {
+          "path": "protocol/fixtures/info-request.bin",
+          "sha256": "29b9b57a1d6fd8ac9599343b0c4a6f99d050d7fea89d8e4eacdf1dea95b45f3c"
+        },
+        {
+          "path": "protocol/fixtures/info-response.bin",
+          "sha256": "71fe422700015d43b340aa35d079869370362ffaa8b2a67829f1785725b474c7"
+        },
+        {
+          "path": "protocol/fixtures/manifest.json",
+          "sha256": "e354b6dd7749b4dcea9ee233297f5712f645c2d0a1444d990e22f02303c99568"
+        },
+        {
+          "path": "protocol/fixtures/ping-request.bin",
+          "sha256": "3861fce26f53e4e1d2939756569b6e6b0819e15be856b878632b1d0b7d3d9cd8"
+        },
+        {
+          "path": "protocol/fixtures/ping-response.bin",
+          "sha256": "7a0b37d42dc14845a3673052d2b5ec3472307f404f418a48dd0048db56b66f11"
+        },
+        {
+          "path": "protocol/fixtures/reset-stats-request.bin",
+          "sha256": "4411da315ac2363cf323e858bdf89e351b221e80c255b523fc50846551091646"
+        },
+        {
+          "path": "protocol/fixtures/reset-stats-response.bin",
+          "sha256": "cc22d2ea1cbcedfdd6863616557560e91db1b411d3782fa2dfe8fa21edc5f337"
+        },
+        {
+          "path": "protocol/fixtures/start-request.bin",
+          "sha256": "6a05f4efc6119d9a0576d4629fa28eb2f01036cf3f1d6713d1b5690f179a70dd"
+        },
+        {
+          "path": "protocol/fixtures/start-response.bin",
+          "sha256": "9d546cf5cbce61f812dc3f375b3d984c218b27e89af484b19d32839a7dded688"
+        },
+        {
+          "path": "protocol/fixtures/stop-request.bin",
+          "sha256": "8025d47b1a62867a2c5b68eab10922f2b1c98c316d1c58254ce0488420013f9b"
+        },
+        {
+          "path": "protocol/fixtures/stop-response.bin",
+          "sha256": "2a40df907e291a408b59482dd0267779634788aeb85d0ec8651331074726f13b"
+        },
+        {
+          "path": "protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+        }
+      ],
+      "level": "host",
+      "method": "Byte comparison of the canonical v1 contract and all 26 generated v1 outputs against the immutable baseline branch.",
+      "path_hashes": {
+        "daq_api/src/thingdaq/_generated/protocol_constants.py": "a5dc4cd73dd12e291c03d536c2937d14ad1d0ca84b9c8a2860ad2797fbf15961",
+        "firmware/src/generated/protocol_constants.h": "9604390433f7d8227432d341ecc65b9292002797da9457937ed4d5d3cc096290",
+        "protocol/fixtures/adc-data.bin": "31a14e47c224fe2b7ef4bda7153b7ea37ecb7905c2b3e9732eb2fcecff2efd6a",
+        "protocol/fixtures/checksum-benchmark-request.bin": "95c062b0b6b8213c4a53278339f600ce86f67c7cdd64f0c485071a722b37602d",
+        "protocol/fixtures/checksum-benchmark-response.bin": "968e404a1d835f71b000be629fead1e4b821dcc9b235e7a8a3901d6ef063af7b",
+        "protocol/fixtures/configure-request.bin": "d78ac3972e6b7d049b6c764f835949d6098f104cce83595f1fcd7197c3b43cf9",
+        "protocol/fixtures/configure-response.bin": "aabf46243e588eb0d7e534ec6fa408f6cb0565c49d8c989e5743f5e25c13c95c",
+        "protocol/fixtures/error-response.bin": "d999ee9858397c7559bf937bb8c96e179e9cd7d158316f0ba4aac059c1efc47a",
+        "protocol/fixtures/get-status-request.bin": "c656785ffd4c3fbc4970ed3d31b134039bab2bc29300f564c0352017d5c17706",
+        "protocol/fixtures/get-status-response.bin": "fb1b9d1b471048f55a2c87b80bb436859e9aa6de4bf9c30d3031a0a694cab979",
+        "protocol/fixtures/gpio-capture-diagnostic-request.bin": "33e8b9e6395b4c0e9ef2f48bc6695b1fc06b79f15d899e1bcfec86629f61e8a6",
+        "protocol/fixtures/gpio-capture-diagnostic-response.bin": "ac24a6d9392364deefef376eda2e95cdc3fd51098d8a6d8231c0a7d9abd2d993",
+        "protocol/fixtures/gpio-clock-diagnostic-request.bin": "7d5fb760c5f6ad97fceb2576e248c0f9cefec7923db55a4e2c3f910dac995c66",
+        "protocol/fixtures/gpio-clock-diagnostic-response.bin": "25352e73531d85c93de82974718ae980caf53e22f8294db861184c55cd17af80",
+        "protocol/fixtures/gpio-data.bin": "2b998c3d3c587d0f3e2dcb71a657912c5081e85c729aae5927d8c3120a310749",
+        "protocol/fixtures/info-request.bin": "29b9b57a1d6fd8ac9599343b0c4a6f99d050d7fea89d8e4eacdf1dea95b45f3c",
+        "protocol/fixtures/info-response.bin": "71fe422700015d43b340aa35d079869370362ffaa8b2a67829f1785725b474c7",
+        "protocol/fixtures/manifest.json": "e354b6dd7749b4dcea9ee233297f5712f645c2d0a1444d990e22f02303c99568",
+        "protocol/fixtures/ping-request.bin": "3861fce26f53e4e1d2939756569b6e6b0819e15be856b878632b1d0b7d3d9cd8",
+        "protocol/fixtures/ping-response.bin": "7a0b37d42dc14845a3673052d2b5ec3472307f404f418a48dd0048db56b66f11",
+        "protocol/fixtures/reset-stats-request.bin": "4411da315ac2363cf323e858bdf89e351b221e80c255b523fc50846551091646",
+        "protocol/fixtures/reset-stats-response.bin": "cc22d2ea1cbcedfdd6863616557560e91db1b411d3782fa2dfe8fa21edc5f337",
+        "protocol/fixtures/start-request.bin": "6a05f4efc6119d9a0576d4629fa28eb2f01036cf3f1d6713d1b5690f179a70dd",
+        "protocol/fixtures/start-response.bin": "9d546cf5cbce61f812dc3f375b3d984c218b27e89af484b19d32839a7dded688",
+        "protocol/fixtures/stop-request.bin": "8025d47b1a62867a2c5b68eab10922f2b1c98c316d1c58254ce0488420013f9b",
+        "protocol/fixtures/stop-response.bin": "2a40df907e291a408b59482dd0267779634788aeb85d0ec8651331074726f13b",
+        "protocol/protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+      },
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "Git object database and SHA-256"
+    },
+    {
+      "command": {
+        "argv": [
+          "python",
+          "daq_api/examples/rle_compression.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "deterministic_budget": {
+        "frames_per_run": 24,
+        "frames_per_stream": 2,
+        "pattern_count": 6,
+        "repeat_count": 2,
+        "streams_per_pattern": 2
+      },
+      "final_state": "IDLE",
+      "id": "simulator-demo",
+      "inputs": [
+        {
+          "path": "daq_api/examples/rle_compression.py",
+          "sha256": "1994f23a3fc2284ec7282c46e1ab4962413ee1e083153026cc855652d06a44de"
+        },
+        {
+          "path": "daq_api/src/thingdaq/client.py",
+          "sha256": "19a1d36bac5e04b475859853a2743279a9ebe6907fc92aa5fac5c06349a12a3c"
+        },
+        {
+          "path": "daq_api/src/thingdaq/protocol_v2.py",
+          "sha256": "1d3cdc4e7ca1c2a62a3d9abf92eee4d9488961c1c4ae080434c3597a2d4930a3"
+        },
+        {
+          "path": "daq_api/src/thingdaq/simulator.py",
+          "sha256": "5502689a06774aaccc8423069d535f9ccc84f4b5c0bbdf396dd9f66d2ac1da6e"
+        },
+        {
+          "path": "protocol/protocol-v2.json",
+          "sha256": "60d624a2a28095dc8ac49f748fb9352a3a940547a129cebc8e12bc1883fd6274"
+        }
+      ],
+      "level": "simulated",
+      "method": "Two bounded public RAW-versus-RLE_AUTO simulator runs with exact decoded-block equality across six ADC/GPIO source patterns.",
+      "output_sha256": "d958c5a9f59b57dbcf4638b4ab3413ee1f758694462a368f39f43d0c65558aee",
+      "protocol_identity": "protocol-v2 sha256:60d624a2a28095dc8ac49f748fb9352a3a940547a129cebc8e12bc1883fd6274",
+      "queue_bound_violations": 0,
+      "reason": null,
+      "result": "PASS",
+      "simulator_identity": "ThingDAQ ExperimentalSimulatedDevice",
+      "summaries": [
+        {
+          "encoded_payload_bytes": 12,
+          "encoded_wire_bytes": 108,
+          "fallback_frames": 0,
+          "frames": 2,
+          "pattern": "constant",
+          "payload_ratio": 0.001482,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 12
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 2,
+          "runs": 2,
+          "stream": "ADC",
+          "wire_ratio": 0.013184,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 108
+          }
+        },
+        {
+          "encoded_payload_bytes": 6,
+          "encoded_wire_bytes": 102,
+          "fallback_frames": 0,
+          "frames": 2,
+          "pattern": "constant",
+          "payload_ratio": 0.000741,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 6
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 2,
+          "runs": 2,
+          "stream": "GPIO",
+          "wire_ratio": 0.012451,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 102
+          }
+        },
+        {
+          "encoded_payload_bytes": 102,
+          "encoded_wire_bytes": 198,
+          "fallback_frames": 0,
+          "frames": 2,
+          "pattern": "long-hold",
+          "payload_ratio": 0.012599,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 102
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 2,
+          "runs": 17,
+          "stream": "ADC",
+          "wire_ratio": 0.02417,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 198
+          }
+        },
+        {
+          "encoded_payload_bytes": 51,
+          "encoded_wire_bytes": 147,
+          "fallback_frames": 0,
+          "frames": 2,
+          "pattern": "long-hold",
+          "payload_ratio": 0.006299,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 51
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 2,
+          "runs": 17,
+          "stream": "GPIO",
+          "wire_ratio": 0.017944,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 147
+          }
+        },
+        {
+          "encoded_payload_bytes": 24,
+          "encoded_wire_bytes": 120,
+          "fallback_frames": 0,
+          "frames": 2,
+          "pattern": "sparse-transition",
+          "payload_ratio": 0.002964,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 24
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 2,
+          "runs": 4,
+          "stream": "ADC",
+          "wire_ratio": 0.014648,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 120
+          }
+        },
+        {
+          "encoded_payload_bytes": 12,
+          "encoded_wire_bytes": 108,
+          "fallback_frames": 0,
+          "frames": 2,
+          "pattern": "sparse-transition",
+          "payload_ratio": 0.001482,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 12
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 2,
+          "runs": 4,
+          "stream": "GPIO",
+          "wire_ratio": 0.013184,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 108
+          }
+        },
+        {
+          "encoded_payload_bytes": 2484,
+          "encoded_wire_bytes": 2580,
+          "fallback_frames": 0,
+          "frames": 2,
+          "pattern": "slowly-changing",
+          "payload_ratio": 0.306818,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 2484
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 2,
+          "runs": 414,
+          "stream": "ADC",
+          "wire_ratio": 0.314941,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 2580
+          }
+        },
+        {
+          "encoded_payload_bytes": 1518,
+          "encoded_wire_bytes": 1614,
+          "fallback_frames": 0,
+          "frames": 2,
+          "pattern": "slowly-changing",
+          "payload_ratio": 0.1875,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 1518
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 2,
+          "runs": 506,
+          "stream": "GPIO",
+          "wire_ratio": 0.197021,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 1614
+          }
+        },
+        {
+          "encoded_payload_bytes": 8096,
+          "encoded_wire_bytes": 8192,
+          "fallback_frames": 2,
+          "frames": 2,
+          "pattern": "alternating",
+          "payload_ratio": 1.0,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 8096
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 0,
+          "runs": 2024,
+          "stream": "ADC",
+          "wire_ratio": 1.0,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 8192
+          }
+        },
+        {
+          "encoded_payload_bytes": 8096,
+          "encoded_wire_bytes": 8192,
+          "fallback_frames": 2,
+          "frames": 2,
+          "pattern": "alternating",
+          "payload_ratio": 1.0,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 8096
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 0,
+          "runs": 8096,
+          "stream": "GPIO",
+          "wire_ratio": 1.0,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 8192
+          }
+        },
+        {
+          "encoded_payload_bytes": 8096,
+          "encoded_wire_bytes": 8192,
+          "fallback_frames": 2,
+          "frames": 2,
+          "pattern": "high-entropy",
+          "payload_ratio": 1.0,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 8096
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 0,
+          "runs": 2024,
+          "stream": "ADC",
+          "wire_ratio": 1.0,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 8192
+          }
+        },
+        {
+          "encoded_payload_bytes": 8096,
+          "encoded_wire_bytes": 8192,
+          "fallback_frames": 2,
+          "frames": 2,
+          "pattern": "high-entropy",
+          "payload_ratio": 1.0,
+          "payload_ratio_exact": {
+            "denominator": 8096,
+            "numerator": 8096
+          },
+          "raw_payload_bytes": 8096,
+          "raw_wire_bytes": 8192,
+          "rle_frames": 0,
+          "runs": 8061,
+          "stream": "GPIO",
+          "wire_ratio": 1.0,
+          "wire_ratio_exact": {
+            "denominator": 8192,
+            "numerator": 8192
+          }
+        }
+      ],
+      "transport_closed": true
+    }
+  ],
+  "experiment_id": "rle-streaming",
+  "identity": {
+    "baseline_branch": "experiment/baseline-2026-09-01",
+    "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
+    "branch": "experiment/rle-streaming",
+    "protocol_contract_path": "protocol/protocol-v1.json",
+    "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+    "protocol_version": 1,
+    "repository": "https://github.com/ThingDone/thingdaq.git",
+    "source_clean": true,
+    "source_commit": "3aeefc435f1e1d020772670467ea60227ad7aeaa",
+    "source_id": "07df743de1619a41d55a929a693510e6497fa2d22783ac92ba84ad762e62b5dc",
+    "source_tree": "81417d52c6e57aa59c027ba8206716f48579b9f8",
+    "toolchains": [
+      {
+        "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+        "name": "arduino-cli",
+        "version": "1.4.1"
+      },
+      {
+        "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "name": "arm-none-eabi-g++",
+        "version": "15.2.1"
+      },
+      {
+        "identity": "CPython 3.12.3",
+        "name": "python",
+        "version": "3.12.3"
+      },
+      {
+        "identity": "teensy:avr 1.62.0",
+        "name": "teensy-core",
+        "version": "1.62.0"
+      }
+    ]
+  },
+  "limitations": [
+    {
+      "applies_to_evidence_levels": [
+        "simulated"
+      ],
+      "id": "simulation_is_not_physical",
+      "statement": "Simulator evidence does not establish firmware target timing, USB behavior, electrical behavior, or physical signal quality."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "host"
+      ],
+      "id": "build_is_not_target_runtime",
+      "statement": "A no-upload build and linker/map inspection do not establish that the artifact ran correctly on a Teensy or over USB."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig"
+      ],
+      "id": "analog_performance_untested",
+      "statement": "Unstimulated or synthetic data do not establish ADC accuracy, noise, ENOB, linearity, bandwidth, source tolerance, or true aperture timing."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig"
+      ],
+      "id": "external_gpio_timing_untested",
+      "statement": "Without a declared external stimulus, evidence does not establish pad mapping, voltage thresholds, transition timing, jitter, or signal integrity."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig"
+      ],
+      "id": "compression_is_workload_dependent",
+      "statement": "Compression results apply only to the declared workload and framing; they do not promise savings for noisy or incompressible inputs."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "id": "cross_branch_combinations_untested",
+      "statement": "Independent candidate results do not establish that clock, compression, auxiliary input, and auxiliary output changes work together in one artifact."
+    }
+  ],
+  "matrix_schema_version": 1,
+  "metrics": [
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "flash_used_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 126972
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "flash_headroom_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 1904644
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram1_used_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 489760
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram1_headroom_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 34528
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram2_used_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 520192
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram2_headroom_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 4096
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "cpu_clock_hz",
+      "scope": "artifact",
+      "unit": "hertz",
+      "value": 600000000
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "host-corpus-benchmark"
+      ],
+      "evidence_level": "host",
+      "name": "logical_raw_bytes",
+      "scope": "declared_codec_workload",
+      "unit": "byte",
+      "value": 291456
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "evidence_level": "simulated",
+      "name": "logical_raw_bytes",
+      "scope": "declared_codec_workload",
+      "unit": "byte",
+      "value": 97152
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "host-corpus-benchmark"
+      ],
+      "evidence_level": "host",
+      "name": "encoded_wire_bytes",
+      "scope": "declared_codec_workload",
+      "unit": "byte",
+      "value": 143261
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "evidence_level": "simulated",
+      "name": "encoded_wire_bytes",
+      "scope": "declared_codec_workload",
+      "unit": "byte",
+      "value": 37745
+    },
+    {
+      "denominator": "logical_raw_bytes",
+      "evidence_ids": [
+        "host-corpus-benchmark"
+      ],
+      "evidence_level": "host",
+      "name": "encoded_to_raw_ratio",
+      "scope": "declared_codec_workload",
+      "unit": "ratio",
+      "value": 0.49153560057092666
+    },
+    {
+      "denominator": "logical_raw_bytes",
+      "evidence_ids": [
+        "simulator-demo"
+      ],
+      "evidence_level": "simulated",
+      "name": "encoded_to_raw_ratio",
+      "scope": "declared_codec_workload",
+      "unit": "ratio",
+      "value": 0.38851490447957837
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "host-corpus-benchmark"
+      ],
+      "evidence_level": "host",
+      "name": "codec_throughput_bytes_per_second",
+      "scope": "declared_codec_benchmark",
+      "unit": "byte_per_second",
+      "value": 5277575.761053098
+    }
+  ],
+  "reason": null,
+  "related": [
+    "[[ADR-006-Experimental-RLE-Streaming]]",
+    "[[Experiment-Baseline]]",
+    "[[Quickstart]]"
+  ],
+  "result": "PASS",
+  "schema_version": 1,
+  "summary": "The negotiated protocol-v2 Python/simulator prototype passed every local correctness,\nno-expansion, bounded-memory, decode-headroom, build, and compatibility gate.\nCompression remains opt-in and simulated/host-only.\n\n### Exact corpus compression\n\nAll ratios retain their measured complete-wire numerator and RAW complete-wire denominator.\n\n| Workload | RAW / selected payload bytes | RAW / selected wire bytes | Exact wire ratio | Runs | RLE / fallback frames |\n| --- | ---: | ---: | ---: | ---: | ---: |\n| `gpio-constant` | 32,384 / 24 | 32,768 / 408 | 408/32768 = 0.012451172 | 8 | 8 / 0 |\n| `gpio-long-digital-holds` | 32,384 / 213 | 32,768 / 597 | 597/32768 = 0.018218994 | 71 | 8 / 0 |\n| `gpio-sparse-single-bit-changes` | 32,384 / 48 | 32,768 / 432 | 432/32768 = 0.013183594 | 16 | 8 / 0 |\n| `gpio-alternating-bytes` | 32,384 / 32,384 | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 32,384 | 0 / 8 |\n| `gpio-pseudo-random-bytes` | 32,384 / 32,384 | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 32,246 | 0 / 8 |\n| `adc-constant-pairs` | 32,384 / 48 | 32,768 / 432 | 432/32768 = 0.013183594 | 8 | 8 / 0 |\n| `adc-independent-slow-channels` | 32,384 / 9,936 | 32,768 / 10,320 | 10320/32768 = 0.314941406 | 1,656 | 8 / 0 |\n| `adc-quantization-noise` | 32,384 / 32,384 | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 7,953 | 0 / 8 |\n| `adc-high-entropy` | 32,384 / 32,384 | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 8,096 | 0 / 8 |\n\n### Host codec throughput\n\nValues are the slowest retained batch across all nine workloads for each path; headroom uses the exact 4,000,000 logical B/s per-stream denominator.\n\n| Run | Path | Limiting workload | Minimum logical B/s | Target headroom |\n| ---: | --- | --- | ---: | ---: |\n| 1 | `raw_encode` | `adc-high-entropy` | 39828880.974819 | 9.957220244x |\n| 1 | `rle_auto_encode` | `gpio-pseudo-random-bytes` | 3772978.487382 | 0.943244622x |\n| 1 | `raw_decode` | `gpio-pseudo-random-bytes` | 6094371.687918 | 1.523592922x |\n| 1 | `rle_auto_decode` | `gpio-alternating-bytes` | 6181090.854221 | 1.545272714x |\n| 2 | `raw_encode` | `adc-quantization-noise` | 40959654.439391 | 10.239913610x |\n| 2 | `rle_auto_encode` | `gpio-pseudo-random-bytes` | 3439740.145490 | 0.859935036x |\n| 2 | `raw_decode` | `gpio-long-digital-holds` | 6195371.939035 | 1.548842985x |\n| 2 | `rle_auto_decode` | `gpio-alternating-bytes` | 5277575.761053 | 1.319393940x |\n\n### Determinism, compatibility, and build closure\n\n| Gate | Exact observation |\n| --- | --- |\n| Simulator demonstration | Two byte-identical outputs; SHA-256 `d958c5a9f59b57dbcf4638b4ab3413ee1f758694462a368f39f43d0c65558aee` |\n| Corpus normalization | Two byte-identical timing-independent outputs; SHA-256 `48af28678522ed58879db3aa01ad4e5b733f56b25a007d09f4e62301dfda531a` |\n| Complete regression | 487 passed, 8 expected skips, 14,493 subtests |\n| Focused RLE/docs gate | 73 passed, 1 expected skip, 1,802 subtests |\n| Ruff / MyPy | 140 files formatted and lint-clean; 29 sources type-clean |\n| Protocol v1 | 27 source/generated/fixture paths byte-identical to baseline; fixture tree `58f3800a8450714f58ec486249521aacb68eb2e4` |\n| Pinned firmware | 600 MHz, USB Serial, `-O2`; flash 126,972 B, RAM1 489,760 B, RAM2 520,192 B |\n\nThe firmware build is a no-upload compile of the unchanged default v1 path. The isolated generated v2 constants header changes build identity bookkeeping, so this report does not claim a byte-identical firmware artifact or target-side RLE execution.",
+  "title": "ThingDAQ Negotiated RLE Experiment"
+}

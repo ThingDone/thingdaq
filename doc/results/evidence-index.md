@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Evidence Index
 created: 2026-08-29
-updated: 2026-08-31
+updated: 2026-09-02
 tags:
   - thingdaq
   - evidence
@@ -30,6 +30,7 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[rle-prototype]]'
 ---
 
 # ThingDAQ evidence index
@@ -59,6 +60,21 @@ serve as release acceptance for ThingDAQ 1.0.
 Use [[soak-harness]] to generate and run new evidence against this identity.
 Do not compare a current report to the hashes in the historical sections
 below.
+
+## Experimental negotiated RLE prototype
+
+[[rle-prototype]] records the isolated `experiment/rle-streaming` host and
+simulator gate. Two no-hardware demonstrations were byte-identical, both
+72-frame corpus benchmarks passed exact round-trip, adaptive no-expansion,
+bounded-memory, long-hold savings, incompressible fallback, and 1.25x decode
+headroom requirements, and the pinned default 600 MHz firmware still compiled
+without upload. All 27 protocol-v1 source/generated/fixture paths remained
+byte-identical to the immutable baseline.
+
+This is not target-side RLE, USB, analog, external-GPIO, or physical timing
+evidence. Compression savings are workload-dependent, ADC savings have no
+minimum acceptance threshold, and no cross-experiment branch combination was
+tested.
 
 ## Historical autonomous acceptance (superseded identity)
 
