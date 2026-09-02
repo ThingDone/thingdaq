@@ -550,6 +550,15 @@ def _final_gauges(metrics: SoakMetrics) -> dict[str, int]:
     }
 
 
+def _reader_counter_evidence(metrics: SoakMetrics) -> dict[str, Any]:
+    """Return semantic reader counters without scheduler-dependent empty polls."""
+
+    counters = asdict(metrics.reader_counters)
+    counters.pop("read_calls")
+    counters.pop("readinto_calls")
+    return counters
+
+
 def run_capture(
     *,
     frame_budget: int,
@@ -1282,7 +1291,7 @@ def _evidence_records(
             "queue_bounds": list(capture.queue_bounds),
             "counter_snapshot": {
                 "firmware_faults": [asdict(fault) for fault in firmware_faults.faults],
-                "host_reader": asdict(capture.metrics.reader_counters),
+                "host_reader": _reader_counter_evidence(capture.metrics),
                 "host_parser": asdict(capture.metrics.parser_counters),
                 "reconciliation": asdict(capture.metrics.reconciliation),
                 "sequence_gaps": {"adc": 0, "gpio": 0, "total": 0},
