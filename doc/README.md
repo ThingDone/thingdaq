@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Documentation Index
 created: 2026-08-27
-updated: 2026-08-31
+updated: 2026-09-02
 tags:
   - thingdaq
   - documentation
@@ -37,6 +37,8 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[ADR-006-Experimental-RLE-Streaming]]'
+  - '[[Experiment-Baseline]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -82,7 +84,8 @@ physical acceptance.
 - `decisions/` contains architecture decision records, including
   [[ADR-001-Wire-Protocol]], [[ADR-002-Checksum-Selection]], and
   [[ADR-003-GPIO-Clock-DMA]], followed by the permanent converter, trigger,
-  and DMA resource contract in [[ADR-004-ADC-Trigger-DMA]].
+  and DMA resource contract in [[ADR-004-ADC-Trigger-DMA]]. The isolated
+  negotiated compression contract is [[ADR-006-Experimental-RLE-Streaming]].
 - `reference/` records durable user and implementation references: begin with
   [[Hardware-Safety]] before connecting signals, use [[API-Reference]] for the
   stable Python surface, and consult [[Foundation-Reuse-Inventory]] for the
@@ -90,7 +93,8 @@ physical acceptance.
 - `research/` records evidence gathered before implementation or selection,
   beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
-  including [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
+  beginning with the immutable [[Experiment-Baseline]] and including
+  [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
   by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical
   [[Phase-03-Control-Plane]] control acceptance and
