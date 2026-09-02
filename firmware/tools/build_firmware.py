@@ -87,9 +87,14 @@ FQBN = DEFAULT_CPU_PROFILE.fqbn
 EXPECTED_BUILD_PROPERTIES = DEFAULT_CPU_PROFILE.expected_build_properties
 OUTPUT_DIRECTORY = DEFAULT_CPU_PROFILE.output_directory
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 11
+MANIFEST_SCHEMA_VERSION = 12
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
+IDENTICAL_ARTIFACT_SUFFIXES = (".eep",)
+SAME_SIZE_PROFILE_VARIANT_ARTIFACT_SUFFIXES = (".bin", ".hex")
+PROFILE_VARIANT_ARTIFACT_SUFFIXES = (".elf", ".map")
+LINKER_SYMBOL_CONTRACT_POLICY = "thingdaq-profile-stable-nm-symbols-v1"
+ALLOCATABLE_SECTION_CONTRACT_POLICY = "thingdaq-identical-alloc-sections-v1"
 SOURCE_INPUTS = (
     SKETCH_DIRECTORY / "firmware.ino",
     SKETCH_DIRECTORY / "src",
@@ -119,6 +124,28 @@ CHECKSUM_DISPATCH_SYMBOL = (
     "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, "
     "unsigned char const*, unsigned int, unsigned long&)"
 )
+PROFILE_VARIANT_LINKER_SYMBOLS = {
+    "thingdaq::control::ControlState::infoResponse() const": {
+        "symbol_type": "T",
+        "size_bytes_by_profile": {"600": 424, "528": 432},
+    },
+    (
+        "thingdaq::stats::Statistics::wireStatus("
+        "thingdaq::protocol_v1::DeviceState, "
+        "thingdaq::protocol::Configuration const&) const"
+    ): {
+        "symbol_type": "T",
+        "size_bytes_by_profile": {"600": 1900, "528": 1904},
+    },
+    (
+        "thingdaq::protocol::(anonymous namespace)::validatePayload("
+        "thingdaq::protocol::FrameHeader const&, "
+        "thingdaq::protocol::ByteView)"
+    ): {
+        "symbol_type": "t",
+        "size_bytes_by_profile": {"600": 4632, "528": 4624},
+    },
+}
 BENCHMARK_BUFFER_SYMBOLS = {
     "DTCM_PACKET": (
         "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer",
@@ -563,6 +590,15 @@ def resolve_nm(compiler: Path) -> Path:
     return nm.resolve()
 
 
+def resolve_objdump(compiler: Path) -> Path:
+    """Resolve the section inspector adjacent to the pinned cross-compiler."""
+
+    objdump = compiler.with_name("arm-none-eabi-objdump")
+    if not objdump.is_file():
+        raise BuildError(f"cross-toolchain section inspector does not exist: {objdump}")
+    return objdump.resolve()
+
+
 def compile_command(
     arduino_cli: Path,
     identity: BuildIdentity,
@@ -669,6 +705,117 @@ def parse_nm_symbols(output: str) -> dict[str, tuple[int, int, str]]:
             continue
         symbols[name] = (address, size, symbol_type)
     return symbols
+
+
+def linker_symbol_contract(nm_output: str, profile: CpuProfile) -> dict[str, Any]:
+    """Hash every invariant symbol while allowing only reviewed clock variants."""
+
+    profile = _validated_profile(profile)
+    records: list[tuple[str, str, int]] = []
+    for line in nm_output.splitlines():
+        fields = line.split(maxsplit=3)
+        if len(fields) != 4:
+            continue
+        address_text, size_text, symbol_type, name = fields
+        try:
+            int(address_text, 16)
+            size = int(size_text, 16)
+        except ValueError:
+            continue
+        records.append((name, symbol_type, size))
+    if not records:
+        raise BuildError("firmware ELF symbol inventory is empty")
+
+    variant_contract: dict[str, dict[str, Any]] = {}
+    for name, specification in PROFILE_VARIANT_LINKER_SYMBOLS.items():
+        matches = [record for record in records if record[0] == name]
+        if len(matches) != 1:
+            raise BuildError(
+                f"firmware ELF must contain exactly one clock-profile symbol {name}"
+            )
+        _, symbol_type, size = matches[0]
+        expected_type = specification["symbol_type"]
+        expected_sizes = specification["size_bytes_by_profile"]
+        if symbol_type != expected_type:
+            raise BuildError(
+                f"clock-profile symbol {name} has type {symbol_type}, "
+                f"expected {expected_type}"
+            )
+        expected_size = expected_sizes[profile.name]
+        if size != expected_size:
+            raise BuildError(
+                f"clock-profile symbol {name} occupies {size} bytes, "
+                f"expected {expected_size} for {profile.name} MHz"
+            )
+        variant_contract[name] = {
+            "symbol_type": expected_type,
+            "size_bytes_by_profile": dict(expected_sizes),
+        }
+
+    invariant_records = [
+        {
+            "name": name,
+            "symbol_type": symbol_type,
+            "size_bytes": size,
+        }
+        for name, symbol_type, size in records
+        if name not in PROFILE_VARIANT_LINKER_SYMBOLS
+    ]
+    invariant_records.sort(
+        key=lambda record: (
+            record["name"],
+            record["symbol_type"],
+            record["size_bytes"],
+        )
+    )
+    return {
+        "policy": LINKER_SYMBOL_CONTRACT_POLICY,
+        "symbol_count": len(records),
+        "profile_invariant_symbol_count": len(invariant_records),
+        "profile_invariant_sha256": _canonical_sha256(invariant_records),
+        "profile_variant_symbols": variant_contract,
+    }
+
+
+def allocatable_section_contract(objdump_output: str) -> dict[str, Any]:
+    """Record ELF sections that consume target address space, excluding debug data."""
+
+    header_pattern = re.compile(
+        r"^\s*\d+\s+(\S+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+"
+        r"([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s+2\*\*(\d+)\s*$"
+    )
+    lines = objdump_output.splitlines()
+    sections: list[dict[str, Any]] = []
+    for index, line in enumerate(lines):
+        match = header_pattern.match(line)
+        if match is None or index + 1 >= len(lines):
+            continue
+        flags = tuple(
+            sorted(flag.strip() for flag in lines[index + 1].split(",") if flag.strip())
+        )
+        if "ALLOC" not in flags:
+            continue
+        name, size_text, vma_text, lma_text, alignment_exponent = match.groups()
+        sections.append(
+            {
+                "name": name,
+                "size_bytes": int(size_text, 16),
+                "vma": f"0x{int(vma_text, 16):08x}",
+                "lma": f"0x{int(lma_text, 16):08x}",
+                "alignment_bytes": 1 << int(alignment_exponent),
+                "flags": list(flags),
+            }
+        )
+    if not sections:
+        raise BuildError("firmware ELF has no allocatable section inventory")
+    names = [section["name"] for section in sections]
+    if len(names) != len(set(names)):
+        raise BuildError("firmware ELF contains duplicate allocatable section names")
+    return {
+        "policy": ALLOCATABLE_SECTION_CONTRACT_POLICY,
+        "section_count": len(sections),
+        "sections": sections,
+    }
 
 
 def checksum_resource_usage(nm_output: str) -> dict[str, Any]:
@@ -1033,7 +1180,7 @@ def stable_linker_resource_contract(
         "binary_inspection": {
             name: value
             for name, value in binary_inspection.items()
-            if name != "nm_path"
+            if name not in {"nm_path", "objdump_path"}
         },
     }
 
@@ -1045,6 +1192,104 @@ def _required_mapping(
     if not isinstance(selected, dict):
         raise BuildError(f"{location}.{name} must be an object")
     return selected
+
+
+def _expected_profile_variant_symbol_contract() -> dict[str, dict[str, Any]]:
+    """Return the JSON-safe, profile-invariant reviewed symbol contract."""
+
+    return {
+        name: {
+            "symbol_type": specification["symbol_type"],
+            "size_bytes_by_profile": dict(specification["size_bytes_by_profile"]),
+        }
+        for name, specification in PROFILE_VARIANT_LINKER_SYMBOLS.items()
+    }
+
+
+def validate_linker_symbol_contract(contract: Mapping[str, Any]) -> None:
+    """Reject incomplete or contradictory normalized linker-symbol evidence."""
+
+    if contract.get("policy") != LINKER_SYMBOL_CONTRACT_POLICY:
+        raise BuildError("profile manifest linker symbol policy mismatch")
+    symbol_count = contract.get("symbol_count")
+    invariant_count = contract.get("profile_invariant_symbol_count")
+    if (
+        not isinstance(symbol_count, int)
+        or isinstance(symbol_count, bool)
+        or not isinstance(invariant_count, int)
+        or isinstance(invariant_count, bool)
+        or invariant_count <= 0
+        or symbol_count != invariant_count + len(PROFILE_VARIANT_LINKER_SYMBOLS)
+    ):
+        raise BuildError("profile manifest linker symbol counts are invalid")
+    digest = contract.get("profile_invariant_sha256")
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise BuildError("profile manifest linker symbol digest is invalid")
+    if (
+        contract.get("profile_variant_symbols")
+        != _expected_profile_variant_symbol_contract()
+    ):
+        raise BuildError("profile manifest clock-variant symbol contract mismatch")
+
+
+def validate_allocatable_section_contract(contract: Mapping[str, Any]) -> None:
+    """Reject malformed target-address-space section evidence."""
+
+    if contract.get("policy") != ALLOCATABLE_SECTION_CONTRACT_POLICY:
+        raise BuildError("profile manifest allocatable section policy mismatch")
+    section_count = contract.get("section_count")
+    sections = contract.get("sections")
+    if (
+        not isinstance(section_count, int)
+        or isinstance(section_count, bool)
+        or section_count <= 0
+        or not isinstance(sections, list)
+        or len(sections) != section_count
+    ):
+        raise BuildError("profile manifest allocatable section count is invalid")
+    names: set[str] = set()
+    for index, section in enumerate(sections):
+        if not isinstance(section, dict):
+            raise BuildError(
+                f"profile manifest allocatable section {index} must be an object"
+            )
+        name = section.get("name")
+        size = section.get("size_bytes")
+        alignment = section.get("alignment_bytes")
+        flags = section.get("flags")
+        if not isinstance(name, str) or not name or name in names:
+            raise BuildError("profile manifest allocatable section name is invalid")
+        names.add(name)
+        if (
+            not isinstance(size, int)
+            or isinstance(size, bool)
+            or size <= 0
+            or not isinstance(alignment, int)
+            or isinstance(alignment, bool)
+            or alignment <= 0
+            or alignment & (alignment - 1)
+        ):
+            raise BuildError(
+                f"profile manifest allocatable section {name} size/alignment is invalid"
+            )
+        for address_name in ("vma", "lma"):
+            address = section.get(address_name)
+            if (
+                not isinstance(address, str)
+                or re.fullmatch(r"0x[0-9a-f]{8}", address) is None
+            ):
+                raise BuildError(
+                    f"profile manifest allocatable section {name} {address_name} is invalid"
+                )
+        if (
+            not isinstance(flags, list)
+            or not all(isinstance(flag, str) and flag for flag in flags)
+            or "ALLOC" not in flags
+            or "DEBUGGING" in flags
+        ):
+            raise BuildError(
+                f"profile manifest allocatable section {name} flags are invalid"
+            )
 
 
 def validate_profile_manifest(manifest: Mapping[str, Any]) -> CpuProfile:
@@ -1135,15 +1380,28 @@ def validate_profile_manifest(manifest: Mapping[str, Any]) -> CpuProfile:
 
     memory_usage = _required_mapping(manifest, "memory_usage")
     binary_inspection = _required_mapping(manifest, "binary_inspection")
+    validate_linker_symbol_contract(
+        _required_mapping(
+            binary_inspection,
+            "linker_symbol_contract",
+            "manifest.binary_inspection",
+        )
+    )
+    validate_allocatable_section_contract(
+        _required_mapping(
+            binary_inspection,
+            "allocatable_section_contract",
+            "manifest.binary_inspection",
+        )
+    )
     parity = _required_mapping(manifest, "profile_parity")
     expected_parity_policy = {
         "policy": "thingdaq-clock-profile-parity-v1",
-        "identical_artifact_suffixes": [".eep", ".map"],
-        "same_size_profile_variant_artifact_suffixes": [
-            ".bin",
-            ".elf",
-            ".hex",
-        ],
+        "identical_artifact_suffixes": list(IDENTICAL_ARTIFACT_SUFFIXES),
+        "same_size_profile_variant_artifact_suffixes": list(
+            SAME_SIZE_PROFILE_VARIANT_ARTIFACT_SUFFIXES
+        ),
+        "profile_variant_artifact_suffixes": list(PROFILE_VARIANT_ARTIFACT_SUFFIXES),
     }
     parity_mismatches = [
         name
@@ -1248,20 +1506,29 @@ def validate_profile_parity(
     second_artifacts = _manifest_artifacts(second)
     if first_artifacts.keys() != second_artifacts.keys():
         raise BuildError("profile manifests contain different artifact sets")
-    identical_suffixes = {".eep", ".map"}
-    variant_suffixes = {".bin", ".elf", ".hex"}
+    identical_suffixes = set(IDENTICAL_ARTIFACT_SUFFIXES)
+    same_size_variant_suffixes = set(SAME_SIZE_PROFILE_VARIANT_ARTIFACT_SUFFIXES)
+    variant_suffixes = set(PROFILE_VARIANT_ARTIFACT_SUFFIXES)
     for name, first_record in first_artifacts.items():
         second_record = second_artifacts[name]
-        if first_record.get("size_bytes") != second_record.get("size_bytes"):
-            raise BuildError(f"unexpected cross-profile artifact size drift: {name}")
         suffix = Path(name).suffix.casefold()
         first_hash = first_record.get("sha256")
         second_hash = second_record.get("sha256")
-        if suffix in identical_suffixes and first_hash != second_hash:
+        first_size = first_record.get("size_bytes")
+        second_size = second_record.get("size_bytes")
+        if suffix in identical_suffixes and (
+            first_size != second_size or first_hash != second_hash
+        ):
             raise BuildError(f"unexpected cross-profile {suffix} drift: {name}")
-        if suffix in variant_suffixes and first_hash == second_hash:
+        if suffix in same_size_variant_suffixes and first_size != second_size:
+            raise BuildError(f"unexpected cross-profile artifact size drift: {name}")
+        if suffix in same_size_variant_suffixes | variant_suffixes and (
+            first_hash == second_hash
+        ):
             raise BuildError(f"profile-specific artifact did not vary: {name}")
-        if suffix not in identical_suffixes | variant_suffixes:
+        if suffix not in (
+            identical_suffixes | same_size_variant_suffixes | variant_suffixes
+        ):
             raise BuildError(f"profile parity has no artifact policy for {name}")
 
     contract_hash = _canonical_sha256(first_contract)
@@ -1319,6 +1586,7 @@ def build(
     validate_build_properties(properties, profile)
     compiler = resolve_compiler(properties)
     nm = resolve_nm(compiler)
+    objdump = resolve_objdump(compiler)
     compiler_identity = run_command([str(compiler), "--version"]).stdout.strip()
     compiler_first_line = compiler_identity.splitlines()[0]
     if COMPILER_VERSION not in compiler_first_line.split():
@@ -1366,6 +1634,7 @@ def build(
     nm_result = run_command(
         [str(nm), "--print-size", "--size-sort", "--demangle", str(elf)]
     )
+    objdump_result = run_command([str(objdump), "-h", str(elf)])
     checksum_resources = checksum_resource_usage(nm_result.stdout)
     benchmark_buffers = benchmark_buffer_usage(nm_result.stdout)
     packet_buffers = packet_buffer_usage(nm_result.stdout)
@@ -1375,6 +1644,11 @@ def build(
     gpio_packed_buffers = gpio_packed_buffer_usage(nm_result.stdout)
     binary_inspection = {
         "nm_path": str(nm),
+        "objdump_path": str(objdump),
+        "linker_symbol_contract": linker_symbol_contract(nm_result.stdout, profile),
+        "allocatable_section_contract": allocatable_section_contract(
+            objdump_result.stdout
+        ),
         "checksum_resources": checksum_resources,
         "checksum_benchmark_buffers": benchmark_buffers,
         "packet_buffers": packet_buffers,
@@ -1416,12 +1690,13 @@ def build(
             "stable_linker_resource_contract_sha256": _canonical_sha256(
                 parity_contract
             ),
-            "identical_artifact_suffixes": [".eep", ".map"],
-            "same_size_profile_variant_artifact_suffixes": [
-                ".bin",
-                ".elf",
-                ".hex",
-            ],
+            "identical_artifact_suffixes": list(IDENTICAL_ARTIFACT_SUFFIXES),
+            "same_size_profile_variant_artifact_suffixes": list(
+                SAME_SIZE_PROFILE_VARIANT_ARTIFACT_SUFFIXES
+            ),
+            "profile_variant_artifact_suffixes": list(
+                PROFILE_VARIANT_ARTIFACT_SUFFIXES
+            ),
         },
         "source": {
             "source_id": identity.source_id,

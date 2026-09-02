@@ -35,12 +35,38 @@ class BuildConfigurationTests(unittest.TestCase):
             "ram1": {"variables_bytes": 3},
             "ram2": {"variables_bytes": 4},
         }
+        variant_symbols = "\n".join(
+            (
+                f"60000000 {specification['size_bytes_by_profile'][profile.name]:08x} "
+                f"{specification['symbol_type']} {name}"
+            )
+            for name, specification in (
+                build_firmware.PROFILE_VARIANT_LINKER_SYMBOLS.items()
+            )
+        )
+        nm_output = f"{variant_symbols}\n60010000 00000004 T stableSymbol"
+        objdump_output = """Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text.code    00000010  60000000  60000000  00001000  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .debug_info   00000020  00000000  00000000  00002000  2**0
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+"""
         inspection = {
             "nm_path": "/tools/arm-none-eabi-nm",
+            "objdump_path": "/tools/arm-none-eabi-objdump",
+            "linker_symbol_contract": build_firmware.linker_symbol_contract(
+                nm_output, profile
+            ),
+            "allocatable_section_contract": (
+                build_firmware.allocatable_section_contract(objdump_output)
+            ),
             "packet_buffers": {"total_bytes": 819_200},
         }
         contract = build_firmware.stable_linker_resource_contract(memory, inspection)
         variant_hash = "a" * 64 if profile.name == "600" else "b" * 64
+        elf_size = 2 if profile.name == "600" else 7
+        map_size = 4 if profile.name == "600" else 9
         return {
             "schema_version": build_firmware.MANIFEST_SCHEMA_VERSION,
             "target": {
@@ -64,12 +90,12 @@ class BuildConfigurationTests(unittest.TestCase):
                 "stable_linker_resource_contract_sha256": (
                     build_firmware._canonical_sha256(contract)
                 ),
-                "identical_artifact_suffixes": [".eep", ".map"],
+                "identical_artifact_suffixes": [".eep"],
                 "same_size_profile_variant_artifact_suffixes": [
                     ".bin",
-                    ".elf",
                     ".hex",
                 ],
+                "profile_variant_artifact_suffixes": [".elf", ".map"],
             },
             "source": {
                 "source_id": source_id,
@@ -103,7 +129,7 @@ class BuildConfigurationTests(unittest.TestCase):
                 {"path": "firmware.ino.eep", "size_bytes": 1, "sha256": "e" * 64},
                 {
                     "path": "firmware.ino.elf",
-                    "size_bytes": 2,
+                    "size_bytes": elf_size,
                     "sha256": variant_hash,
                 },
                 {
@@ -111,14 +137,18 @@ class BuildConfigurationTests(unittest.TestCase):
                     "size_bytes": 3,
                     "sha256": variant_hash,
                 },
-                {"path": "firmware.ino.map", "size_bytes": 4, "sha256": "d" * 64},
+                {
+                    "path": "firmware.ino.map",
+                    "size_bytes": map_size,
+                    "sha256": variant_hash,
+                },
             ],
         }
 
     def test_helper_pins_both_complete_targets_and_isolated_exports(self) -> None:
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(11, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(12, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -251,6 +281,75 @@ class BuildConfigurationTests(unittest.TestCase):
         summary["ram1"]["free_for_locals_bytes"] = 32_767
         with self.assertRaisesRegex(build_firmware.BuildError, "locals/stack"):
             build_firmware.validate_memory_headroom(summary)
+
+    def test_linker_symbol_contract_allows_only_reviewed_clock_variants(self) -> None:
+        contracts: dict[str, dict[str, object]] = {}
+        for profile_name, profile in build_firmware.CPU_PROFILES.items():
+            lines = ["60010000 00000004 T stableSymbol"]
+            for (
+                name,
+                specification,
+            ) in build_firmware.PROFILE_VARIANT_LINKER_SYMBOLS.items():
+                lines.append(
+                    "60000000 "
+                    f"{specification['size_bytes_by_profile'][profile_name]:08x} "
+                    f"{specification['symbol_type']} {name}"
+                )
+            contracts[profile_name] = build_firmware.linker_symbol_contract(
+                "\n".join(lines), profile
+            )
+
+        self.assertEqual(contracts["600"], contracts["528"])
+        self.assertEqual(4, contracts["600"]["symbol_count"])
+        self.assertEqual(1, contracts["600"]["profile_invariant_symbol_count"])
+
+        drifted = "\n".join(lines).replace(
+            "60010000 00000004 T stableSymbol",
+            "60010000 00000008 T stableSymbol",
+        )
+        drifted_contract = build_firmware.linker_symbol_contract(
+            drifted, build_firmware.CPU_PROFILES["528"]
+        )
+        self.assertNotEqual(
+            contracts["528"]["profile_invariant_sha256"],
+            drifted_contract["profile_invariant_sha256"],
+        )
+
+        wrong_variant = "\n".join(lines).replace("000001b0", "000001b4", 1)
+        with self.assertRaisesRegex(build_firmware.BuildError, "occupies"):
+            build_firmware.linker_symbol_contract(
+                wrong_variant, build_firmware.CPU_PROFILES["528"]
+            )
+
+    def test_allocatable_section_contract_ignores_only_non_target_metadata(
+        self,
+    ) -> None:
+        common = """Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text.code    00000100  60000000  60000000  00001000  2**3
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .bss          00000200  20000000  20000000  00002000  2**5
+                  ALLOC
+  2 .debug_info   {debug_size}  00000000  00000000  00003000  2**0
+                  CONTENTS, READONLY, DEBUGGING, OCTETS
+"""
+        first = build_firmware.allocatable_section_contract(
+            common.format(debug_size="00000020")
+        )
+        second = build_firmware.allocatable_section_contract(
+            common.format(debug_size="00000044")
+        )
+
+        self.assertEqual(first, second)
+        self.assertEqual(2, first["section_count"])
+        self.assertEqual(
+            [".text.code", ".bss"], [item["name"] for item in first["sections"]]
+        )
+
+        target_drift = build_firmware.allocatable_section_contract(
+            common.replace("00000100", "00000104", 1).format(debug_size="00000020")
+        )
+        self.assertNotEqual(first, target_drift)
 
     def test_checksum_table_provenance_requires_flash_residency(self) -> None:
         symbols = (
@@ -639,10 +738,30 @@ class BuildConfigurationTests(unittest.TestCase):
         with self.assertRaisesRegex(build_firmware.BuildError, "resource drift"):
             build_firmware.validate_profile_parity(production, resource_drift)
 
-        map_drift = deepcopy(candidate)
-        map_drift["artifacts"][-1]["sha256"] = "f" * 64  # type: ignore[index]
-        with self.assertRaisesRegex(build_firmware.BuildError, r"\.map drift"):
-            build_firmware.validate_profile_parity(production, map_drift)
+        eep_drift = deepcopy(candidate)
+        eep_drift["artifacts"][0]["sha256"] = "f" * 64  # type: ignore[index]
+        with self.assertRaisesRegex(build_firmware.BuildError, r"\.eep drift"):
+            build_firmware.validate_profile_parity(production, eep_drift)
+
+        loadable_size_drift = deepcopy(candidate)
+        loadable_size_drift["artifacts"][2]["size_bytes"] = 4  # type: ignore[index]
+        with self.assertRaisesRegex(build_firmware.BuildError, "artifact size drift"):
+            build_firmware.validate_profile_parity(production, loadable_size_drift)
+
+        linker_symbol_drift = deepcopy(candidate)
+        linker_symbol_drift["binary_inspection"]["linker_symbol_contract"][  # type: ignore[index]
+            "profile_invariant_sha256"
+        ] = "f" * 64
+        linker_symbol_drift["profile_parity"][  # type: ignore[index]
+            "stable_linker_resource_contract_sha256"
+        ] = build_firmware._canonical_sha256(
+            build_firmware.stable_linker_resource_contract(
+                linker_symbol_drift["memory_usage"],  # type: ignore[arg-type]
+                linker_symbol_drift["binary_inspection"],  # type: ignore[arg-type]
+            )
+        )
+        with self.assertRaisesRegex(build_firmware.BuildError, "resource drift"):
+            build_firmware.validate_profile_parity(production, linker_symbol_drift)
 
         contradictory_clock = deepcopy(candidate)
         contradictory_clock["target"]["expected_runtime_clocks"][  # type: ignore[index]
@@ -663,7 +782,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         same_variant_hash = deepcopy(candidate)
         for artifact in same_variant_hash["artifacts"]:  # type: ignore[index]
-            if artifact["path"].endswith((".bin", ".elf", ".hex")):
+            if artifact["path"].endswith((".bin", ".elf", ".hex", ".map")):
                 matching = next(  # type: ignore[arg-type]
                     item
                     for item in production["artifacts"]
