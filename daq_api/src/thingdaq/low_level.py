@@ -6,7 +6,7 @@ byte-transport access available for protocol tooling without making callers
 construct frames for ordinary discovery, configuration, or capture workflows.
 """
 
-from ._generated import protocol_constants
+from ._generated import protocol_constants, protocol_v2_constants
 from .protocol import (
     ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
@@ -22,6 +22,26 @@ from .protocol import (
     compute_checksum,
     decode_frame,
     encode_frame,
+)
+from .protocol_v2 import (
+    MAX_V2_BUFFERED_BYTES,
+    CompatibleFrame,
+    IncrementalV2FrameParser,
+    V2ChecksumMismatchError,
+    V2ConfigurationEchoError,
+    V2ConfigurationFields,
+    V2Frame,
+    V2FrameHeader,
+    V2FrameValidationError,
+    V2ProtocolError,
+    V2UnsupportedChecksumError,
+    compute_v2_checksum,
+    decode_compatible_frame,
+    decode_v2_configuration,
+    decode_v2_frame,
+    encode_v2_frame,
+    select_protocol_version,
+    validate_v2_configuration_echo,
 )
 from .reader import (
     DEFAULT_MAX_QUEUED_BLOCKS,
@@ -56,10 +76,12 @@ from .transport import (
 
 __all__ = [
     "DEFAULT_MAX_QUEUED_BLOCKS",
+    "MAX_V2_BUFFERED_BYTES",
     "BackgroundReader",
     "ByteTransport",
     "ChecksumAlgorithmMismatchError",
     "ChecksumMismatchError",
+    "CompatibleFrame",
     "DeviceDisconnectedError",
     "Frame",
     "FrameHeader",
@@ -67,6 +89,7 @@ __all__ = [
     "FrameValidationError",
     "InMemoryTransport",
     "IncrementalFrameParser",
+    "IncrementalV2FrameParser",
     "MemoryTransport",
     "ParserCounters",
     "PendingRequestLimitError",
@@ -91,9 +114,25 @@ __all__ = [
     "TransportOpenError",
     "TransportTimeoutError",
     "UnsupportedChecksumError",
+    "V2ChecksumMismatchError",
+    "V2ConfigurationEchoError",
+    "V2ConfigurationFields",
+    "V2Frame",
+    "V2FrameHeader",
+    "V2FrameValidationError",
+    "V2ProtocolError",
+    "V2UnsupportedChecksumError",
     "checksum_backend",
     "compute_checksum",
+    "compute_v2_checksum",
+    "decode_compatible_frame",
     "decode_frame",
+    "decode_v2_configuration",
+    "decode_v2_frame",
     "encode_frame",
+    "encode_v2_frame",
     "protocol_constants",
+    "protocol_v2_constants",
+    "select_protocol_version",
+    "validate_v2_configuration_echo",
 ]
