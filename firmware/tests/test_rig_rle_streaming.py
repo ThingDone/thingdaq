@@ -159,6 +159,7 @@ class CampaignFakeSerial:
         self.source = rig.SOURCE_HARDWARE
         self.checksum = rig.CHECKSUM_ADLER32
         self.configuration_encoding = rig.CONFIGURATION_ENCODING_RAW
+        self.measurement_encoding = rig.CONFIGURATION_ENCODING_RAW
         self.pending = bytearray()
         self.requests = bytearray()
         self.read_pattern = (1, 7, 53, 4096, rig.SERIAL_READ_BYTES)
@@ -274,6 +275,7 @@ class CampaignFakeSerial:
                 self.configuration_encoding,
                 frame_bytes,
             ) = rig.CONFIGURATION.unpack(payload)
+            self.measurement_encoding = self.configuration_encoding
             if frame_bytes != rig.DATA_FRAME_BYTES:
                 raise AssertionError("fake received a noncanonical frame size")
             self.state = rig.STATE_CONFIGURED
@@ -382,6 +384,18 @@ class CampaignFakeSerial:
         if self.fault == "disconnect" and len(self.generated_kinds) == 1:
             self.disconnect_when_empty = True
 
+    def _logical_item(self, kind: int, index: int) -> bytes:
+        if self.pattern != "physical":
+            return rig.logical_item(self.pattern, kind, index)
+        if kind == rig.ADC_DATA:
+            return struct.pack("<HH", 0x321, 0xABC)
+        return b"\x5a"
+
+    def _expected_run_length(self, kind: int, index: int, maximum: int) -> int:
+        if self.pattern == "physical":
+            return maximum
+        return rig.expected_run_length(self.pattern, kind, index, maximum)
+
     def _data_frame(self, kind: int) -> tuple[bytes, int, int, int]:
         item_count = (
             rig.ADC_PAIRS_PER_FRAME
@@ -390,17 +404,15 @@ class CampaignFakeSerial:
         )
         item_bytes = rig.ADC_BYTES_PER_PAIR if kind == rig.ADC_DATA else 1
         logical = b"".join(
-            rig.logical_item(self.pattern, kind, index) for index in range(item_count)
+            self._logical_item(kind, index) for index in range(item_count)
         )
         rle_payload = bytearray()
         logical_index = 0
         remaining = item_count
         while remaining:
-            run_length = rig.expected_run_length(
-                self.pattern, kind, logical_index, remaining
-            )
+            run_length = self._expected_run_length(kind, logical_index, remaining)
             rle_payload.extend(struct.pack("<H", run_length))
-            rle_payload.extend(rig.logical_item(self.pattern, kind, logical_index))
+            rle_payload.extend(self._logical_item(kind, logical_index))
             logical_index += run_length
             remaining -= run_length
         use_rle = (
@@ -413,20 +425,18 @@ class CampaignFakeSerial:
 
         first_attack = len(self.generated_kinds) == 1
         if first_attack and self.fault == "corrupt_rle":
-            payload = struct.pack("<H", 0) + rig.logical_item(self.pattern, kind, 0)
+            payload = struct.pack("<H", 0) + self._logical_item(kind, 0)
             encoding = rig.FRAME_ENCODING_RLE
             run_count = 1
         elif first_attack and self.fault == "noncanonical_rle":
-            item = rig.logical_item(self.pattern, kind, 0)
+            item = self._logical_item(kind, 0)
             payload = (
                 struct.pack("<H", 1) + item + struct.pack("<H", item_count - 1) + item
             )
             encoding = rig.FRAME_ENCODING_RLE
             run_count = 2
         elif first_attack and self.fault == "decode_bound":
-            payload = struct.pack("<H", item_count + 1) + rig.logical_item(
-                self.pattern, kind, 0
-            )
+            payload = struct.pack("<H", item_count + 1) + self._logical_item(kind, 0)
             encoding = rig.FRAME_ENCODING_RLE
             run_count = 1
 
@@ -438,7 +448,11 @@ class CampaignFakeSerial:
             sequence=0,
             first_sample_ticks=0,
             item_count=item_count,
-            flags=rig.FLAG_SYNTHETIC | rig.FLAG_EPOCH_START,
+            flags=(
+                rig.FLAG_EPOCH_START
+                if self.pattern == "physical"
+                else rig.FLAG_SYNTHETIC | rig.FLAG_EPOCH_START
+            ),
             checksum_algorithm=self.checksum,
             encoding=encoding,
         )
@@ -524,9 +538,24 @@ class CampaignFakeSerial:
                     f"{prefix}_raw_frames": metrics["raw_frames"],
                     f"{prefix}_rle_frames": metrics["rle_frames"],
                     f"{prefix}_rle_runs": metrics["runs"],
-                    f"{prefix}_fallback_frames": metrics["raw_frames"],
-                    f"{prefix}_fallback_not_smaller": metrics["raw_frames"],
-                    f"{prefix}_encode_cycles": frames * 100,
+                    f"{prefix}_fallback_frames": (
+                        metrics["raw_frames"]
+                        if self.measurement_encoding
+                        == rig.CONFIGURATION_ENCODING_RLE_AUTO
+                        else 0
+                    ),
+                    f"{prefix}_fallback_not_smaller": (
+                        metrics["raw_frames"]
+                        if self.measurement_encoding
+                        == rig.CONFIGURATION_ENCODING_RLE_AUTO
+                        else 0
+                    ),
+                    f"{prefix}_encode_cycles": (
+                        frames * 100
+                        if self.measurement_encoding
+                        == rig.CONFIGURATION_ENCODING_RLE_AUTO
+                        else 0
+                    ),
                 }
             )
             legacy_framed = (
@@ -546,14 +575,51 @@ class CampaignFakeSerial:
                 values["gpio_samples_delivered"] = items
                 values["gpio_frames_packed"] = frames
                 values["gpio_frames_produced"] = frames
+                values["gpio_dma_major_loops"] = frames
+                values["gpio_buffers_completed"] = frames
+                values["gpio_buffers_acquired"] = frames
+                values["gpio_buffers_released"] = frames
             else:
                 values["adc_frames_consumed"] = frames
                 values["adc_pairs_consumed"] = items
+                values["adc0_dma_major_loops"] = frames
+                values["adc1_dma_major_loops"] = frames
+                values["adc0_dma_results"] = items
+                values["adc1_dma_results"] = items
+                values["adc_paired_major_loops"] = frames
+                values["adc_buffers_completed"] = frames
+                values["adc_buffers_acquired"] = frames
+                values["adc_buffers_released"] = frames
+                values["adc_pairs_captured"] = items
+                values["adc_pairs_delivered"] = items
             if items != frames * item_count:
                 raise AssertionError("fake stream item accounting drifted")
         values["packet_frames_promoted"] = combined_frames
         values["data_payload_bytes_transmitted"] = combined_logical
         values["data_framed_bytes_transmitted"] = combined_wire
+        if (
+            self.pattern == "physical"
+            and self.state == rig.STATE_IDLE
+            and self.fault == "physical_stop_tail"
+        ):
+            adc_tail = 17
+            gpio_tail = 23
+            values.update(
+                {
+                    "adc_items_dropped": adc_tail,
+                    "adc_raw_pairs_lost": adc_tail,
+                    "adc_stop_pairs_discarded": adc_tail,
+                    "adc_incomplete_conversions": 1,
+                    "adc_incomplete_buffers": 1,
+                    "adc_completion_mismatches": 1,
+                    "adc_pairs_captured": (values["adc_pairs_captured"] + adc_tail),
+                    "gpio_items_dropped": gpio_tail,
+                    "gpio_raw_samples_lost": gpio_tail,
+                    "gpio_samples_captured": (
+                        values["gpio_samples_captured"] + gpio_tail
+                    ),
+                }
+            )
         if self.fault == "counter_disagreement" and self.state == rig.STATE_IDLE:
             values["gpio_encoded_payload_bytes_transmitted"] += 1
         for name, (fmt, offset) in rig.STATUS_FIELDS.items():
@@ -563,7 +629,9 @@ class CampaignFakeSerial:
 
 
 def _run_campaign_fake(
-    pattern: str, fault: str | None = None
+    pattern: str,
+    fault: str | None = None,
+    encoding: str = "RLE_AUTO",
 ) -> tuple[int, dict[str, object], CampaignFakeSerial, str]:
     fake = CampaignFakeSerial(pattern, fault)
     output = io.StringIO()
@@ -574,7 +642,7 @@ def _run_campaign_fake(
         "RLE_WARMUP_SECONDS": "0",
         "RLE_STATUS_INTERVAL_SECONDS": "0.05",
         "RLE_PATTERN": pattern,
-        "RLE_ENCODING": "RLE_AUTO",
+        "RLE_ENCODING": encoding,
     }
     with (
         mock.patch.object(rig, "STARTUP_DRAIN_SECONDS", 0),
@@ -811,7 +879,7 @@ class RLEStreamingRigTests(unittest.TestCase):
             rig.parse_configuration()
 
     def test_full_program_executes_every_target_pattern_with_partial_io(self) -> None:
-        for pattern in rig.PATTERN_SOURCE:
+        for pattern in rig.SYNTHETIC_PATTERNS:
             with self.subTest(pattern=pattern):
                 exit_code, result, fake, transcript = _run_campaign_fake(pattern)
                 self.assertEqual(0, exit_code, transcript)
@@ -835,6 +903,68 @@ class RLEStreamingRigTests(unittest.TestCase):
                 self.assertEqual(rig.STATE_IDLE, fake.state)
                 self.assertIn(0, fake.write_counts)
                 self.assertLessEqual(max(fake.read_counts), rig.SERIAL_READ_BYTES)
+
+    def test_full_program_executes_physical_raw_and_rle_with_stable_identity(
+        self,
+    ) -> None:
+        for encoding, raw_frames, rle_frames in (
+            ("RAW", 2, 0),
+            ("RLE_AUTO", 0, 2),
+        ):
+            with self.subTest(encoding=encoding):
+                exit_code, result, fake, transcript = _run_campaign_fake(
+                    "physical", encoding=encoding
+                )
+                self.assertEqual(0, exit_code, transcript)
+                self.assertEqual("PASS", result["result"])
+                self.assertEqual(
+                    "physical-rle-streaming-v2",
+                    result["validation_semantics"],
+                )
+                self.assertEqual(0xAABBCCDD, result["identity"]["hardware_serial"])
+                self.assertEqual(raw_frames, result["host"]["combined"]["raw_frames"])
+                self.assertEqual(rle_frames, result["host"]["combined"]["rle_frames"])
+                for stream in result["host"]["streams"].values():
+                    self.assertIsNotNone(stream["decoded_logical_adler32"])
+                    self.assertGreater(stream["wall_logical_bytes_per_second"], 0)
+                self.assertEqual(
+                    {"adc_pairs": 0, "gpio_samples": 0},
+                    result["firmware"]["physical_stop_tail"],
+                )
+                self.assertTrue(result["cleanup"]["idle_confirmed"])
+                self.assertTrue(fake.closed)
+
+        exit_code, result, _fake, transcript = _run_campaign_fake(
+            "physical", fault="physical_stop_tail"
+        )
+        self.assertEqual(0, exit_code, transcript)
+        self.assertEqual(
+            {"adc_pairs": 17, "gpio_samples": 23},
+            result["firmware"]["physical_stop_tail"],
+        )
+
+    def test_physical_decoder_rejects_raw_adc_codes_above_twelve_bits(self) -> None:
+        payload = bytearray(rig.DATA_PAYLOAD_BYTES)
+        struct.pack_into("<H", payload, 0, 0x1000)
+        capture = rig.CaptureValidator("physical", rig.CONFIGURATION_ENCODING_RAW)
+        with self.assertRaisesRegex(rig.FirmwareFailure, "above 12 bits"):
+            capture.observe(
+                rig.Frame(
+                    version=rig.PROTOCOL_V2,
+                    kind=rig.ADC_DATA,
+                    flags=rig.FLAG_EPOCH_START,
+                    checksum_algorithm=rig.CHECKSUM_ADLER32,
+                    encoding=rig.FRAME_ENCODING_RAW,
+                    total_length=rig.DATA_FRAME_BYTES,
+                    run_id=7,
+                    sequence=0,
+                    request_id=0,
+                    first_sample_ticks=0,
+                    item_count=rig.ADC_PAIRS_PER_FRAME,
+                    payload=bytes(payload),
+                    checksum=0,
+                )
+            )
 
     def test_full_program_rejects_every_adversarial_rle_envelope(self) -> None:
         for fault in (

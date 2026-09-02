@@ -99,11 +99,15 @@ ADC_PAIR_PERIOD_TICKS = 8
 ADC_BYTES_PER_PAIR = 4
 ADC_PAIRS_PER_FRAME = 1012
 ADC_CODE_MASK = 0x0FFF
+ADC_DMA_RING_DEPTH = 8
 GPIO_SAMPLE_RATE_HZ = 4_000_000
 GPIO_SAMPLE_PERIOD_TICKS = 2
 GPIO_SAMPLES_PER_FRAME = 4048
+GPIO_RAW_RING_DEPTH = 4
+GPIO_PACKED_RING_DEPTH = 4
 FRAME_COVERAGE_TICKS = 8096
 CPU_DWT_HZ = 600_000_000
+PACKET_BUFFER_COUNT = 200
 
 ADC_DATA = 0x01
 GPIO_DATA = 0x02
@@ -146,12 +150,14 @@ SOURCE_SYNTHETIC_SLOW_ADC = 4
 SOURCE_SYNTHETIC_ALTERNATING = 5
 SOURCE_SYNTHETIC_INCOMPRESSIBLE = 6
 PATTERN_SOURCE = {
+    "physical": SOURCE_HARDWARE,
     "constant": SOURCE_SYNTHETIC_CONSTANT,
     "sparse-hold": SOURCE_SYNTHETIC_SPARSE_HOLD,
     "slow-adc": SOURCE_SYNTHETIC_SLOW_ADC,
     "alternating": SOURCE_SYNTHETIC_ALTERNATING,
     "incompressible": SOURCE_SYNTHETIC_INCOMPRESSIBLE,
 }
+SYNTHETIC_PATTERNS = frozenset(PATTERN_SOURCE) - {"physical"}
 SOURCE_PATTERN = {value: key for key, value in PATTERN_SOURCE.items()}
 
 CAPABILITY_RLE_STREAMING = 0x00000200
@@ -1171,6 +1177,7 @@ class StreamMetrics:
     encoded_payload_bytes: int = 0
     framed_bytes: int = 0
     decode_nanoseconds: int = 0
+    decoded_logical_adler32: int | None = None
     formula_full_frames: int = 0
     formula_spot_items: int = 0
     first_sequence: int | None = None
@@ -1207,6 +1214,7 @@ class StreamMetrics:
                 if decode_seconds > 0
                 else None
             ),
+            "decoded_logical_adler32": self.decoded_logical_adler32,
             "formula_full_frames": self.formula_full_frames,
             "formula_spot_items": self.formula_spot_items,
             "first_sequence": self.first_sequence,
@@ -1253,16 +1261,23 @@ class CaptureValidator:
                 f"{metrics.name} timestamp {frame.first_sample_ticks} "
                 f"!= {expected_ticks}"
             )
-        required_flags = FLAG_SYNTHETIC | (
-            FLAG_EPOCH_START if metrics.frames == 0 else 0
-        )
+        required_flags = FLAG_EPOCH_START if metrics.frames == 0 else 0
+        if self.pattern != "physical":
+            required_flags |= FLAG_SYNTHETIC
         if frame.flags != required_flags:
             raise FirmwareFailure(
                 f"{metrics.name} flags 0x{frame.flags:04x} != 0x{required_flags:04x}"
             )
 
         started = time.perf_counter_ns()
-        if frame.encoding == FRAME_ENCODING_RLE:
+        if self.pattern == "physical":
+            logical_payload = self._decode_physical(frame, metrics)
+            metrics.decoded_logical_adler32 = zlib.adler32(
+                logical_payload,
+                metrics.decoded_logical_adler32 or 1,
+            )
+            full, spots = 0, 0
+        elif frame.encoding == FRAME_ENCODING_RLE:
             full, spots = self._validate_rle_formula(frame, metrics)
         else:
             full, spots = self._validate_raw_formula(frame, metrics)
@@ -1282,6 +1297,34 @@ class CaptureValidator:
         metrics.decode_nanoseconds += elapsed
         metrics.formula_full_frames += full
         metrics.formula_spot_items += spots
+
+    @staticmethod
+    def _decode_physical(frame: Frame, metrics: StreamMetrics) -> bytes:
+        """Boundedly decode one physical frame and validate its sample range."""
+
+        if frame.encoding == FRAME_ENCODING_RAW:
+            logical_payload = frame.payload
+        else:
+            record_bytes = metrics.item_bytes + 2
+            decoded = bytearray()
+            previous: bytes | None = None
+            for offset in range(0, len(frame.payload), record_bytes):
+                run_length = struct.unpack_from("<H", frame.payload, offset)[0]
+                item = frame.payload[offset + 2 : offset + record_bytes]
+                if item == previous:
+                    raise CodecFailure("physical RLE contains adjacent equal records")
+                if len(decoded) + run_length * metrics.item_bytes > DATA_PAYLOAD_BYTES:
+                    raise CodecFailure("physical RLE exceeds the logical payload bound")
+                decoded.extend(item * run_length)
+                previous = item
+            logical_payload = bytes(decoded)
+        if len(logical_payload) != DATA_PAYLOAD_BYTES:
+            raise CodecFailure("physical decode does not fill one logical payload")
+        if frame.kind == ADC_DATA and any(
+            high_byte & 0xF0 for high_byte in logical_payload[1::2]
+        ):
+            raise FirmwareFailure("physical ADC payload contains a code above 12 bits")
+        return logical_payload
 
     def _validate_rle_formula(
         self, frame: Frame, metrics: StreamMetrics
@@ -1465,7 +1508,6 @@ ZERO_COUNTER_FIELDS = (
     "bad_types",
     "bad_versions",
     "timeouts",
-    "partial_usb_writes",
     "state_errors",
     "usb_io_errors",
     "bad_flags",
@@ -1539,10 +1581,24 @@ HIGH_WATER_FIELDS = (
 )
 
 SERVICE_COUNTER_FIELDS = (
+    "partial_usb_writes",
     "usb_short_capacity_deferrals",
     "usb_rx_stall_events",
     "usb_tx_stall_events",
     "packet_fairness_deferrals",
+)
+
+BOUNDED_PHYSICAL_STOP_TAIL_FIELDS = frozenset(
+    {
+        "adc_items_dropped",
+        "gpio_items_dropped",
+        "gpio_raw_samples_lost",
+        "adc_raw_pairs_lost",
+        "adc_stop_pairs_discarded",
+        "adc_incomplete_conversions",
+        "adc_incomplete_buffers",
+        "adc_completion_mismatches",
+    }
 )
 
 
@@ -1609,8 +1665,31 @@ class StatusObserver:
             raise FirmwareFailure("fair scheduler accounted-frame skew exceeds one")
         if status.temporary_pages_owned > 1 or status.temporary_page_high_water > 1:
             raise FirmwareFailure("temporary RLE ownership exceeds one fixed page")
-        if status.packet_owned_depth > 200 or status.packet_owned_high_water > 200:
+        if (
+            status.packet_owned_depth > PACKET_BUFFER_COUNT
+            or status.packet_owned_high_water > PACKET_BUFFER_COUNT
+        ):
             raise FirmwareFailure("packet ownership exceeds the fixed 200-page pool")
+        queue_limits = {
+            "adc_raw_ready_depth": ADC_DMA_RING_DEPTH,
+            "adc_raw_ready_high_water": ADC_DMA_RING_DEPTH,
+            "gpio_raw_ready_depth": GPIO_RAW_RING_DEPTH,
+            "gpio_raw_ready_high_water": GPIO_RAW_RING_DEPTH,
+            "gpio_packed_ready_depth": GPIO_PACKED_RING_DEPTH,
+            "gpio_packed_ready_high_water": GPIO_PACKED_RING_DEPTH,
+            "packet_ready_depth": PACKET_BUFFER_COUNT,
+            "packet_transmit_depth": PACKET_BUFFER_COUNT,
+        }
+        exceeded = {
+            name: {"observed": status.values[name], "limit": limit}
+            for name, limit in queue_limits.items()
+            if status.values[name] > limit
+        }
+        if exceeded:
+            raise FirmwareFailure(
+                "firmware queue exceeds its fixed capacity: "
+                + json.dumps(exceeded, sort_keys=True, separators=(",", ":"))
+            )
         self.latencies.append(latency)
         self.samples += 1
         for name in CURRENT_QUEUE_FIELDS:
@@ -1655,15 +1734,38 @@ class StatusObserver:
         }
 
 
-def validate_status_health(status: StatusSnapshot) -> None:
+def validate_status_health(
+    status: StatusSnapshot, *, allow_bounded_physical_stop_tail: bool = False
+) -> None:
     nonzero = {
-        name: status.values[name] for name in ZERO_COUNTER_FIELDS if status.values[name]
+        name: status.values[name]
+        for name in ZERO_COUNTER_FIELDS
+        if status.values[name]
+        and (
+            not allow_bounded_physical_stop_tail
+            or name not in BOUNDED_PHYSICAL_STOP_TAIL_FIELDS
+        )
     }
     if nonzero:
         raise FirmwareFailure(
             "STATUS reports loss or error counters: "
             + json.dumps(nonzero, sort_keys=True, separators=(",", ":"))
         )
+    if allow_bounded_physical_stop_tail:
+        adc_tail = status.adc_stop_pairs_discarded
+        gpio_tail = status.gpio_raw_samples_lost
+        if not (
+            0 <= adc_tail < 2 * ADC_PAIRS_PER_FRAME
+            and status.adc_raw_pairs_lost == adc_tail
+            and status.adc_items_dropped == adc_tail
+            and 0 <= status.adc_incomplete_buffers <= 2
+            and 0 <= status.adc_completion_mismatches <= status.adc_incomplete_buffers
+            and 0 <= status.adc_incomplete_conversions <= adc_tail
+            and (adc_tail == 0) == (status.adc_incomplete_buffers == 0)
+            and 0 <= gpio_tail < GPIO_SAMPLES_PER_FRAME
+            and status.gpio_items_dropped == gpio_tail
+        ):
+            raise FirmwareFailure("physical STOP-tail accounting is inconsistent")
 
 
 @dataclass(frozen=True)
@@ -1912,6 +2014,46 @@ def _require_equal(status: StatusSnapshot, expected: dict[str, int]) -> None:
         )
 
 
+def _validate_physical_acquisition_accounting(
+    status: StatusSnapshot, capture: CaptureValidator
+) -> dict[str, int]:
+    """Reconcile complete hardware frames plus bounded partial STOP tails."""
+
+    adc = capture.streams[ADC_DATA]
+    gpio = capture.streams[GPIO_DATA]
+    adc_tail = status.adc_stop_pairs_discarded
+    gpio_tail = status.gpio_raw_samples_lost
+    _require_equal(
+        status,
+        {
+            "adc0_dma_major_loops": adc.frames,
+            "adc1_dma_major_loops": adc.frames,
+            "adc0_dma_results": adc.logical_items,
+            "adc1_dma_results": adc.logical_items,
+            "adc_paired_major_loops": adc.frames,
+            "adc_buffers_completed": adc.frames,
+            "adc_buffers_acquired": adc.frames,
+            "adc_buffers_released": adc.frames,
+            "adc_pairs_captured": adc.logical_items + adc_tail,
+            "adc_pairs_delivered": adc.logical_items,
+            "adc_frames_consumed": adc.frames,
+            "adc_pairs_consumed": adc.logical_items,
+            "gpio_samples_captured": gpio.logical_items + gpio_tail,
+            "gpio_samples_packed": gpio.logical_items,
+            "gpio_dma_major_loops": gpio.frames,
+            "gpio_buffers_completed": gpio.frames,
+            "gpio_buffers_acquired": gpio.frames,
+            "gpio_buffers_released": gpio.frames,
+            "gpio_samples_delivered": gpio.logical_items,
+            "gpio_stop_samples_discarded": 0,
+            "gpio_frames_produced": gpio.frames,
+            "gpio_samples_produced": gpio.logical_items,
+            "gpio_frames_packed": gpio.frames,
+        },
+    )
+    return {"adc_pairs": adc_tail, "gpio_samples": gpio_tail}
+
+
 def validate_final_accounting(
     status: StatusSnapshot,
     capture: CaptureValidator,
@@ -1923,7 +2065,8 @@ def validate_final_accounting(
 
     if dwt_clock_hz <= 0:
         raise FirmwareFailure("INFO reported a non-positive DWT clock")
-    validate_status_health(status)
+    is_physical = capture.pattern == "physical"
+    validate_status_health(status, allow_bounded_physical_stop_tail=is_physical)
     if (
         status.device_state != STATE_IDLE
         or status.stream_mask != STREAM_NONE
@@ -1954,6 +2097,12 @@ def validate_final_accounting(
         )
     if status.temporary_page_high_water > 1:
         raise FirmwareFailure("temporary RLE page high water exceeds one")
+
+    physical_stop_tail = (
+        _validate_physical_acquisition_accounting(status, capture)
+        if is_physical
+        else None
+    )
 
     combined_logical = 0
     combined_framed = 0
@@ -2071,6 +2220,7 @@ def validate_final_accounting(
             name: status.values[name] for name in SERVICE_COUNTER_FIELDS
         },
         "stats_generation": status.stats_generation,
+        "physical_stop_tail": physical_stop_tail,
     }
 
 
@@ -2236,7 +2386,7 @@ def parse_configuration() -> RigConfiguration:
     )
     if pattern not in PATTERN_SOURCE:
         raise ValueError(
-            "RLE_PATTERN must be constant, sparse-hold, slow-adc, "
+            "RLE_PATTERN must be physical, constant, sparse-hold, slow-adc, "
             "alternating, or incompressible"
         )
     encoding_name = os.environ.get("RLE_ENCODING", "RLE_AUTO").strip().upper()
@@ -2301,6 +2451,8 @@ def execute_capture(
     if _identity_key(execution.identity_v1) != _identity_key(execution.identity_v2):
         raise FixtureFailure("v1/v2 INFO responses identify different firmware")
     identity = execution.identity_v2
+    if not 1 <= identity.hardware_serial <= 0xFFFFFFFF:
+        raise FixtureFailure("firmware does not advertise a nonzero uint32 serial")
     if identity.supported_stream_mask != STREAM_BOTH:
         raise FixtureFailure("firmware does not advertise both logical streams")
     if not identity.supported_checksum_mask & (1 << configuration.checksum):
@@ -2550,6 +2702,17 @@ def result_payload(
         combined["wall_framed_bytes_per_second"] = (
             framed_bytes / execution.observed_seconds
         )
+        for stream in streams.values():
+            logical_stream_bytes = stream["logical_payload_bytes"]
+            framed_stream_bytes = stream["framed_bytes"]
+            assert logical_stream_bytes is not None
+            assert framed_stream_bytes is not None
+            stream["wall_logical_bytes_per_second"] = (
+                logical_stream_bytes / execution.observed_seconds
+            )
+            stream["wall_framed_bytes_per_second"] = (
+                framed_stream_bytes / execution.observed_seconds
+            )
     host = {
         "streams": streams,
         "combined": combined,
@@ -2577,7 +2740,11 @@ def result_payload(
     return {
         "schema_version": RLE_RESULT_SCHEMA_VERSION,
         "kind": "thingdaq-rle-streaming-run",
-        "validation_semantics": "synthetic-rle-streaming-v2",
+        "validation_semantics": (
+            "physical-rle-streaming-v2"
+            if configuration is not None and configuration.pattern == "physical"
+            else "synthetic-rle-streaming-v2"
+        ),
         "mode": configuration.mode if configuration is not None else None,
         "result": result,
         "reason": (
@@ -2632,6 +2799,8 @@ def result_payload(
             "bulk_capture_retained": False,
             "incompressible_formula_scope": (
                 "full cadence frames plus rotating spots on every frame"
+                if configuration is not None and configuration.pattern != "physical"
+                else None
             ),
             "control_versions_encoded_independently": [PROTOCOL_V1, PROTOCOL_V2],
         },
