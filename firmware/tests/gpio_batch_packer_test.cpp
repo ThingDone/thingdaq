@@ -14,6 +14,8 @@ namespace {
 
 namespace capture = thingdaq::gpio_capture;
 namespace constants = thingdaq::protocol_v1;
+namespace experimental = thingdaq::protocol_v2;
+namespace layout = thingdaq::stream_layout;
 namespace packet = thingdaq::packet;
 namespace packer = thingdaq::gpio_packer;
 namespace stats = thingdaq::stats;
@@ -175,6 +177,90 @@ void testExactMappingAndBatchPrimitive() {
                                 destination.data(), destination.size() - 1U) ==
              0U,
          "batch mapping rejects a short destination");
+}
+
+void testDisabledExperimentalProfileRetainsOneBankPacker() {
+  {
+    FakeRawSource source{};
+    expect(source.add(0U, constants::kGpioSamplesPerFrame) &&
+               source.add(constants::kGpioSamplesPerFrame,
+                          constants::kGpioSamplesPerFrame),
+           "prepare two reduced-rate one-bank GPIO frames");
+    PipelineFixture fixture{};
+    constexpr auto profile =
+        experimental::RateProfile::kAdc125khzGpio500khz;
+    const layout::Result selected = layout::experimental(
+        experimental::AuxBankMode::kDisabled, profile);
+    expect(selected.ok() &&
+               fixture.pipeline.startRun(
+                   39U, constants::ChecksumAlgorithm::kCrc32c,
+                   packet::kGpioStreamMask, selected.layout) ==
+                   packet::OperationStatus::kOk,
+           "bind a DISABLED reduced-rate layout to the packet pool");
+    packer::GpioBatchPacker gpio{source, fixture.packed_storage};
+    expect(gpio.startRun(39U, constants::ChecksumAlgorithm::kCrc32c,
+                         fixture.pipeline) ==
+               packer::OperationStatus::kOk,
+           "the original one-bank packer accepts DISABLED v2 profiles");
+    const packer::ServiceReport serviced =
+        gpio.service(fixture.pipeline, 2U, 2U);
+    expect(serviced.frames_framed == 2U &&
+               fixture.pipeline.serviceReadyFrames(2U).frames_promoted ==
+                   2U,
+           "the original one-bank path frames both reduced-rate batches");
+
+    wire::ByteView frame = fixture.pipeline.frontFrame();
+    std::uint32_t item_count = 0U;
+    std::uint64_t first_ticks = 1U;
+    expect(frame.size == experimental::kMaxDataFrameBytes &&
+               frame.data[constants::kHeaderVersionOffset] ==
+                   experimental::kProtocolVersion &&
+               wire::loadU32(frame, constants::kHeaderItemCountOffset,
+                             item_count) &&
+               wire::loadU64(frame,
+                             constants::kHeaderFirstSampleTicksOffset,
+                             first_ticks) &&
+               item_count == constants::kGpioSamplesPerFrame &&
+               first_ticks == 0U,
+           "the first one-bank frame preserves its established byte shape");
+    fixture.pipeline.releaseFrontFrame();
+    frame = fixture.pipeline.frontFrame();
+    expect(wire::loadU64(frame,
+                         constants::kHeaderFirstSampleTicksOffset,
+                         first_ticks) &&
+               first_ticks ==
+                   constants::kGpioSamplesPerFrame * 16U,
+           "the original packer timestamps with the selected GPIO period");
+    fixture.pipeline.releaseFrontFrame();
+    const packer::Snapshot snapshot = gpio.snapshot(fixture.pipeline);
+    expect(snapshot.layout == selected.layout &&
+               snapshot.progress.samples_transmitted ==
+                   2U * constants::kGpioSamplesPerFrame &&
+               snapshot.progress.samples_dropped == 0U,
+           "one-bank profile counters conserve the unchanged item count");
+    (void)gpio.stopProduction();
+    (void)fixture.pipeline.stopProduction();
+  }
+
+  {
+    FakeRawSource source{};
+    PipelineFixture fixture{};
+    const layout::Result selected = layout::experimental(
+        experimental::AuxBankMode::kInput,
+        experimental::RateProfile::kAdc1mhzGpio4mhz);
+    expect(selected.ok() &&
+               fixture.pipeline.startRun(
+                   41U, constants::ChecksumAlgorithm::kCrc32c,
+                   packet::kGpioStreamMask, selected.layout) ==
+                   packet::OperationStatus::kOk,
+           "bind an INPUT layout for the fail-closed check");
+    packer::GpioBatchPacker gpio{source, fixture.packed_storage};
+    expect(gpio.startRun(41U, constants::ChecksumAlgorithm::kCrc32c,
+                         fixture.pipeline) ==
+               packer::OperationStatus::kPipelineNotReady,
+           "the one-bank packer cannot consume an auxiliary INPUT layout");
+    (void)fixture.pipeline.stopProduction();
+  }
 }
 
 void testRawBoundariesBecomeExactChecksummedFrames() {
@@ -497,6 +583,7 @@ void testTargetProcessingProfileHandlesCounterWrap() {
 
 int main() {
   testExactMappingAndBatchPrimitive();
+  testDisabledExperimentalProfileRetainsOneBankPacker();
   testRawBoundariesBecomeExactChecksummedFrames();
   testRawGapAdvancesSequenceWithoutDoubleCountingStatus();
   testPackedRingPressureStaysBoundedAndVisible();

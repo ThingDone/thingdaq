@@ -148,10 +148,16 @@ struct BufferHandle {
   std::uint32_t lease = 0U;
   std::uint8_t buffer_index = kInvalidDestination;
 
-  constexpr bool valid() const {
+  constexpr bool validForPairCount(std::uint32_t expected_pair_count) const {
     return pairs != nullptr && buffer_index < board::kAdcDmaRingDepth &&
-           pair_count == protocol_v1::kAdcPairsPerFrame && epoch != 0U &&
-           lease != 0U;
+           expected_pair_count != 0U &&
+           expected_pair_count <= protocol_v1::kAdcPairsPerFrame &&
+           pair_count == expected_pair_count && epoch != 0U && lease != 0U;
+  }
+
+  constexpr bool valid() const {
+    return validForPairCount(
+        static_cast<std::uint32_t>(protocol_v1::kAdcPairsPerFrame));
   }
 };
 

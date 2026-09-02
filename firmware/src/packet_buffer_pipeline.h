@@ -6,6 +6,7 @@
 
 #include "board_config.h"
 #include "protocol.h"
+#include "stream_layout.h"
 #include "usb_transport.h"
 
 namespace thingdaq::packet {
@@ -187,6 +188,7 @@ enum class OperationStatus : std::uint8_t {
   kChecksumMismatch,
   kInvalidStreamMask,
   kStreamDisabled,
+  kInvalidLayout,
 };
 
 struct BeginFillResult {
@@ -257,6 +259,7 @@ struct PipelineSnapshot {
   std::uint8_t enabled_stream_mask = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
       protocol_v1::kDefaultChecksumAlgorithm;
+  stream_layout::RunLayout layout = stream_layout::legacy();
   std::uint32_t run_starts = 0U;
   std::uint32_t run_start_rejections = 0U;
   std::uint32_t pool_exhaustions = 0U;
@@ -315,6 +318,11 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
       protocol_v1::ChecksumAlgorithm checksum_algorithm =
           protocol_v1::kDefaultChecksumAlgorithm,
       std::uint8_t enabled_stream_mask = kAllStreamMask);
+  OperationStatus startRun(
+      std::uint32_t run_id,
+      protocol_v1::ChecksumAlgorithm checksum_algorithm,
+      std::uint8_t enabled_stream_mask,
+      const stream_layout::RunLayout &layout);
   // STOP cancels any producer-owned partial construction, then drains every
   // already complete READY/TRANSMITTING frame through normal USB ownership.
   StopReport stopProduction();
@@ -359,6 +367,14 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   }
   constexpr protocol_v1::ChecksumAlgorithm checksumAlgorithm() const {
     return checksum_algorithm_;
+  }
+  constexpr const stream_layout::RunLayout &layout() const {
+    return layout_;
+  }
+  constexpr const stream_layout::FrameLayout &streamLayout(
+      Stream stream) const {
+    const std::size_t index = streamIndex(stream);
+    return layout_.streams[index < kStreamCount ? index : 0U];
   }
   constexpr bool accepts(
       Stream stream, std::uint32_t run_id,
@@ -421,6 +437,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::uint8_t enabled_stream_mask_ = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm_ =
       protocol_v1::kDefaultChecksumAlgorithm;
+  stream_layout::RunLayout layout_ = stream_layout::legacy();
   std::uint32_t next_lease_ = 1U;
   std::uint32_t run_starts_ = 0U;
   std::uint32_t run_start_rejections_ = 0U;

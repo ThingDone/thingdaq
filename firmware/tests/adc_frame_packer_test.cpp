@@ -13,7 +13,9 @@ namespace capture = thingdaq::adc_capture;
 namespace packer = thingdaq::adc_packer;
 namespace packet = thingdaq::packet;
 namespace v1 = thingdaq::protocol_v1;
+namespace v2 = thingdaq::protocol_v2;
 namespace wire = thingdaq::protocol;
+namespace layout = thingdaq::stream_layout;
 
 int failures = 0;
 
@@ -306,6 +308,83 @@ void testPairCountAndCounterBoundariesFailClosed() {
   }
 }
 
+void testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod() {
+  FakePairSource source{};
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  packer::AdcFramePacker adc{source};
+  constexpr std::uint32_t run_id = 35U;
+  constexpr auto profile = v2::RateProfile::kAdc125khzGpio500khz;
+  const layout::Result selected =
+      layout::experimental(v2::AuxBankMode::kInput, profile);
+  expect(selected.ok() &&
+             pipeline.startRun(run_id, v1::ChecksumAlgorithm::kCrc32c,
+                               packet::kAdcStreamMask,
+                               selected.layout) ==
+                 packet::OperationStatus::kOk &&
+             adc.startRun(run_id, v1::ChecksumAlgorithm::kCrc32c,
+                          pipeline) == packer::OperationStatus::kOk,
+         "the existing ADC packer binds to a generated INPUT layout");
+  source.push(0U, run_id, 0x0100U,
+              static_cast<std::uint32_t>(v2::kInputAdcPairsPerFrame));
+  source.push(2U * v2::kInputAdcPairsPerFrame, run_id, 0x0200U,
+              static_cast<std::uint32_t>(v2::kInputAdcPairsPerFrame));
+
+  const packer::ServiceReport serviced = adc.service(pipeline, 2U);
+  expect(serviced.buffers_consumed == 2U &&
+             serviced.pairs_consumed ==
+                 2U * v2::kInputAdcPairsPerFrame &&
+             serviced.frames_framed == 2U && source.releases == 2U &&
+             pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+         "506-pair source leases frame through the existing ADC owner");
+
+  wire::ByteView frame = pipeline.frontFrame();
+  std::uint32_t item_count = 0U;
+  std::uint32_t payload_bytes = 0U;
+  std::uint32_t sequence = 0U;
+  std::uint64_t first_ticks = 0U;
+  expect(frame.size == v2::kMinDataFrameBytes &&
+             frame.data[v1::kHeaderVersionOffset] ==
+                 v2::kProtocolVersion &&
+             wire::loadU32(frame, v1::kHeaderItemCountOffset,
+                           item_count) &&
+             wire::loadU32(frame, v1::kHeaderPayloadLengthOffset,
+                           payload_bytes) &&
+             wire::loadU64(frame, v1::kHeaderFirstSampleTicksOffset,
+                           first_ticks) &&
+             item_count == v2::kInputAdcPairsPerFrame &&
+             payload_bytes == selected.layout.streams[0].payload_bytes &&
+             first_ticks == 0U,
+         "the first INPUT ADC frame carries its exact short v2 shape");
+  pipeline.releaseFrontFrame();
+
+  frame = pipeline.frontFrame();
+  expect(wire::loadU32(frame, v1::kHeaderSequenceOffset, sequence) &&
+             wire::loadU64(frame, v1::kHeaderFirstSampleTicksOffset,
+                           first_ticks) &&
+             sequence == 2U &&
+             first_ticks ==
+                 2U * v2::kInputAdcPairsPerFrame * 64U,
+         "a missing short frame consumes one sequence and the selected 64-tick period");
+  pipeline.releaseFrontFrame();
+
+  const packet::SourceCounters counters =
+      pipeline.sourceCounters(packet::Stream::kAdc);
+  const packer::Snapshot snapshot = adc.snapshot(pipeline);
+  expect(counters.frames_produced == 3U &&
+             counters.frames_framed == 2U &&
+             counters.frames_dropped == 1U &&
+             counters.items_dropped == v2::kInputAdcPairsPerFrame &&
+             snapshot.progress.raw_gap_pairs ==
+                 v2::kInputAdcPairsPerFrame &&
+             snapshot.progress.raw_drop_pairs_projected ==
+                 v2::kInputAdcPairsPerFrame &&
+             snapshot.layout == selected.layout,
+         "short-frame ADC production and raw loss conserve exact items");
+  (void)adc.stopProduction();
+  (void)pipeline.stopProduction();
+}
+
 }  // namespace
 
 int main() {
@@ -313,6 +392,7 @@ int main() {
   testStaleEpochCannotCrossRuns();
   testAlignedFrameBoundaryAtLargestSafeTimestamp();
   testPairCountAndCounterBoundariesFailClosed();
+  testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod();
   if (failures != 0) {
     std::cerr << failures << " ADC frame packer assertion(s) failed\n";
     return 1;

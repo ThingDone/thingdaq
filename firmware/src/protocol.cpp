@@ -3,6 +3,8 @@
 #include <limits>
 
 #include "checksum.h"
+#include "generated/protocol_v2_constants.h"
+#include "rate_profile_table.h"
 
 #if defined(__IMXRT1062__)
 #define THINGDAQ_PROTOCOL_COLD_CODE(section_name) \
@@ -1982,6 +1984,72 @@ void saturatingIncrement(std::uint64_t &value) {
   }
 }
 
+bool dataFrameShapeMatchesContract(protocol_v1::FrameKind kind,
+                                   const DataFrameShape &shape) {
+  if (!isDataKind(kind) || shape.item_count == 0U ||
+      shape.item_bytes == 0U || shape.item_period_ticks == 0U ||
+      shape.payload_bytes > std::numeric_limits<std::uint32_t>::max() ||
+      shape.frame_bytes > protocol_v2::kMaxDataFrameBytes) {
+    return false;
+  }
+  const std::uint64_t payload =
+      static_cast<std::uint64_t>(shape.item_count) * shape.item_bytes;
+  const std::uint64_t total =
+      payload + protocol_v1::kHeaderSize + protocol_v1::kTrailerSize;
+  if (payload != shape.payload_bytes || total != shape.frame_bytes) {
+    return false;
+  }
+
+  if (shape.protocol_version == protocol_v1::kProtocolVersion) {
+    const bool adc = kind == protocol_v1::FrameKind::kAdcData;
+    return shape.item_count ==
+               (adc ? protocol_v1::kAdcPairsPerFrame
+                    : protocol_v1::kGpioSamplesPerFrame) &&
+           shape.item_bytes ==
+               (adc ? protocol_v1::kAdcBytesPerPair : 1U) &&
+           shape.item_period_ticks ==
+               (adc ? protocol_v1::kAdcPairPeriodTicks
+                    : protocol_v1::kGpioSamplePeriodTicks) &&
+           shape.payload_bytes == protocol_v1::kDataPayloadBytes &&
+           shape.frame_bytes == protocol_v1::kDataFrameBytes;
+  }
+  if (shape.protocol_version != protocol_v2::kProtocolVersion) {
+    return false;
+  }
+
+  for (const protocol_v2::RateProfileTiming &timing :
+       rate_profile::kTimings) {
+    const bool adc = kind == protocol_v1::FrameKind::kAdcData;
+    const std::uint32_t expected_period =
+        adc ? timing.adc_pair_period_ticks
+            : timing.gpio_sample_period_ticks;
+    if (shape.item_period_ticks != expected_period) {
+      continue;
+    }
+    const std::uint64_t coverage =
+        static_cast<std::uint64_t>(shape.item_count) *
+        shape.item_period_ticks;
+    const bool disabled =
+        coverage == timing.disabled_frame_coverage_ticks &&
+        shape.item_count ==
+            (adc ? protocol_v2::kDisabledAdcPairsPerFrame
+                 : protocol_v2::kDisabledGpioSamplesPerFrame) &&
+        shape.item_bytes ==
+            (adc ? protocol_v2::kAdcBytesPerPair : 1U);
+    const bool input =
+        coverage == timing.input_frame_coverage_ticks &&
+        shape.item_count ==
+            (adc ? protocol_v2::kInputAdcPairsPerFrame
+                 : protocol_v2::kInputGpioSamplesPerFrame) &&
+        shape.item_bytes ==
+            (adc ? protocol_v2::kAdcBytesPerPair : 2U);
+    if (disabled || input) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 bool loadU16(ByteView input, std::size_t offset, std::uint16_t &value) {
@@ -2258,6 +2326,7 @@ Result decodeFrame(ByteView input, DecodedFrame &frame) {
   return Result::success();
 }
 
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.frame_encode")
 Result encodeFrameTo(FrameFields fields, ByteView payload,
                      MutableByteView output, std::size_t &written) {
   written = 0U;
@@ -2361,6 +2430,81 @@ Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
   if (!result.ok() ||
       !storeU32(frame,
                 protocol_v1::kHeaderSize + protocol_v1::kDataPayloadBytes,
+                checksum)) {
+    return result.ok() ? badLength() : result;
+  }
+  return Result::success();
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.data_frame_v2")
+Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
+                              std::size_t payload_bytes_written,
+                              const DataFrameShape &shape) {
+  if (shape.protocol_version != protocol_v1::kProtocolVersion &&
+      shape.protocol_version != protocol_v2::kProtocolVersion) {
+    return badVersion();
+  }
+  if (!frame.valid() || frame.size != shape.frame_bytes ||
+      payload_bytes_written != shape.payload_bytes ||
+      !isDataKind(fields.kind) ||
+      !dataFrameShapeMatchesContract(fields.kind, shape)) {
+    return badLength();
+  }
+  if (!isSupportedChecksum(fields.checksum_algorithm)) {
+    return unsupportedChecksum();
+  }
+  const std::uint16_t allowed = protocol_v1::allowedFlags(fields.kind);
+  if ((fields.flags & static_cast<std::uint16_t>(~allowed)) != 0U) {
+    return badFlags();
+  }
+  const std::uint16_t overrun = static_cast<std::uint16_t>(
+      protocol_v1::FrameFlag::kOverrunBefore);
+  const std::uint16_t gap =
+      static_cast<std::uint16_t>(protocol_v1::FrameFlag::kGapBefore);
+  if ((fields.flags & overrun) != 0U && (fields.flags & gap) == 0U) {
+    return badFlags();
+  }
+  const bool epoch_start =
+      (fields.flags & static_cast<std::uint16_t>(
+                          protocol_v1::FrameFlag::kEpochStart)) != 0U;
+  const bool first_item =
+      fields.sequence == 0U && fields.first_sample_ticks == 0U;
+  if (fields.run_id == 0U || fields.request_id != 0U ||
+      fields.item_count != shape.item_count ||
+      fields.first_sample_ticks % shape.item_period_ticks != 0U ||
+      epoch_start != first_item) {
+    return badPayload();
+  }
+
+  FrameHeader header{};
+  header.kind = fields.kind;
+  header.version = shape.protocol_version;
+  header.flags = fields.flags;
+  header.checksum_algorithm = fields.checksum_algorithm;
+  header.total_length = static_cast<std::uint32_t>(shape.frame_bytes);
+  header.payload_length = static_cast<std::uint32_t>(shape.payload_bytes);
+  header.run_id = fields.run_id;
+  header.sequence = fields.sequence;
+  header.request_id = fields.request_id;
+  header.first_sample_ticks = fields.first_sample_ticks;
+  header.item_count = fields.item_count;
+  Result result = validatePayload(
+      header,
+      {frame.data + protocol_v1::kHeaderSize, shape.payload_bytes});
+  if (!result.ok()) {
+    return result;
+  }
+  if (!writeHeader(header, frame)) {
+    return badLength();
+  }
+
+  std::uint32_t checksum = 0U;
+  result = computeChecksum(
+      header.checksum_algorithm,
+      {frame.data, protocol_v1::kHeaderSize + shape.payload_bytes},
+      checksum);
+  if (!result.ok() ||
+      !storeU32(frame, protocol_v1::kHeaderSize + shape.payload_bytes,
                 checksum)) {
     return result.ok() ? badLength() : result;
   }

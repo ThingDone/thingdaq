@@ -33,11 +33,11 @@ Integer saturatingMultiply(Integer left, Integer right) {
 }
 
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.byte_counters")
-SourceByteCounters byteCounters(Stream stream,
+SourceByteCounters byteCounters(const stream_layout::FrameLayout &layout,
                                 const SourceCounters &source) {
   SourceByteCounters result{};
-  const std::uint64_t payload_bytes_per_item = payloadBytesPerItem(stream);
-  const std::uint64_t frame_bytes = protocol_v1::kDataFrameBytes;
+  const std::uint64_t payload_bytes_per_item = layout.item_bytes;
+  const std::uint64_t frame_bytes = layout.frame_bytes;
   result.payload_bytes_produced = saturatingMultiply(
       source.items_produced, payload_bytes_per_item);
   result.payload_bytes_framed = saturatingMultiply(
@@ -68,6 +68,16 @@ OperationStatus PacketBufferPipeline::startRun(
     std::uint32_t run_id,
     protocol_v1::ChecksumAlgorithm checksum_algorithm,
     std::uint8_t enabled_stream_mask) {
+  return startRun(run_id, checksum_algorithm, enabled_stream_mask,
+                  stream_layout::legacy());
+}
+
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.start_layout")
+OperationStatus PacketBufferPipeline::startRun(
+    std::uint32_t run_id,
+    protocol_v1::ChecksumAlgorithm checksum_algorithm,
+    std::uint8_t enabled_stream_mask,
+    const stream_layout::RunLayout &layout) {
   if (run_id == 0U || run_id == run_id_) {
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kInvalidRunId;
@@ -88,6 +98,10 @@ OperationStatus PacketBufferPipeline::startRun(
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kInvalidStreamMask;
   }
+  if (!layout.valid()) {
+    saturatingIncrement(run_start_rejections_);
+    return OperationStatus::kInvalidLayout;
+  }
 
   for (ReadyQueue &queue : ready_queues_) {
     queue.clear();
@@ -101,6 +115,7 @@ OperationStatus PacketBufferPipeline::startRun(
   run_id_ = run_id;
   enabled_stream_mask_ = enabled_stream_mask;
   checksum_algorithm_ = checksum_algorithm;
+  layout_ = layout;
   next_free_search_ = 0U;
   next_ready_source_ = 0U;
   ready_queue_high_water_ = 0U;
@@ -154,15 +169,16 @@ BeginFillResult PacketBufferPipeline::beginFill(Stream stream) {
   }
 
   SourceCounters &source = source_counters_[streamIndex(stream)];
+  const stream_layout::FrameLayout &layout = streamLayout(stream);
   result.handle.sequence = source.next_sequence;
   ++source.next_sequence;  // Protocol sequence arithmetic wraps modulo 2^32.
   saturatingIncrement(source.frames_produced);
   saturatingAdd(source.items_produced,
-                static_cast<std::uint64_t>(itemsPerFrame(stream)));
+                static_cast<std::uint64_t>(layout.item_count));
 
   const BufferIndex buffer_index = takeFreeBuffer();
   if (buffer_index == kInvalidBufferIndex) {
-    recordDrop(stream, itemsPerFrame(stream));
+    recordDrop(stream, layout.item_count);
     gap_before_next_frame_[streamIndex(stream)] = true;
     saturatingIncrement(capacity_drops_without_evictable_frame_);
     result.status = OperationStatus::kPoolExhausted;
@@ -185,7 +201,7 @@ BeginFillResult PacketBufferPipeline::beginFill(Stream stream) {
   gap_before_next_frame_[streamIndex(stream)] = false;
   record.run_id = run_id_;
   record.sequence = result.handle.sequence;
-  record.item_count = itemsPerFrame(stream);
+  record.item_count = layout.item_count;
   record.lease = lease;
   record.frame_size = 0U;
   result.handle.buffer_index = buffer_index;
@@ -211,8 +227,9 @@ OperationStatus PacketBufferPipeline::recordSourceFrameDrops(
   }
 
   SourceCounters &source = source_counters_[streamIndex(stream)];
+  const stream_layout::FrameLayout &layout = streamLayout(stream);
   const std::uint64_t items = saturatingMultiply(
-      frame_count, static_cast<std::uint64_t>(itemsPerFrame(stream)));
+      frame_count, static_cast<std::uint64_t>(layout.item_count));
   saturatingAdd(source.frames_produced, frame_count);
   saturatingAdd(source.items_produced, items);
   saturatingAdd(source.frames_dropped, frame_count);
@@ -230,7 +247,7 @@ protocol::MutableByteView PacketBufferPipeline::writablePayload(
   }
   return {storage_.frame(handle.buffer_index).data() +
               protocol_v1::kHeaderSize,
-          protocol_v1::kDataPayloadBytes};
+          streamLayout(handle.stream).payload_bytes};
 }
 
 FinishFillResult PacketBufferPipeline::finishFill(
@@ -243,12 +260,13 @@ FinishFillResult PacketBufferPipeline::finishFill(
   }
 
   BufferRecord &record = records_[handle.buffer_index];
+  const stream_layout::FrameLayout &layout = streamLayout(record.stream);
   if (!accepting_frames_ || record.run_id != run_id_) {
     dropBuffer(handle.buffer_index, false);
     result.status = OperationStatus::kNotRunning;
     return result;
   }
-  if (completion.payload_bytes_written != protocol_v1::kDataPayloadBytes) {
+  if (completion.payload_bytes_written != layout.payload_bytes) {
     dropBuffer(handle.buffer_index, false);
     result.status = OperationStatus::kIncompletePayload;
     return result;
@@ -277,11 +295,21 @@ FinishFillResult PacketBufferPipeline::finishFill(
   fields.sequence = record.sequence;
   fields.first_sample_ticks = completion.first_sample_ticks;
   fields.item_count = record.item_count;
-  result.encoding = protocol::encodeDataFrameInPlace(
-      fields,
-      {storage_.frame(handle.buffer_index).data(),
-       storage_.frame(handle.buffer_index).size()},
-      completion.payload_bytes_written);
+  const protocol::DataFrameShape shape{
+      layout_.protocol_version,
+      layout.item_count,
+      layout.item_bytes,
+      layout.item_period_ticks,
+      layout.payload_bytes,
+      layout.frame_bytes};
+  const protocol::MutableByteView frame{
+      storage_.frame(handle.buffer_index).data(), layout.frame_bytes};
+  result.encoding =
+      layout_.protocol_version == protocol_v1::kProtocolVersion
+          ? protocol::encodeDataFrameInPlace(
+                fields, frame, completion.payload_bytes_written)
+          : protocol::encodeDataFrameInPlace(
+                fields, frame, completion.payload_bytes_written, shape);
   if (!result.encoding.ok()) {
     saturatingIncrement(encoding_rejections_);
     dropBuffer(handle.buffer_index, false);
@@ -299,7 +327,7 @@ FinishFillResult PacketBufferPipeline::finishFill(
   }
 
   record.state = BufferState::kReady;
-  record.frame_size = protocol_v1::kDataFrameBytes;
+  record.frame_size = layout.frame_bytes;
   SourceCounters &source = source_counters_[streamIndex(record.stream)];
   saturatingIncrement(source.frames_framed);
   saturatingAdd(source.items_framed,
@@ -352,9 +380,10 @@ PromotionReport PacketBufferPipeline::serviceReadyFrames(std::size_t limit) {
       continue;
     }
     BufferRecord &record = records_[buffer_index];
+    const stream_layout::FrameLayout &layout = streamLayout(record.stream);
     if (record.state != BufferState::kReady ||
         streamIndex(record.stream) != selected_source ||
-        record.frame_size != protocol_v1::kDataFrameBytes) {
+        record.frame_size != layout.frame_bytes) {
       saturatingIncrement(invalid_operations_);
       dropBuffer(buffer_index, false);
       report.invariant_error = true;
@@ -401,7 +430,7 @@ protocol::ByteView PacketBufferPipeline::frontFrame() const {
   }
   const BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
-      record.frame_size != protocol_v1::kDataFrameBytes) {
+      record.frame_size != streamLayout(record.stream).frame_bytes) {
     return {};
   }
   return {storage_.frame(*buffer_index).data(), record.frame_size};
@@ -417,7 +446,7 @@ bool PacketBufferPipeline::prepareFrontFrame() {
   const BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
       record.transmission_started ||
-      record.frame_size != protocol_v1::kDataFrameBytes) {
+      record.frame_size != streamLayout(record.stream).frame_bytes) {
     saturatingIncrement(invalid_operations_);
     return false;
   }
@@ -433,7 +462,7 @@ void PacketBufferPipeline::markFrontFrameStarted() {
   }
   BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
-      record.frame_size != protocol_v1::kDataFrameBytes) {
+      record.frame_size != streamLayout(record.stream).frame_bytes) {
     saturatingIncrement(invalid_operations_);
     return;
   }
@@ -534,7 +563,7 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.sources = source_counters_;
   for (std::size_t source = 0U; source < kStreamCount; ++source) {
     result.source_bytes[source] = byteCounters(
-        static_cast<Stream>(source), source_counters_[source]);
+        layout_.streams[source], source_counters_[source]);
     saturatingAdd(result.data_payload_bytes_transmitted,
                   result.source_bytes[source].payload_bytes_transmitted);
     saturatingAdd(result.data_framed_bytes_transmitted,
@@ -558,6 +587,7 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.run_id = run_id_;
   result.enabled_stream_mask = enabled_stream_mask_;
   result.checksum_algorithm = checksum_algorithm_;
+  result.layout = layout_;
   result.run_starts = run_starts_;
   result.run_start_rejections = run_start_rejections_;
   result.pool_exhaustions = pool_exhaustions_;
@@ -673,8 +703,8 @@ PacketBufferPipeline::oldestEvictableCompleteBuffer() const {
         record.state == BufferState::kReady ||
         (record.state == BufferState::kTransmitting &&
          !record.transmission_started);
-    if (!complete_unsent ||
-        record.frame_size != protocol_v1::kDataFrameBytes) {
+    if (!complete_unsent || !validStream(record.stream) ||
+        record.frame_size != streamLayout(record.stream).frame_bytes) {
       continue;
     }
 
@@ -723,9 +753,8 @@ bool PacketBufferPipeline::evictCompleteBuffer(BufferIndex index) {
   const BufferRecord record = records_[index];
   if ((record.state != BufferState::kReady &&
        record.state != BufferState::kTransmitting) ||
-      record.transmission_started ||
-      record.frame_size != protocol_v1::kDataFrameBytes ||
-      !validStream(record.stream)) {
+      record.transmission_started || !validStream(record.stream) ||
+      record.frame_size != streamLayout(record.stream).frame_bytes) {
     saturatingIncrement(invalid_operations_);
     return false;
   }
@@ -840,7 +869,8 @@ bool PacketBufferPipeline::finalizeGapBefore(BufferIndex index) {
   }
   if ((record.state != BufferState::kReady &&
        record.state != BufferState::kTransmitting) ||
-      record.frame_size != protocol_v1::kDataFrameBytes) {
+      !validStream(record.stream) ||
+      record.frame_size != streamLayout(record.stream).frame_bytes) {
     return false;
   }
 
@@ -856,17 +886,15 @@ bool PacketBufferPipeline::finalizeGapBefore(BufferIndex index) {
       static_cast<std::uint16_t>(protocol_v1::FrameFlag::kGapBefore) |
       static_cast<std::uint16_t>(protocol_v1::FrameFlag::kOverrunBefore));
   std::uint32_t checksum = 0U;
+  const std::size_t checksum_offset =
+      record.frame_size - protocol_v1::kTrailerSize;
   if (!protocol::storeU16(bytes, protocol_v1::kHeaderFlagsOffset, flags) ||
       !protocol::computeChecksum(
            checksum_algorithm_,
-           {frame.data(), protocol_v1::kDataFrameBytes -
-                              protocol_v1::kTrailerSize},
+           {frame.data(), checksum_offset},
            checksum)
            .ok() ||
-      !protocol::storeU32(bytes,
-                          protocol_v1::kDataFrameBytes -
-                              protocol_v1::kTrailerSize,
-                          checksum)) {
+      !protocol::storeU32(bytes, checksum_offset, checksum)) {
     saturatingIncrement(encoding_rejections_);
     return false;
   }

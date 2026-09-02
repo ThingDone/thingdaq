@@ -96,6 +96,18 @@ struct FrameFields {
   std::uint32_t item_count = 0U;
 };
 
+// Exact wire shape for a data frame. Protocol v1 callers keep using the
+// three-argument encoder below; the experimental portable path supplies one
+// of the generated v2 mode/profile shapes explicitly.
+struct DataFrameShape {
+  std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
+  std::uint32_t item_count = 0U;
+  std::uint32_t item_bytes = 0U;
+  std::uint32_t item_period_ticks = 0U;
+  std::size_t payload_bytes = 0U;
+  std::size_t frame_bytes = 0U;
+};
+
 struct DecodedFrame {
   FrameHeader header{};
   ByteView payload{};
@@ -142,6 +154,9 @@ Result encodeFrameTo(FrameFields fields, ByteView payload,
 // constructing the complete header/checksum before queue admission.
 Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
                               std::size_t payload_bytes_written);
+Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
+                              std::size_t payload_bytes_written,
+                              const DataFrameShape &shape);
 
 template <std::size_t Capacity>
 Result encodeFrame(FrameFields fields, ByteView payload,

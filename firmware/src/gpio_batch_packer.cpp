@@ -82,6 +82,17 @@ OperationStatus GpioBatchPacker::startRun(
       !protocol::isSupportedChecksum(checksum_algorithm)) {
     return OperationStatus::kPipelineNotReady;
   }
+  const stream_layout::RunLayout &selected_layout = pipeline.layout();
+  const stream_layout::FrameLayout &gpio_layout =
+      selected_layout.forStream(stream_layout::Stream::kGpio);
+  if (!selected_layout.valid() ||
+      selected_layout.aux_bank_mode !=
+          protocol_v2::AuxBankMode::kDisabled ||
+      gpio_layout.item_count != kFrameSamples ||
+      gpio_layout.item_bytes != kPackedWireBytesPerSample ||
+      gpio_layout.payload_bytes != storage_.buffers[0].bytes.size()) {
+    return OperationStatus::kPipelineNotReady;
+  }
 
   records_ = {};
   ready_queue_.clear();
@@ -110,6 +121,7 @@ OperationStatus GpioBatchPacker::startRun(
   filling_buffer_ = kInvalidBuffer;
   run_id_ = run_id;
   checksum_algorithm_ = checksum_algorithm;
+  layout_ = selected_layout;
   current_frame_invalid_ = false;
   input_gap_pending_ = false;
   packet_gap_pending_ = false;
@@ -226,6 +238,7 @@ Snapshot GpioBatchPacker::snapshot(
   }
   result.run_id = run_id_;
   result.checksum_algorithm = checksum_algorithm_;
+  result.layout = layout_;
   result.next_source_sample = next_source_sample_;
   result.start_epoch_ticks = start_epoch_ticks_;
   result.pending_dropped_frames = pending_dropped_frames_;
@@ -574,14 +587,20 @@ bool GpioBatchPacker::packetizeOne(
   bool framed = begun.ok();
   if (framed) {
     protocol::MutableByteView payload = pipeline.writablePayload(begun.handle);
-    framed = payload.valid() &&
-             payload.size == protocol_v1::kDataPayloadBytes;
+    const stream_layout::FrameLayout &gpio_layout =
+        layout_.forStream(stream_layout::Stream::kGpio);
+    const bool timestamp_valid =
+        record.first_sample <=
+        std::numeric_limits<std::uint64_t>::max() /
+            gpio_layout.item_period_ticks;
+    framed = payload.valid() && payload.size == gpio_layout.payload_bytes &&
+             timestamp_valid;
     if (framed) {
       std::memcpy(payload.data, storage_.buffers[index].bytes.data(),
                   payload.size);
       packet::FrameCompletion completion{};
       completion.first_sample_ticks =
-          record.first_sample * protocol_v1::kGpioSamplePeriodTicks;
+          record.first_sample * gpio_layout.item_period_ticks;
       if (begun.handle.sequence == 0U && record.first_sample == 0U) {
         completion.flags = flag(protocol_v1::FrameFlag::kEpochStart);
       }
@@ -595,6 +614,11 @@ bool GpioBatchPacker::packetizeOne(
       framed = pipeline.finishFill(begun.handle, completion).ok();
     } else {
       (void)pipeline.cancelFill(begun.handle);
+      if (!timestamp_valid) {
+        saturatingIncrement(chronology_errors_);
+        saturatingIncrement(source_errors_);
+        report.source_error = true;
+      }
     }
   }
 
@@ -634,6 +658,7 @@ bool GpioBatchPacker::applyDroppedFrames(
   return true;
 }
 
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.trailing_drops")
 bool GpioBatchPacker::flushTrailingDrops(
     packet::PacketBufferPipeline &pipeline) {
   if (!applyDroppedFrames(pipeline, pending_dropped_frames_,

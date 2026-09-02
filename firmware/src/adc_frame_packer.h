@@ -41,6 +41,7 @@ struct Snapshot {
   std::uint32_t run_id = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
       protocol_v1::kDefaultChecksumAlgorithm;
+  stream_layout::RunLayout layout = stream_layout::legacy();
   std::uint64_t next_source_pair = 0U;
   std::uint64_t start_epoch_ticks = 0U;
   std::uint64_t service_calls = 0U;
@@ -95,6 +96,7 @@ class AdcFramePacker final {
   std::uint32_t chronology_errors_ = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm_ =
       protocol_v1::kDefaultChecksumAlgorithm;
+  stream_layout::RunLayout layout_ = stream_layout::legacy();
   bool packet_gap_pending_ = false;
   bool running_ = false;
 };
