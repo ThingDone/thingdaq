@@ -17,6 +17,7 @@ related:
   - '[[Hardware-Safety]]'
   - '[[System-Overview]]'
   - '[[Firmware-Resource-Map]]'
+  - '[[RLE-Firmware-Integration]]'
   - '[[Acquisition-Pipeline]]'
   - '[[Calibration]]'
   - '[[NumPy-Integration]]'
@@ -75,6 +76,8 @@ physical acceptance.
   and the generated remote endurance workflow in [[soak-harness]].
 - `architecture/` describes system boundaries and component relationships,
   beginning with [[System-Overview]] and [[Firmware-Resource-Map]], with the
+  target-side adaptive compression ownership decision in
+  [[RLE-Firmware-Integration]],
   centralized physical lifecycle and Phase 08 composition audit in
   [[Acquisition-Pipeline]], the synchronized public host boundary in
   [[Python-API]], the immutable opt-in host correction model in [[Calibration]],
