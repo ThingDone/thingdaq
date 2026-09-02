@@ -129,8 +129,9 @@ class ControlState {
   bool recoverToIdle();
 
   // Request identifiers are unique only within one CDC host session. DTR
-  // reopen clears this bounded replay window without changing acquisition
-  // state, run identity, configuration, or counters.
+  // reopen clears this bounded replay window. The default v1 lifecycle keeps
+  // its historical state; an explicit v2 negotiation is session-scoped and
+  // fails safe to IDLE so RLE intent can never leak to a new host.
   void beginHostSession();
 
   DispatchResult dispatch(

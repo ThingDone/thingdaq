@@ -1148,6 +1148,12 @@ def _v1_compatible_control_frame(frame: V2Frame) -> V1Frame:
             constants.INFO_RESPONSE_CAPABILITY_BITS_OFFSET,
             capability_bits & v1_constants.KNOWN_CAPABILITY_MASK,
         )
+        struct.pack_into(
+            "<I",
+            payload,
+            constants.INFO_RESPONSE_MAX_CONTROL_FRAME_BYTES_OFFSET,
+            v1_constants.MAX_CONTROL_FRAME_BYTES,
+        )
     elif frame.header.kind is constants.FrameKind.CONFIGURE_REQUEST:
         payload[constants.CONFIGURE_REQUEST_ENCODING_OFFSET] = 0
     elif (
@@ -1159,6 +1165,8 @@ def _v1_compatible_control_frame(frame: V2Frame) -> V1Frame:
         and response_ok
     ):
         payload[constants.CONFIGURE_RESPONSE_ENCODING_OFFSET] = 0
+    elif frame.header.kind is constants.FrameKind.GET_STATUS_RESPONSE and response_ok:
+        del payload[v1_constants.STATUS_RESPONSE_PAYLOAD_SIZE :]
 
     header = V1FrameHeader(
         kind=v1_constants.FrameKind(int(frame.header.kind)),
@@ -1166,8 +1174,10 @@ def _v1_compatible_control_frame(frame: V2Frame) -> V1Frame:
         checksum_algorithm=v1_constants.ChecksumAlgorithm(
             int(frame.header.checksum_algorithm)
         ),
-        total_length=frame.header.total_length,
-        payload_length=frame.header.payload_length,
+        total_length=(
+            v1_constants.HEADER_SIZE + len(payload) + v1_constants.TRAILER_SIZE
+        ),
+        payload_length=len(payload),
         run_id=frame.header.run_id,
         sequence=frame.header.sequence,
         request_id=frame.header.request_id,
@@ -1210,6 +1220,7 @@ def decode_v2_message(
             value,
             protocol_version=constants.PROTOCOL_VERSION,
             capability_bits=advertised,
+            max_control_frame_bytes=constants.MAX_CONTROL_FRAME_BYTES,
             configuration_encoding=(
                 negotiated
                 if advertised & constants.Capability.RLE_STREAMING

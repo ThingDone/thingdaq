@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "board_config.h"
+#include "cycle_counter.h"
 #include "protocol.h"
 #include "rle_encoder.h"
 #include "usb_transport.h"
@@ -295,11 +296,49 @@ struct SourceByteCounters {
   std::uint64_t framed_bytes_emitted = 0U;
   std::uint64_t framed_bytes_transmitted = 0U;
   std::uint64_t framed_bytes_evicted = 0U;
+  std::uint64_t encoded_payload_bytes_framed = 0U;
+  std::uint64_t encoded_payload_bytes_emitted = 0U;
+  std::uint64_t encoded_payload_bytes_transmitted = 0U;
+  std::uint64_t encoded_payload_bytes_dropped = 0U;
+  std::uint64_t encoded_payload_bytes_evicted = 0U;
+  std::uint64_t encoded_payload_bytes_queued = 0U;
+  std::uint64_t framed_bytes_dropped = 0U;
+  std::uint64_t encoded_wire_bytes_queued = 0U;
+};
+
+// Mutable accounting keeps only cumulative selected-wire totals. Logical
+// payload totals come from SourceCounters, while queued gauges are derived by
+// inspecting owned records in snapshot(); excluding both from this long-lived
+// state avoids duplicating 128 bytes of target RAM.
+struct SelectedByteCounters {
+  std::uint64_t framed_bytes_framed = 0U;
+  std::uint64_t framed_bytes_emitted = 0U;
+  std::uint64_t framed_bytes_transmitted = 0U;
+  std::uint64_t framed_bytes_evicted = 0U;
+  std::uint64_t encoded_payload_bytes_framed = 0U;
+  std::uint64_t encoded_payload_bytes_emitted = 0U;
+  std::uint64_t encoded_payload_bytes_transmitted = 0U;
+  std::uint64_t encoded_payload_bytes_dropped = 0U;
+  std::uint64_t encoded_payload_bytes_evicted = 0U;
+  std::uint64_t framed_bytes_dropped = 0U;
+};
+
+struct EncodingCounters {
+  std::uint64_t raw_frames = 0U;
+  std::uint64_t rle_frames = 0U;
+  std::uint64_t rle_runs = 0U;
+  std::uint64_t fallback_frames = 0U;
+  std::uint64_t fallback_not_smaller = 0U;
+  std::uint64_t fallback_temporary_page_unavailable = 0U;
+  std::uint64_t fallback_encoder_failure = 0U;
+  std::uint64_t encode_cycles = 0U;
+  std::uint32_t encode_failures = 0U;
 };
 
 struct PipelineSnapshot {
   std::array<SourceCounters, kStreamCount> sources{};
   std::array<SourceByteCounters, kStreamCount> source_bytes{};
+  std::array<EncodingCounters, kStreamCount> encoding{};
   std::array<std::size_t, kBufferStateCount> buffers_by_state{};
   std::array<std::size_t, kStreamCount> ready_depth_by_source{};
   std::array<std::size_t, kStreamCount> transmit_depth_by_source{};
@@ -358,8 +397,9 @@ struct StopReport {
 // in cooperative context.
 class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
  public:
-  explicit PacketBufferPipeline(PacketBufferStorage &storage)
-      : storage_(storage) {}
+  explicit PacketBufferPipeline(PacketBufferStorage &storage,
+                                timing::CycleCounter *cycle_counter = nullptr)
+      : storage_(storage), cycle_counter_(cycle_counter) {}
   PacketBufferPipeline(const PacketBufferPipeline &) = delete;
   PacketBufferPipeline &operator=(const PacketBufferPipeline &) = delete;
   PacketBufferPipeline(PacketBufferPipeline &&) = delete;
@@ -491,6 +531,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::array<ReadyQueue, kStreamCount> ready_queues_{};
   TransmitQueue transmit_queue_{};
   std::array<SourceCounters, kStreamCount> source_counters_{};
+  std::array<SelectedByteCounters, kStreamCount> selected_byte_counters_{};
+  std::array<EncodingCounters, kStreamCount> encoding_counters_{};
   std::array<std::size_t, kStreamCount> transmit_depth_by_source_{};
   std::uint32_t run_id_ = 0U;
   std::uint8_t enabled_stream_mask_ = 0U;
@@ -521,6 +563,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::size_t temporary_page_high_water_ = 0U;
   std::array<bool, kStreamCount> gap_before_next_frame_{};
   bool accepting_frames_ = false;
+  timing::CycleCounter *cycle_counter_ = nullptr;
+  bool cycle_counter_ready_ = false;
 #if defined(THINGDAQ_TESTING)
   bool inject_rle_encode_failure_ = false;
 #endif

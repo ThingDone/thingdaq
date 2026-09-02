@@ -848,6 +848,7 @@ class ExperimentalSimulatedDevice(SimulatedDevice):
             firmware_version=(0, 2, 0),
             protocol_version=v2_constants.PROTOCOL_VERSION,
             capability_bits=capability_bits,
+            max_control_frame_bytes=v2_constants.MAX_CONTROL_FRAME_BYTES,
             configuration_encoding=(
                 self._configuration.encoding
                 if self._configuration is not None
@@ -934,6 +935,42 @@ class ExperimentalSimulatedDevice(SimulatedDevice):
                 run_id=run_id,
                 request_id=request_id,
             )
+        if (
+            kind is constants.FrameKind.GET_STATUS_RESPONSE
+            and not flags & constants.FrameFlag.RESPONSE_ERROR
+        ):
+            extended = bytearray(payload)
+            extended.extend(
+                bytes(v2_constants.STATUS_RESPONSE_PAYLOAD_SIZE - len(extended))
+            )
+            extended[v2_constants.STATUS_RESPONSE_CONFIGURATION_ENCODING_OFFSET] = int(
+                self._experimental_encoding
+            )
+            struct.pack_into(
+                "<Q",
+                extended,
+                v2_constants.STATUS_RESPONSE_ADC_ENCODED_PAYLOAD_BYTES_FRAMED_OFFSET,
+                self._adc_encoded_payload_bytes,
+            )
+            struct.pack_into(
+                "<Q",
+                extended,
+                v2_constants.STATUS_RESPONSE_ADC_ENCODED_PAYLOAD_BYTES_TRANSMITTED_OFFSET,
+                self._adc_encoded_payload_bytes,
+            )
+            struct.pack_into(
+                "<Q",
+                extended,
+                v2_constants.STATUS_RESPONSE_GPIO_ENCODED_PAYLOAD_BYTES_FRAMED_OFFSET,
+                self._gpio_encoded_payload_bytes,
+            )
+            struct.pack_into(
+                "<Q",
+                extended,
+                v2_constants.STATUS_RESPONSE_GPIO_ENCODED_PAYLOAD_BYTES_TRANSMITTED_OFFSET,
+                self._gpio_encoded_payload_bytes,
+            )
+            payload = extended
         return encode_v2_frame(
             kind,
             payload,

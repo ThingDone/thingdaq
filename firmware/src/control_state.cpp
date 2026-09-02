@@ -69,6 +69,10 @@ void ControlState::beginHostSession() {
   recent_request_ids_ = {};
   recent_request_count_ = 0U;
   next_request_slot_ = 0U;
+  if (has_configuration_ &&
+      configuration_.protocol_version == protocol_v2::kProtocolVersion) {
+    (void)recoverToIdle();
+  }
 }
 
 THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.dispatch")
@@ -136,6 +140,11 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
       }
       if (!readiness.start_ready) {
         return reject(request, protocol_v1::ErrorCode::kBusy, response);
+      }
+      if (request.protocol_version != configuration_.protocol_version) {
+        return reject(request,
+                      protocol_v1::ErrorCode::kUnsupportedConfiguration,
+                      response);
       }
       const std::uint32_t next_run = nextRunId(run_id_);
       const protocol::Result encoding = protocol::encodeStartResponse(
@@ -332,12 +341,21 @@ PendingEvents ControlState::takePendingEvents() {
 THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.configuration_validation")
 protocol_v1::ErrorCode ControlState::validateConfiguration(
     const protocol::Configuration &configuration) {
+  const bool raw = configuration.encoding ==
+                   protocol_v2::ConfigurationEncoding::kRaw;
+  const bool rle_auto = configuration.encoding ==
+                        protocol_v2::ConfigurationEncoding::kRleAuto;
   if ((configuration.stream_mask &
        static_cast<std::uint8_t>(~kKnownStreamMask)) != 0U ||
       !knownSource(configuration.source) ||
       configuration.data_checksum_algorithm ==
           protocol_v1::ChecksumAlgorithm::kNoneReserved ||
-      configuration.data_frame_bytes != protocol_v1::kDataFrameBytes) {
+      configuration.data_frame_bytes != protocol_v1::kDataFrameBytes ||
+      (configuration.protocol_version != protocol_v1::kProtocolVersion &&
+       configuration.protocol_version != protocol_v2::kProtocolVersion) ||
+      (!raw && !rle_auto) ||
+      (configuration.protocol_version == protocol_v1::kProtocolVersion &&
+       !raw)) {
     return protocol_v1::ErrorCode::kInvalidPayload;
   }
 

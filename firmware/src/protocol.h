@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "generated/protocol_constants.h"
+#include "generated/protocol_v2_constants.h"
 
 namespace thingdaq::protocol {
 
@@ -80,6 +81,7 @@ struct FrameHeader {
   std::uint64_t first_sample_ticks = 0U;
   std::uint32_t item_count = 0U;
   std::uint8_t version = protocol_v1::kProtocolVersion;
+  protocol_v2::FrameEncoding encoding = protocol_v2::FrameEncoding::kRaw;
   std::uint16_t header_length =
       static_cast<std::uint16_t>(protocol_v1::kHeaderSize);
 };
@@ -94,6 +96,8 @@ struct FrameFields {
   std::uint32_t request_id = 0U;
   std::uint64_t first_sample_ticks = 0U;
   std::uint32_t item_count = 0U;
+  std::uint8_t version = protocol_v1::kProtocolVersion;
+  protocol_v2::FrameEncoding encoding = protocol_v2::FrameEncoding::kRaw;
 };
 
 struct DecodedFrame {
@@ -129,7 +133,7 @@ class FixedFrame {
 };
 
 using CommandFrame = FixedFrame<protocol_v1::kMaxCommandFrameBytes>;
-using ControlFrame = FixedFrame<protocol_v1::kMaxControlFrameBytes>;
+using ControlFrame = FixedFrame<protocol_v2::kMaxControlFrameBytes>;
 using DataFrame = FixedFrame<protocol_v1::kMaxDataFrameBytes>;
 
 Result decodeFrame(ByteView input, DecodedFrame &frame);
@@ -166,6 +170,9 @@ struct Configuration {
       protocol_v1::kDefaultChecksumAlgorithm;
   std::uint32_t data_frame_bytes =
       static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes);
+  std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
+  protocol_v2::ConfigurationEncoding encoding =
+      protocol_v2::ConfigurationEncoding::kRaw;
 };
 
 struct ChecksumBenchmarkRequest {
@@ -215,6 +222,7 @@ struct Request {
   ChecksumBenchmarkRequest checksum_benchmark{};
   GpioClockDiagnosticRequest gpio_clock_diagnostic{};
   std::uint64_t nonce = 0U;
+  std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
 };
 
 struct ParsedCommand {
@@ -468,6 +476,24 @@ struct StreamTelemetry {
   std::uint16_t packet_transmit_high_water = 0U;
 };
 
+struct StreamEncodingTelemetry {
+  std::uint64_t encoded_payload_bytes_framed = 0U;
+  std::uint64_t encoded_payload_bytes_transmitted = 0U;
+  std::uint64_t encoded_payload_bytes_dropped = 0U;
+  std::uint64_t encoded_payload_bytes_queued = 0U;
+  std::uint64_t encoded_wire_bytes_dropped = 0U;
+  std::uint64_t encoded_wire_bytes_queued = 0U;
+  std::uint64_t raw_frames = 0U;
+  std::uint64_t rle_frames = 0U;
+  std::uint64_t rle_runs = 0U;
+  std::uint64_t fallback_frames = 0U;
+  std::uint64_t fallback_not_smaller = 0U;
+  std::uint64_t fallback_temporary_page_unavailable = 0U;
+  std::uint64_t fallback_encoder_failure = 0U;
+  std::uint64_t encode_cycles = 0U;
+  std::uint32_t encode_failures = 0U;
+};
+
 struct PacketTelemetry {
   std::uint16_t owned_depth = 0U;
   std::uint16_t ready_high_water = 0U;
@@ -484,6 +510,10 @@ struct PacketTelemetry {
   std::uint32_t encoding_rejections = 0U;
   std::uint32_t ready_queue_rejections = 0U;
   std::uint32_t transmit_queue_rejections = 0U;
+  std::uint16_t temporary_pages_owned = 0U;
+  std::uint16_t temporary_page_high_water = 0U;
+  std::uint32_t temporary_page_exhaustions = 0U;
+  std::uint32_t encode_failures = 0U;
 };
 
 struct FirmwareDiagnosticTelemetry {
@@ -610,6 +640,7 @@ struct StatusResponse {
   std::uint64_t gpio_raw_drop_samples_projected = 0U;
   std::uint64_t gpio_packer_drop_samples_projected = 0U;
   std::array<StreamTelemetry, 2U> streams{};
+  std::array<StreamEncodingTelemetry, 2U> encoding_streams{};
   PacketTelemetry packet{};
   FirmwareDiagnosticTelemetry diagnostics{};
   UsbTelemetry usb{};

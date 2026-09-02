@@ -249,7 +249,9 @@ void FirmwareRuntime::applyPendingEvents(
         packet_pipeline_.startRun(
             events.run_id,
             control_.appliedConfiguration().data_checksum_algorithm,
-            control_.appliedConfiguration().stream_mask);
+            control_.appliedConfiguration().stream_mask,
+            {control_.appliedConfiguration().protocol_version,
+             control_.appliedConfiguration().encoding});
     report.packet_run_started =
         report.packet_start_status == packet::OperationStatus::kOk;
     if (!report.packet_run_started) {
@@ -293,6 +295,7 @@ void FirmwareRuntime::publishPacketStatistics() {
     stats::DataPathProgress progress{};
     const auto copy = [](const packet::SourceCounters &source,
                          const packet::SourceByteCounters &bytes,
+                         const packet::EncodingCounters &encoding,
                          stats::StreamProgress &destination) {
       destination.frames_generated = source.frames_produced;
       destination.items_generated = source.items_produced;
@@ -321,12 +324,36 @@ void FirmwareRuntime::publishPacketStatistics() {
       destination.framed_bytes_emitted = bytes.framed_bytes_emitted;
       destination.framed_bytes_transmitted =
           bytes.framed_bytes_transmitted;
+      destination.encoded_payload_bytes_framed =
+          bytes.encoded_payload_bytes_framed;
+      destination.encoded_payload_bytes_transmitted =
+          bytes.encoded_payload_bytes_transmitted;
+      destination.encoded_payload_bytes_dropped =
+          bytes.encoded_payload_bytes_dropped;
+      destination.encoded_payload_bytes_queued =
+          bytes.encoded_payload_bytes_queued;
+      destination.encoded_wire_bytes_dropped = bytes.framed_bytes_dropped;
+      destination.encoded_wire_bytes_queued =
+          bytes.encoded_wire_bytes_queued;
+      destination.raw_frames = encoding.raw_frames;
+      destination.rle_frames = encoding.rle_frames;
+      destination.rle_runs = encoding.rle_runs;
+      destination.fallback_frames = encoding.fallback_frames;
+      destination.fallback_not_smaller = encoding.fallback_not_smaller;
+      destination.fallback_temporary_page_unavailable =
+          encoding.fallback_temporary_page_unavailable;
+      destination.fallback_encoder_failure =
+          encoding.fallback_encoder_failure;
+      destination.encode_cycles = encoding.encode_cycles;
+      destination.encode_failures = encoding.encode_failures;
     };
     copy(pipeline.sources[packet::streamIndex(packet::Stream::kAdc)],
          pipeline.source_bytes[packet::streamIndex(packet::Stream::kAdc)],
+         pipeline.encoding[packet::streamIndex(packet::Stream::kAdc)],
          progress.adc);
     copy(pipeline.sources[packet::streamIndex(packet::Stream::kGpio)],
          pipeline.source_bytes[packet::streamIndex(packet::Stream::kGpio)],
+         pipeline.encoding[packet::streamIndex(packet::Stream::kGpio)],
          progress.gpio);
     control_.statistics().publishDataPath(progress);
     stats::PacketQueueProgress queues{};
@@ -360,6 +387,11 @@ void FirmwareRuntime::publishPacketStatistics() {
     queues.encoding_rejections = pipeline.encoding_rejections;
     queues.ready_queue_rejections = pipeline.ready_queue_rejections;
     queues.transmit_queue_rejections = pipeline.transmit_queue_rejections;
+    queues.temporary_pages_owned = pipeline.temporary_pages_owned;
+    queues.temporary_page_high_water = pipeline.temporary_page_high_water;
+    queues.temporary_page_exhaustions =
+        pipeline.temporary_page_exhaustions;
+    queues.encode_failures = pipeline.encode_failures;
     control_.statistics().publishPacketQueues(queues);
     acquisition_controller_.publishStatistics(control_.runId());
   }

@@ -31,6 +31,21 @@ struct StreamProgress {
   std::uint64_t framed_bytes_framed = 0U;
   std::uint64_t framed_bytes_emitted = 0U;
   std::uint64_t framed_bytes_transmitted = 0U;
+  std::uint64_t encoded_payload_bytes_framed = 0U;
+  std::uint64_t encoded_payload_bytes_transmitted = 0U;
+  std::uint64_t encoded_payload_bytes_dropped = 0U;
+  std::uint64_t encoded_payload_bytes_queued = 0U;
+  std::uint64_t encoded_wire_bytes_dropped = 0U;
+  std::uint64_t encoded_wire_bytes_queued = 0U;
+  std::uint64_t raw_frames = 0U;
+  std::uint64_t rle_frames = 0U;
+  std::uint64_t rle_runs = 0U;
+  std::uint64_t fallback_frames = 0U;
+  std::uint64_t fallback_not_smaller = 0U;
+  std::uint64_t fallback_temporary_page_unavailable = 0U;
+  std::uint64_t fallback_encoder_failure = 0U;
+  std::uint64_t encode_cycles = 0U;
+  std::uint32_t encode_failures = 0U;
 };
 
 struct DataPathProgress {
@@ -166,6 +181,10 @@ struct PacketQueueProgress {
   std::uint32_t encoding_rejections = 0U;
   std::uint32_t ready_queue_rejections = 0U;
   std::uint32_t transmit_queue_rejections = 0U;
+  std::size_t temporary_pages_owned = 0U;
+  std::size_t temporary_page_high_water = 0U;
+  std::uint32_t temporary_page_exhaustions = 0U;
+  std::uint32_t encode_failures = 0U;
 };
 
 struct UsbProgress {

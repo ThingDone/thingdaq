@@ -73,6 +73,10 @@ struct TransportSnapshot {
   std::uint64_t rx_bytes_processed = 0U;
   std::uint64_t tx_bytes = 0U;
   std::uint64_t tx_bytes_requested = 0U;
+  std::uint64_t response_bytes_written = 0U;
+  std::uint64_t lower_priority_bytes_written = 0U;
+  std::uint64_t lower_priority_frame_bytes_completed = 0U;
+  std::uint64_t lower_priority_bytes_aborted = 0U;
   std::uint32_t rx_available_calls = 0U;
   std::uint32_t rx_read_calls = 0U;
   std::uint32_t tx_available_calls = 0U;
@@ -83,6 +87,7 @@ struct TransportSnapshot {
   std::uint32_t responses_queued = 0U;
   std::uint32_t responses_completed = 0U;
   std::uint32_t lower_priority_frames_completed = 0U;
+  std::uint32_t lower_priority_frames_aborted = 0U;
   std::uint32_t response_queue_rejections = 0U;
   std::uint32_t response_reservations_abandoned = 0U;
   std::uint32_t partial_write_events = 0U;

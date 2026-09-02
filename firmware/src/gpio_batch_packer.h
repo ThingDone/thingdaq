@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "board_config.h"
+#include "cycle_counter.h"
 #include "gpio_raw_capture.h"
 #include "packet_buffer_pipeline.h"
 #include "statistics.h"
@@ -82,12 +83,7 @@ struct StopReport {
 // Optional target timing source. The ratio of cycles spent inside service()
 // to elapsed cycles is independent of the counter frequency, so the portable
 // packer needs only a wrapping 32-bit counter and an availability probe.
-class CycleCounter {
- public:
-  virtual ~CycleCounter() = default;
-  virtual bool begin() = 0;
-  virtual std::uint32_t read() = 0;
-};
+using CycleCounter = timing::CycleCounter;
 
 struct Snapshot {
   stats::GpioPackerProgress progress{};

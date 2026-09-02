@@ -38,7 +38,7 @@ thingdaq::runtime::FirmwareRuntime firmware_runtime{
     &thingdaq::gpio_diagnostic::teensyRunner(),
     &thingdaq::adc::teensyInitializer(),
     &thingdaq::adc_trigger::teensyScheduler(),
-    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer};
+    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer, &thingdaq::gpio_packer::teensyCycleCounter()};
 }  // namespace
 
 void setup() {

@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v2.json. Do not edit by hand.
-// Source SHA-256: 60d624a2a28095dc8ac49f748fb9352a3a940547a129cebc8e12bc1883fd6274
+// Source SHA-256: bcd25bfba3b1559ee13bb21228629ccc25b164e65d38049d2c4d659b0c731b76
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v2 {
 
-inline constexpr char kSourceSha256[] = "60d624a2a28095dc8ac49f748fb9352a3a940547a129cebc8e12bc1883fd6274";
+inline constexpr char kSourceSha256[] = "bcd25bfba3b1559ee13bb21228629ccc25b164e65d38049d2c4d659b0c731b76";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 2U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -18,7 +18,7 @@ inline constexpr std::size_t kDataFrameBytes = 4096U;
 inline constexpr std::size_t kMaxDataFrameBytes = 4096U;
 inline constexpr std::size_t kMinRleDataFrameBytes = 51U;
 inline constexpr std::size_t kDataPayloadBytes = 4048U;
-inline constexpr std::size_t kMaxControlFrameBytes = 1280U;
+inline constexpr std::size_t kMaxControlFrameBytes = 1536U;
 inline constexpr std::size_t kMaxControlPayloadBytes =
     kMaxControlFrameBytes - kHeaderSize - kTrailerSize;
 inline constexpr std::size_t kMaxCommandFrameBytes = 56U;
@@ -642,7 +642,7 @@ inline constexpr std::size_t kConfigureResponseSourceOffset = 5U;
 inline constexpr std::size_t kConfigureResponseDataChecksumAlgorithmOffset = 6U;
 inline constexpr std::size_t kConfigureResponseEncodingOffset = 7U;
 inline constexpr std::size_t kConfigureResponseDataFrameBytesOffset = 8U;
-inline constexpr std::size_t kStatusResponsePayloadSize = 1228U;
+inline constexpr std::size_t kStatusResponsePayloadSize = 1484U;
 inline constexpr std::size_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::size_t kStatusResponseErrorCodeOffset = 2U;
@@ -907,6 +907,45 @@ inline constexpr std::size_t kStatusResponseAdcRawGapPairsOffset = 1196U;
 inline constexpr std::size_t kStatusResponseAdcRawDropPairsProjectedOffset = 1204U;
 inline constexpr std::size_t kStatusResponseGpioRawDropSamplesProjectedOffset = 1212U;
 inline constexpr std::size_t kStatusResponseGpioPackerDropSamplesProjectedOffset = 1220U;
+inline constexpr std::size_t kStatusResponseConfigurationEncodingOffset = 1228U;
+inline constexpr std::size_t kStatusResponseReserved7Offset = 1229U;
+inline constexpr std::size_t kStatusResponseTemporaryPagesOwnedOffset = 1230U;
+inline constexpr std::size_t kStatusResponseTemporaryPageHighWaterOffset = 1232U;
+inline constexpr std::size_t kStatusResponseReserved8Offset = 1234U;
+inline constexpr std::size_t kStatusResponseTemporaryPageExhaustionsOffset = 1236U;
+inline constexpr std::size_t kStatusResponseEncodeFailuresOffset = 1240U;
+inline constexpr std::size_t kStatusResponseAdcEncodedPayloadBytesFramedOffset = 1244U;
+inline constexpr std::size_t kStatusResponseAdcEncodedPayloadBytesTransmittedOffset = 1252U;
+inline constexpr std::size_t kStatusResponseAdcEncodedPayloadBytesDroppedOffset = 1260U;
+inline constexpr std::size_t kStatusResponseAdcEncodedPayloadBytesQueuedOffset = 1268U;
+inline constexpr std::size_t kStatusResponseAdcEncodedWireBytesDroppedOffset = 1276U;
+inline constexpr std::size_t kStatusResponseAdcEncodedWireBytesQueuedOffset = 1284U;
+inline constexpr std::size_t kStatusResponseAdcRawFramesOffset = 1292U;
+inline constexpr std::size_t kStatusResponseAdcRleFramesOffset = 1300U;
+inline constexpr std::size_t kStatusResponseAdcRleRunsOffset = 1308U;
+inline constexpr std::size_t kStatusResponseAdcFallbackFramesOffset = 1316U;
+inline constexpr std::size_t kStatusResponseAdcFallbackNotSmallerOffset = 1324U;
+inline constexpr std::size_t kStatusResponseAdcFallbackTemporaryPageUnavailableOffset = 1332U;
+inline constexpr std::size_t kStatusResponseAdcFallbackEncoderFailureOffset = 1340U;
+inline constexpr std::size_t kStatusResponseAdcEncodeCyclesOffset = 1348U;
+inline constexpr std::size_t kStatusResponseAdcEncodeFailuresOffset = 1356U;
+inline constexpr std::size_t kStatusResponseReserved9Offset = 1360U;
+inline constexpr std::size_t kStatusResponseGpioEncodedPayloadBytesFramedOffset = 1364U;
+inline constexpr std::size_t kStatusResponseGpioEncodedPayloadBytesTransmittedOffset = 1372U;
+inline constexpr std::size_t kStatusResponseGpioEncodedPayloadBytesDroppedOffset = 1380U;
+inline constexpr std::size_t kStatusResponseGpioEncodedPayloadBytesQueuedOffset = 1388U;
+inline constexpr std::size_t kStatusResponseGpioEncodedWireBytesDroppedOffset = 1396U;
+inline constexpr std::size_t kStatusResponseGpioEncodedWireBytesQueuedOffset = 1404U;
+inline constexpr std::size_t kStatusResponseGpioRawFramesOffset = 1412U;
+inline constexpr std::size_t kStatusResponseGpioRleFramesOffset = 1420U;
+inline constexpr std::size_t kStatusResponseGpioRleRunsOffset = 1428U;
+inline constexpr std::size_t kStatusResponseGpioFallbackFramesOffset = 1436U;
+inline constexpr std::size_t kStatusResponseGpioFallbackNotSmallerOffset = 1444U;
+inline constexpr std::size_t kStatusResponseGpioFallbackTemporaryPageUnavailableOffset = 1452U;
+inline constexpr std::size_t kStatusResponseGpioFallbackEncoderFailureOffset = 1460U;
+inline constexpr std::size_t kStatusResponseGpioEncodeCyclesOffset = 1468U;
+inline constexpr std::size_t kStatusResponseGpioEncodeFailuresOffset = 1476U;
+inline constexpr std::size_t kStatusResponseReserved10Offset = 1480U;
 inline constexpr std::size_t kStopResponsePayloadSize = 8U;
 inline constexpr std::size_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kStopResponseReserved0Offset = 1U;

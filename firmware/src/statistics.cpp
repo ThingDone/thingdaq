@@ -409,6 +409,35 @@ protocol::StatusResponse Statistics::wireStatus(
   };
   project_stream(counters_.data_path.adc, response.streams[0U]);
   project_stream(counters_.data_path.gpio, response.streams[1U]);
+  const auto project_encoding = [](
+      const StreamProgress &source,
+      protocol::StreamEncodingTelemetry &destination) {
+    destination.encoded_payload_bytes_framed =
+        source.encoded_payload_bytes_framed;
+    destination.encoded_payload_bytes_transmitted =
+        source.encoded_payload_bytes_transmitted;
+    destination.encoded_payload_bytes_dropped =
+        source.encoded_payload_bytes_dropped;
+    destination.encoded_payload_bytes_queued =
+        source.encoded_payload_bytes_queued;
+    destination.encoded_wire_bytes_dropped =
+        source.encoded_wire_bytes_dropped;
+    destination.encoded_wire_bytes_queued =
+        source.encoded_wire_bytes_queued;
+    destination.raw_frames = source.raw_frames;
+    destination.rle_frames = source.rle_frames;
+    destination.rle_runs = source.rle_runs;
+    destination.fallback_frames = source.fallback_frames;
+    destination.fallback_not_smaller = source.fallback_not_smaller;
+    destination.fallback_temporary_page_unavailable =
+        source.fallback_temporary_page_unavailable;
+    destination.fallback_encoder_failure =
+        source.fallback_encoder_failure;
+    destination.encode_cycles = source.encode_cycles;
+    destination.encode_failures = source.encode_failures;
+  };
+  project_encoding(counters_.data_path.adc, response.encoding_streams[0U]);
+  project_encoding(counters_.data_path.gpio, response.encoding_streams[1U]);
   for (std::size_t index = 0U; index < response.streams.size(); ++index) {
     response.streams[index].packet_ready_depth = narrowDepth(
         counters_.packet_queue.ready_depth_by_source[index]);
@@ -450,6 +479,13 @@ protocol::StatusResponse Statistics::wireStatus(
       counters_.packet_queue.ready_queue_rejections;
   response.packet.transmit_queue_rejections =
       counters_.packet_queue.transmit_queue_rejections;
+  response.packet.temporary_pages_owned =
+      narrowDepth(counters_.packet_queue.temporary_pages_owned);
+  response.packet.temporary_page_high_water =
+      narrowDepth(counters_.packet_queue.temporary_page_high_water);
+  response.packet.temporary_page_exhaustions =
+      counters_.packet_queue.temporary_page_exhaustions;
+  response.packet.encode_failures = counters_.packet_queue.encode_failures;
   response.diagnostics.commands_accepted = counters_.commands_accepted;
   response.diagnostics.commands_rejected = counters_.commands_rejected;
   response.diagnostics.bad_checksums = counters_.bad_checksums;

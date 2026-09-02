@@ -22,6 +22,7 @@ namespace adc_trigger = thingdaq::adc_trigger;
 namespace benchmark = thingdaq::benchmark;
 namespace board = thingdaq::board;
 namespace constants = thingdaq::protocol_v1;
+namespace constants_v2 = thingdaq::protocol_v2;
 namespace control = thingdaq::control;
 namespace gpio_clock = thingdaq::gpio_clock;
 namespace gpio_capture = thingdaq::gpio_capture;
@@ -59,6 +60,44 @@ wire::CommandFrame emptyRequest(constants::FrameKind kind,
   wire::CommandFrame frame{};
   expect(wire::encodeFrame(fields, {}, frame).ok(),
          "encode empty request");
+  return frame;
+}
+
+wire::CommandFrame v2EmptyRequest(constants::FrameKind kind,
+                                  std::uint32_t request_id) {
+  wire::FrameFields fields{};
+  fields.kind = kind;
+  fields.version = constants_v2::kProtocolVersion;
+  fields.request_id = request_id;
+  wire::CommandFrame frame{};
+  expect(wire::encodeFrame(fields, {}, frame).ok(),
+         "encode empty v2 request");
+  return frame;
+}
+
+wire::CommandFrame v2RleConfigureRequest(std::uint32_t request_id) {
+  std::array<std::uint8_t, constants_v2::kConfigureRequestPayloadSize>
+      payload{};
+  payload[constants_v2::kConfigureRequestStreamMaskOffset] = 3U;
+  payload[constants_v2::kConfigureRequestSourceOffset] =
+      static_cast<std::uint8_t>(constants_v2::Source::kSynthetic);
+  payload[constants_v2::kConfigureRequestDataChecksumAlgorithmOffset] =
+      static_cast<std::uint8_t>(constants_v2::ChecksumAlgorithm::kAdler32);
+  payload[constants_v2::kConfigureRequestEncodingOffset] =
+      static_cast<std::uint8_t>(
+          constants_v2::ConfigurationEncoding::kRleAuto);
+  expect(wire::storeU32(
+             {payload.data(), payload.size()},
+             constants_v2::kConfigureRequestDataFrameBytesOffset,
+             constants_v2::kDataFrameBytes),
+         "encode v2 RLE configuration");
+  wire::FrameFields fields{};
+  fields.kind = constants::FrameKind::kConfigureRequest;
+  fields.version = constants_v2::kProtocolVersion;
+  fields.request_id = request_id;
+  wire::CommandFrame frame{};
+  expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame).ok(),
+         "encode v2 RLE_AUTO CONFIGURE request");
   return frame;
 }
 
@@ -1068,6 +1107,173 @@ void testCompleteControlPlane() {
              transport.responses_completed == 9U &&
              transport.response_reservations_abandoned == 0U,
          "transport lifetime diagnostics account for parser recovery and I/O");
+}
+
+void testV2RleRuntimeTelemetryAndConservation() {
+  FakeCdcStream stream{};
+  packet::OwnedPacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  app::FirmwareRuntime firmware{stream, packet_storage, clock};
+  expect(firmware.begin(0xAABBCCDDU), "v2 runtime completes BOOT");
+  stream.appendInput(v2EmptyRequest(constants::FrameKind::kInfoRequest, 401U));
+  stream.appendInput(v2RleConfigureRequest(402U));
+  stream.appendInput(v2EmptyRequest(constants::FrameKind::kStartRequest, 403U));
+  const DrainResult started = drain(firmware, stream);
+  const packet::PipelineSnapshot negotiated = firmware.packetSnapshot();
+  expect(started.saw_start && started.packet_started &&
+             firmware.state() == constants::DeviceState::kRunning &&
+             negotiated.frame_format.protocol_version ==
+                 constants_v2::kProtocolVersion &&
+             negotiated.frame_format.encoding ==
+                 constants_v2::ConfigurationEncoding::kRleAuto,
+         "runtime maps the accepted v2 encoding into one immutable packet run");
+
+  clock.ticks = 2U * constants_v2::kFrameCoverageTicks;
+  for (std::size_t iteration = 0U; iteration < 32U; ++iteration) {
+    const app::LoopReport report = firmware.service();
+    expect(!report.internal_error,
+           "v2 synthetic production remains cooperative and error-free");
+  }
+  stream.appendInput(
+      v2EmptyRequest(constants::FrameKind::kGetStatusRequest, 404U));
+  stream.appendInput(v2EmptyRequest(constants::FrameKind::kStopRequest, 405U));
+  expect(drain(firmware, stream).quiescent &&
+             firmware.state() == constants::DeviceState::kIdle,
+         "v2 STATUS and STOP drain without starving control");
+
+  const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
+  const wire::DecodedFrame *info = nullptr;
+  const wire::DecodedFrame *configure = nullptr;
+  const wire::DecodedFrame *start = nullptr;
+  const wire::DecodedFrame *status = nullptr;
+  const wire::DecodedFrame *stop = nullptr;
+  std::size_t data_frames = 0U;
+  for (const wire::DecodedFrame &frame : frames) {
+    if (frame.header.kind == constants::FrameKind::kAdcData ||
+        frame.header.kind == constants::FrameKind::kGpioData) {
+      ++data_frames;
+      expect(frame.header.version == constants_v2::kProtocolVersion &&
+                 (frame.header.encoding == constants_v2::FrameEncoding::kRaw ||
+                  frame.header.encoding == constants_v2::FrameEncoding::kRle),
+             "one negotiated run emits only legal mixed RAW/RLE selectors");
+    } else if (frame.header.request_id == 401U) {
+      info = &frame;
+    } else if (frame.header.request_id == 402U) {
+      configure = &frame;
+    } else if (frame.header.request_id == 403U) {
+      start = &frame;
+    } else if (frame.header.request_id == 404U) {
+      status = &frame;
+    } else if (frame.header.request_id == 405U) {
+      stop = &frame;
+    }
+  }
+  expect(info != nullptr && configure != nullptr && start != nullptr &&
+             status != nullptr && stop != nullptr && data_frames != 0U,
+         "v2 lifecycle returns every typed response and at least one data frame");
+  if (info == nullptr || configure == nullptr || start == nullptr ||
+      status == nullptr || stop == nullptr) {
+    return;
+  }
+  std::uint32_t max_control = 0U;
+  std::uint32_t capability_bits = 0U;
+  expect(info->header.version == constants_v2::kProtocolVersion &&
+             wire::loadU32(
+                 info->payload,
+                 constants_v2::kInfoResponseMaxControlFrameBytesOffset,
+                 max_control) &&
+             max_control == constants_v2::kMaxControlFrameBytes &&
+             wire::loadU32(info->payload,
+                           constants_v2::kInfoResponseCapabilityBitsOffset,
+                           capability_bits) &&
+             (capability_bits & static_cast<std::uint32_t>(
+                                    constants_v2::Capability::kRleStreaming)) !=
+                 0U &&
+             configure->payload.data[
+                 constants_v2::kConfigureResponseEncodingOffset] == 1U &&
+             start->payload.data[
+                 constants_v2::kConfigureResponseEncodingOffset] == 1U,
+         "v2 INFO advertises the bound/capability and CONFIGURE/START echo RLE_AUTO");
+
+  std::uint64_t logical_framed = 0U;
+  std::uint64_t encoded_framed = 0U;
+  std::uint64_t encoded_transmitted = 0U;
+  std::uint64_t encoded_dropped = 0U;
+  std::uint64_t encoded_queued = 0U;
+  std::uint64_t wire_framed = 0U;
+  std::uint64_t wire_transmitted = 0U;
+  std::uint64_t wire_dropped = 0U;
+  std::uint64_t wire_queued = 0U;
+  std::uint64_t framed_frames = 0U;
+  std::uint64_t raw_frames = 0U;
+  std::uint64_t rle_frames = 0U;
+  expect(status->header.version == constants_v2::kProtocolVersion &&
+             status->payload.size == constants_v2::kStatusResponsePayloadSize &&
+             status->payload.data[
+                 constants_v2::kStatusResponseConfigurationEncodingOffset] ==
+                 1U &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioPayloadBytesFramedOffset,
+                 logical_framed) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioEncodedPayloadBytesFramedOffset,
+                 encoded_framed) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioEncodedPayloadBytesTransmittedOffset,
+                 encoded_transmitted) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioEncodedPayloadBytesDroppedOffset,
+                 encoded_dropped) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioEncodedPayloadBytesQueuedOffset,
+                 encoded_queued) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioFramedBytesFramedOffset,
+                 wire_framed) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioFramedBytesTransmittedOffset,
+                 wire_transmitted) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioEncodedWireBytesDroppedOffset,
+                 wire_dropped) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioEncodedWireBytesQueuedOffset,
+                 wire_queued) &&
+             wire::loadU64(
+                 status->payload,
+                 constants_v2::kStatusResponseGpioFramesFramedPipelineOffset,
+                 framed_frames) &&
+             wire::loadU64(status->payload,
+                           constants_v2::kStatusResponseGpioRawFramesOffset,
+                           raw_frames) &&
+             wire::loadU64(status->payload,
+                           constants_v2::kStatusResponseGpioRleFramesOffset,
+                           rle_frames),
+         "v2 STATUS exposes every GPIO conservation term");
+  expect(framed_frames != 0U && raw_frames + rle_frames == framed_frames &&
+             encoded_framed <= logical_framed &&
+             encoded_framed ==
+                 encoded_transmitted + encoded_dropped + encoded_queued &&
+             wire_framed == encoded_framed + 48U * framed_frames &&
+             wire_framed == wire_transmitted + wire_dropped + wire_queued,
+         "logical production, selection, queue ownership, transmission, and drops reconcile");
+  const usb::TransportSnapshot transport = firmware.transportSnapshot();
+  expect(transport.tx_bytes == transport.response_bytes_written +
+                                   transport.lower_priority_bytes_written &&
+             transport.lower_priority_bytes_written ==
+                 transport.lower_priority_frame_bytes_completed +
+                     transport.lower_priority_bytes_aborted +
+                     transport.active_frame_bytes_sent,
+         "runtime USB response/data byte ownership conserves exactly");
 }
 
 void testResetStatsWaitsForOlderControlResponses() {
@@ -2218,6 +2424,7 @@ void testGpioClockRoundTripPreservesIdleAcquisitionState() {
 
 int main() {
   testCompleteControlPlane();
+  testV2RleRuntimeTelemetryAndConservation();
   testResetStatsWaitsForOlderControlResponses();
   testSyntheticDataCountersReachStatus();
   testStartupSchedulingJitterFitsPacketPool();

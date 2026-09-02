@@ -55,9 +55,10 @@ class FirmwareRuntime {
                   adc::Initializer *adc_initializer = nullptr,
                   adc_trigger::Scheduler *adc_trigger_scheduler = nullptr,
                   adc_capture::HardwareCapture *adc_capture = nullptr,
-                  adc_packer::AdcFramePacker *adc_packer = nullptr)
+                  adc_packer::AdcFramePacker *adc_packer = nullptr,
+                  timing::CycleCounter *encoding_cycle_counter = nullptr)
       : control_{},
-        packet_pipeline_{packet_storage},
+        packet_pipeline_{packet_storage, encoding_cycle_counter},
         synthetic_source_{source_mode},
         clock_(clock),
         transport_{stream, control_.statistics(), &packet_pipeline_},

@@ -11,6 +11,7 @@ namespace {
 
 namespace control = thingdaq::control;
 namespace constants = thingdaq::protocol_v1;
+namespace constants_v2 = thingdaq::protocol_v2;
 namespace stats = thingdaq::stats;
 namespace wire = thingdaq::protocol;
 
@@ -43,7 +44,13 @@ wire::DecodedFrame decodeResponse(const wire::ControlFrame &response,
   wire::DecodedFrame decoded{};
   const wire::Result result = wire::decodeFrame(response.view(), decoded);
   expect(result.ok(), name + " decodes");
-  expect(response.size() <= constants::kMaxControlFrameBytes,
+  const std::size_t bound =
+      response.size() > constants::kHeaderVersionOffset &&
+              response.data()[constants::kHeaderVersionOffset] ==
+                  constants_v2::kProtocolVersion
+          ? constants_v2::kMaxControlFrameBytes
+          : constants::kMaxControlFrameBytes;
+  expect(response.size() <= bound,
          name + " stays within the control-frame bound");
   return decoded;
 }
@@ -101,6 +108,103 @@ void testLegalTransitionMatrix() {
              control::ControlState::nextRunId(
                  std::numeric_limits<std::uint32_t>::max()) == 1U,
          "run IDs remain nonzero at both allocation boundaries");
+}
+
+void testV2EncodingNegotiationAndSessionReset() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(0x1234U), "v2 lifecycle boot completes");
+
+  wire::Request info = request(constants::CommandKind::kInfo, 201U);
+  info.protocol_version = constants_v2::kProtocolVersion;
+  expect(state.dispatch(info, response).commandAccepted(),
+         "v2 INFO is accepted explicitly");
+  wire::DecodedFrame decoded = decodeResponse(response, "v2 INFO");
+  std::uint32_t value32 = 0U;
+  expect(decoded.header.version == constants_v2::kProtocolVersion &&
+             decoded.payload.data[
+                 constants_v2::kInfoResponseProtocolVersionOffset] ==
+                 constants_v2::kProtocolVersion &&
+             wire::loadU32(
+                 decoded.payload,
+                 constants_v2::kInfoResponseCapabilityBitsOffset,
+                 value32) &&
+             (value32 & static_cast<std::uint32_t>(
+                            constants_v2::Capability::kRleStreaming)) != 0U,
+         "v2 INFO advertises only the explicit RLE capability path");
+
+  wire::Configuration rle = control::kSyntheticConfiguration;
+  rle.protocol_version = constants_v2::kProtocolVersion;
+  rle.encoding = constants_v2::ConfigurationEncoding::kRleAuto;
+  wire::Request configure = configureRequest(202U, rle);
+  configure.protocol_version = constants_v2::kProtocolVersion;
+  expect(state.dispatch(configure, response).commandAccepted(),
+         "v2 RLE_AUTO CONFIGURE is accepted");
+  decoded = decodeResponse(response, "v2 CONFIGURE");
+  expect(decoded.header.version == constants_v2::kProtocolVersion &&
+             decoded.payload.data[
+                 constants_v2::kConfigureResponseEncodingOffset] ==
+                 static_cast<std::uint8_t>(
+                     constants_v2::ConfigurationEncoding::kRleAuto) &&
+             state.appliedConfiguration().encoding ==
+                 constants_v2::ConfigurationEncoding::kRleAuto,
+         "CONFIGURE echoes and stores the exact applied encoding");
+
+  const control::DispatchResult wrong_start = state.dispatch(
+      request(constants::CommandKind::kStart, 203U), response);
+  expect(!wrong_start.commandAccepted() &&
+             wrong_start.command_error ==
+                 constants::ErrorCode::kUnsupportedConfiguration &&
+             state.state() == constants::DeviceState::kConfigured,
+         "a v1 START cannot enter a negotiated v2 run");
+
+  wire::Request start = request(constants::CommandKind::kStart, 204U);
+  start.protocol_version = constants_v2::kProtocolVersion;
+  expect(state.dispatch(start, response).commandAccepted(),
+         "matching v2 START is accepted");
+  decoded = decodeResponse(response, "v2 START");
+  expect(decoded.payload.data[
+             constants_v2::kConfigureResponseEncodingOffset] ==
+             static_cast<std::uint8_t>(
+                 constants_v2::ConfigurationEncoding::kRleAuto),
+         "START echoes the retained negotiated encoding");
+
+  wire::Request status = request(constants::CommandKind::kGetStatus, 205U);
+  status.protocol_version = constants_v2::kProtocolVersion;
+  expect(state.dispatch(status, response).commandAccepted(),
+         "v2 STATUS is accepted during an RLE run");
+  decoded = decodeResponse(response, "v2 STATUS");
+  expect(decoded.payload.size == constants_v2::kStatusResponsePayloadSize &&
+             decoded.payload.data[
+                 constants_v2::kStatusResponseConfigurationEncodingOffset] ==
+                 static_cast<std::uint8_t>(
+                     constants_v2::ConfigurationEncoding::kRleAuto),
+         "v2 STATUS publishes the applied encoding and extended telemetry");
+
+  wire::Request stop = request(constants::CommandKind::kStop, 206U);
+  stop.protocol_version = constants_v2::kProtocolVersion;
+  expect(state.dispatch(stop, response).commandAccepted() &&
+             state.state() == constants::DeviceState::kIdle &&
+             state.appliedConfiguration().protocol_version ==
+                 constants::kProtocolVersion &&
+             state.appliedConfiguration().encoding ==
+                 constants_v2::ConfigurationEncoding::kRaw,
+         "STOP returns the control state to the default v1 RAW profile");
+
+  configure.request_id = 207U;
+  expect(state.dispatch(configure, response).commandAccepted(),
+         "v2 configuration can be negotiated again");
+  state.beginHostSession();
+  expect(state.state() == constants::DeviceState::kIdle &&
+             !state.hasConfiguration() &&
+             state.takePendingEvents().has(control::Event::kStop),
+         "reconnect clears session-scoped v2 encoding and signals cleanup");
+
+  wire::Configuration illegal = control::kSyntheticConfiguration;
+  illegal.encoding = constants_v2::ConfigurationEncoding::kRleAuto;
+  expect(control::ControlState::validateConfiguration(illegal) ==
+             constants::ErrorCode::kInvalidPayload,
+         "protocol v1 rejects the RLE_AUTO selector");
 }
 
 void testAdcInitializationTelemetry() {
@@ -1128,6 +1232,7 @@ void testStatisticsDetailAndSaturation() {
 
 int main() {
   testLegalTransitionMatrix();
+  testV2EncodingNegotiationAndSessionReset();
   testAdcInitializationTelemetry();
   testBootAndInfo();
   testSyntheticLifecycle();

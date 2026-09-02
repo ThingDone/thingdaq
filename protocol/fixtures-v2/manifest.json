@@ -344,18 +344,18 @@
       "total_length": 48
     },
     {
-      "checksum": "0xb0d32df6",
+      "checksum": "0xb2322df7",
       "checksum_algorithm": "ADLER32",
       "encoding": "RAW",
       "encoding_selector": 0,
       "file": "info-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_sha256": "40c57c975ebe20c8ed6f1a33dc74e1e5c3aed01fe9feee69faa919c979208d9f",
+      "frame_sha256": "549b801d9a2ccd3675268350781aac5add39e2b3f31d4eded8d5d34ceab33b4b",
       "item_count": 0,
       "kind": "INFO_RESPONSE",
       "payload_length": 376,
-      "payload_sha256": "446bd1aa5a039aefc472af65cf2dfcbaff290f5388297660cb358e3b1cd6ef2d",
+      "payload_sha256": "1648e10cf353d3948207ed5a874c09cb9f4a8d915a6584c1d9ef7b1dd83a76be",
       "request_id": 1,
       "run_id": 0,
       "sequence": 0,
@@ -438,22 +438,22 @@
       "total_length": 60
     },
     {
-      "checksum": "0x3dfa2554",
+      "checksum": "0x063028d4",
       "checksum_algorithm": "ADLER32",
       "encoding": "RAW",
       "encoding_selector": 0,
       "file": "get-status-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_sha256": "74140dd38c4d756acfd8552e04416bf1fca8c4080594ee8ac51202711344a965",
+      "frame_sha256": "a1afd954c3e7b9a1e8f59d11b0df73b53f96507a2e92cc40725c0941265ea57a",
       "item_count": 0,
       "kind": "GET_STATUS_RESPONSE",
-      "payload_length": 1228,
-      "payload_sha256": "58e4e6ca40e8e88ce7188077a59e2b97f1c5b713271aa1523484deee95a4153e",
+      "payload_length": 1484,
+      "payload_sha256": "488bdf0d33f9388e6ee91fac28c4b4735caf50086d06cd0efb83e75caa980e7d",
       "request_id": 4,
       "run_id": 7,
       "sequence": 0,
-      "total_length": 1276
+      "total_length": 1532
     },
     {
       "checksum": "0xd1640449",
@@ -698,7 +698,7 @@
   ],
   "protocol_version": 2,
   "source": "protocol/protocol-v2.json",
-  "source_sha256": "60d624a2a28095dc8ac49f748fb9352a3a940547a129cebc8e12bc1883fd6274",
+  "source_sha256": "bcd25bfba3b1559ee13bb21228629ccc25b164e65d38049d2c4d659b0c731b76",
   "streams": [
     {
       "file": "adc-mixed-raw-rle-stream.bin",

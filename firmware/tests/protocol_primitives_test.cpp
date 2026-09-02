@@ -12,6 +12,7 @@ namespace {
 
 namespace wire = thingdaq::protocol;
 namespace constants = thingdaq::protocol_v1;
+namespace constants_v2 = thingdaq::protocol_v2;
 
 int failures = 0;
 
@@ -624,7 +625,7 @@ void testFixedCapacityBoundaries() {
   static_assert(wire::CommandFrame::capacity() ==
                 constants::kMaxCommandFrameBytes);
   static_assert(wire::ControlFrame::capacity() ==
-                constants::kMaxControlFrameBytes);
+                constants_v2::kMaxControlFrameBytes);
   static_assert(wire::DataFrame::capacity() == constants::kMaxDataFrameBytes);
 
   wire::FrameFields fields{};
@@ -673,6 +674,54 @@ void testFixedCapacityBoundaries() {
          "fixed frame clears itself after an oversized length");
 }
 
+void testV2ConfigureParsingAndSelectorRejection() {
+  std::array<std::uint8_t, constants_v2::kConfigureRequestPayloadSize>
+      payload{};
+  payload[constants_v2::kConfigureRequestStreamMaskOffset] = 3U;
+  payload[constants_v2::kConfigureRequestSourceOffset] =
+      static_cast<std::uint8_t>(constants_v2::Source::kSynthetic);
+  payload[constants_v2::kConfigureRequestDataChecksumAlgorithmOffset] =
+      static_cast<std::uint8_t>(constants_v2::ChecksumAlgorithm::kAdler32);
+  payload[constants_v2::kConfigureRequestEncodingOffset] =
+      static_cast<std::uint8_t>(
+          constants_v2::ConfigurationEncoding::kRleAuto);
+  expect(wire::storeU32({payload.data(), payload.size()},
+                        constants_v2::kConfigureRequestDataFrameBytesOffset,
+                        constants_v2::kDataFrameBytes),
+         "construct a v2 RLE_AUTO CONFIGURE payload");
+  wire::FrameFields fields{};
+  fields.kind = constants::FrameKind::kConfigureRequest;
+  fields.version = constants_v2::kProtocolVersion;
+  fields.request_id = 77U;
+  wire::CommandFrame frame{};
+  expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame).ok(),
+         "encode an explicit v2 CONFIGURE request");
+  wire::Request decoded{};
+  expect(wire::decodeRequest(frame.view(), decoded).ok() &&
+             decoded.protocol_version == constants_v2::kProtocolVersion &&
+             decoded.configuration.protocol_version ==
+                 constants_v2::kProtocolVersion &&
+             decoded.configuration.encoding ==
+                 constants_v2::ConfigurationEncoding::kRleAuto,
+         "v2 CONFIGURE preserves the negotiated selector in typed control");
+
+  frame.mutableData()[constants_v2::kHeaderSize +
+                      constants_v2::kConfigureRequestEncodingOffset] = 2U;
+  std::uint32_t checksum = 0U;
+  expect(wire::computeChecksum(
+             constants::kBootstrapChecksumAlgorithm,
+             {frame.data(), frame.size() - constants_v2::kTrailerSize},
+             checksum)
+             .ok() &&
+             wire::storeU32(
+                 {frame.mutableData(), frame.capacity()},
+                 frame.size() - constants_v2::kTrailerSize, checksum),
+         "rechecksum an illegal v2 encoding selector");
+  expect(wire::decodeRequest(frame.view(), decoded).error ==
+             constants::ErrorCode::kInvalidPayload,
+         "v2 CONFIGURE rejects reserved encoding selectors atomically");
+}
+
 std::vector<std::uint8_t> mutated(const std::vector<std::uint8_t> &source,
                                   std::size_t offset, std::uint8_t value) {
   std::vector<std::uint8_t> result = source;
@@ -689,7 +738,9 @@ void expectDecodeError(const std::vector<std::uint8_t> &bytes,
 void testValidation(const std::string &fixture_directory) {
   const std::vector<std::uint8_t> info =
       readFixture(fixture_directory, "info-request.bin");
-  expectDecodeError(mutated(info, constants::kHeaderVersionOffset, 2U),
+  const std::vector<std::uint8_t> adc =
+      readFixture(fixture_directory, "adc-data.bin");
+  expectDecodeError(mutated(info, constants::kHeaderVersionOffset, 3U),
                     constants::ErrorCode::kUnsupportedVersion,
                     "reject bad version");
   expectDecodeError(mutated(info, constants::kHeaderKindOffset, 0xFEU),
@@ -704,6 +755,9 @@ void testValidation(const std::string &fixture_directory) {
   expectDecodeError(mutated(info, constants::kHeaderRequestIdOffset, 0U),
                     constants::ErrorCode::kInvalidRequestId,
                     "reject zero request ID");
+  expectDecodeError(mutated(adc, constants::kHeaderReservedOffset, 1U),
+                    constants::ErrorCode::kInvalidPayload,
+                    "protocol v1 preserves its reserved-selector error");
   std::vector<std::uint8_t> checksum = info;
   checksum.back() ^= 0x80U;
   expectDecodeError(checksum, constants::ErrorCode::kChecksumMismatch,
@@ -787,7 +841,7 @@ void testParser(const std::string &fixture_directory) {
   const std::vector<std::uint8_t> response =
       readFixture(fixture_directory, "stop-response.bin");
   std::vector<std::vector<std::uint8_t>> corruptions{
-      mutated(info, constants::kHeaderVersionOffset, 2U),
+      mutated(info, constants::kHeaderVersionOffset, 3U),
       mutated(info, constants::kHeaderKindOffset, 0xFEU),
       mutated(info, constants::kHeaderFlagsOffset, 1U),
       mutated(info, constants::kHeaderHeaderLengthOffset, 43U),
@@ -911,6 +965,7 @@ int main(int argc, char **argv) {
   }
   testGoldenEncode(argv[1], response_directory);
   testFixedCapacityBoundaries();
+  testV2ConfigureParsingAndSelectorRejection();
   testValidation(argv[1]);
   testParser(argv[1]);
   if (failures != 0) {

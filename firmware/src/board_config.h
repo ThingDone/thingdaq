@@ -427,7 +427,7 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
      kCommandQueueDepth * protocol_v1::kMaxCommandFrameBytes, 4U,
      ResourceOwner::kControlPlane},
     {MemoryUse::kResponseQueue, MemoryRegion::kDtcmRam1,
-     kResponseQueueDepth * protocol_v1::kMaxControlFrameBytes, 4U,
+     kResponseQueueDepth * protocol::ControlFrame::capacity(), 4U,
      ResourceOwner::kUsbTransport},
     {MemoryUse::kPacketBufferStorage, MemoryRegion::kDtcmRam1,
      kPacketBufferPrimaryStorageBytes, kCacheLineBytes,

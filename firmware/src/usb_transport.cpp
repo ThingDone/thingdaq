@@ -62,6 +62,61 @@ bool responseKind(protocol_v1::FrameKind kind) {
   return false;
 }
 
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.lower_frame_validation")
+bool validLowerPriorityFrame(protocol::ByteView frame) {
+  if (!frame.valid() || frame.size < protocol_v1::kMinFrameBytes ||
+      frame.size > protocol_v1::kMaxDataFrameBytes) {
+    return false;
+  }
+  const std::uint8_t version =
+      frame.data[protocol_v1::kHeaderVersionOffset];
+  const std::uint8_t kind = frame.data[protocol_v1::kHeaderKindOffset];
+  const bool adc =
+      kind == static_cast<std::uint8_t>(protocol_v1::FrameKind::kAdcData);
+  const bool gpio =
+      kind == static_cast<std::uint8_t>(protocol_v1::FrameKind::kGpioData);
+  std::uint16_t header_size = 0U;
+  std::uint32_t total_size = 0U;
+  std::uint32_t payload_size = 0U;
+  if ((!adc && !gpio) ||
+      !protocol::loadU16(frame, protocol_v1::kHeaderHeaderLengthOffset,
+                         header_size) ||
+      !protocol::loadU32(frame, protocol_v1::kHeaderTotalLengthOffset,
+                         total_size) ||
+      !protocol::loadU32(frame, protocol_v1::kHeaderPayloadLengthOffset,
+                         payload_size) ||
+      header_size != protocol_v1::kHeaderSize || total_size != frame.size ||
+      payload_size + protocol_v1::kHeaderSize +
+              protocol_v1::kTrailerSize !=
+          frame.size) {
+    return false;
+  }
+  const std::uint8_t encoding =
+      frame.data[protocol_v1::kHeaderReservedOffset];
+  if (version == protocol_v1::kProtocolVersion) {
+    return encoding == 0U && frame.size == protocol_v1::kDataFrameBytes &&
+           payload_size == protocol_v1::kDataPayloadBytes;
+  }
+  if (version != protocol_v2::kProtocolVersion) {
+    return false;
+  }
+  if (encoding ==
+      static_cast<std::uint8_t>(protocol_v2::FrameEncoding::kRaw)) {
+    return frame.size == protocol_v2::kDataFrameBytes &&
+           payload_size == protocol_v2::kDataPayloadBytes;
+  }
+  if (encoding !=
+      static_cast<std::uint8_t>(protocol_v2::FrameEncoding::kRle)) {
+    return false;
+  }
+  const std::size_t record_bytes =
+      adc ? protocol_v2::kAdcRleRecordBytes
+          : protocol_v2::kGpioRleRecordBytes;
+  return frame.size >= protocol_v2::kMinRleDataFrameBytes &&
+         frame.size < protocol_v2::kDataFrameBytes &&
+         payload_size >= record_bytes && payload_size % record_bytes == 0U;
+}
+
 }  // namespace
 
 ServiceReport CdcTransport::serviceReceive() {
@@ -274,11 +329,14 @@ ServiceReport CdcTransport::serviceTransmit() {
         break;
       }
       selection.bytes = lower_priority_->frontFrame();
-      if (!selection.bytes.valid() ||
-          selection.bytes.size != protocol_v1::kDataFrameBytes) {
+      if (!validLowerPriorityFrame(selection.bytes)) {
         recordIoError();
-        stalled = true;
-        break;
+        if (!lower_priority_->abortFrontFrame()) {
+          recordIoError();
+        } else {
+          saturatingIncrement(counters_.lower_priority_frames_aborted);
+        }
+        continue;
       }
     }
     const std::size_t requested =
@@ -336,6 +394,13 @@ ServiceReport CdcTransport::serviceTransmit() {
     report.bytes_written += accepted;
     saturatingAdd(counters_.tx_bytes,
                   static_cast<std::uint64_t>(accepted));
+    if (selection.kind == ActiveFrame::kResponse) {
+      saturatingAdd(counters_.response_bytes_written,
+                    static_cast<std::uint64_t>(accepted));
+    } else if (selection.kind == ActiveFrame::kLowerPriority) {
+      saturatingAdd(counters_.lower_priority_bytes_written,
+                    static_cast<std::uint64_t>(accepted));
+    }
 
     if (tx_offset_ == selection.bytes.size) {
       completeTransmitFrame(selection.kind);
@@ -485,6 +550,10 @@ void CdcTransport::resetSessionQueues() {
       (lower_priority_ == nullptr ||
        !lower_priority_->abortFrontFrame())) {
     recordIoError();
+  } else if (active_frame_ == ActiveFrame::kLowerPriority) {
+    saturatingAdd(counters_.lower_priority_bytes_aborted,
+                  static_cast<std::uint64_t>(tx_offset_));
+    saturatingIncrement(counters_.lower_priority_frames_aborted);
   }
   active_frame_ = ActiveFrame::kNone;
   active_lower_priority_frame_ = {};
@@ -519,6 +588,7 @@ void CdcTransport::publishParserDelta() {
   published_parser_counters_ = current;
 }
 
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.frame_selection")
 CdcTransport::FrameSelection CdcTransport::selectTransmitFrame() {
   if (active_frame_ == ActiveFrame::kResponse) {
     protocol::ControlFrame *response = response_queue_.front();
@@ -540,14 +610,19 @@ CdcTransport::FrameSelection CdcTransport::selectTransmitFrame() {
   if (lower.size == 0U) {
     return {};
   }
-  if (!lower.valid() || lower.size != protocol_v1::kDataFrameBytes) {
+  if (!validLowerPriorityFrame(lower)) {
     recordIoError();
-    lower_priority_->releaseFrontFrame();
+    if (!lower_priority_->abortFrontFrame()) {
+      recordIoError();
+    } else {
+      saturatingIncrement(counters_.lower_priority_frames_aborted);
+    }
     return {};
   }
   return {ActiveFrame::kLowerPriority, lower};
 }
 
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.frame_completion")
 void CdcTransport::completeTransmitFrame(ActiveFrame kind) {
   if (kind == ActiveFrame::kResponse) {
     if (!response_queue_.popFront()) {
@@ -559,6 +634,11 @@ void CdcTransport::completeTransmitFrame(ActiveFrame kind) {
     if (lower_priority_ == nullptr) {
       recordIoError();
     } else {
+      saturatingAdd(counters_.lower_priority_frame_bytes_completed,
+                    static_cast<std::uint64_t>(
+                        active_frame_ == ActiveFrame::kLowerPriority
+                            ? active_lower_priority_frame_.size
+                            : lower_priority_->frontFrame().size));
       lower_priority_->releaseFrontFrame();
       saturatingIncrement(counters_.lower_priority_frames_completed);
     }

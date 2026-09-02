@@ -17,6 +17,7 @@
 namespace {
 
 namespace constants = thingdaq::protocol_v1;
+namespace constants_v2 = thingdaq::protocol_v2;
 namespace stats = thingdaq::stats;
 namespace usb = thingdaq::usb;
 namespace wire = thingdaq::protocol;
@@ -94,6 +95,35 @@ std::vector<std::uint8_t> dataFrame(constants::FrameKind kind,
   wire::DataFrame frame{};
   expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame).ok(),
          "encode complete lower-priority data frame");
+  return bytes(frame);
+}
+
+std::vector<std::uint8_t> rleGpioFrame(std::uint32_t run_id,
+                                       std::uint32_t sequence) {
+  std::array<std::uint8_t, constants_v2::kGpioRleRecordBytes> payload{};
+  expect(wire::storeU16({payload.data(), payload.size()}, 0U,
+                        static_cast<std::uint16_t>(
+                            constants_v2::kGpioSamplesPerFrame)),
+         "encode one complete GPIO RLE run");
+  payload[2U] = 0x5AU;
+  wire::FrameFields fields{};
+  fields.kind = constants::FrameKind::kGpioData;
+  fields.version = constants_v2::kProtocolVersion;
+  fields.encoding = constants_v2::FrameEncoding::kRle;
+  fields.run_id = run_id;
+  fields.sequence = sequence;
+  fields.first_sample_ticks =
+      static_cast<std::uint64_t>(sequence) *
+      constants_v2::kFrameCoverageTicks;
+  fields.item_count = constants_v2::kGpioSamplesPerFrame;
+  if (sequence == 0U) {
+    fields.flags = static_cast<std::uint16_t>(
+        constants_v2::FrameFlag::kEpochStart);
+  }
+  wire::DataFrame frame{};
+  expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame).ok() &&
+             frame.size() == constants_v2::kMinRleDataFrameBytes,
+         "encode a variable-size lower-priority v2 RLE frame");
   return bytes(frame);
 }
 
@@ -543,6 +573,51 @@ void testResponsePriorityAndActiveFrameOwnership() {
          "new response overtakes a lower-priority frame with zero bytes sent");
 }
 
+void testVariableRleConservationAndSessionAbort() {
+  const std::vector<std::uint8_t> rle = rleGpioFrame(12U, 0U);
+  const wire::ControlFrame high = pingResponse(12U, 0x1234U);
+  FakeLowerPrioritySource lower{};
+  lower.frames = {rle};
+  FakeCdcStream stream{};
+  stats::Statistics statistics{};
+  usb::CdcTransport transport(stream, statistics, &lower);
+  expect(transport.queueResponse(high),
+         "queue control response ahead of a variable RLE frame");
+  drainTransmit(transport);
+  std::vector<std::uint8_t> expected = bytes(high);
+  append(expected, rle);
+  const usb::TransportSnapshot complete = transport.snapshot();
+  expect(stream.output == expected &&
+             complete.tx_bytes == expected.size() &&
+             complete.response_bytes_written == high.size() &&
+             complete.lower_priority_bytes_written == rle.size() &&
+             complete.lower_priority_frame_bytes_completed == rle.size() &&
+             complete.lower_priority_bytes_aborted == 0U &&
+             complete.active_frame_bytes_sent == 0U,
+         "control priority and variable-frame USB byte conservation reconcile");
+
+  FakeLowerPrioritySource partial_lower{};
+  partial_lower.frames = {rle};
+  FakeCdcStream partial_stream{};
+  partial_stream.write_plan = {7, 0};
+  stats::Statistics partial_statistics{};
+  usb::CdcTransport partial_transport(partial_stream, partial_statistics,
+                                      &partial_lower);
+  (void)partial_transport.serviceTransmit();
+  expect(partial_transport.snapshot().active_frame_bytes_sent == 7U,
+         "a partial variable RLE frame is pinned to its session");
+  partial_stream.session_open = false;
+  (void)partial_transport.serviceTransmit();
+  const usb::TransportSnapshot aborted = partial_transport.snapshot();
+  expect(partial_lower.frames.empty() &&
+             aborted.lower_priority_bytes_written == 7U &&
+             aborted.lower_priority_frame_bytes_completed == 0U &&
+             aborted.lower_priority_bytes_aborted == 7U &&
+             aborted.lower_priority_frames_aborted == 1U &&
+             aborted.active_frame_bytes_sent == 0U,
+         "session cleanup loss-accounts every accepted RLE prefix byte");
+}
+
 void testTransmitBudgets() {
   FakeLowerPrioritySource lower{};
   lower.frames.push_back(
@@ -622,7 +697,7 @@ void testTransmitBudgets() {
   (void)malformed_transport.serviceTransmit();
   expect(malformed_lower.frames.empty() && malformed_stream.output.empty() &&
              malformed_transport.snapshot().io_errors == 1U,
-         "lower-priority admission rejects every non-4096-byte data frame");
+         "lower-priority admission aborts structurally invalid data without reporting transmission");
 }
 
 }  // namespace
@@ -635,6 +710,7 @@ int main() {
   testZeroReadAndResponseReservation();
   testPartialAndZeroWritesPreserveFrames();
   testResponsePriorityAndActiveFrameOwnership();
+  testVariableRleConservationAndSessionAbort();
   testTransmitBudgets();
 
   if (failures == 0) {

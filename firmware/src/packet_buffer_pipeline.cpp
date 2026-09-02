@@ -33,11 +33,10 @@ Integer saturatingMultiply(Integer left, Integer right) {
 }
 
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.byte_counters")
-SourceByteCounters byteCounters(Stream stream,
-                                const SourceCounters &source) {
+SourceByteCounters byteCounters(Stream stream, const SourceCounters &source,
+                                const SelectedByteCounters &selected) {
   SourceByteCounters result{};
   const std::uint64_t payload_bytes_per_item = payloadBytesPerItem(stream);
-  const std::uint64_t frame_bytes = protocol_v1::kDataFrameBytes;
   result.payload_bytes_produced = saturatingMultiply(
       source.items_produced, payload_bytes_per_item);
   result.payload_bytes_framed = saturatingMultiply(
@@ -50,15 +49,30 @@ SourceByteCounters byteCounters(Stream stream,
       source.items_dropped, payload_bytes_per_item);
   result.payload_bytes_evicted = saturatingMultiply(
       source.items_evicted, payload_bytes_per_item);
-  result.framed_bytes_framed =
-      saturatingMultiply(source.frames_framed, frame_bytes);
-  result.framed_bytes_emitted =
-      saturatingMultiply(source.frames_emitted, frame_bytes);
-  result.framed_bytes_transmitted =
-      saturatingMultiply(source.frames_transmitted, frame_bytes);
-  result.framed_bytes_evicted =
-      saturatingMultiply(source.frames_evicted, frame_bytes);
+  result.framed_bytes_framed = selected.framed_bytes_framed;
+  result.framed_bytes_emitted = selected.framed_bytes_emitted;
+  result.framed_bytes_transmitted = selected.framed_bytes_transmitted;
+  result.framed_bytes_evicted = selected.framed_bytes_evicted;
+  result.encoded_payload_bytes_framed =
+      selected.encoded_payload_bytes_framed;
+  result.encoded_payload_bytes_emitted =
+      selected.encoded_payload_bytes_emitted;
+  result.encoded_payload_bytes_transmitted =
+      selected.encoded_payload_bytes_transmitted;
+  result.encoded_payload_bytes_dropped =
+      selected.encoded_payload_bytes_dropped;
+  result.encoded_payload_bytes_evicted =
+      selected.encoded_payload_bytes_evicted;
+  result.framed_bytes_dropped = selected.framed_bytes_dropped;
   return result;
+}
+
+std::uint64_t encodedPayloadBytes(std::size_t frame_bytes) {
+  const std::size_t framing =
+      protocol_v1::kHeaderSize + protocol_v1::kTrailerSize;
+  return frame_bytes >= framing
+             ? static_cast<std::uint64_t>(frame_bytes - framing)
+             : 0U;
 }
 
 protocol::Result rleFailure(rle::Status status) {
@@ -133,6 +147,8 @@ OperationStatus PacketBufferPipeline::startRun(
   }
   transmit_queue_.clear();
   source_counters_ = {};
+  selected_byte_counters_ = {};
+  encoding_counters_ = {};
   transmit_depth_by_source_ = {};
   run_id_ = run_id;
   enabled_stream_mask_ = enabled_stream_mask;
@@ -158,6 +174,9 @@ OperationStatus PacketBufferPipeline::startRun(
   capacity_drops_without_evictable_frame_ = 0U;
   next_eviction_source_ = 0U;
   gap_before_next_frame_ = {};
+  cycle_counter_ready_ = frame_format_.rleAuto() &&
+                         cycle_counter_ != nullptr &&
+                         cycle_counter_->begin();
   accepting_frames_ = true;
   saturatingIncrement(run_starts_);
   return OperationStatus::kOk;
@@ -355,9 +374,18 @@ FinishFillResult PacketBufferPipeline::finishFill(
   record.lease_or_representation =
       static_cast<std::uint32_t>(LeaseOrRepresentation::kV1Raw);
   SourceCounters &source = source_counters_[streamIndex(record.stream)];
+  SelectedByteCounters &selected =
+      selected_byte_counters_[streamIndex(record.stream)];
+  EncodingCounters &encoding =
+      encoding_counters_[streamIndex(record.stream)];
   saturatingIncrement(source.frames_framed);
   saturatingAdd(source.items_framed,
                 static_cast<std::uint64_t>(record.item_count));
+  saturatingAdd(selected.encoded_payload_bytes_framed,
+                static_cast<std::uint64_t>(result.payload_bytes));
+  saturatingAdd(selected.framed_bytes_framed,
+                static_cast<std::uint64_t>(result.frame_bytes));
+  saturatingIncrement(encoding.raw_frames);
   if (ready.size() > source.ready_queue_high_water) {
     source.ready_queue_high_water = ready.size();
   }
@@ -425,12 +453,19 @@ FinishFillResult PacketBufferPipeline::finishV2Fill(
   const rle::Status input_status =
       rle::validateDataFrameInput(fields, decoded);
   BufferIndex selected_index = handle.buffer_index;
+  const std::size_t source_index = streamIndex(stream);
+  const bool encode_attempted =
+      input_status == rle::Status::kOk && frame_format_.rleAuto();
+  const std::uint32_t encode_started =
+      encode_attempted && cycle_counter_ready_ ? cycle_counter_->read() : 0U;
   if (input_status != rle::Status::kOk) {
     result.encoding = rleFailure(input_status);
   } else if (frame_format_.rleAuto()) {
     const rle::SizingPlan plan =
         rle::size(decoded, rle::dataShape(fields.kind));
     if (!plan.ok()) {
+      saturatingIncrement(encode_failures_);
+      saturatingIncrement(encoding_counters_[source_index].encode_failures);
       result.encoding = rleFailure(plan.status);
     } else if (plan.encoded_frame_bytes < protocol_v2::kDataFrameBytes) {
       const BufferIndex temporary = takeTransformBuffer(record);
@@ -463,6 +498,8 @@ FinishFillResult PacketBufferPipeline::finishV2Fill(
           selected.gap_before_required = false;
         } else {
           saturatingIncrement(encode_failures_);
+          saturatingIncrement(
+              encoding_counters_[source_index].encode_failures);
           recycleTransform(temporary);
           result.raw_fallback_reason = RawFallbackReason::kEncoderFailure;
         }
@@ -480,6 +517,11 @@ FinishFillResult PacketBufferPipeline::finishV2Fill(
         {storage_.frame(handle.buffer_index).data(),
          storage_.frame(handle.buffer_index).size()});
     applyFinalizedResult(finalized, result);
+  }
+  if (encode_attempted && cycle_counter_ready_) {
+    const std::uint32_t elapsed = cycle_counter_->read() - encode_started;
+    saturatingAdd(encoding_counters_[source_index].encode_cycles,
+                  static_cast<std::uint64_t>(elapsed));
   }
   if (!result.encoding.ok()) {
     if (selected_index != handle.buffer_index) {
@@ -523,9 +565,40 @@ FinishFillResult PacketBufferPipeline::finishV2Fill(
   }
 
   SourceCounters &source = source_counters_[streamIndex(stream)];
+  SelectedByteCounters &selected = selected_byte_counters_[source_index];
+  EncodingCounters &encoding = encoding_counters_[source_index];
   saturatingIncrement(source.frames_framed);
   saturatingAdd(source.items_framed,
                 static_cast<std::uint64_t>(item_count));
+  saturatingAdd(selected.encoded_payload_bytes_framed,
+                static_cast<std::uint64_t>(result.payload_bytes));
+  saturatingAdd(selected.framed_bytes_framed,
+                static_cast<std::uint64_t>(result.frame_bytes));
+  if (result.frame_encoding == protocol_v2::FrameEncoding::kRle) {
+    saturatingIncrement(encoding.rle_frames);
+    saturatingAdd(encoding.rle_runs,
+                  static_cast<std::uint64_t>(result.rle_run_count));
+  } else {
+    saturatingIncrement(encoding.raw_frames);
+  }
+  switch (result.raw_fallback_reason) {
+    case RawFallbackReason::kRleNotSmaller:
+      saturatingIncrement(encoding.fallback_frames);
+      saturatingIncrement(encoding.fallback_not_smaller);
+      break;
+    case RawFallbackReason::kTemporaryPageUnavailable:
+      saturatingIncrement(encoding.fallback_frames);
+      saturatingIncrement(
+          encoding.fallback_temporary_page_unavailable);
+      break;
+    case RawFallbackReason::kEncoderFailure:
+      saturatingIncrement(encoding.fallback_frames);
+      saturatingIncrement(encoding.fallback_encoder_failure);
+      break;
+    case RawFallbackReason::kNone:
+    case RawFallbackReason::kNotRequested:
+      break;
+  }
   if (ready.size() > source.ready_queue_high_water) {
     source.ready_queue_high_water = ready.size();
   }
@@ -601,6 +674,12 @@ PromotionReport PacketBufferPipeline::serviceReadyFrames(std::size_t limit) {
     saturatingIncrement(source.frames_emitted);
     saturatingAdd(source.items_emitted,
                   static_cast<std::uint64_t>(record.item_count));
+    SelectedByteCounters &selected =
+        selected_byte_counters_[selected_source];
+    saturatingAdd(selected.encoded_payload_bytes_emitted,
+                  encodedPayloadBytes(record.frame_size));
+    saturatingAdd(selected.framed_bytes_emitted,
+                  static_cast<std::uint64_t>(record.frame_size));
     if (transmit_depth_by_source_[selected_source] >
         source.transmit_queue_high_water) {
       source.transmit_queue_high_water =
@@ -673,7 +752,7 @@ bool PacketBufferPipeline::abortFrontFrame() {
 
   BufferRecord &record = records_[buffer_index];
   if (record.state != BufferState::kTransmitting ||
-      !record.transmission_started || !validStream(record.stream)) {
+      !validStream(record.stream)) {
     saturatingIncrement(invalid_operations_);
     recycle(buffer_index);
     return false;
@@ -688,6 +767,7 @@ bool PacketBufferPipeline::abortFrontFrame() {
   return true;
 }
 
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.release_front")
 void PacketBufferPipeline::releaseFrontFrame() {
   BufferIndex buffer_index = kInvalidBufferIndex;
   if (!transmit_queue_.pop(buffer_index) ||
@@ -708,9 +788,14 @@ void PacketBufferPipeline::releaseFrontFrame() {
   record.transmission_started = true;
   const std::size_t source_index = streamIndex(record.stream);
   SourceCounters &source = source_counters_[source_index];
+  SelectedByteCounters &selected = selected_byte_counters_[source_index];
   saturatingIncrement(source.frames_transmitted);
   saturatingAdd(source.items_transmitted,
                 static_cast<std::uint64_t>(record.item_count));
+  saturatingAdd(selected.encoded_payload_bytes_transmitted,
+                encodedPayloadBytes(record.frame_size));
+  saturatingAdd(selected.framed_bytes_transmitted,
+                static_cast<std::uint64_t>(record.frame_size));
   if (transmit_depth_by_source_[source_index] == 0U) {
     saturatingIncrement(invalid_operations_);
   } else {
@@ -757,7 +842,9 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.sources = source_counters_;
   for (std::size_t source = 0U; source < kStreamCount; ++source) {
     result.source_bytes[source] = byteCounters(
-        static_cast<Stream>(source), source_counters_[source]);
+        static_cast<Stream>(source), source_counters_[source],
+        selected_byte_counters_[source]);
+    result.encoding[source] = encoding_counters_[source];
     saturatingAdd(result.data_payload_bytes_transmitted,
                   result.source_bytes[source].payload_bytes_transmitted);
     saturatingAdd(result.data_framed_bytes_transmitted,
@@ -771,6 +858,16 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
     if (record.state == BufferState::kFilling &&
         validStream(record.stream)) {
       ++result.filling_depth_by_source[streamIndex(record.stream)];
+    }
+    if ((record.state == BufferState::kReady ||
+         record.state == BufferState::kTransmitting) &&
+        validStream(record.stream) && completeRecordValid(record)) {
+      SourceByteCounters &queued =
+          result.source_bytes[streamIndex(record.stream)];
+      saturatingAdd(queued.encoded_payload_bytes_queued,
+                    encodedPayloadBytes(record.frame_size));
+      saturatingAdd(queued.encoded_wire_bytes_queued,
+                    static_cast<std::uint64_t>(record.frame_size));
     }
   }
   for (std::size_t source = 0U; source < kStreamCount; ++source) {
@@ -1063,10 +1160,16 @@ void PacketBufferPipeline::dropBuffer(BufferIndex index,
     return;
   }
   const BufferRecord dropped = records_[index];
-  SourceCounters &source = source_counters_[streamIndex(dropped.stream)];
+  const std::size_t source_index = streamIndex(dropped.stream);
+  SourceCounters &source = source_counters_[source_index];
+  SelectedByteCounters &selected = selected_byte_counters_[source_index];
   if (dropped.state == BufferState::kReady ||
       dropped.state == BufferState::kTransmitting) {
     saturatingIncrement(source.frames_dropped_after_framing);
+    saturatingAdd(selected.encoded_payload_bytes_dropped,
+                  encodedPayloadBytes(dropped.frame_size));
+    saturatingAdd(selected.framed_bytes_dropped,
+                  static_cast<std::uint64_t>(dropped.frame_size));
   }
   if (dropped.state == BufferState::kTransmitting) {
     saturatingIncrement(source.frames_dropped_after_promotion);
@@ -1075,6 +1178,10 @@ void PacketBufferPipeline::dropBuffer(BufferIndex index,
     saturatingIncrement(source.frames_evicted);
     saturatingAdd(source.items_evicted,
                   static_cast<std::uint64_t>(dropped.item_count));
+    saturatingAdd(selected.encoded_payload_bytes_evicted,
+                  encodedPayloadBytes(dropped.frame_size));
+    saturatingAdd(selected.framed_bytes_evicted,
+                  static_cast<std::uint64_t>(dropped.frame_size));
   }
   propagateGapAfter(dropped);
   recordDrop(dropped.stream, dropped.item_count);

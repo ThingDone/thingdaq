@@ -68,6 +68,21 @@ namespace wire = thingdaq::protocol;
 
 int failures = 0;
 
+class FakeCycleCounter final : public thingdaq::timing::CycleCounter {
+ public:
+  bool begin() override {
+    begun = true;
+    return true;
+  }
+  std::uint32_t read() override {
+    value += 100U;
+    return value;
+  }
+
+  std::uint32_t value = 0U;
+  bool begun = false;
+};
+
 void expect(bool condition, const std::string &message) {
   if (!condition) {
     std::cerr << "FAIL: " << message << '\n';
@@ -279,7 +294,8 @@ packet::FinishFillResult finishConstantGpio(
 void testAdaptivePipelineSuccessAndFallbacks() {
   {
     packet::OwnedPacketBufferStorage storage{};
-    packet::PacketBufferPipeline pipeline{storage};
+    FakeCycleCounter cycles{};
+    packet::PacketBufferPipeline pipeline{storage, &cycles};
     expect(pipeline.startRun(41U, constants::kDefaultChecksumAlgorithm,
                              packet::kGpioStreamMask, v2Auto()) ==
                packet::OperationStatus::kOk,
@@ -309,6 +325,45 @@ void testAdaptivePipelineSuccessAndFallbacks() {
                checksumValid(frame),
            "published RLE metadata and checksum cover the transmitted view");
     pipeline.releaseFrontFrame();
+    const packet::BeginFillResult raw_begun =
+        pipeline.beginFill(packet::Stream::kGpio);
+    const wire::MutableByteView raw_payload =
+        pipeline.writablePayload(raw_begun.handle);
+    for (std::size_t index = 0U; index < raw_payload.size; ++index) {
+      raw_payload.data[index] = static_cast<std::uint8_t>(index & 0xFFU);
+    }
+    packet::FrameCompletion raw_completion{};
+    raw_completion.first_sample_ticks = constants_v2::kFrameCoverageTicks;
+    raw_completion.payload_bytes_written = raw_payload.size;
+    const packet::FinishFillResult raw_finished =
+        pipeline.finishFill(raw_begun.handle, raw_completion);
+    expect(raw_finished.ok() &&
+               raw_finished.frame_encoding ==
+                   constants_v2::FrameEncoding::kRaw &&
+               raw_finished.raw_fallback_reason ==
+                   packet::RawFallbackReason::kRleNotSmaller &&
+               pipeline.serviceReadyFrames(1U).frames_promoted == 1U,
+           "one negotiated run may select RLE and RAW on adjacent frames");
+    pipeline.releaseFrontFrame();
+    const packet::PipelineSnapshot mixed = pipeline.snapshot();
+    const packet::SourceByteCounters &bytes =
+        mixed.source_bytes[packet::streamIndex(packet::Stream::kGpio)];
+    const packet::EncodingCounters &encoding =
+        mixed.encoding[packet::streamIndex(packet::Stream::kGpio)];
+    expect(cycles.begun && encoding.raw_frames == 1U &&
+               encoding.rle_frames == 1U && encoding.rle_runs == 1U &&
+               encoding.fallback_frames == 1U &&
+               encoding.fallback_not_smaller == 1U &&
+               encoding.encode_cycles == 200U &&
+               bytes.payload_bytes_framed == 8096U &&
+               bytes.payload_bytes_transmitted == 8096U &&
+               bytes.encoded_payload_bytes_framed == 4051U &&
+               bytes.encoded_payload_bytes_transmitted == 4051U &&
+               bytes.framed_bytes_framed == 4147U &&
+               bytes.framed_bytes_transmitted == 4147U &&
+               bytes.encoded_payload_bytes_queued == 0U &&
+               bytes.encoded_wire_bytes_queued == 0U,
+           "logical, selected-payload, selected-wire, run, fallback, and cycle totals reconcile");
     pipeline.stopProduction();
     expect(pipeline.readyForStart(),
            "RLE success leaves no hidden temporary ownership");

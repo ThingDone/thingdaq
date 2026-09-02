@@ -79,6 +79,7 @@ namespace {
 namespace app = thingdaq::runtime;
 namespace board = thingdaq::board;
 namespace constants = thingdaq::protocol_v1;
+namespace v2_constants = thingdaq::protocol_v2;
 namespace control = thingdaq::control;
 namespace packet = thingdaq::packet;
 namespace stats = thingdaq::stats;
@@ -847,7 +848,7 @@ void testGarbageAndCorruptParserRecovery() {
            static_cast<std::uint32_t>(constants::kMaxCommandFrameBytes + 1U));
   std::vector<std::uint8_t> bad_version = bytes(info);
   bad_version[constants::kHeaderVersionOffset] =
-      static_cast<std::uint8_t>(constants::kProtocolVersion + 1U);
+      static_cast<std::uint8_t>(v2_constants::kProtocolVersion + 1U);
   std::vector<std::uint8_t> bad_kind = bytes(info);
   bad_kind[constants::kHeaderKindOffset] = 0x7FU;
   std::vector<std::uint8_t> bad_flags = bytes(info);

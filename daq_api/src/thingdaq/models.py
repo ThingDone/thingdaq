@@ -2596,7 +2596,12 @@ class DeviceCapabilities:
         fixed_values = (
             (self.timestamp_hz, constants.TIMESTAMP_HZ),
             (self.data_frame_bytes, constants.DATA_FRAME_BYTES),
-            (self.max_control_frame_bytes, constants.MAX_CONTROL_FRAME_BYTES),
+            (
+                self.max_control_frame_bytes,
+                v2_constants.MAX_CONTROL_FRAME_BYTES
+                if self.protocol_version == v2_constants.PROTOCOL_VERSION
+                else constants.MAX_CONTROL_FRAME_BYTES,
+            ),
             (self.adc_pair_rate_hz, constants.ADC_PAIR_RATE_HZ),
             (self.gpio_sample_rate_hz, constants.GPIO_SAMPLE_RATE_HZ),
             (self.adc_pair_period_ticks, constants.ADC_PAIR_PERIOD_TICKS),
