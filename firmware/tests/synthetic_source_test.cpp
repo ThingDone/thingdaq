@@ -13,6 +13,7 @@ namespace {
 
 namespace board = thingdaq::board;
 namespace constants = thingdaq::protocol_v1;
+namespace constants_v2 = thingdaq::protocol_v2;
 namespace packet = thingdaq::packet;
 namespace synthetic = thingdaq::synthetic;
 namespace wire = thingdaq::protocol;
@@ -44,6 +45,116 @@ wire::Configuration patternConfiguration(constants::Source source) {
   configuration.protocol_version = thingdaq::protocol_v2::kProtocolVersion;
   configuration.source = source;
   return configuration;
+}
+
+packet::RunFrameFormat v2AutoFormat() {
+  packet::RunFrameFormat format{};
+  format.protocol_version = constants_v2::kProtocolVersion;
+  format.encoding = constants_v2::ConfigurationEncoding::kRleAuto;
+  return format;
+}
+
+bool sameLogicalItem(synthetic::Pattern pattern, packet::Stream stream,
+                     std::uint64_t left, std::uint64_t right) {
+  if (stream == packet::Stream::kGpio) {
+    return synthetic::SyntheticSource::gpioByte(pattern, left) ==
+           synthetic::SyntheticSource::gpioByte(pattern, right);
+  }
+  return synthetic::SyntheticSource::adc0Code(pattern, left) ==
+             synthetic::SyntheticSource::adc0Code(pattern, right) &&
+         synthetic::SyntheticSource::adc1Code(pattern, left) ==
+             synthetic::SyntheticSource::adc1Code(pattern, right);
+}
+
+std::size_t expectedRunCount(synthetic::Pattern pattern,
+                             packet::Stream stream,
+                             std::uint64_t first_item) {
+  const std::size_t items = packet::itemsPerFrame(stream);
+  std::size_t runs = 1U;
+  for (std::size_t item = 1U; item < items; ++item) {
+    if (!sameLogicalItem(pattern, stream, first_item + item - 1U,
+                         first_item + item)) {
+      ++runs;
+    }
+  }
+  return runs;
+}
+
+bool selectedFrameMatchesFormula(const wire::DecodedFrame &frame,
+                                 synthetic::Pattern pattern,
+                                 packet::Stream stream) {
+  const std::size_t item_bytes = packet::payloadBytesPerItem(stream);
+  const std::size_t items = packet::itemsPerFrame(stream);
+  const std::uint64_t first_item =
+      static_cast<std::uint64_t>(frame.header.sequence) * items;
+  if (frame.header.encoding == constants_v2::FrameEncoding::kRaw) {
+    for (std::size_t item = 0U; item < items; ++item) {
+      const std::size_t offset = item * item_bytes;
+      if (stream == packet::Stream::kGpio) {
+        if (frame.payload.data[offset] !=
+            synthetic::SyntheticSource::gpioByte(pattern,
+                                                   first_item + item)) {
+          return false;
+        }
+      } else {
+        std::uint16_t adc0 = 0U;
+        std::uint16_t adc1 = 0U;
+        if (!wire::loadU16(frame.payload, offset, adc0) ||
+            !wire::loadU16(frame.payload, offset + 2U, adc1) ||
+            adc0 != synthetic::SyntheticSource::adc0Code(
+                        pattern, first_item + item) ||
+            adc1 != synthetic::SyntheticSource::adc1Code(
+                        pattern, first_item + item)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  const std::size_t record_bytes = item_bytes + sizeof(std::uint16_t);
+  if (frame.payload.size == 0U || frame.payload.size % record_bytes != 0U) {
+    return false;
+  }
+  std::size_t logical = 0U;
+  for (std::size_t offset = 0U; offset < frame.payload.size;
+       offset += record_bytes) {
+    std::uint16_t run_length = 0U;
+    if (!wire::loadU16(frame.payload, offset, run_length) ||
+        run_length == 0U || logical + run_length > items) {
+      return false;
+    }
+    const std::uint64_t index = first_item + logical;
+    if (stream == packet::Stream::kGpio) {
+      if (frame.payload.data[offset + 2U] !=
+          synthetic::SyntheticSource::gpioByte(pattern, index)) {
+        return false;
+      }
+    } else {
+      std::uint16_t adc0 = 0U;
+      std::uint16_t adc1 = 0U;
+      if (!wire::loadU16(frame.payload, offset + 2U, adc0) ||
+          !wire::loadU16(frame.payload, offset + 4U, adc1) ||
+          adc0 != synthetic::SyntheticSource::adc0Code(pattern, index) ||
+          adc1 != synthetic::SyntheticSource::adc1Code(pattern, index)) {
+        return false;
+      }
+    }
+    const std::size_t expected_length = [&]() {
+      std::size_t length = 1U;
+      while (logical + length < items &&
+             sameLogicalItem(pattern, stream, index,
+                             first_item + logical + length)) {
+        ++length;
+      }
+      return length;
+    }();
+    if (run_length != expected_length) {
+      return false;
+    }
+    logical += run_length;
+  }
+  return logical == items;
 }
 
 wire::DecodedFrame decodeFront(packet::PacketBufferPipeline &pipeline,
@@ -250,6 +361,96 @@ void testExperimentalPatternsAreV2OnlyAndExact() {
     source.stop();
     expect(source.pattern() == synthetic::Pattern::kDefaultRamp,
            "STOP restores the default synthetic formula selector");
+  }
+}
+
+void testEveryExperimentalPatternUsesBoundedAdaptiveFinalization() {
+  struct PatternCase {
+    constants_v2::Source source;
+    synthetic::Pattern pattern;
+  };
+  constexpr std::array<PatternCase, 5U> cases{{
+      {constants_v2::Source::kSyntheticConstant,
+       synthetic::Pattern::kConstant},
+      {constants_v2::Source::kSyntheticSparseHold,
+       synthetic::Pattern::kSparseHold},
+      {constants_v2::Source::kSyntheticSlowAdc,
+       synthetic::Pattern::kSlowAdc},
+      {constants_v2::Source::kSyntheticAlternating,
+       synthetic::Pattern::kAlternating},
+      {constants_v2::Source::kSyntheticIncompressible,
+       synthetic::Pattern::kIncompressible},
+  }};
+
+  for (std::size_t case_index = 0U; case_index < cases.size(); ++case_index) {
+    const PatternCase &test_case = cases[case_index];
+    const constants::Source source_id = static_cast<constants::Source>(
+        static_cast<std::uint8_t>(test_case.source));
+    wire::Configuration configuration = patternConfiguration(source_id);
+    configuration.encoding =
+        constants_v2::ConfigurationEncoding::kRleAuto;
+    packet::OwnedPacketBufferStorage storage{};
+    packet::PacketBufferPipeline pipeline{storage};
+    synthetic::SyntheticSource source{synthetic::Mode::kUnpacedDiagnostic};
+    const std::uint32_t run_id =
+        static_cast<std::uint32_t>(120U + case_index);
+    expect(pipeline.startRun(run_id, constants::kDefaultChecksumAlgorithm,
+                             packet::kAllStreamMask, v2AutoFormat()) ==
+                   packet::OperationStatus::kOk &&
+               source.startRun(run_id, configuration, 0U, pipeline) ==
+                   synthetic::OperationStatus::kOk,
+           "each v2 pattern starts through the adaptive packet format");
+    const synthetic::ServiceReport report = source.service(0U, pipeline);
+    const packet::PipelineSnapshot ready = pipeline.snapshot();
+    expect(report.frames_generated == board::kSyntheticFramesPerLoop &&
+               report.frames_generated == 2U &&
+               report.frames_framed == report.frames_generated &&
+               report.work_limit_reached && !report.invariant_error &&
+               ready.temporary_pages_owned == 0U &&
+               ready.temporary_page_high_water <= 1U &&
+               ready.buffers_owned == 2U &&
+               pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+           "one source visit finishes at most one frame per stream and returns workspace");
+
+    for (packet::Stream stream : {packet::Stream::kAdc,
+                                  packet::Stream::kGpio}) {
+      const wire::ByteView frame_bytes = pipeline.frontFrame();
+      wire::DecodedFrame frame{};
+      const std::size_t runs = expectedRunCount(test_case.pattern, stream, 0U);
+      const std::size_t record_bytes =
+          packet::payloadBytesPerItem(stream) + sizeof(std::uint16_t);
+      const constants_v2::FrameEncoding expected_encoding =
+          runs * record_bytes < constants_v2::kDataPayloadBytes
+              ? constants_v2::FrameEncoding::kRle
+              : constants_v2::FrameEncoding::kRaw;
+      expect(wire::decodeFrame(frame_bytes, frame).ok() &&
+                 frame.header.version == constants_v2::kProtocolVersion &&
+                 frame.header.encoding == expected_encoding &&
+                 frame.header.sequence == 0U &&
+                 frame.header.first_sample_ticks == 0U &&
+                 selectedFrameMatchesFormula(frame, test_case.pattern,
+                                             stream),
+             "adaptive output matches the exact target formula and break-even rule");
+      pipeline.releaseFrontFrame();
+    }
+
+    const packet::PipelineSnapshot completed = pipeline.snapshot();
+    for (std::size_t stream = 0U; stream < packet::kStreamCount; ++stream) {
+      const packet::EncodingCounters &encoding = completed.encoding[stream];
+      const packet::SourceCounters &counters = completed.sources[stream];
+      expect(counters.frames_produced == 1U &&
+                 counters.frames_framed == 1U &&
+                 counters.frames_emitted == 1U &&
+                 counters.frames_transmitted == 1U &&
+                 counters.frames_dropped == 0U &&
+                 encoding.raw_frames + encoding.rle_frames == 1U &&
+                 encoding.fallback_frames == encoding.raw_frames,
+             "per-pattern logical and adaptive selection counters reconcile");
+    }
+    source.stop();
+    pipeline.stopProduction();
+    expect(pipeline.readyForStart(),
+           "per-pattern STOP leaves the fixed packet pool quiescent");
   }
 }
 
@@ -473,6 +674,7 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
 int main() {
   testRealtimePacingAndExactLayouts();
   testExperimentalPatternsAreV2OnlyAndExact();
+  testEveryExperimentalPatternUsesBoundedAdaptiveFinalization();
   testUnpacedDiagnosticIsExplicitAndBounded();
   testNewRunResetsIndependentEpochState();
   testRealtimePoolLossPreservesFormulaTimeAndFlags();

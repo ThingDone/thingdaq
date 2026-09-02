@@ -17,6 +17,7 @@ namespace {
 
 namespace board = thingdaq::board;
 namespace constants = thingdaq::protocol_v1;
+namespace constants_v2 = thingdaq::protocol_v2;
 namespace packet = thingdaq::packet;
 namespace stats = thingdaq::stats;
 namespace usb = thingdaq::usb;
@@ -89,6 +90,37 @@ packet::FinishFillResult fillAndFinish(packet::PacketBufferPipeline &pipeline,
   completion.first_sample_ticks = first_ticks;
   completion.flags = flags;
   completion.checksum_algorithm = checksum;
+  completion.payload_bytes_written = payload.size;
+  return pipeline.finishFill(handle, completion);
+}
+
+packet::RunFrameFormat v2AutoFormat() {
+  packet::RunFrameFormat format{};
+  format.protocol_version = constants_v2::kProtocolVersion;
+  format.encoding = constants_v2::ConfigurationEncoding::kRleAuto;
+  return format;
+}
+
+packet::FinishFillResult fillConstantAndFinish(
+    packet::PacketBufferPipeline &pipeline, packet::Stream stream,
+    std::uint64_t first_ticks, std::uint16_t flags,
+    packet::FillHandle &handle) {
+  const packet::BeginFillResult begun = pipeline.beginFill(stream);
+  expect(begun.ok(), "reserve one constant RLE source frame");
+  handle = begun.handle;
+  wire::MutableByteView payload = pipeline.writablePayload(handle);
+  if (stream == packet::Stream::kGpio) {
+    std::fill_n(payload.data, payload.size, std::uint8_t{0x5AU});
+  } else {
+    for (std::size_t offset = 0U; offset < payload.size; offset += 4U) {
+      expect(wire::storeU16(payload, offset, 0x155U) &&
+                 wire::storeU16(payload, offset + 2U, 0xAAAU),
+             "write one constant ADC pair");
+    }
+  }
+  packet::FrameCompletion completion{};
+  completion.first_sample_ticks = first_ticks;
+  completion.flags = flags;
   completion.payload_bytes_written = payload.size;
   return pipeline.finishFill(handle, completion);
 }
@@ -395,6 +427,278 @@ void testSessionBoundaryAbortsPartialDataFrame() {
              after_close.sources[0].frames_dropped == 1U &&
              pipeline.quiescent(),
          "session abort and successor transmission conserve packet ownership");
+}
+
+void testRlePressureStallPriorityAndExactConservation() {
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  constexpr std::uint32_t run_id = 14U;
+  constexpr std::size_t rle_frame_bytes =
+      constants_v2::kHeaderSize + 3U + constants_v2::kTrailerSize;
+  constexpr std::uint64_t frame_count = board::kPacketBufferCount;
+  expect(pipeline.startRun(run_id, constants::kDefaultChecksumAlgorithm,
+                           packet::kGpioStreamMask, v2AutoFormat()) ==
+             packet::OperationStatus::kOk,
+         "start a single-stream adaptive page-pressure run");
+
+  for (std::uint32_t sequence = 0U;
+       sequence < static_cast<std::uint32_t>(frame_count); ++sequence) {
+    packet::FillHandle handle{};
+    const packet::FinishFillResult finished = fillConstantAndFinish(
+        pipeline, packet::Stream::kGpio,
+        static_cast<std::uint64_t>(sequence) *
+            constants_v2::kFrameCoverageTicks,
+        sequence == 0U
+            ? static_cast<std::uint16_t>(constants::FrameFlag::kEpochStart)
+            : 0U,
+        handle);
+    const bool final_raw =
+        sequence + 1U == static_cast<std::uint32_t>(frame_count);
+    expect(finished.ok() &&
+               finished.frame_encoding ==
+                   (final_raw ? constants_v2::FrameEncoding::kRaw
+                              : constants_v2::FrameEncoding::kRle) &&
+               finished.raw_fallback_reason ==
+                   (final_raw
+                        ? packet::RawFallbackReason::kTemporaryPageUnavailable
+                        : packet::RawFallbackReason::kNone),
+           "adaptive selection falls back only when the retained RAW page fills the pool");
+  }
+
+  const packet::PipelineSnapshot pressured = pipeline.snapshot();
+  const packet::SourceByteCounters &ready_bytes = pressured.source_bytes[1U];
+  const packet::EncodingCounters &ready_encoding = pressured.encoding[1U];
+  constexpr std::uint64_t rle_frames = frame_count - 1U;
+  constexpr std::uint64_t expected_encoded_payload =
+      rle_frames * 3U + constants_v2::kDataPayloadBytes;
+  constexpr std::uint64_t expected_wire =
+      rle_frames * rle_frame_bytes + constants_v2::kDataFrameBytes;
+  constexpr std::uint64_t expected_logical =
+      frame_count * constants_v2::kDataPayloadBytes;
+  expect(pressured.ready_queue_depth == frame_count &&
+             pressured.buffers_owned == frame_count &&
+             pressured.temporary_pages_owned == 0U &&
+             pressured.temporary_page_high_water == 1U &&
+             pressured.temporary_page_exhaustions == 1U &&
+             ready_encoding.rle_frames == rle_frames &&
+             ready_encoding.raw_frames == 1U &&
+             ready_encoding.rle_runs == rle_frames &&
+             ready_encoding.fallback_frames == 1U &&
+             ready_encoding.fallback_temporary_page_unavailable == 1U &&
+             ready_bytes.payload_bytes_framed == expected_logical &&
+             ready_bytes.encoded_payload_bytes_framed ==
+                 expected_encoded_payload &&
+             ready_bytes.framed_bytes_framed == expected_wire &&
+             ready_bytes.encoded_payload_bytes_queued ==
+                 expected_encoded_payload &&
+             ready_bytes.encoded_wire_bytes_queued == expected_wire,
+         "page pressure retains every logical frame and accounts the exact selected payload and wire bytes");
+
+  const packet::StopReport stopped = pipeline.stopProduction();
+  expect(stopped.ready_frames_to_drain == frame_count &&
+             stopped.temporary_pages_recycled == 0U &&
+             pipeline.serviceReadyFrames(board::kPacketBufferCount)
+                     .frames_promoted == frame_count,
+         "STOP preserves all complete adaptive frames for bounded transport drain");
+
+  FakeCdcStream stream{};
+  stream.write_plan = {37, 0};
+  stats::Statistics statistics{};
+  usb::CdcTransport transport{stream, statistics, &pipeline};
+  const usb::ServiceReport partial = transport.serviceTransmit();
+  expect(partial.stalled && partial.bytes_written == 37U &&
+             transport.snapshot().active_frame_size == rle_frame_bytes &&
+             pipeline.queuedFrames() == frame_count,
+         "a host stall pins the exact variable-length RLE frame after byte zero");
+  const wire::ControlFrame response = statusResponse(702U, run_id);
+  expect(transport.queueResponse(response),
+         "control response remains admissible behind a partial RLE frame");
+  for (std::size_t visit = 0U;
+       visit < board::kPacketBufferCount + 32U &&
+       transport.hasPendingTransmission();
+       ++visit) {
+    (void)transport.serviceTransmit();
+  }
+
+  std::size_t offset = 0U;
+  std::size_t frame_index = 0U;
+  std::size_t data_frames = 0U;
+  std::size_t observed_rle = 0U;
+  std::size_t observed_raw = 0U;
+  while (offset < stream.output.size()) {
+    std::uint32_t total = 0U;
+    expect(wire::loadU32({stream.output.data(), stream.output.size()},
+                         offset + constants::kHeaderTotalLengthOffset,
+                         total) &&
+               total >= constants::kMinFrameBytes &&
+               total <= stream.output.size() - offset,
+           "walk each pressured data/control frame by its declared length");
+    if (total < constants::kMinFrameBytes ||
+        total > stream.output.size() - offset) {
+      break;
+    }
+    wire::DecodedFrame decoded{};
+    expect(wire::decodeFrame({stream.output.data() + offset, total}, decoded)
+               .ok(),
+           "every resumed pressured frame retains a valid selected checksum");
+    if (frame_index == 0U) {
+      expect(decoded.header.kind == constants::FrameKind::kGpioData &&
+                 decoded.header.encoding ==
+                     constants_v2::FrameEncoding::kRle,
+             "the partial RLE frame completes before priority can change ownership");
+    } else if (frame_index == 1U) {
+      expect(decoded.header.kind == constants::FrameKind::kGetStatusResponse,
+             "STATUS takes priority at the first complete RLE frame boundary");
+    }
+    if (decoded.header.kind == constants::FrameKind::kGpioData) {
+      const bool raw =
+          decoded.header.encoding == constants_v2::FrameEncoding::kRaw;
+      observed_raw += raw ? 1U : 0U;
+      observed_rle += raw ? 0U : 1U;
+      expect(decoded.header.sequence == data_frames &&
+                 decoded.header.first_sample_ticks ==
+                     static_cast<std::uint64_t>(data_frames) *
+                         constants_v2::kFrameCoverageTicks &&
+                 (decoded.header.flags &
+                  static_cast<std::uint16_t>(
+                      constants::FrameFlag::kGapBefore)) == 0U,
+             "pressure fallback preserves contiguous sequence, timestamp, and loss semantics");
+      ++data_frames;
+    }
+    offset += total;
+    ++frame_index;
+  }
+
+  const packet::PipelineSnapshot drained = pipeline.snapshot();
+  const usb::TransportSnapshot transported = transport.snapshot();
+  const packet::SourceByteCounters &drained_bytes = drained.source_bytes[1U];
+  expect(offset == stream.output.size() && data_frames == frame_count &&
+             observed_rle == rle_frames && observed_raw == 1U &&
+             frame_index == frame_count + 1U && pipeline.quiescent() &&
+             drained.sources[1U].frames_transmitted == frame_count &&
+             drained.sources[1U].frames_dropped == 0U &&
+             drained_bytes.payload_bytes_transmitted == expected_logical &&
+             drained_bytes.encoded_payload_bytes_transmitted ==
+                 expected_encoded_payload &&
+             drained_bytes.framed_bytes_transmitted == expected_wire &&
+             drained_bytes.encoded_payload_bytes_queued == 0U &&
+             drained_bytes.encoded_wire_bytes_queued == 0U &&
+             transported.lower_priority_frames_completed == frame_count &&
+             transported.lower_priority_frame_bytes_completed ==
+                 expected_wire &&
+             transported.lower_priority_bytes_written == expected_wire &&
+             transported.response_bytes_written == response.size(),
+         "stalled mixed-size drain conserves every logical, encoded, and complete wire byte exactly");
+}
+
+void testRleReconnectRepairsGapAndConservesLoss() {
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  constexpr std::uint32_t run_id = 15U;
+  constexpr std::size_t rle_frame_bytes =
+      constants_v2::kHeaderSize + 3U + constants_v2::kTrailerSize;
+  expect(pipeline.startRun(run_id, constants::kDefaultChecksumAlgorithm,
+                           packet::kGpioStreamMask, v2AutoFormat()) ==
+             packet::OperationStatus::kOk,
+         "start an adaptive reconnect run");
+  for (std::uint32_t sequence = 0U; sequence < 2U; ++sequence) {
+    packet::FillHandle handle{};
+    expect(fillConstantAndFinish(
+               pipeline, packet::Stream::kGpio,
+               static_cast<std::uint64_t>(sequence) *
+                   constants_v2::kFrameCoverageTicks,
+               sequence == 0U
+                   ? static_cast<std::uint16_t>(
+                         constants::FrameFlag::kEpochStart)
+                   : 0U,
+               handle)
+               .ok(),
+           "prepare consecutive RLE frames around a session boundary");
+  }
+  expect(pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+         "promote both variable-size reconnect frames");
+
+  FakeCdcStream stream{};
+  stream.write_plan = {7, 0};
+  stats::Statistics statistics{};
+  usb::CdcTransport transport{stream, statistics, &pipeline};
+  expect(transport.serviceTransmit().stalled &&
+             transport.snapshot().active_frame_bytes_sent == 7U,
+         "pin one checksummed RLE prefix in the old host session");
+  stream.session_open = false;
+  (void)transport.serviceTransmit();
+  packet::PipelineSnapshot snapshot = pipeline.snapshot();
+  expect(pipeline.queuedFrames() == 1U &&
+             snapshot.sources[1U].frames_dropped == 1U &&
+             snapshot.source_bytes[1U].encoded_payload_bytes_dropped == 3U &&
+             snapshot.source_bytes[1U].framed_bytes_dropped ==
+                 rle_frame_bytes,
+         "disconnect loss-accounts the partial selected representation exactly once");
+
+  expect(pipeline.stopProduction().transmitting_frames_to_drain == 1U,
+         "STOP retains the complete successor after reconnect loss");
+  stream.output.clear();
+  stream.session_open = true;
+  (void)transport.serviceReceive();
+  const wire::ControlFrame response = statusResponse(703U, run_id);
+  expect(transport.queueResponse(response),
+         "the new session admits a response before untouched data");
+  for (std::size_t visit = 0U;
+       visit < 8U && transport.hasPendingTransmission(); ++visit) {
+    (void)transport.serviceTransmit();
+  }
+
+  wire::DecodedFrame first{};
+  wire::DecodedFrame successor{};
+  std::uint32_t response_size = 0U;
+  expect(wire::loadU32({stream.output.data(), stream.output.size()},
+                       constants::kHeaderTotalLengthOffset, response_size) &&
+             response_size == response.size() &&
+             wire::decodeFrame({stream.output.data(), response_size}, first)
+                 .ok() &&
+             first.header.kind == constants::FrameKind::kGetStatusResponse &&
+             stream.output.size() == response_size + rle_frame_bytes &&
+             wire::decodeFrame(
+                 {stream.output.data() + response_size, rle_frame_bytes},
+                 successor)
+                 .ok(),
+         "reopened session sends priority control then one complete RLE successor");
+  const std::uint16_t required_gap = static_cast<std::uint16_t>(
+      static_cast<std::uint16_t>(constants::FrameFlag::kGapBefore) |
+      static_cast<std::uint16_t>(constants::FrameFlag::kOverrunBefore));
+  snapshot = pipeline.snapshot();
+  const usb::TransportSnapshot usb_snapshot = transport.snapshot();
+  expect(successor.header.kind == constants::FrameKind::kGpioData &&
+             successor.header.encoding ==
+                 constants_v2::FrameEncoding::kRle &&
+             successor.header.sequence == 1U &&
+             successor.header.first_sample_ticks ==
+                 constants_v2::kFrameCoverageTicks &&
+             (successor.header.flags & required_gap) == required_gap &&
+             snapshot.sources[1U].frames_transmitted == 1U &&
+             snapshot.sources[1U].frames_dropped == 1U &&
+             snapshot.sources[1U].items_transmitted ==
+                 constants_v2::kGpioSamplesPerFrame &&
+             snapshot.sources[1U].items_dropped ==
+                 constants_v2::kGpioSamplesPerFrame &&
+             snapshot.source_bytes[1U].payload_bytes_transmitted ==
+                 constants_v2::kDataPayloadBytes &&
+             snapshot.source_bytes[1U].payload_bytes_dropped ==
+                 constants_v2::kDataPayloadBytes &&
+             snapshot.source_bytes[1U].encoded_payload_bytes_transmitted ==
+                 3U &&
+             snapshot.source_bytes[1U].encoded_payload_bytes_dropped == 3U &&
+             snapshot.source_bytes[1U].framed_bytes_transmitted ==
+                 rle_frame_bytes &&
+             snapshot.source_bytes[1U].framed_bytes_dropped ==
+                 rle_frame_bytes &&
+             usb_snapshot.lower_priority_bytes_aborted == 7U &&
+             usb_snapshot.lower_priority_frames_aborted == 1U &&
+             usb_snapshot.lower_priority_frames_completed == 1U &&
+             usb_snapshot.lower_priority_frame_bytes_completed ==
+                 rle_frame_bytes &&
+             pipeline.quiescent(),
+         "reconnect repairs RLE flags/checksum and exactly partitions transmitted versus lost bytes");
 }
 
 void testFairPromotionKeepsNominalCoverageAligned() {
@@ -788,6 +1092,8 @@ int main() {
   testAlignedFixedPoolAndFailureAccounting();
   testTransportOwnershipSurvivesPartialWrites();
   testSessionBoundaryAbortsPartialDataFrame();
+  testRlePressureStallPriorityAndExactConservation();
+  testRleReconnectRepairsGapAndConservesLoss();
   testFairPromotionKeepsNominalCoverageAligned();
   testCombinedFairnessBoundsLeadAndCountsMissingCoverage();
   testPoolExhaustionIsBoundedAndSequenceVisible();

@@ -616,6 +616,62 @@ void testVariableRleConservationAndSessionAbort() {
              aborted.lower_priority_frames_aborted == 1U &&
              aborted.active_frame_bytes_sent == 0U,
          "session cleanup loss-accounts every accepted RLE prefix byte");
+
+  FakeLowerPrioritySource active_lower{};
+  active_lower.frames = {rle};
+  FakeCdcStream active_stream{};
+  active_stream.write_plan = {7, 0};
+  stats::Statistics active_statistics{};
+  usb::CdcTransport active_transport(active_stream, active_statistics,
+                                     &active_lower);
+  (void)active_transport.serviceTransmit();
+  expect(active_transport.queueResponse(high),
+         "queue control behind a byte-started variable RLE frame");
+  drainTransmit(active_transport);
+  expected = rle;
+  append(expected, bytes(high));
+  const usb::TransportSnapshot active = active_transport.snapshot();
+  expect(active_stream.output == expected && active_lower.frames.empty() &&
+             active.responses_completed == 1U &&
+             active.lower_priority_frames_completed == 1U &&
+             active.lower_priority_frame_bytes_completed == rle.size() &&
+             active.lower_priority_bytes_written == rle.size() &&
+             active.response_bytes_written == high.size() &&
+             active.tx_bytes == rle.size() + high.size(),
+         "active RLE ownership completes before response priority and conserves partial writes");
+
+  const std::vector<std::uint8_t> successor = rleGpioFrame(12U, 1U);
+  FakeLowerPrioritySource reconnect_lower{};
+  reconnect_lower.frames = {rle, successor};
+  FakeCdcStream reconnect_stream{};
+  reconnect_stream.write_plan = {7, 0};
+  stats::Statistics reconnect_statistics{};
+  usb::CdcTransport reconnect_transport(reconnect_stream,
+                                        reconnect_statistics,
+                                        &reconnect_lower);
+  (void)reconnect_transport.serviceTransmit();
+  reconnect_stream.session_open = false;
+  (void)reconnect_transport.serviceTransmit();
+  reconnect_stream.output.clear();
+  reconnect_stream.session_open = true;
+  (void)reconnect_transport.serviceReceive();
+  expect(reconnect_transport.queueResponse(high),
+         "reopened session queues control at a clean frame boundary");
+  drainTransmit(reconnect_transport);
+  expected = bytes(high);
+  append(expected, successor);
+  const usb::TransportSnapshot reconnected = reconnect_transport.snapshot();
+  expect(reconnect_stream.output == expected && reconnect_lower.frames.empty() &&
+             reconnected.session_close_events == 1U &&
+             reconnected.session_open_events == 2U &&
+             reconnected.lower_priority_frames_aborted == 1U &&
+             reconnected.lower_priority_bytes_aborted == 7U &&
+             reconnected.lower_priority_frames_completed == 1U &&
+             reconnected.lower_priority_frame_bytes_completed ==
+                 successor.size() &&
+             reconnected.response_bytes_written == high.size() &&
+             reconnected.active_frame_bytes_sent == 0U,
+         "reconnect discards only the old RLE prefix and restarts with priority control plus a complete successor");
 }
 
 void testTransmitBudgets() {
