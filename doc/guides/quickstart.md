@@ -75,6 +75,7 @@ path is opt-in and clearly represents a physical-device operation.
 | Combined timestamp alignment | `.venv/bin/python daq_api/examples/combined_alignment.py` | Safe A0/A1 and D6-D13 inputs |
 | Live STATUS and loss handling | `.venv/bin/python daq_api/examples/status_and_loss.py` | Safe inputs; performs a short physical combined capture |
 | Standalone simulator lifecycle | `.venv/bin/python daq_api/examples/simulator.py` | None; this example intentionally has no `--real` path |
+| Auxiliary-input workload matrix | `.venv/bin/python daq_api/examples/aux_input_matrix.py` | None; this example intentionally has no `--real` path |
 | Explicit clean shutdown | `.venv/bin/python daq_api/examples/clean_shutdown.py` | Safe A0/A1 input; demonstrates STOP in `finally` |
 
 For example:
@@ -87,6 +88,32 @@ For example:
 The calibration example's simulator coefficients are illustrative and exist
 only in memory. They are not a personal calibration, do not touch a default
 path, and must not be reused for a physical device. See [[Calibration]].
+
+## Validate the auxiliary-input workload matrix
+
+The experimental auxiliary-input example runs the 8-bit and 16-bit layouts at
+all four exact rate profiles, plus the one-bank and 16-input GPIO-only 4 MHz
+cases. Its no-argument path validates all four independent primary/auxiliary
+GPIO formulas, every ADC pair and half-period timestamp, frame chronology,
+STATUS byte conservation, STOP, and closed cleanup:
+
+```bash
+.venv/bin/python daq_api/examples/aux_input_matrix.py
+```
+
+It prints exact analytic payload/framed rates, logical packed-item and channel
+sample rates, frame coverage, projected load increases, and decoded examples.
+Generate a temporary shared-schema JSON/structured-Markdown pair only when
+needed:
+
+```bash
+.venv/bin/python daq_api/examples/aux_input_matrix.py \
+  --output .maestro/aux-input-demo
+```
+
+The reported 12 MB/s full-combined payload is explicitly a protocol-load
+hypothesis. Simulator execution does not establish host throughput, physical
+USB acceptance, target timing, pad behavior, or electrical performance.
 
 ## Minimal Python lifecycle
 

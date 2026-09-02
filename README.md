@@ -55,6 +55,18 @@ The baseline's simulator command-latency fields use a deterministic logical
 clock so normalized reports are reproducible. They are simulator bookkeeping,
 not host, live-USB, or target timing evidence.
 
+Run the isolated auxiliary-input workload matrix entirely offline:
+
+```bash
+.venv/bin/python daq_api/examples/aux_input_matrix.py
+.venv/bin/python daq_api/examples/aux_input_matrix.py \
+  --output .maestro/aux-input-demo
+```
+
+The optional output prefix writes temporary shared-schema JSON and structured
+Markdown. The printed 12 MB/s full-combined payload and protocol-framed byte
+rates are analytic load hypotheses, not physical USB acceptance.
+
 All examples default to the simulator. A script touches hardware only when
 `--real` is present:
 

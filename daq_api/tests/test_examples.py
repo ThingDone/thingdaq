@@ -18,7 +18,7 @@ EXAMPLE_SCRIPTS = tuple(
 
 class SimulatorExampleTests(unittest.TestCase):
     def test_every_public_example_runs_offline_and_identifies_itself(self) -> None:
-        self.assertEqual(9, len(EXAMPLE_SCRIPTS))
+        self.assertEqual(10, len(EXAMPLE_SCRIPTS))
         environment = os.environ.copy()
         source_path = str(PACKAGE_ROOT / "src")
         environment["PYTHONPATH"] = os.pathsep.join(

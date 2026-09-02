@@ -196,14 +196,40 @@ thingdaq monitor --simulate --duration 1 \
   --gpio-channel D6 --gpio-channel D23
 ```
 
+Run the complete offline workload matrix with one command:
+
+```bash
+python examples/aux_input_matrix.py
+```
+
+The command executes the 8-bit and 16-bit layouts at all four exact combined
+profiles, plus the one-bank and 16-input GPIO-only 4 MHz cases. By default it
+validates two frames per enabled stream for all four GPIO formulas, including
+every decoded ADC value, ADC1 half-period timestamp, primary-bank byte,
+auxiliary-bank byte, sequence, frame timestamp, STATUS byte counter, STOP, and
+closed cleanup. It prints packed-item and per-channel logical sample rates,
+payload and exact rational framed byte rates, coverage, projected load increase,
+and decoded examples.
+
+An output prefix requests temporary shared-schema JSON and structured Markdown:
+
+```bash
+python examples/aux_input_matrix.py --output ../.maestro/aux-input-demo
+```
+
+The 12 MB/s full-combined payload and all protocol-framed rates are analytic
+load hypotheses checked against simulator structure. They are not measurements
+of host throughput, USB bus overhead, target execution, or physical USB
+acceptance.
+
 ## Runnable workflows
 
-The nine scripts in `examples/` cover discovery/serial selection, raw ADC
+The ten scripts in `examples/` cover discovery/serial selection, raw ADC
 channels, explicit interleaving, optional calibration, packed/selected GPIO,
 combined timestamp alignment, live STATUS/loss handling, standalone simulator
-use, and explicit clean shutdown. Every script's no-argument path uses the
-simulator. Physical access is opt-in via `--real`; calibration additionally
-requires an explicit user-owned path:
+use, the auxiliary-input workload matrix, and explicit clean shutdown. Every
+script's no-argument path uses the simulator. Physical access is opt-in via
+`--real`; calibration additionally requires an explicit user-owned path:
 
 ```bash
 python examples/raw_adc_channels.py
