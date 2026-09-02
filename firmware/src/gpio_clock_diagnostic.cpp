@@ -28,7 +28,7 @@ Plan makePlan(const protocol::GpioClockDiagnosticRequest &request) {
   plan.rate_hz = request.rate_hz;
   plan.pit_divisor = protocol_v1::kGpioClockPitHz / request.rate_hz;
   plan.pit_load_value = plan.pit_divisor - 1U;
-  plan.cycles_per_event = protocol_v1::kGpioClockDwtHz / request.rate_hz;
+  plan.cycles_per_event = identity::kExpectedDwtHz / request.rate_hz;
   plan.measurement_cycles =
       static_cast<std::uint32_t>(request.event_count) * plan.cycles_per_event;
   plan.requested_event_count = request.event_count;
@@ -64,7 +64,7 @@ RunResult Runner::run(
     result.status = RunStatus::kOk;
     return result;
   }
-  if (response.dwt_counter_hz != protocol_v1::kGpioClockDwtHz ||
+  if (response.dwt_counter_hz != identity::kExpectedDwtHz ||
       response.dwt_elapsed_cycles == 0U) {
     response.hardware_error_flags |=
         errorBit(protocol_v1::GpioClockError::kDwtUnavailable);
@@ -111,7 +111,7 @@ static_assert(protocol_v1::kGpioClockPitHz /
 static_assert(protocol_v1::kGpioClockPitHz %
                       protocol_v1::kGpioClockProductionRateHz ==
                   0U);
-static_assert(protocol_v1::kGpioClockDwtHz %
+static_assert(identity::kExpectedDwtHz %
                       protocol_v1::kGpioClockPitHz ==
                   0U);
 static_assert(2U * protocol_v1::kGpioClockMaxEventCount +

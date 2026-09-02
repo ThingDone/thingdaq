@@ -36,6 +36,10 @@ constexpr std::uint32_t kTriggerErrorMask =
     ADC_ETC_DONE2_ERR_IRQ_TRIG_ERR(protocol_v1::kAdcTriggerQueues[1]);
 constexpr std::uint32_t kAdcClockGateMask =
     CCM_CCGR1_ADC1(CCM_CCGR_ON) | CCM_CCGR1_ADC2(CCM_CCGR_ON);
+constexpr std::uint32_t kAdcClockDividerMask =
+    ADC_CFG_ADIV(3U) | ADC_CFG_ADICLK(3U);
+constexpr std::uint32_t kAdcClockDividerConfiguration =
+    ADC_CFG_ADIV(1U) | ADC_CFG_ADICLK(1U);
 
 volatile std::uint32_t g_completion_counts[kConverterCount]{};
 volatile std::uint32_t g_first_completion_cycles[kConverterCount]{};
@@ -141,7 +145,7 @@ bool resourcesBusy() {
 }
 
 bool clocksValid() {
-  return F_BUS_ACTUAL == protocol_v1::kAdcTriggerIpgClockHz &&
+  return identity::runtimeClocksMatchProfile(F_CPU_ACTUAL, F_BUS_ACTUAL) &&
          (CCM_CSCMR1 & gpio_dma_route::kPerclkMask) ==
              gpio_dma_route::kPerclk24M &&
          (CCM_CCGR1 & (gpio_dma_route::kPitGateMask |
@@ -170,7 +174,7 @@ bool queuesValid() {
   for (std::size_t index = 0U; index < kConverterCount; ++index) {
     if (triggerQueue(index).CTRL != ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0U) ||
         triggerQueue(index).COUNTER != ADC_ETC_TRIG_COUNTER_INIT_DELAY(
-                                           protocol_v1::
+                                           identity::
                                                kAdcTriggerInitialDelays[index]) ||
         triggerQueue(index).CHAIN_1_0 != chainConfiguration(index)) {
       return false;
@@ -179,9 +183,15 @@ bool queuesValid() {
   return true;
 }
 
+THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
+    ".flashmem.adc_trigger.target_converter_valid")
 bool convertersHardwareTriggered() {
   return (IMXRT_ADC1.CFG & ADC_CFG_ADTRG) != 0U &&
          (IMXRT_ADC2.CFG & ADC_CFG_ADTRG) != 0U &&
+         (IMXRT_ADC1.CFG & kAdcClockDividerMask) ==
+             kAdcClockDividerConfiguration &&
+         (IMXRT_ADC2.CFG & kAdcClockDividerMask) ==
+             kAdcClockDividerConfiguration &&
          IMXRT_ADC1.HC0 == kAdcHardwareTriggerChannel &&
          IMXRT_ADC2.HC0 == kAdcHardwareTriggerChannel;
 }
@@ -289,7 +299,7 @@ class TeensyPlatform final : public Platform {
     for (std::size_t index = 0U; index < kConverterCount; ++index) {
       triggerQueue(index).CTRL = ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0U);
       triggerQueue(index).COUNTER = ADC_ETC_TRIG_COUNTER_INIT_DELAY(
-          protocol_v1::kAdcTriggerInitialDelays[index]);
+          identity::kAdcTriggerInitialDelays[index]);
       triggerQueue(index).CHAIN_1_0 = chainConfiguration(index);
     }
     IMXRT_ADC1.CFG |= ADC_CFG_ADTRG;
@@ -312,7 +322,8 @@ class TeensyPlatform final : public Platform {
         result.error_flags |=
             triggerError(protocol_v1::AdcTriggerError::kPerclkMismatch);
       }
-      if (F_BUS_ACTUAL != protocol_v1::kAdcTriggerIpgClockHz) {
+      if (!identity::runtimeClocksMatchProfile(F_CPU_ACTUAL,
+                                               F_BUS_ACTUAL)) {
         result.error_flags |=
             triggerError(protocol_v1::AdcTriggerError::kIpgClockMismatch);
       }
@@ -366,7 +377,7 @@ class TeensyPlatform final : public Platform {
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_counter_begin")
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    if (F_CPU_ACTUAL != protocol_v1::kAdcTriggerDwtClockHz) {
+    if (F_CPU_ACTUAL != identity::kExpectedDwtHz) {
       frequency_hz = 0U;
       return false;
     }
@@ -386,7 +397,8 @@ class TeensyPlatform final : public Platform {
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_arm")
   bool armFromStopped(bool completion_diagnostic) override {
-    if (!queuesValid() || !xbarValid() || !convertersHardwareTriggered() ||
+    if (!clocksValid() || !queuesValid() || !xbarValid() ||
+        !convertersHardwareTriggered() ||
         (IMXRT_ADC1.GS & ADC_GS_ADACT) != 0U ||
         (IMXRT_ADC2.GS & ADC_GS_ADACT) != 0U) {
       return false;

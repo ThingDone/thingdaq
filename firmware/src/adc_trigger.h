@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "firmware_identity.h"
 #include "generated/protocol_constants.h"
 #include "protocol.h"
 
@@ -13,8 +14,8 @@ inline constexpr std::size_t kConverterCount = 2U;
 inline constexpr std::uint16_t kRequiredConfigurationFlags =
     protocol_v1::kKnownAdcTriggerConfigurationFlagMask;
 inline constexpr std::uint32_t kDiagnosticDeadlineCycles =
-    (protocol_v1::kAdcTriggerDwtClockHz / 1000000U) *
-    protocol_v1::kAdcTriggerDiagnosticDeadlineUs;
+    identity::dwtCyclesForMicroseconds(
+        protocol_v1::kAdcTriggerDiagnosticDeadlineUs);
 
 constexpr std::uint16_t configurationFlag(
     protocol_v1::AdcTriggerConfigurationFlag flag) {
@@ -51,11 +52,11 @@ struct Snapshot {
   std::uint16_t configuration_flags = 0U;
   std::uint32_t error_flags = 0U;
   std::uint32_t pit_clock_hz = protocol_v1::kAdcTriggerPitClockHz;
-  std::uint32_t dwt_clock_hz = protocol_v1::kAdcTriggerDwtClockHz;
+  std::uint32_t dwt_clock_hz = identity::kExpectedDwtHz;
   std::uint32_t gpio_master_rate_hz =
       protocol_v1::kAdcTriggerGpioMasterRateHz;
   std::uint32_t pair_rate_hz = protocol_v1::kAdcTriggerPairRateHz;
-  std::uint32_t ipg_clock_hz = protocol_v1::kAdcTriggerIpgClockHz;
+  std::uint32_t ipg_clock_hz = identity::kExpectedIpgHz;
   std::uint8_t gpio_master_pit_channel =
       protocol_v1::kAdcTriggerGpioMasterPitChannel;
   std::uint8_t pair_pit_channel =
@@ -75,19 +76,19 @@ struct Snapshot {
       protocol_v1::kAdcTriggerQueues[0],
       protocol_v1::kAdcTriggerQueues[1]};
   std::array<std::uint16_t, kConverterCount> initial_delays{
-      protocol_v1::kAdcTriggerInitialDelays[0],
-      protocol_v1::kAdcTriggerInitialDelays[1]};
+      identity::kAdcTriggerInitialDelays[0],
+      identity::kAdcTriggerInitialDelays[1]};
   std::array<std::uint16_t, kConverterCount> effective_delays{
-      protocol_v1::kAdcTriggerEffectiveDelays[0],
-      protocol_v1::kAdcTriggerEffectiveDelays[1]};
-  std::uint16_t phase_ipg_cycles = protocol_v1::kAdcTriggerPhaseIpgCycles;
+      identity::kAdcTriggerEffectiveDelays[0],
+      identity::kAdcTriggerEffectiveDelays[1]};
+  std::uint16_t phase_ipg_cycles = identity::kAdcNominalPhaseIpgCycles;
   HardwareEvidence evidence{};
   std::array<std::uint32_t, kConverterCount> completion_counts{};
   std::uint32_t completion_delta_cycles = 0U;
   std::uint32_t completion_expected_delta_cycles =
-      protocol_v1::kAdcCompletionExpectedDwtCycles;
+      identity::kAdcCompletionExpectedDwtCycles;
   std::uint32_t completion_tolerance_cycles =
-      protocol_v1::kAdcCompletionToleranceDwtCycles;
+      identity::kAdcCompletionToleranceDwtCycles;
   std::uint32_t diagnostic_elapsed_cycles = 0U;
   std::uint32_t trigger_error_count = 0U;
 
@@ -147,20 +148,21 @@ static_assert(protocol_v1::kAdcTriggerGpioMasterRateHz /
                           protocol_v1::kAdcTriggerPairRateHz -
                       1U ==
                   protocol_v1::kAdcTriggerPairPitLoad);
-static_assert(protocol_v1::kAdcTriggerEffectiveDelays[1] -
-                      protocol_v1::kAdcTriggerEffectiveDelays[0] ==
-                  75U);
-static_assert(protocol_v1::kAdcTriggerPhaseIpgCycles *
+static_assert(identity::kAdcTriggerEffectiveDelays[1] -
+                      identity::kAdcTriggerEffectiveDelays[0] ==
+                  identity::kAdcNominalPhaseIpgCycles);
+static_assert(identity::kAdcNominalPhaseIpgCycles *
                       protocol_v1::kTimestampHz /
-                      protocol_v1::kAdcTriggerIpgClockHz ==
+                      identity::kExpectedIpgHz ==
                   protocol_v1::kAdc1PhaseTicks);
 static_assert(static_cast<std::uint64_t>(
-                  protocol_v1::kAdcTriggerPhaseIpgCycles) *
-                      protocol_v1::kAdcTriggerDwtClockHz /
-                      protocol_v1::kAdcTriggerIpgClockHz ==
-                  protocol_v1::kAdcCompletionExpectedDwtCycles);
+                  identity::kAdcNominalPhaseIpgCycles) *
+                      identity::kExpectedDwtHz /
+                      identity::kExpectedIpgHz ==
+                  identity::kAdcCompletionExpectedDwtCycles);
 static_assert(protocol_v1::kAdcTriggerQueues[0] !=
               protocol_v1::kAdcTriggerQueues[1]);
-static_assert(kDiagnosticDeadlineCycles == 1200000U);
+static_assert(kDiagnosticDeadlineCycles ==
+              identity::kExpectedDwtHz / 500U);
 
 }  // namespace thingdaq::adc_trigger

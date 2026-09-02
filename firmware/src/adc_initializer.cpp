@@ -124,7 +124,7 @@ const Snapshot &Initializer::initialize() {
 
   std::uint32_t counter_hz = 0U;
   if (!platform_.beginCycleCounter(counter_hz) ||
-      counter_hz != protocol_v1::kAdcCalibrationCycleCounterHz) {
+      counter_hz != identity::kExpectedDwtHz) {
     addError(snapshot_, protocol_v1::AdcInitializationError::kDwtUnavailable);
     for (std::size_t index = 0U; index < kConverterCount; ++index) {
       if (prepared[index]) {

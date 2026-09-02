@@ -11,6 +11,7 @@ namespace {
 
 namespace adc = thingdaq::adc;
 namespace board = thingdaq::board;
+namespace identity = thingdaq::identity;
 namespace wire = thingdaq::protocol;
 namespace v1 = thingdaq::protocol_v1;
 
@@ -46,7 +47,7 @@ class FakePlatform final : public adc::Platform {
   std::array<adc::Settings, 2U> observed_settings{};
   bool cycle_counter_available = true;
   std::uint32_t reported_counter_hz =
-      v1::kAdcCalibrationCycleCounterHz;
+      identity::kExpectedDwtHz;
   std::uint32_t cycles = 0U;
   std::uint32_t cycle_step = 100U;
 
@@ -120,9 +121,17 @@ void testPrimaryInitializationAndRoutes() {
              snapshot.settings.code_max == 4095U,
          "primary acquisition is explicit 12-bit data in uint16 containers");
   expect(snapshot.settings.hardware_average_count == 0U &&
-             snapshot.settings.adc_clock_hz == 37500000U &&
-             snapshot.settings.sample_time_adck == 3U,
-         "initializer uses no averaging and the exact high-speed short sample");
+             snapshot.settings.ipg_clock_hz == identity::kExpectedIpgHz &&
+             snapshot.settings.adc_clock_hz ==
+                 identity::kExpectedAdcClockHz &&
+             snapshot.settings.sample_time_adck == 3U &&
+             snapshot.settings.primary_12bit_conversion_time_picoseconds ==
+                 identity::kAdcPrimaryConversionTimePicoseconds &&
+             snapshot.settings.primary_12bit_conversion_margin_picoseconds ==
+                 identity::kAdcPrimaryConversionMarginPicoseconds &&
+             snapshot.settings.conversion_deadline_dwt_cycles ==
+                 identity::kExpectedDwtHz / 1000000U,
+         "initializer exposes the selected ADC clock and 12-bit timing margin");
   expect(platform.prepare_calls == std::array<std::uint32_t, 2U>{1U, 1U} &&
              platform.start_calls == std::array<std::uint32_t, 2U>{1U, 1U},
          "both converters are prepared and started independently");
@@ -207,7 +216,7 @@ void testRouteConfigurationAndClockFailures() {
          "unavailable deadline clock fails closed without starting either ADC");
 
   FakePlatform wrong_frequency{};
-  wrong_frequency.reported_counter_hz = 599999999U;
+  wrong_frequency.reported_counter_hz = identity::kExpectedDwtHz - 1U;
   adc::Initializer wrong_frequency_initializer{wrong_frequency};
   const adc::Snapshot &wrong_frequency_snapshot =
       wrong_frequency_initializer.initialize();
@@ -223,7 +232,7 @@ void testRouteConfigurationAndClockFailures() {
 void testIndependentTimeoutAndCycleWrap() {
   FakePlatform platform{};
   platform.active_polls = {100U, 0U};
-  platform.cycle_step = 3000000U;
+  platform.cycle_step = adc::kCalibrationDeadlineCycles / 2U + 1U;
   adc::Initializer initializer{platform};
   const adc::Snapshot &snapshot = initializer.initialize();
   expect(snapshot.converters[0].calibration_state ==

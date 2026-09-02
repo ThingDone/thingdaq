@@ -22,49 +22,57 @@ class ChecksumBenchmarkTests(unittest.TestCase):
             self.skipTest("g++ is required for portable firmware tests")
 
         with tempfile.TemporaryDirectory(prefix="thingdaq-benchmark-") as directory:
-            executable = Path(directory) / "checksum-benchmark-test"
-            compile_result = subprocess.run(
-                [
-                    compiler,
-                    "-std=c++17",
-                    "-O3",
-                    "-flto",
-                    "-Wall",
-                    "-Wextra",
-                    "-Werror",
-                    "-Wconversion",
-                    "-Wsign-conversion",
-                    "-pedantic",
-                    "-fno-exceptions",
-                    "-fno-rtti",
-                    f"-I{FIRMWARE_SOURCE}",
-                    str(CPP_TEST),
-                    str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
-                    str(FIRMWARE_SOURCE / "protocol.cpp"),
-                    str(FIRMWARE_SOURCE / "checksum.cpp"),
-                    "-o",
-                    str(executable),
-                ],
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertEqual(
-                0,
-                compile_result.returncode,
-                compile_result.stdout + compile_result.stderr,
-            )
-            run_result = subprocess.run(
-                [str(executable)],
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertEqual(
-                0,
-                run_result.returncode,
-                run_result.stdout + run_result.stderr,
-            )
+            for profile, cpu_hz, bus_hz in (
+                (600, 600_000_000, 150_000_000),
+                (528, 528_000_000, 132_000_000),
+            ):
+                with self.subTest(profile=profile):
+                    executable = Path(directory) / f"checksum-benchmark-{profile}"
+                    compile_result = subprocess.run(
+                        [
+                            compiler,
+                            "-std=c++17",
+                            "-O3",
+                            "-flto",
+                            "-Wall",
+                            "-Wextra",
+                            "-Werror",
+                            "-Wconversion",
+                            "-Wsign-conversion",
+                            "-pedantic",
+                            "-fno-exceptions",
+                            "-fno-rtti",
+                            f"-DTHINGDAQ_CPU_PROFILE_MHZ={profile}",
+                            f"-DTHINGDAQ_EXPECTED_CPU_HZ={cpu_hz}",
+                            f"-DTHINGDAQ_EXPECTED_BUS_HZ={bus_hz}",
+                            f"-I{FIRMWARE_SOURCE}",
+                            str(CPP_TEST),
+                            str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
+                            str(FIRMWARE_SOURCE / "protocol.cpp"),
+                            str(FIRMWARE_SOURCE / "checksum.cpp"),
+                            "-o",
+                            str(executable),
+                        ],
+                        capture_output=True,
+                        check=False,
+                        text=True,
+                    )
+                    self.assertEqual(
+                        0,
+                        compile_result.returncode,
+                        compile_result.stdout + compile_result.stderr,
+                    )
+                    run_result = subprocess.run(
+                        [str(executable)],
+                        capture_output=True,
+                        check=False,
+                        text=True,
+                    )
+                    self.assertEqual(
+                        0,
+                        run_result.returncode,
+                        run_result.stdout + run_result.stderr,
+                    )
 
     def test_compiler_optimization_guards_are_explicit(self) -> None:
         benchmark_source = BENCHMARK_SOURCE.read_text(encoding="utf-8")

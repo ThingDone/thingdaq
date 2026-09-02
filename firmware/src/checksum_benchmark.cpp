@@ -200,7 +200,7 @@ RunResult Runner::run(const protocol::ChecksumBenchmarkRequest &request) {
 
   std::uint32_t counter_hz = 0U;
   if (!platform_.beginCycleCounter(counter_hz) ||
-      counter_hz != protocol_v1::kChecksumBenchmarkCycleCounterHz) {
+      counter_hz != identity::kExpectedDwtHz) {
     result.status = RunStatus::kCounterUnavailable;
     return result;
   }

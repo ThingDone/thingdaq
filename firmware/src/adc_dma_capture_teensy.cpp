@@ -11,6 +11,7 @@
 #include <imxrt.h>
 
 #include "board_config.h"
+#include "firmware_identity.h"
 #include "gpio_dma_route_teensy.h"
 
 #define THINGDAQ_ADC_DMA_TARGET_COLD_CODE(section_name) \
@@ -51,9 +52,9 @@ constexpr std::uint16_t kTcdAttributes =
 constexpr std::uint16_t kTcdControl =
     DMA_TCD_CSR_ESG | DMA_TCD_CSR_INTMAJOR;
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
-    protocol_v1::kAdcTriggerDwtClockHz / 100U;
+    identity::dwtCyclesForMicroseconds(10000U);
 constexpr std::uint32_t kDmaAlignmentWaitCycles =
-    protocol_v1::kAdcTriggerDwtClockHz / 100000U;
+    identity::dwtCyclesForMicroseconds(10U);
 constexpr std::size_t kDmaPipelineDepth = board::kAdcDmaPipelineDepth;
 constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
 constexpr std::size_t kPairDispatchConverter = 1U;
@@ -673,6 +674,9 @@ StartStatus inspectHardwareStart(std::uint32_t epoch) {
   if (g_hardware_prepared) {
     return StartStatus::kAlreadyRunning;
   }
+  if (!identity::runtimeClocksMatchProfile(F_CPU_ACTUAL, F_BUS_ACTUAL)) {
+    return StartStatus::kHardwareError;
+  }
   if (!triggersStopped() || resourcesBusy()) {
     return StartStatus::kResourceBusy;
   }
@@ -928,7 +932,8 @@ static_assert(sizeof(g_adc_dma_overflow_sink) ==
               board::kAdcDmaOverflowSinkBytes);
 static_assert(protocol_v1::kAdcPairsPerFrame <=
               std::numeric_limits<std::int16_t>::max());
-static_assert(kStopBoundaryTimeoutCycles == 6000000U);
+static_assert(kStopBoundaryTimeoutCycles ==
+              identity::kExpectedDwtHz / 100U);
 static_assert(kStopBoundaryPollLimit == 2000000U);
 static_assert(kStopBoundaryArmMinimumPairs == 759U);
 static_assert(board::kAdcConverterConfigurations[0].edma_channel == 0U);
@@ -941,7 +946,8 @@ static_assert(board::kAdcEdmaPriorities[0] == 2U);
 static_assert(board::kAdcEdmaPriorities[1] == 1U);
 static_assert(kPairDispatchConverter == 1U);
 static_assert(kDmaPipelineDepth == 6U);
-static_assert(kDmaAlignmentWaitCycles == 6000U);
+static_assert(kDmaAlignmentWaitCycles ==
+              identity::kExpectedDwtHz / 100000U);
 
 }  // namespace thingdaq::adc_capture
 

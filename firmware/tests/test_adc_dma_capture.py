@@ -117,7 +117,7 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "void adcPairDmaIsr()",
             "DMA_INT & channelMask(kPairDispatchConverter)",
             "kDmaAlignmentWaitCycles",
-            "protocol_v1::kAdcTriggerDwtClockHz / 100000U",
+            "identity::kExpectedDwtHz / 100000U",
             "ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles",
             "constexpr std::size_t kPairDispatchConverter = 1U",
             "static_assert(kDmaPipelineDepth == 6U)",

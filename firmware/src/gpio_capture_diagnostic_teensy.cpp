@@ -20,7 +20,7 @@ namespace thingdaq::gpio_diagnostic {
 namespace {
 
 constexpr std::uint32_t kDiagnosticTimeoutCycles =
-    protocol_v1::kGpioClockDwtHz / 100U;
+    identity::dwtCyclesForMicroseconds(10000U);
 
 void forceSafeInputs() {
   gpio_capture::selectStandardGpioInputs(IOMUXC_GPR_GPR27, GPIO2_GDIR);
@@ -141,7 +141,7 @@ class TeensyPlatform final : public Platform {
     __asm__ volatile("nop\n\tnop\n\tnop\n\tnop" : : : "memory");
     snapshot.dwt_counter_hz = F_CPU_ACTUAL;
     if (ARM_DWT_CYCCNT == dwt_probe ||
-        F_CPU_ACTUAL != protocol_v1::kGpioClockDwtHz) {
+        F_CPU_ACTUAL != identity::kExpectedDwtHz) {
       addError(snapshot, Error::kDwtUnavailable);
       forceSafeInputs();
       recordConfigured(capture.snapshot(), snapshot);
@@ -216,7 +216,8 @@ static_assert(F_CPU == identity::kExpectedCpuHz,
               "GPIO capture diagnostic requires the selected CPU profile");
 static_assert(board::kGpioEdmaChannel == 2U);
 static_assert(board::kGpioPitChannel == 0U);
-static_assert(kDiagnosticTimeoutCycles == 6000000U);
+static_assert(kDiagnosticTimeoutCycles ==
+              identity::kExpectedDwtHz / 100U);
 
 }  // namespace thingdaq::gpio_diagnostic
 

@@ -8,6 +8,7 @@ namespace {
 
 namespace clock_diagnostic = thingdaq::gpio_clock;
 namespace constants = thingdaq::protocol_v1;
+namespace identity = thingdaq::identity;
 namespace wire = thingdaq::protocol;
 
 int failures = 0;
@@ -50,7 +51,7 @@ class FakePlatform final : public clock_diagnostic::Platform {
     if (!dwt_available) {
       return true;
     }
-    snapshot.dwt_counter_hz = constants::kGpioClockDwtHz;
+    snapshot.dwt_counter_hz = identity::kExpectedDwtHz;
     snapshot.dwt_elapsed_cycles = static_cast<std::uint32_t>(
         static_cast<std::int32_t>(plan.measurement_cycles) +
         elapsed_event_adjustment *
@@ -76,8 +77,11 @@ void testExactPlansAndBounds() {
   expect(production_plan.rate_hz == 4000000U &&
              production_plan.pit_divisor == 6U &&
              production_plan.pit_load_value == 5U &&
-             production_plan.cycles_per_event == 150U &&
-             production_plan.measurement_cycles == 1228800U &&
+             production_plan.cycles_per_event ==
+                 identity::kExpectedDwtHz / 4000000U &&
+             production_plan.measurement_cycles ==
+                 production.event_count *
+                     (identity::kExpectedDwtHz / 4000000U) &&
              production_plan.tcd_major_count == 16400U,
          "4 MHz plan uses exact PIT/DWT arithmetic and a duplicate guard");
 
@@ -88,8 +92,10 @@ void testExactPlansAndBounds() {
       clock_diagnostic::makePlan(low_rate);
   expect(wire::validGpioClockDiagnosticRequest(low_rate) &&
              low_plan.pit_load_value == 23999U &&
-             low_plan.cycles_per_event == 600000U &&
-             low_plan.measurement_cycles == 19200000U,
+             low_plan.cycles_per_event ==
+                 identity::kExpectedDwtHz / 1000U &&
+             low_plan.measurement_cycles ==
+                 32U * (identity::kExpectedDwtHz / 1000U),
          "bounded 1 kHz bring-up plan remains exact");
 
   low_rate.rate_hz = 3999999U;

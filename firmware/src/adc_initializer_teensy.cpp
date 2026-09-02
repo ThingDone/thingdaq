@@ -115,8 +115,9 @@ bool pinPrepared(const board::AdcConverterConfiguration &route) {
 
 std::uint32_t configurationFor(const Settings &settings) {
   // ADICLK=1 selects IPG/2 and ADIV=1 divides by another two: the resulting
-  // 37.5 MHz ADCK completes a 12-bit, three-ADCK sample conversion in
-  // (25 + 3 + 4.5) / 37.5 MHz = 866.667 ns, inside the 1 us pair period.
+  // profile ADCK retains the reviewed 32 ADCK + 2 IPG first-conversion
+  // budget. The selected-profile contract publishes its conservative 12-bit
+  // time and remaining margin before the next 1 us trigger.
   return ADC_CFG_OVWREN | ADC_CFG_ADHSC | ADC_CFG_ADIV(1U) |
          ADC_CFG_ADICLK(1U) | ADC_CFG_MODE(settings.conversion_mode);
 }
@@ -130,9 +131,11 @@ class TeensyPlatform final : public Platform {
     if (!routeMatchesContract(route)) {
       return PrepareStatus::kRouteInvalid;
     }
-    if (F_BUS_ACTUAL != settings.ipg_clock_hz ||
-        settings.adc_clock_hz * settings.clock_divider !=
-            settings.ipg_clock_hz) {
+    if (F_BUS_ACTUAL != identity::kExpectedIpgHz ||
+        settings.ipg_clock_hz != identity::kExpectedIpgHz ||
+        settings.clock_divider != identity::kExpectedAdcClockDivider ||
+        settings.adc_clock_hz != identity::kExpectedAdcClockHz ||
+        settings.adc_clock_hz * settings.clock_divider != F_BUS_ACTUAL) {
       return PrepareStatus::kConfigurationInvalid;
     }
     IMXRT_ADCS_t *const module = moduleFor(route);
@@ -158,7 +161,7 @@ class TeensyPlatform final : public Platform {
 
   THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_counter_begin")
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    if (F_CPU_ACTUAL != protocol_v1::kAdcCalibrationCycleCounterHz) {
+    if (F_CPU_ACTUAL != identity::kExpectedDwtHz) {
       frequency_hz = 0U;
       return false;
     }
@@ -215,9 +218,12 @@ class TeensyPlatform final : public Platform {
                        const Settings &settings) override {
     const IMXRT_ADCS_t *const module = moduleFor(route);
     return module != nullptr && routeMatchesContract(route) &&
-           F_BUS_ACTUAL == settings.ipg_clock_hz &&
+           F_BUS_ACTUAL == identity::kExpectedIpgHz &&
+           settings.ipg_clock_hz == identity::kExpectedIpgHz &&
+           settings.clock_divider == identity::kExpectedAdcClockDivider &&
+           settings.adc_clock_hz == identity::kExpectedAdcClockHz &&
            settings.adc_clock_hz * settings.clock_divider ==
-               settings.ipg_clock_hz &&
+               F_BUS_ACTUAL &&
            (CCM_CCGR1 & kAdcClockGateMask) == kAdcClockGateMask &&
            pinPrepared(route) && module->CFG == configurationFor(settings) &&
            module->GC == 0U && (module->GS & ADC_GS_CALF) == 0U &&
@@ -251,8 +257,10 @@ static_assert(board::kAdc0Peripheral == 1U);
 static_assert(board::kAdc1Peripheral == 2U);
 static_assert(board::kAdc0InputChannel == 7U);
 static_assert(board::kAdc1InputChannel == 8U);
-static_assert(protocol_v1::kAdcClockHz * protocol_v1::kAdcClockDivider ==
-              protocol_v1::kAdcIpgClockHz);
+static_assert(identity::kExpectedAdcClockDivider == 4U);
+static_assert(identity::kExpectedAdcClockHz *
+                      identity::kExpectedAdcClockDivider ==
+                  identity::kExpectedIpgHz);
 
 }  // namespace thingdaq::adc
 

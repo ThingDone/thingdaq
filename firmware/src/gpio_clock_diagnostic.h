@@ -21,8 +21,9 @@ struct Plan {
 };
 
 // All integer arithmetic is exact because accepted rates divide both the
-// 24 MHz PIT clock and the 600 MHz DWT clock. The request validator also
-// proves every intermediate and the 15-bit eDMA ELINKNO count are bounded.
+// fixed 24 MHz PIT clock and the selected, runtime-verified DWT clock. The
+// request validator also proves every intermediate and the 15-bit eDMA
+// ELINKNO count are bounded.
 Plan makePlan(const protocol::GpioClockDiagnosticRequest &request);
 
 class Platform {

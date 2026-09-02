@@ -18,7 +18,7 @@ namespace {
 class TeensyPlatform final : public Platform {
  public:
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    if (F_CPU_ACTUAL != protocol_v1::kChecksumBenchmarkCycleCounterHz) {
+    if (F_CPU_ACTUAL != identity::kExpectedDwtHz) {
       frequency_hz = 0U;
       return false;
     }

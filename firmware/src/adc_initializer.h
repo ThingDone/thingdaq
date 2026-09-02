@@ -5,14 +5,17 @@
 #include <cstdint>
 
 #include "board_config.h"
+#include "firmware_identity.h"
 #include "generated/protocol_constants.h"
 
 namespace thingdaq::adc {
 
 inline constexpr std::size_t kConverterCount = board::kLogicalAdcCount;
 inline constexpr std::uint32_t kCalibrationDeadlineCycles =
-    (protocol_v1::kAdcCalibrationCycleCounterHz / 1000000U) *
-    protocol_v1::kAdcCalibrationDeadlineUs;
+    identity::dwtCyclesForMicroseconds(
+        protocol_v1::kAdcCalibrationDeadlineUs);
+inline constexpr std::uint32_t kConversionDeadlineDwtCycles =
+    identity::dwtCyclesForMicroseconds(1U);
 
 constexpr std::uint16_t configurationFlag(
     protocol_v1::AdcConfigurationFlag flag) {
@@ -81,10 +84,16 @@ struct Settings {
   std::uint8_t sample_time_adck = protocol_v1::kAdcSampleTimeAdck;
   std::uint8_t conversion_mode = conversionMode(
       protocol_v1::kAdcPrimaryResolutionBits);
-  std::uint32_t ipg_clock_hz = protocol_v1::kAdcIpgClockHz;
-  std::uint32_t adc_clock_hz = protocol_v1::kAdcClockHz;
+  std::uint32_t ipg_clock_hz = identity::kExpectedIpgHz;
+  std::uint32_t adc_clock_hz = identity::kExpectedAdcClockHz;
   std::uint32_t calibration_deadline_us =
       protocol_v1::kAdcCalibrationDeadlineUs;
+  std::uint32_t primary_12bit_conversion_time_picoseconds =
+      identity::kAdcPrimaryConversionTimePicoseconds;
+  std::uint32_t primary_12bit_conversion_margin_picoseconds =
+      identity::kAdcPrimaryConversionMarginPicoseconds;
+  std::uint32_t conversion_deadline_dwt_cycles =
+      kConversionDeadlineDwtCycles;
 };
 
 constexpr Settings settingsFor(const ResolutionGate &gate) {
@@ -188,7 +197,13 @@ class Initializer {
 };
 
 static_assert(kConverterCount == 2U);
-static_assert(kCalibrationDeadlineCycles == 6000000U);
+static_assert(kCalibrationDeadlineCycles ==
+              identity::kExpectedDwtHz / 100U);
+static_assert(kConversionDeadlineDwtCycles ==
+              identity::kExpectedDwtHz / 1000000U);
+static_assert(identity::kAdcPrimaryConversionTimePicoseconds +
+                      identity::kAdcPrimaryConversionMarginPicoseconds ==
+                  identity::kAdcPairPeriodPicoseconds);
 static_assert(selectResolution({}) == protocol_v1::kAdcPrimaryResolutionBits);
 static_assert(codeMaximum(protocol_v1::kAdcPrimaryResolutionBits) == 4095U);
 static_assert(codeMaximum(protocol_v1::kAdcFallbackResolutionBits) == 1023U);

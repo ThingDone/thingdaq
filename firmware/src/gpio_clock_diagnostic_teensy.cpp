@@ -78,7 +78,7 @@ class TeensyPlatform final : public Platform {
     const std::uint32_t counter_begin = ARM_DWT_CYCCNT;
     __asm__ volatile("nop\n\tnop\n\tnop\n\tnop" : : : "memory");
     if (ARM_DWT_CYCCNT == counter_begin ||
-        F_CPU_ACTUAL != protocol_v1::kGpioClockDwtHz) {
+        F_CPU_ACTUAL != identity::kExpectedDwtHz) {
       addError(snapshot, protocol_v1::GpioClockError::kDwtUnavailable);
       captureUnarmed(snapshot, *dmamux, tcd);
       return true;

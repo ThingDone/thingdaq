@@ -8,6 +8,13 @@
 #define A0 14U
 #define A1 15U
 
+#ifndef THINGDAQ_EXPECTED_CPU_HZ
+#define THINGDAQ_EXPECTED_CPU_HZ 600000000U
+#endif
+#ifndef THINGDAQ_EXPECTED_BUS_HZ
+#define THINGDAQ_EXPECTED_BUS_HZ 150000000U
+#endif
+
 #define CORE_PIN6_BIT 10U
 #define CORE_PIN7_BIT 17U
 #define CORE_PIN8_BIT 16U
@@ -36,8 +43,8 @@ inline volatile std::uint32_t pin14_config = 0U;
 inline volatile std::uint32_t pin15_config = 0U;
 inline volatile std::uint32_t pin14_padconfig = 0U;
 inline volatile std::uint32_t pin15_padconfig = 0U;
-inline volatile std::uint32_t f_bus_actual = 150000000U;
-inline volatile std::uint32_t f_cpu_actual = 600000000U;
+inline volatile std::uint32_t f_bus_actual = THINGDAQ_EXPECTED_BUS_HZ;
+inline volatile std::uint32_t f_cpu_actual = THINGDAQ_EXPECTED_CPU_HZ;
 inline bool interrupts_enabled = true;
 
 }  // namespace fake_imxrt
@@ -53,7 +60,7 @@ inline bool interrupts_enabled = true;
 #define CORE_PIN15_PADCONFIG fake_imxrt::pin15_padconfig
 #define F_BUS_ACTUAL fake_imxrt::f_bus_actual
 #define F_CPU_ACTUAL fake_imxrt::f_cpu_actual
-#define F_CPU 600000000U
+#define F_CPU THINGDAQ_EXPECTED_CPU_HZ
 
 inline void __disable_irq() { fake_imxrt::interrupts_enabled = false; }
 inline void __enable_irq() { fake_imxrt::interrupts_enabled = true; }

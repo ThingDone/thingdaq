@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "firmware_identity.h"
 #include "generated/protocol_constants.h"
 
 namespace thingdaq::protocol {
@@ -258,11 +259,11 @@ struct AdcTriggerMetadata {
   std::uint16_t configuration_flags = 0U;
   std::uint32_t error_flags = 0U;
   std::uint32_t pit_clock_hz = protocol_v1::kAdcTriggerPitClockHz;
-  std::uint32_t dwt_clock_hz = protocol_v1::kAdcTriggerDwtClockHz;
+  std::uint32_t dwt_clock_hz = identity::kExpectedDwtHz;
   std::uint32_t gpio_master_rate_hz =
       protocol_v1::kAdcTriggerGpioMasterRateHz;
   std::uint32_t pair_rate_hz = protocol_v1::kAdcTriggerPairRateHz;
-  std::uint32_t ipg_clock_hz = protocol_v1::kAdcTriggerIpgClockHz;
+  std::uint32_t ipg_clock_hz = identity::kExpectedIpgHz;
   std::uint8_t gpio_master_pit_channel =
       protocol_v1::kAdcTriggerGpioMasterPitChannel;
   std::uint8_t pair_pit_channel =
@@ -282,19 +283,19 @@ struct AdcTriggerMetadata {
       protocol_v1::kAdcTriggerQueues[0],
       protocol_v1::kAdcTriggerQueues[1]};
   std::array<std::uint16_t, 2U> initial_delays{
-      protocol_v1::kAdcTriggerInitialDelays[0],
-      protocol_v1::kAdcTriggerInitialDelays[1]};
+      identity::kAdcTriggerInitialDelays[0],
+      identity::kAdcTriggerInitialDelays[1]};
   std::array<std::uint16_t, 2U> effective_delays{
-      protocol_v1::kAdcTriggerEffectiveDelays[0],
-      protocol_v1::kAdcTriggerEffectiveDelays[1]};
-  std::uint16_t phase_ipg_cycles = protocol_v1::kAdcTriggerPhaseIpgCycles;
+      identity::kAdcTriggerEffectiveDelays[0],
+      identity::kAdcTriggerEffectiveDelays[1]};
+  std::uint16_t phase_ipg_cycles = identity::kAdcNominalPhaseIpgCycles;
   AdcTriggerHardwareEvidence evidence{};
   std::array<std::uint32_t, 2U> completion_counts{};
   std::uint32_t completion_delta_cycles = 0U;
   std::uint32_t completion_expected_delta_cycles =
-      protocol_v1::kAdcCompletionExpectedDwtCycles;
+      identity::kAdcCompletionExpectedDwtCycles;
   std::uint32_t completion_tolerance_cycles =
-      protocol_v1::kAdcCompletionToleranceDwtCycles;
+      identity::kAdcCompletionToleranceDwtCycles;
   std::uint32_t diagnostic_elapsed_cycles = 0U;
   std::uint32_t trigger_error_count = 0U;
 };
@@ -342,8 +343,8 @@ struct AdcInitializationMetadata {
       protocol_v1::kAdcPeripherals[0], protocol_v1::kAdcPeripherals[1]};
   std::array<std::uint8_t, 2U> channels{protocol_v1::kAdcChannels[0],
                                         protocol_v1::kAdcChannels[1]};
-  std::uint32_t ipg_clock_hz = protocol_v1::kAdcIpgClockHz;
-  std::uint32_t adc_clock_hz = protocol_v1::kAdcClockHz;
+  std::uint32_t ipg_clock_hz = identity::kExpectedIpgHz;
+  std::uint32_t adc_clock_hz = identity::kExpectedAdcClockHz;
   std::uint32_t calibration_deadline_us =
       protocol_v1::kAdcCalibrationDeadlineUs;
   std::array<std::uint32_t, 2U> calibration_cycles{};

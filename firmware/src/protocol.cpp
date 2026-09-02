@@ -668,8 +668,8 @@ Result validateAdcMetadata(ByteView payload,
       offsets.calibration_deadline_us,
   };
   const std::uint32_t clock_expected[] = {
-      protocol_v1::kAdcIpgClockHz,
-      protocol_v1::kAdcClockHz,
+      identity::kExpectedIpgHz,
+      identity::kExpectedAdcClockHz,
       protocol_v1::kAdcCalibrationDeadlineUs,
   };
   for (std::size_t index = 0U;
@@ -776,12 +776,12 @@ Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
       kIpgClockHz, kCompletionExpected, kCompletionTolerance};
   const std::uint32_t fixed32_expected[] = {
       protocol_v1::kAdcTriggerPitClockHz,
-      protocol_v1::kAdcTriggerDwtClockHz,
+      identity::kExpectedDwtHz,
       protocol_v1::kAdcTriggerGpioMasterRateHz,
       protocol_v1::kAdcTriggerPairRateHz,
-      protocol_v1::kAdcTriggerIpgClockHz,
-      protocol_v1::kAdcCompletionExpectedDwtCycles,
-      protocol_v1::kAdcCompletionToleranceDwtCycles};
+      identity::kExpectedIpgHz,
+      identity::kAdcCompletionExpectedDwtCycles,
+      identity::kAdcCompletionToleranceDwtCycles};
   std::uint32_t value32 = 0U;
   for (std::size_t index = 0U;
        index < sizeof(fixed32_offsets) / sizeof(fixed32_offsets[0]); ++index) {
@@ -816,11 +816,11 @@ Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
       kInitialDelays, kInitialDelays + 2U, kEffectiveDelays,
       kEffectiveDelays + 2U, kPhaseIpgCycles};
   const std::uint16_t fixed16_expected[] = {
-      protocol_v1::kAdcTriggerInitialDelays[0],
-      protocol_v1::kAdcTriggerInitialDelays[1],
-      protocol_v1::kAdcTriggerEffectiveDelays[0],
-      protocol_v1::kAdcTriggerEffectiveDelays[1],
-      protocol_v1::kAdcTriggerPhaseIpgCycles};
+      identity::kAdcTriggerInitialDelays[0],
+      identity::kAdcTriggerInitialDelays[1],
+      identity::kAdcTriggerEffectiveDelays[0],
+      identity::kAdcTriggerEffectiveDelays[1],
+      identity::kAdcNominalPhaseIpgCycles};
   for (std::size_t index = 0U;
        index < sizeof(fixed16_offsets) / sizeof(fixed16_offsets[0]); ++index) {
     if (!loadU16(payload, base + fixed16_offsets[index], value16) ||
@@ -853,8 +853,8 @@ Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
       (errors != 0U || completion0 == 0U || completion1 == 0U ||
        (flags & arm_exercised) == 0U || (flags & stopped) == 0U ||
        absoluteDifference(completion_delta,
-                          protocol_v1::kAdcCompletionExpectedDwtCycles) >
-           protocol_v1::kAdcCompletionToleranceDwtCycles)) {
+                          identity::kAdcCompletionExpectedDwtCycles) >
+           identity::kAdcCompletionToleranceDwtCycles)) {
     return badPayload();
   }
   return Result::success();
@@ -1593,7 +1593,7 @@ Result validateChecksumBenchmarkResponse(ByteView payload) {
   if (!isKnownChecksum(decoded.request.checksum_algorithm) ||
       !isSupportedChecksum(decoded.request.checksum_algorithm) ||
       decoded.cycle_counter_hz !=
-          protocol_v1::kChecksumBenchmarkCycleCounterHz ||
+          identity::kExpectedDwtHz ||
       decoded.target_framed_bytes_per_second !=
           protocol_v1::kChecksumBenchmarkTargetFramedBytesPerSecond ||
       decoded.implementation_code_bytes == 0U ||
@@ -1693,8 +1693,8 @@ Result validateGpioClockDiagnosticResponse(ByteView payload) {
   const bool configuration_was_armed =
       (error_flags & unarmed_error_mask) == 0U;
   const std::uint32_t expected_scheduled =
-      dwt_hz == protocol_v1::kGpioClockDwtHz && request.rate_hz != 0U
-          ? elapsed_cycles / (protocol_v1::kGpioClockDwtHz / request.rate_hz)
+      dwt_hz == identity::kExpectedDwtHz && request.rate_hz != 0U
+          ? elapsed_cycles / (identity::kExpectedDwtHz / request.rate_hz)
           : 0U;
   if (!validGpioClockDiagnosticRequest(request) ||
       production_rate != protocol_v1::kGpioClockProductionRateHz ||
@@ -1704,10 +1704,10 @@ Result validateGpioClockDiagnosticResponse(ByteView payload) {
       (configuration_was_armed &&
        (biter != expected_major_count || citer > biter ||
         samples != static_cast<std::uint32_t>(biter - citer))) ||
-      (dwt_hz == protocol_v1::kGpioClockDwtHz &&
+      (dwt_hz == identity::kExpectedDwtHz &&
        scheduled_events != expected_scheduled) ||
       (error_flags == 0U &&
-       (dwt_hz != protocol_v1::kGpioClockDwtHz || elapsed_cycles == 0U ||
+       (dwt_hz != identity::kExpectedDwtHz || elapsed_cycles == 0U ||
         absoluteDifference(scheduled_events, requested_events) >
             protocol_v1::kGpioClockCountTolerance ||
         absoluteDifference(samples, scheduled_events) >
@@ -1727,6 +1727,8 @@ Result validateGpioCaptureDiagnosticResponse(ByteView payload) {
   std::uint32_t retained = 0U;
   std::uint32_t analyzed = 0U;
   std::uint32_t limit = 0U;
+  std::uint32_t dwt_hz = 0U;
+  std::uint32_t elapsed_cycles = 0U;
   if (payload.data[
           protocol_v1::kGpioCaptureDiagnosticResponseModeOffset] >
           static_cast<std::uint8_t>(
@@ -1759,6 +1761,14 @@ Result validateGpioCaptureDiagnosticResponse(ByteView payload) {
       (flags & static_cast<std::uint32_t>(
                    protocol_v1::GpioCaptureDiagnosticFlag::kAvailable)) ==
           0U ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioCaptureDiagnosticResponseDwtCounterHzOffset,
+          dwt_hz) ||
+      !loadU32(
+          payload,
+          protocol_v1::kGpioCaptureDiagnosticResponseDwtElapsedCyclesOffset,
+          elapsed_cycles) ||
       !loadU64(
           payload,
           protocol_v1::kGpioCaptureDiagnosticResponseDmaSamplesCapturedOffset,
@@ -1783,8 +1793,13 @@ Result validateGpioCaptureDiagnosticResponse(ByteView payload) {
       protocol_v1::GpioCaptureDiagnosticFlag::kOutputDrivePermitted);
   const std::uint32_t output_exercised = static_cast<std::uint32_t>(
       protocol_v1::GpioCaptureDiagnosticFlag::kOutputDriveExercised);
-  return (flags & output_exercised) != 0U &&
-                 (flags & output_permitted) == 0U
+  const std::uint32_t dma_exercised = static_cast<std::uint32_t>(
+      protocol_v1::GpioCaptureDiagnosticFlag::kDmaCaptureExercised);
+  return ((flags & output_exercised) != 0U &&
+          (flags & output_permitted) == 0U) ||
+                 ((flags & dma_exercised) != 0U &&
+                  (dwt_hz != identity::kExpectedDwtHz ||
+                   elapsed_cycles == 0U))
              ? badPayload()
              : Result::success();
 }
@@ -2118,18 +2133,18 @@ bool validGpioClockDiagnosticRequest(
   if (request.rate_hz < protocol_v1::kGpioClockMinRateHz ||
       request.rate_hz > protocol_v1::kGpioClockProductionRateHz ||
       protocol_v1::kGpioClockPitHz % request.rate_hz != 0U ||
-      protocol_v1::kGpioClockDwtHz % request.rate_hz != 0U ||
+      identity::kExpectedDwtHz % request.rate_hz != 0U ||
       request.event_count < protocol_v1::kGpioClockMinEventCount ||
       request.event_count > protocol_v1::kGpioClockMaxEventCount) {
     return false;
   }
   const std::uint64_t elapsed_cycles =
       static_cast<std::uint64_t>(request.event_count) *
-      (protocol_v1::kGpioClockDwtHz / request.rate_hz);
+      (identity::kExpectedDwtHz / request.rate_hz);
   const std::uint32_t major_count =
       2U * static_cast<std::uint32_t>(request.event_count) +
       protocol_v1::kGpioClockDuplicateGuardEvents;
-  return elapsed_cycles <= protocol_v1::kGpioClockMaxElapsedCycles &&
+  return elapsed_cycles <= identity::kGpioClockMaximumMeasurementCycles &&
          major_count <= std::numeric_limits<std::int16_t>::max();
 }
 

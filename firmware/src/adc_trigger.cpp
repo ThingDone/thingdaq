@@ -94,7 +94,7 @@ const Snapshot &Scheduler::initialize(bool converters_ready) {
 
   std::uint32_t counter_hz = 0U;
   if (!platform_.beginCycleCounter(counter_hz) ||
-      counter_hz != protocol_v1::kAdcTriggerDwtClockHz) {
+      counter_hz != identity::kExpectedDwtHz) {
     addError(snapshot_, protocol_v1::AdcTriggerError::kDwtUnavailable);
     return snapshot_;
   }

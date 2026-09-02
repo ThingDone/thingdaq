@@ -20,39 +20,53 @@ class AdcRegisterAdapterTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for target-register adapter tests")
 
-        with tempfile.TemporaryDirectory(prefix="thingdaq-adc-registers-") as directory:
-            executable = Path(directory) / "adc-register-adapter-test"
-            compiled = subprocess.run(
-                [
-                    compiler,
-                    "-std=c++17",
-                    "-O3",
-                    "-flto",
-                    "-Wall",
-                    "-Wextra",
-                    "-Werror",
-                    "-Wconversion",
-                    "-Wsign-conversion",
-                    "-pedantic",
-                    "-fno-exceptions",
-                    "-fno-rtti",
-                    f"-I{FAKE_TEENSY_INCLUDE}",
-                    f"-I{FIRMWARE_SOURCE}",
-                    str(CPP_TEST),
-                    "-o",
-                    str(executable),
-                ],
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertEqual(0, compiled.returncode, compiled.stdout + compiled.stderr)
-            completed = subprocess.run(
-                [str(executable)], capture_output=True, check=False, text=True
-            )
-            self.assertEqual(
-                0, completed.returncode, completed.stdout + completed.stderr
-            )
+        for profile_mhz, cpu_hz, bus_hz in (
+            (600, 600_000_000, 150_000_000),
+            (528, 528_000_000, 132_000_000),
+        ):
+            with (
+                self.subTest(profile_mhz=profile_mhz),
+                tempfile.TemporaryDirectory(
+                    prefix=f"thingdaq-adc-registers-{profile_mhz}-"
+                ) as directory,
+            ):
+                executable = Path(directory) / "adc-register-adapter-test"
+                compiled = subprocess.run(
+                    [
+                        compiler,
+                        "-std=c++17",
+                        "-O3",
+                        "-flto",
+                        "-Wall",
+                        "-Wextra",
+                        "-Werror",
+                        "-Wconversion",
+                        "-Wsign-conversion",
+                        "-pedantic",
+                        "-fno-exceptions",
+                        "-fno-rtti",
+                        f"-DTHINGDAQ_CPU_PROFILE_MHZ={profile_mhz}",
+                        f"-DTHINGDAQ_EXPECTED_CPU_HZ={cpu_hz}",
+                        f"-DTHINGDAQ_EXPECTED_BUS_HZ={bus_hz}",
+                        f"-I{FAKE_TEENSY_INCLUDE}",
+                        f"-I{FIRMWARE_SOURCE}",
+                        str(CPP_TEST),
+                        "-o",
+                        str(executable),
+                    ],
+                    capture_output=True,
+                    check=False,
+                    text=True,
+                )
+                self.assertEqual(
+                    0, compiled.returncode, compiled.stdout + compiled.stderr
+                )
+                completed = subprocess.run(
+                    [str(executable)], capture_output=True, check=False, text=True
+                )
+                self.assertEqual(
+                    0, completed.returncode, completed.stdout + completed.stderr
+                )
 
 
 if __name__ == "__main__":

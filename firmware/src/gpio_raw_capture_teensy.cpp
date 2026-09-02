@@ -11,6 +11,7 @@
 #include <imxrt.h>
 
 #include "board_config.h"
+#include "firmware_identity.h"
 #include "gpio_dma_route_teensy.h"
 
 #define THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(section_name) \
@@ -54,7 +55,7 @@ constexpr std::uint32_t kProductionPitLoad =
         protocol_v1::kGpioClockProductionRateHz -
     1U;
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
-    protocol_v1::kGpioClockDwtHz / 100U;
+    identity::dwtCyclesForMicroseconds(10000U);
 
 std::uint32_t readPrimask() {
   std::uint32_t value = 0U;
@@ -277,6 +278,9 @@ StartStatus inspectHardwareStart() {
   if (g_hardware_prepared || g_hardware_running) {
     return StartStatus::kAlreadyRunning;
   }
+  if (!identity::runtimeClocksMatchProfile(F_CPU_ACTUAL, F_BUS_ACTUAL)) {
+    return StartStatus::kHardwareError;
+  }
   if (resourcesBusy()) {
     return StartStatus::kResourceBusy;
   }
@@ -288,7 +292,17 @@ bool preparedHardwareValid() {
   const IMXRT_PIT_CHANNEL_t &pit =
       IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
   const IMXRT_DMA_TCD_t &tcd = gpio_dma_route::edmaTcd();
-  return pit.LDVAL == kProductionPitLoad && pit.TCTRL == 0U &&
+  return identity::runtimeClocksMatchProfile(F_CPU_ACTUAL, F_BUS_ACTUAL) &&
+         (CCM_CSCMR1 & gpio_dma_route::kPerclkMask) ==
+             gpio_dma_route::kPerclk24M &&
+         (CCM_CCGR1 & gpio_dma_route::kPitGateMask) ==
+             gpio_dma_route::kPitGateMask &&
+         (CCM_CCGR2 & gpio_dma_route::kXbarGateMask) ==
+             gpio_dma_route::kXbarGateMask &&
+         (CCM_CCGR5 & gpio_dma_route::kDmaGateMask) ==
+             gpio_dma_route::kDmaGateMask &&
+         (PIT_MCR & PIT_MCR_MDIS) == 0U &&
+         pit.LDVAL == kProductionPitLoad && pit.TCTRL == 0U &&
          gpio_dma_route::selectedOutputBusy() &&
          gpio_dma_route::edmaRequestBusy() &&
          *gpio_dma_route::dmamuxChannelRegister() ==
@@ -539,7 +553,8 @@ static_assert(sizeof(g_gpio_raw_dma_overflow_sink) ==
 static_assert(protocol_v1::kGpioSamplesPerFrame <=
               std::numeric_limits<std::int16_t>::max());
 static_assert(kProductionPitLoad == 5U);
-static_assert(kStopBoundaryTimeoutCycles == 6000000U);
+static_assert(kStopBoundaryTimeoutCycles ==
+              identity::kExpectedDwtHz / 100U);
 static_assert(board::kGpioEdmaChannel == 2U);
 static_assert(board::kGpioEdmaPriority == 0U);
 

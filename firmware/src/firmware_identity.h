@@ -158,6 +158,65 @@ inline constexpr char kCpuArchitecture[] = "Arm Cortex-M7";
 inline constexpr std::uint16_t kCpuProfileMhz = THINGDAQ_CPU_PROFILE_MHZ;
 inline constexpr std::uint32_t kExpectedCpuHz = THINGDAQ_EXPECTED_CPU_HZ;
 inline constexpr std::uint32_t kExpectedBusHz = THINGDAQ_EXPECTED_BUS_HZ;
+inline constexpr std::uint32_t kExpectedDwtHz = kExpectedCpuHz;
+inline constexpr std::uint32_t kExpectedIpgHz = kExpectedBusHz;
+inline constexpr std::uint32_t kExpectedPitHz =
+    protocol_v1::kGpioClockPitHz;
+inline constexpr std::uint32_t kExpectedGpioSampleRateHz =
+    protocol_v1::kGpioClockProductionRateHz;
+inline constexpr std::uint32_t kExpectedAdcPairRateHz =
+    protocol_v1::kAdcTriggerPairRateHz;
+inline constexpr std::uint8_t kExpectedAdcClockDivider =
+    protocol_v1::kAdcClockDivider;
+inline constexpr std::uint32_t kExpectedAdcClockHz =
+    kExpectedIpgHz / kExpectedAdcClockDivider;
+inline constexpr std::uint32_t kAdcNominalPhaseNanoseconds = 500U;
+inline constexpr std::uint16_t kAdcNominalPhaseIpgCycles =
+    static_cast<std::uint16_t>(kExpectedIpgHz / 2000000U);
+inline constexpr std::array<std::uint16_t, 2U> kAdcTriggerInitialDelays{
+    0U, kAdcNominalPhaseIpgCycles};
+inline constexpr std::array<std::uint16_t, 2U> kAdcTriggerEffectiveDelays{
+    1U, static_cast<std::uint16_t>(kAdcNominalPhaseIpgCycles + 1U)};
+inline constexpr std::uint32_t kAdcCompletionExpectedDwtCycles =
+    kExpectedDwtHz / 2000000U;
+inline constexpr std::uint32_t kAdcCompletionToleranceNanoseconds = 200U;
+inline constexpr std::uint32_t kAdcPrimaryConversionHalfAdckCycles = 65U;
+inline constexpr std::uint32_t kAdcPairPeriodPicoseconds = 1000000U;
+
+constexpr std::uint32_t divideCeil(std::uint64_t numerator,
+                                   std::uint64_t denominator) {
+  return static_cast<std::uint32_t>(
+      (numerator + denominator - 1U) / denominator);
+}
+
+constexpr std::uint32_t dwtCyclesForMicroseconds(
+    std::uint32_t microseconds) {
+  return divideCeil(static_cast<std::uint64_t>(kExpectedDwtHz) *
+                        microseconds,
+                    1000000U);
+}
+
+constexpr std::uint32_t dwtCyclesForNanoseconds(
+    std::uint32_t nanoseconds) {
+  return divideCeil(static_cast<std::uint64_t>(kExpectedDwtHz) *
+                        nanoseconds,
+                    1000000000U);
+}
+
+inline constexpr std::uint32_t kAdcCompletionToleranceDwtCycles =
+    dwtCyclesForNanoseconds(kAdcCompletionToleranceNanoseconds);
+inline constexpr std::uint32_t kAdcPrimaryConversionTimePicoseconds =
+    divideCeil(
+        static_cast<std::uint64_t>(kAdcPrimaryConversionHalfAdckCycles) *
+            1000000000000ULL,
+        2ULL * kExpectedAdcClockHz);
+inline constexpr std::uint32_t kAdcPrimaryConversionMarginPicoseconds =
+    kAdcPairPeriodPicoseconds - kAdcPrimaryConversionTimePicoseconds;
+inline constexpr std::uint32_t kGpioClockMaximumMeasurementMicroseconds =
+    protocol_v1::kGpioClockMaxElapsedCycles /
+    (protocol_v1::kGpioClockDwtHz / 1000000U);
+inline constexpr std::uint32_t kGpioClockMaximumMeasurementCycles =
+    dwtCyclesForMicroseconds(kGpioClockMaximumMeasurementMicroseconds);
 inline constexpr char kExpectedTeensyCoreId[] = "teensy:avr";
 inline constexpr char kExpectedTeensyCoreVersion[] = "1.62.0";
 inline constexpr std::uint16_t kExpectedTeensyduinoMacro = 160U;
@@ -268,6 +327,17 @@ constexpr bool runtimeClocksMatchProfile(std::uint32_t cpu_actual_hz,
          bus_actual_hz == kExpectedBusHz;
 }
 
+constexpr bool runtimeAcquisitionClocksMatchProfile(
+    std::uint32_t cpu_actual_hz, std::uint32_t bus_actual_hz,
+    std::uint32_t pit_hz, std::uint32_t adc_clock_hz,
+    std::uint32_t adc_clock_divider) {
+  return runtimeClocksMatchProfile(cpu_actual_hz, bus_actual_hz) &&
+         pit_hz == kExpectedPitHz &&
+         adc_clock_divider == kExpectedAdcClockDivider &&
+         adc_clock_hz == kExpectedAdcClockHz &&
+         adc_clock_hz * adc_clock_divider == bus_actual_hz;
+}
+
 template <std::size_t N>
 constexpr std::size_t stringLength(const std::array<char, N> &) {
   return N - 1U;
@@ -286,6 +356,44 @@ constexpr bool isLowerHexString(const std::array<char, N> &value) {
 static_assert(kProtocolVersion == 1U);
 static_assert(kCpuProfileMhz == 600U || kCpuProfileMhz == 528U);
 static_assert(runtimeClocksMatchProfile(kExpectedCpuHz, kExpectedBusHz));
+static_assert(runtimeAcquisitionClocksMatchProfile(
+    kExpectedCpuHz, kExpectedBusHz, kExpectedPitHz, kExpectedAdcClockHz,
+    kExpectedAdcClockDivider));
+static_assert(kExpectedDwtHz % kExpectedPitHz == 0U);
+static_assert(kExpectedPitHz % kExpectedGpioSampleRateHz == 0U);
+static_assert(kExpectedGpioSampleRateHz % kExpectedAdcPairRateHz == 0U);
+static_assert(kExpectedIpgHz % kExpectedAdcClockDivider == 0U);
+static_assert(kExpectedAdcClockHz <= 40000000U);
+static_assert(kExpectedIpgHz % 2000000U == 0U);
+static_assert(kExpectedDwtHz % 2000000U == 0U);
+static_assert(kAdcTriggerEffectiveDelays[1] -
+                      kAdcTriggerEffectiveDelays[0] ==
+                  kAdcNominalPhaseIpgCycles);
+static_assert(static_cast<std::uint64_t>(kAdcNominalPhaseIpgCycles) *
+                      protocol_v1::kTimestampHz ==
+                  static_cast<std::uint64_t>(protocol_v1::kAdc1PhaseTicks) *
+                      kExpectedIpgHz);
+static_assert(static_cast<std::uint64_t>(kAdcNominalPhaseIpgCycles) *
+                      kExpectedDwtHz ==
+                  static_cast<std::uint64_t>(
+                      kAdcCompletionExpectedDwtCycles) *
+                      kExpectedIpgHz);
+static_assert(kAdcPrimaryConversionTimePicoseconds <
+              kAdcPairPeriodPicoseconds);
+static_assert(kCpuProfileMhz != 600U ||
+              (kExpectedIpgHz == 150000000U &&
+               kExpectedAdcClockHz == 37500000U &&
+               kAdcNominalPhaseIpgCycles == 75U &&
+               kAdcCompletionExpectedDwtCycles == 300U &&
+               kAdcCompletionToleranceDwtCycles == 120U &&
+               kAdcPrimaryConversionMarginPicoseconds == 133333U));
+static_assert(kCpuProfileMhz != 528U ||
+              (kExpectedIpgHz == 132000000U &&
+               kExpectedAdcClockHz == 33000000U &&
+               kAdcNominalPhaseIpgCycles == 66U &&
+               kAdcCompletionExpectedDwtCycles == 264U &&
+               kAdcCompletionToleranceDwtCycles == 106U &&
+               kAdcPrimaryConversionMarginPicoseconds == 15151U));
 static_assert(usbProductNameMatchesIdentity(),
               "USB descriptor product must match firmware identity");
 static_assert(stringLength(kSourceId) == 64U,

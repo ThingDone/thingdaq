@@ -21,7 +21,7 @@ class TeensyCycleCounter final : public CycleCounter {
     ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
     const std::uint32_t before = ARM_DWT_CYCCNT;
     __asm__ volatile("nop\n\tnop\n\tnop\n\tnop" : : : "memory");
-    return F_CPU_ACTUAL == protocol_v1::kGpioClockDwtHz &&
+    return F_CPU_ACTUAL == identity::kExpectedDwtHz &&
            ARM_DWT_CYCCNT != before;
   }
 

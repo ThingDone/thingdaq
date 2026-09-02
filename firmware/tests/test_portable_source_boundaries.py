@@ -222,8 +222,10 @@ class PortableSourceBoundaryTests(unittest.TestCase):
         self.assertNotIn("ADC1", deferred_body)
         self.assertNotIn("ADC2", deferred_body)
         self.assertNotIn("while", deferred_body)
-        self.assertIn("F_BUS_ACTUAL != settings.ipg_clock_hz", adapter)
-        self.assertIn("F_BUS_ACTUAL == settings.ipg_clock_hz", adapter)
+        self.assertIn("F_BUS_ACTUAL != identity::kExpectedIpgHz", adapter)
+        self.assertIn("F_BUS_ACTUAL == identity::kExpectedIpgHz", adapter)
+        self.assertIn("settings.ipg_clock_hz != identity::kExpectedIpgHz", adapter)
+        self.assertIn("settings.ipg_clock_hz == identity::kExpectedIpgHz", adapter)
 
     def test_host_dependency_output_excludes_teensy_core_and_adapters(self) -> None:
         compiler = shutil.which("g++")

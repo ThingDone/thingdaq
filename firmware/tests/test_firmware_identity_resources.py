@@ -19,19 +19,46 @@ class FirmwareIdentityResourceTests(unittest.TestCase):
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        for profile_mhz, cpu_hz, bus_hz in (
-            (600, 600_000_000, 150_000_000),
-            (528, 528_000_000, 132_000_000),
+        for (
+            profile_mhz,
+            cpu_hz,
+            bus_hz,
+            adc_hz,
+            phase_cycles,
+            completion_cycles,
+            tolerance_cycles,
+            conversion_time_ps,
+            conversion_margin_ps,
+        ) in (
+            (600, 600_000_000, 150_000_000, 37_500_000, 75, 300, 120, 866_667, 133_333),
+            (528, 528_000_000, 132_000_000, 33_000_000, 66, 264, 106, 984_849, 15_151),
         ):
             with self.subTest(profile_mhz=profile_mhz):
                 source = f"""#include "firmware_identity.h"
 static_assert(thingdaq::identity::kCpuProfileMhz == {profile_mhz}U);
 static_assert(thingdaq::identity::kExpectedCpuHz == {cpu_hz}U);
 static_assert(thingdaq::identity::kExpectedBusHz == {bus_hz}U);
+static_assert(thingdaq::identity::kExpectedDwtHz == {cpu_hz}U);
+static_assert(thingdaq::identity::kExpectedIpgHz == {bus_hz}U);
+static_assert(thingdaq::identity::kExpectedAdcClockHz == {adc_hz}U);
+static_assert(thingdaq::identity::kExpectedPitHz == 24000000U);
+static_assert(thingdaq::identity::kExpectedGpioSampleRateHz == 4000000U);
+static_assert(thingdaq::identity::kExpectedAdcPairRateHz == 1000000U);
+static_assert(thingdaq::identity::kAdcNominalPhaseIpgCycles == {phase_cycles}U);
+static_assert(thingdaq::identity::kAdcCompletionExpectedDwtCycles == {completion_cycles}U);
+static_assert(thingdaq::identity::kAdcCompletionToleranceDwtCycles == {tolerance_cycles}U);
+static_assert(thingdaq::identity::kAdcPrimaryConversionTimePicoseconds == {conversion_time_ps}U);
+static_assert(thingdaq::identity::kAdcPrimaryConversionMarginPicoseconds == {conversion_margin_ps}U);
+static_assert(thingdaq::identity::kGpioClockMaximumMeasurementCycles == {cpu_hz // 10}U);
+static_assert(thingdaq::identity::dwtCyclesForMicroseconds(10000U) == {cpu_hz // 100}U);
 static_assert(thingdaq::identity::runtimeClocksMatchProfile(
     {cpu_hz}U, {bus_hz}U));
 static_assert(!thingdaq::identity::runtimeClocksMatchProfile(
     {cpu_hz - 1}U, {bus_hz}U));
+static_assert(thingdaq::identity::runtimeAcquisitionClocksMatchProfile(
+    {cpu_hz}U, {bus_hz}U, 24000000U, {adc_hz}U, 4U));
+static_assert(!thingdaq::identity::runtimeAcquisitionClocksMatchProfile(
+    {cpu_hz}U, {bus_hz}U, 24000000U, {adc_hz - 1}U, 4U));
 """
                 result = subprocess.run(
                     [

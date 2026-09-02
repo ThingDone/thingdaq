@@ -20,6 +20,7 @@ namespace {
 namespace adc = thingdaq::adc;
 namespace board = thingdaq::board;
 namespace gpio_route = thingdaq::gpio_dma_route;
+namespace identity = thingdaq::identity;
 namespace trigger = thingdaq::adc_trigger;
 namespace v1 = thingdaq::protocol_v1;
 
@@ -43,8 +44,8 @@ void resetFakeRegisters() {
   fake_imxrt::pin15_config = 0U;
   fake_imxrt::pin14_padconfig = 0U;
   fake_imxrt::pin15_padconfig = 0U;
-  fake_imxrt::f_bus_actual = v1::kAdcIpgClockHz;
-  fake_imxrt::f_cpu_actual = v1::kAdcCalibrationCycleCounterHz;
+  fake_imxrt::f_bus_actual = identity::kExpectedIpgHz;
+  fake_imxrt::f_cpu_actual = identity::kExpectedDwtHz;
   fake_imxrt::interrupts_enabled = true;
   fake_imxrt::arm_demcr = 0U;
   fake_imxrt::arm_dwt_ctrl = 0U;
@@ -80,6 +81,17 @@ void resetFakeRegisters() {
   fake_imxrt::interrupt_pending.fill(false);
   fake_imxrt::adc_trigger_diagnostic_poll_hook = nullptr;
   fake_imxrt::clearRegisterWrites();
+}
+
+void prepareConvertersForTrigger() {
+  adc::TeensyPlatform platform{};
+  const adc::Settings settings = adc::settingsFor({});
+  expect(platform.prepareConverter(board::kAdcConverterConfigurations[0],
+                                   settings) == adc::PrepareStatus::kOk &&
+             platform.prepareConverter(
+                 board::kAdcConverterConfigurations[1], settings) ==
+                 adc::PrepareStatus::kOk,
+         "both converters retain the selected synchronous ADC divider");
 }
 
 std::size_t writeIndex(const fake_imxrt::Register32 &target,
@@ -168,6 +180,7 @@ void testFixedPinModuleRoutesAndLegalResolutionModes() {
 
 void testExactStoppedTriggerScheduleAndResourceIsolation() {
   resetFakeRegisters();
+  prepareConvertersForTrigger();
   // Unreserved activity and queue state must not be mistaken for ownership of
   // PIT0/PIT1, ADC_ETC queues 0/4, or XBAR outputs 103/107.
   fake_imxrt::pit_channels[2].TCTRL.reset(PIT_TCTRL_TEN);
@@ -204,16 +217,16 @@ void testExactStoppedTriggerScheduleAndResourceIsolation() {
   const std::array<std::uint16_t, 2U> effective_delays{
       static_cast<std::uint16_t>(raw_delays[0] + 1U),
       static_cast<std::uint16_t>(raw_delays[1] + 1U)};
-  expect(raw_delays == std::array<std::uint16_t, 2U>{0U, 75U} &&
-             effective_delays ==
-                 std::array<std::uint16_t, 2U>{1U, 76U} &&
+  expect(raw_delays == identity::kAdcTriggerInitialDelays &&
+             effective_delays == identity::kAdcTriggerEffectiveDelays &&
              effective_delays[1] - effective_delays[0] ==
-                 v1::kAdcTriggerPhaseIpgCycles &&
-             static_cast<std::uint32_t>(v1::kAdcTriggerPhaseIpgCycles) *
+                 identity::kAdcNominalPhaseIpgCycles &&
+             static_cast<std::uint32_t>(
+                 identity::kAdcNominalPhaseIpgCycles) *
                      v1::kTimestampHz /
-                     v1::kAdcTriggerIpgClockHz ==
+                     identity::kExpectedIpgHz ==
                  v1::kAdc1PhaseTicks,
-         "raw delays 0/75 implement effective 1/76 and exactly four ticks");
+         "profile delays retain the exact half-microsecond phase");
   expect(fake_imxrt::adc_etc.TRIG[queues[0]].CHAIN_1_0 ==
                  (ADC_ETC_TRIG_CHAIN_IE0(1U) |
                   ADC_ETC_TRIG_CHAIN_HWTS0(1U) |
@@ -254,6 +267,7 @@ void testExactStoppedTriggerScheduleAndResourceIsolation() {
 
 void testDeterministicArmStopOrderAndOwnedConflict() {
   resetFakeRegisters();
+  prepareConvertersForTrigger();
   trigger::TeensyPlatform platform{};
   expect(platform.configureStopped().error_flags == 0U,
          "arm-order fixture configures");
@@ -308,6 +322,27 @@ void testDeterministicArmStopOrderAndOwnedConflict() {
              (static_cast<std::uint32_t>(ADC_ETC_CTRL) & 0xFFU) == 0U,
          "stop disables master PIT0, chained PIT1, then both ADC_ETC queues");
 
+  fake_imxrt::f_cpu_actual = identity::kExpectedDwtHz - 1U;
+  expect(!platform.armFromStopped(false) &&
+             fake_imxrt::pit_channels[
+                 v1::kAdcTriggerGpioMasterPitChannel].TCTRL == 0U,
+         "a runtime CPU-clock mismatch fails before the trigger START");
+  fake_imxrt::f_cpu_actual = identity::kExpectedDwtHz;
+  fake_imxrt::f_bus_actual = identity::kExpectedIpgHz - 1U;
+  expect(!platform.armFromStopped(false) &&
+             fake_imxrt::pit_channels[
+                 v1::kAdcTriggerGpioMasterPitChannel].TCTRL == 0U,
+         "a runtime IPG-clock mismatch fails before the trigger START");
+  fake_imxrt::f_bus_actual = identity::kExpectedIpgHz;
+  const std::uint32_t adc0_configuration = IMXRT_ADC1.CFG;
+  IMXRT_ADC1.CFG = adc0_configuration &
+                   ~(ADC_CFG_ADIV(3U) | ADC_CFG_ADICLK(3U));
+  expect(!platform.armFromStopped(false) &&
+             fake_imxrt::pit_channels[
+                 v1::kAdcTriggerGpioMasterPitChannel].TCTRL == 0U,
+         "an ADC divider readback mismatch fails before the trigger START");
+  IMXRT_ADC1.CFG = adc0_configuration;
+
   resetFakeRegisters();
   fake_imxrt::pit_channels[v1::kAdcTriggerPairPitChannel].TCTRL.reset(
       PIT_TCTRL_CHN | PIT_TCTRL_TEN);
@@ -331,7 +366,8 @@ void publishDiagnosticCompletions() {
     fake_imxrt::adc_etc.DONE0_1_IRQ.reset(
         ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(v1::kAdcTriggerQueues[0]));
   } else if (diagnostic_poll_count == 2U) {
-    fake_imxrt::arm_dwt_cyccnt = 1'300U;
+    fake_imxrt::arm_dwt_cyccnt =
+        1'000U + identity::kAdcCompletionExpectedDwtCycles;
     fake_imxrt::adc_etc.DONE0_1_IRQ.reset(
         ADC_ETC_DONE0_1_IRQ_TRIG_DONE1(v1::kAdcTriggerQueues[1]));
   }
@@ -339,6 +375,7 @@ void publishDiagnosticCompletions() {
 
 void testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked() {
   resetFakeRegisters();
+  prepareConvertersForTrigger();
   diagnostic_poll_count = 0U;
   fake_imxrt::adc_trigger_diagnostic_poll_hook =
       publishDiagnosticCompletions;
@@ -351,8 +388,11 @@ void testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked() {
   const auto completion_cycles = platform.firstCompletionCycles();
   expect(completion_counts == std::array<std::uint32_t, 2U>{1U, 1U} &&
              completion_cycles ==
-                 std::array<std::uint32_t, 2U>{1'000U, 1'300U},
-         "diagnostic retains exactly the first 300-cycle-spaced DONE transitions (counts " +
+                 std::array<std::uint32_t, 2U>{
+                     1'000U,
+                     1'000U +
+                         identity::kAdcCompletionExpectedDwtCycles},
+         "diagnostic retains the first profile-spaced DONE transitions (counts " +
              std::to_string(completion_counts[0]) + "/" +
              std::to_string(completion_counts[1]) + ", cycles " +
              std::to_string(completion_cycles[0]) + "/" +
@@ -367,6 +407,7 @@ void testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked() {
   expect(platform.stop(), "latched completion diagnostic stops cleanly");
 
   resetFakeRegisters();
+  prepareConvertersForTrigger();
   diagnostic_poll_count = 0U;
   fake_imxrt::adc_trigger_diagnostic_poll_hook =
       publishDiagnosticCompletions;
@@ -390,6 +431,7 @@ std::uint8_t selectedXbarInput(std::uint8_t output) {
 
 void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
   resetFakeRegisters();
+  prepareConvertersForTrigger();
   trigger::TeensyPlatform platform{};
   expect(platform.configureStopped().error_flags == 0U,
          "combined register fixture configures the ADC schedule stopped");

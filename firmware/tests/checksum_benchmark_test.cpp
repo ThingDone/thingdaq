@@ -11,6 +11,7 @@ namespace {
 
 namespace benchmark = thingdaq::benchmark;
 namespace constants = thingdaq::protocol_v1;
+namespace identity = thingdaq::identity;
 namespace protocol = thingdaq::protocol;
 
 int failures = 0;
@@ -25,8 +26,7 @@ void expect(bool condition, const std::string &message) {
 class FakePlatform final : public benchmark::Platform {
  public:
   bool counter_available = true;
-  std::uint32_t counter_frequency =
-      constants::kChecksumBenchmarkCycleCounterHz;
+  std::uint32_t counter_frequency = identity::kExpectedDwtHz;
   std::uint32_t counter = std::numeric_limits<std::uint32_t>::max() - 50U;
   std::uint32_t calibration_elapsed = 4U;
   std::uint32_t checksum_elapsed = 104U;
@@ -143,6 +143,8 @@ void testHotCanonicalAndCounterWrap() {
   const protocol::ChecksumBenchmarkResponse &response = result.response;
   expect(response.buffer_bytes == 9U && response.processed_bytes == 54U,
          "canonical benchmark reports exact processed bytes");
+  expect(response.cycle_counter_hz == identity::kExpectedDwtHz,
+         "benchmark throughput uses the selected verified DWT frequency");
   expect(response.timer_overhead_cycles == 4U &&
              response.raw_checksum_cycles == 624U &&
              response.net_checksum_cycles == 600U,
@@ -272,11 +274,11 @@ void testEmptyBoundsAndCounterFailure() {
              .status == benchmark::RunStatus::kCounterUnavailable,
          "unavailable cycle counter fails closed");
   platform.counter_available = true;
-  platform.counter_frequency = 599999999U;
+  platform.counter_frequency = identity::kExpectedDwtHz - 1U;
   expect(runner.run(request(constants::ChecksumAlgorithm::kAdler32,
                             constants::BenchmarkVector::kBuffer512))
              .status == benchmark::RunStatus::kCounterUnavailable,
-         "a cycle counter at any frequency other than 600 MHz fails closed");
+         "a cycle counter outside the selected profile fails closed");
 
   const protocol::ChecksumBenchmarkRequest bounded = request(
       constants::ChecksumAlgorithm::kAdler32,

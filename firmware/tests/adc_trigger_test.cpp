@@ -7,6 +7,7 @@
 #include "adc_trigger.h"
 
 namespace adc_trigger = thingdaq::adc_trigger;
+namespace identity = thingdaq::identity;
 namespace protocol_v1 = thingdaq::protocol_v1;
 
 namespace {
@@ -28,14 +29,17 @@ class FakePlatform final : public adc_trigger::Platform {
  public:
   adc_trigger::ConfigureResult configure_result{};
   bool counter_available = true;
-  std::uint32_t counter_hz = protocol_v1::kAdcTriggerDwtClockHz;
+  std::uint32_t counter_hz = identity::kExpectedDwtHz;
   std::uint32_t cycles = 0U;
   std::uint32_t cycle_step = 100U;
   bool arm_ok = true;
   bool stop_ok = true;
   std::uint32_t completion_after_poll = 2U;
   std::array<std::uint32_t, 2U> completed_counts{1U, 1U};
-  std::array<std::uint32_t, 2U> first_cycles{0xFFFFFF00U, 0x0000002CU};
+  std::array<std::uint32_t, 2U> first_cycles{
+      0xFFFFFF00U,
+      static_cast<std::uint32_t>(0xFFFFFF00U +
+                                 identity::kAdcCompletionExpectedDwtCycles)};
   std::uint32_t trigger_errors = 0U;
   std::uint32_t trigger_error_count = 0U;
   adc_trigger::HardwareEvidence terminal_evidence{};
@@ -110,11 +114,13 @@ void testExactScheduleAndSuccessfulDiagnostic() {
          protocol_v1::kKnownAdcTriggerConfigurationFlagMask);
   assert(snapshot.error_flags == 0U);
   assert(snapshot.gpio_master_rate_hz == 4U * snapshot.pair_rate_hz);
-  assert(snapshot.initial_delays ==
-         (std::array<std::uint16_t, 2U>{0U, 75U}));
-  assert(snapshot.effective_delays ==
-         (std::array<std::uint16_t, 2U>{1U, 76U}));
-  assert(snapshot.completion_delta_cycles == 300U);
+  assert(snapshot.initial_delays == identity::kAdcTriggerInitialDelays);
+  assert(snapshot.effective_delays == identity::kAdcTriggerEffectiveDelays);
+  assert(snapshot.phase_ipg_cycles == identity::kAdcNominalPhaseIpgCycles);
+  assert(snapshot.completion_delta_cycles ==
+         identity::kAdcCompletionExpectedDwtCycles);
+  assert(snapshot.completion_tolerance_cycles ==
+         identity::kAdcCompletionToleranceDwtCycles);
   assert(snapshot.evidence.done0_1_irq_final == 0xB0U);
   assert((platform.operations ==
           std::vector<std::string>{"configure", "counter", "arm", "stop"}));
@@ -124,7 +130,8 @@ void testExactScheduleAndSuccessfulDiagnostic() {
       adc_trigger::protocolMetadata(snapshot);
   assert(metadata.configuration_flags == snapshot.configuration_flags);
   assert(metadata.initial_delays == snapshot.initial_delays);
-  assert(metadata.completion_delta_cycles == 300U);
+  assert(metadata.completion_delta_cycles ==
+         identity::kAdcCompletionExpectedDwtCycles);
   assert(metadata.evidence.done0_1_irq_final == 0xB0U);
 
   assert(scheduler.arm());
@@ -222,7 +229,8 @@ void testCompletionTimingAndTriggerErrorsStayDistinct() {
   adc_trigger::Scheduler error_scheduler{valid_delta_with_error};
   const adc_trigger::Snapshot &error_snapshot =
       error_scheduler.initialize(true);
-  assert(error_snapshot.completion_delta_cycles == 300U);
+  assert(error_snapshot.completion_delta_cycles ==
+         identity::kAdcCompletionExpectedDwtCycles);
   assert((error_snapshot.configuration_flags &
           adc_trigger::configurationFlag(
               protocol_v1::AdcTriggerConfigurationFlag::
