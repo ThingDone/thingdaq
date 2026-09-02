@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate protocol-v1 constants and deterministic golden frames."""
+"""Generate versioned protocol constants and deterministic golden vectors."""
 
 from __future__ import annotations
 
@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
+V1_SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
+V2_SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v2.json"
+SOURCE_PATH = V1_SOURCE_PATH
+SOURCE_PATHS = (V1_SOURCE_PATH, V2_SOURCE_PATH)
 PYTHON_OUTPUT_PATH = (
     REPOSITORY_ROOT / "daq_api/src/thingdaq/_generated/protocol_constants.py"
 )
@@ -40,14 +43,63 @@ class ContractError(ValueError):
     """Raised when the canonical source is internally inconsistent."""
 
 
-def load_contract() -> tuple[dict[str, Any], bytes]:
+def load_contract(path: Path = SOURCE_PATH) -> tuple[dict[str, Any], bytes]:
     """Read the canonical JSON source and return it with its exact bytes."""
 
-    source_bytes = SOURCE_PATH.read_bytes()
+    source_bytes = path.read_bytes()
     contract = json.loads(source_bytes)
     if not isinstance(contract, dict):
         raise ContractError("protocol source root must be a JSON object")
     return contract, source_bytes
+
+
+def generated_paths(
+    contract: Mapping[str, Any],
+) -> tuple[str, Path, Path, Path, Path]:
+    """Resolve disjoint generated paths for one versioned contract."""
+
+    version = int(contract["protocol_version"])
+    source_relative = f"protocol/protocol-v{version}.json"
+    if version == 1:
+        return (
+            source_relative,
+            PYTHON_OUTPUT_PATH,
+            CPP_OUTPUT_PATH,
+            FIXTURE_DIRECTORY,
+            MANIFEST_PATH,
+        )
+
+    declared = contract.get("generated_outputs")
+    if not isinstance(declared, Mapping):
+        raise ContractError("protocol extensions must declare generated_outputs")
+    required = {
+        "python_constants",
+        "cpp_constants",
+        "fixture_directory",
+        "fixture_manifest",
+    }
+    if set(declared) != required:
+        raise ContractError(
+            "generated_outputs must contain exactly " + ", ".join(sorted(required))
+        )
+
+    def resolve(name: str) -> Path:
+        relative = Path(str(declared[name]))
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ContractError(f"generated output {name} must stay in the repository")
+        return REPOSITORY_ROOT / relative
+
+    fixture_directory = resolve("fixture_directory")
+    fixture_manifest = resolve("fixture_manifest")
+    if fixture_manifest.parent != fixture_directory:
+        raise ContractError("fixture_manifest must live in fixture_directory")
+    return (
+        source_relative,
+        resolve("python_constants"),
+        resolve("cpp_constants"),
+        fixture_directory,
+        fixture_manifest,
+    )
 
 
 def enum_map(entries: Sequence[Mapping[str, Any]]) -> dict[str, int]:
@@ -118,15 +170,186 @@ def validate_fields(owner: str, size: int, fields: Sequence[Mapping[str, Any]]) 
         raise ContractError(f"{owner} has uncovered bytes: {gaps}")
 
 
+def validate_rle_contract(contract: Mapping[str, Any]) -> None:
+    """Validate the isolated protocol-v2 RLE extension and output envelope."""
+
+    extends = contract.get("extends")
+    if not isinstance(extends, Mapping):
+        raise ContractError("protocol v2 must pin the protocol-v1 source")
+    v1_source_bytes = V1_SOURCE_PATH.read_bytes()
+    v1_sha256 = hashlib.sha256(v1_source_bytes).hexdigest()
+    if (
+        int(extends.get("protocol_version", 0)) != 1
+        or extends.get("source") != "protocol/protocol-v1.json"
+        or extends.get("source_sha256") != v1_sha256
+    ):
+        raise ContractError("protocol v2 does not pin the exact protocol-v1 source")
+
+    _, python_path, cpp_path, fixture_directory, manifest_path = generated_paths(
+        contract
+    )
+    v1_paths = {
+        PYTHON_OUTPUT_PATH,
+        CPP_OUTPUT_PATH,
+        FIXTURE_DIRECTORY,
+        MANIFEST_PATH,
+    }
+    v2_paths = {python_path, cpp_path, fixture_directory, manifest_path}
+    if len(v2_paths) != 4:
+        raise ContractError("protocol-v2 generated output paths must be unique")
+    if not v1_paths.isdisjoint(v2_paths):
+        raise ContractError("protocol-v2 generated outputs must be disjoint from v1")
+
+    header_fields = {
+        str(field["name"]): field for field in contract["header"]["fields"]
+    }
+    encoding_field = header_fields.get("encoding")
+    if not isinstance(encoding_field, Mapping) or (
+        int(encoding_field.get("offset", -1)) != 11
+        or encoding_field.get("type") != "u8"
+        or encoding_field.get("enum") != "frame_encoding"
+        or int(encoding_field.get("control_required", -1)) != 0
+    ):
+        raise ContractError("protocol-v2 header byte 11 must be the encoding selector")
+
+    configuration_encodings = enum_map(contract["enums"]["configuration_encoding"])
+    frame_encodings = enum_map(contract["enums"]["frame_encoding"])
+    validate_enum_width(
+        "configuration_encoding",
+        contract["enums"]["configuration_encoding"],
+        8,
+    )
+    validate_enum_width("frame_encoding", contract["enums"]["frame_encoding"], 8)
+    if configuration_encodings != {"RAW": 0, "RLE_AUTO": 1}:
+        raise ContractError("configuration encodings must remain RAW=0/RLE_AUTO=1")
+    if frame_encodings != {"RAW": 0, "RLE": 1}:
+        raise ContractError("frame encodings must remain RAW=0/RLE=1")
+
+    compression = contract["compression"]
+    if (
+        compression["capability"] != "RLE_STREAMING"
+        or compression["default_configuration_encoding"] != "RAW"
+        or compression["explicit_configuration_encoding"] != "RLE_AUTO"
+        or int(compression["control_header_encoding"]) != 0
+    ):
+        raise ContractError(
+            "RLE negotiation defaults disagree with the frozen contract"
+        )
+    run_length = compression["run_length"]
+    if (
+        run_length["type"] != "u16"
+        or run_length["byte_order"] != "little"
+        or int(run_length["minimum"]) != 1
+        or int(run_length["maximum"]) != 0xFFFF
+    ):
+        raise ContractError("RLE run lengths must be positive little-endian u16 values")
+
+    envelope_bytes = int(contract["header"]["size"]) + int(contract["trailer"]["size"])
+    if int(compression["adaptive_selection"]["envelope_bytes"]) != envelope_bytes:
+        raise ContractError("RLE adaptive-selection envelope is inconsistent")
+    for kind_name, layout_name in (("ADC_DATA", "adc"), ("GPIO_DATA", "gpio")):
+        stream = compression["streams"][kind_name]
+        layout = contract["data_layouts"][layout_name]
+        item_count = int(layout["items_per_frame"])
+        item_bytes = int(layout["bytes_per_item"])
+        raw_payload_bytes = item_count * item_bytes
+        record_bytes = 2 + item_bytes
+        maximum_selected_runs = (raw_payload_bytes - 1) // record_bytes
+        expected = {
+            "logical_item_bytes": item_bytes,
+            "logical_items_per_frame": item_count,
+            "raw_payload_bytes": raw_payload_bytes,
+            "raw_total_bytes": envelope_bytes + raw_payload_bytes,
+            "rle_record_bytes": record_bytes,
+            "minimum_rle_payload_bytes": record_bytes,
+            "maximum_selected_run_count": maximum_selected_runs,
+            "maximum_selected_payload_bytes": maximum_selected_runs * record_bytes,
+            "maximum_selected_total_bytes": (
+                envelope_bytes + maximum_selected_runs * record_bytes
+            ),
+        }
+        for name, value in expected.items():
+            if int(stream[name]) != value:
+                raise ContractError(f"{kind_name} compression bound {name} disagrees")
+        if int(stream["maximum_selected_total_bytes"]) >= int(
+            stream["raw_total_bytes"]
+        ):
+            raise ContractError(f"{kind_name} selected RLE frames must be smaller")
+
+    golden_fixtures = contract["golden_fixtures"]
+    fixture_names = {str(entry["name"]) for entry in golden_fixtures}
+    for kind_name in ("ADC_DATA", "GPIO_DATA"):
+        encodings = {
+            str(entry.get("encoding"))
+            for entry in golden_fixtures
+            if str(entry["kind"]) == kind_name
+        }
+        if not {"RAW", "RLE"}.issubset(encodings):
+            raise ContractError(f"{kind_name} needs RAW and RLE golden fixtures")
+        if not any(
+            str(entry["kind"]) == kind_name
+            and entry.get("selection_reason") == "rle_not_smaller"
+            for entry in golden_fixtures
+        ):
+            raise ContractError(f"{kind_name} needs an explicit RAW fallback fixture")
+    stream_names: set[str] = set()
+    fixtures_by_name = {
+        str(entry["name"]): entry for entry in contract["golden_fixtures"]
+    }
+    for stream in contract.get("golden_streams", []):
+        name = str(stream["name"])
+        if name in stream_names:
+            raise ContractError(f"duplicate golden stream name: {name}")
+        stream_names.add(name)
+        referenced = [str(value) for value in stream["frames"]]
+        if not referenced or set(referenced) - fixture_names:
+            raise ContractError(f"golden stream {name} references unknown fixtures")
+        encodings = {
+            str(fixtures_by_name[fixture_name].get("encoding"))
+            for fixture_name in referenced
+        }
+        if not {"RAW", "RLE"}.issubset(encodings):
+            raise ContractError(f"golden stream {name} must mix RAW and RLE frames")
+
+    malformed_names: set[str] = set()
+    observed_errors: set[str] = set()
+    for malformed in contract.get("malformed_fixtures", []):
+        name = str(malformed["name"])
+        if name in malformed_names or name in fixture_names or name in stream_names:
+            raise ContractError(f"duplicate generated vector name: {name}")
+        malformed_names.add(name)
+        if str(malformed["base"]) not in fixture_names:
+            raise ContractError(f"malformed fixture {name} has an unknown base")
+        if not str(malformed.get("expected_error", "")):
+            raise ContractError(f"malformed fixture {name} needs an expected error")
+        observed_errors.add(str(malformed["expected_error"]))
+    required_errors = {
+        "zero_run",
+        "decoded_count_overflow",
+        "truncated_item",
+        "adjacent_equal_runs",
+        "count_mismatch",
+        "illegal_selector",
+        "invalid_length",
+        "checksum_mismatch",
+    }
+    if not required_errors.issubset(observed_errors):
+        missing = ", ".join(sorted(required_errors - observed_errors))
+        raise ContractError(f"protocol-v2 malformed vectors are missing: {missing}")
+
+
 def validate_contract(contract: Mapping[str, Any]) -> None:
     """Validate cross-field invariants before generating any output."""
 
+    version = int(contract["protocol_version"])
+    if version not in {1, 2}:
+        raise ContractError(f"unsupported protocol version {version}")
     if contract["byte_order"] != "little":
-        raise ContractError("protocol v1 must use explicit little-endian encoding")
+        raise ContractError("protocol must use explicit little-endian encoding")
     if int(contract["magic"]) != 0xDEADBEEF:
-        raise ContractError("protocol v1 magic must be 0xDEADBEEF")
-    if int(contract["protocol_version"]) != 1:
-        raise ContractError("this generator only accepts protocol version 1")
+        raise ContractError("protocol magic must be 0xDEADBEEF")
+    if version == 2:
+        validate_rle_contract(contract)
 
     scalar_types = contract["scalar_types"]
     if set(scalar_types) != set(INTEGER_WIDTHS):
@@ -143,7 +366,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     trailer = contract["trailer"]
     trailer_size = int(trailer["size"])
     if trailer_size != 4 or trailer["type"] != "u32":
-        raise ContractError("the v1 trailer must be one little-endian uint32")
+        raise ContractError("the trailer must be one little-endian uint32")
 
     limits = contract["limits"]
     data_frame_bytes = int(limits["data_frame_bytes"])
@@ -153,7 +376,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     max_command_frame_bytes = int(limits["max_command_frame_bytes"])
     max_command_payload_bytes = int(limits["max_command_payload_bytes"])
     if data_frame_bytes != 4096:
-        raise ContractError("v1 data frames must be exactly 4096 bytes")
+        raise ContractError("the RAW data-frame envelope must be exactly 4096 bytes")
     if max_data_frame_bytes != data_frame_bytes:
         raise ContractError("the fixed data frame must also be the maximum data frame")
     if min_frame_bytes != header_size + trailer_size:
@@ -430,10 +653,11 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
 
     checksums = enum_map(contract["checksum_algorithms"])
     validate_enum_width("checksum_algorithms", contract["checksum_algorithms"], 8)
+    enabled_key = f"enabled_in_v{version}"
     enabled_checksums = {
         str(entry["name"])
         for entry in contract["checksum_algorithms"]
-        if bool(entry["enabled_in_v1"])
+        if bool(entry[enabled_key])
     }
     if checksums.get("NONE_RESERVED") != 0:
         raise ContractError("checksum algorithm zero must remain invalid/reserved")
@@ -447,7 +671,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         raise ContractError("enabled checksum IDs must fit the uint32 capability mask")
     bootstrap_checksum = contract.get("bootstrap_checksum_algorithm")
     if bootstrap_checksum != "ADLER32":
-        raise ContractError("protocol v1 bootstrap checksum must remain Adler-32")
+        raise ContractError("the bootstrap checksum must remain Adler-32")
     if bootstrap_checksum not in enabled_checksums:
         raise ContractError("bootstrap checksum must be enabled")
     if contract["default_checksum_algorithm"] not in enabled_checksums:
@@ -541,6 +765,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         "adc_initialization_error": 32,
         "adc_trigger_configuration_flag": 16,
         "adc_trigger_error": 32,
+        **({"configuration_encoding": 8, "frame_encoding": 8} if version == 2 else {}),
     }.items():
         enum_map(contract["enums"][enum_name])
         validate_enum_width(enum_name, contract["enums"][enum_name], bits)
@@ -557,13 +782,20 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
             f"golden fixtures must cover every frame kind; missing={missing}, "
             f"extra={extra}"
         )
-    fixtures_by_kind = {str(fixture["kind"]): fixture for fixture in fixtures}
     for command in contract["command_kinds"]:
-        request = fixtures_by_kind[str(command["request_kind"])]
-        response = fixtures_by_kind[str(command["response_kind"])]
-        if int(request["request_id"]) != int(response["request_id"]):
+        request_ids = {
+            int(fixture["request_id"])
+            for fixture in fixtures
+            if str(fixture["kind"]) == str(command["request_kind"])
+        }
+        response_ids = {
+            int(fixture["request_id"])
+            for fixture in fixtures
+            if str(fixture["kind"]) == str(command["response_kind"])
+        }
+        if request_ids.isdisjoint(response_ids):
             raise ContractError(
-                f"{command['name']} golden response must echo its request ID"
+                f"{command['name']} needs a golden response that echoes a request ID"
             )
 
 
@@ -594,6 +826,8 @@ def python_enum(
 def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     """Render Python constants and enums from the canonical contract."""
 
+    version = int(contract["protocol_version"])
+    source_relative, _, _, _, _ = generated_paths(contract)
     header = contract["header"]
     trailer = contract["trailer"]
     limits = contract["limits"]
@@ -627,11 +861,55 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     magic_bytes_literal = "".join(
         f"\\x{byte:02x}" for byte in int(contract["magic"]).to_bytes(4, "little")
     )
+    extension_limit_lines = (
+        [f"MIN_RLE_DATA_FRAME_BYTES = {int(limits['min_rle_data_frame_bytes'])}"]
+        if version == 2
+        else []
+    )
+    compression_lines: list[str] = []
+    if version == 2:
+        compression = contract["compression"]
+        adc_compression = compression["streams"]["ADC_DATA"]
+        gpio_compression = compression["streams"]["GPIO_DATA"]
+        compression_lines = [
+            f"RLE_RUN_LENGTH_MIN = {int(compression['run_length']['minimum'])}",
+            f"RLE_RUN_LENGTH_MAX = {int(compression['run_length']['maximum'])}",
+            (
+                "CONTROL_HEADER_ENCODING = "
+                f"{int(compression['control_header_encoding'])}"
+            ),
+            f"ADC_RLE_RECORD_BYTES = {int(adc_compression['rle_record_bytes'])}",
+            (
+                "ADC_RLE_MAX_SELECTED_RUNS = "
+                f"{int(adc_compression['maximum_selected_run_count'])}"
+            ),
+            (
+                "ADC_RLE_MAX_SELECTED_PAYLOAD_BYTES = "
+                f"{int(adc_compression['maximum_selected_payload_bytes'])}"
+            ),
+            (
+                "ADC_RLE_MAX_SELECTED_FRAME_BYTES = "
+                f"{int(adc_compression['maximum_selected_total_bytes'])}"
+            ),
+            f"GPIO_RLE_RECORD_BYTES = {int(gpio_compression['rle_record_bytes'])}",
+            (
+                "GPIO_RLE_MAX_SELECTED_RUNS = "
+                f"{int(gpio_compression['maximum_selected_run_count'])}"
+            ),
+            (
+                "GPIO_RLE_MAX_SELECTED_PAYLOAD_BYTES = "
+                f"{int(gpio_compression['maximum_selected_payload_bytes'])}"
+            ),
+            (
+                "GPIO_RLE_MAX_SELECTED_FRAME_BYTES = "
+                f"{int(gpio_compression['maximum_selected_total_bytes'])}"
+            ),
+        ]
 
     lines = [
-        '"""Generated protocol-v1 constants. Do not edit by hand.',
+        f'"""Generated protocol-v{version} constants. Do not edit by hand.',
         "",
-        "Source: protocol/protocol-v1.json",
+        f"Source: {source_relative}",
         f"Source SHA-256: {source_sha256}",
         '"""',
         "",
@@ -650,6 +928,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"MIN_FRAME_BYTES = {int(limits['min_frame_bytes'])}",
         f"DATA_FRAME_BYTES = {int(limits['data_frame_bytes'])}",
         f"MAX_DATA_FRAME_BYTES = {int(limits['max_data_frame_bytes'])}",
+        *extension_limit_lines,
         f"DATA_PAYLOAD_BYTES = {data_payload_bytes}",
         f"MAX_CONTROL_FRAME_BYTES = {int(limits['max_control_frame_bytes'])}",
         "MAX_CONTROL_PAYLOAD_BYTES = MAX_CONTROL_FRAME_BYTES - HEADER_SIZE - TRAILER_SIZE",
@@ -782,6 +1061,7 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"ADC_CONTAINER_BITS = {int(layouts['adc']['container_bits'])}",
         f"GPIO_SAMPLES_PER_FRAME = {int(layouts['gpio']['items_per_frame'])}",
         f"GPIO_PINS_BY_BIT = {tuple(layouts['gpio']['pins_by_bit'])!r}",
+        *compression_lines,
         "UINT32_MAX = 0xFFFFFFFF",
         "UINT64_MAX = 0xFFFFFFFFFFFFFFFF",
         "",
@@ -824,6 +1104,14 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         )
     )
     lines.extend(python_enum("Source", contract["enums"]["source"]))
+    if version == 2:
+        lines.extend(
+            python_enum(
+                "ConfigurationEncoding",
+                contract["enums"]["configuration_encoding"],
+            )
+        )
+        lines.extend(python_enum("FrameEncoding", contract["enums"]["frame_encoding"]))
     lines.extend(python_enum("BoardId", contract["enums"]["board_id"]))
     lines.extend(python_enum("McuId", contract["enums"]["mcu_id"]))
     lines.extend(python_enum("BenchmarkVector", contract["enums"]["benchmark_vector"]))
@@ -913,13 +1201,13 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         ]
     )
     for entry in checksums:
-        if entry["enabled_in_v1"]:
+        if entry[f"enabled_in_v{version}"]:
             lines.append(f"        ChecksumAlgorithm.{entry['name']},")
     lines.extend(["    }", ")", ""])
     supported_checksum_mask = sum(
         1 << checksum_values[str(entry["name"])]
         for entry in checksums
-        if entry["enabled_in_v1"]
+        if entry[f"enabled_in_v{version}"]
     )
     lines.append(f"SUPPORTED_CHECKSUM_MASK = {supported_checksum_mask}")
     lines.append(
@@ -1097,6 +1385,8 @@ def cpp_enum(
 def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     """Render portable C++ constants without relying on packed structs."""
 
+    version = int(contract["protocol_version"])
+    source_relative, _, _, _, _ = generated_paths(contract)
     header = contract["header"]
     trailer = contract["trailer"]
     limits = contract["limits"]
@@ -1123,16 +1413,77 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     )
     bootstrap_checksum = snake_to_pascal(str(contract["bootstrap_checksum_algorithm"]))
     default_checksum = snake_to_pascal(str(contract["default_checksum_algorithm"]))
+    extension_limit_lines = (
+        [
+            (
+                "inline constexpr std::size_t kMinRleDataFrameBytes = "
+                f"{int(limits['min_rle_data_frame_bytes'])}U;"
+            )
+        ]
+        if version == 2
+        else []
+    )
+    compression_lines: list[str] = []
+    if version == 2:
+        compression = contract["compression"]
+        adc_compression = compression["streams"]["ADC_DATA"]
+        gpio_compression = compression["streams"]["GPIO_DATA"]
+        compression_lines = [
+            (
+                "inline constexpr std::uint16_t kRleRunLengthMin = "
+                f"{int(compression['run_length']['minimum'])}U;"
+            ),
+            (
+                "inline constexpr std::uint16_t kRleRunLengthMax = "
+                f"{int(compression['run_length']['maximum'])}U;"
+            ),
+            (
+                "inline constexpr std::uint8_t kControlHeaderEncoding = "
+                f"{int(compression['control_header_encoding'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kAdcRleRecordBytes = "
+                f"{int(adc_compression['rle_record_bytes'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kAdcRleMaxSelectedRuns = "
+                f"{int(adc_compression['maximum_selected_run_count'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kAdcRleMaxSelectedPayloadBytes = "
+                f"{int(adc_compression['maximum_selected_payload_bytes'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kAdcRleMaxSelectedFrameBytes = "
+                f"{int(adc_compression['maximum_selected_total_bytes'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kGpioRleRecordBytes = "
+                f"{int(gpio_compression['rle_record_bytes'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kGpioRleMaxSelectedRuns = "
+                f"{int(gpio_compression['maximum_selected_run_count'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kGpioRleMaxSelectedPayloadBytes = "
+                f"{int(gpio_compression['maximum_selected_payload_bytes'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kGpioRleMaxSelectedFrameBytes = "
+                f"{int(gpio_compression['maximum_selected_total_bytes'])}U;"
+            ),
+        ]
 
     lines = [
-        "// Generated from protocol/protocol-v1.json. Do not edit by hand.",
+        f"// Generated from {source_relative}. Do not edit by hand.",
         f"// Source SHA-256: {source_sha256}",
         "#pragma once",
         "",
         "#include <cstddef>",
         "#include <cstdint>",
         "",
-        "namespace thingdaq::protocol_v1 {",
+        f"namespace thingdaq::protocol_v{version} {{",
         "",
         f'inline constexpr char kSourceSha256[] = "{source_sha256}";',
         f"inline constexpr std::uint32_t kMagic = 0x{int(contract['magic']):08X}U;",
@@ -1143,6 +1494,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"inline constexpr std::size_t kMinFrameBytes = {int(limits['min_frame_bytes'])}U;",
         f"inline constexpr std::size_t kDataFrameBytes = {int(limits['data_frame_bytes'])}U;",
         f"inline constexpr std::size_t kMaxDataFrameBytes = {int(limits['max_data_frame_bytes'])}U;",
+        *extension_limit_lines,
         f"inline constexpr std::size_t kDataPayloadBytes = {data_payload_bytes}U;",
         (
             "inline constexpr std::size_t kMaxControlFrameBytes = "
@@ -1356,6 +1708,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         "inline constexpr std::uint8_t kGpioPinsByBit[] = {"
         + ", ".join(f"{int(pin)}U" for pin in layouts["gpio"]["pins_by_bit"])
         + "};",
+        *compression_lines,
         "",
     ]
     for field in header["fields"]:
@@ -1391,6 +1744,21 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     )
     lines.extend(cpp_enum("Capability", "std::uint32_t", capabilities))
     lines.extend(cpp_enum("Source", "std::uint8_t", contract["enums"]["source"]))
+    if version == 2:
+        lines.extend(
+            cpp_enum(
+                "ConfigurationEncoding",
+                "std::uint8_t",
+                contract["enums"]["configuration_encoding"],
+            )
+        )
+        lines.extend(
+            cpp_enum(
+                "FrameEncoding",
+                "std::uint8_t",
+                contract["enums"]["frame_encoding"],
+            )
+        )
     lines.extend(cpp_enum("BoardId", "std::uint16_t", contract["enums"]["board_id"]))
     lines.extend(cpp_enum("McuId", "std::uint16_t", contract["enums"]["mcu_id"]))
     lines.extend(
@@ -1497,7 +1865,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
                 sum(
                     1 << int(entry["value"])
                     for entry in checksums
-                    if entry["enabled_in_v1"]
+                    if entry[f"enabled_in_v{version}"]
                 )
             )
             + "U;",
@@ -1667,7 +2035,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             "              kDataPayloadBytes);",
             "static_assert(kGpioSamplesPerFrame == kDataPayloadBytes);",
             "",
-            "}  // namespace thingdaq::protocol_v1",
+            f"}}  // namespace thingdaq::protocol_v{version}",
             "",
         ]
     )
@@ -1754,6 +2122,44 @@ def encode_fixture_payload(
         count = int(contract["data_layouts"]["gpio"]["items_per_frame"])
         start_index = int(payload_spec["start_index"])
         return bytes((start_index + offset) & 0xFF for offset in range(count))
+    if pattern == "adc_alternating_pairs":
+        count = int(contract["data_layouts"]["adc"]["items_per_frame"])
+        payload = bytearray()
+        for index in range(count):
+            payload.extend(
+                struct.pack("<HH", 0, 0x0FFF)
+                if index % 2 == 0
+                else struct.pack("<HH", 0x0FFF, 0)
+            )
+        return bytes(payload)
+    if pattern == "gpio_alternating_bytes":
+        count = int(contract["data_layouts"]["gpio"]["items_per_frame"])
+        return bytes(0x55 if index % 2 == 0 else 0xAA for index in range(count))
+    if pattern == "rle_records":
+        kind_name = str(fixture["kind"])
+        records = payload_spec["records"]
+        payload = bytearray()
+        for record in records:
+            run_length = int(record["run_length"])
+            if not 1 <= run_length <= 0xFFFF:
+                raise ContractError("golden RLE run length is outside u16 bounds")
+            payload.extend(struct.pack("<H", run_length))
+            item = record["item"]
+            if kind_name == "ADC_DATA":
+                if not isinstance(item, Sequence) or len(item) != 2:
+                    raise ContractError("ADC RLE items must contain adc0 and adc1")
+                adc0, adc1 = (int(value) for value in item)
+                if not 0 <= adc0 <= 0x0FFF or not 0 <= adc1 <= 0x0FFF:
+                    raise ContractError("ADC RLE item exceeds the 12-bit code range")
+                payload.extend(struct.pack("<HH", adc0, adc1))
+            elif kind_name == "GPIO_DATA":
+                gpio = int(item)
+                if not 0 <= gpio <= 0xFF:
+                    raise ContractError("GPIO RLE item exceeds one byte")
+                payload.append(gpio)
+            else:
+                raise ContractError("RLE records are valid only for data fixtures")
+        return bytes(payload)
     if pattern is not None:
         raise ContractError(f"unknown golden payload pattern: {pattern}")
 
@@ -1778,6 +2184,37 @@ def compute_golden_checksum(data: bytes, algorithm_name: str) -> int:
     raise ContractError(f"no golden checksum implementation for {algorithm_name}")
 
 
+def validate_generated_rle_payload(
+    contract: Mapping[str, Any],
+    kind_name: str,
+    payload: bytes,
+    item_count: int,
+) -> int:
+    """Validate a canonical generated RLE payload and return its run count."""
+
+    stream = contract["compression"]["streams"][kind_name]
+    record_bytes = int(stream["rle_record_bytes"])
+    item_bytes = int(stream["logical_item_bytes"])
+    if not payload or len(payload) % record_bytes:
+        raise ContractError(f"{kind_name} RLE payload has an incomplete record")
+    decoded_count = 0
+    previous_item: bytes | None = None
+    for offset in range(0, len(payload), record_bytes):
+        run_length = struct.unpack_from("<H", payload, offset)[0]
+        item = payload[offset + 2 : offset + 2 + item_bytes]
+        if run_length == 0:
+            raise ContractError(f"{kind_name} RLE payload contains a zero run")
+        if item == previous_item:
+            raise ContractError(f"{kind_name} RLE payload has adjacent equal records")
+        if run_length > item_count - decoded_count:
+            raise ContractError(f"{kind_name} RLE payload exceeds item_count")
+        decoded_count += run_length
+        previous_item = item
+    if decoded_count != item_count:
+        raise ContractError(f"{kind_name} RLE run sum disagrees with item_count")
+    return len(payload) // record_bytes
+
+
 def build_golden_frames(
     contract: Mapping[str, Any],
 ) -> tuple[dict[str, bytes], list[dict[str, Any]]]:
@@ -1798,6 +2235,10 @@ def build_golden_frames(
     checksum_values = enum_map(contract["checksum_algorithms"])
     bootstrap_checksum_name = str(contract["bootstrap_checksum_algorithm"])
     default_checksum_name = str(contract["default_checksum_algorithm"])
+    version = int(contract["protocol_version"])
+    frame_encodings = (
+        enum_map(contract["enums"]["frame_encoding"]) if version == 2 else {"RAW": 0}
+    )
 
     outputs: dict[str, bytes] = {}
     manifest_entries: list[dict[str, Any]] = []
@@ -1839,12 +2280,36 @@ def build_golden_frames(
         first_sample_ticks = int(fixture.get("first_sample_ticks", 0))
         item_count = int(fixture.get("item_count", 0))
         total_length = int(header["size"]) + len(payload) + trailer_size
+        encoding_name = str(fixture.get("encoding", "RAW"))
+        if encoding_name not in frame_encodings:
+            raise ContractError(f"fixture {fixture_name} has an unknown encoding")
+        encoding = frame_encodings[encoding_name]
+        run_count: int | None = None
         if kind_spec["class"] == "data":
-            if total_length != int(limits["data_frame_bytes"]):
-                raise ContractError(f"fixture {fixture_name} is not 4096 bytes")
+            if version == 2 and "encoding" not in fixture:
+                raise ContractError(
+                    f"protocol-v2 data fixture {fixture_name} needs an encoding"
+                )
+            if encoding_name == "RAW":
+                if total_length != int(limits["data_frame_bytes"]):
+                    raise ContractError(f"RAW fixture {fixture_name} is not 4096 bytes")
+            else:
+                run_count = validate_generated_rle_payload(
+                    contract,
+                    kind_name,
+                    payload,
+                    item_count,
+                )
+                stream = contract["compression"]["streams"][kind_name]
+                if total_length > int(stream["maximum_selected_total_bytes"]):
+                    raise ContractError(
+                        f"RLE fixture {fixture_name} is not strictly smaller than RAW"
+                    )
             if request_id != 0:
                 raise ContractError(f"data fixture {fixture_name} has a request ID")
         else:
+            if encoding != 0:
+                raise ContractError(f"control fixture {fixture_name} selects encoding")
             if total_length > int(limits["max_control_frame_bytes"]):
                 raise ContractError(f"fixture {fixture_name} exceeds control bound")
             if kind_spec["class"] == "request" and total_length > int(
@@ -1868,7 +2333,7 @@ def build_golden_frames(
             flags,
             int(header["size"]),
             checksum_id,
-            0,
+            encoding,
             total_length,
             len(payload),
             run_id,
@@ -1898,6 +2363,13 @@ def build_golden_frames(
             "sequence": sequence,
             "total_length": len(frame),
         }
+        if version == 2:
+            manifest_entry["encoding"] = encoding_name
+            manifest_entry["encoding_selector"] = encoding
+            if run_count is not None:
+                manifest_entry["run_count"] = run_count
+            if "selection_reason" in fixture:
+                manifest_entry["selection_reason"] = str(fixture["selection_reason"])
         if len(frame) <= 256:
             manifest_entry["frame_hex"] = frame.hex()
         manifest_entries.append(manifest_entry)
@@ -1905,30 +2377,217 @@ def build_golden_frames(
     return outputs, manifest_entries
 
 
+def build_golden_streams(
+    contract: Mapping[str, Any],
+    frame_outputs: Mapping[str, bytes],
+) -> tuple[dict[str, bytes], list[dict[str, Any]]]:
+    """Build deterministic multi-frame byte streams from named golden frames."""
+
+    outputs: dict[str, bytes] = {}
+    entries: list[dict[str, Any]] = []
+    for stream in contract.get("golden_streams", []):
+        name = str(stream["name"])
+        frame_names = [str(value) for value in stream["frames"]]
+        frame_files = [f"{frame_name}.bin" for frame_name in frame_names]
+        contents = b"".join(frame_outputs[file_name] for file_name in frame_files)
+        output_name = f"{name}.bin"
+        if output_name in frame_outputs or output_name in outputs:
+            raise ContractError(f"duplicate generated stream output {output_name}")
+        outputs[output_name] = contents
+        entries.append(
+            {
+                "file": output_name,
+                "frame_count": len(frame_files),
+                "frames": frame_files,
+                "stream_sha256": hashlib.sha256(contents).hexdigest(),
+                "total_length": len(contents),
+            }
+        )
+    return outputs, entries
+
+
+def _rechecksum_mutated_frame(contract: Mapping[str, Any], frame: bytearray) -> None:
+    header_fields = {
+        str(field["name"]): field for field in contract["header"]["fields"]
+    }
+    checksum_offset = int(header_fields["checksum_algorithm"]["offset"])
+    checksum_id = frame[checksum_offset]
+    checksum_names = {
+        value: name for name, value in enum_map(contract["checksum_algorithms"]).items()
+    }
+    if checksum_id not in checksum_names:
+        raise ContractError("malformed fixture base selects an unknown checksum")
+    checksum = compute_golden_checksum(bytes(frame[:-4]), checksum_names[checksum_id])
+    struct.pack_into("<I", frame, len(frame) - 4, checksum)
+
+
+def _mutate_frame(
+    contract: Mapping[str, Any],
+    base_fixture: Mapping[str, Any],
+    base_frame: bytes,
+    mutation: Mapping[str, Any],
+) -> bytes:
+    """Apply one declarative negative-vector mutation to a valid base frame."""
+
+    result = bytearray(base_frame)
+    mutation_type = str(mutation["type"])
+    header_fields = {
+        str(field["name"]): field for field in contract["header"]["fields"]
+    }
+    kind_name = str(base_fixture["kind"])
+    stream = contract.get("compression", {}).get("streams", {}).get(kind_name)
+
+    if mutation_type == "set_run_length":
+        if not isinstance(stream, Mapping):
+            raise ContractError("set_run_length needs an RLE data-frame base")
+        record_bytes = int(stream["rle_record_bytes"])
+        record_index = int(mutation["record_index"])
+        offset = int(contract["header"]["size"]) + record_index * record_bytes
+        struct.pack_into("<H", result, offset, int(mutation["value"]))
+    elif mutation_type == "copy_previous_item":
+        if not isinstance(stream, Mapping):
+            raise ContractError("copy_previous_item needs an RLE data-frame base")
+        record_bytes = int(stream["rle_record_bytes"])
+        item_bytes = int(stream["logical_item_bytes"])
+        record_index = int(mutation["record_index"])
+        if record_index <= 0:
+            raise ContractError("copy_previous_item needs a positive record index")
+        payload_start = int(contract["header"]["size"])
+        previous = payload_start + (record_index - 1) * record_bytes + 2
+        current = payload_start + record_index * record_bytes + 2
+        result[current : current + item_bytes] = result[
+            previous : previous + item_bytes
+        ]
+    elif mutation_type == "truncate_payload":
+        count = int(mutation.get("bytes", 1))
+        if not 0 < count < len(result) - int(contract["header"]["size"]):
+            raise ContractError("truncate_payload byte count is invalid")
+        del result[
+            -int(contract["trailer"]["size"]) - count : -int(
+                contract["trailer"]["size"]
+            )
+        ]
+        payload_length = (
+            len(result)
+            - int(contract["header"]["size"])
+            - int(contract["trailer"]["size"])
+        )
+        struct.pack_into(
+            "<I",
+            result,
+            int(header_fields["payload_length"]["offset"]),
+            payload_length,
+        )
+        struct.pack_into(
+            "<I",
+            result,
+            int(header_fields["total_length"]["offset"]),
+            len(result),
+        )
+    elif mutation_type == "set_header_fields":
+        for field_name, raw_value in mutation["values"].items():
+            if field_name not in header_fields:
+                raise ContractError(f"unknown header field mutation {field_name}")
+            field = header_fields[field_name]
+            field_type = str(field["type"])
+            struct.pack_into(
+                "<" + INTEGER_FORMATS[field_type],
+                result,
+                int(field["offset"]),
+                int(raw_value),
+            )
+    elif mutation_type == "corrupt_checksum":
+        byte_from_end = int(mutation.get("byte_from_end", 1))
+        if not 1 <= byte_from_end <= int(contract["trailer"]["size"]):
+            raise ContractError("checksum corruption must target the trailer")
+        result[-byte_from_end] ^= int(mutation.get("xor", 1))
+        return bytes(result)
+    else:
+        raise ContractError(f"unknown malformed-fixture mutation {mutation_type}")
+
+    _rechecksum_mutated_frame(contract, result)
+    return bytes(result)
+
+
+def build_malformed_frames(
+    contract: Mapping[str, Any],
+    frame_outputs: Mapping[str, bytes],
+) -> tuple[dict[str, bytes], list[dict[str, Any]]]:
+    """Build deterministic corrupt frames that exercise each rejection class."""
+
+    fixtures_by_name = {
+        str(fixture["name"]): fixture for fixture in contract["golden_fixtures"]
+    }
+    outputs: dict[str, bytes] = {}
+    entries: list[dict[str, Any]] = []
+    for fixture in contract.get("malformed_fixtures", []):
+        name = str(fixture["name"])
+        base_name = str(fixture["base"])
+        base_file = f"{base_name}.bin"
+        frame = _mutate_frame(
+            contract,
+            fixtures_by_name[base_name],
+            frame_outputs[base_file],
+            fixture["mutation"],
+        )
+        output_name = f"{name}.bin"
+        if output_name in frame_outputs or output_name in outputs:
+            raise ContractError(f"duplicate malformed output {output_name}")
+        outputs[output_name] = frame
+        entry: dict[str, Any] = {
+            "base": base_file,
+            "expected_error": str(fixture["expected_error"]),
+            "file": output_name,
+            "frame_sha256": hashlib.sha256(frame).hexdigest(),
+            "mutation": fixture["mutation"],
+            "physical_length": len(frame),
+        }
+        if len(frame) <= 256:
+            entry["frame_hex"] = frame.hex()
+        entries.append(entry)
+    return outputs, entries
+
+
 def expected_outputs(
     contract: Mapping[str, Any], source_bytes: bytes
 ) -> dict[Path, bytes]:
     """Return all expected generated paths and exact bytes."""
 
+    (
+        source_relative,
+        python_output_path,
+        cpp_output_path,
+        fixture_directory,
+        manifest_path,
+    ) = generated_paths(contract)
     source_sha256 = hashlib.sha256(source_bytes).hexdigest()
     fixture_outputs, manifest_entries = build_golden_frames(contract)
+    stream_outputs, stream_entries = build_golden_streams(contract, fixture_outputs)
+    malformed_outputs, malformed_entries = build_malformed_frames(
+        contract, fixture_outputs
+    )
     manifest = {
         "byte_order": contract["byte_order"],
         "fixtures": manifest_entries,
         "generator": "tools/generate_protocol.py",
         "protocol_version": int(contract["protocol_version"]),
-        "source": "protocol/protocol-v1.json",
+        "source": source_relative,
         "source_sha256": source_sha256,
     }
+    if stream_entries:
+        manifest["streams"] = stream_entries
+    if malformed_entries:
+        manifest["malformed_fixtures"] = malformed_entries
     outputs = {
-        PYTHON_OUTPUT_PATH: render_python(contract, source_sha256),
-        CPP_OUTPUT_PATH: render_cpp(contract, source_sha256),
-        MANIFEST_PATH: (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(),
+        python_output_path: render_python(contract, source_sha256),
+        cpp_output_path: render_cpp(contract, source_sha256),
+        manifest_path: (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(),
     }
+    all_fixture_outputs = fixture_outputs | stream_outputs | malformed_outputs
     outputs.update(
         {
-            FIXTURE_DIRECTORY / name: contents
-            for name, contents in fixture_outputs.items()
+            fixture_directory / name: contents
+            for name, contents in all_fixture_outputs.items()
         }
     )
     return outputs
@@ -1940,6 +2599,22 @@ def relative_paths(paths: Iterable[Path]) -> list[str]:
     return [str(path.relative_to(REPOSITORY_ROOT)) for path in paths]
 
 
+def generated_fixture_directories(outputs: Mapping[Path, bytes]) -> set[Path]:
+    """Return every fixture directory represented by a generated manifest."""
+
+    return {path.parent for path in outputs if path.name == "manifest.json"}
+
+
+def orphaned_fixture_paths(outputs: Mapping[Path, bytes]) -> list[Path]:
+    """Find generated-looking fixture files not declared by either contract."""
+
+    orphans: list[Path] = []
+    for directory in generated_fixture_directories(outputs):
+        expected = {path for path in outputs if path.parent == directory}
+        orphans.extend(path for path in directory.glob("*.bin") if path not in expected)
+    return sorted(orphans)
+
+
 def check_outputs(outputs: Mapping[Path, bytes]) -> int:
     """Return zero only when every generated output matches exactly."""
 
@@ -1948,18 +2623,10 @@ def check_outputs(outputs: Mapping[Path, bytes]) -> int:
         for path, expected in outputs.items()
         if not path.is_file() or path.read_bytes() != expected
     ]
-    if MANIFEST_PATH in outputs:
-        expected_fixture_paths = {
-            path for path in outputs if path.parent == FIXTURE_DIRECTORY
-        }
-        drifted.extend(
-            path
-            for path in FIXTURE_DIRECTORY.glob("*.bin")
-            if path not in expected_fixture_paths
-        )
+    drifted.extend(orphaned_fixture_paths(outputs))
     if drifted:
         print("Generated protocol files are missing or stale:", file=sys.stderr)
-        for relative_path in relative_paths(drifted):
+        for relative_path in relative_paths(sorted(set(drifted))):
             print(f"  {relative_path}", file=sys.stderr)
         print(
             "Run: python3 tools/generate_protocol.py",
@@ -1974,15 +2641,9 @@ def write_outputs(outputs: Mapping[Path, bytes]) -> int:
     """Write only changed outputs, preserving mtimes for identical files."""
 
     changed: list[Path] = []
-    removed: list[Path] = []
-    if MANIFEST_PATH in outputs:
-        expected_fixture_paths = {
-            path for path in outputs if path.parent == FIXTURE_DIRECTORY
-        }
-        for path in FIXTURE_DIRECTORY.glob("*.bin"):
-            if path not in expected_fixture_paths:
-                path.unlink()
-                removed.append(path)
+    removed = orphaned_fixture_paths(outputs)
+    for path in removed:
+        path.unlink()
     for path, expected in outputs.items():
         if path.is_file() and path.read_bytes() == expected:
             continue
@@ -2013,9 +2674,18 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
-        contract, source_bytes = load_contract()
-        validate_contract(contract)
-        outputs = expected_outputs(contract, source_bytes)
+        outputs: dict[Path, bytes] = {}
+        for source_path in SOURCE_PATHS:
+            contract, source_bytes = load_contract(source_path)
+            validate_contract(contract)
+            version_outputs = expected_outputs(contract, source_bytes)
+            collisions = set(outputs) & set(version_outputs)
+            if collisions:
+                raise ContractError(
+                    "generated output collision: "
+                    + ", ".join(relative_paths(sorted(collisions)))
+                )
+            outputs.update(version_outputs)
     except (ContractError, KeyError, TypeError, json.JSONDecodeError) as error:
         print(f"Invalid protocol contract: {error}", file=sys.stderr)
         return 2

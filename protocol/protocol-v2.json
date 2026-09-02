@@ -1561,6 +1561,38 @@
       "payload": {"pattern": "adc_interleaved_ramp", "start_index": 0}
     },
     {
+      "name": "adc-rle-data",
+      "kind": "ADC_DATA",
+      "encoding": "RLE",
+      "flags": ["SYNTHETIC"],
+      "run_id": 7,
+      "sequence": 1,
+      "request_id": 0,
+      "first_sample_ticks": 8096,
+      "item_count": 1012,
+      "payload": {
+        "pattern": "rle_records",
+        "records": [
+          {"run_length": 400, "item": [291, 1110]},
+          {"run_length": 1, "item": [16, 32]},
+          {"run_length": 611, "item": [2748, 3567]}
+        ]
+      }
+    },
+    {
+      "name": "adc-raw-fallback-data",
+      "kind": "ADC_DATA",
+      "encoding": "RAW",
+      "selection_reason": "rle_not_smaller",
+      "flags": ["SYNTHETIC"],
+      "run_id": 7,
+      "sequence": 2,
+      "request_id": 0,
+      "first_sample_ticks": 16192,
+      "item_count": 1012,
+      "payload": {"pattern": "adc_alternating_pairs"}
+    },
+    {
       "name": "gpio-data",
       "kind": "GPIO_DATA",
       "encoding": "RAW",
@@ -1571,6 +1603,38 @@
       "first_sample_ticks": 0,
       "item_count": 4048,
       "payload": {"pattern": "gpio_byte_ramp", "start_index": 0}
+    },
+    {
+      "name": "gpio-rle-data",
+      "kind": "GPIO_DATA",
+      "encoding": "RLE",
+      "flags": ["SYNTHETIC"],
+      "run_id": 7,
+      "sequence": 1,
+      "request_id": 0,
+      "first_sample_ticks": 8096,
+      "item_count": 4048,
+      "payload": {
+        "pattern": "rle_records",
+        "records": [
+          {"run_length": 2048, "item": 0},
+          {"run_length": 1000, "item": 255},
+          {"run_length": 1000, "item": 85}
+        ]
+      }
+    },
+    {
+      "name": "gpio-raw-fallback-data",
+      "kind": "GPIO_DATA",
+      "encoding": "RAW",
+      "selection_reason": "rle_not_smaller",
+      "flags": ["SYNTHETIC"],
+      "run_id": 7,
+      "sequence": 2,
+      "request_id": 0,
+      "first_sample_ticks": 16192,
+      "item_count": 4048,
+      "payload": {"pattern": "gpio_alternating_bytes"}
     },
     {
       "name": "info-request",
@@ -1594,9 +1658,30 @@
       }
     },
     {
+      "name": "configure-rle-request",
+      "kind": "CONFIGURE_REQUEST",
+      "request_id": 12,
+      "payload": {
+        "schema": "configure_request",
+        "values": {
+          "stream_mask": 3,
+          "source": 1,
+          "data_checksum_algorithm": 1,
+          "encoding": 1,
+          "data_frame_bytes": 4096
+        }
+      }
+    },
+    {
       "name": "start-request",
       "kind": "START_REQUEST",
       "request_id": 3,
+      "payload": {"schema": "empty", "values": {}}
+    },
+    {
+      "name": "start-rle-request",
+      "kind": "START_REQUEST",
+      "request_id": 13,
       "payload": {"schema": "empty", "values": {}}
     },
     {
@@ -1831,6 +1916,23 @@
       }
     },
     {
+      "name": "configure-rle-response",
+      "kind": "CONFIGURE_RESPONSE",
+      "request_id": 12,
+      "payload": {
+        "schema": "configure_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "stream_mask": 3,
+          "source": 1,
+          "data_checksum_algorithm": 1,
+          "encoding": 1,
+          "data_frame_bytes": 4096
+        }
+      }
+    },
+    {
       "name": "start-response",
       "kind": "START_RESPONSE",
       "run_id": 7,
@@ -1844,6 +1946,24 @@
           "source": 1,
           "data_checksum_algorithm": 1,
           "encoding": 0,
+          "data_frame_bytes": 4096
+        }
+      }
+    },
+    {
+      "name": "start-rle-response",
+      "kind": "START_RESPONSE",
+      "run_id": 8,
+      "request_id": 13,
+      "payload": {
+        "schema": "configure_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "stream_mask": 3,
+          "source": 1,
+          "data_checksum_algorithm": 1,
+          "encoding": 1,
           "data_frame_bytes": 4096
         }
       }
@@ -2316,6 +2436,87 @@
           "rejected_version": 1
         }
       }
+    }
+  ],
+  "golden_streams": [
+    {
+      "name": "adc-mixed-raw-rle-stream",
+      "frames": ["adc-data", "adc-rle-data", "adc-raw-fallback-data"]
+    },
+    {
+      "name": "gpio-mixed-raw-rle-stream",
+      "frames": ["gpio-data", "gpio-rle-data", "gpio-raw-fallback-data"]
+    }
+  ],
+  "malformed_fixtures": [
+    {
+      "name": "gpio-rle-zero-run",
+      "base": "gpio-rle-data",
+      "expected_error": "zero_run",
+      "mutation": {
+        "type": "set_run_length",
+        "record_index": 0,
+        "value": 0
+      }
+    },
+    {
+      "name": "gpio-rle-overflowing-run",
+      "base": "gpio-rle-data",
+      "expected_error": "decoded_count_overflow",
+      "mutation": {
+        "type": "set_run_length",
+        "record_index": 0,
+        "value": 65535
+      }
+    },
+    {
+      "name": "adc-rle-truncated-item",
+      "base": "adc-rle-data",
+      "expected_error": "truncated_item",
+      "mutation": {"type": "truncate_payload", "bytes": 1}
+    },
+    {
+      "name": "adc-rle-noncanonical-adjacent",
+      "base": "adc-rle-data",
+      "expected_error": "adjacent_equal_runs",
+      "mutation": {"type": "copy_previous_item", "record_index": 1}
+    },
+    {
+      "name": "gpio-rle-count-mismatch",
+      "base": "gpio-rle-data",
+      "expected_error": "count_mismatch",
+      "mutation": {
+        "type": "set_run_length",
+        "record_index": 2,
+        "value": 999
+      }
+    },
+    {
+      "name": "gpio-data-illegal-selector",
+      "base": "gpio-data",
+      "expected_error": "illegal_selector",
+      "mutation": {
+        "type": "set_header_fields",
+        "values": {"encoding": 2}
+      }
+    },
+    {
+      "name": "adc-rle-bad-lengths",
+      "base": "adc-rle-data",
+      "expected_error": "invalid_length",
+      "mutation": {
+        "type": "set_header_fields",
+        "values": {
+          "total_length": 4294967295,
+          "payload_length": 4294967247
+        }
+      }
+    },
+    {
+      "name": "adc-rle-checksum-corruption",
+      "base": "adc-rle-data",
+      "expected_error": "checksum_mismatch",
+      "mutation": {"type": "corrupt_checksum", "byte_from_end": 1, "xor": 128}
     }
   ]
 }
