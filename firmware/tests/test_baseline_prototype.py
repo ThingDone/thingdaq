@@ -346,6 +346,62 @@ class BaselineOfflineBoundaryTests(unittest.TestCase):
         }
         self.assertTrue(forbidden_options.isdisjoint(arguments))
 
+    def test_default_command_clock_produces_byte_identical_reports(self) -> None:
+        matrix = experiment_evidence.load_experiment_matrix(MATRIX_PATH)
+        build, identity = _fixed_build_and_identity(matrix)
+
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            first_directory = parent / "first"
+            second_directory = parent / "second"
+            with (
+                patch.object(
+                    baseline,
+                    "build_or_load_manifest",
+                    return_value=build,
+                ),
+                patch.object(
+                    baseline.experiment_evidence,
+                    "capture_identity",
+                    return_value=identity,
+                ),
+            ):
+                first = baseline.run_baseline(
+                    output_directory=first_directory,
+                    frame_budget=8,
+                    parser_chunk_size=31,
+                    status_frame_interval=2,
+                    created="2026-09-01",
+                    baseline_commit=identity["baseline_commit"],
+                    output=io.StringIO(),
+                )
+                second = baseline.run_baseline(
+                    output_directory=second_directory,
+                    frame_budget=8,
+                    parser_chunk_size=31,
+                    status_frame_interval=2,
+                    created="2026-09-01",
+                    baseline_commit=identity["baseline_commit"],
+                    output=io.StringIO(),
+                )
+
+            self.assertEqual(first, second)
+            self.assertEqual(
+                (first_directory / "baseline.json").read_bytes(),
+                (second_directory / "baseline.json").read_bytes(),
+            )
+            self.assertEqual(
+                (first_directory / "baseline.md").read_bytes(),
+                (second_directory / "baseline.md").read_bytes(),
+            )
+            simulator_record = next(
+                item for item in first["evidence"] if item["id"] == "simulator-capture"
+            )
+            self.assertEqual(
+                baseline.DETERMINISTIC_CLOCK_BASIS,
+                simulator_record["command_latency"]["clock_basis"],
+            )
+
     def test_full_fake_clock_baseline_is_offline_pass_and_byte_identical(
         self,
     ) -> None:

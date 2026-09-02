@@ -47,6 +47,12 @@ DEFAULT_STATUS_FRAME_INTERVAL = 32
 DEFAULT_PARSER_CHUNK_SIZE = 47
 MAX_HOST_EVENTS = 32
 MAX_PENDING_REQUESTS = 32
+DETERMINISTIC_CLOCK_STEP_SECONDS = 0.001
+DETERMINISTIC_CLOCK_BASIS = (
+    "deterministic logical simulator clock advancing 1 millisecond per observation"
+)
+HOST_MONOTONIC_CLOCK_BASIS = "host monotonic clock"
+INJECTED_CLOCK_BASIS = "caller-supplied clock"
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 GIT_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 DATE_PATTERN = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
@@ -89,10 +95,29 @@ class CaptureEvidence:
     info: DeviceInfo
     metrics: SoakMetrics
     info_latency_milliseconds: float
+    command_clock_basis: str
     logical_duration_seconds: float
     queue_bounds: tuple[QueueBound, ...]
     final_gauges: dict[str, int]
     transport_closed: bool
+
+
+@dataclass(slots=True)
+class DeterministicSimulatorClock:
+    """Advance a logical simulator clock predictably at each observation."""
+
+    value: float = 100.0
+    step_seconds: float = DETERMINISTIC_CLOCK_STEP_SECONDS
+
+    def __call__(self) -> float:
+        observed = self.value
+        self.value += self.step_seconds
+        return observed
+
+    def sleep(self, seconds: float) -> None:
+        if seconds < 0:
+            raise ValueError("logical clock cannot sleep for a negative duration")
+        self.value += seconds
 
 
 def _mapping(owner: Mapping[str, Any], name: str, location: str) -> dict[str, Any]:
@@ -566,6 +591,7 @@ def run_capture(
     status_frame_interval: int,
     clock: Callable[[], float] = monotonic,
     sleeper: Callable[[float], None] = sleep,
+    command_clock_basis: str = HOST_MONOTONIC_CLOCK_BASIS,
 ) -> CaptureEvidence:
     """Exercise INFO through cleanup using only the public simulated facade."""
 
@@ -664,6 +690,7 @@ def run_capture(
         info=info,
         metrics=metrics,
         info_latency_milliseconds=info_latency * 1_000.0,
+        command_clock_basis=command_clock_basis,
         logical_duration_seconds=logical_duration,
         queue_bounds=queue_bounds,
         final_gauges=_final_gauges(metrics),
@@ -1276,6 +1303,7 @@ def _evidence_records(
                 "timestamp_hz": capture.info.timestamp_hz,
             },
             "command_latency": {
+                "clock_basis": capture.command_clock_basis,
                 "command_counts": command_counts,
                 "info_milliseconds": capture.info_latency_milliseconds,
                 "maximum_milliseconds": (
@@ -1548,11 +1576,29 @@ def run_baseline(
     status_frame_interval: int = DEFAULT_STATUS_FRAME_INTERVAL,
     created: str | None = None,
     baseline_commit: str | None = None,
-    clock: Callable[[], float] = monotonic,
-    sleeper: Callable[[float], None] = sleep,
+    clock: Callable[[], float] | None = None,
+    sleeper: Callable[[float], None] | None = None,
     output: TextIO | None = None,
 ) -> dict[str, Any]:
-    """Run the complete offline baseline and atomically write its report pair."""
+    """Run the offline baseline with a reproducible logical clock by default."""
+
+    selected_clock: Callable[[], float]
+    selected_sleeper: Callable[[float], None]
+    if clock is None and sleeper is None:
+        logical_clock = DeterministicSimulatorClock()
+        selected_clock = logical_clock
+        selected_sleeper = logical_clock.sleep
+        command_clock_basis = DETERMINISTIC_CLOCK_BASIS
+    elif clock is None or sleeper is None:
+        raise ValueError("clock and sleeper must be supplied together")
+    else:
+        selected_clock = clock
+        selected_sleeper = sleeper
+        command_clock_basis = (
+            DETERMINISTIC_CLOCK_BASIS
+            if isinstance(clock, DeterministicSimulatorClock)
+            else INJECTED_CLOCK_BASIS
+        )
 
     selected_output = sys.stdout if output is None else output
     matrix = experiment_evidence.load_experiment_matrix(matrix_path)
@@ -1565,8 +1611,9 @@ def run_baseline(
         frame_budget=frame_budget,
         parser_chunk_size=parser_chunk_size,
         status_frame_interval=status_frame_interval,
-        clock=clock,
-        sleeper=sleeper,
+        clock=selected_clock,
+        sleeper=selected_sleeper,
+        command_clock_basis=command_clock_basis,
     )
     print(
         f"CAPTURE   adc={capture.metrics.adc.frame_count} frame(s)/"

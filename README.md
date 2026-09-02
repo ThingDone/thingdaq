@@ -51,6 +51,10 @@ without uploading it, and writes validated JSON and structured Markdown:
   --output-dir doc/results/experiments
 ```
 
+The baseline's simulator command-latency fields use a deterministic logical
+clock so normalized reports are reproducible. They are simulator bookkeeping,
+not host, live-USB, or target timing evidence.
+
 All examples default to the simulator. A script touches hardware only when
 `--real` is present:
 
