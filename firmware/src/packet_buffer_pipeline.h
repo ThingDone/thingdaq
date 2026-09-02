@@ -6,6 +6,7 @@
 
 #include "board_config.h"
 #include "protocol.h"
+#include "rle_encoder.h"
 #include "usb_transport.h"
 
 namespace thingdaq::packet {
@@ -23,7 +24,13 @@ enum class BufferState : std::uint8_t {
   kFilling = 1U,
   kReady = 2U,
   kTransmitting = 3U,
+  // A TRANSFORMING page is a synchronous, non-evicting RLE destination. It
+  // never survives finishFill(): success promotes it to READY, while every
+  // fallback/failure path recycles it before returning.
+  kTransforming = 4U,
 };
+
+inline constexpr std::size_t kBufferStateCount = 5U;
 
 enum class Stream : std::uint8_t {
   kAdc = 0U,
@@ -63,6 +70,42 @@ constexpr protocol_v1::FrameKind frameKind(Stream stream) {
   return stream == Stream::kAdc ? protocol_v1::FrameKind::kAdcData
                                 : protocol_v1::FrameKind::kGpioData;
 }
+
+constexpr protocol_v2::FrameKind v2FrameKind(Stream stream) {
+  return stream == Stream::kAdc ? protocol_v2::FrameKind::kAdcData
+                                : protocol_v2::FrameKind::kGpioData;
+}
+
+// Control integration maps an accepted configuration to this immutable
+// per-run format. Existing callers receive the exact v1/RAW default.
+struct RunFrameFormat {
+  std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
+  protocol_v2::ConfigurationEncoding encoding =
+      protocol_v2::ConfigurationEncoding::kRaw;
+
+  constexpr bool valid() const {
+    const bool raw =
+        encoding == protocol_v2::ConfigurationEncoding::kRaw;
+    const bool rle_auto =
+        encoding == protocol_v2::ConfigurationEncoding::kRleAuto;
+    return (protocol_version == protocol_v1::kProtocolVersion && raw) ||
+           (protocol_version == protocol_v2::kProtocolVersion &&
+            (raw || rle_auto));
+  }
+
+  constexpr bool rleAuto() const {
+    return protocol_version == protocol_v2::kProtocolVersion &&
+           encoding == protocol_v2::ConfigurationEncoding::kRleAuto;
+  }
+};
+
+enum class RawFallbackReason : std::uint8_t {
+  kNone = 0U,
+  kNotRequested,
+  kRleNotSmaller,
+  kTemporaryPageUnavailable,
+  kEncoderFailure,
+};
 
 constexpr std::uint32_t itemsPerFrame(Stream stream) {
   return stream == Stream::kAdc
@@ -187,6 +230,7 @@ enum class OperationStatus : std::uint8_t {
   kChecksumMismatch,
   kInvalidStreamMask,
   kStreamDisabled,
+  kUnsupportedFrameFormat,
 };
 
 struct BeginFillResult {
@@ -199,6 +243,13 @@ struct BeginFillResult {
 struct FinishFillResult {
   OperationStatus status = OperationStatus::kInvalidHandle;
   protocol::Result encoding = protocol::Result::success();
+  std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
+  protocol_v2::FrameEncoding frame_encoding =
+      protocol_v2::FrameEncoding::kRaw;
+  RawFallbackReason raw_fallback_reason = RawFallbackReason::kNotRequested;
+  std::size_t payload_bytes = 0U;
+  std::size_t frame_bytes = 0U;
+  std::size_t rle_run_count = 0U;
 
   constexpr bool ok() const { return status == OperationStatus::kOk; }
 };
@@ -249,7 +300,7 @@ struct SourceByteCounters {
 struct PipelineSnapshot {
   std::array<SourceCounters, kStreamCount> sources{};
   std::array<SourceByteCounters, kStreamCount> source_bytes{};
-  std::array<std::size_t, 4U> buffers_by_state{};
+  std::array<std::size_t, kBufferStateCount> buffers_by_state{};
   std::array<std::size_t, kStreamCount> ready_depth_by_source{};
   std::array<std::size_t, kStreamCount> transmit_depth_by_source{};
   std::array<std::size_t, kStreamCount> filling_depth_by_source{};
@@ -257,6 +308,7 @@ struct PipelineSnapshot {
   std::uint8_t enabled_stream_mask = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
       protocol_v1::kDefaultChecksumAlgorithm;
+  RunFrameFormat frame_format{};
   std::uint32_t run_starts = 0U;
   std::uint32_t run_start_rejections = 0U;
   std::uint32_t pool_exhaustions = 0U;
@@ -264,6 +316,8 @@ struct PipelineSnapshot {
   std::uint32_t encoding_rejections = 0U;
   std::uint32_t ready_queue_rejections = 0U;
   std::uint32_t transmit_queue_rejections = 0U;
+  std::uint32_t temporary_page_exhaustions = 0U;
+  std::uint32_t encode_failures = 0U;
   std::uint64_t frames_promoted = 0U;
   std::uint64_t fairness_deferrals = 0U;
   std::uint64_t pressure_evictions = 0U;
@@ -277,6 +331,8 @@ struct PipelineSnapshot {
   std::size_t ready_queue_high_water = 0U;
   std::size_t transmit_queue_high_water = 0U;
   std::size_t buffers_owned_high_water = 0U;
+  std::size_t temporary_pages_owned = 0U;
+  std::size_t temporary_page_high_water = 0U;
   bool accepting_frames = false;
   bool drain_pending = false;
   bool ready_for_start = true;
@@ -291,6 +347,7 @@ struct PromotionReport {
 
 struct StopReport {
   std::size_t filling_frames_canceled = 0U;
+  std::size_t temporary_pages_recycled = 0U;
   std::size_t ready_frames_to_drain = 0U;
   std::size_t transmitting_frames_to_drain = 0U;
 };
@@ -314,7 +371,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
       std::uint32_t run_id,
       protocol_v1::ChecksumAlgorithm checksum_algorithm =
           protocol_v1::kDefaultChecksumAlgorithm,
-      std::uint8_t enabled_stream_mask = kAllStreamMask);
+      std::uint8_t enabled_stream_mask = kAllStreamMask,
+      RunFrameFormat frame_format = {});
   // STOP cancels any producer-owned partial construction, then drains every
   // already complete READY/TRANSMITTING frame through normal USB ownership.
   StopReport stopProduction();
@@ -360,6 +418,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   constexpr protocol_v1::ChecksumAlgorithm checksumAlgorithm() const {
     return checksum_algorithm_;
   }
+  constexpr RunFrameFormat frameFormat() const { return frame_format_; }
   constexpr bool accepts(
       Stream stream, std::uint32_t run_id,
       protocol_v1::ChecksumAlgorithm checksum_algorithm) const {
@@ -378,6 +437,16 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   friend struct PacketBufferPipelineTestAccess;
 #endif
 
+  // FILLING records use this word as the nonzero producer lease. Complete
+  // records no longer need that lease, so the same accounted word records the
+  // immutable wire representation without growing all 200 pool records.
+  enum class LeaseOrRepresentation : std::uint32_t {
+    kUnowned = 0U,
+    kV1Raw = 1U,
+    kV2Raw = 2U,
+    kV2Rle = 3U,
+  };
+
   struct BufferRecord {
     BufferState state = BufferState::kFree;
     Stream stream = Stream::kAdc;
@@ -386,7 +455,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
     std::uint32_t run_id = 0U;
     std::uint32_t sequence = 0U;
     std::uint32_t item_count = 0U;
-    std::uint32_t lease = 0U;
+    std::uint32_t lease_or_representation = 0U;
     std::size_t frame_size = 0U;
   };
 
@@ -396,10 +465,15 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   using TransmitQueue = usb::detail::FixedQueue<
       BufferIndex, board::kPacketTransmitQueueDepth>;
 
+  FinishFillResult finishV2Fill(const FillHandle &handle,
+                                const FrameCompletion &completion);
   bool handleMatches(const FillHandle &handle) const;
   std::size_t selectReadySource(bool &fairness_deferred) const;
   std::uint64_t accountedFrames(std::size_t source_index) const;
   BufferIndex takeFreeBuffer();
+  BufferIndex takeTransformBuffer(const BufferRecord &source);
+  bool releaseTransformOwnership(BufferIndex index);
+  bool completeRecordValid(const BufferRecord &record) const;
   BufferIndex oldestEvictableCompleteBuffer() const;
   bool evictCompleteBuffer(BufferIndex index);
   void dropBuffer(BufferIndex index, bool pressure_eviction);
@@ -407,6 +481,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   void markGapBefore(BufferIndex index);
   bool finalizeGapBefore(BufferIndex index);
   void recycle(BufferIndex index);
+  void recycleTransform(BufferIndex index);
   void recordDrop(Stream stream, std::uint32_t item_count);
   void updateOwnedHighWater();
   std::size_t ownedBuffers() const;
@@ -421,6 +496,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::uint8_t enabled_stream_mask_ = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm_ =
       protocol_v1::kDefaultChecksumAlgorithm;
+  RunFrameFormat frame_format_{};
   std::uint32_t next_lease_ = 1U;
   std::uint32_t run_starts_ = 0U;
   std::uint32_t run_start_rejections_ = 0U;
@@ -429,6 +505,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::uint32_t encoding_rejections_ = 0U;
   std::uint32_t ready_queue_rejections_ = 0U;
   std::uint32_t transmit_queue_rejections_ = 0U;
+  std::uint32_t temporary_page_exhaustions_ = 0U;
+  std::uint32_t encode_failures_ = 0U;
   std::uint64_t frames_promoted_ = 0U;
   std::uint64_t fairness_deferrals_ = 0U;
   std::uint64_t pressure_evictions_ = 0U;
@@ -439,17 +517,29 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::size_t ready_queue_high_water_ = 0U;
   std::size_t transmit_queue_high_water_ = 0U;
   std::size_t buffers_owned_high_water_ = 0U;
+  std::size_t temporary_pages_owned_ = 0U;
+  std::size_t temporary_page_high_water_ = 0U;
   std::array<bool, kStreamCount> gap_before_next_frame_{};
   bool accepting_frames_ = false;
+#if defined(THINGDAQ_TESTING)
+  bool inject_rle_encode_failure_ = false;
+#endif
 };
 
 static_assert(kStreamCount == 2U);
+static_assert(kBufferStateCount ==
+              static_cast<std::size_t>(BufferState::kTransforming) + 1U);
 static_assert(kAllStreamMask == 3U);
 static_assert(protocol_v1::kAdcPairsPerFrame *
                       protocol_v1::kAdcBytesPerPair ==
                   protocol_v1::kDataPayloadBytes);
 static_assert(protocol_v1::kGpioSamplesPerFrame ==
               protocol_v1::kDataPayloadBytes);
+static_assert(protocol_v1::kHeaderSize == protocol_v2::kHeaderSize);
+static_assert(protocol_v1::kHeaderFlagsOffset ==
+              protocol_v2::kHeaderFlagsOffset);
+static_assert(protocol_v1::kHeaderFirstSampleTicksOffset ==
+              protocol_v2::kHeaderFirstSampleTicksOffset);
 static_assert(kNominalPayloadBytesPerSecondPerStream == 4000000U);
 static_assert(kNominalCombinedPayloadBytesPerSecond == 8000000U);
 static_assert(board::kPacketBufferCount < kInvalidBufferIndex);

@@ -61,13 +61,45 @@ SourceByteCounters byteCounters(Stream stream,
   return result;
 }
 
+protocol::Result rleFailure(rle::Status status) {
+  if (status == rle::Status::kUnsupportedChecksum) {
+    return protocol::Result::failure(
+        protocol_v1::ErrorCode::kUnsupportedChecksum,
+        protocol::ValidationIssue::kUnsupportedChecksum);
+  }
+  const bool bad_length =
+      status == rle::Status::kInvalidView ||
+      status == rle::Status::kInvalidShape ||
+      status == rle::Status::kInvalidLength ||
+      status == rle::Status::kItemCountOverflow ||
+      status == rle::Status::kSizeOverflow ||
+      status == rle::Status::kOutputTooSmall ||
+      status == rle::Status::kPlanMismatch;
+  return protocol::Result::failure(
+      bad_length ? protocol_v1::ErrorCode::kInvalidLength
+                 : protocol_v1::ErrorCode::kInvalidPayload,
+      bad_length ? protocol::ValidationIssue::kBadLength
+                 : protocol::ValidationIssue::kBadPayload);
+}
+
+void applyFinalizedResult(const rle::FinalizeResult &finalized,
+                          FinishFillResult &result) {
+  result.frame_encoding = finalized.encoding;
+  result.payload_bytes = finalized.payload_bytes;
+  result.frame_bytes = finalized.frame_bytes;
+  result.rle_run_count = finalized.run_count;
+  result.encoding = finalized.ok() ? protocol::Result::success()
+                                   : rleFailure(finalized.status);
+}
+
 }  // namespace
 
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.start")
 OperationStatus PacketBufferPipeline::startRun(
     std::uint32_t run_id,
     protocol_v1::ChecksumAlgorithm checksum_algorithm,
-    std::uint8_t enabled_stream_mask) {
+    std::uint8_t enabled_stream_mask,
+    RunFrameFormat frame_format) {
   if (run_id == 0U || run_id == run_id_) {
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kInvalidRunId;
@@ -88,6 +120,10 @@ OperationStatus PacketBufferPipeline::startRun(
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kInvalidStreamMask;
   }
+  if (!frame_format.valid()) {
+    saturatingIncrement(run_start_rejections_);
+    return OperationStatus::kUnsupportedFrameFormat;
+  }
 
   for (ReadyQueue &queue : ready_queues_) {
     queue.clear();
@@ -101,16 +137,21 @@ OperationStatus PacketBufferPipeline::startRun(
   run_id_ = run_id;
   enabled_stream_mask_ = enabled_stream_mask;
   checksum_algorithm_ = checksum_algorithm;
+  frame_format_ = frame_format;
   next_free_search_ = 0U;
   next_ready_source_ = 0U;
   ready_queue_high_water_ = 0U;
   transmit_queue_high_water_ = 0U;
   buffers_owned_high_water_ = 0U;
+  temporary_pages_owned_ = 0U;
+  temporary_page_high_water_ = 0U;
   pool_exhaustions_ = 0U;
   invalid_operations_ = 0U;
   encoding_rejections_ = 0U;
   ready_queue_rejections_ = 0U;
   transmit_queue_rejections_ = 0U;
+  temporary_page_exhaustions_ = 0U;
+  encode_failures_ = 0U;
   frames_promoted_ = 0U;
   fairness_deferrals_ = 0U;
   pressure_evictions_ = 0U;
@@ -127,12 +168,14 @@ StopReport PacketBufferPipeline::stopProduction() {
   StopReport report{};
   accepting_frames_ = false;
   for (std::size_t index = 0U; index < records_.size(); ++index) {
-    const BufferRecord &record = records_[index];
-    if (record.state != BufferState::kFilling) {
-      continue;
+    const BufferState state = records_[index].state;
+    if (state == BufferState::kTransforming) {
+      recycleTransform(static_cast<BufferIndex>(index));
+      ++report.temporary_pages_recycled;
+    } else if (state == BufferState::kFilling) {
+      dropBuffer(static_cast<BufferIndex>(index), false);
+      ++report.filling_frames_canceled;
     }
-    dropBuffer(static_cast<BufferIndex>(index), false);
-    ++report.filling_frames_canceled;
   }
   report.ready_frames_to_drain = readyFrames();
   report.transmitting_frames_to_drain = transmit_queue_.size();
@@ -186,7 +229,7 @@ BeginFillResult PacketBufferPipeline::beginFill(Stream stream) {
   record.run_id = run_id_;
   record.sequence = result.handle.sequence;
   record.item_count = itemsPerFrame(stream);
-  record.lease = lease;
+  record.lease_or_representation = lease;
   record.frame_size = 0U;
   result.handle.buffer_index = buffer_index;
   result.handle.lease = lease;
@@ -222,6 +265,7 @@ OperationStatus PacketBufferPipeline::recordSourceFrameDrops(
   return OperationStatus::kOk;
 }
 
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.writable_payload")
 protocol::MutableByteView PacketBufferPipeline::writablePayload(
     const FillHandle &handle) {
   if (!handleMatches(handle)) {
@@ -235,7 +279,11 @@ protocol::MutableByteView PacketBufferPipeline::writablePayload(
 
 FinishFillResult PacketBufferPipeline::finishFill(
     const FillHandle &handle, const FrameCompletion &completion) {
+  if (frame_format_.protocol_version == protocol_v2::kProtocolVersion) {
+    return finishV2Fill(handle, completion);
+  }
   FinishFillResult result{};
+  result.protocol_version = protocol_v1::kProtocolVersion;
   if (!handleMatches(handle)) {
     saturatingIncrement(invalid_operations_);
     result.status = OperationStatus::kInvalidHandle;
@@ -282,6 +330,10 @@ FinishFillResult PacketBufferPipeline::finishFill(
       {storage_.frame(handle.buffer_index).data(),
        storage_.frame(handle.buffer_index).size()},
       completion.payload_bytes_written);
+  result.frame_encoding = protocol_v2::FrameEncoding::kRaw;
+  result.raw_fallback_reason = RawFallbackReason::kNotRequested;
+  result.payload_bytes = protocol_v1::kDataPayloadBytes;
+  result.frame_bytes = protocol_v1::kDataFrameBytes;
   if (!result.encoding.ok()) {
     saturatingIncrement(encoding_rejections_);
     dropBuffer(handle.buffer_index, false);
@@ -300,10 +352,180 @@ FinishFillResult PacketBufferPipeline::finishFill(
 
   record.state = BufferState::kReady;
   record.frame_size = protocol_v1::kDataFrameBytes;
+  record.lease_or_representation =
+      static_cast<std::uint32_t>(LeaseOrRepresentation::kV1Raw);
   SourceCounters &source = source_counters_[streamIndex(record.stream)];
   saturatingIncrement(source.frames_framed);
   saturatingAdd(source.items_framed,
                 static_cast<std::uint64_t>(record.item_count));
+  if (ready.size() > source.ready_queue_high_water) {
+    source.ready_queue_high_water = ready.size();
+  }
+  const std::size_t total_ready = readyFrames();
+  if (total_ready > ready_queue_high_water_) {
+    ready_queue_high_water_ = total_ready;
+  }
+  result.status = OperationStatus::kOk;
+  return result;
+}
+
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.finish_v2")
+FinishFillResult PacketBufferPipeline::finishV2Fill(
+    const FillHandle &handle, const FrameCompletion &completion) {
+  FinishFillResult result{};
+  result.protocol_version = protocol_v2::kProtocolVersion;
+  if (!handleMatches(handle)) {
+    saturatingIncrement(invalid_operations_);
+    result.status = OperationStatus::kInvalidHandle;
+    return result;
+  }
+
+  BufferRecord &record = records_[handle.buffer_index];
+  if (!accepting_frames_ || record.run_id != run_id_) {
+    dropBuffer(handle.buffer_index, false);
+    result.status = OperationStatus::kNotRunning;
+    return result;
+  }
+  if (completion.payload_bytes_written != protocol_v2::kDataPayloadBytes) {
+    dropBuffer(handle.buffer_index, false);
+    result.status = OperationStatus::kIncompletePayload;
+    return result;
+  }
+  if (completion.checksum_algorithm != checksum_algorithm_) {
+    saturatingIncrement(encoding_rejections_);
+    dropBuffer(handle.buffer_index, false);
+    result.status = OperationStatus::kChecksumMismatch;
+    result.encoding = protocol::Result::failure(
+        protocol_v1::ErrorCode::kUnsupportedChecksum,
+        protocol::ValidationIssue::kUnsupportedChecksum);
+    return result;
+  }
+
+  const Stream stream = record.stream;
+  const std::uint32_t item_count = record.item_count;
+  std::uint16_t selected_flags = completion.flags;
+  if (record.gap_before_required) {
+    selected_flags = static_cast<std::uint16_t>(
+        selected_flags |
+        static_cast<std::uint16_t>(protocol_v2::FrameFlag::kGapBefore) |
+        static_cast<std::uint16_t>(protocol_v2::FrameFlag::kOverrunBefore));
+  }
+
+  rle::DataFrameFields fields{};
+  fields.kind = v2FrameKind(stream);
+  fields.flags = selected_flags;
+  fields.checksum_algorithm = completion.checksum_algorithm;
+  fields.run_id = record.run_id;
+  fields.sequence = record.sequence;
+  fields.first_sample_ticks = completion.first_sample_ticks;
+  const protocol::ByteView decoded{
+      storage_.frame(handle.buffer_index).data() +
+          protocol_v2::kHeaderSize,
+      protocol_v2::kDataPayloadBytes};
+  const rle::Status input_status =
+      rle::validateDataFrameInput(fields, decoded);
+  BufferIndex selected_index = handle.buffer_index;
+  if (input_status != rle::Status::kOk) {
+    result.encoding = rleFailure(input_status);
+  } else if (frame_format_.rleAuto()) {
+    const rle::SizingPlan plan =
+        rle::size(decoded, rle::dataShape(fields.kind));
+    if (!plan.ok()) {
+      result.encoding = rleFailure(plan.status);
+    } else if (plan.encoded_frame_bytes < protocol_v2::kDataFrameBytes) {
+      const BufferIndex temporary = takeTransformBuffer(record);
+      if (temporary == kInvalidBufferIndex) {
+        result.raw_fallback_reason =
+            RawFallbackReason::kTemporaryPageUnavailable;
+      } else {
+        rle::FinalizeResult finalized{};
+        bool inject_failure = false;
+#if defined(THINGDAQ_TESTING)
+        inject_failure = inject_rle_encode_failure_;
+        inject_rle_encode_failure_ = false;
+#endif
+        if (inject_failure) {
+          finalized.status = rle::Status::kPlanMismatch;
+        } else {
+          finalized = rle::finalizeRleDataFrame(
+              fields, decoded, plan,
+              {storage_.frame(temporary).data(),
+               storage_.frame(temporary).size()});
+        }
+        if (finalized.ok()) {
+          selected_index = temporary;
+          applyFinalizedResult(finalized, result);
+          result.raw_fallback_reason = RawFallbackReason::kNone;
+          BufferRecord &selected = records_[selected_index];
+          selected.frame_size = finalized.frame_bytes;
+          selected.lease_or_representation =
+              static_cast<std::uint32_t>(LeaseOrRepresentation::kV2Rle);
+          selected.gap_before_required = false;
+        } else {
+          saturatingIncrement(encode_failures_);
+          recycleTransform(temporary);
+          result.raw_fallback_reason = RawFallbackReason::kEncoderFailure;
+        }
+      }
+    } else {
+      result.raw_fallback_reason = RawFallbackReason::kRleNotSmaller;
+    }
+  } else {
+    result.raw_fallback_reason = RawFallbackReason::kNotRequested;
+  }
+
+  if (result.encoding.ok() && selected_index == handle.buffer_index) {
+    const rle::FinalizeResult finalized = rle::finalizeRawDataFrame(
+        fields,
+        {storage_.frame(handle.buffer_index).data(),
+         storage_.frame(handle.buffer_index).size()});
+    applyFinalizedResult(finalized, result);
+  }
+  if (!result.encoding.ok()) {
+    if (selected_index != handle.buffer_index) {
+      recycleTransform(selected_index);
+    }
+    saturatingIncrement(encoding_rejections_);
+    dropBuffer(handle.buffer_index, false);
+    result.status = OperationStatus::kEncodingRejected;
+    return result;
+  }
+
+  ReadyQueue &ready = ready_queues_[streamIndex(stream)];
+  if (!ready.push(selected_index)) {
+    saturatingIncrement(ready_queue_rejections_);
+    if (selected_index != handle.buffer_index) {
+      recycleTransform(selected_index);
+    }
+    dropBuffer(handle.buffer_index, false);
+    result.status = OperationStatus::kQueueFull;
+    return result;
+  }
+
+  if (selected_index != handle.buffer_index) {
+    if (!releaseTransformOwnership(selected_index)) {
+      ready.eraseFirst(selected_index);
+      recycleTransform(selected_index);
+      saturatingIncrement(invalid_operations_);
+      dropBuffer(handle.buffer_index, false);
+      result.status = OperationStatus::kEncodingRejected;
+      result.encoding = rleFailure(rle::Status::kPlanMismatch);
+      return result;
+    }
+    records_[selected_index].state = BufferState::kReady;
+    recycle(handle.buffer_index);
+  } else {
+    record.state = BufferState::kReady;
+    record.frame_size = result.frame_bytes;
+    record.lease_or_representation = static_cast<std::uint32_t>(
+        LeaseOrRepresentation::kV2Raw);
+    record.gap_before_required = false;
+  }
+
+  SourceCounters &source = source_counters_[streamIndex(stream)];
+  saturatingIncrement(source.frames_framed);
+  saturatingAdd(source.items_framed,
+                static_cast<std::uint64_t>(item_count));
   if (ready.size() > source.ready_queue_high_water) {
     source.ready_queue_high_water = ready.size();
   }
@@ -354,7 +576,7 @@ PromotionReport PacketBufferPipeline::serviceReadyFrames(std::size_t limit) {
     BufferRecord &record = records_[buffer_index];
     if (record.state != BufferState::kReady ||
         streamIndex(record.stream) != selected_source ||
-        record.frame_size != protocol_v1::kDataFrameBytes) {
+        !completeRecordValid(record)) {
       saturatingIncrement(invalid_operations_);
       dropBuffer(buffer_index, false);
       report.invariant_error = true;
@@ -401,7 +623,7 @@ protocol::ByteView PacketBufferPipeline::frontFrame() const {
   }
   const BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
-      record.frame_size != protocol_v1::kDataFrameBytes) {
+      !completeRecordValid(record)) {
     return {};
   }
   return {storage_.frame(*buffer_index).data(), record.frame_size};
@@ -417,7 +639,7 @@ bool PacketBufferPipeline::prepareFrontFrame() {
   const BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
       record.transmission_started ||
-      record.frame_size != protocol_v1::kDataFrameBytes) {
+      !completeRecordValid(record)) {
     saturatingIncrement(invalid_operations_);
     return false;
   }
@@ -433,7 +655,7 @@ void PacketBufferPipeline::markFrontFrameStarted() {
   }
   BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
-      record.frame_size != protocol_v1::kDataFrameBytes) {
+      !completeRecordValid(record)) {
     saturatingIncrement(invalid_operations_);
     return;
   }
@@ -519,6 +741,7 @@ std::size_t PacketBufferPipeline::freeBuffers() const {
   return total;
 }
 
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.quiescent")
 bool PacketBufferPipeline::quiescent() const {
   return ownedBuffers() == 0U && readyFrames() == 0U &&
          transmit_queue_.empty();
@@ -558,6 +781,7 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.run_id = run_id_;
   result.enabled_stream_mask = enabled_stream_mask_;
   result.checksum_algorithm = checksum_algorithm_;
+  result.frame_format = frame_format_;
   result.run_starts = run_starts_;
   result.run_start_rejections = run_start_rejections_;
   result.pool_exhaustions = pool_exhaustions_;
@@ -565,6 +789,8 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.encoding_rejections = encoding_rejections_;
   result.ready_queue_rejections = ready_queue_rejections_;
   result.transmit_queue_rejections = transmit_queue_rejections_;
+  result.temporary_page_exhaustions = temporary_page_exhaustions_;
+  result.encode_failures = encode_failures_;
   result.frames_promoted = frames_promoted_;
   result.fairness_deferrals = fairness_deferrals_;
   result.pressure_evictions = pressure_evictions_;
@@ -580,12 +806,15 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.ready_queue_high_water = ready_queue_high_water_;
   result.transmit_queue_high_water = transmit_queue_high_water_;
   result.buffers_owned_high_water = buffers_owned_high_water_;
+  result.temporary_pages_owned = temporary_pages_owned_;
+  result.temporary_page_high_water = temporary_page_high_water_;
   result.accepting_frames = accepting_frames_;
   result.drain_pending = !quiescent();
   result.ready_for_start = readyForStart();
   return result;
 }
 
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.handle_matches")
 bool PacketBufferPipeline::handleMatches(const FillHandle &handle) const {
   if (!handle.valid() || handle.buffer_index >= records_.size()) {
     return false;
@@ -593,7 +822,8 @@ bool PacketBufferPipeline::handleMatches(const FillHandle &handle) const {
   const BufferRecord &record = records_[handle.buffer_index];
   return record.state == BufferState::kFilling &&
          record.stream == handle.stream &&
-         record.sequence == handle.sequence && record.lease == handle.lease;
+         record.sequence == handle.sequence &&
+         record.lease_or_representation == handle.lease;
 }
 
 std::size_t PacketBufferPipeline::selectReadySource(
@@ -662,6 +892,76 @@ PacketBufferPipeline::BufferIndex PacketBufferPipeline::takeFreeBuffer() {
   return kInvalidBufferIndex;
 }
 
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.take_transform")
+PacketBufferPipeline::BufferIndex
+PacketBufferPipeline::takeTransformBuffer(const BufferRecord &source) {
+  for (std::size_t offset = 0U; offset < records_.size(); ++offset) {
+    const std::size_t index = (next_free_search_ + offset) % records_.size();
+    if (records_[index].state != BufferState::kFree) {
+      continue;
+    }
+    next_free_search_ = (index + 1U) % records_.size();
+    BufferRecord &temporary = records_[index];
+    temporary = source;
+    temporary.state = BufferState::kTransforming;
+    temporary.transmission_started = false;
+    temporary.frame_size = 0U;
+    temporary.lease_or_representation =
+        static_cast<std::uint32_t>(LeaseOrRepresentation::kV2Rle);
+    ++temporary_pages_owned_;
+    if (temporary_pages_owned_ > temporary_page_high_water_) {
+      temporary_page_high_water_ = temporary_pages_owned_;
+    }
+    updateOwnedHighWater();
+    return static_cast<BufferIndex>(index);
+  }
+
+  // Compression workspace acquisition never evicts retained logical data.
+  // The still-owned RAW source page is therefore always available for the
+  // adaptive fallback path.
+  saturatingIncrement(temporary_page_exhaustions_);
+  return kInvalidBufferIndex;
+}
+
+bool PacketBufferPipeline::releaseTransformOwnership(BufferIndex index) {
+  if (index >= records_.size() ||
+      records_[index].state != BufferState::kTransforming ||
+      temporary_pages_owned_ == 0U) {
+    return false;
+  }
+  --temporary_pages_owned_;
+  return true;
+}
+
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.complete_record")
+bool PacketBufferPipeline::completeRecordValid(
+    const BufferRecord &record) const {
+  if (!validStream(record.stream)) {
+    return false;
+  }
+  const LeaseOrRepresentation representation =
+      static_cast<LeaseOrRepresentation>(record.lease_or_representation);
+  if (representation == LeaseOrRepresentation::kV1Raw) {
+    return record.frame_size == protocol_v1::kDataFrameBytes;
+  }
+  if (representation == LeaseOrRepresentation::kV2Raw) {
+    return record.frame_size == protocol_v2::kDataFrameBytes;
+  }
+  if (representation != LeaseOrRepresentation::kV2Rle) {
+    return false;
+  }
+  const protocol_v2::FrameKind kind = v2FrameKind(record.stream);
+  const std::size_t minimum =
+      protocol_v2::kHeaderSize +
+      (record.stream == Stream::kAdc
+           ? protocol_v2::kAdcRleRecordBytes
+           : protocol_v2::kGpioRleRecordBytes) +
+      protocol_v2::kTrailerSize;
+  return record.frame_size >= minimum &&
+         record.frame_size <= rle::maximumSelectedFrameBytes(kind) &&
+         record.frame_size < protocol_v2::kDataFrameBytes;
+}
+
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.select_eviction")
 PacketBufferPipeline::BufferIndex
 PacketBufferPipeline::oldestEvictableCompleteBuffer() const {
@@ -674,7 +974,7 @@ PacketBufferPipeline::oldestEvictableCompleteBuffer() const {
         (record.state == BufferState::kTransmitting &&
          !record.transmission_started);
     if (!complete_unsent ||
-        record.frame_size != protocol_v1::kDataFrameBytes) {
+        !completeRecordValid(record)) {
       continue;
     }
 
@@ -724,7 +1024,7 @@ bool PacketBufferPipeline::evictCompleteBuffer(BufferIndex index) {
   if ((record.state != BufferState::kReady &&
        record.state != BufferState::kTransmitting) ||
       record.transmission_started ||
-      record.frame_size != protocol_v1::kDataFrameBytes ||
+      !completeRecordValid(record) ||
       !validStream(record.stream)) {
     saturatingIncrement(invalid_operations_);
     return false;
@@ -840,7 +1140,7 @@ bool PacketBufferPipeline::finalizeGapBefore(BufferIndex index) {
   }
   if ((record.state != BufferState::kReady &&
        record.state != BufferState::kTransmitting) ||
-      record.frame_size != protocol_v1::kDataFrameBytes) {
+      !completeRecordValid(record)) {
     return false;
   }
 
@@ -859,13 +1159,11 @@ bool PacketBufferPipeline::finalizeGapBefore(BufferIndex index) {
   if (!protocol::storeU16(bytes, protocol_v1::kHeaderFlagsOffset, flags) ||
       !protocol::computeChecksum(
            checksum_algorithm_,
-           {frame.data(), protocol_v1::kDataFrameBytes -
-                              protocol_v1::kTrailerSize},
+           {frame.data(), record.frame_size - protocol_v1::kTrailerSize},
            checksum)
            .ok() ||
       !protocol::storeU32(bytes,
-                          protocol_v1::kDataFrameBytes -
-                              protocol_v1::kTrailerSize,
+                          record.frame_size - protocol_v1::kTrailerSize,
                           checksum)) {
     saturatingIncrement(encoding_rejections_);
     return false;
@@ -878,6 +1176,21 @@ void PacketBufferPipeline::recycle(BufferIndex index) {
   if (index >= records_.size()) {
     saturatingIncrement(invalid_operations_);
     return;
+  }
+  records_[index] = {};
+}
+
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.recycle_transform")
+void PacketBufferPipeline::recycleTransform(BufferIndex index) {
+  if (index >= records_.size() ||
+      records_[index].state != BufferState::kTransforming) {
+    saturatingIncrement(invalid_operations_);
+    return;
+  }
+  if (temporary_pages_owned_ == 0U) {
+    saturatingIncrement(invalid_operations_);
+  } else {
+    --temporary_pages_owned_;
   }
   records_[index] = {};
 }

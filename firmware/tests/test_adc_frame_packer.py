@@ -39,6 +39,7 @@ class AdcFramePackerTests(unittest.TestCase):
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "adc_frame_packer.cpp"),
                     str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
+                    str(FIRMWARE_SOURCE / "rle_encoder.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
                     str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",

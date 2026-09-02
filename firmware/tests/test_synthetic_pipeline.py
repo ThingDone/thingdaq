@@ -16,6 +16,8 @@ CPP_TEST = FIRMWARE_DIRECTORY / "tests/synthetic_pipeline_test.cpp"
 PIPELINE_SOURCES = (
     FIRMWARE_SOURCE / "packet_buffer_pipeline.h",
     FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp",
+    FIRMWARE_SOURCE / "rle_encoder.h",
+    FIRMWARE_SOURCE / "rle_encoder.cpp",
     FIRMWARE_SOURCE / "synthetic_source.h",
     FIRMWARE_SOURCE / "synthetic_source.cpp",
     FIRMWARE_SOURCE / "usb_transport.h",
@@ -54,6 +56,7 @@ class SyntheticPipelineTests(unittest.TestCase):
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
                     str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
+                    str(FIRMWARE_SOURCE / "rle_encoder.cpp"),
                     str(FIRMWARE_SOURCE / "usb_transport.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),

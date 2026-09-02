@@ -1,4 +1,4 @@
-"""Host-compiled checks for deterministic paced firmware sources."""
+"""Host-compiled tests for bounded firmware RLE and adaptive ownership."""
 
 from __future__ import annotations
 
@@ -10,25 +10,29 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIRMWARE_SOURCE = REPOSITORY_ROOT / "firmware/src"
-CPP_TEST = REPOSITORY_ROOT / "firmware/tests/synthetic_source_test.cpp"
+CPP_TEST = REPOSITORY_ROOT / "firmware/tests/rle_encoder_test.cpp"
+FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures-v2"
 PRODUCTION_SOURCES = (
-    FIRMWARE_SOURCE / "synthetic_source.h",
-    FIRMWARE_SOURCE / "synthetic_source.cpp",
+    FIRMWARE_SOURCE / "rle_encoder.h",
+    FIRMWARE_SOURCE / "rle_encoder.cpp",
+    FIRMWARE_SOURCE / "packet_buffer_pipeline.h",
+    FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp",
 )
 
 
-class SyntheticSourceTests(unittest.TestCase):
-    def test_realtime_and_unpaced_sources_use_the_packet_pipeline(self) -> None:
+class RLEEncoderTests(unittest.TestCase):
+    def test_portable_codec_and_adaptive_page_ownership(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
 
-        with tempfile.TemporaryDirectory(prefix="thingdaq-synthetic-") as directory:
-            executable = Path(directory) / "synthetic-source-test"
-            compile_result = subprocess.run(
+        with tempfile.TemporaryDirectory(prefix="thingdaq-rle-") as directory:
+            executable = Path(directory) / "rle-encoder-test"
+            compiled = subprocess.run(
                 [
                     compiler,
                     "-std=c++17",
+                    "-O2",
                     "-Wall",
                     "-Wextra",
                     "-Werror",
@@ -37,11 +41,11 @@ class SyntheticSourceTests(unittest.TestCase):
                     "-pedantic",
                     "-fno-exceptions",
                     "-fno-rtti",
+                    "-DTHINGDAQ_TESTING=1",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
-                    str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
-                    str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
                     str(FIRMWARE_SOURCE / "rle_encoder.cpp"),
+                    str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
                     str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",
@@ -51,49 +55,43 @@ class SyntheticSourceTests(unittest.TestCase):
                 check=False,
                 text=True,
             )
-            self.assertEqual(
-                0,
-                compile_result.returncode,
-                compile_result.stdout + compile_result.stderr,
-            )
-            run_result = subprocess.run(
-                [str(executable)],
+            self.assertEqual(0, compiled.returncode, compiled.stdout + compiled.stderr)
+            completed = subprocess.run(
+                [str(executable), str(FIXTURE_DIRECTORY)],
                 capture_output=True,
                 check=False,
                 text=True,
             )
             self.assertEqual(
-                0,
-                run_result.returncode,
-                run_result.stdout + run_result.stderr,
+                0, completed.returncode, completed.stdout + completed.stderr
             )
 
-    def test_source_is_fixed_capacity_cooperative_and_isr_free(self) -> None:
+    def test_production_transform_is_allocation_and_isr_free(self) -> None:
         source = "\n".join(
             path.read_text(encoding="utf-8") for path in PRODUCTION_SOURCES
         )
         for token in (
             "std::vector",
             "std::deque",
+            "std::string",
             "malloc(",
             "calloc(",
             "realloc(",
+            "free(",
             "operator new",
+            "new ",
+            "delete ",
+            "arm_dcache",
             "attachInterrupt",
             "IntervalTimer",
-            "ISR(",
-            "Serial.",
-            "delay(",
-            "yield(",
+            "DMAChannel",
+            "isr(",
         ):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
-
-        self.assertIn("Mode::kRealtime", source)
-        self.assertIn("Mode::kUnpacedDiagnostic", source)
-        self.assertIn("pipeline.beginFill", source)
-        self.assertIn("pipeline.finishFill", source)
-        self.assertIn("std::array", source)
+        self.assertIn("BufferState::kTransforming", source)
+        self.assertIn("takeTransformBuffer", source)
+        self.assertIn("plan.encoded_frame_bytes <", source)
 
 
 if __name__ == "__main__":
