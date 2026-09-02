@@ -40,14 +40,14 @@ thingdaq::runtime::FirmwareRuntime firmware_runtime{
     &thingdaq::adc_trigger::teensyScheduler(),
     &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer};
 }  // namespace
-
 void setup() {
   // Do not initialize the Arduino serial facade, wait for DTR, or emit a
-  // banner. Both ADC modules are explicitly reconfigured and independently
-  // calibrated under a DWT deadline before the bounded BOOT completion.
-  (void)firmware_runtime.begin(thingdaq::usb::hardwareSerialNumber());
+  // banner. A clock mismatch stays in BOOT; otherwise both ADC modules are
+  // reconfigured and independently calibrated before BOOT completion.
+  (void)(thingdaq::clock::runtimeProfileClocksValid() &&
+         firmware_runtime.begin(
+             thingdaq::usb::hardwareSerialNumber()));
 }
-
 void loop() {
   // Service one bounded cooperative control/data-path iteration. Teensy's
   // main() calls yield afterward.

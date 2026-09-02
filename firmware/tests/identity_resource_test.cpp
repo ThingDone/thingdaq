@@ -273,6 +273,13 @@ static_assert(thingdaq::control::kSyntheticConfiguration.source ==
 static_assert(thingdaq::identity::kFirmwareVersion.major == 1U);
 static_assert(thingdaq::identity::kFirmwareVersion.minor == 0U);
 static_assert(thingdaq::identity::kFirmwareVersion.patch == 0U);
+static_assert(thingdaq::identity::kCpuProfileMhz == 600U);
+static_assert(thingdaq::identity::kExpectedCpuHz == 600000000U);
+static_assert(thingdaq::identity::kExpectedBusHz == 150000000U);
+static_assert(thingdaq::identity::runtimeClocksMatchProfile(600000000U,
+                                                           150000000U));
+static_assert(!thingdaq::identity::runtimeClocksMatchProfile(528000000U,
+                                                            132000000U));
 static_assert(thingdaq::board::kAdc0Pin == 14U);
 static_assert(thingdaq::board::kAdc1Pin == 15U);
 static_assert(thingdaq::board::countOf(

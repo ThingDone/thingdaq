@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the pinned Teensy toolchain and export identified firmware."""
+"""Verify the pinned Teensy toolchain and export profile-identified firmware."""
 
 from __future__ import annotations
 
@@ -20,21 +20,74 @@ from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SKETCH_DIRECTORY = REPOSITORY_ROOT / "firmware"
-FQBN = "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std"
 CORE_ID = "teensy:avr"
 CORE_VERSION = "1.62.0"
 COMPILER_VERSION = "15.2.1"
-EXPECTED_BUILD_PROPERTIES = {
+DEFAULT_CPU_PROFILE_NAME = "600"
+COMMON_BUILD_PROPERTIES = {
     "build.board": "TEENSY40",
-    "build.fcpu": "600000000",
     "build.flags.optimize": "-O2",
     "build.usbtype": "USB_SERIAL",
 }
-OUTPUT_DIRECTORY = (
-    SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
+COMPILE_RECIPE_PROPERTIES = (
+    "recipe.S.o.pattern",
+    "recipe.c.o.pattern",
+    "recipe.cpp.o.pattern",
 )
+
+
+@dataclass(frozen=True, slots=True)
+class CpuProfile:
+    """One complete, reviewed Teensy CPU-menu selection."""
+
+    name: str
+    fqbn: str
+    cpu_hz: int
+    bus_hz: int
+    output_directory: Path
+
+    @property
+    def expected_build_properties(self) -> dict[str, str]:
+        return {
+            **COMMON_BUILD_PROPERTIES,
+            "build.fcpu": str(self.cpu_hz),
+        }
+
+
+CPU_PROFILES = {
+    "600": CpuProfile(
+        name="600",
+        fqbn="teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+        cpu_hz=600_000_000,
+        bus_hz=150_000_000,
+        output_directory=(
+            SKETCH_DIRECTORY
+            / "build"
+            / "teensy.avr.teensy40.usb_serial.speed_600.opt_o2std"
+        ),
+    ),
+    "528": CpuProfile(
+        name="528",
+        fqbn="teensy:avr:teensy40:usb=serial,speed=528,opt=o2std",
+        cpu_hz=528_000_000,
+        bus_hz=132_000_000,
+        output_directory=(
+            SKETCH_DIRECTORY
+            / "build"
+            / "teensy.avr.teensy40.usb_serial.speed_528.opt_o2std"
+        ),
+    ),
+}
+DEFAULT_CPU_PROFILE = CPU_PROFILES[DEFAULT_CPU_PROFILE_NAME]
+
+# Compatibility aliases deliberately remain bound to the production profile.
+# Existing no-argument release commands and baseline tooling must continue to
+# resolve the accepted 600 MHz menu selection and output directory.
+FQBN = DEFAULT_CPU_PROFILE.fqbn
+EXPECTED_BUILD_PROPERTIES = DEFAULT_CPU_PROFILE.expected_build_properties
+OUTPUT_DIRECTORY = DEFAULT_CPU_PROFILE.output_directory
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 10
+MANIFEST_SCHEMA_VERSION = 11
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
@@ -142,12 +195,35 @@ class BuildError(RuntimeError):
     """A reproducibility check or firmware build failed."""
 
 
+def cpu_profile(name: str) -> CpuProfile:
+    """Resolve exactly one reviewed profile and reject every other speed."""
+
+    try:
+        return CPU_PROFILES[name]
+    except KeyError as error:
+        supported = ", ".join(CPU_PROFILES)
+        raise BuildError(
+            f"unsupported CPU profile {name!r}; expected one of: {supported}"
+        ) from error
+
+
+def _validated_profile(profile: CpuProfile) -> CpuProfile:
+    """Reject a forged profile object even in programmatic helper use."""
+
+    registered = cpu_profile(profile.name)
+    if profile != registered:
+        raise BuildError(f"CPU profile {profile.name!r} does not match its registry")
+    return registered
+
+
 @dataclass(frozen=True, slots=True)
 class BuildIdentity:
-    """Deterministic source and timestamp metadata embedded in the firmware."""
+    """Deterministic source, target, and timestamp firmware metadata."""
 
     source_id: str
+    build_fingerprint: str
     build_id: str
+    cpu_profile: str
     timestamp_epoch: int
     timestamp_utc: str
 
@@ -207,12 +283,29 @@ def parse_build_properties(output: str) -> dict[str, str]:
     return properties
 
 
-def validate_build_properties(properties: Mapping[str, str]) -> None:
-    """Reject a menu selection that differs from the documented target."""
+def _recipe_definitions(recipe: str) -> set[str]:
+    """Return concrete ``-D`` tokens from one resolved compiler recipe."""
+
+    try:
+        tokens = shlex.split(recipe)
+    except ValueError as error:
+        raise BuildError(
+            f"could not parse resolved compiler recipe: {error}"
+        ) from error
+    return {token for token in tokens if token.startswith("-D")}
+
+
+def validate_build_properties(
+    properties: Mapping[str, str],
+    profile: CpuProfile = DEFAULT_CPU_PROFILE,
+) -> None:
+    """Reject a resolved menu or compile recipe outside ``profile``."""
+
+    profile = _validated_profile(profile)
 
     mismatches = [
         f"{name}={properties.get(name)!r}, expected {expected!r}"
-        for name, expected in EXPECTED_BUILD_PROPERTIES.items()
+        for name, expected in profile.expected_build_properties.items()
         if properties.get(name) != expected
     ]
     definitions = set(properties.get("build.flags.defs", "").split())
@@ -221,6 +314,21 @@ def validate_build_properties(properties: Mapping[str, str]) -> None:
             mismatches.append(f"build.flags.defs is missing {required}")
     if "-std=gnu++17" not in properties.get("build.flags.cpp", "").split():
         mismatches.append("build.flags.cpp is missing -std=gnu++17")
+    required_recipe_definitions = {
+        "-DARDUINO_TEENSY40",
+        f"-DF_CPU={profile.cpu_hz}",
+        "-DUSB_SERIAL",
+        "-D__IMXRT1062__",
+        "-DTEENSYDUINO=160",
+    }
+    for name in COMPILE_RECIPE_PROPERTIES:
+        recipe = properties.get(name, "")
+        recipe_definitions = _recipe_definitions(recipe)
+        missing = required_recipe_definitions - recipe_definitions
+        if missing:
+            mismatches.append(f"{name} is missing " + ", ".join(sorted(missing)))
+        if "-O2" not in shlex.split(recipe):
+            mismatches.append(f"{name} is missing -O2")
     if mismatches:
         raise BuildError(
             "resolved build properties are incompatible: " + "; ".join(mismatches)
@@ -309,36 +417,96 @@ def resolve_build_epoch(environment: Mapping[str, str] | None = None) -> int:
     return epoch
 
 
-def build_identity(environment: Mapping[str, str] | None = None) -> BuildIdentity:
-    """Create deterministic metadata for the current firmware source snapshot."""
+def profile_build_fingerprint(source_id: str, profile: CpuProfile) -> str:
+    """Hash the source and immutable target contract into one build identity."""
 
+    profile = _validated_profile(profile)
+    if len(source_id) != 64 or any(
+        character not in "0123456789abcdef" for character in source_id
+    ):
+        raise BuildError("source ID must be a lowercase SHA-256")
+    contract = {
+        "schema": "thingdaq-profile-build-v1",
+        "source_id": source_id,
+        "cpu_profile": profile.name,
+        "fqbn": profile.fqbn,
+        "core_id": CORE_ID,
+        "core_version": CORE_VERSION,
+        "compiler_version": COMPILER_VERSION,
+        "resolved_build_properties": profile.expected_build_properties,
+        "expected_runtime_clocks": {
+            "F_CPU_ACTUAL": profile.cpu_hz,
+            "F_BUS_ACTUAL": profile.bus_hz,
+        },
+    }
+    encoded = json.dumps(contract, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def profile_build_id(
+    source_id: str, build_fingerprint: str, profile: CpuProfile
+) -> str:
+    """Return the bounded wire ID without changing production ID semantics."""
+
+    profile = _validated_profile(profile)
+    expected_fingerprint = profile_build_fingerprint(source_id, profile)
+    if build_fingerprint != expected_fingerprint:
+        raise BuildError("build fingerprint must derive from source and CPU profile")
+    identity_digest = source_id if profile is DEFAULT_CPU_PROFILE else build_fingerprint
+    return f"thingdaq-{identity_digest[:16]}"
+
+
+def build_identity(
+    environment: Mapping[str, str] | None = None,
+    profile: CpuProfile = DEFAULT_CPU_PROFILE,
+) -> BuildIdentity:
+    """Create deterministic metadata for the current source and CPU profile."""
+
+    profile = _validated_profile(profile)
     source_id = source_fingerprint(collect_source_files())
+    build_fingerprint = profile_build_fingerprint(source_id, profile)
     epoch = resolve_build_epoch(environment)
     timestamp = datetime.fromtimestamp(epoch, tz=timezone.utc).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
     return BuildIdentity(
         source_id=source_id,
-        build_id=f"thingdaq-{source_id[:16]}",
+        build_fingerprint=build_fingerprint,
+        build_id=profile_build_id(source_id, build_fingerprint, profile),
+        cpu_profile=profile.name,
         timestamp_epoch=epoch,
         timestamp_utc=timestamp,
     )
 
 
-def identity_definitions(base_definitions: str, identity: BuildIdentity) -> str:
-    """Append numeric deterministic identity macros to core definitions."""
+def identity_definitions(
+    base_definitions: str,
+    identity: BuildIdentity,
+    profile: CpuProfile = DEFAULT_CPU_PROFILE,
+) -> str:
+    """Append numeric deterministic identity and profile macros."""
 
+    profile = _validated_profile(profile)
     if len(identity.source_id) != 64 or any(
         character not in "0123456789abcdef" for character in identity.source_id
     ):
         raise BuildError("source ID must be a lowercase SHA-256")
+    expected_fingerprint = profile_build_fingerprint(identity.source_id, profile)
+    if identity.build_fingerprint != expected_fingerprint:
+        raise BuildError("build fingerprint must derive from source and CPU profile")
+    if identity.cpu_profile != profile.name:
+        raise BuildError("build identity CPU profile does not match selected profile")
     if not identity.build_id.isascii() or not 0 < len(identity.build_id) < 32:
         raise BuildError("build ID must fit the protocol's 31-byte ASCII limit")
     timestamp = datetime.fromtimestamp(identity.timestamp_epoch, tz=timezone.utc)
-    expected_build_id = f"thingdaq-{identity.source_id[:16]}"
+    expected_build_id = profile_build_id(
+        identity.source_id, identity.build_fingerprint, profile
+    )
     expected_timestamp = timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
     if identity.build_id != expected_build_id:
-        raise BuildError("build ID must be derived from the source ID")
+        raise BuildError("build ID does not match the selected profile identity")
     if identity.timestamp_utc != expected_timestamp:
         raise BuildError("UTC build timestamp must agree with its epoch")
     source_words = tuple(
@@ -349,6 +517,7 @@ def identity_definitions(base_definitions: str, identity: BuildIdentity) -> str:
             f"-DTHINGDAQ_SOURCE_ID_WORD{index}=0x{word}ULL"
             for index, word in enumerate(source_words)
         ),
+        f"-DTHINGDAQ_BUILD_ID_WORD=0x{identity.build_id.removeprefix('thingdaq-')}ULL",
         f"-DTHINGDAQ_BUILD_EPOCH={identity.timestamp_epoch}ULL",
         f"-DTHINGDAQ_BUILD_YEAR={timestamp.year}U",
         f"-DTHINGDAQ_BUILD_MONTH={timestamp.month}U",
@@ -356,6 +525,9 @@ def identity_definitions(base_definitions: str, identity: BuildIdentity) -> str:
         f"-DTHINGDAQ_BUILD_HOUR={timestamp.hour}U",
         f"-DTHINGDAQ_BUILD_MINUTE={timestamp.minute}U",
         f"-DTHINGDAQ_BUILD_SECOND={timestamp.second}U",
+        f"-DTHINGDAQ_CPU_PROFILE_MHZ={profile.name}U",
+        f"-DTHINGDAQ_EXPECTED_CPU_HZ={profile.cpu_hz}U",
+        f"-DTHINGDAQ_EXPECTED_BUS_HZ={profile.bus_hz}U",
         "-DTHINGDAQ_OPTIMIZATION_O2STD=1",
     )
     return " ".join((base_definitions, *identity_macros))
@@ -396,25 +568,30 @@ def compile_command(
     identity: BuildIdentity,
     base_definitions: str,
     base_linker_flags: str,
+    profile: CpuProfile = DEFAULT_CPU_PROFILE,
 ) -> list[str]:
     """Return the immutable command used for every supported firmware build."""
 
-    linker_map = OUTPUT_DIRECTORY / LINKER_MAP_NAME
+    profile = _validated_profile(profile)
+    linker_map = profile.output_directory / LINKER_MAP_NAME
     return [
         str(arduino_cli),
         "compile",
         "--fqbn",
-        FQBN,
+        profile.fqbn,
         "--clean",
         "--warnings",
         "all",
         "--build-property",
-        f"build.flags.defs={identity_definitions(base_definitions, identity)}",
+        (
+            "build.flags.defs="
+            f"{identity_definitions(base_definitions, identity, profile)}"
+        ),
         "--build-property",
         f"build.flags.ld={base_linker_flags} -Wl,-Map={linker_map},--cref",
         "--export-binaries",
         "--output-dir",
-        str(OUTPUT_DIRECTORY),
+        str(profile.output_directory),
         str(SKETCH_DIRECTORY),
     ]
 
@@ -838,8 +1015,275 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def build(arduino_cli_name: str) -> Path:
-    """Validate tool identities, compile the exact target, and write a manifest."""
+def _canonical_sha256(value: Any) -> str:
+    """Hash one JSON-compatible value with a stable representation."""
+
+    encoded = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def stable_linker_resource_contract(
+    memory_usage: Mapping[str, Any],
+    binary_inspection: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Project the profile-invariant linker and fixed-resource evidence."""
+
+    return {
+        "memory_usage": memory_usage,
+        "binary_inspection": {
+            name: value
+            for name, value in binary_inspection.items()
+            if name != "nm_path"
+        },
+    }
+
+
+def _required_mapping(
+    value: Mapping[str, Any], name: str, location: str = "manifest"
+) -> Mapping[str, Any]:
+    selected = value.get(name)
+    if not isinstance(selected, dict):
+        raise BuildError(f"{location}.{name} must be an object")
+    return selected
+
+
+def validate_profile_manifest(manifest: Mapping[str, Any]) -> CpuProfile:
+    """Validate one manifest's closed profile, identity, and output contract."""
+
+    if manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
+        raise BuildError("profile manifest schema version is not current")
+    target = _required_mapping(manifest, "target")
+    name = target.get("cpu_profile")
+    if not isinstance(name, str):
+        raise BuildError("manifest.target.cpu_profile must be a string")
+    profile = cpu_profile(name)
+    expected_target = {
+        "fqbn": profile.fqbn,
+        "core_id": CORE_ID,
+        "core_version": CORE_VERSION,
+        "warnings": "all",
+        "resolved_build_properties": profile.expected_build_properties,
+        "compile_time_clocks": {"F_CPU": profile.cpu_hz},
+        "expected_runtime_clocks": {
+            "F_CPU_ACTUAL": profile.cpu_hz,
+            "F_BUS_ACTUAL": profile.bus_hz,
+        },
+    }
+    mismatches = [
+        name
+        for name, expected in expected_target.items()
+        if target.get(name) != expected
+    ]
+    if mismatches:
+        raise BuildError("profile manifest target mismatch: " + ", ".join(mismatches))
+
+    source = _required_mapping(manifest, "source")
+    source_id = source.get("source_id")
+    if not isinstance(source_id, str):
+        raise BuildError("manifest.source.source_id must be a string")
+    fingerprint = profile_build_fingerprint(source_id, profile)
+    expected_source = {
+        "build_fingerprint": fingerprint,
+        "build_id": profile_build_id(source_id, fingerprint, profile),
+        "cpu_profile": profile.name,
+    }
+    identity_mismatches = [
+        name
+        for name, expected in expected_source.items()
+        if source.get(name) != expected
+    ]
+    if identity_mismatches:
+        raise BuildError(
+            "profile manifest build identity mismatch: "
+            + ", ".join(identity_mismatches)
+        )
+
+    expected_output = profile.output_directory.relative_to(REPOSITORY_ROOT).as_posix()
+    if manifest.get("output_directory") != expected_output:
+        raise BuildError("profile manifest output directory is not isolated")
+
+    compiler = _required_mapping(manifest, "compiler")
+    compiler_identity = compiler.get("identity")
+    if not isinstance(compiler_identity, str) or COMPILER_VERSION not in (
+        compiler_identity.split()
+    ):
+        raise BuildError("profile manifest compiler identity is not pinned")
+
+    command = manifest.get("command")
+    if not isinstance(command, list) or not all(
+        isinstance(argument, str) for argument in command
+    ):
+        raise BuildError("profile manifest command must be a string array")
+    required_options = {
+        "--clean",
+        "--export-binaries",
+        "--fqbn",
+        "--output-dir",
+    }
+    if not required_options.issubset(command):
+        raise BuildError("profile manifest command is missing required options")
+    fqbn_index = command.index("--fqbn")
+    output_index = command.index("--output-dir")
+    if fqbn_index + 1 >= len(command) or command[fqbn_index + 1] != profile.fqbn:
+        raise BuildError("profile manifest command FQBN is contradictory")
+    if output_index + 1 >= len(command) or command[output_index + 1] != str(
+        profile.output_directory
+    ):
+        raise BuildError("profile manifest command output directory is contradictory")
+    if any("upload" in argument.casefold() for argument in command):
+        raise BuildError("profile manifest command contains an upload action")
+
+    memory_usage = _required_mapping(manifest, "memory_usage")
+    binary_inspection = _required_mapping(manifest, "binary_inspection")
+    parity = _required_mapping(manifest, "profile_parity")
+    expected_parity_policy = {
+        "policy": "thingdaq-clock-profile-parity-v1",
+        "identical_artifact_suffixes": [".eep", ".map"],
+        "same_size_profile_variant_artifact_suffixes": [
+            ".bin",
+            ".elf",
+            ".hex",
+        ],
+    }
+    parity_mismatches = [
+        name
+        for name, expected in expected_parity_policy.items()
+        if parity.get(name) != expected
+    ]
+    if parity_mismatches:
+        raise BuildError(
+            "profile manifest parity policy mismatch: " + ", ".join(parity_mismatches)
+        )
+    contract = stable_linker_resource_contract(memory_usage, binary_inspection)
+    if parity.get("stable_linker_resource_contract_sha256") != _canonical_sha256(
+        contract
+    ):
+        raise BuildError("profile manifest linker/resource contract hash is invalid")
+    _manifest_artifacts(manifest)
+    return profile
+
+
+def _manifest_artifacts(
+    manifest: Mapping[str, Any],
+) -> dict[str, Mapping[str, Any]]:
+    raw = manifest.get("artifacts")
+    if not isinstance(raw, list):
+        raise BuildError("manifest.artifacts must be a list")
+    artifacts: dict[str, Mapping[str, Any]] = {}
+    for index, record in enumerate(raw):
+        if not isinstance(record, dict):
+            raise BuildError(f"manifest.artifacts[{index}] must be an object")
+        path = record.get("path")
+        if not isinstance(path, str) or not path:
+            raise BuildError(f"manifest.artifacts[{index}].path must be a string")
+        relative = Path(path)
+        if relative.is_absolute() or len(relative.parts) != 1:
+            raise BuildError(f"manifest artifact path is not local: {path!r}")
+        if path in artifacts:
+            raise BuildError(f"manifest contains duplicate artifact {path!r}")
+        size = record.get("size_bytes")
+        digest = record.get("sha256")
+        if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+            raise BuildError(f"manifest artifact size is invalid: {path!r}")
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise BuildError(f"manifest artifact SHA-256 is invalid: {path!r}")
+        artifacts[path] = record
+    suffixes = {Path(path).suffix.casefold() for path in artifacts}
+    missing = {".elf", ".hex", ".map"} - suffixes
+    if missing:
+        raise BuildError(
+            "profile manifest is missing artifacts: " + ", ".join(sorted(missing))
+        )
+    if LINKER_MAP_NAME not in artifacts:
+        raise BuildError("profile manifest does not identify the exact linker map")
+    return artifacts
+
+
+def validate_profile_parity(
+    first: Mapping[str, Any], second: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Separate allowed profile metadata from linker/resource drift."""
+
+    first_profile = validate_profile_manifest(first)
+    second_profile = validate_profile_manifest(second)
+    if {first_profile.name, second_profile.name} != set(CPU_PROFILES):
+        raise BuildError("profile parity requires exactly the 600 and 528 manifests")
+
+    first_source = _required_mapping(first, "source")
+    second_source = _required_mapping(second, "source")
+    profile_identity_fields = {"build_fingerprint", "build_id", "cpu_profile"}
+    first_stable_source = {
+        name: value
+        for name, value in first_source.items()
+        if name not in profile_identity_fields
+    }
+    second_stable_source = {
+        name: value
+        for name, value in second_source.items()
+        if name not in profile_identity_fields
+    }
+    if first_stable_source != second_stable_source:
+        raise BuildError("profile manifests do not share identical source provenance")
+    if first_source["build_id"] == second_source["build_id"]:
+        raise BuildError("profile manifests do not have distinct build identities")
+
+    for name in ("arduino_cli", "compiler"):
+        if first.get(name) != second.get(name):
+            raise BuildError(f"profile manifests disagree on {name}")
+    if first.get("sketch_directory") != second.get("sketch_directory"):
+        raise BuildError("profile manifests disagree on the sketch directory")
+
+    first_contract = stable_linker_resource_contract(
+        _required_mapping(first, "memory_usage"),
+        _required_mapping(first, "binary_inspection"),
+    )
+    second_contract = stable_linker_resource_contract(
+        _required_mapping(second, "memory_usage"),
+        _required_mapping(second, "binary_inspection"),
+    )
+    if first_contract != second_contract:
+        raise BuildError("unexpected cross-profile linker, memory, or resource drift")
+
+    first_artifacts = _manifest_artifacts(first)
+    second_artifacts = _manifest_artifacts(second)
+    if first_artifacts.keys() != second_artifacts.keys():
+        raise BuildError("profile manifests contain different artifact sets")
+    identical_suffixes = {".eep", ".map"}
+    variant_suffixes = {".bin", ".elf", ".hex"}
+    for name, first_record in first_artifacts.items():
+        second_record = second_artifacts[name]
+        if first_record.get("size_bytes") != second_record.get("size_bytes"):
+            raise BuildError(f"unexpected cross-profile artifact size drift: {name}")
+        suffix = Path(name).suffix.casefold()
+        first_hash = first_record.get("sha256")
+        second_hash = second_record.get("sha256")
+        if suffix in identical_suffixes and first_hash != second_hash:
+            raise BuildError(f"unexpected cross-profile {suffix} drift: {name}")
+        if suffix in variant_suffixes and first_hash == second_hash:
+            raise BuildError(f"profile-specific artifact did not vary: {name}")
+        if suffix not in identical_suffixes | variant_suffixes:
+            raise BuildError(f"profile parity has no artifact policy for {name}")
+
+    contract_hash = _canonical_sha256(first_contract)
+    return {
+        "profiles": sorted((first_profile.name, second_profile.name), reverse=True),
+        "source_id": first_source["source_id"],
+        "build_ids": {
+            first_profile.name: first_source["build_id"],
+            second_profile.name: second_source["build_id"],
+        },
+        "stable_linker_resource_contract_sha256": contract_hash,
+        "artifact_count": len(first_artifacts),
+    }
+
+
+def build(
+    arduino_cli_name: str,
+    cpu_profile_name: str = DEFAULT_CPU_PROFILE_NAME,
+) -> Path:
+    """Validate tools, compile one exact profile, and write its manifest."""
+
+    profile = cpu_profile(cpu_profile_name)
 
     resolved_cli = shutil.which(arduino_cli_name)
     if resolved_cli is None:
@@ -866,13 +1310,13 @@ def build(arduino_cli_name: str) -> Path:
             str(arduino_cli),
             "compile",
             "--fqbn",
-            FQBN,
+            profile.fqbn,
             "--show-properties",
             str(SKETCH_DIRECTORY),
         ]
     )
     properties = parse_build_properties(properties_result.stdout)
-    validate_build_properties(properties)
+    validate_build_properties(properties, profile)
     compiler = resolve_compiler(properties)
     nm = resolve_nm(compiler)
     compiler_identity = run_command([str(compiler), "--version"]).stdout.strip()
@@ -882,15 +1326,16 @@ def build(arduino_cli_name: str) -> Path:
             f"requires Arm GNU {COMPILER_VERSION}, but found {compiler_first_line}"
         )
 
-    identity = build_identity()
+    identity = build_identity(profile=profile)
 
-    OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
-    (OUTPUT_DIRECTORY / LINKER_MAP_NAME).unlink(missing_ok=True)
+    profile.output_directory.mkdir(parents=True, exist_ok=True)
+    (profile.output_directory / LINKER_MAP_NAME).unlink(missing_ok=True)
     command = compile_command(
         arduino_cli,
         identity,
         properties["build.flags.defs"],
         properties["build.flags.ld"],
+        profile,
     )
     compile_environment = dict(os.environ)
     compile_environment["SOURCE_DATE_EPOCH"] = str(identity.timestamp_epoch)
@@ -907,14 +1352,16 @@ def build(arduino_cli_name: str) -> Path:
 
     artifacts = sorted(
         path
-        for path in OUTPUT_DIRECTORY.rglob("*")
+        for path in profile.output_directory.rglob("*")
         if path.is_file() and path.suffix.lower() in ARTIFACT_SUFFIXES
     )
     artifact_suffixes = {path.suffix.lower() for path in artifacts}
     missing_artifacts = {".elf", ".hex", ".map"} - artifact_suffixes
     if missing_artifacts:
         names = ", ".join(sorted(missing_artifacts))
-        raise BuildError(f"compile produced no {names} artifact in {OUTPUT_DIRECTORY}")
+        raise BuildError(
+            f"compile produced no {names} artifact in {profile.output_directory}"
+        )
     elf = next(path for path in artifacts if path.suffix.lower() == ".elf")
     nm_result = run_command(
         [str(nm), "--print-size", "--size-sort", "--demangle", str(elf)]
@@ -926,16 +1373,33 @@ def build(arduino_cli_name: str) -> Path:
     adc_dma_buffers = adc_dma_buffer_usage(nm_result.stdout)
     gpio_raw_dma_buffers = gpio_raw_dma_buffer_usage(nm_result.stdout)
     gpio_packed_buffers = gpio_packed_buffer_usage(nm_result.stdout)
+    binary_inspection = {
+        "nm_path": str(nm),
+        "checksum_resources": checksum_resources,
+        "checksum_benchmark_buffers": benchmark_buffers,
+        "packet_buffers": packet_buffers,
+        "gpio_clock_diagnostic_buffer": gpio_clock_diagnostic_buffer,
+        "adc_dma_buffers": adc_dma_buffers,
+        "gpio_raw_dma_buffers": gpio_raw_dma_buffers,
+        "gpio_packed_buffers": gpio_packed_buffers,
+    }
+    parity_contract = stable_linker_resource_contract(memory_usage, binary_inspection)
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "target": {
-            "fqbn": FQBN,
+            "cpu_profile": profile.name,
+            "fqbn": profile.fqbn,
             "core_id": CORE_ID,
             "core_version": installed_version,
             "warnings": "all",
             "resolved_build_properties": {
-                name: properties[name] for name in EXPECTED_BUILD_PROPERTIES
+                name: properties[name] for name in profile.expected_build_properties
+            },
+            "compile_time_clocks": {"F_CPU": profile.cpu_hz},
+            "expected_runtime_clocks": {
+                "F_CPU_ACTUAL": profile.cpu_hz,
+                "F_BUS_ACTUAL": profile.bus_hz,
             },
         },
         "arduino_cli": {
@@ -946,19 +1410,24 @@ def build(arduino_cli_name: str) -> Path:
             "path": str(compiler),
             "identity": compiler_first_line,
         },
-        "binary_inspection": {
-            "nm_path": str(nm),
-            "checksum_resources": checksum_resources,
-            "checksum_benchmark_buffers": benchmark_buffers,
-            "packet_buffers": packet_buffers,
-            "gpio_clock_diagnostic_buffer": gpio_clock_diagnostic_buffer,
-            "adc_dma_buffers": adc_dma_buffers,
-            "gpio_raw_dma_buffers": gpio_raw_dma_buffers,
-            "gpio_packed_buffers": gpio_packed_buffers,
+        "binary_inspection": binary_inspection,
+        "profile_parity": {
+            "policy": "thingdaq-clock-profile-parity-v1",
+            "stable_linker_resource_contract_sha256": _canonical_sha256(
+                parity_contract
+            ),
+            "identical_artifact_suffixes": [".eep", ".map"],
+            "same_size_profile_variant_artifact_suffixes": [
+                ".bin",
+                ".elf",
+                ".hex",
+            ],
         },
         "source": {
             "source_id": identity.source_id,
+            "build_fingerprint": identity.build_fingerprint,
             "build_id": identity.build_id,
+            "cpu_profile": identity.cpu_profile,
             "timestamp_epoch": identity.timestamp_epoch,
             "timestamp_utc": identity.timestamp_utc,
             "timestamp_policy": (
@@ -974,17 +1443,17 @@ def build(arduino_cli_name: str) -> Path:
         "memory_usage": memory_usage,
         "command": command,
         "sketch_directory": str(SKETCH_DIRECTORY.relative_to(REPOSITORY_ROOT)),
-        "output_directory": str(OUTPUT_DIRECTORY.relative_to(REPOSITORY_ROOT)),
+        "output_directory": str(profile.output_directory.relative_to(REPOSITORY_ROOT)),
         "artifacts": [
             {
-                "path": str(path.relative_to(OUTPUT_DIRECTORY)),
+                "path": str(path.relative_to(profile.output_directory)),
                 "size_bytes": path.stat().st_size,
                 "sha256": sha256(path),
             }
             for path in artifacts
         ],
     }
-    manifest_path = OUTPUT_DIRECTORY / MANIFEST_NAME
+    manifest_path = profile.output_directory / MANIFEST_NAME
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -992,6 +1461,7 @@ def build(arduino_cli_name: str) -> Path:
     print(f"Arduino CLI: {cli_identity.splitlines()[0]}")
     print(f"Teensy core: {CORE_ID} {installed_version}")
     print(f"Compiler: {compiler_first_line}")
+    print(f"CPU profile: {profile.name} MHz")
     print(f"Build ID: {identity.build_id}")
     print(f"Build timestamp: {identity.timestamp_utc}")
     print(f"Build manifest: {manifest_path}")
@@ -999,13 +1469,30 @@ def build(arduino_cli_name: str) -> Path:
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse the one host-specific override without weakening target pins."""
+    """Parse host tooling and one closed CPU-profile selection."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--arduino-cli",
         default="arduino-cli",
         help="Arduino CLI executable name or path (default: arduino-cli)",
+    )
+    parser.add_argument(
+        "--cpu-profile",
+        choices=tuple(CPU_PROFILES),
+        default=DEFAULT_CPU_PROFILE_NAME,
+        help=(
+            "reviewed CPU menu profile "
+            f"(default: {DEFAULT_CPU_PROFILE_NAME}, the production target)"
+        ),
+    )
+    parser.add_argument(
+        "--compare-profile-manifest",
+        type=Path,
+        help=(
+            "after building, require profile parity with the other profile's "
+            "build manifest"
+        ),
     )
     return parser.parse_args(argv)
 
@@ -1015,7 +1502,25 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     arguments = parse_args(argv)
     try:
-        build(arguments.arduino_cli)
+        manifest_path = build(arguments.arduino_cli, arguments.cpu_profile)
+        if arguments.compare_profile_manifest is not None:
+            try:
+                built_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                reference_manifest = json.loads(
+                    arguments.compare_profile_manifest.read_text(encoding="utf-8")
+                )
+            except (OSError, json.JSONDecodeError) as error:
+                raise BuildError(f"could not load profile manifest: {error}") from error
+            if not isinstance(built_manifest, dict) or not isinstance(
+                reference_manifest, dict
+            ):
+                raise BuildError("profile manifests must contain JSON objects")
+            parity = validate_profile_parity(built_manifest, reference_manifest)
+            print(
+                "Profile parity: "
+                f"{', '.join(parity['profiles'])} MHz; "
+                f"contract {parity['stable_linker_resource_contract_sha256']}"
+            )
     except BuildError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

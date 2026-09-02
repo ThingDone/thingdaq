@@ -9,6 +9,7 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
+#include "firmware_identity.h"
 #include "gpio_batch_packer.h"
 #include "gpio_raw_capture_teensy.h"
 
@@ -211,8 +212,8 @@ Runner g_runner{kRegisteredTeensyFixture, g_platform};
 
 Runner &teensyRunner() { return g_runner; }
 
-static_assert(F_CPU == protocol_v1::kGpioClockDwtHz,
-              "GPIO capture diagnostic requires the pinned 600 MHz target");
+static_assert(F_CPU == identity::kExpectedCpuHz,
+              "GPIO capture diagnostic requires the selected CPU profile");
 static_assert(board::kGpioEdmaChannel == 2U);
 static_assert(board::kGpioPitChannel == 0U);
 static_assert(kDiagnosticTimeoutCycles == 6000000U);

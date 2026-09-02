@@ -9,6 +9,8 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
+#include "firmware_identity.h"
+
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
 
@@ -272,8 +274,8 @@ Runner &teensyRunner() { return g_runner; }
 
 static_assert(sizeof(DiagnosticBuffer) == board::kGpioClockDiagnosticSinkBytes);
 static_assert(alignof(DiagnosticBuffer) == board::kCacheLineBytes);
-static_assert(F_CPU == protocol_v1::kGpioClockDwtHz,
-              "GPIO clock diagnostic requires the pinned 600 MHz target");
+static_assert(F_CPU == identity::kExpectedCpuHz,
+              "GPIO clock diagnostic requires the selected CPU profile");
 static_assert(board::kGpioPitChannel == 0U);
 static_assert(board::kGpioEdmaChannel == 2U);
 static_assert(board::kGpioXbarInput == board::kXbarPitTrigger0Input);

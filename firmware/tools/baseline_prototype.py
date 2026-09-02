@@ -246,6 +246,7 @@ def validate_build_manifest(path: Path) -> BuildEvidence:
 
     target = _mapping(raw, "target", "manifest")
     required_target = {
+        "cpu_profile": build_firmware.DEFAULT_CPU_PROFILE_NAME,
         "fqbn": build_firmware.FQBN,
         "core_id": build_firmware.CORE_ID,
         "core_version": build_firmware.CORE_VERSION,
@@ -268,9 +269,23 @@ def validate_build_manifest(path: Path) -> BuildEvidence:
     source_commit = _text(source, "git_commit", "manifest.source")
     if not SHA256_PATTERN.fullmatch(source_id):
         raise BaselinePrototypeError("manifest source ID is not a lowercase SHA-256")
-    if build_id != f"thingdaq-{source_id[:16]}":
+    expected_build_fingerprint = build_firmware.profile_build_fingerprint(
+        source_id, build_firmware.DEFAULT_CPU_PROFILE
+    )
+    if source.get("build_fingerprint") != expected_build_fingerprint:
         raise BaselinePrototypeError(
-            "manifest build ID is not derived from its source ID"
+            "manifest build fingerprint is not derived from source and target"
+        )
+    if source.get("cpu_profile") != build_firmware.DEFAULT_CPU_PROFILE_NAME:
+        raise BaselinePrototypeError("manifest source CPU profile is not production")
+    expected_build_id = build_firmware.profile_build_id(
+        source_id,
+        expected_build_fingerprint,
+        build_firmware.DEFAULT_CPU_PROFILE,
+    )
+    if build_id != expected_build_id:
+        raise BaselinePrototypeError(
+            "manifest build ID does not match the production identity"
         )
     if not GIT_COMMIT_PATTERN.fullmatch(source_commit):
         raise BaselinePrototypeError("manifest source commit is not a full Git commit")

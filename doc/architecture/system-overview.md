@@ -2,7 +2,7 @@
 type: reference
 title: System Overview
 created: 2026-08-27
-updated: 2026-08-29
+updated: 2026-09-01
 tags:
   - thingdaq
   - architecture
@@ -12,6 +12,7 @@ related:
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
+  - '[[ADR-005-Experimental-Clock-Profiles]]'
 ---
 
 # System overview
@@ -65,19 +66,24 @@ code must not grow board or build constants of its own. [[Firmware-Resource-Map]
 records every reservation and the distinction between present control support
 and future acquisition work.
 
-The required target is exact:
+The production target remains exact, and the isolated clock experiment adds
+one explicit comparison target:
 
 ```text
 teensy:avr:teensy40:usb=serial,speed=600,opt=o2std
+teensy:avr:teensy40:usb=serial,speed=528,opt=o2std
 ```
 
-That means Teensy 4.0, i.MX RT1062/Cortex-M7, 600 MHz, USB Serial, standard
-`-O2`, Teensy core 1.62.0, GNU C++17, and Arm GNU 15.2.1. The build helper
-checks resolved Arduino properties and compiler identity. The firmware header
-also rejects a wrong board, MCU, CPU frequency, USB mode, core compile macro,
-language mode, unvalidated optimization selection, or compiler major/minor at
-compile time. The helper establishes the optimization marker only after the
-resolved menu property equals `-O2`.
+Both mean Teensy 4.0, i.MX RT1062/Cortex-M7, USB Serial, standard `-O2`,
+Teensy core 1.62.0, GNU C++17, and Arm GNU 15.2.1. An omitted profile still
+selects 600 MHz. The helper rejects any speed other than `600` or `528`, checks
+the resolved `build.fcpu` and recipe-level `F_CPU`, and exports each profile to
+its own exact directory. The firmware header rejects a wrong board, MCU, CPU
+profile, USB mode, core compile macro, language mode, unvalidated optimization
+selection, or compiler major/minor. Before completing BOOT, the sketch also
+requires runtime `F_CPU_ACTUAL`/`F_BUS_ACTUAL` to match 600/150 MHz or 528/132
+MHz respectively. [[ADR-005-Experimental-Clock-Profiles]] owns the experiment
+boundary; 600 MHz remains the production profile.
 
 ## USB identity and boot contract
 
@@ -223,7 +229,7 @@ prevents prior-run data from appearing after the acknowledged new epoch.
 
 The end-to-end INFO response carries the protocol version, semantic firmware
 version, exact Teensy 4.0 and i.MX RT1062 IDs, core-derived hardware serial,
-source-derived build ID, and truthful support masks. A host can therefore
+profile-specific build ID, and truthful support masks. A host can therefore
 reject a wrong target, incompatible protocol/firmware, unexpected physical
 device, stale build, or unsupported operation before sending state-changing
 commands.
@@ -232,9 +238,14 @@ commands.
 
 `firmware/tools/build_firmware.py` hashes stable relative paths and bytes for
 `firmware/firmware.ino`, every non-hidden file under `firmware/src/`, and
-`protocol/protocol-v1.json`. The full lowercase SHA-256 is the source ID. The
-wire-safe build ID is `thingdaq-` followed by the first 16 source-ID digits and is
-therefore well inside INFO's 31-ASCII-byte limit.
+`protocol/protocol-v1.json`. The full lowercase SHA-256 is the source ID and is
+identical for both profiles built from one tree. A second SHA-256 fingerprints
+that source together with the exact FQBN, resolved clock properties, pinned
+core, and compiler. To preserve the accepted production identity contract, the
+600 MHz wire ID remains `thingdaq-` plus the first 16 source-ID digits. The
+experimental 528 MHz wire ID uses the first 16 build-fingerprint digits. The
+two images are therefore distinct while both remain inside INFO's 31-ASCII-byte
+limit.
 
 Build metadata never uses C/C++ `__DATE__` or `__TIME__`. Its UTC timestamp is:
 
@@ -243,9 +254,12 @@ Build metadata never uses C/C++ `__DATE__` or `__TIME__`. Its UTC timestamp is:
 
 The helper exports that epoch to the compiler, formats it as
 `YYYY-MM-DDTHH:MM:SSZ`, embeds both forms, and records the policy and complete
-source input list in the build manifest. Rebuilding the same source with the
-same epoch therefore produces identical application build metadata. The
-source ID, rather than wall-clock time, is the stale-image compatibility key.
+source input list in the build manifest. Rebuilding the same source, target,
+and epoch therefore produces identical application build metadata. Each
+manifest hashes its artifacts and a stable linker/resource projection. The
+cross-profile gate permits only the declared target/identity and ELF/HEX byte
+differences; it requires identical memory accounting, fixed-resource evidence,
+linker map, EEPROM image, and artifact sizes.
 
 ## Phase 06/07 physical acquisition capabilities
 

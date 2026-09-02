@@ -24,6 +24,18 @@
 #if defined(ARDUINO) && !defined(THINGDAQ_BUILD_EPOCH)
 #error "build firmware with firmware/tools/build_firmware.py"
 #endif
+#if defined(ARDUINO) && !defined(THINGDAQ_BUILD_ID_WORD)
+#error "build firmware with firmware/tools/build_firmware.py"
+#endif
+#if defined(ARDUINO) && !defined(THINGDAQ_CPU_PROFILE_MHZ)
+#error "build firmware with firmware/tools/build_firmware.py"
+#endif
+#if defined(ARDUINO) && !defined(THINGDAQ_EXPECTED_CPU_HZ)
+#error "build firmware with firmware/tools/build_firmware.py"
+#endif
+#if defined(ARDUINO) && !defined(THINGDAQ_EXPECTED_BUS_HZ)
+#error "build firmware with firmware/tools/build_firmware.py"
+#endif
 #if defined(ARDUINO) &&                                                \
     (!defined(THINGDAQ_BUILD_YEAR) ||                               \
      !defined(THINGDAQ_BUILD_MONTH) ||                              \
@@ -49,6 +61,18 @@
 #ifndef THINGDAQ_BUILD_EPOCH
 #define THINGDAQ_BUILD_EPOCH 0ULL
 #endif
+#ifndef THINGDAQ_BUILD_ID_WORD
+#define THINGDAQ_BUILD_ID_WORD THINGDAQ_SOURCE_ID_WORD0
+#endif
+#ifndef THINGDAQ_CPU_PROFILE_MHZ
+#define THINGDAQ_CPU_PROFILE_MHZ 600U
+#endif
+#ifndef THINGDAQ_EXPECTED_CPU_HZ
+#define THINGDAQ_EXPECTED_CPU_HZ 600000000U
+#endif
+#ifndef THINGDAQ_EXPECTED_BUS_HZ
+#define THINGDAQ_EXPECTED_BUS_HZ 150000000U
+#endif
 #ifndef THINGDAQ_BUILD_YEAR
 #define THINGDAQ_BUILD_YEAR 1970U
 #endif
@@ -68,6 +92,23 @@
 #define THINGDAQ_BUILD_SECOND 0U
 #endif
 
+// The helper injects one complete clock contract. Reject hand-crafted or stale
+// combinations even outside Arduino so portable compile tests exercise the
+// same closed two-profile registry.
+#if THINGDAQ_CPU_PROFILE_MHZ == 600U
+#if THINGDAQ_EXPECTED_CPU_HZ != 600000000U || \
+    THINGDAQ_EXPECTED_BUS_HZ != 150000000U
+#error "invalid ThingDAQ 600 MHz clock profile"
+#endif
+#elif THINGDAQ_CPU_PROFILE_MHZ == 528U
+#if THINGDAQ_EXPECTED_CPU_HZ != 528000000U || \
+    THINGDAQ_EXPECTED_BUS_HZ != 132000000U
+#error "invalid ThingDAQ 528 MHz clock profile"
+#endif
+#else
+#error "ThingDAQ supports only the explicit 600 or 528 MHz CPU profile"
+#endif
+
 // Fail closed when an Arduino build bypasses the exact Teensy 4.0 target. The
 // core version and optimization menu are also checked by build_firmware.py;
 // these preprocessor checks prevent a copied sketch from silently degrading.
@@ -78,8 +119,8 @@
 #if !defined(__IMXRT1062__)
 #error "ThingDAQ requires the i.MX RT1062"
 #endif
-#if !defined(F_CPU) || F_CPU != 600000000
-#error "ThingDAQ requires the 600 MHz CPU menu option"
+#if !defined(F_CPU) || F_CPU != THINGDAQ_EXPECTED_CPU_HZ
+#error "ThingDAQ F_CPU does not match the selected CPU profile"
 #endif
 #if !defined(USB_SERIAL)
 #error "ThingDAQ requires the USB Serial menu option"
@@ -114,7 +155,9 @@ inline constexpr std::array<std::uint16_t, 8U> kUsbProductNameUtf16{
 inline constexpr char kBoardName[] = "Teensy 4.0";
 inline constexpr char kMcuName[] = "NXP i.MX RT1062";
 inline constexpr char kCpuArchitecture[] = "Arm Cortex-M7";
-inline constexpr std::uint32_t kExpectedCpuHz = 600000000U;
+inline constexpr std::uint16_t kCpuProfileMhz = THINGDAQ_CPU_PROFILE_MHZ;
+inline constexpr std::uint32_t kExpectedCpuHz = THINGDAQ_EXPECTED_CPU_HZ;
+inline constexpr std::uint32_t kExpectedBusHz = THINGDAQ_EXPECTED_BUS_HZ;
 inline constexpr char kExpectedTeensyCoreId[] = "teensy:avr";
 inline constexpr char kExpectedTeensyCoreVersion[] = "1.62.0";
 inline constexpr std::uint16_t kExpectedTeensyduinoMacro = 160U;
@@ -174,13 +217,14 @@ constexpr std::array<char, 65U> makeSourceId() {
   return result;
 }
 
-constexpr std::array<char, 26U> makeBuildId(
-    const std::array<char, 65U> &source_id) {
+constexpr std::array<char, 26U> makeBuildId(std::uint64_t build_id_word) {
   std::array<char, 26U> result{
       't', 'h', 'i', 'n', 'g', 'd', 'a', 'q', '-',
   };
   for (std::size_t index = 0U; index < 16U; ++index) {
-    result[index + 9U] = source_id[index];
+    const std::uint8_t shift = static_cast<std::uint8_t>(60U - index * 4U);
+    result[index + 9U] =
+        hexDigit(static_cast<std::uint8_t>((build_id_word >> shift) & 0xFU));
   }
   return result;
 }
@@ -211,11 +255,18 @@ constexpr std::array<char, 21U> makeBuildTimestampUtc() {
   };
 }
 
-// kSourceId hashes every firmware input and the protocol source. kBuildId is
-// the bounded wire identity derived from its first 16 hexadecimal digits.
+// kSourceId hashes every firmware input and the protocol source. The helper
+// preserves the production source-derived wire ID and supplies a distinct
+// source/profile/toolchain-derived ID for the experimental profile.
 inline constexpr auto kSourceId = makeSourceId();
-inline constexpr auto kBuildId = makeBuildId(kSourceId);
+inline constexpr auto kBuildId = makeBuildId(THINGDAQ_BUILD_ID_WORD);
 inline constexpr auto kBuildTimestampUtc = makeBuildTimestampUtc();
+
+constexpr bool runtimeClocksMatchProfile(std::uint32_t cpu_actual_hz,
+                                         std::uint32_t bus_actual_hz) {
+  return cpu_actual_hz == kExpectedCpuHz &&
+         bus_actual_hz == kExpectedBusHz;
+}
 
 template <std::size_t N>
 constexpr std::size_t stringLength(const std::array<char, N> &) {
@@ -233,6 +284,8 @@ constexpr bool isLowerHexString(const std::array<char, N> &value) {
 }
 
 static_assert(kProtocolVersion == 1U);
+static_assert(kCpuProfileMhz == 600U || kCpuProfileMhz == 528U);
+static_assert(runtimeClocksMatchProfile(kExpectedCpuHz, kExpectedBusHz));
 static_assert(usbProductNameMatchesIdentity(),
               "USB descriptor product must match firmware identity");
 static_assert(stringLength(kSourceId) == 64U,

@@ -196,6 +196,19 @@ Common local gates:
 python3 firmware/tools/build_firmware.py
 ```
 
+The no-argument firmware command remains the production 600 MHz build. On the
+isolated `experiment/clock-528mhz` branch, the reviewed comparison profile is
+selected explicitly and exported to its own directory:
+
+```bash
+python3 firmware/tools/build_firmware.py --cpu-profile 528 \
+  --compare-profile-manifest \
+  firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json
+```
+
+Only `600` and `528` are accepted. Both commands compile and inspect artifacts;
+neither uploads firmware.
+
 ## Distribution and trademark boundary
 
 The distribution remains marked `Private :: Do Not Upload` until package-index

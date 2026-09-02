@@ -7,6 +7,8 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
+#include "firmware_identity.h"
+
 #define THINGDAQ_ADC_TARGET_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
 
@@ -241,8 +243,8 @@ Initializer g_initializer{g_platform};
 THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_singleton")
 Initializer &teensyInitializer() { return g_initializer; }
 
-static_assert(F_CPU == protocol_v1::kAdcCalibrationCycleCounterHz,
-              "ADC initialization requires the pinned 600 MHz target");
+static_assert(F_CPU == identity::kExpectedCpuHz,
+              "ADC initialization requires the selected CPU profile");
 static_assert(A0 == board::kAdc0Pin);
 static_assert(A1 == board::kAdc1Pin);
 static_assert(board::kAdc0Peripheral == 1U);

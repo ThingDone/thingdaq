@@ -5,6 +5,8 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
+#include "firmware_identity.h"
+
 namespace thingdaq::benchmark {
 
 Buffer g_checksum_benchmark_dtcm_buffer __attribute__((used));
@@ -67,8 +69,8 @@ Runner g_runner{g_platform, g_checksum_benchmark_dtcm_buffer,
 
 Runner &teensyRunner() { return g_runner; }
 
-static_assert(F_CPU == protocol_v1::kChecksumBenchmarkCycleCounterHz,
-              "checksum benchmark requires the pinned 600 MHz target");
+static_assert(F_CPU == identity::kExpectedCpuHz,
+              "checksum benchmark requires the selected CPU profile");
 
 }  // namespace thingdaq::benchmark
 

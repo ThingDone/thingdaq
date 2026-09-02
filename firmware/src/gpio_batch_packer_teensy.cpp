@@ -5,6 +5,8 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
+#include "firmware_identity.h"
+
 namespace thingdaq::gpio_packer {
 
 PackedBufferStorage g_gpio_packed_buffers
@@ -46,8 +48,8 @@ static_assert(sizeof(g_gpio_packed_buffers) ==
               board::kGpioPackedRingDepth *
                   board::kGpioPackedBufferStrideBytes);
 static_assert(alignof(PackedBufferStorage) == board::kCacheLineBytes);
-static_assert(F_CPU == protocol_v1::kGpioClockDwtHz,
-              "GPIO processing profiling requires the pinned 600 MHz target");
+static_assert(F_CPU == identity::kExpectedCpuHz,
+              "GPIO processing profiling requires the selected CPU profile");
 
 }  // namespace thingdaq::gpio_packer
 

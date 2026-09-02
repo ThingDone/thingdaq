@@ -8,6 +8,8 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
+#include "firmware_identity.h"
+
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
 
@@ -521,8 +523,8 @@ THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
     ".flashmem.adc_trigger.target_singleton")
 Scheduler &teensyScheduler() { return g_scheduler; }
 
-static_assert(F_CPU == protocol_v1::kAdcTriggerDwtClockHz,
-              "ADC trigger diagnostic requires the pinned 600 MHz target");
+static_assert(F_CPU == identity::kExpectedCpuHz,
+              "ADC trigger diagnostic requires the selected CPU profile");
 static_assert(XBARA1_IN_PIT_TRIGGER1 ==
               protocol_v1::kAdcTriggerXbarInputs[0]);
 static_assert(XBARA1_OUT_ADC_ETC_TRIG00 ==

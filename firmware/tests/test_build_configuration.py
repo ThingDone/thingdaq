@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,59 +23,211 @@ SPEC.loader.exec_module(build_firmware)
 
 
 class BuildConfigurationTests(unittest.TestCase):
-    def test_helper_pins_the_complete_target_and_export_directory(self) -> None:
-        identity = build_firmware.BuildIdentity(
-            source_id="a" * 64,
-            build_id="thingdaq-aaaaaaaaaaaaaaaa",
-            timestamp_epoch=1_700_000_000,
-            timestamp_utc="2023-11-14T22:13:20Z",
-        )
-        command = build_firmware.compile_command(
-            Path("/tools/arduino-cli"),
-            identity,
-            "-D__IMXRT1062__ -DTEENSYDUINO=160",
-            "-Wl,--gc-sections -T/imxrt1062.ld",
-        )
+    @staticmethod
+    def _profile_manifest(
+        profile: build_firmware.CpuProfile,
+    ) -> dict[str, object]:
+        source_id = "6" * 64
+        fingerprint = build_firmware.profile_build_fingerprint(source_id, profile)
+        build_id = build_firmware.profile_build_id(source_id, fingerprint, profile)
+        memory = {
+            "flash": {"code_bytes": 1, "data_bytes": 2},
+            "ram1": {"variables_bytes": 3},
+            "ram2": {"variables_bytes": 4},
+        }
+        inspection = {
+            "nm_path": "/tools/arm-none-eabi-nm",
+            "packet_buffers": {"total_bytes": 819_200},
+        }
+        contract = build_firmware.stable_linker_resource_contract(memory, inspection)
+        variant_hash = "a" * 64 if profile.name == "600" else "b" * 64
+        return {
+            "schema_version": build_firmware.MANIFEST_SCHEMA_VERSION,
+            "target": {
+                "cpu_profile": profile.name,
+                "fqbn": profile.fqbn,
+                "core_id": build_firmware.CORE_ID,
+                "core_version": build_firmware.CORE_VERSION,
+                "warnings": "all",
+                "resolved_build_properties": profile.expected_build_properties,
+                "compile_time_clocks": {"F_CPU": profile.cpu_hz},
+                "expected_runtime_clocks": {
+                    "F_CPU_ACTUAL": profile.cpu_hz,
+                    "F_BUS_ACTUAL": profile.bus_hz,
+                },
+            },
+            "arduino_cli": {"path": "/tools/arduino-cli", "identity": "1.4.1"},
+            "compiler": {"path": "/tools/g++", "identity": "15.2.1"},
+            "binary_inspection": inspection,
+            "profile_parity": {
+                "policy": "thingdaq-clock-profile-parity-v1",
+                "stable_linker_resource_contract_sha256": (
+                    build_firmware._canonical_sha256(contract)
+                ),
+                "identical_artifact_suffixes": [".eep", ".map"],
+                "same_size_profile_variant_artifact_suffixes": [
+                    ".bin",
+                    ".elf",
+                    ".hex",
+                ],
+            },
+            "source": {
+                "source_id": source_id,
+                "build_fingerprint": fingerprint,
+                "build_id": build_id,
+                "cpu_profile": profile.name,
+                "timestamp_epoch": 1,
+                "timestamp_utc": "1970-01-01T00:00:01Z",
+                "inputs": ["firmware/firmware.ino"],
+                "git_commit": "c" * 40,
+                "firmware_inputs_clean": True,
+                "firmware_input_changes": [],
+            },
+            "memory_usage": memory,
+            "command": [
+                "/tools/arduino-cli",
+                "compile",
+                "--fqbn",
+                profile.fqbn,
+                "--clean",
+                "--export-binaries",
+                "--output-dir",
+                str(profile.output_directory),
+                str(build_firmware.SKETCH_DIRECTORY),
+            ],
+            "sketch_directory": "firmware",
+            "output_directory": profile.output_directory.relative_to(
+                build_firmware.REPOSITORY_ROOT
+            ).as_posix(),
+            "artifacts": [
+                {"path": "firmware.ino.eep", "size_bytes": 1, "sha256": "e" * 64},
+                {
+                    "path": "firmware.ino.elf",
+                    "size_bytes": 2,
+                    "sha256": variant_hash,
+                },
+                {
+                    "path": "firmware.ino.hex",
+                    "size_bytes": 3,
+                    "sha256": variant_hash,
+                },
+                {"path": "firmware.ino.map", "size_bytes": 4, "sha256": "d" * 64},
+            ],
+        }
 
+    def test_helper_pins_both_complete_targets_and_isolated_exports(self) -> None:
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(10, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(11, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
         )
-        self.assertEqual("/tools/arduino-cli", command[0])
-        self.assertIn("--export-binaries", command)
+        self.assertIs(
+            build_firmware.DEFAULT_CPU_PROFILE,
+            build_firmware.CPU_PROFILES["600"],
+        )
         self.assertEqual(
-            str(build_firmware.OUTPUT_DIRECTORY),
-            command[command.index("--output-dir") + 1],
+            build_firmware.OUTPUT_DIRECTORY,
+            build_firmware.CPU_PROFILES["600"].output_directory,
         )
-        self.assertEqual("compile", command[1])
-        self.assertNotIn("upload", command)
-        self.assertIn("--clean", command)
-        self.assertEqual("all", command[command.index("--warnings") + 1])
-        build_properties = [
-            command[index + 1]
-            for index, value in enumerate(command)
-            if value == "--build-property"
-        ]
-        definitions = next(
-            value for value in build_properties if value.startswith("build.flags.defs=")
-        )
-        self.assertIn("-DTHINGDAQ_SOURCE_ID_WORD0=0x" + "a" * 16 + "ULL", definitions)
-        self.assertIn("-DTHINGDAQ_SOURCE_ID_WORD3=0x" + "a" * 16 + "ULL", definitions)
-        self.assertIn("-DTHINGDAQ_BUILD_EPOCH=1700000000ULL", definitions)
-        self.assertIn("-DTHINGDAQ_BUILD_YEAR=2023U", definitions)
-        self.assertIn("-DTHINGDAQ_BUILD_SECOND=20U", definitions)
-        self.assertIn("-DTHINGDAQ_OPTIMIZATION_O2STD=1", definitions)
-        linker_flags = next(
-            value for value in build_properties if value.startswith("build.flags.ld=")
-        )
-        self.assertIn("-Wl,--gc-sections -T/imxrt1062.ld", linker_flags)
-        self.assertIn(
-            f"-Wl,-Map={build_firmware.OUTPUT_DIRECTORY / build_firmware.LINKER_MAP_NAME},--cref",
-            linker_flags,
-        )
+
+        source_id = "a" * 64
+        output_directories: set[Path] = set()
+        build_ids: set[str] = set()
+        expected = {
+            "600": (600_000_000, 150_000_000),
+            "528": (528_000_000, 132_000_000),
+        }
+        for name, profile in build_firmware.CPU_PROFILES.items():
+            with self.subTest(profile=name):
+                fingerprint = build_firmware.profile_build_fingerprint(
+                    source_id, profile
+                )
+                build_id = build_firmware.profile_build_id(
+                    source_id, fingerprint, profile
+                )
+                identity = build_firmware.BuildIdentity(
+                    source_id=source_id,
+                    build_fingerprint=fingerprint,
+                    build_id=build_id,
+                    cpu_profile=name,
+                    timestamp_epoch=1_700_000_000,
+                    timestamp_utc="2023-11-14T22:13:20Z",
+                )
+                command = build_firmware.compile_command(
+                    Path("/tools/arduino-cli"),
+                    identity,
+                    "-D__IMXRT1062__ -DTEENSYDUINO=160",
+                    "-Wl,--gc-sections -T/imxrt1062.ld",
+                    profile,
+                )
+
+                self.assertEqual(
+                    f"teensy:avr:teensy40:usb=serial,speed={name},opt=o2std",
+                    profile.fqbn,
+                )
+                self.assertEqual("/tools/arduino-cli", command[0])
+                self.assertIn("--export-binaries", command)
+                self.assertEqual(
+                    str(profile.output_directory),
+                    command[command.index("--output-dir") + 1],
+                )
+                self.assertEqual("compile", command[1])
+                self.assertNotIn("upload", command)
+                self.assertIn("--clean", command)
+                self.assertEqual("all", command[command.index("--warnings") + 1])
+                build_properties = [
+                    command[index + 1]
+                    for index, value in enumerate(command)
+                    if value == "--build-property"
+                ]
+                definitions = next(
+                    value
+                    for value in build_properties
+                    if value.startswith("build.flags.defs=")
+                )
+                self.assertIn(
+                    "-DTHINGDAQ_SOURCE_ID_WORD0=0x" + "a" * 16 + "ULL",
+                    definitions,
+                )
+                self.assertIn(
+                    "-DTHINGDAQ_SOURCE_ID_WORD3=0x" + "a" * 16 + "ULL",
+                    definitions,
+                )
+                self.assertIn(
+                    "-DTHINGDAQ_BUILD_ID_WORD=0x"
+                    f"{build_id.removeprefix('thingdaq-')}ULL",
+                    definitions,
+                )
+                self.assertIn("-DTHINGDAQ_BUILD_EPOCH=1700000000ULL", definitions)
+                self.assertIn("-DTHINGDAQ_BUILD_YEAR=2023U", definitions)
+                self.assertIn("-DTHINGDAQ_BUILD_SECOND=20U", definitions)
+                self.assertIn(f"-DTHINGDAQ_CPU_PROFILE_MHZ={name}U", definitions)
+                self.assertIn(
+                    f"-DTHINGDAQ_EXPECTED_CPU_HZ={expected[name][0]}U",
+                    definitions,
+                )
+                self.assertIn(
+                    f"-DTHINGDAQ_EXPECTED_BUS_HZ={expected[name][1]}U",
+                    definitions,
+                )
+                self.assertIn("-DTHINGDAQ_OPTIMIZATION_O2STD=1", definitions)
+                linker_flags = next(
+                    value
+                    for value in build_properties
+                    if value.startswith("build.flags.ld=")
+                )
+                self.assertIn("-Wl,--gc-sections -T/imxrt1062.ld", linker_flags)
+                self.assertIn(
+                    f"-Wl,-Map={profile.output_directory / build_firmware.LINKER_MAP_NAME},--cref",
+                    linker_flags,
+                )
+                output_directories.add(profile.output_directory)
+                build_ids.add(identity.build_id)
+
+        self.assertEqual(2, len(output_directories))
+        self.assertEqual(2, len(build_ids))
 
     def test_memory_summary_is_recorded_exactly(self) -> None:
         summary = build_firmware.parse_memory_usage(
@@ -333,17 +488,126 @@ class BuildConfigurationTests(unittest.TestCase):
         with self.assertRaisesRegex(build_firmware.BuildError, "decimal integer"):
             build_firmware.resolve_build_epoch({"SOURCE_DATE_EPOCH": "tomorrow"})
 
-    def test_resolved_target_properties_fail_closed(self) -> None:
-        properties = {
-            **build_firmware.EXPECTED_BUILD_PROPERTIES,
+    @staticmethod
+    def _resolved_properties(
+        profile: build_firmware.CpuProfile,
+    ) -> dict[str, str]:
+        recipe = (
+            "arm-none-eabi-g++ -c -O2 -D__IMXRT1062__ "
+            "-DTEENSYDUINO=160 -DARDUINO_TEENSY40 "
+            f"-DF_CPU={profile.cpu_hz} -DUSB_SERIAL"
+        )
+        return {
+            **profile.expected_build_properties,
             "build.flags.defs": "-D__IMXRT1062__ -DTEENSYDUINO=160",
             "build.flags.cpp": "-std=gnu++17 -fno-exceptions",
+            **{name: recipe for name in build_firmware.COMPILE_RECIPE_PROPERTIES},
         }
-        build_firmware.validate_build_properties(properties)
 
-        properties["build.fcpu"] = "528000000"
-        with self.assertRaisesRegex(build_firmware.BuildError, "build.fcpu"):
-            build_firmware.validate_build_properties(properties)
+    def test_resolved_target_properties_fail_closed_for_each_profile(self) -> None:
+        for name, profile in build_firmware.CPU_PROFILES.items():
+            with self.subTest(profile=name):
+                properties = self._resolved_properties(profile)
+                build_firmware.validate_build_properties(properties, profile)
+
+                properties["build.fcpu"] = "720000000"
+                with self.assertRaisesRegex(build_firmware.BuildError, "build.fcpu"):
+                    build_firmware.validate_build_properties(properties, profile)
+
+                properties = self._resolved_properties(profile)
+                properties["recipe.cpp.o.pattern"] = properties[
+                    "recipe.cpp.o.pattern"
+                ].replace(f"-DF_CPU={profile.cpu_hz}", "-DF_CPU=720000000")
+                with self.assertRaisesRegex(build_firmware.BuildError, "F_CPU"):
+                    build_firmware.validate_build_properties(properties, profile)
+
+    def test_profile_selection_and_cli_default_fail_closed(self) -> None:
+        self.assertEqual("600", build_firmware.parse_args([]).cpu_profile)
+        self.assertIs(
+            build_firmware.cpu_profile("528"), build_firmware.CPU_PROFILES["528"]
+        )
+        with self.assertRaisesRegex(build_firmware.BuildError, "unsupported CPU"):
+            build_firmware.cpu_profile("720")
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            build_firmware.parse_args(["--cpu-profile", "720"])
+        forged = build_firmware.CpuProfile(
+            name="600",
+            fqbn="teensy:avr:teensy40:usb=serial,speed=720,opt=o2std",
+            cpu_hz=720_000_000,
+            bus_hz=144_000_000,
+            output_directory=Path("/tmp/forged"),
+        )
+        with self.assertRaisesRegex(build_firmware.BuildError, "registry"):
+            build_firmware.profile_build_fingerprint("5" * 64, forged)
+
+    def test_unsupported_build_profile_stops_before_tool_lookup(self) -> None:
+        with (
+            patch.object(build_firmware.shutil, "which") as which,
+            self.assertRaisesRegex(build_firmware.BuildError, "unsupported CPU"),
+        ):
+            build_firmware.build("arduino-cli", "720")
+        which.assert_not_called()
+
+    def test_build_identity_is_source_stable_and_profile_specific(self) -> None:
+        source_id = "5" * 64
+        first = build_firmware.profile_build_fingerprint(
+            source_id, build_firmware.CPU_PROFILES["600"]
+        )
+        repeated = build_firmware.profile_build_fingerprint(
+            source_id, build_firmware.CPU_PROFILES["600"]
+        )
+        candidate = build_firmware.profile_build_fingerprint(
+            source_id, build_firmware.CPU_PROFILES["528"]
+        )
+
+        self.assertEqual(first, repeated)
+        self.assertNotEqual(first, candidate)
+        self.assertEqual(64, len(first))
+        self.assertEqual(64, len(candidate))
+        production_id = build_firmware.profile_build_id(
+            source_id, first, build_firmware.CPU_PROFILES["600"]
+        )
+        candidate_id = build_firmware.profile_build_id(
+            source_id, candidate, build_firmware.CPU_PROFILES["528"]
+        )
+        self.assertEqual("thingdaq-5555555555555555", production_id)
+        self.assertEqual(f"thingdaq-{candidate[:16]}", candidate_id)
+        self.assertNotEqual(production_id, candidate_id)
+
+    def test_profile_parity_allows_only_declared_metadata_and_artifacts(self) -> None:
+        production = self._profile_manifest(build_firmware.CPU_PROFILES["600"])
+        candidate = self._profile_manifest(build_firmware.CPU_PROFILES["528"])
+
+        result = build_firmware.validate_profile_parity(production, candidate)
+
+        self.assertEqual(["600", "528"], result["profiles"])
+        self.assertEqual(4, result["artifact_count"])
+        self.assertNotEqual(result["build_ids"]["600"], result["build_ids"]["528"])
+
+        resource_drift = deepcopy(candidate)
+        resource_drift["memory_usage"]["ram1"]["variables_bytes"] = 5  # type: ignore[index]
+        resource_drift["profile_parity"][  # type: ignore[index]
+            "stable_linker_resource_contract_sha256"
+        ] = build_firmware._canonical_sha256(
+            build_firmware.stable_linker_resource_contract(
+                resource_drift["memory_usage"],  # type: ignore[arg-type]
+                resource_drift["binary_inspection"],  # type: ignore[arg-type]
+            )
+        )
+        with self.assertRaisesRegex(build_firmware.BuildError, "resource drift"):
+            build_firmware.validate_profile_parity(production, resource_drift)
+
+        map_drift = deepcopy(candidate)
+        map_drift["artifacts"][-1]["sha256"] = "f" * 64  # type: ignore[index]
+        with self.assertRaisesRegex(build_firmware.BuildError, r"\.map drift"):
+            build_firmware.validate_profile_parity(production, map_drift)
+
+        contradictory_clock = deepcopy(candidate)
+        contradictory_clock["target"]["expected_runtime_clocks"][  # type: ignore[index]
+            "F_BUS_ACTUAL"
+        ] = 150_000_000
+        with self.assertRaisesRegex(build_firmware.BuildError, "target mismatch"):
+            build_firmware.validate_profile_manifest(contradictory_clock)
 
     def test_sketch_boot_is_independent_of_host_open_and_has_no_banner(self) -> None:
         sketch = (REPOSITORY_ROOT / "firmware/firmware.ino").read_text(encoding="utf-8")
@@ -358,6 +622,13 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertIn('include "src/firmware_runtime.h"', sketch)
         self.assertIn('include "src/teensy_usb.h"', sketch)
         self.assertIn("firmware_runtime.begin", sketch)
+        clock_adapter = (REPOSITORY_ROOT / "firmware/src/teensy_clock.cpp").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("runtimeProfileClocksValid", sketch)
+        self.assertIn("runtimeClocksMatchProfile", clock_adapter)
+        self.assertIn("F_CPU_ACTUAL", clock_adapter)
+        self.assertIn("F_BUS_ACTUAL", clock_adapter)
         self.assertIn("hardwareSerialNumber()", sketch)
         self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("while (!Serial", sketch)
