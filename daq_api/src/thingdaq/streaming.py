@@ -505,12 +505,14 @@ def _timed(
     recorder: _LatencyRecorder,
     command: str,
     operation: Callable[[], _Result],
+    *,
+    clock: Callable[[], float] = monotonic,
 ) -> _Result:
-    started = monotonic()
+    started = clock()
     try:
         return operation()
     finally:
-        recorder.record(command, monotonic() - started)
+        recorder.record(command, clock() - started)
 
 
 def _reader_delta(name: str, final: int, baseline: int) -> int:
@@ -666,14 +668,16 @@ def _wait_for_final_status(
     *,
     timeout: float,
     quiet_period: float,
+    clock: Callable[[], float] = monotonic,
+    sleeper: Callable[[float], None] = sleep,
 ) -> Status:
-    deadline = monotonic() + timeout
+    deadline = clock() + timeout
     stable_since: float | None = None
     previous: tuple[int, int, int, int] | None = None
     latest: Status | None = None
 
     while True:
-        latest = _timed(recorder, "STATUS", daq.status)
+        latest = _timed(recorder, "STATUS", daq.status, clock=clock)
         reader = daq.reader_counters
         adc_wire = _reader_delta(
             "ADC received counter",
@@ -691,7 +695,7 @@ def _wait_for_final_status(
             adc_wire,
             gpio_wire,
         )
-        now = monotonic()
+        now = clock()
         balanced = current[0] == current[2] and current[1] == current[3]
         if balanced and current == previous:
             if stable_since is None:
@@ -703,7 +707,7 @@ def _wait_for_final_status(
         if now >= deadline:
             return latest
         previous = current
-        sleep(min(0.005, max(0.0, deadline - now)))
+        sleeper(min(0.005, max(0.0, deadline - now)))
 
 
 def run_synthetic_soak(
@@ -714,17 +718,27 @@ def run_synthetic_soak(
     adc: bool = True,
     gpio: bool = True,
     status_interval: float | None = 0.25,
+    status_frame_interval: int | None = None,
     block_timeout: float = 1.0,
     drain_timeout: float = 1.0,
     drain_quiet_period: float = 0.02,
     max_latency_samples: int = 4096,
     track_memory: bool = True,
+    adc_pair_rate_hz: int | None = None,
+    gpio_sample_rate_hz: int | None = None,
+    adc_resolution_bits: int | None = None,
+    clock: Callable[[], float] = monotonic,
+    sleeper: Callable[[float], None] = sleep,
 ) -> SoakMetrics:
     """Run, validate, stop, and reconcile one bounded synthetic acquisition.
 
     Exactly one of ``duration`` or ``frame_count`` selects the capture bound.
     ``frame_count`` counts complete ADC/GPIO blocks and is useful for fast,
     deterministic offline checks; real soak runs normally use ``duration``.
+    ``status_frame_interval`` provides deterministic frame-budget STATUS
+    sampling, while the rate/resolution arguments make fixed-profile
+    requirements explicit at CONFIGURE. Injectable clock/sleeper callables are
+    intended for deterministic host tests and do not alter device time.
     The supplied facade remains open but is left in IDLE.
     """
 
@@ -752,6 +766,12 @@ def run_synthetic_soak(
         if status_interval is None
         else _positive_seconds("status_interval", status_interval)
     )
+    if status_frame_interval is not None and (
+        not isinstance(status_frame_interval, int)
+        or isinstance(status_frame_interval, bool)
+        or status_frame_interval <= 0
+    ):
+        raise ValueError("status_frame_interval must be a positive integer or None")
     if (
         not isinstance(max_latency_samples, int)
         or isinstance(max_latency_samples, bool)
@@ -760,6 +780,10 @@ def run_synthetic_soak(
         raise ValueError("max_latency_samples must be a positive integer")
     if not isinstance(track_memory, bool):
         raise TypeError("track_memory must be a boolean")
+    if not callable(clock):
+        raise TypeError("clock must be callable")
+    if not callable(sleeper):
+        raise TypeError("sleeper must be callable")
     if daq.state not in {constants.DeviceState.IDLE, constants.DeviceState.CONFIGURED}:
         raise ValueError("synthetic soak requires an IDLE or CONFIGURED facade")
 
@@ -783,7 +807,7 @@ def run_synthetic_soak(
     run_id = 0
     adc_frames = 0
     gpio_frames = 0
-    capture_started = monotonic()
+    capture_started = clock()
     capture_finished = capture_started
 
     try:
@@ -795,7 +819,11 @@ def run_synthetic_soak(
                     adc=adc,
                     gpio=gpio,
                     source=constants.Source.SYNTHETIC,
+                    adc_pair_rate_hz=adc_pair_rate_hz,
+                    gpio_sample_rate_hz=gpio_sample_rate_hz,
+                    adc_resolution_bits=adc_resolution_bits,
                 ),
+                clock=clock,
             )
             configured_here = True
         else:
@@ -811,7 +839,7 @@ def run_synthetic_soak(
 
         baseline_reader = daq.reader_counters
         baseline_parser = daq.parser_counters
-        run_id = _timed(latency, "START", daq.start)
+        run_id = _timed(latency, "START", daq.start, clock=clock)
         started = True
         validator = SyntheticStreamValidator(
             run_id,
@@ -819,7 +847,7 @@ def run_synthetic_soak(
             reader_baseline=baseline_reader,
             parser_baseline=baseline_parser,
         )
-        capture_started = monotonic()
+        capture_started = clock()
         deadline = (
             None if selected_duration is None else capture_started + selected_duration
         )
@@ -831,18 +859,18 @@ def run_synthetic_soak(
         total_frames = 0
 
         while frame_count is None or total_frames < frame_count:
-            now = monotonic()
+            now = clock()
             if deadline is not None and now >= deadline:
                 break
             if next_status is not None and now >= next_status:
                 assert selected_status_interval is not None
-                status = _timed(latency, "STATUS", daq.status)
+                status = _timed(latency, "STATUS", daq.status, clock=clock)
                 validator.validate_status(status, response_run_id=daq.run_id)
                 validator.validate_host_health(
                     daq.reader_counters,
                     daq.parser_counters,
                 )
-                next_status = monotonic() + selected_status_interval
+                next_status = clock() + selected_status_interval
                 continue
 
             wait_timeout = selected_block_timeout
@@ -851,7 +879,7 @@ def run_synthetic_soak(
             try:
                 item = daq.read_block(timeout=wait_timeout)
             except BlockTimeoutError:
-                if deadline is not None and monotonic() >= deadline:
+                if deadline is not None and clock() >= deadline:
                     break
                 raise
             block = validator.validate(item)
@@ -860,21 +888,31 @@ def run_synthetic_soak(
             else:
                 gpio_frames += 1
             total_frames += 1
+            if (
+                status_frame_interval is not None
+                and total_frames % status_frame_interval == 0
+            ):
+                status = _timed(latency, "STATUS", daq.status, clock=clock)
+                validator.validate_status(status, response_run_id=daq.run_id)
+                validator.validate_host_health(
+                    daq.reader_counters,
+                    daq.parser_counters,
+                )
             if total_frames % 32 == 0:
                 validator.validate_host_health(
                     daq.reader_counters,
                     daq.parser_counters,
                 )
-        capture_finished = monotonic()
+        capture_finished = clock()
         validator.validate_host_health(daq.reader_counters, daq.parser_counters)
     except BaseException as error:  # noqa: BLE001 - cleanup must still STOP
-        capture_finished = monotonic()
+        capture_finished = clock()
         primary_error = error
     finally:
         stop_cleanup_error: BaseException | None = None
         try:
             if started or configured_here:
-                _timed(latency, "STOP", daq.stop)
+                _timed(latency, "STOP", daq.stop, clock=clock)
         except BaseException as error:  # noqa: BLE001 - still attempt STATUS
             stop_cleanup_error = error
 
@@ -890,9 +928,16 @@ def run_synthetic_soak(
                         selected_drain_quiet_period,
                         selected_drain_timeout,
                     ),
+                    clock=clock,
+                    sleeper=sleeper,
                 )
             elif configured_here:
-                final_status = _timed(latency, "STATUS", daq.status)
+                final_status = _timed(
+                    latency,
+                    "STATUS",
+                    daq.status,
+                    clock=clock,
+                )
         except BaseException as error:  # noqa: BLE001 - preserve primary failure
             status_cleanup_error = error
         cleanup_error = stop_cleanup_error or status_cleanup_error

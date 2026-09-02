@@ -42,6 +42,15 @@ Run the complete deterministic demo or a bounded CLI capture:
   --gpio-channel D6 --gpio-channel D13
 ```
 
+Run the autonomous experiment baseline from a clean checkout. This exercises
+the maximum-rate simulator profile, compiles the exact pinned 600 MHz firmware
+without uploading it, and writes validated JSON and structured Markdown:
+
+```bash
+.venv/bin/python firmware/tools/baseline_prototype.py \
+  --output-dir doc/results/experiments
+```
+
 All examples default to the simulator. A script touches hardware only when
 `--real` is present:
 
