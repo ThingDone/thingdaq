@@ -56,6 +56,18 @@ Markdown through the shared experiment reporter. Those artifacts are labeled
 `simulated` and make no firmware, USB, electrical, or physical-performance
 claim.
 
+Run the deterministic host corpus benchmark against the production v2 codec:
+
+```bash
+.venv/bin/python -m thingdaq.rle_benchmark --pretty
+```
+
+It covers five GPIO and four ADC workloads, compares exact RAW and selected
+`RLE_AUTO` payload/wire bytes, measures all four encode/decode paths and their
+bounded peak allocations, and exits nonzero unless round trips, adaptive
+no-expansion, incompressible fallback, long-hold savings, and 1.25x per-stream
+decode headroom all pass. ADC ratios are reported without a savings threshold.
+
 Run the autonomous experiment baseline from a clean checkout. This exercises
 the maximum-rate simulator profile, compiles the exact pinned 600 MHz firmware
 without uploading it, and writes validated JSON and structured Markdown:

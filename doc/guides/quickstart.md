@@ -116,6 +116,21 @@ quality. The ordinary `ThingDAQ.simulated()` path remains protocol v1 with its
 original formulas; pattern controls exist only on the explicitly experimental
 surface described by [[ADR-006-Experimental-RLE-Streaming]].
 
+For host codec evidence rather than simulator lifecycle evidence, run the
+fixed nine-workload corpus benchmark:
+
+```bash
+.venv/bin/python -m thingdaq.rle_benchmark --pretty
+```
+
+It invokes the production v2 RAW and `RLE_AUTO` frame paths, requires exact
+round trips and no selected-frame expansion, checks raw fallback for noisy or
+alternating inputs, grades long-hold GPIO savings, and requires at least 1.25x
+decode headroom over the exact 4,000,000 B/s logical rate of one stream. Its
+JSON includes exact payload/wire denominators, run distributions, fallback
+frequency, encode/decode timings, bounded peak allocations, and analytic
+break-even run sizes. ADC ratios are observations, not a minimum-savings gate.
+
 ## Minimal Python lifecycle
 
 ```python

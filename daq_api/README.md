@@ -215,6 +215,24 @@ The optional output prefix produces a temporary `.json`/`.md` pair using the
 shared experiment reporter. Its evidence level is explicitly `simulated`; it
 does not promote the result to firmware, USB, rig, or physical evidence.
 
+Run the separate deterministic host corpus benchmark against the exact
+production v2 encoder and decoder:
+
+```bash
+python -m thingdaq.rle_benchmark --pretty
+```
+
+The fixed corpus covers constant GPIO, long digital holds, sparse single-bit
+changes, alternating and pseudo-random bytes, constant ADC pairs,
+independently slow channels, bounded quantization noise, and high-entropy ADC.
+The JSON retains exact ratio numerators/denominators, frame-local run-length
+distributions, RAW and `RLE_AUTO` encode/decode throughput batches, per-path
+peak `tracemalloc` bytes, fallback frequency, and analytic ADC/GPIO break-even
+records. The command exits nonzero if any required acceptance fails. Its 1.25x
+decode gate uses the exact single-stream logical target of 4,000,000 B/s;
+host timing is not firmware or physical evidence, and ADC savings have no
+minimum target.
+
 ## Runnable workflows
 
 The ten scripts in `examples/` cover discovery/serial selection, raw ADC
