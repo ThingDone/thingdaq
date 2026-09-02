@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 import struct
+from enum import Enum
 from functools import lru_cache
 
 from ._generated import protocol_constants as constants
-from .models import ADCBlock, AdcConverter, GPIOBlock
+from .models import ADCBlock, AdcConverter, AuxBankMode, GPIOBlock
+
+
+class SyntheticGPIOPattern(Enum):
+    """Deterministic GPIO stress formulas applied independently per bank."""
+
+    ALL_ZERO = "all-zero"
+    WALKING_BIT = "walking-bit"
+    COUNTER = "counter"
+    HIGH_TRANSITION = "high-transition"
 
 
 class SyntheticPatternError(ValueError):
@@ -49,6 +59,47 @@ def synthetic_gpio_byte(sample_index: int) -> int:
     return _sample_index(sample_index) & 0xFF
 
 
+def synthetic_gpio_bank_bytes(
+    sample_index: int,
+    pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
+) -> tuple[int, int]:
+    """Return independent ``(primary, auxiliary)`` bank bytes for one sample."""
+
+    index = _sample_index(sample_index)
+    try:
+        selected = SyntheticGPIOPattern(pattern)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("unknown synthetic GPIO pattern") from exc
+    if selected is SyntheticGPIOPattern.ALL_ZERO:
+        return 0, 0
+    if selected is SyntheticGPIOPattern.WALKING_BIT:
+        return 1 << (index % 8), 1 << ((index + 3) % 8)
+    if selected is SyntheticGPIOPattern.COUNTER:
+        return index & 0xFF, (3 * index + 0x55) & 0xFF
+    return (
+        (0xAA if index % 2 == 0 else 0x55),
+        (0x0F if index % 2 == 0 else 0xF0),
+    )
+
+
+def synthetic_gpio_value(
+    sample_index: int,
+    *,
+    aux_bank_mode: AuxBankMode | int = AuxBankMode.DISABLED,
+    pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
+) -> int:
+    """Return one packed 8- or 16-bit sample for the selected bank mode."""
+
+    if isinstance(aux_bank_mode, bool):
+        raise TypeError("auxiliary bank mode must be DISABLED or INPUT")
+    try:
+        mode = AuxBankMode(aux_bank_mode)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("auxiliary bank mode must be DISABLED or INPUT") from exc
+    primary, auxiliary = synthetic_gpio_bank_bytes(sample_index, pattern)
+    return primary if mode is AuxBankMode.DISABLED else primary | (auxiliary << 8)
+
+
 @lru_cache(maxsize=1)
 def _adc_pattern_cycle() -> bytes:
     pair_period = 1 << (constants.ADC_RESOLUTION_BITS - 1)
@@ -68,6 +119,27 @@ def _adc_pattern_cycle() -> bytes:
 @lru_cache(maxsize=1)
 def _gpio_pattern_cycle() -> bytes:
     return bytes(range(256))
+
+
+@lru_cache(maxsize=len(AuxBankMode) * len(SyntheticGPIOPattern))
+def _gpio_mode_pattern_cycle(
+    mode: AuxBankMode,
+    pattern: SyntheticGPIOPattern,
+) -> bytes:
+    if mode is AuxBankMode.DISABLED and pattern is SyntheticGPIOPattern.COUNTER:
+        return _gpio_pattern_cycle()
+    payload = bytearray(256 * (1 if mode is AuxBankMode.DISABLED else 2))
+    for index in range(256):
+        value = synthetic_gpio_value(
+            index,
+            aux_bank_mode=mode,
+            pattern=pattern,
+        )
+        if mode is AuxBankMode.DISABLED:
+            payload[index] = value
+        else:
+            struct.pack_into("<H", payload, index * 2, value)
+    return bytes(payload)
 
 
 def _cyclic_bytes(cycle: bytes, start: int, length: int) -> bytes:
@@ -141,13 +213,26 @@ def synthetic_adc_payload(
 def synthetic_gpio_payload(
     start_index: int,
     sample_count: int = constants.GPIO_SAMPLES_PER_FRAME,
+    *,
+    aux_bank_mode: AuxBankMode | int = AuxBankMode.DISABLED,
+    pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
 ) -> bytes:
     """Build packed simultaneous GPIO samples beginning at global index ``m``."""
 
     first = _sample_index(start_index)
     if not isinstance(sample_count, int) or sample_count < 0:
         raise ValueError("sample_count must be a nonnegative integer")
-    return _cyclic_bytes(_gpio_pattern_cycle(), first, sample_count)
+    try:
+        mode = AuxBankMode(aux_bank_mode)
+        selected_pattern = SyntheticGPIOPattern(pattern)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("unknown GPIO mode/pattern") from exc
+    item_bytes = 1 if mode is AuxBankMode.DISABLED else 2
+    return _cyclic_bytes(
+        _gpio_mode_pattern_cycle(mode, selected_pattern),
+        first * item_bytes,
+        sample_count * item_bytes,
+    )
 
 
 def validate_synthetic_adc_payload(
@@ -194,6 +279,9 @@ def validate_synthetic_gpio_payload(
     payload: bytes | bytearray | memoryview,
     start_index: int,
     sample_count: int = constants.GPIO_SAMPLES_PER_FRAME,
+    *,
+    aux_bank_mode: AuxBankMode | int = AuxBankMode.DISABLED,
+    pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
 ) -> None:
     """Validate a packed GPIO ramp without expanding bytes into pin booleans."""
 
@@ -204,26 +292,42 @@ def validate_synthetic_gpio_payload(
         or sample_count < 0
     ):
         raise ValueError("sample_count must be a nonnegative integer")
-    if len(payload) != sample_count:
+    try:
+        mode = AuxBankMode(aux_bank_mode)
+        selected_pattern = SyntheticGPIOPattern(pattern)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("unknown GPIO mode/pattern") from exc
+    item_bytes = 1 if mode is AuxBankMode.DISABLED else 2
+    if len(payload) != sample_count * item_bytes:
         raise SyntheticPatternError(
-            f"GPIO payload has {len(payload)} bytes; expected {sample_count}"
+            f"GPIO payload has {len(payload)} bytes; expected "
+            f"{sample_count * item_bytes}"
         )
-    mismatch = _cyclic_mismatch(payload, _gpio_pattern_cycle(), first)
+    mismatch = _cyclic_mismatch(
+        payload,
+        _gpio_mode_pattern_cycle(mode, selected_pattern),
+        first * item_bytes,
+    )
     if mismatch is None:
         return
-    observed_view = memoryview(payload).cast("B")
-    try:
-        observed = observed_view[mismatch]
-    finally:
-        observed_view.release()
-    sample_index = first + mismatch
+    sample_offset = mismatch // item_bytes
+    observed = (
+        payload[sample_offset]
+        if item_bytes == 1
+        else struct.unpack_from("<H", payload, sample_offset * item_bytes)[0]
+    )
+    sample_index = first + sample_offset
     raise SyntheticPatternError(
         f"GPIO sample {sample_index} is {observed}; "
-        f"expected {synthetic_gpio_byte(sample_index)}"
+        f"expected {synthetic_gpio_value(sample_index, aux_bank_mode=mode, pattern=selected_pattern)}"
     )
 
 
-def validate_synthetic_block(block: ADCBlock | GPIOBlock) -> None:
+def validate_synthetic_block(
+    block: ADCBlock | GPIOBlock,
+    *,
+    gpio_pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
+) -> None:
     """Validate one decoded block's source marker, timestamp, count, and pattern."""
 
     if not isinstance(block, (ADCBlock, GPIOBlock)):
@@ -231,7 +335,7 @@ def validate_synthetic_block(block: ADCBlock | GPIOBlock) -> None:
     if not block.flags & constants.FrameFlag.SYNTHETIC:
         raise SyntheticPatternError("synthetic block is missing the SYNTHETIC flag")
     if isinstance(block, ADCBlock):
-        if block.first_sample_ticks % constants.ADC_PAIR_PERIOD_TICKS:
+        if block.first_sample_ticks % block.pair_period_ticks:
             raise SyntheticPatternError("ADC timestamp is not pair-period aligned")
         validate_synthetic_adc_payload(
             block.payload,
@@ -239,23 +343,28 @@ def validate_synthetic_block(block: ADCBlock | GPIOBlock) -> None:
             block.item_count,
         )
     else:
-        if block.first_sample_ticks % constants.GPIO_SAMPLE_PERIOD_TICKS:
+        if block.first_sample_ticks % block.sample_period_ticks:
             raise SyntheticPatternError("GPIO timestamp is not sample-period aligned")
         validate_synthetic_gpio_payload(
             block.payload,
             block.first_sample_index,
             block.item_count,
+            aux_bank_mode=block.aux_bank_mode,
+            pattern=gpio_pattern,
         )
 
 
 __all__ = [
+    "SyntheticGPIOPattern",
     "SyntheticPatternError",
     "synthetic_adc0_code",
     "synthetic_adc1_code",
     "synthetic_adc_code",
     "synthetic_adc_payload",
+    "synthetic_gpio_bank_bytes",
     "synthetic_gpio_byte",
     "synthetic_gpio_payload",
+    "synthetic_gpio_value",
     "validate_synthetic_adc_payload",
     "validate_synthetic_block",
     "validate_synthetic_gpio_payload",

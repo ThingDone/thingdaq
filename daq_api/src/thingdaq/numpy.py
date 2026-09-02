@@ -27,6 +27,7 @@ from .models import ADCBlock, AdcConverter, GPIOBlock
 
 _ADC_PAIR_DTYPE = np.dtype("<u2")
 _GPIO_BYTE_DTYPE = np.dtype("u1")
+_GPIO_WORD_DTYPE = np.dtype("<u2")
 _TIMESTAMP_DTYPE = np.dtype("u8")
 _CALIBRATED_DTYPE = np.dtype("f8")
 
@@ -387,11 +388,11 @@ class ADCInterleavedArray:
 
 @dataclass(frozen=True, slots=True, eq=False)
 class GPIOArrayView:
-    """Read-only zero-copy packed-byte view over one GPIO block.
+    """Read-only zero-copy packed-item view over one GPIO block.
 
-    ``packed`` has shape ``(item_count,)`` and dtype ``uint8``.  Each byte is
-    one simultaneous D6-through-D13 snapshot in bit order; creating this view
-    does not expand any Boolean channel.
+    ``packed`` has shape ``(item_count,)``. Legacy blocks retain ``uint8``;
+    auxiliary-input blocks use explicit little-endian ``uint16``. Creating
+    this view does not expand any Boolean channel.
     """
 
     raw_block: GPIOBlock
@@ -400,14 +401,14 @@ class GPIOArrayView:
     calibrated: ClassVar[bool] = False
     units: ClassVar[str] = "packed-bits"
     ownership: ClassVar[str] = "borrowed-read-only"
-    pins: ClassVar[tuple[int, ...]] = tuple(range(6, 14))
-    bits: ClassVar[tuple[int, ...]] = tuple(range(8))
+    wire_endianness: ClassVar[str] = "little"
 
     def __post_init__(self) -> None:
         block = _require_gpio_block(self.raw_block)
+        dtype = _GPIO_BYTE_DTYPE if block.item_bytes == 1 else _GPIO_WORD_DTYPE
         packed = np.frombuffer(
             block.payload_view,
-            dtype=_GPIO_BYTE_DTYPE,
+            dtype=dtype,
             count=block.item_count,
         )
         object.__setattr__(self, "packed", _readonly(packed))
@@ -415,6 +416,22 @@ class GPIOArrayView:
     @property
     def bytes(self) -> Any:
         return self.packed
+
+    @property
+    def samples(self) -> Any:
+        return self.packed
+
+    @property
+    def pins(self) -> tuple[int, ...]:
+        return self.raw_block.pins_by_bit
+
+    @property
+    def bits(self) -> tuple[int, ...]:
+        return tuple(range(self.raw_block.packed_width_bits))
+
+    @property
+    def packed_width_bits(self) -> int:
+        return self.raw_block.packed_width_bits
 
     @property
     def payload_owner(self) -> builtins.bytes:
@@ -457,8 +474,9 @@ class GPIOArrayView:
         """Explicitly allocate one selected pin's Boolean sample vector."""
 
         channel = self.raw_block.channel(pin)
+        mask = np.asarray(1 << channel.bit, dtype=self.packed.dtype)
         values = np.not_equal(
-            np.bitwise_and(self.packed, np.uint8(1 << channel.bit)),
+            np.bitwise_and(self.packed, mask),
             0,
         )
         return GPIOChannelArray(
@@ -474,7 +492,12 @@ class GPIOArrayView:
         try:
             selected_pins = tuple(pins)
         except TypeError as exc:
-            raise TypeError("pins must be an iterable of D6 through D13 pins") from exc
+            message = "pins must be an iterable of D6 through D13 pins"
+            if self.raw_block.packed_width_bits == 16:
+                message = (
+                    "pins must be an iterable of D6 through D13 or D16 through D23 pins"
+                )
+            raise TypeError(message) from exc
         if not selected_pins:
             raise ValueError("at least one GPIO pin must be selected")
         if len(set(selected_pins)) != len(selected_pins):
@@ -483,7 +506,7 @@ class GPIOArrayView:
         selected_bits = tuple(channel.bit for channel in channel_views)
         masks = np.asarray(
             tuple(1 << bit for bit in selected_bits),
-            dtype=_GPIO_BYTE_DTYPE,
+            dtype=self.packed.dtype,
         )
         values = np.not_equal(
             np.bitwise_and(self.packed[:, np.newaxis], masks[np.newaxis, :]),

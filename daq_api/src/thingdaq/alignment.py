@@ -44,6 +44,24 @@ def _gap_signature(gap: StreamGap) -> tuple[object, ...]:
         gap.observed_first_sample_ticks,
         gap.firmware_reported,
         gap.firmware_overrun,
+        gap.item_period_ticks,
+        gap.items_per_frame,
+    )
+
+
+def _block_coverage_ticks(block: ADCBlock | GPIOBlock) -> int:
+    return block.item_count * (
+        block.pair_period_ticks
+        if isinstance(block, ADCBlock)
+        else block.sample_period_ticks
+    )
+
+
+def _block_profile_signature(block: ADCBlock | GPIOBlock) -> tuple[int, int, int]:
+    return (
+        block.protocol_version,
+        int(block.aux_bank_mode),
+        int(block.rate_profile),
     )
 
 
@@ -132,17 +150,15 @@ class AlignedInterval:
         else:
             assert self.gpio is not None
             reference = self.gpio
+        coverage_ticks = _block_coverage_ticks(reference)
         duration = (
             reference.end_tick_exclusive - reference.first_sample_ticks
         ) & constants.UINT64_MAX
-        if duration != constants.FRAME_COVERAGE_TICKS:
-            raise ValueError("source block does not cover one protocol-v1 interval")
-        if reference.first_sample_ticks % constants.FRAME_COVERAGE_TICKS:
+        if duration != coverage_ticks:
+            raise ValueError("source block does not cover one selected interval")
+        if reference.first_sample_ticks % coverage_ticks:
             raise ValueError("source block is not aligned to a frame interval")
-        if (
-            reference.first_sample_ticks + constants.FRAME_COVERAGE_TICKS
-            > constants.UINT64_MAX
-        ):
+        if reference.first_sample_ticks + coverage_ticks > constants.UINT64_MAX:
             raise ValueError("aligned intervals cannot cross timestamp wrap")
 
         if self.adc is not None and self.gpio is not None:
@@ -154,6 +170,10 @@ class AlignedInterval:
                 raise ValueError("ADC and GPIO blocks start at different timestamps")
             if self.adc.end_tick_exclusive != self.gpio.end_tick_exclusive:
                 raise ValueError("ADC and GPIO blocks cover different intervals")
+            if _block_profile_signature(self.adc) != _block_profile_signature(
+                self.gpio
+            ):
+                raise ValueError("ADC and GPIO blocks use different selected profiles")
 
         gaps = tuple(self.stream_gaps)
         seen_kinds: set[constants.FrameKind] = set()
@@ -200,12 +220,19 @@ class AlignedInterval:
     @property
     def end_tick_exclusive(self) -> int:
         return (
-            self.first_sample_ticks + constants.FRAME_COVERAGE_TICKS
+            self.first_sample_ticks + self.frame_coverage_ticks
         ) & constants.UINT64_MAX
 
     @property
     def duration_ticks(self) -> int:
-        return constants.FRAME_COVERAGE_TICKS
+        return self.frame_coverage_ticks
+
+    @property
+    def frame_coverage_ticks(self) -> int:
+        if self.adc is not None:
+            return _block_coverage_ticks(self.adc)
+        assert self.gpio is not None
+        return _block_coverage_ticks(self.gpio)
 
     @property
     def nominal_start_seconds(self) -> float:
@@ -280,6 +307,7 @@ class AlignmentLoss:
     interval_count: int
     present_streams: constants.StreamMask
     missing_streams: constants.StreamMask
+    frame_coverage_ticks: int = constants.FRAME_COVERAGE_TICKS
 
     def __post_init__(self) -> None:
         if not isinstance(self.reason, AlignmentLossReason):
@@ -288,7 +316,13 @@ class AlignmentLoss:
         _unsigned("first_sample_ticks", self.first_sample_ticks, 64)
         if self.run_id == 0:
             raise ValueError("alignment loss requires a nonzero run ID")
-        if self.first_sample_ticks % constants.FRAME_COVERAGE_TICKS:
+        if (
+            not isinstance(self.frame_coverage_ticks, int)
+            or isinstance(self.frame_coverage_ticks, bool)
+            or self.frame_coverage_ticks <= 0
+        ):
+            raise ValueError("frame_coverage_ticks must be a positive integer")
+        if self.first_sample_ticks % self.frame_coverage_ticks:
             raise ValueError("alignment loss must begin on a frame interval")
         if (
             not isinstance(self.interval_count, int)
@@ -312,7 +346,7 @@ class AlignmentLoss:
             raise ValueError("alignment loss contains unsupported stream bits")
         if not missing or present & missing or present | missing != _BOTH_STREAMS:
             raise ValueError("present and missing streams must partition ADC/GPIO")
-        duration = self.interval_count * constants.FRAME_COVERAGE_TICKS
+        duration = self.interval_count * self.frame_coverage_ticks
         if self.first_sample_ticks + duration > constants.UINT64_MAX:
             raise ValueError("alignment loss crosses unsupported timestamp wrap")
         object.__setattr__(self, "source", source)
@@ -325,7 +359,7 @@ class AlignmentLoss:
 
     @property
     def missing_duration_ticks(self) -> int:
-        return self.interval_count * constants.FRAME_COVERAGE_TICKS
+        return self.interval_count * self.frame_coverage_ticks
 
     @property
     def end_tick_exclusive(self) -> int:
@@ -395,6 +429,8 @@ class TimestampAligner:
         ] = {}
         self._active_run_id: int | None = None
         self._active_source: constants.Source | None = None
+        self._frame_coverage_ticks: int | None = None
+        self._profile_signature: tuple[int, int, int] | None = None
         self._next_output_ticks = 0
         self._expected_sequence = {
             constants.FrameKind.ADC_DATA: 0,
@@ -427,6 +463,10 @@ class TimestampAligner:
     def active_source(self) -> constants.Source | None:
         return self._active_source
 
+    @property
+    def frame_coverage_ticks(self) -> int | None:
+        return self._frame_coverage_ticks
+
     def push(self, item: AlignmentInput) -> tuple[AlignmentItem, ...]:
         """Accept one arrival and return every now-resolved event/interval."""
 
@@ -438,7 +478,12 @@ class TimestampAligner:
             raise TypeError("alignment input must be ADCBlock, GPIOBlock, or StreamGap")
 
         self._validate_block_interval(item)
-        outputs = self._activate_epoch(item.run_id, item.source)
+        outputs = self._activate_epoch(
+            item.run_id,
+            item.source,
+            frame_coverage_ticks=_block_coverage_ticks(item),
+            profile_signature=_block_profile_signature(item),
+        )
         if item.first_sample_ticks < self._next_output_ticks:
             raise TimestampAlignmentError(
                 f"late or reordered {_block_kind(item).name} interval at "
@@ -505,15 +550,40 @@ class TimestampAligner:
         self,
         run_id: int,
         source: constants.Source | None,
+        *,
+        frame_coverage_ticks: int,
+        profile_signature: tuple[int, int, int] | None = None,
     ) -> list[AlignmentItem]:
         outputs: list[AlignmentItem] = []
         if self._active_run_id is None:
-            self._start_epoch(run_id, source)
+            self._start_epoch(
+                run_id,
+                source,
+                frame_coverage_ticks=frame_coverage_ticks,
+                profile_signature=profile_signature,
+            )
             return outputs
         if run_id != self._active_run_id:
             outputs.extend(self._flush_pending(AlignmentLossReason.RUN_BOUNDARY))
-            self._start_epoch(run_id, source)
+            self._start_epoch(
+                run_id,
+                source,
+                frame_coverage_ticks=frame_coverage_ticks,
+                profile_signature=profile_signature,
+            )
             return outputs
+        if frame_coverage_ticks != self._frame_coverage_ticks:
+            raise TimestampAlignmentError(
+                f"frame coverage changed within run {run_id}: "
+                f"{self._frame_coverage_ticks} to {frame_coverage_ticks} ticks"
+            )
+        if profile_signature is not None:
+            if self._profile_signature is None:
+                self._profile_signature = profile_signature
+            elif profile_signature != self._profile_signature:
+                raise TimestampAlignmentError(
+                    f"mode/rate profile changed within run {run_id}"
+                )
         if source is not None:
             if self._active_source is None:
                 self._active_source = source
@@ -528,28 +598,44 @@ class TimestampAligner:
         self,
         run_id: int,
         source: constants.Source | None,
+        *,
+        frame_coverage_ticks: int,
+        profile_signature: tuple[int, int, int] | None,
     ) -> None:
         _unsigned("run_id", run_id, 32)
         if run_id == 0:
             raise TimestampAlignmentError("alignment input requires a nonzero run ID")
+        if (
+            not isinstance(frame_coverage_ticks, int)
+            or isinstance(frame_coverage_ticks, bool)
+            or frame_coverage_ticks <= 0
+        ):
+            raise TimestampAlignmentError("frame coverage must be positive")
         self._pending.clear()
         self._announced_gaps.clear()
         self._active_run_id = run_id
         self._active_source = source
+        self._frame_coverage_ticks = frame_coverage_ticks
+        self._profile_signature = profile_signature
         self._next_output_ticks = 0
         for kind in self._expected_sequence:
             self._expected_sequence[kind] = 0
             self._expected_ticks[kind] = 0
 
     def _push_announced_gap(self, gap: StreamGap) -> list[AlignmentItem]:
+        coverage_ticks = gap.item_period_ticks * gap.items_per_frame
         if (
-            gap.expected_first_sample_ticks % constants.FRAME_COVERAGE_TICKS
-            or gap.observed_first_sample_ticks % constants.FRAME_COVERAGE_TICKS
+            gap.expected_first_sample_ticks % coverage_ticks
+            or gap.observed_first_sample_ticks % coverage_ticks
         ):
             raise TimestampAlignmentError(
-                "stream gap is not aligned to protocol-v1 frame coverage"
+                "stream gap is not aligned to selected frame coverage"
             )
-        outputs = self._activate_epoch(gap.run_id, None)
+        outputs = self._activate_epoch(
+            gap.run_id,
+            None,
+            frame_coverage_ticks=coverage_ticks,
+        )
         if gap.observed_first_sample_ticks < self._next_output_ticks:
             raise TimestampAlignmentError(
                 "stream gap describes an already emitted interval"
@@ -570,27 +656,26 @@ class TimestampAligner:
 
     @staticmethod
     def _validate_block_interval(block: ADCBlock | GPIOBlock) -> None:
+        coverage_ticks = _block_coverage_ticks(block)
         duration = (
             block.end_tick_exclusive - block.first_sample_ticks
         ) & constants.UINT64_MAX
-        if duration != constants.FRAME_COVERAGE_TICKS:
+        if duration != coverage_ticks:
             raise TimestampAlignmentError(
                 f"{_block_kind(block).name} does not cover one frame interval"
             )
-        if block.first_sample_ticks % constants.FRAME_COVERAGE_TICKS:
+        if block.first_sample_ticks % coverage_ticks:
             raise TimestampAlignmentError(
                 f"{_block_kind(block).name} timestamp is not frame aligned"
             )
-        if (
-            block.first_sample_ticks + constants.FRAME_COVERAGE_TICKS
-            > constants.UINT64_MAX
-        ):
+        if block.first_sample_ticks + coverage_ticks > constants.UINT64_MAX:
             raise TimestampAlignmentError(
                 f"{_block_kind(block).name} interval crosses timestamp wrap"
             )
 
     def _drain(self, highest_seen_ticks: int) -> list[AlignmentItem]:
         outputs: list[AlignmentItem] = []
+        coverage_ticks = self._required_frame_coverage_ticks()
         while self._pending:
             slot = self._pending.get(self._next_output_ticks)
             if slot is not None and slot.complete:
@@ -598,9 +683,7 @@ class TimestampAligner:
                 continue
             if highest_seen_ticks < self._next_output_ticks:
                 break
-            span = (
-                highest_seen_ticks - self._next_output_ticks
-            ) // constants.FRAME_COVERAGE_TICKS
+            span = (highest_seen_ticks - self._next_output_ticks) // coverage_ticks
             if span < self._max_pending_intervals:
                 break
             if slot is not None:
@@ -616,7 +699,7 @@ class TimestampAligner:
             next_pending_ticks = min(self._pending)
             pending_distance = (
                 next_pending_ticks - self._next_output_ticks
-            ) // constants.FRAME_COVERAGE_TICKS
+            ) // coverage_ticks
             interval_count = min(eligible_count, pending_distance)
             if interval_count <= 0:
                 raise AssertionError("timestamp drain made no progress")
@@ -633,17 +716,18 @@ class TimestampAligner:
 
     def _flush_pending(self, reason: AlignmentLossReason) -> list[AlignmentItem]:
         outputs: list[AlignmentItem] = []
+        coverage_ticks = self._required_frame_coverage_ticks()
         while self._pending:
             next_pending_ticks = min(self._pending)
             if next_pending_ticks < self._next_output_ticks:
                 raise TimestampAlignmentError("pending timestamp moved behind output")
             if next_pending_ticks > self._next_output_ticks:
                 delta = next_pending_ticks - self._next_output_ticks
-                if delta % constants.FRAME_COVERAGE_TICKS:
+                if delta % coverage_ticks:
                     raise TimestampAlignmentError(
                         "pending timestamp is not frame aligned"
                     )
-                interval_count = delta // constants.FRAME_COVERAGE_TICKS
+                interval_count = delta // coverage_ticks
                 outputs.append(
                     self._alignment_loss(
                         reason,
@@ -765,11 +849,13 @@ class TimestampAligner:
             interval_count=interval_count,
             present_streams=present_streams,
             missing_streams=missing,
+            frame_coverage_ticks=self._required_frame_coverage_ticks(),
         )
 
     def _advance(self, interval_count: int) -> None:
         next_ticks = (
-            self._next_output_ticks + interval_count * constants.FRAME_COVERAGE_TICKS
+            self._next_output_ticks
+            + interval_count * self._required_frame_coverage_ticks()
         )
         if next_ticks > constants.UINT64_MAX:
             raise TimestampAlignmentError(
@@ -781,6 +867,11 @@ class TimestampAligner:
         )
         for key in stale_announcements:
             del self._announced_gaps[key]
+
+    def _required_frame_coverage_ticks(self) -> int:
+        if self._frame_coverage_ticks is None:
+            raise AssertionError("alignment epoch has no frame coverage")
+        return self._frame_coverage_ticks
 
 
 def align_by_timestamp(

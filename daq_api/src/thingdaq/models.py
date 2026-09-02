@@ -8,11 +8,13 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from dataclasses import replace as dataclass_replace
 from enum import Enum, IntEnum
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, overload
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .protocol import Frame, FrameValidationError
+from .protocol_v2 import V2Frame
 
 if TYPE_CHECKING:
     from .calibration import (
@@ -23,6 +25,7 @@ if TYPE_CHECKING:
     from .numpy import ADCArrayView, GPIOArrayView
 
 _CONFIGURATION = struct.Struct("<BBBBI")
+_CONFIGURATION_V2 = struct.Struct("<BBBBIII")
 _CHECKSUM_BENCHMARK_REQUEST = struct.Struct("<BBBBHH")
 _GPIO_CLOCK_DIAGNOSTIC_REQUEST = struct.Struct("<IHH")
 _RESPONSE_PREFIX = struct.Struct("<BBH")
@@ -153,10 +156,132 @@ _ALL_CONFIGURATION_PROFILES = constants.ConfigurationProfile(
     constants.SUPPORTED_CONFIGURATION_MASK
 )
 
+AuxBankMode: TypeAlias = v2_constants.AuxBankMode
+RateProfile: TypeAlias = v2_constants.RateProfile
+
+
+@dataclass(frozen=True, slots=True)
+class RateProfileTiming:
+    """One generated exact-rate schedule shared by host and simulator."""
+
+    profile: RateProfile
+    adc_pair_rate_hz: int
+    gpio_sample_rate_hz: int
+    adc_pair_period_ticks: int
+    adc1_phase_ticks: int
+    gpio_sample_period_ticks: int
+    gpio_master_pit_divider: int
+    gpio_master_pit_load: int
+    adc_pair_pit_divider: int
+    adc_pair_pit_load: int
+    adc_etc_predivider: int
+    adc_etc_chain_length: int
+    adc0_initial_delay: int
+    adc1_initial_delay: int
+    adc0_effective_delay: int
+    adc1_effective_delay: int
+    adc1_phase_ipg_cycles: int
+    completion_expected_dwt_cycles: int
+    disabled_frame_coverage_ticks: int
+    input_frame_coverage_ticks: int
+
+    @classmethod
+    def from_profile(cls, profile: RateProfile | int) -> RateProfileTiming:
+        if isinstance(profile, bool):
+            raise TypeError("rate profile must be a generated RateProfile")
+        try:
+            selected = RateProfile(profile)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "rate profile is not one of the four exact profiles"
+            ) from exc
+        return cls(profile=selected, **v2_constants.RATE_PROFILE_TIMING[selected])
+
+    @classmethod
+    def from_rates(
+        cls,
+        adc_pair_rate_hz: int,
+        gpio_sample_rate_hz: int,
+    ) -> RateProfileTiming:
+        if any(
+            not isinstance(value, int) or isinstance(value, bool) or value <= 0
+            for value in (adc_pair_rate_hz, gpio_sample_rate_hz)
+        ):
+            raise ValueError("ADC and GPIO rates must be positive integers")
+        for profile in RateProfile:
+            timing = cls.from_profile(profile)
+            if (
+                timing.adc_pair_rate_hz == adc_pair_rate_hz
+                and timing.gpio_sample_rate_hz == gpio_sample_rate_hz
+            ):
+                return timing
+        raise ValueError("rates must match an exact generated 4:1 ADC/GPIO profile")
+
+    def frame_coverage_ticks(self, mode: AuxBankMode | int) -> int:
+        try:
+            selected = AuxBankMode(mode)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("auxiliary bank mode must be DISABLED or INPUT") from exc
+        return (
+            self.disabled_frame_coverage_ticks
+            if selected is AuxBankMode.DISABLED
+            else self.input_frame_coverage_ticks
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GPIOLayout:
+    """Generated packed GPIO layout for one whole-bank mode."""
+
+    aux_bank_mode: AuxBankMode
+    packed_width_bits: int
+    item_bytes: int
+    items_per_frame: int
+    payload_bytes: int
+    total_frame_bytes: int
+    adc_items_per_frame: int
+    adc_payload_bytes: int
+    adc_total_frame_bytes: int
+    pins_by_bit: tuple[int, ...]
+    primary_pins_by_bit: tuple[int, ...] = v2_constants.PRIMARY_GPIO_PINS_BY_BIT
+    auxiliary_pins_by_bit: tuple[int, ...] = v2_constants.AUX_GPIO_PINS_BY_BIT
+
+    @classmethod
+    def from_mode(cls, mode: AuxBankMode | int) -> GPIOLayout:
+        if isinstance(mode, bool):
+            raise TypeError("auxiliary bank mode must be DISABLED or INPUT")
+        try:
+            selected = AuxBankMode(mode)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("auxiliary bank mode must be DISABLED or INPUT") from exc
+        layout = v2_constants.AUX_BANK_LAYOUTS[selected]
+        pins = (
+            v2_constants.PRIMARY_GPIO_PINS_BY_BIT
+            if selected is AuxBankMode.DISABLED
+            else v2_constants.GPIO_16_PINS_BY_BIT
+        )
+        return cls(
+            aux_bank_mode=selected,
+            packed_width_bits=layout["gpio_width_bits"],
+            item_bytes=layout["gpio_bytes_per_item"],
+            items_per_frame=layout["gpio_items_per_frame"],
+            payload_bytes=layout["gpio_payload_bytes"],
+            total_frame_bytes=layout["gpio_total_frame_bytes"],
+            adc_items_per_frame=layout["adc_items_per_frame"],
+            adc_payload_bytes=layout["adc_payload_bytes"],
+            adc_total_frame_bytes=layout["adc_total_frame_bytes"],
+            pins_by_bit=pins,
+        )
+
+
+RATE_PROFILE_TIMINGS = tuple(
+    RateProfileTiming.from_profile(profile) for profile in RateProfile
+)
+
 
 @dataclass(frozen=True, slots=True)
 class AdcTriggerMetadata:
-    """Observable 1 MHz ADC_ETC schedule and completion-timing evidence.
+    """Observable selected-rate ADC_ETC schedule and completion evidence.
 
     ``completion_delta_cycles`` measures conversion-completion interrupt
     timing. It is a bounded digital cross-check, not an analog aperture
@@ -220,25 +345,35 @@ class AdcTriggerMetadata:
         if int(errors) & ~constants.KNOWN_ADC_TRIGGER_ERROR_MASK:
             raise ValueError("ADC trigger metadata contains reserved error flags")
 
+        try:
+            timing = RateProfileTiming.from_rates(
+                self.pair_rate_hz,
+                self.gpio_master_rate_hz,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "ADC trigger schedule is not an exact rate profile"
+            ) from exc
+
         fixed_scalars = (
             ("pit_clock_hz", constants.ADC_TRIGGER_PIT_CLOCK_HZ),
             ("dwt_clock_hz", constants.ADC_TRIGGER_DWT_CLOCK_HZ),
-            ("gpio_master_rate_hz", constants.ADC_TRIGGER_GPIO_MASTER_RATE_HZ),
-            ("pair_rate_hz", constants.ADC_TRIGGER_PAIR_RATE_HZ),
+            ("gpio_master_rate_hz", timing.gpio_sample_rate_hz),
+            ("pair_rate_hz", timing.adc_pair_rate_hz),
             ("ipg_clock_hz", constants.ADC_TRIGGER_IPG_CLOCK_HZ),
             (
                 "gpio_master_pit_channel",
                 constants.ADC_TRIGGER_GPIO_MASTER_PIT_CHANNEL,
             ),
             ("pair_pit_channel", constants.ADC_TRIGGER_PAIR_PIT_CHANNEL),
-            ("gpio_master_pit_load", constants.ADC_TRIGGER_GPIO_MASTER_PIT_LOAD),
-            ("pair_pit_load", constants.ADC_TRIGGER_PAIR_PIT_LOAD),
-            ("predivider", constants.ADC_TRIGGER_PREDIVIDER),
-            ("chain_length", constants.ADC_TRIGGER_CHAIN_LENGTH),
-            ("phase_ipg_cycles", constants.ADC_TRIGGER_PHASE_IPG_CYCLES),
+            ("gpio_master_pit_load", timing.gpio_master_pit_load),
+            ("pair_pit_load", timing.adc_pair_pit_load),
+            ("predivider", timing.adc_etc_predivider),
+            ("chain_length", timing.adc_etc_chain_length),
+            ("phase_ipg_cycles", timing.adc1_phase_ipg_cycles),
             (
                 "completion_expected_delta_cycles",
-                constants.ADC_COMPLETION_EXPECTED_DWT_CYCLES,
+                timing.completion_expected_dwt_cycles,
             ),
             (
                 "completion_tolerance_cycles",
@@ -251,14 +386,20 @@ class AdcTriggerMetadata:
             or getattr(self, name) != expected
             for name, expected in fixed_scalars
         ):
-            raise ValueError("ADC trigger schedule is incompatible with protocol v1")
+            raise ValueError("ADC trigger schedule is incompatible")
 
         fixed_pairs = (
             ("xbar_inputs", constants.ADC_TRIGGER_XBAR_INPUTS),
             ("xbar_outputs", constants.ADC_TRIGGER_XBAR_OUTPUTS),
             ("trigger_queues", constants.ADC_TRIGGER_QUEUES),
-            ("initial_delays", constants.ADC_TRIGGER_INITIAL_DELAYS),
-            ("effective_delays", constants.ADC_TRIGGER_EFFECTIVE_DELAYS),
+            (
+                "initial_delays",
+                (timing.adc0_initial_delay, timing.adc1_initial_delay),
+            ),
+            (
+                "effective_delays",
+                (timing.adc0_effective_delay, timing.adc1_effective_delay),
+            ),
         )
         for name, expected in fixed_pairs:
             values = tuple(getattr(self, name))
@@ -312,6 +453,32 @@ class AdcTriggerMetadata:
             raise ValueError("ADC completion timing evidence is inconsistent")
         object.__setattr__(self, "configuration_flags", flags)
         object.__setattr__(self, "error_flags", errors)
+
+    @classmethod
+    def for_rate_profile(
+        cls,
+        profile: RateProfile | int,
+        **evidence: Any,
+    ) -> AdcTriggerMetadata:
+        """Build exact schedule metadata while allowing measured evidence fields."""
+
+        timing = RateProfileTiming.from_profile(profile)
+        return cls(
+            gpio_master_rate_hz=timing.gpio_sample_rate_hz,
+            pair_rate_hz=timing.adc_pair_rate_hz,
+            gpio_master_pit_load=timing.gpio_master_pit_load,
+            pair_pit_load=timing.adc_pair_pit_load,
+            predivider=timing.adc_etc_predivider,
+            chain_length=timing.adc_etc_chain_length,
+            initial_delays=(timing.adc0_initial_delay, timing.adc1_initial_delay),
+            effective_delays=(
+                timing.adc0_effective_delay,
+                timing.adc1_effective_delay,
+            ),
+            phase_ipg_cycles=timing.adc1_phase_ipg_cycles,
+            completion_expected_delta_cycles=(timing.completion_expected_dwt_cycles),
+            **evidence,
+        )
 
     @property
     def ready(self) -> bool:
@@ -775,15 +942,18 @@ class AdcBlockMetadata:
         except (TypeError, ValueError) as exc:
             raise ValueError("ADC block source is invalid") from exc
         object.__setattr__(self, "source", source)
+        try:
+            timing = next(
+                item
+                for item in RATE_PROFILE_TIMINGS
+                if item.adc_pair_rate_hz == self.pair_rate_hz
+            )
+        except StopIteration as exc:
+            raise ValueError("ADC block pair rate is not an exact profile") from exc
         fixed_values = (
             ("timestamp_hz", self.timestamp_hz, constants.TIMESTAMP_HZ),
-            ("pair_rate_hz", self.pair_rate_hz, constants.ADC_PAIR_RATE_HZ),
-            (
-                "pair_period_ticks",
-                self.pair_period_ticks,
-                constants.ADC_PAIR_PERIOD_TICKS,
-            ),
-            ("adc1_phase_ticks", self.adc1_phase_ticks, constants.ADC1_PHASE_TICKS),
+            ("pair_period_ticks", self.pair_period_ticks, timing.adc_pair_period_ticks),
+            ("adc1_phase_ticks", self.adc1_phase_ticks, timing.adc1_phase_ticks),
             (
                 "container_bytes",
                 self.container_bytes,
@@ -1242,6 +1412,8 @@ class DAQConfiguration:
         constants.DEFAULT_CHECKSUM_ALGORITHM
     )
     data_frame_bytes: int = constants.DATA_FRAME_BYTES
+    aux_bank_mode: AuxBankMode = v2_constants.DEFAULT_AUX_BANK_MODE
+    rate_profile: RateProfile = v2_constants.DEFAULT_RATE_PROFILE
 
     def __post_init__(self) -> None:
         if any(
@@ -1250,6 +1422,8 @@ class DAQConfiguration:
                 self.stream_mask,
                 self.source,
                 self.data_checksum_algorithm,
+                self.aux_bank_mode,
+                self.rate_profile,
             )
         ):
             raise ValueError("configuration contains an unknown enum value")
@@ -1257,11 +1431,15 @@ class DAQConfiguration:
             stream_mask = constants.StreamMask(self.stream_mask)
             source = constants.Source(self.source)
             checksum = constants.ChecksumAlgorithm(self.data_checksum_algorithm)
+            aux_bank_mode = AuxBankMode(self.aux_bank_mode)
+            rate_profile = RateProfile(self.rate_profile)
         except (TypeError, ValueError) as exc:
             raise ValueError("configuration contains an unknown enum value") from exc
         object.__setattr__(self, "stream_mask", stream_mask)
         object.__setattr__(self, "source", source)
         object.__setattr__(self, "data_checksum_algorithm", checksum)
+        object.__setattr__(self, "aux_bank_mode", aux_bank_mode)
+        object.__setattr__(self, "rate_profile", rate_profile)
         valid_streams = constants.StreamMask.ADC | constants.StreamMask.GPIO
         if int(stream_mask) & ~int(valid_streams):
             raise ValueError("configuration stream mask contains unknown bits")
@@ -1272,6 +1450,15 @@ class DAQConfiguration:
             raise ValueError(
                 "the zero-stream control profile requires the hardware source"
             )
+        if stream_mask == constants.StreamMask.NONE and (
+            aux_bank_mode is not AuxBankMode.DISABLED
+            or rate_profile is not v2_constants.DEFAULT_RATE_PROFILE
+        ):
+            raise ValueError("the zero-stream control profile cannot use v2 extensions")
+        if aux_bank_mode is AuxBankMode.INPUT and not (
+            stream_mask & constants.StreamMask.GPIO
+        ):
+            raise ValueError("auxiliary INPUT mode requires the GPIO stream")
         if checksum is constants.ChecksumAlgorithm.NONE_RESERVED:
             raise ValueError("configuration cannot select checksum ID zero")
         if checksum not in HOST_SUPPORTED_CHECKSUM_ALGORITHMS:
@@ -1283,7 +1470,7 @@ class DAQConfiguration:
             or isinstance(self.data_frame_bytes, bool)
             or self.data_frame_bytes != constants.DATA_FRAME_BYTES
         ):
-            raise ValueError("protocol v1 data frames are exactly 4096 bytes")
+            raise ValueError("data frames are exactly 4096 bytes")
 
     @property
     def is_control_only(self) -> bool:
@@ -1293,6 +1480,41 @@ class DAQConfiguration:
             self.stream_mask == constants.StreamMask.NONE
             and self.source is constants.Source.HARDWARE
         )
+
+    @property
+    def rate_timing(self) -> RateProfileTiming:
+        """Return the generated exact timing record selected by this request."""
+
+        return RateProfileTiming.from_profile(self.rate_profile)
+
+    @property
+    def gpio_layout(self) -> GPIOLayout:
+        """Return the generated packed GPIO layout selected by this request."""
+
+        return GPIOLayout.from_mode(self.aux_bank_mode)
+
+    @property
+    def adc_pair_rate_hz(self) -> int:
+        return self.rate_timing.adc_pair_rate_hz
+
+    @property
+    def gpio_sample_rate_hz(self) -> int:
+        return self.rate_timing.gpio_sample_rate_hz
+
+    @property
+    def protocol_version(self) -> int:
+        """Select v1 only for the exact legacy default configuration."""
+
+        return (
+            constants.PROTOCOL_VERSION
+            if self.aux_bank_mode is AuxBankMode.DISABLED
+            and self.rate_profile is v2_constants.DEFAULT_RATE_PROFILE
+            else v2_constants.PROTOCOL_VERSION
+        )
+
+    @property
+    def uses_protocol_v2(self) -> bool:
+        return self.protocol_version == v2_constants.PROTOCOL_VERSION
 
     @property
     def profile(self) -> constants.ConfigurationProfile:
@@ -1338,15 +1560,32 @@ class DAQConfiguration:
             data_frame_bytes=constants.DATA_FRAME_BYTES,
         )
 
-    def to_payload(self) -> bytes:
-        """Encode the eight configuration fields that follow any response prefix."""
+    def to_payload(self, *, protocol_version: int | None = None) -> bytes:
+        """Encode the v1 or explicitly selected extended configuration body."""
 
-        return _CONFIGURATION.pack(
+        selected_version = (
+            self.protocol_version if protocol_version is None else protocol_version
+        )
+        if selected_version == constants.PROTOCOL_VERSION:
+            if self.uses_protocol_v2:
+                raise ValueError("an auxiliary/rate extension cannot be encoded as v1")
+            return _CONFIGURATION.pack(
+                int(self.stream_mask),
+                int(self.source),
+                int(self.data_checksum_algorithm),
+                0,
+                self.data_frame_bytes,
+            )
+        if selected_version != v2_constants.PROTOCOL_VERSION:
+            raise ValueError("configuration protocol version must be 1 or 2")
+        return _CONFIGURATION_V2.pack(
             int(self.stream_mask),
             int(self.source),
             int(self.data_checksum_algorithm),
-            0,
+            int(self.aux_bank_mode),
             self.data_frame_bytes,
+            self.adc_pair_rate_hz,
+            self.gpio_sample_rate_hz,
         )
 
     @classmethod
@@ -1354,19 +1593,42 @@ class DAQConfiguration:
         """Decode the eight-byte CONFIGURE request/applied-configuration body."""
 
         payload_bytes = bytes(payload)
-        if len(payload_bytes) != constants.CONFIGURE_REQUEST_PAYLOAD_SIZE:
-            raise FrameValidationError("configuration body must be eight bytes")
-        raw_streams, raw_source, raw_checksum, reserved, frame_bytes = (
-            _CONFIGURATION.unpack(payload_bytes)
-        )
-        if reserved != 0:
-            raise FrameValidationError("configuration reserved byte must be zero")
+        if len(payload_bytes) == constants.CONFIGURE_REQUEST_PAYLOAD_SIZE:
+            raw_streams, raw_source, raw_checksum, reserved, frame_bytes = (
+                _CONFIGURATION.unpack(payload_bytes)
+            )
+            if reserved != 0:
+                raise FrameValidationError("configuration reserved byte must be zero")
+            aux_bank_mode = AuxBankMode.DISABLED
+            rate_profile = v2_constants.DEFAULT_RATE_PROFILE
+        elif len(payload_bytes) == v2_constants.CONFIGURE_REQUEST_PAYLOAD_SIZE:
+            (
+                raw_streams,
+                raw_source,
+                raw_checksum,
+                raw_aux_bank_mode,
+                frame_bytes,
+                adc_pair_rate_hz,
+                gpio_sample_rate_hz,
+            ) = _CONFIGURATION_V2.unpack(payload_bytes)
+            try:
+                aux_bank_mode = AuxBankMode(raw_aux_bank_mode)
+                rate_profile = RateProfileTiming.from_rates(
+                    adc_pair_rate_hz,
+                    gpio_sample_rate_hz,
+                ).profile
+            except (TypeError, ValueError) as exc:
+                raise FrameValidationError(str(exc)) from exc
+        else:
+            raise FrameValidationError("configuration body must be eight or 16 bytes")
         try:
             return cls(
                 stream_mask=constants.StreamMask(raw_streams),
                 source=constants.Source(raw_source),
                 data_checksum_algorithm=constants.ChecksumAlgorithm(raw_checksum),
                 data_frame_bytes=frame_bytes,
+                aux_bank_mode=aux_bank_mode,
+                rate_profile=rate_profile,
             )
         except ValueError as exc:
             raise FrameValidationError(str(exc)) from exc
@@ -2313,6 +2575,141 @@ class GpioCaptureDiagnosticResult:
 
 
 @dataclass(frozen=True, slots=True)
+class AuxiliaryInputMetadata:
+    """Validated protocol-v2 mode, pin, timing, and provisional resource table."""
+
+    selected_rate_profile: RateProfile = v2_constants.DEFAULT_RATE_PROFILE
+    applied_aux_bank_mode: AuxBankMode = v2_constants.DEFAULT_AUX_BANK_MODE
+    supported_rate_profiles: tuple[RateProfileTiming, ...] = RATE_PROFILE_TIMINGS
+    supported_aux_bank_modes: tuple[AuxBankMode, ...] = tuple(AuxBankMode)
+    gpio_item_bytes: int = 1
+    primary_gpio_pins_by_bit: tuple[int, ...] = v2_constants.PRIMARY_GPIO_PINS_BY_BIT
+    auxiliary_gpio_pins_by_bit: tuple[int, ...] = v2_constants.AUX_GPIO_PINS_BY_BIT
+    primary_gpio_port_bits_by_wire_bit: tuple[int, ...] = (
+        v2_constants.PRIMARY_GPIO_PORT_BITS_BY_WIRE_BIT
+    )
+    auxiliary_gpio_port_bits_by_wire_bit: tuple[int, ...] = (
+        v2_constants.AUX_GPIO_PORT_BITS_BY_WIRE_BIT
+    )
+    primary_gpio_capture_mask: int = v2_constants.PRIMARY_GPIO_CAPTURE_MASK
+    auxiliary_gpio_capture_mask: int = v2_constants.AUX_GPIO_CAPTURE_MASK
+    primary_gpio_standard_port: int = v2_constants.PRIMARY_GPIO_STANDARD_PORT
+    auxiliary_gpio_standard_port: int = v2_constants.AUX_GPIO_STANDARD_PORT
+    primary_gpio_fast_port: int = v2_constants.PRIMARY_GPIO_FAST_PORT
+    auxiliary_gpio_fast_port: int = v2_constants.AUX_GPIO_FAST_PORT
+    primary_gpio_fast_select_gpr: int = v2_constants.PRIMARY_GPIO_FAST_SELECT_GPR
+    auxiliary_gpio_fast_select_gpr: int = v2_constants.AUX_GPIO_FAST_SELECT_GPR
+    primary_gpio_xbar_output: int = v2_constants.GPIO_XBAR_OUTPUT
+    auxiliary_gpio_xbar_output: int = v2_constants.AUX_GPIO_XBAR_OUTPUT
+    primary_gpio_dmamux_source: int = v2_constants.GPIO_DMAMUX_SOURCE
+    auxiliary_gpio_dmamux_source: int = v2_constants.AUX_GPIO_DMAMUX_SOURCE
+    primary_gpio_edma_channel: int = v2_constants.GPIO_EDMA_CHANNEL
+    auxiliary_gpio_edma_channel: int = v2_constants.AUX_GPIO_EDMA_CHANNEL
+    primary_gpio_edma_priority: int = 1
+    auxiliary_gpio_edma_priority: int = v2_constants.AUX_GPIO_EDMA_PRIORITY
+    adc_edma_priorities: tuple[int, int] = (3, 2)
+    auxiliary_gpio_dma_irq_priority: int = constants.GPIO_DMA_IRQ_PRIORITY
+    paired_gpio_xbar_input: int = v2_constants.GPIO_XBAR_INPUT
+    paired_gpio_join_required: bool = v2_constants.PAIRED_GPIO_JOIN_REQUIRED
+    primary_gpio_raw_ring_depth: int = v2_constants.GPIO_RAW_RING_DEPTH
+    auxiliary_gpio_raw_ring_depth: int = v2_constants.AUX_GPIO_RAW_RING_DEPTH
+    disabled_adc_pairs_per_frame: int = v2_constants.AUX_BANK_LAYOUTS[
+        AuxBankMode.DISABLED
+    ]["adc_items_per_frame"]
+    disabled_gpio_samples_per_frame: int = v2_constants.AUX_BANK_LAYOUTS[
+        AuxBankMode.DISABLED
+    ]["gpio_items_per_frame"]
+    input_adc_pairs_per_frame: int = v2_constants.AUX_BANK_LAYOUTS[AuxBankMode.INPUT][
+        "adc_items_per_frame"
+    ]
+    input_gpio_samples_per_frame: int = v2_constants.AUX_BANK_LAYOUTS[
+        AuxBankMode.INPUT
+    ]["gpio_items_per_frame"]
+
+    def __post_init__(self) -> None:
+        try:
+            selected_profile = RateProfile(self.selected_rate_profile)
+            selected_mode = AuxBankMode(self.applied_aux_bank_mode)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("auxiliary INFO contains an unknown mode/profile") from exc
+        profiles = tuple(self.supported_rate_profiles)
+        modes = tuple(self.supported_aux_bank_modes)
+        if profiles != RATE_PROFILE_TIMINGS or modes != tuple(AuxBankMode):
+            raise ValueError("auxiliary INFO omits or reorders a generated profile")
+        object.__setattr__(self, "selected_rate_profile", selected_profile)
+        object.__setattr__(self, "applied_aux_bank_mode", selected_mode)
+        object.__setattr__(self, "supported_rate_profiles", profiles)
+        object.__setattr__(self, "supported_aux_bank_modes", modes)
+
+        exact_values = {
+            "gpio_item_bytes": GPIOLayout.from_mode(selected_mode).item_bytes,
+            "primary_gpio_pins_by_bit": v2_constants.PRIMARY_GPIO_PINS_BY_BIT,
+            "auxiliary_gpio_pins_by_bit": v2_constants.AUX_GPIO_PINS_BY_BIT,
+            "primary_gpio_port_bits_by_wire_bit": (
+                v2_constants.PRIMARY_GPIO_PORT_BITS_BY_WIRE_BIT
+            ),
+            "auxiliary_gpio_port_bits_by_wire_bit": (
+                v2_constants.AUX_GPIO_PORT_BITS_BY_WIRE_BIT
+            ),
+            "primary_gpio_capture_mask": v2_constants.PRIMARY_GPIO_CAPTURE_MASK,
+            "auxiliary_gpio_capture_mask": v2_constants.AUX_GPIO_CAPTURE_MASK,
+            "primary_gpio_standard_port": v2_constants.PRIMARY_GPIO_STANDARD_PORT,
+            "auxiliary_gpio_standard_port": v2_constants.AUX_GPIO_STANDARD_PORT,
+            "primary_gpio_fast_port": v2_constants.PRIMARY_GPIO_FAST_PORT,
+            "auxiliary_gpio_fast_port": v2_constants.AUX_GPIO_FAST_PORT,
+            "primary_gpio_fast_select_gpr": (v2_constants.PRIMARY_GPIO_FAST_SELECT_GPR),
+            "auxiliary_gpio_fast_select_gpr": (v2_constants.AUX_GPIO_FAST_SELECT_GPR),
+            "primary_gpio_xbar_output": v2_constants.GPIO_XBAR_OUTPUT,
+            "auxiliary_gpio_xbar_output": v2_constants.AUX_GPIO_XBAR_OUTPUT,
+            "primary_gpio_dmamux_source": v2_constants.GPIO_DMAMUX_SOURCE,
+            "auxiliary_gpio_dmamux_source": v2_constants.AUX_GPIO_DMAMUX_SOURCE,
+            "primary_gpio_edma_channel": v2_constants.GPIO_EDMA_CHANNEL,
+            "auxiliary_gpio_edma_channel": v2_constants.AUX_GPIO_EDMA_CHANNEL,
+            "primary_gpio_edma_priority": 1,
+            "auxiliary_gpio_edma_priority": v2_constants.AUX_GPIO_EDMA_PRIORITY,
+            "adc_edma_priorities": (3, 2),
+            "auxiliary_gpio_dma_irq_priority": constants.GPIO_DMA_IRQ_PRIORITY,
+            "paired_gpio_xbar_input": v2_constants.GPIO_XBAR_INPUT,
+            "paired_gpio_join_required": True,
+            "primary_gpio_raw_ring_depth": v2_constants.GPIO_RAW_RING_DEPTH,
+            "auxiliary_gpio_raw_ring_depth": v2_constants.AUX_GPIO_RAW_RING_DEPTH,
+            "disabled_adc_pairs_per_frame": v2_constants.AUX_BANK_LAYOUTS[
+                AuxBankMode.DISABLED
+            ]["adc_items_per_frame"],
+            "disabled_gpio_samples_per_frame": v2_constants.AUX_BANK_LAYOUTS[
+                AuxBankMode.DISABLED
+            ]["gpio_items_per_frame"],
+            "input_adc_pairs_per_frame": v2_constants.AUX_BANK_LAYOUTS[
+                AuxBankMode.INPUT
+            ]["adc_items_per_frame"],
+            "input_gpio_samples_per_frame": v2_constants.AUX_BANK_LAYOUTS[
+                AuxBankMode.INPUT
+            ]["gpio_items_per_frame"],
+        }
+        for name, expected in exact_values.items():
+            actual = getattr(self, name)
+            if isinstance(expected, tuple):
+                actual = tuple(actual)
+                object.__setattr__(self, name, actual)
+            if actual != expected:
+                raise ValueError(f"auxiliary INFO {name} is contradictory")
+
+    @property
+    def selected_timing(self) -> RateProfileTiming:
+        return RateProfileTiming.from_profile(self.selected_rate_profile)
+
+    @property
+    def active_layout(self) -> GPIOLayout:
+        return GPIOLayout.from_mode(self.applied_aux_bank_mode)
+
+    def supports_configuration(self, configuration: DAQConfiguration) -> bool:
+        return configuration.aux_bank_mode in self.supported_aux_bank_modes and any(
+            timing.profile is configuration.rate_profile
+            for timing in self.supported_rate_profiles
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class DeviceCapabilities:
     """Validated fixed and negotiated capabilities reported by INFO."""
 
@@ -2416,6 +2813,7 @@ class DeviceCapabilities:
     nominal_framed_bytes_per_second_per_stream: int = (
         constants.NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM
     )
+    auxiliary: AuxiliaryInputMetadata | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.supported_stream_mask, bool) or isinstance(
@@ -2466,9 +2864,25 @@ class DeviceCapabilities:
             raise ValueError("supported source mask contains unknown bits")
         _unsigned("supported_checksum_mask", self.supported_checksum_mask, 32)
         if self.supported_checksum_mask != constants.SUPPORTED_CHECKSUM_MASK:
-            raise ValueError("supported checksum mask is incompatible with protocol v1")
-        if int(capability_bits) & ~constants.KNOWN_CAPABILITY_MASK:
-            raise ValueError("capability mask contains reserved protocol-v1 bits")
+            raise ValueError("supported checksum mask is incompatible")
+        is_v2 = self.protocol_version == v2_constants.PROTOCOL_VERSION
+        if is_v2 != (self.auxiliary is not None):
+            raise ValueError("protocol version and auxiliary metadata disagree")
+        known_capability_mask = (
+            v2_constants.KNOWN_CAPABILITY_MASK
+            if is_v2
+            else constants.KNOWN_CAPABILITY_MASK
+        )
+        if int(capability_bits) & ~known_capability_mask:
+            raise ValueError("capability mask contains reserved bits")
+        if is_v2 and int(capability_bits) & int(
+            v2_constants.Capability.AUXILIARY_INPUT_BANK
+            | v2_constants.Capability.EXACT_RATE_PROFILES
+        ) != int(
+            v2_constants.Capability.AUXILIARY_INPUT_BANK
+            | v2_constants.Capability.EXACT_RATE_PROFILES
+        ):
+            raise ValueError("protocol-v2 INFO omits auxiliary/rate capabilities")
         if int(configuration_mask) & ~constants.KNOWN_CONFIGURATION_PROFILE_MASK:
             raise ValueError("configuration profile mask contains reserved bits")
         if bool(stream_mask) != bool(configuration_mask):
@@ -2547,24 +2961,51 @@ class DeviceCapabilities:
                 "GPIO capture diagnostic metadata disagrees with capability bits"
             )
 
+        timing = (
+            self.auxiliary.selected_timing
+            if self.auxiliary is not None
+            else RateProfileTiming.from_profile(v2_constants.DEFAULT_RATE_PROFILE)
+        )
+        layout = (
+            self.auxiliary.active_layout
+            if self.auxiliary is not None
+            else GPIOLayout.from_mode(AuxBankMode.DISABLED)
+        )
+        expected_gpio_priority = 1 if layout.aux_bank_mode is AuxBankMode.INPUT else 0
+        expected_adc_priorities = (
+            (3, 2)
+            if layout.aux_bank_mode is AuxBankMode.INPUT
+            else constants.ADC_EDMA_PRIORITIES
+        )
+        expected_adc_ring_bytes = (
+            ((layout.adc_payload_bytes + 31) // 32) * 32 * constants.ADC_DMA_RING_DEPTH
+        )
         fixed_values = (
-            (self.protocol_version, constants.PROTOCOL_VERSION),
+            (
+                self.protocol_version,
+                v2_constants.PROTOCOL_VERSION if is_v2 else constants.PROTOCOL_VERSION,
+            ),
             (self.timestamp_hz, constants.TIMESTAMP_HZ),
             (self.data_frame_bytes, constants.DATA_FRAME_BYTES),
             (self.max_control_frame_bytes, constants.MAX_CONTROL_FRAME_BYTES),
-            (self.adc_pair_rate_hz, constants.ADC_PAIR_RATE_HZ),
-            (self.gpio_sample_rate_hz, constants.GPIO_SAMPLE_RATE_HZ),
-            (self.adc_pair_period_ticks, constants.ADC_PAIR_PERIOD_TICKS),
-            (self.adc1_phase_ticks, constants.ADC1_PHASE_TICKS),
-            (self.gpio_sample_period_ticks, constants.GPIO_SAMPLE_PERIOD_TICKS),
-            (self.gpio_packed_width_bits, constants.GPIO_PACKED_WIDTH_BITS),
+            (self.adc_pair_rate_hz, timing.adc_pair_rate_hz),
+            (self.gpio_sample_rate_hz, timing.gpio_sample_rate_hz),
+            (self.adc_pair_period_ticks, timing.adc_pair_period_ticks),
+            (self.adc1_phase_ticks, timing.adc1_phase_ticks),
+            (self.gpio_sample_period_ticks, timing.gpio_sample_period_ticks),
+            (self.gpio_packed_width_bits, layout.packed_width_bits),
             (self.gpio_raw_ring_depth, constants.GPIO_RAW_RING_DEPTH),
             (self.gpio_packed_ring_depth, constants.GPIO_PACKED_RING_DEPTH),
             (
                 self.gpio_raw_samples_per_buffer,
-                constants.GPIO_RAW_SAMPLES_PER_BUFFER,
+                layout.items_per_frame,
             ),
-            (self.gpio_raw_ring_bytes, constants.GPIO_RAW_RING_BYTES),
+            (
+                self.gpio_raw_ring_bytes,
+                layout.items_per_frame
+                * v2_constants.GPIO_RAW_WORD_BYTES_PER_BANK
+                * constants.GPIO_RAW_RING_DEPTH,
+            ),
             (self.gpio_packed_ring_bytes, constants.GPIO_PACKED_RING_BYTES),
             (self.gpio_packet_buffer_count, constants.GPIO_PACKET_BUFFER_COUNT),
             (self.gpio_pit_channel, constants.GPIO_PIT_CHANNEL),
@@ -2572,18 +3013,24 @@ class DeviceCapabilities:
             (self.gpio_xbar_output, constants.GPIO_XBAR_OUTPUT),
             (self.gpio_edma_channel, constants.GPIO_EDMA_CHANNEL),
             (self.gpio_dmamux_source, constants.GPIO_DMAMUX_SOURCE),
-            (self.gpio_edma_priority, constants.GPIO_EDMA_PRIORITY),
+            (self.gpio_edma_priority, expected_gpio_priority),
             (self.gpio_xbar_active_edge, constants.GPIO_XBAR_ACTIVE_EDGE),
-            (self.data_payload_bytes, constants.DATA_PAYLOAD_BYTES),
-            (self.adc_pairs_per_frame, constants.ADC_PAIRS_PER_FRAME),
-            (self.gpio_samples_per_frame, constants.GPIO_SAMPLES_PER_FRAME),
-            (self.frame_coverage_ticks, constants.FRAME_COVERAGE_TICKS),
+            (self.data_payload_bytes, layout.adc_payload_bytes),
+            (self.adc_pairs_per_frame, layout.adc_items_per_frame),
+            (self.gpio_samples_per_frame, layout.items_per_frame),
+            (
+                self.frame_coverage_ticks,
+                timing.frame_coverage_ticks(layout.aux_bank_mode),
+            ),
             (self.adc_dma_ring_depth, constants.ADC_DMA_RING_DEPTH),
             (self.adc_pair_bytes, constants.ADC_PAIR_BYTES),
             (self.adc_dma_irq_priority, constants.ADC_DMA_IRQ_PRIORITY),
             (self.gpio_dma_irq_priority, constants.GPIO_DMA_IRQ_PRIORITY),
-            (self.adc_pairs_per_buffer, constants.ADC_PAIRS_PER_BUFFER),
-            (self.adc_dma_ring_bytes, constants.ADC_DMA_RING_BYTES),
+            (
+                self.adc_pairs_per_buffer,
+                layout.adc_items_per_frame,
+            ),
+            (self.adc_dma_ring_bytes, expected_adc_ring_bytes),
             (self.packet_buffer_count, constants.PACKET_BUFFER_COUNT),
             (self.packet_primary_count, constants.PACKET_PRIMARY_COUNT),
             (self.packet_reserve_count, constants.PACKET_RESERVE_COUNT),
@@ -2612,15 +3059,15 @@ class DeviceCapabilities:
             or actual != expected
             for actual, expected in fixed_values
         ):
-            raise ValueError("INFO capabilities are incompatible with protocol v1")
+            raise ValueError("INFO capabilities are incompatible")
         if gpio_pin_map != constants.GPIO_PINS_BY_BIT:
             raise ValueError("GPIO bit order must remain D6 through D13")
         if (
             adc_edma_channels != constants.ADC_EDMA_CHANNELS
-            or adc_edma_priorities != constants.ADC_EDMA_PRIORITIES
+            or adc_edma_priorities != expected_adc_priorities
             or adc_dmamux_sources != constants.ADC_DMAMUX_SOURCES
         ):
-            raise ValueError("ADC DMA route metadata is incompatible with protocol v1")
+            raise ValueError("ADC DMA route metadata is incompatible")
 
     @property
     def adc_calibration(self) -> AdcCalibrationMetadata:
@@ -2670,7 +3117,13 @@ class DeviceCapabilities:
                 self.supported_stream_mask is constants.StreamMask.NONE
                 and self.supports_source(constants.Source.HARDWARE)
             )
-        return bool(self.supported_configuration_mask & configuration.profile)
+        if not self.supported_configuration_mask & configuration.profile:
+            return False
+        if configuration.uses_protocol_v2:
+            return self.auxiliary is not None and self.auxiliary.supports_configuration(
+                configuration
+            )
+        return True
 
     @property
     def supported_checksum_algorithms(
@@ -2691,9 +3144,435 @@ class DeviceCapabilities:
             selected = constants.Capability(capability)
         except (TypeError, ValueError) as exc:
             raise ValueError("capability contains an unknown bit") from exc
-        if int(selected) & ~constants.KNOWN_CAPABILITY_MASK:
-            raise ValueError("capability contains a reserved protocol-v1 bit")
+        known_mask = (
+            v2_constants.KNOWN_CAPABILITY_MASK
+            if self.auxiliary is not None
+            else constants.KNOWN_CAPABILITY_MASK
+        )
+        if int(selected) & ~known_mask:
+            raise ValueError("capability contains a reserved bit")
         return self.capability_bits & selected == selected
+
+
+def _pack_auxiliary_info(
+    payload: bytearray,
+    auxiliary: AuxiliaryInputMetadata,
+) -> None:
+    """Pack the generated protocol-v2 INFO extension."""
+
+    c = v2_constants
+    payload[c.INFO_RESPONSE_SUPPORTED_RATE_PROFILE_MASK_OFFSET] = sum(
+        1 << int(timing.profile) for timing in auxiliary.supported_rate_profiles
+    )
+    payload[c.INFO_RESPONSE_SELECTED_RATE_PROFILE_OFFSET] = int(
+        auxiliary.selected_rate_profile
+    )
+    payload[c.INFO_RESPONSE_SUPPORTED_AUX_BANK_MODE_MASK_OFFSET] = sum(
+        1 << int(mode) for mode in auxiliary.supported_aux_bank_modes
+    )
+    payload[c.INFO_RESPONSE_APPLIED_AUX_BANK_MODE_OFFSET] = int(
+        auxiliary.applied_aux_bank_mode
+    )
+    payload[c.INFO_RESPONSE_GPIO_ITEM_BYTES_OFFSET] = auxiliary.gpio_item_bytes
+    payload[c.INFO_RESPONSE_AUX_GPIO_PIN_COUNT_OFFSET] = len(
+        auxiliary.auxiliary_gpio_pins_by_bit
+    )
+    payload[c.INFO_RESPONSE_RATE_PROFILE_COUNT_OFFSET] = len(
+        auxiliary.supported_rate_profiles
+    )
+    start = c.INFO_RESPONSE_AUX_GPIO_PIN_MAP_OFFSET
+    payload[start : start + c.INFO_RESPONSE_AUX_GPIO_PIN_MAP_COUNT] = bytes(
+        auxiliary.auxiliary_gpio_pins_by_bit
+    )
+    start = c.INFO_RESPONSE_AUX_GPIO_PORT_BITS_OFFSET
+    payload[start : start + c.INFO_RESPONSE_AUX_GPIO_PORT_BITS_COUNT] = bytes(
+        auxiliary.auxiliary_gpio_port_bits_by_wire_bit
+    )
+    for offset, value in (
+        (
+            c.INFO_RESPONSE_AUX_GPIO_STANDARD_PORT_OFFSET,
+            auxiliary.auxiliary_gpio_standard_port,
+        ),
+        (c.INFO_RESPONSE_AUX_GPIO_FAST_PORT_OFFSET, auxiliary.auxiliary_gpio_fast_port),
+        (
+            c.INFO_RESPONSE_AUX_GPIO_FAST_SELECT_GPR_OFFSET,
+            auxiliary.auxiliary_gpio_fast_select_gpr,
+        ),
+        (c.INFO_RESPONSE_GPIO_RAW_WORD_BYTES_OFFSET, c.GPIO_RAW_WORD_BYTES_PER_BANK),
+        (
+            c.INFO_RESPONSE_PRIMARY_GPIO_STANDARD_PORT_OFFSET,
+            auxiliary.primary_gpio_standard_port,
+        ),
+        (
+            c.INFO_RESPONSE_PRIMARY_GPIO_FAST_PORT_OFFSET,
+            auxiliary.primary_gpio_fast_port,
+        ),
+        (
+            c.INFO_RESPONSE_PRIMARY_GPIO_FAST_SELECT_GPR_OFFSET,
+            auxiliary.primary_gpio_fast_select_gpr,
+        ),
+        (
+            c.INFO_RESPONSE_PRIMARY_GPIO_EDMA_CHANNEL_OFFSET,
+            auxiliary.primary_gpio_edma_channel,
+        ),
+        (
+            c.INFO_RESPONSE_AUX_GPIO_EDMA_CHANNEL_OFFSET,
+            auxiliary.auxiliary_gpio_edma_channel,
+        ),
+        (
+            c.INFO_RESPONSE_PRIMARY_GPIO_DMAMUX_SOURCE_OFFSET,
+            auxiliary.primary_gpio_dmamux_source,
+        ),
+        (
+            c.INFO_RESPONSE_AUX_GPIO_DMAMUX_SOURCE_OFFSET,
+            auxiliary.auxiliary_gpio_dmamux_source,
+        ),
+        (
+            c.INFO_RESPONSE_PRIMARY_GPIO_XBAR_OUTPUT_OFFSET,
+            auxiliary.primary_gpio_xbar_output,
+        ),
+        (
+            c.INFO_RESPONSE_AUX_GPIO_XBAR_OUTPUT_OFFSET,
+            auxiliary.auxiliary_gpio_xbar_output,
+        ),
+        (
+            c.INFO_RESPONSE_PAIRED_GPIO_XBAR_INPUT_OFFSET,
+            auxiliary.paired_gpio_xbar_input,
+        ),
+        (
+            c.INFO_RESPONSE_AUX_GPIO_EDMA_PRIORITY_OFFSET,
+            auxiliary.auxiliary_gpio_edma_priority,
+        ),
+        (
+            c.INFO_RESPONSE_PRIMARY_GPIO_EDMA_PRIORITY_OFFSET,
+            auxiliary.primary_gpio_edma_priority,
+        ),
+        (c.INFO_RESPONSE_ADC0_EDMA_PRIORITY_OFFSET, auxiliary.adc_edma_priorities[0]),
+        (c.INFO_RESPONSE_ADC1_EDMA_PRIORITY_OFFSET, auxiliary.adc_edma_priorities[1]),
+        (
+            c.INFO_RESPONSE_AUX_GPIO_DMA_IRQ_PRIORITY_OFFSET,
+            auxiliary.auxiliary_gpio_dma_irq_priority,
+        ),
+        (
+            c.INFO_RESPONSE_PRIMARY_GPIO_RAW_RING_DEPTH_OFFSET,
+            auxiliary.primary_gpio_raw_ring_depth,
+        ),
+        (
+            c.INFO_RESPONSE_AUX_GPIO_RAW_RING_DEPTH_OFFSET,
+            auxiliary.auxiliary_gpio_raw_ring_depth,
+        ),
+        (
+            c.INFO_RESPONSE_PAIRED_GPIO_JOIN_REQUIRED_OFFSET,
+            int(auxiliary.paired_gpio_join_required),
+        ),
+    ):
+        payload[offset] = value
+    struct.pack_into(
+        "<I",
+        payload,
+        c.INFO_RESPONSE_AUX_GPIO_CAPTURE_MASK_OFFSET,
+        auxiliary.auxiliary_gpio_capture_mask,
+    )
+    struct.pack_into(
+        "<I",
+        payload,
+        c.INFO_RESPONSE_PRIMARY_GPIO_CAPTURE_MASK_OFFSET,
+        auxiliary.primary_gpio_capture_mask,
+    )
+    struct.pack_into(
+        "<HHHH",
+        payload,
+        c.INFO_RESPONSE_DISABLED_ADC_PAIRS_PER_FRAME_OFFSET,
+        auxiliary.disabled_adc_pairs_per_frame,
+        auxiliary.disabled_gpio_samples_per_frame,
+        auxiliary.input_adc_pairs_per_frame,
+        auxiliary.input_gpio_samples_per_frame,
+    )
+    for index, timing in enumerate(auxiliary.supported_rate_profiles):
+        base = c.INFO_RESPONSE_RATE_PROFILES_OFFSET + (
+            index * c.RATE_PROFILE_INFO_PAYLOAD_SIZE
+        )
+        payload[base + c.RATE_PROFILE_INFO_RATE_PROFILE_OFFSET] = int(timing.profile)
+        payload[base + c.RATE_PROFILE_INFO_ADC_ETC_PREDIVIDER_OFFSET] = (
+            timing.adc_etc_predivider
+        )
+        payload[base + c.RATE_PROFILE_INFO_ADC_ETC_CHAIN_LENGTH_OFFSET] = (
+            timing.adc_etc_chain_length
+        )
+        for offset, value in (
+            (c.RATE_PROFILE_INFO_ADC_PAIR_RATE_HZ_OFFSET, timing.adc_pair_rate_hz),
+            (
+                c.RATE_PROFILE_INFO_GPIO_SAMPLE_RATE_HZ_OFFSET,
+                timing.gpio_sample_rate_hz,
+            ),
+            (
+                c.RATE_PROFILE_INFO_COMPLETION_EXPECTED_DWT_CYCLES_OFFSET,
+                timing.completion_expected_dwt_cycles,
+            ),
+            (
+                c.RATE_PROFILE_INFO_DISABLED_FRAME_COVERAGE_TICKS_OFFSET,
+                timing.disabled_frame_coverage_ticks,
+            ),
+            (
+                c.RATE_PROFILE_INFO_INPUT_FRAME_COVERAGE_TICKS_OFFSET,
+                timing.input_frame_coverage_ticks,
+            ),
+        ):
+            struct.pack_into("<I", payload, base + offset, value)
+        for offset, value in (
+            (
+                c.RATE_PROFILE_INFO_ADC_PAIR_PERIOD_TICKS_OFFSET,
+                timing.adc_pair_period_ticks,
+            ),
+            (c.RATE_PROFILE_INFO_ADC1_PHASE_TICKS_OFFSET, timing.adc1_phase_ticks),
+            (
+                c.RATE_PROFILE_INFO_GPIO_SAMPLE_PERIOD_TICKS_OFFSET,
+                timing.gpio_sample_period_ticks,
+            ),
+            (
+                c.RATE_PROFILE_INFO_GPIO_MASTER_PIT_DIVIDER_OFFSET,
+                timing.gpio_master_pit_divider,
+            ),
+            (
+                c.RATE_PROFILE_INFO_GPIO_MASTER_PIT_LOAD_OFFSET,
+                timing.gpio_master_pit_load,
+            ),
+            (
+                c.RATE_PROFILE_INFO_ADC_PAIR_PIT_DIVIDER_OFFSET,
+                timing.adc_pair_pit_divider,
+            ),
+            (c.RATE_PROFILE_INFO_ADC_PAIR_PIT_LOAD_OFFSET, timing.adc_pair_pit_load),
+            (c.RATE_PROFILE_INFO_ADC0_INITIAL_DELAY_OFFSET, timing.adc0_initial_delay),
+            (c.RATE_PROFILE_INFO_ADC1_INITIAL_DELAY_OFFSET, timing.adc1_initial_delay),
+            (
+                c.RATE_PROFILE_INFO_ADC0_EFFECTIVE_DELAY_OFFSET,
+                timing.adc0_effective_delay,
+            ),
+            (
+                c.RATE_PROFILE_INFO_ADC1_EFFECTIVE_DELAY_OFFSET,
+                timing.adc1_effective_delay,
+            ),
+            (
+                c.RATE_PROFILE_INFO_ADC1_PHASE_IPG_CYCLES_OFFSET,
+                timing.adc1_phase_ipg_cycles,
+            ),
+        ):
+            struct.pack_into("<H", payload, base + offset, value)
+
+
+def _unpack_auxiliary_info(payload: bytes) -> AuxiliaryInputMetadata:
+    """Decode and validate the generated protocol-v2 INFO extension."""
+
+    c = v2_constants
+
+    def byte(offset: int) -> int:
+        return payload[offset]
+
+    def u16_at(offset: int) -> int:
+        return struct.unpack_from("<H", payload, offset)[0]
+
+    def u32_at(offset: int) -> int:
+        return struct.unpack_from("<I", payload, offset)[0]
+
+    if payload[c.INFO_RESPONSE_SUPPORTED_RATE_PROFILE_MASK_OFFSET] != (
+        c.SUPPORTED_RATE_PROFILE_MASK
+    ) or payload[c.INFO_RESPONSE_SUPPORTED_AUX_BANK_MODE_MASK_OFFSET] != (
+        c.SUPPORTED_AUX_BANK_MODE_MASK
+    ):
+        raise FrameValidationError("INFO auxiliary capability masks are invalid")
+    if payload[c.INFO_RESPONSE_RATE_PROFILE_COUNT_OFFSET] != len(RateProfile):
+        raise FrameValidationError("INFO rate-profile count is invalid")
+    if payload[c.INFO_RESPONSE_AUX_GPIO_PIN_COUNT_OFFSET] != len(
+        c.AUX_GPIO_PINS_BY_BIT
+    ):
+        raise FrameValidationError("INFO auxiliary GPIO pin count is invalid")
+    if payload[c.INFO_RESPONSE_GPIO_RAW_WORD_BYTES_OFFSET] != (
+        c.GPIO_RAW_WORD_BYTES_PER_BANK
+    ):
+        raise FrameValidationError("INFO GPIO raw-word width is invalid")
+    for offset in (
+        c.INFO_RESPONSE_RESERVED_9_OFFSET,
+        c.INFO_RESPONSE_RESERVED_10_OFFSET,
+        c.INFO_RESPONSE_RESERVED_11_OFFSET,
+    ):
+        if payload[offset] != 0:
+            raise FrameValidationError("INFO auxiliary reserved byte must be zero")
+
+    timings: list[RateProfileTiming] = []
+    for index, expected_profile in enumerate(RateProfile):
+        base = c.INFO_RESPONSE_RATE_PROFILES_OFFSET + (
+            index * c.RATE_PROFILE_INFO_PAYLOAD_SIZE
+        )
+        if payload[base + c.RATE_PROFILE_INFO_RESERVED_OFFSET] != 0:
+            raise FrameValidationError("INFO rate-profile reserved byte must be zero")
+        try:
+            profile = RateProfile(
+                payload[base + c.RATE_PROFILE_INFO_RATE_PROFILE_OFFSET]
+            )
+        except ValueError as exc:
+            raise FrameValidationError("INFO rate-profile ID is invalid") from exc
+        if profile is not expected_profile:
+            raise FrameValidationError("INFO rate-profile table order is invalid")
+
+        timings.append(
+            RateProfileTiming(
+                profile=profile,
+                adc_pair_rate_hz=u32_at(
+                    base + c.RATE_PROFILE_INFO_ADC_PAIR_RATE_HZ_OFFSET
+                ),
+                gpio_sample_rate_hz=u32_at(
+                    base + c.RATE_PROFILE_INFO_GPIO_SAMPLE_RATE_HZ_OFFSET
+                ),
+                adc_pair_period_ticks=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC_PAIR_PERIOD_TICKS_OFFSET
+                ),
+                adc1_phase_ticks=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC1_PHASE_TICKS_OFFSET
+                ),
+                gpio_sample_period_ticks=u16_at(
+                    base + c.RATE_PROFILE_INFO_GPIO_SAMPLE_PERIOD_TICKS_OFFSET
+                ),
+                gpio_master_pit_divider=u16_at(
+                    base + c.RATE_PROFILE_INFO_GPIO_MASTER_PIT_DIVIDER_OFFSET
+                ),
+                gpio_master_pit_load=u16_at(
+                    base + c.RATE_PROFILE_INFO_GPIO_MASTER_PIT_LOAD_OFFSET
+                ),
+                adc_pair_pit_divider=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC_PAIR_PIT_DIVIDER_OFFSET
+                ),
+                adc_pair_pit_load=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC_PAIR_PIT_LOAD_OFFSET
+                ),
+                adc_etc_predivider=payload[
+                    base + c.RATE_PROFILE_INFO_ADC_ETC_PREDIVIDER_OFFSET
+                ],
+                adc_etc_chain_length=payload[
+                    base + c.RATE_PROFILE_INFO_ADC_ETC_CHAIN_LENGTH_OFFSET
+                ],
+                adc0_initial_delay=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC0_INITIAL_DELAY_OFFSET
+                ),
+                adc1_initial_delay=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC1_INITIAL_DELAY_OFFSET
+                ),
+                adc0_effective_delay=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC0_EFFECTIVE_DELAY_OFFSET
+                ),
+                adc1_effective_delay=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC1_EFFECTIVE_DELAY_OFFSET
+                ),
+                adc1_phase_ipg_cycles=u16_at(
+                    base + c.RATE_PROFILE_INFO_ADC1_PHASE_IPG_CYCLES_OFFSET
+                ),
+                completion_expected_dwt_cycles=u32_at(
+                    base + c.RATE_PROFILE_INFO_COMPLETION_EXPECTED_DWT_CYCLES_OFFSET
+                ),
+                disabled_frame_coverage_ticks=u32_at(
+                    base + c.RATE_PROFILE_INFO_DISABLED_FRAME_COVERAGE_TICKS_OFFSET
+                ),
+                input_frame_coverage_ticks=u32_at(
+                    base + c.RATE_PROFILE_INFO_INPUT_FRAME_COVERAGE_TICKS_OFFSET
+                ),
+            )
+        )
+
+    pin_start = c.INFO_RESPONSE_AUX_GPIO_PIN_MAP_OFFSET
+    bit_start = c.INFO_RESPONSE_AUX_GPIO_PORT_BITS_OFFSET
+    try:
+        return AuxiliaryInputMetadata(
+            selected_rate_profile=RateProfile(
+                byte(c.INFO_RESPONSE_SELECTED_RATE_PROFILE_OFFSET)
+            ),
+            applied_aux_bank_mode=AuxBankMode(
+                byte(c.INFO_RESPONSE_APPLIED_AUX_BANK_MODE_OFFSET)
+            ),
+            supported_rate_profiles=tuple(timings),
+            gpio_item_bytes=byte(c.INFO_RESPONSE_GPIO_ITEM_BYTES_OFFSET),
+            auxiliary_gpio_pins_by_bit=tuple(
+                payload[pin_start : pin_start + c.INFO_RESPONSE_AUX_GPIO_PIN_MAP_COUNT]
+            ),
+            auxiliary_gpio_port_bits_by_wire_bit=tuple(
+                payload[
+                    bit_start : bit_start + c.INFO_RESPONSE_AUX_GPIO_PORT_BITS_COUNT
+                ]
+            ),
+            auxiliary_gpio_capture_mask=u32_at(
+                c.INFO_RESPONSE_AUX_GPIO_CAPTURE_MASK_OFFSET
+            ),
+            primary_gpio_capture_mask=u32_at(
+                c.INFO_RESPONSE_PRIMARY_GPIO_CAPTURE_MASK_OFFSET
+            ),
+            auxiliary_gpio_standard_port=byte(
+                c.INFO_RESPONSE_AUX_GPIO_STANDARD_PORT_OFFSET
+            ),
+            auxiliary_gpio_fast_port=byte(c.INFO_RESPONSE_AUX_GPIO_FAST_PORT_OFFSET),
+            auxiliary_gpio_fast_select_gpr=byte(
+                c.INFO_RESPONSE_AUX_GPIO_FAST_SELECT_GPR_OFFSET
+            ),
+            primary_gpio_standard_port=byte(
+                c.INFO_RESPONSE_PRIMARY_GPIO_STANDARD_PORT_OFFSET
+            ),
+            primary_gpio_fast_port=byte(c.INFO_RESPONSE_PRIMARY_GPIO_FAST_PORT_OFFSET),
+            primary_gpio_fast_select_gpr=byte(
+                c.INFO_RESPONSE_PRIMARY_GPIO_FAST_SELECT_GPR_OFFSET
+            ),
+            primary_gpio_edma_channel=byte(
+                c.INFO_RESPONSE_PRIMARY_GPIO_EDMA_CHANNEL_OFFSET
+            ),
+            auxiliary_gpio_edma_channel=byte(
+                c.INFO_RESPONSE_AUX_GPIO_EDMA_CHANNEL_OFFSET
+            ),
+            primary_gpio_dmamux_source=byte(
+                c.INFO_RESPONSE_PRIMARY_GPIO_DMAMUX_SOURCE_OFFSET
+            ),
+            auxiliary_gpio_dmamux_source=byte(
+                c.INFO_RESPONSE_AUX_GPIO_DMAMUX_SOURCE_OFFSET
+            ),
+            primary_gpio_xbar_output=byte(
+                c.INFO_RESPONSE_PRIMARY_GPIO_XBAR_OUTPUT_OFFSET
+            ),
+            auxiliary_gpio_xbar_output=byte(
+                c.INFO_RESPONSE_AUX_GPIO_XBAR_OUTPUT_OFFSET
+            ),
+            paired_gpio_xbar_input=byte(c.INFO_RESPONSE_PAIRED_GPIO_XBAR_INPUT_OFFSET),
+            auxiliary_gpio_edma_priority=byte(
+                c.INFO_RESPONSE_AUX_GPIO_EDMA_PRIORITY_OFFSET
+            ),
+            primary_gpio_edma_priority=byte(
+                c.INFO_RESPONSE_PRIMARY_GPIO_EDMA_PRIORITY_OFFSET
+            ),
+            adc_edma_priorities=(
+                byte(c.INFO_RESPONSE_ADC0_EDMA_PRIORITY_OFFSET),
+                byte(c.INFO_RESPONSE_ADC1_EDMA_PRIORITY_OFFSET),
+            ),
+            auxiliary_gpio_dma_irq_priority=byte(
+                c.INFO_RESPONSE_AUX_GPIO_DMA_IRQ_PRIORITY_OFFSET
+            ),
+            primary_gpio_raw_ring_depth=byte(
+                c.INFO_RESPONSE_PRIMARY_GPIO_RAW_RING_DEPTH_OFFSET
+            ),
+            auxiliary_gpio_raw_ring_depth=byte(
+                c.INFO_RESPONSE_AUX_GPIO_RAW_RING_DEPTH_OFFSET
+            ),
+            paired_gpio_join_required=bool(
+                byte(c.INFO_RESPONSE_PAIRED_GPIO_JOIN_REQUIRED_OFFSET)
+            ),
+            disabled_adc_pairs_per_frame=u16_at(
+                c.INFO_RESPONSE_DISABLED_ADC_PAIRS_PER_FRAME_OFFSET
+            ),
+            disabled_gpio_samples_per_frame=u16_at(
+                c.INFO_RESPONSE_DISABLED_GPIO_SAMPLES_PER_FRAME_OFFSET
+            ),
+            input_adc_pairs_per_frame=u16_at(
+                c.INFO_RESPONSE_INPUT_ADC_PAIRS_PER_FRAME_OFFSET
+            ),
+            input_gpio_samples_per_frame=u16_at(
+                c.INFO_RESPONSE_INPUT_GPIO_SAMPLES_PER_FRAME_OFFSET
+            ),
+        )
+    except (TypeError, ValueError) as exc:
+        raise FrameValidationError(str(exc)) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -2818,6 +3697,7 @@ class DeviceInfo:
     nominal_framed_bytes_per_second_per_stream: int = (
         constants.NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM
     )
+    auxiliary: AuxiliaryInputMetadata | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.device_state, constants.DeviceState):
@@ -2906,6 +3786,16 @@ class DeviceInfo:
                 stream_mask=applied_streams,
                 source=applied_source,
                 data_checksum_algorithm=data_checksum,
+                aux_bank_mode=(
+                    self.auxiliary.applied_aux_bank_mode
+                    if self.auxiliary is not None
+                    else AuxBankMode.DISABLED
+                ),
+                rate_profile=(
+                    self.auxiliary.selected_rate_profile
+                    if self.auxiliary is not None
+                    else v2_constants.DEFAULT_RATE_PROFILE
+                ),
             )
             if not capabilities.supports_configuration(applied):
                 raise ValueError("INFO applied configuration is not advertised")
@@ -3003,6 +3893,7 @@ class DeviceInfo:
             nominal_framed_bytes_per_second_per_stream=(
                 self.nominal_framed_bytes_per_second_per_stream
             ),
+            auxiliary=self.auxiliary,
         )
 
     @property
@@ -3015,6 +3906,16 @@ class DeviceInfo:
             stream_mask=self.applied_stream_mask,
             source=self.applied_source,
             data_checksum_algorithm=self.data_checksum_algorithm,
+            aux_bank_mode=(
+                self.auxiliary.applied_aux_bank_mode
+                if self.auxiliary is not None
+                else AuxBankMode.DISABLED
+            ),
+            rate_profile=(
+                self.auxiliary.selected_rate_profile
+                if self.auxiliary is not None
+                else v2_constants.DEFAULT_RATE_PROFILE
+            ),
         )
 
     @property
@@ -3055,7 +3956,11 @@ class DeviceInfo:
     def to_payload(self) -> bytes:
         """Encode a successful INFO response with actual ADC settings."""
 
-        payload = bytearray(constants.INFO_RESPONSE_PAYLOAD_SIZE)
+        payload = bytearray(
+            v2_constants.INFO_RESPONSE_PAYLOAD_SIZE
+            if self.auxiliary is not None
+            else constants.INFO_RESPONSE_PAYLOAD_SIZE
+        )
         _RESPONSE_PREFIX.pack_into(
             payload, 0, constants.ResponseStatus.OK, 0, constants.ErrorCode.OK
         )
@@ -3209,6 +4114,8 @@ class DeviceInfo:
             self.nominal_payload_bytes_per_second_per_stream,
             self.nominal_framed_bytes_per_second_per_stream,
         )
+        if self.auxiliary is not None:
+            _pack_auxiliary_info(payload, self.auxiliary)
         return bytes(payload)
 
     @classmethod
@@ -3216,7 +4123,17 @@ class DeviceInfo:
         """Decode a successful INFO response payload."""
 
         payload_bytes = bytes(payload)
-        _success_prefix(payload_bytes, constants.INFO_RESPONSE_PAYLOAD_SIZE)
+        if len(payload_bytes) == v2_constants.INFO_RESPONSE_PAYLOAD_SIZE:
+            expected_size = v2_constants.INFO_RESPONSE_PAYLOAD_SIZE
+            auxiliary = _unpack_auxiliary_info(payload_bytes)
+        elif len(payload_bytes) == constants.INFO_RESPONSE_PAYLOAD_SIZE:
+            expected_size = constants.INFO_RESPONSE_PAYLOAD_SIZE
+            auxiliary = None
+        else:
+            raise FrameValidationError(
+                "INFO payload must use the generated v1 or v2 size"
+            )
+        _success_prefix(payload_bytes, expected_size)
         build_start = constants.INFO_RESPONSE_BUILD_ID_OFFSET
         build_end = build_start + constants.INFO_RESPONSE_BUILD_ID_COUNT
         raw_build = payload_bytes[build_start:build_end]
@@ -3460,6 +4377,7 @@ class DeviceInfo:
                 payload_bytes,
                 constants.INFO_RESPONSE_NOMINAL_FRAMED_BYTES_PER_SECOND_PER_STREAM_OFFSET,
             )[0],
+            auxiliary=auxiliary,
             **_unpack_adc_metadata(payload_bytes, "INFO_RESPONSE"),
         )
 
@@ -3692,6 +4610,7 @@ class Status:
     adc_packer_chronology_errors: int = 0
     adc_cache_dma_discards: int = 0
     adc_cache_cpu_invalidations: int = 0
+    configuration: DAQConfiguration | None = None
 
     def __post_init__(self) -> None:
         if any(
@@ -3715,6 +4634,16 @@ class Status:
         object.__setattr__(self, "stream_mask", stream_mask)
         object.__setattr__(self, "source", source)
         object.__setattr__(self, "data_checksum_algorithm", checksum)
+        if self.configuration is not None:
+            if not isinstance(self.configuration, DAQConfiguration):
+                raise TypeError("status configuration must be DAQConfiguration or None")
+            if (
+                self.configuration.stream_mask != stream_mask
+                or self.configuration.source is not source
+                or self.configuration.data_checksum_algorithm is not checksum
+                or self.configuration.data_frame_bytes != self.data_frame_bytes
+            ):
+                raise ValueError("status fields contradict the applied configuration")
         if state is constants.DeviceState.BOOT:
             raise ValueError("BOOT does not produce STATUS responses")
         valid_streams = int(constants.StreamMask.ADC | constants.StreamMask.GPIO)
@@ -4615,7 +5544,7 @@ class AdcChannelView(Sequence[int]):
 
 @dataclass(frozen=True, slots=True)
 class ADCBlock:
-    """One fixed ADC frame; each logical item is an ADC0/ADC1 sample pair."""
+    """One ADC frame; each logical item is an ADC0/ADC1 sample pair."""
 
     run_id: int
     sequence: int
@@ -4626,6 +5555,9 @@ class ADCBlock:
         constants.DEFAULT_CHECKSUM_ALGORITHM
     )
     metadata: AdcBlockMetadata = dataclass_field(default_factory=AdcBlockMetadata)
+    aux_bank_mode: AuxBankMode = AuxBankMode.DISABLED
+    rate_profile: RateProfile = v2_constants.DEFAULT_RATE_PROFILE
+    protocol_version: int = constants.PROTOCOL_VERSION
     gap: StreamGap | None = None
 
     def __post_init__(self) -> None:
@@ -4653,10 +5585,41 @@ class ADCBlock:
                 f"host has no implementation for checksum algorithm {checksum.name}"
             )
         object.__setattr__(self, "checksum_algorithm", checksum)
-        if len(payload) != constants.ADC_DATA_PAYLOAD_SIZE:
-            raise ValueError("ADC blocks require exactly 1012 sample pairs")
+        if isinstance(self.aux_bank_mode, bool) or isinstance(self.rate_profile, bool):
+            raise TypeError("ADC block mode/rate metadata is invalid")
+        try:
+            mode = AuxBankMode(self.aux_bank_mode)
+            profile = RateProfile(self.rate_profile)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("ADC block mode/rate metadata is invalid") from exc
+        if self.protocol_version not in {
+            constants.PROTOCOL_VERSION,
+            v2_constants.PROTOCOL_VERSION,
+        } or isinstance(self.protocol_version, bool):
+            raise ValueError("ADC block protocol version must be 1 or 2")
+        if self.protocol_version == constants.PROTOCOL_VERSION and (
+            mode is not AuxBankMode.DISABLED
+            or profile is not v2_constants.DEFAULT_RATE_PROFILE
+        ):
+            raise ValueError("protocol-v1 ADC blocks require the legacy layout/rate")
+        object.__setattr__(self, "aux_bank_mode", mode)
+        object.__setattr__(self, "rate_profile", profile)
+        layout = GPIOLayout.from_mode(mode)
+        if len(payload) != layout.adc_payload_bytes:
+            if mode is AuxBankMode.DISABLED:
+                raise ValueError("ADC blocks require exactly 1012 sample pairs")
+            raise ValueError(
+                "ADC blocks in INPUT mode require exactly 506 sample pairs"
+            )
         if not isinstance(self.metadata, AdcBlockMetadata):
             raise TypeError("ADC block metadata must be AdcBlockMetadata")
+        timing = RateProfileTiming.from_profile(profile)
+        if (
+            self.metadata.pair_rate_hz != timing.adc_pair_rate_hz
+            or self.metadata.pair_period_ticks != timing.adc_pair_period_ticks
+            or self.metadata.adc1_phase_ticks != timing.adc1_phase_ticks
+        ):
+            raise ValueError("ADC block metadata disagrees with its rate profile")
         wire_source = (
             constants.Source.SYNTHETIC
             if self.flags & constants.FrameFlag.SYNTHETIC
@@ -4707,6 +5670,54 @@ class ADCBlock:
             metadata=AdcBlockMetadata(source=source),
         )
 
+    @classmethod
+    def from_v2_frame(
+        cls,
+        frame: V2Frame,
+        configuration: DAQConfiguration,
+    ) -> ADCBlock:
+        """Decode a v2 ADC frame using its already-negotiated exact profile."""
+
+        if int(frame.header.kind) != int(constants.FrameKind.ADC_DATA):
+            raise TypeError("frame is not ADC_DATA")
+        if not isinstance(configuration, DAQConfiguration):
+            raise TypeError("configuration must be DAQConfiguration")
+        layout = configuration.gpio_layout
+        timing = configuration.rate_timing
+        if frame.header.item_count != layout.adc_items_per_frame:
+            raise FrameValidationError(
+                "protocol-v2 ADC item count disagrees with negotiated layout"
+            )
+        if frame.header.first_sample_ticks % timing.adc_pair_period_ticks:
+            raise FrameValidationError(
+                "protocol-v2 ADC timestamp disagrees with selected period"
+            )
+        source = (
+            constants.Source.SYNTHETIC
+            if int(frame.header.flags) & int(constants.FrameFlag.SYNTHETIC)
+            else constants.Source.HARDWARE
+        )
+        return cls(
+            run_id=frame.header.run_id,
+            sequence=frame.header.sequence,
+            first_sample_ticks=frame.header.first_sample_ticks,
+            payload=frame.payload,
+            flags=constants.FrameFlag(int(frame.header.flags)),
+            checksum_algorithm=constants.ChecksumAlgorithm(
+                int(frame.header.checksum_algorithm)
+            ),
+            metadata=AdcBlockMetadata(
+                source=source,
+                pair_rate_hz=timing.adc_pair_rate_hz,
+                pair_period_ticks=timing.adc_pair_period_ticks,
+                adc1_phase_ticks=timing.adc1_phase_ticks,
+                trigger=AdcTriggerMetadata.for_rate_profile(configuration.rate_profile),
+            ),
+            aux_bank_mode=configuration.aux_bank_mode,
+            rate_profile=configuration.rate_profile,
+            protocol_version=v2_constants.PROTOCOL_VERSION,
+        )
+
     @property
     def data_checksum_algorithm(self) -> constants.ChecksumAlgorithm:
         """The exact algorithm that validated this frame's trailer."""
@@ -4717,7 +5728,11 @@ class ADCBlock:
     def item_count(self) -> int:
         """Logical pair count; this is not a combined two-channel sample rate."""
 
-        return constants.ADC_PAIRS_PER_FRAME
+        return len(self.payload) // constants.ADC_BYTES_PER_PAIR
+
+    @property
+    def frame_coverage_ticks(self) -> int:
+        return self.item_count * self.pair_period_ticks
 
     @property
     def t0_ticks(self) -> int:
@@ -4918,17 +5933,17 @@ def interleave_adc(block: ADCBlock) -> Iterator[AdcSample]:
 
 
 class GpioChannelView(Sequence[bool]):
-    """Lazy Boolean view over one D6-through-D13 bit in packed GPIO samples."""
+    """Lazy Boolean view over one advertised bit in packed GPIO samples."""
 
     __slots__ = ("_block", "bit", "pin")
 
     def __init__(self, block: GPIOBlock, pin: int) -> None:
         if not isinstance(pin, int) or isinstance(pin, bool):
-            raise TypeError("GPIO pin must be one of D6 through D13")
+            raise TypeError(block.pin_error_message)
         try:
-            self.bit = constants.GPIO_PINS_BY_BIT.index(pin)
+            self.bit = block.pins_by_bit.index(pin)
         except ValueError as exc:
-            raise ValueError("GPIO pin must be one of D6 through D13") from exc
+            raise ValueError(block.pin_error_message) from exc
         self._block = block
         self.pin = pin
 
@@ -4951,12 +5966,12 @@ class GpioChannelView(Sequence[bool]):
             position += len(self)
         if not 0 <= position < len(self):
             raise IndexError("GPIO sample index out of range")
-        return bool(self._block.payload[position] & (1 << self.bit))
+        return bool(self._block.sample(position) & (1 << self.bit))
 
 
 @dataclass(frozen=True, slots=True)
 class GPIOBlock:
-    """One fixed GPIO frame containing packed simultaneous D6-D13 samples."""
+    """One frame of packed simultaneous primary or primary+auxiliary GPIO."""
 
     run_id: int
     sequence: int
@@ -4966,6 +5981,9 @@ class GPIOBlock:
     checksum_algorithm: constants.ChecksumAlgorithm = (
         constants.DEFAULT_CHECKSUM_ALGORITHM
     )
+    aux_bank_mode: AuxBankMode = AuxBankMode.DISABLED
+    rate_profile: RateProfile = v2_constants.DEFAULT_RATE_PROFILE
+    protocol_version: int = constants.PROTOCOL_VERSION
 
     def __post_init__(self) -> None:
         _unsigned("run_id", self.run_id, 32)
@@ -4992,8 +6010,32 @@ class GPIOBlock:
                 f"host has no implementation for checksum algorithm {checksum.name}"
             )
         object.__setattr__(self, "checksum_algorithm", checksum)
-        if len(payload) != constants.GPIO_DATA_PAYLOAD_SIZE:
-            raise ValueError("GPIO blocks require exactly 4048 packed samples")
+        if isinstance(self.aux_bank_mode, bool) or isinstance(self.rate_profile, bool):
+            raise TypeError("GPIO block mode/rate metadata is invalid")
+        try:
+            mode = AuxBankMode(self.aux_bank_mode)
+            profile = RateProfile(self.rate_profile)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("GPIO block mode/rate metadata is invalid") from exc
+        if self.protocol_version not in {
+            constants.PROTOCOL_VERSION,
+            v2_constants.PROTOCOL_VERSION,
+        } or isinstance(self.protocol_version, bool):
+            raise ValueError("GPIO block protocol version must be 1 or 2")
+        if self.protocol_version == constants.PROTOCOL_VERSION and (
+            mode is not AuxBankMode.DISABLED
+            or profile is not v2_constants.DEFAULT_RATE_PROFILE
+        ):
+            raise ValueError("protocol-v1 GPIO blocks require the legacy layout/rate")
+        object.__setattr__(self, "aux_bank_mode", mode)
+        object.__setattr__(self, "rate_profile", profile)
+        layout = GPIOLayout.from_mode(mode)
+        if len(payload) != layout.payload_bytes:
+            if mode is AuxBankMode.DISABLED:
+                raise ValueError("GPIO blocks require exactly 4048 packed samples")
+            raise ValueError(
+                "GPIO blocks in INPUT mode require exactly 2024 packed samples"
+            )
 
     @classmethod
     def from_frame(cls, frame: Frame) -> GPIOBlock:
@@ -5006,6 +6048,42 @@ class GPIOBlock:
             payload=frame.payload,
             flags=frame.header.flags,
             checksum_algorithm=frame.header.checksum_algorithm,
+        )
+
+    @classmethod
+    def from_v2_frame(
+        cls,
+        frame: V2Frame,
+        configuration: DAQConfiguration,
+    ) -> GPIOBlock:
+        """Decode v2 packed samples using the negotiated whole-bank mode."""
+
+        if int(frame.header.kind) != int(constants.FrameKind.GPIO_DATA):
+            raise TypeError("frame is not GPIO_DATA")
+        if not isinstance(configuration, DAQConfiguration):
+            raise TypeError("configuration must be DAQConfiguration")
+        layout = configuration.gpio_layout
+        timing = configuration.rate_timing
+        if frame.header.item_count != layout.items_per_frame:
+            raise FrameValidationError(
+                "protocol-v2 GPIO item count disagrees with negotiated layout"
+            )
+        if frame.header.first_sample_ticks % timing.gpio_sample_period_ticks:
+            raise FrameValidationError(
+                "protocol-v2 GPIO timestamp disagrees with selected period"
+            )
+        return cls(
+            run_id=frame.header.run_id,
+            sequence=frame.header.sequence,
+            first_sample_ticks=frame.header.first_sample_ticks,
+            payload=frame.payload,
+            flags=constants.FrameFlag(int(frame.header.flags)),
+            checksum_algorithm=constants.ChecksumAlgorithm(
+                int(frame.header.checksum_algorithm)
+            ),
+            aux_bank_mode=configuration.aux_bank_mode,
+            rate_profile=configuration.rate_profile,
+            protocol_version=v2_constants.PROTOCOL_VERSION,
         )
 
     @property
@@ -5026,13 +6104,47 @@ class GPIOBlock:
 
     @property
     def item_count(self) -> int:
-        """Count of simultaneous eight-pin samples in the payload."""
+        """Count of simultaneous packed samples in the payload."""
 
-        return constants.GPIO_SAMPLES_PER_FRAME
+        return self.layout.items_per_frame
+
+    @property
+    def layout(self) -> GPIOLayout:
+        return GPIOLayout.from_mode(self.aux_bank_mode)
+
+    @property
+    def packed_width_bits(self) -> int:
+        return self.layout.packed_width_bits
+
+    @property
+    def item_bytes(self) -> int:
+        return self.layout.item_bytes
+
+    @property
+    def pins_by_bit(self) -> tuple[int, ...]:
+        return self.layout.pins_by_bit
+
+    @property
+    def primary_pins_by_bit(self) -> tuple[int, ...]:
+        return self.layout.primary_pins_by_bit
+
+    @property
+    def auxiliary_pins_by_bit(self) -> tuple[int, ...]:
+        return self.layout.auxiliary_pins_by_bit
+
+    @property
+    def sample_mask(self) -> int:
+        return (1 << self.packed_width_bits) - 1
+
+    @property
+    def pin_error_message(self) -> str:
+        if self.aux_bank_mode is AuxBankMode.DISABLED:
+            return "GPIO pin must be one of D6 through D13"
+        return "GPIO pin must be one of D6 through D13 or D16 through D23"
 
     @property
     def samples(self) -> memoryview:
-        """Zero-copy byte view preserving the packed D6-through-D13 bit order."""
+        """Zero-copy byte view preserving the packed wire representation."""
 
         return memoryview(self.payload)
 
@@ -5044,7 +6156,7 @@ class GPIOBlock:
 
     @property
     def t0_ticks(self) -> int:
-        """Nominal run-relative timestamp of the first packed GPIO byte."""
+        """Nominal run-relative timestamp of the first packed GPIO sample."""
 
         return self.first_sample_ticks
 
@@ -5060,7 +6172,9 @@ class GPIOBlock:
 
     @property
     def sample_period_ticks(self) -> int:
-        return constants.GPIO_SAMPLE_PERIOD_TICKS
+        return RateProfileTiming.from_profile(
+            self.rate_profile
+        ).gpio_sample_period_ticks
 
     @property
     def sample_period(self) -> int:
@@ -5075,18 +6189,27 @@ class GPIOBlock:
     @property
     def end_tick_exclusive(self) -> int:
         return (
-            self.first_sample_ticks
-            + self.item_count * constants.GPIO_SAMPLE_PERIOD_TICKS
+            self.first_sample_ticks + self.item_count * self.sample_period_ticks
         ) & constants.UINT64_MAX
+
+    @property
+    def frame_coverage_ticks(self) -> int:
+        return self.item_count * self.sample_period_ticks
 
     @property
     def first_sample_index(self) -> int:
         """Global simultaneous-snapshot index implied by the 8 MHz timestamp."""
 
-        return self.first_sample_ticks // constants.GPIO_SAMPLE_PERIOD_TICKS
+        return self.first_sample_ticks // self.sample_period_ticks
 
     def sample(self, index: int) -> int:
-        return self.payload[index]
+        if index < 0:
+            index += self.item_count
+        if not 0 <= index < self.item_count:
+            raise IndexError("GPIO sample index out of range")
+        if self.item_bytes == 1:
+            return self.payload[index]
+        return struct.unpack_from("<H", self.payload, index * self.item_bytes)[0]
 
     def sample_ticks(self, index: int) -> int:
         if index < 0:
@@ -5094,7 +6217,7 @@ class GPIOBlock:
         if not 0 <= index < self.item_count:
             raise IndexError("GPIO sample index out of range")
         return (
-            self.first_sample_ticks + index * constants.GPIO_SAMPLE_PERIOD_TICKS
+            self.first_sample_ticks + index * self.sample_period_ticks
         ) & constants.UINT64_MAX
 
     def sample_seconds(self, index: int) -> float:
@@ -5235,6 +6358,8 @@ class StreamGap:
     source: constants.Source = constants.Source.HARDWARE
     sequence_inferred_items: int | None = None
     firmware_evidence: FirmwareLossEvidence | None = None
+    period_ticks: int | None = None
+    frame_item_count: int | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.kind, bool):
@@ -5272,6 +6397,33 @@ class StreamGap:
         except (TypeError, ValueError) as exc:
             raise ValueError("stream gap source is invalid") from exc
         object.__setattr__(self, "source", source)
+        default_period = (
+            constants.ADC_PAIR_PERIOD_TICKS
+            if kind is constants.FrameKind.ADC_DATA
+            else constants.GPIO_SAMPLE_PERIOD_TICKS
+        )
+        default_count = (
+            constants.ADC_PAIRS_PER_FRAME
+            if kind is constants.FrameKind.ADC_DATA
+            else constants.GPIO_SAMPLES_PER_FRAME
+        )
+        period_ticks = (
+            default_period if self.period_ticks is None else self.period_ticks
+        )
+        frame_item_count = (
+            default_count if self.frame_item_count is None else self.frame_item_count
+        )
+        if (
+            not isinstance(period_ticks, int)
+            or isinstance(period_ticks, bool)
+            or period_ticks <= 0
+            or not isinstance(frame_item_count, int)
+            or isinstance(frame_item_count, bool)
+            or frame_item_count <= 0
+        ):
+            raise ValueError("stream gap timing/layout metadata must be positive")
+        object.__setattr__(self, "period_ticks", period_ticks)
+        object.__setattr__(self, "frame_item_count", frame_item_count)
         sequence_items = self.sequence_inferred_items
         if sequence_items is None:
             sequence_items = self.missing_frames * self.items_per_frame
@@ -5307,19 +6459,13 @@ class StreamGap:
 
     @property
     def item_period_ticks(self) -> int:
-        return (
-            constants.ADC_PAIR_PERIOD_TICKS
-            if self.kind is constants.FrameKind.ADC_DATA
-            else constants.GPIO_SAMPLE_PERIOD_TICKS
-        )
+        assert self.period_ticks is not None
+        return self.period_ticks
 
     @property
     def items_per_frame(self) -> int:
-        return (
-            constants.ADC_PAIRS_PER_FRAME
-            if self.kind is constants.FrameKind.ADC_DATA
-            else constants.GPIO_SAMPLES_PER_FRAME
-        )
+        assert self.frame_item_count is not None
+        return self.frame_item_count
 
     @property
     def stream(self) -> constants.StreamMask:
@@ -5387,7 +6533,7 @@ class StreamGap:
         period = (
             current.pair_period_ticks
             if isinstance(current, ADCBlock)
-            else constants.GPIO_SAMPLE_PERIOD_TICKS
+            else current.sample_period_ticks
         )
         if tick_delta % period:
             raise ValueError("stream timestamp gap is not sample-period aligned")
@@ -5430,6 +6576,8 @@ class StreamGap:
             source=source,
             sequence_inferred_items=sequence_inferred_items,
             firmware_evidence=evidence,
+            period_ticks=period,
+            frame_item_count=current.item_count,
         )
 
     @classmethod
@@ -5444,6 +6592,22 @@ class StreamGap:
             raise ValueError("cannot compare different stream types")
         if previous.run_id != current.run_id:
             raise ValueError("a run change is an epoch boundary, not a stream gap")
+        previous_period = (
+            previous.pair_period_ticks
+            if isinstance(previous, ADCBlock)
+            else previous.sample_period_ticks
+        )
+        current_period = (
+            current.pair_period_ticks
+            if isinstance(current, ADCBlock)
+            else current.sample_period_ticks
+        )
+        if (
+            previous_period != current_period
+            or previous.item_count != current.item_count
+            or previous.protocol_version != current.protocol_version
+        ):
+            raise ValueError("stream profile changed inside one run")
         expected_sequence = (previous.sequence + 1) & constants.UINT32_MAX
         expected_ticks = previous.end_tick_exclusive
         return cls.from_expected(
@@ -5591,6 +6755,8 @@ class HostQueueLoss:
     firmware_gap_blocks: int = 0
     firmware_overrun_blocks: int = 0
     contiguous: bool = True
+    period_ticks: int | None = None
+    frame_item_count: int | None = None
 
     def __post_init__(self) -> None:
         if any(
@@ -5611,6 +6777,33 @@ class HostQueueLoss:
         object.__setattr__(self, "kind", kind)
         object.__setattr__(self, "source", source)
         object.__setattr__(self, "policy", policy)
+        default_period = (
+            constants.ADC_PAIR_PERIOD_TICKS
+            if kind is constants.FrameKind.ADC_DATA
+            else constants.GPIO_SAMPLE_PERIOD_TICKS
+        )
+        default_count = (
+            constants.ADC_PAIRS_PER_FRAME
+            if kind is constants.FrameKind.ADC_DATA
+            else constants.GPIO_SAMPLES_PER_FRAME
+        )
+        period_ticks = (
+            default_period if self.period_ticks is None else self.period_ticks
+        )
+        frame_item_count = (
+            default_count if self.frame_item_count is None else self.frame_item_count
+        )
+        if (
+            not isinstance(period_ticks, int)
+            or isinstance(period_ticks, bool)
+            or period_ticks <= 0
+            or not isinstance(frame_item_count, int)
+            or isinstance(frame_item_count, bool)
+            or frame_item_count <= 0
+        ):
+            raise ValueError("host queue timing/layout metadata must be positive")
+        object.__setattr__(self, "period_ticks", period_ticks)
+        object.__setattr__(self, "frame_item_count", frame_item_count)
         _unsigned("run_id", self.run_id, 32)
         _unsigned("first_sequence", self.first_sequence, 32)
         _unsigned("last_sequence", self.last_sequence, 32)
@@ -5655,19 +6848,13 @@ class HostQueueLoss:
 
     @property
     def item_period_ticks(self) -> int:
-        return (
-            constants.ADC_PAIR_PERIOD_TICKS
-            if self.kind is constants.FrameKind.ADC_DATA
-            else constants.GPIO_SAMPLE_PERIOD_TICKS
-        )
+        assert self.period_ticks is not None
+        return self.period_ticks
 
     @property
     def items_per_block(self) -> int:
-        return (
-            constants.ADC_PAIRS_PER_FRAME
-            if self.kind is constants.FrameKind.ADC_DATA
-            else constants.GPIO_SAMPLES_PER_FRAME
-        )
+        assert self.frame_item_count is not None
+        return self.frame_item_count
 
     @property
     def origin(self) -> LossOrigin:
@@ -5708,6 +6895,12 @@ class HostQueueLoss:
             firmware_overrun_blocks=int(
                 bool(block.flags & constants.FrameFlag.OVERRUN_BEFORE)
             ),
+            period_ticks=(
+                block.pair_period_ticks
+                if isinstance(block, ADCBlock)
+                else block.sample_period_ticks
+            ),
+            frame_item_count=block.item_count,
         )
 
     def can_merge(self, other: HostQueueLoss) -> bool:
@@ -5715,6 +6908,8 @@ class HostQueueLoss:
             self.kind is other.kind
             and self.source is other.source
             and self.run_id == other.run_id
+            and self.item_period_ticks == other.item_period_ticks
+            and self.items_per_block == other.items_per_block
             and other.first_sequence
             == ((self.last_sequence + 1) & constants.UINT32_MAX)
             and other.first_sample_ticks == self.end_sample_ticks
@@ -5740,6 +6935,8 @@ class HostQueueLoss:
             firmware_overrun_blocks=(
                 self.firmware_overrun_blocks + other.firmware_overrun_blocks
             ),
+            period_ticks=self.item_period_ticks,
+            frame_item_count=self.items_per_block,
         )
 
     def aggregated_with(self, other: HostQueueLoss) -> HostQueueLoss:
@@ -5749,6 +6946,8 @@ class HostQueueLoss:
             self.kind is not other.kind
             or self.source is not other.source
             or self.run_id != other.run_id
+            or self.item_period_ticks != other.item_period_ticks
+            or self.items_per_block != other.items_per_block
         ):
             raise ValueError("cannot aggregate unrelated host queue losses")
         if self.can_merge(other) and self.contiguous and other.contiguous:
@@ -5769,6 +6968,8 @@ class HostQueueLoss:
                 self.firmware_overrun_blocks + other.firmware_overrun_blocks
             ),
             contiguous=False,
+            period_ticks=self.item_period_ticks,
+            frame_item_count=self.items_per_block,
         )
 
 
@@ -5814,7 +7015,7 @@ def analyze_stream_continuity(
     period = (
         current.pair_period_ticks
         if isinstance(current, ADCBlock)
-        else constants.GPIO_SAMPLE_PERIOD_TICKS
+        else current.sample_period_ticks
     )
     if sequence_delta > constants.UINT32_MAX // 2:
         reason = (
@@ -5910,16 +7111,20 @@ ResponseValue = (
     | constants.DeviceState
     | int
 )
-DecodedMessage = AdcBlock | GpioBlock | CommandResponse[ResponseValue] | Frame
+DecodedMessage = AdcBlock | GpioBlock | CommandResponse[ResponseValue] | Frame | V2Frame
 
 
-def decode_response(frame: Frame) -> CommandResponse[ResponseValue]:
+def decode_response(frame: Frame | V2Frame) -> CommandResponse[ResponseValue]:
     """Decode any typed or generic response into a request-correlated model."""
 
+    try:
+        kind = constants.FrameKind(int(frame.header.kind))
+    except ValueError as exc:
+        raise TypeError("frame kind is not supported by the public API") from exc
     response_kinds = set(constants.REQUEST_RESPONSE_KIND.values()) | {
         constants.FrameKind.ERROR_RESPONSE
     }
-    if frame.header.kind not in response_kinds:
+    if kind not in response_kinds:
         raise TypeError("frame is not a command response")
     raw_status, _, raw_error = _RESPONSE_PREFIX.unpack_from(frame.payload)
     status = constants.ResponseStatus(raw_status)
@@ -5928,42 +7133,42 @@ def decode_response(frame: Frame) -> CommandResponse[ResponseValue]:
     rejected_kind: int | None = None
     rejected_version: int | None = None
     if status is constants.ResponseStatus.OK:
-        if frame.header.kind is constants.FrameKind.INFO_RESPONSE:
+        if kind is constants.FrameKind.INFO_RESPONSE:
             value = Info.from_payload(frame.payload)
-        elif frame.header.kind in {
+        elif kind in {
             constants.FrameKind.CONFIGURE_RESPONSE,
             constants.FrameKind.START_RESPONSE,
         }:
             value = Configuration.from_payload(frame.payload[4:])
-        elif frame.header.kind is constants.FrameKind.GET_STATUS_RESPONSE:
+        elif kind is constants.FrameKind.GET_STATUS_RESPONSE:
             value = Status.from_payload(frame.payload)
-        elif frame.header.kind is constants.FrameKind.STOP_RESPONSE:
+        elif kind is constants.FrameKind.STOP_RESPONSE:
             value = constants.DeviceState(
                 frame.payload[constants.STOP_RESPONSE_DEVICE_STATE_OFFSET]
             )
-        elif frame.header.kind is constants.FrameKind.RESET_STATS_RESPONSE:
+        elif kind is constants.FrameKind.RESET_STATS_RESPONSE:
             value = struct.unpack_from(
                 "<I",
                 frame.payload,
                 constants.RESET_STATS_RESPONSE_STATS_GENERATION_OFFSET,
             )[0]
-        elif frame.header.kind is constants.FrameKind.PING_RESPONSE:
+        elif kind is constants.FrameKind.PING_RESPONSE:
             value = struct.unpack_from(
                 "<Q", frame.payload, constants.PING_RESPONSE_NONCE_OFFSET
             )[0]
-        elif frame.header.kind is constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE:
+        elif kind is constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE:
             value = ChecksumBenchmarkResult.from_payload(frame.payload)
-        elif frame.header.kind is constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_RESPONSE:
+        elif kind is constants.FrameKind.GPIO_CLOCK_DIAGNOSTIC_RESPONSE:
             value = GpioClockDiagnosticResult.from_payload(frame.payload)
-        elif frame.header.kind is constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE:
+        elif kind is constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE:
             value = GpioCaptureDiagnosticResult.from_payload(frame.payload)
-    elif frame.header.kind is constants.FrameKind.ERROR_RESPONSE:
+    elif kind is constants.FrameKind.ERROR_RESPONSE:
         rejected_kind = frame.payload[constants.ERROR_RESPONSE_REJECTED_KIND_OFFSET]
         rejected_version = frame.payload[
             constants.ERROR_RESPONSE_REJECTED_VERSION_OFFSET
         ]
     return CommandResponse(
-        kind=frame.header.kind,
+        kind=kind,
         request_id=frame.header.request_id,
         run_id=frame.header.run_id,
         status=status,
@@ -5974,14 +7179,34 @@ def decode_response(frame: Frame) -> CommandResponse[ResponseValue]:
     )
 
 
-def decode_message(frame: Frame) -> DecodedMessage:
+def decode_message(
+    frame: Frame | V2Frame,
+    *,
+    configuration: DAQConfiguration | None = None,
+) -> DecodedMessage:
     """Decode data and response frames; validated request frames remain frames."""
 
-    if frame.header.kind is constants.FrameKind.ADC_DATA:
+    try:
+        kind = constants.FrameKind(int(frame.header.kind))
+    except ValueError:
+        return frame
+    if kind is constants.FrameKind.ADC_DATA:
+        if isinstance(frame, V2Frame):
+            if configuration is None:
+                raise FrameValidationError(
+                    "protocol-v2 ADC_DATA requires negotiated configuration"
+                )
+            return ADCBlock.from_v2_frame(frame, configuration)
         return AdcBlock.from_frame(frame)
-    if frame.header.kind is constants.FrameKind.GPIO_DATA:
+    if kind is constants.FrameKind.GPIO_DATA:
+        if isinstance(frame, V2Frame):
+            if configuration is None:
+                raise FrameValidationError(
+                    "protocol-v2 GPIO_DATA requires negotiated configuration"
+                )
+            return GPIOBlock.from_v2_frame(frame, configuration)
         return GpioBlock.from_frame(frame)
-    if frame.header.kind in set(constants.REQUEST_RESPONSE_KIND.values()) | {
+    if kind in set(constants.REQUEST_RESPONSE_KIND.values()) | {
         constants.FrameKind.ERROR_RESPONSE
     }:
         return decode_response(frame)
@@ -5989,6 +7214,7 @@ def decode_message(frame: Frame) -> DecodedMessage:
 
 
 __all__ = [
+    "RATE_PROFILE_TIMINGS",
     "ADCBlock",
     "AdcAcquisitionStatus",
     "AdcBlock",
@@ -5997,6 +7223,9 @@ __all__ = [
     "AdcChannelView",
     "AdcConverter",
     "AdcSample",
+    "AdcTriggerMetadata",
+    "AuxBankMode",
+    "AuxiliaryInputMetadata",
     "ChecksumBenchmarkRequest",
     "ChecksumBenchmarkResult",
     "CommandResponse",
@@ -6008,6 +7237,7 @@ __all__ = [
     "FirmwareCounters",
     "FirmwareLossEvidence",
     "GPIOBlock",
+    "GPIOLayout",
     "GpioBlock",
     "GpioCaptureDiagnosticResult",
     "GpioChannelView",
@@ -6019,6 +7249,8 @@ __all__ = [
     "Info",
     "LossCounters",
     "LossOrigin",
+    "RateProfile",
+    "RateProfileTiming",
     "ResponseValue",
     "Status",
     "StreamAnomaly",

@@ -16,10 +16,22 @@ from ._generated import protocol_v2_constants as constants
 from ._incremental import BoundedIncrementalParser, BytesLike, ParserCounters
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS, compute_checksum_value
 from .protocol import (
+    ChecksumMismatchError as V1ChecksumMismatchError,
+)
+from .protocol import (
     Frame as V1Frame,
 )
 from .protocol import (
+    FrameHeader as V1FrameHeader,
+)
+from .protocol import (
     FrameValidationError as V1FrameValidationError,
+)
+from .protocol import (
+    _decode_buffered_frame as _decode_buffered_v1_frame,
+)
+from .protocol import (
+    _decode_header as _decode_v1_header,
 )
 from .protocol import (
     decode_frame as decode_v1_frame,
@@ -171,6 +183,7 @@ class V2Frame:
 
 
 CompatibleFrame = V1Frame | V2Frame
+CompatibleFrameHeader = V1FrameHeader | V2FrameHeader
 
 
 def _v1_checksum_algorithm(
@@ -1120,9 +1133,80 @@ class IncrementalV2FrameParser(BoundedIncrementalParser[V2FrameHeader, V2Frame])
         )
 
 
+def _decode_compatible_header(
+    data: bytearray,
+    offset: int = 0,
+) -> CompatibleFrameHeader:
+    """Decode a v1 or v2 header while presenting one validation type."""
+
+    if len(data) - offset <= constants.HEADER_VERSION_OFFSET:
+        raise V2FrameValidationError(
+            "frame does not contain a protocol version",
+            reason="invalid_length",
+            error_code=constants.ErrorCode.INVALID_LENGTH,
+        )
+    version = data[offset + constants.HEADER_VERSION_OFFSET]
+    if version == constants.PROTOCOL_VERSION:
+        return _decode_v2_header(data, offset)
+    if version == v1_constants.PROTOCOL_VERSION:
+        try:
+            return _decode_v1_header(data, offset)
+        except V1FrameValidationError as exc:
+            raise V2FrameValidationError(
+                str(exc),
+                reason="invalid_v1_frame",
+                error_code=constants.ErrorCode(int(exc.error_code)),
+            ) from exc
+    raise V2FrameValidationError(
+        f"unsupported protocol version {version}",
+        reason="unsupported_version",
+        error_code=constants.ErrorCode.UNSUPPORTED_VERSION,
+    )
+
+
+def _decode_buffered_compatible_frame(
+    buffer: bytearray,
+    offset: int,
+    header: CompatibleFrameHeader,
+) -> CompatibleFrame:
+    if isinstance(header, V2FrameHeader):
+        return _decode_buffered_v2_frame(buffer, offset, header)
+    try:
+        return _decode_buffered_v1_frame(buffer, offset, header)
+    except V1ChecksumMismatchError as exc:
+        raise V2ChecksumMismatchError(exc.expected, exc.observed) from exc
+    except V1FrameValidationError as exc:
+        raise V2FrameValidationError(
+            str(exc),
+            reason="invalid_v1_frame",
+            error_code=constants.ErrorCode(int(exc.error_code)),
+        ) from exc
+
+
+class IncrementalCompatibleFrameParser(
+    BoundedIncrementalParser[CompatibleFrameHeader, CompatibleFrame]
+):
+    """Boundedly parse interleaved v1 and explicitly negotiated v2 frames."""
+
+    max_buffered_bytes = MAX_V2_BUFFERED_BYTES
+
+    def __init__(self) -> None:
+        super().__init__(
+            magic_bytes=constants.MAGIC_BYTES,
+            header_size=constants.HEADER_SIZE,
+            max_frame_bytes=_MAX_FRAME_BYTES,
+            decode_header=_decode_compatible_header,
+            decode_frame=_decode_buffered_compatible_frame,
+            validation_error=V2FrameValidationError,
+            checksum_error=V2ChecksumMismatchError,
+        )
+
+
 __all__ = [
     "MAX_V2_BUFFERED_BYTES",
     "CompatibleFrame",
+    "CompatibleFrameHeader",
+    "IncrementalCompatibleFrameParser",
     "IncrementalV2FrameParser",
     "ParserCounters",
     "V2ChecksumMismatchError",

@@ -10,6 +10,7 @@ from types import TracebackType
 from typing import Literal, TypeAlias
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .models import (
     AdcBlock,
     CommandResponse,
@@ -21,10 +22,14 @@ from .models import (
     decode_message,
 )
 from .protocol import (
-    Frame,
     IncrementalFrameParser,
     ParserCounters,
     encode_frame,
+)
+from .protocol_v2 import (
+    CompatibleFrame,
+    IncrementalCompatibleFrameParser,
+    encode_v2_frame,
 )
 from .transport import (
     ByteTransport,
@@ -37,7 +42,7 @@ from .transport import (
 DataBlock: TypeAlias = AdcBlock | GpioBlock
 ReaderStreamReport: TypeAlias = HostQueueLoss | StreamAnomaly
 ReaderStreamItem: TypeAlias = DataBlock | ReaderStreamReport
-ReaderEvent: TypeAlias = Frame
+ReaderEvent: TypeAlias = CompatibleFrame
 DEFAULT_MAX_QUEUED_BLOCKS = 512
 
 
@@ -195,7 +200,7 @@ class BackgroundReader:
         queue_timeout: float = 1.0,
         shutdown_timeout: float = 1.0,
         idle_sleep: float = 0.001,
-        parser: IncrementalFrameParser | None = None,
+        parser: IncrementalFrameParser | IncrementalCompatibleFrameParser | None = None,
     ) -> None:
         integer_limits = {
             "read_size": read_size,
@@ -230,7 +235,9 @@ class BackgroundReader:
         self._queue_timeout = float(queue_timeout)
         self._shutdown_timeout = float(shutdown_timeout)
         self._idle_sleep = float(idle_sleep)
-        self._parser = parser if parser is not None else IncrementalFrameParser()
+        self._parser = (
+            parser if parser is not None else IncrementalCompatibleFrameParser()
+        )
         self._read_buffer = bytearray(read_size)
 
         self._condition = Condition(RLock())
@@ -243,6 +250,7 @@ class BackgroundReader:
         self._next_request_id = 1
         self._active_run_id = 0
         self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
+        self._active_configuration: DAQConfiguration | None = None
         self._stream_active = False
         self._thread: Thread | None = None
         self._started = False
@@ -321,7 +329,19 @@ class BackgroundReader:
     def parser_counters(self) -> ParserCounters:
         """Return the independent incremental-parser counter snapshot."""
 
-        return self._parser.counters
+        snapshot = self._parser.counters
+        return ParserCounters(
+            bytes_received=snapshot.bytes_received,
+            frames_decoded=snapshot.frames_decoded,
+            corruption_events=snapshot.corruption_events,
+            header_errors=snapshot.header_errors,
+            checksum_errors=snapshot.checksum_errors,
+            payload_errors=snapshot.payload_errors,
+            resynchronizations=snapshot.resynchronizations,
+            bytes_discarded=snapshot.bytes_discarded,
+            buffered_bytes=snapshot.buffered_bytes,
+            high_water_mark=snapshot.high_water_mark,
+        )
 
     @property
     def counters(self) -> ReaderCounters:
@@ -389,6 +409,7 @@ class BackgroundReader:
         payload: bytes | bytearray | memoryview = b"",
         *,
         timeout: float | None = None,
+        protocol_version: int = constants.PROTOCOL_VERSION,
     ) -> CommandResponse[ResponseValue]:
         """Send one command and wait for its request-ID-correlated response."""
 
@@ -398,6 +419,11 @@ class BackgroundReader:
             raise ValueError(f"unknown request frame kind {int(kind)}") from error
         if selected_kind not in constants.REQUEST_RESPONSE_KIND:
             raise ValueError(f"{selected_kind.name} is not a request frame kind")
+        if protocol_version not in {
+            constants.PROTOCOL_VERSION,
+            v2_constants.PROTOCOL_VERSION,
+        } or isinstance(protocol_version, bool):
+            raise ValueError("protocol_version must be 1 or 2")
         selected_timeout = self._resolve_timeout(timeout, self._request_timeout)
 
         with self._condition:
@@ -414,10 +440,18 @@ class BackgroundReader:
                 deadline=monotonic() + selected_timeout,
                 timeout=selected_timeout,
             )
-            wire = encode_frame(
-                selected_kind,
-                payload,
-                request_id=request_id,
+            wire = (
+                encode_frame(
+                    selected_kind,
+                    payload,
+                    request_id=request_id,
+                )
+                if protocol_version == constants.PROTOCOL_VERSION
+                else encode_v2_frame(
+                    v2_constants.FrameKind(int(selected_kind)),
+                    payload,
+                    request_id=request_id,
+                )
             )
             self._pending[request_id] = pending
             self._pending_request_high_water = max(
@@ -574,6 +608,7 @@ class BackgroundReader:
         checksum_algorithm: constants.ChecksumAlgorithm = (
             constants.DEFAULT_CHECKSUM_ALGORITHM
         ),
+        configuration: DAQConfiguration | None = None,
     ) -> None:
         """Establish an externally learned run identity and clear old blocks."""
 
@@ -587,9 +622,13 @@ class BackgroundReader:
             raise ValueError("active checksum algorithm is not supported") from exc
         if selected_checksum not in constants.SUPPORTED_CHECKSUM_ALGORITHMS:
             raise ValueError("active checksum algorithm is not supported")
+        if configuration is not None and not isinstance(
+            configuration, DAQConfiguration
+        ):
+            raise TypeError("configuration must be DAQConfiguration or None")
         with self._condition:
             self._require_live_locked()
-            self._activate_run_locked(run_id, selected_checksum)
+            self._activate_run_locked(run_id, selected_checksum, configuration)
 
     def deactivate_stream(self) -> None:
         """Cancel block waiters and discard blocks at a deliberate boundary."""
@@ -731,7 +770,10 @@ class BackgroundReader:
                 if self._stop_event.is_set():
                     return
                 try:
-                    message = decode_message(frame)
+                    message = decode_message(
+                        frame,
+                        configuration=self._active_configuration,
+                    )
                     with self._condition:
                         self._frames_received += 1
                     if isinstance(message, CommandResponse):
@@ -789,6 +831,7 @@ class BackgroundReader:
                         self._activate_run_locked(
                             response.run_id,
                             response.value.data_checksum_algorithm,
+                            response.value,
                         )
                 elif response.ok and response.kind is constants.FrameKind.STOP_RESPONSE:
                     self._deactivate_stream_locked()
@@ -996,7 +1039,7 @@ class BackgroundReader:
 
     def _attach_evidence(self, error: ReaderError) -> None:
         error.reader_counters = self.counters
-        error.parser_counters = self._parser.counters
+        error.parser_counters = self.parser_counters
 
     def _fail_all_pending_locked(self, error: ReaderError) -> None:
         pending_requests = tuple(self._pending.values())
@@ -1010,6 +1053,7 @@ class BackgroundReader:
         self,
         run_id: int,
         checksum_algorithm: constants.ChecksumAlgorithm,
+        configuration: DAQConfiguration | None = None,
     ) -> None:
         if run_id == 0:
             raise ReaderProtocolError("successful START established run ID zero")
@@ -1022,6 +1066,7 @@ class BackgroundReader:
         self._stream_reports.clear()
         self._active_run_id = run_id
         self._active_checksum_algorithm = checksum_algorithm
+        self._active_configuration = configuration
         self._stream_active = True
         self._condition.notify_all()
 
@@ -1031,6 +1076,7 @@ class BackgroundReader:
         self._stream_reports.clear()
         self._stream_active = False
         self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
+        self._active_configuration = None
         self._condition.notify_all()
 
     def _record_boundary_blocks_locked(self) -> None:
