@@ -1,0 +1,1603 @@
+{
+  "acceptance": [
+    {
+      "description": "The matrix and report validate fail closed with no unknown state, level, metric, check, or limitation identifiers.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": true,
+      "id": "schema_valid",
+      "observed": {
+        "matrix": true,
+        "normalized_report": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Required Git, source, protocol, toolchain, branch, and baseline identities are present and syntactically valid.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": [
+        "repository",
+        "branch",
+        "baseline_branch",
+        "baseline_commit",
+        "source_commit",
+        "source_tree",
+        "source_clean",
+        "source_id",
+        "protocol_contract_path",
+        "protocol_version",
+        "protocol_sha256",
+        "toolchains"
+      ],
+      "id": "identity_complete",
+      "observed": {
+        "baseline_branch": "experiment/baseline-2026-09-01",
+        "baseline_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+        "branch": "main",
+        "protocol_contract_path": "protocol/protocol-v1.json",
+        "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "protocol_version": 1,
+        "repository": "https://github.com/ThingDone/thingdaq.git",
+        "source_clean": true,
+        "source_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+        "source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673",
+        "source_tree": "78da91a8ecd9642b4efd695c65feeafea422314a",
+        "toolchains": [
+          {
+            "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+            "name": "arduino-cli",
+            "version": "1.4.1"
+          },
+          {
+            "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+            "name": "arm-none-eabi-g++",
+            "version": "15.2.1"
+          },
+          {
+            "identity": "CPython 3.12.3",
+            "name": "python",
+            "version": "3.12.3"
+          },
+          {
+            "identity": "teensy:avr 1.62.0",
+            "name": "teensy-core",
+            "version": "1.62.0"
+          }
+        ]
+      },
+      "operator": "present",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Tracked canonical evidence was generated from the declared clean source commit and tree.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": true,
+      "id": "provenance_clean",
+      "observed": true,
+      "operator": "eq",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every referenced input, firmware, map, manifest, and output artifact matches its declared SHA-256 and size.",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "expected": {
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "27ebd95e21a2057c332167f4c528e9d5fa42b3c6d7e99fb5262bbe0a449b1882",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "b3ae54862e9f6360b3623614bdf69c6aaf9fdf2476dda65829b49514d3fbaa4c",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "8566e88fd27f3fef07ae0ada3bca928a545851f6e0eb3d509dbec71df2f3ff44"
+      },
+      "id": "artifact_hashes_verified",
+      "observed": {
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "27ebd95e21a2057c332167f4c528e9d5fa42b3c6d7e99fb5262bbe0a449b1882",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "b3ae54862e9f6360b3623614bdf69c6aaf9fdf2476dda65829b49514d3fbaa4c",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "8566e88fd27f3fef07ae0ada3bca928a545851f6e0eb3d509dbec71df2f3ff44"
+      },
+      "operator": "hash_equal",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "The exact declared firmware profile compiles with the pinned toolchain without enumerating hardware or uploading firmware.",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "expected": true,
+      "id": "firmware_build_no_upload",
+      "observed": {
+        "compile_completed": true,
+        "exact_fqbn": true,
+        "network_unused": true,
+        "serial_hardware_unused": true,
+        "upload_unused": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Two renders from identical normalized inputs are byte-identical JSON and Markdown.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": {
+        "json": "byte-identical",
+        "markdown": "byte-identical"
+      },
+      "id": "deterministic_output",
+      "observed": {
+        "json": "byte-identical",
+        "markdown": "byte-identical"
+      },
+      "operator": "byte_equal",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "INFO, CONFIGURE, START, bounded data capture, STATUS, STOP, and cleanup complete in the declared order.",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "expected": true,
+      "id": "lifecycle_complete",
+      "observed": {
+        "bounded_capture": true,
+        "configure": true,
+        "final_status": true,
+        "info": true,
+        "running_status": true,
+        "start": true,
+        "stop": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every validated synthetic ADC pair and GPIO sample matches the declared deterministic formula and chronology.",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "expected": "every logical item and timestamp matched",
+      "id": "synthetic_formulas_exact",
+      "observed": "every logical item and timestamp matched",
+      "operator": "eq",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Sequence gaps, loss, parser errors, transport errors, host-queue drops, and unexplained firmware errors are zero unless a named negative case declares and reconciles them.",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "expected": true,
+      "id": "stream_health",
+      "observed": {
+        "firmware_drops_zero": true,
+        "gaps_zero": true,
+        "host_queue_drops_zero": true,
+        "parser_errors_zero": true,
+        "transport_errors_zero": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "All applicable frame, item, payload-byte, framed-byte, queue, loss, and source-stage equations are exact and nonsaturated.",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "expected": true,
+      "id": "counter_conservation",
+      "observed": {
+        "adc_firmware_to_wire_frames": {
+          "left": 128,
+          "right": 128
+        },
+        "adc_framed_bytes": {
+          "left": 524288,
+          "right": 524288
+        },
+        "adc_items": {
+          "left": 129536,
+          "right": 129536
+        },
+        "adc_payload_bytes": {
+          "left": 518144,
+          "right": 518144
+        },
+        "adc_wire_to_consumer_frames": {
+          "left": 128,
+          "right": 128
+        },
+        "combined_framed_bytes": {
+          "left": 1048576,
+          "right": 1048576
+        },
+        "combined_payload_bytes": {
+          "left": 1036288,
+          "right": 1036288
+        },
+        "gpio_firmware_to_wire_frames": {
+          "left": 128,
+          "right": 128
+        },
+        "gpio_framed_bytes": {
+          "left": 524288,
+          "right": 524288
+        },
+        "gpio_items": {
+          "left": 518144,
+          "right": 518144
+        },
+        "gpio_payload_bytes": {
+          "left": 518144,
+          "right": 518144
+        },
+        "gpio_wire_to_consumer_frames": {
+          "left": 128,
+          "right": 128
+        }
+      },
+      "operator": "exact_conservation",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every observed queue depth and high-water value is at or below its same-artifact advertised capacity.",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "expected": 1.0,
+      "id": "queue_bounds",
+      "observed": 0.9992681141741888,
+      "operator": "lte",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "STOP and final cleanup leave IDLE with every required ownership and transport gauge at zero.",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "expected": true,
+      "id": "final_idle_cleanup",
+      "observed": {
+        "all_gauges_zero": true,
+        "state_idle": true,
+        "stream_mask_empty": true,
+        "transport_closed": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every required limitation is explicit and no conclusion exceeds the evidence level that supports it.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": true,
+      "id": "claim_scope_complete",
+      "observed": {
+        "analog_performance_untested": true,
+        "build_is_not_target_runtime": true,
+        "cross_branch_combinations_untested": true,
+        "external_gpio_timing_untested": true,
+        "live_usb_untested": true,
+        "simulation_is_not_physical": true,
+        "temperature_power_lifetime_scope": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "state": "PASS"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "firmware-build-manifest",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+      "sha256": "27ebd95e21a2057c332167f4c528e9d5fa42b3c6d7e99fb5262bbe0a449b1882",
+      "size_bytes": 12733
+    },
+    {
+      "kind": "firmware-eep",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep",
+      "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+      "size_bytes": 34
+    },
+    {
+      "kind": "firmware-elf",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf",
+      "sha256": "b3ae54862e9f6360b3623614bdf69c6aaf9fdf2476dda65829b49514d3fbaa4c",
+      "size_bytes": 1805372
+    },
+    {
+      "kind": "firmware-hex",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
+      "sha256": "da645bafbf05cd342ef069a17de35ecbfd7ec6f485365cedc571d01ee87415e3",
+      "size_bytes": 357227
+    },
+    {
+      "kind": "firmware-map",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
+      "sha256": "8566e88fd27f3fef07ae0ada3bca928a545851f6e0eb3d509dbec71df2f3ff44",
+      "size_bytes": 828461
+    }
+  ],
+  "created": "2026-09-01",
+  "evidence": [
+    {
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/experiment_evidence.py",
+          "--report",
+          "baseline-input.json"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "evidence-framework",
+      "inputs": [
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        },
+        {
+          "path": "firmware/tools/experiment_evidence.py",
+          "sha256": "c3c0fe5813c72bad3bf5f0b0eab3dc5823f97aca680defaade14710491e152e8"
+        }
+      ],
+      "level": "host",
+      "method": "Fail-closed matrix validation followed by two canonical JSON and Markdown renders before atomic replacement.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "Python 3.12.3"
+    },
+    {
+      "clocks_hz": {
+        "adc": 37500000,
+        "cpu": 600000000,
+        "ipg": 150000000,
+        "pit": 24000000
+      },
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/build_firmware.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "firmware_build_id": "thingdaq-e27556de5b898f28",
+      "firmware_source_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+      "firmware_source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673",
+      "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "firmware-build",
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+          "sha256": "27ebd95e21a2057c332167f4c528e9d5fa42b3c6d7e99fb5262bbe0a449b1882"
+        },
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
+          "sha256": "8566e88fd27f3fef07ae0ada3bca928a545851f6e0eb3d509dbec71df2f3ff44"
+        },
+        {
+          "path": "firmware/tools/build_firmware.py",
+          "sha256": "61cbd926f714ee594a6a31e68c462efb241cab6840ed73ef92d3a8c30210ba71"
+        },
+        {
+          "path": "protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+        }
+      ],
+      "level": "host",
+      "memory_bytes": {
+        "flash_headroom": 1904644,
+        "flash_used": 126972,
+        "ram1_headroom": 34528,
+        "ram1_used": 489760,
+        "ram2_headroom": 4096,
+        "ram2_used": 520192
+      },
+      "method": "Pinned no-upload Teensy 4.0 compilation, manifest hash validation, linker-map inspection, and memory/resource accounting.",
+      "reason": null,
+      "resource_map": {
+        "adc_dma_buffers": {
+          "allocations": {
+            "DESCRIPTORS": {
+              "address": "0x2025f000",
+              "alignment_bytes": 32,
+              "bytes": 768,
+              "range_end_exclusive": "0x20280000",
+              "range_start": "0x20200000",
+              "symbol": "thingdaq::adc_capture::g_adc_dma_descriptors",
+              "symbol_type": "B"
+            },
+            "OVERFLOW_SINK": {
+              "address": "0x2025f300",
+              "alignment_bytes": 32,
+              "bytes": 32,
+              "range_end_exclusive": "0x20280000",
+              "range_start": "0x20200000",
+              "symbol": "thingdaq::adc_capture::g_adc_dma_overflow_sink",
+              "symbol_type": "B"
+            },
+            "RING": {
+              "address": "0x2025f320",
+              "alignment_bytes": 32,
+              "bytes": 32512,
+              "range_end_exclusive": "0x20280000",
+              "range_start": "0x20200000",
+              "symbol": "thingdaq::adc_capture::g_adc_dma_buffers",
+              "symbol_type": "B"
+            }
+          },
+          "total_bytes": 33312
+        },
+        "checksum_benchmark_buffers": {
+          "regions": {
+            "DTCM_PACKET": {
+              "address": "0x2006aae0",
+              "alignment_bytes": 32,
+              "bytes": 4096,
+              "range_end_exclusive": "0x20200000",
+              "range_start": "0x20000000",
+              "symbol": "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer",
+              "symbol_type": "B"
+            },
+            "OCRAM_DMA": {
+              "address": "0x20267220",
+              "alignment_bytes": 32,
+              "bytes": 4096,
+              "range_end_exclusive": "0x20280000",
+              "range_start": "0x20200000",
+              "symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer",
+              "symbol_type": "B"
+            }
+          },
+          "working_ram_bytes": 8192
+        },
+        "checksum_resources": {
+          "algorithms": {
+            "ADLER32": {
+              "code_address": "0x00001000",
+              "code_symbol": "thingdaq::checksum::adler32(unsigned char const*, unsigned int)",
+              "code_symbol_type": "T",
+              "implementation": "arithmetic (no lookup table)",
+              "implementation_code_bytes": 120,
+              "table_flash_bytes": 0,
+              "table_ram_bytes": 0
+            },
+            "CRC32C": {
+              "address": "0x600125b4",
+              "code_address": "0x00001078",
+              "code_symbol": "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)",
+              "code_symbol_type": "T",
+              "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+              "implementation_code_bytes": 308,
+              "symbol": "thingdaq::checksum::detail::kCrc32cTable",
+              "symbol_type": "R",
+              "table_flash_bytes": 8192,
+              "table_ram_bytes": 0
+            },
+            "CRC32_ISO_HDLC": {
+              "address": "0x600105b4",
+              "code_address": "0x000011ac",
+              "code_symbol": "thingdaq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
+              "code_symbol_type": "T",
+              "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+              "implementation_code_bytes": 308,
+              "symbol": "thingdaq::checksum::detail::kCrc32IsoHdlcTable",
+              "symbol_type": "R",
+              "table_flash_bytes": 8192,
+              "table_ram_bytes": 0
+            }
+          },
+          "placement": "memory-mapped program flash (.progmem.checksum.*)",
+          "shared_dispatch": {
+            "address": "0x000012e0",
+            "code_bytes": 84,
+            "symbol": "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
+            "symbol_type": "T"
+          },
+          "total_implementation_code_bytes": 736,
+          "total_table_flash_bytes": 16384,
+          "total_table_ram_bytes": 0
+        },
+        "gpio_clock_diagnostic_buffer": {
+          "address": "0x2026c1a0",
+          "alignment_bytes": 32,
+          "bytes": 32,
+          "range_end_exclusive": "0x20280000",
+          "range_start": "0x20200000",
+          "symbol": "thingdaq::gpio_clock::g_gpio_clock_diagnostic_buffer",
+          "symbol_type": "B"
+        },
+        "gpio_packed_buffers": {
+          "address": "0x20268220",
+          "alignment_bytes": 32,
+          "buffers": 4,
+          "bytes": 16256,
+          "payload_bytes_per_buffer": 4048,
+          "range_end_exclusive": "0x20280000",
+          "range_start": "0x20200000",
+          "stride_bytes": 4064,
+          "symbol": "thingdaq::gpio_packer::g_gpio_packed_buffers",
+          "symbol_type": "B"
+        },
+        "gpio_raw_dma_buffers": {
+          "allocations": {
+            "DESCRIPTORS": {
+              "address": "0x2026c1c0",
+              "alignment_bytes": 32,
+              "bytes": 160,
+              "range_end_exclusive": "0x20280000",
+              "range_start": "0x20200000",
+              "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_descriptors",
+              "symbol_type": "B"
+            },
+            "OVERFLOW_SINK": {
+              "address": "0x2026c260",
+              "alignment_bytes": 32,
+              "bytes": 32,
+              "range_end_exclusive": "0x20280000",
+              "range_start": "0x20200000",
+              "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_overflow_sink",
+              "symbol_type": "B"
+            },
+            "RING": {
+              "address": "0x2026c280",
+              "alignment_bytes": 32,
+              "bytes": 64768,
+              "range_end_exclusive": "0x20280000",
+              "range_start": "0x20200000",
+              "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_buffers",
+              "symbol_type": "B"
+            }
+          },
+          "total_bytes": 64960
+        },
+        "packet_buffers": {
+          "banks": {
+            "DTCM_PRIMARY": {
+              "address": "0x20001ac0",
+              "alignment_bytes": 32,
+              "bytes": 430080,
+              "frames": 105,
+              "range_end_exclusive": "0x20200000",
+              "range_start": "0x20000000",
+              "symbol": "(anonymous namespace)::packet_storage_primary",
+              "symbol_type": "b"
+            },
+            "OCRAM_RESERVE": {
+              "address": "0x20200000",
+              "alignment_bytes": 32,
+              "bytes": 389120,
+              "frames": 95,
+              "range_end_exclusive": "0x20280000",
+              "range_start": "0x20200000",
+              "symbol": "(anonymous namespace)::packet_storage_reserve",
+              "symbol_type": "b"
+            }
+          },
+          "total_bytes": 819200,
+          "total_frames": 200
+        }
+      },
+      "result": "PASS",
+      "toolchain_identity": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std; Teensy core 1.62.0; Arm GNU 15.2.1"
+    },
+    {
+      "chronology": {
+        "adc_first_sequence": 0,
+        "adc_last_sequence": 127,
+        "end_tick_exclusive": 1036288,
+        "first_sample_tick": 0,
+        "gpio_first_sequence": 0,
+        "gpio_last_sequence": 127,
+        "timestamp_hz": 8000000
+      },
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/baseline_prototype.py",
+          "--frame-budget",
+          "256",
+          "--parser-chunk-size",
+          "47",
+          "--status-every-frames",
+          "32"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "command_latency": {
+        "clock_basis": "deterministic logical simulator clock advancing 1 millisecond per observation",
+        "command_counts": {
+          "CONFIGURE": 1,
+          "START": 1,
+          "STATUS": 11,
+          "STOP": 1
+        },
+        "info_milliseconds": 1.0000000000047748,
+        "maximum_milliseconds": 1.0000000000047748,
+        "p99_milliseconds": 1.0000000000047748,
+        "retained_measurements": 14
+      },
+      "conservation": {
+        "adc_firmware_to_wire_frames": {
+          "left": 128,
+          "right": 128
+        },
+        "adc_framed_bytes": {
+          "left": 524288,
+          "right": 524288
+        },
+        "adc_items": {
+          "left": 129536,
+          "right": 129536
+        },
+        "adc_payload_bytes": {
+          "left": 518144,
+          "right": 518144
+        },
+        "adc_wire_to_consumer_frames": {
+          "left": 128,
+          "right": 128
+        },
+        "combined_framed_bytes": {
+          "left": 1048576,
+          "right": 1048576
+        },
+        "combined_payload_bytes": {
+          "left": 1036288,
+          "right": 1036288
+        },
+        "gpio_firmware_to_wire_frames": {
+          "left": 128,
+          "right": 128
+        },
+        "gpio_framed_bytes": {
+          "left": 524288,
+          "right": 524288
+        },
+        "gpio_items": {
+          "left": 518144,
+          "right": 518144
+        },
+        "gpio_payload_bytes": {
+          "left": 518144,
+          "right": 518144
+        },
+        "gpio_wire_to_consumer_frames": {
+          "left": 128,
+          "right": 128
+        }
+      },
+      "counter_snapshot": {
+        "firmware_faults": [],
+        "host_parser": {
+          "buffered_bytes": 0,
+          "bytes_discarded": 0,
+          "bytes_received": 1064060,
+          "checksum_errors": 0,
+          "corruption_events": 0,
+          "frames_decoded": 273,
+          "header_errors": 0,
+          "high_water_mark": 4096,
+          "payload_errors": 0,
+          "resynchronizations": 0
+        },
+        "host_reader": {
+          "adc_block_queue_drops": 0,
+          "adc_boundary_blocks_discarded": 0,
+          "adc_frames_received": 128,
+          "adc_item_queue_drops": 0,
+          "adc_stale_blocks_discarded": 0,
+          "block_queue_high_water": 1,
+          "boundary_blocks_discarded": 0,
+          "bytes_read": 1064060,
+          "disconnects": 0,
+          "event_queue_high_water": 0,
+          "frames_received": 273,
+          "gpio_block_queue_drops": 0,
+          "gpio_boundary_blocks_discarded": 0,
+          "gpio_frames_received": 128,
+          "gpio_item_queue_drops": 0,
+          "gpio_stale_blocks_discarded": 0,
+          "host_block_queue_drops": 0,
+          "host_event_queue_drops": 0,
+          "late_responses": 0,
+          "loss_report_queue_drops": 0,
+          "maximum_read_bytes": 47,
+          "pending_request_high_water": 1,
+          "pending_requests": 0,
+          "protocol_failures": 0,
+          "queue_wait_timeouts": 0,
+          "queued_blocks": 0,
+          "queued_events": 0,
+          "queued_loss_reports": 0,
+          "request_timeouts": 0,
+          "responses_matched": 17,
+          "stale_blocks_discarded": 0
+        },
+        "reconciliation": {
+          "adc_boundary_discards": 0,
+          "adc_firmware_frames_emitted": 128,
+          "adc_host_queue_drops": 0,
+          "adc_stale_discards": 0,
+          "adc_validated_frames": 128,
+          "adc_wire_frames_received": 128,
+          "firmware_adc_items_dropped": 0,
+          "firmware_gpio_items_dropped": 0,
+          "firmware_parser_errors": 0,
+          "firmware_transport_errors": 0,
+          "gpio_boundary_discards": 0,
+          "gpio_firmware_frames_emitted": 128,
+          "gpio_host_queue_drops": 0,
+          "gpio_stale_discards": 0,
+          "gpio_validated_frames": 128,
+          "gpio_wire_frames_received": 128,
+          "host_event_queue_drops": 0,
+          "host_parser_errors": 0,
+          "issues": []
+        },
+        "sequence_gaps": {
+          "adc": 0,
+          "gpio": 0,
+          "total": 0
+        }
+      },
+      "deterministic_budget": "256 complete frames; 128 ADC and 128 GPIO",
+      "final_gauges": {
+        "adc_packet_filling_depth": 0,
+        "adc_raw_ready_depth": 0,
+        "gpio_packed_ready_depth": 0,
+        "gpio_packet_filling_depth": 0,
+        "gpio_raw_ready_depth": 0,
+        "host_pending_requests": 0,
+        "host_queued_blocks": 0,
+        "host_queued_events": 0,
+        "packet_owned_depth": 0,
+        "packet_ready_depth": 0,
+        "packet_transmit_depth": 0,
+        "parser_buffered_bytes": 0,
+        "usb_command_queue_depth": 0,
+        "usb_lower_priority_queue_depth": 0,
+        "usb_response_queue_depth": 0
+      },
+      "id": "simulator-capture",
+      "inputs": [
+        {
+          "path": "daq_api/src/thingdaq/client.py",
+          "sha256": "1fcb1ef47b74c9a2ca0320378dd46f78583493ed21edadeeea86873c93408e66"
+        },
+        {
+          "path": "daq_api/src/thingdaq/simulator.py",
+          "sha256": "238727e479defa2077be763c37250607f1d4576f3b34b010b1220eb3da50f6c4"
+        },
+        {
+          "path": "daq_api/src/thingdaq/streaming.py",
+          "sha256": "5f296e4dd1db6fce990fffc89cfb8dd0e141a1e29d5ca236257cd7cc4fa91ae0"
+        },
+        {
+          "path": "daq_api/src/thingdaq/synthetic.py",
+          "sha256": "1c0dea74d05c50111c699edaf7ff70cb4dcbcdedf8345f3f6e99621cfa66e311"
+        },
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        },
+        {
+          "path": "firmware/tools/baseline_prototype.py",
+          "sha256": "5a35bff1deadca8bdac76923311552f20533942d3ccbbcd2666e77228e5bf1cc"
+        },
+        {
+          "path": "protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+        }
+      ],
+      "level": "simulated",
+      "maximum_profile": {
+        "adc_pair_rate_hz": 1000000,
+        "adc_resolution_bits": 12,
+        "gpio_sample_rate_hz": 4000000,
+        "stream_mask": 3
+      },
+      "method": "Public ThingDAQ facade over the deterministic in-memory protocol peer, with strict per-item formulas, chronology, health, STOP/drain, and exact counter reconciliation.",
+      "protocol_identity": "protocol-v1 sha256:014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+      "queue_bounds": [
+        {
+          "capacity": 512,
+          "name": "host_blocks",
+          "observed": 1
+        },
+        {
+          "capacity": 32,
+          "name": "host_events",
+          "observed": 0
+        },
+        {
+          "capacity": 4099,
+          "name": "host_parser_bytes",
+          "observed": 4096
+        },
+        {
+          "capacity": 32,
+          "name": "host_pending_requests",
+          "observed": 1
+        },
+        {
+          "capacity": 200,
+          "name": "packet_owned",
+          "observed": 0
+        },
+        {
+          "capacity": 200,
+          "name": "packet_ready",
+          "observed": 0
+        },
+        {
+          "capacity": 200,
+          "name": "packet_transmit",
+          "observed": 0
+        },
+        {
+          "capacity": 4099,
+          "name": "parser_current_bytes",
+          "observed": 0
+        },
+        {
+          "capacity": 512,
+          "name": "reader_current_blocks",
+          "observed": 0
+        },
+        {
+          "capacity": 4,
+          "name": "usb_command",
+          "observed": 0
+        },
+        {
+          "capacity": 4,
+          "name": "usb_response",
+          "observed": 0
+        }
+      ],
+      "reason": null,
+      "result": "PASS",
+      "simulator_identity": "thingdaq-simulator-v1; SIMULATOR; SIMULATED",
+      "transport_closed": true
+    }
+  ],
+  "experiment_id": "baseline",
+  "identity": {
+    "baseline_branch": "experiment/baseline-2026-09-01",
+    "baseline_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+    "branch": "main",
+    "protocol_contract_path": "protocol/protocol-v1.json",
+    "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+    "protocol_version": 1,
+    "repository": "https://github.com/ThingDone/thingdaq.git",
+    "source_clean": true,
+    "source_commit": "ee23f78546afae1274a0b0f013d69b8a19b08c58",
+    "source_id": "e27556de5b898f281dfbae8a9a1fefb486a4fa38a885516e2fac5ce6974ba673",
+    "source_tree": "78da91a8ecd9642b4efd695c65feeafea422314a",
+    "toolchains": [
+      {
+        "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+        "name": "arduino-cli",
+        "version": "1.4.1"
+      },
+      {
+        "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "name": "arm-none-eabi-g++",
+        "version": "15.2.1"
+      },
+      {
+        "identity": "CPython 3.12.3",
+        "name": "python",
+        "version": "3.12.3"
+      },
+      {
+        "identity": "teensy:avr 1.62.0",
+        "name": "teensy-core",
+        "version": "1.62.0"
+      }
+    ]
+  },
+  "limitations": [
+    {
+      "applies_to_evidence_levels": [
+        "simulated"
+      ],
+      "id": "simulation_is_not_physical",
+      "statement": "Simulator evidence does not establish firmware target timing, USB behavior, electrical behavior, or physical signal quality."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "host"
+      ],
+      "id": "build_is_not_target_runtime",
+      "statement": "A no-upload build and linker/map inspection do not establish that the artifact ran correctly on a Teensy or over USB."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig"
+      ],
+      "id": "analog_performance_untested",
+      "statement": "Unstimulated or synthetic data do not establish ADC accuracy, noise, ENOB, linearity, bandwidth, source tolerance, or true aperture timing."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig"
+      ],
+      "id": "external_gpio_timing_untested",
+      "statement": "Without a declared external stimulus, evidence does not establish pad mapping, voltage thresholds, transition timing, jitter, or signal integrity."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "simulated",
+        "host"
+      ],
+      "id": "live_usb_untested",
+      "statement": "In-memory transport and host-only evidence do not establish sustained behavior on a live USB controller or operating system."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "id": "temperature_power_lifetime_scope",
+      "statement": "On-chip temperature is not ambient temperature, power, junction characterization, or evidence of part lifetime; those claims require separately declared evidence."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "id": "cross_branch_combinations_untested",
+      "statement": "Independent candidate results do not establish that clock, compression, auxiliary input, and auxiliary output changes work together in one artifact."
+    }
+  ],
+  "matrix_schema_version": 1,
+  "metrics": [
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "measurement_duration_seconds",
+      "scope": "streaming_window",
+      "unit": "second",
+      "value": 0.129536
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_pairs_observed",
+      "scope": "streaming_window",
+      "unit": "adc_pair",
+      "value": 129536
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_samples_observed",
+      "scope": "streaming_window",
+      "unit": "gpio_sample",
+      "value": 518144
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_frames_observed",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 128
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_frames_observed",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 128
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 518144
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 518144
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "combined_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 1036288
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 524288
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 524288
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "combined_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 1048576
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_pair_rate_hz",
+      "scope": "streaming_window",
+      "unit": "adc_pair_per_second",
+      "value": 999999.9999999999
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_sample_rate_hz",
+      "scope": "streaming_window",
+      "unit": "gpio_sample_per_second",
+      "value": 3999999.9999999995
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_payload_rate_bytes_per_second",
+      "scope": "streaming_window",
+      "unit": "byte_per_second",
+      "value": 3999999.9999999995
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_payload_rate_bytes_per_second",
+      "scope": "streaming_window",
+      "unit": "byte_per_second",
+      "value": 3999999.9999999995
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "combined_payload_rate_bytes_per_second",
+      "scope": "streaming_window",
+      "unit": "byte_per_second",
+      "value": 7999999.999999999
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_framed_rate_bytes_per_second",
+      "scope": "streaming_window",
+      "unit": "byte_per_second",
+      "value": 4047430.8300395254
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_framed_rate_bytes_per_second",
+      "scope": "streaming_window",
+      "unit": "byte_per_second",
+      "value": 4047430.8300395254
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "combined_framed_rate_bytes_per_second",
+      "scope": "streaming_window",
+      "unit": "byte_per_second",
+      "value": 8094861.660079051
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "sequence_gap_frames",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_sequence_gap_frames",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_sequence_gap_frames",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "firmware_dropped_frames",
+      "scope": "run",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_frames_dropped",
+      "scope": "run",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_frames_dropped",
+      "scope": "run",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "firmware_dropped_items",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_pairs_dropped",
+      "scope": "run",
+      "unit": "adc_pair",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_samples_dropped",
+      "scope": "run",
+      "unit": "gpio_sample",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "host_queue_drops",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "parser_errors",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "transport_errors",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "conservation_failures",
+      "scope": "final_status",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "command_latency_samples",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "command_latency_p99_milliseconds",
+      "scope": "run",
+      "unit": "millisecond",
+      "value": 1.0000000000047748
+    },
+    {
+      "denominator": "command_latency_samples",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "command_latency_maximum_milliseconds",
+      "scope": "run",
+      "unit": "millisecond",
+      "value": 1.0000000000047748
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "packet_owned_high_water_frames",
+      "scope": "run",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "packet_buffer_capacity_frames",
+      "scope": "artifact",
+      "unit": "frame",
+      "value": 200
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "flash_used_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 126972
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "flash_headroom_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 1904644
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram1_used_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 489760
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram1_headroom_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 34528
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram2_used_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 520192
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram2_headroom_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 4096
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "cpu_clock_hz",
+      "scope": "artifact",
+      "unit": "hertz",
+      "value": 600000000
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ipg_clock_hz",
+      "scope": "artifact",
+      "unit": "hertz",
+      "value": 150000000
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "adc_clock_hz",
+      "scope": "artifact",
+      "unit": "hertz",
+      "value": 37500000
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "pit_clock_hz",
+      "scope": "artifact",
+      "unit": "hertz",
+      "value": 24000000
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "timestamp_clock_hz",
+      "scope": "artifact",
+      "unit": "hertz",
+      "value": 8000000
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "adc_phase_ticks",
+      "scope": "artifact",
+      "unit": "tick",
+      "value": 4
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "simulator-capture"
+      ],
+      "evidence_level": "simulated",
+      "name": "gpio_width_bits",
+      "scope": "artifact_profile",
+      "unit": "bit",
+      "value": 8
+    }
+  ],
+  "reason": null,
+  "related": [
+    "[[Evidence-Index]]",
+    "[[Protocol-V1]]",
+    "[[System-Overview]]",
+    "[[soak-harness]]"
+  ],
+  "result": "PASS",
+  "schema_version": 1,
+  "summary": "The public in-memory API completed the maximum protocol-v1 profile with exact formulas, chronology, health, conservation, and cleanup; the pinned 600 MHz firmware compiled without upload and its manifest, map, artifact hashes, clocks, and memory resources were verified. This is simulated and host build evidence, not physical DAQ or USB evidence.",
+  "title": "ThingDAQ Experiment Baseline"
+}
