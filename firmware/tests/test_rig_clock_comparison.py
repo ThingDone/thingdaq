@@ -70,6 +70,11 @@ class ClockComparisonDevice(combined_fixture.PhysicalCombinedDevice):
     def __init__(self, profile_id: ClockProfile, fault: str | None = None) -> None:
         super().__init__()
         self.profile = ClockProfileMetadata.for_profile(profile_id)
+        self.build_id = (
+            "thingdaq-0123456789abcdef"
+            if profile_id is ClockProfile.PRODUCTION_600_MHZ
+            else "thingdaq-fedcba9876543210"
+        )
         self.trigger = _ready_trigger(profile_id)
         self.fault = fault
         self.health_sequence = 0
@@ -82,7 +87,7 @@ class ClockComparisonDevice(combined_fixture.PhysicalCombinedDevice):
         metadata["adc_trigger"] = self.trigger
         info = DeviceInfo(
             device_state=self.state,
-            build_id="thingdaq-0123456789abcdef",
+            build_id=self.build_id,
             clock_profile=self.profile,
             hardware_serial=12_345_670,
             firmware_version=(0, 7, 0),
@@ -349,7 +354,8 @@ class ClockComparisonRigTests(unittest.TestCase):
             "CLOCK_CAPTURE_SECONDS": "0.12",
             "CLOCK_WARMUP_SECONDS": "0.02",
             "CLOCK_STATUS_INTERVAL_SECONDS": "0.02",
-            "EXPECTED_BUILD_ID": "thingdaq-0123456789abcdef",
+            "EXPECTED_BUILD_ID": device.build_id,
+            "EXPECTED_SOURCE_ID": "0123456789abcdef" * 4,
             "EXPECTED_HARDWARE_SERIAL": "12345670",
             "EXPECTED_CLOCK_PROFILE": str(
                 600 if profile_id is ClockProfile.PRODUCTION_600_MHZ else 528
@@ -424,6 +430,14 @@ class ClockComparisonRigTests(unittest.TestCase):
                 self.assertEqual(
                     rig.CLOCK_PROFILE_SPECS[int(profile_id)].fqbn,
                     summary["identity"]["clock_profile"]["fqbn"],
+                )
+                self.assertEqual(
+                    peer.device.build_id,
+                    summary["identity"]["firmware_build_id"],
+                )
+                self.assertEqual(
+                    "0123456789abcdef" * 4,
+                    summary["declared_identity"]["source_id"],
                 )
                 self.assertTrue(summary["cleanup"]["idle_confirmed"])
                 self.assertEqual(constants.DeviceState.IDLE, peer.device.state)

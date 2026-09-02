@@ -5190,6 +5190,19 @@ def main() -> int:
             "EXPECTED_FIRMWARE_ARTIFACT_SHA256"
         )
         source_id = _optional_sha256_environment("EXPECTED_SOURCE_ID")
+        expected_build_id = os.environ.get("EXPECTED_BUILD_ID")
+        if (
+            expected_build_id is not None
+            and re.fullmatch(r"thingdaq-[0-9a-f]{16}", expected_build_id) is None
+        ):
+            raise ValueError(
+                "EXPECTED_BUILD_ID must have the form thingdaq-<16 lowercase hex>"
+            )
+        if source_id is not None and expected_build_id is None:
+            raise ValueError(
+                "EXPECTED_SOURCE_ID requires EXPECTED_BUILD_ID so the declared "
+                "source is tied to a wire-verified build identity"
+            )
         fixture_declaration_sha256 = _optional_sha256_environment(
             "FIXTURE_DECLARATION_SHA256"
         )
@@ -5219,7 +5232,6 @@ def main() -> int:
             }
         )
         return 2
-    expected_build_id = os.environ.get("EXPECTED_BUILD_ID")
     emit_event(
         "program_start",
         baud=BAUD_RATE,
@@ -5308,14 +5320,6 @@ def main() -> int:
         failures.append(message)
         failure_class = "firmware"
         failure_reason = message
-    if source_id is not None and identity.get("firmware_build_id") != (
-        "thingdaq-" + source_id[:16]
-    ):
-        message = "runtime firmware build ID contradicts EXPECTED_SOURCE_ID"
-        failures.append(message)
-        failure_class = "firmware"
-        failure_reason = message
-
     telemetry_result = result.telemetry
     thermal_evidence = telemetry_result.get("thermal_evidence")
     utilization_evidence = telemetry_result.get("utilization_evidence")
