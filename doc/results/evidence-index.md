@@ -30,6 +30,7 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[rle-streaming]]'
   - '[[rle-prototype]]'
 ---
 
@@ -61,20 +62,28 @@ Use [[soak-harness]] to generate and run new evidence against this identity.
 Do not compare a current report to the hashes in the historical sections
 below.
 
-## Experimental negotiated RLE prototype
+## Experimental negotiated RLE firmware
 
-[[rle-prototype]] records the isolated `experiment/rle-streaming` host and
-simulator gate. Two no-hardware demonstrations were byte-identical, both
-72-frame corpus benchmarks passed exact round-trip, adaptive no-expansion,
-bounded-memory, long-hold savings, incompressible fallback, and 1.25x decode
-headroom requirements, and the pinned default 600 MHz firmware still compiled
-without upload. All 27 protocol-v1 source/generated/fixture paths remained
-byte-identical to the immutable baseline.
+[[rle-streaming]] records the final isolated `experiment/rle-streaming`
+firmware result. The complete local firmware, codec, packet/USB, fake-device,
+resource, compatibility, and deterministic-build gates pass. The staged
+candidate is build `thingdaq-85f2698ba97fb1de`, HEX SHA-256
+`856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da`.
+Its live rig and physical-bandwidth conclusions are **INCONCLUSIVE** because
+the Teensy did not enumerate in either bounded prerequisite v1/RAW attempt;
+firmware was not programmed and no target runner or physical stream started.
 
-This is not target-side RLE, USB, analog, external-GPIO, or physical timing
-evidence. Compression savings are workload-dependent, ADC savings have no
-minimum acceptance threshold, and no cross-experiment branch combination was
-tested.
+[[rle-prototype]] remains the earlier host/simulator prototype record. The
+final report carries its deterministic workload contract forward: all nine
+72-frame corpus workloads retain exact round-trip and adaptive no-expansion,
+including strong long-hold savings and complete RAW fallback for alternating
+and high-entropy inputs. All 27 protocol-v1 source/generated/fixture paths
+remain byte-identical to the immutable baseline.
+
+No target-side RLE, live USB, analog, external-GPIO, physical timing, firmware
+encode-load, or physical compression-ratio value was observed. Compression
+savings are workload-dependent, ADC savings have no minimum acceptance
+threshold, and no cross-experiment branch combination was tested.
 
 ## Historical autonomous acceptance (superseded identity)
 
