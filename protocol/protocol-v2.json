@@ -32,7 +32,7 @@
     "unknown_capability_bits": "bits outside the generated protocol-v2 capability mask are rejected in an INFO response",
     "default_client": "Existing clients and default RAW configurations continue to speak protocol v1 and never infer or request compression.",
     "version_selection": "Only an explicit RLE_AUTO request enters protocol-v2 negotiation; the host obtains a protocol-v2 INFO response and requires RLE_STREAMING before sending CONFIGURE.",
-    "v1_isolation": "A protocol-v1 INFO response never advertises RLE_STREAMING, and no protocol-v1 header, payload, constant, manifest, or fixture is reinterpreted as protocol v2."
+    "v1_isolation": "A protocol-v1 INFO response never advertises RLE_STREAMING or SYNTHETIC_PATTERNS, and no protocol-v1 header, payload, source selector, constant, manifest, or fixture is reinterpreted as protocol v2."
   },
   "header": {
     "size": 44,
@@ -225,6 +225,39 @@
         "maximum_selected_run_count": 1349,
         "maximum_selected_payload_bytes": 4047,
         "maximum_selected_total_bytes": 4095
+      }
+    }
+  },
+  "synthetic_patterns": {
+    "capability": "SYNTHETIC_PATTERNS",
+    "selection_field": "configure_request.source",
+    "default_source": "SYNTHETIC",
+    "v1_behavior": "Protocol-v1 and ordinary protocol-v2 SYNTHETIC retain the exact ADC ramp and GPIO byte-ramp formulas.",
+    "patterns": {
+      "SYNTHETIC_CONSTANT": {
+        "adc0": "0x155",
+        "adc1": "0xaaa",
+        "gpio": "0x5a"
+      },
+      "SYNTHETIC_SPARSE_HOLD": {
+        "adc0": "0x456 ^ (((n / 997) & 1) << 3)",
+        "adc1": "0x789",
+        "gpio": "0x33 ^ (((m / 4001) ^ ((m / 4001) >> 1)) & 0xff)"
+      },
+      "SYNTHETIC_SLOW_ADC": {
+        "adc0": "(0x100 + n / 8) & 0xfff",
+        "adc1": "(0x900 + n / 11) & 0xfff",
+        "gpio": "(0x40 + m / 16) & 0xff"
+      },
+      "SYNTHETIC_ALTERNATING": {
+        "adc": "n even: (0x123, 0xabc); n odd: (0xfed, 0x456)",
+        "gpio": "m even: 0x55; m odd: 0xaa"
+      },
+      "SYNTHETIC_INCOMPRESSIBLE": {
+        "mixer": "mix32(x) = fmix32((x + 0x9e3779b9) mod 2^32)",
+        "adc0": "mix32(n) & 0xfff",
+        "adc1": "(mix32(n ^ 0xa5a55a5a) >> 12) & 0xfff",
+        "gpio": "mix32(m ^ 0xc001d00d) & 0xff"
       }
     }
   },
@@ -683,7 +716,8 @@
       {"name": "CHECKSUM_BENCHMARK", "value": 64},
       {"name": "GPIO_CLOCK_DIAGNOSTIC", "value": 128},
       {"name": "GPIO_CAPTURE_DIAGNOSTIC", "value": 256},
-      {"name": "RLE_STREAMING", "value": 512}
+      {"name": "RLE_STREAMING", "value": 512},
+      {"name": "SYNTHETIC_PATTERNS", "value": 1024}
     ],
     "configuration_encoding": [
       {
@@ -711,7 +745,12 @@
     ],
     "source": [
       {"name": "HARDWARE", "value": 0},
-      {"name": "SYNTHETIC", "value": 1}
+      {"name": "SYNTHETIC", "value": 1},
+      {"name": "SYNTHETIC_CONSTANT", "value": 2},
+      {"name": "SYNTHETIC_SPARSE_HOLD", "value": 3},
+      {"name": "SYNTHETIC_SLOW_ADC", "value": 4},
+      {"name": "SYNTHETIC_ALTERNATING", "value": 5},
+      {"name": "SYNTHETIC_INCOMPRESSIBLE", "value": 6}
     ],
     "board_id": [
       {"name": "SIMULATOR", "value": 0},
@@ -1801,9 +1840,9 @@
           "device_state": 1,
           "protocol_version": 2,
           "supported_stream_mask": 3,
-          "supported_source_mask": 3,
+          "supported_source_mask": 127,
           "supported_checksum_mask": 14,
-          "capability_bits": 1023,
+          "capability_bits": 2047,
           "timestamp_hz": 8000000,
           "data_frame_bytes": 4096,
           "max_control_frame_bytes": 1536,

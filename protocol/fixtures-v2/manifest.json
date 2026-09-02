@@ -344,18 +344,18 @@
       "total_length": 48
     },
     {
-      "checksum": "0xb2322df7",
+      "checksum": "0x6aa92e77",
       "checksum_algorithm": "ADLER32",
       "encoding": "RAW",
       "encoding_selector": 0,
       "file": "info-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_sha256": "549b801d9a2ccd3675268350781aac5add39e2b3f31d4eded8d5d34ceab33b4b",
+      "frame_sha256": "98ed21d8252ab23982b752fea8f96908908a485bf43dbfd80b3dd7eb4f2bb1b2",
       "item_count": 0,
       "kind": "INFO_RESPONSE",
       "payload_length": 376,
-      "payload_sha256": "1648e10cf353d3948207ed5a874c09cb9f4a8d915a6584c1d9ef7b1dd83a76be",
+      "payload_sha256": "a2f6ec61bc53c75bb71e5df3a5c9b8ba4a169db5bf9726bca94190f829427877",
       "request_id": 1,
       "run_id": 0,
       "sequence": 0,
@@ -698,7 +698,7 @@
   ],
   "protocol_version": 2,
   "source": "protocol/protocol-v2.json",
-  "source_sha256": "bcd25bfba3b1559ee13bb21228629ccc25b164e65d38049d2c4d659b0c731b76",
+  "source_sha256": "2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3",
   "streams": [
     {
       "file": "adc-mixed-raw-rle-stream.bin",

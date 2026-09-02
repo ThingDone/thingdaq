@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v2.json. Do not edit by hand.
-// Source SHA-256: bcd25bfba3b1559ee13bb21228629ccc25b164e65d38049d2c4d659b0c731b76
+// Source SHA-256: 2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v2 {
 
-inline constexpr char kSourceSha256[] = "bcd25bfba3b1559ee13bb21228629ccc25b164e65d38049d2c4d659b0c731b76";
+inline constexpr char kSourceSha256[] = "2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 2U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -260,11 +260,17 @@ enum class Capability : std::uint32_t {
   kGpioClockDiagnostic = 128U,
   kGpioCaptureDiagnostic = 256U,
   kRleStreaming = 512U,
+  kSyntheticPatterns = 1024U,
 };
 
 enum class Source : std::uint8_t {
   kHardware = 0U,
   kSynthetic = 1U,
+  kSyntheticConstant = 2U,
+  kSyntheticSparseHold = 3U,
+  kSyntheticSlowAdc = 4U,
+  kSyntheticAlternating = 5U,
+  kSyntheticIncompressible = 6U,
 };
 
 enum class ConfigurationEncoding : std::uint8_t {
@@ -441,7 +447,7 @@ inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr std::uint32_t kSupportedChecksumMask = 14U;
 inline constexpr std::uint16_t kKnownFrameFlagMask = 32783U;
-inline constexpr std::uint32_t kKnownCapabilityMask = 1023U;
+inline constexpr std::uint32_t kKnownCapabilityMask = 2047U;
 inline constexpr std::uint16_t kKnownConfigurationProfileMask = 63U;
 inline constexpr std::uint32_t kKnownGpioClockErrorMask = 32767U;
 inline constexpr std::uint32_t kKnownGpioCaptureDiagnosticFlagMask = 511U;

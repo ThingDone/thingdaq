@@ -2503,7 +2503,13 @@ class DeviceCapabilities:
         if int(stream_mask) & ~valid_streams:
             raise ValueError("supported stream mask contains unknown bits")
         _unsigned("supported_source_mask", self.supported_source_mask, 8)
-        if self.supported_source_mask == 0 or self.supported_source_mask & ~0x03:
+        known_source_mask = (
+            0x7F if self.protocol_version == v2_constants.PROTOCOL_VERSION else 0x03
+        )
+        if (
+            self.supported_source_mask == 0
+            or self.supported_source_mask & ~known_source_mask
+        ):
             raise ValueError("supported source mask contains unknown bits")
         _unsigned("supported_checksum_mask", self.supported_checksum_mask, 32)
         if self.supported_checksum_mask != constants.SUPPORTED_CHECKSUM_MASK:

@@ -155,6 +155,28 @@ queue mutation, and cleanup in bounded cooperative context. It also keeps the
 raw compatibility path structurally independent: v1 never requests a
 temporary page and continues through its existing fixed-frame finalizer.
 
+## Target validation surface
+
+The target source exposes five deterministic workloads only through the v2
+`SYNTHETIC_PATTERNS` capability and source selectors defined by
+[[ADR-006-Experimental-RLE-Streaming]]. Ordinary `SYNTHETIC` and every v1
+request retain the original ramp. The selector is carried in the existing
+CONFIGURE source byte, so the experiment adds no command payload, queue, or
+runtime allocation.
+
+`firmware/tests/rig_rle_streaming.py` is the self-contained physical runner.
+It independently encodes v1 and v2 controls, proves the v1 capability boundary,
+validates each complete transmitted checksum before streaming bounded RLE
+inspection, and accepts the legal per-frame RAW/RLE mixture. It compares
+logical formulas, sequences, and timestamps without retaining bulk capture;
+samples every v2 STATUS scalar; reconciles logical, encoded-payload, and wire
+bytes; reports host decode throughput, firmware encode cycles/load, queue and
+memory high-water marks, fallback reasons, and all loss/error counters; and
+always attempts STOP plus a final IDLE STATUS. Smoke runs are capped at 60
+seconds, while endurance runs require at least 600 seconds. Its `RLE_RESULT`
+JSON distinguishes configuration, serial-service, fixture/identity, codec,
+and firmware failures.
+
 ## Alternatives considered
 
 ### Reuse a checksum-benchmark buffer

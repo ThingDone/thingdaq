@@ -337,6 +337,60 @@ def validate_rle_contract(contract: Mapping[str, Any]) -> None:
         missing = ", ".join(sorted(required_errors - observed_errors))
         raise ContractError(f"protocol-v2 malformed vectors are missing: {missing}")
 
+    pattern_contract = contract.get("synthetic_patterns")
+    if not isinstance(pattern_contract, Mapping):
+        raise ContractError("protocol v2 must define target synthetic patterns")
+    sources = enum_map(contract["enums"]["source"])
+    capabilities = enum_map(contract["enums"]["capability_bits"])
+    expected_sources = {
+        "HARDWARE": 0,
+        "SYNTHETIC": 1,
+        "SYNTHETIC_CONSTANT": 2,
+        "SYNTHETIC_SPARSE_HOLD": 3,
+        "SYNTHETIC_SLOW_ADC": 4,
+        "SYNTHETIC_ALTERNATING": 5,
+        "SYNTHETIC_INCOMPRESSIBLE": 6,
+    }
+    if sources != expected_sources:
+        raise ContractError("protocol-v2 synthetic source selectors changed")
+    if capabilities.get("SYNTHETIC_PATTERNS") != 1024:
+        raise ContractError("SYNTHETIC_PATTERNS must remain capability bit 1024")
+    if (
+        pattern_contract.get("capability") != "SYNTHETIC_PATTERNS"
+        or pattern_contract.get("selection_field") != "configure_request.source"
+        or pattern_contract.get("default_source") != "SYNTHETIC"
+    ):
+        raise ContractError("synthetic-pattern negotiation metadata is invalid")
+    expected_patterns = {
+        "SYNTHETIC_CONSTANT": {
+            "adc0": "0x155",
+            "adc1": "0xaaa",
+            "gpio": "0x5a",
+        },
+        "SYNTHETIC_SPARSE_HOLD": {
+            "adc0": "0x456 ^ (((n / 997) & 1) << 3)",
+            "adc1": "0x789",
+            "gpio": "0x33 ^ (((m / 4001) ^ ((m / 4001) >> 1)) & 0xff)",
+        },
+        "SYNTHETIC_SLOW_ADC": {
+            "adc0": "(0x100 + n / 8) & 0xfff",
+            "adc1": "(0x900 + n / 11) & 0xfff",
+            "gpio": "(0x40 + m / 16) & 0xff",
+        },
+        "SYNTHETIC_ALTERNATING": {
+            "adc": "n even: (0x123, 0xabc); n odd: (0xfed, 0x456)",
+            "gpio": "m even: 0x55; m odd: 0xaa",
+        },
+        "SYNTHETIC_INCOMPRESSIBLE": {
+            "mixer": "mix32(x) = fmix32((x + 0x9e3779b9) mod 2^32)",
+            "adc0": "mix32(n) & 0xfff",
+            "adc1": "(mix32(n ^ 0xa5a55a5a) >> 12) & 0xfff",
+            "gpio": "mix32(m ^ 0xc001d00d) & 0xff",
+        },
+    }
+    if pattern_contract.get("patterns") != expected_patterns:
+        raise ContractError("protocol-v2 synthetic-pattern formulas changed")
+
 
 def validate_contract(contract: Mapping[str, Any]) -> None:
     """Validate cross-field invariants before generating any output."""

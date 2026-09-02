@@ -94,6 +94,10 @@ class SyntheticSourceTests(unittest.TestCase):
         self.assertIn("pipeline.beginFill", source)
         self.assertIn("pipeline.finishFill", source)
         self.assertIn("std::array", source)
+        self.assertIn("pattern_ != Pattern::kDefaultRamp", source)
+        self.assertIn(".flashmem.synthetic.start", source)
+        self.assertIn(".flashmem.synthetic.fill_adc", source)
+        self.assertIn(".flashmem.synthetic.fill_gpio", source)
 
 
 if __name__ == "__main__":

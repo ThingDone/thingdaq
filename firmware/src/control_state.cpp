@@ -16,9 +16,12 @@ constexpr std::uint8_t kKnownStreamMask =
     static_cast<std::uint8_t>(protocol_v1::StreamMask::kAdc) |
     static_cast<std::uint8_t>(protocol_v1::StreamMask::kGpio);
 
-constexpr bool knownSource(protocol_v1::Source source) {
+constexpr bool knownSource(protocol_v1::Source source,
+                           std::uint8_t protocol_version) {
   return source == protocol_v1::Source::kHardware ||
-         source == protocol_v1::Source::kSynthetic;
+         source == protocol_v1::Source::kSynthetic ||
+         (protocol_version == protocol_v2::kProtocolVersion &&
+          capabilities::isExperimentalSyntheticSource(source));
 }
 
 constexpr bool capabilityEnabled(protocol_v1::Capability capability) {
@@ -347,7 +350,7 @@ protocol_v1::ErrorCode ControlState::validateConfiguration(
                         protocol_v2::ConfigurationEncoding::kRleAuto;
   if ((configuration.stream_mask &
        static_cast<std::uint8_t>(~kKnownStreamMask)) != 0U ||
-      !knownSource(configuration.source) ||
+      !knownSource(configuration.source, configuration.protocol_version) ||
       configuration.data_checksum_algorithm ==
           protocol_v1::ChecksumAlgorithm::kNoneReserved ||
       configuration.data_frame_bytes != protocol_v1::kDataFrameBytes ||
@@ -368,7 +371,9 @@ protocol_v1::ErrorCode ControlState::validateConfiguration(
       static_cast<std::uint8_t>(configuration.source);
   if ((configuration.stream_mask &
        static_cast<std::uint8_t>(~capabilities::kSupportedStreamMask)) != 0U ||
-      (capabilities::kSupportedSourceMask &
+      ((configuration.protocol_version == protocol_v2::kProtocolVersion
+            ? capabilities::kV2SupportedSourceMask
+            : capabilities::kSupportedSourceMask) &
        static_cast<std::uint8_t>(1U << source_id)) == 0U) {
     return protocol_v1::ErrorCode::kUnsupportedConfiguration;
   }

@@ -1137,6 +1137,7 @@ def _v1_compatible_control_frame(frame: V2Frame) -> V1Frame:
         payload[constants.INFO_RESPONSE_PROTOCOL_VERSION_OFFSET] = (
             v1_constants.PROTOCOL_VERSION
         )
+        payload[constants.INFO_RESPONSE_SUPPORTED_SOURCE_MASK_OFFSET] &= 0x03
         capability_bits = struct.unpack_from(
             "<I",
             payload,

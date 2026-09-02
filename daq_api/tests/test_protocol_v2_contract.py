@@ -142,9 +142,13 @@ class ProtocolV2ContractTests(unittest.TestCase):
     def test_rle_requires_explicit_capability_negotiation(self) -> None:
         v1_capabilities = self.v1["enums"]["capability_bits"]
         v2_capabilities = self.v2["enums"]["capability_bits"]
-        self.assertEqual(v1_capabilities, v2_capabilities[:-1])
+        self.assertEqual(v1_capabilities, v2_capabilities[:-2])
         self.assertEqual(
             {"name": "RLE_STREAMING", "value": 0x200},
+            v2_capabilities[-2],
+        )
+        self.assertEqual(
+            {"name": "SYNTHETIC_PATTERNS", "value": 0x400},
             v2_capabilities[-1],
         )
 
@@ -308,7 +312,8 @@ class ProtocolV2ContractTests(unittest.TestCase):
         )
         info = fixtures["info-response"]["payload"]["values"]
         self.assertEqual(2, info["protocol_version"])
-        self.assertEqual(0x3FF, info["capability_bits"])
+        self.assertEqual(0x7FF, info["capability_bits"])
+        self.assertEqual(0x7F, info["supported_source_mask"])
         self.assertEqual("synthetic-golden-v2", info["build_id"])
 
     def test_adr_links_and_normative_values_match_the_source(self) -> None:

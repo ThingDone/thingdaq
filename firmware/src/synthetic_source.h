@@ -19,8 +19,38 @@ enum class Mode : std::uint8_t {
   kUnpacedDiagnostic = 1U,
 };
 
+// The original ramp remains the only protocol-v1/default behavior. Every
+// other workload requires one of the explicit protocol-v2 source selectors
+// advertised behind SYNTHETIC_PATTERNS.
+enum class Pattern : std::uint8_t {
+  kDefaultRamp = 0U,
+  kConstant = 1U,
+  kSparseHold = 2U,
+  kSlowAdc = 3U,
+  kAlternating = 4U,
+  kIncompressible = 5U,
+};
+
 constexpr const char *modeName(Mode mode) {
   return mode == Mode::kRealtime ? "realtime" : "unpaced-diagnostic";
+}
+
+constexpr const char *patternName(Pattern pattern) {
+  switch (pattern) {
+    case Pattern::kDefaultRamp:
+      return "default-ramp";
+    case Pattern::kConstant:
+      return "constant";
+    case Pattern::kSparseHold:
+      return "sparse-hold";
+    case Pattern::kSlowAdc:
+      return "slow-adc";
+    case Pattern::kAlternating:
+      return "alternating";
+    case Pattern::kIncompressible:
+      return "incompressible";
+  }
+  return "invalid";
 }
 
 // Platform adapters expose monotonically sampled unsigned 8 MHz ticks. The
@@ -53,6 +83,7 @@ struct Snapshot {
   std::array<StreamSnapshot, packet::kStreamCount> streams{};
   protocol::Configuration configuration{};
   Mode mode = Mode::kRealtime;
+  Pattern pattern = Pattern::kDefaultRamp;
   std::uint32_t run_id = 0U;
   std::uint64_t start_clock_ticks = 0U;
   std::uint64_t last_elapsed_ticks = 0U;
@@ -89,11 +120,51 @@ class SyntheticSource {
 
   Snapshot snapshot() const;
   constexpr Mode mode() const { return mode_; }
+  constexpr Pattern pattern() const { return pattern_; }
   constexpr bool running() const { return running_; }
 
+  static constexpr bool supportsSource(protocol_v1::Source source,
+                                       std::uint8_t protocol_version) {
+    const std::uint8_t source_id = static_cast<std::uint8_t>(source);
+    return source == protocol_v1::Source::kSynthetic ||
+           (protocol_version == protocol_v2::kProtocolVersion &&
+            source_id >= static_cast<std::uint8_t>(
+                             protocol_v2::Source::kSyntheticConstant) &&
+            source_id <= static_cast<std::uint8_t>(
+                             protocol_v2::Source::kSyntheticIncompressible));
+  }
+
+  static constexpr Pattern patternForSource(protocol_v1::Source source) {
+    switch (static_cast<std::uint8_t>(source)) {
+      case static_cast<std::uint8_t>(
+          protocol_v2::Source::kSyntheticConstant):
+        return Pattern::kConstant;
+      case static_cast<std::uint8_t>(
+          protocol_v2::Source::kSyntheticSparseHold):
+        return Pattern::kSparseHold;
+      case static_cast<std::uint8_t>(
+          protocol_v2::Source::kSyntheticSlowAdc):
+        return Pattern::kSlowAdc;
+      case static_cast<std::uint8_t>(
+          protocol_v2::Source::kSyntheticAlternating):
+        return Pattern::kAlternating;
+      case static_cast<std::uint8_t>(
+          protocol_v2::Source::kSyntheticIncompressible):
+        return Pattern::kIncompressible;
+      default:
+        return Pattern::kDefaultRamp;
+    }
+  }
+
+  static std::uint16_t adc0Code(Pattern pattern,
+                                std::uint64_t pair_index);
+  static std::uint16_t adc1Code(Pattern pattern,
+                                std::uint64_t pair_index);
+  static std::uint8_t gpioByte(Pattern pattern,
+                               std::uint64_t sample_index);
+
   static constexpr std::uint16_t adc0Code(std::uint64_t pair_index) {
-    return static_cast<std::uint16_t>(
-        (pair_index * 2U) & kAdcCodeMask);
+    return static_cast<std::uint16_t>((pair_index * 2U) & kAdcCodeMask);
   }
   static constexpr std::uint16_t adc1Code(std::uint64_t pair_index) {
     return static_cast<std::uint16_t>(
@@ -123,14 +194,19 @@ class SyntheticSource {
   bool generateFrame(packet::Stream stream,
                      packet::PacketBufferPipeline &pipeline,
                      ServiceReport &report);
-  static void fillAdc(protocol::MutableByteView payload,
-                      std::uint64_t first_pair_index);
-  static void fillGpio(protocol::MutableByteView payload,
-                       std::uint64_t first_sample_index);
+  void fillAdc(protocol::MutableByteView payload,
+               std::uint64_t first_pair_index);
+  void fillGpio(protocol::MutableByteView payload,
+                std::uint64_t first_sample_index);
+  void fillExperimentalAdc(protocol::MutableByteView payload,
+                           std::uint64_t first_pair_index);
+  void fillExperimentalGpio(protocol::MutableByteView payload,
+                            std::uint64_t first_sample_index);
 
   std::array<StreamState, packet::kStreamCount> streams_{};
   protocol::Configuration configuration_{};
   Mode mode_ = Mode::kRealtime;
+  Pattern pattern_ = Pattern::kDefaultRamp;
   std::uint32_t run_id_ = 0U;
   std::uint64_t start_clock_ticks_ = 0U;
   std::uint64_t last_elapsed_ticks_ = 0U;

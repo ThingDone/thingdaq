@@ -65,6 +65,29 @@ paths. Protocol v1 remains authoritative for existing clients.
   requested encoding. CONFIGURE and START response byte 7 is the exact applied
   encoding. `RAW` is `0`; `RLE_AUTO` is `1`; every other value is invalid.
 
+### Target-only deterministic workload selectors
+
+Target RLE validation additionally requires the v2-only
+`SYNTHETIC_PATTERNS` capability bit (`0x00000400`). It extends the CONFIGURE
+source byte with selectors 2 through 6; source `1` remains the original ADC and
+GPIO ramp in both protocol versions. Protocol-v1 INFO therefore keeps source
+mask `0x03` and capability mask `0x000001ff`, while the experimental v2 INFO
+uses source mask `0x7f` and capability mask `0x000007ff`.
+
+| Source | Selector | ADC pair at logical index \(n\) | GPIO byte at logical index \(m\) |
+| --- | ---: | --- | --- |
+| `SYNTHETIC_CONSTANT` | 2 | `(0x155, 0xaaa)` | `0x5a` |
+| `SYNTHETIC_SPARSE_HOLD` | 3 | `(0x456 ^ (((n / 997) & 1) << 3), 0x789)` | `0x33 ^ gray(m / 4001)` (low eight Gray-code bits) |
+| `SYNTHETIC_SLOW_ADC` | 4 | `((0x100 + n / 8) & 0xfff, (0x900 + n / 11) & 0xfff)` | `(0x40 + m / 16) & 0xff` |
+| `SYNTHETIC_ALTERNATING` | 5 | even `(0x123, 0xabc)`, odd `(0xfed, 0x456)` | even `0x55`, odd `0xaa` |
+| `SYNTHETIC_INCOMPRESSIBLE` | 6 | fixed `fmix32` projections of `n` | low byte of the fixed `fmix32` projection of `m` |
+
+These selectors are test stimuli, not new physical acquisition profiles. They
+retain the shared 8,096-tick frame coverage, source flag, sequence, checksum,
+bounded cooperative service, and exact item counts. STOP restores the idle
+configuration and the default ramp selector. A v1 CONFIGURE carrying any of
+these values is rejected before state mutation.
+
 ### Frame selector and unchanged envelope
 
 Protocol v2 retains the 44-byte header and four-byte trailer. Header byte 11,

@@ -4,6 +4,13 @@
 
 #include "board_config.h"
 
+#if defined(__IMXRT1062__)
+#define THINGDAQ_SYNTHETIC_PATTERN_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define THINGDAQ_SYNTHETIC_PATTERN_CODE(section_name)
+#endif
+
 namespace thingdaq::synthetic {
 namespace {
 
@@ -22,8 +29,111 @@ constexpr std::uint16_t flag(protocol_v1::FrameFlag value) {
   return static_cast<std::uint16_t>(value);
 }
 
+constexpr std::uint16_t kAdcCodeMask = static_cast<std::uint16_t>(
+    (1U << protocol_v1::kAdcResolutionBits) - 1U);
+
+constexpr std::uint32_t mixU32(std::uint32_t value) {
+  value += 0x9E3779B9U;
+  value = (value ^ (value >> 16U)) * 0x85EBCA6BU;
+  value = (value ^ (value >> 13U)) * 0xC2B2AE35U;
+  return value ^ (value >> 16U);
+}
+
+constexpr void patternAdcCodes(Pattern pattern, std::uint64_t pair_index,
+                               std::uint16_t &adc0,
+                               std::uint16_t &adc1) {
+  switch (pattern) {
+    case Pattern::kDefaultRamp:
+      adc0 = static_cast<std::uint16_t>((pair_index * 2U) & kAdcCodeMask);
+      adc1 = static_cast<std::uint16_t>(
+          (pair_index * 2U + 1U) & kAdcCodeMask);
+      return;
+    case Pattern::kConstant:
+      adc0 = 0x155U;
+      adc1 = 0xAAAU;
+      return;
+    case Pattern::kSparseHold:
+      adc0 = static_cast<std::uint16_t>(
+          0x456U ^ (((pair_index / 997U) & 1U) << 3U));
+      adc1 = 0x789U;
+      return;
+    case Pattern::kSlowAdc:
+      adc0 = static_cast<std::uint16_t>(
+          (0x100U + pair_index / 8U) & kAdcCodeMask);
+      adc1 = static_cast<std::uint16_t>(
+          (0x900U + pair_index / 11U) & kAdcCodeMask);
+      return;
+    case Pattern::kAlternating:
+      adc0 = pair_index % 2U == 0U ? 0x123U : 0xFEDU;
+      adc1 = pair_index % 2U == 0U ? 0xABCU : 0x456U;
+      return;
+    case Pattern::kIncompressible:
+      adc0 = static_cast<std::uint16_t>(
+          mixU32(static_cast<std::uint32_t>(pair_index)) & kAdcCodeMask);
+      adc1 = static_cast<std::uint16_t>(
+          (mixU32(static_cast<std::uint32_t>(
+               pair_index ^ 0xA5A55A5AULL)) >>
+           12U) &
+          kAdcCodeMask);
+      return;
+  }
+  adc0 = 0U;
+  adc1 = 0U;
+}
+
+constexpr std::uint8_t patternGpioByte(Pattern pattern,
+                                       std::uint64_t sample_index) {
+  switch (pattern) {
+    case Pattern::kDefaultRamp:
+      return static_cast<std::uint8_t>(sample_index & 0xFFU);
+    case Pattern::kConstant:
+      return 0x5AU;
+    case Pattern::kSparseHold: {
+      const std::uint64_t epoch = sample_index / 4001U;
+      const std::uint64_t gray = epoch ^ (epoch >> 1U);
+      return static_cast<std::uint8_t>(0x33U ^ (gray & 0xFFU));
+    }
+    case Pattern::kSlowAdc:
+      return static_cast<std::uint8_t>(
+          (0x40U + sample_index / 16U) & 0xFFU);
+    case Pattern::kAlternating:
+      return sample_index % 2U == 0U ? 0x55U : 0xAAU;
+    case Pattern::kIncompressible:
+      return static_cast<std::uint8_t>(
+          mixU32(static_cast<std::uint32_t>(
+              sample_index ^ 0xC001D00DULL)) &
+          0xFFU);
+  }
+  return 0U;
+}
+
 }  // namespace
 
+THINGDAQ_SYNTHETIC_PATTERN_CODE(".flashmem.synthetic.formula_adc0")
+std::uint16_t SyntheticSource::adc0Code(Pattern pattern,
+                                        std::uint64_t pair_index) {
+  std::uint16_t adc0 = 0U;
+  std::uint16_t adc1 = 0U;
+  patternAdcCodes(pattern, pair_index, adc0, adc1);
+  return adc0;
+}
+
+THINGDAQ_SYNTHETIC_PATTERN_CODE(".flashmem.synthetic.formula_adc1")
+std::uint16_t SyntheticSource::adc1Code(Pattern pattern,
+                                        std::uint64_t pair_index) {
+  std::uint16_t adc0 = 0U;
+  std::uint16_t adc1 = 0U;
+  patternAdcCodes(pattern, pair_index, adc0, adc1);
+  return adc1;
+}
+
+THINGDAQ_SYNTHETIC_PATTERN_CODE(".flashmem.synthetic.formula_gpio")
+std::uint8_t SyntheticSource::gpioByte(Pattern pattern,
+                                       std::uint64_t sample_index) {
+  return patternGpioByte(pattern, sample_index);
+}
+
+THINGDAQ_SYNTHETIC_PATTERN_CODE(".flashmem.synthetic.start")
 OperationStatus SyntheticSource::startRun(
     std::uint32_t run_id, const protocol::Configuration &configuration,
     std::uint64_t start_clock_ticks,
@@ -37,7 +147,7 @@ OperationStatus SyntheticSource::startRun(
   if (configuration.stream_mask == 0U ||
       (configuration.stream_mask &
        static_cast<std::uint8_t>(~known_streams)) != 0U ||
-      configuration.source != protocol_v1::Source::kSynthetic ||
+      !supportsSource(configuration.source, configuration.protocol_version) ||
       !protocol::isSupportedChecksum(
           configuration.data_checksum_algorithm) ||
       configuration.data_frame_bytes != protocol_v1::kDataFrameBytes) {
@@ -55,6 +165,7 @@ OperationStatus SyntheticSource::startRun(
     stream.epoch_frame_pending = true;
   }
   configuration_ = configuration;
+  pattern_ = patternForSource(configuration.source);
   run_id_ = run_id;
   start_clock_ticks_ = start_clock_ticks;
   last_elapsed_ticks_ = 0U;
@@ -68,6 +179,7 @@ OperationStatus SyntheticSource::startRun(
 
 void SyntheticSource::stop() {
   running_ = false;
+  pattern_ = Pattern::kDefaultRamp;
 }
 
 ServiceReport SyntheticSource::service(
@@ -126,6 +238,7 @@ Snapshot SyntheticSource::snapshot() const {
   }
   result.configuration = configuration_;
   result.mode = mode_;
+  result.pattern = pattern_;
   result.run_id = run_id_;
   result.start_clock_ticks = start_clock_ticks_;
   result.last_elapsed_ticks = last_elapsed_ticks_;
@@ -240,6 +353,10 @@ bool SyntheticSource::generateFrame(
 
 void SyntheticSource::fillAdc(protocol::MutableByteView payload,
                               std::uint64_t first_pair_index) {
+  if (pattern_ != Pattern::kDefaultRamp) {
+    fillExperimentalAdc(payload, first_pair_index);
+    return;
+  }
   for (std::size_t pair = 0U; pair < protocol_v1::kAdcPairsPerFrame;
        ++pair) {
     const std::uint64_t index = first_pair_index + pair;
@@ -257,9 +374,42 @@ void SyntheticSource::fillAdc(protocol::MutableByteView payload,
 
 void SyntheticSource::fillGpio(protocol::MutableByteView payload,
                                std::uint64_t first_sample_index) {
+  if (pattern_ != Pattern::kDefaultRamp) {
+    fillExperimentalGpio(payload, first_sample_index);
+    return;
+  }
   for (std::size_t sample = 0U;
        sample < protocol_v1::kGpioSamplesPerFrame; ++sample) {
     payload.data[sample] = gpioByte(first_sample_index + sample);
+  }
+}
+
+THINGDAQ_SYNTHETIC_PATTERN_CODE(".flashmem.synthetic.fill_adc")
+void SyntheticSource::fillExperimentalAdc(
+    protocol::MutableByteView payload, std::uint64_t first_pair_index) {
+  for (std::size_t pair = 0U; pair < protocol_v1::kAdcPairsPerFrame;
+       ++pair) {
+    const std::uint64_t index = first_pair_index + pair;
+    std::uint16_t adc0 = 0U;
+    std::uint16_t adc1 = 0U;
+    patternAdcCodes(pattern_, index, adc0, adc1);
+    const std::size_t offset = pair * 4U;
+    payload.data[offset] = static_cast<std::uint8_t>(adc0 & 0xFFU);
+    payload.data[offset + 1U] =
+        static_cast<std::uint8_t>((adc0 >> 8U) & 0xFFU);
+    payload.data[offset + 2U] = static_cast<std::uint8_t>(adc1 & 0xFFU);
+    payload.data[offset + 3U] =
+        static_cast<std::uint8_t>((adc1 >> 8U) & 0xFFU);
+  }
+}
+
+THINGDAQ_SYNTHETIC_PATTERN_CODE(".flashmem.synthetic.fill_gpio")
+void SyntheticSource::fillExperimentalGpio(
+    protocol::MutableByteView payload, std::uint64_t first_sample_index) {
+  for (std::size_t sample = 0U;
+       sample < protocol_v1::kGpioSamplesPerFrame; ++sample) {
+    payload.data[sample] =
+        patternGpioByte(pattern_, first_sample_index + sample);
   }
 }
 

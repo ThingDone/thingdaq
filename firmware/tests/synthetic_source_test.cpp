@@ -39,6 +39,13 @@ wire::Configuration bothStreams() {
   return configuration;
 }
 
+wire::Configuration patternConfiguration(constants::Source source) {
+  wire::Configuration configuration = bothStreams();
+  configuration.protocol_version = thingdaq::protocol_v2::kProtocolVersion;
+  configuration.source = source;
+  return configuration;
+}
+
 wire::DecodedFrame decodeFront(packet::PacketBufferPipeline &pipeline,
                                const std::string &name) {
   wire::DecodedFrame frame{};
@@ -167,6 +174,83 @@ void testRealtimePacingAndExactLayouts() {
              counters.sources[1].items_transmitted ==
                  2U * constants::kGpioSamplesPerFrame,
          "generated, framed, transmitted, and dropped item counts are exact");
+}
+
+void testExperimentalPatternsAreV2OnlyAndExact() {
+  struct PatternCase {
+    thingdaq::protocol_v2::Source source;
+    synthetic::Pattern pattern;
+  };
+  constexpr std::array<PatternCase, 5U> cases{{
+      {thingdaq::protocol_v2::Source::kSyntheticConstant,
+       synthetic::Pattern::kConstant},
+      {thingdaq::protocol_v2::Source::kSyntheticSparseHold,
+       synthetic::Pattern::kSparseHold},
+      {thingdaq::protocol_v2::Source::kSyntheticSlowAdc,
+       synthetic::Pattern::kSlowAdc},
+      {thingdaq::protocol_v2::Source::kSyntheticAlternating,
+       synthetic::Pattern::kAlternating},
+      {thingdaq::protocol_v2::Source::kSyntheticIncompressible,
+       synthetic::Pattern::kIncompressible},
+  }};
+
+  for (std::size_t case_index = 0U; case_index < cases.size(); ++case_index) {
+    const PatternCase &test_case = cases[case_index];
+    const constants::Source source_id = static_cast<constants::Source>(
+        static_cast<std::uint8_t>(test_case.source));
+    packet::OwnedPacketBufferStorage storage{};
+    packet::PacketBufferPipeline pipeline{storage};
+    synthetic::SyntheticSource source{synthetic::Mode::kUnpacedDiagnostic};
+    wire::Configuration configuration = patternConfiguration(source_id);
+    const std::uint32_t run_id = static_cast<std::uint32_t>(80U + case_index);
+
+    wire::Configuration v1_configuration = configuration;
+    v1_configuration.protocol_version = constants::kProtocolVersion;
+    expect(pipeline.startRun(run_id) == packet::OperationStatus::kOk,
+           "experimental-pattern packet run starts");
+    expect(source.startRun(run_id, v1_configuration, 0U, pipeline) ==
+               synthetic::OperationStatus::kInvalidConfiguration,
+           "protocol v1 cannot select an experimental synthetic pattern");
+    expect(source.startRun(run_id, configuration, 0U, pipeline) ==
+               synthetic::OperationStatus::kOk &&
+               source.pattern() == test_case.pattern &&
+               source.snapshot().pattern == test_case.pattern,
+           std::string("protocol v2 selects ") +
+               synthetic::patternName(test_case.pattern));
+
+    const synthetic::ServiceReport report = source.service(0U, pipeline);
+    expect(report.frames_generated == 2U && report.frames_framed == 2U &&
+               pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
+           "each selected pattern produces one exact frame per stream");
+
+    const wire::DecodedFrame adc = decodeFront(pipeline, "pattern ADC frame");
+    constexpr std::array<std::size_t, 4U> adc_indices{{0U, 1U, 997U, 1011U}};
+    for (const std::size_t pair : adc_indices) {
+      const std::size_t offset = pair * constants::kAdcBytesPerPair;
+      expect(sampleCode(adc.payload, offset) ==
+                     synthetic::SyntheticSource::adc0Code(test_case.pattern,
+                                                           pair) &&
+                 sampleCode(adc.payload, offset + 2U) ==
+                     synthetic::SyntheticSource::adc1Code(test_case.pattern,
+                                                           pair),
+             "selected ADC bytes match the independently callable formula");
+    }
+    pipeline.releaseFrontFrame();
+
+    const wire::DecodedFrame gpio = decodeFront(pipeline, "pattern GPIO frame");
+    constexpr std::array<std::size_t, 4U> gpio_indices{{0U, 1U, 4001U,
+                                                        4047U}};
+    for (const std::size_t sample : gpio_indices) {
+      expect(gpio.payload.data[sample] ==
+                 synthetic::SyntheticSource::gpioByte(test_case.pattern,
+                                                       sample),
+             "selected GPIO bytes match the independently callable formula");
+    }
+    pipeline.releaseFrontFrame();
+    source.stop();
+    expect(source.pattern() == synthetic::Pattern::kDefaultRamp,
+           "STOP restores the default synthetic formula selector");
+  }
 }
 
 void testUnpacedDiagnosticIsExplicitAndBounded() {
@@ -388,6 +472,7 @@ void testRealtimePoolLossPreservesFormulaTimeAndFlags() {
 
 int main() {
   testRealtimePacingAndExactLayouts();
+  testExperimentalPatternsAreV2OnlyAndExact();
   testUnpacedDiagnosticIsExplicitAndBounded();
   testNewRunResetsIndependentEpochState();
   testRealtimePoolLossPreservesFormulaTimeAndFlags();

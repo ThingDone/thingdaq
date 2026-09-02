@@ -5,6 +5,7 @@
 
 #include "firmware_identity.h"
 #include "generated/protocol_constants.h"
+#include "generated/protocol_v2_constants.h"
 
 namespace thingdaq::capabilities {
 
@@ -41,6 +42,24 @@ constexpr std::uint8_t sourceBit(protocol_v1::Source source) {
       1U << static_cast<std::uint8_t>(source));
 }
 
+constexpr std::uint8_t sourceBit(protocol_v2::Source source) {
+  return static_cast<std::uint8_t>(
+      1U << static_cast<std::uint8_t>(source));
+}
+
+constexpr bool isExperimentalSyntheticSource(protocol_v1::Source source) {
+  const std::uint8_t source_id = static_cast<std::uint8_t>(source);
+  return source_id >= static_cast<std::uint8_t>(
+                          protocol_v2::Source::kSyntheticConstant) &&
+         source_id <= static_cast<std::uint8_t>(
+                          protocol_v2::Source::kSyntheticIncompressible);
+}
+
+constexpr bool isSyntheticSource(protocol_v1::Source source) {
+  return source == protocol_v1::Source::kSynthetic ||
+         isExperimentalSyntheticSource(source);
+}
+
 constexpr std::uint16_t configurationProfileBit(
     protocol_v1::Source source, std::uint8_t stream_mask) {
   const std::uint8_t adc =
@@ -61,7 +80,7 @@ constexpr std::uint16_t configurationProfileBit(
           protocol_v1::ConfigurationProfile::kHardwareCombined);
     }
   }
-  if (source == protocol_v1::Source::kSynthetic) {
+  if (isSyntheticSource(source)) {
     if (stream_mask == adc) {
       return static_cast<std::uint16_t>(
           protocol_v1::ConfigurationProfile::kSyntheticAdc);
@@ -94,6 +113,14 @@ inline constexpr std::uint8_t kSupportedStreamMask =
 inline constexpr std::uint8_t kSupportedSourceMask =
     sourceBit(protocol_v1::Source::kHardware) |
     sourceBit(protocol_v1::Source::kSynthetic);
+inline constexpr std::uint8_t kExperimentalSyntheticSourceMask =
+    sourceBit(protocol_v2::Source::kSyntheticConstant) |
+    sourceBit(protocol_v2::Source::kSyntheticSparseHold) |
+    sourceBit(protocol_v2::Source::kSyntheticSlowAdc) |
+    sourceBit(protocol_v2::Source::kSyntheticAlternating) |
+    sourceBit(protocol_v2::Source::kSyntheticIncompressible);
+inline constexpr std::uint8_t kV2SupportedSourceMask =
+    kSupportedSourceMask | kExperimentalSyntheticSourceMask;
 inline constexpr std::uint32_t kCapabilityBits =
     capabilityBit(protocol_v1::Capability::kAdcStream) |
     capabilityBit(protocol_v1::Capability::kGpioStream) |
@@ -104,6 +131,10 @@ inline constexpr std::uint32_t kCapabilityBits =
     capabilityBit(protocol_v1::Capability::kChecksumBenchmark) |
     capabilityBit(protocol_v1::Capability::kGpioClockDiagnostic) |
     capabilityBit(protocol_v1::Capability::kGpioCaptureDiagnostic);
+inline constexpr std::uint32_t kV2CapabilityBits =
+    kCapabilityBits |
+    static_cast<std::uint32_t>(protocol_v2::Capability::kRleStreaming) |
+    static_cast<std::uint32_t>(protocol_v2::Capability::kSyntheticPatterns);
 inline constexpr std::uint16_t kGpioCaptureDiagnosticInfoFlags =
     static_cast<std::uint16_t>(
         protocol_v1::GpioCaptureDiagnosticFlag::kAvailable) |
@@ -157,6 +188,13 @@ static_assert((kMetadata.capability_bits & kDataCapabilityMask) ==
 static_assert(kMetadata.supported_source_mask ==
               (sourceBit(protocol_v1::Source::kHardware) |
                sourceBit(protocol_v1::Source::kSynthetic)));
+static_assert(kV2SupportedSourceMask == 0x7FU);
+static_assert(kV2CapabilityBits == protocol_v2::kKnownCapabilityMask);
+static_assert(isExperimentalSyntheticSource(static_cast<protocol_v1::Source>(
+    protocol_v2::Source::kSyntheticConstant)));
+static_assert(supportsConfiguration(static_cast<protocol_v1::Source>(
+                                       protocol_v2::Source::kSyntheticSlowAdc),
+                                   3U));
 static_assert(kMetadata.supported_checksum_mask ==
               ((1U << static_cast<std::uint8_t>(
                           protocol_v1::ChecksumAlgorithm::kAdler32)) |

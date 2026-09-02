@@ -130,8 +130,14 @@ void testV2EncodingNegotiationAndSessionReset() {
                  constants_v2::kInfoResponseCapabilityBitsOffset,
                  value32) &&
              (value32 & static_cast<std::uint32_t>(
-                            constants_v2::Capability::kRleStreaming)) != 0U,
-         "v2 INFO advertises only the explicit RLE capability path");
+                            constants_v2::Capability::kRleStreaming)) != 0U &&
+             (value32 & static_cast<std::uint32_t>(
+                            constants_v2::Capability::kSyntheticPatterns)) !=
+                 0U &&
+             decoded.payload.data[
+                 constants_v2::kInfoResponseSupportedSourceMaskOffset] ==
+                 0x7FU,
+         "v2 INFO advertises the explicit RLE and pattern capabilities");
 
   wire::Configuration rle = control::kSyntheticConfiguration;
   rle.protocol_version = constants_v2::kProtocolVersion;

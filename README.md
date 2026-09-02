@@ -70,6 +70,22 @@ decode headroom all pass. ADC ratios are reported without a savings threshold.
 The validated two-run host/simulator result is retained in the
 [RLE prototype evidence](doc/results/experiments/rle-prototype.md).
 
+Run the target-side v2 synthetic/RLE smoke validator against a flashed Teensy
+CDC port (the runner imports only the standard library and PySerial):
+
+```bash
+SERIAL_PORT=/dev/ttyACM0 \
+RLE_PATTERN=constant \
+RLE_ENCODING=RLE_AUTO \
+.venv/bin/python firmware/tests/rig_rle_streaming.py
+```
+
+`RLE_PATTERN` also accepts `sparse-hold`, `slow-adc`, `alternating`, and
+`incompressible`. Set `RLE_STREAMING_MODE=endurance` for the bounded campaign;
+that mode requires at least 600 capture seconds. Every outcome emits one
+schema-versioned `RLE_RESULT` JSON record and attempts STOP plus final IDLE
+confirmation.
+
 Run the autonomous experiment baseline from a clean checkout. This exercises
 the maximum-rate simulator profile, compiles the exact pinned 600 MHz firmware
 without uploading it, and writes validated JSON and structured Markdown:

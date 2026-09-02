@@ -30,6 +30,18 @@ constexpr bool isV2(std::uint8_t version) {
   return version == protocol_v2::kProtocolVersion;
 }
 
+constexpr std::uint8_t v2SourceBit(protocol_v2::Source source) {
+  return static_cast<std::uint8_t>(
+      1U << static_cast<std::uint8_t>(source));
+}
+
+constexpr std::uint8_t kV2ExperimentalSourceMask =
+    v2SourceBit(protocol_v2::Source::kSyntheticConstant) |
+    v2SourceBit(protocol_v2::Source::kSyntheticSparseHold) |
+    v2SourceBit(protocol_v2::Source::kSyntheticSlowAdc) |
+    v2SourceBit(protocol_v2::Source::kSyntheticAlternating) |
+    v2SourceBit(protocol_v2::Source::kSyntheticIncompressible);
+
 constexpr std::size_t maxControlFrameBytes(std::uint8_t version) {
   return isV2(version) ? protocol_v2::kMaxControlFrameBytes
                        : protocol_v1::kMaxControlFrameBytes;
@@ -196,8 +208,12 @@ constexpr bool isKnownState(std::uint8_t state) {
          static_cast<std::uint8_t>(protocol_v1::DeviceState::kRunning);
 }
 
-constexpr bool isKnownSource(std::uint8_t source) {
-  return source <= static_cast<std::uint8_t>(protocol_v1::Source::kSynthetic);
+constexpr bool isKnownSource(std::uint8_t source, std::uint8_t version) {
+  return source <=
+         (isV2(version)
+              ? static_cast<std::uint8_t>(
+                    protocol_v2::Source::kSyntheticIncompressible)
+              : static_cast<std::uint8_t>(protocol_v1::Source::kSynthetic));
 }
 
 constexpr std::uint16_t configurationProfileBit(std::uint8_t source,
@@ -219,7 +235,10 @@ constexpr std::uint16_t configurationProfileBit(std::uint8_t source,
                      protocol_v1::ConfigurationProfile::kHardwareCombined)
                : 0U;
   }
-  if (source == static_cast<std::uint8_t>(protocol_v1::Source::kSynthetic)) {
+  if (source >= static_cast<std::uint8_t>(
+                    protocol_v1::Source::kSynthetic) &&
+      source <= static_cast<std::uint8_t>(
+                    protocol_v2::Source::kSyntheticIncompressible)) {
     return streams == adc
                ? static_cast<std::uint16_t>(
                      protocol_v1::ConfigurationProfile::kSyntheticAdc)
@@ -562,7 +581,7 @@ Result validateConfiguration(ByteView payload, std::size_t offset,
        encoding == static_cast<std::uint8_t>(
                        protocol_v2::ConfigurationEncoding::kRleAuto));
   if ((streams & static_cast<std::uint8_t>(~kValidStreamMask)) != 0U ||
-      !isKnownSource(source) || !valid_encoding) {
+      !isKnownSource(source, version) || !valid_encoding) {
     return badPayload();
   }
   const auto checksum_algorithm =
@@ -987,6 +1006,8 @@ void encodeAdcTriggerMetadata(MutableByteView payload, std::size_t base,
 }
 
 Result validateInfo(ByteView payload, std::uint8_t version) {
+  const std::uint8_t known_source_mask =
+      isV2(version) ? 0x7FU : 0x03U;
   if (payload.data[protocol_v1::kInfoResponseReserved0Offset] != 0U ||
       payload.data[protocol_v1::kInfoResponseReserved2Offset] != 0U ||
       payload.data[protocol_v1::kInfoResponseReserved4Offset] != 0U ||
@@ -998,7 +1019,8 @@ Result validateInfo(ByteView payload, std::uint8_t version) {
       payload.data[protocol_v1::kInfoResponseSupportedStreamMaskOffset] &
           static_cast<std::uint8_t>(~kValidStreamMask) ||
       payload.data[protocol_v1::kInfoResponseSupportedSourceMaskOffset] == 0U ||
-      payload.data[protocol_v1::kInfoResponseSupportedSourceMaskOffset] & 0xFCU ||
+      (payload.data[protocol_v1::kInfoResponseSupportedSourceMaskOffset] &
+       static_cast<std::uint8_t>(~known_source_mask)) != 0U ||
       payload.data[protocol_v1::kInfoResponseGpioPinCountOffset] !=
           protocol_v1::kInfoResponseGpioPinMapCount ||
       payload.data[protocol_v1::kInfoResponseGpioPackedWidthBitsOffset] !=
@@ -1186,7 +1208,7 @@ Result validateInfo(ByteView payload, std::uint8_t version) {
   const std::uint8_t applied_source =
       payload.data[protocol_v1::kInfoResponseAppliedSourceOffset];
   if ((applied_streams & static_cast<std::uint8_t>(~kValidStreamMask)) != 0U ||
-      !isKnownSource(applied_source) ||
+      !isKnownSource(applied_source, version) ||
       (state == static_cast<std::uint8_t>(protocol_v1::DeviceState::kIdle) &&
        applied_streams != 0U)) {
     return badPayload();
@@ -1342,7 +1364,7 @@ Result validateStatus(ByteView payload, std::uint8_t version) {
       (streams & static_cast<std::uint8_t>(~kValidStreamMask)) != 0U ||
       (state == static_cast<std::uint8_t>(protocol_v1::DeviceState::kIdle) &&
        streams != 0U) ||
-      !isKnownSource(source) ||
+      !isKnownSource(source, version) ||
       !isSupportedChecksum(
           static_cast<protocol_v1::ChecksumAlgorithm>(checksum))) {
     return badPayload();
@@ -2526,14 +2548,19 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   payload[protocol_v1::kInfoResponseSupportedStreamMaskOffset] =
       response.supported_stream_mask;
   payload[protocol_v1::kInfoResponseSupportedSourceMaskOffset] =
-      response.supported_source_mask;
+      isV2(request.protocol_version)
+          ? static_cast<std::uint8_t>(response.supported_source_mask |
+                                      kV2ExperimentalSourceMask)
+          : response.supported_source_mask;
   storeU32(bytes, protocol_v1::kInfoResponseSupportedChecksumMaskOffset,
            response.supported_checksum_mask);
   const std::uint32_t capability_bits =
       isV2(request.protocol_version)
           ? response.capability_bits |
                 static_cast<std::uint32_t>(
-                    protocol_v2::Capability::kRleStreaming)
+                    protocol_v2::Capability::kRleStreaming) |
+                static_cast<std::uint32_t>(
+                    protocol_v2::Capability::kSyntheticPatterns)
           : response.capability_bits;
   storeU32(bytes, protocol_v1::kInfoResponseCapabilityBitsOffset,
            capability_bits);
