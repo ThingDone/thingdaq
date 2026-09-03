@@ -18,6 +18,7 @@ from unittest import mock
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 RIG_PATH = REPOSITORY_ROOT / "firmware/tests/rig_rle_streaming.py"
 CONTRACT_PATH = REPOSITORY_ROOT / "protocol/protocol-v2.json"
+V1_CONTRACT_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
 
 
 def _load_rig():
@@ -683,6 +684,15 @@ class RLEStreamingRigTests(unittest.TestCase):
         self.assertEqual({"serial"}, imported_roots - set(sys.stdlib_module_names))
 
         contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        v1_contract = json.loads(V1_CONTRACT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(
+            v1_contract["limits"]["max_control_frame_bytes"],
+            rig.MAX_V1_CONTROL_FRAME_BYTES,
+        )
+        self.assertEqual(
+            contract["limits"]["max_control_frame_bytes"],
+            rig.MAX_V2_CONTROL_FRAME_BYTES,
+        )
         fields = contract["payload_schemas"]["status_response"]["fields"]
         expected = {
             name: (rig._SCALAR_FORMAT[field["type"]], field["offset"])
