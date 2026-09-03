@@ -735,7 +735,10 @@ class RLEStreamingRigTests(unittest.TestCase):
             item_count=rig.ADC_PAIRS_PER_FRAME,
             checksum_valid=False,
         )
-        with self.assertRaisesRegex(rig.CodecFailure, "checksum mismatch"):
+        with self.assertRaisesRegex(
+            rig.CodecFailure,
+            r"checksum mismatch: .*kind=0x01 encoding=1 .*sequence=0",
+        ):
             rig.FrameParser(strict=True).feed(bad_checksum)
 
         valid_checksum = _device_frame(

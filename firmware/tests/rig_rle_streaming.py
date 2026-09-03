@@ -477,7 +477,11 @@ class FrameParser:
                 self.checksum_errors += 1
                 message = (
                     f"checksum mismatch: expected 0x{expected:08x}, "
-                    f"received 0x{actual:08x}"
+                    f"received 0x{actual:08x}; "
+                    f"kind=0x{fields[2]:02x} encoding={fields[6]} "
+                    f"total_length={fields[7]} payload_length={fields[8]} "
+                    f"run_id={fields[9]} sequence={fields[10]} "
+                    f"request_id={fields[11]}"
                 )
                 if self.strict:
                     raise CodecFailure(message)
