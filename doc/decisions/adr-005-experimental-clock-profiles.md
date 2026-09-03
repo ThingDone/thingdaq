@@ -2,6 +2,7 @@
 type: analysis
 title: 'ADR 005: Experimental Clock Profiles'
 created: 2026-09-01
+updated: 2026-09-03
 tags:
   - thingdaq
   - decision
@@ -23,9 +24,10 @@ Accepted as the design boundary for the isolated 528 MHz experiment. The
 `experiment/clock-528mhz` branch is experimental and descends from the exact
 pushed `experiment/baseline-2026-09-01` commit
 `b23004defeca465da0ae2d2884c4fef71979e5d4`. The 600 MHz profile remains the
-production default. This decision records the inspected boundary; it does not
-itself claim a working 528 MHz build or any physical, thermal, power, or
-lifetime result.
+production default. A bounded physical smoke now establishes the 528 MHz
+profile's digital acquisition and transport path with its explicit 10-bit ADC
+fallback. It does not establish a complete same-board ABBA comparison or any
+thermal benefit, power, reliability, or lifetime result.
 
 The candidate was created at
 `.maestro/playbooks/Working/clock-528mhz` and was clean at the baseline commit
@@ -169,6 +171,27 @@ works.
    On-chip temperature can support only the declared comparison under the
    recorded fixture and ambient limitations. It cannot support power, junction
    temperature, reliability, or lifetime claims.
+
+## Physical 528 MHz smoke evidence
+
+Clean commit `a7a2e0a0538cf1f07611e9cc08850bbc5edde110` produced build
+`thingdaq-a3acfafe0d8a3d6e` with source ID
+`a30d4124fd5ab3884cfdf7d8bbfc2b2cc08dcdc5d8b23b55c2dac9a1b6ecb839`
+and HEX SHA-256
+`cf8e43322ca89eec9e779093b466c441050523201bc17cdb3bda9a52f1149056`.
+Physical service job `d916d7d9-5300-45fa-b65d-19fae0b81798` programmed that
+exact artifact on replacement board serial `20428100`, verified the advertised
+528/132/33/24 MHz clocks and 1175 mV profile target, passed the expanded ADC
+completion diagnostic at 10 bits, and passed all 404 maximum-rate stream and
+counter-conservation checks. The measured timed rates were 1,000,020.31 ADC
+pairs/s and 4,000,081.25 GPIO samples/s over 10.000381 seconds, followed by a
+bounded, exactly reconciled STOP tail and clean IDLE.
+
+The runner's separate thermal result remains `INCONCLUSIVE` because one of 20
+steady-state TEMPMON polls returned `NOT_READY`; the other 19 valid steady
+samples ranged from 39.123 to 41.579 degrees Celsius. The single-profile smoke
+does not supersede the canonical ABBA comparison report and supports no
+lifetime inference.
 
 ## Consequences
 

@@ -2,7 +2,7 @@
 type: analysis
 title: 'ADR 004: ADC Trigger and DMA'
 created: 2026-08-28
-updated: 2026-08-29
+updated: 2026-09-03
 tags:
   - thingdaq
   - decision
@@ -301,6 +301,28 @@ and advertises 10-bit conversion, while the 600 MHz control retains 12-bit
 conversion. The 12-bit observation is retained in physical campaign `00006`,
 service job `5f13a168-2587-4098-9466-da8891747c34`, against clean build
 `thingdaq-be5662e7c9f0aae3` from commit `2254f7cfa29a262a3b951f382cfcf095de8141ea`.
+
+The fallback subsequently passed a physical maximum-rate smoke on replacement
+Teensy serial `20428100`. Service job
+`d916d7d9-5300-45fa-b65d-19fae0b81798` programmed clean 528 MHz build
+`thingdaq-a3acfafe0d8a3d6e` from commit
+`a7a2e0a0538cf1f07611e9cc08850bbc5edde110`. The boot diagnostic observed
+completion counts `[8, 8]` with a 272-DWT-cycle median inside the required
+`264 +/- 106` range. The combined stream then passed all 404 performance and
+conservation checks over 10.000381 seconds at 1,000,020.31 ADC pairs/s and
+4,000,081.25 GPIO samples/s, with zero runtime ADC_ETC, eDMA, ring, frame,
+packet, parser, transport, USB-I/O, or root hardware errors. Its immediate
+STOP discarded one bounded partial generation (39 ADC pairs and 156 GPIO
+samples), reconciled every detailed incomplete counter exactly, and returned
+to clean IDLE.
+
+One of 20 steady-state temperature polls returned the protocol's explicit
+`NOT_READY` state, so the comparison runner conservatively reported its
+top-level result as `INCONCLUSIVE` for thermal evidence even though
+`performance_result` was `PASS` with no validation failures. This smoke proves
+the selected 10-bit digital acquisition and transport path at 528 MHz; it does
+not grade analog accuracy/aperture, comparative thermals, power, reliability,
+or lifetime.
 
 The 10-bit fallback keeps the `uint16_t` container, exact 1 MHz-per-converter
 rate, 500 ns trigger offset, and permanent ADC0/A0 and ADC1/A1 routes. It
