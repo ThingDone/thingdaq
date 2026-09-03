@@ -426,6 +426,7 @@ class FrameParser:
         self.bytes_discarded = 0
         self.high_water_bytes = 0
         self.rle_validator: Callable[[Frame], tuple[int, str]] | None = None
+        self.last_frame_context = "none"
 
     @property
     def errors(self) -> int:
@@ -434,6 +435,7 @@ class FrameParser:
     def reset_for_cleanup(self) -> None:
         self.buffer.clear()
         self.strict = False
+        self.last_frame_context = "none"
 
     def feed(self, data: bytes) -> list[Frame]:
         incoming = bytes(data)
@@ -536,6 +538,11 @@ class FrameParser:
                 )
             del self.buffer[:total_length]
             self.frames_decoded += 1
+            self.last_frame_context = (
+                f"kind=0x{frame.kind:02x} encoding={frame.encoding} "
+                f"run_id={frame.run_id} sequence={frame.sequence} "
+                f"request_id={frame.request_id} total_length={frame.total_length}"
+            )
             frames.append(frame)
 
         retained_bound = MAX_FRAME_BYTES + len(MAGIC_BYTES) - 1
@@ -736,7 +743,14 @@ class FrameParser:
 
     def _discard_or_fail(self, count: int, message: str) -> None:
         if self.strict:
-            raise CodecFailure(message)
+            preview_bytes = min(count, 32)
+            prefix = bytes(self.buffer[:preview_bytes]).hex()
+            suffix = bytes(self.buffer[max(0, count - preview_bytes) : count]).hex()
+            raise CodecFailure(
+                f"{message}: discard_bytes={count} buffered_bytes={len(self.buffer)} "
+                f"prefix_hex={prefix} suffix_hex={suffix} "
+                f"last_frame=({self.last_frame_context})"
+            )
         del self.buffer[:count]
         self.bytes_discarded += count
 

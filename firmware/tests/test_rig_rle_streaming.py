@@ -750,6 +750,30 @@ class RLEStreamingRigTests(unittest.TestCase):
         with self.assertRaisesRegex(rig.CodecFailure, "run length is zero"):
             rig.FrameParser(strict=True).feed(valid_checksum)
 
+    def test_strict_resynchronization_reports_bounded_wire_context(self) -> None:
+        payload = struct.pack("<H", rig.ADC_PAIRS_PER_FRAME) + b"\x01\x00\x02\x00"
+        frame = _device_frame(
+            kind=rig.ADC_DATA,
+            payload=payload,
+            encoding=rig.FRAME_ENCODING_RLE,
+            item_count=rig.ADC_PAIRS_PER_FRAME,
+        )
+        parser = rig.FrameParser(strict=True)
+        self.assertEqual(1, len(parser.feed(frame)))
+
+        prefix = b"ERROR status = 68"
+        with self.assertRaisesRegex(
+            rig.CodecFailure,
+            (
+                r"wire bytes precede frame magic: discard_bytes=17 "
+                r"buffered_bytes=.*prefix_hex=4552524f5220737461747573203d203638 "
+                r"suffix_hex=4552524f5220737461747573203d203638 "
+                r"last_frame=\(kind=0x01 encoding=1 run_id=7 sequence=0 "
+                r"request_id=0 total_length=54\)"
+            ),
+        ):
+            parser.feed(prefix + frame)
+
     def test_slow_adc_parser_fuses_bounded_and_formula_validation(self) -> None:
         payload = bytearray()
         logical = 0

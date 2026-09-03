@@ -53,7 +53,7 @@ constexpr std::uint16_t kTcdControl =
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100U;
 constexpr std::uint32_t kDmaAlignmentWaitCycles =
-    protocol_v1::kAdcTriggerDwtClockHz / 10000U;
+    protocol_v1::kAdcTriggerDwtClockHz / 100000U;
 constexpr std::size_t kDmaPipelineDepth = board::kAdcDmaPipelineDepth;
 constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
 constexpr std::size_t kPairDispatchConverter = 1U;
@@ -950,7 +950,7 @@ static_assert(board::kAdcEdmaPriorities[0] == 2U);
 static_assert(board::kAdcEdmaPriorities[1] == 1U);
 static_assert(kPairDispatchConverter == 1U);
 static_assert(kDmaPipelineDepth == 6U);
-static_assert(kDmaAlignmentWaitCycles == 60000U);
+static_assert(kDmaAlignmentWaitCycles == 6000U);
 
 }  // namespace thingdaq::adc_capture
 
