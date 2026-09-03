@@ -83,6 +83,7 @@ clock, while PIT remains fixed.
 | Core voltage target selected by Teensy 1.62.0 | 1,250 mV | 1,175 mV |
 | IPG divider and runtime `F_BUS_ACTUAL` | 4; 150,000,000 Hz | 4; 132,000,000 Hz |
 | ADC divider and clock | 4; 37,500,000 Hz | 4; 33,000,000 Hz |
+| ADC resolution after full-rate timing/error gate | 12-bit primary | 10-bit explicit fallback |
 | Nominal 500 ns phase | 75 IPG cycles | 66 IPG cycles |
 | Nominal 500 ns diagnostic target | 300 DWT cycles | 264 DWT cycles |
 | PIT root | 24,000,000 Hz | 24,000,000 Hz |
@@ -146,9 +147,12 @@ works.
    clocks. The 24 MHz PIT schedule and nominal acquisition rates do not change.
 4. The existing protocol-v1 raw ADC and GPIO data frame header, payload layout,
    sequence/timestamp semantics, checksum behavior, and nominal sample rates
-   remain compatible. Profile and health metadata are additive control-plane
-   information. The 600 MHz profile remains the fallback/control behavior and
-   must preserve its accepted raw bytes.
+   remain compatible. The 600 MHz profile retains primary 12-bit ADC codes;
+   the 528 MHz profile uses the protocol's explicit 10-bit fallback after its
+   corrected full-rate 12-bit gate produced both ADC_ETC queue errors. INFO and
+   STATUS advertise the selected resolution, CFG mode, and code maximum. The
+   600 MHz profile remains the control behavior and must preserve its accepted
+   raw bytes.
 5. Temperature and service-health sampling is bounded and acquisition-safe.
    TEMPMON timeout, invalid calibration, non-finite conversion, or unavailable
    data is represented explicitly; no health query may wait indefinitely.

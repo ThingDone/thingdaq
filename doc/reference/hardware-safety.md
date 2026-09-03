@@ -34,8 +34,8 @@ external circuit before connection.
 
 | Logical input | Teensy pin | Internal path | Current use |
 | --- | --- | --- | --- |
-| ADC0 | A0 / D14 | NXP ADC1 channel 7 | 12-bit raw code, nominal 1 MS/s |
-| ADC1 | A1 / D15 | NXP ADC2 channel 8 | 12-bit raw code, nominal 1 MS/s, 500 ns after ADC0 |
+| ADC0 | A0 / D14 | NXP ADC1 channel 7 | 12-bit at 600 MHz or advertised 10-bit fallback at 528 MHz, nominal 1 MS/s |
+| ADC1 | A1 / D15 | NXP ADC2 channel 8 | same selected resolution, nominal 1 MS/s, 500 ns after ADC0 |
 | GPIO bit 0 | D6 | packed digital input | nominal 4 MS/s |
 | GPIO bit 1 | D7 | packed digital input | nominal 4 MS/s |
 | GPIO bit 2 | D8 | packed digital input | nominal 4 MS/s |
@@ -67,9 +67,10 @@ voltage, contention path, or ground offset safe.
   review the board schematic and attached circuitry rather than assuming it is
   an unencumbered header node.
 
-The firmware's nominal ADC range metadata is 0-3.3 V and codes 0-4095 for the
-accepted 12-bit build. It is metadata, not a precision reference guarantee or
-permission to approach absolute maximum ratings.
+The firmware's nominal ADC range metadata is 0-3.3 V with codes 0-4095 for the
+600 MHz 12-bit profile or 0-1023 for the 528 MHz gated 10-bit profile. It is
+metadata, not a precision reference guarantee or permission to approach
+absolute maximum ratings.
 
 ## ADC source impedance and front end
 

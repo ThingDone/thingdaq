@@ -273,7 +273,7 @@
     "pins": [14, 15],
     "peripherals": [1, 2],
     "channels": [7, 8],
-    "semantics": "Both ADC modules are configured independently for synchronous 37.5 MHz high-speed conversion, no hardware averaging, and the shortest three-ADCK sample setting. Calibration starts only after route/configuration validation and is bounded independently per converter by both the 600 MHz DWT deadline and a finite poll limit. VREFH/VREFL range values are nominal board metadata, not calibrated voltage claims. Twelve bits remains primary; ten bits may be selected only by the explicit completed timing/error fallback gate."
+    "semantics": "Both ADC modules are configured independently for profile-selected synchronous high-speed conversion (37.5 MHz at the 600 MHz profile or 33 MHz at the 528 MHz profile), no hardware averaging, and the shortest three-ADCK sample setting. Calibration starts only after route/configuration validation and is bounded independently per converter by a profile-scaled DWT deadline and a finite poll limit. VREFH/VREFL range values are nominal board metadata, not calibrated voltage claims. The 600 MHz profile retains primary 12-bit conversion; the 528 MHz profile advertises 10-bit conversion after its completed corrected full-rate 12-bit timing/error gate reported both ADC_ETC queue errors."
   },
   "adc_trigger": {
     "pit_clock_hz": 24000000,

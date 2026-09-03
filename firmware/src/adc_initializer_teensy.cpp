@@ -242,7 +242,7 @@ class TeensyPlatform final : public Platform {
 };
 
 TeensyPlatform g_platform{};
-Initializer g_initializer{g_platform};
+Initializer g_initializer{g_platform, selectedProfileResolutionGate()};
 
 }  // namespace
 

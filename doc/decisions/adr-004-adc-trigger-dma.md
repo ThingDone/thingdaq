@@ -289,17 +289,24 @@ The initializer defaults to the 12-bit configuration above. Its resolution
 selector can choose 10-bit only when a completed gate records corrected
 configuration, exact-rate and calibration verification, and then a remaining
 timing-budget or conversion-error failure. An incomplete gate, route error, or
-calibration error cannot authorize fallback. The completed full-rate target
-gate passed at 12 bits with exact-rate, calibration, trigger, DMA, and zero-
-error evidence, so fallback was not authorized and the accepted build remains
-explicitly 12-bit. A future regression may select 10-bit only when that same
-defined gate still fails at the exact 1 MHz-per-converter rate after clocks,
-calibration, trigger queues, and DMA ownership have been verified. A 10-bit
-fallback keeps the `uint16_t` container and the permanent ADC0/A0 and ADC1/A1
-routes, but must
-change advertised resolution/code range, update this ADR, and rerun every
-local and physical acceptance test. It is never silent and never triggered by
-the numeric values observed on floating or unstimulated inputs.
+calibration error cannot authorize fallback. The completed 600 MHz full-rate
+target gate passed at 12 bits with exact-rate, calibration, trigger, DMA, and
+zero-error evidence, so that profile remains explicitly 12-bit. The corrected
+528 MHz target gate verified the exact 528/132/33/24 MHz clock profile, both
+routes, and both calibrations, but at 12 bits both ADC_ETC queues raised
+trigger errors before either completion was recorded within the next 1 us
+trigger interval. This satisfies the defined timing/error fallback gate
+independently of the observed ADC codes. The 528 MHz profile therefore selects
+and advertises 10-bit conversion, while the 600 MHz control retains 12-bit
+conversion. The 12-bit observation is retained in physical campaign `00006`,
+service job `5f13a168-2587-4098-9466-da8891747c34`, against clean build
+`thingdaq-be5662e7c9f0aae3` from commit `2254f7cfa29a262a3b951f382cfcf095de8141ea`.
+
+The 10-bit fallback keeps the `uint16_t` container, exact 1 MHz-per-converter
+rate, 500 ns trigger offset, and permanent ADC0/A0 and ADC1/A1 routes. It
+changes the advertised resolution to 10 bits, code maximum to 1,023, and CFG
+mode to 1. It is never silent and is never triggered by the numeric values
+observed on floating or unstimulated inputs.
 
 No fallback may swap converters or pins, use an approximate sample rate,
 remove the 500 ns delay difference, enable averaging, or dynamically allocate

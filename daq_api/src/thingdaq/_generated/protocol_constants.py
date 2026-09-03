@@ -1,7 +1,7 @@
 """Generated protocol-v1 constants. Do not edit by hand.
 
 Source: protocol/protocol-v1.json
-Source SHA-256: 5e4c41f7c9cefe6c71fbaafaa6f2fb62c44a6927ac7a19d901222cdca97a365b
+Source SHA-256: c62485cca47ba07cd292d36ecd889a50a01c29817c284fb56a51502162ae4540
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from enum import IntEnum, IntFlag
 from typing import NamedTuple
 
-SOURCE_SHA256 = "5e4c41f7c9cefe6c71fbaafaa6f2fb62c44a6927ac7a19d901222cdca97a365b"
+SOURCE_SHA256 = "c62485cca47ba07cd292d36ecd889a50a01c29817c284fb56a51502162ae4540"
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
 PROTOCOL_VERSION = 1

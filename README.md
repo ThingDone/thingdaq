@@ -16,8 +16,8 @@ developed without hardware.
 
 | Input | Physical schedule | Python representation |
 | --- | --- | --- |
-| ADC0 on A0/D14 | 1 MS/s, nominal ticks `0, 8, 16, ...` | unchanged 12-bit raw codes |
-| ADC1 on A1/D15 | 1 MS/s, nominally 500 ns after ADC0 | unchanged 12-bit raw codes |
+| ADC0 on A0/D14 | 1 MS/s, nominal ticks `0, 8, 16, ...` | 12-bit at 600 MHz; explicitly advertised 10-bit fallback at 528 MHz |
+| ADC1 on A1/D15 | 1 MS/s, nominally 500 ns after ADC0 | same profile-selected resolution in unchanged `uint16_t` containers |
 | GPIO D6-D13 | 4 MS/s simultaneous packed snapshots | one byte per sample, D6 in bit 0 through D13 in bit 7 |
 
 The timestamp domain is an unsigned, START-relative 8 MHz clock. Explicit ADC

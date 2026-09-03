@@ -291,6 +291,30 @@ void testFallbackGatePolicy() {
          "authorized fallback is fully and unambiguously advertised");
 }
 
+void testSelectedProfileResolutionPolicy() {
+  constexpr adc::ResolutionGate gate = adc::selectedProfileResolutionGate();
+  constexpr adc::Snapshot snapshot = adc::defaultSnapshot(gate);
+#if THINGDAQ_CPU_PROFILE_MHZ == 528U
+  expect(adc::selectResolution(gate) == 10U &&
+             snapshot.settings.resolution_bits == 10U &&
+             snapshot.settings.code_max == 1023U &&
+             (snapshot.configuration_flags &
+              flag(v1::AdcConfigurationFlag::kFallback10Bit)) != 0U &&
+             (snapshot.configuration_flags &
+              flag(v1::AdcConfigurationFlag::kPrimary12Bit)) == 0U,
+         "the 528 MHz profile selects and advertises the gated 10-bit mode");
+#else
+  expect(adc::selectResolution(gate) == 12U &&
+             snapshot.settings.resolution_bits == 12U &&
+             snapshot.settings.code_max == 4095U &&
+             (snapshot.configuration_flags &
+              flag(v1::AdcConfigurationFlag::kPrimary12Bit)) != 0U &&
+             (snapshot.configuration_flags &
+              flag(v1::AdcConfigurationFlag::kFallback10Bit)) == 0U,
+         "the 600 MHz profile retains and advertises primary 12-bit mode");
+#endif
+}
+
 void testEveryFallbackGateCombination() {
   constexpr std::uint16_t primary_flag =
       flag(v1::AdcConfigurationFlag::kPrimary12Bit);
@@ -356,6 +380,7 @@ int main() {
   testRouteConfigurationAndClockFailures();
   testIndependentTimeoutAndCycleWrap();
   testFallbackGatePolicy();
+  testSelectedProfileResolutionPolicy();
   testEveryFallbackGateCombination();
   testFrozenCounterPollLimit();
   if (failures != 0) {

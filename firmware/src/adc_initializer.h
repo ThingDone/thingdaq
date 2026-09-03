@@ -49,6 +49,20 @@ constexpr std::uint8_t selectResolution(const ResolutionGate &gate) {
                              : protocol_v1::kAdcPrimaryResolutionBits;
 }
 
+// Profile selection is deliberately compile-time and evidence-backed. The
+// 600 MHz control completed the corrected full-rate timing/error gate at
+// 12 bits. On the same firmware source, the 528 MHz profile verified clocks,
+// routes, and calibration but both ADC_ETC queues reported trigger errors
+// before recording a completion at 12 bits. Preserve the exact 1 MHz schedule
+// by selecting the already-declared 10-bit fallback for that profile only.
+constexpr ResolutionGate selectedProfileResolutionGate() {
+#if THINGDAQ_CPU_PROFILE_MHZ == 528U
+  return {true, true, true, true, false, false};
+#else
+  return {true, true, true, true, true, true};
+#endif
+}
+
 constexpr std::uint16_t codeMaximum(std::uint8_t resolution_bits) {
   return resolution_bits == protocol_v1::kAdcFallbackResolutionBits
              ? static_cast<std::uint16_t>(
@@ -205,6 +219,13 @@ static_assert(identity::kAdcPrimaryConversionTimePicoseconds +
                       identity::kAdcPrimaryConversionMarginPicoseconds ==
                   identity::kAdcPairPeriodPicoseconds);
 static_assert(selectResolution({}) == protocol_v1::kAdcPrimaryResolutionBits);
+#if THINGDAQ_CPU_PROFILE_MHZ == 528U
+static_assert(selectResolution(selectedProfileResolutionGate()) ==
+              protocol_v1::kAdcFallbackResolutionBits);
+#else
+static_assert(selectResolution(selectedProfileResolutionGate()) ==
+              protocol_v1::kAdcPrimaryResolutionBits);
+#endif
 static_assert(codeMaximum(protocol_v1::kAdcPrimaryResolutionBits) == 4095U);
 static_assert(codeMaximum(protocol_v1::kAdcFallbackResolutionBits) == 1023U);
 static_assert(conversionMode(protocol_v1::kAdcPrimaryResolutionBits) == 2U);
