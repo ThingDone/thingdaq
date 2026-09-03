@@ -223,14 +223,26 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
             264,
             106,
         ),
+        "EXPERIMENTAL_450_MHZ": (
+            450_000_000,
+            150_000_000,
+            37_500_000,
+            24_000_000,
+            450_000_000,
+            1150,
+            75,
+            225,
+            90,
+        ),
     }
     if set(profile_values) != set(expected_profiles):
         raise ContractError(
-            "clock profile registry must contain exactly 600 and 528 MHz"
+            "clock profile registry must contain exactly 600, 528, and 450 MHz"
         )
     if profile_values != {
         "PRODUCTION_600_MHZ": 0,
         "EXPERIMENTAL_528_MHZ": 1,
+        "EXPERIMENTAL_450_MHZ": 2,
     }:
         raise ContractError("clock profile wire IDs must remain stable")
     profile_by_name = {str(profile["name"]): profile for profile in profile_entries}
@@ -1778,11 +1790,11 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             "",
         ]
     )
-    profile_constant_names: list[str] = []
+    profile_constant_names: list[tuple[str, str]] = []
     for profile in clock_profiles["profiles"]:
         constant_name = f"k{snake_to_pascal(str(profile['name']))}ClockProfile"
-        profile_constant_names.append(constant_name)
         enum_name = snake_to_pascal(str(profile["name"]))
+        profile_constant_names.append((enum_name, constant_name))
         lines.extend(
             [
                 f"inline constexpr ClockProfileSpec {constant_name}{{",
@@ -1807,10 +1819,19 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             f"    ClockProfile::k{default_profile_name};",
             "",
             "constexpr const ClockProfileSpec &clockProfileSpec(ClockProfile profile) {",
-            (
-                "  return profile == ClockProfile::kExperimental528Mhz ? "
-                f"{profile_constant_names[1]} : {profile_constant_names[0]};"
-            ),
+        ]
+    )
+    for enum_name, constant_name in profile_constant_names:
+        lines.extend(
+            [
+                f"  if (profile == ClockProfile::k{enum_name}) {{",
+                f"    return {constant_name};",
+                "  }",
+            ]
+        )
+    lines.extend(
+        [
+            f"  return k{default_profile_name}ClockProfile;",
             "}",
             "",
         ]

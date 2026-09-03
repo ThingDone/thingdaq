@@ -392,5 +392,5 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 1,
   "source": "protocol/protocol-v1.json",
-  "source_sha256": "c62485cca47ba07cd292d36ecd889a50a01c29817c284fb56a51502162ae4540"
+  "source_sha256": "668c7fedf87da00f9003d7bdcda256916946aeac1f3d5e52659a09ab5bfd7e4b"
 }

@@ -26,8 +26,10 @@ pushed `experiment/baseline-2026-09-01` commit
 `b23004defeca465da0ae2d2884c4fef71979e5d4`. The 600 MHz profile remains the
 production default. A bounded physical smoke now establishes the 528 MHz
 profile's digital acquisition and transport path with its explicit 10-bit ADC
-fallback. It does not establish a complete same-board ABBA comparison or any
-thermal benefit, power, reliability, or lifetime result.
+fallback. A derived 450 MHz profile is an isolated CPU-headroom experiment
+that restores the production IPG/ADC clocks while lowering the CPU clock. It
+does not establish a complete same-board comparison or any thermal benefit,
+power, reliability, or lifetime result.
 
 The candidate was created at
 `.maestro/playbooks/Working/clock-528mhz` and was clean at the baseline commit
@@ -61,8 +63,8 @@ the required build properties differ only in `build.fcpu`.
 
 | Pinned source | SHA-256 | Finding used by this decision |
 | --- | --- | --- |
-| `boards.txt` | `b58e03c4ccfd5a6f471ba05350987e0f845d0885255dd26fe163422d67c48714` | Teensy 4.0 exposes `speed=600` and `speed=528`, resolving `build.fcpu` to `600000000` and `528000000` respectively. |
-| `cores/teensy4/clockspeed.c` | `3cc8a1e339eb8ee85edd8480ca364dc63c529dddfd7336ab1285649d1ec6fa63` | `set_arm_clock()` chooses `div_ipg = ceil(frequency / 150000000)`, then publishes `F_CPU_ACTUAL=frequency` and `F_BUS_ACTUAL=frequency/div_ipg`. Both profiles use divider 4, producing 150 MHz at 600 MHz and 132 MHz at 528 MHz. Its DCDC policy targets 1250 mV above 528 MHz through 600 MHz and 1175 mV at 528 MHz. |
+| `boards.txt` | `b58e03c4ccfd5a6f471ba05350987e0f845d0885255dd26fe163422d67c48714` | Teensy 4.0 exposes `speed=600`, `speed=528`, and `speed=450`, resolving `build.fcpu` to `600000000`, `528000000`, and `450000000` respectively. |
+| `cores/teensy4/clockspeed.c` | `3cc8a1e339eb8ee85edd8480ca364dc63c529dddfd7336ab1285649d1ec6fa63` | `set_arm_clock()` chooses `div_ipg = ceil(frequency / 150000000)`, then publishes `F_CPU_ACTUAL=frequency` and `F_BUS_ACTUAL=frequency/div_ipg`. The 600 and 528 MHz profiles use divider 4, producing 150 and 132 MHz IPG; 450 MHz uses divider 3 and restores 150 MHz IPG. Its DCDC policy targets 1250 mV at 600 MHz, 1175 mV at 528 MHz, and 1150 mV at 450 MHz. |
 | `cores/teensy4/startup.c` | `2307f20018fde63cf5ccb4e0d7de14047f8cb0fb5a567b474894d814c330de40` | Before applying `F_CPU`, startup selects the undivided 24 MHz oscillator as PERCLK for PIT/GPT. The acquisition PIT root therefore remains independent of the CPU menu selection. |
 | `cores/teensy4/tempmon.c` | `d3572899cd9f123ddf6c5e1f6109e27c659b0ab266b1ba27dd6df9bc5d4c1afb` | The core initializes TEMPMON from OCOTP calibration data, but `tempmonGetTemp()` busy-waits without a deadline for the ready bit and returns a float. Runtime health sampling must reuse the calibrated register formula behind a bounded readiness check rather than call this unbounded API in acquisition service. |
 
@@ -77,19 +79,19 @@ accepted half-microsecond ADC phase remains a time requirement, so its integer
 cycle representation changes with the profile. DWT follows the actual CPU
 clock, while PIT remains fixed.
 
-| Property | Production/control profile | Experimental candidate profile |
-| --- | ---: | ---: |
-| Profile identity | `600` | `528` |
-| Exact FQBN | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` | `teensy:avr:teensy40:usb=serial,speed=528,opt=o2std` |
-| Resolved `build.fcpu`, required `F_CPU`, runtime `F_CPU_ACTUAL` | 600,000,000 Hz | 528,000,000 Hz |
-| Core voltage target selected by Teensy 1.62.0 | 1,250 mV | 1,175 mV |
-| IPG divider and runtime `F_BUS_ACTUAL` | 4; 150,000,000 Hz | 4; 132,000,000 Hz |
-| ADC divider and clock | 4; 37,500,000 Hz | 4; 33,000,000 Hz |
-| ADC resolution after full-rate timing/error gate | 12-bit primary | 10-bit explicit fallback |
-| Nominal 500 ns phase | 75 IPG cycles | 66 IPG cycles |
-| Nominal 500 ns diagnostic target | 300 DWT cycles | 264 DWT cycles |
-| PIT root | 24,000,000 Hz | 24,000,000 Hz |
-| GPIO / ADC-pair schedule | 4,000,000 / 1,000,000 samples/s | 4,000,000 / 1,000,000 samples/s |
+| Property | Production/control | Experimental 528 | Experimental 450 |
+| --- | ---: | ---: | ---: |
+| Profile identity | `600` | `528` | `450` |
+| Exact FQBN | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` | `teensy:avr:teensy40:usb=serial,speed=528,opt=o2std` | `teensy:avr:teensy40:usb=serial,speed=450,opt=o2std` |
+| Resolved `build.fcpu`, required `F_CPU`, runtime `F_CPU_ACTUAL` | 600,000,000 Hz | 528,000,000 Hz | 450,000,000 Hz |
+| Core voltage target selected by Teensy 1.62.0 | 1,250 mV | 1,175 mV | 1,150 mV |
+| IPG divider and runtime `F_BUS_ACTUAL` | 4; 150,000,000 Hz | 4; 132,000,000 Hz | 3; 150,000,000 Hz |
+| ADC divider and clock | 4; 37,500,000 Hz | 4; 33,000,000 Hz | 4; 37,500,000 Hz |
+| ADC resolution selection | 12-bit primary | 10-bit explicit fallback | 12-bit primary trial |
+| Nominal 500 ns phase | 75 IPG cycles | 66 IPG cycles | 75 IPG cycles |
+| Nominal 500 ns diagnostic target | 300 DWT cycles | 264 DWT cycles | 225 DWT cycles |
+| PIT root | 24,000,000 Hz | 24,000,000 Hz | 24,000,000 Hz |
+| GPIO / ADC-pair schedule | 4,000,000 / 1,000,000 samples/s | 4,000,000 / 1,000,000 samples/s | 4,000,000 / 1,000,000 samples/s |
 
 These are required values to validate, not values to assume. Target code must
 read back the clock tree and fail before START when the resolved build,
@@ -136,9 +138,9 @@ works.
 
 ## Decision
 
-1. Only explicit `600` and `528` CPU profiles are valid. The production
-   default remains `600`; an omitted profile must never select 528 MHz. Every
-   other speed fails before compilation or START.
+1. Only explicit `600`, `528`, and `450` CPU profiles are valid. The production
+   default remains `600`; an omitted profile must never select an experimental
+   clock. Every other speed fails before compilation or START.
 2. The firmware advertises selected profile identity and actual CPU, DWT, IPG,
    ADC, and PIT clocks, core-voltage target, and phase-cycle metadata. Runtime
    readbacks are checked against the selected profile. Python rejects missing
@@ -149,12 +151,12 @@ works.
    clocks. The 24 MHz PIT schedule and nominal acquisition rates do not change.
 4. The existing protocol-v1 raw ADC and GPIO data frame header, payload layout,
    sequence/timestamp semantics, checksum behavior, and nominal sample rates
-   remain compatible. The 600 MHz profile retains primary 12-bit ADC codes;
-   the 528 MHz profile uses the protocol's explicit 10-bit fallback after its
-   corrected full-rate 12-bit gate produced both ADC_ETC queue errors. INFO and
-   STATUS advertise the selected resolution, CFG mode, and code maximum. The
-   600 MHz profile remains the control behavior and must preserve its accepted
-   raw bytes.
+   remain compatible. The 600 and experimental 450 MHz profiles select primary
+   12-bit ADC codes; the 528 MHz profile uses the protocol's explicit 10-bit
+   fallback after its corrected full-rate 12-bit gate produced both ADC_ETC
+   queue errors. INFO and STATUS advertise the selected resolution, CFG mode,
+   and code maximum. The 600 MHz profile remains the control behavior and must
+   preserve its accepted raw bytes.
 5. Temperature and service-health sampling is bounded and acquisition-safe.
    TEMPMON timeout, invalid calibration, non-finite conversion, or unavailable
    data is represented explicitly; no health query may wait indefinitely.
@@ -171,6 +173,22 @@ works.
    On-chip temperature can support only the declared comparison under the
    recorded fixture and ambient limitations. It cannot support power, junction
    temperature, reliability, or lifetime claims.
+
+## Derived 450 MHz CPU-headroom experiment
+
+The pinned core's official 450 MHz menu selection resolves exactly to a
+450 MHz CPU and DWT clock with IPG divider 3. This restores 150 MHz IPG and the
+same 37.5 MHz synchronous ADC clock, 133.333 ns conservative 12-bit conversion
+margin, and 75-IPG-cycle phase used by the 600 MHz control. The independent
+24 MHz PIT continues to generate exact 4 MHz GPIO and 1 MHz ADC-pair schedules.
+The 500 ns phase becomes 225 DWT cycles with a 90-cycle tolerance.
+
+Because 450 MHz is not an integer multiple of the 24 MHz PIT, the optional GPIO
+clock diagnostic measures complete windows with rational DWT/event arithmetic
+instead of truncating every 4 MHz period from 112.5 to 112 cycles. This changes
+no acquisition timer or wire timestamp. Physical maximum-rate evidence is
+required to determine whether the slower CPU can service packing, checksums,
+control polling, and USB without loss.
 
 ## Physical 528 MHz smoke evidence
 
@@ -202,5 +220,6 @@ lifetime inference.
   to validate each one independently.
 - Existing historical 600 MHz reports remain reproducible and are not
   reinterpreted as profile-neutral evidence.
-- The 528 MHz branch is not eligible for production or cross-branch synthesis
-  until its local gates and same-board physical campaign are complete.
+- The 528 and 450 MHz branches are not eligible for production or cross-branch
+  synthesis until their local gates and same-board physical campaigns are
+  complete.

@@ -20,10 +20,11 @@ struct Plan {
   std::uint16_t tcd_major_count = 0U;
 };
 
-// All integer arithmetic is exact because accepted rates divide both the
-// fixed 24 MHz PIT clock and the selected, runtime-verified DWT clock. The
-// request validator also proves every intermediate and the 15-bit eDMA
-// ELINKNO count are bounded.
+// Accepted rates divide the fixed 24 MHz PIT clock exactly. DWT measurement
+// windows use bounded rational arithmetic because a valid CPU profile need
+// not be an integer multiple of every PIT-derived event rate. The request
+// validator also proves every intermediate and the 15-bit eDMA ELINKNO count
+// are bounded.
 Plan makePlan(const protocol::GpioClockDiagnosticRequest &request);
 
 class Platform {

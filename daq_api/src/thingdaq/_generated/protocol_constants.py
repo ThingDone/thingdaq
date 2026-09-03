@@ -1,7 +1,7 @@
 """Generated protocol-v1 constants. Do not edit by hand.
 
 Source: protocol/protocol-v1.json
-Source SHA-256: c62485cca47ba07cd292d36ecd889a50a01c29817c284fb56a51502162ae4540
+Source SHA-256: 668c7fedf87da00f9003d7bdcda256916946aeac1f3d5e52659a09ab5bfd7e4b
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from enum import IntEnum, IntFlag
 from typing import NamedTuple
 
-SOURCE_SHA256 = "c62485cca47ba07cd292d36ecd889a50a01c29817c284fb56a51502162ae4540"
+SOURCE_SHA256 = "668c7fedf87da00f9003d7bdcda256916946aeac1f3d5e52659a09ab5bfd7e4b"
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
 PROTOCOL_VERSION = 1
@@ -260,6 +260,7 @@ class ConfigurationProfile(IntFlag):
 class ClockProfile(IntEnum):
     PRODUCTION_600_MHZ = 0
     EXPERIMENTAL_528_MHZ = 1
+    EXPERIMENTAL_450_MHZ = 2
 
 
 class TemperatureStatus(IntEnum):
@@ -509,6 +510,17 @@ CLOCK_PROFILE_SPECS: dict[ClockProfile, ClockProfileSpec] = {
         phase_ipg_cycles=66,
         phase_dwt_cycles=264,
         phase_tolerance_dwt_cycles=106,
+    ),
+    ClockProfile.EXPERIMENTAL_450_MHZ: ClockProfileSpec(
+        cpu_hz=450000000,
+        ipg_hz=150000000,
+        adc_hz=37500000,
+        pit_hz=24000000,
+        dwt_hz=450000000,
+        core_voltage_target_mv=1150,
+        phase_ipg_cycles=75,
+        phase_dwt_cycles=225,
+        phase_tolerance_dwt_cycles=90,
     ),
 }
 DEFAULT_CLOCK_PROFILE = ClockProfile.PRODUCTION_600_MHZ

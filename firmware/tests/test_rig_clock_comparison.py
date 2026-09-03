@@ -357,9 +357,7 @@ class ClockComparisonRigTests(unittest.TestCase):
             "EXPECTED_BUILD_ID": device.build_id,
             "EXPECTED_SOURCE_ID": "0123456789abcdef" * 4,
             "EXPECTED_HARDWARE_SERIAL": "12345670",
-            "EXPECTED_CLOCK_PROFILE": str(
-                600 if profile_id is ClockProfile.PRODUCTION_600_MHZ else 528
-            ),
+            "EXPECTED_CLOCK_PROFILE": profile.cpu_profile,
             "EXPECTED_FQBN": profile.fqbn,
         }
         output = io.StringIO()
@@ -419,7 +417,7 @@ class ClockComparisonRigTests(unittest.TestCase):
         )
         self.assertNotIn("thingdaq", imports)
 
-    def test_full_fake_runs_pass_for_both_exact_profiles(self) -> None:
+    def test_full_fake_runs_pass_for_all_exact_profiles(self) -> None:
         for profile_id in ClockProfile:
             with self.subTest(profile=profile_id.name):
                 exit_code, summary, peer, report = self._run_case(profile_id)

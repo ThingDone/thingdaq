@@ -34,7 +34,7 @@ external circuit before connection.
 
 | Logical input | Teensy pin | Internal path | Current use |
 | --- | --- | --- | --- |
-| ADC0 | A0 / D14 | NXP ADC1 channel 7 | 12-bit at 600 MHz or advertised 10-bit fallback at 528 MHz, nominal 1 MS/s |
+| ADC0 | A0 / D14 | NXP ADC1 channel 7 | 12-bit at 600 or experimental 450 MHz, or advertised 10-bit fallback at 528 MHz; nominal 1 MS/s |
 | ADC1 | A1 / D15 | NXP ADC2 channel 8 | same selected resolution, nominal 1 MS/s, 500 ns after ADC0 |
 | GPIO bit 0 | D6 | packed digital input | nominal 4 MS/s |
 | GPIO bit 1 | D7 | packed digital input | nominal 4 MS/s |

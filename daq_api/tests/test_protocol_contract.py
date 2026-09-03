@@ -98,9 +98,21 @@ class ProtocolContractTests(unittest.TestCase):
                 264,
                 106,
             ),
+            "EXPERIMENTAL_450_MHZ": (
+                2,
+                450_000_000,
+                150_000_000,
+                37_500_000,
+                24_000_000,
+                450_000_000,
+                1_150,
+                75,
+                225,
+                90,
+            ),
         }
         self.assertEqual(set(expected), set(constants.ClockProfile.__members__))
-        self.assertEqual(2, len(clock_contract["profiles"]))
+        self.assertEqual(3, len(clock_contract["profiles"]))
         for record in clock_contract["profiles"]:
             name = record["name"]
             profile = constants.ClockProfile[name]

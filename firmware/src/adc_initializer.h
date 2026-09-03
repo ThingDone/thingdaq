@@ -50,11 +50,13 @@ constexpr std::uint8_t selectResolution(const ResolutionGate &gate) {
 }
 
 // Profile selection is deliberately compile-time and evidence-backed. The
-// 600 MHz control completed the corrected full-rate timing/error gate at
-// 12 bits. On the same firmware source, the 528 MHz profile verified clocks,
-// routes, and calibration but both ADC_ETC queues reported trigger errors
-// before recording a completion at 12 bits. Preserve the exact 1 MHz schedule
-// by selecting the already-declared 10-bit fallback for that profile only.
+// The 600 MHz control completed the corrected full-rate timing/error gate at
+// 12 bits. The 450 MHz experiment restores the same 150 MHz IPG and 37.5 MHz
+// ADCK and deliberately trials that primary mode. On the same firmware source,
+// the 528 MHz profile verified clocks, routes, and calibration but both ADC_ETC
+// queues reported trigger errors before recording a completion at 12 bits.
+// Preserve the exact 1 MHz schedule by selecting the already-declared 10-bit
+// fallback for that profile only.
 constexpr ResolutionGate selectedProfileResolutionGate() {
 #if THINGDAQ_CPU_PROFILE_MHZ == 528U
   return {true, true, true, true, false, false};

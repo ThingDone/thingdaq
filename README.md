@@ -16,7 +16,7 @@ developed without hardware.
 
 | Input | Physical schedule | Python representation |
 | --- | --- | --- |
-| ADC0 on A0/D14 | 1 MS/s, nominal ticks `0, 8, 16, ...` | 12-bit at 600 MHz; explicitly advertised 10-bit fallback at 528 MHz |
+| ADC0 on A0/D14 | 1 MS/s, nominal ticks `0, 8, 16, ...` | 12-bit at 600 or experimental 450 MHz; explicitly advertised 10-bit fallback at 528 MHz |
 | ADC1 on A1/D15 | 1 MS/s, nominally 500 ns after ADC0 | same profile-selected resolution in unchanged `uint16_t` containers |
 | GPIO D6-D13 | 4 MS/s simultaneous packed snapshots | one byte per sample, D6 in bit 0 through D13 in bit 7 |
 
@@ -196,18 +196,20 @@ Common local gates:
 python3 firmware/tools/build_firmware.py
 ```
 
-The no-argument firmware command remains the production 600 MHz build. On the
-isolated `experiment/clock-528mhz` branch, the reviewed comparison profile is
-selected explicitly and exported to its own directory:
+The no-argument firmware command remains the production 600 MHz build.
+Experimental clock profiles are selected explicitly and exported to isolated
+directories:
 
 ```bash
 python3 firmware/tools/build_firmware.py --cpu-profile 528 \
   --compare-profile-manifest \
   firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json
+python3 firmware/tools/build_firmware.py --cpu-profile 450
 ```
 
-Only `600` and `528` are accepted. Both commands compile and inspect artifacts;
-neither uploads firmware.
+Only `600`, `528`, and `450` are accepted. These commands compile and inspect
+artifacts; none uploads firmware. The 450 MHz profile is an experimental
+CPU-headroom probe and remains separate from the production default.
 
 ## Distribution and trademark boundary
 

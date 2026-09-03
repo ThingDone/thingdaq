@@ -17,6 +17,20 @@ constexpr std::uint32_t absoluteDifference(std::uint32_t left,
   return left >= right ? left - right : right - left;
 }
 
+constexpr std::uint32_t dwtCyclesForEvents(std::uint32_t event_count,
+                                           std::uint32_t rate_hz) {
+  return identity::divideCeil(
+      static_cast<std::uint64_t>(event_count) * identity::kExpectedDwtHz,
+      rate_hz);
+}
+
+constexpr std::uint32_t eventsForDwtCycles(std::uint32_t elapsed_cycles,
+                                           std::uint32_t rate_hz) {
+  return static_cast<std::uint32_t>(
+      static_cast<std::uint64_t>(elapsed_cycles) * rate_hz /
+      identity::kExpectedDwtHz);
+}
+
 }  // namespace
 
 THINGDAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.plan")
@@ -28,9 +42,10 @@ Plan makePlan(const protocol::GpioClockDiagnosticRequest &request) {
   plan.rate_hz = request.rate_hz;
   plan.pit_divisor = protocol_v1::kGpioClockPitHz / request.rate_hz;
   plan.pit_load_value = plan.pit_divisor - 1U;
-  plan.cycles_per_event = identity::kExpectedDwtHz / request.rate_hz;
+  plan.cycles_per_event =
+      identity::divideCeil(identity::kExpectedDwtHz, request.rate_hz);
   plan.measurement_cycles =
-      static_cast<std::uint32_t>(request.event_count) * plan.cycles_per_event;
+      dwtCyclesForEvents(request.event_count, request.rate_hz);
   plan.requested_event_count = request.event_count;
   plan.tcd_major_count = static_cast<std::uint16_t>(
       2U * static_cast<std::uint32_t>(request.event_count) +
@@ -72,7 +87,7 @@ RunResult Runner::run(
     return result;
   } else {
     response.scheduled_event_count =
-        response.dwt_elapsed_cycles / plan.cycles_per_event;
+        eventsForDwtCycles(response.dwt_elapsed_cycles, plan.rate_hz);
   }
 
   const std::uint32_t sample_count = response.dma_sample_count;
@@ -110,9 +125,6 @@ static_assert(protocol_v1::kGpioClockPitHz /
               "4 MHz production clock requires six 24 MHz PIT ticks");
 static_assert(protocol_v1::kGpioClockPitHz %
                       protocol_v1::kGpioClockProductionRateHz ==
-                  0U);
-static_assert(identity::kExpectedDwtHz %
-                      protocol_v1::kGpioClockPitHz ==
                   0U);
 static_assert(2U * protocol_v1::kGpioClockMaxEventCount +
                       protocol_v1::kGpioClockDuplicateGuardEvents <=

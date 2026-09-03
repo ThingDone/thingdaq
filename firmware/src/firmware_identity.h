@@ -94,7 +94,7 @@
 
 // The helper injects one complete clock contract. Reject hand-crafted or stale
 // combinations even outside Arduino so portable compile tests exercise the
-// same closed two-profile registry.
+// same closed profile registry.
 #if THINGDAQ_CPU_PROFILE_MHZ == 600U
 #if THINGDAQ_EXPECTED_CPU_HZ != 600000000U || \
     THINGDAQ_EXPECTED_BUS_HZ != 150000000U
@@ -105,8 +105,13 @@
     THINGDAQ_EXPECTED_BUS_HZ != 132000000U
 #error "invalid ThingDAQ 528 MHz clock profile"
 #endif
+#elif THINGDAQ_CPU_PROFILE_MHZ == 450U
+#if THINGDAQ_EXPECTED_CPU_HZ != 450000000U || \
+    THINGDAQ_EXPECTED_BUS_HZ != 150000000U
+#error "invalid ThingDAQ 450 MHz clock profile"
+#endif
 #else
-#error "ThingDAQ supports only the explicit 600 or 528 MHz CPU profile"
+#error "ThingDAQ supports only the explicit 600, 528, or 450 MHz CPU profile"
 #endif
 
 // Fail closed when an Arduino build bypasses the exact Teensy 4.0 target. The
@@ -159,9 +164,12 @@ inline constexpr std::uint16_t kCpuProfileMhz = THINGDAQ_CPU_PROFILE_MHZ;
 #if THINGDAQ_CPU_PROFILE_MHZ == 600U
 inline constexpr protocol_v1::ClockProfile kClockProfile =
     protocol_v1::ClockProfile::kProduction600Mhz;
-#else
+#elif THINGDAQ_CPU_PROFILE_MHZ == 528U
 inline constexpr protocol_v1::ClockProfile kClockProfile =
     protocol_v1::ClockProfile::kExperimental528Mhz;
+#else
+inline constexpr protocol_v1::ClockProfile kClockProfile =
+    protocol_v1::ClockProfile::kExperimental450Mhz;
 #endif
 inline constexpr const protocol_v1::ClockProfileSpec &kClockProfileSpec =
     protocol_v1::clockProfileSpec(kClockProfile);
@@ -363,7 +371,8 @@ constexpr bool isLowerHexString(const std::array<char, N> &value) {
 }
 
 static_assert(kProtocolVersion == 1U);
-static_assert(kCpuProfileMhz == 600U || kCpuProfileMhz == 528U);
+static_assert(kCpuProfileMhz == 600U || kCpuProfileMhz == 528U ||
+              kCpuProfileMhz == 450U);
 static_assert(kClockProfileSpec.cpu_hz == kExpectedCpuHz);
 static_assert(kClockProfileSpec.ipg_hz == kExpectedIpgHz);
 static_assert(kClockProfileSpec.dwt_hz == kExpectedDwtHz);
@@ -371,7 +380,6 @@ static_assert(runtimeClocksMatchProfile(kExpectedCpuHz, kExpectedBusHz));
 static_assert(runtimeAcquisitionClocksMatchProfile(
     kExpectedCpuHz, kExpectedBusHz, kExpectedPitHz, kExpectedAdcClockHz,
     kExpectedAdcClockDivider));
-static_assert(kExpectedDwtHz % kExpectedPitHz == 0U);
 static_assert(kExpectedPitHz % kExpectedGpioSampleRateHz == 0U);
 static_assert(kExpectedGpioSampleRateHz % kExpectedAdcPairRateHz == 0U);
 static_assert(kExpectedIpgHz % kExpectedAdcClockDivider == 0U);
@@ -406,6 +414,13 @@ static_assert(kCpuProfileMhz != 528U ||
                kAdcCompletionExpectedDwtCycles == 264U &&
                kAdcCompletionToleranceDwtCycles == 106U &&
                kAdcPrimaryConversionMarginPicoseconds == 15151U));
+static_assert(kCpuProfileMhz != 450U ||
+              (kExpectedIpgHz == 150000000U &&
+               kExpectedAdcClockHz == 37500000U &&
+               kAdcNominalPhaseIpgCycles == 75U &&
+               kAdcCompletionExpectedDwtCycles == 225U &&
+               kAdcCompletionToleranceDwtCycles == 90U &&
+               kAdcPrimaryConversionMarginPicoseconds == 133333U));
 static_assert(usbProductNameMatchesIdentity(),
               "USB descriptor product must match firmware identity");
 static_assert(stringLength(kSourceId) == 64U,

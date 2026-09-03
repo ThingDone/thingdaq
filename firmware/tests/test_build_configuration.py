@@ -145,7 +145,7 @@ Idx Name          Size      VMA       LMA       File off  Algn
             ],
         }
 
-    def test_helper_pins_both_complete_targets_and_isolated_exports(self) -> None:
+    def test_helper_pins_all_complete_targets_and_isolated_exports(self) -> None:
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
         self.assertEqual(12, build_firmware.MANIFEST_SCHEMA_VERSION)
@@ -168,6 +168,7 @@ Idx Name          Size      VMA       LMA       File off  Algn
         expected = {
             "600": (600_000_000, 150_000_000),
             "528": (528_000_000, 132_000_000),
+            "450": (450_000_000, 150_000_000),
         }
         for name, profile in build_firmware.CPU_PROFILES.items():
             with self.subTest(profile=name):
@@ -256,8 +257,8 @@ Idx Name          Size      VMA       LMA       File off  Algn
                 output_directories.add(profile.output_directory)
                 build_ids.add(identity.build_id)
 
-        self.assertEqual(2, len(output_directories))
-        self.assertEqual(2, len(build_ids))
+        self.assertEqual(3, len(output_directories))
+        self.assertEqual(3, len(build_ids))
 
     def test_memory_summary_is_recorded_exactly(self) -> None:
         summary = build_firmware.parse_memory_usage(
@@ -284,6 +285,7 @@ Idx Name          Size      VMA       LMA       File off  Algn
 
     def test_linker_symbol_contract_allows_only_reviewed_clock_variants(self) -> None:
         contracts: dict[str, dict[str, object]] = {}
+        symbols_by_profile: dict[str, str] = {}
         for profile_name, profile in build_firmware.CPU_PROFILES.items():
             lines = ["60010000 00000004 T stableSymbol"]
             for (
@@ -295,15 +297,17 @@ Idx Name          Size      VMA       LMA       File off  Algn
                     f"{specification['size_bytes_by_profile'][profile_name]:08x} "
                     f"{specification['symbol_type']} {name}"
                 )
+            symbols_by_profile[profile_name] = "\n".join(lines)
             contracts[profile_name] = build_firmware.linker_symbol_contract(
-                "\n".join(lines), profile
+                symbols_by_profile[profile_name], profile
             )
 
         self.assertEqual(contracts["600"], contracts["528"])
+        self.assertEqual(contracts["600"], contracts["450"])
         self.assertEqual(4, contracts["600"]["symbol_count"])
         self.assertEqual(1, contracts["600"]["profile_invariant_symbol_count"])
 
-        drifted = "\n".join(lines).replace(
+        drifted = symbols_by_profile["528"].replace(
             "60010000 00000004 T stableSymbol",
             "60010000 00000008 T stableSymbol",
         )
@@ -315,7 +319,7 @@ Idx Name          Size      VMA       LMA       File off  Algn
             drifted_contract["profile_invariant_sha256"],
         )
 
-        wrong_variant = "\n".join(lines).replace("000001b0", "000001b4", 1)
+        wrong_variant = symbols_by_profile["528"].replace("000001b0", "000001b4", 1)
         with self.assertRaisesRegex(build_firmware.BuildError, "occupies"):
             build_firmware.linker_symbol_contract(
                 wrong_variant, build_firmware.CPU_PROFILES["528"]
@@ -667,6 +671,9 @@ Idx Name          Size      VMA       LMA       File off  Algn
         self.assertIs(
             build_firmware.cpu_profile("528"), build_firmware.CPU_PROFILES["528"]
         )
+        self.assertIs(
+            build_firmware.cpu_profile("450"), build_firmware.CPU_PROFILES["450"]
+        )
         with self.assertRaisesRegex(build_firmware.BuildError, "unsupported CPU"):
             build_firmware.cpu_profile("720")
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
@@ -700,11 +707,17 @@ Idx Name          Size      VMA       LMA       File off  Algn
         candidate = build_firmware.profile_build_fingerprint(
             source_id, build_firmware.CPU_PROFILES["528"]
         )
+        low_clock = build_firmware.profile_build_fingerprint(
+            source_id, build_firmware.CPU_PROFILES["450"]
+        )
 
         self.assertEqual(first, repeated)
         self.assertNotEqual(first, candidate)
+        self.assertNotEqual(first, low_clock)
+        self.assertNotEqual(candidate, low_clock)
         self.assertEqual(64, len(first))
         self.assertEqual(64, len(candidate))
+        self.assertEqual(64, len(low_clock))
         production_id = build_firmware.profile_build_id(
             source_id, first, build_firmware.CPU_PROFILES["600"]
         )
@@ -724,6 +737,14 @@ Idx Name          Size      VMA       LMA       File off  Algn
         self.assertEqual(["600", "528"], result["profiles"])
         self.assertEqual(4, result["artifact_count"])
         self.assertNotEqual(result["build_ids"]["600"], result["build_ids"]["528"])
+
+        low_clock = self._profile_manifest(build_firmware.CPU_PROFILES["450"])
+        low_clock_result = build_firmware.validate_profile_parity(production, low_clock)
+        self.assertEqual(["600", "450"], low_clock_result["profiles"])
+        self.assertNotEqual(
+            low_clock_result["build_ids"]["600"],
+            low_clock_result["build_ids"]["450"],
+        )
 
         resource_drift = deepcopy(candidate)
         resource_drift["memory_usage"]["ram1"]["variables_bytes"] = 5  # type: ignore[index]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone 600/528 MHz physical combined-acquisition comparison runner.
+"""Standalone clock-profile physical combined-acquisition comparison runner.
 
 The remote rig uploads this file by itself to a network-disabled Python 3.13
 container. It embeds the protocol-v1 values it grades, uses only the Python
@@ -95,6 +95,7 @@ CHECKSUM_NAMES = {
 
 CLOCK_PROFILE_PRODUCTION_600_MHZ = 0
 CLOCK_PROFILE_EXPERIMENTAL_528_MHZ = 1
+CLOCK_PROFILE_EXPERIMENTAL_450_MHZ = 2
 TEMPERATURE_UNAVAILABLE = 0
 TEMPERATURE_VALID = 1
 TEMPERATURE_NOT_READY = 2
@@ -201,6 +202,21 @@ CLOCK_PROFILE_SPECS = {
         phase_ipg_cycles=66,
         phase_dwt_cycles=264,
         phase_tolerance_dwt_cycles=106,
+    ),
+    CLOCK_PROFILE_EXPERIMENTAL_450_MHZ: ClockProfileSpec(
+        profile=CLOCK_PROFILE_EXPERIMENTAL_450_MHZ,
+        label="EXPERIMENTAL_450_MHZ",
+        cpu_profile="450",
+        fqbn="teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+        cpu_hz=450_000_000,
+        ipg_hz=150_000_000,
+        adc_hz=37_500_000,
+        pit_hz=24_000_000,
+        dwt_hz=450_000_000,
+        core_voltage_target_mv=1_150,
+        phase_ipg_cycles=75,
+        phase_dwt_cycles=225,
+        phase_tolerance_dwt_cycles=90,
     ),
 }
 _ACTIVE_CLOCK_PROFILE = CLOCK_PROFILE_SPECS[CLOCK_PROFILE_PRODUCTION_600_MHZ]
@@ -2447,7 +2463,7 @@ def grade_info(
         (
             CLOCK_PROFILE_SPECS[expected_clock_profile].label
             if expected_clock_profile is not None
-            else "one exact generated 600/528 MHz profile"
+            else "one exact generated clock profile"
         ),
         _ACTIVE_CLOCK_PROFILE.label,
         expected_clock_profile is None
@@ -5054,10 +5070,14 @@ def _clock_profile_environment(name: str) -> int | None:
         "528": CLOCK_PROFILE_EXPERIMENTAL_528_MHZ,
         "528MHZ": CLOCK_PROFILE_EXPERIMENTAL_528_MHZ,
         "EXPERIMENTAL_528_MHZ": CLOCK_PROFILE_EXPERIMENTAL_528_MHZ,
+        "2": CLOCK_PROFILE_EXPERIMENTAL_450_MHZ,
+        "450": CLOCK_PROFILE_EXPERIMENTAL_450_MHZ,
+        "450MHZ": CLOCK_PROFILE_EXPERIMENTAL_450_MHZ,
+        "EXPERIMENTAL_450_MHZ": CLOCK_PROFILE_EXPERIMENTAL_450_MHZ,
     }
     selected = aliases.get(normalized)
     if selected is None:
-        raise ValueError(f"{name} must select exactly 600 or 528")
+        raise ValueError(f"{name} must select exactly 600, 528, or 450")
     return selected
 
 

@@ -1930,7 +1930,9 @@ Result validateGpioClockDiagnosticResponse(ByteView payload) {
       (error_flags & unarmed_error_mask) == 0U;
   const std::uint32_t expected_scheduled =
       dwt_hz == identity::kExpectedDwtHz && request.rate_hz != 0U
-          ? elapsed_cycles / (identity::kExpectedDwtHz / request.rate_hz)
+          ? static_cast<std::uint32_t>(
+                static_cast<std::uint64_t>(elapsed_cycles) * request.rate_hz /
+                identity::kExpectedDwtHz)
           : 0U;
   if (!validGpioClockDiagnosticRequest(request) ||
       production_rate != protocol_v1::kGpioClockProductionRateHz ||
@@ -2369,14 +2371,15 @@ bool validGpioClockDiagnosticRequest(
   if (request.rate_hz < protocol_v1::kGpioClockMinRateHz ||
       request.rate_hz > protocol_v1::kGpioClockProductionRateHz ||
       protocol_v1::kGpioClockPitHz % request.rate_hz != 0U ||
-      identity::kExpectedDwtHz % request.rate_hz != 0U ||
       request.event_count < protocol_v1::kGpioClockMinEventCount ||
       request.event_count > protocol_v1::kGpioClockMaxEventCount) {
     return false;
   }
-  const std::uint64_t elapsed_cycles =
+  const std::uint64_t elapsed_numerator =
       static_cast<std::uint64_t>(request.event_count) *
-      (identity::kExpectedDwtHz / request.rate_hz);
+      identity::kExpectedDwtHz;
+  const std::uint64_t elapsed_cycles =
+      (elapsed_numerator + request.rate_hz - 1U) / request.rate_hz;
   const std::uint32_t major_count =
       2U * static_cast<std::uint32_t>(request.event_count) +
       protocol_v1::kGpioClockDuplicateGuardEvents;

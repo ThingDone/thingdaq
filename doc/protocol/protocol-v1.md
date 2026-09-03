@@ -237,9 +237,10 @@ Each four-byte pair is:
 | 0 | `u16` little endian | ADC0 / A0 raw code |
 | 2 | `u16` little endian | ADC1 / A1 raw code |
 
-ADC values are raw codes in 16-bit containers. The 600 MHz profile advertises
-12-bit codes and the 528 MHz profile advertises the explicit gated 10-bit
-fallback; unused high bits are zero in either mode. If the header time is
+ADC values are raw codes in 16-bit containers. The 600 MHz and experimental
+450 MHz profiles advertise 12-bit codes, while the 528 MHz profile advertises
+the explicit gated 10-bit fallback; unused high bits are zero in either mode.
+If the header time is
 \(T\), pair \(n\) has these nominal times:
 
 $$

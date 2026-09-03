@@ -14,7 +14,7 @@ CPP_TEST = REPOSITORY_ROOT / "firmware/tests/identity_resource_test.cpp"
 
 
 class FirmwareIdentityResourceTests(unittest.TestCase):
-    def test_identity_header_accepts_only_both_reviewed_clock_profiles(self) -> None:
+    def test_identity_header_accepts_only_reviewed_clock_profiles(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:
             self.skipTest("g++ is required for portable firmware tests")
@@ -32,6 +32,7 @@ class FirmwareIdentityResourceTests(unittest.TestCase):
         ) in (
             (600, 600_000_000, 150_000_000, 37_500_000, 75, 300, 120, 866_667, 133_333),
             (528, 528_000_000, 132_000_000, 33_000_000, 66, 264, 106, 984_849, 15_151),
+            (450, 450_000_000, 150_000_000, 37_500_000, 75, 225, 90, 866_667, 133_333),
         ):
             with self.subTest(profile_mhz=profile_mhz):
                 source = f"""#include "firmware_identity.h"
@@ -118,11 +119,12 @@ static_assert(!thingdaq::identity::runtimeAcquisitionClocksMatchProfile(
             text=True,
         )
         self.assertNotEqual(0, invalid.returncode)
-        self.assertIn("explicit 600 or 528 MHz", invalid.stderr)
+        self.assertIn("explicit 600, 528, or 450 MHz", invalid.stderr)
 
         contradictory_profiles = (
             (600, 528_000_000, 132_000_000, "invalid ThingDAQ 600 MHz"),
             (528, 600_000_000, 150_000_000, "invalid ThingDAQ 528 MHz"),
+            (450, 528_000_000, 132_000_000, "invalid ThingDAQ 450 MHz"),
         )
         for profile, cpu_hz, bus_hz, diagnostic in contradictory_profiles:
             with self.subTest(profile=profile, contradictory_cpu_hz=cpu_hz):

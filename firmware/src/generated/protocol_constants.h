@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: c62485cca47ba07cd292d36ecd889a50a01c29817c284fb56a51502162ae4540
+// Source SHA-256: 668c7fedf87da00f9003d7bdcda256916946aeac1f3d5e52659a09ab5bfd7e4b
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "c62485cca47ba07cd292d36ecd889a50a01c29817c284fb56a51502162ae4540";
+inline constexpr char kSourceSha256[] = "668c7fedf87da00f9003d7bdcda256916946aeac1f3d5e52659a09ab5bfd7e4b";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -247,6 +247,7 @@ enum class ConfigurationProfile : std::uint16_t {
 enum class ClockProfile : std::uint8_t {
   kProduction600Mhz = 0U,
   kExperimental528Mhz = 1U,
+  kExperimental450Mhz = 2U,
 };
 
 enum class TemperatureStatus : std::uint8_t {
@@ -489,12 +490,33 @@ inline constexpr ClockProfileSpec kExperimental528MhzClockProfile{
     264U,
     106U,
 };
+inline constexpr ClockProfileSpec kExperimental450MhzClockProfile{
+    ClockProfile::kExperimental450Mhz,
+    450000000U,
+    150000000U,
+    37500000U,
+    24000000U,
+    450000000U,
+    1150U,
+    75U,
+    225U,
+    90U,
+};
 
 inline constexpr ClockProfile kDefaultClockProfile =
     ClockProfile::kProduction600Mhz;
 
 constexpr const ClockProfileSpec &clockProfileSpec(ClockProfile profile) {
-  return profile == ClockProfile::kExperimental528Mhz ? kExperimental528MhzClockProfile : kProduction600MhzClockProfile;
+  if (profile == ClockProfile::kProduction600Mhz) {
+    return kProduction600MhzClockProfile;
+  }
+  if (profile == ClockProfile::kExperimental528Mhz) {
+    return kExperimental528MhzClockProfile;
+  }
+  if (profile == ClockProfile::kExperimental450Mhz) {
+    return kExperimental450MhzClockProfile;
+  }
+  return kProduction600MhzClockProfile;
 }
 
 inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =

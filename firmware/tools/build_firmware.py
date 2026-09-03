@@ -77,6 +77,17 @@ CPU_PROFILES = {
             / "teensy.avr.teensy40.usb_serial.speed_528.opt_o2std"
         ),
     ),
+    "450": CpuProfile(
+        name="450",
+        fqbn="teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+        cpu_hz=450_000_000,
+        bus_hz=150_000_000,
+        output_directory=(
+            SKETCH_DIRECTORY
+            / "build"
+            / "teensy.avr.teensy40.usb_serial.speed_450.opt_o2std"
+        ),
+    ),
 }
 DEFAULT_CPU_PROFILE = CPU_PROFILES[DEFAULT_CPU_PROFILE_NAME]
 
@@ -127,7 +138,7 @@ CHECKSUM_DISPATCH_SYMBOL = (
 PROFILE_VARIANT_LINKER_SYMBOLS = {
     "thingdaq::control::ControlState::infoResponse() const": {
         "symbol_type": "T",
-        "size_bytes_by_profile": {"600": 424, "528": 432},
+        "size_bytes_by_profile": {"600": 424, "528": 432, "450": 428},
     },
     (
         "thingdaq::stats::Statistics::wireStatus("
@@ -135,7 +146,7 @@ PROFILE_VARIANT_LINKER_SYMBOLS = {
         "thingdaq::protocol::Configuration const&) const"
     ): {
         "symbol_type": "T",
-        "size_bytes_by_profile": {"600": 1900, "528": 1904},
+        "size_bytes_by_profile": {"600": 1900, "528": 1904, "450": 1904},
     },
     (
         "thingdaq::protocol::(anonymous namespace)::validatePayload("
@@ -143,7 +154,7 @@ PROFILE_VARIANT_LINKER_SYMBOLS = {
         "thingdaq::protocol::ByteView)"
     ): {
         "symbol_type": "t",
-        "size_bytes_by_profile": {"600": 4632, "528": 4624},
+        "size_bytes_by_profile": {"600": 4632, "528": 4624, "450": 4616},
     },
 }
 BENCHMARK_BUFFER_SYMBOLS = {
@@ -1464,8 +1475,8 @@ def validate_profile_parity(
 
     first_profile = validate_profile_manifest(first)
     second_profile = validate_profile_manifest(second)
-    if {first_profile.name, second_profile.name} != set(CPU_PROFILES):
-        raise BuildError("profile parity requires exactly the 600 and 528 manifests")
+    if first_profile == second_profile:
+        raise BuildError("profile parity requires two distinct registered profiles")
 
     first_source = _required_mapping(first, "source")
     second_source = _required_mapping(second, "source")

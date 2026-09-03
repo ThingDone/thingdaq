@@ -78,10 +78,12 @@ void testExactPlansAndBounds() {
              production_plan.pit_divisor == 6U &&
              production_plan.pit_load_value == 5U &&
              production_plan.cycles_per_event ==
-                 identity::kExpectedDwtHz / 4000000U &&
+                 identity::divideCeil(identity::kExpectedDwtHz, 4000000U) &&
              production_plan.measurement_cycles ==
-                 production.event_count *
-                     (identity::kExpectedDwtHz / 4000000U) &&
+                 identity::divideCeil(
+                     static_cast<std::uint64_t>(production.event_count) *
+                         identity::kExpectedDwtHz,
+                     4000000U) &&
              production_plan.tcd_major_count == 16400U,
          "4 MHz plan uses exact PIT/DWT arithmetic and a duplicate guard");
 
@@ -93,9 +95,10 @@ void testExactPlansAndBounds() {
   expect(wire::validGpioClockDiagnosticRequest(low_rate) &&
              low_plan.pit_load_value == 23999U &&
              low_plan.cycles_per_event ==
-                 identity::kExpectedDwtHz / 1000U &&
+                 identity::divideCeil(identity::kExpectedDwtHz, 1000U) &&
              low_plan.measurement_cycles ==
-                 32U * (identity::kExpectedDwtHz / 1000U),
+                 identity::divideCeil(
+                     32ULL * identity::kExpectedDwtHz, 1000U),
          "bounded 1 kHz bring-up plan remains exact");
 
   low_rate.rate_hz = 3999999U;

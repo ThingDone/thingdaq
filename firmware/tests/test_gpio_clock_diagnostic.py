@@ -23,6 +23,7 @@ class GpioClockDiagnosticTests(unittest.TestCase):
             for profile, cpu_hz, bus_hz in (
                 (600, 600_000_000, 150_000_000),
                 (528, 528_000_000, 132_000_000),
+                (450, 450_000_000, 150_000_000),
             ):
                 with self.subTest(profile=profile):
                     executable = (
