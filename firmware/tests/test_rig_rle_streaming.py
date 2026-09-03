@@ -702,6 +702,89 @@ class RLEStreamingRigTests(unittest.TestCase):
         self.assertEqual(expected, rig.STATUS_FIELDS)
         self.assertIn("finally:\n        cleanup_to_idle", source)
 
+    def test_endurance_reader_continuously_drains_into_a_bounded_queue(self) -> None:
+        class ChunkPort:
+            def __init__(self) -> None:
+                self.chunks = [b"abcdef", b"ghij"]
+                self.writes: list[bytes] = []
+
+            def read(self, size: int = 1) -> bytes:
+                if self.chunks:
+                    return self.chunks.pop(0)[:size]
+                time.sleep(0.0001)
+                return b""
+
+            def write(self, data: bytes) -> int:
+                self.writes.append(data)
+                return len(data)
+
+            def close(self) -> None:
+                pass
+
+        buffered = rig.BufferedSerialPort(ChunkPort())
+        deadline = time.monotonic() + 0.5
+        while buffered.metrics()["high_water_bytes"] < 10:
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(0.0001)
+        self.assertEqual(b"abcd", buffered.read(4))
+        self.assertEqual(b"ef", buffered.read(4))
+        self.assertEqual(b"ghij", buffered.read(16))
+        buffered.close()
+        metrics = buffered.metrics()
+        self.assertTrue(metrics["enabled"])
+        self.assertEqual(rig.SERIAL_READER_QUEUE_BYTES, metrics["capacity_bytes"])
+        self.assertEqual(10, metrics["high_water_bytes"])
+        self.assertEqual(2, metrics["high_water_chunks"])
+        self.assertEqual(0, metrics["final_bytes"])
+        self.assertEqual(0, metrics["final_chunks"])
+
+    def test_endurance_main_uses_reader_queue_and_restores_runtime_state(self) -> None:
+        fake = CampaignFakeSerial(pattern="physical")
+        configuration = rig.RigConfiguration(
+            port="fake-rle-endurance",
+            mode=rig.MODE_ENDURANCE,
+            capture_seconds=0.05,
+            warmup_seconds=0.0,
+            status_interval_seconds=0.05,
+            pattern="physical",
+            source=rig.SOURCE_HARDWARE,
+            encoding=rig.CONFIGURATION_ENCODING_RLE_AUTO,
+            checksum=rig.CHECKSUM_ADLER32,
+            expected_build_id=None,
+            expected_hardware_serial=None,
+            artifact_sha256=None,
+            source_id=None,
+            job_id=None,
+        )
+        output = io.StringIO()
+        switch_interval = sys.getswitchinterval()
+        gc_enabled = rig.gc.isenabled()
+        with (
+            mock.patch.object(rig, "parse_configuration", return_value=configuration),
+            mock.patch.object(rig, "STARTUP_DRAIN_SECONDS", 0),
+            mock.patch.object(rig, "STOP_DRAIN_DEADLINE_SECONDS", 0.1),
+            mock.patch.object(rig, "STOP_DRAIN_QUIET_SECONDS", 0.001),
+            mock.patch.object(rig.serial, "Serial", return_value=fake),
+            redirect_stdout(output),
+        ):
+            exit_code = rig.main()
+        result = json.loads(
+            next(
+                line.removeprefix(rig.RLE_RESULT_PREFIX)
+                for line in output.getvalue().splitlines()
+                if line.startswith(rig.RLE_RESULT_PREFIX)
+            )
+        )
+        self.assertEqual(0, exit_code, output.getvalue())
+        reader = result["host"]["serial_reader"]
+        self.assertTrue(reader["enabled"])
+        self.assertLessEqual(reader["high_water_bytes"], reader["capacity_bytes"])
+        self.assertEqual(0, reader["final_bytes"])
+        self.assertGreater(reader["read_calls"], 0)
+        self.assertEqual(switch_interval, sys.getswitchinterval())
+        self.assertEqual(gc_enabled, rig.gc.isenabled())
+        self.assertTrue(fake.closed)
+
     def test_v1_and_v2_controls_are_encoded_independently(self) -> None:
         for version in (rig.PROTOCOL_V1, rig.PROTOCOL_V2):
             with self.subTest(version=version):
@@ -1056,9 +1139,7 @@ class RLEStreamingRigTests(unittest.TestCase):
         )
         for high_byte in range(256):
             with self.subTest(high_byte=high_byte):
-                payload = bytes((0x5A, high_byte)) * (
-                    rig.DATA_PAYLOAD_BYTES // 2
-                )
+                payload = bytes((0x5A, high_byte)) * (rig.DATA_PAYLOAD_BYTES // 2)
                 frame = rig.Frame(
                     version=rig.PROTOCOL_V2,
                     kind=rig.ADC_DATA,
@@ -1080,9 +1161,7 @@ class RLEStreamingRigTests(unittest.TestCase):
                         rig.CaptureValidator._decode_physical(frame, metrics),
                     )
                 else:
-                    with self.assertRaisesRegex(
-                        rig.FirmwareFailure, "above 12 bits"
-                    ):
+                    with self.assertRaisesRegex(rig.FirmwareFailure, "above 12 bits"):
                         rig.CaptureValidator._decode_physical(frame, metrics)
 
     def test_full_program_rejects_every_adversarial_rle_envelope(self) -> None:

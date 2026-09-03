@@ -15,6 +15,7 @@ STATUS, including after codec, firmware, fixture, or serial-service failures.
 
 from __future__ import annotations
 
+import gc
 import json
 import math
 import os
@@ -22,8 +23,10 @@ import resource
 import statistics
 import struct
 import sys
+import threading
 import time
 import zlib
+from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -34,6 +37,9 @@ BAUD_RATE = 115_200
 SERIAL_READ_TIMEOUT_SECONDS = 0.02
 SERIAL_WRITE_TIMEOUT_SECONDS = 0.5
 SERIAL_READ_BYTES = 16 * 1024
+SERIAL_READER_QUEUE_CHUNKS = 32
+SERIAL_READER_QUEUE_BYTES = SERIAL_READ_BYTES * SERIAL_READER_QUEUE_CHUNKS
+SERIAL_READER_SWITCH_INTERVAL_SECONDS = 0.001
 STARTUP_DRAIN_SECONDS = 0.25
 COMMAND_DEADLINE_SECONDS = 0.75
 STOP_DRAIN_DEADLINE_SECONDS = 2.0
@@ -392,6 +398,133 @@ class SerialPort(Protocol):
     def write(self, data: bytes) -> int | None: ...
 
     def close(self) -> None: ...
+
+
+class BufferedSerialPort:
+    """Drain the OS TTY continuously into one fixed-capacity chunk queue."""
+
+    def __init__(self, port: SerialPort) -> None:
+        self._port = port
+        self._chunks: deque[bytes] = deque()
+        self._queued_bytes = 0
+        self._high_water_bytes = 0
+        self._high_water_chunks = 0
+        self._maximum_read_call_seconds = 0.0
+        self._maximum_successful_read_gap_seconds = 0.0
+        self._last_successful_read_at: float | None = None
+        self._read_calls = 0
+        self._error: Exception | None = None
+        self._stopped = False
+        self._condition = threading.Condition()
+        self._thread = threading.Thread(
+            target=self._reader_loop,
+            name="rle-rig-serial-reader",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def read(self, size: int = 1) -> bytes:
+        if size <= 0:
+            return b""
+        deadline = time.monotonic() + SERIAL_READ_TIMEOUT_SECONDS
+        with self._condition:
+            while not self._chunks:
+                if self._error is not None:
+                    raise self._error
+                if self._stopped:
+                    return b""
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return b""
+                self._condition.wait(remaining)
+            chunk = self._chunks.popleft()
+            if len(chunk) > size:
+                result = chunk[:size]
+                self._chunks.appendleft(chunk[size:])
+            else:
+                result = chunk
+            self._queued_bytes -= len(result)
+            self._condition.notify_all()
+            return result
+
+    def write(self, data: bytes) -> int | None:
+        return self._port.write(data)
+
+    def close(self) -> None:
+        with self._condition:
+            self._stopped = True
+            self._condition.notify_all()
+        self._thread.join(timeout=1.0)
+        if self._thread.is_alive():
+            raise RuntimeError("bounded serial reader did not stop")
+
+    def metrics(self) -> dict[str, int | float | bool]:
+        with self._condition:
+            return {
+                "enabled": True,
+                "capacity_bytes": SERIAL_READER_QUEUE_BYTES,
+                "capacity_chunks": SERIAL_READER_QUEUE_CHUNKS,
+                "final_bytes": self._queued_bytes,
+                "final_chunks": len(self._chunks),
+                "high_water_bytes": self._high_water_bytes,
+                "high_water_chunks": self._high_water_chunks,
+                "maximum_read_call_seconds": self._maximum_read_call_seconds,
+                "maximum_successful_read_gap_seconds": (
+                    self._maximum_successful_read_gap_seconds
+                ),
+                "read_calls": self._read_calls,
+            }
+
+    def _reader_loop(self) -> None:
+        while True:
+            with self._condition:
+                while (
+                    len(self._chunks) >= SERIAL_READER_QUEUE_CHUNKS
+                    and not self._stopped
+                ):
+                    self._condition.wait()
+                if self._stopped:
+                    return
+            try:
+                read_started = time.monotonic()
+                chunk = bytes(self._port.read(SERIAL_READ_BYTES))
+                read_finished = time.monotonic()
+                if len(chunk) > SERIAL_READ_BYTES:
+                    raise ServiceFailure(
+                        "serial reader exceeded its fixed per-call byte bound"
+                    )
+            except Exception as error:  # noqa: BLE001 - relay reader failures
+                with self._condition:
+                    self._error = error
+                    self._condition.notify_all()
+                return
+            with self._condition:
+                self._read_calls += 1
+                self._maximum_read_call_seconds = max(
+                    self._maximum_read_call_seconds,
+                    read_finished - read_started,
+                )
+                if not chunk or self._stopped:
+                    if self._stopped:
+                        return
+                    continue
+                if self._last_successful_read_at is not None:
+                    self._maximum_successful_read_gap_seconds = max(
+                        self._maximum_successful_read_gap_seconds,
+                        read_finished - self._last_successful_read_at,
+                    )
+                self._last_successful_read_at = read_finished
+                self._chunks.append(chunk)
+                self._queued_bytes += len(chunk)
+                self._high_water_bytes = max(
+                    self._high_water_bytes,
+                    self._queued_bytes,
+                )
+                self._high_water_chunks = max(
+                    self._high_water_chunks,
+                    len(self._chunks),
+                )
+                self._condition.notify_all()
 
 
 @dataclass(frozen=True)
@@ -2004,6 +2137,22 @@ class SerialLink:
         self.maximum_read_bytes = 0
         self.command_latencies: list[float] = []
 
+    def reader_metrics(self) -> dict[str, int | float | bool]:
+        if isinstance(self.port, BufferedSerialPort):
+            return self.port.metrics()
+        return {
+            "enabled": False,
+            "capacity_bytes": 0,
+            "capacity_chunks": 0,
+            "final_bytes": 0,
+            "final_chunks": 0,
+            "high_water_bytes": 0,
+            "high_water_chunks": 0,
+            "maximum_read_call_seconds": 0.0,
+            "maximum_successful_read_gap_seconds": 0.0,
+            "read_calls": 0,
+        }
+
     def drain_startup(self, duration: float) -> None:
         deadline = time.monotonic() + duration
         while time.monotonic() < deadline:
@@ -2882,6 +3031,7 @@ def result_payload(
             if link is not None
             else {}
         ),
+        "serial_reader": link.reader_metrics() if link is not None else {},
         "command_latency_seconds": (
             _latency_summary(link.command_latencies) if link is not None else {}
         ),
@@ -2988,7 +3138,27 @@ def main() -> int:
         emit_result(result_payload(configuration, execution, None, open_failure))
         return 2
 
-    link = SerialLink(port)
+    buffered_port: BufferedSerialPort | None = None
+    cyclic_gc_was_enabled = False
+    previous_switch_interval: float | None = None
+    link_port: SerialPort = port
+    if configuration.mode == MODE_ENDURANCE:
+        previous_switch_interval = sys.getswitchinterval()
+        sys.setswitchinterval(SERIAL_READER_SWITCH_INTERVAL_SECONDS)
+        buffered_port = BufferedSerialPort(port)
+        link_port = buffered_port
+        cyclic_gc_was_enabled = gc.isenabled()
+        if cyclic_gc_was_enabled:
+            gc.disable()
+        emit_event(
+            "serial_reader_started",
+            chunk_bytes=SERIAL_READ_BYTES,
+            queue_bytes=SERIAL_READER_QUEUE_BYTES,
+            queue_chunks=SERIAL_READER_QUEUE_CHUNKS,
+            switch_interval_seconds=SERIAL_READER_SWITCH_INTERVAL_SECONDS,
+        )
+
+    link = SerialLink(link_port)
     failure: BaseException | None = None
     try:
         link.drain_startup(STARTUP_DRAIN_SECONDS)
@@ -3026,6 +3196,25 @@ def main() -> int:
             )
         except Exception as error:  # noqa: BLE001 - validation classification
             failure = error
+
+    if buffered_port is not None:
+        try:
+            buffered_port.close()
+            reader_metrics = buffered_port.metrics()
+            if failure is None and reader_metrics["final_bytes"] != 0:
+                failure = ServiceFailure(
+                    "bounded serial reader retained bytes after final IDLE"
+                )
+        except Exception as error:  # noqa: BLE001 - explicit service boundary
+            close_failure = ServiceFailure(f"serial reader close failed: {error}")
+            if failure is None:
+                failure = close_failure
+            cleanup_errors.append(str(close_failure))
+        finally:
+            if cyclic_gc_was_enabled:
+                gc.enable()
+            assert previous_switch_interval is not None
+            sys.setswitchinterval(previous_switch_interval)
 
     try:
         port.close()
