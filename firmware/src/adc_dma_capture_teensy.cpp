@@ -324,12 +324,7 @@ void configureDescriptors() {
 }
 
 void configurePriorities() {
-  for (std::size_t converter = 0U; converter < kConverterCount;
-       ++converter) {
-    priorityRegister(converter) = static_cast<std::uint8_t>(
-        DMA_DCHPRI_ECP |
-        DMA_DCHPRI_CHPRI(board::kAdcEdmaPriorities[converter]));
-  }
+  gpio_dma_route::configureOwnedEdmaPriorities();
 }
 
 bool hardwareDestinationMatches(std::size_t converter,

@@ -396,7 +396,7 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
 
   gpio_route::configureXbarRequest();
   gpio_route::clearEdmaChannelState();
-  gpio_route::configureEdmaPriority();
+  gpio_route::configureOwnedEdmaPriorities();
   gpio_route::enableEdmaRequest();
   expect(platform.armFromStopped(false),
          "combined register fixture arms the one common schedule");
@@ -441,8 +441,11 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
   expect(board::kAdcEdmaPriorities[0] == 2U &&
              board::kAdcEdmaPriorities[1] == 1U &&
              board::kGpioEdmaPriority == 0U &&
+             (fake_imxrt::dma_dchpri[0] & 0x0FU) == 2U &&
+             (fake_imxrt::dma_dchpri[1] & 0x0FU) == 1U &&
+             (fake_imxrt::dma_dchpri[2] & 0x0FU) == 0U &&
              board::kAdcEdmaIrqPriority < board::kGpioEdmaIrqPriority,
-         "fixed eDMA and IRQ tiers prioritize paired ADC completion over continuous GPIO traffic");
+         "fixed unique eDMA and IRQ tiers prioritize paired ADC completion over continuous GPIO traffic");
 
   expect(platform.stop(),
          "combined stop first disables PIT0/PIT1 and ADC_ETC");

@@ -6,6 +6,7 @@
 
 #define ARDUINO_TEENSY40 1
 #define __IMXRT1062__ 1
+#define THINGDAQ_HOST_REGISTER_TEST 1
 
 #include "gpio_dma_route_teensy.h"
 #include "gpio_raw_capture.h"
@@ -185,7 +186,7 @@ void testOnlyReservedXbarOutputChanges() {
          "XBAR shutdown disables only the reserved output request");
 }
 
-void testOnlyReservedEdmaChannelChanges() {
+void testOnlyOwnedEdmaPrioritiesAndReservedGpioChannelChange() {
   resetFakeRegisters();
   std::array<std::uint32_t, 32U> dmamux_before{};
   std::array<std::uint32_t, 32U> tcd_before{};
@@ -205,7 +206,18 @@ void testOnlyReservedEdmaChannelChanges() {
   fake_imxrt::dma_erq = 0U;
 
   route::clearEdmaChannelState();
-  route::configureEdmaPriority();
+  const std::uint32_t reset_priority_word = 0x00010203U;
+  const std::uint32_t configured_priority_word =
+      route::withOwnedEdmaPriorities(reset_priority_word);
+  expect((configured_priority_word & 0x000000FFU) == 0x00000003U &&
+             ((configured_priority_word >> 8U) & 0xFFU) ==
+                 route::configuredPriority(board::kGpioEdmaPriority) &&
+             ((configured_priority_word >> 16U) & 0xFFU) ==
+                 route::configuredPriority(board::kAdcEdmaPriorities[1]) &&
+             ((configured_priority_word >> 24U) & 0xFFU) ==
+                 route::configuredPriority(board::kAdcEdmaPriorities[0]),
+         "one priority-word update swaps channels 0/2 while preserving channel 3");
+  route::configureOwnedEdmaPriorities();
   route::edmaTcd().marker = 0xDEADBEEFU;
   route::enableEdmaRequest();
 
@@ -215,21 +227,28 @@ void testOnlyReservedEdmaChannelChanges() {
              fake_imxrt::dma_cint == board::kGpioEdmaChannel &&
              fake_imxrt::dma_cdne == board::kGpioEdmaChannel &&
              fake_imxrt::dma_serq == board::kGpioEdmaChannel,
-         "all eDMA command writes name only reserved channel 2");
+         "GPIO channel commands end on channel 2 after owned error repair");
   expect(fake_imxrt::dmamux_chcfg[board::kGpioEdmaChannel] ==
                  route::kDmamuxConfiguration &&
              route::edmaPriority() == board::kGpioEdmaPriority &&
+             (fake_imxrt::dma_dchpri[0] & 0x0FU) ==
+                 board::kAdcEdmaPriorities[0] &&
+             (fake_imxrt::dma_dchpri[1] & 0x0FU) ==
+                 board::kAdcEdmaPriorities[1] &&
              fake_imxrt::dma_tcd[board::kGpioEdmaChannel].marker ==
                  0xDEADBEEFU,
-         "DMAMUX, priority, and TCD access resolve to reserved channel 2");
+         "DMAMUX/TCD access stays on channel 2 and all owned priorities are unique");
   for (std::size_t channel = 0U; channel < dmamux_before.size(); ++channel) {
     if (channel == board::kGpioEdmaChannel) {
       continue;
     }
     expect(fake_imxrt::dmamux_chcfg[channel] == dmamux_before[channel] &&
-               fake_imxrt::dma_tcd[channel].marker == tcd_before[channel] &&
-               fake_imxrt::dma_dchpri[channel] == priority_before[channel],
-           "eDMA setup leaves every unreserved channel register untouched");
+               fake_imxrt::dma_tcd[channel].marker == tcd_before[channel],
+           "GPIO eDMA setup leaves every unreserved DMAMUX/TCD untouched");
+    if (channel > 1U) {
+      expect(fake_imxrt::dma_dchpri[channel] == priority_before[channel],
+             "priority setup leaves every unowned channel untouched");
+    }
   }
 
   route::disableEdmaRequest();
@@ -244,7 +263,7 @@ int main() {
   testGpioAliasAndDirectionIsolation();
   testOnlyReservedPitAndClockGatesChange();
   testOnlyReservedXbarOutputChanges();
-  testOnlyReservedEdmaChannelChanges();
+  testOnlyOwnedEdmaPrioritiesAndReservedGpioChannelChange();
   if (failures != 0) {
     std::cerr << failures << " GPIO register assertion(s) failed\n";
     return 1;
