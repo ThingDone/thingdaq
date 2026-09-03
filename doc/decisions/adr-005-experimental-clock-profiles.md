@@ -156,6 +156,11 @@ works.
 5. Temperature and service-health sampling is bounded and acquisition-safe.
    TEMPMON timeout, invalid calibration, non-finite conversion, or unavailable
    data is represented explicitly; no health query may wait indefinitely.
+   The aggregate ADC hardware-fault count includes root-cause fault counters,
+   not the incomplete-conversion/buffer/mismatch symptoms used to account for
+   a bounded partial generation at an immediate combined-stream STOP. Those
+   detailed counters remain visible and are accepted only when they reconcile
+   exactly with the reported STOP tail.
 6. Experimental manifests, output directories, build identities, and artifact
    hashes are profile-specific. Repeated artifacts for one profile must be
    deterministic; different profile metadata is legitimate and must not mask

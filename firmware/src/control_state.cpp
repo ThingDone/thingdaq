@@ -35,13 +35,17 @@ std::uint32_t boundedAdcHardwareErrorCount(
                  ? std::numeric_limits<std::uint32_t>::max()
                  : value;
   };
-  add(status.adc_incomplete_conversions);
+  // Incomplete conversions, incomplete buffers, and completion mismatches
+  // describe the bounded partial generation discarded by an immediate
+  // combined-stream STOP as well as genuine faults. They remain visible in
+  // their dedicated STATUS fields, where lifecycle-aware validation can
+  // distinguish an allowed STOP tail. Do not misclassify those symptoms as
+  // hardware faults in this context-free aggregate; count their root-cause
+  // counters below instead.
   add(status.adc_overwritten_conversions);
   add(status.adc_raw_ring_overruns);
-  add(status.adc_incomplete_buffers);
   add(status.adc_etc_error_events);
   add(status.adc_dma_error_events);
-  add(status.adc_completion_mismatches);
   add(status.adc_destination_mismatches);
   add(status.adc_schedule_exhaustions);
   add(status.adc_raw_invariant_errors);

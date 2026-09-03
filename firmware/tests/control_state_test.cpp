@@ -1124,6 +1124,49 @@ void testStatisticsDetailAndSaturation() {
          "statistics reset clears all counters");
 }
 
+void testClockHealthAdcHardwareFaultAggregation() {
+  control::ControlState state{};
+  wire::ControlFrame response{};
+  expect(state.completeBoot(79U),
+         "ADC hardware-fault aggregation test completes BOOT");
+
+  stats::AdcCaptureProgress stop_tail{};
+  stop_tail.stop_discarded_pairs = 715U;
+  stop_tail.incomplete_conversions = 1U;
+  stop_tail.incomplete_buffers = 1U;
+  stop_tail.completion_mismatches = 1U;
+  state.statistics().publishAdcCapture(stop_tail);
+  expect(state.dispatch(request(constants::CommandKind::kGetStatus, 150U),
+                        response)
+             .commandAccepted(),
+         "STATUS accepts a bounded combined-stream ADC STOP tail");
+  wire::DecodedFrame decoded = decodeResponse(response, "STOP-tail STATUS");
+  std::uint32_t hardware_faults = 1U;
+  expect(wire::loadU32(
+             decoded.payload,
+             constants::kStatusResponseHealthAdcHardwareErrorCountOffset,
+             hardware_faults) &&
+             hardware_faults == 0U,
+         "clock health does not misclassify bounded STOP-tail symptoms as hardware faults");
+
+  stats::AdcCaptureProgress faults = stop_tail;
+  faults.overwritten_conversions = 2U;
+  faults.adc_etc_error_events = 3U;
+  faults.dma_error_events = 4U;
+  state.statistics().publishAdcCapture(faults);
+  expect(state.dispatch(request(constants::CommandKind::kGetStatus, 151U),
+                        response)
+             .commandAccepted(),
+         "STATUS accepts explicit ADC root-cause fault counters");
+  decoded = decodeResponse(response, "ADC-fault STATUS");
+  expect(wire::loadU32(
+             decoded.payload,
+             constants::kStatusResponseHealthAdcHardwareErrorCountOffset,
+             hardware_faults) &&
+             hardware_faults == 9U,
+         "clock health aggregates explicit ADC hardware root-cause faults");
+}
+
 }  // namespace
 
 int main() {
@@ -1140,6 +1183,7 @@ int main() {
   testDuplicateRequestIdsAreSessionScopedAndAtomic();
   testRecoverableFaultReturnsIdle();
   testStatisticsDetailAndSaturation();
+  testClockHealthAdcHardwareFaultAggregation();
 
   if (failures != 0) {
     std::cerr << failures << " control/state assertion(s) failed\n";
