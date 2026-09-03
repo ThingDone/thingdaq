@@ -96,6 +96,7 @@ protocol::Result rleFailure(rle::Status status) {
                  : protocol::ValidationIssue::kBadPayload);
 }
 
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.apply_finalized")
 void applyFinalizedResult(const rle::FinalizeResult &finalized,
                           FinishFillResult &result) {
   result.frame_encoding = finalized.encoding;
@@ -450,24 +451,21 @@ FinishFillResult PacketBufferPipeline::finishV2Fill(
       storage_.frame(handle.buffer_index).data() +
           protocol_v2::kHeaderSize,
       protocol_v2::kDataPayloadBytes};
-  const rle::Status input_status =
-      rle::validateDataFrameInput(fields, decoded);
   BufferIndex selected_index = handle.buffer_index;
   const std::size_t source_index = streamIndex(stream);
-  const bool encode_attempted =
-      input_status == rle::Status::kOk && frame_format_.rleAuto();
+  const bool encode_attempted = frame_format_.rleAuto();
   const std::uint32_t encode_started =
       encode_attempted && cycle_counter_ready_ ? cycle_counter_->read() : 0U;
-  if (input_status != rle::Status::kOk) {
-    result.encoding = rleFailure(input_status);
-  } else if (frame_format_.rleAuto()) {
-    const rle::SizingPlan plan =
-        rle::size(decoded, rle::dataShape(fields.kind));
-    if (!plan.ok()) {
+  if (frame_format_.rleAuto()) {
+    const rle::AdaptiveSizingResult sizing =
+        rle::sizeForAdaptiveSelection(
+            decoded, rle::dataShape(fields.kind),
+            rle::maximumSelectedFrameBytes(fields.kind));
+    if (!sizing.ok()) {
       saturatingIncrement(encode_failures_);
       saturatingIncrement(encoding_counters_[source_index].encode_failures);
-      result.encoding = rleFailure(plan.status);
-    } else if (plan.encoded_frame_bytes < protocol_v2::kDataFrameBytes) {
+      result.encoding = rleFailure(sizing.status);
+    } else if (sizing.select_rle) {
       const BufferIndex temporary = takeTransformBuffer(record);
       if (temporary == kInvalidBufferIndex) {
         result.raw_fallback_reason =
@@ -483,7 +481,7 @@ FinishFillResult PacketBufferPipeline::finishV2Fill(
           finalized.status = rle::Status::kPlanMismatch;
         } else {
           finalized = rle::finalizeRleDataFrame(
-              fields, decoded, plan,
+              fields, decoded, sizing.plan,
               {storage_.frame(temporary).data(),
                storage_.frame(temporary).size()});
         }

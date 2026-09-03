@@ -43,6 +43,16 @@ struct SizingPlan {
   constexpr bool ok() const { return status == Status::kOk; }
 };
 
+struct AdaptiveSizingResult {
+  Status status = Status::kInvalidView;
+  SizingPlan plan{};
+  std::size_t items_examined = 0U;
+  std::size_t runs_observed = 0U;
+  bool select_rle = false;
+
+  constexpr bool ok() const { return status == Status::kOk; }
+};
+
 struct EncodeResult {
   Status status = Status::kInvalidView;
   std::size_t run_count = 0U;
@@ -54,6 +64,14 @@ struct EncodeResult {
 // Read-only sizing is the mandatory first pass. It counts canonical maximal
 // runs and checks every multiplication/addition before reporting a capacity.
 SizingPlan size(protocol::ByteView decoded, CodecShape shape);
+
+// Stop once the observed run count proves that a complete RLE frame cannot
+// fit below the caller's strict selection ceiling. A usable sizing plan is
+// returned only when every logical item was examined and RLE is selectable;
+// an early RAW decision therefore cannot accidentally be passed to encode().
+AdaptiveSizingResult sizeForAdaptiveSelection(
+    protocol::ByteView decoded, CodecShape shape,
+    std::size_t maximum_selected_frame_bytes);
 
 // Encode exactly the supplied sizing plan into a separate caller-owned view.
 // Overlap is rejected so output can never overwrite unread logical input.

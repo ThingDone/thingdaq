@@ -1,5 +1,6 @@
 #include "rle_encoder.h"
 
+#include <cstring>
 #include <limits>
 
 #if defined(__IMXRT1062__)
@@ -33,10 +34,66 @@ bool checkedMultiply(std::size_t left, std::size_t right,
   return true;
 }
 
+THINGDAQ_RLE_CODE(".flashmem.rle.equal_item")
 bool equalItem(protocol::ByteView decoded, std::size_t left,
                std::size_t right, std::size_t item_bytes) {
+  if (item_bytes == 1U) {
+    return decoded.data[left] == decoded.data[right];
+  }
+  if (item_bytes == sizeof(std::uint32_t)) {
+    std::uint32_t left_value = 0U;
+    std::uint32_t right_value = 0U;
+    std::memcpy(&left_value, decoded.data + left, sizeof(left_value));
+    std::memcpy(&right_value, decoded.data + right, sizeof(right_value));
+    return left_value == right_value;
+  }
   for (std::size_t offset = 0U; offset < item_bytes; ++offset) {
     if (decoded.data[left + offset] != decoded.data[right + offset]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::uint32_t loadUnalignedU32(const std::uint8_t *source) {
+  std::uint32_t value = 0U;
+  std::memcpy(&value, source, sizeof(value));
+  return value;
+}
+
+bool allItemsEqual(protocol::ByteView decoded, CodecShape shape) {
+  if (shape.item_bytes == 1U) {
+    const std::uint32_t repeated =
+        static_cast<std::uint32_t>(decoded.data[0U]) * 0x01010101UL;
+    std::size_t item = 1U;
+    while (item + sizeof(std::uint32_t) <= decoded.size) {
+      if (loadUnalignedU32(decoded.data + item) != repeated) {
+        return false;
+      }
+      item += sizeof(std::uint32_t);
+    }
+    while (item < decoded.size) {
+      if (decoded.data[item] != decoded.data[0U]) {
+        return false;
+      }
+      ++item;
+    }
+    return true;
+  }
+  if (shape.item_bytes == sizeof(std::uint32_t)) {
+    const std::uint32_t first = loadUnalignedU32(decoded.data);
+    for (std::size_t offset = sizeof(first); offset < decoded.size;
+         offset += sizeof(first)) {
+      if (loadUnalignedU32(decoded.data + offset) != first) {
+        return false;
+      }
+    }
+    return true;
+  }
+  for (std::size_t item = 1U; item < decoded.size / shape.item_bytes;
+       ++item) {
+    if (!equalItem(decoded, 0U, item * shape.item_bytes,
+                   shape.item_bytes)) {
       return false;
     }
   }
@@ -66,6 +123,7 @@ bool validCodecShape(CodecShape shape) {
   return shape.item_bytes != 0U && shape.max_items != 0U;
 }
 
+THINGDAQ_RLE_CODE(".flashmem.rle.write_record")
 bool writeRecord(protocol::MutableByteView output, std::size_t &offset,
                  std::uint16_t run_length, protocol::ByteView decoded,
                  std::size_t item_offset, std::size_t item_bytes) {
@@ -137,14 +195,16 @@ bool validLogicalPayload(protocol_v2::FrameKind kind,
   if (kind == protocol_v2::FrameKind::kGpioData) {
     return true;
   }
-  constexpr std::uint16_t kAdcCodeMask =
-      static_cast<std::uint16_t>(
-          (1UL << protocol_v2::kAdcResolutionBits) - 1UL);
+  constexpr std::uint32_t kAdcCodeMask =
+      (1UL << protocol_v2::kAdcResolutionBits) - 1UL;
+  constexpr std::uint32_t kInvalidAdcCodeBits =
+      static_cast<std::uint32_t>(~kAdcCodeMask) & 0xFFFFUL;
+  constexpr std::uint32_t kInvalidAdcPairBits =
+      kInvalidAdcCodeBits | (kInvalidAdcCodeBits << 16U);
   for (std::size_t offset = 0U; offset < payload.size;
-       offset += sizeof(std::uint16_t)) {
-    std::uint16_t code = 0U;
-    if (!protocol::loadU16(payload, offset, code) ||
-        (code & static_cast<std::uint16_t>(~kAdcCodeMask)) != 0U) {
+       offset += sizeof(std::uint32_t)) {
+    if ((loadUnalignedU32(payload.data + offset) & kInvalidAdcPairBits) !=
+        0U) {
       return false;
     }
   }
@@ -259,6 +319,107 @@ SizingPlan size(protocol::ByteView decoded, CodecShape shape) {
   return result;
 }
 
+THINGDAQ_RLE_CODE(".flashmem.rle.adaptive_size")
+AdaptiveSizingResult sizeForAdaptiveSelection(
+    protocol::ByteView decoded, CodecShape shape,
+    std::size_t maximum_selected_frame_bytes) {
+  AdaptiveSizingResult result{};
+  result.plan.shape = shape;
+  result.plan.decoded_bytes = decoded.size;
+  if (!decoded.valid()) {
+    result.status = Status::kInvalidView;
+    return result;
+  }
+  if (!validCodecShape(shape)) {
+    result.status = Status::kInvalidShape;
+    return result;
+  }
+  if (decoded.size == 0U || decoded.size % shape.item_bytes != 0U) {
+    result.status = Status::kInvalidLength;
+    return result;
+  }
+  result.plan.item_count = decoded.size / shape.item_bytes;
+  if (result.plan.item_count > shape.max_items ||
+      result.plan.item_count > protocol_v2::kRleRunLengthMax) {
+    result.status = Status::kItemCountOverflow;
+    return result;
+  }
+
+  std::size_t record_bytes = 0U;
+  std::size_t minimum_frame_bytes = 0U;
+  if (!checkedAdd(shape.item_bytes, sizeof(std::uint16_t), record_bytes) ||
+      !checkedAdd(kEnvelopeBytes, record_bytes, minimum_frame_bytes) ||
+      maximum_selected_frame_bytes < minimum_frame_bytes) {
+    result.status = Status::kInvalidLength;
+    return result;
+  }
+  const std::size_t maximum_selected_runs =
+      (maximum_selected_frame_bytes - kEnvelopeBytes) / record_bytes;
+  std::size_t run_count = 1U;
+  result.items_examined = 1U;
+  if (shape.item_bytes == 1U) {
+    std::uint8_t previous = decoded.data[0U];
+    for (std::size_t item = 1U; item < result.plan.item_count; ++item) {
+      const std::uint8_t current = decoded.data[item];
+      ++result.items_examined;
+      if (current != previous) {
+        ++run_count;
+        if (run_count > maximum_selected_runs) {
+          result.status = Status::kOk;
+          result.runs_observed = run_count;
+          return result;
+        }
+        previous = current;
+      }
+    }
+  } else if (shape.item_bytes == sizeof(std::uint32_t)) {
+    std::uint32_t previous = loadUnalignedU32(decoded.data);
+    for (std::size_t item = 1U; item < result.plan.item_count; ++item) {
+      const std::uint32_t current = loadUnalignedU32(
+          decoded.data + item * sizeof(std::uint32_t));
+      ++result.items_examined;
+      if (current != previous) {
+        ++run_count;
+        if (run_count > maximum_selected_runs) {
+          result.status = Status::kOk;
+          result.runs_observed = run_count;
+          return result;
+        }
+        previous = current;
+      }
+    }
+  } else {
+    for (std::size_t item = 1U; item < result.plan.item_count; ++item) {
+      ++result.items_examined;
+      const std::size_t current = item * shape.item_bytes;
+      if (!equalItem(decoded, current - shape.item_bytes, current,
+                     shape.item_bytes)) {
+        ++run_count;
+        if (run_count > maximum_selected_runs) {
+          result.status = Status::kOk;
+          result.runs_observed = run_count;
+          return result;
+        }
+      }
+    }
+  }
+
+  result.plan.run_count = run_count;
+  result.runs_observed = run_count;
+  if (!checkedMultiply(run_count, record_bytes,
+                       result.plan.encoded_payload_bytes) ||
+      !checkedAdd(result.plan.encoded_payload_bytes, kEnvelopeBytes,
+                  result.plan.encoded_frame_bytes)) {
+    result.status = Status::kSizeOverflow;
+    return result;
+  }
+  result.plan.status = Status::kOk;
+  result.status = Status::kOk;
+  result.select_rle =
+      result.plan.encoded_frame_bytes <= maximum_selected_frame_bytes;
+  return result;
+}
+
 THINGDAQ_RLE_CODE(".flashmem.rle.encode")
 EncodeResult encode(protocol::ByteView decoded, const SizingPlan &plan,
                     protocol::MutableByteView output) {
@@ -298,6 +459,24 @@ EncodeResult encode(protocol::ByteView decoded, const SizingPlan &plan,
       output.data, plan.encoded_payload_bytes};
   if (rangesOverlap(decoded, bounded_output)) {
     result.status = Status::kOverlappingBuffers;
+    return result;
+  }
+
+  if (plan.run_count == 1U) {
+    if (!allItemsEqual(decoded, plan.shape)) {
+      result.status = Status::kPlanMismatch;
+      return result;
+    }
+    std::size_t output_offset = 0U;
+    if (!writeRecord(bounded_output, output_offset,
+                     static_cast<std::uint16_t>(plan.item_count), decoded,
+                     0U, plan.shape.item_bytes)) {
+      result.status = Status::kPlanMismatch;
+      return result;
+    }
+    result.status = Status::kOk;
+    result.run_count = 1U;
+    result.bytes_written = output_offset;
     return result;
   }
 

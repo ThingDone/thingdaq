@@ -412,6 +412,22 @@ void testEveryFrameLocalSingleRunLengthAndPlanGuards() {
              std::all_of(output.begin(), output.end(),
                          [](std::uint8_t value) { return value == 0U; }),
          "tampered sizing metadata is rejected before output mutation");
+
+  std::array<std::uint8_t, 8U> changed_after_sizing{};
+  std::fill(changed_after_sizing.begin(), changed_after_sizing.end(), 0x5AU);
+  const rle::SizingPlan single_run_plan =
+      rle::size({changed_after_sizing.data(), changed_after_sizing.size()},
+                {1U, changed_after_sizing.size()});
+  changed_after_sizing.back() = 0xA5U;
+  std::array<std::uint8_t, 3U> single_run_output{};
+  expect(rle::encode(
+             {changed_after_sizing.data(), changed_after_sizing.size()},
+             single_run_plan,
+             {single_run_output.data(), single_run_output.size()})
+                 .status == rle::Status::kPlanMismatch &&
+             std::all_of(single_run_output.begin(), single_run_output.end(),
+                         [](std::uint8_t value) { return value == 0U; }),
+         "single-run acceleration still rejects input mutated after sizing");
 }
 
 void testSizingBoundariesAndCapacityGuards() {
@@ -461,6 +477,54 @@ void testSizingBoundariesAndCapacityGuards() {
   expect(rle::size({decoded.data(), decoded.size() - 1U}, {2U, 4U}).status ==
              rle::Status::kInvalidLength,
          "a sizing pass rejects input truncated inside a logical item");
+}
+
+void testAdaptiveSizingStopsAtStrictWireBoundary() {
+  std::array<std::uint8_t, constants_v2::kDataPayloadBytes> payload{};
+  for (const auto &test :
+       std::array<std::pair<constants_v2::FrameKind, std::size_t>, 4U>{
+           std::pair{constants_v2::FrameKind::kAdcData, 674U},
+           std::pair{constants_v2::FrameKind::kAdcData, 675U},
+           std::pair{constants_v2::FrameKind::kGpioData, 1349U},
+           std::pair{constants_v2::FrameKind::kGpioData, 1350U}}) {
+    fillExactRuns(test.first, {payload.data(), payload.size()}, test.second);
+    const rle::CodecShape shape = rle::dataShape(test.first);
+    const rle::AdaptiveSizingResult adaptive =
+        rle::sizeForAdaptiveSelection(
+            {payload.data(), payload.size()}, shape,
+            rle::maximumSelectedFrameBytes(test.first));
+    const rle::SizingPlan exact =
+        rle::size({payload.data(), payload.size()}, shape);
+    const std::size_t maximum_runs =
+        test.first == constants_v2::FrameKind::kAdcData ? 674U : 1349U;
+    if (test.second <= maximum_runs) {
+      expect(adaptive.ok() && adaptive.select_rle && adaptive.plan.ok() &&
+                 adaptive.items_examined == shape.max_items &&
+                 adaptive.runs_observed == test.second &&
+                 adaptive.plan.run_count == exact.run_count &&
+                 adaptive.plan.encoded_payload_bytes ==
+                     exact.encoded_payload_bytes &&
+                 adaptive.plan.encoded_frame_bytes ==
+                     exact.encoded_frame_bytes,
+             "selectable adaptive sizing returns the exact complete plan");
+    } else {
+      std::array<std::uint8_t, constants_v2::kDataFrameBytes> output{};
+      std::fill(output.begin(), output.end(), 0xA5U);
+      const rle::EncodeResult rejected = rle::encode(
+          {payload.data(), payload.size()}, adaptive.plan,
+          {output.data(), output.size()});
+      expect(adaptive.ok() && !adaptive.select_rle &&
+                 !adaptive.plan.ok() &&
+                 adaptive.runs_observed == maximum_runs + 1U &&
+                 adaptive.items_examined == maximum_runs + 1U &&
+                 rejected.status == rle::Status::kPlanMismatch &&
+                 std::all_of(output.begin(), output.end(),
+                             [](std::uint8_t value) {
+                               return value == 0xA5U;
+                             }),
+             "non-selectable adaptive sizing stops at the first impossible run and exposes no encodable plan");
+    }
+  }
 }
 
 packet::RunFrameFormat v2Auto() {
@@ -701,6 +765,40 @@ void testAdaptivePipelineSuccessAndFallbacks() {
     pipeline.releaseFrontFrame();
     pipeline.stopProduction();
   }
+}
+
+void testAdaptivePipelineRejectsInvalidAdcWithoutPublishing() {
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  expect(pipeline.startRun(46U, constants::kDefaultChecksumAlgorithm,
+                           packet::kAdcStreamMask, v2Auto()) ==
+             packet::OperationStatus::kOk,
+         "start an invalid-input rejection run");
+  const packet::BeginFillResult begun =
+      pipeline.beginFill(packet::Stream::kAdc);
+  const wire::MutableByteView payload = pipeline.writablePayload(begun.handle);
+  for (std::size_t pair = 0U; pair < constants_v2::kAdcPairsPerFrame;
+       ++pair) {
+    setAdcPair(payload, pair, 0x155U, 0xAAAU);
+  }
+  payload.data[1U] = 0xF1U;
+  packet::FrameCompletion completion{};
+  completion.flags = static_cast<std::uint16_t>(
+      constants_v2::FrameFlag::kEpochStart);
+  completion.payload_bytes_written = payload.size;
+  const packet::FinishFillResult rejected =
+      pipeline.finishFill(begun.handle, completion);
+  const packet::PipelineSnapshot snapshot = pipeline.snapshot();
+  expect(rejected.status == packet::OperationStatus::kEncodingRejected &&
+             rejected.encoding.issue == wire::ValidationIssue::kBadPayload &&
+             snapshot.encoding_rejections == 1U &&
+             snapshot.ready_queue_depth == 0U &&
+             snapshot.temporary_pages_owned == 0U &&
+             pipeline.freeBuffers() == thingdaq::board::kPacketBufferCount,
+         "adaptive sizing never publishes an invalid ADC item or leaks either page");
+  pipeline.stopProduction();
+  expect(pipeline.readyForStart(),
+         "invalid adaptive input leaves the pipeline restartable");
 }
 
 void testV1RawCompatibility(const std::string &fixture_directory) {
@@ -1057,7 +1155,9 @@ int main(int argc, char **argv) {
   testPythonOracleCorpus(argv[2]);
   testEveryFrameLocalSingleRunLengthAndPlanGuards();
   testSizingBoundariesAndCapacityGuards();
+  testAdaptiveSizingStopsAtStrictWireBoundary();
   testAdaptivePipelineSuccessAndFallbacks();
+  testAdaptivePipelineRejectsInvalidAdcWithoutPublishing();
   testV1RawCompatibility(argv[1]);
   testFormatRollbackAndMixedStreamConservation();
   testQueueFailureReturnsBothPages();

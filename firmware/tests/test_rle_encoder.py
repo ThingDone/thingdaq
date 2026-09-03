@@ -229,6 +229,9 @@ class RLEEncoderTests(unittest.TestCase):
         expected_sections = {
             "rle_encoder.cpp": {
                 ".flashmem.rle.size",
+                ".flashmem.rle.adaptive_size",
+                ".flashmem.rle.equal_item",
+                ".flashmem.rle.write_record",
                 ".flashmem.rle.encode",
                 ".flashmem.rle.validate",
                 ".flashmem.rle.finalize_raw",
@@ -236,6 +239,7 @@ class RLEEncoderTests(unittest.TestCase):
             },
             "packet_buffer_pipeline.cpp": {
                 ".flashmem.packet.finish_v2",
+                ".flashmem.packet.apply_finalized",
                 ".flashmem.packet.take_transform",
                 ".flashmem.packet.recycle_transform",
                 ".flashmem.packet.snapshot",
