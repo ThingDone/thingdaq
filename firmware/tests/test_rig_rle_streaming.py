@@ -747,6 +747,52 @@ class RLEStreamingRigTests(unittest.TestCase):
         with self.assertRaisesRegex(rig.CodecFailure, "run length is zero"):
             rig.FrameParser(strict=True).feed(valid_checksum)
 
+    def test_slow_adc_parser_fuses_bounded_and_formula_validation(self) -> None:
+        payload = bytearray()
+        logical = 0
+        remaining = rig.ADC_PAIRS_PER_FRAME
+        while remaining:
+            run_length = rig.expected_run_length(
+                "slow-adc", rig.ADC_DATA, logical, remaining
+            )
+            payload.extend(struct.pack("<H", run_length))
+            payload.extend(rig.logical_item("slow-adc", rig.ADC_DATA, logical))
+            logical += run_length
+            remaining -= run_length
+        wire = _device_frame(
+            kind=rig.ADC_DATA,
+            payload=bytes(payload),
+            encoding=rig.FRAME_ENCODING_RLE,
+            item_count=rig.ADC_PAIRS_PER_FRAME,
+        )
+
+        capture = rig.CaptureValidator("slow-adc", rig.CONFIGURATION_ENCODING_RLE_AUTO)
+        callback_calls = 0
+
+        def validate(frame: rig.Frame) -> tuple[int, str]:
+            nonlocal callback_calls
+            callback_calls += 1
+            return capture.validate_rle_payload(frame)
+
+        parser = rig.FrameParser(strict=True)
+        parser.rle_validator = validate
+        frame = parser.feed(wire)[0]
+        self.assertEqual(1, callback_calls)
+        self.assertEqual("slow-adc", frame.rle_formula_pattern)
+        self.assertGreater(frame.rle_validation_nanoseconds, 0)
+        capture.observe(frame)
+        self.assertEqual(1, callback_calls)
+        self.assertEqual(1, capture.streams[rig.ADC_DATA].frames)
+        self.assertEqual(frame.run_count, capture.streams[rig.ADC_DATA].rle_runs)
+
+        parser = rig.FrameParser(strict=True)
+        parser.rle_validator = validate
+        damaged = bytearray(wire)
+        damaged[-1] ^= 1
+        with self.assertRaisesRegex(rig.CodecFailure, "checksum mismatch"):
+            parser.feed(bytes(damaged))
+        self.assertEqual(1, callback_calls)
+
     def test_validator_accepts_legal_mixed_raw_and_rle_frames(self) -> None:
         capture = _constant_capture()
         combined = capture.combined_summary()

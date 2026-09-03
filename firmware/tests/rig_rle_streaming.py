@@ -408,6 +408,8 @@ class Frame:
     payload: bytes
     checksum: int
     run_count: int = 0
+    rle_formula_pattern: str | None = None
+    rle_validation_nanoseconds: int = 0
 
 
 class FrameParser:
@@ -423,6 +425,7 @@ class FrameParser:
         self.payload_errors = 0
         self.bytes_discarded = 0
         self.high_water_bytes = 0
+        self.rle_validator: Callable[[Frame], tuple[int, str]] | None = None
 
     @property
     def errors(self) -> int:
@@ -498,8 +501,14 @@ class FrameParser:
                 payload=payload,
                 checksum=actual,
             )
+            validation_started = (
+                time.perf_counter_ns()
+                if frame.encoding == FRAME_ENCODING_RLE
+                and self.rle_validator is not None
+                else 0
+            )
             try:
-                run_count = self._validate_payload(frame)
+                run_count, formula_pattern = self._validate_payload(frame)
             except CodecFailure:
                 self.payload_errors += 1
                 if self.strict:
@@ -507,8 +516,20 @@ class FrameParser:
                 del self.buffer[0]
                 self.bytes_discarded += 1
                 continue
-            if run_count:
-                frame = Frame(**{**frame.__dict__, "run_count": run_count})
+            if run_count or formula_pattern is not None:
+                validation_nanoseconds = (
+                    time.perf_counter_ns() - validation_started
+                    if formula_pattern is not None
+                    else 0
+                )
+                frame = Frame(
+                    **{
+                        **frame.__dict__,
+                        "run_count": run_count,
+                        "rle_formula_pattern": formula_pattern,
+                        "rle_validation_nanoseconds": validation_nanoseconds,
+                    }
+                )
             del self.buffer[:total_length]
             self.frames_decoded += 1
             frames.append(frame)
@@ -626,11 +647,12 @@ class FrameParser:
             raise CodecFailure("successful START requires a nonzero run ID")
         return total_length
 
-    @staticmethod
-    def _validate_payload(frame: Frame) -> int:
+    def _validate_payload(self, frame: Frame) -> tuple[int, str | None]:
         if frame.kind in DATA_KINDS:
             if frame.encoding == FRAME_ENCODING_RAW:
-                return 0
+                return 0, None
+            if self.rle_validator is not None:
+                return self.rle_validator(frame)
             item_bytes = ADC_BYTES_PER_PAIR if frame.kind == ADC_DATA else 1
             record_bytes = item_bytes + 2
             decoded_items = 0
@@ -654,7 +676,7 @@ class FrameParser:
                 run_count += 1
             if decoded_items != frame.item_count:
                 raise CodecFailure("RLE runs do not sum to header.item_count")
-            return run_count
+            return run_count, None
 
         status, reserved, error = RESPONSE_PREFIX.unpack_from(frame.payload)
         is_error = frame.flags == FLAG_RESPONSE_ERROR
@@ -665,7 +687,7 @@ class FrameParser:
         if error > 12:
             raise CodecFailure("response reports an unknown error code")
         if is_error and frame.kind != ERROR_RESPONSE:
-            return 0
+            return 0, None
         if frame.kind == INFO_RESPONSE:
             reserved_ranges = (
                 frame.payload[1:2],
@@ -699,7 +721,7 @@ class FrameParser:
             frame.payload[1] or any(frame.payload[6:])
         ):
             raise CodecFailure("generic error reserved fields are nonzero")
-        return 0
+        return 0, None
 
     def _partial_magic_suffix(self) -> int:
         maximum = min(len(self.buffer), len(MAGIC_BYTES) - 1)
@@ -1278,10 +1300,20 @@ class CaptureValidator:
             )
             full, spots = 0, 0
         elif frame.encoding == FRAME_ENCODING_RLE:
-            full, spots = self._validate_rle_formula(frame, metrics)
+            if frame.rle_formula_pattern is None:
+                run_count, formula_pattern = self.validate_rle_payload(frame)
+                if run_count != frame.run_count or formula_pattern != self.pattern:
+                    raise CodecFailure("RLE formula pass disagrees with bounded parser")
+                elapsed = time.perf_counter_ns() - started
+            elif frame.rle_formula_pattern != self.pattern:
+                raise CodecFailure("RLE frame carries the wrong formula proof")
+            else:
+                elapsed = frame.rle_validation_nanoseconds
+            full, spots = 1, metrics.items_per_frame
         else:
             full, spots = self._validate_raw_formula(frame, metrics)
-        elapsed = time.perf_counter_ns() - started
+        if frame.encoding != FRAME_ENCODING_RLE or self.pattern == "physical":
+            elapsed = time.perf_counter_ns() - started
 
         if metrics.first_sequence is None:
             metrics.first_sequence = frame.sequence
@@ -1326,34 +1358,123 @@ class CaptureValidator:
             raise FirmwareFailure("physical ADC payload contains a code above 12 bits")
         return logical_payload
 
-    def _validate_rle_formula(
-        self, frame: Frame, metrics: StreamMetrics
-    ) -> tuple[int, int]:
+    def validate_rle_payload(self, frame: Frame) -> tuple[int, str]:
+        """Validate one synthetic RLE payload after its wire checksum passes."""
+
+        metrics = self.streams[frame.kind]
+        if self.pattern == "slow-adc":
+            records = self._validate_slow_adc_rle(frame, metrics)
+        else:
+            records = self._validate_generic_rle(frame, metrics)
+        return records, self.pattern
+
+    def _validate_generic_rle(self, frame: Frame, metrics: StreamMetrics) -> int:
         record_bytes = metrics.item_bytes + 2
         logical = frame.sequence * metrics.items_per_frame
         remaining = metrics.items_per_frame
         records = 0
         previous: bytes | None = None
+        formula_mismatch_at: int | None = None
         for offset in range(0, len(frame.payload), record_bytes):
             run_length = struct.unpack_from("<H", frame.payload, offset)[0]
+            if run_length == 0:
+                raise CodecFailure("RLE run length is zero")
+            if run_length > remaining:
+                raise CodecFailure("RLE decoded count exceeds advertised bound")
             item = frame.payload[offset + 2 : offset + record_bytes]
+            if item == previous:
+                raise CodecFailure("adjacent equal RLE records are noncanonical")
+            if frame.kind == ADC_DATA:
+                adc0, adc1 = struct.unpack("<HH", item)
+                if adc0 & ~ADC_CODE_MASK or adc1 & ~ADC_CODE_MASK:
+                    raise CodecFailure("RLE ADC item exceeds 12 bits")
             expected_item = logical_item(self.pattern, frame.kind, logical)
             expected_run = expected_run_length(
                 self.pattern, frame.kind, logical, remaining
             )
-            if item != expected_item or run_length != expected_run:
-                raise FirmwareFailure(
-                    f"{metrics.name} RLE formula/run mismatch at logical {logical}"
-                )
-            if item == previous:
-                raise CodecFailure("RLE formula pass found adjacent equal records")
+            if formula_mismatch_at is None and (
+                item != expected_item or run_length != expected_run
+            ):
+                formula_mismatch_at = logical
             previous = item
             logical += run_length
             remaining -= run_length
             records += 1
-        if remaining or records != frame.run_count:
-            raise CodecFailure("RLE formula pass disagrees with bounded parser")
-        return 1, metrics.items_per_frame
+        if remaining:
+            raise CodecFailure("RLE runs do not sum to header.item_count")
+        if formula_mismatch_at is not None:
+            raise FirmwareFailure(
+                f"{metrics.name} RLE formula/run mismatch at logical "
+                f"{formula_mismatch_at}"
+            )
+        return records
+
+    @staticmethod
+    def _validate_slow_adc_rle(frame: Frame, metrics: StreamMetrics) -> int:
+        """Validate the record-dense slow-ADC workload without byte objects."""
+
+        logical = frame.sequence * metrics.items_per_frame
+        remaining = metrics.items_per_frame
+        records = 0
+        formula_mismatch_at: int | None = None
+        if frame.kind == ADC_DATA:
+            previous: tuple[int, int] | None = None
+            for offset in range(0, len(frame.payload), 6):
+                run_length, adc0, adc1 = struct.unpack_from(
+                    "<HHH", frame.payload, offset
+                )
+                if run_length == 0:
+                    raise CodecFailure("RLE run length is zero")
+                if run_length > remaining:
+                    raise CodecFailure("RLE decoded count exceeds advertised bound")
+                item = (adc0, adc1)
+                if item == previous:
+                    raise CodecFailure("adjacent equal RLE records are noncanonical")
+                if adc0 & ~ADC_CODE_MASK or adc1 & ~ADC_CODE_MASK:
+                    raise CodecFailure("RLE ADC item exceeds 12 bits")
+                expected_run = min(
+                    remaining,
+                    8 - logical % 8,
+                    11 - logical % 11,
+                )
+                if formula_mismatch_at is None and (
+                    run_length != expected_run
+                    or adc0 != (0x100 + logical // 8) & ADC_CODE_MASK
+                    or adc1 != (0x900 + logical // 11) & ADC_CODE_MASK
+                ):
+                    formula_mismatch_at = logical
+                previous = item
+                logical += run_length
+                remaining -= run_length
+                records += 1
+        else:
+            previous_gpio: int | None = None
+            for offset in range(0, len(frame.payload), 3):
+                run_length = frame.payload[offset] | frame.payload[offset + 1] << 8
+                value = frame.payload[offset + 2]
+                if run_length == 0:
+                    raise CodecFailure("RLE run length is zero")
+                if run_length > remaining:
+                    raise CodecFailure("RLE decoded count exceeds advertised bound")
+                if value == previous_gpio:
+                    raise CodecFailure("adjacent equal RLE records are noncanonical")
+                expected_run = min(remaining, 16 - logical % 16)
+                if formula_mismatch_at is None and (
+                    run_length != expected_run or value != (0x40 + logical // 16) & 0xFF
+                ):
+                    formula_mismatch_at = logical
+                previous_gpio = value
+                logical += run_length
+                remaining -= run_length
+                records += 1
+        if remaining:
+            raise CodecFailure("RLE runs do not sum to header.item_count")
+        if formula_mismatch_at is not None:
+            raise FirmwareFailure(
+                f"{metrics.name} RLE formula/run mismatch at logical "
+                f"{formula_mismatch_at}"
+            )
+        return records
 
     def _validate_raw_formula(
         self, frame: Frame, metrics: StreamMetrics
@@ -2509,6 +2630,11 @@ def execute_capture(
     )
 
     capture = CaptureValidator(configuration.pattern, configuration.encoding)
+    if configuration.pattern != "physical":
+        # The parser invokes this only after the complete wire checksum passes.
+        # Fusing canonical/bounded and target-formula checks keeps record-dense
+        # real-time patterns ahead of the advertised 8 MB/s logical cadence.
+        link.parser.rle_validator = capture.validate_rle_payload
     observer = StatusObserver(
         configuration.source, configuration.encoding, configuration.checksum
     )
