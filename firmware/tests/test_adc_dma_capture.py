@@ -116,10 +116,13 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "void adcPairDmaIsr()",
             "DMA_INT & channelMask(kPairDispatchConverter)",
             "kDmaAlignmentWaitCycles",
-            "protocol_v1::kAdcTriggerDwtClockHz / 100000U",
+            "protocol_v1::kAdcTriggerDwtClockHz / 10000U",
             "ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles",
+            "std::size_t alignedHardwarePipelineIndex()",
+            "return alignedHardwarePipelineIndex();",
             "constexpr std::size_t kPairDispatchConverter = 1U",
             "static_assert(kDmaPipelineDepth == 6U)",
+            "static_assert(kDmaAlignmentWaitCycles == 60000U)",
             "attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr)",
             'THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.error_isr")',
             "NVIC_DISABLE_IRQ(IRQ_DMA_CH0)",
@@ -162,6 +165,17 @@ class AdcDmaCaptureTests(unittest.TestCase):
         self.assertIn("(void)servicePendingDmaPair()", paired_isr)
         self.assertNotIn("attachInterruptVector(IRQ_DMA_CH0", enable)
         self.assertNotIn("NVIC_ENABLE_IRQ(IRQ_DMA_CH0)", enable)
+
+        wait = source[
+            source.index("std::size_t waitForAlignedPipeline()") : source.index(
+                "bool servicePendingDmaPair()"
+            )
+        ]
+        self.assertEqual(2, wait.count("alignedHardwarePipelineIndex()"))
+        self.assertLess(
+            wait.index("ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles"),
+            wait.rindex("return alignedHardwarePipelineIndex();"),
+        )
 
 
 if __name__ == "__main__":

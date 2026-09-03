@@ -53,7 +53,7 @@ constexpr std::uint16_t kTcdControl =
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     protocol_v1::kAdcTriggerDwtClockHz / 100U;
 constexpr std::uint32_t kDmaAlignmentWaitCycles =
-    protocol_v1::kAdcTriggerDwtClockHz / 100000U;
+    protocol_v1::kAdcTriggerDwtClockHz / 10000U;
 constexpr std::size_t kDmaPipelineDepth = board::kAdcDmaPipelineDepth;
 constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
 constexpr std::size_t kPairDispatchConverter = 1U;
@@ -478,18 +478,32 @@ bool processInferredPairCompletion() {
 }
 
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
+    ".flashmem.adc_dma.pipeline_alignment")
+std::size_t alignedHardwarePipelineIndex() {
+  const std::size_t adc0 = hardwarePipelineIndex(0U);
+  const std::size_t adc1 = hardwarePipelineIndex(1U);
+  if (adc0 == adc1 && adc0 != 0U &&
+      adc0 < kDmaPipelineDepth - 1U) {
+    return adc0;
+  }
+  return kInvalidPipelineIndex;
+}
+
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_wait")
 std::size_t waitForAlignedPipeline() {
   const std::uint32_t started = ARM_DWT_CYCCNT;
   do {
-    const std::size_t adc0 = hardwarePipelineIndex(0U);
-    const std::size_t adc1 = hardwarePipelineIndex(1U);
-    if (adc0 == adc1 && adc0 != 0U &&
-        adc0 < kDmaPipelineDepth - 1U) {
-      return adc0;
+    const std::size_t aligned = alignedHardwarePipelineIndex();
+    if (aligned != kInvalidPipelineIndex) {
+      return aligned;
     }
   } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles);
-  return kInvalidPipelineIndex;
+
+  // A flash/cache stall can consume the cycle budget after the preceding
+  // observation. Always inspect the live TCDs once at the deadline so an
+  // already-recovered pair is not converted into a synthetic DMA fault.
+  return alignedHardwarePipelineIndex();
 }
 
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
@@ -936,7 +950,7 @@ static_assert(board::kAdcEdmaPriorities[0] == 2U);
 static_assert(board::kAdcEdmaPriorities[1] == 1U);
 static_assert(kPairDispatchConverter == 1U);
 static_assert(kDmaPipelineDepth == 6U);
-static_assert(kDmaAlignmentWaitCycles == 6000U);
+static_assert(kDmaAlignmentWaitCycles == 60000U);
 
 }  // namespace thingdaq::adc_capture
 

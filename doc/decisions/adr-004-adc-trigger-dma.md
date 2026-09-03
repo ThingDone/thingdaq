@@ -139,7 +139,11 @@ generations are always prelinked, and each descriptor slot is keyed by
 generation rather than destination so repeated pressure-sink generations
 cannot alias. ADC1's enabled interrupt is only a wakeup: the handler immediately
 acknowledges both latches so a newer ADC0 completion cannot be erased by a late
-clear, then waits at most 10 us for the two live TCD positions to align. Their
+clear, then waits at most 100 us for the two live TCD positions to align. This
+remains below one tenth of the 1,012 us major-loop period, tolerates bounded
+bus and flash/cache stalls observed under simultaneous framing, and includes a
+final live-TCD observation at the deadline so a recovered pair is not reported
+as a synthetic fault. Their
 `DADDR` plus `DLASTSGA` links identify as many as four paired generations
 completed before it ran. It reconciles each inferred
 generation exactly once in ADC0-to-ADC1 order, patches only descriptors at
