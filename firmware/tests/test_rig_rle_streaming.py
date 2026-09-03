@@ -1050,6 +1050,41 @@ class RLEStreamingRigTests(unittest.TestCase):
                 )
             )
 
+    def test_physical_adc_range_check_accepts_exactly_twelve_bit_codes(self) -> None:
+        metrics = rig.StreamMetrics(
+            "adc", rig.ADC_DATA, rig.ADC_PAIRS_PER_FRAME, rig.ADC_BYTES_PER_PAIR
+        )
+        for high_byte in range(256):
+            with self.subTest(high_byte=high_byte):
+                payload = bytes((0x5A, high_byte)) * (
+                    rig.DATA_PAYLOAD_BYTES // 2
+                )
+                frame = rig.Frame(
+                    version=rig.PROTOCOL_V2,
+                    kind=rig.ADC_DATA,
+                    flags=rig.FLAG_EPOCH_START,
+                    checksum_algorithm=rig.CHECKSUM_ADLER32,
+                    encoding=rig.FRAME_ENCODING_RAW,
+                    total_length=rig.DATA_FRAME_BYTES,
+                    run_id=7,
+                    sequence=0,
+                    request_id=0,
+                    first_sample_ticks=0,
+                    item_count=rig.ADC_PAIRS_PER_FRAME,
+                    payload=payload,
+                    checksum=0,
+                )
+                if high_byte <= rig.ADC_CODE_MASK >> 8:
+                    self.assertEqual(
+                        payload,
+                        rig.CaptureValidator._decode_physical(frame, metrics),
+                    )
+                else:
+                    with self.assertRaisesRegex(
+                        rig.FirmwareFailure, "above 12 bits"
+                    ):
+                        rig.CaptureValidator._decode_physical(frame, metrics)
+
     def test_full_program_rejects_every_adversarial_rle_envelope(self) -> None:
         for fault in (
             "corrupt_rle",

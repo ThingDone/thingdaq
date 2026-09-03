@@ -99,6 +99,10 @@ ADC_PAIR_PERIOD_TICKS = 8
 ADC_BYTES_PER_PAIR = 4
 ADC_PAIRS_PER_FRAME = 1012
 ADC_CODE_MASK = 0x0FFF
+# Each little-endian ADC code is valid exactly when its high byte is one of
+# these 16 values.  bytes.translate() applies the deletion set in C, avoiding
+# a Python-level loop over 2,024 high bytes for every full-rate ADC frame.
+VALID_ADC_HIGH_BYTES = bytes(range((ADC_CODE_MASK >> 8) + 1))
 ADC_DMA_RING_DEPTH = 8
 GPIO_SAMPLE_RATE_HZ = 4_000_000
 GPIO_SAMPLE_PERIOD_TICKS = 2
@@ -1370,8 +1374,8 @@ class CaptureValidator:
             logical_payload = bytes(decoded)
         if len(logical_payload) != DATA_PAYLOAD_BYTES:
             raise CodecFailure("physical decode does not fill one logical payload")
-        if frame.kind == ADC_DATA and any(
-            high_byte & 0xF0 for high_byte in logical_payload[1::2]
+        if frame.kind == ADC_DATA and logical_payload[1::2].translate(
+            None, VALID_ADC_HIGH_BYTES
         ):
             raise FirmwareFailure("physical ADC payload contains a code above 12 bits")
         return logical_payload
