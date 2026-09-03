@@ -252,9 +252,9 @@ struct AdcTriggerHardwareEvidence {
   std::array<std::uint16_t, 2U> xbar_sel_configured{};
 };
 
-// The measured delta below is conversion-completion status timing. It
-// cross-checks the programmed digital phase but does not claim to measure the
-// analog aperture at either ADC input.
+// The measured delta below is the median conversion-completion status timing
+// after one warm-up pair. It cross-checks the programmed digital phase but does
+// not claim to measure the analog aperture at either ADC input.
 struct AdcTriggerMetadata {
   std::uint16_t configuration_flags = 0U;
   std::uint32_t error_flags = 0U;

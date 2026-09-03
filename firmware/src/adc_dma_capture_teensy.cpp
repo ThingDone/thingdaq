@@ -152,6 +152,7 @@ std::uint32_t g_stop_errors = 0U;
 std::uint32_t g_stale_interrupts = 0U;
 bool g_hardware_prepared = false;
 bool g_faulted = false;
+bool g_boundary_stop_armed = false;
 
 std::uint32_t address32(const volatile void *address) {
   return static_cast<std::uint32_t>(
@@ -325,12 +326,7 @@ void configureDescriptors() {
 }
 
 void configurePriorities() {
-  for (std::size_t converter = 0U; converter < kConverterCount;
-       ++converter) {
-    priorityRegister(converter) = static_cast<std::uint8_t>(
-        DMA_DCHPRI_ECP |
-        DMA_DCHPRI_CHPRI(board::kAdcEdmaPriorities[converter]));
-  }
+  gpio_dma_route::configureOwnedEdmaPriorities();
 }
 
 bool hardwareDestinationMatches(std::size_t converter,
@@ -484,18 +480,34 @@ bool processInferredPairCompletion() {
 }
 
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
+    ".flashmem.adc_dma.pipeline_alignment")
+std::size_t alignedHardwarePipelineIndex() {
+  const std::size_t adc0 = hardwarePipelineIndex(0U);
+  const std::size_t adc1 = hardwarePipelineIndex(1U);
+  if (adc0 == adc1 && adc0 != 0U &&
+      adc0 < kDmaPipelineDepth - 1U) {
+    return adc0;
+  }
+  return kInvalidPipelineIndex;
+}
+
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_wait")
 std::size_t waitForAlignedPipeline() {
   const std::uint32_t started = ARM_DWT_CYCCNT;
+  const std::uint32_t alignment_wait_cycles =
+      F_CPU_ACTUAL / 100000U;
   do {
-    const std::size_t adc0 = hardwarePipelineIndex(0U);
-    const std::size_t adc1 = hardwarePipelineIndex(1U);
-    if (adc0 == adc1 && adc0 != 0U &&
-        adc0 < kDmaPipelineDepth - 1U) {
-      return adc0;
+    const std::size_t aligned = alignedHardwarePipelineIndex();
+    if (aligned != kInvalidPipelineIndex) {
+      return aligned;
     }
-  } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles);
-  return kInvalidPipelineIndex;
+  } while (ARM_DWT_CYCCNT - started < alignment_wait_cycles);
+
+  // A flash/cache stall can consume the cycle budget after the preceding
+  // observation. Always inspect the live TCDs once at the deadline so an
+  // already-recovered pair is not converted into a synthetic DMA fault.
+  return alignedHardwarePipelineIndex();
 }
 
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
@@ -517,8 +529,17 @@ bool servicePendingDmaPair() {
                    .edma_channel;
     DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel;
     barrier();
-    const std::size_t completed_generations = waitForAlignedPipeline();
+    // DREQ deliberately disables both request lines at the armed ADC-only
+    // stop boundary.  That terminal major loop is known to be paired even
+    // though the live TCDs are no longer required to expose an ordinary
+    // running-pipeline index after DREQ takes effect.
+    const bool terminal_boundary_completion =
+        g_boundary_stop_armed &&
+        (DMA_ERQ & kAdcDmaChannelMask) == 0U;
+    const std::size_t completed_generations =
+        terminal_boundary_completion ? 1U : waitForAlignedPipeline();
     if (completed_generations == kInvalidPipelineIndex) {
+      g_boundary_stop_armed = false;
       g_ring.recordDmaError(g_epoch, 0U);
       g_ring.recordDmaError(g_epoch, 1U);
       g_faulted = true;
@@ -527,9 +548,13 @@ bool servicePendingDmaPair() {
     for (std::size_t completed = 0U;
          completed < completed_generations; ++completed) {
       if (!processInferredPairCompletion()) {
+        g_boundary_stop_armed = false;
         g_faulted = true;
         return false;
       }
+    }
+    if (terminal_boundary_completion) {
+      g_boundary_stop_armed = false;
     }
   }
   g_ring.recordDmaError(g_epoch, 0U);
@@ -630,8 +655,11 @@ bool waitForCompleteStopBoundary() {
     __disable_irq();
     bool safe_to_arm =
         (DMA_ERQ & kAdcDmaChannelMask) == kAdcDmaChannelMask &&
+        (DMA_INT & kAdcDmaChannelMask) == 0U &&
         g_current_generations[0] == g_current_generations[1] &&
-        g_current_destinations[0] == g_current_destinations[1];
+        g_current_destinations[0] == g_current_destinations[1] &&
+        hardwarePipelineIndex(0U) == 0U &&
+        hardwarePipelineIndex(1U) == 0U;
     for (std::size_t converter = 0U;
          converter < kConverterCount && safe_to_arm; ++converter) {
       const IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
@@ -641,6 +669,7 @@ bool waitForCompleteStopBoundary() {
           tcd.CITER_ELINKNO <= tcd.BITER_ELINKNO;
     }
     if (safe_to_arm) {
+      g_boundary_stop_armed = true;
       for (std::size_t converter = 0U; converter < kConverterCount;
            ++converter) {
         IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
@@ -661,6 +690,7 @@ bool waitForCompleteStopBoundary() {
   const bool completed = armed &&
       (DMA_ERQ & kAdcDmaChannelMask) == 0U;
   if (!completed) {
+    g_boundary_stop_armed = false;
     saturatingIncrement(g_stop_errors);
   }
   return completed;
@@ -744,6 +774,7 @@ StartStatus prepareHardware(std::uint32_t epoch) {
   g_adc_etc_error_flags = 0U;
   g_adc_etc_error_interrupts = 0U;
   g_stale_interrupts = 0U;
+  g_boundary_stop_armed = false;
   g_faulted = false;
   g_hardware_prepared = true;
   ARM_DEMCR |= ARM_DEMCR_TRCENA;
@@ -771,6 +802,7 @@ StartStatus prepareHardware(std::uint32_t epoch) {
           g_current_destinations[converter];
     }
     g_hardware_prepared = false;
+    g_boundary_stop_armed = false;
     (void)g_ring.stop(stopped);
     g_epoch = 0U;
     g_faulted = true;
@@ -813,6 +845,7 @@ StopReport stopHardwareAfterTriggers() {
     clearChannelState(converter);
   }
   clearInterruptState();
+  g_boundary_stop_armed = false;
   g_hardware_prepared = false;
   restorePrimask(primask);
 

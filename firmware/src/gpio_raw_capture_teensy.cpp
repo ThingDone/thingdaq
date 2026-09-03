@@ -341,7 +341,7 @@ StartStatus prepareHardware() {
 
   gpio_dma_route::clearEdmaChannelState();
   configureDescriptors(prime);
-  gpio_dma_route::configureEdmaPriority();
+  gpio_dma_route::configureOwnedEdmaPriorities();
 
   gpio_dma_route::configureStoppedPit(kProductionPitLoad);
   gpio_dma_route::configureXbarRequest();

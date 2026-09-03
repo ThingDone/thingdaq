@@ -42,7 +42,8 @@ constexpr std::uint32_t kAdcClockDividerConfiguration =
     ADC_CFG_ADIV(1U) | ADC_CFG_ADICLK(1U);
 
 volatile std::uint32_t g_completion_counts[kConverterCount]{};
-volatile std::uint32_t g_first_completion_cycles[kConverterCount]{};
+volatile std::uint32_t
+    g_completion_cycles[kConverterCount][kDiagnosticCompletionTarget]{};
 volatile std::uint32_t g_trigger_error_flags = 0U;
 volatile std::uint32_t g_trigger_error_count = 0U;
 std::uint32_t g_done0_1_irq_final = 0U;
@@ -201,7 +202,10 @@ void resetDiagnosticState() {
   __disable_irq();
   for (std::size_t index = 0U; index < kConverterCount; ++index) {
     g_completion_counts[index] = 0U;
-    g_first_completion_cycles[index] = 0U;
+    for (std::size_t sample = 0U; sample < kDiagnosticCompletionTarget;
+         ++sample) {
+      g_completion_cycles[index][sample] = 0U;
+    }
   }
   g_trigger_error_flags = 0U;
   g_trigger_error_count = 0U;
@@ -225,7 +229,6 @@ void recordDiagnosticError(std::uint32_t pending) {
 THINGDAQ_ADC_TRIGGER_TARGET_HOT_CODE
 void captureCompletionStatusTransitions() {
   const std::uint32_t started = ARM_DWT_CYCCNT;
-  std::uint32_t captured = 0U;
   for (std::uint32_t poll = 0U;
        poll < protocol_v1::kAdcTriggerDiagnosticPollLimit; ++poll) {
 #if defined(THINGDAQ_ADC_TRIGGER_DIAGNOSTIC_POLL_HOOK)
@@ -236,26 +239,28 @@ void captureCompletionStatusTransitions() {
     const std::uint32_t error_pending =
         ADC_ETC_DONE2_ERR_IRQ & kTriggerErrorMask;
     const std::uint32_t observed = ARM_DWT_CYCCNT;
-    const std::uint32_t first_pending = done_pending & ~captured;
 
-    if ((first_pending & kDone0Mask) != 0U) {
-      g_first_completion_cycles[0] = observed;
-      g_completion_counts[0] = 1U;
-      captured |= kDone0Mask;
+    if ((done_pending & kDone0Mask) != 0U &&
+        g_completion_counts[0] < kDiagnosticCompletionTarget) {
+      const std::uint32_t sample = g_completion_counts[0];
+      g_completion_cycles[0][sample] = observed;
+      g_completion_counts[0] = sample + 1U;
     }
-    if ((first_pending & kDone1Mask) != 0U) {
-      g_first_completion_cycles[1] = observed;
-      g_completion_counts[1] = 1U;
-      captured |= kDone1Mask;
+    if ((done_pending & kDone1Mask) != 0U &&
+        g_completion_counts[1] < kDiagnosticCompletionTarget) {
+      const std::uint32_t sample = g_completion_counts[1];
+      g_completion_cycles[1][sample] = observed;
+      g_completion_counts[1] = sample + 1U;
     }
-    if (first_pending != 0U) {
-      ADC_ETC_DONE0_1_IRQ = first_pending;
+    if (done_pending != 0U) {
+      ADC_ETC_DONE0_1_IRQ = done_pending;
     }
     if (error_pending != 0U) {
       recordDiagnosticError(error_pending);
       return;
     }
-    if (captured == (kDone0Mask | kDone1Mask) ||
+    if ((g_completion_counts[0] >= kDiagnosticCompletionTarget &&
+         g_completion_counts[1] >= kDiagnosticCompletionTarget) ||
         observed - started >= kDiagnosticDeadlineCycles) {
       return;
     }
@@ -467,14 +472,18 @@ class TeensyPlatform final : public Platform {
     return result;
   }
 
-  std::array<std::uint32_t, kConverterCount>
+  CompletionDeltaSamples
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
-      ".flashmem.adc_trigger.target_completion_cycles")
-  firstCompletionCycles() override {
+      ".flashmem.adc_trigger.target_completion_deltas")
+  completionDeltaSamples() override {
     const std::uint32_t primask = readPrimask();
     __disable_irq();
-    const std::array<std::uint32_t, kConverterCount> result{
-        g_first_completion_cycles[0], g_first_completion_cycles[1]};
+    CompletionDeltaSamples result{};
+    for (std::size_t sample = 0U; sample < result.size(); ++sample) {
+      const std::size_t captured = kDiagnosticWarmupPairCount + sample;
+      result[sample] = g_completion_cycles[1][captured] -
+                       g_completion_cycles[0][captured];
+    }
     restorePrimask(primask);
     return result;
   }

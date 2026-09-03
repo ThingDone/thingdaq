@@ -43,6 +43,31 @@ inline constexpr std::uint32_t kEdmaChannelMask =
     std::uint32_t{1U} << board::kGpioEdmaChannel;
 inline constexpr std::uint32_t kDmamuxConfiguration =
     DMAMUX_CHCFG_ENBL | board::kGpioDmamuxSource;
+inline constexpr std::uint32_t kFirstPriorityWordOwnedMask = 0xFFFFFF00U;
+
+constexpr std::uint8_t configuredPriority(std::uint8_t priority) {
+  return static_cast<std::uint8_t>(
+      DMA_DCHPRI_ECP | DMA_DCHPRI_CHPRI(priority));
+}
+
+// The i.MX RT1062 lays out DCHPRI3..DCHPRI0 as the four bytes of the first
+// aligned priority word. Updating the three acquisition channels in one bus
+// write is required: the reset permutation is 0,1,2,3, while ThingDAQ swaps
+// channels 0 and 2. Sequential byte writes temporarily duplicate a priority
+// and latch DMA_ES[CPE] before a transfer can start.
+constexpr std::uint32_t withOwnedEdmaPriorities(
+    std::uint32_t priority_word) {
+  return (priority_word & ~kFirstPriorityWordOwnedMask) |
+         (static_cast<std::uint32_t>(configuredPriority(
+              board::kGpioEdmaPriority))
+          << 8U) |
+         (static_cast<std::uint32_t>(configuredPriority(
+              board::kAdcEdmaPriorities[1]))
+          << 16U) |
+         (static_cast<std::uint32_t>(configuredPriority(
+              board::kAdcEdmaPriorities[0]))
+          << 24U);
+}
 
 inline void barrier() {
 #if defined(THINGDAQ_HOST_REGISTER_TEST)
@@ -137,10 +162,29 @@ inline void clearEdmaChannelState() {
   DMA_CDNE = board::kGpioEdmaChannel;
 }
 
-inline void configureEdmaPriority() {
+inline void configureOwnedEdmaPriorities() {
+  static_assert(board::kAdcConverterConfigurations[0].edma_channel == 0U);
+  static_assert(board::kAdcConverterConfigurations[1].edma_channel == 1U);
   static_assert(board::kGpioEdmaChannel == 2U);
+#if defined(THINGDAQ_HOST_REGISTER_TEST)
+  // The narrow host fake exposes the priority bytes in logical-channel order.
+  // The pure word composer above is asserted separately by the register test.
+  DMA_DCHPRI0 = configuredPriority(board::kAdcEdmaPriorities[0]);
+  DMA_DCHPRI1 = configuredPriority(board::kAdcEdmaPriorities[1]);
   DMA_DCHPRI2 = static_cast<std::uint8_t>(
-      DMA_DCHPRI_ECP | DMA_DCHPRI_CHPRI(board::kGpioEdmaPriority));
+      configuredPriority(board::kGpioEdmaPriority));
+#else
+  volatile std::uint32_t *const first_priority_word =
+      reinterpret_cast<volatile std::uint32_t *>(&DMA_DCHPRI3);
+  *first_priority_word = withOwnedEdmaPriorities(*first_priority_word);
+#endif
+  // A warm upload can retain a CPE raised by an older image. Clear only the
+  // three channels in this firmware's resource contract after repairing the
+  // complete priority permutation.
+  DMA_CERR = board::kAdcConverterConfigurations[0].edma_channel;
+  DMA_CERR = board::kAdcConverterConfigurations[1].edma_channel;
+  DMA_CERR = board::kGpioEdmaChannel;
+  barrier();
 }
 
 inline std::uint8_t edmaPriority() {

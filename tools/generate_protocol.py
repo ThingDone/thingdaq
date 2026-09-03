@@ -431,6 +431,8 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         "phase_ipg_cycles",
         "completion_expected_dwt_cycles",
         "completion_tolerance_dwt_cycles",
+        "diagnostic_warmup_pair_count",
+        "diagnostic_measured_pair_count",
         "diagnostic_deadline_us",
         "diagnostic_poll_limit",
         "irq_priority",
@@ -489,6 +491,22 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
     )
     if not 0 < diagnostic_deadline_cycles <= 0xFFFFFFFF:
         raise ContractError("ADC trigger diagnostic deadline must fit DWT")
+    diagnostic_warmup_pairs = int(adc_trigger["diagnostic_warmup_pair_count"])
+    diagnostic_measured_pairs = int(adc_trigger["diagnostic_measured_pair_count"])
+    if diagnostic_warmup_pairs != 1 or diagnostic_measured_pairs != 7:
+        raise ContractError(
+            "ADC trigger diagnostic must retain one warm-up and seven measured pairs"
+        )
+    if diagnostic_measured_pairs % 2 != 1:
+        raise ContractError(
+            "ADC trigger diagnostic median requires an odd sample count"
+        )
+    if diagnostic_warmup_pairs + diagnostic_measured_pairs >= int(
+        adc_trigger["diagnostic_poll_limit"]
+    ):
+        raise ContractError(
+            "ADC trigger diagnostic sample target exceeds its poll bound"
+        )
 
     flag_values = enum_map(contract["flags"])
     validate_enum_width("flags", contract["flags"], 16)
@@ -895,6 +913,12 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"ADC_TRIGGER_PHASE_IPG_CYCLES = {int(adc_trigger['phase_ipg_cycles'])}",
         f"ADC_COMPLETION_EXPECTED_DWT_CYCLES = {int(adc_trigger['completion_expected_dwt_cycles'])}",
         f"ADC_COMPLETION_TOLERANCE_DWT_CYCLES = {int(adc_trigger['completion_tolerance_dwt_cycles'])}",
+        f"ADC_TRIGGER_DIAGNOSTIC_WARMUP_PAIR_COUNT = {int(adc_trigger['diagnostic_warmup_pair_count'])}",
+        f"ADC_TRIGGER_DIAGNOSTIC_MEASURED_PAIR_COUNT = {int(adc_trigger['diagnostic_measured_pair_count'])}",
+        "ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET = (",
+        "    ADC_TRIGGER_DIAGNOSTIC_WARMUP_PAIR_COUNT",
+        "    + ADC_TRIGGER_DIAGNOSTIC_MEASURED_PAIR_COUNT",
+        ")",
         f"ADC_TRIGGER_DIAGNOSTIC_DEADLINE_US = {int(adc_trigger['diagnostic_deadline_us'])}",
         f"ADC_TRIGGER_DIAGNOSTIC_POLL_LIMIT = {int(adc_trigger['diagnostic_poll_limit'])}",
         f"ADC_TRIGGER_IRQ_PRIORITY = {int(adc_trigger['irq_priority'])}",
@@ -1569,6 +1593,9 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         f"inline constexpr std::uint16_t kAdcTriggerPhaseIpgCycles = {int(adc_trigger['phase_ipg_cycles'])}U;",
         f"inline constexpr std::uint32_t kAdcCompletionExpectedDwtCycles = {int(adc_trigger['completion_expected_dwt_cycles'])}U;",
         f"inline constexpr std::uint32_t kAdcCompletionToleranceDwtCycles = {int(adc_trigger['completion_tolerance_dwt_cycles'])}U;",
+        f"inline constexpr std::size_t kAdcTriggerDiagnosticWarmupPairCount = {int(adc_trigger['diagnostic_warmup_pair_count'])}U;",
+        f"inline constexpr std::size_t kAdcTriggerDiagnosticMeasuredPairCount = {int(adc_trigger['diagnostic_measured_pair_count'])}U;",
+        "inline constexpr std::size_t kAdcTriggerDiagnosticCompletionTarget = kAdcTriggerDiagnosticWarmupPairCount + kAdcTriggerDiagnosticMeasuredPairCount;",
         f"inline constexpr std::uint32_t kAdcTriggerDiagnosticDeadlineUs = {int(adc_trigger['diagnostic_deadline_us'])}U;",
         f"inline constexpr std::uint32_t kAdcTriggerDiagnosticPollLimit = {int(adc_trigger['diagnostic_poll_limit'])}U;",
         f"inline constexpr std::uint8_t kAdcTriggerIrqPriority = {int(adc_trigger['irq_priority'])}U;",

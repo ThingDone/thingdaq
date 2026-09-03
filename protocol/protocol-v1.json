@@ -295,10 +295,12 @@
     "phase_ipg_cycles": 75,
     "completion_expected_dwt_cycles": 300,
     "completion_tolerance_dwt_cycles": 120,
+    "diagnostic_warmup_pair_count": 1,
+    "diagnostic_measured_pair_count": 7,
     "diagnostic_deadline_us": 2000,
     "diagnostic_poll_limit": 2000000,
     "irq_priority": 32,
-    "semantics": "PIT0 divides the verified 24 MHz PERCLK root by six for the exact 4 MHz GPIO master. Chained PIT1 divides those expirations by four for one exact 1 MHz event fanned out through distinct XBAR outputs to asynchronous ADC_ETC queues 0 and 4. With PRE_DIVIDER=0, raw initial delays 0 and 75 have effective delays of 1 and 76 IPG cycles, an exact 75-cycle or 500 ns difference. The bounded DWT diagnostic measures relative conversion-completion interrupt timing only; it is not analog aperture evidence."
+    "semantics": "PIT0 divides the verified 24 MHz PERCLK root by six for the exact 4 MHz GPIO master. Chained PIT1 divides those expirations by four for one exact 1 MHz event fanned out through distinct XBAR outputs to asynchronous ADC_ETC queues 0 and 4. With PRE_DIVIDER=0, raw initial delays 0 and 75 have effective delays of 1 and 76 IPG cycles, an exact 75-cycle or 500 ns difference. The bounded DWT diagnostic records eight consecutive completion pairs, discards the first pair as startup warm-up, and reports the median of the remaining seven relative conversion-completion deltas. It is not analog aperture evidence."
   },
   "data_layouts": {
     "adc": {

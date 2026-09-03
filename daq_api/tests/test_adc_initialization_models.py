@@ -40,7 +40,10 @@ class AdcInitializationModelTests(unittest.TestCase):
             ccm_ccgr2_configured=0x00C00000,
             pair_tctrl_configured=4,
             trigger_counter_configured=(0, 75),
-            completion_counts=(1, 1),
+            completion_counts=(
+                constants.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,
+                constants.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,
+            ),
             completion_delta_cycles=300,
             diagnostic_elapsed_cycles=600,
             xbar_sel_configured=(0x3900, 0x3900),
@@ -106,8 +109,25 @@ class AdcInitializationModelTests(unittest.TestCase):
                     | constants.AdcTriggerConfigurationFlag.COMPLETION_TIMING_VALID
                     | constants.AdcTriggerConfigurationFlag.STOPPED_AFTER_DIAGNOSTIC
                 ),
-                completion_counts=(1, 1),
+                completion_counts=(
+                    constants.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,
+                    constants.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,
+                ),
                 completion_delta_cycles=500,
+            )
+
+        with self.assertRaisesRegex(ValueError, "completion timing"):
+            AdcTriggerMetadata(
+                configuration_flags=(
+                    constants.AdcTriggerConfigurationFlag.ARM_SEQUENCE_EXERCISED
+                    | constants.AdcTriggerConfigurationFlag.COMPLETION_TIMING_VALID
+                    | constants.AdcTriggerConfigurationFlag.STOPPED_AFTER_DIAGNOSTIC
+                ),
+                completion_counts=(
+                    constants.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET - 1,
+                    constants.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,
+                ),
+                completion_delta_cycles=300,
             )
 
     def test_info_and_status_round_trip_actual_success_snapshot(self) -> None:

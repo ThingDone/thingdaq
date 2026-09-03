@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 4bf3ce7074766f54bf7c7f279d926d9fcc122584ce20715d190d444ae4206abb
+// Source SHA-256: 5e4c41f7c9cefe6c71fbaafaa6f2fb62c44a6927ac7a19d901222cdca97a365b
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "4bf3ce7074766f54bf7c7f279d926d9fcc122584ce20715d190d444ae4206abb";
+inline constexpr char kSourceSha256[] = "5e4c41f7c9cefe6c71fbaafaa6f2fb62c44a6927ac7a19d901222cdca97a365b";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -120,6 +120,9 @@ inline constexpr std::uint16_t kAdcTriggerEffectiveDelays[] = {1U, 76U};
 inline constexpr std::uint16_t kAdcTriggerPhaseIpgCycles = 75U;
 inline constexpr std::uint32_t kAdcCompletionExpectedDwtCycles = 300U;
 inline constexpr std::uint32_t kAdcCompletionToleranceDwtCycles = 120U;
+inline constexpr std::size_t kAdcTriggerDiagnosticWarmupPairCount = 1U;
+inline constexpr std::size_t kAdcTriggerDiagnosticMeasuredPairCount = 7U;
+inline constexpr std::size_t kAdcTriggerDiagnosticCompletionTarget = kAdcTriggerDiagnosticWarmupPairCount + kAdcTriggerDiagnosticMeasuredPairCount;
 inline constexpr std::uint32_t kAdcTriggerDiagnosticDeadlineUs = 2000U;
 inline constexpr std::uint32_t kAdcTriggerDiagnosticPollLimit = 2000000U;
 inline constexpr std::uint8_t kAdcTriggerIrqPriority = 32U;

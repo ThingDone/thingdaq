@@ -11,6 +11,12 @@
 namespace thingdaq::adc_trigger {
 
 inline constexpr std::size_t kConverterCount = 2U;
+inline constexpr std::size_t kDiagnosticWarmupPairCount =
+    protocol_v1::kAdcTriggerDiagnosticWarmupPairCount;
+inline constexpr std::size_t kDiagnosticMeasuredPairCount =
+    protocol_v1::kAdcTriggerDiagnosticMeasuredPairCount;
+inline constexpr std::size_t kDiagnosticCompletionTarget =
+    protocol_v1::kAdcTriggerDiagnosticCompletionTarget;
 inline constexpr std::uint16_t kRequiredConfigurationFlags =
     protocol_v1::kKnownAdcTriggerConfigurationFlagMask;
 inline constexpr std::uint32_t kDiagnosticDeadlineCycles =
@@ -37,6 +43,8 @@ inline constexpr std::uint16_t kStoppedConfigurationFlags =
         protocol_v1::AdcTriggerConfigurationFlag::kAdcHardwareTriggerValid);
 
 using HardwareEvidence = protocol::AdcTriggerHardwareEvidence;
+using CompletionDeltaSamples =
+    std::array<std::uint32_t, kDiagnosticMeasuredPairCount>;
 
 struct ConfigureResult {
   std::uint16_t configuration_flags = 0U;
@@ -44,8 +52,9 @@ struct ConfigureResult {
   HardwareEvidence evidence{};
 };
 
-// This diagnostic timestamps the first ADC_ETC conversion-completion status
-// transitions. It is an implementation cross-check of the programmed relative
+// This diagnostic timestamps consecutive ADC_ETC conversion-completion status
+// transitions, discards one startup pair, and grades the median of seven paired
+// deltas. It is an implementation cross-check of the programmed relative
 // trigger delay; it is deliberately not evidence of the analog sample-and-hold
 // aperture.
 struct Snapshot {
@@ -110,8 +119,7 @@ class Platform {
   // and enables only the stopped trigger schedule.
   virtual bool armFromStopped(bool completion_diagnostic) = 0;
   virtual std::array<std::uint32_t, kConverterCount> completionCounts() = 0;
-  virtual std::array<std::uint32_t, kConverterCount>
-  firstCompletionCycles() = 0;
+  virtual CompletionDeltaSamples completionDeltaSamples() = 0;
   virtual std::uint32_t triggerErrorFlags() = 0;
   virtual std::uint32_t triggerErrorCount() = 0;
   virtual bool stop() = 0;
@@ -164,5 +172,11 @@ static_assert(protocol_v1::kAdcTriggerQueues[0] !=
               protocol_v1::kAdcTriggerQueues[1]);
 static_assert(kDiagnosticDeadlineCycles ==
               identity::kExpectedDwtHz / 500U);
+static_assert(kDiagnosticMeasuredPairCount % 2U == 1U,
+              "the completion-delta median requires an odd sample count");
+static_assert(kDiagnosticCompletionTarget ==
+              kDiagnosticWarmupPairCount + kDiagnosticMeasuredPairCount);
+static_assert(kDiagnosticCompletionTarget <
+              protocol_v1::kAdcTriggerDiagnosticPollLimit);
 
 }  // namespace thingdaq::adc_trigger

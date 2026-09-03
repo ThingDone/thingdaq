@@ -376,7 +376,8 @@ class AdcTriggerMetadata:
         if flags & timing_valid and (
             errors
             or flags & required_timing_flags != required_timing_flags
-            or not all(self.completion_counts)
+            or self.completion_counts
+            != 2 * (constants.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,)
             or abs(self.completion_delta_cycles - self.completion_expected_delta_cycles)
             > self.completion_tolerance_cycles
         ):
@@ -396,7 +397,7 @@ class AdcTriggerMetadata:
 
     @property
     def completion_timing_delta_ns(self) -> float:
-        """Return completion timing in ns; this is not aperture timing."""
+        """Return median completion timing in ns; this is not aperture timing."""
 
         return self.completion_delta_cycles * 1_000_000_000 / self.dwt_clock_hz
 

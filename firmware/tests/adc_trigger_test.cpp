@@ -35,11 +35,17 @@ class FakePlatform final : public adc_trigger::Platform {
   bool arm_ok = true;
   bool stop_ok = true;
   std::uint32_t completion_after_poll = 2U;
-  std::array<std::uint32_t, 2U> completed_counts{1U, 1U};
-  std::array<std::uint32_t, 2U> first_cycles{
-      0xFFFFFF00U,
-      static_cast<std::uint32_t>(0xFFFFFF00U +
-                                 identity::kAdcCompletionExpectedDwtCycles)};
+  std::array<std::uint32_t, 2U> completed_counts{
+      adc_trigger::kDiagnosticCompletionTarget,
+      adc_trigger::kDiagnosticCompletionTarget};
+  adc_trigger::CompletionDeltaSamples completion_deltas{
+      identity::kAdcCompletionExpectedDwtCycles,
+      identity::kAdcCompletionExpectedDwtCycles,
+      identity::kAdcCompletionExpectedDwtCycles,
+      identity::kAdcCompletionExpectedDwtCycles,
+      identity::kAdcCompletionExpectedDwtCycles,
+      identity::kAdcCompletionExpectedDwtCycles,
+      identity::kAdcCompletionExpectedDwtCycles};
   std::uint32_t trigger_errors = 0U;
   std::uint32_t trigger_error_count = 0U;
   adc_trigger::HardwareEvidence terminal_evidence{};
@@ -84,8 +90,8 @@ class FakePlatform final : public adc_trigger::Platform {
                : std::array<std::uint32_t, 2U>{};
   }
 
-  std::array<std::uint32_t, 2U> firstCompletionCycles() override {
-    return first_cycles;
+  adc_trigger::CompletionDeltaSamples completionDeltaSamples() override {
+    return completion_deltas;
   }
 
   std::uint32_t triggerErrorFlags() override { return trigger_errors; }
@@ -106,6 +112,14 @@ class FakePlatform final : public adc_trigger::Platform {
 
 void testExactScheduleAndSuccessfulDiagnostic() {
   FakePlatform platform{};
+  platform.completion_deltas = {
+      identity::kAdcCompletionExpectedDwtCycles - 5U,
+      identity::kAdcCompletionExpectedDwtCycles + 3U,
+      identity::kAdcCompletionExpectedDwtCycles,
+      identity::kAdcCompletionExpectedDwtCycles + 1000U,
+      identity::kAdcCompletionExpectedDwtCycles - 3U,
+      identity::kAdcCompletionExpectedDwtCycles + 1U,
+      0U};
   adc_trigger::Scheduler scheduler{platform};
   const adc_trigger::Snapshot &snapshot = scheduler.initialize(true);
 
@@ -119,6 +133,10 @@ void testExactScheduleAndSuccessfulDiagnostic() {
   assert(snapshot.phase_ipg_cycles == identity::kAdcNominalPhaseIpgCycles);
   assert(snapshot.completion_delta_cycles ==
          identity::kAdcCompletionExpectedDwtCycles);
+  assert((snapshot.completion_counts ==
+          std::array<std::uint32_t, 2U>{
+              adc_trigger::kDiagnosticCompletionTarget,
+              adc_trigger::kDiagnosticCompletionTarget}));
   assert(snapshot.completion_tolerance_cycles ==
          identity::kAdcCompletionToleranceDwtCycles);
   assert(snapshot.evidence.done0_1_irq_final == 0xB0U);
@@ -206,9 +224,26 @@ void testDiagnosticTimeoutIsBoundedAndLeavesStopped() {
   assert(platform.completion_polls < 10U);
 }
 
+void testDiagnosticRequiresExactCompletionTarget() {
+  FakePlatform platform{};
+  platform.completed_counts = {
+      adc_trigger::kDiagnosticCompletionTarget + 1U,
+      adc_trigger::kDiagnosticCompletionTarget};
+  adc_trigger::Scheduler scheduler{platform};
+  const adc_trigger::Snapshot &snapshot = scheduler.initialize(true);
+  assert(!snapshot.ready());
+  assert((snapshot.error_flags &
+          adc_trigger::triggerError(
+              protocol_v1::AdcTriggerError::kCompletionCountMismatch)) != 0U);
+  assert((snapshot.configuration_flags &
+          adc_trigger::configurationFlag(
+              protocol_v1::AdcTriggerConfigurationFlag::
+                  kCompletionTimingValid)) == 0U);
+}
+
 void testCompletionTimingAndTriggerErrorsStayDistinct() {
   FakePlatform platform{};
-  platform.first_cycles = {100U, 600U};
+  platform.completion_deltas.fill(500U);
   platform.trigger_errors = 1U;
   platform.trigger_error_count = 1U;
   adc_trigger::Scheduler scheduler{platform};
@@ -258,6 +293,7 @@ int main() {
   testConvertersMustBeReadyBeforeAnyPeripheralWrite();
   testConfigurationAndCounterFailuresAreObservable();
   testDiagnosticTimeoutIsBoundedAndLeavesStopped();
+  testDiagnosticRequiresExactCompletionTarget();
   testCompletionTimingAndTriggerErrorsStayDistinct();
   testFailedProductionArmForcesStoppedCleanup();
   return 0;

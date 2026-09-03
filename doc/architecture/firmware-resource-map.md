@@ -122,10 +122,11 @@ Chained PIT1 divides the verified 4 MHz PIT0 event by four. In the 150 MHz
 ADC_ETC/IPG domain with predivider zero, raw initial delays 0 and 75 become
 effective delays of 1 and 76 cycles; their difference is exactly 75 cycles, or
 500 ns. This four-tick phase is digital trigger/timestamp metadata, not a
-physical aperture claim. The BOOT diagnostic records the first ADC_ETC
-conversion-completion status transitions against DWT under a bounded,
-interrupt-masked poll, accepts an explicit 300 ± 120 cycle completion delta,
-and exposes configured registers, counts, and errors in INFO/STATUS. Later
+physical aperture claim. The BOOT diagnostic records eight consecutive
+ADC_ETC conversion-completion pairs against DWT under a bounded,
+interrupt-masked poll, discards the first pair as startup warm-up, accepts the
+median of the remaining seven against an explicit 300 ± 120 cycle completion
+delta, and exposes configured registers, counts, and errors in INFO/STATUS. Later
 hardware work must still keep completion timing separate from analog aperture
 before making a physical analog-timing claim.
 
@@ -142,7 +143,12 @@ set may contain duplicates. Pinned core macros are asserted against all three
 source numbers. Acquisition code must bind these exact channels rather than
 use an unconstrained first-free allocator. ADC0/ADC1 use fixed priority values
 2/1, above GPIO's priority 0, use NVIC priority 48, and each own twelve 32-byte
-generation-indexed scatter/gather TCDs. Channel 0 reads `ADC1_R0` and channel 1 reads `ADC2_R0`;
+generation-indexed scatter/gather TCDs. All three priority bytes are committed
+with one aligned word write so the 2/1/0 permutation never transiently
+duplicates a priority and latches `DMA_ES[CPE]`. An ADC-only paired-boundary
+STOP accepts its DREQ-disabled terminal completion as one known pair instead
+of requiring the live TCDs to retain a normal running-pipeline position.
+Channel 0 reads `ADC1_R0` and channel 1 reads `ADC2_R0`;
 both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012`, and
 `DOFF=4` for consumer buffers. Both completion IRQs and the production
 ADC_ETC error IRQ share priority 48. Only the later ADC1 completion line

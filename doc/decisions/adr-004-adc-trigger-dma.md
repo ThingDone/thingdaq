@@ -109,7 +109,10 @@ halfwords at pair offset 2, both with a four-byte destination stride. Channel
 through source 88. Both use 16-bit source/destination attributes, two-byte
 minor transfers, equal 1,012-result major loops, fixed priorities 2/1 above
 GPIO priority 0, major completion interrupts, and twelve generation-indexed
-scatter/gather descriptor slots per channel.
+scatter/gather descriptor slots per channel. The three owned priorities are
+installed together with one aligned 32-bit write before stale channel errors
+are cleared; sequential byte writes can temporarily duplicate a priority and
+latch the i.MX RT1062 channel-priority error before acquisition starts.
 
 Eight 4,064-byte cache-line-aligned OCRAM buffers each contain 1,012 native
 `{uint16_t adc0, uint16_t adc1}` pairs plus alignment padding. Both channel
@@ -139,7 +142,10 @@ generations are always prelinked, and each descriptor slot is keyed by
 generation rather than destination so repeated pressure-sink generations
 cannot alias. ADC1's enabled interrupt is only a wakeup: the handler immediately
 acknowledges both latches so a newer ADC0 completion cannot be erased by a late
-clear, then waits at most 10 us for the two live TCD positions to align. Their
+clear, then waits at most 10 us for the two live TCD positions to align. A final
+live-TCD observation at the deadline tolerates a bounded flash/cache stall that
+consumes the polling budget without extending this high-priority ISR across a
+meaningful part of a USB high-speed microframe. Their
 `DADDR` plus `DLASTSGA` links identify as many as four paired generations
 completed before it ran. It reconciles each inferred
 generation exactly once in ADC0-to-ADC1 order, patches only descriptors at
@@ -149,13 +155,16 @@ software ownership can advance, while a matching pair is the only path that
 makes a buffer ready.
 
 Normal STOP first waits for both live channels to enter the first quarter of
-the same DMA generation, then atomically sets `DREQ` on both active TCDs while
-triggers remain live. This avoids a channel-transition race while retaining
-ample time before the next boundary. It waits at most 10 ms and 2,000,000 polls
-for both request-enable bits to clear at the matching major-loop boundary,
-then stops the shared trigger schedule before disabling ADC DMA requests,
-interrupts, and routes. This preserves every complete paired generation
-without treating an arbitrary command arrival point as data loss.
+the same software and live-TCD generation with no pending completion, then
+atomically sets `DREQ` on both active TCDs while triggers remain live. This
+avoids a channel-transition race while retaining ample time before the next
+boundary. It waits at most 10 ms and 2,000,000 polls for both request-enable
+bits to clear at the matching major-loop boundary. The terminal wakeup is
+reconciled as exactly one known paired generation even when DREQ leaves the
+live TCDs outside an ordinary running-pipeline position. STOP then disables the
+shared trigger schedule, ADC DMA requests, interrupts, and routes. This
+preserves every complete paired generation without treating either command
+arrival or the intentional terminal TCD state as data loss or a DMA fault.
 A boundary timeout remains fail-safe: it is reported as a STOP error, triggers
 are still disabled before DMA teardown, and any actual partial progress is
 accounted exactly by the paired ring.
@@ -202,20 +211,20 @@ route, queue, delay, and hardware-trigger setting is read back before arming.
 
 The BOOT diagnostic clears ADC_ETC/NVIC state, leaves the three ADC_ETC IRQ
 lines disabled, briefly masks interrupts, enables queues 0/4 and chained PIT1,
-and enables the 4 MHz PIT0 master last. A bounded ITCM loop timestamps the
-first queue-0 Done0 and queue-4 Done1 status transitions with the free-running
+and enables the 4 MHz PIT0 master last. A bounded ITCM loop timestamps eight
+consecutive queue-0 Done0 and queue-4 Done1 status pairs with the free-running
 600 MHz DWT counter, clears each observed status bit, and retains the first
-ADC_ETC trigger-error state. This avoids mistaking NVIC tail-chaining latency
-for the programmed hardware phase when both equal-priority completion IRQs
-have become pending before either handler runs. The target poll and portable
+ADC_ETC trigger-error state. It discards the startup pair and grades the median
+of the remaining seven deltas. This avoids both first-pair startup bias and
+mistaking NVIC tail-chaining latency for the programmed hardware phase. The target poll and portable
 scheduler retain independent 2,000 us and 2,000,000-poll ceilings. Teardown
 stops PIT0 first, disables both queues, waits boundedly for both ADCs to become
 idle, disables and acknowledges the IRQ lines, and verifies the stopped state.
 
 Identically configured conversions should complete 300 DWT cycles apart. The
-cross-check accepts ±120 DWT cycles to cover register-observation variation and
-publishes the observed delta, expected delta, tolerance, elapsed cycles,
-completion counts, trigger-error count, final IRQ words, and configured
+cross-check accepts a seven-pair median within ±120 DWT cycles to cover
+register-observation variation and publishes the observed median, expected
+delta, tolerance, elapsed cycles, completion counts, trigger-error count, final IRQ words, and configured
 CCM/PIT/XBAR/ADC_ETC register evidence through INFO and STATUS. This is
 conversion-completion timing only. It does not observe either ADC's analog
 sample-and-hold aperture and must never be presented as aperture or phase

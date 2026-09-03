@@ -80,7 +80,10 @@ def _ready_trigger() -> AdcTriggerMetadata:
         pair_tctrl_configured=rig.PIT_TCTRL_CHAIN,
         trigger_counter_configured=rig.ADC_TRIGGER_INITIAL_DELAYS,
         chain_configured=(rig.ADC0_CHAIN_CONFIGURED, rig.ADC1_CHAIN_CONFIGURED),
-        completion_counts=(1, 1),
+        completion_counts=(
+            rig.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,
+            rig.ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,
+        ),
         completion_delta_cycles=rig.ADC_COMPLETION_EXPECTED_DWT_CYCLES,
         diagnostic_elapsed_cycles=600,
         xbar_sel_configured=(0x3900, 0x3900),

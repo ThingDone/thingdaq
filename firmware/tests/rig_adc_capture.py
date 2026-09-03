@@ -128,6 +128,12 @@ ADC_TRIGGER_EFFECTIVE_DELAYS = (1, 76)
 ADC_TRIGGER_PHASE_IPG_CYCLES = 75
 ADC_COMPLETION_EXPECTED_DWT_CYCLES = 300
 ADC_COMPLETION_TOLERANCE_DWT_CYCLES = 120
+ADC_TRIGGER_DIAGNOSTIC_WARMUP_PAIR_COUNT = 1
+ADC_TRIGGER_DIAGNOSTIC_MEASURED_PAIR_COUNT = 7
+ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET = (
+    ADC_TRIGGER_DIAGNOSTIC_WARMUP_PAIR_COUNT
+    + ADC_TRIGGER_DIAGNOSTIC_MEASURED_PAIR_COUNT
+)
 ADC_TRIGGER_DIAGNOSTIC_DEADLINE_US = 2_000
 ADC_TRIGGER_DIAGNOSTIC_DEADLINE_CYCLES = (
     ADC_TRIGGER_DWT_CLOCK_HZ * ADC_TRIGGER_DIAGNOSTIC_DEADLINE_US // 1_000_000
@@ -1651,9 +1657,9 @@ def grade_adc_metadata(
     completion_counts = _metadata_pair(metadata, "completion_counts")
     evidence.check(
         f"{label}.completion_counts",
-        "equal nonzero converter counts",
+        f"{ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET} observations per converter",
         completion_counts,
-        completion_counts[0] == completion_counts[1] and completion_counts[0] > 0,
+        completion_counts == 2 * (ADC_TRIGGER_DIAGNOSTIC_COMPLETION_TARGET,),
     )
     completion_delta = _metadata_int(metadata, "completion_delta_cycles")
     evidence.check(

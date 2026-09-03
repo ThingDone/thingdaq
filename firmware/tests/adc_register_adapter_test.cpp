@@ -357,17 +357,36 @@ void testDeterministicArmStopOrderAndOwnedConflict() {
 }
 
 std::uint32_t diagnostic_poll_count = 0U;
+constexpr std::array<std::uint32_t, trigger::kDiagnosticCompletionTarget>
+    kDiagnosticPairDeltas{
+        128U,
+        identity::kAdcCompletionExpectedDwtCycles - 4U,
+        identity::kAdcCompletionExpectedDwtCycles + 3U,
+        identity::kAdcCompletionExpectedDwtCycles,
+        identity::kAdcCompletionExpectedDwtCycles + 100U,
+        identity::kAdcCompletionExpectedDwtCycles - 1U,
+        identity::kAdcCompletionExpectedDwtCycles + 1U,
+        identity::kAdcCompletionExpectedDwtCycles};
 
 void publishDiagnosticCompletions() {
   ++diagnostic_poll_count;
+  fake_imxrt::adc_etc.DONE0_1_IRQ.reset(0U);
   fake_imxrt::adc_etc.DONE2_ERR_IRQ.reset(0U);
-  if (diagnostic_poll_count == 1U) {
-    fake_imxrt::arm_dwt_cyccnt = 1'000U;
+  const std::size_t event = diagnostic_poll_count - 1U;
+  const std::size_t pair = event / 2U;
+  if (pair >= trigger::kDiagnosticCompletionTarget) {
+    return;
+  }
+  const std::uint32_t pair_period_cycles =
+      identity::kExpectedDwtHz / v1::kAdcTriggerPairRateHz;
+  const std::uint32_t pair_started =
+      1'000U + static_cast<std::uint32_t>(pair) * pair_period_cycles;
+  if (event % 2U == 0U) {
+    fake_imxrt::arm_dwt_cyccnt = pair_started;
     fake_imxrt::adc_etc.DONE0_1_IRQ.reset(
         ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(v1::kAdcTriggerQueues[0]));
-  } else if (diagnostic_poll_count == 2U) {
-    fake_imxrt::arm_dwt_cyccnt =
-        1'000U + identity::kAdcCompletionExpectedDwtCycles;
+  } else {
+    fake_imxrt::arm_dwt_cyccnt = pair_started + kDiagnosticPairDeltas[pair];
     fake_imxrt::adc_etc.DONE0_1_IRQ.reset(
         ADC_ETC_DONE0_1_IRQ_TRIG_DONE1(v1::kAdcTriggerQueues[1]));
   }
@@ -385,18 +404,20 @@ void testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked() {
          "completion diagnostic arms from verified stopped state");
 
   const auto completion_counts = platform.completionCounts();
-  const auto completion_cycles = platform.firstCompletionCycles();
-  expect(completion_counts == std::array<std::uint32_t, 2U>{1U, 1U} &&
-             completion_cycles ==
+  const auto completion_deltas = platform.completionDeltaSamples();
+  const trigger::CompletionDeltaSamples expected_deltas{
+      kDiagnosticPairDeltas[1], kDiagnosticPairDeltas[2],
+      kDiagnosticPairDeltas[3], kDiagnosticPairDeltas[4],
+      kDiagnosticPairDeltas[5], kDiagnosticPairDeltas[6],
+      kDiagnosticPairDeltas[7]};
+  expect(completion_counts ==
                  std::array<std::uint32_t, 2U>{
-                     1'000U,
-                     1'000U +
-                         identity::kAdcCompletionExpectedDwtCycles},
-         "diagnostic retains the first profile-spaced DONE transitions (counts " +
+                     trigger::kDiagnosticCompletionTarget,
+                     trigger::kDiagnosticCompletionTarget} &&
+             completion_deltas == expected_deltas,
+         "diagnostic discards one warm-up pair and retains seven DONE deltas (counts " +
              std::to_string(completion_counts[0]) + "/" +
-             std::to_string(completion_counts[1]) + ", cycles " +
-             std::to_string(completion_cycles[0]) + "/" +
-             std::to_string(completion_cycles[1]) + ")");
+             std::to_string(completion_counts[1]) + ")");
   expect(!fake_imxrt::interrupt_enabled[IRQ_ADC_ETC0] &&
              !fake_imxrt::interrupt_enabled[IRQ_ADC_ETC1] &&
              !fake_imxrt::interrupt_enabled[IRQ_ADC_ETC_ERR] &&
@@ -438,7 +459,7 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
 
   gpio_route::configureXbarRequest();
   gpio_route::clearEdmaChannelState();
-  gpio_route::configureEdmaPriority();
+  gpio_route::configureOwnedEdmaPriorities();
   gpio_route::enableEdmaRequest();
   expect(platform.armFromStopped(false),
          "combined register fixture arms the one common schedule");
@@ -483,8 +504,11 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
   expect(board::kAdcEdmaPriorities[0] == 2U &&
              board::kAdcEdmaPriorities[1] == 1U &&
              board::kGpioEdmaPriority == 0U &&
+             (fake_imxrt::dma_dchpri[0] & 0x0FU) == 2U &&
+             (fake_imxrt::dma_dchpri[1] & 0x0FU) == 1U &&
+             (fake_imxrt::dma_dchpri[2] & 0x0FU) == 0U &&
              board::kAdcEdmaIrqPriority < board::kGpioEdmaIrqPriority,
-         "fixed eDMA and IRQ tiers prioritize paired ADC completion over continuous GPIO traffic");
+         "fixed unique eDMA and IRQ tiers prioritize paired ADC completion over continuous GPIO traffic");
 
   expect(platform.stop(),
          "combined stop first disables PIT0/PIT1 and ADC_ETC");

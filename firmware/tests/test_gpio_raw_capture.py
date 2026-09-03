@@ -101,6 +101,8 @@ class GpioRawCaptureTests(unittest.TestCase):
             "DMA_TCD_CSR_ESG | DMA_TCD_CSR_INTMAJOR",
             "protocol_v1::kGpioSamplesPerFrame",
             "DMA_DCHPRI2",
+            "reinterpret_cast<volatile std::uint32_t *>(&DMA_DCHPRI3)",
+            "withOwnedEdmaPriorities(*first_priority_word)",
             "board::kGpioEdmaPriority",
             "gpio_dma_route::clearEdmaChannelState()",
             "gpio_dma_route::enableEdmaRequest()",

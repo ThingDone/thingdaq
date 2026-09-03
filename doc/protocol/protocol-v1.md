@@ -457,8 +457,9 @@ converter readiness, resource conflicts, PERCLK/IPG mismatch, DWT failure,
 PIT/XBAR/ADC_ETC/ADC readback faults, arm/cleanup faults, deadline/count faults,
 ADC_ETC trigger errors, and out-of-tolerance completion timing. Raw delays 0/75
 mean effective delays 1/76 at 150 MHz, an exact 75-cycle or 500 ns difference.
-The observed DWT value is the bounded, interrupt-masked observation time of
-the first conversion-completion status transitions. It is not an analog
+The observed DWT value is the median of seven bounded, interrupt-masked
+conversion-completion status deltas after one discarded startup pair. The
+completion counts must therefore both be eight. It is not an analog
 aperture measurement or an analog phase-accuracy claim.
 
 Stream-mask bits are ADC = 1 and GPIO = 2. Source IDs are hardware = 0 and

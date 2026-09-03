@@ -101,8 +101,7 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "static_cast<std::int16_t>(sizeof(SamplePair))",
             "protocol_v1::kAdcPairsPerFrame",
             "DMA_TCD_CSR_ESG | DMA_TCD_CSR_INTMAJOR",
-            "DMA_DCHPRI0",
-            "DMA_DCHPRI1",
+            "gpio_dma_route::configureOwnedEdmaPriorities()",
             "DMAMUX_SOURCE_ADC1",
             "DMAMUX_SOURCE_ADC2",
             "ADC_GC_DMAEN",
@@ -118,7 +117,14 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "DMA_INT & channelMask(kPairDispatchConverter)",
             "kDmaAlignmentWaitCycles",
             "identity::kExpectedDwtHz / 100000U",
-            "ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles",
+            "F_CPU_ACTUAL / 100000U",
+            "ARM_DWT_CYCCNT - started < alignment_wait_cycles",
+            "std::size_t alignedHardwarePipelineIndex()",
+            "return alignedHardwarePipelineIndex();",
+            "g_boundary_stop_armed",
+            "terminal_boundary_completion",
+            "hardwarePipelineIndex(0U) == 0U",
+            "hardwarePipelineIndex(1U) == 0U",
             "constexpr std::size_t kPairDispatchConverter = 1U",
             "static_assert(kDmaPipelineDepth == 6U)",
             "attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr)",
@@ -163,6 +169,34 @@ class AdcDmaCaptureTests(unittest.TestCase):
         self.assertIn("(void)servicePendingDmaPair()", paired_isr)
         self.assertNotIn("attachInterruptVector(IRQ_DMA_CH0", enable)
         self.assertNotIn("NVIC_ENABLE_IRQ(IRQ_DMA_CH0)", enable)
+
+        terminal = service.index("const bool terminal_boundary_completion")
+        select_completion = service.index(
+            "terminal_boundary_completion ? 1U : waitForAlignedPipeline()"
+        )
+        self.assertLess(terminal, select_completion)
+
+        boundary = source[source.index("bool waitForCompleteStopBoundary()") :]
+        no_pending = boundary.index("(DMA_INT & kAdcDmaChannelMask) == 0U")
+        at_head_0 = boundary.index("hardwarePipelineIndex(0U) == 0U")
+        at_head_1 = boundary.index("hardwarePipelineIndex(1U) == 0U")
+        arm_terminal = boundary.index("g_boundary_stop_armed = true")
+        write_dreq = boundary.index("DMA_TCD_CSR_DREQ")
+        self.assertLess(no_pending, arm_terminal)
+        self.assertLess(at_head_0, arm_terminal)
+        self.assertLess(at_head_1, arm_terminal)
+        self.assertLess(arm_terminal, write_dreq)
+
+        wait = source[
+            source.index("std::size_t waitForAlignedPipeline()") : source.index(
+                "bool servicePendingDmaPair()"
+            )
+        ]
+        self.assertEqual(2, wait.count("alignedHardwarePipelineIndex()"))
+        self.assertLess(
+            wait.index("ARM_DWT_CYCCNT - started < alignment_wait_cycles"),
+            wait.rindex("return alignedHardwarePipelineIndex();"),
+        )
 
 
 if __name__ == "__main__":

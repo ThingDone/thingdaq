@@ -109,7 +109,7 @@ class TeensyPlatform final : public Platform {
     tcd.DLASTSGA = 0;
     tcd.BITER_ELINKNO = plan.tcd_major_count;
     tcd.CSR = kTcdCsr;
-    gpio_dma_route::configureEdmaPriority();
+    gpio_dma_route::configureOwnedEdmaPriorities();
     gpio_dma_route::enableEdmaRequest();
 
     snapshot.ccm_cscmr1_configured = CCM_CSCMR1;

@@ -21,6 +21,21 @@ std::uint32_t absoluteDifference(std::uint32_t left, std::uint32_t right) {
 }
 
 THINGDAQ_ADC_TRIGGER_COLD_CODE(
+    ".flashmem.adc_trigger.median_completion_delta")
+std::uint32_t medianCompletionDelta(CompletionDeltaSamples samples) {
+  for (std::size_t index = 1U; index < samples.size(); ++index) {
+    const std::uint32_t value = samples[index];
+    std::size_t destination = index;
+    while (destination != 0U && samples[destination - 1U] > value) {
+      samples[destination] = samples[destination - 1U];
+      --destination;
+    }
+    samples[destination] = value;
+  }
+  return samples[samples.size() / 2U];
+}
+
+THINGDAQ_ADC_TRIGGER_COLD_CODE(
     ".flashmem.adc_trigger.capture_terminal_evidence")
 void captureTerminalEvidence(Platform &platform, Snapshot &snapshot) {
   snapshot.evidence = platform.evidence();
@@ -120,7 +135,8 @@ const Snapshot &Scheduler::initialize(bool converters_ready) {
   for (std::uint32_t poll = 0U;
        poll < protocol_v1::kAdcTriggerDiagnosticPollLimit; ++poll) {
     const auto counts = platform_.completionCounts();
-    if (counts[0] != 0U && counts[1] != 0U) {
+    if (counts[0] >= kDiagnosticCompletionTarget &&
+        counts[1] >= kDiagnosticCompletionTarget) {
       completed = true;
       break;
     }
@@ -144,15 +160,15 @@ const Snapshot &Scheduler::initialize(bool converters_ready) {
   if (!completed) {
     addError(snapshot_, protocol_v1::AdcTriggerError::kDiagnosticTimeout);
   }
-  if (snapshot_.completion_counts[0] == 0U ||
-      snapshot_.completion_counts[1] == 0U) {
+  if (snapshot_.completion_counts[0] != kDiagnosticCompletionTarget ||
+      snapshot_.completion_counts[1] != kDiagnosticCompletionTarget) {
     addError(snapshot_,
              protocol_v1::AdcTriggerError::kCompletionCountMismatch);
     return snapshot_;
   }
 
-  const auto first = platform_.firstCompletionCycles();
-  snapshot_.completion_delta_cycles = first[1] - first[0];
+  snapshot_.completion_delta_cycles =
+      medianCompletionDelta(platform_.completionDeltaSamples());
   if (absoluteDifference(snapshot_.completion_delta_cycles,
                          snapshot_.completion_expected_delta_cycles) >
       snapshot_.completion_tolerance_cycles) {

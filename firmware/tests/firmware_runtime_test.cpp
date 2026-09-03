@@ -371,12 +371,17 @@ class LifecycleTriggerPlatform final : public adc_trigger::Platform {
     return arm_ok;
   }
   std::array<std::uint32_t, 2U> completionCounts() override {
-    return {1U, 1U};
+    return {adc_trigger::kDiagnosticCompletionTarget,
+            adc_trigger::kDiagnosticCompletionTarget};
   }
-  std::array<std::uint32_t, 2U> firstCompletionCycles() override {
-    return {100U,
-            static_cast<std::uint32_t>(
-                100U + identity::kAdcCompletionExpectedDwtCycles)};
+  adc_trigger::CompletionDeltaSamples completionDeltaSamples() override {
+    return {identity::kAdcCompletionExpectedDwtCycles,
+            identity::kAdcCompletionExpectedDwtCycles,
+            identity::kAdcCompletionExpectedDwtCycles,
+            identity::kAdcCompletionExpectedDwtCycles,
+            identity::kAdcCompletionExpectedDwtCycles,
+            identity::kAdcCompletionExpectedDwtCycles,
+            identity::kAdcCompletionExpectedDwtCycles};
   }
   std::uint32_t triggerErrorFlags() override { return 0U; }
   std::uint32_t triggerErrorCount() override { return 0U; }
