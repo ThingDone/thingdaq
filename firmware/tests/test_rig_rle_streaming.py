@@ -616,6 +616,7 @@ class CampaignFakeSerial:
                     "adc_pairs_captured": (values["adc_pairs_captured"] + adc_tail),
                     "gpio_items_dropped": gpio_tail,
                     "gpio_raw_samples_lost": gpio_tail,
+                    "gpio_stop_samples_discarded": gpio_tail,
                     "gpio_samples_captured": (
                         values["gpio_samples_captured"] + gpio_tail
                     ),
