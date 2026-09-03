@@ -302,6 +302,20 @@ conversion. The 12-bit observation is retained in physical campaign `00006`,
 service job `5f13a168-2587-4098-9466-da8891747c34`, against clean build
 `thingdaq-be5662e7c9f0aae3` from commit `2254f7cfa29a262a3b951f382cfcf095de8141ea`.
 
+The derived 450 MHz experiment retains 12-bit conversion because its IPG
+divider of three restores the 150 MHz IPG and 37.5 MHz ADCK clocks used by the
+600 MHz control. Physical service job
+`fe5bb7ba-7469-4fd2-bce3-62f7a43c9de4` programmed clean build
+`thingdaq-2dbd6a60fe4409cd` from commit
+`6b3ae88f5f5c2f27e49311084ec02ec85b9707f6`. Its boot diagnostic observed
+completion counts `[8, 8]` and a 222-DWT-cycle median inside the required
+`225 +/- 90` range, then the combined stream passed all 404 checks for
+10.003074 seconds at 999,852.20 ADC pairs/s and 3,999,004.12 GPIO samples/s.
+The 74.14% median acquisition-service utilization and bounded, exactly
+reconciled STOP tail establish short-run digital timing and processing
+headroom at 450 MHz; unstimulated A0/A1 still provide no analog-accuracy,
+bandwidth, settling, or aperture evidence.
+
 The fallback subsequently passed a physical maximum-rate smoke on replacement
 Teensy serial `20428100`. Service job
 `d916d7d9-5300-45fa-b65d-19fae0b81798` programmed clean 528 MHz build

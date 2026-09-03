@@ -5204,7 +5204,7 @@ def main() -> int:
                 if spec.fqbn == expected_fqbn
             ]
             if len(matching_profiles) != 1:
-                raise ValueError("EXPECTED_FQBN is not one of the two exact targets")
+                raise ValueError("EXPECTED_FQBN is not one of the exact targets")
             fqbn_profile = matching_profiles[0]
             if (
                 expected_clock_profile is not None

@@ -27,9 +27,11 @@ pushed `experiment/baseline-2026-09-01` commit
 production default. A bounded physical smoke now establishes the 528 MHz
 profile's digital acquisition and transport path with its explicit 10-bit ADC
 fallback. A derived 450 MHz profile is an isolated CPU-headroom experiment
-that restores the production IPG/ADC clocks while lowering the CPU clock. It
-does not establish a complete same-board comparison or any thermal benefit,
-power, reliability, or lifetime result.
+that restores the production IPG/ADC clocks while lowering the CPU clock. A
+bounded physical maximum-rate smoke establishes its 12-bit digital acquisition
+and transport path with measured CPU headroom. It does not establish a complete
+same-board comparison or any thermal benefit, power, reliability, or lifetime
+result.
 
 The candidate was created at
 `.maestro/playbooks/Working/clock-528mhz` and was clean at the baseline commit
@@ -186,9 +188,30 @@ The 500 ns phase becomes 225 DWT cycles with a 90-cycle tolerance.
 Because 450 MHz is not an integer multiple of the 24 MHz PIT, the optional GPIO
 clock diagnostic measures complete windows with rational DWT/event arithmetic
 instead of truncating every 4 MHz period from 112.5 to 112 cycles. This changes
-no acquisition timer or wire timestamp. Physical maximum-rate evidence is
-required to determine whether the slower CPU can service packing, checksums,
-control polling, and USB without loss.
+no acquisition timer or wire timestamp.
+
+Clean commit `6b3ae88f5f5c2f27e49311084ec02ec85b9707f6` produced 450 MHz
+build `thingdaq-2dbd6a60fe4409cd` with source ID
+`4e3b4a2ff9376c0dca4f0781dfbfdc58b265e743ed7c30dc71cd6d74f8b400da`
+and HEX SHA-256
+`11d3b89666d83245b78fbb5e1a52a918c828fd9e859cd6f70a005d610dbb1651`.
+Physical service job `fe5bb7ba-7469-4fd2-bce3-62f7a43c9de4` programmed that
+artifact on Teensy serial `20428100`, verified the exact 450/150/37.5/24 MHz
+clock tree and advertised 1150 mV profile target, and retained the primary
+12-bit configuration. The expanded diagnostic observed completion counts
+`[8, 8]` and a 222-DWT-cycle median inside the required `225 +/- 90` range.
+
+The combined stream passed all 404 checks over 10.003074 seconds at 999,852.20
+ADC pairs/s, 3,999,004.12 GPIO samples/s, and 7,998,412.92 payload bytes/s.
+Steady-state acquisition-service utilization was 74.14% median and 74.18%
+maximum, while USB-service utilization was 11.43% median and 11.49% maximum.
+Raw ADC/GPIO queue high-water marks were one buffer and packet ownership peaked
+at 20 of 200 buffers. There were no root ADC, clock, DMA, ring, frame, packet,
+parser, transport, or USB-I/O failures. One immediate-STOP partial generation
+discarded 733 ADC pairs and 2,935 GPIO samples; every detailed incomplete/loss
+counter reconciled to that bounded tail, cleanup succeeded, and IDLE was
+confirmed. This result establishes short-run digital processing headroom at
+450 MHz, not analog accuracy, endurance, power, thermal benefit, or lifetime.
 
 ## Physical 528 MHz smoke evidence
 
@@ -220,6 +243,6 @@ lifetime inference.
   to validate each one independently.
 - Existing historical 600 MHz reports remain reproducible and are not
   reinterpreted as profile-neutral evidence.
-- The 528 and 450 MHz branches are not eligible for production or cross-branch
-  synthesis until their local gates and same-board physical campaigns are
-  complete.
+- The 528 and 450 MHz branches remain experimental. Their bounded physical
+  smokes do not make either profile eligible for production or cross-branch
+  synthesis without the remaining local and same-board qualification gates.
