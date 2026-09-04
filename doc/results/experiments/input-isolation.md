@@ -11,10 +11,13 @@ After the user recovered the board, the **eight-input rate experiment passed
 all four profiles**, including a 0→1→2→3→0 cycle without reflashing (ten seconds
 per cell). The sixteen-input comparisons exposed additional, independent
 metadata, transport and validator defects described below. With those fixed,
-**sixteen inputs plus ADCs pass at GPIO 2 MHz / ADC 500 kHz and GPIO 500 kHz /
-ADC 125 kHz**, ten seconds each. Full-speed sixteen-input combined acquisition
+**sixteen inputs plus ADCs pass for 60 seconds at GPIO 1 MHz / ADC 250 kHz and
+GPIO 500 kHz / ADC 125 kHz**. GPIO 2 MHz / ADC 500 kHz passed ten seconds.
+Full-speed sixteen-input combined acquisition
 still stalls the ADC path; its queued GPIO evictions are a downstream symptom.
-Investigation and the remaining matrix cells are in progress.
+The 60-second profile-1 follow-up streamed without active loss but returned an
+ADC error on STOP; it remains an overall **FAIL**. Short capture passes do not
+establish reliable shutdown or production readiness.
 
 No new wires or loopbacks are required for these tests.
 
@@ -27,10 +30,10 @@ firmware, not separate builds with the unused feature compiled out.
 
 | ADC / GPIO rate | Eight inputs + ADC | Sixteen inputs + ADC | GPIO-only controls |
 | --- | --- | --- | --- |
-| 1 MHz / 4 MHz | **PASS**, 10 seconds, twice in rate cycle | **FAIL**, no ADC major loops; GPIO queue fills | Sixteen inputs: 10-second capture completed, STOP reported four-sample bank-tail skew |
-| 500 kHz / 2 MHz | **PASS**, 10 seconds | **PASS**, 10 seconds | Pending |
-| 250 kHz / 1 MHz | **PASS**, 10 seconds | Pending | Pending |
-| 125 kHz / 500 kHz | **PASS**, 10 seconds | **PASS**, 10 seconds | Pending |
+| 1 MHz / 4 MHz | **PASS**, 10 seconds, twice in rate cycle | **FAIL**, no ADC major loops; GPIO queue fills | Sixteen inputs: **FAIL**, 10-second capture completed; STOP bank-tail skew of four/five samples |
+| 500 kHz / 2 MHz | **PASS**, 10 seconds | **PASS**, 10 seconds; **FAIL** at STOP after 60-second capture | Sixteen inputs: **PASS**, 10 seconds |
+| 250 kHz / 1 MHz | **PASS**, 10 seconds | **PASS**, 60 seconds | Sixteen inputs: **PASS**, 10 seconds |
+| 125 kHz / 500 kHz | **PASS**, 10 seconds | **PASS**, 60 seconds | Sixteen inputs: **PASS**, 10 seconds |
 
 The rate experiment changes only the profile with eight inputs selected.
 The width experiment compares eight versus sixteen inputs at the same profile.
@@ -57,6 +60,45 @@ Hardware register semantics were checked against
 and [NXP's RT1062 register definitions](https://github.com/nxp-mcuxpresso/legacy-mcux-sdk/blob/main/devices/MIMXRT1062/MIMXRT1062.h).
 The priority rule is documented in
 [NXP's eDMA reference material](https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/imx-processors/186373/1/IMXRT1050RM.pdf).
+
+## Remaining failures are separate
+
+### Full-rate GPIO DMA interferes with ADC acquisition
+
+On the repaired full-rate sixteen-input build, both ADCs remain active but
+produce almost no DMA results. Their DMA requests and triggers are enabled,
+with no DMA error. GPIO keeps producing frames; combined-stream fairness waits
+for the missing ADC stream, and the GPIO packet queue eventually overflows.
+Increasing the USB buffer or relaxing fairness would not repair acquisition.
+
+Diagnostic job `94accc35-1af3-437c-b1e8-1e5703552345` measured the same ADC
+remaining-transfer counters before and after a controlled intervention:
+
+| Observation in one run | ADC0 CITER | ADC1 CITER |
+| --- | --- | --- |
+| With both GPIO DMA streams running | 505 | 506 |
+| After another 20 µs, GPIO DMA unchanged | 505 | 506 |
+| After disabling only GPIO DMA requests and waiting 20 µs | 484 | 485 |
+
+The ADC timing, trigger routing and DMA configuration were not reset or changed.
+Both ADCs resumed immediately when GPIO DMA traffic was removed. This proves
+the load dependency, but **does not yet distinguish peripheral-bus contention,
+DMA arbitration or ADC_ETC handshake behavior**. It is not proof that 4 MHz
+sixteen-input capture is an absolute hardware limit. The diagnostic intentionally
+breaks normal combined capture and is not graded as an acceptance pass.
+Its exact source patch is retained alongside the submitted binary and program.
+
+### STOP has independent problems
+
+- GPIO-only sixteen-input capture at 4 MHz completed ten seconds, then STOP
+  reported a four-sample bank-tail mismatch; a clean-candidate repeat reported
+  five samples. The strict bank-skew checks remain
+  enabled; this has not been relabeled as harmless loss.
+- Combined sixteen-input profile 1 completed 60 seconds and transmitted 59,559
+  frames from each stream without active loss. STOP returned INTERNAL_ERROR
+  with one ADC stop error; cleanup ultimately reached IDLE. Job
+  `b677587f-a453-407e-88d7-98c75143ee55` remains failed. The precise shutdown race
+  has not yet been established.
 
 ## Physical evidence
 
@@ -101,14 +143,26 @@ submitted programs and service responses remain under
   `e14177fd-bb5d-4672-adc4-f8bda41c34fd`, 131 checks each.
 - Recovery rate-cycle job `61dda5f7-0115-45b2-b828-e5a2e14ca93b` passed all five
   eight-input cells, 128 checks each, on the preceding candidate.
+- Clean candidate job `552f77f2-28a5-4e5f-b55c-ef44f107dc62` passed profiles 2
+  and 3 for 60 seconds each, 131 checks each. It used a clean rebuild of
+  `086d44d`, HEX SHA-256
+  `dd37617356911ded1583c73c8981ea2a4d737c34062f8f20a991a194902e3a0b`.
 - A clean rebuild of `c96bdbd` with `SOURCE_DATE_EPOCH=1788552674` produced
   exactly the successful physical test's HEX, SHA-256
   `7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681`.
+- GPIO-only job `110f8ca6-41e4-4ffa-ad94-3efd01161eb9` passed sixteen-input
+  profiles 1, 2 and 3 for ten seconds each, 126 checks each, then failed the
+  full-rate STOP bank-skew check. The partial sequence's overall result is FAIL;
+  the three preceding per-profile PASS records remain independently useful.
 - Full branch regression: **508 tests and 16,020 subtests passed**, no skips.
 - USB fix full regression: **508 tests and 16,020 subtests passed**; subsequent
   paired-STOP runner regression: **7 tests and 22 subtests passed**. Focused
   Python lint and the pinned build passed. USB fix uses 32,760 ITCM bytes,
   preserving 34,528 bytes RAM1 stack/local headroom and 4,096 bytes RAM2 free.
+- Final clean-source regression: **508 tests and 16,021 subtests passed**, no
+  skips. The thin-sketch guard correctly failed while temporary Serial tracing
+  was present; removing that diagnostic restored the full gate. No guard was
+  disabled or excluded. Final main wrapper regression: **7 tests passed**.
 - Main experiment-wrapper tests: **5 passed**. Focused Python lint passed.
 - Pinned Teensy build passed: RAM1 stack/local headroom 34,528 bytes; RAM2 free
   4,096 bytes. No memory-capacity gate was weakened.
@@ -117,7 +171,7 @@ submitted programs and service responses remain under
   gate used the existing complete root virtual environment; both issues were
   resolved, not excluded.
 
-## Resume after rig recovery
+## Reproduce individual experiments
 
 Build the auxiliary-input branch with its `firmware/tools/build_firmware.py`.
 From main, run one cold-boot cell:
@@ -133,6 +187,8 @@ Use `INPUT_COMBINED` for sixteen inputs, `CONTROL_GPIO`/`INPUT_GPIO` to remove
 ADC, and profiles 0–3 for the table above. Use a fresh evidence directory each
 time. Add `--cycle` for 0→1→2→3→0 without reflashing; add `--diagnostic` only
 for the separate paired-bank diagnostic.
+Use `--profiles 1 2 3` to test lower rates independently of the known full-rate
+failure. Sequences stop on their first failure and retain every completed cell.
 
 After short cells pass, repeat each matched eight/sixteen pair for 60 seconds.
 The tool refuses stale HEX/manifest combinations, pins board/build identity,

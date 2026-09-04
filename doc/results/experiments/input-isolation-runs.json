@@ -1,23 +1,32 @@
 {
   "date": "2026-09-04",
+  "previous_candidates": [
+    {
+      "branch": "experiment/aux-input-bank",
+      "commit": "c96bdbdff2ab1af4067fd8dc303520aa10c3a237",
+      "source_id": "92254306334bb69f51fe1989b756659a38f39f4e5e3c3566f49819501cc2f2fe",
+      "firmware_inputs_clean": true,
+      "build_id": "thingdaq-92254306334bb69f",
+      "source_date_epoch": 1788552674,
+      "hex": {
+        "path": "firmware.ino.hex",
+        "sha256": "7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681",
+        "size_bytes": 449404
+      },
+      "rebuild_matches_successful_physical_hex": true
+    }
+  ],
   "candidate": {
     "branch": "experiment/aux-input-bank",
-    "commit": "c96bdbdff2ab1af4067fd8dc303520aa10c3a237",
-    "source_id": "92254306334bb69f51fe1989b756659a38f39f4e5e3c3566f49819501cc2f2fe",
+    "commit": "086d44d8bb0980eabc1f7589a7c28130f8a9ed36",
+    "source_id": "81e5fa1be59b4aaed6a61bc9f73b2f1ccc592598ccf1d1043b8fd5ff7629a565",
     "firmware_inputs_clean": true,
-    "build_id": "thingdaq-92254306334bb69f",
+    "build_id": "thingdaq-81e5fa1be59b4aae",
     "source_date_epoch": 1788552674,
     "hex": {
       "path": "firmware.ino.hex",
-      "sha256": "7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681",
+      "sha256": "dd37617356911ded1583c73c8981ea2a4d737c34062f8f20a991a194902e3a0b",
       "size_bytes": 449404
-    },
-    "rebuild_matches_successful_physical_hex": true,
-    "superseded_by": {
-      "commit": "086d44d",
-      "build_id": "thingdaq-81e5fa1be59b4aae",
-      "physical_evidence": "089ab77b-a6e6-4c17-a424-c1d4d540b970",
-      "note": "Original candidate retained above for historical provenance; trace builds are diagnostic-only."
     }
   },
   "physical_scope": "Unstimulated inputs; no pin-level electrical fidelity claims",
@@ -3473,6 +3482,1069 @@
         "test_id": "fd24325a-1c9d-47ba-98fc-b8c5a20e45b0"
       },
       "raw_result_sha256": "3d043f13ba57be66dd36750484e2aa8860c400eee8989976e495cb559bbeff63"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/clean-input-combined-p123-60s",
+      "diagnostic_events": [
+        {
+          "error": "ProtocolFailure: response kind=0x94 flags=0x8000 status=1 error=11; expected success 0x94",
+          "event": "fatal"
+        },
+        {
+          "event": "failure_status",
+          "values": {
+            "adc0_dma_major_loops": 59559,
+            "adc1_dma_major_loops": 59559,
+            "adc_completion_mismatches": 0,
+            "adc_destination_mismatches": 0,
+            "adc_dma_error_events": 0,
+            "adc_etc_error_events": 0,
+            "adc_etc_error_flags": 0,
+            "adc_frames_evicted": 0,
+            "adc_frames_evicted_after_promotion": 0,
+            "adc_frames_transmitted": 59559,
+            "adc_initialization_error_flags": 0,
+            "adc_packer_chronology_errors": 0,
+            "adc_packer_pipeline_errors": 0,
+            "adc_packer_source_errors": 0,
+            "adc_pairs_captured": 30136949,
+            "adc_raw_invariant_errors": 0,
+            "adc_start_errors": 0,
+            "adc_stop_errors": 1,
+            "adc_trigger_error_count": 0,
+            "adc_trigger_error_flags": 0,
+            "aux_gpio_dma_major_loops": 59559,
+            "device_state": 1,
+            "gpio_dma_major_loops": 59559,
+            "gpio_frames_evicted": 0,
+            "gpio_frames_evicted_after_promotion": 0,
+            "gpio_frames_transmitted": 59559,
+            "gpio_hardware_errors": 0,
+            "gpio_packer_chronology_errors": 0,
+            "gpio_packer_pipeline_errors": 0,
+            "gpio_packer_source_errors": 0,
+            "gpio_raw_invariant_errors": 0,
+            "gpio_start_errors": 0,
+            "gpio_stop_errors": 0,
+            "packet_accounted_frame_skew": 0,
+            "packet_capacity_drops_without_evictable_frame": 0,
+            "packet_fairness_deferrals": 0,
+            "packet_pressure_evictions": 0,
+            "paired_gpio_canceled_generations": 2,
+            "paired_gpio_count_mismatches": 0,
+            "paired_gpio_destination_mismatches": 0,
+            "paired_gpio_dma_major_loops": 59559,
+            "paired_gpio_generation_skew_events": 0,
+            "paired_gpio_generation_skew_samples": 0,
+            "paired_gpio_hardware_errors": 0,
+            "paired_gpio_invariant_errors": 0,
+            "paired_gpio_start_errors": 0,
+            "paired_gpio_stop_errors": 0,
+            "paired_gpio_stop_tail_samples": 380,
+            "paired_gpio_timestamp_mismatches": 0,
+            "parser_errors": 0,
+            "primary_gpio_dma_major_loops": 59559,
+            "state_errors": 0,
+            "transport_errors": 1,
+            "usb_io_errors": 0
+          }
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-81e5fa1be59b4aae",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "dd37617356911ded1583c73c8981ea2a4d737c34062f8f20a991a194902e3a0b",
+        "manifest_sha256": "7dde901f34041ad3ca961f4cc173e663410e44876f00d1240bc182ecfc393510",
+        "profile_sequence": [
+          1,
+          2,
+          3
+        ],
+        "program_sha256": "202636a20140caf45b5489c3941e82af080df4971d9f56cc9d55deb4e7d35a80",
+        "runner_sha256": "dd739809677b625ae4f4f781a60de6790b78d724143bd9fd858238a89851c44d",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "60.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "1",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-81e5fa1be59b4aae",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-81e5fa1be59b4aae",
+          "firmware_input_changes": [],
+          "firmware_inputs_clean": true,
+          "git_commit": "086d44d8bb0980eabc1f7589a7c28130f8a9ed36",
+          "source_id": "81e5fa1be59b4aaed6a61bc9f73b2f1ccc592598ccf1d1043b8fd5ff7629a565",
+          "timestamp_epoch": 1788552674,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-09-04T20:11:14Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 106,
+            "configured_rates_hz": {
+              "adc_pairs": 500000,
+              "gpio_samples": 2000000
+            },
+            "duration_seconds": 60,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: response kind=0x94 flags=0x8000 status=1 error=11; expected success 0x94"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_500KHZ_GPIO_2MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id b677587f-a453-407e-88d7-98c75143ee55",
+        "outcome": "TEST_FAIL",
+        "test_id": "b677587f-a453-407e-88d7-98c75143ee55"
+      },
+      "raw_result_sha256": "2351efce800cc673baf22ef6f0826838b36becbbe07947a287c47b66e4ad7f28"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/clean-input-combined-p23-60s",
+      "diagnostic_events": [],
+      "provenance": {
+        "build_id": "thingdaq-81e5fa1be59b4aae",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "dd37617356911ded1583c73c8981ea2a4d737c34062f8f20a991a194902e3a0b",
+        "manifest_sha256": "7dde901f34041ad3ca961f4cc173e663410e44876f00d1240bc182ecfc393510",
+        "profile_sequence": [
+          2,
+          3
+        ],
+        "program_sha256": "315abbfeefa2d46d519de77bdbe1f9b493dcb3add680345577953180429a2c65",
+        "runner_sha256": "dd739809677b625ae4f4f781a60de6790b78d724143bd9fd858238a89851c44d",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "60.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "2",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-81e5fa1be59b4aae",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-81e5fa1be59b4aae",
+          "firmware_input_changes": [],
+          "firmware_inputs_clean": true,
+          "git_commit": "086d44d8bb0980eabc1f7589a7c28130f8a9ed36",
+          "source_id": "81e5fa1be59b4aaed6a61bc9f73b2f1ccc592598ccf1d1043b8fd5ff7629a565",
+          "timestamp_epoch": 1788552674,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-09-04T20:11:14Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 131,
+            "configured_rates_hz": {
+              "adc_pairs": 250000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 60,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 29786,
+              "adc_rate_hz": 250003.51427647442,
+              "aux_bank_samples_captured": 60286864,
+              "capture_seconds": 60.00873245089315,
+              "firmware_processing_cpu_basis_points": 1520,
+              "gpio_frames": 29786,
+              "gpio_rate_hz": 999980.3286814279,
+              "host_peak_rss_growth_bytes": 16384,
+              "maximum_frame_skew": 1,
+              "maximum_receive_gap_seconds": 0.021856516832485795,
+              "packet_ready_high_water": 2,
+              "packet_transmit_high_water": 2,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 60286864,
+              "paired_samples_transmitted": 60286864,
+              "primary_bank_samples_captured": 60286864,
+              "status_count": 121,
+              "status_p99_seconds": 0.02228290494531393,
+              "stop_tail_adc_items": 98,
+              "stop_tail_gpio_items": 395
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_250KHZ_GPIO_1MHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          },
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 131,
+            "configured_rates_hz": {
+              "adc_pairs": 125000,
+              "gpio_samples": 500000
+            },
+            "duration_seconds": 60,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 14894,
+              "adc_rate_hz": 125001.36385091834,
+              "aux_bank_samples_captured": 30145456,
+              "capture_seconds": 60.01499318797141,
+              "firmware_processing_cpu_basis_points": 1190,
+              "gpio_frames": 14894,
+              "gpio_rate_hz": 500005.45540367335,
+              "host_peak_rss_growth_bytes": 0,
+              "maximum_frame_skew": 1,
+              "maximum_receive_gap_seconds": 0.0222116329241544,
+              "packet_ready_high_water": 2,
+              "packet_transmit_high_water": 2,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 30145456,
+              "paired_samples_transmitted": 30145456,
+              "primary_bank_samples_captured": 30145456,
+              "status_count": 121,
+              "status_p99_seconds": 0.02201084792613983,
+              "stop_tail_adc_items": 149,
+              "stop_tail_gpio_items": 598
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_125KHZ_GPIO_500KHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 552f77f2-28a5-4e5f-b55c-ef44f107dc62",
+        "outcome": "PASS",
+        "test_id": "552f77f2-28a5-4e5f-b55c-ef44f107dc62"
+      },
+      "raw_result_sha256": "829a7657dce46588a6e2f9943f8f13cbdbcc400ae2c9648c8b7a4513cd167960"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/clean-input-gpio-p1230-10s",
+      "diagnostic_events": [
+        {
+          "error": "ProtocolFailure: STATUS reports loss/error counters: {\"paired_gpio_count_mismatches\": 1, \"paired_gpio_generation_skew_events\": 1, \"paired_gpio_generation_skew_samples\": 5}",
+          "event": "fatal"
+        },
+        {
+          "event": "failure_status",
+          "values": {
+            "adc0_dma_major_loops": 0,
+            "adc1_dma_major_loops": 0,
+            "adc_completion_mismatches": 0,
+            "adc_destination_mismatches": 0,
+            "adc_dma_error_events": 0,
+            "adc_etc_error_events": 0,
+            "adc_etc_error_flags": 0,
+            "adc_frames_evicted": 0,
+            "adc_frames_evicted_after_promotion": 0,
+            "adc_frames_transmitted": 0,
+            "adc_initialization_error_flags": 0,
+            "adc_packer_chronology_errors": 0,
+            "adc_packer_pipeline_errors": 0,
+            "adc_packer_source_errors": 0,
+            "adc_pairs_captured": 0,
+            "adc_raw_invariant_errors": 0,
+            "adc_start_errors": 0,
+            "adc_stop_errors": 0,
+            "adc_trigger_error_count": 0,
+            "adc_trigger_error_flags": 0,
+            "aux_gpio_dma_major_loops": 20283,
+            "device_state": 1,
+            "gpio_dma_major_loops": 20283,
+            "gpio_frames_evicted": 0,
+            "gpio_frames_evicted_after_promotion": 0,
+            "gpio_frames_transmitted": 20283,
+            "gpio_hardware_errors": 0,
+            "gpio_packer_chronology_errors": 0,
+            "gpio_packer_pipeline_errors": 0,
+            "gpio_packer_source_errors": 0,
+            "gpio_raw_invariant_errors": 0,
+            "gpio_start_errors": 0,
+            "gpio_stop_errors": 0,
+            "packet_accounted_frame_skew": 20283,
+            "packet_capacity_drops_without_evictable_frame": 0,
+            "packet_fairness_deferrals": 0,
+            "packet_pressure_evictions": 0,
+            "paired_gpio_canceled_generations": 2,
+            "paired_gpio_count_mismatches": 1,
+            "paired_gpio_destination_mismatches": 0,
+            "paired_gpio_dma_major_loops": 20283,
+            "paired_gpio_generation_skew_events": 1,
+            "paired_gpio_generation_skew_samples": 5,
+            "paired_gpio_hardware_errors": 0,
+            "paired_gpio_invariant_errors": 0,
+            "paired_gpio_start_errors": 0,
+            "paired_gpio_stop_errors": 0,
+            "paired_gpio_stop_tail_samples": 1563,
+            "paired_gpio_timestamp_mismatches": 0,
+            "parser_errors": 0,
+            "primary_gpio_dma_major_loops": 20283,
+            "state_errors": 0,
+            "transport_errors": 0,
+            "usb_io_errors": 0
+          }
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-81e5fa1be59b4aae",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "dd37617356911ded1583c73c8981ea2a4d737c34062f8f20a991a194902e3a0b",
+        "manifest_sha256": "7dde901f34041ad3ca961f4cc173e663410e44876f00d1240bc182ecfc393510",
+        "profile_sequence": [
+          1,
+          2,
+          3,
+          0
+        ],
+        "program_sha256": "55f1fdbebfbd8e6a9fafc90d9d2925fd80060c16057d1ab9b341136e74006173",
+        "runner_sha256": "dd739809677b625ae4f4f781a60de6790b78d724143bd9fd858238a89851c44d",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "10.0",
+          "AUX_INPUT_CASE": "INPUT_GPIO",
+          "AUX_INPUT_RATE_PROFILE": "1",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-81e5fa1be59b4aae",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-81e5fa1be59b4aae",
+          "firmware_input_changes": [],
+          "firmware_inputs_clean": true,
+          "git_commit": "086d44d8bb0980eabc1f7589a7c28130f8a9ed36",
+          "source_id": "81e5fa1be59b4aaed6a61bc9f73b2f1ccc592598ccf1d1043b8fd5ff7629a565",
+          "timestamp_epoch": 1788552674,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-09-04T20:11:14Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_GPIO",
+            "checks": 126,
+            "configured_rates_hz": {
+              "adc_pairs": 500000,
+              "gpio_samples": 2000000
+            },
+            "duration_seconds": 10,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 0,
+              "adc_rate_hz": null,
+              "aux_bank_samples_captured": 20584080,
+              "capture_seconds": 10.015665855025873,
+              "firmware_processing_cpu_basis_points": 2696,
+              "gpio_frames": 10170,
+              "gpio_rate_hz": 2000019.5982924248,
+              "host_peak_rss_growth_bytes": 12288,
+              "maximum_frame_skew": 0,
+              "maximum_receive_gap_seconds": 0.02057968801818788,
+              "packet_ready_high_water": 1,
+              "packet_transmit_high_water": 1,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 20584080,
+              "paired_samples_transmitted": 20584080,
+              "primary_bank_samples_captured": 20584080,
+              "status_count": 21,
+              "status_p99_seconds": 0.016364659182727337,
+              "stop_tail_adc_items": 0,
+              "stop_tail_gpio_items": 752
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_500KHZ_GPIO_2MHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          },
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_GPIO",
+            "checks": 126,
+            "configured_rates_hz": {
+              "adc_pairs": 250000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 10,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 0,
+              "adc_rate_hz": null,
+              "aux_bank_samples_captured": 10287992,
+              "capture_seconds": 10.016250703949481,
+              "firmware_processing_cpu_basis_points": 2065,
+              "gpio_frames": 5083,
+              "gpio_rate_hz": 1000052.4443792438,
+              "host_peak_rss_growth_bytes": 0,
+              "maximum_frame_skew": 0,
+              "maximum_receive_gap_seconds": 0.022102698916569352,
+              "packet_ready_high_water": 1,
+              "packet_transmit_high_water": 1,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 10287992,
+              "paired_samples_transmitted": 10287992,
+              "primary_bank_samples_captured": 10287992,
+              "status_count": 21,
+              "status_p99_seconds": 0.021204716991633177,
+              "stop_tail_adc_items": 0,
+              "stop_tail_gpio_items": 942
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_250KHZ_GPIO_1MHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          },
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_GPIO",
+            "checks": 126,
+            "configured_rates_hz": {
+              "adc_pairs": 125000,
+              "gpio_samples": 500000
+            },
+            "duration_seconds": 10,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 0,
+              "adc_rate_hz": null,
+              "aux_bank_samples_captured": 5153104,
+              "capture_seconds": 10.018487987108529,
+              "firmware_processing_cpu_basis_points": 1750,
+              "gpio_frames": 2546,
+              "gpio_rate_hz": 500015.5718553475,
+              "host_peak_rss_growth_bytes": 0,
+              "maximum_frame_skew": 0,
+              "maximum_receive_gap_seconds": 0.021840478060767055,
+              "packet_ready_high_water": 1,
+              "packet_transmit_high_water": 1,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 5153104,
+              "paired_samples_transmitted": 5153104,
+              "primary_bank_samples_captured": 5153104,
+              "status_count": 21,
+              "status_p99_seconds": 0.02138133905827999,
+              "stop_tail_adc_items": 0,
+              "stop_tail_gpio_items": 1006
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_125KHZ_GPIO_500KHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          },
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_GPIO",
+            "checks": 109,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 10,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: STATUS reports loss/error counters: {\"paired_gpio_count_mismatches\": 1, \"paired_gpio_generation_skew_events\": 1, \"paired_gpio_generation_skew_samples\": 5}"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 110f8ca6-41e4-4ffa-ad94-3efd01161eb9",
+        "outcome": "TEST_FAIL",
+        "test_id": "110f8ca6-41e4-4ffa-ad94-3efd01161eb9"
+      },
+      "raw_result_sha256": "a03f5ecdce88628ca2881d54427a1c4a6ded7e31c73e57f4e536c2fb34b901d3"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/trace-expanded-input-combined-p0-10s",
+      "diagnostic_events": [
+        {
+          "event": "debug_trace",
+          "text": " 00000000 0000000f 00000000 00000008 00000000 00000002 00000002 00000001 00000001 00000000 00000000 00000011 00100001 00000000 00000001 00000005 000001f9 000001fa 00000012 00000012 80000018 80000058 00000083 00000082 00000081 00000080 00000524 00000526 00012429 00012429 00000010 00000010 fcfff300 0cfff033 f0033cf3 67130040 00000005 00000003 00003900 00003900 00000000 00000000 00000000 0000004b 00002017 00004018\n"
+        },
+        {
+          "error": "ProtocolFailure: STATUS reports loss/error counters: {\"gpio_frames_dropped\": 849, \"gpio_frames_dropped_after_framing\": 849, \"gpio_frames_evicted\": 849, \"gpio_payload_bytes_dropped\": 3436752, \"packet_pool_exhaustions\": 849, \"packet_pressure_evictions\": 849}",
+          "event": "fatal"
+        },
+        {
+          "event": "failure_status",
+          "values": {
+            "adc0_dma_major_loops": 0,
+            "adc1_dma_major_loops": 0,
+            "adc_completion_mismatches": 0,
+            "adc_destination_mismatches": 0,
+            "adc_dma_error_events": 0,
+            "adc_etc_error_events": 0,
+            "adc_etc_error_flags": 0,
+            "adc_frames_evicted": 0,
+            "adc_frames_evicted_after_promotion": 0,
+            "adc_frames_transmitted": 0,
+            "adc_initialization_error_flags": 0,
+            "adc_packer_chronology_errors": 0,
+            "adc_packer_pipeline_errors": 0,
+            "adc_packer_source_errors": 0,
+            "adc_pairs_captured": 0,
+            "adc_raw_invariant_errors": 0,
+            "adc_start_errors": 0,
+            "adc_stop_errors": 0,
+            "adc_trigger_error_count": 0,
+            "adc_trigger_error_flags": 0,
+            "aux_gpio_dma_major_loops": 1093,
+            "device_state": 3,
+            "gpio_dma_major_loops": 1093,
+            "gpio_frames_evicted": 892,
+            "gpio_frames_evicted_after_promotion": 0,
+            "gpio_frames_transmitted": 1,
+            "gpio_hardware_errors": 0,
+            "gpio_packer_chronology_errors": 0,
+            "gpio_packer_pipeline_errors": 0,
+            "gpio_packer_source_errors": 0,
+            "gpio_raw_invariant_errors": 0,
+            "gpio_start_errors": 0,
+            "gpio_stop_errors": 0,
+            "packet_accounted_frame_skew": 893,
+            "packet_capacity_drops_without_evictable_frame": 0,
+            "packet_fairness_deferrals": 29821,
+            "packet_pressure_evictions": 892,
+            "paired_gpio_canceled_generations": 0,
+            "paired_gpio_count_mismatches": 0,
+            "paired_gpio_destination_mismatches": 0,
+            "paired_gpio_dma_major_loops": 1093,
+            "paired_gpio_generation_skew_events": 0,
+            "paired_gpio_generation_skew_samples": 0,
+            "paired_gpio_hardware_errors": 0,
+            "paired_gpio_invariant_errors": 0,
+            "paired_gpio_start_errors": 0,
+            "paired_gpio_stop_errors": 0,
+            "paired_gpio_stop_tail_samples": 0,
+            "paired_gpio_timestamp_mismatches": 0,
+            "parser_errors": 0,
+            "primary_gpio_dma_major_loops": 1093,
+            "state_errors": 0,
+            "transport_errors": 0,
+            "usb_io_errors": 0
+          }
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-71467772a7663627",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "69efac64feaa18fbec4a5ca82f7150980f3e6b6e0e06dd344dddffc6ba0c6d50",
+        "manifest_sha256": "c6469989d356f26dfef97d159331972e25c8eacadc7fead3315c3fbfe0755d65",
+        "profile_sequence": [
+          0
+        ],
+        "program_sha256": "120cb95a199a11b215e5d0576587470a6aff92adb016f807c464d63ea3e534fc",
+        "runner_sha256": "93b18336a2c22b357ce46f77a8553aa32241b83330fe9148204d02f8889a38d6",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "10.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-71467772a7663627",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-71467772a7663627",
+          "firmware_input_changes": [
+            " M firmware/firmware.ino"
+          ],
+          "firmware_inputs_clean": false,
+          "git_commit": "086d44d8bb0980eabc1f7589a7c28130f8a9ed36",
+          "source_id": "71467772a76636278a8ba8d295b7a58683e474efd2b064372c03b50bda37774b",
+          "timestamp_epoch": 1788552674,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-09-04T20:11:14Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 106,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 10,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: STATUS reports loss/error counters: {\"gpio_frames_dropped\": 849, \"gpio_frames_dropped_after_framing\": 849, \"gpio_frames_evicted\": 849, \"gpio_payload_bytes_dropped\": 3436752, \"packet_pool_exhaustions\": 849, \"packet_pressure_evictions\": 849}"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 8fdef523-f864-4f0a-8577-18623cde7469",
+        "outcome": "TEST_FAIL",
+        "test_id": "8fdef523-f864-4f0a-8577-18623cde7469"
+      },
+      "raw_result_sha256": "cbcd7c1be8bd6b3e547758d1608dcac97dcd5a0e4dcf4c4c001362bab284a368"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/trace-paired-before-after-gpio-dma-p0",
+      "diagnostic_events": [
+        {
+          "event": "debug_trace",
+          "text": " 000001f9 000001fa 000001f9 000001fa 00000000 00000003 00000000 00000000 00000000 00000002 00000002 00000001 00000001 00000000 00000000 00000011 00100001 00000000 00000001 00000005 000001e4 000001e5 00000012 00000012 80000018 80000058 00000083 00000082 00000081 00000080 000004f5 000004f9 00012429 00012429 00000010 00000010 fcfff300 0cfff033 f0033cf3 67130040 00000005 00000003 00003900 00003900 00000000 00000000 00000000 0000004b 00002017 00004018\n"
+        },
+        {
+          "error": "ProtocolFailure: STATUS reports loss/error counters: {\"adc_frames_dropped\": 808, \"adc_frames_dropped_after_framing\": 808, \"adc_frames_evicted\": 808, \"adc_payload_bytes_dropped\": 1635392, \"packet_pool_exhaustions\": 808, \"packet_pressure_evictions\": 808}",
+          "event": "fatal"
+        },
+        {
+          "event": "failure_status",
+          "values": {
+            "adc0_dma_major_loops": 1072,
+            "adc1_dma_major_loops": 1072,
+            "adc_completion_mismatches": 0,
+            "adc_destination_mismatches": 0,
+            "adc_dma_error_events": 0,
+            "adc_etc_error_events": 0,
+            "adc_etc_error_flags": 0,
+            "adc_frames_evicted": 851,
+            "adc_frames_evicted_after_promotion": 0,
+            "adc_frames_transmitted": 21,
+            "adc_initialization_error_flags": 0,
+            "adc_packer_chronology_errors": 0,
+            "adc_packer_pipeline_errors": 0,
+            "adc_packer_source_errors": 0,
+            "adc_pairs_captured": 542432,
+            "adc_raw_invariant_errors": 0,
+            "adc_start_errors": 0,
+            "adc_stop_errors": 0,
+            "adc_trigger_error_count": 0,
+            "adc_trigger_error_flags": 0,
+            "aux_gpio_dma_major_loops": 20,
+            "device_state": 3,
+            "gpio_dma_major_loops": 20,
+            "gpio_frames_evicted": 0,
+            "gpio_frames_evicted_after_promotion": 0,
+            "gpio_frames_transmitted": 20,
+            "gpio_hardware_errors": 0,
+            "gpio_packer_chronology_errors": 0,
+            "gpio_packer_pipeline_errors": 0,
+            "gpio_packer_source_errors": 0,
+            "gpio_raw_invariant_errors": 0,
+            "gpio_start_errors": 0,
+            "gpio_stop_errors": 0,
+            "packet_accounted_frame_skew": 852,
+            "packet_capacity_drops_without_evictable_frame": 0,
+            "packet_fairness_deferrals": 47108,
+            "packet_pressure_evictions": 851,
+            "paired_gpio_canceled_generations": 0,
+            "paired_gpio_count_mismatches": 0,
+            "paired_gpio_destination_mismatches": 0,
+            "paired_gpio_dma_major_loops": 20,
+            "paired_gpio_generation_skew_events": 0,
+            "paired_gpio_generation_skew_samples": 0,
+            "paired_gpio_hardware_errors": 0,
+            "paired_gpio_invariant_errors": 0,
+            "paired_gpio_start_errors": 0,
+            "paired_gpio_stop_errors": 0,
+            "paired_gpio_stop_tail_samples": 0,
+            "paired_gpio_timestamp_mismatches": 0,
+            "parser_errors": 0,
+            "primary_gpio_dma_major_loops": 20,
+            "state_errors": 0,
+            "transport_errors": 0,
+            "usb_io_errors": 0
+          }
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-a61982e13c5b528e",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "87581be50d12fb36e8208ba70c3493a01fe06b44fd2cbfd14375eced7a3796a4",
+        "manifest_sha256": "cac0ad8f98e0608a9119086343c82e4d6ea16eff16303063f83e4edbd7acfc50",
+        "profile_sequence": [
+          0
+        ],
+        "program_sha256": "3119e53ddc2a38262f191cb34421e46e7a67b6d6c99b39de7f8f387bb8c6a79e",
+        "runner_sha256": "b4a326e42d74de39900651d9bd3719775abb1c35d451ffe8cd4c3e307c33f369",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "1.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-a61982e13c5b528e",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-a61982e13c5b528e",
+          "firmware_input_changes": [
+            " M firmware/firmware.ino"
+          ],
+          "firmware_inputs_clean": false,
+          "git_commit": "086d44d8bb0980eabc1f7589a7c28130f8a9ed36",
+          "source_id": "a61982e13c5b528ece624fa9ada0b9695cc9f0801b9d9b834aed8a5129d3ca03",
+          "timestamp_epoch": 1788552674,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-09-04T20:11:14Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 106,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 1,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: STATUS reports loss/error counters: {\"adc_frames_dropped\": 808, \"adc_frames_dropped_after_framing\": 808, \"adc_frames_evicted\": 808, \"adc_payload_bytes_dropped\": 1635392, \"packet_pool_exhaustions\": 808, \"packet_pressure_evictions\": 808}"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 94accc35-1af3-437c-b1e8-1e5703552345",
+        "outcome": "TEST_FAIL",
+        "test_id": "94accc35-1af3-437c-b1e8-1e5703552345"
+      },
+      "raw_result_sha256": "3d81b2e35f25d98a4dd8414ab83883cb4fa9f49ec692e3c5e80b5eab5a83877f",
+      "diagnostic_source_patch_sha256": "f48ad78f532e11eac1a237259f39863b7822b873b813de88fd1c8b0299866183"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/trace-remove-gpio-dma-p0",
+      "diagnostic_events": [
+        {
+          "event": "debug_trace",
+          "text": " 00000000 00000003 00000000 00000000 00000000 00000002 00000002 00000001 00000001 00000000 00000000 00000011 00100001 00000000 00000001 00000005 000001e2 000001e5 00000012 00000012 80000018 80000058 00000083 00000082 00000081 00000080 00000547 0000054a 00012429 00012429 00000010 00000010 fcfff300 0cfff033 f0033cf3 67130040 00000005 00000003 00003900 00003900 00000000 00000000 00000000 0000004b 00002017 00004018\n"
+        },
+        {
+          "error": "ProtocolFailure: STATUS reports loss/error counters: {\"adc_frames_dropped\": 808, \"adc_frames_dropped_after_framing\": 808, \"adc_frames_evicted\": 808, \"adc_payload_bytes_dropped\": 1635392, \"packet_pool_exhaustions\": 808, \"packet_pressure_evictions\": 808}",
+          "event": "fatal"
+        },
+        {
+          "event": "failure_status",
+          "values": {
+            "adc0_dma_major_loops": 1072,
+            "adc1_dma_major_loops": 1072,
+            "adc_completion_mismatches": 0,
+            "adc_destination_mismatches": 0,
+            "adc_dma_error_events": 0,
+            "adc_etc_error_events": 0,
+            "adc_etc_error_flags": 0,
+            "adc_frames_evicted": 851,
+            "adc_frames_evicted_after_promotion": 0,
+            "adc_frames_transmitted": 21,
+            "adc_initialization_error_flags": 0,
+            "adc_packer_chronology_errors": 0,
+            "adc_packer_pipeline_errors": 0,
+            "adc_packer_source_errors": 0,
+            "adc_pairs_captured": 542432,
+            "adc_raw_invariant_errors": 0,
+            "adc_start_errors": 0,
+            "adc_stop_errors": 0,
+            "adc_trigger_error_count": 0,
+            "adc_trigger_error_flags": 0,
+            "aux_gpio_dma_major_loops": 20,
+            "device_state": 3,
+            "gpio_dma_major_loops": 20,
+            "gpio_frames_evicted": 0,
+            "gpio_frames_evicted_after_promotion": 0,
+            "gpio_frames_transmitted": 20,
+            "gpio_hardware_errors": 0,
+            "gpio_packer_chronology_errors": 0,
+            "gpio_packer_pipeline_errors": 0,
+            "gpio_packer_source_errors": 0,
+            "gpio_raw_invariant_errors": 0,
+            "gpio_start_errors": 0,
+            "gpio_stop_errors": 0,
+            "packet_accounted_frame_skew": 852,
+            "packet_capacity_drops_without_evictable_frame": 0,
+            "packet_fairness_deferrals": 43733,
+            "packet_pressure_evictions": 851,
+            "paired_gpio_canceled_generations": 0,
+            "paired_gpio_count_mismatches": 0,
+            "paired_gpio_destination_mismatches": 0,
+            "paired_gpio_dma_major_loops": 20,
+            "paired_gpio_generation_skew_events": 0,
+            "paired_gpio_generation_skew_samples": 0,
+            "paired_gpio_hardware_errors": 0,
+            "paired_gpio_invariant_errors": 0,
+            "paired_gpio_start_errors": 0,
+            "paired_gpio_stop_errors": 0,
+            "paired_gpio_stop_tail_samples": 0,
+            "paired_gpio_timestamp_mismatches": 0,
+            "parser_errors": 0,
+            "primary_gpio_dma_major_loops": 20,
+            "state_errors": 0,
+            "transport_errors": 0,
+            "usb_io_errors": 0
+          }
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-8ca547c0640fae9f",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "c115f5ec483a27551543e5e68b85b9bda9ded17492e8e80a9752323588f7df8d",
+        "manifest_sha256": "9a062e5219094ff0798a63c448081b72c544bbcfb6a00af00014667ca7e9d7bf",
+        "profile_sequence": [
+          0
+        ],
+        "program_sha256": "f11651fd5e91f68d75018a9d1150fbd2b787270cfb2ba4f0934c636559a40011",
+        "runner_sha256": "93b18336a2c22b357ce46f77a8553aa32241b83330fe9148204d02f8889a38d6",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "1.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-8ca547c0640fae9f",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-8ca547c0640fae9f",
+          "firmware_input_changes": [
+            " M firmware/firmware.ino"
+          ],
+          "firmware_inputs_clean": false,
+          "git_commit": "086d44d8bb0980eabc1f7589a7c28130f8a9ed36",
+          "source_id": "8ca547c0640fae9f582fa6b6a70998fd2f2611f5a476aa478096e50db1b9837c",
+          "timestamp_epoch": 1788552674,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-09-04T20:11:14Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 106,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 1,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: STATUS reports loss/error counters: {\"adc_frames_dropped\": 808, \"adc_frames_dropped_after_framing\": 808, \"adc_frames_evicted\": 808, \"adc_payload_bytes_dropped\": 1635392, \"packet_pool_exhaustions\": 808, \"packet_pressure_evictions\": 808}"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 4a44be3b-df74-4b58-ad08-b1ee8a95f6fd",
+        "outcome": "TEST_FAIL",
+        "test_id": "4a44be3b-df74-4b58-ad08-b1ee8a95f6fd"
+      },
+      "raw_result_sha256": "f20d304c63371f215375dbc41dc6b148c8818635f1ca5276ac031a7ef974b44e",
+      "diagnostic_source_patch_sha256": "2d681487321e7c103fb7f0b5583ad6f80e138b20d5650cf680e46893a207ece3"
     }
   ],
   "schema": "thingdaq.input-isolation/v1"
