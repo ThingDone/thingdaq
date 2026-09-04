@@ -30,6 +30,7 @@ from ._generated.protocol_constants import (
     Source,
     StreamMask,
 )
+from ._generated.protocol_v2_constants import OutputBankMode, OutputError, OutputState
 from ._version import __version__ as __version__
 from .alignment import (
     AlignedInterval,
@@ -83,6 +84,10 @@ from .client import (
     DeviceCommandError,
     DeviceIdentityMismatchError,
     DeviceSynchronizationError,
+    DigitalOutputDeviceError,
+    DigitalOutputLifecycleError,
+    DigitalOutputUnavailableError,
+    DigitalOutputUploadError,
     HostBufferFullError,
     LossReport,
     MultipleDevicesFoundError,
@@ -171,6 +176,15 @@ from .models import (
     decode_response,
     extract_gpio_channel,
     interleave_adc,
+)
+from .output import (
+    DigitalOutputAppendEcho,
+    DigitalOutputCapabilities,
+    DigitalOutputError,
+    DigitalOutputProgram,
+    DigitalOutputProgramError,
+    DigitalOutputSegment,
+    DigitalOutputStatus,
 )
 from .protocol import (
     ChecksumAlgorithmMismatchError,
@@ -325,6 +339,17 @@ __all__ = [
     "DeviceNotFoundError",
     "DeviceState",
     "DeviceSynchronizationError",
+    "DigitalOutputAppendEcho",
+    "DigitalOutputCapabilities",
+    "DigitalOutputDeviceError",
+    "DigitalOutputError",
+    "DigitalOutputLifecycleError",
+    "DigitalOutputProgram",
+    "DigitalOutputProgramError",
+    "DigitalOutputSegment",
+    "DigitalOutputStatus",
+    "DigitalOutputUnavailableError",
+    "DigitalOutputUploadError",
     "DiscoveredDevice",
     "DiscoveryError",
     "DiscoveryProbeError",
@@ -368,6 +393,9 @@ __all__ = [
     "MemoryTransport",
     "MultipleDevicesFoundError",
     "NominalEpoch",
+    "OutputBankMode",
+    "OutputError",
+    "OutputState",
     "ParserCounters",
     "PendingRequestLimitError",
     "ProtocolError",

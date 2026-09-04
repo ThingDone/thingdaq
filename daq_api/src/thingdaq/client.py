@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import struct
 from collections import deque
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, replace
@@ -12,6 +13,7 @@ from types import TracebackType
 from typing import Literal, TypeAlias
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .discovery import (
     DEFAULT_DISCOVERY_TIMEOUT,
@@ -52,6 +54,13 @@ from .models import (
     StreamAnomalyReason,
     StreamGap,
     analyze_stream_continuity,
+)
+from .output import (
+    DigitalOutputAppendEcho,
+    DigitalOutputCapabilities,
+    DigitalOutputProgram,
+    DigitalOutputSegment,
+    DigitalOutputStatus,
 )
 from .protocol import ParserCounters
 from .reader import (
@@ -227,6 +236,53 @@ class DeviceCapabilityError(DeviceCommandError):
         self.request_id = 0
 
 
+class DigitalOutputUnavailableError(DeviceCapabilityError):
+    """The device did not advertise the exact experimental output contract."""
+
+
+class DigitalOutputLifecycleError(ThingDAQError):
+    """A host output operation is inconsistent with the tracked lifecycle."""
+
+
+class DigitalOutputDeviceError(ThingDAQError):
+    """A protocol-v2 output command returned a typed device/output error."""
+
+    def __init__(
+        self,
+        command: v2_constants.FrameKind,
+        generation: int,
+        error_code: constants.ErrorCode,
+        output_error: v2_constants.OutputError | None,
+    ) -> None:
+        detail = "UNKNOWN" if output_error is None else output_error.name
+        super().__init__(
+            f"{command.name} generation {generation} failed with "
+            f"{error_code.name} ({detail})"
+        )
+        self.command = command
+        self.generation = generation
+        self.error_code = error_code
+        self.output_error = output_error
+
+
+class DigitalOutputUploadError(ThingDAQError):
+    """A transactional upload failed and records whether cleanup succeeded."""
+
+    def __init__(
+        self,
+        cause: BaseException,
+        cleanup_error: BaseException | None,
+    ) -> None:
+        suffix = (
+            "cleanup succeeded"
+            if cleanup_error is None
+            else f"cleanup failed: {cleanup_error}"
+        )
+        super().__init__(f"output upload failed ({suffix}): {cause}")
+        self.cause = cause
+        self.cleanup_error = cleanup_error
+
+
 class MultipleDevicesFoundError(ThingDAQError):
     """Automatic open found more than one DAQ and needs a hardware serial."""
 
@@ -372,6 +428,12 @@ class ThingDAQ:
         self._state: constants.DeviceState | None = None
         self._configuration: DAQConfiguration | None = None
         self._device_info: DeviceInfo | None = None
+        self._output_capabilities: DigitalOutputCapabilities | None = None
+        self._output_generation_cursor = 0
+        self._output_generation: int | None = None
+        self._output_program: DigitalOutputProgram | None = None
+        self._output_appended = 0
+        self._output_status_snapshot: DigitalOutputStatus | None = None
         self._last_status: Status | None = None
         self._run_id = 0
         self._expected_sequence: dict[constants.FrameKind, int] = {}
@@ -806,6 +868,296 @@ class ThingDAQ:
         with self._lock:
             info, _ = self._read_info()
             return info
+
+    @property
+    def output_capabilities(self) -> DigitalOutputCapabilities | None:
+        """Cached exact output contract, or ``None`` until explicit discovery."""
+
+        return self._output_capabilities
+
+    def discover_output(self) -> DigitalOutputCapabilities:
+        """Explicitly negotiate protocol v2 without changing v1 acquisition mode."""
+
+        with self._lock:
+            self._require_verified_identity()
+            if self._output_capabilities is not None:
+                return self._output_capabilities
+            try:
+                response = self._reader.request(
+                    v2_constants.FrameKind.INFO_REQUEST,
+                    timeout=self._command_timeout,
+                    protocol_version=v2_constants.PROTOCOL_VERSION,
+                )
+            except (
+                RequestTimeoutError,
+                ReaderProtocolError,
+                DeviceDisconnectedError,
+            ) as error:
+                raise DigitalOutputUnavailableError(
+                    "device did not complete explicit protocol-v2 output discovery",
+                    command=constants.FrameKind.INFO_REQUEST,
+                ) from error
+            if not response.ok or not isinstance(
+                response.value, DigitalOutputCapabilities
+            ):
+                raise DigitalOutputUnavailableError(
+                    "device does not advertise the exact auxiliary-output contract",
+                    command=constants.FrameKind.INFO_REQUEST,
+                )
+            self._output_capabilities = response.value
+            return response.value
+
+    def _next_output_generation(self) -> int:
+        self._output_generation_cursor = (
+            self._output_generation_cursor % v2_constants.UINT32_MAX
+        ) + 1
+        return self._output_generation_cursor
+
+    def _select_output_generation(self, generation: int | None) -> int:
+        if generation is None:
+            return self._output_generation or self._next_output_generation()
+        if not isinstance(generation, int) or isinstance(generation, bool):
+            raise TypeError("output generation must be an integer")
+        if not 1 <= generation <= v2_constants.UINT32_MAX:
+            raise ValueError("output generation must be a nonzero u32")
+        return generation
+
+    def _output_command(
+        self,
+        kind: v2_constants.FrameKind,
+        payload: bytes,
+        generation: int,
+    ) -> CommandResponse[ResponseValue]:
+        self.discover_output()
+        try:
+            response = self._reader.request(
+                kind,
+                payload,
+                timeout=self._command_timeout,
+                protocol_version=v2_constants.PROTOCOL_VERSION,
+                run_id=generation,
+            )
+        except RequestTimeoutError as error:
+            raise CommandTimeoutError(error, self._recovery_evidence()) from error
+        if response.run_id != generation:
+            raise UnexpectedMessageError("output response generation echo mismatch")
+        expected = v2_constants.REQUEST_RESPONSE_KIND[kind]
+        if response.kind != expected:
+            raise UnexpectedMessageError(
+                f"expected {expected.name}, received {response.kind.name}"
+            )
+        if not response.ok:
+            output_error = response.output_error
+            raise DigitalOutputDeviceError(
+                kind,
+                generation,
+                response.error_code,
+                output_error
+                if isinstance(output_error, v2_constants.OutputError)
+                else None,
+            )
+        return response
+
+    def output_begin(
+        self,
+        program: DigitalOutputProgram,
+        *,
+        generation: int | None = None,
+    ) -> DigitalOutputStatus:
+        """Begin uploading one fully validated, checksummed immutable program."""
+
+        if not isinstance(program, DigitalOutputProgram):
+            raise TypeError("program must be DigitalOutputProgram")
+        # Materialize and checksum locally before the first device request.
+        _ = program.canonical_bytes
+        _ = program.checksum
+        with self._lock:
+            self._require_state("output_begin", constants.DeviceState.IDLE)
+            selected = self._select_output_generation(generation)
+            payload = struct.pack("<II", program.repeat_count, program.idle_state_mask)
+            # Track before the exchange so a malformed/mismatched successful
+            # BEGIN can still be cleared by upload_output's rollback path.
+            self._output_generation = selected
+            self._output_program = program
+            self._output_appended = 0
+            response = self._output_command(
+                v2_constants.FrameKind.OUTPUT_BEGIN_REQUEST, payload, selected
+            )
+            if not isinstance(response.value, DigitalOutputStatus):
+                raise UnexpectedMessageError("OUTPUT_BEGIN omitted output status")
+            status = response.value
+            if (
+                status.state is not v2_constants.OutputState.LOADING
+                or status.generation != selected
+                or status.repeat_count != program.repeat_count
+                or status.idle_state_mask != program.idle_state_mask
+                or status.accepted_segment_count != 0
+            ):
+                raise UnexpectedMessageError(
+                    "OUTPUT_BEGIN response echo is inconsistent"
+                )
+            self._output_status_snapshot = status
+            return status
+
+    def output_append(self, segment: DigitalOutputSegment) -> DigitalOutputAppendEcho:
+        """Append the next exact canonical segment in the active upload."""
+
+        if not isinstance(segment, DigitalOutputSegment):
+            raise TypeError("segment must be DigitalOutputSegment")
+        with self._lock:
+            if self._output_generation is None or self._output_program is None:
+                raise DigitalOutputLifecycleError("OUTPUT_APPEND requires OUTPUT_BEGIN")
+            if self._output_appended >= len(self._output_program.segments):
+                raise DigitalOutputLifecycleError(
+                    "all canonical segments are already appended"
+                )
+            expected = self._output_program.segments[self._output_appended]
+            if segment != expected:
+                raise DigitalOutputLifecycleError(
+                    "OUTPUT_APPEND does not match the canonical program"
+                )
+            response = self._output_command(
+                v2_constants.FrameKind.OUTPUT_APPEND_REQUEST,
+                segment.to_bytes(),
+                self._output_generation,
+            )
+            if not isinstance(response.value, DigitalOutputAppendEcho):
+                raise UnexpectedMessageError("OUTPUT_APPEND omitted its exact echo")
+            echo = response.value
+            if (
+                echo.segment != segment
+                or echo.accepted_segment_count != self._output_appended + 1
+            ):
+                raise UnexpectedMessageError(
+                    "OUTPUT_APPEND response echo is inconsistent"
+                )
+            self._output_appended += 1
+            return echo
+
+    def output_commit(self) -> DigitalOutputStatus:
+        """Commit only after every locally canonical segment was echoed."""
+
+        with self._lock:
+            if self._output_generation is None or self._output_program is None:
+                raise DigitalOutputLifecycleError("OUTPUT_COMMIT requires OUTPUT_BEGIN")
+            program = self._output_program
+            if self._output_appended != len(program.segments):
+                raise DigitalOutputLifecycleError(
+                    "OUTPUT_COMMIT requires a complete upload"
+                )
+            payload = struct.pack("<II", len(program.segments), program.checksum)
+            response = self._output_command(
+                v2_constants.FrameKind.OUTPUT_COMMIT_REQUEST,
+                payload,
+                self._output_generation,
+            )
+            if not isinstance(response.value, DigitalOutputStatus):
+                raise UnexpectedMessageError("OUTPUT_COMMIT omitted output status")
+            status = response.value
+            if (
+                status.state is not v2_constants.OutputState.COMMITTED
+                or status.segment_count != len(program.segments)
+                or status.accepted_segment_count != len(program.segments)
+                or status.program_checksum != program.checksum
+            ):
+                raise UnexpectedMessageError(
+                    "OUTPUT_COMMIT response echo is inconsistent"
+                )
+            self._output_status_snapshot = status
+            return status
+
+    def upload_output(
+        self,
+        program: DigitalOutputProgram,
+        *,
+        generation: int | None = None,
+    ) -> DigitalOutputStatus:
+        """Run bounded BEGIN/APPEND/COMMIT with best-effort interrupted cleanup."""
+
+        try:
+            self.output_begin(program, generation=generation)
+            for segment in program.segments:
+                self.output_append(segment)
+            return self.output_commit()
+        except Exception as cause:
+            cleanup_error: BaseException | None = None
+            if self._output_generation is not None:
+                try:
+                    self.output_clear()
+                except Exception as error:  # noqa: BLE001 - preserve upload failure
+                    cleanup_error = error
+            raise DigitalOutputUploadError(cause, cleanup_error) from cause
+
+    def output_arm(self) -> DigitalOutputStatus:
+        """Arm the exact committed generation for the next ordinary START."""
+
+        with self._lock:
+            status = self._output_status_snapshot
+            if (
+                self._output_generation is None
+                or status is None
+                or status.state is not v2_constants.OutputState.COMMITTED
+            ):
+                raise DigitalOutputLifecycleError(
+                    "OUTPUT_ARM requires a committed program"
+                )
+            self._require_state("output_arm", constants.DeviceState.IDLE)
+            response = self._output_command(
+                v2_constants.FrameKind.OUTPUT_ARM_REQUEST,
+                b"",
+                self._output_generation,
+            )
+            if (
+                not isinstance(response.value, DigitalOutputStatus)
+                or response.value.state is not v2_constants.OutputState.ARMED
+            ):
+                raise UnexpectedMessageError("OUTPUT_ARM response did not enter ARMED")
+            self._output_status_snapshot = response.value
+            return response.value
+
+    def output_status(self) -> DigitalOutputStatus:
+        """Query output state without advancing device-timed playback."""
+
+        with self._lock:
+            self._require_state(
+                "output_status",
+                constants.DeviceState.IDLE,
+                constants.DeviceState.CONFIGURED,
+                constants.DeviceState.RUNNING,
+            )
+            generation = self._select_output_generation(None)
+            response = self._output_command(
+                v2_constants.FrameKind.OUTPUT_STATUS_REQUEST, b"", generation
+            )
+            if not isinstance(response.value, DigitalOutputStatus):
+                raise UnexpectedMessageError("OUTPUT_STATUS omitted output status")
+            self._output_status_snapshot = response.value
+            return response.value
+
+    def output_clear(self) -> DigitalOutputStatus:
+        """While IDLE, erase/disarm and release the entire bank to inputs."""
+
+        with self._lock:
+            self._require_state("output_clear", constants.DeviceState.IDLE)
+            generation = self._select_output_generation(None)
+            response = self._output_command(
+                v2_constants.FrameKind.OUTPUT_CLEAR_REQUEST, b"", generation
+            )
+            if not isinstance(response.value, DigitalOutputStatus):
+                raise UnexpectedMessageError("OUTPUT_CLEAR omitted output status")
+            status = response.value
+            if (
+                status.state is not v2_constants.OutputState.EMPTY
+                or status.bank_mode is not v2_constants.OutputBankMode.DISABLED
+            ):
+                raise UnexpectedMessageError(
+                    "OUTPUT_CLEAR did not release the output bank"
+                )
+            self._output_generation = None
+            self._output_program = None
+            self._output_appended = 0
+            self._output_status_snapshot = status
+            return status
 
     def configure(
         self,

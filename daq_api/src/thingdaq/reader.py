@@ -10,6 +10,7 @@ from types import TracebackType
 from typing import Literal, TypeAlias
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .models import (
     AdcBlock,
     CommandResponse,
@@ -26,6 +27,7 @@ from .protocol import (
     ParserCounters,
     encode_frame,
 )
+from .protocol_v2 import V2Frame, decode_v2_response, encode_v2_frame
 from .transport import (
     ByteTransport,
     TransportClosedError,
@@ -67,7 +69,7 @@ class RequestTimeoutError(ReaderError):
 
     def __init__(
         self,
-        kind: constants.FrameKind,
+        kind: constants.FrameKind | v2_constants.FrameKind,
         request_id: int,
         timeout: float,
     ) -> None:
@@ -160,8 +162,8 @@ class ReaderCounters:
 
 @dataclass(slots=True)
 class _PendingRequest:
-    kind: constants.FrameKind
-    expected_kind: constants.FrameKind
+    kind: constants.FrameKind | v2_constants.FrameKind
+    expected_kind: constants.FrameKind | v2_constants.FrameKind
     request_id: int
     deadline: float
     timeout: float
@@ -230,7 +232,11 @@ class BackgroundReader:
         self._queue_timeout = float(queue_timeout)
         self._shutdown_timeout = float(shutdown_timeout)
         self._idle_sleep = float(idle_sleep)
-        self._parser = parser if parser is not None else IncrementalFrameParser()
+        self._parser = (
+            parser
+            if parser is not None
+            else IncrementalFrameParser(accept_protocol_v2=True)
+        )
         self._read_buffer = bytearray(read_size)
 
         self._condition = Condition(RLock())
@@ -385,19 +391,30 @@ class BackgroundReader:
 
     def request(
         self,
-        kind: constants.FrameKind | int,
+        kind: constants.FrameKind | v2_constants.FrameKind | int,
         payload: bytes | bytearray | memoryview = b"",
         *,
         timeout: float | None = None,
+        protocol_version: int = constants.PROTOCOL_VERSION,
+        run_id: int = 0,
     ) -> CommandResponse[ResponseValue]:
         """Send one command and wait for its request-ID-correlated response."""
 
+        selected_kind: constants.FrameKind | v2_constants.FrameKind
+        expected_kind: constants.FrameKind | v2_constants.FrameKind
         try:
-            selected_kind = constants.FrameKind(kind)
-        except ValueError as error:
+            if protocol_version == constants.PROTOCOL_VERSION:
+                selected_kind = constants.FrameKind(kind)
+                expected_kind = constants.REQUEST_RESPONSE_KIND[selected_kind]
+            elif protocol_version == v2_constants.PROTOCOL_VERSION:
+                selected_kind = v2_constants.FrameKind(kind)
+                expected_kind = v2_constants.REQUEST_RESPONSE_KIND[selected_kind]
+            else:
+                raise ValueError("protocol_version must be 1 or 2")
+        except (KeyError, ValueError) as error:
             raise ValueError(f"unknown request frame kind {int(kind)}") from error
-        if selected_kind not in constants.REQUEST_RESPONSE_KIND:
-            raise ValueError(f"{selected_kind.name} is not a request frame kind")
+        if protocol_version == constants.PROTOCOL_VERSION and run_id:
+            raise ValueError("protocol-v1 requests require run_id zero")
         selected_timeout = self._resolve_timeout(timeout, self._request_timeout)
 
         with self._condition:
@@ -409,15 +426,20 @@ class BackgroundReader:
             request_id = self._allocate_request_id_locked()
             pending = _PendingRequest(
                 kind=selected_kind,
-                expected_kind=constants.REQUEST_RESPONSE_KIND[selected_kind],
+                expected_kind=expected_kind,
                 request_id=request_id,
                 deadline=monotonic() + selected_timeout,
                 timeout=selected_timeout,
             )
-            wire = encode_frame(
-                selected_kind,
-                payload,
-                request_id=request_id,
+            wire = (
+                encode_frame(selected_kind, payload, request_id=request_id)
+                if protocol_version == constants.PROTOCOL_VERSION
+                else encode_v2_frame(
+                    selected_kind,
+                    payload,
+                    request_id=request_id,
+                    run_id=run_id,
+                )
             )
             self._pending[request_id] = pending
             self._pending_request_high_water = max(
@@ -731,7 +753,14 @@ class BackgroundReader:
                 if self._stop_event.is_set():
                     return
                 try:
-                    message = decode_message(frame)
+                    message = (
+                        decode_v2_response(frame)
+                        if isinstance(frame, V2Frame)
+                        and frame.header.kind
+                        in set(v2_constants.REQUEST_RESPONSE_KIND.values())
+                        | {v2_constants.FrameKind.ERROR_RESPONSE}
+                        else decode_message(frame)  # type: ignore[arg-type]
+                    )
                     with self._condition:
                         self._frames_received += 1
                     if isinstance(message, CommandResponse):

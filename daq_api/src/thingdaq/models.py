@@ -11,7 +11,13 @@ from enum import Enum, IntEnum
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
+from .output import (
+    DigitalOutputAppendEcho,
+    DigitalOutputCapabilities,
+    DigitalOutputStatus,
+)
 from .protocol import Frame, FrameValidationError
 
 if TYPE_CHECKING:
@@ -4496,6 +4502,7 @@ class CommandResponse(Generic[_ResponseValue]):
     value: _ResponseValue | None = None
     rejected_kind: int | None = None
     rejected_version: int | None = None
+    output_error: v2_constants.OutputError | None = None
 
     def __post_init__(self) -> None:
         _unsigned("request_id", self.request_id, 32)
@@ -5907,6 +5914,9 @@ ResponseValue = (
     | ChecksumBenchmarkResult
     | GpioClockDiagnosticResult
     | GpioCaptureDiagnosticResult
+    | DigitalOutputCapabilities
+    | DigitalOutputAppendEcho
+    | DigitalOutputStatus
     | constants.DeviceState
     | int
 )

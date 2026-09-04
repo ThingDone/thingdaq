@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass
+from typing import Any
 
 from ._generated import protocol_constants as constants
 from .checksum import (
@@ -1350,6 +1351,15 @@ def _decode_buffered_frame(
 ) -> Frame:
     """Decode a complete plausible frame without copying its full wire image."""
 
+    if header.version == 2:
+        from .protocol_v2 import decode_buffered_v2_frame
+
+        return decode_buffered_v2_frame(  # type: ignore[return-value]
+            buffer,
+            offset,
+            header,  # type: ignore[arg-type]
+        )
+
     payload_start = offset + constants.HEADER_SIZE
     payload_end = payload_start + header.payload_length
     observed_checksum = _TRAILER.unpack_from(buffer, payload_end)[0]
@@ -1385,7 +1395,10 @@ class IncrementalFrameParser:
 
     max_buffered_bytes = MAX_BUFFERED_BYTES
 
-    def __init__(self) -> None:
+    def __init__(self, *, accept_protocol_v2: bool = False) -> None:
+        if not isinstance(accept_protocol_v2, bool):
+            raise TypeError("accept_protocol_v2 must be a boolean")
+        self._accept_protocol_v2 = accept_protocol_v2
         self._buffer = bytearray()
         self._scan_start = 0
         self._resynchronizing = False
@@ -1497,8 +1510,15 @@ class IncrementalFrameParser:
                 self._discard(magic_at - self._scan_start)
             if self.buffered_bytes < constants.HEADER_SIZE:
                 break
+            version = self._buffer[self._scan_start + constants.HEADER_VERSION_OFFSET]
+            header: Any
             try:
-                header = _decode_header(self._buffer, self._scan_start)
+                if version == 2 and self._accept_protocol_v2:
+                    from .protocol_v2 import decode_v2_header
+
+                    header = decode_v2_header(self._buffer, self._scan_start)
+                else:
+                    header = _decode_header(self._buffer, self._scan_start)
             except FrameValidationError:
                 self._record_corruption("header")
                 self._discard(1)
