@@ -1,4 +1,5 @@
 #pragma once
+#include "input_experiment_profile.h"
 
 #include <array>
 #include <cstddef>
@@ -78,8 +79,8 @@
 #if !defined(__IMXRT1062__)
 #error "ThingDAQ requires the i.MX RT1062"
 #endif
-#if !defined(F_CPU) || F_CPU != 600000000
-#error "ThingDAQ requires the 600 MHz CPU menu option"
+#if !defined(F_CPU) || F_CPU != THINGDAQ_EXPERIMENT_CPU_HZ
+#error "ThingDAQ CPU menu must match the selected experiment clock"
 #endif
 #if !defined(USB_SERIAL)
 #error "ThingDAQ requires the USB Serial menu option"
@@ -114,7 +115,7 @@ inline constexpr std::array<std::uint16_t, 8U> kUsbProductNameUtf16{
 inline constexpr char kBoardName[] = "Teensy 4.0";
 inline constexpr char kMcuName[] = "NXP i.MX RT1062";
 inline constexpr char kCpuArchitecture[] = "Arm Cortex-M7";
-inline constexpr std::uint32_t kExpectedCpuHz = 600000000U;
+inline constexpr std::uint32_t kExpectedCpuHz = input_experiment::kCpuHz;
 inline constexpr char kExpectedTeensyCoreId[] = "teensy:avr";
 inline constexpr char kExpectedTeensyCoreVersion[] = "1.62.0";
 inline constexpr std::uint16_t kExpectedTeensyduinoMacro = 160U;

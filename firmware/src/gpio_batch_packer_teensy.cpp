@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "gpio_batch_packer_teensy.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -19,7 +21,7 @@ class TeensyCycleCounter final : public CycleCounter {
     ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
     const std::uint32_t before = ARM_DWT_CYCCNT;
     __asm__ volatile("nop\n\tnop\n\tnop\n\tnop" : : : "memory");
-    return F_CPU_ACTUAL == protocol_v1::kGpioClockDwtHz &&
+    return F_CPU_ACTUAL == input_experiment::kCpuHz &&
            ARM_DWT_CYCCNT != before;
   }
 
@@ -46,7 +48,7 @@ static_assert(sizeof(g_gpio_packed_buffers) ==
               board::kGpioPackedRingDepth *
                   board::kGpioPackedBufferStrideBytes);
 static_assert(alignof(PackedBufferStorage) == board::kCacheLineBytes);
-static_assert(F_CPU == protocol_v1::kGpioClockDwtHz,
+static_assert(F_CPU == input_experiment::kCpuHz,
               "GPIO processing profiling requires the pinned 600 MHz target");
 
 }  // namespace thingdaq::gpio_packer

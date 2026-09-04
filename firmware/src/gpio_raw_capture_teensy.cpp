@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "gpio_raw_capture_teensy.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -58,7 +60,7 @@ constexpr std::uint32_t kProductionPitLoad =
         protocol_v1::kGpioClockProductionRateHz -
     1U;
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
-    protocol_v1::kGpioClockDwtHz / 100U;
+    input_experiment::kCpuHz / 100U;
 
 std::uint32_t readPrimask() {
   std::uint32_t value = 0U;
@@ -651,7 +653,7 @@ static_assert(sizeof(g_gpio_raw_dma_overflow_sink) ==
 static_assert(protocol_v1::kGpioSamplesPerFrame <=
               std::numeric_limits<std::int16_t>::max());
 static_assert(kProductionPitLoad == 5U);
-static_assert(kStopBoundaryTimeoutCycles == 6000000U);
+static_assert(kStopBoundaryTimeoutCycles == input_experiment::scaleDwt(6000000U));
 static_assert(board::kGpioEdmaChannel == 2U);
 static_assert(board::kGpioEdmaPriority == 0U);
 

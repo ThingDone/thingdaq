@@ -1,5 +1,7 @@
 #pragma once
 
+#include "input_experiment_profile.h"
+
 #include <cstdint>
 
 #include "generated/protocol_v2_constants.h"
@@ -10,7 +12,7 @@ struct ClockDomains {
   std::uint32_t timestamp_hz = protocol_v2::kTimestampHz;
   std::uint32_t pit_hz = protocol_v2::kPitClockHz;
   std::uint32_t ipg_hz = protocol_v2::kIpgClockHz;
-  std::uint32_t dwt_hz = protocol_v2::kDwtClockHz;
+  std::uint32_t dwt_hz = input_experiment::kCpuHz;
 };
 
 constexpr bool operator==(const ClockDomains &left,
@@ -175,6 +177,6 @@ class Scheduler final {
 static_assert(kContractClocks.timestamp_hz == protocol_v2::kTimestampHz);
 static_assert(kContractClocks.pit_hz == protocol_v2::kPitClockHz);
 static_assert(kContractClocks.ipg_hz == protocol_v2::kIpgClockHz);
-static_assert(kContractClocks.dwt_hz == protocol_v2::kDwtClockHz);
+static_assert(kContractClocks.dwt_hz == input_experiment::kCpuHz);
 
 }  // namespace thingdaq::variable_rate

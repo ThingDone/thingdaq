@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "checksum_benchmark.h"
 
 #include <limits>
@@ -202,7 +204,7 @@ RunResult Runner::run(const protocol::ChecksumBenchmarkRequest &request) {
 
   std::uint32_t counter_hz = 0U;
   if (!platform_.beginCycleCounter(counter_hz) ||
-      counter_hz != protocol_v1::kChecksumBenchmarkCycleCounterHz) {
+      counter_hz != input_experiment::kCpuHz) {
     result.status = RunStatus::kCounterUnavailable;
     return result;
   }

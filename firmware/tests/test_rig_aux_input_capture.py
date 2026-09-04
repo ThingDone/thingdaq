@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import time
 import unittest
@@ -40,6 +41,38 @@ def _load_rig() -> ModuleType:
 
 
 rig = _load_rig()
+
+
+class EqualRateValidatorTests(unittest.TestCase):
+    def test_equal_rate_clock_metadata_and_weighted_continuity(self):
+        with patch.dict(os.environ, {"AUX_INPUT_EQUAL_RATES": "1", "AUX_INPUT_CPU_MHZ": "450"}):
+            equal = _load_rig()
+        profile = equal.PROFILES[0]
+        self.assertEqual(1_000_000, profile.gpio_rate_hz)
+        self.assertEqual(225, profile.completion_dwt_cycles)
+        self.assertEqual(1, equal._expected_profile_record(profile)["adc_pair_divider"])
+        validator = equal.AcquisitionValidator(
+            1, equal.CHECKSUM_ADLER32, equal.RUN_CASES["INPUT_COMBINED"], profile, None)
+
+        def frame(kind, sequence):
+            layout = equal.LAYOUTS[equal.AUX_INPUT]
+            adc = kind == equal.ADC_DATA
+            items = layout.adc_items_per_frame if adc else layout.gpio_items_per_frame
+            payload_bytes = layout.adc_payload_bytes if adc else layout.gpio_payload_bytes
+            return equal.Frame(kind, equal.FLAG_EPOCH_START if sequence == 0 else 0,
+                               equal.CHECKSUM_ADLER32, 1, sequence, 0,
+                               sequence * items * 8, items, bytes(payload_bytes), 0)
+
+        for batch in range(2):
+            for i in range(4):
+                validator.accept(frame(equal.ADC_DATA, batch * 4 + i))
+            validator.accept(frame(equal.GPIO_DATA, batch))
+        self.assertEqual(4, validator.maximum_frame_skew)
+        self.assertEqual(validator.adc.expected_ticks, validator.gpio.expected_ticks)
+        for i in range(4):
+            validator.accept(frame(equal.ADC_DATA, 8 + i))
+        with self.assertRaisesRegex(equal.ProtocolFailure, "coverage skew"):
+            validator.accept(frame(equal.ADC_DATA, 12))
 
 
 def _fixture_frame(name: str):  # type: ignore[no-untyped-def]

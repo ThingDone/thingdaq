@@ -46,7 +46,8 @@ DeriveResult deriveKnown(const protocol_v2::RateProfileTiming &timing,
     return result;
   }
   const std::uint64_t four_adc =
-      static_cast<std::uint64_t>(timing.adc_pair_rate_hz) * 4U;
+      static_cast<std::uint64_t>(timing.adc_pair_rate_hz) *
+      input_experiment::kGpioRateMultiplier;
   if (!fitsU32(four_adc)) {
     result.status = Status::kArithmeticOverflow;
     return result;
@@ -163,7 +164,8 @@ DeriveResult deriveForRates(std::uint32_t adc_pair_rate_hz,
     return result;
   }
   const std::uint64_t four_adc =
-      static_cast<std::uint64_t>(adc_pair_rate_hz) * 4U;
+      static_cast<std::uint64_t>(adc_pair_rate_hz) *
+      input_experiment::kGpioRateMultiplier;
   if (!fitsU32(four_adc)) {
     DeriveResult result{};
     result.status = Status::kArithmeticOverflow;

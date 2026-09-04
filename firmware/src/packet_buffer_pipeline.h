@@ -414,6 +414,7 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
 
   bool handleMatches(const FillHandle &handle) const;
   std::size_t selectReadySource(bool &fairness_deferred) const;
+  std::uint64_t coverageFrames(std::size_t source_index) const;
   std::uint64_t accountedFrames(std::size_t source_index) const;
   BufferIndex takeFreeBuffer();
   BufferIndex oldestEvictableCompleteBuffer() const;

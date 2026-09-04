@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "adc_trigger_teensy.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -376,7 +378,7 @@ class TeensyPlatform final : public Platform {
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_counter_begin")
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    if (F_CPU_ACTUAL != protocol_v1::kAdcTriggerDwtClockHz) {
+    if (F_CPU_ACTUAL != input_experiment::kCpuHz) {
       frequency_hz = 0U;
       return false;
     }
@@ -536,7 +538,7 @@ THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
     ".flashmem.adc_trigger.target_singleton")
 Scheduler &teensyScheduler() { return g_scheduler; }
 
-static_assert(F_CPU == protocol_v1::kAdcTriggerDwtClockHz,
+static_assert(F_CPU == input_experiment::kCpuHz,
               "ADC trigger diagnostic requires the pinned 600 MHz target");
 static_assert(XBARA1_IN_PIT_TRIGGER1 ==
               protocol_v1::kAdcTriggerXbarInputs[0]);

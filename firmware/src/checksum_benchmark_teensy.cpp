@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "checksum_benchmark_teensy.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -30,7 +32,7 @@ namespace {
 class TeensyPlatform final : public Platform {
  public:
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    if (F_CPU_ACTUAL != protocol_v1::kChecksumBenchmarkCycleCounterHz) {
+    if (F_CPU_ACTUAL != input_experiment::kCpuHz) {
       frequency_hz = 0U;
       return false;
     }
@@ -90,7 +92,7 @@ packet::PacketBufferPrimaryStorage &teensyPacketPrimaryStorage() {
 
 Buffer &teensyOcramBuffer() { return g_checksum_benchmark_ocram_buffer; }
 
-static_assert(F_CPU == protocol_v1::kChecksumBenchmarkCycleCounterHz,
+static_assert(F_CPU == input_experiment::kCpuHz,
               "checksum benchmark requires the pinned 600 MHz target");
 static_assert(sizeof(packet::PacketFrame) == sizeof(Buffer));
 

@@ -89,8 +89,12 @@ struct RunLayout {
 
   THINGDAQ_STREAM_LAYOUT_COLD_CODE(".flashmem.stream_layout.run_valid")
   constexpr bool valid() const {
+    const std::uint32_t gpio_coverage_multiplier =
+        input_experiment::kEqualRates &&
+                protocol_version == protocol_v2::kProtocolVersion ? 4U : 1U;
     if (!streams[0].valid() || !streams[1].valid() ||
-        streams[0].coverage_ticks != streams[1].coverage_ticks) {
+        streams[0].coverage_ticks * gpio_coverage_multiplier !=
+            streams[1].coverage_ticks) {
       return false;
     }
     if (protocol_version == protocol_v1::kProtocolVersion) {
@@ -145,7 +149,7 @@ struct RunLayout {
            streams[1].item_bytes == gpio_item_bytes &&
            streams[1].item_period_ticks ==
                timing->gpio_sample_period_ticks &&
-           streams[1].coverage_ticks == coverage &&
+           streams[1].coverage_ticks == coverage * gpio_coverage_multiplier &&
            streams[1].payload_bytes == protocol_v2::kDataPayloadBytes;
   }
 };

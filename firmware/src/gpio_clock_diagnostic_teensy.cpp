@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "gpio_clock_diagnostic_teensy.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -76,7 +78,7 @@ class TeensyPlatform final : public Platform {
     const std::uint32_t counter_begin = ARM_DWT_CYCCNT;
     __asm__ volatile("nop\n\tnop\n\tnop\n\tnop" : : : "memory");
     if (ARM_DWT_CYCCNT == counter_begin ||
-        F_CPU_ACTUAL != protocol_v1::kGpioClockDwtHz) {
+        F_CPU_ACTUAL != input_experiment::kCpuHz) {
       addError(snapshot, protocol_v1::GpioClockError::kDwtUnavailable);
       captureUnarmed(snapshot, *dmamux, tcd);
       return true;
@@ -272,7 +274,7 @@ Runner &teensyRunner() { return g_runner; }
 
 static_assert(sizeof(DiagnosticBuffer) == board::kGpioClockDiagnosticSinkBytes);
 static_assert(alignof(DiagnosticBuffer) == board::kCacheLineBytes);
-static_assert(F_CPU == protocol_v1::kGpioClockDwtHz,
+static_assert(F_CPU == input_experiment::kCpuHz,
               "GPIO clock diagnostic requires the pinned 600 MHz target");
 static_assert(board::kGpioPitChannel == 0U);
 static_assert(board::kGpioEdmaChannel == 2U);

@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "protocol.h"
 
 #include <limits>
@@ -429,7 +431,7 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
       }
       bool aligned = false;
       for (const protocol_v2::RateProfileTiming &timing :
-           protocol_v2::kRateProfiles) {
+           rate_profile::kTimings) {
         const std::uint32_t period =
             adc ? timing.adc_pair_period_ticks
                 : timing.gpio_sample_period_ticks;
@@ -606,7 +608,7 @@ Result validateConfiguration(ByteView payload, std::size_t offset,
     }
     bool matched = false;
     for (const protocol_v2::RateProfileTiming &timing :
-         protocol_v2::kRateProfiles) {
+         rate_profile::kTimings) {
       matched = matched ||
                 (timing.adc_pair_rate_hz == adc_rate &&
                  timing.gpio_sample_rate_hz == gpio_rate);
@@ -866,12 +868,12 @@ Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
       kIpgClockHz, kCompletionExpected, kCompletionTolerance};
   const std::uint32_t fixed32_expected[] = {
       protocol_v1::kAdcTriggerPitClockHz,
-      protocol_v1::kAdcTriggerDwtClockHz,
+      input_experiment::kCpuHz,
       protocol_v1::kAdcTriggerGpioMasterRateHz,
       protocol_v1::kAdcTriggerPairRateHz,
       protocol_v1::kAdcTriggerIpgClockHz,
-      protocol_v1::kAdcCompletionExpectedDwtCycles,
-      protocol_v1::kAdcCompletionToleranceDwtCycles};
+      input_experiment::scaleDwt(protocol_v1::kAdcCompletionExpectedDwtCycles),
+      input_experiment::scaleDwt(protocol_v1::kAdcCompletionToleranceDwtCycles)};
   std::uint32_t value32 = 0U;
   for (std::size_t index = 0U;
        index < sizeof(fixed32_offsets) / sizeof(fixed32_offsets[0]); ++index) {
@@ -943,8 +945,8 @@ Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
       (errors != 0U || completion0 == 0U || completion1 == 0U ||
        (flags & arm_exercised) == 0U || (flags & stopped) == 0U ||
        absoluteDifference(completion_delta,
-                          protocol_v1::kAdcCompletionExpectedDwtCycles) >
-           protocol_v1::kAdcCompletionToleranceDwtCycles)) {
+                          input_experiment::scaleDwt(protocol_v1::kAdcCompletionExpectedDwtCycles)) >
+           input_experiment::scaleDwt(protocol_v1::kAdcCompletionToleranceDwtCycles))) {
     return badPayload();
   }
   return Result::success();
@@ -1683,7 +1685,7 @@ Result validateChecksumBenchmarkResponse(ByteView payload) {
   if (!isKnownChecksum(decoded.request.checksum_algorithm) ||
       !isSupportedChecksum(decoded.request.checksum_algorithm) ||
       decoded.cycle_counter_hz !=
-          protocol_v1::kChecksumBenchmarkCycleCounterHz ||
+          input_experiment::kCpuHz ||
       decoded.target_framed_bytes_per_second !=
           protocol_v1::kChecksumBenchmarkTargetFramedBytesPerSecond ||
       decoded.implementation_code_bytes == 0U ||
@@ -1783,8 +1785,10 @@ Result validateGpioClockDiagnosticResponse(ByteView payload) {
   const bool configuration_was_armed =
       (error_flags & unarmed_error_mask) == 0U;
   const std::uint32_t expected_scheduled =
-      dwt_hz == protocol_v1::kGpioClockDwtHz && request.rate_hz != 0U
-          ? elapsed_cycles / (protocol_v1::kGpioClockDwtHz / request.rate_hz)
+      dwt_hz == input_experiment::kCpuHz && request.rate_hz != 0U
+          ? static_cast<std::uint32_t>(
+                static_cast<std::uint64_t>(elapsed_cycles) * request.rate_hz /
+                input_experiment::kCpuHz)
           : 0U;
   if (!validGpioClockDiagnosticRequest(request) ||
       production_rate != protocol_v1::kGpioClockProductionRateHz ||
@@ -1794,10 +1798,10 @@ Result validateGpioClockDiagnosticResponse(ByteView payload) {
       (configuration_was_armed &&
        (biter != expected_major_count || citer > biter ||
         samples != static_cast<std::uint32_t>(biter - citer))) ||
-      (dwt_hz == protocol_v1::kGpioClockDwtHz &&
+      (dwt_hz == input_experiment::kCpuHz &&
        scheduled_events != expected_scheduled) ||
       (error_flags == 0U &&
-       (dwt_hz != protocol_v1::kGpioClockDwtHz || elapsed_cycles == 0U ||
+       (dwt_hz != input_experiment::kCpuHz || elapsed_cycles == 0U ||
         absoluteDifference(scheduled_events, requested_events) >
             protocol_v1::kGpioClockCountTolerance ||
         absoluteDifference(samples, scheduled_events) >
@@ -2157,7 +2161,7 @@ void writeConfiguration(MutableByteView payload, std::size_t offset,
   storeU32(payload, offset + 4U, configuration.data_frame_bytes);
   if (version == protocol_v2::kProtocolVersion) {
     const protocol_v2::RateProfileTiming &timing =
-        protocol_v2::kRateProfiles[
+        rate_profile::kTimings[
             static_cast<std::size_t>(configuration.rate_profile)];
     storeU32(payload, offset + 8U, timing.adc_pair_rate_hz);
     storeU32(payload, offset + 12U, timing.gpio_sample_rate_hz);
@@ -2231,15 +2235,17 @@ bool dataFrameShapeMatchesContract(protocol_v1::FrameKind kind,
     const std::uint64_t coverage =
         static_cast<std::uint64_t>(shape.item_count) *
         shape.item_period_ticks;
+    const std::uint32_t coverage_multiplier =
+        input_experiment::kEqualRates && !adc ? 4U : 1U;
     const bool disabled =
-        coverage == timing.disabled_frame_coverage_ticks &&
+        coverage == timing.disabled_frame_coverage_ticks * coverage_multiplier &&
         shape.item_count ==
             (adc ? protocol_v2::kDisabledAdcPairsPerFrame
                  : protocol_v2::kDisabledGpioSamplesPerFrame) &&
         shape.item_bytes ==
             (adc ? protocol_v2::kAdcBytesPerPair : 1U);
     const bool input =
-        coverage == timing.input_frame_coverage_ticks &&
+        coverage == timing.input_frame_coverage_ticks * coverage_multiplier &&
         shape.item_count ==
             (adc ? protocol_v2::kInputAdcPairsPerFrame
                  : protocol_v2::kInputGpioSamplesPerFrame) &&
@@ -2388,18 +2394,17 @@ bool validGpioClockDiagnosticRequest(
   if (request.rate_hz < protocol_v1::kGpioClockMinRateHz ||
       request.rate_hz > protocol_v1::kGpioClockProductionRateHz ||
       protocol_v1::kGpioClockPitHz % request.rate_hz != 0U ||
-      protocol_v1::kGpioClockDwtHz % request.rate_hz != 0U ||
       request.event_count < protocol_v1::kGpioClockMinEventCount ||
       request.event_count > protocol_v1::kGpioClockMaxEventCount) {
     return false;
   }
   const std::uint64_t elapsed_cycles =
-      static_cast<std::uint64_t>(request.event_count) *
-      (protocol_v1::kGpioClockDwtHz / request.rate_hz);
+      (static_cast<std::uint64_t>(request.event_count) *
+       input_experiment::kCpuHz + request.rate_hz - 1U) / request.rate_hz;
   const std::uint32_t major_count =
       2U * static_cast<std::uint32_t>(request.event_count) +
       protocol_v1::kGpioClockDuplicateGuardEvents;
-  return elapsed_cycles <= protocol_v1::kGpioClockMaxElapsedCycles &&
+  return elapsed_cycles <= input_experiment::scaleDwt(protocol_v1::kGpioClockMaxElapsedCycles) &&
          major_count <= std::numeric_limits<std::int16_t>::max();
 }
 
@@ -2759,7 +2764,7 @@ Result decodeRequest(ByteView input, Request &request) {
       }
       bool matched = false;
       for (const protocol_v2::RateProfileTiming &timing :
-           protocol_v2::kRateProfiles) {
+           rate_profile::kTimings) {
         if (timing.adc_pair_rate_hz == adc_rate &&
             timing.gpio_sample_rate_hz == gpio_rate) {
           decoded.configuration.rate_profile = timing.profile;
@@ -3146,7 +3151,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
              protocol_v2::kInputGpioSamplesPerFrame);
     for (std::size_t index = 0U; index < rate_profile::kCount; ++index) {
       const protocol_v2::RateProfileTiming &entry =
-          protocol_v2::kRateProfiles[index];
+          rate_profile::kTimings[index];
       const std::size_t base = protocol_v2::kInfoResponseRateProfilesOffset +
                                index * protocol_v2::kRateProfileInfoPayloadSize;
       payload[base + protocol_v2::kRateProfileInfoRateProfileOffset] =

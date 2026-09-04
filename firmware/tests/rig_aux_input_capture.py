@@ -99,6 +99,10 @@ CHECKSUM_NAMES = {
 }
 
 TIMESTAMP_HZ = 8_000_000
+EXPERIMENT_EQUAL_RATES = os.environ.get("AUX_INPUT_EQUAL_RATES", "0") == "1"
+EXPERIMENT_CPU_HZ = int(os.environ.get("AUX_INPUT_CPU_MHZ", "600")) * 1_000_000
+if EXPERIMENT_CPU_HZ not in (600_000_000, 450_000_000):
+    raise ValueError("only reviewed 600/150 and 450/150 MHz profiles are supported")
 STREAM_NONE = 0
 STREAM_ADC = 1
 STREAM_GPIO = 2
@@ -309,6 +313,24 @@ PROFILES = (
         64768,
         32384,
     ),
+)
+PROFILES = tuple(
+    RateProfile(
+        profile.value,
+        (f"EXPERIMENT_ADC_GPIO_{profile.adc_rate_hz}HZ"
+         if EXPERIMENT_EQUAL_RATES else profile.name),
+        profile.adc_rate_hz,
+        profile.adc_rate_hz if EXPERIMENT_EQUAL_RATES else profile.gpio_rate_hz,
+        profile.adc_period_ticks,
+        profile.adc_phase_ticks,
+        profile.adc_period_ticks if EXPERIMENT_EQUAL_RATES else profile.gpio_period_ticks,
+        profile.pit_divider * (4 if EXPERIMENT_EQUAL_RATES else 1),
+        profile.pit_divider * (4 if EXPERIMENT_EQUAL_RATES else 1) - 1,
+        profile.adc_phase_ipg_cycles,
+        profile.completion_dwt_cycles * EXPERIMENT_CPU_HZ // 600_000_000,
+        profile.disabled_coverage_ticks,
+        profile.input_coverage_ticks,
+    ) for profile in PROFILES
 )
 PROFILE_BY_VALUE = {profile.value: profile for profile in PROFILES}
 PROFILE_BY_NAME = {profile.name: profile for profile in PROFILES}
@@ -1240,8 +1262,8 @@ def _expected_profile_record(profile: RateProfile) -> dict[str, int]:
         "gpio_period_ticks": profile.gpio_period_ticks,
         "pit_divider": profile.pit_divider,
         "pit_load": profile.pit_load,
-        "adc_pair_divider": 4,
-        "adc_pair_load": 3,
+        "adc_pair_divider": profile.gpio_rate_hz // profile.adc_rate_hz,
+        "adc_pair_load": profile.gpio_rate_hz // profile.adc_rate_hz - 1,
         "adc0_initial_delay": 0,
         "adc1_initial_delay": profile.adc_phase_ipg_cycles,
         "adc0_effective_delay": 1,
@@ -2319,6 +2341,15 @@ def validate_status(
         )
 
     adc_enabled = bool(case.stream_mask & STREAM_ADC)
+    if adc_enabled:
+        for name, expected in {
+            "adc_trigger_dwt_clock_hz": EXPERIMENT_CPU_HZ,
+            "adc_ipg_clock_hz": 150_000_000,
+            "adc_clock_hz": 37_500_000,
+            "adc_trigger_pit_clock_hz": 24_000_000,
+        }.items():
+            if status.values[name] != expected:
+                raise ProtocolFailure(f"{name}: expected {expected}, got {status.values[name]}")
     if not adc_enabled and any(
         status.values[name]
         for name in (
@@ -2663,11 +2694,12 @@ class AcquisitionValidator:
         else:
             raise ProtocolFailure(f"unexpected data kind 0x{frame.kind:02x}")
         if self.case.stream_mask == STREAM_BOTH:
+            weight = 4 if EXPERIMENT_EQUAL_RATES else 1
             self.maximum_frame_skew = max(
-                self.maximum_frame_skew, abs(self.adc.frames - self.gpio.frames)
+                self.maximum_frame_skew, abs(self.adc.frames - weight * self.gpio.frames)
             )
-            if self.maximum_frame_skew > 1:
-                raise ProtocolFailure("combined host frame skew exceeds one")
+            if self.maximum_frame_skew > weight:
+                raise ProtocolFailure("combined host time-coverage skew exceeds one GPIO frame")
 
     def _continuity(
         self, frame: Frame, totals: StreamTotals, period: int, coverage: int, label: str
@@ -2714,11 +2746,7 @@ class AcquisitionValidator:
         self._advance(self.adc, frame, self.layout.adc_total_frame_bytes)
 
     def _accept_gpio(self, frame: Frame) -> None:
-        coverage = (
-            self.profile.input_coverage_ticks
-            if self.case.aux_mode == AUX_INPUT
-            else self.profile.disabled_coverage_ticks
-        )
+        coverage = self.layout.gpio_items_per_frame * self.profile.gpio_period_ticks
         self._continuity(
             frame, self.gpio, self.profile.gpio_period_ticks, coverage, "GPIO"
         )
@@ -3260,9 +3288,10 @@ def run_acceptance(
             )
             evidence.check(
                 "rate.gpio_to_adc_ratio",
-                "4 +/- 1%",
+                f"{profile.gpio_rate_hz / profile.adc_rate_hz} +/- 1%",
                 gpio_rate / adc_rate,
-                abs(gpio_rate / adc_rate - 4.0) <= 0.04,
+                abs(gpio_rate / adc_rate - profile.gpio_rate_hz / profile.adc_rate_hz)
+                <= 0.01 * profile.gpio_rate_hz / profile.adc_rate_hz,
             )
         evidence.equal("host.parser_errors", 0, link.parser.errors)
         evidence.equal("host.stale_responses", 0, link.stale_responses)

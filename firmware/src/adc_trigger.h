@@ -1,5 +1,7 @@
 #pragma once
 
+#include "input_experiment_profile.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -13,7 +15,7 @@ inline constexpr std::size_t kConverterCount = 2U;
 inline constexpr std::uint16_t kRequiredConfigurationFlags =
     protocol_v1::kKnownAdcTriggerConfigurationFlagMask;
 inline constexpr std::uint32_t kDiagnosticDeadlineCycles =
-    (protocol_v1::kAdcTriggerDwtClockHz / 1000000U) *
+    (input_experiment::kCpuHz / 1000000U) *
     protocol_v1::kAdcTriggerDiagnosticDeadlineUs;
 
 constexpr std::uint16_t configurationFlag(
@@ -51,7 +53,7 @@ struct Snapshot {
   std::uint16_t configuration_flags = 0U;
   std::uint32_t error_flags = 0U;
   std::uint32_t pit_clock_hz = protocol_v1::kAdcTriggerPitClockHz;
-  std::uint32_t dwt_clock_hz = protocol_v1::kAdcTriggerDwtClockHz;
+  std::uint32_t dwt_clock_hz = input_experiment::kCpuHz;
   std::uint32_t gpio_master_rate_hz =
       protocol_v1::kAdcTriggerGpioMasterRateHz;
   std::uint32_t pair_rate_hz = protocol_v1::kAdcTriggerPairRateHz;
@@ -85,9 +87,9 @@ struct Snapshot {
   std::array<std::uint32_t, kConverterCount> completion_counts{};
   std::uint32_t completion_delta_cycles = 0U;
   std::uint32_t completion_expected_delta_cycles =
-      protocol_v1::kAdcCompletionExpectedDwtCycles;
+      input_experiment::scaleDwt(protocol_v1::kAdcCompletionExpectedDwtCycles);
   std::uint32_t completion_tolerance_cycles =
-      protocol_v1::kAdcCompletionToleranceDwtCycles;
+      input_experiment::scaleDwt(protocol_v1::kAdcCompletionToleranceDwtCycles);
   std::uint32_t diagnostic_elapsed_cycles = 0U;
   std::uint32_t trigger_error_count = 0U;
 
@@ -156,11 +158,11 @@ static_assert(protocol_v1::kAdcTriggerPhaseIpgCycles *
                   protocol_v1::kAdc1PhaseTicks);
 static_assert(static_cast<std::uint64_t>(
                   protocol_v1::kAdcTriggerPhaseIpgCycles) *
-                      protocol_v1::kAdcTriggerDwtClockHz /
+                      input_experiment::kCpuHz /
                       protocol_v1::kAdcTriggerIpgClockHz ==
-                  protocol_v1::kAdcCompletionExpectedDwtCycles);
+                  input_experiment::scaleDwt(protocol_v1::kAdcCompletionExpectedDwtCycles));
 static_assert(protocol_v1::kAdcTriggerQueues[0] !=
               protocol_v1::kAdcTriggerQueues[1]);
-static_assert(kDiagnosticDeadlineCycles == 1200000U);
+static_assert(kDiagnosticDeadlineCycles == input_experiment::scaleDwt(1200000U));
 
 }  // namespace thingdaq::adc_trigger

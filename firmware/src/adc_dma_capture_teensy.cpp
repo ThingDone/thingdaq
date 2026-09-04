@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "adc_dma_capture_teensy.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -52,9 +54,9 @@ constexpr std::uint16_t kTcdAttributes =
 constexpr std::uint16_t kTcdControl =
     DMA_TCD_CSR_ESG | DMA_TCD_CSR_INTMAJOR;
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
-    protocol_v1::kAdcTriggerDwtClockHz / 100U;
+    input_experiment::kCpuHz / 100U;
 constexpr std::uint32_t kDmaAlignmentWaitCycles =
-    protocol_v1::kAdcTriggerDwtClockHz / 100000U;
+    input_experiment::kCpuHz / 100000U;
 constexpr std::size_t kDmaPipelineDepth = board::kAdcDmaPipelineDepth;
 constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
 constexpr std::size_t kPairDispatchConverter = 1U;
@@ -957,7 +959,7 @@ static_assert(sizeof(g_adc_dma_overflow_sink) ==
               board::kAdcDmaOverflowSinkBytes);
 static_assert(protocol_v1::kAdcPairsPerFrame <=
               std::numeric_limits<std::int16_t>::max());
-static_assert(kStopBoundaryTimeoutCycles == 6000000U);
+static_assert(kStopBoundaryTimeoutCycles == input_experiment::scaleDwt(6000000U));
 static_assert(kStopBoundaryPollLimit == 2000000U);
 static_assert(stopBoundaryArmMinimumPairs(
                   static_cast<std::uint16_t>(
@@ -975,7 +977,7 @@ static_assert(board::kAdcEdmaPriorities[0] == 2U);
 static_assert(board::kAdcEdmaPriorities[1] == 1U);
 static_assert(kPairDispatchConverter == 1U);
 static_assert(kDmaPipelineDepth == 6U);
-static_assert(kDmaAlignmentWaitCycles == 6000U);
+static_assert(kDmaAlignmentWaitCycles == input_experiment::scaleDwt(6000U));
 
 }  // namespace thingdaq::adc_capture
 

@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "adc_initializer_teensy.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -156,7 +158,7 @@ class TeensyPlatform final : public Platform {
 
   THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_counter_begin")
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    if (F_CPU_ACTUAL != protocol_v1::kAdcCalibrationCycleCounterHz) {
+    if (F_CPU_ACTUAL != input_experiment::kCpuHz) {
       frequency_hz = 0U;
       return false;
     }
@@ -241,7 +243,7 @@ Initializer g_initializer{g_platform};
 THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_singleton")
 Initializer &teensyInitializer() { return g_initializer; }
 
-static_assert(F_CPU == protocol_v1::kAdcCalibrationCycleCounterHz,
+static_assert(F_CPU == input_experiment::kCpuHz,
               "ADC initialization requires the pinned 600 MHz target");
 static_assert(A0 == board::kAdc0Pin);
 static_assert(A1 == board::kAdc1Pin);

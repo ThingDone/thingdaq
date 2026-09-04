@@ -601,9 +601,9 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
   result.capacity_drops_without_evictable_frame =
       capacity_drops_without_evictable_frame_;
   result.accounted_frame_skew =
-      accountedFrames(0U) > accountedFrames(1U)
-          ? accountedFrames(0U) - accountedFrames(1U)
-          : accountedFrames(1U) - accountedFrames(0U);
+      coverageFrames(0U) > coverageFrames(1U)
+          ? coverageFrames(0U) - coverageFrames(1U)
+          : coverageFrames(1U) - coverageFrames(0U);
   result.ready_queue_depth = readyFrames();
   result.transmit_queue_depth = transmit_queue_.size();
   result.buffers_owned = ownedBuffers();
@@ -643,7 +643,7 @@ std::size_t PacketBufferPipeline::selectReadySource(
       return candidate;
     }
     const std::size_t peer = (candidate + 1U) % kStreamCount;
-    if (accountedFrames(candidate) <= accountedFrames(peer)) {
+    if (coverageFrames(candidate) <= coverageFrames(peer)) {
       return candidate;
     }
     fairness_deferred = true;
@@ -667,6 +667,14 @@ std::uint64_t PacketBufferPipeline::accountedFrames(
                ? 0U
                : result - dropped_after_promotion;
   return result;
+}
+
+std::uint64_t PacketBufferPipeline::coverageFrames(std::size_t index) const {
+  // Existing layouts remain 1:1. Equal-rate v2 has four short ADC frames
+  // per GPIO frame; fairness and reported skew use GPIO-frame time units.
+  const bool weighted = input_experiment::kEqualRates &&
+      layout_.protocol_version == protocol_v2::kProtocolVersion;
+  return accountedFrames(index) / (weighted && index == 0U ? 4U : 1U);
 }
 
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.take_free")
