@@ -1,0 +1,803 @@
+{
+  "date": "2026-09-04",
+  "candidate": {
+    "branch": "experiment/aux-input-bank",
+    "commit": "c96bdbdff2ab1af4067fd8dc303520aa10c3a237",
+    "source_id": "92254306334bb69f51fe1989b756659a38f39f4e5e3c3566f49819501cc2f2fe",
+    "firmware_inputs_clean": true,
+    "build_id": "thingdaq-92254306334bb69f",
+    "source_date_epoch": 1788552674,
+    "hex": {
+      "path": "firmware.ino.hex",
+      "sha256": "7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681",
+      "size_bytes": 449404
+    },
+    "rebuild_matches_successful_physical_hex": true
+  },
+  "physical_scope": "Unstimulated inputs; no pin-level electrical fidelity claims",
+  "runs": [
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/fixed-control-combined-p0",
+      "diagnostic_events": [
+        {
+          "error": "ProtocolFailure: STATUS configuration echo is contradictory: {\"stream_mask\": {\"actual\": 0, \"expected\": 3}}",
+          "event": "fatal"
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-92254306334bb69f",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681",
+        "program_sha256": "26a97f30a5bc1371dc936c94bf084d7f71bac21a5fd19904ed21c405b8c22380",
+        "runner_sha256": "39a4be157859693cca06ac8b39f144591a4546d5f1f2afd36a3bd5d6a95a3506",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-92254306334bb69f",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "e6870e6d77af662bb4ed22af9a4427707c7b8c29d1153043758e003f0a1be55f",
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_COMBINED",
+            "checks": 109,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 5.0,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: STATUS configuration echo is contradictory: {\"stream_mask\": {\"actual\": 0, \"expected\": 3}}"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id f5e2e054-b4ea-4c75-8311-656060e9bf08",
+        "outcome": "TEST_FAIL",
+        "test_id": "f5e2e054-b4ea-4c75-8311-656060e9bf08"
+      },
+      "run": "fixed-control-combined-p0"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/fixed-control-combined-p0-r2",
+      "diagnostic_events": [],
+      "provenance": {
+        "build_id": "thingdaq-92254306334bb69f",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681",
+        "program_sha256": "fcecb4ac32b567fa4f7c36bf7338deac45dcde779c8f77b1649e975f591af84b",
+        "runner_sha256": "d2f2325a915f884aebf751d1c4a7fa4171ce910f9d210b83340c9fcfc9a699a3",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-92254306334bb69f",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "c5d81b34429c07c6c6dc23d22873f10f9d9b3ac2bc439f0701d228e763d97227",
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_COMBINED",
+            "checks": 128,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 5.0,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 5208,
+              "adc_rate_hz": 1000000.0755736068,
+              "aux_bank_samples_captured": 0,
+              "capture_seconds": 5.001303622033447,
+              "firmware_processing_cpu_basis_points": 2323,
+              "gpio_frames": 5208,
+              "gpio_rate_hz": 4000000.302294427,
+              "host_peak_rss_growth_bytes": 16384,
+              "maximum_frame_skew": 1,
+              "maximum_receive_gap_seconds": 0.020846081897616386,
+              "packet_ready_high_water": 2,
+              "packet_transmit_high_water": 3,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 0,
+              "paired_samples_transmitted": 21081984,
+              "primary_bank_samples_captured": 0,
+              "status_count": 11,
+              "status_p99_seconds": 0.008164403028786182,
+              "stop_tail_adc_items": 82,
+              "stop_tail_gpio_items": 331
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id dad59acd-67eb-4c51-90ae-44d1f5dd1b99",
+        "outcome": "PASS",
+        "test_id": "dad59acd-67eb-4c51-90ae-44d1f5dd1b99"
+      },
+      "run": "fixed-control-combined-p0-r2"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/fixed-control-combined-p3",
+      "diagnostic_events": [],
+      "provenance": {
+        "build_id": "thingdaq-92254306334bb69f",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681",
+        "profile_sequence": [
+          3
+        ],
+        "program_sha256": "ba20d8c0e92547476ae705fe0b182b78e687cdbc4f8dfcb9024b94128ae36319",
+        "runner_sha256": "d2f2325a915f884aebf751d1c4a7fa4171ce910f9d210b83340c9fcfc9a699a3",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "3",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-92254306334bb69f",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "b9ff284b12ca4cfbd8d17989c67dfd4989de23432193a3dd2e9b5ca139a65aea",
+      "result": {
+        "evidence": [],
+        "exit_code": -100,
+        "message": "Board teensy:avr:teensy40 did not appear on any serial port within 20s of powering hub port 15; no Teensy HalfKay bootloader (16c0:0478) is enumerated either",
+        "outcome": "INFRASTRUCTURE_FAIL",
+        "test_id": "73d6d833-aada-4efe-9bc1-af28e1091244"
+      },
+      "run": "fixed-control-combined-p3"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/fixed-input-combined-p0",
+      "diagnostic_events": [],
+      "provenance": {
+        "build_id": "thingdaq-92254306334bb69f",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681",
+        "program_sha256": "73b89bc6149ee0c06ba39579fb4faa3162ce6a8a2cac802e67bbc9d9b0e11ce6",
+        "runner_sha256": "d2f2325a915f884aebf751d1c4a7fa4171ce910f9d210b83340c9fcfc9a699a3",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-92254306334bb69f",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "e13c4447463337591eba40ccf763bc8c97791d5ee1070e7610ac7e0974137a09",
+      "result": {
+        "evidence": [],
+        "exit_code": -130,
+        "message": "Error loading program for test_id 87b7c89e-1b7d-4e76-9d3d-6dd7a85f9684: 1",
+        "outcome": "INFRASTRUCTURE_FAIL",
+        "test_id": "87b7c89e-1b7d-4e76-9d3d-6dd7a85f9684"
+      },
+      "run": "fixed-input-combined-p0"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/fixed-input-combined-p0-r2",
+      "diagnostic_events": [],
+      "provenance": {
+        "build_id": "thingdaq-92254306334bb69f",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "7824c6b9620074da7da6eb31fc2ec4f1294af0d1f6829cb55bd77afeeaf65681",
+        "program_sha256": "73b89bc6149ee0c06ba39579fb4faa3162ce6a8a2cac802e67bbc9d9b0e11ce6",
+        "runner_sha256": "d2f2325a915f884aebf751d1c4a7fa4171ce910f9d210b83340c9fcfc9a699a3",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-92254306334bb69f",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "6b3e45f35ac2e41bf740fd3da7ac249afebe66f10572f698b21ce5bb65b211d0",
+      "result": {
+        "evidence": [],
+        "exit_code": -100,
+        "message": "Board teensy:avr:teensy40 did not appear on any serial port within 20s of powering hub port 15; no Teensy HalfKay bootloader (16c0:0478) is enumerated either",
+        "outcome": "INFRASTRUCTURE_FAIL",
+        "test_id": "9122f006-adef-4652-8569-9a335aa73efe"
+      },
+      "run": "fixed-input-combined-p0-r2"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/original-control-combined-p0",
+      "diagnostic_events": [
+        {
+          "error": "DeadlineExpired: request 4 kind 0x11 timed out; parser_errors=1 rx_prefix=efbeadde019f00802c00010038000000080000000000000000000000040000000000000000000000000000000100040011020000e20427e9",
+          "event": "fatal"
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-c1f05b3a2ebfc8b3",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "6ade9731134a87475672607d746cb2b338fb923ccc72a7aeb04a075a88c9cb95",
+        "program_sha256": "0b3727c03558806bb952856ad8e6f46fb71a55d39f39ead09c63a632207a064e",
+        "runner_sha256": "ad44ad61496317c452d4545a8a4f69221c0f7fc6911a57106833fe81dad7ddbf",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-c1f05b3a2ebfc8b3",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "179c7ec611279af39a4ff888ba37729509914336df5ba45a4605132fd4f1d968",
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_COMBINED",
+            "checks": 76,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 5.0,
+            "failed_checks": [],
+            "failures": [
+              "DeadlineExpired: request 4 kind 0x11 timed out; parser_errors=1 rx_prefix=efbeadde019f00802c00010038000000080000000000000000000000040000000000000000000000000000000100040011020000e20427e9"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 9924586f-17cc-41a6-8f03-85ad8a46aaa4",
+        "outcome": "TEST_FAIL",
+        "test_id": "9924586f-17cc-41a6-8f03-85ad8a46aaa4"
+      },
+      "run": "original-control-combined-p0"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/original-control-gpio-p0",
+      "diagnostic_events": [
+        {
+          "error": "DeadlineExpired: request 4 kind 0x11 timed out",
+          "event": "fatal"
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-c1f05b3a2ebfc8b3",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "6ade9731134a87475672607d746cb2b338fb923ccc72a7aeb04a075a88c9cb95",
+        "program_sha256": "b155e94cb6a13690fe0ae105950dbc80b044046fa4df8c8652db9360982b501d",
+        "runner_sha256": "ebf8ec39ed7f9fbe42a0195d8729c3fb3397bf2cf7f83aa4827dcac5b62d66e5",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_GPIO",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-c1f05b3a2ebfc8b3",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "3c596c0fd79ab2ec6cc1ae1ca281072ac1992e3eb3c725a43ab798831f6b680a",
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_GPIO",
+            "checks": 76,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 5.0,
+            "failed_checks": [],
+            "failures": [
+              "DeadlineExpired: request 4 kind 0x11 timed out"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 6365be6b-b039-4448-8c13-bb6cc985d057",
+        "outcome": "TEST_FAIL",
+        "test_id": "6365be6b-b039-4448-8c13-bb6cc985d057"
+      },
+      "run": "original-control-gpio-p0"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/parser-fixed-control-combined-p0",
+      "diagnostic_events": [
+        {
+          "error": "ProtocolFailure: response kind=0x92 flags=0x8000 status=1 error=11; expected success 0x92",
+          "event": "fatal"
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-f1857bd9d7352716",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "ef794a4b407714f93648f7eda09e6c30c76ec8afd8b73e44353b4ab3d74bfc61",
+        "program_sha256": "1e3b7a582e765302b44ada4d1bdac9b1d16bf742eeabb318c92c74a941fb8c88",
+        "runner_sha256": "f317f118225e278e26eca044a2ed5e42a73f8995c1d67d1d52f7e47992572483",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-f1857bd9d7352716",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "4de5600de09b30f47a2c1ee3cb60a9f89ad3e14b13b95c23934b5f177bcfcf5d",
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_COMBINED",
+            "checks": 104,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 5.0,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: response kind=0x92 flags=0x8000 status=1 error=11; expected success 0x92"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 838876ad-4537-42fe-a2d9-b0fb2ecfee46",
+        "outcome": "TEST_FAIL",
+        "test_id": "838876ad-4537-42fe-a2d9-b0fb2ecfee46"
+      },
+      "run": "parser-fixed-control-combined-p0"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/parser-fixed-control-gpio-p3",
+      "diagnostic_events": [
+        {
+          "error": "ProtocolFailure: response kind=0x92 flags=0x8000 status=1 error=11; expected success 0x92",
+          "event": "fatal"
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-f1857bd9d7352716",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "ef794a4b407714f93648f7eda09e6c30c76ec8afd8b73e44353b4ab3d74bfc61",
+        "program_sha256": "5b1b0dd63e5f5cecbbacb64c9dac97b861f9c39a93bad08195981dcd15dcc99c",
+        "runner_sha256": "d7cb8d8d38fa5be45eff97c90e530bb994f03277375f2415ea7b3cd766737c28",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_GPIO",
+          "AUX_INPUT_RATE_PROFILE": "3",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-f1857bd9d7352716",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "bf10313506d55088b6b15ba795aba61e64b1a55be7d116d212a82c5a156dfc42",
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_GPIO",
+            "checks": 104,
+            "configured_rates_hz": {
+              "adc_pairs": 125000,
+              "gpio_samples": 500000
+            },
+            "duration_seconds": 5.0,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: response kind=0x92 flags=0x8000 status=1 error=11; expected success 0x92"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_125KHZ_GPIO_500KHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 2de4706b-e362-417b-87a9-914bfb9ca3d2",
+        "outcome": "TEST_FAIL",
+        "test_id": "2de4706b-e362-417b-87a9-914bfb9ca3d2"
+      },
+      "run": "parser-fixed-control-gpio-p3"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/trace-control-combined-p0",
+      "diagnostic_events": [
+        {
+          "event": "debug_trace",
+          "text": "TRACE :122000"
+        },
+        {
+          "error": "ProtocolFailure: response kind=0x92 flags=0x8000 status=1 error=11; expected success 0x92",
+          "event": "fatal"
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-b9c7197aeb33a8ee",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "0b8a2f37211e4f09484641c803c91eee01058e300a7d7efad9759b089f7e59b1",
+        "program_sha256": "a1f527cf05fd09783725d611827a89829f4eb47b8c8433394d917e616dbef6e8",
+        "runner_sha256": "9d0186e958932782b527006801e94585e75f8eeb995e09ffef87efb4805a6f8f",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-b9c7197aeb33a8ee",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "0652d6fb4bd2d475d69e99c3374b22ab86f262b17e42c2de28647f2ebeda8e21",
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_COMBINED",
+            "checks": 104,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 5.0,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: response kind=0x92 flags=0x8000 status=1 error=11; expected success 0x92"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 48b04a97-6ea4-4e81-9021-e58914f70d23",
+        "outcome": "TEST_FAIL",
+        "test_id": "48b04a97-6ea4-4e81-9021-e58914f70d23"
+      },
+      "run": "trace-control-combined-p0"
+    },
+    {
+      "artifact_directory": ".maestro/playbooks/Working/input-isolation/trace-registers-control-combined-p0",
+      "diagnostic_events": [
+        {
+          "event": "debug_trace",
+          "text": "TRACE regs 00000000 00110000 00000005 00000000 00000003 00000004 00000000 00000000 00002017 00000000 0000004b 00004018 00012429 00000010 00012429 00000010 67130040 fcfff300 0cfff033 00000000 00000000 00000000 00000039 00000039 "
+        },
+        {
+          "error": "ProtocolFailure: response kind=0x92 flags=0x8000 status=1 error=11; expected success 0x92",
+          "event": "fatal"
+        },
+        {
+          "event": "cleanup_stop",
+          "state": 1
+        }
+      ],
+      "provenance": {
+        "build_id": "thingdaq-d4d3687bee7881bf",
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "9a66faae9a5c84a1866078c0b1e186a4ee8ea75e83e5605746792c62ce48a5c4",
+        "program_sha256": "aab859c1442e0ecd6ed958ce31a5c90c853c0a4f675782c3ada3f8884f845a6c",
+        "runner_sha256": "796b0893bde9b106cb006ff07e7cee24b262853349799f83d7069dfa6fd23c60",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "5.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "EXPECTED_BUILD_ID": "thingdaq-d4d3687bee7881bf",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_result_sha256": "6685a03067962d7ef829c4164b68be149b7a34bd5ef437d6162cb2902374a72a",
+      "result": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_COMBINED",
+            "checks": 104,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 4000000
+            },
+            "duration_seconds": 5.0,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: response kind=0x92 flags=0x8000 status=1 error=11; expected success 0x92"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {},
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_4MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 3ca6850f-804b-4357-9900-959e2e9e6f42",
+        "outcome": "TEST_FAIL",
+        "test_id": "3ca6850f-804b-4357-9900-959e2e9e6f42"
+      },
+      "run": "trace-registers-control-combined-p0"
+    }
+  ],
+  "schema": "thingdaq.input-isolation/v1"
+}
