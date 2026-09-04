@@ -9,7 +9,8 @@ has **not** been merged into production main.
 
 After the user recovered the board, the **eight-input rate experiment passed
 all four profiles**, including a 0→1→2→3→0 cycle without reflashing (ten seconds
-per cell). The sixteen-input comparisons exposed additional, independent
+per cell), then **60 seconds per cell on the final clean candidate**, with every
+STOP passing. The sixteen-input comparisons exposed additional, independent
 metadata, transport and validator defects described below. With those fixed,
 **sixteen inputs plus ADCs pass for 60 seconds at GPIO 1 MHz / ADC 250 kHz and
 GPIO 500 kHz / ADC 125 kHz**. GPIO 2 MHz / ADC 500 kHz passed ten seconds.
@@ -28,12 +29,12 @@ unstimulated inputs and no output engine. The paired-bank diagnostic is opt-in,
 not a prerequisite. These are runtime-feature controls in the experimental
 firmware, not separate builds with the unused feature compiled out.
 
-| ADC / GPIO rate | Eight inputs + ADC | Sixteen inputs + ADC | GPIO-only controls |
-| --- | --- | --- | --- |
-| 1 MHz / 4 MHz | **PASS**, 10 seconds, twice in rate cycle | **FAIL**, no ADC major loops; GPIO queue fills | Sixteen inputs: **FAIL**, 10-second capture completed; STOP bank-tail skew of four/five samples |
-| 500 kHz / 2 MHz | **PASS**, 10 seconds | **PASS**, 10 seconds; **FAIL** at STOP after 60-second capture | Sixteen inputs: **PASS**, 10 seconds |
-| 250 kHz / 1 MHz | **PASS**, 10 seconds | **PASS**, 60 seconds | Sixteen inputs: **PASS**, 10 seconds |
-| 125 kHz / 500 kHz | **PASS**, 10 seconds | **PASS**, 60 seconds | Sixteen inputs: **PASS**, 10 seconds |
+| ADC / GPIO rate | Eight inputs + ADC | Sixteen inputs + ADC | Eight inputs, GPIO only | Sixteen inputs, GPIO only |
+| --- | --- | --- | --- | --- |
+| 1 MHz / 4 MHz | **PASS**, 60 s twice | **FAIL**, ADC stalls; GPIO queue fills | **PASS**, 10 s twice | **FAIL** at STOP after 10 s; four/five-sample bank skew |
+| 500 kHz / 2 MHz | **PASS**, 60 s | **PASS**, 10 s; **FAIL** at STOP after 60 s | **PASS**, 10 s | **PASS**, 10 s |
+| 250 kHz / 1 MHz | **PASS**, 60 s | **PASS**, 60 s | **PASS**, 10 s | **PASS**, 10 s |
+| 125 kHz / 500 kHz | **PASS**, 60 s | **PASS**, 60 s | **PASS**, 10 s | **PASS**, 10 s |
 
 The rate experiment changes only the profile with eight inputs selected.
 The width experiment compares eight versus sixteen inputs at the same profile.
@@ -48,11 +49,11 @@ the first full-rate failure, so lower rates are submitted independently.
 | --- | --- | --- |
 | Command-size mismatch | v2 CONFIGURE is 64 bytes, but firmware retained v1's 56-byte limit and 59-byte parser buffer. Every valid v2 configuration was rejected before rate/pin testing. | Version-aware limit, 67-byte parser storage and 68-byte reservation. New C++ test first reproduced all eight width/rate failures, then passed every fragmentation boundary. Physical CONFIGURE now passes. |
 | Status bits mistaken for enables | Rate setup required the entire ADC_ETC DMA_CTRL register to be zero. Boot completion flags left `0x00110000` latched even though requests were disabled. START rolled back with platform-apply failure. | Check only enable bits; preserve W1C status during rollback. Temporary hardware trace identified the register value; the real target adapter is now exercised with a W1C-aware fake. Physical START and capture now pass. |
-| Truncated slow-rate ADC delay | Teensy core 1.62's INIT_DELAY macro masks to eight bits. Required delays of 300 and 600 IPG cycles would become 44 and 88. The old readback check used the same defective macro. | Encode the actual 16-bit register field in both scheduler and trigger adapter. Real-adapter tests verify register values 75, 150, 300 and 600. Slow-rate physical timing remains untested. |
-| Colliding DMA priorities | Paired GPIO setup assigned channels 2/3 priorities 1/0 without updating inactive ADC channels 0/1, whose reset priorities are 0/1. Standalone GPIO and switching back from INPUT could also leave duplicates. | Configure all four reserved priorities as a unique permutation: legacy 2/1/0/3, INPUT 3/2/1/0. Host tests cover inactive channels and repeated mode changes. This is a confirmed static defect matching the original diagnostic failure; physical paired-bank reproduction is still pending. |
+| Truncated slow-rate ADC delay | Teensy core 1.62's INIT_DELAY macro masks to eight bits. Required delays of 300 and 600 IPG cycles would become 44 and 88. The old readback check used the same defective macro. | Encode the actual 16-bit register field in both scheduler and trigger adapter. Real-adapter tests verify register values 75, 150, 300 and 600. Slow-rate hardware throughput now passes; external aperture/phase measurements remain untested. |
+| Colliding DMA priorities | Paired GPIO setup assigned channels 2/3 priorities 1/0 without updating inactive ADC channels 0/1, whose reset priorities are 0/1. Standalone GPIO and switching back from INPUT could also leave duplicates. | Configure all four reserved priorities as a unique permutation: legacy 2/1/0/3, INPUT 3/2/1/0. Host tests cover inactive channels and repeated mode changes. Physical paired capture now completes both banks; separate diagnostic grading mismatches remain below. |
 | Misleading runner grading | The runner discarded v1 generic rejections, required both banks in the eight-input control, graded the paired diagnostic against v1 primary BITER/priority, and expected active metadata after STOP. | Accept only the legitimate legacy rejection shape, make diagnostic optional, expect primary BITER 2024/priority 1, and distinguish IDLE metadata from completed-run counters. Active-loss and STOP-tail checks remain enabled. |
 | Incomplete sixteen-input INFO encoding | After board recovery, the eight-input rate cycle passed, but sixteen-input CONFIGURE advertised ADC payload 4048 instead of 2024 bytes and legacy ADC/GPIO priorities. Acquisition was never started. | The encoder now selects these three fields from the active mode, matching the API and existing validator. The new C++ regression reproduced all twelve mismatches across four rates before the fix. |
-| Fixed-size USB admission | Sixteen-input mode produces 2072-byte ADC frames, but USB admission still required 4096 bytes. The transport discarded valid ADC frames, recorded I/O errors and misleadingly released them as transmitted. | Both admission checks now accept the two supported lengths. A real-encoder/USB regression first failed, then passed with mixed ADC/GPIO frames and zero/partial writes. Physical combined capture now passes at profiles 1 and 3. |
+| Fixed-size USB admission | Sixteen-input mode produces 2072-byte ADC frames, but USB admission still required 4096 bytes. The transport discarded valid ADC frames, recorded I/O errors and misleadingly released them as transmitted. | Both admission checks now accept the two supported lengths. A real-encoder/USB regression first failed, then passed with mixed ADC/GPIO frames and zero/partial writes. Physical combined capture passes at profiles 1–3, with the profile-1 sustained STOP failure retained. |
 | Invalid single-stream/STOP assertions | GPIO-only accounted frame skew legitimately grows when ADC is disabled. Normal paired STOP cancels its two outstanding reservations. The fake device omitted both behaviors, hiding the runner mistakes. | Bound cross-stream skew only in combined mode; permit at most two canceled generations only in final paired STOP status. Active cancellation, bank skew, count mismatches and all loss/conservation checks remain strict. Fakes now reproduce these real firmware behaviors. |
 
 Hardware register semantics were checked against
@@ -100,6 +101,25 @@ Its exact source patch is retained alongside the submitted binary and program.
   `b677587f-a453-407e-88d7-98c75143ee55` remains failed. The precise shutdown race
   has not yet been established.
 
+### The optional paired diagnostic still has contract/grading mismatches
+
+Job `ff0513fb-2617-4e29-af5d-1ef2fee7bae4` exercised the diagnostic at its fixed
+4 MHz rate, independently of the selected streaming profile. Both banks retained
+and analyzed a complete 2024-sample block, and the hardware-error checks passed.
+The overall diagnostic nevertheless failed four assertions:
+
+- The runner requires auxiliary CITER to remain exactly 2024 even though it is
+  read while DMA is running; the actual value was 1861.
+- Its paired-count check still expects 4048 primary samples from the old layout,
+  although sixteen-input mode uses 2024 samples in each bank.
+- Both captured-count checks expect partial tails to be included, but the target
+  currently publishes completed-bank counts (2024), separately from its reported
+  partial tail (200). The firmware and validator need a consistent definition.
+
+These remaining diagnostic issues were **identified, not fixed or waived** in
+this capture-focused follow-up. No streaming START was issued for that job.
+The independent matrix does not depend on this diagnostic passing.
+
 ## Physical evidence
 
 Target: Teensy serial **20428100**, remote rig hub port **15**.
@@ -143,6 +163,12 @@ submitted programs and service responses remain under
   `e14177fd-bb5d-4672-adc4-f8bda41c34fd`, 131 checks each.
 - Recovery rate-cycle job `61dda5f7-0115-45b2-b828-e5a2e14ca93b` passed all five
   eight-input cells, 128 checks each, on the preceding candidate.
+- Final clean-candidate eight-input rate cycle
+  `7b642559-e98b-471f-ab0b-f10cc15ba6ac` passed profiles 0→1→2→3→0 for 60
+  seconds each, 128 checks each, including every STOP. This is the matched
+  baseline for the sixteen-input sustained tests.
+- Eight-input GPIO-only cycle `db1b1348-c10e-438e-8925-3164d61f4da3` passed
+  profiles 0→1→2→3→0 for ten seconds each, 123 checks each.
 - Clean candidate job `552f77f2-28a5-4e5f-b55c-ef44f107dc62` passed profiles 2
   and 3 for 60 seconds each, 131 checks each. It used a clean rebuild of
   `086d44d`, HEX SHA-256
