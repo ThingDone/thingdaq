@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import re
 import shutil
 import subprocess
@@ -250,6 +252,62 @@ class CombinedAcquisitionTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(build_firmware.BuildError, "overlaps"):
             build_firmware.managed_memory_usage(overlapping_map)
+
+    def test_map_gate_fails_closed_for_every_managed_allocation(self) -> None:
+        linker_map = MAP_FIXTURE.read_text(encoding="utf-8")
+        manifest = build_firmware.managed_memory_usage(linker_map)
+        self.assertEqual(13, manifest["allocation_count"])
+
+        for allocation in manifest["allocations"]:
+            symbol = str(allocation["symbol"])
+            without_symbol = "\n".join(
+                line for line in linker_map.splitlines() if symbol not in line
+            )
+            with (
+                self.subTest(owner=allocation["owner"], failure="missing"),
+                self.assertRaisesRegex(build_firmware.BuildError, "missing"),
+            ):
+                build_firmware.managed_memory_usage(without_symbol)
+
+            old_address = int(str(allocation["address"]), 16)
+            escaped = re.escape(symbol)
+            relocated = re.sub(
+                rf"^{old_address:08x}(\s+[0-9a-fA-F]+\s+[bB]\s+{escaped})$",
+                r"20280000\1",
+                linker_map,
+                count=1,
+                flags=re.MULTILINE,
+            )
+            self.assertNotEqual(linker_map, relocated)
+            with (
+                self.subTest(owner=allocation["owner"], failure="region"),
+                self.assertRaisesRegex(
+                    build_firmware.BuildError, "managed memory region"
+                ),
+            ):
+                build_firmware.managed_memory_usage(relocated)
+
+    def test_default_eight_input_contract_and_resources_remain_frozen(self) -> None:
+        v1_path = REPOSITORY_ROOT / "protocol/protocol-v1.json"
+        v1 = json.loads(v1_path.read_text(encoding="utf-8"))
+        v2 = json.loads(
+            (REPOSITORY_ROOT / "protocol/protocol-v2.json").read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(
+            "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+            hashlib.sha256(v1_path.read_bytes()).hexdigest(),
+        )
+        self.assertEqual("DISABLED", v2["auxiliary_input"]["default_mode"])
+        self.assertEqual(list(range(6, 14)), v1["data_layouts"]["gpio"]["pins_by_bit"])
+        resources = v2["auxiliary_input"]["provisional_resources"]
+        self.assertEqual(0, resources["primary_xbar_output"])
+        self.assertEqual(30, resources["primary_dmamux_source"])
+        self.assertEqual(2, resources["primary_edma_channel"])
+        self.assertEqual(
+            200,
+            v2["combined_acquisition"]["packet_buffer_count"],
+        )
 
 
 if __name__ == "__main__":

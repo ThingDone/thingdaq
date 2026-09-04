@@ -498,6 +498,15 @@ void testLongGenerationStressAcrossWrap() {
              snapshot.progress.sample_instants_delivered == expected_samples &&
              snapshot.progress.sample_instants_lost == 0U &&
              snapshot.progress.raw_ring_overruns == 0U &&
+             snapshot.progress.cache_cpu_invalidations ==
+                 2U * iterations &&
+             snapshot.progress.cache_dma_discards ==
+                 2U * join::kRingDepth + join::kBankCount +
+                     2U * iterations &&
+             fixture.cache.invalidations ==
+                 snapshot.progress.cache_cpu_invalidations &&
+             fixture.cache.discards ==
+                 snapshot.progress.cache_dma_discards &&
              snapshot.progress.invariant_errors == 0U &&
              snapshot.progress.conserved() && fixture.critical.balanced &&
              fixture.critical.depth == 0U,
@@ -563,6 +572,12 @@ void testSmallCapacityPressureRecoversAndConserves() {
              snapshot.progress.sample_instants_lost == lost_pairs * samples &&
              snapshot.progress.raw_ring_overruns == lost_pairs &&
              snapshot.progress.ready_high_water == join::kRingDepth &&
+             snapshot.progress.cache_cpu_invalidations ==
+                 2U * ready_pairs &&
+             fixture.cache.invalidations ==
+                 snapshot.progress.cache_cpu_invalidations &&
+             fixture.cache.discards ==
+                 snapshot.progress.cache_dma_discards &&
              snapshot.progress.conserved() &&
              snapshot.progress.invariant_errors == 0U,
          "small-ring pressure must recover and classify every sample exactly");
