@@ -36,20 +36,44 @@
     "acquisition_default": "When no output program is armed, CONFIGURE, START, STOP, data layout, timestamps, checksums, and all acquisition behavior are byte-for-byte protocol-v1 behavior."
   },
   "auxiliary_output": {
-    "capabilities": ["PRELOADED_AUXILIARY_OUTPUT", "COMMON_EPOCH_OUTPUT"],
+    "capabilities": [
+      "PRELOADED_AUXILIARY_OUTPUT",
+      "COMMON_EPOCH_OUTPUT"
+    ],
     "mode_enum": "output_bank_mode",
     "lifecycle_enum": "output_state",
     "error_enum": "output_error",
     "default_mode": "DISABLED",
-    "supported_modes": ["DISABLED", "OUTPUT"],
+    "supported_modes": [
+      "DISABLED",
+      "OUTPUT"
+    ],
     "direction_granularity": "whole_bank",
     "direction_rule": "All D16 through D23 pads are high-impedance inputs together or push-pull outputs together. INPUT, mixed direction, and per-pin direction fields are unsupported and rejected atomically.",
     "pins_remain_inputs_until": "All eight pins remain high-impedance inputs until an explicit immutable committed program is successfully armed while the common controller is IDLE.",
     "pin_bank": {
-      "teensy_pins_by_logical_bit": [16, 17, 18, 19, 20, 21, 22, 23],
+      "teensy_pins_by_logical_bit": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
       "standard_gpio": 1,
       "fast_gpio": 6,
-      "standard_gpio_bits_by_logical_bit": [23, 22, 17, 16, 26, 27, 24, 25],
+      "standard_gpio_bits_by_logical_bit": [
+        23,
+        22,
+        17,
+        16,
+        26,
+        27,
+        24,
+        25
+      ],
       "aggregate_mask": 264437760,
       "aggregate_mask_hex": "0x0FC30000",
       "fast_select_gpr": 26,
@@ -72,8 +96,16 @@
         "size": 8,
         "byte_order": "little",
         "fields": [
-          {"name": "duration_samples", "offset": 0, "type": "u32"},
-          {"name": "logical_state_mask", "offset": 4, "type": "u32"}
+          {
+            "name": "duration_samples",
+            "offset": 0,
+            "type": "u32"
+          },
+          {
+            "name": "logical_state_mask",
+            "offset": 4,
+            "type": "u32"
+          }
         ]
       },
       "duration_min": 1,
@@ -97,7 +129,11 @@
     },
     "upload": {
       "mutation_controller_state": "IDLE",
-      "status_allowed_controller_states": ["IDLE", "CONFIGURED", "RUNNING"],
+      "status_allowed_controller_states": [
+        "IDLE",
+        "CONFIGURED",
+        "RUNNING"
+      ],
       "generation_location": "header.run_id",
       "generation_type": "u32",
       "generation_zero_valid": false,
@@ -107,27 +143,64 @@
         "OUTPUT_BEGIN": {
           "payload_size": 8,
           "fields": [
-            {"name": "repeat_count", "offset": 0, "type": "u32"},
-            {"name": "idle_state_mask", "offset": 4, "type": "u32"}
+            {
+              "name": "repeat_count",
+              "offset": 0,
+              "type": "u32"
+            },
+            {
+              "name": "idle_state_mask",
+              "offset": 4,
+              "type": "u32"
+            }
           ],
-          "semantics": "Begin a fresh mutable loading generation without changing pad direction."
+          "semantics": "Begin a fresh mutable loading generation without changing pad direction.",
+          "request_schema": "output_begin_request",
+          "response_schema": "output_status_response"
         },
         "OUTPUT_APPEND": {
           "payload_size": 8,
           "schema": "auxiliary_output.program.segment_schema",
-          "semantics": "Append exactly one canonical segment to the matching loading generation."
+          "semantics": "Append exactly one canonical segment to the matching loading generation.",
+          "request_schema": "output_append_request",
+          "response_schema": "output_append_response"
         },
         "OUTPUT_COMMIT": {
           "payload_size": 8,
           "fields": [
-            {"name": "segment_count", "offset": 0, "type": "u32"},
-            {"name": "program_checksum", "offset": 4, "type": "u32"}
+            {
+              "name": "segment_count",
+              "offset": 0,
+              "type": "u32"
+            },
+            {
+              "name": "program_checksum",
+              "offset": 4,
+              "type": "u32"
+            }
           ],
-          "semantics": "Atomically validate and make immutable one complete matching generation; failed commit preserves the prior committed program."
+          "semantics": "Atomically validate and make immutable one complete matching generation; failed commit preserves the prior committed program.",
+          "request_schema": "output_commit_request",
+          "response_schema": "output_status_response"
         },
-        "OUTPUT_ARM": {"payload_size": 0, "semantics": "Arm exactly the matching committed generation for the next common START, configure the entire bank as outputs, and physically emit the declared idle state."},
-        "OUTPUT_STATUS": {"payload_size": 0, "semantics": "Query only; host reads never advance playback."},
-        "OUTPUT_CLEAR": {"payload_size": 0, "semantics": "While IDLE, disarm, erase loading and committed program state, clear output fault evidence after capture in the response, and transactionally release all eight pads to inputs."}
+        "OUTPUT_ARM": {
+          "payload_size": 0,
+          "semantics": "Arm exactly the matching committed generation for the next common START, configure the entire bank as outputs, and physically emit the declared idle state.",
+          "request_schema": "empty",
+          "response_schema": "output_status_response"
+        },
+        "OUTPUT_STATUS": {
+          "payload_size": 0,
+          "semantics": "Query only; host reads never advance playback.",
+          "request_schema": "empty",
+          "response_schema": "output_status_response"
+        },
+        "OUTPUT_CLEAR": {
+          "payload_size": 0,
+          "semantics": "While IDLE, disarm, erase loading and committed program state, clear output fault evidence after capture in the response, and transactionally release all eight pads to inputs.",
+          "request_schema": "empty",
+          "response_schema": "output_status_response"
+        }
       },
       "retry_rule": "Generation, request correlation, accepted segment count, and exact response echoes distinguish retries from stale or mixed uploads.",
       "truncated_upload_rule": "An uncommitted partial generation never becomes armable and is erased by CLEAR or replacement BEGIN."
@@ -659,6 +732,114 @@
       "allowed_flags": ["RESPONSE_ERROR"]
     },
     {
+      "name": "OUTPUT_BEGIN_REQUEST",
+      "value": 32,
+      "class": "request",
+      "payload_schema": "output_begin_request",
+      "response_kind": "OUTPUT_BEGIN_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "OUTPUT_BEGIN_RESPONSE",
+      "value": 160,
+      "class": "response",
+      "payload_schema": "output_status_response",
+      "error_payload_schema": "output_status_response",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "OUTPUT_APPEND_REQUEST",
+      "value": 33,
+      "class": "request",
+      "payload_schema": "output_append_request",
+      "response_kind": "OUTPUT_APPEND_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "OUTPUT_APPEND_RESPONSE",
+      "value": 161,
+      "class": "response",
+      "payload_schema": "output_append_response",
+      "error_payload_schema": "output_status_response",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "OUTPUT_COMMIT_REQUEST",
+      "value": 34,
+      "class": "request",
+      "payload_schema": "output_commit_request",
+      "response_kind": "OUTPUT_COMMIT_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "OUTPUT_COMMIT_RESPONSE",
+      "value": 162,
+      "class": "response",
+      "payload_schema": "output_status_response",
+      "error_payload_schema": "output_status_response",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "OUTPUT_ARM_REQUEST",
+      "value": 35,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "OUTPUT_ARM_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "OUTPUT_ARM_RESPONSE",
+      "value": 163,
+      "class": "response",
+      "payload_schema": "output_status_response",
+      "error_payload_schema": "output_status_response",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "OUTPUT_STATUS_REQUEST",
+      "value": 36,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "OUTPUT_STATUS_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "OUTPUT_STATUS_RESPONSE",
+      "value": 164,
+      "class": "response",
+      "payload_schema": "output_status_response",
+      "error_payload_schema": "output_status_response",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "OUTPUT_CLEAR_REQUEST",
+      "value": 37,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "OUTPUT_CLEAR_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "OUTPUT_CLEAR_RESPONSE",
+      "value": 165,
+      "class": "response",
+      "payload_schema": "output_status_response",
+      "error_payload_schema": "output_status_response",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
       "name": "ERROR_RESPONSE",
       "value": 159,
       "class": "error_response",
@@ -676,7 +857,49 @@
     {"name": "PING", "value": 22, "request_kind": "PING_REQUEST", "response_kind": "PING_RESPONSE", "optional": true},
     {"name": "CHECKSUM_BENCHMARK", "value": 23, "request_kind": "CHECKSUM_BENCHMARK_REQUEST", "response_kind": "CHECKSUM_BENCHMARK_RESPONSE", "optional": true},
     {"name": "GPIO_CLOCK_DIAGNOSTIC", "value": 24, "request_kind": "GPIO_CLOCK_DIAGNOSTIC_REQUEST", "response_kind": "GPIO_CLOCK_DIAGNOSTIC_RESPONSE", "optional": true},
-    {"name": "GPIO_CAPTURE_DIAGNOSTIC", "value": 25, "request_kind": "GPIO_CAPTURE_DIAGNOSTIC_REQUEST", "response_kind": "GPIO_CAPTURE_DIAGNOSTIC_RESPONSE", "optional": true}
+    {"name": "GPIO_CAPTURE_DIAGNOSTIC", "value": 25, "request_kind": "GPIO_CAPTURE_DIAGNOSTIC_REQUEST", "response_kind": "GPIO_CAPTURE_DIAGNOSTIC_RESPONSE", "optional": true},
+    {
+      "name": "OUTPUT_BEGIN",
+      "value": 32,
+      "request_kind": "OUTPUT_BEGIN_REQUEST",
+      "response_kind": "OUTPUT_BEGIN_RESPONSE",
+      "optional": true
+    },
+    {
+      "name": "OUTPUT_APPEND",
+      "value": 33,
+      "request_kind": "OUTPUT_APPEND_REQUEST",
+      "response_kind": "OUTPUT_APPEND_RESPONSE",
+      "optional": true
+    },
+    {
+      "name": "OUTPUT_COMMIT",
+      "value": 34,
+      "request_kind": "OUTPUT_COMMIT_REQUEST",
+      "response_kind": "OUTPUT_COMMIT_RESPONSE",
+      "optional": true
+    },
+    {
+      "name": "OUTPUT_ARM",
+      "value": 35,
+      "request_kind": "OUTPUT_ARM_REQUEST",
+      "response_kind": "OUTPUT_ARM_RESPONSE",
+      "optional": true
+    },
+    {
+      "name": "OUTPUT_STATUS",
+      "value": 36,
+      "request_kind": "OUTPUT_STATUS_REQUEST",
+      "response_kind": "OUTPUT_STATUS_RESPONSE",
+      "optional": true
+    },
+    {
+      "name": "OUTPUT_CLEAR",
+      "value": 37,
+      "request_kind": "OUTPUT_CLEAR_REQUEST",
+      "response_kind": "OUTPUT_CLEAR_RESPONSE",
+      "optional": true
+    }
   ],
   "enums": {
     "response_status": [
@@ -940,7 +1163,7 @@
       ]
     },
     "info_response": {
-      "size": 376,
+      "size": 412,
       "fields": [
         {"name": "response_status", "offset": 0, "type": "u8"},
         {"name": "reserved_0", "offset": 1, "type": "u8", "required": 0},
@@ -1092,8 +1315,18 @@
         {"name": "command_queue_capacity", "offset": 366, "type": "u8"},
         {"name": "response_queue_capacity", "offset": 367, "type": "u8"},
         {"name": "nominal_payload_bytes_per_second_per_stream", "offset": 368, "type": "u32"},
-        {"name": "nominal_framed_bytes_per_second_per_stream", "offset": 372, "type": "u32"}
-      ]
+        {"name": "nominal_framed_bytes_per_second_per_stream", "offset": 372, "type": "u32"},
+      {"name": "output_bank_mode", "offset": 376, "type": "u8"},
+      {"name": "output_pin_count", "offset": 377, "type": "u8"},
+      {"name": "output_state_width_bits", "offset": 378, "type": "u8"},
+      {"name": "output_duration_quantum_us", "offset": 379, "type": "u8"},
+      {"name": "output_pin_map", "offset": 380, "type": "u8_array", "count": 8},
+      {"name": "output_gpio_bits_by_logical_bit", "offset": 388, "type": "u8_array", "count": 8},
+      {"name": "output_rate_hz", "offset": 396, "type": "u32"},
+      {"name": "output_period_ticks", "offset": 400, "type": "u32"},
+      {"name": "output_capacity_segments", "offset": 404, "type": "u32"},
+      {"name": "output_legal_state_mask", "offset": 408, "type": "u32"}
+    ]
     },
     "configure_response": {
       "size": 12,
@@ -1575,6 +1808,206 @@
         {"name": "rejected_version", "offset": 5, "type": "u8"},
         {"name": "reserved_1", "offset": 6, "type": "u16", "required": 0}
       ]
+    },
+    "output_begin_request": {
+      "size": 8,
+      "fields": [
+        {
+          "name": "repeat_count",
+          "offset": 0,
+          "type": "u32"
+        },
+        {
+          "name": "idle_state_mask",
+          "offset": 4,
+          "type": "u32"
+        }
+      ]
+    },
+    "output_append_request": {
+      "size": 8,
+      "fields": [
+        {
+          "name": "duration_samples",
+          "offset": 0,
+          "type": "u32"
+        },
+        {
+          "name": "logical_state_mask",
+          "offset": 4,
+          "type": "u32"
+        }
+      ]
+    },
+    "output_commit_request": {
+      "size": 8,
+      "fields": [
+        {
+          "name": "segment_count",
+          "offset": 0,
+          "type": "u32"
+        },
+        {
+          "name": "program_checksum",
+          "offset": 4,
+          "type": "u32"
+        }
+      ]
+    },
+    "output_append_response": {
+      "size": 16,
+      "fields": [
+        {
+          "name": "response_status",
+          "offset": 0,
+          "type": "u8"
+        },
+        {
+          "name": "reserved",
+          "offset": 1,
+          "type": "u8",
+          "required": 0
+        },
+        {
+          "name": "error_code",
+          "offset": 2,
+          "type": "u16"
+        },
+        {
+          "name": "accepted_segment_count",
+          "offset": 4,
+          "type": "u32"
+        },
+        {
+          "name": "duration_samples",
+          "offset": 8,
+          "type": "u32"
+        },
+        {
+          "name": "logical_state_mask",
+          "offset": 12,
+          "type": "u32"
+        }
+      ]
+    },
+    "output_status_response": {
+      "size": 64,
+      "fields": [
+        {
+          "name": "response_status",
+          "offset": 0,
+          "type": "u8"
+        },
+        {
+          "name": "reserved_0",
+          "offset": 1,
+          "type": "u8",
+          "required": 0
+        },
+        {
+          "name": "error_code",
+          "offset": 2,
+          "type": "u16"
+        },
+        {
+          "name": "output_state",
+          "offset": 4,
+          "type": "u8"
+        },
+        {
+          "name": "output_bank_mode",
+          "offset": 5,
+          "type": "u8"
+        },
+        {
+          "name": "fault_latched",
+          "offset": 6,
+          "type": "u8"
+        },
+        {
+          "name": "reserved_1",
+          "offset": 7,
+          "type": "u8",
+          "required": 0
+        },
+        {
+          "name": "generation",
+          "offset": 8,
+          "type": "u32"
+        },
+        {
+          "name": "idle_state_mask",
+          "offset": 12,
+          "type": "u32"
+        },
+        {
+          "name": "current_state_mask",
+          "offset": 16,
+          "type": "u32"
+        },
+        {
+          "name": "last_emitted_state_mask",
+          "offset": 20,
+          "type": "u32"
+        },
+        {
+          "name": "repeat_count",
+          "offset": 24,
+          "type": "u32"
+        },
+        {
+          "name": "completed_repeats",
+          "offset": 28,
+          "type": "u32"
+        },
+        {
+          "name": "segment_count",
+          "offset": 32,
+          "type": "u32"
+        },
+        {
+          "name": "accepted_segment_count",
+          "offset": 36,
+          "type": "u32"
+        },
+        {
+          "name": "program_checksum",
+          "offset": 40,
+          "type": "u32"
+        },
+        {
+          "name": "current_segment_index",
+          "offset": 44,
+          "type": "u32"
+        },
+        {
+          "name": "ticks_elapsed",
+          "offset": 48,
+          "type": "u64"
+        },
+        {
+          "name": "transitions_emitted",
+          "offset": 56,
+          "type": "u32"
+        },
+        {
+          "name": "output_error",
+          "offset": 60,
+          "type": "u8"
+        },
+        {
+          "name": "reserved_2",
+          "offset": 61,
+          "type": "u8",
+          "required": 0
+        },
+        {
+          "name": "reserved_3",
+          "offset": 62,
+          "type": "u16",
+          "required": 0
+        }
+      ]
     }
   },
   "golden_fixtures": [
@@ -1836,7 +2269,17 @@
           "command_queue_capacity": 4,
           "response_queue_capacity": 4,
           "nominal_payload_bytes_per_second_per_stream": 4000000,
-          "nominal_framed_bytes_per_second_per_stream": 4047431
+          "nominal_framed_bytes_per_second_per_stream": 4047431,
+          "output_bank_mode": 0,
+          "output_pin_count": 8,
+          "output_state_width_bits": 8,
+          "output_duration_quantum_us": 1,
+          "output_pin_map": [16, 17, 18, 19, 20, 21, 22, 23],
+          "output_gpio_bits_by_logical_bit": [23, 22, 17, 16, 26, 27, 24, 25],
+          "output_rate_hz": 1000000,
+          "output_period_ticks": 8,
+          "output_capacity_segments": 1024,
+          "output_legal_state_mask": 255
         }
       }
     },
@@ -2339,6 +2782,707 @@
           "error_code": 2,
           "rejected_kind": 254,
           "rejected_version": 1
+        }
+      }
+    },
+    {
+      "name": "output-begin-request",
+      "kind": "OUTPUT_BEGIN_REQUEST",
+      "request_id": 100,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_begin_request",
+        "values": {
+          "repeat_count": 3,
+          "idle_state_mask": 18
+        }
+      }
+    },
+    {
+      "name": "output-begin-response",
+      "kind": "OUTPUT_BEGIN_RESPONSE",
+      "request_id": 100,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 1,
+          "output_bank_mode": 0,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 0,
+          "last_emitted_state_mask": 0,
+          "repeat_count": 3,
+          "completed_repeats": 0,
+          "segment_count": 0,
+          "accepted_segment_count": 1,
+          "program_checksum": 0,
+          "current_segment_index": 0,
+          "ticks_elapsed": 0,
+          "transitions_emitted": 0,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "LOADING"
+      }
+    },
+    {
+      "name": "output-append-request",
+      "kind": "OUTPUT_APPEND_REQUEST",
+      "request_id": 101,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_append_request",
+        "values": {
+          "duration_samples": 10,
+          "logical_state_mask": 1
+        }
+      }
+    },
+    {
+      "name": "output-append-response",
+      "kind": "OUTPUT_APPEND_RESPONSE",
+      "request_id": 101,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_append_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "accepted_segment_count": 1,
+          "duration_samples": 10,
+          "logical_state_mask": 1
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "LOADING"
+      }
+    },
+    {
+      "name": "output-commit-request",
+      "kind": "OUTPUT_COMMIT_REQUEST",
+      "request_id": 102,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_commit_request",
+        "values": {
+          "segment_count": 2,
+          "program_checksum": 305419896
+        }
+      }
+    },
+    {
+      "name": "output-commit-response",
+      "kind": "OUTPUT_COMMIT_RESPONSE",
+      "request_id": 102,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 2,
+          "output_bank_mode": 0,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 0,
+          "last_emitted_state_mask": 0,
+          "repeat_count": 3,
+          "completed_repeats": 0,
+          "segment_count": 2,
+          "accepted_segment_count": 2,
+          "program_checksum": 305419896,
+          "current_segment_index": 0,
+          "ticks_elapsed": 0,
+          "transitions_emitted": 0,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "COMMITTED"
+      }
+    },
+    {
+      "name": "output-arm-request",
+      "kind": "OUTPUT_ARM_REQUEST",
+      "request_id": 103,
+      "run_id": 101,
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      }
+    },
+    {
+      "name": "output-arm-response",
+      "kind": "OUTPUT_ARM_RESPONSE",
+      "request_id": 103,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 3,
+          "output_bank_mode": 1,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 165,
+          "last_emitted_state_mask": 165,
+          "repeat_count": 3,
+          "completed_repeats": 0,
+          "segment_count": 2,
+          "accepted_segment_count": 2,
+          "program_checksum": 305419896,
+          "current_segment_index": 0,
+          "ticks_elapsed": 0,
+          "transitions_emitted": 0,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "ARMED"
+      }
+    },
+    {
+      "name": "output-status-request",
+      "kind": "OUTPUT_STATUS_REQUEST",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      }
+    },
+    {
+      "name": "output-status-response",
+      "kind": "OUTPUT_STATUS_RESPONSE",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 4,
+          "output_bank_mode": 1,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 165,
+          "last_emitted_state_mask": 165,
+          "repeat_count": 3,
+          "completed_repeats": 1,
+          "segment_count": 2,
+          "accepted_segment_count": 2,
+          "program_checksum": 305419896,
+          "current_segment_index": 1,
+          "ticks_elapsed": 120,
+          "transitions_emitted": 4,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "RUNNING"
+      }
+    },
+    {
+      "name": "output-clear-request",
+      "kind": "OUTPUT_CLEAR_REQUEST",
+      "request_id": 105,
+      "run_id": 101,
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      }
+    },
+    {
+      "name": "output-clear-response",
+      "kind": "OUTPUT_CLEAR_RESPONSE",
+      "request_id": 105,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 0,
+          "output_bank_mode": 0,
+          "fault_latched": 0,
+          "generation": 0,
+          "idle_state_mask": 0,
+          "current_state_mask": 0,
+          "last_emitted_state_mask": 0,
+          "repeat_count": 0,
+          "completed_repeats": 0,
+          "segment_count": 0,
+          "accepted_segment_count": 0,
+          "program_checksum": 0,
+          "current_segment_index": 0,
+          "ticks_elapsed": 0,
+          "transitions_emitted": 0,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "EMPTY"
+      }
+    },
+    {
+      "name": "output-status-empty-response",
+      "kind": "OUTPUT_STATUS_RESPONSE",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 0,
+          "output_bank_mode": 0,
+          "fault_latched": 0,
+          "generation": 0,
+          "idle_state_mask": 0,
+          "current_state_mask": 0,
+          "last_emitted_state_mask": 0,
+          "repeat_count": 0,
+          "completed_repeats": 0,
+          "segment_count": 0,
+          "accepted_segment_count": 0,
+          "program_checksum": 0,
+          "current_segment_index": 0,
+          "ticks_elapsed": 0,
+          "transitions_emitted": 0,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "EMPTY"
+      }
+    },
+    {
+      "name": "output-status-loading-response",
+      "kind": "OUTPUT_STATUS_RESPONSE",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 1,
+          "output_bank_mode": 0,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 0,
+          "last_emitted_state_mask": 0,
+          "repeat_count": 3,
+          "completed_repeats": 0,
+          "segment_count": 0,
+          "accepted_segment_count": 1,
+          "program_checksum": 0,
+          "current_segment_index": 0,
+          "ticks_elapsed": 0,
+          "transitions_emitted": 0,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "LOADING"
+      }
+    },
+    {
+      "name": "output-status-committed-response",
+      "kind": "OUTPUT_STATUS_RESPONSE",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 2,
+          "output_bank_mode": 0,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 0,
+          "last_emitted_state_mask": 0,
+          "repeat_count": 3,
+          "completed_repeats": 0,
+          "segment_count": 2,
+          "accepted_segment_count": 2,
+          "program_checksum": 305419896,
+          "current_segment_index": 0,
+          "ticks_elapsed": 0,
+          "transitions_emitted": 0,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "COMMITTED"
+      }
+    },
+    {
+      "name": "output-status-armed-response",
+      "kind": "OUTPUT_STATUS_RESPONSE",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 3,
+          "output_bank_mode": 1,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 165,
+          "last_emitted_state_mask": 165,
+          "repeat_count": 3,
+          "completed_repeats": 0,
+          "segment_count": 2,
+          "accepted_segment_count": 2,
+          "program_checksum": 305419896,
+          "current_segment_index": 0,
+          "ticks_elapsed": 0,
+          "transitions_emitted": 0,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "ARMED"
+      }
+    },
+    {
+      "name": "output-status-running-response",
+      "kind": "OUTPUT_STATUS_RESPONSE",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 4,
+          "output_bank_mode": 1,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 165,
+          "last_emitted_state_mask": 165,
+          "repeat_count": 3,
+          "completed_repeats": 1,
+          "segment_count": 2,
+          "accepted_segment_count": 2,
+          "program_checksum": 305419896,
+          "current_segment_index": 1,
+          "ticks_elapsed": 120,
+          "transitions_emitted": 4,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "RUNNING"
+      }
+    },
+    {
+      "name": "output-status-held-response",
+      "kind": "OUTPUT_STATUS_RESPONSE",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 5,
+          "output_bank_mode": 1,
+          "fault_latched": 0,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 165,
+          "last_emitted_state_mask": 165,
+          "repeat_count": 3,
+          "completed_repeats": 1,
+          "segment_count": 2,
+          "accepted_segment_count": 2,
+          "program_checksum": 305419896,
+          "current_segment_index": 1,
+          "ticks_elapsed": 120,
+          "transitions_emitted": 4,
+          "output_error": 0
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "HELD"
+      }
+    },
+    {
+      "name": "output-status-faulted-response",
+      "kind": "OUTPUT_STATUS_RESPONSE",
+      "request_id": 104,
+      "run_id": 101,
+      "payload": {
+        "schema": "output_status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "output_state": 6,
+          "output_bank_mode": 1,
+          "fault_latched": 1,
+          "generation": 101,
+          "idle_state_mask": 18,
+          "current_state_mask": 165,
+          "last_emitted_state_mask": 165,
+          "repeat_count": 3,
+          "completed_repeats": 1,
+          "segment_count": 2,
+          "accepted_segment_count": 2,
+          "program_checksum": 305419896,
+          "current_segment_index": 1,
+          "ticks_elapsed": 120,
+          "transitions_emitted": 4,
+          "output_error": 7
+        }
+      },
+      "expected": {
+        "outcome": "success",
+        "output_state": "FAULTED"
+      }
+    },
+    {
+      "name": "output-malformed-zero-duration",
+      "kind": "OUTPUT_APPEND_REQUEST",
+      "request_id": 201,
+      "run_id": 201,
+      "payload": {
+        "schema": "output_append_request",
+        "values": {
+          "duration_samples": 0,
+          "logical_state_mask": 1
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "zero_duration",
+        "output_error": "INVALID_SEGMENT",
+        "precondition": {
+          "output_state": "LOADING"
+        }
+      }
+    },
+    {
+      "name": "output-malformed-high-state-bits",
+      "kind": "OUTPUT_APPEND_REQUEST",
+      "request_id": 202,
+      "run_id": 202,
+      "payload": {
+        "schema": "output_append_request",
+        "values": {
+          "duration_samples": 1,
+          "logical_state_mask": 256
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "high_state_bits",
+        "output_error": "INVALID_SEGMENT",
+        "precondition": {
+          "output_state": "LOADING"
+        }
+      }
+    },
+    {
+      "name": "output-malformed-adjacent-duplicate",
+      "kind": "OUTPUT_APPEND_REQUEST",
+      "request_id": 203,
+      "run_id": 203,
+      "payload": {
+        "schema": "output_append_request",
+        "values": {
+          "duration_samples": 2,
+          "logical_state_mask": 85
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "adjacent_duplicate",
+        "output_error": "INVALID_SEGMENT",
+        "precondition": {
+          "output_state": "LOADING",
+          "previous_state_mask": 85
+        }
+      }
+    },
+    {
+      "name": "output-malformed-duration-overflow",
+      "kind": "OUTPUT_APPEND_REQUEST",
+      "request_id": 204,
+      "run_id": 204,
+      "payload": {
+        "schema": "output_append_request",
+        "values": {
+          "duration_samples": 1,
+          "logical_state_mask": 170
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "duration_overflow",
+        "output_error": "INVALID_SEGMENT",
+        "precondition": {
+          "output_state": "LOADING",
+          "previous_state_mask": 170,
+          "previous_duration_samples": 4294967295
+        }
+      }
+    },
+    {
+      "name": "output-malformed-capacity-exceeded",
+      "kind": "OUTPUT_APPEND_REQUEST",
+      "request_id": 205,
+      "run_id": 205,
+      "payload": {
+        "schema": "output_append_request",
+        "values": {
+          "duration_samples": 1,
+          "logical_state_mask": 1
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "capacity_exceeded",
+        "output_error": "CAPACITY_EXCEEDED",
+        "precondition": {
+          "output_state": "LOADING",
+          "accepted_segment_count": 1024
+        }
+      }
+    },
+    {
+      "name": "output-malformed-checksum-mismatch",
+      "kind": "OUTPUT_COMMIT_REQUEST",
+      "request_id": 206,
+      "run_id": 206,
+      "payload": {
+        "schema": "output_commit_request",
+        "values": {
+          "segment_count": 2,
+          "program_checksum": 3735928559
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "checksum_mismatch",
+        "output_error": "CHECKSUM_MISMATCH",
+        "precondition": {
+          "output_state": "LOADING",
+          "canonical_checksum": 305419896,
+          "accepted_segment_count": 2
+        }
+      }
+    },
+    {
+      "name": "output-malformed-generation-mismatch",
+      "kind": "OUTPUT_APPEND_REQUEST",
+      "request_id": 207,
+      "run_id": 207,
+      "payload": {
+        "schema": "output_append_request",
+        "values": {
+          "duration_samples": 1,
+          "logical_state_mask": 2
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "generation_mismatch",
+        "output_error": "GENERATION_MISMATCH",
+        "precondition": {
+          "output_state": "LOADING",
+          "active_generation": 208
+        }
+      }
+    },
+    {
+      "name": "output-malformed-illegal-lifecycle",
+      "kind": "OUTPUT_CLEAR_REQUEST",
+      "request_id": 208,
+      "run_id": 208,
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "illegal_lifecycle",
+        "output_error": "INVALID_LIFECYCLE",
+        "precondition": {
+          "output_state": "RUNNING"
+        }
+      }
+    },
+    {
+      "name": "output-malformed-truncated-upload",
+      "kind": "OUTPUT_COMMIT_REQUEST",
+      "request_id": 209,
+      "run_id": 209,
+      "payload": {
+        "schema": "output_commit_request",
+        "values": {
+          "segment_count": 3,
+          "program_checksum": 305419896
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "truncated_upload",
+        "output_error": "TRUNCATED_UPLOAD",
+        "precondition": {
+          "output_state": "LOADING",
+          "accepted_segment_count": 2
+        }
+      }
+    },
+    {
+      "name": "output-malformed-stale-replay",
+      "kind": "OUTPUT_APPEND_REQUEST",
+      "request_id": 210,
+      "run_id": 210,
+      "payload": {
+        "schema": "output_append_request",
+        "values": {
+          "duration_samples": 1,
+          "logical_state_mask": 4
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "case": "stale_replay",
+        "output_error": "GENERATION_MISMATCH",
+        "precondition": {
+          "output_state": "COMMITTED",
+          "committed_generation": 211
         }
       }
     }

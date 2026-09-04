@@ -106,12 +106,31 @@ class AuxOutputV2ContractTests(unittest.TestCase):
             "checksum_algorithms",
             "bootstrap_checksum_algorithm",
             "default_checksum_algorithm",
-            "frame_kinds",
-            "command_kinds",
-            "payload_schemas",
         ):
             with self.subTest(key=key):
                 self.assertEqual(self.v1[key], self.v2[key])
+
+        v1_error = self.v1["frame_kinds"][-1]
+        self.assertEqual(
+            self.v1["frame_kinds"][:-1],
+            self.v2["frame_kinds"][: len(self.v1["frame_kinds"]) - 1],
+        )
+        self.assertEqual(v1_error, self.v2["frame_kinds"][-1])
+        self.assertEqual(
+            self.v1["command_kinds"],
+            self.v2["command_kinds"][: len(self.v1["command_kinds"])],
+        )
+        for schema_name, v1_schema in self.v1["payload_schemas"].items():
+            with self.subTest(schema=schema_name):
+                if schema_name == "info_response":
+                    self.assertEqual(
+                        v1_schema["fields"],
+                        self.v2["payload_schemas"][schema_name]["fields"][
+                            : len(v1_schema["fields"])
+                        ],
+                    )
+                else:
+                    self.assertEqual(v1_schema, self.v2["payload_schemas"][schema_name])
 
         self.assertEqual(
             _by_name(self.v1["enums"]["capability_bits"]),

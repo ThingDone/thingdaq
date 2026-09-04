@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate protocol-v1 constants and deterministic golden frames."""
+"""Generate stable v1 and isolated experimental-v2 protocol artifacts."""
 
 from __future__ import annotations
 
@@ -15,12 +15,20 @@ from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
+V2_SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v2.json"
 PYTHON_OUTPUT_PATH = (
     REPOSITORY_ROOT / "daq_api/src/thingdaq/_generated/protocol_constants.py"
 )
 CPP_OUTPUT_PATH = REPOSITORY_ROOT / "firmware/src/generated/protocol_constants.h"
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"
 MANIFEST_PATH = FIXTURE_DIRECTORY / "manifest.json"
+V2_PYTHON_OUTPUT_PATH = (
+    REPOSITORY_ROOT / "daq_api/src/thingdaq/_generated/protocol_v2_constants.py"
+)
+V2_CPP_OUTPUT_PATH = REPOSITORY_ROOT / "firmware/src/generated/protocol_v2_constants.h"
+V2_FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures-v2"
+V2_MANIFEST_PATH = V2_FIXTURE_DIRECTORY / "manifest.json"
+FIXTURE_DIRECTORIES = (FIXTURE_DIRECTORY, V2_FIXTURE_DIRECTORY)
 
 INTEGER_FORMATS = {
     "u8": "B",
@@ -40,10 +48,10 @@ class ContractError(ValueError):
     """Raised when the canonical source is internally inconsistent."""
 
 
-def load_contract() -> tuple[dict[str, Any], bytes]:
+def load_contract(path: Path = SOURCE_PATH) -> tuple[dict[str, Any], bytes]:
     """Read the canonical JSON source and return it with its exact bytes."""
 
-    source_bytes = SOURCE_PATH.read_bytes()
+    source_bytes = path.read_bytes()
     contract = json.loads(source_bytes)
     if not isinstance(contract, dict):
         raise ContractError("protocol source root must be a JSON object")
@@ -118,15 +126,20 @@ def validate_fields(owner: str, size: int, fields: Sequence[Mapping[str, Any]]) 
         raise ContractError(f"{owner} has uncovered bytes: {gaps}")
 
 
-def validate_contract(contract: Mapping[str, Any]) -> None:
+def validate_contract(
+    contract: Mapping[str, Any], *, expected_version: int = 1
+) -> None:
     """Validate cross-field invariants before generating any output."""
 
     if contract["byte_order"] != "little":
         raise ContractError("protocol v1 must use explicit little-endian encoding")
     if int(contract["magic"]) != 0xDEADBEEF:
         raise ContractError("protocol v1 magic must be 0xDEADBEEF")
-    if int(contract["protocol_version"]) != 1:
-        raise ContractError("this generator only accepts protocol version 1")
+    if int(contract["protocol_version"]) != expected_version:
+        raise ContractError(
+            f"expected protocol version {expected_version}, got "
+            f"{contract['protocol_version']}"
+        )
 
     scalar_types = contract["scalar_types"]
     if set(scalar_types) != set(INTEGER_WIDTHS):
@@ -557,13 +570,17 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
             f"golden fixtures must cover every frame kind; missing={missing}, "
             f"extra={extra}"
         )
-    fixtures_by_kind = {str(fixture["kind"]): fixture for fixture in fixtures}
+    fixtures_by_kind: dict[str, list[Mapping[str, Any]]] = {}
+    for fixture in fixtures:
+        fixtures_by_kind.setdefault(str(fixture["kind"]), []).append(fixture)
     for command in contract["command_kinds"]:
-        request = fixtures_by_kind[str(command["request_kind"])]
-        response = fixtures_by_kind[str(command["response_kind"])]
-        if int(request["request_id"]) != int(response["request_id"]):
+        requests = fixtures_by_kind[str(command["request_kind"])]
+        responses = fixtures_by_kind[str(command["response_kind"])]
+        request_ids = {int(fixture["request_id"]) for fixture in requests}
+        response_ids = {int(fixture["request_id"]) for fixture in responses}
+        if request_ids.isdisjoint(response_ids):
             raise ContractError(
-                f"{command['name']} golden response must echo its request ID"
+                f"{command['name']} needs a golden response that echoes a request ID"
             )
 
 
@@ -571,6 +588,169 @@ def snake_to_pascal(name: str) -> str:
     """Convert a source identifier to a stable C++ PascalCase identifier."""
 
     return "".join(part.capitalize() for part in name.lower().split("_"))
+
+
+def validate_v2_contract(
+    contract: Mapping[str, Any],
+    v1_contract: Mapping[str, Any],
+    v1_source_bytes: bytes,
+) -> None:
+    """Validate the isolated output extension and its frozen-v1 boundary."""
+
+    validate_contract(contract, expected_version=2)
+    if contract.get("status") != "experimental" or contract.get("extension") != (
+        "aux-output-bank"
+    ):
+        raise ContractError("protocol v2 must remain the experimental aux-output-bank")
+    extends = contract["extends"]
+    if (
+        extends["source"] != "protocol/protocol-v1.json"
+        or extends["source_sha256"] != hashlib.sha256(v1_source_bytes).hexdigest()
+    ):
+        raise ContractError("protocol v2 does not pin the exact protocol-v1 source")
+    expected_paths = {
+        "python_constants": str(V2_PYTHON_OUTPUT_PATH.relative_to(REPOSITORY_ROOT)),
+        "cpp_constants": str(V2_CPP_OUTPUT_PATH.relative_to(REPOSITORY_ROOT)),
+        "fixture_directory": str(V2_FIXTURE_DIRECTORY.relative_to(REPOSITORY_ROOT)),
+        "fixture_manifest": str(V2_MANIFEST_PATH.relative_to(REPOSITORY_ROOT)),
+    }
+    if contract["generated_outputs"] != expected_paths:
+        raise ContractError(
+            "protocol-v2 generated paths must remain isolated and fixed"
+        )
+
+    unchanged_keys = set(v1_contract) - {
+        "compatibility",
+        "enums",
+        "frame_kinds",
+        "command_kinds",
+        "payload_schemas",
+        "golden_fixtures",
+        "protocol_version",
+    }
+    for key in unchanged_keys:
+        if contract.get(key) != v1_contract[key]:
+            raise ContractError(f"protocol v2 changed frozen v1 field {key}")
+    v2_enums = contract["enums"]
+    for enum_name, entries in v1_contract["enums"].items():
+        if enum_name == "capability_bits":
+            if v2_enums[enum_name][: len(entries)] != entries:
+                raise ContractError("protocol v2 changed a v1 capability entry")
+        elif v2_enums[enum_name] != entries:
+            raise ContractError(f"protocol v2 changed v1 enum {enum_name}")
+    for enum_name in ("output_bank_mode", "output_state", "output_error"):
+        enum_map(v2_enums[enum_name])
+        validate_enum_width(enum_name, v2_enums[enum_name], 8)
+
+    if (
+        contract["frame_kinds"][: len(v1_contract["frame_kinds"]) - 1]
+        != (v1_contract["frame_kinds"][:-1])
+    ):
+        raise ContractError("protocol v2 changed a v1 frame kind")
+    if contract["frame_kinds"][-1] != v1_contract["frame_kinds"][-1]:
+        raise ContractError("protocol v2 changed the v1 ERROR_RESPONSE kind")
+    if (
+        contract["command_kinds"][: len(v1_contract["command_kinds"])]
+        != (v1_contract["command_kinds"])
+    ):
+        raise ContractError("protocol v2 changed a v1 command kind")
+    for name, schema in v1_contract["payload_schemas"].items():
+        candidate = contract["payload_schemas"][name]
+        if name == "info_response":
+            if candidate["fields"][: len(schema["fields"])] != schema["fields"]:
+                raise ContractError("protocol v2 changed the v1 INFO response prefix")
+        elif candidate != schema:
+            raise ContractError(f"protocol v2 changed v1 payload schema {name}")
+
+    output = contract["auxiliary_output"]
+    pins = output["pin_bank"]
+    logical_pins = [int(value) for value in pins["teensy_pins_by_logical_bit"]]
+    gpio_bits = [int(value) for value in pins["standard_gpio_bits_by_logical_bit"]]
+    if logical_pins != list(range(16, 24)) or len(gpio_bits) != 8:
+        raise ContractError("output pin metadata must describe D16-D23 exactly")
+    if int(pins["aggregate_mask"]) != sum(1 << bit for bit in gpio_bits):
+        raise ContractError("output GPIO aggregate mask disagrees with its bit map")
+    timing = output["timing"]
+    if (
+        int(timing["timestamp_hz"]) % int(timing["output_rate_hz"])
+        or int(timing["timestamp_hz"]) // int(timing["output_rate_hz"])
+        != int(timing["output_period_ticks"])
+        or int(timing["first_event_tick"]) != 0
+    ):
+        raise ContractError("output timing metadata does not define exact 1 MHz ticks")
+    program = output["program"]
+    validate_fields(
+        "auxiliary_output.program.segment_schema",
+        int(program["segment_schema"]["size"]),
+        program["segment_schema"]["fields"],
+    )
+    if (
+        int(program["segment_schema"]["size"]) != 8
+        or int(program["duration_min"]) != 1
+        or int(program["legal_state_mask"]) != 0xFF
+        or int(program["capacity_segments"]) != 1024
+        or program["checksum"]["algorithm"] != "ADLER32"
+    ):
+        raise ContractError("output program bounds/checksum changed")
+
+    operation_sizes = {
+        name: int(spec["payload_size"])
+        for name, spec in output["upload"]["operations"].items()
+    }
+    expected_operation_sizes = {
+        "OUTPUT_BEGIN": 8,
+        "OUTPUT_APPEND": 8,
+        "OUTPUT_COMMIT": 8,
+        "OUTPUT_ARM": 0,
+        "OUTPUT_STATUS": 0,
+        "OUTPUT_CLEAR": 0,
+    }
+    if operation_sizes != expected_operation_sizes:
+        raise ContractError("output operation payload bounds changed")
+    commands = {entry["name"]: entry for entry in contract["command_kinds"]}
+    for name, size in expected_operation_sizes.items():
+        command = commands.get(name)
+        if command is None:
+            raise ContractError(f"missing output command {name}")
+        request_kind = next(
+            entry
+            for entry in contract["frame_kinds"]
+            if entry["name"] == command["request_kind"]
+        )
+        schema = contract["payload_schemas"][request_kind["payload_schema"]]
+        if int(schema["size"]) != size or size > int(
+            contract["limits"]["max_command_payload_bytes"]
+        ):
+            raise ContractError(f"{name} request schema violates its payload bound")
+
+    expected_errors = {
+        "zero_duration",
+        "high_state_bits",
+        "adjacent_duplicate",
+        "duration_overflow",
+        "capacity_exceeded",
+        "checksum_mismatch",
+        "generation_mismatch",
+        "illegal_lifecycle",
+        "truncated_upload",
+        "stale_replay",
+    }
+    fixture_cases = {
+        str(fixture["expected"]["case"])
+        for fixture in contract["golden_fixtures"]
+        if fixture.get("expected", {}).get("outcome") == "error"
+    }
+    if fixture_cases != expected_errors:
+        raise ContractError("output malformed fixtures are incomplete")
+    state_names = {entry["name"] for entry in v2_enums["output_state"]}
+    fixture_states = {
+        str(fixture["expected"]["output_state"])
+        for fixture in contract["golden_fixtures"]
+        if fixture.get("expected", {}).get("outcome") == "success"
+        and "output_state" in fixture["expected"]
+    }
+    if not state_names.issubset(fixture_states):
+        raise ContractError("golden fixtures do not cover every output state")
 
 
 def python_enum(
@@ -1674,6 +1854,137 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     return "\n".join(lines).encode()
 
 
+def _output_constant_lines_python(contract: Mapping[str, Any]) -> list[str]:
+    """Render the experimental output metadata shared by discovery and clients."""
+
+    output = contract["auxiliary_output"]
+    pins = output["pin_bank"]
+    timing = output["timing"]
+    program = output["program"]
+    resources = output["provisional_resources"]
+    return [
+        f"OUTPUT_RATE_HZ = {int(timing['output_rate_hz'])}",
+        f"OUTPUT_DURATION_QUANTUM_US = {int(timing['duration_quantum_us'])}",
+        f"OUTPUT_PERIOD_TICKS = {int(timing['output_period_ticks'])}",
+        f"OUTPUT_FIRST_EVENT_TICK = {int(timing['first_event_tick'])}",
+        f"OUTPUT_STATE_WIDTH_BITS = {int(program['state_width_bits'])}",
+        f"OUTPUT_LEGAL_STATE_MASK = {int(program['legal_state_mask'])}",
+        f"OUTPUT_SEGMENT_BYTES = {int(program['segment_schema']['size'])}",
+        f"OUTPUT_SEGMENT_CAPACITY = {int(program['capacity_segments'])}",
+        f"OUTPUT_MINIMUM_COMMITTED_SEGMENTS = {int(program['minimum_committed_segments'])}",
+        f"OUTPUT_REPEAT_FOREVER = {int(program['repeat_forever_value'])}",
+        f"OUTPUT_PINS_BY_LOGICAL_BIT = {tuple(pins['teensy_pins_by_logical_bit'])!r}",
+        f"OUTPUT_GPIO_BITS_BY_LOGICAL_BIT = {tuple(pins['standard_gpio_bits_by_logical_bit'])!r}",
+        f"OUTPUT_GPIO_AGGREGATE_MASK = {int(pins['aggregate_mask'])}",
+        f"OUTPUT_STANDARD_GPIO = {int(pins['standard_gpio'])}",
+        f"OUTPUT_FAST_GPIO = {int(pins['fast_gpio'])}",
+        f"OUTPUT_FAST_SELECT_GPR = {int(pins['fast_select_gpr'])}",
+        f"OUTPUT_LOGIC_VOLTAGE_MAX_MV = {int(pins['logic_voltage_max_mv'])}",
+        f"OUTPUT_PIT_CHANNEL = {int(resources['clock_pit_channel'])}",
+        f"OUTPUT_XBAR_INPUT = {int(resources['xbar_input'])}",
+        f"OUTPUT_XBAR_OUTPUT = {int(resources['xbar_output'])}",
+        f"OUTPUT_DMAMUX_SOURCE = {int(resources['dmamux_source'])}",
+        f"OUTPUT_EDMA_CHANNEL = {int(resources['edma_channel'])}",
+    ]
+
+
+def render_v2_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
+    """Render a disjoint Python surface for the experimental v2 extension."""
+
+    rendered = render_python(contract, source_sha256).decode()
+    rendered = rendered.replace(
+        "Generated protocol-v1 constants",
+        "Generated experimental protocol-v2 constants",
+    ).replace("protocol/protocol-v1.json", "protocol/protocol-v2.json")
+    constant_marker = "UINT32_MAX = 0xFFFFFFFF"
+    rendered = rendered.replace(
+        constant_marker,
+        "\n".join(_output_constant_lines_python(contract)) + "\n" + constant_marker,
+        1,
+    )
+    enum_marker = "BOOTSTRAP_CHECKSUM_ALGORITHM ="
+    output_enums: list[str] = []
+    output_enums.extend(
+        python_enum("OutputBankMode", contract["enums"]["output_bank_mode"])
+    )
+    output_enums.extend(python_enum("OutputState", contract["enums"]["output_state"]))
+    output_enums.extend(python_enum("OutputError", contract["enums"]["output_error"]))
+    rendered = rendered.replace(
+        enum_marker, "\n".join(output_enums) + "\n" + enum_marker, 1
+    )
+    return rendered.encode()
+
+
+def _output_constant_lines_cpp(contract: Mapping[str, Any]) -> list[str]:
+    """Render experimental output metadata as portable C++ constants."""
+
+    output = contract["auxiliary_output"]
+    pins = output["pin_bank"]
+    timing = output["timing"]
+    program = output["program"]
+    resources = output["provisional_resources"]
+
+    def array(name: str, values: Sequence[Any]) -> str:
+        encoded = ", ".join(f"{int(value)}U" for value in values)
+        return f"inline constexpr std::uint8_t {name}[] = {{{encoded}}};"
+
+    return [
+        f"inline constexpr std::uint32_t kOutputRateHz = {int(timing['output_rate_hz'])}U;",
+        f"inline constexpr std::uint8_t kOutputDurationQuantumUs = {int(timing['duration_quantum_us'])}U;",
+        f"inline constexpr std::uint32_t kOutputPeriodTicks = {int(timing['output_period_ticks'])}U;",
+        f"inline constexpr std::uint32_t kOutputFirstEventTick = {int(timing['first_event_tick'])}U;",
+        f"inline constexpr std::uint8_t kOutputStateWidthBits = {int(program['state_width_bits'])}U;",
+        f"inline constexpr std::uint32_t kOutputLegalStateMask = {int(program['legal_state_mask'])}U;",
+        f"inline constexpr std::size_t kOutputSegmentBytes = {int(program['segment_schema']['size'])}U;",
+        f"inline constexpr std::size_t kOutputSegmentCapacity = {int(program['capacity_segments'])}U;",
+        f"inline constexpr std::size_t kOutputMinimumCommittedSegments = {int(program['minimum_committed_segments'])}U;",
+        f"inline constexpr std::uint32_t kOutputRepeatForever = {int(program['repeat_forever_value'])}U;",
+        array("kOutputPinsByLogicalBit", pins["teensy_pins_by_logical_bit"]),
+        array("kOutputGpioBitsByLogicalBit", pins["standard_gpio_bits_by_logical_bit"]),
+        f"inline constexpr std::uint32_t kOutputGpioAggregateMask = {int(pins['aggregate_mask'])}U;",
+        f"inline constexpr std::uint8_t kOutputStandardGpio = {int(pins['standard_gpio'])}U;",
+        f"inline constexpr std::uint8_t kOutputFastGpio = {int(pins['fast_gpio'])}U;",
+        f"inline constexpr std::uint8_t kOutputFastSelectGpr = {int(pins['fast_select_gpr'])}U;",
+        f"inline constexpr std::uint16_t kOutputLogicVoltageMaxMv = {int(pins['logic_voltage_max_mv'])}U;",
+        f"inline constexpr std::uint8_t kOutputPitChannel = {int(resources['clock_pit_channel'])}U;",
+        f"inline constexpr std::uint8_t kOutputXbarInput = {int(resources['xbar_input'])}U;",
+        f"inline constexpr std::uint8_t kOutputXbarOutput = {int(resources['xbar_output'])}U;",
+        f"inline constexpr std::uint8_t kOutputDmamuxSource = {int(resources['dmamux_source'])}U;",
+        f"inline constexpr std::uint8_t kOutputEdmaChannel = {int(resources['edma_channel'])}U;",
+    ]
+
+
+def render_v2_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
+    """Render a disjoint C++ surface for the experimental v2 extension."""
+
+    rendered = render_cpp(contract, source_sha256).decode()
+    rendered = rendered.replace(
+        "Generated from protocol/protocol-v1.json",
+        "Generated from protocol/protocol-v2.json",
+    ).replace("thingdaq::protocol_v1", "thingdaq::protocol_v2")
+    header_marker = "inline constexpr std::size_t kHeaderMagicOffset"
+    rendered = rendered.replace(
+        header_marker,
+        "\n".join(_output_constant_lines_cpp(contract)) + "\n\n" + header_marker,
+        1,
+    )
+    enum_marker = "inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm"
+    enum_lines: list[str] = []
+    enum_lines.extend(
+        cpp_enum(
+            "OutputBankMode", "std::uint8_t", contract["enums"]["output_bank_mode"]
+        )
+    )
+    enum_lines.extend(
+        cpp_enum("OutputState", "std::uint8_t", contract["enums"]["output_state"])
+    )
+    enum_lines.extend(
+        cpp_enum("OutputError", "std::uint8_t", contract["enums"]["output_error"])
+    )
+    rendered = rendered.replace(enum_marker, "\n".join(enum_lines) + enum_marker, 1)
+    return rendered.encode()
+
+
 def encode_schema_payload(
     contract: Mapping[str, Any], schema_name: str, values: Mapping[str, Any]
 ) -> bytes:
@@ -1898,6 +2209,8 @@ def build_golden_frames(
             "sequence": sequence,
             "total_length": len(frame),
         }
+        if "expected" in fixture:
+            manifest_entry["expected"] = fixture["expected"]
         if len(frame) <= 256:
             manifest_entry["frame_hex"] = frame.hex()
         manifest_entries.append(manifest_entry)
@@ -1934,6 +2247,39 @@ def expected_outputs(
     return outputs
 
 
+def expected_v2_outputs(
+    contract: Mapping[str, Any], source_bytes: bytes
+) -> dict[Path, bytes]:
+    """Return every isolated experimental-v2 generated artifact."""
+
+    source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+    fixture_outputs, manifest_entries = build_golden_frames(contract)
+    manifest = {
+        "byte_order": contract["byte_order"],
+        "extension": contract["extension"],
+        "fixtures": manifest_entries,
+        "generator": "tools/generate_protocol.py",
+        "protocol_version": int(contract["protocol_version"]),
+        "source": "protocol/protocol-v2.json",
+        "source_sha256": source_sha256,
+        "status": contract["status"],
+    }
+    outputs = {
+        V2_PYTHON_OUTPUT_PATH: render_v2_python(contract, source_sha256),
+        V2_CPP_OUTPUT_PATH: render_v2_cpp(contract, source_sha256),
+        V2_MANIFEST_PATH: (
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+        ).encode(),
+    }
+    outputs.update(
+        {
+            V2_FIXTURE_DIRECTORY / name: contents
+            for name, contents in fixture_outputs.items()
+        }
+    )
+    return outputs
+
+
 def relative_paths(paths: Iterable[Path]) -> list[str]:
     """Make generated paths concise and stable in command output."""
 
@@ -1948,13 +2294,15 @@ def check_outputs(outputs: Mapping[Path, bytes]) -> int:
         for path, expected in outputs.items()
         if not path.is_file() or path.read_bytes() != expected
     ]
-    if MANIFEST_PATH in outputs:
+    for fixture_directory in FIXTURE_DIRECTORIES:
         expected_fixture_paths = {
-            path for path in outputs if path.parent == FIXTURE_DIRECTORY
+            path for path in outputs if path.parent == fixture_directory
         }
+        if not expected_fixture_paths:
+            continue
         drifted.extend(
             path
-            for path in FIXTURE_DIRECTORY.glob("*.bin")
+            for path in fixture_directory.glob("*.bin")
             if path not in expected_fixture_paths
         )
     if drifted:
@@ -1975,11 +2323,13 @@ def write_outputs(outputs: Mapping[Path, bytes]) -> int:
 
     changed: list[Path] = []
     removed: list[Path] = []
-    if MANIFEST_PATH in outputs:
+    for fixture_directory in FIXTURE_DIRECTORIES:
         expected_fixture_paths = {
-            path for path in outputs if path.parent == FIXTURE_DIRECTORY
+            path for path in outputs if path.parent == fixture_directory
         }
-        for path in FIXTURE_DIRECTORY.glob("*.bin"):
+        if not expected_fixture_paths:
+            continue
+        for path in fixture_directory.glob("*.bin"):
             if path not in expected_fixture_paths:
                 path.unlink()
                 removed.append(path)
@@ -2014,8 +2364,11 @@ def main() -> int:
     args = parse_args()
     try:
         contract, source_bytes = load_contract()
+        v2_contract, v2_source_bytes = load_contract(V2_SOURCE_PATH)
         validate_contract(contract)
+        validate_v2_contract(v2_contract, contract, source_bytes)
         outputs = expected_outputs(contract, source_bytes)
+        outputs.update(expected_v2_outputs(v2_contract, v2_source_bytes))
     except (ContractError, KeyError, TypeError, json.JSONDecodeError) as error:
         print(f"Invalid protocol contract: {error}", file=sys.stderr)
         return 2
