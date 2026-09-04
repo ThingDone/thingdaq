@@ -40,6 +40,7 @@ related:
   - '[[ADR-007-Experimental-Aux-Input-Bank]]'
   - '[[Experiment-Baseline]]'
   - '[[Aux-Input-Prototype]]'
+  - '[[Phase-06-Aux-Input-Local-Gate]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -96,7 +97,9 @@ physical acceptance.
   beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
   beginning with the immutable [[Experiment-Baseline]], the isolated
-  simulator/host [[Aux-Input-Prototype]] validation, and including
+  simulator/host [[Aux-Input-Prototype]] validation, and the complete
+  target-branch compile and regression checkpoint in
+  [[Phase-06-Aux-Input-Local-Gate]]. The historical sequence includes
   [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
   by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical
