@@ -1,0 +1,333 @@
+{
+  "experiments": [
+    {
+      "experiment_id": "baseline",
+      "revision": "fixture/baseline",
+      "revision_commit": "1111111111111111111111111111111111111111",
+      "revision_tree": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "result": "PASS",
+      "report": {
+        "result": "PASS",
+        "reason": null,
+        "identity": {
+          "source_commit": "1111111111111111111111111111111111111111",
+          "source_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "evidence": [
+          {
+            "id": "baseline-host",
+            "level": "host",
+            "result": "PASS",
+            "reason": null
+          }
+        ],
+        "acceptance": [
+          {
+            "id": "baseline-regression",
+            "state": "PASS",
+            "reason": null,
+            "observed": true
+          }
+        ],
+        "metrics": [
+          {
+            "name": "measurement_duration_seconds",
+            "value": 10,
+            "unit": "second",
+            "denominator": "none",
+            "scope": "streaming_window",
+            "evidence_level": "host",
+            "evidence_ids": [
+              "baseline-host"
+            ]
+          },
+          {
+            "name": "logical_rate",
+            "value": 1000,
+            "unit": "item_per_second",
+            "denominator": "streaming_elapsed_seconds",
+            "scope": "streaming_window",
+            "evidence_level": "host",
+            "evidence_ids": [
+              "baseline-host"
+            ]
+          }
+        ],
+        "limitations": [
+          "Fixture baseline has no physical evidence."
+        ]
+      },
+      "declared_files": [],
+      "incidents": []
+    },
+    {
+      "experiment_id": "rle-streaming",
+      "revision": "fixture/rle-streaming",
+      "revision_commit": "2222222222222222222222222222222222222222",
+      "revision_tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "result": "INCONCLUSIVE",
+      "report": {
+        "result": "INCONCLUSIVE",
+        "reason": "The physical endurance gate was unavailable.",
+        "identity": {
+          "source_commit": "2222222222222222222222222222222222222222",
+          "source_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "evidence": [
+          {
+            "id": "rle-simulation",
+            "level": "simulated",
+            "result": "PASS",
+            "reason": null
+          }
+        ],
+        "acceptance": [
+          {
+            "id": "logical-equality",
+            "state": "PASS",
+            "reason": null,
+            "observed": true
+          },
+          {
+            "id": "physical-endurance",
+            "state": "INCONCLUSIVE",
+            "reason": "No retained physical endurance capture was available.",
+            "observed": null
+          },
+          {
+            "id": "hardware-fallback",
+            "state": "NOT_RUN",
+            "reason": "The hardware fallback campaign was not run.",
+            "observed": null
+          }
+        ],
+        "metrics": [
+          {
+            "name": "measurement_duration_seconds",
+            "value": 10,
+            "unit": "second",
+            "denominator": "none",
+            "scope": "streaming_window",
+            "evidence_level": "simulated",
+            "evidence_ids": [
+              "rle-simulation"
+            ]
+          },
+          {
+            "name": "logical_rate",
+            "value": 1000,
+            "unit": "item_per_second",
+            "denominator": "streaming_elapsed_seconds",
+            "scope": "streaming_window",
+            "evidence_level": "simulated",
+            "evidence_ids": [
+              "rle-simulation"
+            ]
+          }
+        ],
+        "limitations": [
+          "Simulation does not establish physical streaming behavior."
+        ]
+      },
+      "declared_files": [],
+      "incidents": [
+        {
+          "id": "physical-endurance",
+          "state": "INCONCLUSIVE",
+          "reason": "No retained physical endurance capture was available."
+        },
+        {
+          "id": "hardware-fallback",
+          "state": "NOT_RUN",
+          "reason": "The hardware fallback campaign was not run."
+        }
+      ]
+    },
+    {
+      "experiment_id": "aux-input-bank",
+      "revision": "fixture/aux-input-bank",
+      "revision_commit": "3333333333333333333333333333333333333333",
+      "revision_tree": "cccccccccccccccccccccccccccccccccccccccc",
+      "result": "FAIL",
+      "report": {
+        "result": "FAIL",
+        "reason": "The required input-rate gate failed.",
+        "identity": {
+          "source_commit": "3333333333333333333333333333333333333333",
+          "source_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "evidence": [
+          {
+            "id": "aux-input-rig",
+            "level": "rig",
+            "result": "FAIL",
+            "reason": "The sustained rate was below the acceptance threshold."
+          }
+        ],
+        "acceptance": [
+          {
+            "id": "input-rate",
+            "state": "FAIL",
+            "reason": "The sustained rate was below the acceptance threshold.",
+            "observed": 800
+          }
+        ],
+        "metrics": [
+          {
+            "name": "measurement_duration_seconds",
+            "value": 10,
+            "unit": "second",
+            "denominator": "none",
+            "scope": "streaming_window",
+            "evidence_level": "rig",
+            "evidence_ids": [
+              "aux-input-rig"
+            ]
+          },
+          {
+            "name": "logical_rate",
+            "value": 800,
+            "unit": "sample_per_second",
+            "denominator": "capture_elapsed_seconds",
+            "scope": "streaming_window",
+            "evidence_level": "rig",
+            "evidence_ids": [
+              "aux-input-rig"
+            ]
+          }
+        ],
+        "limitations": [
+          "The failed rate gate remains visible."
+        ]
+      },
+      "declared_files": [],
+      "incidents": [
+        {
+          "id": "input-rate",
+          "state": "FAIL",
+          "reason": "The sustained rate was below the acceptance threshold."
+        }
+      ]
+    },
+    {
+      "experiment_id": "clock-450mhz",
+      "revision": "fixture/clock-450mhz",
+      "revision_commit": "4444444444444444444444444444444444444444",
+      "revision_tree": "dddddddddddddddddddddddddddddddddddddddd",
+      "result": "PASS",
+      "classification": "bounded fixture physical smoke",
+      "identity": {
+        "source_commit": "4444444444444444444444444444444444444444",
+        "source_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "hex_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "evidence": [
+        {
+          "id": "clock-rig",
+          "level": "rig",
+          "result": "PASS",
+          "reason": null
+        }
+      ],
+      "acceptance": [
+        {
+          "id": "physical-smoke",
+          "state": "PASS",
+          "reason": null,
+          "observed": true
+        },
+        {
+          "id": "same-board-comparison",
+          "state": "NOT_RUN",
+          "reason": "No controlled same-board comparison was run.",
+          "observed": null
+        }
+      ],
+      "metrics": [
+        {
+          "name": "measurement_duration_seconds",
+          "value": 10,
+          "unit": "second",
+          "denominator": "none",
+          "scope": "streaming_window",
+          "evidence_level": "rig",
+          "evidence_ids": [
+            "clock-rig"
+          ]
+        },
+        {
+          "name": "logical_rate",
+          "value": 1000,
+          "unit": "item_per_second",
+          "denominator": "streaming_elapsed_seconds",
+          "scope": "streaming_window",
+          "evidence_level": "rig",
+          "evidence_ids": [
+            "clock-rig"
+          ]
+        }
+      ],
+      "limitations": [
+        "No controlled same-board comparison was run."
+      ],
+      "incidents": []
+    }
+  ],
+  "recommendations": [
+    {
+      "experiment_id": "baseline",
+      "decision": "ADOPT",
+      "branch_commit": "1111111111111111111111111111111111111111",
+      "acceptance_ids": [
+        "baseline-regression"
+      ],
+      "evidence_levels": [
+        "host"
+      ],
+      "scope": "production_default",
+      "rationale": "The cited baseline regression gate passed."
+    },
+    {
+      "experiment_id": "rle-streaming",
+      "decision": "CONTINUE",
+      "branch_commit": "2222222222222222222222222222222222222222",
+      "acceptance_ids": [
+        "logical-equality",
+        "physical-endurance",
+        "hardware-fallback"
+      ],
+      "evidence_levels": [
+        "simulated"
+      ],
+      "scope": "experimental",
+      "rationale": "Logical equality passed, while physical gates remain incomplete."
+    },
+    {
+      "experiment_id": "aux-input-bank",
+      "decision": "REJECT",
+      "branch_commit": "3333333333333333333333333333333333333333",
+      "acceptance_ids": [
+        "input-rate"
+      ],
+      "evidence_levels": [
+        "rig"
+      ],
+      "scope": "optional_capability",
+      "rationale": "The cited physical input-rate gate failed."
+    },
+    {
+      "experiment_id": "clock-450mhz",
+      "decision": "DEFER",
+      "branch_commit": "4444444444444444444444444444444444444444",
+      "acceptance_ids": [
+        "physical-smoke",
+        "same-board-comparison"
+      ],
+      "evidence_levels": [
+        "rig"
+      ],
+      "scope": "experimental",
+      "rationale": "The smoke passed, but the comparative gate was not run."
+    }
+  ]
+}
