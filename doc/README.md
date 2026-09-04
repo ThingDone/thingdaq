@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Documentation Index
 created: 2026-08-27
-updated: 2026-08-31
+updated: 2026-09-04
 tags:
   - thingdaq
   - documentation
@@ -39,6 +39,7 @@ related:
   - '[[ADR-004-ADC-Trigger-DMA]]'
   - '[[ADR-008-Experimental-Aux-Output-Bank]]'
   - '[[Aux-Output-Memory-Candidate]]'
+  - '[[Aux-Output-Prototype]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -127,6 +128,10 @@ physical acceptance.
   superseded identity-pinned Windows artifacts, hashes, packaging evidence,
   and report interpretation are in [[Phase-12-Windows-Handoff]]. Use
   [[Evidence-Index]] for the current-candidate boundary and cross-phase map.
+  The isolated protocol-v2 output contract, deterministic trace, portable
+  expansion benchmark, fixed memory candidate, and unchanged default build are
+  recorded in [[Aux-Output-Prototype]]; it is local prototype evidence, not a
+  physical-output result.
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`

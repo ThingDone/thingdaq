@@ -1,0 +1,1501 @@
+{
+  "acceptance": [
+    {
+      "description": "The matrix and report validate fail closed with no unknown state, level, metric, check, or limitation identifiers.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": true,
+      "id": "schema_valid",
+      "observed": true,
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Required Git, source, protocol, toolchain, branch, and baseline identities are present and syntactically valid.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": [
+        "repository",
+        "branch",
+        "baseline_branch",
+        "baseline_commit",
+        "source_commit",
+        "source_tree",
+        "source_clean",
+        "source_id",
+        "protocol_contract_path",
+        "protocol_version",
+        "protocol_sha256",
+        "toolchains"
+      ],
+      "id": "identity_complete",
+      "observed": {
+        "baseline_branch": "experiment/baseline-2026-09-01",
+        "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
+        "branch": "experiment/aux-output-bank",
+        "protocol_contract_path": "protocol/protocol-v1.json",
+        "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "protocol_version": 1,
+        "repository": "https://github.com/ThingDone/thingdaq.git",
+        "source_clean": true,
+        "source_commit": "4dc24bc1de0ae0151bfdbc35c9df369d23085e98",
+        "source_id": "3f3391603dc7c763e237bed5490ddd6bdf4d49a625796058150ec847272a4db4",
+        "source_tree": "b884eb586654c80eb08332e37c9e315a17f4252b",
+        "toolchains": [
+          {
+            "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+            "name": "arduino-cli",
+            "version": "1.4.1"
+          },
+          {
+            "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+            "name": "arm-none-eabi-g++",
+            "version": "15.2.1"
+          },
+          {
+            "identity": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+            "name": "g++",
+            "version": "13.3.0"
+          },
+          {
+            "identity": "CPython 3.12.3",
+            "name": "python",
+            "version": "3.12.3"
+          },
+          {
+            "identity": "teensy:avr 1.62.0",
+            "name": "teensy-core",
+            "version": "1.62.0"
+          }
+        ]
+      },
+      "operator": "present",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Tracked canonical evidence was generated from the declared clean source commit and tree.",
+      "evidence_ids": [
+        "branch-isolation"
+      ],
+      "expected": true,
+      "id": "provenance_clean",
+      "observed": true,
+      "operator": "eq",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every referenced input, firmware, map, manifest, and output artifact matches its declared SHA-256 and size.",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "expected": {
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "0f7bd57e137439b08c1c8201e0cdef3f02fd7a010f98e1f361238089549e3316",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "6edfcb2147c0da1f89b675c623a3a9b27776d8ff759da45f54ae4989f84fd421",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "6ab5b38995003d36b2266542c388dbc6ef7843869b5ed0c82a03430e505b6b13",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "c2f3f495dce7c81bea35b658ae7962b384d9e63cac92b23cb88265db0c081743"
+      },
+      "id": "artifact_hashes_verified",
+      "observed": {
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "0f7bd57e137439b08c1c8201e0cdef3f02fd7a010f98e1f361238089549e3316",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "6edfcb2147c0da1f89b675c623a3a9b27776d8ff759da45f54ae4989f84fd421",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "6ab5b38995003d36b2266542c388dbc6ef7843869b5ed0c82a03430e505b6b13",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "c2f3f495dce7c81bea35b658ae7962b384d9e63cac92b23cb88265db0c081743"
+      },
+      "operator": "hash_equal",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "The exact declared firmware profile compiles with the pinned toolchain without enumerating hardware or uploading firmware.",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "expected": true,
+      "id": "firmware_build_no_upload",
+      "observed": {
+        "compile_completed": true,
+        "exact_fqbn": true,
+        "firmware_inputs_clean": true,
+        "network_unused": true,
+        "repeat_outputs_byte_identical": true,
+        "serial_hardware_unused": true,
+        "upload_unused": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Two renders from identical normalized inputs are byte-identical JSON and Markdown.",
+      "evidence_ids": [
+        "evidence-framework",
+        "host-regression"
+      ],
+      "expected": {
+        "canonical_json_render": "byte-identical",
+        "canonical_markdown_render": "byte-identical",
+        "simulator_stdout_run_1": "a005c0d49502443a45da4dd416a30168029aa8673ca809c73a4a587230b351e6",
+        "simulator_stdout_run_2": "a005c0d49502443a45da4dd416a30168029aa8673ca809c73a4a587230b351e6"
+      },
+      "id": "deterministic_output",
+      "observed": {
+        "canonical_json_render": "byte-identical",
+        "canonical_markdown_render": "byte-identical",
+        "simulator_stdout_run_1": "a005c0d49502443a45da4dd416a30168029aa8673ca809c73a4a587230b351e6",
+        "simulator_stdout_run_2": "a005c0d49502443a45da4dd416a30168029aa8673ca809c73a4a587230b351e6"
+      },
+      "operator": "byte_equal",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "INFO, CONFIGURE, START, bounded data capture, STATUS, STOP, and cleanup complete in the declared order.",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration"
+      ],
+      "expected": true,
+      "id": "lifecycle_complete",
+      "observed": {
+        "bounded_adc_gpio_capture": true,
+        "clear_release": true,
+        "configure_combined": true,
+        "fault_status": true,
+        "finite_completion": true,
+        "infinite_stop_hold": true,
+        "output_arm": true,
+        "output_begin_append_commit": true,
+        "start_common_epoch": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Sequence gaps, loss, parser errors, transport errors, host-queue drops, and unexplained firmware errors are zero unless a named negative case declares and reconciles them.",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration"
+      ],
+      "expected": true,
+      "id": "stream_health",
+      "observed": {
+        "combined_blocks_present": true,
+        "injected_underrun_reconciled": true,
+        "run_ids_exact": true,
+        "unexpected_loss_events_zero": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "All applicable frame, item, payload-byte, framed-byte, queue, loss, and source-stage equations are exact and nonsaturated.",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration"
+      ],
+      "expected": true,
+      "id": "counter_conservation",
+      "observed": {
+        "combined_blocks": {
+          "left": 6,
+          "right": 6
+        },
+        "injected_faults": {
+          "left": 1,
+          "right": 1
+        },
+        "scenarios": {
+          "left": 3,
+          "right": 3
+        },
+        "transitions": {
+          "left": 18,
+          "right": 18
+        }
+      },
+      "operator": "exact_conservation",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every observed queue depth and high-water value is at or below its same-artifact advertised capacity.",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration"
+      ],
+      "expected": 4096,
+      "id": "queue_bounds",
+      "observed": 8,
+      "operator": "lte",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "STOP and final cleanup leave IDLE with every required ownership and transport gauge at zero.",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration"
+      ],
+      "expected": true,
+      "id": "final_idle_cleanup",
+      "observed": {
+        "all_output_banks_disabled": true,
+        "all_output_pins_released": true,
+        "all_transports_closed": true,
+        "fault_clear_empty": true,
+        "finite_clear_empty": true,
+        "infinite_clear_empty": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every required limitation is explicit and no conclusion exceeds the evidence level that supports it.",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration",
+        "evidence-framework",
+        "output-expansion-benchmark",
+        "output-memory-budget"
+      ],
+      "expected": true,
+      "id": "claim_scope_complete",
+      "observed": {
+        "cross_branch_acceptance_absent": true,
+        "host_benchmark_labeled_nontarget": true,
+        "memory_budget_labeled_candidate": true,
+        "physical_fixture_declaration_absent": true,
+        "physical_output_claim_absent": true,
+        "simulated_timing_labeled": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "state": "PASS"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "firmware-build-manifest",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+      "sha256": "0f7bd57e137439b08c1c8201e0cdef3f02fd7a010f98e1f361238089549e3316",
+      "size_bytes": 13108
+    },
+    {
+      "kind": "firmware-eep",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep",
+      "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+      "size_bytes": 34
+    },
+    {
+      "kind": "firmware-elf",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf",
+      "sha256": "6edfcb2147c0da1f89b675c623a3a9b27776d8ff759da45f54ae4989f84fd421",
+      "size_bytes": 1823268
+    },
+    {
+      "kind": "firmware-hex",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
+      "sha256": "6ab5b38995003d36b2266542c388dbc6ef7843869b5ed0c82a03430e505b6b13",
+      "size_bytes": 357227
+    },
+    {
+      "kind": "firmware-map",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
+      "sha256": "c2f3f495dce7c81bea35b658ae7962b384d9e63cac92b23cb88265db0c081743",
+      "size_bytes": 850916
+    }
+  ],
+  "created": "2026-09-04",
+  "evidence": [
+    {
+      "command": {
+        "argv": [
+          "python",
+          "daq_api/examples/preloaded_output.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "deterministic_budget": {
+        "combined_data_blocks_per_scenario": 2,
+        "explicit_advanced_ticks": 168,
+        "injected_underruns": 1,
+        "scenarios": 3
+      },
+      "deterministic_stdout_bytes": 2598,
+      "deterministic_stdout_sha256": "a005c0d49502443a45da4dd416a30168029aa8673ca809c73a4a587230b351e6",
+      "hardware_accessed": false,
+      "id": "aux-output-simulator-demonstration",
+      "inputs": [
+        {
+          "path": "daq_api/examples/preloaded_output.py",
+          "sha256": "19f3fae3927e509ae83fc7481305f430fb87bd260fa03f5c93a3df760ffda418"
+        },
+        {
+          "path": "daq_api/src/thingdaq/client.py",
+          "sha256": "13dc29ca982278bbb297130bc0b3de066f57afa5df03614f728c1d1a9a7814e3"
+        },
+        {
+          "path": "daq_api/src/thingdaq/output.py",
+          "sha256": "94595893044015f551a6741c4ddfd8014d49bca0187e418bf7b68665a442e5d6"
+        },
+        {
+          "path": "daq_api/src/thingdaq/simulator.py",
+          "sha256": "c1ecd38c3aa9f7ef5e59fc880fc5254713864863b2db6a95593c196dbfcc0c7b"
+        },
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        },
+        {
+          "path": "protocol/protocol-v2.json",
+          "sha256": "9d946f081befed6fada3c8c183d01af5911a4a8dcf86377f737e5cd684c69e6c"
+        }
+      ],
+      "level": "simulated",
+      "method": "public protocol-v2 upload/arm/status/CLEAR commands, explicit common-clock advancement, bounded transition/state queries, combined ADC/GPIO block reads, STOP, and injected underrun",
+      "protocol_identity": "protocol/protocol-v2.json sha256:9d946f081befed6fada3c8c183d01af5911a4a8dcf86377f737e5cd684c69e6c",
+      "reason": null,
+      "repeat_stdout_byte_identical": true,
+      "result": "PASS",
+      "scenarios": [
+        {
+          "acquisition": [
+            {
+              "first_sample_tick": 0,
+              "item_count": 1012,
+              "run_id": 1,
+              "sequence": 0,
+              "stream": "ADC"
+            },
+            {
+              "first_sample_tick": 0,
+              "item_count": 4048,
+              "run_id": 1,
+              "sequence": 0,
+              "stream": "GPIO"
+            }
+          ],
+          "completed_repeats": 2,
+          "final_hold_state_mask": 128,
+          "name": "finite",
+          "program": {
+            "checksum_adler32": 44564619,
+            "duration_samples_per_play": 6,
+            "idle_state_mask": 64,
+            "repeat_count": 2,
+            "segments": [
+              {
+                "duration_samples": 2,
+                "logical_state_mask": 1
+              },
+              {
+                "duration_samples": 1,
+                "logical_state_mask": 3
+              },
+              {
+                "duration_samples": 3,
+                "logical_state_mask": 128
+              }
+            ]
+          },
+          "release_bank_mode": "DISABLED",
+          "release_state": "EMPTY",
+          "released_state_mask": null,
+          "run_id": 1,
+          "sampled_state_queries": [
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 1,
+              "tick": 0
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 1,
+              "tick": 15
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 3,
+              "tick": 16
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 3,
+              "tick": 23
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 128,
+              "tick": 24
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 128,
+              "tick": 47
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 1,
+              "tick": 48
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 3,
+              "tick": 64
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 128,
+              "tick": 72
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 101,
+              "output_state": "HELD",
+              "run_id": 1,
+              "state_mask": 128,
+              "tick": 96
+            }
+          ],
+          "stop_state": "HELD",
+          "transitions": [
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 0,
+              "event": "segment",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 0,
+              "state_mask": 1,
+              "tick": 0
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 0,
+              "event": "segment",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 1,
+              "state_mask": 3,
+              "tick": 16
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 0,
+              "event": "segment",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 2,
+              "state_mask": 128,
+              "tick": 24
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 1,
+              "event": "segment",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 0,
+              "state_mask": 1,
+              "tick": 48
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 1,
+              "event": "segment",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 1,
+              "state_mask": 3,
+              "tick": 64
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 1,
+              "event": "segment",
+              "generation": 101,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 2,
+              "state_mask": 128,
+              "tick": 72
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 2,
+              "event": "complete",
+              "generation": 101,
+              "output_state": "HELD",
+              "run_id": 1,
+              "segment_index": 2,
+              "state_mask": 128,
+              "tick": 96
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 2,
+              "event": "stop",
+              "generation": 101,
+              "output_state": "HELD",
+              "run_id": 1,
+              "segment_index": 2,
+              "state_mask": 128,
+              "tick": 96
+            }
+          ]
+        },
+        {
+          "acquisition": [
+            {
+              "first_sample_tick": 0,
+              "item_count": 1012,
+              "run_id": 1,
+              "sequence": 0,
+              "stream": "ADC"
+            },
+            {
+              "first_sample_tick": 0,
+              "item_count": 4048,
+              "run_id": 1,
+              "sequence": 0,
+              "stream": "GPIO"
+            }
+          ],
+          "completed_repeats_before_stop": 2,
+          "final_hold_state_mask": 240,
+          "name": "infinite",
+          "program": {
+            "checksum_adler32": 77857027,
+            "duration_samples_per_play": 3,
+            "idle_state_mask": 85,
+            "repeat_count": 0,
+            "segments": [
+              {
+                "duration_samples": 1,
+                "logical_state_mask": 15
+              },
+              {
+                "duration_samples": 2,
+                "logical_state_mask": 240
+              }
+            ]
+          },
+          "release_bank_mode": "DISABLED",
+          "release_state": "EMPTY",
+          "released_state_mask": null,
+          "run_id": 1,
+          "sampled_state_queries": [
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 15,
+              "tick": 0
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 15,
+              "tick": 7
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 240,
+              "tick": 8
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 240,
+              "tick": 23
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 15,
+              "tick": 24
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 15,
+              "tick": 31
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 240,
+              "tick": 32
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 240,
+              "tick": 47
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 15,
+              "tick": 48
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 15,
+              "tick": 55
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "state_mask": 240,
+              "tick": 56
+            }
+          ],
+          "stop_state": "HELD",
+          "transitions": [
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 0,
+              "event": "segment",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 0,
+              "state_mask": 15,
+              "tick": 0
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 0,
+              "event": "segment",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 1,
+              "state_mask": 240,
+              "tick": 8
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 1,
+              "event": "segment",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 0,
+              "state_mask": 15,
+              "tick": 24
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 1,
+              "event": "segment",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 1,
+              "state_mask": 240,
+              "tick": 32
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 2,
+              "event": "segment",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 0,
+              "state_mask": 15,
+              "tick": 48
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 2,
+              "event": "segment",
+              "generation": 102,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 1,
+              "state_mask": 240,
+              "tick": 56
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 2,
+              "event": "stop",
+              "generation": 102,
+              "output_state": "HELD",
+              "run_id": 1,
+              "segment_index": 1,
+              "state_mask": 240,
+              "tick": 56
+            }
+          ]
+        },
+        {
+          "acquisition": [
+            {
+              "first_sample_tick": 0,
+              "item_count": 1012,
+              "run_id": 1,
+              "sequence": 0,
+              "stream": "ADC"
+            },
+            {
+              "first_sample_tick": 0,
+              "item_count": 4048,
+              "run_id": 1,
+              "sequence": 0,
+              "stream": "GPIO"
+            }
+          ],
+          "active_stream_mask": 0,
+          "common_epoch_state": "IDLE",
+          "data_available_after_fault": false,
+          "fault": "UNDERRUN",
+          "fault_state": "FAULTED",
+          "held_state_mask": 34,
+          "name": "underrun",
+          "program": {
+            "checksum_adler32": 26476600,
+            "duration_samples_per_play": 4,
+            "idle_state_mask": 0,
+            "repeat_count": 0,
+            "segments": [
+              {
+                "duration_samples": 2,
+                "logical_state_mask": 17
+              },
+              {
+                "duration_samples": 2,
+                "logical_state_mask": 34
+              }
+            ]
+          },
+          "recovery_bank_mode": "DISABLED",
+          "recovery_state": "EMPTY",
+          "released_state_mask": null,
+          "run_id": 1,
+          "transitions": [
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 0,
+              "event": "segment",
+              "generation": 103,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 0,
+              "state_mask": 17,
+              "tick": 0
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 0,
+              "event": "segment",
+              "generation": 103,
+              "output_state": "RUNNING",
+              "run_id": 1,
+              "segment_index": 1,
+              "state_mask": 34,
+              "tick": 16
+            },
+            {
+              "bank_mode": "OUTPUT",
+              "completed_repeats": 0,
+              "event": "fault",
+              "generation": 103,
+              "output_state": "FAULTED",
+              "run_id": 1,
+              "segment_index": 1,
+              "state_mask": 34,
+              "tick": 16
+            }
+          ]
+        }
+      ],
+      "simulator_identity": "ThingDAQ SimulatedDevice protocol-v1/v2",
+      "timing_claim": "simulated-only"
+    },
+    {
+      "ancestry": {
+        "ahead": 8,
+        "behind": 0,
+        "merge_base_exact": true
+      },
+      "command": {
+        "argv": [
+          "git",
+          "merge-base",
+          "--is-ancestor",
+          "experiment/baseline-2026-09-01",
+          "HEAD"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "branch-isolation",
+      "inputs": [
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        }
+      ],
+      "level": "host",
+      "method": "Git object checks prove exact baseline descent and identify the isolated eight-commit experiment history.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/experiment_evidence.py",
+          "--report",
+          "doc/results/experiments/aux-output-prototype.json",
+          "--json-output",
+          "doc/results/experiments/aux-output-prototype.json",
+          "--markdown-output",
+          "doc/results/experiments/aux-output-prototype.md",
+          "--check"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "deterministic_render": true,
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "evidence-framework",
+      "inputs": [
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        },
+        {
+          "path": "firmware/tools/experiment_evidence.py",
+          "sha256": "c3c0fe5813c72bad3bf5f0b0eab3dc5823f97aca680defaade14710491e152e8"
+        }
+      ],
+      "level": "host",
+      "method": "Fail-closed shared schema validation, referenced-file/hash verification, normalization, and repeated deterministic rendering.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "build": {
+        "build_id": "thingdaq-3f3391603dc7c763",
+        "flash_code_bytes": 95084,
+        "flash_data_bytes": 23496,
+        "flash_free_for_files_bytes": 1904644,
+        "flash_headers_bytes": 8392,
+        "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+        "output_pins_driven": false,
+        "output_target_adapter_linked": false,
+        "ram1_free_for_locals_bytes": 34528,
+        "ram2_free_for_heap_bytes": 4096,
+        "repeat_outputs_byte_identical": true
+      },
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/build_firmware.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "firmware-build",
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+          "sha256": "0f7bd57e137439b08c1c8201e0cdef3f02fd7a010f98e1f361238089549e3316"
+        },
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
+          "sha256": "c2f3f495dce7c81bea35b658ae7962b384d9e63cac92b23cb88265db0c081743"
+        },
+        {
+          "path": "firmware/firmware.ino",
+          "sha256": "a4059157dc549d998104225452f6590417cc2a9633351843474f4bf357ecf4f3"
+        },
+        {
+          "path": "firmware/src/board_config.h",
+          "sha256": "4ae3ebe952387d4d7f99871fef0c4be7a341f6acbf57ed271b581f41dfe172fb"
+        },
+        {
+          "path": "firmware/tools/build_firmware.py",
+          "sha256": "61cbd926f714ee594a6a31e68c462efb241cab6840ed73ef92d3a8c30210ba71"
+        }
+      ],
+      "level": "host",
+      "method": "Two exact pinned Teensy 4.0 600 MHz no-upload builds plus byte comparison, manifest validation, linker-map inspection, and memory/resource accounting.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "command": {
+        "argv": [
+          "python",
+          "-m",
+          "pytest",
+          "-q"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "host-regression",
+      "inputs": [
+        {
+          "path": "daq_api/tests/test_documentation_integrity.py",
+          "sha256": "14cbc42a3805dabee6309e0f419c7ec9c6fb6ec43c4edf668509b5b744bcbda9"
+        },
+        {
+          "path": "daq_api/tests/test_output_python_api.py",
+          "sha256": "d13713227a67fa68c6bd1f7e453c5195502e366dac6c97aa618fd38122f15bfc"
+        },
+        {
+          "path": "daq_api/tests/test_output_simulator.py",
+          "sha256": "40a60812f65315ce89952d7abef3e8bfb499afbbc3a9c2997e953312691474fa"
+        },
+        {
+          "path": "daq_api/tests/test_repository_layout.py",
+          "sha256": "bd8d73db5429b2f9a8aafbc2f9e046e357c2bca733447e5da901a95e4a774989"
+        },
+        {
+          "path": "firmware/tests/test_digital_output_conformance.py",
+          "sha256": "85b56c7a2cab12e8a6bc177c0ae31bd1136e093f1e6fdad9822475c55a238dc3"
+        },
+        {
+          "path": "firmware/tests/test_digital_output_engine.py",
+          "sha256": "33fde5b4dc8b48a88d304b9c14da1c8b600406178b22157ad064af97e2350afe"
+        },
+        {
+          "path": "firmware/tests/test_digital_output_throughput.py",
+          "sha256": "f9a811988472ce8712cfe9e15b0a380532044dd7ee0f6bbb79ba42eb6849e5a7"
+        },
+        {
+          "path": "tools/generate_protocol.py",
+          "sha256": "c2626e57cda76efd686855abaf037da6dee43a8e0302f13a5e7fce06aa08f6c4"
+        }
+      ],
+      "level": "host",
+      "method": "Generated drift, focused output, documentation/layout, Ruff, MyPy, and complete Python/portable-host-C++ regression gates.",
+      "reason": null,
+      "result": "PASS",
+      "results": {
+        "subtests_passed": 14527,
+        "tests_passed": 486
+      },
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "benchmark": {
+        "deterministic_digest": 1100061081600,
+        "max_blocks_per_service": 1,
+        "minimum_headroom_ratio": 305.662,
+        "minimum_states_per_second": 305662189.756,
+        "required_headroom_ratio": 10,
+        "states_per_block": 1016,
+        "states_per_run": 4161536,
+        "states_per_second_run_1": 331904014.333,
+        "states_per_second_run_2": 305662189.756,
+        "target_states_per_second": 1000000
+      },
+      "command": {
+        "argv": [
+          "python",
+          "-m",
+          "pytest",
+          "-q",
+          "-s",
+          "firmware/tests/test_digital_output_throughput.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "output-expansion-benchmark",
+      "inputs": [
+        {
+          "path": "firmware/src/digital_output_engine.cpp",
+          "sha256": "2d69e87965ec3a6f4a1f188fa5efce25e13db2d58bff4f0a0c0f1727da68a273"
+        },
+        {
+          "path": "firmware/src/digital_output_program.cpp",
+          "sha256": "7addb73d1640e23b98ac5e65b9d69f5ebbea4c5887a5796b5f4b28b7ec5eab44"
+        },
+        {
+          "path": "firmware/tests/digital_output_engine_benchmark.cpp",
+          "sha256": "c820f00e2cdf339562e9e2d7eb76c2e459a6f0c14e5e90ac2468dfde420e9424"
+        },
+        {
+          "path": "firmware/tests/test_digital_output_throughput.py",
+          "sha256": "f9a811988472ce8712cfe9e15b0a380532044dd7ee0f6bbb79ba42eb6849e5a7"
+        }
+      ],
+      "level": "host",
+      "method": "Two strict C++17/O3/LTO runs of the real RLE-to-GPIO1-toggle expansion path, including DMA completion, bounded one-block refill, cache, and critical-section boundaries.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "budget": {
+        "dma_allocation_bytes": 16384,
+        "dma_descriptor_bytes": 128,
+        "dma_state_bytes": 16256,
+        "nominal_retention_microseconds": 98164,
+        "packet_pages_after": 194,
+        "primary_packet_pages_after": 103,
+        "program_storage_bytes": 8192,
+        "ram1_free_for_locals_bytes": 34528,
+        "ram2_free_for_heap_bytes": 4096,
+        "reserve_packet_pages_after": 91,
+        "target_allocations_changed": false,
+        "total_candidate_bytes": 24576
+      },
+      "command": {
+        "argv": [
+          "python",
+          "-m",
+          "pytest",
+          "-q",
+          "firmware/tests/test_digital_output_engine.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "id": "output-memory-budget",
+      "inputs": [
+        {
+          "path": "doc/architecture/Aux-Output-Memory-Candidate.md",
+          "sha256": "16a19b14acdc695a29f9941cb29ed3653dc2f821aabec5244eadb71244537919"
+        },
+        {
+          "path": "firmware/src/board_config.h",
+          "sha256": "4ae3ebe952387d4d7f99871fef0c4be7a341f6acbf57ed271b581f41dfe172fb"
+        },
+        {
+          "path": "firmware/src/digital_output_engine.h",
+          "sha256": "d334ca277627afb6bbaa39ecbb14e2d3379e03cb7dcaee7f98d4dff68cf8a65c"
+        },
+        {
+          "path": "firmware/src/digital_output_program.h",
+          "sha256": "1de94595ad19392eafaa82c1ed0e5bf6d00964b85624e11d11d3a88898ab24cf"
+        },
+        {
+          "path": "firmware/tests/fixtures/combined_acquisition.map",
+          "sha256": "24fea71c4046a36f1dccbf79c8eed8174974f1858756bb23f45ae11d98a430ec"
+        }
+      ],
+      "level": "analytic",
+      "method": "Exact packet-page exchange and fixed C++ storage equations checked against the accepted default linker map.",
+      "method_version": "aux-output-memory-candidate-v1",
+      "reason": null,
+      "result": "PASS"
+    },
+    {
+      "command": {
+        "argv": [
+          "python",
+          "-m",
+          "pytest",
+          "-q",
+          "firmware/tests/test_digital_output_engine.py",
+          "firmware/tests/test_digital_output_conformance.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "portable-output-validation",
+      "inputs": [
+        {
+          "path": "firmware/src/digital_output_engine.cpp",
+          "sha256": "2d69e87965ec3a6f4a1f188fa5efce25e13db2d58bff4f0a0c0f1727da68a273"
+        },
+        {
+          "path": "firmware/src/digital_output_program.cpp",
+          "sha256": "7addb73d1640e23b98ac5e65b9d69f5ebbea4c5887a5796b5f4b28b7ec5eab44"
+        },
+        {
+          "path": "firmware/tests/digital_output_conformance_test.cpp",
+          "sha256": "0077cdb24628b137008b899a8ed1e422da4027459cbed3ef75030ce7765e02b7"
+        },
+        {
+          "path": "firmware/tests/digital_output_engine_test.cpp",
+          "sha256": "85a0379776aa44779b8bce28fe3390418ebfe9dce1322ffa6120f9035b992f98"
+        },
+        {
+          "path": "firmware/tests/test_digital_output_conformance.py",
+          "sha256": "85b56c7a2cab12e8a6bc177c0ae31bd1136e093f1e6fdad9822475c55a238dc3"
+        },
+        {
+          "path": "firmware/tests/test_digital_output_engine.py",
+          "sha256": "33fde5b4dc8b48a88d304b9c14da1c8b600406178b22157ad064af97e2350afe"
+        }
+      ],
+      "level": "host",
+      "method": "Strict host-compiled ownership, wrap, refill, finite/infinite, cancellation, underrun, generation reuse, transactional START, STOP/fault ordering, and cross-language conformance gates.",
+      "reason": null,
+      "result": "PASS",
+      "service_bound": {
+        "blocks_per_visit": 1,
+        "states_per_visit": 1016
+      },
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "command": {
+        "argv": [
+          "git",
+          "diff",
+          "--exit-code",
+          "experiment/baseline-2026-09-01",
+          "HEAD",
+          "--",
+          "protocol/protocol-v1.json",
+          "protocol/fixtures",
+          "daq_api/src/thingdaq/_generated/protocol_constants.py",
+          "firmware/src/generated/protocol_constants.h"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "protocol-v1-compatibility",
+      "inputs": [
+        {
+          "path": "daq_api/src/thingdaq/_generated/protocol_constants.py",
+          "sha256": "a5dc4cd73dd12e291c03d536c2937d14ad1d0ca84b9c8a2860ad2797fbf15961"
+        },
+        {
+          "path": "firmware/src/generated/protocol_constants.h",
+          "sha256": "9604390433f7d8227432d341ecc65b9292002797da9457937ed4d5d3cc096290"
+        },
+        {
+          "path": "protocol/fixtures/manifest.json",
+          "sha256": "e354b6dd7749b4dcea9ee233297f5712f645c2d0a1444d990e22f02303c99568"
+        },
+        {
+          "path": "protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+        }
+      ],
+      "level": "host",
+      "method": "Byte comparison preserves the canonical v1 contract, generated Python/C++ constants, and all frozen v1 fixtures exactly.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0",
+      "unchanged": true
+    }
+  ],
+  "experiment_id": "aux-output-bank",
+  "identity": {
+    "baseline_branch": "experiment/baseline-2026-09-01",
+    "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
+    "branch": "experiment/aux-output-bank",
+    "protocol_contract_path": "protocol/protocol-v1.json",
+    "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+    "protocol_version": 1,
+    "repository": "https://github.com/ThingDone/thingdaq.git",
+    "source_clean": true,
+    "source_commit": "4dc24bc1de0ae0151bfdbc35c9df369d23085e98",
+    "source_id": "3f3391603dc7c763e237bed5490ddd6bdf4d49a625796058150ec847272a4db4",
+    "source_tree": "b884eb586654c80eb08332e37c9e315a17f4252b",
+    "toolchains": [
+      {
+        "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+        "name": "arduino-cli",
+        "version": "1.4.1"
+      },
+      {
+        "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "name": "arm-none-eabi-g++",
+        "version": "15.2.1"
+      },
+      {
+        "identity": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+        "name": "g++",
+        "version": "13.3.0"
+      },
+      {
+        "identity": "CPython 3.12.3",
+        "name": "python",
+        "version": "3.12.3"
+      },
+      {
+        "identity": "teensy:avr 1.62.0",
+        "name": "teensy-core",
+        "version": "1.62.0"
+      }
+    ]
+  },
+  "limitations": [
+    {
+      "applies_to_evidence_levels": [
+        "simulated"
+      ],
+      "id": "simulation_is_not_physical",
+      "statement": "Simulator evidence does not establish firmware target timing, USB behavior, electrical behavior, or physical signal quality."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "host"
+      ],
+      "id": "build_is_not_target_runtime",
+      "statement": "A no-upload build and linker/map inspection do not establish that the artifact ran correctly on a Teensy or over USB."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig"
+      ],
+      "id": "analog_performance_untested",
+      "statement": "Unstimulated or synthetic data do not establish ADC accuracy, noise, ENOB, linearity, bandwidth, source tolerance, or true aperture timing."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "rig",
+        "manual"
+      ],
+      "id": "aux_output_authorization_scope",
+      "statement": "Physical output checks may run only with an exact hashed safety/fixture authorization; absent authorization remains NOT_RUN and cannot be promoted to PASS."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "rig"
+      ],
+      "id": "loopback_is_not_independent_measurement",
+      "statement": "Firmware observing its own looped-back output is not independent certification of pad-level timing, voltage, jitter, or signal integrity."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "id": "cross_branch_combinations_untested",
+      "statement": "Independent candidate results do not establish that clock, compression, auxiliary input, and auxiliary output changes work together in one artifact."
+    }
+  ],
+  "matrix_schema_version": 1,
+  "metrics": [
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration"
+      ],
+      "evidence_level": "simulated",
+      "name": "timestamp_clock_hz",
+      "scope": "artifact",
+      "unit": "hertz",
+      "value": 8000000
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "output-memory-budget"
+      ],
+      "evidence_level": "analytic",
+      "name": "output_state_rate_hz",
+      "scope": "output_window",
+      "unit": "hertz",
+      "value": 1000000
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "output-expansion-benchmark"
+      ],
+      "evidence_level": "host",
+      "name": "output_state_rate_hz",
+      "scope": "output_window",
+      "unit": "hertz",
+      "value": 305662189.756
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration"
+      ],
+      "evidence_level": "simulated",
+      "name": "output_state_rate_hz",
+      "scope": "output_window",
+      "unit": "hertz",
+      "value": 1000000.0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "output-expansion-benchmark"
+      ],
+      "evidence_level": "host",
+      "name": "output_underruns",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "aux-output-simulator-demonstration"
+      ],
+      "evidence_level": "simulated",
+      "name": "output_underruns",
+      "scope": "run",
+      "unit": "event",
+      "value": 1
+    }
+  ],
+  "reason": null,
+  "related": [
+    "[[1-MHz-Parallel-Output-Idea]]",
+    "[[ADR-008-Experimental-Aux-Output-Bank]]",
+    "[[Acquisition-Pipeline]]",
+    "[[Aux-Output-Memory-Candidate]]",
+    "[[Hardware-Safety]]",
+    "[[Protocol-V1]]"
+  ],
+  "result": "PASS",
+  "schema_version": 1,
+  "summary": "The isolated preloaded-output protocol, Python client, deterministic simulator, and portable C++ engine passed every declared local prototype gate while the target adapter remains deliberately absent and D16-D23 remain inputs in the unchanged default firmware.\n\n### Prototype contract and fixed budget\n\n| Item | Exact result |\n| --- | ---: |\n| Logical output rate / timestamp period | 1,000,000 states/s / 8 ticks |\n| Canonical capacity | 1,024 segments (8,192 B) |\n| Cooperative expansion bound | 1 block / service visit; 1,016 states / block |\n| Four-block DMA candidate | 16,384 B (128 B descriptors + 16,256 B states) |\n| Total program + DMA candidate | 24,576 B exchanged for 6 packet pages |\n| Candidate packet retention | 194 pages / 98.164 ms nominal combined framing |\n\n### Local validation result\n\n| Gate | Exact result |\n| --- | --- |\n| Simulator determinism | Two 2,598-byte transcripts byte-identical; SHA-256 `a005c0d49502443a45da4dd416a30168029aa8673ca809c73a4a587230b351e6` |\n| Output expansion benchmark | 305,662,189.756 and 331,904,014.333 states/s; minimum 305.662x host headroom over 1 MHz |\n| Portable service bound | Exactly one 1,016-state block per cooperative service visit |\n| Complete regression | 486 passed; 14,527 subtests |\n| Pinned default build | Two byte-identical 600 MHz no-upload builds; build `thingdaq-3f3391603dc7c763` |\n| Default linker budget | 95,084 B code; 23,496 B data; 34,528 B RAM1 locals/stack; 4,096 B RAM2 heap |\n\nThe expansion rate is a host measurement, the memory repartition is a linker-accounted candidate, and all transition timing is simulated. No target output registers, USB runtime, D16-D23 drive, pad-level timing, voltage, jitter, signal-integrity, loopback, or cross-branch combination has been exercised or accepted.",
+  "title": "ThingDAQ Auxiliary Output Bank Experiment"
+}

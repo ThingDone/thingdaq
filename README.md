@@ -70,6 +70,9 @@ finite completion, infinite-repeat STOP/hold, release-to-input, and injected
 underrun recovery while ADC/GPIO acquisition continues. Pass `--output PREFIX`
 to emit temporary shared-schema JSON and structured Markdown through the
 canonical experiment reporter; the example writes no artifact by default.
+The complete local design, simulator, host-expansion, memory-candidate, and
+unchanged-default-build evidence is recorded in the
+[auxiliary output prototype report](doc/results/experiments/aux-output-prototype.md).
 
 See the [quickstart](doc/guides/quickstart.md) for the complete example roster,
 physical discovery by hardware serial, and lifecycle guidance.

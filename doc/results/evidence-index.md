@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Evidence Index
 created: 2026-08-29
-updated: 2026-08-31
+updated: 2026-09-04
 tags:
   - thingdaq
   - evidence
@@ -11,6 +11,7 @@ tags:
 related:
   - '[[Phase-11-Soak-Evidence]]'
   - '[[Phase-12-Windows-Handoff]]'
+  - '[[Aux-Output-Prototype]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -175,6 +176,7 @@ repair are in [[Phase-11-Soak-Evidence]].
 | 10 | [[Phase-10-Package-Local-Gate]], [[Phase-10-Package-Workflows]] |
 | 11 | [[Phase-11-Soak-Evidence]] |
 | 12 | [[Phase-12-Windows-Handoff]] |
+| Experimental auxiliary output | [[Aux-Output-Prototype]] (local protocol/simulator/portable-C++ evidence only; no physical output) |
 
 ## Architecture decisions
 
