@@ -937,8 +937,8 @@ static_assert(board::kAdcConverterConfigurations[0].dmamux_source ==
               DMAMUX_SOURCE_ADC1);
 static_assert(board::kAdcConverterConfigurations[1].dmamux_source ==
               DMAMUX_SOURCE_ADC2);
-static_assert(board::kAdcEdmaPriorities[0] == 2U);
-static_assert(board::kAdcEdmaPriorities[1] == 1U);
+static_assert(board::kAdcEdmaPriorities[0] == 3U);
+static_assert(board::kAdcEdmaPriorities[1] == 2U);
 static_assert(kPairDispatchConverter == 1U);
 static_assert(kDmaPipelineDepth == 6U);
 static_assert(kDmaAlignmentWaitCycles == 6000U);

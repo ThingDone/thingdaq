@@ -70,10 +70,9 @@ class DigitalOutputEngineTests(unittest.TestCase):
     def test_current_map_supports_exact_six_page_repartition_candidate(self) -> None:
         linker_map = MAP_FIXTURE.read_text(encoding="utf-8")
         memory = build_firmware.parse_memory_usage(linker_map)
-        packets = build_firmware.packet_buffer_usage(linker_map)
-
-        current_primary = packets["banks"]["DTCM_PRIMARY"]["bytes"]
-        current_reserve = packets["banks"]["OCRAM_RESERVE"]["bytes"]
+        symbols = build_firmware.parse_nm_symbols(linker_map)
+        current_primary = symbols["(anonymous namespace)::packet_storage_primary"][1]
+        current_reserve = symbols["(anonymous namespace)::packet_storage_reserve"][1]
         self.assertEqual(105 * 4096, current_primary)
         self.assertEqual(95 * 4096, current_reserve)
         self.assertEqual(34_528, memory["ram1"]["free_for_locals_bytes"])

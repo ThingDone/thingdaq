@@ -14,6 +14,7 @@
 #endif
 
 #include "generated/protocol_constants.h"
+#include "generated/protocol_v2_constants.h"
 #include "protocol.h"
 
 namespace thingdaq::board {
@@ -27,6 +28,7 @@ enum class ResourceOwner : std::uint8_t {
   kAdcPacker,
   kGpioCapture,
   kGpioPacker,
+  kAuxOutput,
   kPacketizer,
   kUsbTransport,
   kChecksumBenchmark,
@@ -55,6 +57,9 @@ enum class MemoryUse : std::uint8_t {
   kGpioPackedRing,
   kGpioPackerState,
   kGpioClockDiagnosticSink,
+  kAuxOutputProgramStorage,
+  kAuxOutputDmaRing,
+  kAuxOutputDmaDescriptors,
   kChecksumBenchmarkDtcmBuffer,
   kChecksumBenchmarkOcramBuffer,
 };
@@ -64,6 +69,7 @@ enum class InterruptUse : std::uint8_t {
   kAdc1DmaCompletion,
   kAdcEtcError,
   kGpioDmaCompletion,
+  kAuxOutputDmaCompletion,
 };
 
 struct PinAllocation {
@@ -74,6 +80,11 @@ struct PinAllocation {
 struct GpioPinMapping {
   std::uint8_t teensy_pin;
   std::uint8_t gpio2_bit;
+};
+
+struct OutputPinMapping {
+  std::uint8_t teensy_pin;
+  std::uint8_t gpio1_bit;
 };
 
 enum class AdcInputPad : std::uint8_t {
@@ -132,6 +143,8 @@ struct MemoryAllocation {
 
 struct InterruptAllocation {
   InterruptUse use;
+  std::uint8_t irq_number;
+  std::uint8_t vector_index;
   std::uint8_t priority;
   ResourceOwner owner;
 };
@@ -214,11 +227,34 @@ inline constexpr std::uint8_t kGpioPitChannel = 0U;
 inline constexpr std::uint8_t kGpioEdmaChannel = 2U;
 inline constexpr std::uint8_t kGpioEdmaPriority = 0U;
 inline constexpr std::uint8_t kGpioEdmaIrqPriority = 64U;
-// Protect both 1 MHz result registers from the continuous 4 MHz GPIO request.
-// ADC0 is triggered 500 ns first and has the highest fixed priority, ADC1 is
-// next, and GPIO retains the remaining bus slots at the lowest priority.
-inline constexpr std::uint8_t kAdcEdmaPriorities[] = {2U, 1U};
+// Protect both 1 MHz result registers from the 1 MHz output write and the
+// continuous 4 MHz GPIO request. ADC0 is triggered 500 ns first and has the
+// highest fixed priority, ADC1 is next, output is third, and GPIO retains the
+// remaining bus slots at the lowest priority.
+inline constexpr std::uint8_t kAdcEdmaPriorities[] = {3U, 2U};
 inline constexpr std::uint8_t kAdcEdmaIrqPriority = 48U;
+inline constexpr std::uint8_t kAuxOutputEdmaPriority = 1U;
+inline constexpr std::uint8_t kAuxOutputEdmaIrqPriority = 56U;
+inline constexpr std::uint8_t kAuxOutputEdmaChannel = 3U;
+inline constexpr std::uint8_t kAuxOutputDmaIrqNumber = 3U;
+inline constexpr std::uint8_t kAuxOutputDmaVectorIndex =
+    kAuxOutputDmaIrqNumber + 16U;
+
+inline constexpr std::uint8_t kAuxOutputPinsByBit[] = {
+    16U, 17U, 18U, 19U, 20U, 21U, 22U, 23U};
+// Array order is the logical output bit. Teensy startup selects GPIO6 through
+// GPR26; ARM clears exactly these bits to select DMA-visible GPIO1.
+inline constexpr OutputPinMapping kAuxOutputMappingsByBit[] = {
+    {16U, 23U}, {17U, 22U}, {18U, 17U}, {19U, 16U},
+    {20U, 26U}, {21U, 27U}, {22U, 24U}, {23U, 25U},
+};
+inline constexpr std::uint32_t kAuxOutputGpio1Mask =
+    (std::uint32_t{1U} << 23U) | (std::uint32_t{1U} << 22U) |
+    (std::uint32_t{1U} << 17U) | (std::uint32_t{1U} << 16U) |
+    (std::uint32_t{1U} << 26U) | (std::uint32_t{1U} << 27U) |
+    (std::uint32_t{1U} << 24U) | (std::uint32_t{1U} << 25U);
+inline constexpr std::uint32_t kGpio6ToGpio1Gpr26ClearMask =
+    kAuxOutputGpio1Mask;
 
 // The later ADC1 completion IRQ is the paired path's sole wakeup; progress is
 // inferred from both live TCDs after immediately acknowledging the latches, so
@@ -227,14 +263,17 @@ inline constexpr std::uint8_t kAdcEdmaIrqPriority = 48U;
 // the same generation state. GPIO tolerates either preempting its lower-priority
 // completion interrupt.
 inline constexpr InterruptAllocation kInterruptAllocations[] = {
-    {InterruptUse::kAdc0DmaCompletion, kAdcEdmaIrqPriority,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, kAdcEdmaIrqPriority,
      ResourceOwner::kAdc0Capture},
-    {InterruptUse::kAdc1DmaCompletion, kAdcEdmaIrqPriority,
+    {InterruptUse::kAdc1DmaCompletion, 1U, 17U, kAdcEdmaIrqPriority,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdcEtcError, kAdcEdmaIrqPriority,
+    {InterruptUse::kAdcEtcError, 121U, 137U, kAdcEdmaIrqPriority,
      ResourceOwner::kAdcCapture},
-    {InterruptUse::kGpioDmaCompletion, kGpioEdmaIrqPriority,
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, kGpioEdmaIrqPriority,
      ResourceOwner::kGpioCapture},
+    {InterruptUse::kAuxOutputDmaCompletion, kAuxOutputDmaIrqNumber,
+     kAuxOutputDmaVectorIndex, kAuxOutputEdmaIrqPriority,
+     ResourceOwner::kAuxOutput},
 };
 
 inline constexpr PinAllocation kPinAllocations[] = {
@@ -248,6 +287,14 @@ inline constexpr PinAllocation kPinAllocations[] = {
     {kGpioPinsByBit[5], ResourceOwner::kGpioCapture},
     {kGpioPinsByBit[6], ResourceOwner::kGpioCapture},
     {kGpioPinsByBit[7], ResourceOwner::kGpioCapture},
+    {kAuxOutputPinsByBit[0], ResourceOwner::kAuxOutput},
+    {kAuxOutputPinsByBit[1], ResourceOwner::kAuxOutput},
+    {kAuxOutputPinsByBit[2], ResourceOwner::kAuxOutput},
+    {kAuxOutputPinsByBit[3], ResourceOwner::kAuxOutput},
+    {kAuxOutputPinsByBit[4], ResourceOwner::kAuxOutput},
+    {kAuxOutputPinsByBit[5], ResourceOwner::kAuxOutput},
+    {kAuxOutputPinsByBit[6], ResourceOwner::kAuxOutput},
+    {kAuxOutputPinsByBit[7], ResourceOwner::kAuxOutput},
 };
 
 // PIT0 is the exact 4 MHz GPIO master. PIT1 is chained down to the proposed
@@ -263,8 +310,22 @@ inline constexpr PitAllocation kPitAllocations[] = {
 inline constexpr std::uint8_t kGpioXbarInput = kXbarPitTrigger0Input;
 inline constexpr std::uint8_t kGpioXbarOutput = kXbarDmaRequest30Output;
 inline constexpr std::uint8_t kGpioXbarActiveEdge = 1U;
+inline constexpr std::uint8_t kAuxOutputXbarInput = kXbarPitTrigger1Input;
+inline constexpr std::uint8_t kAuxOutputXbarOutput =
+    kXbarDmaRequest31Output;
+inline constexpr std::uint8_t kAuxOutputXbarActiveEdge = 1U;
+inline constexpr std::uint8_t kGpioXbarRegisterIndex =
+    kGpioXbarOutput / 2U;
+inline constexpr std::uint8_t kAuxOutputXbarRegisterIndex =
+    kAuxOutputXbarOutput / 2U;
+inline constexpr std::uint8_t kGpioXbarRegisterShift =
+    (kGpioXbarOutput % 2U) * 8U;
+inline constexpr std::uint8_t kAuxOutputXbarRegisterShift =
+    (kAuxOutputXbarOutput % 2U) * 8U;
 inline constexpr XbarRoute kXbarRoutes[] = {
     {kGpioXbarInput, kGpioXbarOutput, ResourceOwner::kGpioCapture},
+    {kAuxOutputXbarInput, kAuxOutputXbarOutput,
+     ResourceOwner::kAuxOutput},
     {kAdcConverterConfigurations[0].xbar_input,
      kAdcConverterConfigurations[0].xbar_output,
      kAdcConverterConfigurations[0].owner},
@@ -284,6 +345,8 @@ inline constexpr AdcEtcAllocation kAdcEtcAllocations[] = {
 
 inline constexpr std::uint8_t kGpioDmamuxSource =
     kDmamuxXbar1Request0Source;
+inline constexpr std::uint8_t kAuxOutputDmamuxSource =
+    kDmamuxXbar1Request1Source;
 inline constexpr EdmaAllocation kEdmaAllocations[] = {
     {kAdcConverterConfigurations[0].edma_channel,
      kAdcConverterConfigurations[0].dmamux_source,
@@ -292,6 +355,8 @@ inline constexpr EdmaAllocation kEdmaAllocations[] = {
      kAdcConverterConfigurations[1].dmamux_source,
      kAdcConverterConfigurations[1].owner},
     {kGpioEdmaChannel, kGpioDmamuxSource, ResourceOwner::kGpioCapture},
+    {kAuxOutputEdmaChannel, kAuxOutputDmamuxSource,
+     ResourceOwner::kAuxOutput},
 };
 
 inline constexpr std::size_t kCommandParserCapacityBytes = 64U;
@@ -316,13 +381,13 @@ inline constexpr std::size_t kGpioRawBuffersPerLoop = 2U;
 inline constexpr std::size_t kGpioPackedFramesPerLoop = 2U;
 inline constexpr std::size_t kGpioPackerStateBudgetBytes = 2048U;
 // At the nominal combined framed rate, each 4096-byte buffer represents 0.506
-// ms. Keep a 105-frame primary bank in cacheless DTCM, then add a fixed
-// 95-frame CPU-owned OCRAM reserve. The complete 200-frame pool retains
-// 101.200 ms and the pinned core contributes another 1.012 ms in four 2048-byte
-// TX buffers. This covers the 60.715 ms Phase 05 service gap while retaining at
-// least 32 KiB of target RAM1 for locals/stack and every future DMA-ring budget.
-inline constexpr std::size_t kPacketBufferPrimaryCount = 105U;
-inline constexpr std::size_t kPacketBufferReserveCount = 95U;
+// ms. The output-capable image keeps 103 frames in cacheless DTCM and 91 in
+// CPU-owned OCRAM after transferring exactly six pages to output. The remaining
+// 194 frames retain 98.164 ms and the pinned core contributes another 1.012 ms
+// in four 2048-byte TX buffers. This covers the 60.715 ms Phase 05 service gap
+// while retaining at least 32 KiB of target RAM1 for locals/stack.
+inline constexpr std::size_t kPacketBufferPrimaryCount = 103U;
+inline constexpr std::size_t kPacketBufferReserveCount = 91U;
 inline constexpr std::size_t kPacketBufferCount =
     kPacketBufferPrimaryCount + kPacketBufferReserveCount;
 inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
@@ -372,10 +437,8 @@ inline constexpr std::size_t kAdcDmaBufferStrideBytes =
     alignUp(protocol_v1::kDataPayloadBytes, kCacheLineBytes);
 inline constexpr std::size_t kEdmaTcdBytes = 32U;
 
-// Experimental auxiliary-output repartition candidate. These constants do
-// not change the active packet pool or instantiate storage in the target
-// image. They prove the exact six-page exchange to be applied only after the
-// portable engine and linker gate are accepted.
+// Active auxiliary-output repartition. The linked image exchanges two DTCM
+// and four OCRAM packet pages for these exact fixed allocations.
 inline constexpr std::size_t kAuxOutputProgramPageCount = 2U;
 inline constexpr std::size_t kAuxOutputDmaPageCount = 4U;
 inline constexpr std::size_t kAuxOutputProgramStorageBytes =
@@ -391,17 +454,22 @@ inline constexpr std::size_t kAuxOutputDmaBlockBytes =
     kAuxOutputDmaStateStorageBytes / kAuxOutputDmaBlockCount;
 inline constexpr std::size_t kAuxOutputStatesPerBlock =
     kAuxOutputDmaBlockBytes / sizeof(std::uint32_t);
-inline constexpr std::size_t kAuxOutputCandidatePacketPrimaryCount =
-    kPacketBufferPrimaryCount - kAuxOutputProgramPageCount;
-inline constexpr std::size_t kAuxOutputCandidatePacketReserveCount =
-    kPacketBufferReserveCount - kAuxOutputDmaPageCount;
-inline constexpr std::size_t kAuxOutputCandidatePacketCount =
-    kAuxOutputCandidatePacketPrimaryCount +
-    kAuxOutputCandidatePacketReserveCount;
-inline constexpr std::uint64_t kAuxOutputCandidateRetentionUs =
-    (static_cast<std::uint64_t>(kAuxOutputCandidatePacketCount) *
+inline constexpr std::uint64_t kPacketRetentionUs =
+    (static_cast<std::uint64_t>(kPacketBufferCount) *
      protocol_v1::kFrameCoverageTicks * 1000000U) /
     (2U * protocol_v1::kTimestampHz);
+inline constexpr std::uint64_t kPinnedUsbCdcTxRetentionUs =
+    (static_cast<std::uint64_t>(kPinnedUsbCdcTxStorageBytes) *
+     protocol_v1::kFrameCoverageTicks * 1000000U) /
+    (std::uint64_t{2U} * protocol_v1::kTimestampHz *
+     protocol_v1::kDataFrameBytes);
+inline constexpr std::uint64_t kPacketAndUsbRetentionUs =
+    kPacketRetentionUs + kPinnedUsbCdcTxRetentionUs;
+inline constexpr std::uint64_t kHistoricalMaximumUsbServiceGapUs = 60715U;
+inline constexpr std::uint64_t kPacketRetentionMarginUs =
+    kPacketRetentionUs - kHistoricalMaximumUsbServiceGapUs;
+inline constexpr std::uint64_t kPacketAndUsbRetentionMarginUs =
+    kPacketAndUsbRetentionUs - kHistoricalMaximumUsbServiceGapUs;
 inline constexpr std::size_t kAdcDmaRingBytes =
     kAdcDmaRingDepth * kAdcDmaBufferStrideBytes;
 inline constexpr std::size_t kAdcDmaOverflowSinkBytes = kCacheLineBytes;
@@ -439,13 +507,15 @@ inline constexpr std::size_t kPacketIndexStorageBytes =
 // not appear here as duplicate 4,096-byte banks.
 inline constexpr std::size_t kCombinedAcquisitionRam1BufferBytes =
     kPacketBufferPrimaryStorageBytes + kPacketPipelineStateBudgetBytes +
-    kAdcPackerStateBudgetBytes + kGpioPackerStateBudgetBytes;
+    kAdcPackerStateBudgetBytes + kGpioPackerStateBudgetBytes +
+    kAuxOutputProgramStorageBytes;
 inline constexpr std::size_t kCombinedAcquisitionRam2BufferBytes =
     kPacketBufferReserveStorageBytes + kAdcDmaRingBytes +
     kAdcDmaOverflowSinkBytes + kAdcDmaDescriptorBytes +
     kGpioRawDmaRingBytes + kGpioRawDmaOverflowSinkBytes +
     kGpioRawDmaDescriptorBytes +
-    kGpioPackedRingDepth * kGpioPackedBufferStrideBytes;
+    kGpioPackedRingDepth * kGpioPackedBufferStrideBytes +
+    kAuxOutputDmaAllocationBytes;
 inline constexpr std::size_t kCombinedAcquisitionAndUsbRam2BufferBytes =
     kCombinedAcquisitionRam2BufferBytes + kPinnedUsbCdcTxStorageBytes;
 
@@ -502,6 +572,15 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kGpioClockDiagnosticSink, MemoryRegion::kOcramRam2Dma,
      kGpioClockDiagnosticSinkBytes, kCacheLineBytes,
      ResourceOwner::kGpioCapture},
+    {MemoryUse::kAuxOutputProgramStorage, MemoryRegion::kDtcmRam1,
+     kAuxOutputProgramStorageBytes, kCacheLineBytes,
+     ResourceOwner::kAuxOutput},
+    {MemoryUse::kAuxOutputDmaRing, MemoryRegion::kOcramRam2Dma,
+     kAuxOutputDmaStateStorageBytes, kCacheLineBytes,
+     ResourceOwner::kAuxOutput},
+    {MemoryUse::kAuxOutputDmaDescriptors, MemoryRegion::kOcramRam2Dma,
+     kAuxOutputDmaDescriptorBytes, kCacheLineBytes,
+     ResourceOwner::kAuxOutput},
     {MemoryUse::kChecksumBenchmarkOcramBuffer,
      MemoryRegion::kOcramRam2Dma, kChecksumBenchmarkBufferBytes,
      kCacheLineBytes, ResourceOwner::kChecksumBenchmark},
@@ -548,6 +627,39 @@ constexpr bool validGpioPinMappings(
 template <std::size_t MappingN, std::size_t PinN>
 constexpr bool gpioPinOrderMatches(
     const GpioPinMapping (&mappings)[MappingN],
+    const std::uint8_t (&pins)[PinN]) {
+  if (MappingN != PinN) {
+    return false;
+  }
+  for (std::size_t index = 0; index < MappingN; ++index) {
+    if (mappings[index].teensy_pin != pins[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <std::size_t N>
+constexpr bool validOutputPinMappings(
+    const OutputPinMapping (&mappings)[N]) {
+  for (std::size_t left = 0; left < N; ++left) {
+    if (mappings[left].teensy_pin >= kTeensy40DigitalPinCount ||
+        mappings[left].gpio1_bit >= kGpioPortBitCount) {
+      return false;
+    }
+    for (std::size_t right = left + 1U; right < N; ++right) {
+      if (mappings[left].teensy_pin == mappings[right].teensy_pin ||
+          mappings[left].gpio1_bit == mappings[right].gpio1_bit) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+template <std::size_t MappingN, std::size_t PinN>
+constexpr bool outputPinOrderMatches(
+    const OutputPinMapping (&mappings)[MappingN],
     const std::uint8_t (&pins)[PinN]) {
   if (MappingN != PinN) {
     return false;
@@ -690,12 +802,13 @@ constexpr bool validEdmaAllocations(const EdmaAllocation (&allocations)[N]) {
 template <std::size_t N>
 constexpr bool validEdmaPriorities(
     const std::uint8_t (&adc_priorities)[N],
-    std::uint8_t gpio_priority) {
+    std::uint8_t output_priority, std::uint8_t gpio_priority) {
   if (N != kLogicalAdcCount) {
     return false;
   }
   for (std::size_t left = 0U; left < N; ++left) {
-    if (adc_priorities[left] == gpio_priority) {
+    if (adc_priorities[left] == output_priority ||
+        adc_priorities[left] == gpio_priority) {
       return false;
     }
     for (std::size_t right = left + 1U; right < N; ++right) {
@@ -704,7 +817,9 @@ constexpr bool validEdmaPriorities(
       }
     }
   }
-  return true;
+  return adc_priorities[0] > adc_priorities[1] &&
+         adc_priorities[1] > output_priority &&
+         output_priority > gpio_priority;
 }
 
 constexpr bool isPowerOfTwo(std::size_t value) {
@@ -732,18 +847,30 @@ constexpr bool validMemoryAllocations(
 template <std::size_t N>
 constexpr bool validInterruptAllocations(
     const InterruptAllocation (&allocations)[N]) {
-  if (N != 4U) {
+  if (N != 5U) {
     return false;
   }
   bool adc0_seen = false;
   bool adc1_seen = false;
   bool adc_etc_seen = false;
   bool gpio_seen = false;
+  bool output_seen = false;
   std::uint8_t adc0_priority = 0U;
   std::uint8_t adc1_priority = 0U;
   std::uint8_t adc_etc_priority = 0U;
   std::uint8_t gpio_priority = 0U;
+  std::uint8_t output_priority = 0U;
   for (const InterruptAllocation &allocation : allocations) {
+    if (allocation.vector_index != allocation.irq_number + 16U) {
+      return false;
+    }
+    for (const InterruptAllocation &later : allocations) {
+      if (&allocation != &later &&
+          (allocation.irq_number == later.irq_number ||
+           allocation.vector_index == later.vector_index)) {
+        return false;
+      }
+    }
     switch (allocation.use) {
       case InterruptUse::kAdc0DmaCompletion:
         if (adc0_seen || allocation.owner != ResourceOwner::kAdc0Capture) {
@@ -773,14 +900,21 @@ constexpr bool validInterruptAllocations(
         gpio_seen = true;
         gpio_priority = allocation.priority;
         break;
+      case InterruptUse::kAuxOutputDmaCompletion:
+        if (output_seen || allocation.owner != ResourceOwner::kAuxOutput) {
+          return false;
+        }
+        output_seen = true;
+        output_priority = allocation.priority;
+        break;
       default:
         return false;
     }
   }
-  return adc0_seen && adc1_seen && adc_etc_seen && gpio_seen &&
+  return adc0_seen && adc1_seen && adc_etc_seen && gpio_seen && output_seen &&
          adc0_priority == adc1_priority &&
          adc0_priority == adc_etc_priority &&
-         adc0_priority < gpio_priority;
+         adc0_priority < output_priority && output_priority < gpio_priority;
 }
 
 constexpr bool dmaWritesMemory(MemoryUse use) {
@@ -792,8 +926,14 @@ constexpr bool dmaWritesMemory(MemoryUse use) {
          use == MemoryUse::kGpioRawDmaDescriptors;
 }
 
+constexpr bool dmaReadsMemory(MemoryUse use) {
+  return use == MemoryUse::kAuxOutputDmaRing ||
+         use == MemoryUse::kAuxOutputDmaDescriptors;
+}
+
 constexpr bool cacheSensitiveMemory(MemoryUse use) {
-  return dmaWritesMemory(use) || use == MemoryUse::kPacketBufferStorage ||
+  return dmaWritesMemory(use) || dmaReadsMemory(use) ||
+         use == MemoryUse::kPacketBufferStorage ||
          use == MemoryUse::kPacketBufferReserveStorage ||
          use == MemoryUse::kGpioPackedRing ||
          use == MemoryUse::kGpioClockDiagnosticSink ||
@@ -805,7 +945,7 @@ template <std::size_t N>
 constexpr bool validAcquisitionMemoryRegions(
     const MemoryAllocation (&allocations)[N]) {
   for (const MemoryAllocation &allocation : allocations) {
-    if (dmaWritesMemory(allocation.use) &&
+    if ((dmaWritesMemory(allocation.use) || dmaReadsMemory(allocation.use)) &&
         allocation.region != MemoryRegion::kOcramRam2Dma) {
       return false;
     }
@@ -872,12 +1012,17 @@ inline constexpr AcquisitionResourceContract kAcquisitionResourceContract{
     validPins(kPinAllocations) &&
         validGpioPinMappings(kGpioMappingsByPackedBit) &&
         gpioPinOrderMatches(kGpioMappingsByPackedBit, kGpioPinsByBit) &&
+        validOutputPinMappings(kAuxOutputMappingsByBit) &&
+        outputPinOrderMatches(kAuxOutputMappingsByBit,
+                              kAuxOutputPinsByBit) &&
         validAdcConverterConfigurations(kAdcConverterConfigurations),
     validPitAllocations(kPitAllocations),
     validXbarRoutes(kXbarRoutes),
     validAdcEtcAllocations(kAdcEtcAllocations),
     validEdmaAllocations(kEdmaAllocations) &&
-        validEdmaPriorities(kAdcEdmaPriorities, kGpioEdmaPriority),
+        validEdmaPriorities(kAdcEdmaPriorities,
+                            kAuxOutputEdmaPriority,
+                            kGpioEdmaPriority),
     validInterruptAllocations(kInterruptAllocations),
     validMemoryAllocations(kMemoryAllocations) &&
         kReservedRam1Bytes <= kRam1BudgetBytes &&
@@ -891,6 +1036,11 @@ static_assert(validGpioPinMappings(kGpioMappingsByPackedBit),
               "GPIO map is unsupported or contains duplicate pins/bits");
 static_assert(gpioPinOrderMatches(kGpioMappingsByPackedBit, kGpioPinsByBit),
               "GPIO resource map and packed pin order disagree");
+static_assert(validOutputPinMappings(kAuxOutputMappingsByBit),
+              "output GPIO map is unsupported or contains duplicate pins/bits");
+static_assert(outputPinOrderMatches(kAuxOutputMappingsByBit,
+                                    kAuxOutputPinsByBit),
+              "output GPIO resource map and logical pin order disagree");
 static_assert(validAdcConverterConfigurations(kAdcConverterConfigurations),
               "ADC converter route is unsupported or conflicts");
 static_assert(countOf(kAdcConverterConfigurations) == kLogicalAdcCount);
@@ -930,16 +1080,32 @@ static_assert(kGpio2PsrCaptureMask == 0x00030C0FU,
               "GPIO2 capture and GPR27 masks must cover only D6-D13");
 static_assert(kGpio7ToGpio2Gpr27ClearMask == kGpio2PsrCaptureMask,
               "GPIO2 direction/read and GPR27 selection masks disagree");
+static_assert(kAuxOutputGpio1Mask == 0x0FC30000U,
+              "GPIO1 output and GPR26 masks must cover only D16-D23");
+static_assert(kGpio6ToGpio1Gpr26ClearMask == kAuxOutputGpio1Mask,
+              "GPIO1 direction/write and GPR26 selection masks disagree");
+static_assert(sameBytes(kAuxOutputPinsByBit,
+                        protocol_v2::kOutputPinsByLogicalBit),
+              "resource registry and protocol-v2 output pin maps disagree");
+static_assert(kAuxOutputGpio1Mask ==
+              protocol_v2::kOutputGpioAggregateMask);
 static_assert(validPitAllocations(kPitAllocations),
               "PIT channel allocation is unsupported or conflicts");
 static_assert(validXbarRoutes(kXbarRoutes),
               "XBAR output allocation is unsupported or conflicts");
+static_assert(kGpioXbarRegisterIndex == kAuxOutputXbarRegisterIndex &&
+                  kGpioXbarRegisterShift != kAuxOutputXbarRegisterShift,
+              "shared XBAR selector/control register fields must be disjoint");
+static_assert(kAuxOutputXbarInput == protocol_v2::kOutputXbarInput);
+static_assert(kAuxOutputXbarOutput == protocol_v2::kOutputXbarOutput);
 static_assert(validAdcEtcAllocations(kAdcEtcAllocations),
               "ADC_ETC allocation is unsupported or conflicts");
 static_assert(validEdmaAllocations(kEdmaAllocations),
               "eDMA allocation is unsupported or conflicts");
-static_assert(validEdmaPriorities(kAdcEdmaPriorities, kGpioEdmaPriority),
-              "eDMA arbitration priorities must be unique");
+static_assert(validEdmaPriorities(kAdcEdmaPriorities,
+                                 kAuxOutputEdmaPriority,
+                                 kGpioEdmaPriority),
+              "eDMA arbitration must be ADC0 > ADC1 > output > GPIO");
 static_assert(validInterruptAllocations(kInterruptAllocations),
               "acquisition IRQ priorities are incomplete or unsafe");
 static_assert(validMemoryAllocations(kMemoryAllocations),
@@ -986,6 +1152,9 @@ static_assert(kAdcDmaDescriptorBytes % kCacheLineBytes == 0U,
 static_assert(countOf(kAdcEdmaPriorities) == kLogicalAdcCount);
 static_assert(kAdcEdmaIrqPriority < kGpioEdmaIrqPriority,
               "ADC completion/error IRQs must preempt GPIO completion");
+static_assert(kAdcEdmaIrqPriority < kAuxOutputEdmaIrqPriority &&
+                  kAuxOutputEdmaIrqPriority < kGpioEdmaIrqPriority,
+              "IRQ arbitration must be ADC > output > GPIO");
 static_assert(kGpioRawDmaBufferBytes % kCacheLineBytes == 0U,
               "each raw GPIO DMA buffer must occupy complete cache lines");
 static_assert(kGpioRawDmaRingDepth >= 2U,
@@ -1011,19 +1180,51 @@ static_assert(kAuxOutputDmaStateStorageBytes == 16256U);
 static_assert(kAuxOutputDmaBlockBytes == 4064U);
 static_assert(kAuxOutputStatesPerBlock == 1016U);
 static_assert(kAuxOutputDmaStateStorageBytes % kCacheLineBytes == 0U);
-static_assert(kAuxOutputCandidatePacketPrimaryCount == 103U);
-static_assert(kAuxOutputCandidatePacketReserveCount == 91U);
-static_assert(kAuxOutputCandidatePacketCount == 194U);
-static_assert(kAuxOutputCandidateRetentionUs == 98164U);
-static_assert((kAuxOutputCandidatePacketPrimaryCount *
+static_assert(kPacketBufferPrimaryCount == 103U);
+static_assert(kPacketBufferReserveCount == 91U);
+static_assert(kPacketBufferCount == 194U);
+static_assert(kPacketRetentionUs == 98164U);
+static_assert(kPinnedUsbCdcTxRetentionUs == 1012U);
+static_assert(kPacketAndUsbRetentionUs == 99176U);
+static_assert(kPacketRetentionMarginUs == 37449U);
+static_assert(kPacketAndUsbRetentionMarginUs == 38461U);
+static_assert(kPacketBufferPrimaryCount ==
+              protocol_v2::kOutputPacketPrimaryCount);
+static_assert(kPacketBufferReserveCount ==
+              protocol_v2::kOutputPacketReserveCount);
+static_assert(kPacketRetentionUs == protocol_v2::kOutputPacketRetentionUs);
+static_assert(kPacketAndUsbRetentionUs ==
+              protocol_v2::kOutputPacketAndUsbRetentionUs);
+static_assert(kAuxOutputProgramStorageBytes ==
+              protocol_v2::kOutputProgramStorageBytes);
+static_assert(kAuxOutputDmaStateStorageBytes ==
+              protocol_v2::kOutputDmaRingBytes);
+static_assert(kAuxOutputDmaDescriptorBytes ==
+              protocol_v2::kOutputDmaDescriptorBytes);
+static_assert(kAuxOutputEdmaChannel == protocol_v2::kOutputEdmaChannel);
+static_assert(kAuxOutputDmamuxSource == protocol_v2::kOutputDmamuxSource);
+static_assert(kAuxOutputEdmaPriority == protocol_v2::kOutputEdmaPriority);
+static_assert(kAdcEdmaPriorities[0] ==
+                  protocol_v2::kOutputAdcEdmaPriorities[0] &&
+              kAdcEdmaPriorities[1] ==
+                  protocol_v2::kOutputAdcEdmaPriorities[1]);
+static_assert(kGpioEdmaPriority ==
+              protocol_v2::kOutputGpioEdmaPriority);
+static_assert(kAuxOutputDmaIrqNumber ==
+              protocol_v2::kOutputDmaIrqNumber);
+static_assert(kAuxOutputDmaVectorIndex ==
+              protocol_v2::kOutputDmaVectorIndex);
+static_assert(kAuxOutputEdmaIrqPriority ==
+              protocol_v2::kOutputDmaIrqPriority);
+static_assert((kPacketBufferPrimaryCount *
                    protocol_v1::kDataFrameBytes) +
                       kAuxOutputProgramStorageBytes ==
-                  kPacketBufferPrimaryStorageBytes,
+                  105U * protocol_v1::kDataFrameBytes,
               "output program must replace exactly two DTCM packet pages");
-static_assert((kAuxOutputCandidatePacketReserveCount *
+static_assert((kPacketBufferReserveCount *
                    protocol_v1::kDataFrameBytes) +
                       kAuxOutputDmaAllocationBytes ==
-                  kPacketBufferReserveStorageBytes,
+                  95U * protocol_v1::kDataFrameBytes,
               "output DMA must replace exactly four OCRAM packet pages");
 static_assert(kChecksumBenchmarkBufferBytes % kCacheLineBytes == 0U,
               "benchmark buffers must occupy complete cache lines");
@@ -1048,7 +1249,9 @@ static_assert(kGpioPackedRingDepth == protocol_v1::kGpioPackedRingDepth);
 static_assert(kGpioRawDmaRingBytes == protocol_v1::kGpioRawRingBytes);
 static_assert(kGpioPackedRingDepth * kGpioPackedBufferStrideBytes ==
               protocol_v1::kGpioPackedRingBytes);
-static_assert(kPacketBufferCount == protocol_v1::kGpioPacketBufferCount);
+// Protocol v1 remains byte-frozen at the baseline resource advertisement.
+// The output-capable branch records its active 194-page partition and raised
+// ADC priorities in the v2 output metadata and deterministic build manifest.
 static_assert(kAdcDmaRingDepth == protocol_v1::kAdcDmaRingDepth);
 static_assert(protocol_v1::kDataPayloadBytes / protocol_v1::kAdcPairBytes ==
               protocol_v1::kAdcPairsPerBuffer);
@@ -1057,23 +1260,12 @@ static_assert(kAdcConverterConfigurations[0].edma_channel ==
               protocol_v1::kAdcEdmaChannels[0]);
 static_assert(kAdcConverterConfigurations[1].edma_channel ==
               protocol_v1::kAdcEdmaChannels[1]);
-static_assert(kAdcEdmaPriorities[0] ==
-                  protocol_v1::kAdcEdmaPriorities[0] &&
-              kAdcEdmaPriorities[1] ==
-                  protocol_v1::kAdcEdmaPriorities[1]);
 static_assert(kAdcConverterConfigurations[0].dmamux_source ==
               protocol_v1::kAdcDmamuxSources[0]);
 static_assert(kAdcConverterConfigurations[1].dmamux_source ==
               protocol_v1::kAdcDmamuxSources[1]);
 static_assert(kAdcEdmaIrqPriority == protocol_v1::kAdcDmaIrqPriority);
 static_assert(kGpioEdmaIrqPriority == protocol_v1::kGpioDmaIrqPriority);
-static_assert(kPacketBufferCount == protocol_v1::kPacketBufferCount);
-static_assert(kPacketBufferPrimaryCount == protocol_v1::kPacketPrimaryCount);
-static_assert(kPacketBufferReserveCount == protocol_v1::kPacketReserveCount);
-static_assert(kPacketReadyQueueDepth ==
-              protocol_v1::kPacketReadyQueueCapacity);
-static_assert(kPacketTransmitQueueDepth ==
-              protocol_v1::kPacketTransmitQueueCapacity);
 static_assert(kCommandQueueDepth == protocol_v1::kCommandQueueCapacity);
 static_assert(kResponseQueueDepth == protocol_v1::kResponseQueueCapacity);
 static_assert(kGpioPitChannel == protocol_v1::kGpioPitChannel);

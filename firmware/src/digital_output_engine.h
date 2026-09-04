@@ -45,6 +45,15 @@ struct alignas(board::kCacheLineBytes) DmaBlockStorage {
       blocks{};
 };
 
+// Four fixed 32-byte hardware TCD images are reserved separately from the
+// source words so the linker manifest can prove both ranges independently.
+struct alignas(board::kCacheLineBytes) DmaDescriptorStorage {
+  std::array<std::array<std::uint32_t,
+                        board::kEdmaTcdBytes / sizeof(std::uint32_t)>,
+             board::kAuxOutputDmaBlockCount>
+      descriptors{};
+};
+
 struct BlockRecord {
   BlockState state = BlockState::kFree;
   std::uint32_t upload_generation = 0U;
@@ -239,5 +248,8 @@ class Engine final : public Participant {
 static_assert(sizeof(DmaBlockStorage) ==
               board::kAuxOutputDmaStateStorageBytes);
 static_assert(alignof(DmaBlockStorage) == board::kCacheLineBytes);
+static_assert(sizeof(DmaDescriptorStorage) ==
+              board::kAuxOutputDmaDescriptorBytes);
+static_assert(alignof(DmaDescriptorStorage) == board::kCacheLineBytes);
 
 }  // namespace thingdaq::digital_output

@@ -1,15 +1,9 @@
-/*
- * ThingDAQ Phase 07 synchronized GPIO and dual-ADC runtime.
- *
- * Native USB and its chip-derived serial descriptor are initialized by the
- * pinned Teensy core before global C++ construction and setup(). The portable
- * runtime owns all bounded parser, state, statistics, and transport work.
- */
 #include "src/firmware_runtime.h"
 #include "src/adc_dma_capture_teensy.h"
 #include "src/adc_initializer_teensy.h"
 #include "src/adc_trigger_teensy.h"
 #include "src/checksum_benchmark_teensy.h"
+#include "src/digital_output_engine.h"
 #include "src/gpio_clock_diagnostic_teensy.h"
 #include "src/gpio_capture_diagnostic_teensy.h"
 #include "src/gpio_raw_capture_teensy.h"
@@ -22,6 +16,9 @@ thingdaq::usb::TeensyCdcByteStream cdc_stream{};
 thingdaq::packet::PacketBufferPrimaryStorage packet_storage_primary{};
 DMAMEM thingdaq::packet::PacketBufferReserveStorage packet_storage_reserve{};
 thingdaq::packet::PacketBufferStorage packet_storage{packet_storage_primary, packet_storage_reserve};
+thingdaq::digital_output::ProgramStorage aux_output_program_storage{};
+DMAMEM thingdaq::digital_output::DmaBlockStorage aux_output_dma_ring{};
+DMAMEM thingdaq::digital_output::DmaDescriptorStorage aux_output_dma_descriptors{};
 thingdaq::gpio_packer::GpioBatchPacker gpio_packer{
     thingdaq::gpio_capture::teensyRawCapture(),
     thingdaq::gpio_packer::teensyPackedBufferStorage(),
@@ -42,9 +39,12 @@ thingdaq::runtime::FirmwareRuntime firmware_runtime{
 }  // namespace
 
 void setup() {
-  // Do not initialize the Arduino serial facade, wait for DTR, or emit a
-  // banner. Both ADC modules are explicitly reconfigured and independently
-  // calibrated under a DWT deadline before the bounded BOOT completion.
+  // Retain reserved output storage without touching pins or registers; the
+  // adapter claims it later. BOOT remains bounded and banner-free.
+  asm volatile("" : : "r"(&aux_output_program_storage),
+                       "r"(&aux_output_dma_ring),
+                       "r"(&aux_output_dma_descriptors)
+               : "memory");
   (void)firmware_runtime.begin(thingdaq::usb::hardwareSerialNumber());
 }
 

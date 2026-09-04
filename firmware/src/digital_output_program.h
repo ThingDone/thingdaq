@@ -21,7 +21,7 @@ struct Segment {
 // The payload allocation is deliberately exactly two packet pages. Metadata
 // lives in ProgramStore so a future target adapter can place only this object
 // in the proposed DTCM packet-page repartition.
-struct ProgramStorage {
+struct alignas(32U) ProgramStorage {
   std::array<Segment, kSegmentCapacity> segments{};
 };
 
@@ -100,5 +100,6 @@ static_assert(sizeof(Segment) == protocol_v2::kOutputSegmentBytes);
 static_assert(sizeof(ProgramStorage) ==
               protocol_v2::kOutputSegmentCapacity *
                   protocol_v2::kOutputSegmentBytes);
+static_assert(alignof(ProgramStorage) == 32U);
 
 }  // namespace thingdaq::digital_output

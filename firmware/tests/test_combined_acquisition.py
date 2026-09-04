@@ -69,11 +69,19 @@ def _section(linker_map: str, name: str) -> tuple[int, int]:
 
 
 def _combined_spans(linker_map: str) -> tuple[list[Span], dict[str, Any]]:
-    packet = build_firmware.packet_buffer_usage(linker_map)
+    symbols = build_firmware.parse_nm_symbols(linker_map)
+    packet_banks: dict[str, dict[str, Any]] = {}
+    for name, symbol in (
+        ("DTCM_PRIMARY", "(anonymous namespace)::packet_storage_primary"),
+        ("OCRAM_RESERVE", "(anonymous namespace)::packet_storage_reserve"),
+    ):
+        address, size, _ = symbols[symbol]
+        packet_banks[name] = {"address": f"0x{address:08x}", "bytes": size}
+    packet = {"banks": packet_banks}
     adc = build_firmware.adc_dma_buffer_usage(linker_map)
     gpio_raw = build_firmware.gpio_raw_dma_buffer_usage(linker_map)
     gpio_packed = build_firmware.gpio_packed_buffer_usage(linker_map)
-    usb_tx_record = build_firmware.parse_nm_symbols(linker_map).get("txbuffer")
+    usb_tx_record = symbols.get("txbuffer")
     if usb_tx_record is None:
         raise AssertionError("linker map is missing the pinned USB TX ring")
     usb_tx_address, usb_tx_bytes, usb_tx_type = usb_tx_record

@@ -1027,6 +1027,6 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 2,
   "source": "protocol/protocol-v2.json",
-  "source_sha256": "9d946f081befed6fada3c8c183d01af5911a4a8dcf86377f737e5cd684c69e6c",
+  "source_sha256": "f90bc70d4d13334b6f8d8210044e282e4a3c639de729a389d44c354b279dbcc4",
   "status": "experimental"
 }

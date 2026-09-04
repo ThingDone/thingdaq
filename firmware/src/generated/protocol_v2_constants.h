@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v2.json. Do not edit by hand.
-// Source SHA-256: 9d946f081befed6fada3c8c183d01af5911a4a8dcf86377f737e5cd684c69e6c
+// Source SHA-256: f90bc70d4d13334b6f8d8210044e282e4a3c639de729a389d44c354b279dbcc4
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v2 {
 
-inline constexpr char kSourceSha256[] = "9d946f081befed6fada3c8c183d01af5911a4a8dcf86377f737e5cd684c69e6c";
+inline constexpr char kSourceSha256[] = "f90bc70d4d13334b6f8d8210044e282e4a3c639de729a389d44c354b279dbcc4";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 2U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -148,6 +148,19 @@ inline constexpr std::uint8_t kOutputXbarInput = 57U;
 inline constexpr std::uint8_t kOutputXbarOutput = 1U;
 inline constexpr std::uint8_t kOutputDmamuxSource = 31U;
 inline constexpr std::uint8_t kOutputEdmaChannel = 3U;
+inline constexpr std::uint8_t kOutputEdmaPriority = 1U;
+inline constexpr std::uint8_t kOutputAdcEdmaPriorities[] = {3U, 2U};
+inline constexpr std::uint8_t kOutputGpioEdmaPriority = 0U;
+inline constexpr std::uint8_t kOutputDmaIrqNumber = 3U;
+inline constexpr std::uint8_t kOutputDmaVectorIndex = 19U;
+inline constexpr std::uint8_t kOutputDmaIrqPriority = 56U;
+inline constexpr std::size_t kOutputProgramStorageBytes = 8192U;
+inline constexpr std::size_t kOutputDmaRingBytes = 16256U;
+inline constexpr std::size_t kOutputDmaDescriptorBytes = 128U;
+inline constexpr std::size_t kOutputPacketPrimaryCount = 103U;
+inline constexpr std::size_t kOutputPacketReserveCount = 91U;
+inline constexpr std::uint64_t kOutputPacketRetentionUs = 98164U;
+inline constexpr std::uint64_t kOutputPacketAndUsbRetentionUs = 99176U;
 
 inline constexpr std::size_t kHeaderMagicOffset = 0U;
 inline constexpr std::size_t kHeaderVersionOffset = 4U;

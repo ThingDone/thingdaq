@@ -15,6 +15,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,7 @@ OUTPUT_DIRECTORY = (
     SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 10
+MANIFEST_SCHEMA_VERSION = 11
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
@@ -83,13 +84,13 @@ BENCHMARK_BUFFER_ALIGNMENT = 32
 PACKET_BUFFER_SYMBOLS = {
     "DTCM_PRIMARY": (
         "(anonymous namespace)::packet_storage_primary",
-        105 * 4096,
+        103 * 4096,
         0x20000000,
         0x20200000,
     ),
     "OCRAM_RESERVE": (
         "(anonymous namespace)::packet_storage_reserve",
-        95 * 4096,
+        91 * 4096,
         0x20200000,
         0x20280000,
     ),
@@ -133,9 +134,32 @@ ADC_DMA_BUFFER_ALIGNMENT = 32
 GPIO_PACKED_BUFFER_SYMBOL = "thingdaq::gpio_packer::g_gpio_packed_buffers"
 GPIO_PACKED_BUFFER_BYTES = 4 * 4064
 GPIO_PACKED_BUFFER_ALIGNMENT = 32
+OUTPUT_PROGRAM_BUFFER_SYMBOL = "(anonymous namespace)::aux_output_program_storage"
+OUTPUT_PROGRAM_BUFFER_BYTES = 2 * 4096
+OUTPUT_DMA_BUFFER_SYMBOLS = {
+    "RING": (
+        "(anonymous namespace)::aux_output_dma_ring",
+        4 * 4064,
+    ),
+    "DESCRIPTORS": (
+        "(anonymous namespace)::aux_output_dma_descriptors",
+        4 * 32,
+    ),
+}
+OUTPUT_BUFFER_ALIGNMENT = 32
 OCRAM_START = 0x20200000
 OCRAM_END = 0x20280000
+RAM1_START = 0x20000000
+RAM1_END = 0x20200000
 MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES = 32 * 1024
+MINIMUM_RAM2_FREE_FOR_HEAP_BYTES = 4 * 1024
+PACKET_FRAME_BYTES = 4096
+PACKET_FRAME_COVERAGE_TICKS = 8096
+TIMESTAMP_HZ = 8_000_000
+PACKET_STREAM_COUNT = 2
+PINNED_USB_TX_BUFFER_COUNT = 4
+PINNED_USB_TX_BUFFER_BYTES = 2048
+HISTORICAL_MAXIMUM_USB_SERVICE_GAP_US = 60_715
 
 
 class BuildError(RuntimeError):
@@ -465,7 +489,7 @@ def parse_memory_usage(output: str) -> dict[str, dict[str, int]]:
 
 
 def validate_memory_headroom(memory_usage: dict[str, dict[str, int]]) -> None:
-    """Reject a linked image that leaves too little DTCM for locals/stack."""
+    """Reject a linked image that violates explicit RAM1 or RAM2 floors."""
 
     available = memory_usage["ram1"]["free_for_locals_bytes"]
     if available < MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES:
@@ -473,6 +497,13 @@ def validate_memory_headroom(memory_usage: dict[str, dict[str, int]]) -> None:
             "RAM1 leaves only "
             f"{available} bytes for locals/stack; requires at least "
             f"{MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES}"
+        )
+    heap_available = memory_usage["ram2"]["free_for_heap_bytes"]
+    if heap_available < MINIMUM_RAM2_FREE_FOR_HEAP_BYTES:
+        raise BuildError(
+            "RAM2 leaves only "
+            f"{heap_available} bytes for malloc/new; requires at least "
+            f"{MINIMUM_RAM2_FREE_FOR_HEAP_BYTES}"
         )
 
 
@@ -797,6 +828,156 @@ def gpio_packed_buffer_usage(nm_output: str) -> dict[str, Any]:
     }
 
 
+def output_program_buffer_usage(nm_output: str) -> dict[str, Any]:
+    """Verify the complete canonical output program is aligned in DTCM."""
+
+    symbols = parse_nm_symbols(nm_output)
+    record = symbols.get(OUTPUT_PROGRAM_BUFFER_SYMBOL)
+    if record is None:
+        raise BuildError(
+            f"firmware ELF is missing output program {OUTPUT_PROGRAM_BUFFER_SYMBOL}"
+        )
+    address, size, symbol_type = record
+    if size != OUTPUT_PROGRAM_BUFFER_BYTES:
+        raise BuildError(
+            f"{OUTPUT_PROGRAM_BUFFER_SYMBOL} occupies {size} bytes, "
+            f"expected {OUTPUT_PROGRAM_BUFFER_BYTES}"
+        )
+    if address % OUTPUT_BUFFER_ALIGNMENT != 0:
+        raise BuildError("output program is not cache-line aligned")
+    if not RAM1_START <= address or address + size > RAM1_END:
+        raise BuildError(f"output program is outside DTCM: 0x{address:08x}")
+    if symbol_type.upper() != "B":
+        raise BuildError("output program is not zero-initialized writable storage")
+    return {
+        "symbol": OUTPUT_PROGRAM_BUFFER_SYMBOL,
+        "symbol_type": symbol_type,
+        "address": f"0x{address:08x}",
+        "bytes": size,
+        "segments": 1024,
+        "segment_bytes": 8,
+        "alignment_bytes": OUTPUT_BUFFER_ALIGNMENT,
+        "range_start": f"0x{RAM1_START:08x}",
+        "range_end_exclusive": f"0x{RAM1_END:08x}",
+    }
+
+
+def output_dma_buffer_usage(nm_output: str) -> dict[str, Any]:
+    """Verify the four-block output source ring and fixed TCD bank."""
+
+    usage = dma_allocation_usage(
+        nm_output,
+        OUTPUT_DMA_BUFFER_SYMBOLS,
+        owner="output",
+        alignment=OUTPUT_BUFFER_ALIGNMENT,
+    )
+    usage["block_count"] = 4
+    usage["state_words_per_block"] = 1016
+    usage["descriptor_bytes_per_block"] = 32
+    return usage
+
+
+def validate_non_overlapping_allocations(
+    allocations: Mapping[str, Mapping[str, Any]],
+) -> None:
+    """Reject any pair of concrete linked allocations with intersecting ranges."""
+
+    intervals: list[tuple[int, int, str]] = []
+    for name, allocation in allocations.items():
+        address = allocation.get("address")
+        size = allocation.get("bytes")
+        if not isinstance(address, str) or not isinstance(size, int) or size <= 0:
+            raise BuildError(f"linked allocation {name} is malformed")
+        start = int(address, 16)
+        intervals.append((start, start + size, name))
+    intervals.sort()
+    for (_, prior_end, prior_name), (start, _, name) in pairwise(intervals):
+        if start < prior_end:
+            raise BuildError(f"linked allocations overlap: {prior_name} and {name}")
+
+
+def packet_retention() -> dict[str, int]:
+    """Return exact retention at the maximum combined framed load."""
+
+    packet_count = sum(
+        expected_size // PACKET_FRAME_BYTES
+        for _, expected_size, _, _ in PACKET_BUFFER_SYMBOLS.values()
+    )
+    packet_us = (
+        packet_count
+        * PACKET_FRAME_COVERAGE_TICKS
+        * 1_000_000
+        // (PACKET_STREAM_COUNT * TIMESTAMP_HZ)
+    )
+    usb_us = (
+        PINNED_USB_TX_BUFFER_COUNT
+        * PINNED_USB_TX_BUFFER_BYTES
+        * PACKET_FRAME_COVERAGE_TICKS
+        * 1_000_000
+        // (PACKET_STREAM_COUNT * TIMESTAMP_HZ * PACKET_FRAME_BYTES)
+    )
+    return {
+        "packet_count": packet_count,
+        "packet_retention_us": packet_us,
+        "pinned_usb_tx_buffer_count": PINNED_USB_TX_BUFFER_COUNT,
+        "pinned_usb_retention_us": usb_us,
+        "packet_and_usb_retention_us": packet_us + usb_us,
+        "historical_maximum_service_gap_us": (HISTORICAL_MAXIMUM_USB_SERVICE_GAP_US),
+        "packet_margin_us": packet_us - HISTORICAL_MAXIMUM_USB_SERVICE_GAP_US,
+        "packet_and_usb_margin_us": (
+            packet_us + usb_us - HISTORICAL_MAXIMUM_USB_SERVICE_GAP_US
+        ),
+    }
+
+
+def resource_registry_manifest() -> dict[str, Any]:
+    """Describe the compile-time resource registry in deterministic JSON."""
+
+    return {
+        "output_bank": {
+            "owner": "aux_output",
+            "teensy_pins_by_logical_bit": list(range(16, 24)),
+            "gpio_standard_port": 1,
+            "gpio_fast_port": 6,
+            "gpio_bits_by_logical_bit": [23, 22, 17, 16, 26, 27, 24, 25],
+            "gpio_mask": "0x0fc30000",
+            "gpr_select_register": 26,
+            "clock_owner": "acquisition_clock:PIT1",
+            "xbar_input": 57,
+            "xbar_output": 1,
+            "dmamux_source": 31,
+            "edma_channel": 3,
+            "edma_priority": 1,
+            "irq_number": 3,
+            "vector_index": 19,
+            "irq_priority": 56,
+        },
+        "edma_arbitration": [
+            {"owner": "adc0", "channel": 0, "priority": 3},
+            {"owner": "adc1", "channel": 1, "priority": 2},
+            {"owner": "aux_output", "channel": 3, "priority": 1},
+            {"owner": "gpio_input", "channel": 2, "priority": 0},
+        ],
+        "xbar_shared_register_rmw": {
+            "selector_register_index": 0,
+            "control_register_index": 0,
+            "gpio_input_output": 0,
+            "gpio_input_byte_shift": 0,
+            "aux_output_output": 1,
+            "aux_output_byte_shift": 8,
+            "unrelated_half_preserved": True,
+        },
+        "memory_ownership": {
+            "program": "aux_output:dtcm_ram1",
+            "dma_ring": "aux_output:ocram_ram2_dma_read",
+            "dma_descriptors": "aux_output:ocram_ram2_dma_read",
+            "packet_primary": "packetizer:dtcm_ram1",
+            "packet_reserve": "packetizer:ocram_ram2_cpu",
+        },
+        "retention": packet_retention(),
+    }
+
+
 def git_source_state() -> dict[str, Any]:
     """Record the Git commit and dirtiness of the exact firmware inputs."""
 
@@ -926,6 +1107,34 @@ def build(arduino_cli_name: str) -> Path:
     adc_dma_buffers = adc_dma_buffer_usage(nm_result.stdout)
     gpio_raw_dma_buffers = gpio_raw_dma_buffer_usage(nm_result.stdout)
     gpio_packed_buffers = gpio_packed_buffer_usage(nm_result.stdout)
+    output_program_buffer = output_program_buffer_usage(nm_result.stdout)
+    output_dma_buffers = output_dma_buffer_usage(nm_result.stdout)
+    linked_allocations: dict[str, Mapping[str, Any]] = {
+        **{
+            f"packet.{name}": allocation
+            for name, allocation in packet_buffers["banks"].items()
+        },
+        **{
+            f"benchmark.{name}": allocation
+            for name, allocation in benchmark_buffers["regions"].items()
+        },
+        "gpio_clock_diagnostic": gpio_clock_diagnostic_buffer,
+        **{
+            f"adc_dma.{name}": allocation
+            for name, allocation in adc_dma_buffers["allocations"].items()
+        },
+        **{
+            f"gpio_raw_dma.{name}": allocation
+            for name, allocation in gpio_raw_dma_buffers["allocations"].items()
+        },
+        "gpio_packed": gpio_packed_buffers,
+        "output_program": output_program_buffer,
+        **{
+            f"output_dma.{name}": allocation
+            for name, allocation in output_dma_buffers["allocations"].items()
+        },
+    }
+    validate_non_overlapping_allocations(linked_allocations)
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -955,7 +1164,11 @@ def build(arduino_cli_name: str) -> Path:
             "adc_dma_buffers": adc_dma_buffers,
             "gpio_raw_dma_buffers": gpio_raw_dma_buffers,
             "gpio_packed_buffers": gpio_packed_buffers,
+            "output_program_buffer": output_program_buffer,
+            "output_dma_buffers": output_dma_buffers,
+            "linked_allocations_non_overlapping": True,
         },
+        "resource_registry": resource_registry_manifest(),
         "source": {
             "source_id": identity.source_id,
             "build_id": identity.build_id,

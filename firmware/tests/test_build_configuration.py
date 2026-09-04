@@ -36,7 +36,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(10, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(11, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -96,6 +96,10 @@ class BuildConfigurationTests(unittest.TestCase):
         summary["ram1"]["free_for_locals_bytes"] = 32_767
         with self.assertRaisesRegex(build_firmware.BuildError, "locals/stack"):
             build_firmware.validate_memory_headroom(summary)
+        summary["ram1"]["free_for_locals_bytes"] = 32_768
+        summary["ram2"]["free_for_heap_bytes"] = 4_095
+        with self.assertRaisesRegex(build_firmware.BuildError, "malloc/new"):
+            build_firmware.validate_memory_headroom(summary)
 
     def test_checksum_table_provenance_requires_flash_residency(self) -> None:
         symbols = (
@@ -150,18 +154,18 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_packet_buffer_provenance_requires_split_target_regions(self) -> None:
         symbols = (
-            "200022c0 00069000 b (anonymous namespace)::packet_storage_primary\n"
-            "20200000 0005f000 b (anonymous namespace)::packet_storage_reserve"
+            "200022c0 00067000 b (anonymous namespace)::packet_storage_primary\n"
+            "20200000 0005b000 b (anonymous namespace)::packet_storage_reserve"
         )
         resources = build_firmware.packet_buffer_usage(symbols)
 
-        self.assertEqual(200, resources["total_frames"])
-        self.assertEqual(819_200, resources["total_bytes"])
+        self.assertEqual(194, resources["total_frames"])
+        self.assertEqual(794_624, resources["total_bytes"])
         self.assertEqual("0x200022c0", resources["banks"]["DTCM_PRIMARY"]["address"])
         self.assertEqual("0x20200000", resources["banks"]["OCRAM_RESERVE"]["address"])
         with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
             build_firmware.packet_buffer_usage(
-                symbols.replace("20200000 0005f000", "2006c4c0 0005f000")
+                symbols.replace("20200000 0005b000", "2006c4c0 0005b000")
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.packet_buffer_usage(symbols.splitlines()[0])
@@ -253,6 +257,48 @@ class BuildConfigurationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.gpio_packed_buffer_usage("")
+
+    def test_output_buffers_and_retention_are_exact_and_non_overlapping(self) -> None:
+        symbols = (
+            "200692c0 00002000 b "
+            "(anonymous namespace)::aux_output_program_storage\n"
+            "2025b000 00003f80 b (anonymous namespace)::aux_output_dma_ring\n"
+            "2025ef80 00000080 b "
+            "(anonymous namespace)::aux_output_dma_descriptors"
+        )
+        program = build_firmware.output_program_buffer_usage(symbols)
+        dma = build_firmware.output_dma_buffer_usage(symbols)
+
+        self.assertEqual(8_192, program["bytes"])
+        self.assertEqual(1_024, program["segments"])
+        self.assertEqual(16_384, dma["total_bytes"])
+        self.assertEqual(1_016, dma["state_words_per_block"])
+        build_firmware.validate_non_overlapping_allocations(
+            {"program": program, **dma["allocations"]}
+        )
+        with self.assertRaisesRegex(build_firmware.BuildError, "overlap"):
+            build_firmware.validate_non_overlapping_allocations(
+                {
+                    "left": {"address": "0x2025b000", "bytes": 64},
+                    "right": {"address": "0x2025b020", "bytes": 64},
+                }
+            )
+
+        retention = build_firmware.packet_retention()
+        self.assertEqual(194, retention["packet_count"])
+        self.assertEqual(98_164, retention["packet_retention_us"])
+        self.assertEqual(99_176, retention["packet_and_usb_retention_us"])
+        self.assertEqual(37_449, retention["packet_margin_us"])
+        self.assertEqual(38_461, retention["packet_and_usb_margin_us"])
+        registry = build_firmware.resource_registry_manifest()
+        self.assertEqual("0x0fc30000", registry["output_bank"]["gpio_mask"])
+        self.assertEqual(
+            [3, 2, 1, 0],
+            [entry["priority"] for entry in registry["edma_arbitration"]],
+        )
+        self.assertTrue(
+            registry["xbar_shared_register_rmw"]["unrelated_half_preserved"]
+        )
 
     def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
         responses = [

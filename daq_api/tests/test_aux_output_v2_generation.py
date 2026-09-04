@@ -91,6 +91,29 @@ class AuxOutputV2GenerationTests(unittest.TestCase):
             constants.OUTPUT_GPIO_BITS_BY_LOGICAL_BIT,
         )
         self.assertEqual(0x0FC30000, constants.OUTPUT_GPIO_AGGREGATE_MASK)
+        self.assertEqual((3, 2), constants.OUTPUT_ADC_EDMA_PRIORITIES)
+        self.assertEqual(1, constants.OUTPUT_EDMA_PRIORITY)
+        self.assertEqual(0, constants.OUTPUT_GPIO_EDMA_PRIORITY)
+        self.assertEqual(
+            (3, 19, 56),
+            (
+                constants.OUTPUT_DMA_IRQ_NUMBER,
+                constants.OUTPUT_DMA_VECTOR_INDEX,
+                constants.OUTPUT_DMA_IRQ_PRIORITY,
+            ),
+        )
+        self.assertEqual(8_192, constants.OUTPUT_PROGRAM_STORAGE_BYTES)
+        self.assertEqual(16_256, constants.OUTPUT_DMA_RING_BYTES)
+        self.assertEqual(128, constants.OUTPUT_DMA_DESCRIPTOR_BYTES)
+        self.assertEqual(
+            (103, 91),
+            (
+                constants.OUTPUT_PACKET_PRIMARY_COUNT,
+                constants.OUTPUT_PACKET_RESERVE_COUNT,
+            ),
+        )
+        self.assertEqual(98_164, constants.OUTPUT_PACKET_RETENTION_US)
+        self.assertEqual(99_176, constants.OUTPUT_PACKET_AND_USB_RETENTION_US)
         self.assertEqual(0x200, int(constants.Capability.PRELOADED_AUXILIARY_OUTPUT))
         self.assertEqual(0x400, int(constants.Capability.COMMON_EPOCH_OUTPUT))
         self.assertEqual(32, int(constants.CommandKind.OUTPUT_BEGIN))

@@ -120,39 +120,51 @@ constexpr MemoryAllocation kCacheUnsafePackedRing[] = {
      ResourceOwner::kGpioPacker},
 };
 constexpr InterruptAllocation kDuplicateInterruptUse[] = {
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
      ResourceOwner::kAdc0Capture},
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 1U, 17U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
-    {InterruptUse::kGpioDmaCompletion, 64U,
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kAuxOutputDmaCompletion, 3U, 19U, 56U,
+     ResourceOwner::kAuxOutput},
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 64U,
      ResourceOwner::kGpioCapture},
 };
 constexpr InterruptAllocation kUnsafeInterruptPriority[] = {
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
      ResourceOwner::kAdc0Capture},
-    {InterruptUse::kAdc1DmaCompletion, 48U,
+    {InterruptUse::kAdc1DmaCompletion, 1U, 17U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
-    {InterruptUse::kGpioDmaCompletion, 40U,
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kAuxOutputDmaCompletion, 3U, 19U, 40U,
+     ResourceOwner::kAuxOutput},
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 64U,
      ResourceOwner::kGpioCapture},
 };
 constexpr InterruptAllocation kWrongInterruptOwner[] = {
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdc1DmaCompletion, 48U,
+    {InterruptUse::kAdc1DmaCompletion, 1U, 17U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
-    {InterruptUse::kGpioDmaCompletion, 64U,
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kAuxOutputDmaCompletion, 3U, 19U, 56U,
+     ResourceOwner::kAuxOutput},
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 64U,
      ResourceOwner::kGpioCapture},
 };
 constexpr InterruptAllocation kReorderedInterrupts[] = {
-    {InterruptUse::kGpioDmaCompletion, 64U,
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 64U,
      ResourceOwner::kGpioCapture},
-    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
-    {InterruptUse::kAdc1DmaCompletion, 48U,
+    {InterruptUse::kAuxOutputDmaCompletion, 3U, 19U, 56U,
+     ResourceOwner::kAuxOutput},
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kAdc1DmaCompletion, 1U, 17U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
      ResourceOwner::kAdc0Capture},
 };
 
@@ -175,6 +187,7 @@ static_assert(thingdaq::board::validEdmaAllocations(
     thingdaq::board::kEdmaAllocations));
 static_assert(thingdaq::board::validEdmaPriorities(
     thingdaq::board::kAdcEdmaPriorities,
+    thingdaq::board::kAuxOutputEdmaPriority,
     thingdaq::board::kGpioEdmaPriority));
 static_assert(thingdaq::board::validMemoryAllocations(
     thingdaq::board::kMemoryAllocations));
@@ -208,7 +221,7 @@ static_assert(
 static_assert(!thingdaq::board::validEdmaAllocations(kInvalidEdma));
 static_assert(!thingdaq::board::validEdmaAllocations(kOutOfRangeEdma));
 static_assert(!thingdaq::board::validEdmaPriorities(
-    kConflictingEdmaPriorities, 2U));
+    kConflictingEdmaPriorities, 1U, 0U));
 static_assert(
     !thingdaq::board::validMemoryAllocations(kConflictingMemory));
 static_assert(!thingdaq::board::validMemoryAllocations(kMisalignedMemory));
@@ -235,19 +248,19 @@ static_assert(thingdaq::board::kUsbRxScratchBytes >=
               thingdaq::protocol_v1::kMaxCommandFrameBytes);
 static_assert(thingdaq::board::kCommandQueueDepth == 4U);
 static_assert(thingdaq::board::kResponseQueueDepth == 4U);
-static_assert(thingdaq::board::kPacketBufferPrimaryCount == 105U);
-static_assert(thingdaq::board::kPacketBufferReserveCount == 95U);
-static_assert(thingdaq::board::kPacketBufferCount == 200U);
-static_assert(thingdaq::board::kPacketBufferPrimaryStorageBytes == 430080U);
-static_assert(thingdaq::board::kPacketBufferReserveStorageBytes == 389120U);
-static_assert(thingdaq::board::kPacketBufferStorageBytes == 819200U);
+static_assert(thingdaq::board::kPacketBufferPrimaryCount == 103U);
+static_assert(thingdaq::board::kPacketBufferReserveCount == 91U);
+static_assert(thingdaq::board::kPacketBufferCount == 194U);
+static_assert(thingdaq::board::kPacketBufferPrimaryStorageBytes == 421888U);
+static_assert(thingdaq::board::kPacketBufferReserveStorageBytes == 372736U);
+static_assert(thingdaq::board::kPacketBufferStorageBytes == 794624U);
 static_assert(thingdaq::board::kPacketReadyQueueDepth ==
               thingdaq::board::kPacketBufferCount);
 static_assert(thingdaq::board::kPacketTransmitQueueDepth ==
               thingdaq::board::kPacketBufferCount);
-static_assert(thingdaq::board::kPacketReadyIndexStorageBytes == 400U);
-static_assert(thingdaq::board::kPacketTransmitIndexStorageBytes == 200U);
-static_assert(thingdaq::board::kPacketIndexStorageBytes == 600U);
+static_assert(thingdaq::board::kPacketReadyIndexStorageBytes == 388U);
+static_assert(thingdaq::board::kPacketTransmitIndexStorageBytes == 194U);
+static_assert(thingdaq::board::kPacketIndexStorageBytes == 582U);
 static_assert(thingdaq::board::kCombinedAcquisitionRam1BufferBytes ==
               440832U);
 static_assert(thingdaq::board::kCombinedAcquisitionRam2BufferBytes ==
@@ -357,8 +370,9 @@ static_assert(thingdaq::board::kAdcDmaOverflowSinkBytes == 32U);
 static_assert(thingdaq::board::kAdcDmaPipelineDepth == 6U);
 static_assert(thingdaq::board::kAdcDmaDescriptorCount == 12U);
 static_assert(thingdaq::board::kAdcDmaDescriptorBytes == 768U);
-static_assert(thingdaq::board::kAdcEdmaPriorities[0] == 2U);
-static_assert(thingdaq::board::kAdcEdmaPriorities[1] == 1U);
+static_assert(thingdaq::board::kAdcEdmaPriorities[0] == 3U);
+static_assert(thingdaq::board::kAdcEdmaPriorities[1] == 2U);
+static_assert(thingdaq::board::kAuxOutputEdmaPriority == 1U);
 static_assert(thingdaq::board::kAdcEdmaIrqPriority == 48U);
 static_assert(thingdaq::board::kGpioRawDmaOverflowSinkBytes == 32U);
 static_assert(thingdaq::board::kGpioRawDmaDescriptorCount == 5U);

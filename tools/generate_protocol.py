@@ -678,6 +678,28 @@ def validate_v2_contract(
         or int(timing["first_event_tick"]) != 0
     ):
         raise ContractError("output timing metadata does not define exact 1 MHz ticks")
+    resources = output["provisional_resources"]
+    if (
+        int(resources["clock_pit_channel"]) != 1
+        or int(resources["xbar_input"]) != 57
+        or int(resources["xbar_output"]) != 1
+        or int(resources["dmamux_source"]) != 31
+        or int(resources["edma_channel"]) != 3
+        or int(resources["edma_priority"]) != 1
+        or list(resources["adc_edma_priorities"]) != [3, 2]
+        or int(resources["gpio_edma_priority"]) != 0
+        or int(resources["dma_irq_number"]) != 3
+        or int(resources["dma_vector_index"]) != 19
+        or int(resources["dma_irq_priority"]) != 56
+        or int(resources["program_storage_bytes"]) != 8192
+        or int(resources["dma_ring_bytes"]) != 16256
+        or int(resources["dma_descriptor_bytes"]) != 128
+        or int(resources["packet_primary_count"]) != 103
+        or int(resources["packet_reserve_count"]) != 91
+        or int(resources["packet_retention_us"]) != 98164
+        or int(resources["packet_and_usb_retention_us"]) != 99176
+    ):
+        raise ContractError("output target resources changed")
     program = output["program"]
     validate_fields(
         "auxiliary_output.program.segment_schema",
@@ -1885,6 +1907,19 @@ def _output_constant_lines_python(contract: Mapping[str, Any]) -> list[str]:
         f"OUTPUT_XBAR_OUTPUT = {int(resources['xbar_output'])}",
         f"OUTPUT_DMAMUX_SOURCE = {int(resources['dmamux_source'])}",
         f"OUTPUT_EDMA_CHANNEL = {int(resources['edma_channel'])}",
+        f"OUTPUT_EDMA_PRIORITY = {int(resources['edma_priority'])}",
+        f"OUTPUT_ADC_EDMA_PRIORITIES = {tuple(resources['adc_edma_priorities'])!r}",
+        f"OUTPUT_GPIO_EDMA_PRIORITY = {int(resources['gpio_edma_priority'])}",
+        f"OUTPUT_DMA_IRQ_NUMBER = {int(resources['dma_irq_number'])}",
+        f"OUTPUT_DMA_VECTOR_INDEX = {int(resources['dma_vector_index'])}",
+        f"OUTPUT_DMA_IRQ_PRIORITY = {int(resources['dma_irq_priority'])}",
+        f"OUTPUT_PROGRAM_STORAGE_BYTES = {int(resources['program_storage_bytes'])}",
+        f"OUTPUT_DMA_RING_BYTES = {int(resources['dma_ring_bytes'])}",
+        f"OUTPUT_DMA_DESCRIPTOR_BYTES = {int(resources['dma_descriptor_bytes'])}",
+        f"OUTPUT_PACKET_PRIMARY_COUNT = {int(resources['packet_primary_count'])}",
+        f"OUTPUT_PACKET_RESERVE_COUNT = {int(resources['packet_reserve_count'])}",
+        f"OUTPUT_PACKET_RETENTION_US = {int(resources['packet_retention_us'])}",
+        f"OUTPUT_PACKET_AND_USB_RETENTION_US = {int(resources['packet_and_usb_retention_us'])}",
     ]
 
 
@@ -1951,6 +1986,19 @@ def _output_constant_lines_cpp(contract: Mapping[str, Any]) -> list[str]:
         f"inline constexpr std::uint8_t kOutputXbarOutput = {int(resources['xbar_output'])}U;",
         f"inline constexpr std::uint8_t kOutputDmamuxSource = {int(resources['dmamux_source'])}U;",
         f"inline constexpr std::uint8_t kOutputEdmaChannel = {int(resources['edma_channel'])}U;",
+        f"inline constexpr std::uint8_t kOutputEdmaPriority = {int(resources['edma_priority'])}U;",
+        array("kOutputAdcEdmaPriorities", resources["adc_edma_priorities"]),
+        f"inline constexpr std::uint8_t kOutputGpioEdmaPriority = {int(resources['gpio_edma_priority'])}U;",
+        f"inline constexpr std::uint8_t kOutputDmaIrqNumber = {int(resources['dma_irq_number'])}U;",
+        f"inline constexpr std::uint8_t kOutputDmaVectorIndex = {int(resources['dma_vector_index'])}U;",
+        f"inline constexpr std::uint8_t kOutputDmaIrqPriority = {int(resources['dma_irq_priority'])}U;",
+        f"inline constexpr std::size_t kOutputProgramStorageBytes = {int(resources['program_storage_bytes'])}U;",
+        f"inline constexpr std::size_t kOutputDmaRingBytes = {int(resources['dma_ring_bytes'])}U;",
+        f"inline constexpr std::size_t kOutputDmaDescriptorBytes = {int(resources['dma_descriptor_bytes'])}U;",
+        f"inline constexpr std::size_t kOutputPacketPrimaryCount = {int(resources['packet_primary_count'])}U;",
+        f"inline constexpr std::size_t kOutputPacketReserveCount = {int(resources['packet_reserve_count'])}U;",
+        f"inline constexpr std::uint64_t kOutputPacketRetentionUs = {int(resources['packet_retention_us'])}U;",
+        f"inline constexpr std::uint64_t kOutputPacketAndUsbRetentionUs = {int(resources['packet_and_usb_retention_us'])}U;",
     ]
 
 

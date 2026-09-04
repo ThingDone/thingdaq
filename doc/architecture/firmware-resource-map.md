@@ -2,7 +2,7 @@
 type: reference
 title: Firmware Resource Map
 created: 2026-08-28
-updated: 2026-08-29
+updated: 2026-09-04
 tags:
   - thingdaq
   - teensy-4-0
@@ -66,14 +66,19 @@ can observe. The installed core itself remains unmodified.
 | GPIO bit 5 | D11 | GPIO7 bit 2; selectively remap to GPIO2 bit 2 | GPIO capture |
 | GPIO bit 6 | D12 | GPIO7 bit 1; selectively remap to GPIO2 bit 1 | GPIO capture |
 | GPIO bit 7 | D13 | GPIO7 bit 3; selectively remap to GPIO2 bit 3 | GPIO capture |
+| Output bits 0-7 | D16-D23 | GPIO6 bits 23,22,17,16,26,27,24,25; ARM-only selective remap to GPIO1 | Auxiliary output |
 
-All ten pin IDs are compile-time range checked against the Teensy 4.0's 40
+All eighteen pin IDs are compile-time range checked against the Teensy 4.0's 40
 digital pin IDs and checked for duplicates. The D6-through-D13 array is also
 compared byte-for-byte with the generated [[Protocol-V1]] GPIO pin map. The
 standard-port bits are independently range/duplicate checked, compile-time
 matched to the pinned `CORE_PIN*_BIT` values, and combined into the exact
 GPIO2/GPR27 mask `0x00030C0F`. Arduino target builds fail closed unless they
 identify a Teensy 4.0 with an i.MX RT1062.
+
+The output mapping is independently checked in logical-bit order and combines
+to the exact GPIO1/GPR26 mask `0x0FC30000`. Reservation does not change pad
+direction: without the later ARM adapter all eight pads remain inputs.
 
 Both NXP ADC modules can see A0 and A1, so pin validity cannot select a
 converter. The compile-time `AdcConverterConfiguration` table additionally
@@ -89,8 +94,9 @@ exact-value assertions prevent a legal-but-wrong A0/A1 swap.
 | PIT channel | 0 | 24 MHz / 6, verified exact 4 MHz GPIO event | GPIO capture |
 | PIT channel | 1 | Chained from PIT0 with `LDVAL=3`; selected exact 1 MHz ADC-pair event | Acquisition clock |
 | XBAR input | 56 | `XBARA1_IN_PIT_TRIGGER0` | GPIO capture |
-| XBAR input | 57 | `XBARA1_IN_PIT_TRIGGER1`, deliberate fan-out | ADC0 and ADC1 capture |
+| XBAR input | 57 | `XBARA1_IN_PIT_TRIGGER1`, deliberate fan-out | ADC0, ADC1, and auxiliary output |
 | XBAR output | 0 | `XBARA1_OUT_DMA_CH_MUX_REQ30`, rising-edge DMA | GPIO capture |
+| XBAR output | 1 | `XBARA1_OUT_DMA_CH_MUX_REQ31`, rising-edge DMA | Auxiliary output |
 | XBAR output | 103 | `XBARA1_OUT_ADC_ETC_TRIG00` | ADC0 capture |
 | XBAR output | 107 | `XBARA1_OUT_ADC_ETC_TRIG10` | ADC1 capture |
 | ADC_ETC trigger queue | 0 | NXP ADC1 / logical ADC0, async raw initial delay 0 | ADC0 capture |
@@ -136,12 +142,15 @@ before making a physical analog-timing claim.
 | 0 | 24 | `DMAMUX_SOURCE_ADC1` | ADC0 capture |
 | 1 | 88 | `DMAMUX_SOURCE_ADC2` | ADC1 capture |
 | 2 | 30 | `DMAMUX_SOURCE_XBAR1_0` | GPIO capture |
+| 3 | 31 | `DMAMUX_SOURCE_XBAR1_1` | Auxiliary output |
 
 All eDMA channels must be below 32, all DMAMUX sources below 128, and neither
 set may contain duplicates. Pinned core macros are asserted against all three
 source numbers. Acquisition code must bind these exact channels rather than
 use an unconstrained first-free allocator. ADC0/ADC1 use fixed priority values
-2/1, above GPIO's priority 0, use NVIC priority 48, and each own twelve 32-byte
+3/2, above output priority 1 and GPIO priority 0. Output reserves DMA IRQ 3,
+vector index 19, and NVIC priority 56 between ADC priority 48 and GPIO priority
+64. The ADC channels each own twelve 32-byte
 generation-indexed scatter/gather TCDs. Channel 0 reads `ADC1_R0` and channel 1 reads `ADC2_R0`;
 both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012`, and
 `DOFF=4` for consumer buffers. Both completion IRQs and the production
@@ -172,9 +181,9 @@ reserved but masked.
 | Packed GPIO ring | 4 buffers | GPIO packer |
 | Raw batches consumed per loop | 2 buffers | GPIO packer |
 | Packed frames finalized per loop | 2 frames | GPIO packer / packetizer |
-| Aligned complete-frame packet pool | 105 DTCM + 95 OCRAM = 200 × 4,096-byte buffers | Packetizer |
-| Per-source ready queues | 200 ADC + 200 GPIO one-byte indexes (400 bytes); shared pool limits actual ownership to 200 | Packetizer |
-| Complete-frame transmit queue | 200 one-byte indexes (200 bytes) | Packetizer / USB transport |
+| Aligned complete-frame packet pool | 103 DTCM + 91 OCRAM = 194 × 4,096-byte buffers | Packetizer |
+| Per-source ready queues | 194 ADC + 194 GPIO one-byte indexes (388 bytes); shared pool limits actual ownership to 194 | Packetizer |
+| Complete-frame transmit queue | 194 one-byte indexes (194 bytes) | Packetizer / USB transport |
 | Synthetic generation per loop | 2 complete frame attempts | Synthetic source |
 | Ready-to-transmit promotions per loop | 4 frames | Packetizer |
 | USB receive work per loop | 1,024 bytes | USB transport |
@@ -198,10 +207,10 @@ unexpected prefixes remain owned for continuation. These values are capacities,
 never heap-growth hints.
 
 At the nominal combined framed rate, one 4,096-byte application buffer covers
-0.506 ms. The 200-frame pool therefore retains 101.200 ms of complete frames,
-and the pinned core's 8,192-byte TX ring contributes 1.012 ms more. Its
-105-frame DTCM primary retains 53.130 ms and its 95-frame OCRAM reserve retains
-48.070 ms; together they cover the 60.715 ms service gap observed by the Phase
+0.506 ms. The 194-frame pool therefore retains 98.164 ms of complete frames,
+and the pinned core's 8,192-byte TX ring contributes 1.012 ms more. Together
+they leave 37.449 ms of packet margin, or 38.461 ms including the core ring,
+over the 60.715 ms service gap observed by the Phase
 05 CRC campaign. Linker verification
 still requires at least 32 KiB of DTCM for locals/stack, and no queue can grow at
 runtime. Normal real-time mode admits only coverage intervals elapsed on the
@@ -216,7 +225,8 @@ to two frames per service call and waits when no packet buffer is free.
 | USB RX scratch | DTCM / RAM1 | fixed | 128 | 4 | USB transport |
 | Command queue | DTCM / RAM1 | `4 × 56` | 224 | 4 | Control plane |
 | Response queue | DTCM / RAM1 | `4 × 1,280` | 5,120 | 4 | USB transport |
-| Primary packet buffers | DTCM / RAM1 | `105 × 4,096` | 430,080 | 32 | Packetizer |
+| Primary packet buffers | DTCM / RAM1 | `103 × 4,096` | 421,888 | 32 | Packetizer |
+| Output program | DTCM / RAM1 | `1,024 × 8` | 8,192 | 32 | Auxiliary output |
 | Packet records, queue indexes, and telemetry | DTCM / RAM1 | compile-time ceiling | 8,192 | 32 | Packetizer |
 | GPIO packer state and telemetry | DTCM / RAM1 | compile-time ceiling | 2,048 | 32 | GPIO packer |
 | ADC packer state and telemetry | DTCM / RAM1 | compile-time ceiling | 512 | 8 | ADC packer |
@@ -228,7 +238,9 @@ to two frames per service call and waits when no packet buffer is free.
 | Raw GPIO TCD bank | OCRAM / RAM2 | `5 × 32` | 160 | 32 | GPIO capture |
 | Packed GPIO ring | OCRAM / RAM2 | `4 × align32(4,048)` | 16,256 | 32 | GPIO packer |
 | GPIO clock diagnostic sink | OCRAM / RAM2 `.dmabuffers` | one isolated cache line | 32 | 32 | GPIO capture |
-| Packet-buffer reserve | OCRAM / RAM2 `.dmabuffers` | `95 × 4,096` | 389,120 | 32 | Packetizer |
+| Output TCD bank | OCRAM / RAM2 `.dmabuffers` | `4 × 32` | 128 | 32 | Auxiliary output |
+| Output source ring | OCRAM / RAM2 `.dmabuffers` | `4 × 4,064` | 16,256 | 32 | Auxiliary output |
+| Packet-buffer reserve | OCRAM / RAM2 `.dmabuffers` | `91 × 4,096` | 372,736 | 32 | Packetizer |
 | Checksum benchmark DTCM buffer | DTCM / RAM1 | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | Checksum benchmark OCRAM buffer | OCRAM / RAM2 `.dmabuffers` | `1 × 4,096` | 4,096 | 32 | Checksum benchmark |
 | **RAM1 subtotal** |  |  | **450,464** |  |  |
@@ -250,14 +262,15 @@ and packed GPIO ring are distinct `.dmabuffers` allocations. The ADC pair
 ring, pressure sink, and two TCD banks are likewise concrete `.dmabuffers`
 allocations. Raw ownership uses explicit cache maintenance; the packed ring
 remains CPU-owned and cached.
-Compile-time checks bind the two packet banks to 819,200 total bytes, cap
+Compile-time checks bind the two packet banks to 794,624 total bytes and the
+output exchange to the same prior DTCM/OCRAM page totals, cap
 pipeline metadata at 8,192 bytes, GPIO packer state at 2,048 bytes, and ADC
 packer state at 512 bytes, and
 reject zero-sized, non-power-of-two, misaligned, or over-budget registry
-entries. The build manifest additionally checks the linked addresses and sizes
-of both packet banks, the isolated GPIO clock diagnostic cache line, all three
+entries. Build-manifest schema 11 additionally checks the linked addresses and sizes
+of both packet banks, both output DMA allocations and the program store, the isolated GPIO clock diagnostic cache line, all three
 ADC DMA allocations, all three raw GPIO DMA allocations, and the four-buffer
-packed ring.
+packed ring, then rejects any overlap across the complete linked allocation set.
 
 The optional IDLE-only checksum benchmark owns no PIT, XBAR, ADC_ETC, eDMA, or
 USB resource. Its ordinary global buffer is link-verified inside DTCM; its
