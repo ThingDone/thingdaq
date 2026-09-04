@@ -15,6 +15,7 @@ related:
   - '[[Acquisition-Pipeline]]'
   - '[[Protocol-V1]]'
   - '[[Hardware-Safety]]'
+  - '[[Aux-Output-Memory-Candidate]]'
 ---
 
 # ADR 008: Experimental auxiliary output bank
@@ -52,7 +53,8 @@ or target-register code.
 The frozen baseline has only 4,096 bytes of RAM2 headroom and 34,528 bytes of
 RAM1 local/stack headroom. A future 1,024-segment store and output ring must
 therefore use a linker-accounted packet-page repartition; this ADR makes no new
-target allocation.
+target allocation. [[Aux-Output-Memory-Candidate]] records the exact six-page
+exchange and the current-map equations used by the portable prototype.
 
 ## Decision
 

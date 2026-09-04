@@ -7,6 +7,7 @@
 #include "adc_frame_packer.h"
 #include "adc_initializer.h"
 #include "adc_trigger.h"
+#include "digital_output_engine.h"
 #include "gpio_batch_packer.h"
 #include "gpio_raw_capture.h"
 #include "packet_buffer_pipeline.h"
@@ -43,6 +44,8 @@ enum class Conflict : std::uint32_t {
   kGpioCaptureUnavailable = 1U << 17U,
   kInvalidConfiguration = 1U << 18U,
   kInvalidRunId = 1U << 19U,
+  kOutputProfileMismatch = 1U << 20U,
+  kOutputUnavailable = 1U << 21U,
 };
 
 constexpr std::uint32_t conflictBit(Conflict conflict) {
@@ -60,6 +63,9 @@ struct Audit {
   std::uint32_t conflict_flags = 0U;
   bool adc_inspected = false;
   bool gpio_inspected = false;
+  bool output_inspected = false;
+  digital_output::StartStatus output_status =
+      digital_output::StartStatus::kNotArmed;
 
   constexpr bool has(Conflict conflict) const {
     return (conflict_flags & conflictBit(conflict)) != 0U;
@@ -81,6 +87,8 @@ struct Report {
   adc_packer::ServiceReport adc_packer{};
   adc_capture::StopReport adc_capture_stop{};
   adc_packer::StopReport adc_packer_stop{};
+  digital_output::ServiceReport output_service{};
+  digital_output::StopReport output_stop{};
   gpio_capture::StartStatus gpio_capture_start_status =
       gpio_capture::StartStatus::kNotQuiescent;
   gpio_packer::OperationStatus gpio_packer_start_status =
@@ -101,6 +109,9 @@ struct Report {
   bool adc_packer_stopped = false;
   bool adc_trigger_armed = false;
   bool adc_trigger_stopped = false;
+  bool output_prepared = false;
+  bool output_started = false;
+  bool output_stopped = false;
   bool packet_production_stopped = false;
   bool physical_drain_pending = false;
   bool physical_fault_detected = false;
@@ -124,7 +135,8 @@ class Controller {
       adc::Initializer *adc_initializer = nullptr,
       adc_trigger::Scheduler *adc_trigger_scheduler = nullptr,
       adc_capture::HardwareCapture *adc_capture = nullptr,
-      adc_packer::AdcFramePacker *adc_packer = nullptr)
+      adc_packer::AdcFramePacker *adc_packer = nullptr,
+      digital_output::Participant *output = nullptr)
       : statistics_(statistics),
         packet_pipeline_(packet_pipeline),
         gpio_capture_(gpio_capture),
@@ -132,7 +144,8 @@ class Controller {
         adc_initializer_(adc_initializer),
         adc_trigger_scheduler_(adc_trigger_scheduler),
         adc_capture_(adc_capture),
-        adc_packer_(adc_packer) {}
+        adc_packer_(adc_packer),
+        output_(output) {}
 
   protocol::AdcInitializationMetadata initialize();
   Audit inspect(const protocol::Configuration &configuration,
@@ -144,6 +157,7 @@ class Controller {
              Report &report);
   bool stop(Report &report);
   void service(Report &report);
+  void serviceOutput(Report &report);
   void publishStatistics(std::uint32_t run_id);
   bool quiescent() const;
 
@@ -213,6 +227,7 @@ class Controller {
   adc_trigger::Scheduler *adc_trigger_scheduler_ = nullptr;
   adc_capture::HardwareCapture *adc_capture_ = nullptr;
   adc_packer::AdcFramePacker *adc_packer_ = nullptr;
+  digital_output::Participant *output_ = nullptr;
   std::uint8_t physical_stream_mask_ = 0U;
   std::uint32_t physical_run_id_ = 0U;
   std::uint64_t physical_epoch_ticks_ = 0U;

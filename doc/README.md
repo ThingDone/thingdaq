@@ -38,6 +38,7 @@ related:
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
   - '[[ADR-008-Experimental-Aux-Output-Bank]]'
+  - '[[Aux-Output-Memory-Candidate]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -77,7 +78,8 @@ physical acceptance.
   [[Acquisition-Pipeline]], the synchronized public host boundary in
   [[Python-API]], the immutable opt-in host correction model in [[Calibration]],
   and the allocation, ownership, and pure-Python parity contract for optional
-  arrays in [[NumPy-Integration]].
+  arrays in [[NumPy-Integration]]. The isolated six-page payload exchange for
+  the output prototype is fixed in [[Aux-Output-Memory-Candidate]].
 - `protocol/` contains versioned wire-contract specifications, beginning with
   [[Protocol-V1]].
 - `decisions/` contains architecture decision records, including

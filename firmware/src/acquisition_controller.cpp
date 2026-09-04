@@ -145,6 +145,16 @@ Audit Controller::inspect(const protocol::Configuration &configuration,
       }
     }
   }
+  if (output_ != nullptr && output_->participatesInNextStart()) {
+    audit.output_inspected = true;
+    if (audit.profile != Profile::kCombined) {
+      addConflict(audit, Conflict::kOutputProfileMismatch);
+    }
+    audit.output_status = output_->inspectStart(epoch);
+    if (audit.output_status != digital_output::StartStatus::kOk) {
+      addConflict(audit, Conflict::kOutputUnavailable);
+    }
+  }
   return audit;
 }
 
@@ -181,6 +191,13 @@ bool Controller::quiescent() const {
   }
   if (adc_packer_ != nullptr && !adc_packer_->readyForStart()) {
     return false;
+  }
+  if (output_ != nullptr) {
+    const digital_output::Snapshot output = output_->snapshot();
+    if (output.prepared ||
+        output.state == protocol_v2::OutputState::kRunning) {
+      return false;
+    }
   }
   return adc_capture_ == nullptr || adc_capture_->rawSnapshot().quiescent;
 }
@@ -280,6 +297,18 @@ bool Controller::start(const protocol::Configuration &configuration,
     }
   }
 
+  // The output ring is the final prepared DMA owner. Its first block becomes
+  // DMA_READING while the shared PIT schedule is still stopped.
+  if (output_ != nullptr && output_->participatesInNextStart()) {
+    report.output_prepared =
+        output_->prepareStart(run_id, epoch_ticks) ==
+        digital_output::StartStatus::kOk;
+    if (!report.output_prepared) {
+      rollbackStart(profile, report);
+      return false;
+    }
+  }
+
   // The ADC scheduler is the sole common-clock owner in combined mode. GPIO
   // DMA is already request-enabled, but PIT0 remains stopped until arm().
   if (includesAdc(profile)) {
@@ -294,6 +323,11 @@ bool Controller::start(const protocol::Configuration &configuration,
     }
   }
 
+  if (report.output_prepared) {
+    output_->commitCommonStart();
+    report.output_started = true;
+  }
+
   physical_start_pending_ = false;
   physical_run_active_ = true;
   physical_drain_pending_ = false;
@@ -306,6 +340,9 @@ void Controller::rollbackStart(Profile profile, Report &report) {
   // did commit, stop the one common source before either DMA path is touched.
   if (includesAdc(profile) && adc_trigger_scheduler_->running()) {
     report.adc_trigger_stopped = adc_trigger_scheduler_->stop();
+  }
+  if (report.output_prepared) {
+    output_->rollbackPreparedStart();
   }
   if (includesGpio(profile) && report.gpio_capture_prepared) {
     report.gpio_capture_stop =
@@ -371,6 +408,18 @@ bool Controller::stopCombinedPaths(Report &report) {
     statistics_.recordAdcStopError();
     report.internal_error = true;
     return false;
+  }
+
+  if (output_ != nullptr) {
+    const digital_output::Snapshot output = output_->snapshot();
+    if (output.state == protocol_v2::OutputState::kRunning ||
+        output.state == protocol_v2::OutputState::kFaulted) {
+      report.output_stop = output_->stopAfterTriggers();
+      report.output_stopped = report.output_stop.dma_quiesced;
+      if (!report.output_stop.ok()) {
+        report.internal_error = true;
+      }
+    }
   }
 
   report.gpio_capture_stop = gpio_capture_->stopAfterTriggers();
@@ -489,10 +538,23 @@ THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.fault_check")
 bool Controller::activePathFaulted() const {
   const std::uint8_t adc = streamBit(protocol_v1::StreamMask::kAdc);
   const std::uint8_t gpio = streamBit(protocol_v1::StreamMask::kGpio);
-  return ((physical_stream_mask_ & adc) != 0U &&
+  return (output_ != nullptr && output_->faulted()) ||
+         ((physical_stream_mask_ & adc) != 0U &&
           adc_capture_ != nullptr && adc_capture_->rawSnapshot().faulted) ||
          ((physical_stream_mask_ & gpio) != 0U &&
           gpio_capture_ != nullptr && gpio_capture_->rawSnapshot().faulted);
+}
+
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.output_service")
+void Controller::serviceOutput(Report &report) {
+  if (output_ == nullptr) {
+    return;
+  }
+  const digital_output::ServiceReport serviced =
+      output_->service(digital_output::kBlocksPerServiceVisit);
+  report.output_service.blocks_filled += serviced.blocks_filled;
+  report.output_service.states_expanded += serviced.states_expanded;
+  report.output_service.expansion_finished = serviced.expansion_finished;
 }
 
 THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.clear")

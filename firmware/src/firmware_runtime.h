@@ -55,7 +55,8 @@ class FirmwareRuntime {
                   adc::Initializer *adc_initializer = nullptr,
                   adc_trigger::Scheduler *adc_trigger_scheduler = nullptr,
                   adc_capture::HardwareCapture *adc_capture = nullptr,
-                  adc_packer::AdcFramePacker *adc_packer = nullptr)
+                  adc_packer::AdcFramePacker *adc_packer = nullptr,
+                  digital_output::Participant *output = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
@@ -63,7 +64,8 @@ class FirmwareRuntime {
         transport_{stream, control_.statistics(), &packet_pipeline_},
         acquisition_controller_{
             control_.statistics(), packet_pipeline_, gpio_capture, gpio_packer,
-            adc_initializer, adc_trigger_scheduler, adc_capture, adc_packer},
+            adc_initializer, adc_trigger_scheduler, adc_capture, adc_packer,
+            output},
         checksum_benchmark_(checksum_benchmark),
         gpio_clock_diagnostic_(gpio_clock_diagnostic),
         gpio_capture_diagnostic_(gpio_capture_diagnostic) {}

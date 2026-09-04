@@ -371,6 +371,37 @@ constexpr std::size_t alignUp(std::size_t value, std::size_t alignment) {
 inline constexpr std::size_t kAdcDmaBufferStrideBytes =
     alignUp(protocol_v1::kDataPayloadBytes, kCacheLineBytes);
 inline constexpr std::size_t kEdmaTcdBytes = 32U;
+
+// Experimental auxiliary-output repartition candidate. These constants do
+// not change the active packet pool or instantiate storage in the target
+// image. They prove the exact six-page exchange to be applied only after the
+// portable engine and linker gate are accepted.
+inline constexpr std::size_t kAuxOutputProgramPageCount = 2U;
+inline constexpr std::size_t kAuxOutputDmaPageCount = 4U;
+inline constexpr std::size_t kAuxOutputProgramStorageBytes =
+    kAuxOutputProgramPageCount * protocol_v1::kDataFrameBytes;
+inline constexpr std::size_t kAuxOutputDmaAllocationBytes =
+    kAuxOutputDmaPageCount * protocol_v1::kDataFrameBytes;
+inline constexpr std::size_t kAuxOutputDmaBlockCount = 4U;
+inline constexpr std::size_t kAuxOutputDmaDescriptorBytes =
+    kAuxOutputDmaBlockCount * kEdmaTcdBytes;
+inline constexpr std::size_t kAuxOutputDmaStateStorageBytes =
+    kAuxOutputDmaAllocationBytes - kAuxOutputDmaDescriptorBytes;
+inline constexpr std::size_t kAuxOutputDmaBlockBytes =
+    kAuxOutputDmaStateStorageBytes / kAuxOutputDmaBlockCount;
+inline constexpr std::size_t kAuxOutputStatesPerBlock =
+    kAuxOutputDmaBlockBytes / sizeof(std::uint32_t);
+inline constexpr std::size_t kAuxOutputCandidatePacketPrimaryCount =
+    kPacketBufferPrimaryCount - kAuxOutputProgramPageCount;
+inline constexpr std::size_t kAuxOutputCandidatePacketReserveCount =
+    kPacketBufferReserveCount - kAuxOutputDmaPageCount;
+inline constexpr std::size_t kAuxOutputCandidatePacketCount =
+    kAuxOutputCandidatePacketPrimaryCount +
+    kAuxOutputCandidatePacketReserveCount;
+inline constexpr std::uint64_t kAuxOutputCandidateRetentionUs =
+    (static_cast<std::uint64_t>(kAuxOutputCandidatePacketCount) *
+     protocol_v1::kFrameCoverageTicks * 1000000U) /
+    (2U * protocol_v1::kTimestampHz);
 inline constexpr std::size_t kAdcDmaRingBytes =
     kAdcDmaRingDepth * kAdcDmaBufferStrideBytes;
 inline constexpr std::size_t kAdcDmaOverflowSinkBytes = kCacheLineBytes;
@@ -973,6 +1004,27 @@ static_assert(kPacketBufferPrimaryStorageBytes +
                       kPacketBufferReserveStorageBytes ==
                   kPacketBufferStorageBytes,
               "packet storage banks must cover the complete pool");
+static_assert(kAuxOutputProgramStorageBytes == 8192U);
+static_assert(kAuxOutputDmaAllocationBytes == 16384U);
+static_assert(kAuxOutputDmaDescriptorBytes == 128U);
+static_assert(kAuxOutputDmaStateStorageBytes == 16256U);
+static_assert(kAuxOutputDmaBlockBytes == 4064U);
+static_assert(kAuxOutputStatesPerBlock == 1016U);
+static_assert(kAuxOutputDmaStateStorageBytes % kCacheLineBytes == 0U);
+static_assert(kAuxOutputCandidatePacketPrimaryCount == 103U);
+static_assert(kAuxOutputCandidatePacketReserveCount == 91U);
+static_assert(kAuxOutputCandidatePacketCount == 194U);
+static_assert(kAuxOutputCandidateRetentionUs == 98164U);
+static_assert((kAuxOutputCandidatePacketPrimaryCount *
+                   protocol_v1::kDataFrameBytes) +
+                      kAuxOutputProgramStorageBytes ==
+                  kPacketBufferPrimaryStorageBytes,
+              "output program must replace exactly two DTCM packet pages");
+static_assert((kAuxOutputCandidatePacketReserveCount *
+                   protocol_v1::kDataFrameBytes) +
+                      kAuxOutputDmaAllocationBytes ==
+                  kPacketBufferReserveStorageBytes,
+              "output DMA must replace exactly four OCRAM packet pages");
 static_assert(kChecksumBenchmarkBufferBytes % kCacheLineBytes == 0U,
               "benchmark buffers must occupy complete cache lines");
 static_assert(kPacketReadyQueueDepth >= kPacketBufferCount &&

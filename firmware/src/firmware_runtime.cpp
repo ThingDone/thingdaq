@@ -24,6 +24,9 @@ bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
 
 LoopReport FirmwareRuntime::service() {
   LoopReport report{};
+  // Output expansion gets one fixed block visit before command parsing,
+  // diagnostics, checksum work, or USB can consume the cooperative loop.
+  acquisition_controller_.serviceOutput(report);
   report.receive = transport_.serviceReceive();
   if (transport_.takeSessionStarted()) {
     control_.beginHostSession();
@@ -198,6 +201,9 @@ LoopReport FirmwareRuntime::service() {
       packet_pipeline_.serviceReadyFrames();
   report.transmit_before_second_acquisition = transport_.serviceTransmit();
 
+  // Refill again between the two physical-acquisition/USB visits. Each call
+  // expands at most one 1,016-state block and never waits for host I/O.
+  acquisition_controller_.serviceOutput(report);
   acquisition_controller_.service(report);
   if (report.physical_fault_detected &&
       control_.state() != protocol_v1::DeviceState::kIdle) {

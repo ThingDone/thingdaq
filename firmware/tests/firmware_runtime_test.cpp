@@ -23,6 +23,7 @@ namespace benchmark = thingdaq::benchmark;
 namespace board = thingdaq::board;
 namespace constants = thingdaq::protocol_v1;
 namespace control = thingdaq::control;
+namespace digital_output = thingdaq::digital_output;
 namespace gpio_clock = thingdaq::gpio_clock;
 namespace gpio_capture = thingdaq::gpio_capture;
 namespace gpio_packer = thingdaq::gpio_packer;
@@ -717,6 +718,94 @@ class AuditGpioCapture final : public thingdaq::gpio_capture::HardwareCapture {
   std::uint32_t inspect_calls = 0U;
 };
 
+class LifecycleOutput final : public digital_output::Participant {
+ public:
+  explicit LifecycleOutput(std::vector<std::string> &operations)
+      : operations_(operations) {}
+
+  bool participatesInNextStart() const override { return armed; }
+
+  digital_output::StartStatus inspectStart(
+      std::uint32_t run_id) const override {
+    if (!armed) {
+      return digital_output::StartStatus::kNotArmed;
+    }
+    if (run_id == 0U) {
+      return digital_output::StartStatus::kInvalidRunId;
+    }
+    return inspect_status;
+  }
+
+  digital_output::StartStatus prepareStart(
+      std::uint32_t run_id, std::uint64_t epoch_ticks) override {
+    operations_.push_back("output_prepare");
+    if (prepare_status != digital_output::StartStatus::kOk) {
+      return prepare_status;
+    }
+    prepared = true;
+    observed_run_id = run_id;
+    observed_epoch_ticks = epoch_ticks;
+    return digital_output::StartStatus::kOk;
+  }
+
+  void commitCommonStart() override {
+    operations_.push_back("output_start");
+    prepared = false;
+    running = true;
+    armed = false;
+  }
+
+  void rollbackPreparedStart() override {
+    operations_.push_back("output_rollback");
+    prepared = false;
+  }
+
+  digital_output::StopReport stopAfterTriggers() override {
+    operations_.push_back("output_stop");
+    running = false;
+    digital_output::StopReport report{};
+    report.status = digital_output::OperationStatus::kOk;
+    report.active_states_emitted = 0U;
+    report.dma_quiesced = true;
+    return report;
+  }
+
+  digital_output::ServiceReport service(std::size_t block_limit) override {
+    ++service_calls;
+    last_service_limit = block_limit;
+    return {};
+  }
+
+  digital_output::Snapshot snapshot() const override {
+    digital_output::Snapshot result{};
+    result.state = fault
+                       ? thingdaq::protocol_v2::OutputState::kFaulted
+                       : running
+                             ? thingdaq::protocol_v2::OutputState::kRunning
+                             : armed
+                                   ? thingdaq::protocol_v2::OutputState::kArmed
+                                   : thingdaq::protocol_v2::OutputState::kHeld;
+    result.prepared = prepared;
+    return result;
+  }
+
+  bool faulted() const override { return fault; }
+
+  std::vector<std::string> &operations_;
+  digital_output::StartStatus inspect_status =
+      digital_output::StartStatus::kOk;
+  digital_output::StartStatus prepare_status =
+      digital_output::StartStatus::kOk;
+  std::uint32_t observed_run_id = 0U;
+  std::uint64_t observed_epoch_ticks = 0U;
+  std::size_t last_service_limit = 0U;
+  std::uint32_t service_calls = 0U;
+  bool armed = false;
+  bool prepared = false;
+  bool running = false;
+  bool fault = false;
+};
+
 struct CombinedControllerFixture {
   packet::OwnedPacketBufferStorage packet_storage{};
   packet::PacketBufferPipeline packet_pipeline{packet_storage};
@@ -732,10 +821,11 @@ struct CombinedControllerFixture {
   gpio_packer::PackedBufferStorage gpio_storage{};
   gpio_packer::GpioBatchPacker gpio_frame_packer{gpio_capture,
                                                  gpio_storage};
+  LifecycleOutput output{operations};
   acquisition::Controller controller{
       statistics,       packet_pipeline,   &gpio_capture,
       &gpio_frame_packer, &adc_initializer, &trigger_scheduler,
-      &adc_capture,     &adc_frame_packer};
+      &adc_capture,     &adc_frame_packer, &output};
 };
 
 wire::Configuration combinedPhysicalConfiguration() {
@@ -1929,6 +2019,137 @@ void testCombinedStartRollbackMatrixCoversEveryAdmissionPoint() {
   }
 }
 
+void testArmedOutputJoinsCommonStartStopAndFaultOrdering() {
+  CombinedControllerFixture fixture{};
+  const wire::Configuration combined = combinedPhysicalConfiguration();
+  fixture.output.armed = true;
+  expect(fixture.controller.initialize().trigger.error_flags == 0U,
+         "output lifecycle fixture completes trigger initialization");
+  fixture.operations.clear();
+
+  wire::Configuration adc_only = combined;
+  adc_only.stream_mask = packet::kAdcStreamMask;
+  const acquisition::Audit incompatible =
+      fixture.controller.inspect(adc_only, 88U);
+  expect(incompatible.output_inspected &&
+             incompatible.has(acquisition::Conflict::kOutputProfileMismatch) &&
+             !incompatible.ready(),
+         "armed output requires the complete physical combined profile");
+
+  expect(fixture.packet_pipeline.startRun(
+             88U, combined.data_checksum_algorithm, combined.stream_mask) ==
+             packet::OperationStatus::kOk,
+         "output lifecycle reserves the packet epoch");
+  acquisition::Report started{};
+  expect(fixture.controller.start(combined, 88U, 123456U, started) &&
+             started.output_prepared && started.output_started &&
+             fixture.output.observed_run_id == 88U &&
+             fixture.output.observed_epoch_ticks == 123456U &&
+             fixture.operations ==
+                 std::vector<std::string>{
+                     "dma_prepare", "gpio_dma_prepare", "output_prepare",
+                     "trigger_arm", "output_start"},
+         "armed output prepares before and commits after the common trigger arm");
+
+  acquisition::Report output_service{};
+  fixture.controller.serviceOutput(output_service);
+  expect(fixture.output.service_calls == 1U &&
+             fixture.output.last_service_limit ==
+                 digital_output::kBlocksPerServiceVisit,
+         "controller exposes one explicitly bounded cooperative refill visit");
+
+  fixture.operations.clear();
+  acquisition::Report stopped{};
+  expect(fixture.controller.stop(stopped) && stopped.output_stopped &&
+             fixture.operations ==
+                 std::vector<std::string>{"trigger_stop", "output_stop",
+                                          "gpio_dma_stop", "dma_stop"},
+         "STOP disables the shared trigger before output and acquisition DMA");
+  acquisition::Report drained{};
+  fixture.controller.service(drained);
+
+  fixture.output.armed = true;
+  fixture.output.prepare_status = digital_output::StartStatus::kNotReady;
+  fixture.operations.clear();
+  expect(fixture.packet_pipeline.startRun(
+             89U, combined.data_checksum_algorithm, combined.stream_mask) ==
+             packet::OperationStatus::kOk,
+         "output rollback reserves a fresh packet epoch");
+  acquisition::Report rejected{};
+  expect(!fixture.controller.start(combined, 89U, 123457U, rejected) &&
+             rejected.internal_error && !rejected.output_prepared &&
+             fixture.operations ==
+                 std::vector<std::string>{
+                     "dma_prepare", "gpio_dma_prepare", "output_prepare",
+                     "gpio_dma_stop", "dma_stop"} &&
+             fixture.controller.quiescent() &&
+             fixture.packet_pipeline.readyForStart(),
+         "output readiness failure rolls back every earlier owner before clock start");
+
+  fixture.output.prepare_status = digital_output::StartStatus::kOk;
+  fixture.output.armed = true;
+  fixture.trigger_platform.arm_ok = false;
+  fixture.operations.clear();
+  expect(fixture.packet_pipeline.startRun(
+             90U, combined.data_checksum_algorithm, combined.stream_mask) ==
+             packet::OperationStatus::kOk,
+         "output clock-rollback fixture reserves another packet epoch");
+  acquisition::Report clock_rejected{};
+  expect(!fixture.controller.start(combined, 90U, 123458U,
+                                   clock_rejected) &&
+             clock_rejected.output_prepared &&
+             !clock_rejected.output_started &&
+             fixture.operations ==
+                 std::vector<std::string>{
+                     "dma_prepare", "gpio_dma_prepare", "output_prepare",
+                     "trigger_arm", "trigger_stop", "output_rollback",
+                     "gpio_dma_stop", "dma_stop"} &&
+             fixture.output.armed && !fixture.output.prepared &&
+             !fixture.output.running,
+         "failed common clock arm returns DMA_READING to DMA_READY without an output transition");
+
+  fixture.trigger_platform.arm_ok = true;
+  fixture.output.armed = true;
+  fixture.operations.clear();
+  expect(fixture.packet_pipeline.startRun(
+             91U, combined.data_checksum_algorithm, combined.stream_mask) ==
+             packet::OperationStatus::kOk,
+         "output fault fixture reserves another packet epoch");
+  acquisition::Report restarted{};
+  expect(fixture.controller.start(combined, 91U, 123459U, restarted),
+         "output fault fixture starts");
+  fixture.operations.clear();
+  fixture.output.fault = true;
+  acquisition::Report faulted{};
+  fixture.controller.service(faulted);
+  expect(faulted.physical_fault_detected && faulted.internal_error &&
+             faulted.output_stopped && !fixture.controller.active() &&
+             fixture.operations ==
+                 std::vector<std::string>{"trigger_stop", "output_stop",
+                                          "gpio_dma_stop", "dma_stop"},
+         "latched output fault fail-stops the common epoch with trigger-first ordering");
+}
+
+void testRuntimeServicesOutputAtBothCooperativePoints() {
+  FakeCdcStream stream{};
+  packet::OwnedPacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  std::vector<std::string> operations{};
+  LifecycleOutput output{operations};
+  app::FirmwareRuntime firmware{
+      stream, packet_storage, clock, synthetic::Mode::kRealtime,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, &output};
+  expect(firmware.begin(0xAABBCCDDU),
+         "bounded output-service fixture boots");
+  const app::LoopReport report = firmware.service();
+  expect(output.service_calls == 2U &&
+             output.last_service_limit ==
+                 digital_output::kBlocksPerServiceVisit &&
+             report.output_service.blocks_filled == 0U,
+         "runtime visits output once before command/USB work and once between acquisition visits");
+}
+
 void testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs() {
   FakeCdcStream stream{};
   stream.max_read_size = 128U;
@@ -2227,6 +2448,8 @@ int main() {
   testCombinedControllerUsesOneEpochAndDeterministicLifecycle();
   testCombinedStartRollsBackEveryPreparedOwner();
   testCombinedStartRollbackMatrixCoversEveryAdmissionPoint();
+  testArmedOutputJoinsCommonStartStopAndFaultOrdering();
+  testRuntimeServicesOutputAtBothCooperativePoints();
   testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs();
   testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState();
   testGpioClockRoundTripPreservesIdleAcquisitionState();
