@@ -75,6 +75,7 @@ path is opt-in and clearly represents a physical-device operation.
 | Combined timestamp alignment | `.venv/bin/python daq_api/examples/combined_alignment.py` | Safe A0/A1 and D6-D13 inputs |
 | Live STATUS and loss handling | `.venv/bin/python daq_api/examples/status_and_loss.py` | Safe inputs; performs a short physical combined capture |
 | Standalone simulator lifecycle | `.venv/bin/python daq_api/examples/simulator.py` | None; this example intentionally has no `--real` path |
+| Preloaded output simulation | `.venv/bin/python daq_api/examples/preloaded_output.py` | None; this experimental example has no hardware path and labels every timing value as simulated |
 | Explicit clean shutdown | `.venv/bin/python daq_api/examples/clean_shutdown.py` | Safe A0/A1 input; demonstrates STOP in `finally` |
 
 For example:

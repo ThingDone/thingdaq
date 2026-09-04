@@ -62,7 +62,14 @@ All examples default to the simulator. A script touches hardware only when
 .venv/bin/python daq_api/examples/raw_adc_channels.py
 .venv/bin/python daq_api/examples/combined_alignment.py
 .venv/bin/python daq_api/examples/status_and_loss.py
+.venv/bin/python daq_api/examples/preloaded_output.py
 ```
+
+The experimental preloaded-output example is simulator-only. It demonstrates
+finite completion, infinite-repeat STOP/hold, release-to-input, and injected
+underrun recovery while ADC/GPIO acquisition continues. Pass `--output PREFIX`
+to emit temporary shared-schema JSON and structured Markdown through the
+canonical experiment reporter; the example writes no artifact by default.
 
 See the [quickstart](doc/guides/quickstart.md) for the complete example roster,
 physical discovery by hardware serial, and lifecycle guidance.
