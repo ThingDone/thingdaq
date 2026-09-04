@@ -96,6 +96,8 @@ enum class StopReason : std::uint8_t {
 struct Progress {
   std::array<std::uint64_t, kBankCount> bank_major_loops{};
   std::array<std::uint64_t, kBankCount> bank_samples_completed{};
+  std::array<std::uint32_t, kBankCount> bank_ring_overruns{};
+  std::array<std::uint32_t, kBankCount> bank_stale_completions{};
   std::uint64_t paired_major_loops = 0U;
   std::uint64_t buffers_completed = 0U;
   std::uint64_t buffers_acquired = 0U;

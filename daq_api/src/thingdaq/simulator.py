@@ -411,6 +411,11 @@ class SimulatedDevice:
             protocol_version=(
                 v2_constants.PROTOCOL_VERSION if use_v2 else constants.PROTOCOL_VERSION
             ),
+            max_control_frame_bytes=(
+                v2_constants.MAX_CONTROL_FRAME_BYTES
+                if use_v2
+                else constants.MAX_CONTROL_FRAME_BYTES
+            ),
             adc_pair_rate_hz=timing.adc_pair_rate_hz,
             gpio_sample_rate_hz=timing.gpio_sample_rate_hz,
             adc_pair_period_ticks=timing.adc_pair_period_ticks,
@@ -509,7 +514,10 @@ class SimulatedDevice:
         )
 
     def _handle_status(self, request: CompatibleFrame) -> bytes:
-        return self._success_response(request, self.status().to_payload())
+        return self._success_response(
+            request,
+            self.status().to_payload(protocol_version=request.header.version),
+        )
 
     def _handle_stop(self, request: CompatibleFrame) -> bytes:
         self._state = constants.DeviceState.IDLE

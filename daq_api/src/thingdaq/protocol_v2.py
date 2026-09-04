@@ -995,6 +995,60 @@ def _validate_v2_payload(header: V2FrameHeader, payload: bytes) -> None:
     }:
         decode_v2_configuration(payload, response=True)
         return
+    if header.kind is constants.FrameKind.GET_STATUS_RESPONSE:
+        if (
+            payload[constants.STATUS_RESPONSE_PROTOCOL_VERSION_OFFSET]
+            != constants.PROTOCOL_VERSION
+            or payload[constants.STATUS_RESPONSE_AUX_BANK_MODE_OFFSET]
+            not in tuple(int(mode) for mode in constants.AuxBankMode)
+            or payload[constants.STATUS_RESPONSE_RATE_PROFILE_OFFSET]
+            not in tuple(int(profile) for profile in constants.RateProfile)
+            or _u32(payload, constants.STATUS_RESPONSE_RESERVED_4_OFFSET) != 0
+        ):
+            raise V2FrameValidationError("STATUS v2 extension is contradictory")
+        expected_item_bytes = (
+            2
+            if payload[constants.STATUS_RESPONSE_AUX_BANK_MODE_OFFSET]
+            == int(constants.AuxBankMode.INPUT)
+            else 1
+        )
+        if payload[constants.STATUS_RESPONSE_GPIO_ITEM_BYTES_OFFSET] != (
+            expected_item_bytes
+        ):
+            raise V2FrameValidationError("STATUS GPIO width is contradictory")
+        return
+    if header.kind is constants.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE:
+        if (
+            payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_BANK_COUNT_OFFSET]
+            not in (1, 2)
+            or payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_AUX_BANK_MODE_OFFSET]
+            not in tuple(int(mode) for mode in constants.AuxBankMode)
+            or payload[
+                constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_SELECTED_RATE_PROFILE_OFFSET
+            ]
+            not in tuple(int(profile) for profile in constants.RateProfile)
+            or payload[
+                constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_AUX_ELECTRICALLY_UNSTIMULATED_OFFSET
+            ]
+            not in (0, 1)
+            or payload[
+                constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_AUX_EXTERNAL_TRANSITION_CHECKS_RUN_OFFSET
+            ]
+            not in (0, 1)
+            or payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_RESERVED_3_OFFSET]
+            != 0
+            or _u16(
+                payload,
+                constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_RESERVED_4_OFFSET,
+            )
+            != 0
+            or payload[constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_RESERVED_5_OFFSET]
+            != 0
+        ):
+            raise V2FrameValidationError(
+                "GPIO capture diagnostic v2 extension is contradictory"
+            )
+        return
     _validate_v1_compatible_control(header, payload)
 
 

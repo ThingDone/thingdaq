@@ -160,6 +160,7 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define DMAMUX_CHCFG0 fake_imxrt::dmamux_chcfg[0]
 #define IMXRT_DMA_TCD fake_imxrt::dma_tcd
 #define DMA_DCHPRI2 fake_imxrt::dma_dchpri[2]
+#define DMA_DCHPRI3 fake_imxrt::dma_dchpri[3]
 #define DMA_ERQ fake_imxrt::dma_erq
 #define DMA_CERQ fake_imxrt::dma_cerq
 #define DMA_CERR fake_imxrt::dma_cerr

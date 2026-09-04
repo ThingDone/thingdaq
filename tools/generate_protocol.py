@@ -735,6 +735,8 @@ def validate_v2_contract(
         int(schemas["configure_request"]["size"]) != 16
         or int(schemas["configure_response"]["size"]) != 20
         or int(schemas["info_response"]["size"]) != 632
+        or int(schemas["status_response"]["size"]) != 1476
+        or int(schemas["gpio_capture_diagnostic_response"]["size"]) != 272
         or int(schemas["rate_profile_info"]["size"]) != 48
     ):
         raise ContractError("protocol v2 control extension sizes are inconsistent")

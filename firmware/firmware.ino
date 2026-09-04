@@ -31,7 +31,8 @@ thingdaq::gpio_packer::GpioBatchPacker gpio_packer{
     thingdaq::gpio_packer::teensyPackedBufferStorage(),
     &thingdaq::gpio_packer::teensyCycleCounter()};
 thingdaq::gpio_aux_packer::AuxiliaryBatchPacker aux_gpio_packer{
-    thingdaq::gpio_join::teensyDualBankCapture()};
+    thingdaq::gpio_join::teensyDualBankCapture(),
+    &thingdaq::gpio_packer::teensyCycleCounter()};
 thingdaq::adc_packer::AdcFramePacker adc_packer{
     thingdaq::adc_capture::teensyAdcDmaCapture()};
 thingdaq::clock::TeensyTickClock tick_clock{};

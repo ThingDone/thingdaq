@@ -179,12 +179,20 @@ CompletionResult DualBankCaptureRing::onMajorLoopComplete(
   const std::uint32_t token = critical_.enter();
   if (!running_) {
     saturatingIncrement(progress_.stale_completions);
+    if (validBank(bank)) {
+      saturatingIncrement(
+          progress_.bank_stale_completions[bankIndex(bank)]);
+    }
     critical_.exit(token);
     result.status = OperationStatus::kNotRunning;
     return result;
   }
   if (epoch == 0U || epoch != epoch_) {
     saturatingIncrement(progress_.stale_completions);
+    if (validBank(bank)) {
+      saturatingIncrement(
+          progress_.bank_stale_completions[bankIndex(bank)]);
+    }
     critical_.exit(token);
     result.status = OperationStatus::kInvalidEpoch;
     return result;
@@ -198,6 +206,7 @@ CompletionResult DualBankCaptureRing::onMajorLoopComplete(
   const std::size_t bank_index = bankIndex(bank);
   if (generation != next_completion_generations_[bank_index]) {
     saturatingIncrement(progress_.stale_completions);
+    saturatingIncrement(progress_.bank_stale_completions[bank_index]);
     critical_.exit(token);
     result.status = OperationStatus::kInvalidCompletion;
     return result;
@@ -216,6 +225,7 @@ CompletionResult DualBankCaptureRing::onMajorLoopComplete(
       static_cast<std::uint8_t>(1U << bank_index);
   if ((completed->completion_mask & bank_bit) != 0U) {
     saturatingIncrement(progress_.stale_completions);
+    saturatingIncrement(progress_.bank_stale_completions[bank_index]);
     critical_.exit(token);
     return result;
   }
@@ -488,6 +498,10 @@ StopReport DualBankCaptureRing::stop(
       }
       if (slot.destination == kOverflowDestination) {
         saturatingIncrement(progress_.raw_ring_overruns);
+        for (std::size_t bank_index = 0U; bank_index < kBankCount;
+             ++bank_index) {
+          saturatingIncrement(progress_.bank_ring_overruns[bank_index]);
+        }
       }
     }
     markDiscardPending(slot, &report);
@@ -694,6 +708,10 @@ void DualBankCaptureRing::finalizeGeneration(
 
   if (slot.destination == kOverflowDestination) {
     saturatingIncrement(progress_.raw_ring_overruns);
+    for (std::size_t bank_index = 0U; bank_index < kBankCount;
+         ++bank_index) {
+      saturatingIncrement(progress_.bank_ring_overruns[bank_index]);
+    }
   } else if (!isBufferDestination(slot.destination)) {
     noteInvariantError();
     result.pair_lost = true;

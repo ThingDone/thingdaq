@@ -30,7 +30,8 @@ constexpr bool usesAuxInput(
 
 constexpr bool usesLegacySchedule(
     const protocol::Configuration &configuration) {
-  return configuration.aux_bank_mode ==
+  return configuration.protocol_version == protocol_v1::kProtocolVersion &&
+         configuration.aux_bank_mode ==
              protocol_v2::kDefaultAuxBankMode &&
          configuration.rate_profile ==
              protocol_v2::kDefaultRateProfile;
@@ -800,6 +801,79 @@ void Controller::service(Report &report) {
 
 THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.statistics")
 void Controller::publishStatistics(std::uint32_t run_id) {
+  if (aux_gpio_packer_ != nullptr) {
+    const gpio_aux_packer::Snapshot packed =
+        aux_gpio_packer_->snapshot(packet_pipeline_);
+    if (packed.run_id != 0U && packed.run_id == run_id) {
+      if (aux_gpio_capture_ != nullptr) {
+        const gpio_join::Snapshot capture =
+            aux_gpio_capture_->rawSnapshot();
+        const gpio_join::Progress &source = capture.progress;
+        stats::AuxiliaryGpioCaptureProgress auxiliary{};
+        auxiliary.bank_major_loops = source.bank_major_loops;
+        auxiliary.bank_samples_captured = source.bank_samples_completed;
+        auxiliary.bank_ring_overruns = source.bank_ring_overruns;
+        auxiliary.bank_stale_completions = source.bank_stale_completions;
+        auxiliary.paired_major_loops = source.paired_major_loops;
+        auxiliary.buffers_completed = source.buffers_completed;
+        auxiliary.buffers_acquired = source.buffers_acquired;
+        auxiliary.buffers_released = source.buffers_released;
+        auxiliary.samples_captured = source.sample_instants_captured;
+        auxiliary.samples_joined = source.sample_instants_joined;
+        auxiliary.samples_delivered = source.sample_instants_delivered;
+        auxiliary.samples_lost = source.sample_instants_lost;
+        auxiliary.raw_ring_overruns = source.raw_ring_overruns;
+        auxiliary.generation_skew_events = source.generation_skew_events;
+        auxiliary.generation_skew_samples = source.generation_skew_samples;
+        auxiliary.canceled_generations = source.canceled_generations;
+        auxiliary.cancellation_samples = source.cancellation_samples;
+        auxiliary.stop_tail_samples = source.stop_tail_samples;
+        auxiliary.timestamp_mismatches = source.timestamp_mismatches;
+        auxiliary.count_mismatches = source.count_mismatches;
+        auxiliary.destination_mismatches = source.destination_mismatches;
+        auxiliary.schedule_exhaustions = source.schedule_exhaustions;
+        auxiliary.stale_completions = source.stale_completions;
+        auxiliary.cache_dma_discards = source.cache_dma_discards;
+        auxiliary.cache_cpu_invalidations = source.cache_cpu_invalidations;
+        auxiliary.hardware_errors = source.hardware_errors;
+        auxiliary.invariant_errors = source.invariant_errors;
+        auxiliary.resource_conflicts = capture.resource_conflicts;
+        auxiliary.start_errors = capture.start_errors;
+        auxiliary.stop_errors = capture.stop_errors;
+        auxiliary.stale_dma_completions = capture.stale_dma_completions;
+        auxiliary.ready_depth = capture.ready_depth;
+        auxiliary.ready_high_water = source.ready_high_water;
+        statistics_.publishAuxiliaryGpioCapture(auxiliary);
+
+        // Preserve the fixed v1 STATUS prefix as logical GPIO-stage units.
+        // In INPUT mode these are paired sample instants, never the sum of
+        // the two physical bank reads.
+        stats::GpioRawCaptureProgress logical{};
+        logical.major_loops_completed = source.paired_major_loops;
+        logical.buffers_completed = source.buffers_completed;
+        logical.buffers_acquired = source.buffers_acquired;
+        logical.buffers_released = source.buffers_released;
+        logical.samples_captured = source.sample_instants_captured;
+        logical.samples_delivered = source.sample_instants_delivered;
+        logical.raw_ring_overruns = source.raw_ring_overruns;
+        logical.samples_lost = source.sample_instants_lost;
+        logical.stop_discarded_samples = source.stop_tail_samples;
+        logical.cache_dma_discards = source.cache_dma_discards;
+        logical.cache_cpu_invalidations = source.cache_cpu_invalidations;
+        logical.ready_depth = capture.ready_depth;
+        logical.ready_high_water = source.ready_high_water;
+        logical.hardware_errors = source.hardware_errors;
+        logical.invariant_errors = source.invariant_errors;
+        logical.resource_conflicts = capture.resource_conflicts;
+        logical.start_errors = capture.start_errors;
+        logical.stop_errors = capture.stop_errors;
+        logical.stale_dma_completions = capture.stale_dma_completions;
+        statistics_.publishGpioRawCapture(logical);
+      }
+      statistics_.publishGpioPacker(packed.progress);
+    }
+  }
+
   if (gpio_packer_ != nullptr) {
     const gpio_packer::Snapshot packed =
         gpio_packer_->snapshot(packet_pipeline_);

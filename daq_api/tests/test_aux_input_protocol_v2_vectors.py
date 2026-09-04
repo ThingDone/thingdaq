@@ -12,7 +12,7 @@ import zlib
 from pathlib import Path
 from typing import Any, ClassVar
 
-from thingdaq import ThingDAQ, low_level
+from thingdaq import GpioCaptureDiagnosticResult, Status, ThingDAQ, low_level
 from thingdaq._generated import protocol_constants as v1_constants
 from thingdaq._generated import protocol_v2_constants as constants
 from thingdaq.protocol import Frame as V1Frame
@@ -193,6 +193,8 @@ class AuxiliaryInputProtocolV2VectorTests(unittest.TestCase):
         self.assertEqual(16, constants.CONFIGURE_REQUEST_PAYLOAD_SIZE)
         self.assertEqual(20, constants.CONFIGURE_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(632, constants.INFO_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(1476, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
+        self.assertEqual(272, constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE)
         self.assertEqual(
             (6, 7, 8, 9, 10, 11, 12, 13), constants.PRIMARY_GPIO_PINS_BY_BIT
         )
@@ -450,6 +452,39 @@ class AuxiliaryInputProtocolV2VectorTests(unittest.TestCase):
                         + constants.RATE_PROFILE_INFO_COMPLETION_EXPECTED_DWT_CYCLES_OFFSET,
                     ),
                 )
+
+    def test_extended_status_and_idle_diagnostic_are_typed_host_evidence(
+        self,
+    ) -> None:
+        status_frame = decode_v2_frame(_fixture("get-status-response"))
+        status = Status.from_payload(status_frame.payload)
+        self.assertIsNotNone(status.configuration)
+        self.assertIsNotNone(status.auxiliary_gpio)
+        assert status.configuration is not None
+        assert status.auxiliary_gpio is not None
+        self.assertIs(
+            constants.AuxBankMode.DISABLED, status.configuration.aux_bank_mode
+        )
+        self.assertIs(
+            constants.RateProfile.ADC_1MHZ_GPIO_4MHZ,
+            status.configuration.rate_profile,
+        )
+        self.assertEqual(1, status.auxiliary_gpio.gpio_item_bytes)
+        self.assertEqual(101_200, status.auxiliary_gpio.packet_retention_us_combined)
+        self.assertEqual(
+            202_400, status.auxiliary_gpio.packet_retention_us_single_stream
+        )
+        self.assertEqual((0, 0), status.auxiliary_gpio.bank_ring_overruns)
+        self.assertEqual((0, 0), status.auxiliary_gpio.bank_stale_completions)
+
+        diagnostic_frame = decode_v2_frame(_fixture("gpio-capture-diagnostic-response"))
+        diagnostic = GpioCaptureDiagnosticResult.from_payload(diagnostic_frame.payload)
+        self.assertEqual(2, diagnostic.bank_count)
+        self.assertIs(constants.AuxBankMode.INPUT, diagnostic.aux_bank_mode)
+        self.assertEqual(2_031, diagnostic.aux_dma_samples_captured)
+        self.assertEqual((8, 8), diagnostic.cache_dma_discards)
+        self.assertTrue(diagnostic.aux_electrically_unstimulated)
+        self.assertFalse(diagnostic.aux_external_transition_checks_run)
 
     def test_all_semantic_rejections_and_error_responses_are_explicit(self) -> None:
         rejected = [

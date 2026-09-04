@@ -85,8 +85,9 @@ struct Snapshot {
 class AuxiliaryBatchPacker final {
  public:
   explicit constexpr AuxiliaryBatchPacker(
-      gpio_join::PairedRawSource &source)
-      : source_(source) {}
+      gpio_join::PairedRawSource &source,
+      gpio_packer::CycleCounter *cycle_counter = nullptr)
+      : source_(source), cycle_counter_(cycle_counter) {}
 
   AuxiliaryBatchPacker(const AuxiliaryBatchPacker &) = delete;
   AuxiliaryBatchPacker &operator=(const AuxiliaryBatchPacker &) = delete;
@@ -114,13 +115,20 @@ class AuxiliaryBatchPacker final {
                      packet::PacketBufferPipeline &pipeline);
   stats::GpioPackerProgress progress(
       const packet::PacketBufferPipeline &pipeline) const;
+  std::uint32_t beginProfile();
+  void finishProfile(std::uint32_t started_at);
+  std::uint16_t processingCpuBasisPoints() const;
 
   gpio_join::PairedRawSource &source_;
+  gpio_packer::CycleCounter *cycle_counter_ = nullptr;
   stream_layout::RunLayout layout_{};
   stats::GpioPackerProgress progress_{};
   std::uint64_t next_sample_ticks_ = 0U;
   std::uint64_t start_epoch_ticks_ = 0U;
   std::uint64_t service_calls_ = 0U;
+  std::uint64_t processing_elapsed_cycles_ = 0U;
+  std::uint64_t processing_active_cycles_ = 0U;
+  std::uint32_t profile_last_cycle_ = 0U;
   std::uint32_t run_id_ = 0U;
   std::uint32_t source_errors_ = 0U;
   std::uint32_t pipeline_errors_ = 0U;
@@ -128,6 +136,7 @@ class AuxiliaryBatchPacker final {
   protocol_v1::ChecksumAlgorithm checksum_algorithm_ =
       protocol_v1::kDefaultChecksumAlgorithm;
   bool packet_gap_pending_ = false;
+  bool processing_profile_active_ = false;
   bool running_ = false;
 };
 

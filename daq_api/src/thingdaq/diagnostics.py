@@ -270,12 +270,23 @@ def _equation(
 
 def _stream_equations(status: Status, source: str) -> list[CounterEquation]:
     is_adc = source == "adc"
+    layout = status.configuration.gpio_layout if status.configuration else None
     items_per_frame = (
-        constants.ADC_PAIRS_PER_FRAME if is_adc else constants.GPIO_SAMPLES_PER_FRAME
+        layout.adc_items_per_frame
+        if is_adc and layout
+        else layout.items_per_frame
+        if layout
+        else constants.ADC_PAIRS_PER_FRAME
+        if is_adc
+        else constants.GPIO_SAMPLES_PER_FRAME
     )
-    bytes_per_item = constants.ADC_BYTES_PER_PAIR if is_adc else 1
-    payload_bytes_per_frame = constants.DATA_PAYLOAD_BYTES
-    frame_bytes = constants.DATA_FRAME_BYTES
+    bytes_per_item = (
+        constants.ADC_BYTES_PER_PAIR if is_adc else layout.item_bytes if layout else 1
+    )
+    payload_bytes_per_frame = items_per_frame * bytes_per_item
+    frame_bytes = (
+        payload_bytes_per_frame + constants.HEADER_SIZE + constants.TRAILER_SIZE
+    )
     frame_unit = f"{source.upper()} frames"
     item_unit = "ADC pairs" if is_adc else "GPIO sample instants"
 
@@ -624,6 +635,13 @@ def reconcile_run_counters(
         raise ValueError("run_id must fit uint32")
 
     inferred_streams = status.stream_mask
+    layout = status.configuration.gpio_layout if status.configuration else None
+    adc_items_per_frame = (
+        layout.adc_items_per_frame if layout else constants.ADC_PAIRS_PER_FRAME
+    )
+    gpio_items_per_frame = (
+        layout.items_per_frame if layout else constants.GPIO_SAMPLES_PER_FRAME
+    )
     if inferred_streams == constants.StreamMask.NONE:
         if (
             status.adc_frames_generated
@@ -793,9 +811,7 @@ def reconcile_run_counters(
                     counter="adc0_dma_results",
                     expression="adc0_dma_results == adc0_major_loops * pairs_per_frame",
                     actual=status.adc0_dma_results,
-                    expected=(
-                        status.adc0_dma_major_loops * constants.ADC_PAIRS_PER_FRAME
-                    ),
+                    expected=(status.adc0_dma_major_loops * adc_items_per_frame),
                     unit="conversion results",
                     fields=("adc0_dma_results", "adc0_dma_major_loops"),
                 ),
@@ -804,9 +820,7 @@ def reconcile_run_counters(
                     counter="adc1_dma_results",
                     expression="adc1_dma_results == adc1_major_loops * pairs_per_frame",
                     actual=status.adc1_dma_results,
-                    expected=(
-                        status.adc1_dma_major_loops * constants.ADC_PAIRS_PER_FRAME
-                    ),
+                    expected=(status.adc1_dma_major_loops * adc_items_per_frame),
                     unit="conversion results",
                     fields=("adc1_dma_results", "adc1_dma_major_loops"),
                 ),
@@ -852,7 +866,7 @@ def reconcile_run_counters(
                     expression="adc_pairs_captured == paired loops * pairs-per-frame + stopped partial",
                     actual=status.adc_pairs_captured,
                     expected=(
-                        status.adc_paired_major_loops * constants.ADC_PAIRS_PER_FRAME
+                        status.adc_paired_major_loops * adc_items_per_frame
                         + status.adc_stop_pairs_discarded
                     ),
                     unit="ADC pairs",
@@ -870,7 +884,7 @@ def reconcile_run_counters(
                     expected=(
                         status.adc_pairs_delivered
                         + status.adc_raw_pairs_lost
-                        + status.adc_raw_ready_depth * constants.ADC_PAIRS_PER_FRAME
+                        + status.adc_raw_ready_depth * adc_items_per_frame
                     ),
                     unit="ADC pairs",
                     fields=(
@@ -884,9 +898,7 @@ def reconcile_run_counters(
                     counter="adc_pairs_delivered",
                     expression="adc_pairs_delivered == buffers_acquired * pairs-per-frame",
                     actual=status.adc_pairs_delivered,
-                    expected=(
-                        status.adc_buffers_acquired * constants.ADC_PAIRS_PER_FRAME
-                    ),
+                    expected=(status.adc_buffers_acquired * adc_items_per_frame),
                     unit="ADC pairs",
                     fields=("adc_pairs_delivered", "adc_buffers_acquired"),
                 ),
@@ -895,9 +907,7 @@ def reconcile_run_counters(
                     counter="adc_pairs_consumed",
                     expression="adc_pairs_consumed == frames_consumed * pairs-per-frame",
                     actual=status.adc_pairs_consumed,
-                    expected=(
-                        status.adc_frames_consumed * constants.ADC_PAIRS_PER_FRAME
-                    ),
+                    expected=(status.adc_frames_consumed * adc_items_per_frame),
                     unit="ADC pairs",
                     fields=("adc_pairs_consumed", "adc_frames_consumed"),
                 ),
@@ -953,7 +963,7 @@ def reconcile_run_counters(
                     expression="adc_items_dropped == packet drops + unprojected raw loss",
                     actual=status.adc_items_dropped,
                     expected=(
-                        status.adc_frames_dropped * constants.ADC_PAIRS_PER_FRAME
+                        status.adc_frames_dropped * adc_items_per_frame
                         + max(
                             0,
                             status.adc_raw_pairs_lost
@@ -985,9 +995,7 @@ def reconcile_run_counters(
                     counter="adc_raw_pairs_lost",
                     expression="adc_raw_pairs_lost >= raw_ring_overruns * pairs_per_frame",
                     actual=status.adc_raw_pairs_lost,
-                    expected=(
-                        status.adc_raw_ring_overruns * constants.ADC_PAIRS_PER_FRAME
-                    ),
+                    expected=(status.adc_raw_ring_overruns * adc_items_per_frame),
                     unit="ADC pairs",
                     relation=">=",
                     fields=("adc_raw_pairs_lost", "adc_raw_ring_overruns"),
@@ -1005,7 +1013,7 @@ def reconcile_run_counters(
                     expected=(
                         status.gpio_samples_delivered
                         + status.gpio_raw_samples_lost
-                        + status.gpio_raw_ready_depth * constants.GPIO_SAMPLES_PER_FRAME
+                        + status.gpio_raw_ready_depth * gpio_items_per_frame
                     ),
                     unit="GPIO sample instants",
                     fields=(
@@ -1039,9 +1047,7 @@ def reconcile_run_counters(
                     counter="gpio_samples_delivered",
                     expression="gpio_samples_delivered == acquired * samples-per-frame",
                     actual=status.gpio_samples_delivered,
-                    expected=(
-                        status.gpio_buffers_acquired * constants.GPIO_SAMPLES_PER_FRAME
-                    ),
+                    expected=(status.gpio_buffers_acquired * gpio_items_per_frame),
                     unit="GPIO sample instants",
                     fields=("gpio_samples_delivered", "gpio_buffers_acquired"),
                 ),
@@ -1113,7 +1119,7 @@ def reconcile_run_counters(
                     expression="gpio_items_dropped == packet + unprojected raw + packer loss",
                     actual=status.gpio_items_dropped,
                     expected=(
-                        status.gpio_frames_dropped * constants.GPIO_SAMPLES_PER_FRAME
+                        status.gpio_frames_dropped * gpio_items_per_frame
                         + max(
                             0,
                             status.gpio_raw_samples_lost
@@ -1140,15 +1146,79 @@ def reconcile_run_counters(
                     counter="gpio_raw_samples_lost",
                     expression="gpio_raw_samples_lost >= raw_ring_overruns * samples_per_frame",
                     actual=status.gpio_raw_samples_lost,
-                    expected=(
-                        status.gpio_raw_ring_overruns * constants.GPIO_SAMPLES_PER_FRAME
-                    ),
+                    expected=(status.gpio_raw_ring_overruns * gpio_items_per_frame),
                     unit="GPIO sample instants",
                     relation=">=",
                     fields=(
                         "gpio_raw_samples_lost",
                         "gpio_raw_ring_overruns",
                     ),
+                ),
+            )
+        )
+
+    auxiliary = status.auxiliary_gpio
+    if auxiliary is not None:
+        for bank_index, bank_name in enumerate(("primary", "auxiliary")):
+            equations.extend(
+                (
+                    _equation(
+                        status,
+                        counter=f"{bank_name}_gpio_samples_captured",
+                        expression=(
+                            f"{bank_name}_samples == major_loops * samples_per_frame"
+                        ),
+                        actual=auxiliary.bank_samples_captured[bank_index],
+                        expected=(
+                            auxiliary.bank_major_loops[bank_index]
+                            * gpio_items_per_frame
+                        ),
+                        unit="GPIO sample instants",
+                    ),
+                    _equation(
+                        status,
+                        counter=f"{bank_name}_gpio_raw_ring_overruns",
+                        expression=f"{bank_name}_overruns <= paired_overruns",
+                        actual=auxiliary.bank_ring_overruns[bank_index],
+                        expected=auxiliary.raw_ring_overruns,
+                        unit="DMA major loops",
+                        relation="<=",
+                    ),
+                )
+            )
+        equations.extend(
+            (
+                _equation(
+                    status,
+                    counter="paired_gpio_samples_captured",
+                    expression="paired captured == joined + paired loss",
+                    actual=auxiliary.samples_captured,
+                    expected=auxiliary.samples_joined + auxiliary.samples_lost,
+                    unit="GPIO sample instants",
+                ),
+                _equation(
+                    status,
+                    counter="paired_gpio_buffers_completed",
+                    expression="paired completed == acquired + ready",
+                    actual=auxiliary.buffers_completed,
+                    expected=(auxiliary.buffers_acquired + auxiliary.ready_depth[0]),
+                    unit="paired DMA buffers",
+                ),
+                _equation(
+                    status,
+                    counter="paired_gpio_buffers_acquired",
+                    expression="paired acquired == released",
+                    actual=auxiliary.buffers_acquired,
+                    expected=auxiliary.buffers_released,
+                    unit="paired DMA buffers",
+                ),
+                _equation(
+                    status,
+                    counter="paired_gpio_samples_delivered",
+                    expression="paired delivered == acquired * samples_per_frame",
+                    actual=auxiliary.samples_delivered,
+                    expected=auxiliary.buffers_acquired * gpio_items_per_frame,
+                    unit="GPIO sample instants",
                 ),
             )
         )

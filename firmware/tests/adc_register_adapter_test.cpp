@@ -9,6 +9,17 @@
 #define __IMXRT1062__ 1
 #define THINGDAQ_HOST_REGISTER_TEST 1
 
+// Supply the target adapter's selected variable-rate schedule through the
+// portable derivation path used by production.
+#include "../src/variable_rate_scheduler.cpp"
+namespace thingdaq::variable_rate {
+const Schedule &teensySelectedSchedule() {
+  static const Schedule schedule =
+      derive(protocol_v2::RateProfile::kAdc1mhzGpio4mhz).schedule;
+  return schedule;
+}
+}  // namespace thingdaq::variable_rate
+
 // White-box inclusion is deliberate: this host executable exercises the
 // production register adapters themselves against the narrow fake i.MX RT1062
 // register surface, including helpers kept in their anonymous namespaces.

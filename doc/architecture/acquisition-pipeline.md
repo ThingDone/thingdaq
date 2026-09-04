@@ -2,7 +2,7 @@
 type: analysis
 title: Acquisition Pipeline
 created: 2026-08-28
-updated: 2026-08-29
+updated: 2026-09-04
 tags:
   - thingdaq
   - architecture
@@ -419,6 +419,22 @@ latency has been measured.
 
 ## Buffer and cache composition
 
+Protocol v2 preserves the v1 STATUS prefix and appends the physical two-bank
+view. The prefix counts one joined logical GPIO instant, whether its wire item
+is one or two bytes; the extension independently accounts primary and
+auxiliary DMA completions before the generation barrier. Consequently the
+conservation checks are width-neutral:
+
+\[
+N_{bank} = N_{paired} + N_{bank\ loss}, \qquad
+N_{paired} = N_{joined} + N_{paired\ loss}
+\]
+
+and packet conservation uses `items × gpio_item_bytes` rather than assuming
+one byte per sample. The advertised packet-retention intervals are derived
+from the selected frame coverage and the exact 200-buffer pool, not from a
+nominal fixed-rate estimate.
+
 The controller adds no payload storage. It reuses the eight-buffer ADC pair
 ring, four-buffer raw GPIO ring, four-buffer packed GPIO ring, isolated sinks,
 and the common 200-frame packet pool documented in [[Firmware-Resource-Map]].
@@ -430,7 +446,7 @@ bytes in RAM1 and 503,648 bytes in RAM2. Including the pinned core's four
 bytes, still inside the 512 KiB region before the exact linker gate accounts
 for all remaining core globals.
 The current prelinked ADC pipeline build uses 456,992 bytes of RAM1 variables,
-32,744 bytes of RAM1 code, 24 bytes of alignment padding, and leaves 34,528
+32,728 bytes of RAM1 code, 40 bytes of alignment padding, and leaves 34,528
 bytes for locals/stack. It uses 520,192 bytes of RAM2 variables and leaves
 4,096 bytes of heap headroom. Cold controller lifecycle, diagnostic snapshot, and
 non-measured checksum-vector preparation remain in flash so the additional

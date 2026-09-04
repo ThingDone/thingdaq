@@ -2397,6 +2397,43 @@ class GpioCaptureDiagnosticResult:
     tcd_csr_configured: int
     edma_priority_configured: int
     analysis_sample_limit: int
+    bank_count: int = 1
+    aux_bank_mode: AuxBankMode = AuxBankMode.DISABLED
+    selected_rate_profile: RateProfile = v2_constants.DEFAULT_RATE_PROFILE
+    aux_electrically_unstimulated: bool = False
+    aux_external_transition_checks_run: bool = False
+    configured_rate_hz: int = constants.GPIO_SAMPLE_RATE_HZ
+    aux_hardware_error_flags: int = 0
+    aux_diagnostic_flags: int = 0
+    aux_dma_samples_captured: int = 0
+    aux_complete_samples_retained: int = 0
+    aux_samples_analyzed: int = 0
+    aux_stopped_partial_samples: int = 0
+    aux_raw_word_and: int = 0
+    aux_raw_word_or: int = 0
+    aux_observed_transitions: int = 0
+    aux_packed_value_and: int = 0
+    aux_packed_value_or: int = 0
+    aux_first_packed_value: int = 0
+    aux_last_packed_value: int = 0
+    gpr26_before: int = 0
+    gpr26_configured: int = 0
+    gpr26_after: int = 0
+    gpio1_gdir_before: int = 0
+    gpio1_gdir_configured: int = 0
+    gpio1_gdir_after: int = 0
+    gpio1_psr_before: int = 0
+    gpio1_psr_configured: int = 0
+    gpio1_psr_after: int = 0
+    aux_dmamux_chcfg_configured: int = 0
+    aux_dma_erq_configured: int = 0
+    aux_dma_err_final: int = 0
+    aux_tcd_citer_configured: int = 0
+    aux_tcd_biter_configured: int = 0
+    aux_tcd_csr_configured: int = 0
+    aux_edma_priority_configured: int = 0
+    cache_dma_discards: tuple[int, int] = (0, 0)
+    cache_cpu_invalidations: tuple[int, int] = (0, 0)
 
     def __post_init__(self) -> None:
         try:
@@ -2475,6 +2512,14 @@ class GpioCaptureDiagnosticResult:
             and not flags & constants.GpioCaptureDiagnosticFlag.OUTPUT_DRIVE_PERMITTED
         ):
             raise ValueError("GPIO capture diagnostic evidence is inconsistent")
+        if self.bank_count not in (1, 2):
+            raise ValueError("GPIO capture diagnostic bank count is invalid")
+        if self.aux_external_transition_checks_run and (
+            self.aux_electrically_unstimulated
+        ):
+            raise ValueError(
+                "unstimulated auxiliary bank cannot claim transition validation"
+            )
 
     @property
     def healthy(self) -> bool:
@@ -2485,28 +2530,36 @@ class GpioCaptureDiagnosticResult:
         cls, payload: bytes | bytearray | memoryview
     ) -> GpioCaptureDiagnosticResult:
         data = bytes(payload)
-        _success_prefix(data, constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE)
+        if len(data) not in (
+            constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE,
+            v2_constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE,
+        ):
+            raise FrameValidationError("GPIO diagnostic payload size is invalid")
+        c = (
+            v2_constants
+            if len(data) == v2_constants.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_PAYLOAD_SIZE
+            else constants
+        )
+        _success_prefix(data, len(data))
 
         def u8(name: str) -> int:
-            return data[
-                getattr(constants, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET")
-            ]
+            return data[getattr(c, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET")]
 
         def u16(name: str) -> int:
             return struct.unpack_from(
                 "<H",
                 data,
-                getattr(constants, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET"),
+                getattr(c, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET"),
             )[0]
 
         def u32(name: str) -> int:
             return struct.unpack_from(
                 "<I",
                 data,
-                getattr(constants, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET"),
+                getattr(c, f"GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_{name}_OFFSET"),
             )[0]
 
-        values: dict[str, int | constants.GpioCaptureDiagnosticMode] = {
+        values: dict[str, object] = {
             "mode": constants.GpioCaptureDiagnosticMode(u8("MODE")),
             "metadata_kind": u8("METADATA_KIND"),
             "drive_safety": u8("DRIVE_SAFETY"),
@@ -2568,6 +2621,67 @@ class GpioCaptureDiagnosticResult:
             "edma_priority_configured",
         ):
             values[field] = u8(field.upper())
+        if c is v2_constants:
+            values.update(
+                bank_count=u8("BANK_COUNT"),
+                aux_bank_mode=AuxBankMode(u8("AUX_BANK_MODE")),
+                selected_rate_profile=RateProfile(u8("SELECTED_RATE_PROFILE")),
+                aux_electrically_unstimulated=bool(u8("AUX_ELECTRICALLY_UNSTIMULATED")),
+                aux_external_transition_checks_run=bool(
+                    u8("AUX_EXTERNAL_TRANSITION_CHECKS_RUN")
+                ),
+                aux_dma_samples_captured=struct.unpack_from(
+                    "<Q",
+                    data,
+                    c.GPIO_CAPTURE_DIAGNOSTIC_RESPONSE_AUX_DMA_SAMPLES_CAPTURED_OFFSET,
+                )[0],
+                cache_dma_discards=(
+                    u32("PRIMARY_CACHE_DMA_DISCARDS"),
+                    u32("AUX_CACHE_DMA_DISCARDS"),
+                ),
+                cache_cpu_invalidations=(
+                    u32("PRIMARY_CACHE_CPU_INVALIDATIONS"),
+                    u32("AUX_CACHE_CPU_INVALIDATIONS"),
+                ),
+            )
+            for field in (
+                "configured_rate_hz",
+                "aux_hardware_error_flags",
+                "aux_diagnostic_flags",
+                "aux_complete_samples_retained",
+                "aux_samples_analyzed",
+                "aux_stopped_partial_samples",
+                "aux_raw_word_and",
+                "aux_raw_word_or",
+                "aux_observed_transitions",
+                "gpr26_before",
+                "gpr26_configured",
+                "gpr26_after",
+                "gpio1_gdir_before",
+                "gpio1_gdir_configured",
+                "gpio1_gdir_after",
+                "gpio1_psr_before",
+                "gpio1_psr_configured",
+                "gpio1_psr_after",
+                "aux_dmamux_chcfg_configured",
+                "aux_dma_erq_configured",
+                "aux_dma_err_final",
+            ):
+                values[field] = u32(field.upper())
+            for field in (
+                "aux_tcd_citer_configured",
+                "aux_tcd_biter_configured",
+                "aux_tcd_csr_configured",
+            ):
+                values[field] = u16(field.upper())
+            for field in (
+                "aux_packed_value_and",
+                "aux_packed_value_or",
+                "aux_first_packed_value",
+                "aux_last_packed_value",
+                "aux_edma_priority_configured",
+            ):
+                values[field] = u8(field.upper())
         try:
             return cls(**values)  # type: ignore[arg-type]
         except (TypeError, ValueError) as exc:
@@ -2987,7 +3101,12 @@ class DeviceCapabilities:
             ),
             (self.timestamp_hz, constants.TIMESTAMP_HZ),
             (self.data_frame_bytes, constants.DATA_FRAME_BYTES),
-            (self.max_control_frame_bytes, constants.MAX_CONTROL_FRAME_BYTES),
+            (
+                self.max_control_frame_bytes,
+                v2_constants.MAX_CONTROL_FRAME_BYTES
+                if is_v2
+                else constants.MAX_CONTROL_FRAME_BYTES,
+            ),
             (self.adc_pair_rate_hz, timing.adc_pair_rate_hz),
             (self.gpio_sample_rate_hz, timing.gpio_sample_rate_hz),
             (self.adc_pair_period_ticks, timing.adc_pair_period_ticks),
@@ -4387,6 +4506,51 @@ Info = DeviceInfo
 
 
 @dataclass(frozen=True, slots=True)
+class AuxiliaryGPIOStatus:
+    """Protocol-v2 per-bank DMA and pairing-barrier telemetry."""
+
+    gpio_item_bytes: int = 1
+    adc_pair_rate_hz: int = v2_constants.ADC_PAIR_RATE_HZ
+    gpio_sample_rate_hz: int = v2_constants.GPIO_SAMPLE_RATE_HZ
+    frame_coverage_ticks: int = v2_constants.FRAME_COVERAGE_TICKS
+    packet_retention_us_combined: int = 0
+    packet_retention_us_single_stream: int = 0
+    bank_major_loops: tuple[int, int] = (0, 0)
+    bank_samples_captured: tuple[int, int] = (0, 0)
+    bank_ring_overruns: tuple[int, int] = (0, 0)
+    bank_stale_completions: tuple[int, int] = (0, 0)
+    ready_depth: tuple[int, int] = (0, 0)
+    ready_high_water: tuple[int, int] = (0, 0)
+    paired_major_loops: int = 0
+    buffers_completed: int = 0
+    buffers_acquired: int = 0
+    buffers_released: int = 0
+    samples_captured: int = 0
+    samples_joined: int = 0
+    samples_delivered: int = 0
+    samples_lost: int = 0
+    raw_ring_overruns: int = 0
+    generation_skew_events: int = 0
+    generation_skew_samples: int = 0
+    canceled_generations: int = 0
+    cancellation_samples: int = 0
+    stop_tail_samples: int = 0
+    timestamp_mismatches: int = 0
+    count_mismatches: int = 0
+    destination_mismatches: int = 0
+    schedule_exhaustions: int = 0
+    stale_completions: int = 0
+    cache_dma_discards: int = 0
+    cache_cpu_invalidations: int = 0
+    hardware_errors: int = 0
+    invariant_errors: int = 0
+    resource_conflicts: int = 0
+    start_errors: int = 0
+    stop_errors: int = 0
+    stale_dma_completions: int = 0
+
+
+@dataclass(frozen=True, slots=True)
 class Status:
     """Device state, active configuration, and statistics-generation counters."""
 
@@ -4611,6 +4775,7 @@ class Status:
     adc_cache_dma_discards: int = 0
     adc_cache_cpu_invalidations: int = 0
     configuration: DAQConfiguration | None = None
+    auxiliary_gpio: AuxiliaryGPIOStatus | None = None
 
     def __post_init__(self) -> None:
         if any(
@@ -4904,10 +5069,17 @@ class Status:
 
         return self.data_checksum_algorithm
 
-    def to_payload(self) -> bytes:
+    def to_payload(
+        self, *, protocol_version: int = constants.PROTOCOL_VERSION
+    ) -> bytes:
         """Encode a successful STATUS response with ADC initialization state."""
 
-        payload = bytearray(constants.STATUS_RESPONSE_PAYLOAD_SIZE)
+        use_v2 = protocol_version == v2_constants.PROTOCOL_VERSION
+        payload = bytearray(
+            v2_constants.STATUS_RESPONSE_PAYLOAD_SIZE
+            if use_v2
+            else constants.STATUS_RESPONSE_PAYLOAD_SIZE
+        )
         _RESPONSE_PREFIX.pack_into(
             payload, 0, constants.ResponseStatus.OK, 0, constants.ErrorCode.OK
         )
@@ -5007,6 +5179,131 @@ class Status:
                 getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
                 getattr(self, name),
             )
+        if use_v2:
+            configuration = self.configuration or DAQConfiguration(
+                stream_mask=self.stream_mask,
+                source=self.source,
+                data_checksum_algorithm=self.data_checksum_algorithm,
+            )
+            timing = configuration.rate_timing
+            layout = configuration.gpio_layout
+            auxiliary = self.auxiliary_gpio or AuxiliaryGPIOStatus(
+                bank_major_loops=(
+                    self.gpio_dma_major_loops,
+                    self.gpio_dma_major_loops,
+                ),
+                bank_samples_captured=(
+                    self.gpio_samples_captured,
+                    self.gpio_samples_captured,
+                ),
+                bank_ring_overruns=(
+                    self.gpio_raw_ring_overruns,
+                    self.gpio_raw_ring_overruns,
+                ),
+                bank_stale_completions=(
+                    self.gpio_stale_dma_completions,
+                    self.gpio_stale_dma_completions,
+                ),
+                ready_depth=(self.gpio_raw_ready_depth,) * 2,
+                ready_high_water=(self.gpio_raw_ready_high_water,) * 2,
+                paired_major_loops=self.gpio_dma_major_loops,
+                buffers_completed=self.gpio_buffers_completed,
+                buffers_acquired=self.gpio_buffers_acquired,
+                buffers_released=self.gpio_buffers_released,
+                samples_captured=self.gpio_samples_captured,
+                samples_joined=self.gpio_samples_packed,
+                samples_delivered=self.gpio_samples_delivered,
+                samples_lost=self.gpio_raw_samples_lost,
+                raw_ring_overruns=self.gpio_raw_ring_overruns,
+                stop_tail_samples=self.gpio_stop_samples_discarded,
+                stale_completions=self.gpio_stale_dma_completions,
+                cache_dma_discards=self.gpio_cache_dma_discards,
+                cache_cpu_invalidations=self.gpio_cache_cpu_invalidations,
+                hardware_errors=self.gpio_hardware_errors,
+                invariant_errors=self.gpio_raw_invariant_errors,
+                resource_conflicts=self.gpio_resource_conflicts,
+                start_errors=self.gpio_start_errors,
+                stop_errors=self.gpio_stop_errors,
+                stale_dma_completions=self.gpio_stale_dma_completions,
+            )
+            c = v2_constants
+            payload[c.STATUS_RESPONSE_PROTOCOL_VERSION_OFFSET] = c.PROTOCOL_VERSION
+            payload[c.STATUS_RESPONSE_AUX_BANK_MODE_OFFSET] = int(
+                configuration.aux_bank_mode
+            )
+            payload[c.STATUS_RESPONSE_RATE_PROFILE_OFFSET] = int(
+                configuration.rate_profile
+            )
+            payload[c.STATUS_RESPONSE_GPIO_ITEM_BYTES_OFFSET] = layout.item_bytes
+            struct.pack_into(
+                "<IIIIIHHHH",
+                payload,
+                c.STATUS_RESPONSE_ADC_PAIR_RATE_HZ_OFFSET,
+                timing.adc_pair_rate_hz,
+                timing.gpio_sample_rate_hz,
+                timing.frame_coverage_ticks(configuration.aux_bank_mode),
+                timing.frame_coverage_ticks(configuration.aux_bank_mode)
+                * constants.PACKET_BUFFER_COUNT
+                // 2
+                // (constants.TIMESTAMP_HZ // 1_000_000),
+                timing.frame_coverage_ticks(configuration.aux_bank_mode)
+                * constants.PACKET_BUFFER_COUNT
+                // (constants.TIMESTAMP_HZ // 1_000_000),
+                *auxiliary.ready_depth,
+                *auxiliary.ready_high_water,
+            )
+            values64 = (
+                *auxiliary.bank_major_loops,
+                *auxiliary.bank_samples_captured,
+                auxiliary.paired_major_loops,
+                auxiliary.buffers_completed,
+                auxiliary.buffers_acquired,
+                auxiliary.buffers_released,
+                auxiliary.samples_captured,
+                auxiliary.samples_joined,
+                auxiliary.samples_delivered,
+                auxiliary.samples_lost,
+                auxiliary.raw_ring_overruns,
+                auxiliary.generation_skew_events,
+                auxiliary.generation_skew_samples,
+                auxiliary.canceled_generations,
+                auxiliary.cancellation_samples,
+                auxiliary.stop_tail_samples,
+            )
+            struct.pack_into(
+                "<" + "Q" * len(values64),
+                payload,
+                c.STATUS_RESPONSE_PRIMARY_GPIO_DMA_MAJOR_LOOPS_OFFSET,
+                *values64,
+            )
+            values32 = (
+                auxiliary.timestamp_mismatches,
+                auxiliary.count_mismatches,
+                auxiliary.destination_mismatches,
+                auxiliary.schedule_exhaustions,
+                auxiliary.stale_completions,
+                auxiliary.cache_dma_discards,
+                auxiliary.cache_cpu_invalidations,
+                auxiliary.hardware_errors,
+                auxiliary.invariant_errors,
+                auxiliary.resource_conflicts,
+                auxiliary.start_errors,
+                auxiliary.stop_errors,
+                auxiliary.stale_dma_completions,
+            )
+            struct.pack_into(
+                "<" + "I" * len(values32),
+                payload,
+                c.STATUS_RESPONSE_PAIRED_GPIO_TIMESTAMP_MISMATCHES_OFFSET,
+                *values32,
+            )
+            struct.pack_into(
+                "<IIII",
+                payload,
+                c.STATUS_RESPONSE_PRIMARY_GPIO_RAW_RING_OVERRUNS_OFFSET,
+                *auxiliary.bank_ring_overruns,
+                *auxiliary.bank_stale_completions,
+            )
         return bytes(payload)
 
     @classmethod
@@ -5014,7 +5311,12 @@ class Status:
         """Decode a successful STATUS response payload."""
 
         payload_bytes = bytes(payload)
-        _success_prefix(payload_bytes, constants.STATUS_RESPONSE_PAYLOAD_SIZE)
+        if len(payload_bytes) not in (
+            constants.STATUS_RESPONSE_PAYLOAD_SIZE,
+            v2_constants.STATUS_RESPONSE_PAYLOAD_SIZE,
+        ):
+            raise ValueError("STATUS payload has an unsupported size")
+        _success_prefix(payload_bytes, len(payload_bytes))
         counters = _STATUS_COUNTERS.unpack_from(
             payload_bytes, constants.STATUS_RESPONSE_ADC_FRAMES_EMITTED_OFFSET
         )
@@ -5052,6 +5354,107 @@ class Status:
                 payload_bytes,
                 getattr(constants, f"STATUS_RESPONSE_{name.upper()}_OFFSET"),
             )[0]
+        configuration = None
+        auxiliary_gpio = None
+        if len(payload_bytes) == v2_constants.STATUS_RESPONSE_PAYLOAD_SIZE:
+            configuration = DAQConfiguration(
+                stream_mask=constants.StreamMask(
+                    payload_bytes[constants.STATUS_RESPONSE_STREAM_MASK_OFFSET]
+                ),
+                source=constants.Source(
+                    payload_bytes[constants.STATUS_RESPONSE_SOURCE_OFFSET]
+                ),
+                data_checksum_algorithm=constants.ChecksumAlgorithm(
+                    payload_bytes[
+                        constants.STATUS_RESPONSE_DATA_CHECKSUM_ALGORITHM_OFFSET
+                    ]
+                ),
+                aux_bank_mode=AuxBankMode(
+                    payload_bytes[v2_constants.STATUS_RESPONSE_AUX_BANK_MODE_OFFSET]
+                ),
+                rate_profile=RateProfile(
+                    payload_bytes[v2_constants.STATUS_RESPONSE_RATE_PROFILE_OFFSET]
+                ),
+            )
+            c = v2_constants
+            values64 = struct.unpack_from(
+                "<" + "Q" * 18,
+                payload_bytes,
+                c.STATUS_RESPONSE_PRIMARY_GPIO_DMA_MAJOR_LOOPS_OFFSET,
+            )
+            values32 = struct.unpack_from(
+                "<" + "I" * 13,
+                payload_bytes,
+                c.STATUS_RESPONSE_PAIRED_GPIO_TIMESTAMP_MISMATCHES_OFFSET,
+            )
+            bank_tail = struct.unpack_from(
+                "<IIII",
+                payload_bytes,
+                c.STATUS_RESPONSE_PRIMARY_GPIO_RAW_RING_OVERRUNS_OFFSET,
+            )
+            auxiliary_gpio = AuxiliaryGPIOStatus(
+                gpio_item_bytes=payload_bytes[c.STATUS_RESPONSE_GPIO_ITEM_BYTES_OFFSET],
+                adc_pair_rate_hz=struct.unpack_from(
+                    "<I", payload_bytes, c.STATUS_RESPONSE_ADC_PAIR_RATE_HZ_OFFSET
+                )[0],
+                gpio_sample_rate_hz=struct.unpack_from(
+                    "<I", payload_bytes, c.STATUS_RESPONSE_GPIO_SAMPLE_RATE_HZ_OFFSET
+                )[0],
+                frame_coverage_ticks=struct.unpack_from(
+                    "<I", payload_bytes, c.STATUS_RESPONSE_FRAME_COVERAGE_TICKS_OFFSET
+                )[0],
+                packet_retention_us_combined=struct.unpack_from(
+                    "<I",
+                    payload_bytes,
+                    c.STATUS_RESPONSE_PACKET_RETENTION_US_COMBINED_OFFSET,
+                )[0],
+                packet_retention_us_single_stream=struct.unpack_from(
+                    "<I",
+                    payload_bytes,
+                    c.STATUS_RESPONSE_PACKET_RETENTION_US_SINGLE_STREAM_OFFSET,
+                )[0],
+                bank_major_loops=(values64[0], values64[1]),
+                bank_samples_captured=(values64[2], values64[3]),
+                paired_major_loops=values64[4],
+                buffers_completed=values64[5],
+                buffers_acquired=values64[6],
+                buffers_released=values64[7],
+                samples_captured=values64[8],
+                samples_joined=values64[9],
+                samples_delivered=values64[10],
+                samples_lost=values64[11],
+                raw_ring_overruns=values64[12],
+                generation_skew_events=values64[13],
+                generation_skew_samples=values64[14],
+                canceled_generations=values64[15],
+                cancellation_samples=values64[16],
+                stop_tail_samples=values64[17],
+                timestamp_mismatches=values32[0],
+                count_mismatches=values32[1],
+                destination_mismatches=values32[2],
+                schedule_exhaustions=values32[3],
+                stale_completions=values32[4],
+                cache_dma_discards=values32[5],
+                cache_cpu_invalidations=values32[6],
+                hardware_errors=values32[7],
+                invariant_errors=values32[8],
+                resource_conflicts=values32[9],
+                start_errors=values32[10],
+                stop_errors=values32[11],
+                stale_dma_completions=values32[12],
+                bank_ring_overruns=(bank_tail[0], bank_tail[1]),
+                bank_stale_completions=(bank_tail[2], bank_tail[3]),
+                ready_depth=struct.unpack_from(
+                    "<HH",
+                    payload_bytes,
+                    c.STATUS_RESPONSE_PRIMARY_GPIO_RAW_READY_DEPTH_OFFSET,
+                ),
+                ready_high_water=struct.unpack_from(
+                    "<HH",
+                    payload_bytes,
+                    c.STATUS_RESPONSE_PRIMARY_GPIO_RAW_READY_HIGH_WATER_OFFSET,
+                ),
+            )
         return cls(
             device_state=constants.DeviceState(
                 payload_bytes[constants.STATUS_RESPONSE_DEVICE_STATE_OFFSET]
@@ -5110,6 +5513,8 @@ class Status:
             gpio_start_errors=errors[6],
             gpio_stop_errors=errors[7],
             gpio_stale_dma_completions=errors[8],
+            configuration=configuration,
+            auxiliary_gpio=auxiliary_gpio,
             **extended,  # type: ignore[arg-type]
             **_unpack_adc_metadata(payload_bytes, "STATUS_RESPONSE"),
             **_unpack_adc_acquisition_status(payload_bytes),
@@ -7225,6 +7630,7 @@ __all__ = [
     "AdcSample",
     "AdcTriggerMetadata",
     "AuxBankMode",
+    "AuxiliaryGPIOStatus",
     "AuxiliaryInputMetadata",
     "ChecksumBenchmarkRequest",
     "ChecksumBenchmarkResult",

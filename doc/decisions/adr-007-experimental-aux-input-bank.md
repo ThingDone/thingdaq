@@ -2,7 +2,7 @@
 type: analysis
 title: 'ADR 007: Experimental Auxiliary Input Bank'
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 tags:
   - thingdaq
   - decision
@@ -30,9 +30,9 @@ protocol-v1 contract, its D6-D13 default, any v1 generated constant or golden
 fixture, or the target implementation accepted by
 [[ADR-003-GPIO-Clock-DMA]].
 
-The D16-D23 mapping and target resources in this decision are provisional
-until the later target campaign exercises them on silicon. Host and simulator
-evidence cannot establish external transition capture, pad order, electrical
+The D16-D23 mapping and target resources are now implemented by the target
+adapter and exposed through protocol-v2 metadata. Host and simulator evidence
+still cannot establish external transition capture, pad order, electrical
 compatibility, signal integrity, or sustainable USB throughput. The 3.3 V-only
 requirements and non-driving test boundary in [[Hardware-Safety]] remain in
 force.
@@ -174,7 +174,7 @@ The shorter ADC frame is deliberate. Padding it to 4,096 bytes would either
 invent samples or give the two streams different coverage. Header
 `payload_length` and `item_count` identify the exact generated layout.
 
-### INFO metadata and provisional ownership
+### INFO and STATUS target metadata
 
 The v2 INFO body extends the v1 prefix to 632 bytes. It reports:
 
@@ -185,9 +185,9 @@ The v2 INFO body extends the v1 prefix to 632 bytes. It reports:
   table;
 - GPIO1/GPIO6/GPR26 and GPIO2/GPIO7/GPR27 masks;
 - paired-join requirement and raw-ring depth; and
-- provisional PIT0/XBARA1/DMAMUX/eDMA identities and fixed arbitration order.
+- actual PIT0/XBARA1/DMAMUX/eDMA identities and fixed arbitration order.
 
-INPUT mode provisionally fans PIT0/XBARA1 input 56 to existing output 0 and
+INPUT mode fans PIT0/XBARA1 input 56 to existing output 0 and
 new output 1. Output 1 maps through DMAMUX source 31 to eDMA channel 3. The
 enabled-mode priority order is ADC0 `3`, ADC1 `2`, primary GPIO `1`, auxiliary
 GPIO `0`; both ADC result reads remain above both GPIO reads, and the primary
@@ -198,9 +198,25 @@ when the auxiliary bank is disabled.
 Both GPIO DMA paths use fixed-capacity generation-indexed ownership. A join is
 publishable only when primary and auxiliary generation, first timestamp, and
 count agree. A stale completion is never paired with a newer bank. Exact skew,
-overrun, cancellation, rollback, and STOP-tail counters are deferred to the
-portable joiner and target implementation; this ADR fixes their required
-semantics, not an unmeasured capacity claim.
+overrun, cancellation, rollback, and STOP-tail counters are implemented in the
+portable joiner and target adapter.
+
+Protocol-v2 STATUS is 1,476 bytes. Its complete 1,228-byte v1 prefix retains
+the original offsets and projects joined logical GPIO samples. The extension
+reports the selected mode/profile, item width, exact rates and coverage,
+packet-retention time, per-bank READY depth/high-water, major loops, captures,
+overruns and stale completions, plus paired join, delivery, skew, cancellation,
+cache, hardware and lifecycle counters. GPIO processing CPU utilization uses
+the established 0–10,000 basis-point scale for both one-bank and joined paths.
+
+The v2 GPIO capture diagnostic is 272 bytes and preserves the accepted
+144-byte diagnostic prefix exactly. It performs one bounded, IDLE-only paired
+capture through the real PIT/XBARA/eDMA routes, reports GPIO1/GPR26 and
+GPIO2/GPR27 register evidence, both TCD paths, raw/packed stable observations,
+sample counts and cache ownership transitions. The registered fixture provides
+no auxiliary stimulus, so `aux_electrically_unstimulated` is true and
+`aux_external_transition_checks_run` remains false; observed values never
+become a claim that external transitions were validated.
 
 ### Target registry and linked-memory checkpoint
 

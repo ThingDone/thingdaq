@@ -29,6 +29,9 @@ PRODUCTION_SOURCES = (
     "gpio_clock_diagnostic.cpp",
     "gpio_raw_capture.cpp",
     "gpio_batch_packer.cpp",
+    "gpio_dual_bank_capture.cpp",
+    "gpio_dual_bank_packer.cpp",
+    "variable_rate_scheduler.cpp",
     "gpio_capture_diagnostic.cpp",
 )
 

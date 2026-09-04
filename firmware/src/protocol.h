@@ -95,6 +95,7 @@ struct FrameFields {
   std::uint32_t request_id = 0U;
   std::uint64_t first_sample_ticks = 0U;
   std::uint32_t item_count = 0U;
+  std::uint8_t version = protocol_v1::kProtocolVersion;
 };
 
 // Exact wire shape for a data frame. Protocol v1 callers keep using the
@@ -141,8 +142,8 @@ class FixedFrame {
   std::size_t size_ = 0U;
 };
 
-using CommandFrame = FixedFrame<protocol_v1::kMaxCommandFrameBytes>;
-using ControlFrame = FixedFrame<protocol_v1::kMaxControlFrameBytes>;
+using CommandFrame = FixedFrame<protocol_v2::kMaxCommandFrameBytes>;
+using ControlFrame = FixedFrame<protocol_v2::kMaxControlFrameBytes>;
 using DataFrame = FixedFrame<protocol_v1::kMaxDataFrameBytes>;
 
 Result decodeFrame(ByteView input, DecodedFrame &frame);
@@ -186,6 +187,7 @@ struct Configuration {
       protocol_v2::kDefaultAuxBankMode;
   protocol_v2::RateProfile rate_profile =
       protocol_v2::kDefaultRateProfile;
+  std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
 };
 
 struct ChecksumBenchmarkRequest {
@@ -235,6 +237,7 @@ struct Request {
   ChecksumBenchmarkRequest checksum_benchmark{};
   GpioClockDiagnosticRequest gpio_clock_diagnostic{};
   std::uint64_t nonce = 0U;
+  std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
 };
 
 struct ParsedCommand {
@@ -371,6 +374,35 @@ struct AdcInitializationMetadata {
   AdcTriggerMetadata trigger{};
 };
 
+// Protocol-v2 appends this generated, fixed-resource description after the
+// complete protocol-v1 INFO prefix. Values describe actual target ownership;
+// ordering is eDMA bus-service priority and is not a pad-aperture claim.
+struct AuxiliaryInfoMetadata {
+  protocol_v2::RateProfile selected_rate_profile =
+      protocol_v2::kDefaultRateProfile;
+  protocol_v2::AuxBankMode applied_aux_bank_mode =
+      protocol_v2::kDefaultAuxBankMode;
+  std::uint8_t gpio_item_bytes = 1U;
+  std::array<std::uint8_t, 8U> pins{
+      protocol_v2::kAuxGpioPinsByBit[0],
+      protocol_v2::kAuxGpioPinsByBit[1],
+      protocol_v2::kAuxGpioPinsByBit[2],
+      protocol_v2::kAuxGpioPinsByBit[3],
+      protocol_v2::kAuxGpioPinsByBit[4],
+      protocol_v2::kAuxGpioPinsByBit[5],
+      protocol_v2::kAuxGpioPinsByBit[6],
+      protocol_v2::kAuxGpioPinsByBit[7]};
+  std::array<std::uint8_t, 8U> port_bits{
+      protocol_v2::kAuxGpioPortBitsByWireBit[0],
+      protocol_v2::kAuxGpioPortBitsByWireBit[1],
+      protocol_v2::kAuxGpioPortBitsByWireBit[2],
+      protocol_v2::kAuxGpioPortBitsByWireBit[3],
+      protocol_v2::kAuxGpioPortBitsByWireBit[4],
+      protocol_v2::kAuxGpioPortBitsByWireBit[5],
+      protocol_v2::kAuxGpioPortBitsByWireBit[6],
+      protocol_v2::kAuxGpioPortBitsByWireBit[7]};
+};
+
 struct InfoResponse {
   protocol_v1::DeviceState device_state = protocol_v1::DeviceState::kIdle;
   std::uint8_t supported_stream_mask = 0U;
@@ -458,6 +490,7 @@ struct InfoResponse {
       protocol_v1::kNominalPayloadBytesPerSecondPerStream;
   std::uint32_t nominal_framed_bytes_per_second_per_stream =
       protocol_v1::kNominalFramedBytesPerSecondPerStream;
+  AuxiliaryInfoMetadata auxiliary{};
 };
 
 struct StreamTelemetry {
@@ -537,6 +570,45 @@ struct UsbTelemetry {
   std::uint16_t response_queue_high_water = 0U;
   std::uint16_t active_frame_bytes_sent = 0U;
   std::uint16_t active_frame_size = 0U;
+};
+
+// Protocol-v2 STATUS extension. The retained v1 prefix projects joined
+// logical GPIO instants; this block exposes each DMA bank and the pairing
+// barrier independently for exact conservation checks.
+struct AuxiliaryGpioTelemetry {
+  std::array<std::uint64_t, 2U> bank_major_loops{};
+  std::array<std::uint64_t, 2U> bank_samples_captured{};
+  std::array<std::uint32_t, 2U> bank_ring_overruns{};
+  std::array<std::uint32_t, 2U> bank_stale_completions{};
+  std::uint64_t paired_major_loops = 0U;
+  std::uint64_t buffers_completed = 0U;
+  std::uint64_t buffers_acquired = 0U;
+  std::uint64_t buffers_released = 0U;
+  std::uint64_t samples_captured = 0U;
+  std::uint64_t samples_joined = 0U;
+  std::uint64_t samples_delivered = 0U;
+  std::uint64_t samples_lost = 0U;
+  std::uint64_t raw_ring_overruns = 0U;
+  std::uint64_t generation_skew_events = 0U;
+  std::uint64_t generation_skew_samples = 0U;
+  std::uint64_t canceled_generations = 0U;
+  std::uint64_t cancellation_samples = 0U;
+  std::uint64_t stop_tail_samples = 0U;
+  std::uint32_t timestamp_mismatches = 0U;
+  std::uint32_t count_mismatches = 0U;
+  std::uint32_t destination_mismatches = 0U;
+  std::uint32_t schedule_exhaustions = 0U;
+  std::uint32_t stale_completions = 0U;
+  std::uint32_t cache_dma_discards = 0U;
+  std::uint32_t cache_cpu_invalidations = 0U;
+  std::uint32_t hardware_errors = 0U;
+  std::uint32_t invariant_errors = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t stale_dma_completions = 0U;
+  std::array<std::uint16_t, 2U> ready_depth{};
+  std::array<std::uint16_t, 2U> ready_high_water{};
 };
 
 struct StatusResponse {
@@ -633,6 +705,7 @@ struct StatusResponse {
   PacketTelemetry packet{};
   FirmwareDiagnosticTelemetry diagnostics{};
   UsbTelemetry usb{};
+  AuxiliaryGpioTelemetry auxiliary_gpio{};
 };
 
 struct ChecksumBenchmarkResponse {
@@ -755,6 +828,45 @@ struct GpioCaptureDiagnosticResponse {
   std::uint8_t edma_priority_configured = 0U;
   std::uint32_t analysis_sample_limit =
       protocol_v1::kGpioCaptureDiagnosticAnalysisSamples;
+  std::uint8_t bank_count = 1U;
+  protocol_v2::AuxBankMode aux_bank_mode =
+      protocol_v2::AuxBankMode::kDisabled;
+  protocol_v2::RateProfile selected_rate_profile =
+      protocol_v2::kDefaultRateProfile;
+  bool aux_electrically_unstimulated = false;
+  bool aux_external_transition_checks_run = false;
+  std::uint32_t configured_rate_hz = protocol_v1::kGpioSampleRateHz;
+  std::uint32_t aux_hardware_error_flags = 0U;
+  std::uint32_t aux_diagnostic_flags = 0U;
+  std::uint64_t aux_dma_samples_captured = 0U;
+  std::uint32_t aux_complete_samples_retained = 0U;
+  std::uint32_t aux_samples_analyzed = 0U;
+  std::uint32_t aux_stopped_partial_samples = 0U;
+  std::uint32_t aux_raw_word_and = 0U;
+  std::uint32_t aux_raw_word_or = 0U;
+  std::uint32_t aux_observed_transitions = 0U;
+  std::uint8_t aux_packed_value_and = 0U;
+  std::uint8_t aux_packed_value_or = 0U;
+  std::uint8_t aux_first_packed_value = 0U;
+  std::uint8_t aux_last_packed_value = 0U;
+  std::uint32_t gpr26_before = 0U;
+  std::uint32_t gpr26_configured = 0U;
+  std::uint32_t gpr26_after = 0U;
+  std::uint32_t gpio1_gdir_before = 0U;
+  std::uint32_t gpio1_gdir_configured = 0U;
+  std::uint32_t gpio1_gdir_after = 0U;
+  std::uint32_t gpio1_psr_before = 0U;
+  std::uint32_t gpio1_psr_configured = 0U;
+  std::uint32_t gpio1_psr_after = 0U;
+  std::uint32_t aux_dmamux_chcfg_configured = 0U;
+  std::uint32_t aux_dma_erq_configured = 0U;
+  std::uint32_t aux_dma_err_final = 0U;
+  std::uint16_t aux_tcd_citer_configured = 0U;
+  std::uint16_t aux_tcd_biter_configured = 0U;
+  std::uint16_t aux_tcd_csr_configured = 0U;
+  std::uint8_t aux_edma_priority_configured = 0U;
+  std::array<std::uint32_t, 2U> cache_dma_discards{};
+  std::array<std::uint32_t, 2U> cache_cpu_invalidations{};
 };
 
 // Fill processed-byte and fixed-point derived fields from the raw measurement.

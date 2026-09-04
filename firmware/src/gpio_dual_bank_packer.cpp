@@ -94,6 +94,12 @@ OperationStatus AuxiliaryBatchPacker::startRun(
   next_sample_ticks_ = 0U;
   start_epoch_ticks_ = start_epoch_ticks;
   service_calls_ = 0U;
+  processing_elapsed_cycles_ = 0U;
+  processing_active_cycles_ = 0U;
+  processing_profile_active_ =
+      cycle_counter_ != nullptr && cycle_counter_->begin();
+  profile_last_cycle_ =
+      processing_profile_active_ ? cycle_counter_->read() : 0U;
   run_id_ = run_id;
   source_errors_ = 0U;
   pipeline_errors_ = 0U;
@@ -111,13 +117,16 @@ THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.service")
 ServiceReport AuxiliaryBatchPacker::service(
     packet::PacketBufferPipeline &pipeline, std::size_t buffer_limit) {
   ServiceReport report{};
+  const std::uint32_t profile_started_at = beginProfile();
   saturatingIncrement(service_calls_);
   if (!pipelineMatches(pipeline)) {
     saturatingIncrement(pipeline_errors_);
     report.pipeline_error = true;
+    finishProfile(profile_started_at);
     return report;
   }
   if (!running_) {
+    finishProfile(profile_started_at);
     return report;
   }
 
@@ -147,6 +156,7 @@ ServiceReport AuxiliaryBatchPacker::service(
   }
   report.work_limit_reached =
       buffer_limit != 0U && report.buffers_consumed == buffer_limit;
+  finishProfile(profile_started_at);
   return report;
 }
 
@@ -323,7 +333,51 @@ stats::GpioPackerProgress AuxiliaryBatchPacker::progress(
   result.source_errors = source_errors_;
   result.pipeline_errors = pipeline_errors_;
   result.chronology_errors = chronology_errors_;
+  result.processing_cpu_basis_points = processingCpuBasisPoints();
   return result;
+}
+
+std::uint32_t AuxiliaryBatchPacker::beginProfile() {
+  if (!processing_profile_active_) {
+    return 0U;
+  }
+  const std::uint32_t started_at = cycle_counter_->read();
+  saturatingAdd(processing_elapsed_cycles_,
+                static_cast<std::uint64_t>(started_at - profile_last_cycle_));
+  profile_last_cycle_ = started_at;
+  return started_at;
+}
+
+void AuxiliaryBatchPacker::finishProfile(std::uint32_t started_at) {
+  if (!processing_profile_active_) {
+    return;
+  }
+  const std::uint32_t finished_at = cycle_counter_->read();
+  const std::uint64_t active =
+      static_cast<std::uint64_t>(finished_at - started_at);
+  saturatingAdd(processing_active_cycles_, active);
+  saturatingAdd(processing_elapsed_cycles_, active);
+  profile_last_cycle_ = finished_at;
+}
+
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.progress")
+std::uint16_t AuxiliaryBatchPacker::processingCpuBasisPoints() const {
+  if (!processing_profile_active_ || processing_elapsed_cycles_ == 0U) {
+    return 0U;
+  }
+  if (processing_active_cycles_ >= processing_elapsed_cycles_) {
+    return gpio_packer::kCpuBasisPointsFullScale;
+  }
+  constexpr std::uint64_t scale = gpio_packer::kCpuBasisPointsFullScale;
+  const std::uint64_t scaled =
+      processing_active_cycles_ <=
+              std::numeric_limits<std::uint64_t>::max() / scale
+          ? (processing_active_cycles_ * scale +
+             processing_elapsed_cycles_ / 2U) /
+                processing_elapsed_cycles_
+          : processing_active_cycles_ /
+                (processing_elapsed_cycles_ / scale + 1U);
+  return static_cast<std::uint16_t>(scaled > scale ? scale : scaled);
 }
 
 }  // namespace thingdaq::gpio_aux_packer
