@@ -1393,6 +1393,31 @@ def malformed_upload_probe(link: SerialLink, generation: int) -> None:
     )
 
 
+def non_driving_output_control_probe(link: SerialLink, generation: int) -> None:
+    """Exercise output controls that cannot arm, then prove fail-closed state."""
+
+    frame, _ = link.exchange(OUTPUT_STATUS_REQUEST, run_id=generation)
+    initial = decode_output_status(frame, OUTPUT_STATUS_RESPONSE)
+    require(
+        initial.state == OUTPUT_EMPTY
+        and initial.bank_mode == OUTPUT_BANK_DISABLED,
+        "output bank was not empty and disabled before non-driving probe",
+    )
+    malformed_upload_probe(link, generation)
+    frame, _ = link.exchange(OUTPUT_STATUS_REQUEST, run_id=generation)
+    final = decode_output_status(frame, OUTPUT_STATUS_RESPONSE)
+    require(
+        final.state == OUTPUT_EMPTY and final.bank_mode == OUTPUT_BANK_DISABLED,
+        "output bank was not empty and disabled after non-driving probe",
+    )
+    emit_event(
+        "non_driving_output_control",
+        drive_requests_written=link.drive_requests_written,
+        final_bank_disabled=True,
+        malformed_segment_rejected=True,
+    )
+
+
 class Campaign:
     def __init__(
         self,
@@ -2025,6 +2050,7 @@ def main() -> int:
             output_bank_disabled=info.output_bank_mode == OUTPUT_BANK_DISABLED,
             protocol=PROTOCOL_VERSION,
         )
+        non_driving_output_control_probe(link, 0xA7000001)
         try:
             permit = interlock.authorize(info.hardware_serial)
         except InterlockDenied as error:
@@ -2032,7 +2058,6 @@ def main() -> int:
             reason = str(error)
             exit_code = 0
         else:
-            malformed_upload_probe(link, 0xA7000001)
             campaign = Campaign(port_name, link, interlock, permit, info, memory)
             cases.append(campaign.run_case(walking_program(), minimum_seconds=0.15))
             cases.append(campaign.run_case(long_hold_program(), minimum_seconds=0.15))

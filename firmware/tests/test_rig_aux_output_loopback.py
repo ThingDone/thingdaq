@@ -58,7 +58,14 @@ def response_wire(
     kind = rig.REQUEST_RESPONSE_KIND[request_kind]
     flags = rig.FLAG_RESPONSE_ERROR if error else 0
     if error:
-        payload = rig.RESPONSE_PREFIX.pack(1, 0, error)
+        payload = bytearray(
+            224
+            if kind in rig.OUTPUT_STATUS_RESPONSE_KINDS
+            or kind == rig.OUTPUT_APPEND_RESPONSE
+            else 4
+        )
+        rig.RESPONSE_PREFIX.pack_into(payload, 0, 1, 0, error)
+        payload = bytes(payload)
     else:
         payload = bytearray(rig.SUCCESS_PAYLOAD_SIZE[kind])
         rig.RESPONSE_PREFIX.pack_into(payload, 0, 0, 0, 0)
@@ -85,6 +92,14 @@ def response_wire(
             struct.pack_into("<I", payload, 400, rig.OUTPUT_PERIOD_TICKS)
             struct.pack_into("<I", payload, 404, rig.OUTPUT_CAPACITY_SEGMENTS)
             struct.pack_into("<I", payload, 408, rig.OUTPUT_LEGAL_STATE_MASK)
+        elif kind in rig.OUTPUT_STATUS_RESPONSE_KINDS:
+            payload[4] = (
+                rig.OUTPUT_LOADING
+                if kind == rig.OUTPUT_BEGIN_RESPONSE
+                else rig.OUTPUT_EMPTY
+            )
+            payload[5] = rig.OUTPUT_BANK_DISABLED
+            payload[208] = 1
         payload = bytes(payload)
     total = rig.HEADER_SIZE + len(payload) + rig.TRAILER_SIZE
     header = rig.HEADER.pack(
@@ -131,7 +146,15 @@ class FakeDevice:
             return 0
         kind = rig.HEADER.unpack_from(data)[2]
         self.requests.append(kind)
-        error = self.stop_error if kind == rig.STOP_REQUEST else 0
+        error = (
+            self.stop_error
+            if kind == rig.STOP_REQUEST
+            else 5
+            if kind == rig.OUTPUT_APPEND_REQUEST
+            and rig.SEGMENT.unpack_from(data, rig.HEADER_SIZE)[1]
+            & ~rig.OUTPUT_LEGAL_STATE_MASK
+            else 0
+        )
         self.pending.extend(
             response_wire(data, error=error, hardware_serial=self.hardware_serial)
         )
@@ -340,7 +363,18 @@ class RecoveryAndReportTests(unittest.TestCase):
                 payload = json.loads(records[0][len(rig.RESULT_PREFIX) :])
                 self.assertEqual("INCONCLUSIVE", payload["result"])
                 self.assertEqual(0, payload["evidence"]["drive_requests_written"])
-                self.assertEqual([rig.INFO_REQUEST, rig.STOP_REQUEST], device.requests)
+                self.assertEqual(
+                    [
+                        rig.INFO_REQUEST,
+                        rig.OUTPUT_STATUS_REQUEST,
+                        rig.OUTPUT_BEGIN_REQUEST,
+                        rig.OUTPUT_APPEND_REQUEST,
+                        rig.OUTPUT_CLEAR_REQUEST,
+                        rig.OUTPUT_STATUS_REQUEST,
+                        rig.STOP_REQUEST,
+                    ],
+                    device.requests,
+                )
                 self.assertTrue(device.closed)
 
     def test_disconnect_reopen_replaces_and_closes_fake_device(self) -> None:
