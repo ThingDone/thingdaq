@@ -126,6 +126,8 @@ def main() -> int:
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--serial", type=int, default=20428100)
     parser.add_argument("--diagnostic", action="store_true")
+    parser.add_argument("--temperature", action="store_true",
+                        help="require die temperature before, during and after each run")
     sequence_group = parser.add_mutually_exclusive_group()
     sequence_group.add_argument(
         "--cycle", action="store_true", help="exercise 0,1,2,3,0 without reflashing"
@@ -164,6 +166,7 @@ def main() -> int:
         "AUX_INPUT_RATE_PROFILE": str(args.profile),
         "AUX_INPUT_CAPTURE_SECONDS": str(args.seconds),
         "AUX_INPUT_RUN_DIAGNOSTIC": "1" if args.diagnostic else "0",
+        "AUX_INPUT_TEMPERATURE": "1" if args.temperature else "0",
         "EXPECTED_HARDWARE_SERIAL": str(args.serial),
         "EXPECTED_BUILD_ID": build_id,
     }

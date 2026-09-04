@@ -23,14 +23,16 @@ class Case:
 def main():
     assert Case().width == 8
     assert os.environ["AUX_INPUT_RUN_DIAGNOSTIC"] == "0"
+    assert os.environ["AUX_INPUT_TEMPERATURE"] == "1"
     return 7
 if __name__ == "__main__":
     raise AssertionError("must call main only once")
 """
     monkeypatch.setenv("AUX_INPUT_RUN_DIAGNOSTIC", "1")
+    monkeypatch.setenv("AUX_INPUT_TEMPERATURE", "0")
     try:
         with pytest.raises(SystemExit) as stopped:
-            exec(isolation.make_program(source, {"AUX_INPUT_RUN_DIAGNOSTIC": "0"}), {})  # noqa: S102 - locally authored test fixture
+            exec(isolation.make_program(source, {"AUX_INPUT_RUN_DIAGNOSTIC": "0", "AUX_INPUT_TEMPERATURE": "1"}), {})  # noqa: S102 - locally authored test fixture
         assert stopped.value.code == 7
     finally:
         sys.modules.pop("input_isolation_rig", None)
