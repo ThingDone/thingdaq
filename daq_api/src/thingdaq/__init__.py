@@ -218,7 +218,15 @@ from .reader import (
     RequestTimeoutError,
     StreamStoppedError,
 )
-from .simulator import SimulatedDevice, SimulatorError, SimulatorInputError
+from .simulator import (
+    OutputTraceEvent,
+    SimulatedDevice,
+    SimulatedOutputSample,
+    SimulatedOutputTransition,
+    SimulatorError,
+    SimulatorInputError,
+    SimulatorTraceUnavailableError,
+)
 from .streaming import (
     CommandLatencyDistribution,
     CounterReconciliation,
@@ -396,6 +404,7 @@ __all__ = [
     "OutputBankMode",
     "OutputError",
     "OutputState",
+    "OutputTraceEvent",
     "ParserCounters",
     "PendingRequestLimitError",
     "ProtocolError",
@@ -417,8 +426,11 @@ __all__ = [
     "SerialTransport",
     "SessionRecoveryPolicy",
     "SimulatedDevice",
+    "SimulatedOutputSample",
+    "SimulatedOutputTransition",
     "SimulatorError",
     "SimulatorInputError",
+    "SimulatorTraceUnavailableError",
     "SoakMetrics",
     "Source",
     "Status",

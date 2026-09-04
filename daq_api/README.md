@@ -405,6 +405,19 @@ demand-driven so offline frame counts remain deterministic under a background
 thread; every command, response, and data frame still crosses the shared wire,
 parser, decoder, and reader path.
 
+The experimental preloaded output peer is separately opt-in with
+`ThingDAQ.simulated(output_enabled=True)`. After upload, arm, configure, and
+START, retrieve the underlying `SimulatedDevice` from `daq.transport.device`.
+`advance_time(ticks)` is the only operation that advances its common 8 MHz
+clock; output status calls and ADC/GPIO reads are query-only. `output_trace`
+returns a bounded immutable transition history, while `sample_output(...)`
+samples logical states at arbitrary advanced timestamps such as the existing
+two-tick 4 MHz GPIO schedule. `inject_output_fault(OutputError.UNDERRUN)` or
+`DMA_FAULT` stops the common run and retains fault/hold evidence until an
+IDLE-only `output_clear()` releases the bank to simulated high-impedance input.
+Closing and reopening an `InMemoryTransport` around the same device preserves
+the active output epoch, just as a host disconnect does not reset firmware.
+
 ## Stream data and loss policy
 
 ADC blocks always retain separate `adc0`/A0 and `adc1`/A1 lazy channel views.

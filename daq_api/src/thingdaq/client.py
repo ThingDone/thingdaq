@@ -603,6 +603,7 @@ class ThingDAQ:
         cls,
         *,
         control_only: bool = False,
+        output_enabled: bool = False,
         read_chunk_size: int | None = None,
         write_chunk_size: int | None = None,
         stream_interval: float | None = None,
@@ -620,10 +621,17 @@ class ThingDAQ:
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
     ) -> ThingDAQ:
-        """Open the public API over the deterministic protocol simulator."""
+        """Open the public API over the deterministic protocol simulator.
+
+        Experimental output protocol v2 remains opt-in so the default peer is
+        byte-for-byte compatible with the protocol-v1 simulator.
+        """
 
         transport = InMemoryTransport(
-            device=SimulatedDevice(control_only=control_only),
+            device=SimulatedDevice(
+                control_only=control_only,
+                output_enabled=output_enabled,
+            ),
             read_chunk_size=read_chunk_size,
             write_chunk_size=write_chunk_size,
             stream_interval=stream_interval,
