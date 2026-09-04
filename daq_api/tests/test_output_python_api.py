@@ -5,18 +5,21 @@ from __future__ import annotations
 import struct
 import unittest
 import zlib
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 from typing import Any
 
 from thingdaq import (
     DigitalOutputAppendEcho,
     DigitalOutputCapabilities,
+    DigitalOutputLifecycleError,
     DigitalOutputProgram,
     DigitalOutputProgramError,
     DigitalOutputSegment,
     DigitalOutputStatus,
     DigitalOutputUnavailableError,
     DigitalOutputUploadError,
+    InMemoryTransport,
     OutputBankMode,
     OutputError,
     OutputState,
@@ -27,6 +30,8 @@ from thingdaq._generated import protocol_v2_constants as v2
 from thingdaq.models import CommandResponse
 from thingdaq.protocol import IncrementalFrameParser
 from thingdaq.protocol_v2 import V2Frame, decode_v2_response
+from thingdaq.reader import DeviceDisconnectedError
+from thingdaq.simulator import SimulatedDevice
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -102,6 +107,92 @@ class DigitalOutputModelTests(unittest.TestCase):
             DigitalOutputProgram(
                 (DigitalOutputSegment(1, 1), DigitalOutputSegment(2, 1))
             )
+
+    def test_segment_and_metadata_boundary_matrix(self) -> None:
+        for duration in (1, v2.UINT32_MAX):
+            for state in (0, 1, 0x80, v2.OUTPUT_LEGAL_STATE_MASK):
+                with self.subTest(duration=duration, state=state):
+                    segment = DigitalOutputSegment(duration, state)
+                    self.assertEqual(
+                        struct.pack("<II", duration, state), segment.to_bytes()
+                    )
+
+        for duration in (-1, 0, v2.UINT32_MAX + 1, True, 1.0):
+            with (
+                self.subTest(invalid_duration=duration),
+                self.assertRaises((TypeError, DigitalOutputProgramError)),
+            ):
+                DigitalOutputSegment(duration, 0)  # type: ignore[arg-type]
+        for state in (-1, 0x100, v2.UINT32_MAX, True, "1"):
+            with (
+                self.subTest(invalid_state=state),
+                self.assertRaises((TypeError, DigitalOutputProgramError)),
+            ):
+                DigitalOutputSegment(1, state)  # type: ignore[arg-type]
+        for repeat in (-1, v2.UINT32_MAX + 1, True, 1.0):
+            with (
+                self.subTest(invalid_repeat=repeat),
+                self.assertRaises((TypeError, DigitalOutputProgramError)),
+            ):
+                DigitalOutputProgram.from_segments(
+                    [(1, 0)],
+                    repeat_count=repeat,  # type: ignore[arg-type]
+                )
+        for idle in (-1, 0x100, True, 1.0):
+            with (
+                self.subTest(invalid_idle=idle),
+                self.assertRaises((TypeError, DigitalOutputProgramError)),
+            ):
+                DigitalOutputProgram.from_segments(
+                    [(1, 0)],
+                    idle_state_mask=idle,  # type: ignore[arg-type]
+                )
+
+    def test_capacity_canonicalization_overflow_and_immutable_storage(self) -> None:
+        maximum = DigitalOutputProgram.from_segments(
+            ((1, index & 1) for index in range(v2.OUTPUT_SEGMENT_CAPACITY)),
+            repeat_count=v2.UINT32_MAX,
+            idle_state_mask=0xFF,
+        )
+        self.assertEqual(v2.OUTPUT_SEGMENT_CAPACITY, len(maximum.segments))
+        self.assertEqual(v2.OUTPUT_SEGMENT_CAPACITY * 8, len(maximum.canonical_bytes))
+        self.assertEqual(
+            zlib.adler32(maximum.canonical_bytes) & v2.UINT32_MAX,
+            maximum.checksum,
+        )
+        with self.assertRaises(DigitalOutputProgramError):
+            DigitalOutputProgram.from_segments(
+                DigitalOutputSegment(1, index & 1)
+                for index in range(v2.OUTPUT_SEGMENT_CAPACITY + 1)
+            )
+
+        coalesced = DigitalOutputProgram.from_segments(
+            [(v2.UINT32_MAX - 1, 0x55), (1, 0x55)]
+        )
+        self.assertEqual(
+            (DigitalOutputSegment(v2.UINT32_MAX, 0x55),), coalesced.segments
+        )
+        with self.assertRaises(DigitalOutputProgramError):
+            DigitalOutputProgram.from_segments([(v2.UINT32_MAX, 0x55), (1, 0x55)])
+        with self.assertRaises(FrozenInstanceError):
+            coalesced.repeat_count = 2  # type: ignore[misc]
+        with self.assertRaises(TypeError):
+            coalesced.segments[0] = DigitalOutputSegment(1, 1)  # type: ignore[index]
+
+    def test_repeat_builders_have_exact_whole_program_semantics(self) -> None:
+        one = DigitalOutputProgram.finite([(1, 1)], 1)
+        maximum = DigitalOutputProgram.finite([(1, 1)], v2.UINT32_MAX)
+        forever = DigitalOutputProgram.forever([(1, 1)])
+        self.assertEqual(
+            (1, v2.UINT32_MAX, 0),
+            (
+                one.repeat_count,
+                maximum.repeat_count,
+                forever.repeat_count,
+            ),
+        )
+        with self.assertRaises(DigitalOutputProgramError):
+            DigitalOutputProgram.finite([(1, 1)], 0)
 
     def test_generated_v2_info_and_output_fixtures_decode_on_shared_parser(
         self,
@@ -251,6 +342,84 @@ class DigitalOutputClientTests(unittest.TestCase):
         self.assertIsNone(raised.exception.cleanup_error)
         self.assertEqual(v2.FrameKind.OUTPUT_CLEAR_REQUEST, self.calls[-1][0])
         self.assertIsNone(self.daq._output_generation)
+
+    def test_interrupted_upload_can_retry_with_a_fresh_generation(self) -> None:
+        self.program = DigitalOutputProgram.from_segments([(2, 1), (3, 2)])
+        self.corrupt_append_echo = True
+        with self.assertRaises(DigitalOutputUploadError):
+            self.daq.upload_output(self.program, generation=91)
+        self.corrupt_append_echo = False
+        committed = self.daq.upload_output(self.program, generation=92)
+        self.assertIs(OutputState.COMMITTED, committed.state)
+        self.assertEqual(92, committed.generation)
+
+    def test_disconnect_preserves_primary_and_cleanup_failures(self) -> None:
+        self.program = DigitalOutputProgram.from_segments([(2, 1), (3, 2)])
+        request_count = 0
+
+        def disconnecting(
+            kind: Any, payload: bytes = b"", **options: Any
+        ) -> CommandResponse[Any]:
+            nonlocal request_count
+            if options.get("protocol_version", 1) == 1:
+                return self.original_request(kind, payload, **options)
+            if v2.FrameKind(kind) is v2.FrameKind.INFO_REQUEST:
+                return self._response(v2.FrameKind.INFO_REQUEST, 0, self.capabilities)
+            request_count += 1
+            if request_count == 1:
+                return self._response(
+                    v2.FrameKind.OUTPUT_BEGIN_REQUEST,
+                    93,
+                    _status(OutputState.LOADING, 93, program=self.program),
+                )
+            raise DeviceDisconnectedError("scripted upload disconnect")
+
+        self.daq._reader.request = disconnecting  # type: ignore[method-assign]
+        with self.assertRaises(DigitalOutputUploadError) as raised:
+            self.daq.upload_output(self.program, generation=93)
+        self.assertIsInstance(raised.exception.cause, DeviceDisconnectedError)
+        self.assertIsInstance(raised.exception.cleanup_error, DeviceDisconnectedError)
+        self.assertEqual(3, request_count)
+
+    def test_local_lifecycle_guards_reject_incomplete_or_mismatched_upload(
+        self,
+    ) -> None:
+        self.program = DigitalOutputProgram.from_segments([(2, 1), (3, 2)])
+        self.daq.output_begin(self.program, generation=94)
+        with self.assertRaises(DigitalOutputLifecycleError):
+            self.daq.output_append(DigitalOutputSegment(9, 9))
+        self.daq.output_append(self.program.segments[0])
+        with self.assertRaises(DigitalOutputLifecycleError):
+            self.daq.output_commit()
+        self.daq.output_append(self.program.segments[1])
+        self.daq.output_commit()
+        with self.assertRaises(DigitalOutputLifecycleError):
+            self.daq.output_append(self.program.segments[0])
+
+    def test_real_partial_wire_upload_and_fresh_generation_retry(self) -> None:
+        device = SimulatedDevice(output_enabled=True)
+        transport = InMemoryTransport(
+            device,
+            read_chunk_size=1,
+            write_chunk_size=1,
+        )
+        with ThingDAQ.open(transport, command_timeout=1.0) as daq:
+            program = DigitalOutputProgram.finite(
+                [(1, 0x01), (2, 0x80), (3, 0x55)],
+                2,
+                idle_state_mask=0xAA,
+            )
+            first = daq.upload_output(program, generation=101)
+            self.assertIs(OutputState.COMMITTED, first.state)
+            self.assertIs(OutputState.EMPTY, daq.output_clear().state)
+            second = daq.upload_output(program, generation=102)
+            self.assertEqual(
+                (102, program.checksum),
+                (
+                    second.generation,
+                    second.program_checksum,
+                ),
+            )
 
     def test_missing_capability_is_a_typed_unavailable_error(self) -> None:
         def unavailable(

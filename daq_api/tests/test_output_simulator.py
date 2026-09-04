@@ -45,6 +45,39 @@ def _v2_request(
 
 
 class OutputSimulatorTests(unittest.TestCase):
+    def test_every_tick_boundary_repeat_completion_and_hold_is_exact(self) -> None:
+        with ThingDAQ.simulated(output_enabled=True) as daq:
+            program = DigitalOutputProgram.finite(
+                [(1, 0x01), (2, 0x02), (1, 0x04)],
+                3,
+                idle_state_mask=0x80,
+            )
+            daq.upload_output(program, generation=71)
+            daq.output_arm()
+            daq.configure(adc=True, gpio=True)
+            run_id = daq.start()
+            device = daq.transport.device
+
+            before_reads = daq.output_status()
+            for _ in range(3):
+                self.assertEqual(before_reads, daq.output_status())
+            self.assertEqual(96, device.advance_time(96))
+            expected_states = ([0x01] + [0x02] * 2 + [0x04]) * 3
+            samples = device.sample_output(
+                [index * 8 for index in range(len(expected_states))],
+                run_id=run_id,
+            )
+            self.assertEqual(expected_states, [sample.state_mask for sample in samples])
+            complete = daq.output_status()
+            self.assertIs(OutputState.HELD, complete.state)
+            self.assertEqual(3, complete.completed_repeats)
+            self.assertEqual(9, complete.transitions_emitted)
+            self.assertEqual(0x04, complete.last_emitted_state_mask)
+            self.assertEqual(
+                [0, 8, 24, 32, 40, 56, 64, 72, 88, 96],
+                [event.tick for event in device.output_trace if event.run_id == run_id],
+            )
+
     def test_finite_boundaries_sampling_and_acquisition_are_independent(self) -> None:
         with ThingDAQ.simulated(output_enabled=True) as daq:
             program = DigitalOutputProgram.finite(
@@ -170,6 +203,51 @@ class OutputSimulatorTests(unittest.TestCase):
             self.assertFalse(daq.status().stream_mask)
             self.assertIs(OutputState.FAULTED, daq.output_status().state)
             self.assertIs(OutputState.EMPTY, daq.output_clear().state)
+
+    def test_both_fault_kinds_hold_exact_state_and_stop_adc_gpio(self) -> None:
+        for generation, error in enumerate(
+            (OutputError.UNDERRUN, OutputError.DMA_FAULT), start=41
+        ):
+            with (
+                self.subTest(error=error.name),
+                ThingDAQ.simulated(output_enabled=True) as daq,
+            ):
+                daq.upload_output(
+                    DigitalOutputProgram.forever([(1, 0x10), (1, 0x20), (1, 0x40)]),
+                    generation=generation,
+                )
+                daq.output_arm()
+                daq.configure(adc=True, gpio=True)
+                daq.start()
+                device = daq.transport.device
+                device.advance_time(16)
+                fault = device.inject_output_fault(error)
+                self.assertIs(OutputState.FAULTED, fault.state)
+                self.assertIs(error, fault.output_error)
+                self.assertEqual(0x40, fault.last_emitted_state_mask)
+                self.assertFalse(daq.status().stream_mask)
+                self.assertIsNone(device.next_data_frame())
+                with self.assertRaisesRegex(Exception, "only during a common run"):
+                    device.advance_time(1)
+
+    def test_output_clock_progress_does_not_interrupt_adc_gpio_delivery(self) -> None:
+        with ThingDAQ.simulated(output_enabled=True) as daq:
+            daq.upload_output(
+                DigitalOutputProgram.forever([(1, 0x01), (1, 0x02)]),
+                generation=52,
+            )
+            daq.output_arm()
+            daq.configure(adc=True, gpio=True)
+            run_id = daq.start()
+            device = daq.transport.device
+            for expected_tick in (8, 16, 24, 32):
+                device.advance_time(8)
+                blocks = (daq.read_block(timeout=0.5), daq.read_block(timeout=0.5))
+                self.assertEqual(
+                    {ADCBlock, GPIOBlock}, {type(block) for block in blocks}
+                )
+                self.assertTrue(all(block.run_id == run_id for block in blocks))
+                self.assertEqual(expected_tick, daq.output_status().ticks_elapsed)
 
     def test_upload_generation_canonical_and_checksum_errors_are_typed(self) -> None:
         device = SimulatedDevice(output_enabled=True)

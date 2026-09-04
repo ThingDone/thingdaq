@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from thingdaq._generated import protocol_v2_constants as constants
+from thingdaq.output import DigitalOutputAppendEcho, DigitalOutputStatus
+from thingdaq.protocol import IncrementalFrameParser
+from thingdaq.protocol_v2 import V2Frame, decode_v2_response, encode_v2_frame
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 V1_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
@@ -188,6 +191,131 @@ class AuxOutputV2GenerationTests(unittest.TestCase):
                 self.assertEqual(request["request_id"], response["request_id"])
                 self.assertEqual(request["run_id"], response["run_id"])
                 self.assertLessEqual(request["payload_length"], 8)
+
+    def test_every_info_and_output_golden_crosses_byte_fragmented_parser(self) -> None:
+        syntactically_invalid = {
+            "output-malformed-zero-duration.bin",
+            "output-malformed-high-state-bits.bin",
+        }
+        selected = [
+            entry
+            for entry in self.manifest["fixtures"]
+            if entry["kind"].startswith("OUTPUT_")
+            or entry["kind"] in {"INFO_REQUEST", "INFO_RESPONSE"}
+        ]
+        self.assertEqual(31, len(selected))
+        for entry in selected:
+            with self.subTest(fixture=entry["file"]):
+                parser = IncrementalFrameParser(accept_protocol_v2=True)
+                decoded: list[object] = []
+                wire = (MANIFEST_PATH.parent / entry["file"]).read_bytes()
+                for byte in wire:
+                    decoded.extend(parser.feed(bytes((byte,))))
+                if entry["file"] in syntactically_invalid:
+                    self.assertEqual([], decoded)
+                    self.assertEqual(1, parser.payload_errors)
+                    continue
+                self.assertEqual(1, len(decoded))
+                frame = decoded[0]
+                self.assertIsInstance(frame, V2Frame)
+                assert isinstance(frame, V2Frame)
+                self.assertEqual(entry["kind"], frame.header.kind.name)
+                self.assertEqual(entry["run_id"], frame.header.run_id)
+                self.assertEqual(entry["request_id"], frame.header.request_id)
+                self.assertEqual(wire, frame.to_bytes())
+                self.assertEqual(0, parser.errors)
+
+    def test_every_success_response_decodes_to_exact_typed_surface(self) -> None:
+        successful = [
+            entry
+            for entry in self.manifest["fixtures"]
+            if entry.get("expected", {}).get("outcome") == "success"
+        ]
+        self.assertEqual(13, len(successful))
+        for entry in successful:
+            with self.subTest(fixture=entry["file"]):
+                parser = IncrementalFrameParser(accept_protocol_v2=True)
+                frames = parser.feed(
+                    (MANIFEST_PATH.parent / entry["file"]).read_bytes()
+                )
+                self.assertEqual(1, len(frames))
+                frame = frames[0]
+                assert isinstance(frame, V2Frame)
+                response = decode_v2_response(frame)
+                self.assertTrue(response.ok)
+                if frame.header.kind is constants.FrameKind.OUTPUT_APPEND_RESPONSE:
+                    self.assertIsInstance(response.value, DigitalOutputAppendEcho)
+                else:
+                    self.assertIsInstance(response.value, DigitalOutputStatus)
+                    assert isinstance(response.value, DigitalOutputStatus)
+                    self.assertIs(
+                        constants.OutputState[entry["expected"]["output_state"]],
+                        response.value.state,
+                    )
+
+    def test_every_output_response_and_error_enum_decodes_as_typed_failure(
+        self,
+    ) -> None:
+        response_kinds = tuple(
+            kind
+            for kind in constants.FrameKind
+            if kind.name.startswith("OUTPUT_") and kind.name.endswith("_RESPONSE")
+        )
+        output_errors = tuple(
+            error
+            for error in constants.OutputError
+            if error is not constants.OutputError.NONE
+        )
+        self.assertEqual(6, len(response_kinds))
+        self.assertEqual(9, len(output_errors))
+        for kind in response_kinds:
+            for output_error in output_errors:
+                with self.subTest(kind=kind.name, output_error=output_error.name):
+                    payload = bytearray(constants.OUTPUT_STATUS_RESPONSE_PAYLOAD_SIZE)
+                    payload[0] = int(constants.ResponseStatus.ERROR)
+                    struct.pack_into(
+                        "<H", payload, 2, int(constants.ErrorCode.INVALID_PAYLOAD)
+                    )
+                    payload[constants.OUTPUT_STATUS_RESPONSE_OUTPUT_ERROR_OFFSET] = int(
+                        output_error
+                    )
+                    wire = encode_v2_frame(
+                        kind,
+                        payload,
+                        flags=constants.FrameFlag.RESPONSE_ERROR,
+                        run_id=99,
+                        request_id=100,
+                    )
+                    frames = IncrementalFrameParser(accept_protocol_v2=True).feed(wire)
+                    self.assertEqual(1, len(frames))
+                    frame = frames[0]
+                    assert isinstance(frame, V2Frame)
+                    response = decode_v2_response(frame)
+                    self.assertFalse(response.ok)
+                    self.assertIs(output_error, response.output_error)
+                    self.assertIsNone(response.value)
+
+    def test_default_v1_parser_rejects_v2_without_weakening_v1_bytes(self) -> None:
+        v2_wire = (MANIFEST_PATH.parent / "output-status-request.bin").read_bytes()
+        parser = IncrementalFrameParser()
+        self.assertEqual([], parser.feed(v2_wire))
+        self.assertGreater(parser.header_errors, 0)
+
+        v1_manifest = json.loads(
+            (REPOSITORY_ROOT / "protocol/fixtures/manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        v1_parser = IncrementalFrameParser()
+        decoded = []
+        for entry in v1_manifest["fixtures"]:
+            decoded.extend(
+                v1_parser.feed(
+                    (REPOSITORY_ROOT / "protocol/fixtures" / entry["file"]).read_bytes()
+                )
+            )
+        self.assertEqual(len(v1_manifest["fixtures"]), len(decoded))
+        self.assertEqual(0, v1_parser.errors)
 
 
 if __name__ == "__main__":

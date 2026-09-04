@@ -311,6 +311,108 @@ void testBoundedRefillStopAndUnderrunFault() {
          "DMA fault latches exact emitted-prefix evidence and hold state");
 }
 
+void testRingWrapGenerationReuseAndCounterConservation() {
+  Fixture fixture{};
+  uploadInfiniteAlternating(fixture, 41U);
+  expect(fixture.engine.inspectStart(0U) == output::StartStatus::kInvalidRunId &&
+             fixture.engine.prepareStart(201U, 900U) ==
+                 output::StartStatus::kOk,
+         "START rejects run zero and accepts a valid prepared epoch");
+  output::Snapshot prepared = fixture.engine.snapshot();
+  const std::uint8_t first_block = prepared.reading_block;
+  const std::uint32_t first_lease = prepared.blocks[first_block].lease;
+  fixture.engine.commitCommonStart();
+  expect(fixture.engine.clear() == output::OperationStatus::kAlreadyActive,
+         "CLEAR cannot cancel active DMA ownership");
+
+  constexpr std::size_t kCompletedBlocks = 10U;
+  for (std::size_t completed = 0U; completed < kCompletedBlocks; ++completed) {
+    const output::Snapshot before = fixture.engine.snapshot();
+    const std::uint8_t reading = before.reading_block;
+    expect(reading != output::kInvalidBlockIndex &&
+               before.reading_depth == 1U && before.ready_depth == 3U,
+           "ring exposes exactly one DMA reader and three immutable ready blocks");
+    expect(fixture.engine.onDmaBlockComplete(
+               reading, 41U, before.blocks[reading].lease) ==
+               output::OperationStatus::kOk,
+           "ring completion advances to the oldest ready block");
+    const output::ServiceReport refilled = fixture.engine.service(1U);
+    const output::Snapshot after = fixture.engine.snapshot();
+    expect(refilled.blocks_filled == 1U &&
+               refilled.states_expanded == board::kAuxOutputStatesPerBlock &&
+               after.reading_depth == 1U && after.ready_depth == 3U &&
+               after.refill_lead ==
+                   board::kAuxOutputDmaBlockCount *
+                       board::kAuxOutputStatesPerBlock &&
+               after.telemetry.blocks_completed == completed + 1U &&
+               after.telemetry.blocks_filled ==
+                   board::kAuxOutputDmaBlockCount + completed + 1U &&
+               after.telemetry.dma_states_emitted ==
+                   (completed + 1U) * board::kAuxOutputStatesPerBlock &&
+               after.telemetry.states_expanded ==
+                   after.telemetry.blocks_filled *
+                       board::kAuxOutputStatesPerBlock,
+           "refill wrap conserves block, state, ownership, and runway counters");
+  }
+  const output::StopReport stopped = fixture.engine.stopAfterTriggersAtProgress(0U);
+  expect(stopped.ok() && fixture.engine.clear() == output::OperationStatus::kOk,
+         "wrapped ring can be stopped, quiesced, and cleared");
+
+  uploadInfiniteAlternating(fixture, 41U);
+  expect(fixture.engine.prepareStart(202U, 1000U) == output::StartStatus::kOk,
+         "a cleared upload generation can be reused with a fresh lease");
+  fixture.engine.commitCommonStart();
+  const output::Snapshot reused = fixture.engine.snapshot();
+  expect(reused.blocks[reused.reading_block].lease != first_lease &&
+             fixture.engine.onDmaBlockComplete(first_block, 41U, first_lease) ==
+                 output::OperationStatus::kInvalidCompletion &&
+             fixture.engine.snapshot().telemetry.dma_states_emitted == 0U,
+         "lease identity rejects stale completion even when generation is reused");
+}
+
+void testMaximumSegmentProgramAndFiniteWrapStress() {
+  Fixture fixture{};
+  expect(fixture.engine.begin(51U, 2U, 0U) == output::ProgramStatus::kOk,
+         "maximum-segment stress upload begins");
+  for (std::size_t index = 0U; index < output::kSegmentCapacity; ++index) {
+    expect(fixture.engine.append(
+               51U, {1U, static_cast<std::uint32_t>(index & 1U)}) ==
+               output::ProgramStatus::kOk,
+           "maximum-segment stress upload remains canonical");
+  }
+  expect(fixture.engine.commit(51U, output::kSegmentCapacity,
+                               checksumFor(fixture.program)) ==
+                 output::ProgramStatus::kOk &&
+             fixture.engine.arm(51U) == output::OperationStatus::kOk &&
+             fixture.engine.prepareStart(301U, 10U) == output::StartStatus::kOk,
+         "maximum-segment finite program commits, prefills, and prepares");
+  fixture.engine.commitCommonStart();
+
+  std::size_t completions = 0U;
+  while (fixture.engine.snapshot().state == v2::OutputState::kRunning) {
+    const output::Snapshot before = fixture.engine.snapshot();
+    const std::uint8_t reading = before.reading_block;
+    expect(reading != output::kInvalidBlockIndex,
+           "finite stress retains one reading owner until completion");
+    expect(fixture.engine.onDmaBlockComplete(
+               reading, 51U, before.blocks[reading].lease) ==
+               output::OperationStatus::kOk,
+           "finite stress block completion succeeds");
+    ++completions;
+  }
+  const output::Snapshot held = fixture.engine.snapshot();
+  expect(completions == 3U && held.state == v2::OutputState::kHeld &&
+             held.telemetry.states_expanded == 2048U &&
+             held.telemetry.dma_states_emitted == 2048U &&
+             held.telemetry.transitions_emitted == 2047U &&
+             held.telemetry.completed_repeats == 2U &&
+             held.telemetry.blocks_filled == held.telemetry.blocks_completed &&
+             held.ready_depth == 0U && held.reading_depth == 0U &&
+             held.last_emitted_state_mask == 1U &&
+             held.completion_tick == 10U + 2048U * v2::kOutputPeriodTicks,
+         "small-duration maximum-capacity stress conserves all finite counters");
+}
+
 }  // namespace
 
 int main() {
@@ -319,6 +421,8 @@ int main() {
   testProgramValidationChecksumAndImmutability();
   testFiniteExpansionOwnershipAndCompletionHold();
   testBoundedRefillStopAndUnderrunFault();
+  testRingWrapGenerationReuseAndCounterConservation();
+  testMaximumSegmentProgramAndFiniteWrapStress();
   if (failures != 0) {
     std::cerr << failures << " digital output assertion(s) failed\n";
     return 1;
