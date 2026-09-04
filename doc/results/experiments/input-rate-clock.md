@@ -12,6 +12,9 @@ Follow-up to [input isolation](input-isolation.md). The question is whether
 **each of the two ADC channels and all sixteen GPIO inputs** can sample at
 1 MHz, or at 500 kHz, with a 600 or 450 MHz CPU.
 
+The subsequent [temperature-instrumented soak campaign](temperature-soaks.md)
+adds die-temperature reporting, longer captures and explicit 8/16-input controls.
+
 ## Results
 
 Both CPU speeds passed **1 MHz → 500 kHz → 1 MHz**, 60 seconds per cell,
