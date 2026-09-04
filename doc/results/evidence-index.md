@@ -12,6 +12,7 @@ related:
   - '[[Phase-11-Soak-Evidence]]'
   - '[[Phase-12-Windows-Handoff]]'
   - '[[Aux-Output-Prototype]]'
+  - '[[Aux-Output-Bank]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -176,7 +177,7 @@ repair are in [[Phase-11-Soak-Evidence]].
 | 10 | [[Phase-10-Package-Local-Gate]], [[Phase-10-Package-Workflows]] |
 | 11 | [[Phase-11-Soak-Evidence]] |
 | 12 | [[Phase-12-Windows-Handoff]] |
-| Experimental auxiliary output | [[Aux-Output-Prototype]] (local protocol/simulator/portable-C++ evidence only; no physical output) |
+| Experimental auxiliary output | [[Aux-Output-Prototype]] (local protocol/simulator/portable-C++ evidence) and [[Aux-Output-Bank]] (target campaign; no-output physical regression PASS, protected-loopback output NOT_RUN without fixture declaration) |
 
 ## Architecture decisions
 

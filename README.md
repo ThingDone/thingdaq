@@ -73,6 +73,9 @@ canonical experiment reporter; the example writes no artifact by default.
 The complete local design, simulator, host-expansion, memory-candidate, and
 unchanged-default-build evidence is recorded in the
 [auxiliary output prototype report](doc/results/experiments/aux-output-prototype.md).
+The final target campaign, including the repaired no-output physical regression
+and the fail-closed missing-fixture conclusion, is recorded in the
+[auxiliary output bank report](doc/results/experiments/aux-output-bank.md).
 
 See the [quickstart](doc/guides/quickstart.md) for the complete example roster,
 physical discovery by hardware serial, and lifecycle guidance.

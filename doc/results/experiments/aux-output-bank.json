@@ -1,0 +1,1345 @@
+{
+  "acceptance": [
+    {
+      "description": "The matrix and report validate fail closed with no unknown state, level, metric, check, or limitation identifiers.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": true,
+      "id": "schema_valid",
+      "observed": {
+        "matrix": true,
+        "normalized_report": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Required Git, source, protocol, toolchain, branch, and baseline identities are present and syntactically valid.",
+      "evidence_ids": [
+        "evidence-framework"
+      ],
+      "expected": [
+        "repository",
+        "branch",
+        "baseline_branch",
+        "baseline_commit",
+        "source_commit",
+        "source_tree",
+        "source_clean",
+        "source_id",
+        "protocol_contract_path",
+        "protocol_version",
+        "protocol_sha256",
+        "toolchains"
+      ],
+      "id": "identity_complete",
+      "observed": {
+        "baseline_branch": "experiment/baseline-2026-09-01",
+        "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
+        "branch": "experiment/aux-output-bank",
+        "protocol_contract_path": "protocol/protocol-v1.json",
+        "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "protocol_version": 1,
+        "repository": "https://github.com/ThingDone/thingdaq.git",
+        "source_clean": true,
+        "source_commit": "42e85a587bb784ede8177c7af710009be69ffa29",
+        "source_id": "8c98b280873e15de4a83255e28a6e444f7d31b69d040dd5c18d2a5825f790f1d",
+        "source_tree": "769c736ffecebeab39728ce7b8fcc0bb0ae78505",
+        "toolchains": [
+          {
+            "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+            "name": "arduino-cli",
+            "version": "1.4.1"
+          },
+          {
+            "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+            "name": "arm-none-eabi-g++",
+            "version": "15.2.1"
+          },
+          {
+            "identity": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+            "name": "g++",
+            "version": "13.3.0"
+          },
+          {
+            "identity": "CPython 3.12.3",
+            "name": "python",
+            "version": "3.12.3"
+          },
+          {
+            "identity": "teensy:avr 1.62.0",
+            "name": "teensy-core",
+            "version": "1.62.0"
+          }
+        ]
+      },
+      "operator": "present",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Tracked canonical evidence was generated from the declared clean source commit and tree.",
+      "evidence_ids": [
+        "branch-isolation"
+      ],
+      "expected": true,
+      "id": "provenance_clean",
+      "observed": true,
+      "operator": "eq",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every referenced input, firmware, map, manifest, and output artifact matches its declared SHA-256 and size.",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "expected": {
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "b989f52131b70f6e88472258b09496d96cf2123bee90186092404bd9212731a3",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "4c19383237f5537a80103014a2a0dfbde00795fcdcedce2f8859188ade54d110",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "0c6a160e87507e4f66c43fba8f0dc8e2a6461718e57a1429adc26702df59ba8f"
+      },
+      "id": "artifact_hashes_verified",
+      "observed": {
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "b989f52131b70f6e88472258b09496d96cf2123bee90186092404bd9212731a3",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "4c19383237f5537a80103014a2a0dfbde00795fcdcedce2f8859188ade54d110",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "0c6a160e87507e4f66c43fba8f0dc8e2a6461718e57a1429adc26702df59ba8f"
+      },
+      "operator": "hash_equal",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "The exact declared firmware profile compiles with the pinned toolchain without enumerating hardware or uploading firmware.",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "expected": true,
+      "id": "firmware_build_no_upload",
+      "observed": {
+        "compile_completed": true,
+        "exact_fqbn": true,
+        "firmware_inputs_clean": true,
+        "repeat_outputs_byte_identical": true,
+        "serial_hardware_unused": true,
+        "upload_unused": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Two renders from identical normalized inputs are byte-identical JSON and Markdown.",
+      "evidence_ids": [
+        "evidence-framework",
+        "output-host-lifecycle"
+      ],
+      "expected": {
+        "json": "byte-identical",
+        "markdown": "byte-identical"
+      },
+      "id": "deterministic_output",
+      "observed": {
+        "json": "byte-identical",
+        "markdown": "byte-identical"
+      },
+      "operator": "byte_equal",
+      "reason": null,
+      "required_evidence_levels": [
+        "host"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "INFO, CONFIGURE, START, bounded data capture, STATUS, STOP, and cleanup complete in the declared order.",
+      "evidence_ids": [],
+      "expected": null,
+      "id": "lifecycle_complete",
+      "observed": null,
+      "operator": "all",
+      "reason": "The complete physical-output lifecycle requires an exact protected-loopback fixture declaration, which was absent.",
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "NOT_RUN"
+    },
+    {
+      "description": "Sequence gaps, loss, parser errors, transport errors, host-queue drops, and unexplained firmware errors are zero unless a named negative case declares and reconciles them.",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "expected": true,
+      "id": "stream_health",
+      "observed": {
+        "complete_frame_loss_zero": true,
+        "hardware_errors_zero": true,
+        "no_output_combined_passed": true,
+        "parser_errors_zero": true,
+        "sequence_gaps_zero": true,
+        "stop_tails_reconciled": true,
+        "transport_errors_zero": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "All applicable frame, item, payload-byte, framed-byte, queue, loss, and source-stage equations are exact and nonsaturated.",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "expected": true,
+      "id": "counter_conservation",
+      "observed": {
+        "adc_capture": {
+          "left": 10256696,
+          "right": 10256696
+        },
+        "adc_pipeline": {
+          "left": 10256620,
+          "right": 10256620
+        },
+        "combined_framed": {
+          "left": 83025920,
+          "right": 83025920
+        },
+        "combined_payload": {
+          "left": 82052960,
+          "right": 82052960
+        },
+        "gpio_capture": {
+          "left": 41026786,
+          "right": 41026786
+        },
+        "gpio_pipeline": {
+          "left": 41026480,
+          "right": 41026480
+        },
+        "promoted_frames": {
+          "left": 20270,
+          "right": 20270
+        }
+      },
+      "operator": "exact_conservation",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every observed queue depth and high-water value is at or below its same-artifact advertised capacity.",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "expected": 194,
+      "id": "queue_bounds",
+      "observed": 37,
+      "operator": "lte",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "STOP and final cleanup leave IDLE with every required ownership and transport gauge at zero.",
+      "evidence_ids": [
+        "rig-no-output-combined",
+        "rig-nondriving-output-controls"
+      ],
+      "expected": true,
+      "id": "final_idle_cleanup",
+      "observed": {
+        "drive_requests_zero": true,
+        "no_output_regression_idle": true,
+        "nondriving_controls_idle": true,
+        "output_bank_disabled": true,
+        "queues_empty": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "simulated",
+        "rig"
+      ],
+      "state": "PASS"
+    },
+    {
+      "description": "Every required limitation is explicit and no conclusion exceeds the evidence level that supports it.",
+      "evidence_ids": [
+        "output-host-lifecycle",
+        "output-resource-and-memory-map",
+        "remote-service-preflight"
+      ],
+      "expected": true,
+      "id": "claim_scope_complete",
+      "observed": {
+        "analog_performance_claim_absent": true,
+        "cross_branch_claim_absent": true,
+        "host_target_distinction_explicit": true,
+        "incidents_classified": true,
+        "independent_timing_claim_absent": true,
+        "loopback_lag_unmeasured_explicit": true,
+        "physical_output_not_run_explicit": true,
+        "signal_integrity_claim_absent": true
+      },
+      "operator": "all",
+      "reason": null,
+      "required_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "state": "PASS"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "firmware-build-manifest",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+      "sha256": "b989f52131b70f6e88472258b09496d96cf2123bee90186092404bd9212731a3",
+      "size_bytes": 16476
+    },
+    {
+      "kind": "firmware-eep",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep",
+      "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+      "size_bytes": 34
+    },
+    {
+      "kind": "firmware-elf",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf",
+      "sha256": "4c19383237f5537a80103014a2a0dfbde00795fcdcedce2f8859188ade54d110",
+      "size_bytes": 2021084
+    },
+    {
+      "kind": "firmware-hex",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
+      "sha256": "3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8",
+      "size_bytes": 397551
+    },
+    {
+      "kind": "firmware-map",
+      "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
+      "sha256": "0c6a160e87507e4f66c43fba8f0dc8e2a6461718e57a1429adc26702df59ba8f",
+      "size_bytes": 900335
+    }
+  ],
+  "created": "2026-09-04",
+  "evidence": [
+    {
+      "ancestry": {
+        "ahead": 20,
+        "behind": 0,
+        "merge_base_exact": true
+      },
+      "command": {
+        "argv": [
+          "git",
+          "merge-base",
+          "b23004defeca465da0ae2d2884c4fef71979e5d4",
+          "42e85a587bb784ede8177c7af710009be69ffa29"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "branch-isolation",
+      "inputs": [
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        }
+      ],
+      "level": "host",
+      "method": "Git object inspection proves exact baseline descent and identifies the isolated twenty-commit experiment history before report generation.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/experiment_evidence.py",
+          "--report",
+          "doc/results/experiments/aux-output-bank.json",
+          "--check"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "deterministic_render": true,
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "evidence-framework",
+      "inputs": [
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        },
+        {
+          "path": "firmware/tools/experiment_evidence.py",
+          "sha256": "c3c0fe5813c72bad3bf5f0b0eab3dc5823f97aca680defaade14710491e152e8"
+        }
+      ],
+      "level": "host",
+      "method": "Fail-closed shared-schema validation, referenced-file and artifact verification, secret/mutable-identity rejection, normalization, and deterministic JSON/Markdown rendering.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "build": {
+        "build_id": "thingdaq-8c98b280873e15de",
+        "firmware_source_commit": "8a29c9d2af9c06657be59f15641b1370704d2abe",
+        "firmware_source_id": "8c98b280873e15de4a83255e28a6e444f7d31b69d040dd5c18d2a5825f790f1d",
+        "flash_code_bytes": 108436,
+        "flash_data_bytes": 24520,
+        "flash_headers_bytes": 8352,
+        "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+        "linked_allocations_non_overlapping": true,
+        "ram1_code_bytes": 32744,
+        "ram1_free_for_locals_bytes": 32768,
+        "ram1_variable_bytes": 458752,
+        "ram2_free_for_heap_bytes": 4096,
+        "ram2_variable_bytes": 520192,
+        "repeat_outputs_byte_identical": true
+      },
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tools/build_firmware.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "firmware-build",
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+          "sha256": "b989f52131b70f6e88472258b09496d96cf2123bee90186092404bd9212731a3"
+        },
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
+          "sha256": "0c6a160e87507e4f66c43fba8f0dc8e2a6461718e57a1429adc26702df59ba8f"
+        },
+        {
+          "path": "firmware/firmware.ino",
+          "sha256": "c34eb230606e9f88c5dffed98984fbc8548745753dab5db282672548e85b60ec"
+        },
+        {
+          "path": "firmware/src/board_config.h",
+          "sha256": "e3d684bd08eaa8c5aa148e0cbb7d6fa922321e147e9655a5a11620e9feb01afe"
+        },
+        {
+          "path": "firmware/src/digital_output_teensy.cpp",
+          "sha256": "4e44e15d04b00d78bbea1b247120533962c559973fec1964b6b7a5c59b2bbbaa"
+        },
+        {
+          "path": "firmware/src/edma_priority_teensy.h",
+          "sha256": "89118cb424fbab69a8b209b9ce2733a2607e44756107cf275ccaab0e9a96b337"
+        },
+        {
+          "path": "firmware/tools/build_firmware.py",
+          "sha256": "765c878439e94571e600f3892bc236b5db723e4d251e26440d6ea16f5e2c49ed"
+        }
+      ],
+      "level": "host",
+      "method": "Two byte-identical pinned Teensy 4.0/core 1.62 no-upload builds with manifest, linker-map, cache-region, resource, and retention validation.",
+      "reason": null,
+      "result": "PASS",
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "command": {
+        "argv": [
+          "env",
+          "PYTHONPATH=daq_api/src",
+          "python3",
+          "-m",
+          "pytest",
+          "-q",
+          "daq_api/tests/test_aux_output_v2_contract.py",
+          "daq_api/tests/test_aux_output_v2_generation.py",
+          "firmware/tests/test_digital_output_engine.py",
+          "firmware/tests/test_digital_output_conformance.py",
+          "firmware/tests/test_digital_output_teensy.py",
+          "firmware/tests/test_digital_output_throughput.py",
+          "firmware/tests/test_rig_aux_output_loopback.py",
+          "firmware/tests/test_experiment_evidence.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "fresh_results": {
+        "subtests_passed": 373,
+        "tests_passed": 49
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "output-host-lifecycle",
+      "inputs": [
+        {
+          "path": "firmware/src/digital_output_engine.cpp",
+          "sha256": "f530eda963d90df240155d919fc2a2a9a92d1b7c9bf1a0ade6e836183489eb61"
+        },
+        {
+          "path": "firmware/src/digital_output_teensy.cpp",
+          "sha256": "4e44e15d04b00d78bbea1b247120533962c559973fec1964b6b7a5c59b2bbbaa"
+        },
+        {
+          "path": "firmware/tests/digital_output_engine_test.cpp",
+          "sha256": "74ee42cdd7ef6d1ae1b754a1f165c5e1364a93c1ced4f8fb9501ba556cfdc6f9"
+        },
+        {
+          "path": "firmware/tests/digital_output_teensy_test.cpp",
+          "sha256": "655c80676706ce7b5bd8db913dc757b495b1bc088673b13cff59dc680f3e56bb"
+        },
+        {
+          "path": "firmware/tests/rig_aux_output_loopback.py",
+          "sha256": "421cc56def85051568e9a76aa000b02f94a664a437357d363f2af7ce7ffd5f44"
+        },
+        {
+          "path": "firmware/tests/test_rig_aux_output_loopback.py",
+          "sha256": "d04a34a420fc40b66cf3aca73433039faa06576c99fdf692a4948dc618f58164"
+        },
+        {
+          "path": "firmware/tools/experiment_evidence.py",
+          "sha256": "c3c0fe5813c72bad3bf5f0b0eab3dc5823f97aca680defaade14710491e152e8"
+        },
+        {
+          "path": "protocol/protocol-v2.json",
+          "sha256": "d6aae4456917798e439e0f58e8c06555373a7e8dd731586bee3c6fa646245c1c"
+        }
+      ],
+      "level": "host",
+      "method": "Fresh protocol/Python/portable/target/fake-rig/evidence tests plus the retained clean local gate exercise output lifecycle, conservation, interlocks, fault injection, and bounded refill.",
+      "output_expansion": {
+        "headroom_over_1mhz": 285.237,
+        "max_blocks_per_service": 1,
+        "required_headroom": 10,
+        "states": 4161536,
+        "states_per_block": 1016,
+        "states_per_second": 285236944.757
+      },
+      "reason": null,
+      "result": "PASS",
+      "retained_complete_gate": {
+        "subtests_passed": 14562,
+        "tests_passed": 501
+      },
+      "safety": {
+        "clear_releases_all_pins": true,
+        "readback_injection_fail_closed": true,
+        "resource_injection_fail_closed": true,
+        "stale_output_replay_prevented": true,
+        "stop_holds_observed_latch": true,
+        "unauthorized_drive_writes": 0,
+        "underrun_injection_fail_closed": true
+      },
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "command": {
+        "argv": [
+          "python3",
+          "-m",
+          "pytest",
+          "-q",
+          "firmware/tests/test_build_firmware.py",
+          "firmware/tests/test_digital_output_teensy.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "id": "output-resource-and-memory-map",
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+          "sha256": "b989f52131b70f6e88472258b09496d96cf2123bee90186092404bd9212731a3"
+        },
+        {
+          "path": "firmware/src/board_config.h",
+          "sha256": "e3d684bd08eaa8c5aa148e0cbb7d6fa922321e147e9655a5a11620e9feb01afe"
+        },
+        {
+          "path": "firmware/src/digital_output_teensy.cpp",
+          "sha256": "4e44e15d04b00d78bbea1b247120533962c559973fec1964b6b7a5c59b2bbbaa"
+        }
+      ],
+      "level": "analytic",
+      "memory_map": {
+        "historical_maximum_service_gap_us": 60715,
+        "output_descriptors": {
+          "address": "0x20200000",
+          "alignment_bytes": 32,
+          "bytes": 128,
+          "count": 4,
+          "region": "OCRAM_DMA_READ"
+        },
+        "output_ring": {
+          "address": "0x20200080",
+          "alignment_bytes": 32,
+          "blocks": 4,
+          "bytes": 16256,
+          "region": "OCRAM_DMA_READ",
+          "states_per_block": 1016
+        },
+        "packet_and_usb_margin_us": 38461,
+        "packet_and_usb_retention_us": 99176,
+        "packet_margin_us": 37449,
+        "packet_primary": {
+          "address": "0x20001ec0",
+          "bytes": 421888,
+          "frames": 103,
+          "region": "DTCM"
+        },
+        "packet_reserve": {
+          "address": "0x20204000",
+          "bytes": 372736,
+          "frames": 91,
+          "region": "OCRAM_CPU"
+        },
+        "packet_retention_us": 98164,
+        "program": {
+          "address": "0x20068ec0",
+          "alignment_bytes": 32,
+          "bytes": 8192,
+          "region": "DTCM",
+          "segments": 1024
+        },
+        "ram1_free_for_locals_bytes": 32768,
+        "ram2_free_for_heap_bytes": 4096
+      },
+      "method": "Exact linker-manifest and central-registry inspection for the complete 1 MHz output path.",
+      "method_version": "aux-output-target-map-v1",
+      "reason": null,
+      "resource_map": {
+        "dmamux_source": 31,
+        "edma_arbitration": [
+          {
+            "channel": 0,
+            "owner": "adc0",
+            "priority": 3
+          },
+          {
+            "channel": 1,
+            "owner": "adc1",
+            "priority": 2
+          },
+          {
+            "channel": 3,
+            "owner": "aux_output",
+            "priority": 1
+          },
+          {
+            "channel": 2,
+            "owner": "gpio_input",
+            "priority": 0
+          }
+        ],
+        "edma_channel": 3,
+        "gpio_bits_by_logical_bit": [
+          23,
+          22,
+          17,
+          16,
+          26,
+          27,
+          24,
+          25
+        ],
+        "gpio_fast_port": 6,
+        "gpio_mask": "0x0fc30000",
+        "gpio_standard_port": 1,
+        "gpr_select_register": 26,
+        "irq_number": 3,
+        "irq_priority": 56,
+        "output_pins_by_logical_bit": [
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23
+        ],
+        "pit_channel": 1,
+        "vector_index": 19,
+        "xbar_input": 57,
+        "xbar_output": 1
+      },
+      "result": "PASS",
+      "target_output_state_rate_hz": 1000000
+    },
+    {
+      "command": {
+        "argv": [
+          "python3",
+          "firmware/tests/rig_aux_output_loopback.py",
+          "--mode",
+          "endurance"
+        ],
+        "firmware_upload": false,
+        "network": true,
+        "serial_hardware": true,
+        "user_input": false
+      },
+      "drive_requests_written": 0,
+      "firmware_artifact_sha256": "3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8",
+      "firmware_build_id": "thingdaq-8c98b280873e15de",
+      "fixture_declaration_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware_serial": 20428100,
+      "id": "protected-loopback-campaign",
+      "inputs": [],
+      "job_id": "not-submitted",
+      "level": "rig",
+      "loopback_lag_stability": "NOT_RUN",
+      "loopback_lag_ticks": null,
+      "method": "Prepared walking-bit, long-hold, every-microsecond-transition, finite/infinite-repeat, varied-STOP, disconnect/reopen, host-stall, underrun-recovery, 60-second, and 600-second checks.",
+      "output_profile": "teensy40-d16-d23-to-d6-d13-1mhz-v1",
+      "patterns": {
+        "disconnect_reopen": "NOT_RUN",
+        "every_microsecond_transition": "NOT_RUN",
+        "finite_repeat": "NOT_RUN",
+        "forced_underrun_recovery": "NOT_RUN",
+        "host_stall": "NOT_RUN",
+        "infinite_repeat": "NOT_RUN",
+        "long_hold": "NOT_RUN",
+        "six_hundred_second_endurance": "NOT_RUN",
+        "sixty_second_combined": "NOT_RUN",
+        "varied_stop_phase": "NOT_RUN",
+        "walking_bit": "NOT_RUN"
+      },
+      "reason": "The service supplied no exact protected-loopback fixture declaration, so the interlock prohibited ARM and START and the physical output campaign was not submitted.",
+      "result": "NOT_RUN"
+    },
+    {
+      "command": {
+        "argv": [
+          "remote-firmware-testing",
+          "preflight",
+          "--deadline-seconds",
+          "10"
+        ],
+        "firmware_upload": false,
+        "network": true,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "fixture_metadata": {
+        "declaration_present": false,
+        "declaration_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hardware_identity_present": false,
+        "no_external_drivers_present": false,
+        "ordered_loopback_present": false,
+        "output_profile_permission_present": false,
+        "series_resistors_present": false,
+        "voltage_declaration_present": false
+      },
+      "host_architecture": "x86_64",
+      "host_os_family": "Linux",
+      "id": "remote-service-preflight",
+      "inputs": [
+        {
+          "path": "experiments/experiment-matrix.json",
+          "sha256": "00f0593c3e950b9fb1ce2eca1ecf6c40b47c972f297c3e74e0c20ab46457c2c0"
+        },
+        {
+          "path": "firmware/tests/rig_aux_output_loopback.py",
+          "sha256": "421cc56def85051568e9a76aa000b02f94a664a437357d363f2af7ce7ffd5f44"
+        }
+      ],
+      "level": "host",
+      "method": "Finite ten-second service, worker, queue, board-catalog, and machine-readable fixture-metadata preflight.",
+      "reason": null,
+      "response_sha256": {
+        "health": "4011a9f35e547b77df99b24e2d2c0d3525f82dea46d3b3a73b462f1cae46e478",
+        "platforms": "0f317c9d1fdb96439b04b21941d7c32bf2fe670b5b9c8670f2b10eba8df9b613",
+        "version": "0ee97a1de8aff454210beebb879f7f77221dbf2d26e22bc973774f6e5bd5ff70"
+      },
+      "result": "PASS",
+      "service": {
+        "api": "v1",
+        "docker_reachable": true,
+        "healthy": true,
+        "hub_reachable": true,
+        "name": "remote-firmware-testing",
+        "queue_depth": 0,
+        "teensy_catalog_connected": false,
+        "teensy_catalog_hub_port": 15,
+        "version": "1.2.0",
+        "worker_thread_alive": true
+      },
+      "toolchain_identity": "CPython 3.12.3; g++ 13.3.0"
+    },
+    {
+      "checks_passed": 352,
+      "command": {
+        "argv": [
+          "remote-firmware-testing",
+          "submit",
+          "teensy:avr:teensy40",
+          "firmware.ino.hex",
+          "rig_combined_capture.py"
+        ],
+        "firmware_upload": true,
+        "network": true,
+        "serial_hardware": true,
+        "user_input": false
+      },
+      "final_state": "IDLE",
+      "firmware_artifact_sha256": "3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8",
+      "firmware_build_id": "thingdaq-8c98b280873e15de",
+      "fixture_declaration_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware_serial": 20428100,
+      "id": "rig-no-output-combined",
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
+          "sha256": "3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8"
+        },
+        {
+          "path": "firmware/tests/rig_combined_capture.py",
+          "sha256": "2c07ce755fa5ddbe2091e3eafbc269c92fa8681be8f365f79ac3bbe8a2d65544"
+        }
+      ],
+      "job_id": "86c8d003-a809-4186-8702-6092ed4d0d4f",
+      "level": "rig",
+      "method": "Maximum-rate physical combined ADC/GPIO regression using the repaired immutable image while the auxiliary output bank remained disabled.",
+      "output_bank_disabled": true,
+      "reason": null,
+      "result": "PASS",
+      "run": {
+        "adc_framed_bytes": 41512960,
+        "adc_frames": 10135,
+        "adc_pair_rate_hz": 1000001.196026857,
+        "adc_pairs": 10256620,
+        "adc_payload_bytes": 41026480,
+        "adc_stop_tail_pairs": 76,
+        "all_commands_latency_max_ms": 20.994924940168858,
+        "common_final_timestamp_ticks": 82052960,
+        "complete_frames_dropped": 0,
+        "conservation_failures": 0,
+        "gpio_framed_bytes": 41512960,
+        "gpio_frames": 10135,
+        "gpio_payload_bytes": 41026480,
+        "gpio_processing_cpu_basis_points": 2238,
+        "gpio_sample_rate_hz": 3999600.007262244,
+        "gpio_samples": 41026480,
+        "gpio_stop_tail_samples": 306,
+        "host_rss_growth_bytes": 200704,
+        "measurement_seconds": 10.000572039047256,
+        "packet_capacity": 194,
+        "packet_owned_high_water": 37,
+        "parser_errors": 0,
+        "sequence_gaps": 0,
+        "status_latency_max_ms": 2.102050930261612,
+        "transport_errors": 0
+      }
+    },
+    {
+      "command": {
+        "argv": [
+          "remote-firmware-testing",
+          "submit",
+          "teensy:avr:teensy40",
+          "firmware.ino.hex",
+          "rig_aux_output_loopback.py"
+        ],
+        "firmware_upload": true,
+        "network": true,
+        "serial_hardware": true,
+        "user_input": false
+      },
+      "drive_requests_written": 0,
+      "failures": [],
+      "final_state": "IDLE",
+      "firmware_artifact_sha256": "3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8",
+      "firmware_build_id": "thingdaq-8c98b280873e15de",
+      "fixture_declaration_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware_serial": 20428100,
+      "id": "rig-nondriving-output-controls",
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
+          "sha256": "3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8"
+        },
+        {
+          "path": "firmware/tests/rig_aux_output_loopback.py",
+          "sha256": "421cc56def85051568e9a76aa000b02f94a664a437357d363f2af7ce7ffd5f44"
+        }
+      ],
+      "job_id": "601bbf65-65d4-4b8c-b032-7100b5963c1d",
+      "level": "rig",
+      "method": "Protocol-v2 OUTPUT_STATUS, unarmed upload, malformed APPEND rejection, CLEAR, final STATUS, and final CLEAR without any ARM or START write.",
+      "output_bank_disabled": true,
+      "reason": null,
+      "result": "PASS",
+      "runner_sha256": "421cc56def85051568e9a76aa000b02f94a664a437357d363f2af7ce7ffd5f44"
+    }
+  ],
+  "experiment_id": "aux-output-bank",
+  "identity": {
+    "baseline_branch": "experiment/baseline-2026-09-01",
+    "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
+    "branch": "experiment/aux-output-bank",
+    "protocol_contract_path": "protocol/protocol-v1.json",
+    "protocol_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+    "protocol_version": 1,
+    "repository": "https://github.com/ThingDone/thingdaq.git",
+    "source_clean": true,
+    "source_commit": "42e85a587bb784ede8177c7af710009be69ffa29",
+    "source_id": "8c98b280873e15de4a83255e28a6e444f7d31b69d040dd5c18d2a5825f790f1d",
+    "source_tree": "769c736ffecebeab39728ce7b8fcc0bb0ae78505",
+    "toolchains": [
+      {
+        "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+        "name": "arduino-cli",
+        "version": "1.4.1"
+      },
+      {
+        "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "name": "arm-none-eabi-g++",
+        "version": "15.2.1"
+      },
+      {
+        "identity": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+        "name": "g++",
+        "version": "13.3.0"
+      },
+      {
+        "identity": "CPython 3.12.3",
+        "name": "python",
+        "version": "3.12.3"
+      },
+      {
+        "identity": "teensy:avr 1.62.0",
+        "name": "teensy-core",
+        "version": "1.62.0"
+      }
+    ]
+  },
+  "limitations": [
+    {
+      "applies_to_evidence_levels": [
+        "simulated"
+      ],
+      "id": "simulation_is_not_physical",
+      "statement": "Simulator evidence does not establish firmware target timing, USB behavior, electrical behavior, or physical signal quality."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "host"
+      ],
+      "id": "build_is_not_target_runtime",
+      "statement": "A no-upload build and linker/map inspection do not establish that the artifact ran correctly on a Teensy or over USB."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig"
+      ],
+      "id": "analog_performance_untested",
+      "statement": "Unstimulated or synthetic data do not establish ADC accuracy, noise, ENOB, linearity, bandwidth, source tolerance, or true aperture timing."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "rig",
+        "manual"
+      ],
+      "id": "aux_output_authorization_scope",
+      "statement": "Physical output checks may run only with an exact hashed safety/fixture authorization; absent authorization remains NOT_RUN and cannot be promoted to PASS."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "rig"
+      ],
+      "id": "loopback_is_not_independent_measurement",
+      "statement": "Firmware observing its own looped-back output is not independent certification of pad-level timing, voltage, jitter, or signal integrity."
+    },
+    {
+      "applies_to_evidence_levels": [
+        "analytic",
+        "simulated",
+        "host",
+        "rig",
+        "manual"
+      ],
+      "id": "cross_branch_combinations_untested",
+      "statement": "Independent candidate results do not establish that clock, compression, auxiliary input, and auxiliary output changes work together in one artifact."
+    }
+  ],
+  "matrix_schema_version": 1,
+  "metrics": [
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "measurement_duration_seconds",
+      "scope": "streaming_window",
+      "unit": "second",
+      "value": 10.000572039047256
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_pairs_observed",
+      "scope": "streaming_window",
+      "unit": "adc_pair",
+      "value": 10256620
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_samples_observed",
+      "scope": "streaming_window",
+      "unit": "gpio_sample",
+      "value": 41026480
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_frames_observed",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 10135
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_frames_observed",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 10135
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 41026480
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 41026480
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "combined_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 82052960
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 41512960
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 41512960
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "combined_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 83025920
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_pair_rate_hz",
+      "scope": "streaming_window",
+      "unit": "adc_pair_per_second",
+      "value": 1000001.196026857
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_sample_rate_hz",
+      "scope": "streaming_window",
+      "unit": "gpio_sample_per_second",
+      "value": 3999600.007262244
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "sequence_gap_frames",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "firmware_dropped_frames",
+      "scope": "run",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "host_queue_drops",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "parser_errors",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "transport_errors",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "conservation_failures",
+      "scope": "final_status",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "command_latency_samples",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "command_latency_p99_milliseconds",
+      "scope": "run",
+      "unit": "millisecond",
+      "value": 2.102050930261612
+    },
+    {
+      "denominator": "command_latency_samples",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "command_latency_maximum_milliseconds",
+      "scope": "run",
+      "unit": "millisecond",
+      "value": 20.994924940168858
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "packet_owned_high_water_frames",
+      "scope": "run",
+      "unit": "frame",
+      "value": 37
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "rig-no-output-combined"
+      ],
+      "evidence_level": "rig",
+      "name": "packet_buffer_capacity_frames",
+      "scope": "artifact",
+      "unit": "frame",
+      "value": 194
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "flash_used_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 132956
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram1_headroom_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 32768
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "firmware-build"
+      ],
+      "evidence_level": "host",
+      "name": "ram2_headroom_bytes",
+      "scope": "artifact",
+      "unit": "byte",
+      "value": 4096
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "output-resource-and-memory-map"
+      ],
+      "evidence_level": "analytic",
+      "name": "output_state_rate_hz",
+      "scope": "output_window",
+      "unit": "hertz",
+      "value": 1000000
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "output-host-lifecycle"
+      ],
+      "evidence_level": "host",
+      "name": "output_underruns",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    }
+  ],
+  "reason": "The protected D16-D23-to-D6-D13 fixture declaration was absent, so all physical-output and loopback checks remained NOT_RUN despite passing local lifecycle and physical no-output regressions.",
+  "related": [
+    "[[1-MHz-Parallel-Output-Idea]]",
+    "[[ADR-008-Experimental-Aux-Output-Bank]]",
+    "[[Acquisition-Pipeline]]",
+    "[[Aux-Output-Memory-Candidate]]",
+    "[[Aux-Output-Prototype]]",
+    "[[Hardware-Safety]]"
+  ],
+  "result": "INCONCLUSIVE",
+  "schema_version": 1,
+  "summary": "The final candidate conclusion is **INCONCLUSIVE for physical output** because the remote service exposed no machine-readable protected-loopback declaration. The safety interlock therefore wrote exactly zero ARM/START requests. Local target/lifecycle evidence passed, and the repaired immutable image passed the mandatory no-output maximum-rate physical combined regression.\n\n### Campaign identity and decision\n\n| Field | Exact result |\n| --- | --- |\n| Baseline / branch source | `b23004defeca465da0ae2d2884c4fef71979e5d4` / `42e85a587bb784ede8177c7af710009be69ffa29` |\n| Firmware source / build | `8a29c9d2af9c06657be59f15641b1370704d2abe` / `thingdaq-8c98b280873e15de` |\n| HEX SHA-256 | `3afc02d303871d106481f71cae3142aa9fc80e80532bd694e59d88cfc3a94bc8` |\n| Identified hardware | Teensy serial `20428100` |\n| Fixture declaration | Absent; canonical empty SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |\n| Physical output decision | **NOT_RUN**; no output pin was armed or driven |\n| Loopback lag / stability | **NOT_MEASURED / NOT_RUN** |\n\n### Output resource and memory map\n\n| Item | Exact allocation |\n| --- | --- |\n| Pins and GPIO | D16-D23 in logical order; GPIO1/GPIO6 bits `23,22,17,16,26,27,24,25`; mask `0x0FC30000` |\n| Trigger and DMA | PIT1; XBARA1 input 57 to output 1; DMAMUX 31; eDMA channel/IRQ 3; vector 19; NVIC priority 56 |\n| Arbitration | ADC0 3 > ADC1 2 > auxiliary output 1 > GPIO input 0 |\n| Program | `0x20068ec0`, 8,192-byte DTCM store, 1,024 eight-byte segments |\n| Output DMA | four 32-byte descriptors at `0x20200000`; four 4,064-byte/1,016-state blocks at `0x20200080` |\n| Packet banks | 103 DTCM frames at `0x20001ec0` + 91 OCRAM frames at `0x20204000` = 194 frames |\n| Retention | 98.164 ms packet-only; 99.176 ms with USB; 38.461 ms margin over the historical 60.715 ms gap |\n| Linked headroom | 32,768 bytes RAM1 locals/stack; 4,096 bytes RAM2 heap |\n\nThe common XBAR selector/control register halves are updated by read-modify-write, all managed allocations are non-overlapping, and the DMA-read output ring is cache flushed before publication.\n\n### Pattern, epoch, preservation, and conservation results\n\n| Check | Result |\n| --- | --- |\n| Walking bit, long hold, every-1-us transition, finite/infinite repeat, varied STOP phase | **NOT_RUN**: protected fixture declaration absent |\n| Disconnect/reopen, host stall, deliberate underrun recovery | **NOT_RUN**: protected fixture declaration absent |\n| 60-second and 600-second combined output campaigns | **NOT_RUN**: protected fixture declaration absent |\n| Shared output/input epoch and four-samples-per-state grading | **NOT_RUN**; no loopback lag was inferred |\n| No-output combined physical regression | **PASS**, job `86c8d003-a809-4186-8702-6092ed4d0d4f`, 352 checks over 10.000572 seconds |\n| Non-driving output controls | **PASS**, job `601bbf65-65d4-4b8c-b032-7100b5963c1d`; zero drive writes; final IDLE |\n\nThe no-output regression observed 10,256,620 ADC pairs and 41,026,480 GPIO samples in 10,135 frames per stream at 1,000,001.196 ADC pairs/s and 3,999,600.007 GPIO samples/s. Both streams ended at timestamp 82,052,960 ticks. All complete-frame, sequence, parser, transport, pool, hardware, and conservation errors were zero. The bounded STOP tails were exactly 76 ADC pairs and 306 GPIO samples and reconciled captured to transmitted counts. Packet ownership peaked at 37 of 194, GPIO processing load was 2,238 basis points, maximum STATUS latency was 2.102 ms, maximum command latency was 20.995 ms, and host RSS growth was 200,704 bytes.\n\nHost fake-register and stress evidence separately passed atomic toggle expansion, shared-register preservation, pre-clock rollback, finite completion, STOP/fault latch hold, CLEAR-to-input release, repeated lifecycle, forced underrun/resource/readback faults, stale-completion rejection, and exact output conservation. These are implementation/lifecycle results, not physical waveform measurements.\n\n### Incidents and boundaries\n\nJob `50c81cf9-21dd-44cd-986b-a1d45a4deb0a` was rejected before power because the option-qualified catalog entry lacked a hub port. Original-image jobs `5cee87df-af4e-4d76-bfc8-97982a395a36` and `8655a7f7-783a-4986-aae7-c7f77f7ed92e` reproduced eDMA priority error `DMA_ES=0x800040c8`; diagnostic job `66278a41-be0d-47ad-a63e-f80974064c65` isolated the reserved-channel collision. The repaired image then passed. Jobs `e6f0a1f0-3b8d-4649-b14e-89d390f2cf58` and `f9bd3504-0f97-4382-9df5-b5fe415f15cb` were bounded runner/envelope diagnostics with zero drive writes, not firmware failures.\n\nNo pad was driven, so this report establishes no measured output rate, physical pattern fidelity, loopback lag, hold voltage, edge timing, jitter, voltage level, or signal integrity. Even an eventual firmware-observed loopback cannot independently certify those properties; logic-analyzer or oscilloscope evidence remains required. ADC values were checked only for transport continuity and conservation, not accuracy, noise, ENOB, linearity, bandwidth, or aperture timing. No compatibility claim is made for combining this branch with the clock, RLE, or auxiliary-input candidates. See [[Aux-Output-Prototype]], [[ADR-008-Experimental-Aux-Output-Bank]], [[1-MHz-Parallel-Output-Idea]], and [[Hardware-Safety]].",
+  "title": "ThingDAQ Auxiliary Output Bank Experiment"
+}

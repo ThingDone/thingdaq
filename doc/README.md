@@ -40,6 +40,7 @@ related:
   - '[[ADR-008-Experimental-Aux-Output-Bank]]'
   - '[[Aux-Output-Memory-Candidate]]'
   - '[[Aux-Output-Prototype]]'
+  - '[[Aux-Output-Bank]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -131,7 +132,10 @@ physical acceptance.
   The isolated protocol-v2 output contract, deterministic trace, portable
   expansion benchmark, fixed memory candidate, and unchanged default build are
   recorded in [[Aux-Output-Prototype]]; it is local prototype evidence, not a
-  physical-output result.
+  physical-output result. The final isolated target campaign is recorded in
+  [[Aux-Output-Bank]]: local target and lifecycle gates plus the repaired
+  no-output combined regression passed, while protected-loopback output checks
+  remained NOT_RUN because the fixture declaration was absent.
 
 Generated captures and scratch results remain outside version control. Small,
 deterministic implementation fixtures belong under `firmware/tests/fixtures/`
