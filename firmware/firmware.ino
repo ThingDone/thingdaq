@@ -3,7 +3,7 @@
 #include "src/adc_initializer_teensy.h"
 #include "src/adc_trigger_teensy.h"
 #include "src/checksum_benchmark_teensy.h"
-#include "src/digital_output_engine.h"
+#include "src/digital_output_teensy.h"
 #include "src/gpio_clock_diagnostic_teensy.h"
 #include "src/gpio_capture_diagnostic_teensy.h"
 #include "src/gpio_raw_capture_teensy.h"
@@ -19,6 +19,10 @@ thingdaq::packet::PacketBufferStorage packet_storage{packet_storage_primary, pac
 thingdaq::digital_output::ProgramStorage aux_output_program_storage{};
 DMAMEM thingdaq::digital_output::DmaBlockStorage aux_output_dma_ring{};
 DMAMEM thingdaq::digital_output::DmaDescriptorStorage aux_output_dma_descriptors{};
+thingdaq::digital_output::TeensyOutput &aux_output =
+    thingdaq::digital_output::teensyOutput(
+        aux_output_program_storage, aux_output_dma_ring,
+        aux_output_dma_descriptors);
 thingdaq::gpio_packer::GpioBatchPacker gpio_packer{
     thingdaq::gpio_capture::teensyRawCapture(),
     thingdaq::gpio_packer::teensyPackedBufferStorage(),
@@ -35,16 +39,12 @@ thingdaq::runtime::FirmwareRuntime firmware_runtime{
     &thingdaq::gpio_diagnostic::teensyRunner(),
     &thingdaq::adc::teensyInitializer(),
     &thingdaq::adc_trigger::teensyScheduler(),
-    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer};
+    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer,
+    &aux_output};
 }  // namespace
 
 void setup() {
-  // Retain reserved output storage without touching pins or registers; the
-  // adapter claims it later. BOOT remains bounded and banner-free.
-  asm volatile("" : : "r"(&aux_output_program_storage),
-                       "r"(&aux_output_dma_ring),
-                       "r"(&aux_output_dma_descriptors)
-               : "memory");
+  // Binding output storage is register-free; BOOT leaves D16-D23 as inputs.
   (void)firmware_runtime.begin(thingdaq::usb::hardwareSerialNumber());
 }
 

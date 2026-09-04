@@ -13,6 +13,11 @@ namespace output = thingdaq::digital_output;
 class NullCache final : public output::CacheMaintenance {
  public:
   void flushBeforeDmaRead(const void *, std::size_t) override {}
+  bool prepareBeforeDmaRead(std::uint8_t, const void *address,
+                            std::size_t bytes, std::size_t) override {
+    flushBeforeDmaRead(address, bytes);
+    return true;
+  }
 };
 
 class Critical final : public output::CriticalSection {

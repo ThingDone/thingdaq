@@ -758,6 +758,8 @@ class LifecycleOutput final : public digital_output::Participant {
   void rollbackPreparedStart() override {
     operations_.push_back("output_rollback");
     prepared = false;
+    running = false;
+    armed = true;
   }
 
   digital_output::StopReport stopAfterTriggers() override {
@@ -2048,8 +2050,8 @@ void testArmedOutputJoinsCommonStartStopAndFaultOrdering() {
              fixture.operations ==
                  std::vector<std::string>{
                      "dma_prepare", "gpio_dma_prepare", "output_prepare",
-                     "trigger_arm", "output_start"},
-         "armed output prepares before and commits after the common trigger arm");
+                     "output_start", "trigger_arm"},
+         "armed output commits before the common trigger is enabled last");
 
   acquisition::Report output_service{};
   fixture.controller.serviceOutput(output_service);
@@ -2098,11 +2100,12 @@ void testArmedOutputJoinsCommonStartStopAndFaultOrdering() {
   expect(!fixture.controller.start(combined, 90U, 123458U,
                                    clock_rejected) &&
              clock_rejected.output_prepared &&
-             !clock_rejected.output_started &&
+             clock_rejected.output_started &&
              fixture.operations ==
                  std::vector<std::string>{
                      "dma_prepare", "gpio_dma_prepare", "output_prepare",
-                     "trigger_arm", "trigger_stop", "output_rollback",
+                     "output_start", "trigger_arm", "trigger_stop",
+                     "output_rollback",
                      "gpio_dma_stop", "dma_stop"} &&
              fixture.output.armed && !fixture.output.prepared &&
              !fixture.output.running,

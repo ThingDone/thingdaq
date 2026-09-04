@@ -28,6 +28,11 @@ class RecordingCache final : public output::CacheMaintenance {
     last_bytes = bytes;
     ++calls;
   }
+  bool prepareBeforeDmaRead(std::uint8_t, const void *address,
+                            std::size_t bytes, std::size_t) override {
+    flushBeforeDmaRead(address, bytes);
+    return true;
+  }
 
   const void *last_address = nullptr;
   std::size_t last_bytes = 0U;
@@ -176,6 +181,16 @@ void testFiniteExpansionOwnershipAndCompletionHold() {
              output::StartStatus::kOk,
          "rolled-back program remains reusable");
   fixture.engine.commitCommonStart();
+  fixture.engine.rollbackPreparedStart();
+  prepared = fixture.engine.snapshot();
+  expect(prepared.state == v2::OutputState::kArmed &&
+             prepared.ready_depth == 1U && prepared.reading_depth == 0U &&
+             prepared.telemetry.dma_states_emitted == 0U,
+         "failed final clock arm rolls a committed pre-clock block back safely");
+  expect(fixture.engine.prepareStart(91U, 1000U) ==
+             output::StartStatus::kOk,
+         "clock-arm rollback leaves the complete prefill reusable");
+  fixture.engine.commitCommonStart();
   output::Snapshot running = fixture.engine.snapshot();
   const std::uint8_t reading = running.reading_block;
   const std::uint32_t lease = running.blocks[reading].lease;
@@ -242,19 +257,19 @@ void testBoundedRefillStopAndUnderrunFault() {
   running = fixture.engine.snapshot();
   reading = running.reading_block;
   const output::StopReport stopped =
-      fixture.engine.stopAfterTriggersAtProgress(1U);
+      fixture.engine.stopAfterTriggersAtProgress(1U, 2U);
   const output::Snapshot held = fixture.engine.snapshot();
   expect(stopped.ok() && stopped.dma_quiesced &&
              stopped.active_states_emitted == 1U &&
              held.state == v2::OutputState::kHeld &&
-             held.last_emitted_state_mask == 1U &&
+             held.last_emitted_state_mask == 2U &&
              held.telemetry.dma_states_emitted ==
                  board::kAuxOutputStatesPerBlock + 1U &&
              held.hold_tick ==
                  500U + (board::kAuxOutputStatesPerBlock + 1U) *
                             v2::kOutputPeriodTicks &&
              held.ready_depth == 0U && held.reading_depth == 0U,
-         "STOP after the shared trigger holds the physically emitted prefix");
+         "STOP after the shared trigger records the observed physical latch");
   expect(fixture.engine.clear(false) == output::OperationStatus::kReleaseFailed &&
              fixture.engine.snapshot().fault_latched &&
              fixture.engine.snapshot().bank_mode == v2::OutputBankMode::kOutput,

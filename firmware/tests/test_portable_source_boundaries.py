@@ -63,6 +63,10 @@ EXPECTED_HARDWARE_INCLUDE_OWNERS = {
         "core_pins.h",
         "imxrt.h",
     },
+    FIRMWARE_SOURCE / "digital_output_teensy.cpp": {
+        "core_pins.h",
+        "imxrt.h",
+    },
     FIRMWARE_SOURCE / "gpio_batch_packer_teensy.cpp": {
         "core_pins.h",
         "imxrt.h",

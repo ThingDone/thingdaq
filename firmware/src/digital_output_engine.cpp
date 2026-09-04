@@ -2,6 +2,13 @@
 
 #include <limits>
 
+#if defined(__IMXRT1062__)
+#define THINGDAQ_OUTPUT_ENGINE_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define THINGDAQ_OUTPUT_ENGINE_COLD_CODE(section_name)
+#endif
+
 namespace thingdaq::digital_output {
 namespace {
 
@@ -29,6 +36,13 @@ std::uint64_t tickAfterStates(std::uint64_t start_tick,
 
 }  // namespace
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.cache_destructor")
+CacheMaintenance::~CacheMaintenance() = default;
+
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.destructor")
+Engine::~Engine() = default;
+
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.begin")
 ProgramStatus Engine::begin(std::uint32_t generation,
                             std::uint32_t repeat_count,
                             std::uint32_t idle_state_mask) {
@@ -47,6 +61,7 @@ ProgramStatus Engine::begin(std::uint32_t generation,
   return status;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.append")
 ProgramStatus Engine::append(std::uint32_t generation,
                              const Segment &segment_value) {
   const ProgramStatus status = program_.append(generation, segment_value);
@@ -56,6 +71,7 @@ ProgramStatus Engine::append(std::uint32_t generation,
   return status;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.commit")
 ProgramStatus Engine::commit(std::uint32_t generation,
                              std::size_t expected_segment_count,
                              std::uint32_t expected_checksum) {
@@ -69,6 +85,7 @@ ProgramStatus Engine::commit(std::uint32_t generation,
   return status;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.arm")
 OperationStatus Engine::arm(std::uint32_t generation) {
   const ProgramSnapshot committed = program_.snapshot();
   if (generation == 0U || generation != committed.generation) {
@@ -89,12 +106,30 @@ OperationStatus Engine::arm(std::uint32_t generation) {
   expand_segment_remaining_ = program_.segment(0U).duration_samples;
   ServiceReport prefill = service(board::kAuxOutputDmaBlockCount);
   if (prefill.blocks_filled == 0U) {
-    latchFault(protocol_v2::OutputError::kUnderrun, 0U);
+    if (state_ != protocol_v2::OutputState::kFaulted) {
+      latchFault(protocol_v2::OutputError::kUnderrun, 0U);
+    }
     return OperationStatus::kNotReady;
   }
   return OperationStatus::kOk;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.rollback_arm")
+void Engine::rollbackArm() {
+  const bool predrive_fault =
+      state_ == protocol_v2::OutputState::kFaulted && run_id_ == 0U &&
+      telemetry_.dma_states_emitted == 0U;
+  if ((state_ != protocol_v2::OutputState::kArmed && !predrive_fault) ||
+      prepared_) {
+    return;
+  }
+  releaseAllBlocks();
+  resetPlayback();
+  state_ = protocol_v2::OutputState::kCommitted;
+  bank_mode_ = protocol_v2::OutputBankMode::kDisabled;
+}
+
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.clear")
 OperationStatus Engine::clear(bool release_succeeded) {
   if (state_ == protocol_v2::OutputState::kRunning || prepared_) {
     saturatingIncrement(telemetry_.invalid_operations);
@@ -117,10 +152,12 @@ OperationStatus Engine::clear(bool release_succeeded) {
   return OperationStatus::kOk;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.participates")
 bool Engine::participatesInNextStart() const {
   return state_ == protocol_v2::OutputState::kArmed;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.inspect")
 StartStatus Engine::inspectStart(std::uint32_t run_id) const {
   if (run_id == 0U) {
     return StartStatus::kInvalidRunId;
@@ -134,6 +171,7 @@ StartStatus Engine::inspectStart(std::uint32_t run_id) const {
   return readyDepth() == 0U ? StartStatus::kNotReady : StartStatus::kOk;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.prepare")
 StartStatus Engine::prepareStart(std::uint32_t run_id,
                                  std::uint64_t epoch_ticks) {
   const StartStatus status = inspectStart(run_id);
@@ -158,6 +196,7 @@ StartStatus Engine::prepareStart(std::uint32_t run_id,
   return StartStatus::kOk;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.start")
 void Engine::commitCommonStart() {
   if (prepared_ && state_ == protocol_v2::OutputState::kArmed) {
     prepared_ = false;
@@ -165,8 +204,12 @@ void Engine::commitCommonStart() {
   }
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.rollback")
 void Engine::rollbackPreparedStart() {
-  if (!prepared_) {
+  const bool committed_without_clock =
+      state_ == protocol_v2::OutputState::kRunning &&
+      telemetry_.dma_states_emitted == 0U;
+  if (!prepared_ && !committed_without_clock) {
     return;
   }
   const std::uint32_t token = critical_.enter();
@@ -176,6 +219,7 @@ void Engine::rollbackPreparedStart() {
   }
   critical_.exit(token);
   prepared_ = false;
+  state_ = protocol_v2::OutputState::kArmed;
   run_id_ = 0U;
   start_tick_ = 0U;
   completion_tick_ = 0U;
@@ -183,12 +227,15 @@ void Engine::rollbackPreparedStart() {
   refreshDepthHighWater();
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.stop")
 StopReport Engine::stopAfterTriggers() {
   return stopAfterTriggersAtProgress(0U);
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.stop_progress")
 StopReport Engine::stopAfterTriggersAtProgress(
-    std::size_t active_states_emitted) {
+    std::size_t active_states_emitted,
+    std::uint32_t observed_logical_state) {
   StopReport report{};
   const std::uint32_t token = critical_.enter();
   const std::uint8_t reading = readingBlock();
@@ -212,6 +259,9 @@ StopReport Engine::stopAfterTriggersAtProgress(
   }
 
   releaseAllBlocks();
+  if (observed_logical_state != kUnknownLogicalState) {
+    last_emitted_state_ = observed_logical_state & kLegalStateMask;
+  }
   prepared_ = false;
   if (state_ != protocol_v2::OutputState::kFaulted) {
     state_ = protocol_v2::OutputState::kHeld;
@@ -226,6 +276,7 @@ StopReport Engine::stopAfterTriggersAtProgress(
   return report;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.service")
 ServiceReport Engine::service(std::size_t block_limit) {
   ServiceReport report{};
   if ((state_ != protocol_v2::OutputState::kArmed &&
@@ -245,6 +296,7 @@ ServiceReport Engine::service(std::size_t block_limit) {
   return report;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.snapshot")
 Snapshot Engine::snapshot() const {
   Snapshot result{};
   const std::uint32_t token = critical_.enter();
@@ -296,6 +348,7 @@ Snapshot Engine::snapshot() const {
   return result;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.faulted")
 bool Engine::faulted() const {
   const std::uint32_t token = critical_.enter();
   const bool result = state_ == protocol_v2::OutputState::kFaulted;
@@ -303,6 +356,7 @@ bool Engine::faulted() const {
   return result;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.completion")
 OperationStatus Engine::onDmaBlockComplete(std::uint8_t block_index,
                                            std::uint32_t upload_generation,
                                            std::uint32_t lease) {
@@ -341,19 +395,23 @@ OperationStatus Engine::onDmaBlockComplete(std::uint8_t block_index,
   return OperationStatus::kNotReady;
 }
 
-OperationStatus Engine::recordDmaFault(std::size_t active_states_emitted) {
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.dma_fault")
+OperationStatus Engine::recordDmaFault(
+    std::size_t active_states_emitted,
+    std::uint32_t observed_logical_state) {
   const std::uint32_t token = critical_.enter();
   if (state_ != protocol_v2::OutputState::kRunning) {
     saturatingIncrement(telemetry_.invalid_operations);
     critical_.exit(token);
     return OperationStatus::kInvalidLifecycle;
   }
-  latchFault(protocol_v2::OutputError::kDmaFault,
-             active_states_emitted);
+  latchFault(protocol_v2::OutputError::kDmaFault, active_states_emitted,
+             observed_logical_state);
   critical_.exit(token);
   return OperationStatus::kOk;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.fill")
 bool Engine::fillOneBlock(ServiceReport &report) {
   std::uint8_t selected = kInvalidBlockIndex;
   const std::uint32_t claim_token = critical_.enter();
@@ -398,8 +456,16 @@ bool Engine::fillOneBlock(ServiceReport &report) {
     return false;
   }
   record.final_logical_state = expanded_logical_state_;
-  cache_.flushBeforeDmaRead(storage_.blocks[selected].data(),
-                            record.valid_states * sizeof(std::uint32_t));
+  if (!cache_.prepareBeforeDmaRead(
+          selected, storage_.blocks[selected].data(),
+          record.valid_states * sizeof(std::uint32_t),
+          record.valid_states)) {
+    const std::uint32_t failed_token = critical_.enter();
+    record = {};
+    latchFault(protocol_v2::OutputError::kDmaFault, 0U);
+    critical_.exit(failed_token);
+    return false;
+  }
   saturatingIncrement(telemetry_.cache_flushes);
   saturatingIncrement(telemetry_.blocks_filled);
   const std::uint32_t publish_token = critical_.enter();
@@ -417,6 +483,7 @@ bool Engine::fillOneBlock(ServiceReport &report) {
   return true;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.promote")
 bool Engine::promoteReadyBlock() {
   const std::uint8_t selected = findReadyBlock();
   if (selected == kInvalidBlockIndex) {
@@ -426,11 +493,12 @@ bool Engine::promoteReadyBlock() {
   return true;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.expand")
 std::uint32_t Engine::expandOneState() {
   const Segment &segment_value = program_.segment(expand_segment_index_);
   const std::uint32_t next_state = segment_value.logical_state_mask;
-  const std::uint32_t toggle =
-      physicalToggleMask(expanded_logical_state_ ^ next_state);
+  const std::uint32_t toggle = physicalMaskForLogicalState(
+      expanded_logical_state_ ^ next_state);
   expanded_logical_state_ = next_state;
   saturatingIncrement(telemetry_.states_expanded);
 
@@ -457,6 +525,7 @@ std::uint32_t Engine::expandOneState() {
   return toggle;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.apply_complete")
 void Engine::applyCompletedBlock(std::uint8_t block_index) {
   const BlockRecord &record = blocks_[block_index];
   last_emitted_state_ = record.final_logical_state;
@@ -467,10 +536,11 @@ void Engine::applyCompletedBlock(std::uint8_t block_index) {
   updateCompletedRepeats();
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.apply_prefix")
 void Engine::applyEmittedPrefix(std::uint8_t block_index, std::size_t count) {
   for (std::size_t index = 0U; index < count; ++index) {
     const std::uint32_t toggle = storage_.blocks[block_index][index];
-    last_emitted_state_ ^= logicalDeltaMask(toggle);
+    last_emitted_state_ ^= logicalStateFromPhysicalMask(toggle);
     if (toggle != 0U) {
       saturatingIncrement(telemetry_.transitions_emitted);
     }
@@ -480,6 +550,7 @@ void Engine::applyEmittedPrefix(std::uint8_t block_index, std::size_t count) {
   updateCompletedRepeats();
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.repeats")
 void Engine::updateCompletedRepeats() {
   const std::uint64_t duration = program_.snapshot().duration_samples;
   if (duration != 0U) {
@@ -491,18 +562,24 @@ void Engine::updateCompletedRepeats() {
   }
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.release")
 void Engine::releaseAllBlocks() {
   for (BlockRecord &record : blocks_) {
     record = {};
   }
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.latch_fault")
 void Engine::latchFault(protocol_v2::OutputError error,
-                        std::size_t active_states_emitted) {
+                        std::size_t active_states_emitted,
+                        std::uint32_t observed_logical_state) {
   const std::uint8_t reading = readingBlock();
   if (reading != kInvalidBlockIndex &&
       active_states_emitted <= blocks_[reading].valid_states) {
     applyEmittedPrefix(reading, active_states_emitted);
+  }
+  if (observed_logical_state != kUnknownLogicalState) {
+    last_emitted_state_ = observed_logical_state & kLegalStateMask;
   }
   if (error == protocol_v2::OutputError::kUnderrun) {
     saturatingIncrement(telemetry_.underruns);
@@ -516,6 +593,7 @@ void Engine::latchFault(protocol_v2::OutputError error,
   hold_tick_ = tickAfterStates(start_tick_, telemetry_.dma_states_emitted);
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.reset")
 void Engine::resetPlayback() {
   releaseAllBlocks();
   telemetry_ = {};
@@ -534,6 +612,7 @@ void Engine::resetPlayback() {
   expansion_finished_ = false;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.depth")
 void Engine::refreshDepthHighWater() {
   const std::uint32_t token = critical_.enter();
   const std::size_t ready = readyDepth();
@@ -547,6 +626,7 @@ void Engine::refreshDepthHighWater() {
   critical_.exit(token);
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.ready_depth")
 std::size_t Engine::readyDepth() const {
   std::size_t depth = 0U;
   for (const BlockRecord &record : blocks_) {
@@ -557,6 +637,7 @@ std::size_t Engine::readyDepth() const {
   return depth;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.refill_lead")
 std::size_t Engine::refillLead() const {
   std::size_t states = 0U;
   for (const BlockRecord &record : blocks_) {
@@ -568,6 +649,7 @@ std::size_t Engine::refillLead() const {
   return states;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.find_ready")
 std::uint8_t Engine::findReadyBlock() const {
   std::uint8_t selected = kInvalidBlockIndex;
   std::uint64_t sequence = std::numeric_limits<std::uint64_t>::max();
@@ -581,6 +663,7 @@ std::uint8_t Engine::findReadyBlock() const {
   return selected;
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.reading")
 std::uint8_t Engine::readingBlock() const {
   for (std::size_t index = 0U; index < blocks_.size(); ++index) {
     if (blocks_[index].state == BlockState::kDmaReading) {
@@ -590,29 +673,6 @@ std::uint8_t Engine::readingBlock() const {
   return kInvalidBlockIndex;
 }
 
-std::uint32_t Engine::physicalToggleMask(std::uint32_t logical_delta) {
-  std::uint32_t physical = 0U;
-  for (std::size_t bit = 0U;
-       bit < sizeof(protocol_v2::kOutputGpioBitsByLogicalBit); ++bit) {
-    if ((logical_delta & (std::uint32_t{1U} << bit)) != 0U) {
-      physical |= std::uint32_t{1U}
-                  << protocol_v2::kOutputGpioBitsByLogicalBit[bit];
-    }
-  }
-  return physical;
-}
-
-std::uint32_t Engine::logicalDeltaMask(std::uint32_t physical_toggle) {
-  std::uint32_t logical = 0U;
-  for (std::size_t bit = 0U;
-       bit < sizeof(protocol_v2::kOutputGpioBitsByLogicalBit); ++bit) {
-    if ((physical_toggle &
-         (std::uint32_t{1U}
-          << protocol_v2::kOutputGpioBitsByLogicalBit[bit])) != 0U) {
-      logical |= std::uint32_t{1U} << bit;
-    }
-  }
-  return logical;
-}
-
 }  // namespace thingdaq::digital_output
+
+#undef THINGDAQ_OUTPUT_ENGINE_COLD_CODE

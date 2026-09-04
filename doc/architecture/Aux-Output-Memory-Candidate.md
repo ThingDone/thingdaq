@@ -2,6 +2,7 @@
 type: analysis
 title: Auxiliary Output Memory Repartition
 created: 2026-09-04
+updated: 2026-09-04
 tags:
   - thingdaq
   - digital-output
@@ -19,8 +20,9 @@ related:
 
 This note records the active linker-accounted allocation for the output path
 described by [[ADR-008-Experimental-Aux-Output-Bank]]. The Teensy image now
-reserves the program store, DMA state blocks, and descriptors; the register
-adapter is still absent, so D16-D23 remain inputs and cannot be energized.
+reserves the program store, DMA state blocks, and descriptors and binds them
+to the ARM-only GPIO1/eDMA adapter. Constructing the facade or uploading and
+committing a program remains register-free; D16-D23 stay inputs until ARM.
 
 ## Accepted pre-repartition map evidence
 
@@ -75,17 +77,22 @@ measured margin.
 
 ## Build bounds and remaining work
 
-The pinned 600 MHz build reports 456,832 RAM1 variable bytes and 34,688 bytes
-for locals/stack, plus 520,192 RAM2 variable bytes and the required 4,096-byte
+The pinned 600 MHz adapter build reports 457,632 RAM1 variable bytes and 33,888
+bytes for locals/stack, plus 520,192 RAM2 variable bytes and the required 4,096-byte
 heap floor. Manifest schema 11 records every address, size, alignment, region,
 packet count, retention interval, IRQ identity, arbitration priority, and the
 successful all-allocation non-overlap check. The 194 packets retain 98.164 ms;
 the core TX ring raises that to 99.176 ms, leaving respective 37.449 ms and
 38.461 ms margins over the historical 60.715 ms service gap.
 
-The target adapter, cache flush implementation, and runtime lifecycle wiring
-remain later work. This allocation alone makes no timing or physical-output
-claim.
+The target now flushes complete source blocks and their 32-byte TCDs before
+publishing DMA ownership, services at most one refill block per visit, and
+joins the existing ADC/GPIO controller before its final common PIT arm. STOP
+and target faults stop the common trigger before channel 3, observe the live
+TCD and GPIO1 latch, and retain the physical hold; CLEAR alone returns the bank
+to GPIO6 inputs. Protocol telemetry, fixture interlocks, loopback grading, and
+physical timing remain later work, so this build makes no pad-timing or
+signal-integrity claim.
 
 See [[Firmware-Resource-Map]] for current owners and
 [[Acquisition-Pipeline]] for the existing trigger-first STOP boundary.

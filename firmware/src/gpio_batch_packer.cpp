@@ -478,6 +478,7 @@ void GpioBatchPacker::invalidateCurrentFrame() {
   }
 }
 
+THINGDAQ_GPIO_PACKER_COLD_CODE(".flashmem.gpio_packer.invalid_frame")
 void GpioBatchPacker::finishInvalidFrame(ServiceReport &report) {
   saturatingIncrement(progress_.frames_produced);
   saturatingIncrement(prepacket_frames_dropped_);

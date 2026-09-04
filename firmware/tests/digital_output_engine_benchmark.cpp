@@ -17,6 +17,11 @@ class BenchmarkCache final : public output::CacheMaintenance {
     __asm__ volatile("" : : "g"(address), "g"(bytes) : "memory");
     ++calls;
   }
+  bool prepareBeforeDmaRead(std::uint8_t, const void *address,
+                            std::size_t bytes, std::size_t) override {
+    flushBeforeDmaRead(address, bytes);
+    return true;
+  }
 
   std::uint64_t calls = 0U;
 };

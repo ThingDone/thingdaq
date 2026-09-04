@@ -12,6 +12,34 @@ namespace thingdaq::digital_output {
 
 inline constexpr std::uint8_t kInvalidBlockIndex = 0xFFU;
 inline constexpr std::size_t kBlocksPerServiceVisit = 1U;
+inline constexpr std::uint32_t kUnknownLogicalState = 0xFFFFFFFFU;
+
+constexpr std::uint32_t physicalMaskForLogicalState(
+    std::uint32_t logical_state) {
+  std::uint32_t physical = 0U;
+  for (std::size_t bit = 0U;
+       bit < sizeof(protocol_v2::kOutputGpioBitsByLogicalBit); ++bit) {
+    if ((logical_state & (std::uint32_t{1U} << bit)) != 0U) {
+      physical |= std::uint32_t{1U}
+                  << protocol_v2::kOutputGpioBitsByLogicalBit[bit];
+    }
+  }
+  return physical;
+}
+
+constexpr std::uint32_t logicalStateFromPhysicalMask(
+    std::uint32_t physical_state) {
+  std::uint32_t logical = 0U;
+  for (std::size_t bit = 0U;
+       bit < sizeof(protocol_v2::kOutputGpioBitsByLogicalBit); ++bit) {
+    if ((physical_state &
+         (std::uint32_t{1U}
+          << protocol_v2::kOutputGpioBitsByLogicalBit[bit])) != 0U) {
+      logical |= std::uint32_t{1U} << bit;
+    }
+  }
+  return logical;
+}
 
 enum class BlockState : std::uint8_t {
   kFree = 0U,
@@ -126,17 +154,22 @@ struct StopReport {
 // Teensy header or touches a register.
 class CacheMaintenance {
  public:
-  virtual ~CacheMaintenance() = default;
+  virtual ~CacheMaintenance();
   virtual void flushBeforeDmaRead(const void *address,
                                   std::size_t bytes) = 0;
+  // A target with a separately cached descriptor bank overrides this hook so
+  // the TCD and source words are complete before the engine publishes the
+  // block as DMA_READY. Portable implementations need only flush the source.
+  virtual bool prepareBeforeDmaRead(std::uint8_t block_index,
+                                    const void *address,
+                                    std::size_t bytes,
+                                    std::size_t state_count) = 0;
 };
 
 using CriticalSection = dma::CriticalSection;
 
-// Optional participant boundary used by the existing common acquisition
-// controller. A target adapter may implement the same boundary later; this
-// phase wires only the portable implementation and does not instantiate it in
-// the Teensy sketch.
+// Participant boundary used by the common acquisition controller. The target
+// facade implements it while delegating program/ring state to Engine.
 class Participant {
  public:
   virtual ~Participant() = default;
@@ -146,9 +179,9 @@ class Participant {
                                    std::uint64_t epoch_ticks) = 0;
   virtual void commitCommonStart() = 0;
   virtual void rollbackPreparedStart() = 0;
-  // Called only after the common trigger is disabled. A future target adapter
-  // reads its own stopped transfer count; the portable engine has no implicit
-  // in-flight states and exposes an explicit-progress helper for tests.
+  // Called only after the common trigger is disabled. The target adapter reads
+  // its stopped transfer count; the portable engine exposes the explicit-
+  // progress helper used by that adapter and host tests.
   virtual StopReport stopAfterTriggers() = 0;
   virtual ServiceReport service(std::size_t block_limit) = 0;
   virtual Snapshot snapshot() const = 0;
@@ -166,6 +199,7 @@ class Engine final : public Participant {
 
   Engine(const Engine &) = delete;
   Engine &operator=(const Engine &) = delete;
+  ~Engine() override;
 
   ProgramStatus begin(std::uint32_t generation, std::uint32_t repeat_count,
                       std::uint32_t idle_state_mask);
@@ -174,6 +208,7 @@ class Engine final : public Participant {
                        std::size_t expected_segment_count,
                        std::uint32_t expected_checksum);
   OperationStatus arm(std::uint32_t generation);
+  void rollbackArm();
   OperationStatus clear(bool release_succeeded = true);
 
   bool participatesInNextStart() const override;
@@ -184,7 +219,8 @@ class Engine final : public Participant {
   void rollbackPreparedStart() override;
   StopReport stopAfterTriggers() override;
   StopReport stopAfterTriggersAtProgress(
-      std::size_t active_states_emitted);
+      std::size_t active_states_emitted,
+      std::uint32_t observed_logical_state = kUnknownLogicalState);
   ServiceReport service(std::size_t block_limit) override;
   Snapshot snapshot() const override;
   bool faulted() const override;
@@ -192,7 +228,9 @@ class Engine final : public Participant {
   OperationStatus onDmaBlockComplete(std::uint8_t block_index,
                                      std::uint32_t upload_generation,
                                      std::uint32_t lease);
-  OperationStatus recordDmaFault(std::size_t active_states_emitted);
+  OperationStatus recordDmaFault(
+      std::size_t active_states_emitted,
+      std::uint32_t observed_logical_state = kUnknownLogicalState);
 
   constexpr const std::uint32_t *blockWords(std::size_t index) const {
     return storage_.blocks[index].data();
@@ -210,15 +248,15 @@ class Engine final : public Participant {
   void updateCompletedRepeats();
   void releaseAllBlocks();
   void latchFault(protocol_v2::OutputError error,
-                  std::size_t active_states_emitted);
+                  std::size_t active_states_emitted,
+                  std::uint32_t observed_logical_state =
+                      kUnknownLogicalState);
   void resetPlayback();
   void refreshDepthHighWater();
   std::size_t readyDepth() const;
   std::size_t refillLead() const;
   std::uint8_t findReadyBlock() const;
   std::uint8_t readingBlock() const;
-  static std::uint32_t physicalToggleMask(std::uint32_t logical_delta);
-  static std::uint32_t logicalDeltaMask(std::uint32_t physical_toggle);
 
   ProgramStore &program_;
   DmaBlockStorage &storage_;

@@ -77,8 +77,11 @@ GPIO2/GPR27 mask `0x00030C0F`. Arduino target builds fail closed unless they
 identify a Teensy 4.0 with an i.MX RT1062.
 
 The output mapping is independently checked in logical-bit order and combines
-to the exact GPIO1/GPR26 mask `0x0FC30000`. Reservation does not change pad
-direction: without the later ARM adapter all eight pads remain inputs.
+to the exact GPIO1/GPR26 mask `0x0FC30000`. Construction, upload, validation,
+and commit do not change pad direction. Explicit ARM alone writes the masked
+idle latch, selectively remaps those eight bits to GPIO1, and changes the
+whole bank to output in one direction-register update; CLEAR restores both
+GPIO aliases to input and selects GPIO6 again.
 
 Both NXP ADC modules can see A0 and A1, so pin validity cannot select a
 converter. The compile-time `AdcConverterConfiguration` table additionally
@@ -163,6 +166,15 @@ ADC0-to-ADC1 order. Runtime updates touch only descriptors at least two
 generations ahead, never the active hardware TCD link. ADC0's NVIC line remains
 reserved but masked.
 
+The auxiliary output adapter builds one 32-bit GPIO1 `DR_TOGGLE` transfer per
+PIT1 event on fixed channel 3. Each cache-flushed source block has a separately
+flushed 32-byte TCD before it becomes `DMA_READY`. The ISR acknowledges first,
+publishes only completed ownership, links the next immutable ready block, and
+handles the bounded short-final-block race without reusing DMA-visible memory.
+Finite completion disables only output requests and holds the last latch while
+ADC/GPIO acquisition can continue. Common STOP and output faults stop PIT0,
+chained PIT1, and ADC_ETC before quiescing channel 3 and observing GPIO1.
+
 ## Queue and per-loop bounds
 
 | Bound | Value | Owner |
@@ -181,6 +193,9 @@ reserved but masked.
 | Packed GPIO ring | 4 buffers | GPIO packer |
 | Raw batches consumed per loop | 2 buffers | GPIO packer |
 | Packed frames finalized per loop | 2 frames | GPIO packer / packetizer |
+| Output source ring | 4 × 1,016 toggle words | Auxiliary output |
+| Output TCD bank | 4 × 32-byte descriptors | Auxiliary output |
+| Output refills per service visit | 1 complete block | Auxiliary output |
 | Aligned complete-frame packet pool | 103 DTCM + 91 OCRAM = 194 × 4,096-byte buffers | Packetizer |
 | Per-source ready queues | 194 ADC + 194 GPIO one-byte indexes (388 bytes); shared pool limits actual ownership to 194 | Packetizer |
 | Complete-frame transmit queue | 194 one-byte indexes (194 bytes) | Packetizer / USB transport |

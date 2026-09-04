@@ -2,6 +2,13 @@
 
 #include "checksum.h"
 
+#if defined(__IMXRT1062__)
+#define THINGDAQ_OUTPUT_PROGRAM_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define THINGDAQ_OUTPUT_PROGRAM_COLD_CODE(section_name)
+#endif
+
 namespace thingdaq::digital_output {
 namespace {
 
@@ -27,6 +34,7 @@ void updateAdlerU32(std::uint32_t value, std::uint32_t &first,
 
 }  // namespace
 
+THINGDAQ_OUTPUT_PROGRAM_COLD_CODE(".flashmem.output.program.begin")
 ProgramStatus ProgramStore::begin(std::uint32_t generation,
                                   std::uint32_t repeat_count,
                                   std::uint32_t idle_state_mask) {
@@ -52,6 +60,7 @@ ProgramStatus ProgramStore::begin(std::uint32_t generation,
   return ProgramStatus::kOk;
 }
 
+THINGDAQ_OUTPUT_PROGRAM_COLD_CODE(".flashmem.output.program.append")
 ProgramStatus ProgramStore::append(std::uint32_t generation,
                                    const Segment &segment_value) {
   if (generation == 0U || generation != generation_) {
@@ -76,6 +85,7 @@ ProgramStatus ProgramStore::append(std::uint32_t generation,
   return ProgramStatus::kOk;
 }
 
+THINGDAQ_OUTPUT_PROGRAM_COLD_CODE(".flashmem.output.program.commit")
 ProgramStatus ProgramStore::commit(std::uint32_t generation,
                                    std::size_t expected_segment_count,
                                    std::uint32_t expected_checksum) {
@@ -97,6 +107,7 @@ ProgramStatus ProgramStore::commit(std::uint32_t generation,
   return ProgramStatus::kOk;
 }
 
+THINGDAQ_OUTPUT_PROGRAM_COLD_CODE(".flashmem.output.program.clear")
 void ProgramStore::clear() {
   for (Segment &segment_value : storage_.segments) {
     segment_value = {};
@@ -110,6 +121,7 @@ void ProgramStore::clear() {
   segment_count_ = 0U;
 }
 
+THINGDAQ_OUTPUT_PROGRAM_COLD_CODE(".flashmem.output.program.checksum")
 std::uint32_t ProgramStore::canonicalChecksum() const {
   std::uint32_t first = checksum::kAdler32Initial;
   std::uint32_t second = 0U;
@@ -121,3 +133,5 @@ std::uint32_t ProgramStore::canonicalChecksum() const {
 }
 
 }  // namespace thingdaq::digital_output
+
+#undef THINGDAQ_OUTPUT_PROGRAM_COLD_CODE

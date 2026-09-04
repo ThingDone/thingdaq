@@ -309,8 +309,18 @@ bool Controller::start(const protocol::Configuration &configuration,
     }
   }
 
+  // Publish every prepared DMA owner before the sole common-clock owner can
+  // enable PIT0. Output rollback accepts this committed-without-clock state,
+  // so a final scheduler readback failure still returns the first block to
+  // DMA_READY without consuming a word.
+  if (report.output_prepared) {
+    output_->commitCommonStart();
+    report.output_started = true;
+  }
+
   // The ADC scheduler is the sole common-clock owner in combined mode. GPIO
-  // DMA is already request-enabled, but PIT0 remains stopped until arm().
+  // and output DMA requests are already enabled, but PIT0/PIT1 remain stopped
+  // until this final arm().
   if (includesAdc(profile)) {
     report.adc_trigger_armed = adc_trigger_scheduler_->arm();
     if (!report.adc_trigger_armed) {
@@ -321,11 +331,6 @@ bool Controller::start(const protocol::Configuration &configuration,
     if (profile == Profile::kCombined) {
       report.gpio_capture_started = true;
     }
-  }
-
-  if (report.output_prepared) {
-    output_->commitCommonStart();
-    report.output_started = true;
   }
 
   physical_start_pending_ = false;
@@ -341,7 +346,7 @@ void Controller::rollbackStart(Profile profile, Report &report) {
   if (includesAdc(profile) && adc_trigger_scheduler_->running()) {
     report.adc_trigger_stopped = adc_trigger_scheduler_->stop();
   }
-  if (report.output_prepared) {
+  if (report.output_prepared || report.output_started) {
     output_->rollbackPreparedStart();
   }
   if (includesGpio(profile) && report.gpio_capture_prepared) {
