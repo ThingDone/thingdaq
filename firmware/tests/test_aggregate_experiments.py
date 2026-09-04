@@ -475,6 +475,79 @@ class AggregateExactCrossAnalysisTests(unittest.TestCase):
         )
         self.assertFalse(interactions["combined_binary_not_tested"]["verified"])
 
+        policy = rendered["recommendation_policy"]
+        recommendations = {
+            item["experiment_id"]: item for item in policy["experiment_recommendations"]
+        }
+        self.assertEqual(
+            {
+                "clock-450mhz": "CONTINUE",
+                "rle-streaming": "CONTINUE",
+                "aux-input-bank": "REJECT",
+                "aux-output-bank": "CONTINUE",
+            },
+            {
+                experiment_id: item["decision"]
+                for experiment_id, item in recommendations.items()
+            },
+        )
+        for experiment_id, item in recommendations.items():
+            source = next(
+                candidate
+                for candidate in rendered["experiments"]
+                if candidate["experiment_id"] == experiment_id
+            )
+            self.assertEqual(source["revision_commit"], item["branch_commit"])
+            self.assertTrue(item["acceptance_outcomes"])
+        self.assertEqual(
+            {
+                "cpu_hz": 600_000_000,
+                "protocol_version": 1,
+                "stream_encoding": "RAW",
+                "gpio_width_bits": 8,
+                "auxiliary_bank_mode": "DISABLED",
+            },
+            {
+                key: policy["production_defaults"][key]
+                for key in (
+                    "cpu_hz",
+                    "protocol_version",
+                    "stream_encoding",
+                    "gpio_width_bits",
+                    "auxiliary_bank_mode",
+                )
+            },
+        )
+        self.assertIn(
+            "Python-only prototype", policy["python_client_migration"]["scope"]
+        )
+        self.assertEqual(5, len(policy["staged_integration"]))
+
+        matrix = policy["compound_test_matrix"]
+        self.assertEqual(1, matrix["immutable_artifact_count"])
+        self.assertEqual(24, matrix["configuration_count"])
+        self.assertEqual(24, len(matrix["configurations"]))
+        self.assertEqual(24, len({item["id"] for item in matrix["configurations"]}))
+        for configuration in matrix["configurations"]:
+            self.assertIn(configuration["bank_mode"], {"DISABLED", "INPUT", "OUTPUT"})
+            self.assertEqual(
+                configuration["bank_mode"] == "INPUT",
+                configuration["gpio_width_bits"] == 16,
+            )
+            self.assertEqual(
+                configuration["bank_mode"] == "OUTPUT",
+                configuration["output_rate_hz"] == 1_000_000,
+            )
+        self.assertEqual(
+            {
+                "protocol-v1 RAW",
+                "eight-input frames with D16-D23 disabled",
+                "600 MHz production build profile",
+            },
+            {item["path"] for item in policy["rollback_paths"]},
+        )
+        self.assertIn("human measurements", policy["follow_up"]["classification"])
+
         markdown = aggregate.render_markdown(rendered)
         headings = (
             "## Cross-experiment analysis",
@@ -483,9 +556,24 @@ class AggregateExactCrossAnalysisTests(unittest.TestCase):
             "### Eight-input versus 16-input acquisition",
             "### Auxiliary output",
             "### Shared conflicts and synergies",
+            "### Production defaults and optional capabilities",
+            "### Python client compatibility and migration cost",
+            "## Staged integration and rollback plan",
+            "## Minimum compound test matrix",
+            "## Human follow-up",
         )
         for heading in headings:
             self.assertEqual(1, markdown.splitlines().count(heading))
+
+        tampered = copy.deepcopy(rendered["experiments"])
+        output = next(
+            item for item in tampered if item["experiment_id"] == "aux-output-bank"
+        )
+        output["report"]["result"] = "PASS"
+        with self.assertRaisesRegex(
+            aggregate.AggregationError, "recommendation_result"
+        ):
+            aggregate.build_recommendation_policy(tampered, analysis)
 
     def test_protocol_extension_hash_mismatch_fails_closed(self) -> None:
         payload = b'{"extension":"rle-streaming","protocol_version":2}\n'

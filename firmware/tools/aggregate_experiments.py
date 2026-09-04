@@ -2012,6 +2012,389 @@ def build_cross_experiment_analysis(
     }
 
 
+def _require_acceptance_states(
+    report: Mapping[str, Any],
+    experiment_id: str,
+    expected: Mapping[str, str],
+) -> None:
+    """Pin a synthesized decision to the exact acceptance states it cites."""
+
+    for acceptance_id, state in expected.items():
+        observed = _acceptance_state(report, experiment_id, acceptance_id)["state"]
+        _require_equal(
+            observed,
+            state,
+            f"{experiment_id}.recommendation_gate.{acceptance_id}",
+        )
+
+
+def build_recommendation_policy(
+    experiments: Sequence[Mapping[str, Any]],
+    cross_analysis: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Derive dispositions, integration order, and qualification from evidence."""
+
+    clock = _experiment_by_id(experiments, "clock-450mhz")
+    rle = _experiment_by_id(experiments, "rle-streaming")
+    aux_input = _experiment_by_id(experiments, "aux-input-bank")
+    aux_output = _experiment_by_id(experiments, "aux-output-bank")
+    clock_report = _report_for(clock)
+    rle_report = _report_for(rle)
+    input_report = _report_for(aux_input)
+    output_report = _report_for(aux_output)
+
+    for report, experiment_id, expected_result in (
+        (clock_report, "clock-450mhz", "PASS"),
+        (rle_report, "rle-streaming", "INCONCLUSIVE"),
+        (input_report, "aux-input-bank", "FAIL"),
+        (output_report, "aux-output-bank", "INCONCLUSIVE"),
+    ):
+        _require_equal(
+            report.get("result"),
+            expected_result,
+            f"{experiment_id}.recommendation_result",
+        )
+
+    _require_acceptance_states(
+        clock_report,
+        "clock-450mhz",
+        {
+            "physical_functional_smoke": "PASS",
+            "same_board_ab_performance": "NOT_RUN",
+            "endurance": "NOT_RUN",
+            "analog_accuracy_aperture": "NOT_RUN",
+            "power": "NOT_RUN",
+            "comparative_thermal_benefit": "NOT_RUN",
+            "reliability_lifetime": "NOT_RUN",
+        },
+    )
+    _require_acceptance_states(
+        rle_report,
+        "rle-streaming",
+        {
+            "lifecycle_complete": "INCONCLUSIVE",
+            "stream_health": "INCONCLUSIVE",
+            "counter_conservation": "INCONCLUSIVE",
+            "queue_bounds": "PASS",
+            "final_idle_cleanup": "PASS",
+        },
+    )
+    _require_acceptance_states(
+        input_report,
+        "aux-input-bank",
+        {
+            "lifecycle_complete": "FAIL",
+            "synthetic_formulas_exact": "NOT_RUN",
+            "stream_health": "FAIL",
+            "counter_conservation": "FAIL",
+            "queue_bounds": "NOT_RUN",
+            "final_idle_cleanup": "PASS",
+        },
+    )
+    _require_acceptance_states(
+        output_report,
+        "aux-output-bank",
+        {
+            "lifecycle_complete": "NOT_RUN",
+            "stream_health": "PASS",
+            "counter_conservation": "PASS",
+            "queue_bounds": "PASS",
+            "final_idle_cleanup": "PASS",
+        },
+    )
+
+    authored_recommendations = [
+        {
+            "experiment_id": "clock-450mhz",
+            "decision": "CONTINUE",
+            "branch_commit": clock["revision_commit"],
+            "acceptance_ids": [
+                "physical_functional_smoke",
+                "same_board_ab_performance",
+                "endurance",
+                "analog_accuracy_aperture",
+                "power",
+                "comparative_thermal_benefit",
+                "reliability_lifetime",
+            ],
+            "evidence_levels": ["rig"],
+            "scope": "experimental",
+            "rationale": "The ten-second 12-bit physical functional smoke passed, but same-board A/B performance, endurance, externally stimulated analog accuracy/aperture, power, comparative thermal benefit, reliability, and lifetime were not run.",
+        },
+        {
+            "experiment_id": "rle-streaming",
+            "decision": "CONTINUE",
+            "branch_commit": rle["revision_commit"],
+            "acceptance_ids": [
+                "lifecycle_complete",
+                "stream_health",
+                "counter_conservation",
+                "queue_bounds",
+                "final_idle_cleanup",
+            ],
+            "evidence_levels": ["host", "rig", "simulated"],
+            "scope": "optional_capability",
+            "rationale": "Logical conservation, bounded queues, cleanup, compatibility, and useful GPIO wire reduction passed in short runs, but the 600-second physical endurance gate remained inconclusive after upstream serial byte loss and combined-workload value did not pass.",
+        },
+        {
+            "experiment_id": "aux-input-bank",
+            "decision": "REJECT",
+            "branch_commit": aux_input["revision_commit"],
+            "acceptance_ids": [
+                "lifecycle_complete",
+                "synthetic_formulas_exact",
+                "stream_health",
+                "counter_conservation",
+                "queue_bounds",
+                "final_idle_cleanup",
+            ],
+            "evidence_levels": ["analytic", "host", "rig"],
+            "scope": "experimental",
+            "rationale": "Reject this branch artifact, not the feature concept: both physical attempts failed before START with incomplete DMA buffers and DMA errors, so no 16-input rate, queue, conservation, processing-load, or electrical-transition claim was established.",
+        },
+        {
+            "experiment_id": "aux-output-bank",
+            "decision": "CONTINUE",
+            "branch_commit": aux_output["revision_commit"],
+            "acceptance_ids": [
+                "lifecycle_complete",
+                "stream_health",
+                "counter_conservation",
+                "queue_bounds",
+                "final_idle_cleanup",
+            ],
+            "evidence_levels": ["analytic", "host", "rig"],
+            "scope": "optional_capability",
+            "rationale": "Host lifecycle semantics and output-disabled physical acquisition passed, but the protected-loopback lifecycle, physical output correctness, lag/stability, and independent signal-integrity gates were not run because no authorized fixture declaration was available.",
+        },
+    ]
+    recommendations = validate_recommendations(authored_recommendations, experiments)
+
+    aux_input_analysis = _nested_mapping(
+        cross_analysis, "cross_experiment_analysis", "aux_input_bank"
+    )
+    profiles = _nested_list(
+        aux_input_analysis, "cross_experiment_analysis.aux_input_bank", "rate_profiles"
+    )
+    rate_profiles: list[dict[str, int | str]] = []
+    for index, item in enumerate(profiles):
+        if not isinstance(item, Mapping):
+            _fail(f"recommendation rate_profiles[{index}]: must be an object")
+        profile_id = item.get("profile")
+        adc_rate = item.get("adc_pair_rate_hz")
+        gpio_rate = item.get("gpio_sample_rate_hz")
+        if (
+            not isinstance(profile_id, str)
+            or not profile_id
+            or not isinstance(adc_rate, int)
+            or isinstance(adc_rate, bool)
+            or adc_rate <= 0
+            or not isinstance(gpio_rate, int)
+            or isinstance(gpio_rate, bool)
+            or gpio_rate <= 0
+        ):
+            _fail(f"recommendation rate_profiles[{index}]: invalid exact profile")
+        rate_profiles.append(
+            {
+                "id": profile_id,
+                "adc_pair_rate_hz": adc_rate,
+                "gpio_sample_rate_hz": gpio_rate,
+            }
+        )
+    if len(rate_profiles) != 4:
+        _fail("recommendation policy requires all four exact rate profiles")
+
+    configurations = [
+        {
+            "id": f"450-{encoding.lower()}-{mode.lower()}-{str(profile['id']).lower()}",
+            "cpu_hz": 450_000_000,
+            "encoding": encoding,
+            "bank_mode": mode,
+            "gpio_width_bits": 16 if mode == "INPUT" else 8,
+            "rate_profile": profile["id"],
+            "adc_pair_rate_hz": profile["adc_pair_rate_hz"],
+            "gpio_sample_rate_hz": profile["gpio_sample_rate_hz"],
+            "output_rate_hz": 1_000_000 if mode == "OUTPUT" else None,
+        }
+        for mode in ("DISABLED", "INPUT", "OUTPUT")
+        for encoding in ("RAW", "RLE_AUTO")
+        for profile in rate_profiles
+    ]
+
+    return {
+        "experiment_recommendations": recommendations,
+        "production_defaults": {
+            "decision": "RETAIN",
+            "cpu_hz": 600_000_000,
+            "protocol_version": 1,
+            "stream_encoding": "RAW",
+            "gpio_width_bits": 8,
+            "auxiliary_bank_mode": "DISABLED",
+            "reason": "No experimental branch has complete evidence for production-default promotion; the frozen baseline remains the rollback and compatibility boundary.",
+        },
+        "optional_capabilities": [
+            {
+                "capability": "450 MHz clock profile",
+                "default": "600 MHz",
+                "recommendation": "CONTINUE",
+                "availability": "experimental build profile only",
+            },
+            {
+                "capability": "RLE_AUTO stream encoding",
+                "default": "RAW",
+                "recommendation": "CONTINUE",
+                "availability": "explicitly negotiated optional capability",
+            },
+            {
+                "capability": "D16-D23 auxiliary input",
+                "default": "DISABLED with eight-input frames",
+                "recommendation": "REJECT",
+                "availability": "exclude the current failed artifact; require a replacement candidate",
+            },
+            {
+                "capability": "D16-D23 preloaded auxiliary output",
+                "default": "DISABLED with high-impedance pins",
+                "recommendation": "CONTINUE",
+                "availability": "explicitly negotiated only after protected physical qualification",
+            },
+        ],
+        "python_client_migration": {
+            "scope": "Python-only prototype; no production client migration is authorized",
+            "unchanged_path": "Protocol-v1 RAW, eight-input parsing, 600 MHz identity, and output-disabled behavior remain byte-compatible defaults.",
+            "costs": [
+                {
+                    "area": "capability and configuration negotiation",
+                    "cost": "HIGH",
+                    "work": "Replace three independent experimental-v2 capability documents with one versioned capability/rate/bank-mode contract and reject unsupported combinations atomically.",
+                },
+                {
+                    "area": "RLE_AUTO decoding",
+                    "cost": "MEDIUM",
+                    "work": "Dispatch each frame by negotiated encoding, validate checksum before decode, enforce canonical frame-local runs, and accept RAW fallback inside RLE_AUTO.",
+                },
+                {
+                    "area": "rate-dependent acquisition layouts",
+                    "cost": "HIGH",
+                    "work": "Select ADC/GPIO item widths, counts, frame lengths, timestamps, and NumPy dtypes from negotiated mode and exact rate-profile readback.",
+                },
+                {
+                    "area": "auxiliary output lifecycle",
+                    "cost": "HIGH",
+                    "work": "Add generation-aware upload, commit, arm, status, held/faulted state, STOP semantics, and explicit CLEAR without treating output program runs as stream RLE records.",
+                },
+            ],
+        },
+        "staged_integration": [
+            {
+                "stage": 1,
+                "name": "unified protocol-v2 contract",
+                "action": "Define one additive capability negotiation and one exact rate/layout/bank-mode readback contract; INPUT and OUTPUT are mutually exclusive whole-bank values.",
+                "source_policy": "Reconcile the three candidate contracts; do not merge a candidate branch wholesale.",
+                "exit_gate": "Generated protocol bytes, Python parser behavior, unknown-capability rejection, v1 fallback, and all legal/illegal combinations pass locally.",
+            },
+            {
+                "stage": 2,
+                "name": "non-default clock profile",
+                "action": "Port only the reviewed 450 MHz clock profile behind the retained 600 MHz production build default.",
+                "source_policy": "Use the 450 MHz branch as evidence and reviewed source material, not as an already qualified combined implementation.",
+                "exit_gate": "Repeat exact clock/readback, phase, error, STOP/IDLE, same-board A/B, and endurance gates before promotion.",
+            },
+            {
+                "stage": 3,
+                "name": "optional RLE_AUTO",
+                "action": "Integrate adaptive stream compression behind RAW default and explicit capability negotiation.",
+                "source_policy": "Preserve per-frame RAW fallback and keep stream compression distinct from output-program run records.",
+                "exit_gate": "Logical equality, checksum/decode ordering, fallback, load, queue, compatibility, and uninterrupted endurance pass on the integration artifact.",
+            },
+            {
+                "stage": 4,
+                "name": "exclusive auxiliary bank modes",
+                "action": "Integrate output only after protected-loopback evidence passes; do not import the rejected input implementation, and admit a replacement INPUT implementation only after its pre-START DMA defect is resolved.",
+                "source_policy": "Allocate eDMA channel 3, DMAMUX source 31, XBAR output 1, pins, packet memory, and priorities once in the integrated resource map.",
+                "exit_gate": "Each selected mode passes its independent electrical, lifecycle, conservation, load, queue, and rollback gates while the other direction remains unavailable.",
+            },
+            {
+                "stage": 5,
+                "name": "one-artifact compound qualification",
+                "action": "Freeze one new 450 MHz integration source/build/HEX identity and run the complete local, rig, and endurance matrix without changing it between configurations.",
+                "source_policy": "No result from a candidate artifact may fill a missing cell for the new artifact.",
+                "exit_gate": "All 24 negotiated configurations and their common/mode-specific gates pass before any combined claim.",
+            },
+        ],
+        "compound_test_matrix": {
+            "claim": "450 MHz plus RLE plus auxiliary input/output",
+            "claim_interpretation": "INPUT and OUTPUT must each work with 450 MHz and RLE_AUTO on the same immutable build; they are mutually exclusive runtime modes and are never enabled simultaneously.",
+            "immutable_artifact_count": 1,
+            "axes": {
+                "cpu_hz": [450_000_000],
+                "stream_encoding": ["RAW", "RLE_AUTO"],
+                "auxiliary_bank_mode": ["DISABLED", "INPUT", "OUTPUT"],
+                "rate_profiles": rate_profiles,
+            },
+            "configuration_count": len(configurations),
+            "configurations": configurations,
+            "qualification_tiers": ["local", "rig_short", "rig_endurance"],
+            "common_gates": [
+                "one exact source/build/HEX identity across every cell",
+                "unified protocol bytes and Python negotiation/parser round trip",
+                "exact configured clock, rate, mode, layout, and resource readback",
+                "START/STATUS/STOP/final-IDLE lifecycle",
+                "zero unexplained ADC, GPIO, DMA, parser, transport, and USB loss/error counters",
+                "exact frame, payload, sequence, and STOP-tail conservation",
+                "bounded processing utilization, memory retention, queues, latency, and temperature",
+                "600 MHz, protocol-v1, RAW, eight-input, output-disabled rollback remains independently usable",
+            ],
+            "mode_specific_gates": {
+                "RLE_AUTO": [
+                    "RAW/RLE logical equality for ADC, GPIO, and combined streams",
+                    "wire savings and fallback frequency by workload",
+                    "encode/decode cost and v1 compatibility",
+                ],
+                "INPUT": [
+                    "externally stimulated D16-D23 bit mapping and transition fidelity",
+                    "16-input sustained rates, framed bandwidth, processing load, retention, and queue bounds",
+                    "clean whole-bank direction rollback after STOP and every injected failure",
+                ],
+                "OUTPUT": [
+                    "authorized protected fixture and independent timing/signal-integrity capture",
+                    "pattern correctness, loopback lag/stability, refill margin, and common-epoch alignment",
+                    "finite completion, STOP/hold, CLEAR/high-impedance release, and injected fault behavior",
+                ],
+            },
+        },
+        "rollback_paths": [
+            {
+                "path": "protocol-v1 RAW",
+                "preserve_until": "every unified protocol-v2 compatibility and compound-matrix gate passes",
+            },
+            {
+                "path": "eight-input frames with D16-D23 disabled",
+                "preserve_until": "INPUT and OUTPUT independently pass every rate and lifecycle cell",
+            },
+            {
+                "path": "600 MHz production build profile",
+                "preserve_until": "450 MHz passes controlled same-board comparison, endurance, and required analog/power/thermal gates",
+            },
+        ],
+        "follow_up": {
+            "classification": "human measurements and product decisions; not executable aggregation tasks or hidden approval gates",
+            "manual_measurements": [
+                "Run a longer same-board 600/450 MHz A/B campaign and 450 MHz endurance campaign.",
+                "Apply traceable external analog stimulus to grade ADC accuracy and aperture at 450 MHz.",
+                "Measure rail power and external temperature if power or comparative thermal benefit will be claimed.",
+                "Stimulate D16-D23 externally to verify input mapping, voltage thresholds, transition fidelity, timing, jitter, and signal integrity on a replacement input candidate.",
+                "Authorize a protected output fixture and capture output correctness, timing, lag stability, voltage levels, and signal integrity independently.",
+            ],
+            "user_decisions": [
+                "Choose whether 450 MHz, RLE_AUTO, and auxiliary output justify continued integration investment.",
+                "Choose whether to redesign the failed auxiliary-input implementation or remove INPUT from the unified contract.",
+                "Choose supported rate profiles and whether optional modes must pass every profile before release.",
+                "Choose fault policy and safety requirements for a combined acquisition/output product.",
+            ],
+        },
+    }
+
+
 def _experiment_evidence_index(
     experiments: Sequence[Mapping[str, Any]],
 ) -> tuple[dict[tuple[str, str], Mapping[str, Any]], dict[str, Mapping[str, Any]]]:
@@ -2335,6 +2718,16 @@ def build_aggregate(
         in {"rle-streaming", "aux-input-bank", "aux-output-bank"}
     }
     analysis, analysis_manifest = load_analysis(root, analysis_path, all_experiments)
+    cross_analysis = build_cross_experiment_analysis(
+        all_experiments, protocol_extensions
+    )
+    recommendation_policy = build_recommendation_policy(all_experiments, cross_analysis)
+    if analysis["recommendations"]:
+        _require_equal(
+            analysis["recommendations"],
+            recommendation_policy["experiment_recommendations"],
+            "analysis.recommendations",
+        )
     aggregate = {
         "schema_version": AGGREGATE_SCHEMA_VERSION,
         "kind": "thingdaq-experiment-aggregate",
@@ -2400,11 +2793,10 @@ def build_aggregate(
         ),
         "experiments": all_experiments,
         "metric_groups": group_metrics(all_experiments),
-        "cross_experiment_analysis": build_cross_experiment_analysis(
-            all_experiments, protocol_extensions
-        ),
+        "cross_experiment_analysis": cross_analysis,
         "conclusions": analysis["conclusions"],
-        "recommendations": analysis["recommendations"],
+        "recommendations": recommendation_policy["experiment_recommendations"],
+        "recommendation_policy": recommendation_policy,
         "claim_limitations": [
             "Independent candidate results do not establish a combined clock, compression, and auxiliary-I/O binary.",
             "A host, analytic, or simulated result is not physical evidence.",
@@ -2742,6 +3134,118 @@ def render_markdown(aggregate: Mapping[str, Any]) -> str:
             f"{_markdown_cell(recommendation['rationale'])}"
         )
     lines.append("")
+
+    recommendation_policy = aggregate.get("recommendation_policy")
+    if isinstance(recommendation_policy, Mapping):
+        defaults = recommendation_policy["production_defaults"]
+        lines.extend(
+            [
+                "### Production defaults and optional capabilities",
+                "",
+                f"Production recommendation: **{_markdown_cell(defaults['decision'])}** — {_markdown_cell(defaults['reason'])}",
+                "",
+                f"Retained default: {_markdown_cell({key: value for key, value in defaults.items() if key not in {'decision', 'reason'}})}",
+                "",
+                "| Capability | Default | Recommendation | Availability |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for capability in recommendation_policy["optional_capabilities"]:
+            lines.append(
+                f"| {_markdown_cell(capability['capability'])} | {_markdown_cell(capability['default'])} | **{_markdown_cell(capability['recommendation'])}** | {_markdown_cell(capability['availability'])} |"
+            )
+
+        migration = recommendation_policy["python_client_migration"]
+        lines.extend(
+            [
+                "",
+                "### Python client compatibility and migration cost",
+                "",
+                f"{_markdown_cell(migration['scope'])}. {_markdown_cell(migration['unchanged_path'])}",
+                "",
+                "| Area | Cost | Required prototype work |",
+                "| --- | --- | --- |",
+            ]
+        )
+        for cost in migration["costs"]:
+            lines.append(
+                f"| {_markdown_cell(cost['area'])} | **{_markdown_cell(cost['cost'])}** | {_markdown_cell(cost['work'])} |"
+            )
+
+        lines.extend(
+            [
+                "",
+                "## Staged integration and rollback plan",
+                "",
+                "| Stage | Name | Action | Source policy | Exit gate |",
+                "| ---: | --- | --- | --- | --- |",
+            ]
+        )
+        for stage in recommendation_policy["staged_integration"]:
+            lines.append(
+                f"| {_markdown_cell(stage['stage'])} | {_markdown_cell(stage['name'])} | {_markdown_cell(stage['action'])} | {_markdown_cell(stage['source_policy'])} | {_markdown_cell(stage['exit_gate'])} |"
+            )
+        lines.extend(
+            [
+                "",
+                "### Rollback paths",
+                "",
+                "| Path | Preserve until |",
+                "| --- | --- |",
+            ]
+        )
+        for rollback in recommendation_policy["rollback_paths"]:
+            lines.append(
+                f"| {_markdown_cell(rollback['path'])} | {_markdown_cell(rollback['preserve_until'])} |"
+            )
+
+        matrix = recommendation_policy["compound_test_matrix"]
+        lines.extend(
+            [
+                "",
+                "## Minimum compound test matrix",
+                "",
+                f"Claim boundary: {_markdown_cell(matrix['claim_interpretation'])}",
+                "",
+                f"Immutable integration artifacts: **{_markdown_cell(matrix['immutable_artifact_count'])}**. Required configurations: **{_markdown_cell(matrix['configuration_count'])}**. Qualification tiers: {_markdown_cell(matrix['qualification_tiers'])}.",
+                "",
+                f"Axes: {_markdown_cell(matrix['axes'])}",
+                "",
+                "| Configuration | Encoding | Bank mode / width | Rate profile (ADC / GPIO) | Output rate |",
+                "| --- | --- | --- | --- | ---: |",
+            ]
+        )
+        for configuration in matrix["configurations"]:
+            lines.append(
+                f"| {_markdown_cell(configuration['id'])} | {_markdown_cell(configuration['encoding'])} | {_markdown_cell(configuration['bank_mode'])} / {_markdown_cell(configuration['gpio_width_bits'])}-bit | {_markdown_cell(configuration['rate_profile'])} ({_markdown_cell(configuration['adc_pair_rate_hz'])} / {_markdown_cell(configuration['gpio_sample_rate_hz'])}) | {_markdown_cell(configuration['output_rate_hz'])} |"
+            )
+        lines.extend(["", "### Common gates", ""])
+        lines.extend(f"- {_markdown_cell(gate)}" for gate in matrix["common_gates"])
+        lines.extend(["", "### Mode-specific gates", ""])
+        for mode, gates in matrix["mode_specific_gates"].items():
+            lines.append(f"- **{_markdown_cell(mode)}**")
+            lines.extend(f"  - {_markdown_cell(gate)}" for gate in gates)
+
+        follow_up = recommendation_policy["follow_up"]
+        lines.extend(
+            [
+                "",
+                "## Human follow-up",
+                "",
+                f"Classification: {_markdown_cell(follow_up['classification'])}.",
+                "",
+                "### Manual measurements",
+                "",
+            ]
+        )
+        lines.extend(
+            f"- {_markdown_cell(item)}" for item in follow_up["manual_measurements"]
+        )
+        lines.extend(["", "### User decisions", ""])
+        lines.extend(
+            f"- {_markdown_cell(item)}" for item in follow_up["user_decisions"]
+        )
+        lines.append("")
 
     lines.extend(["## Aggregate claim limitations", ""])
     lines.extend(f"- {limitation}" for limitation in aggregate["claim_limitations"])
