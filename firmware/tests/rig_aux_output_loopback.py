@@ -95,6 +95,7 @@ MAX_RSS_GROWTH_BYTES = 32 * 1024 * 1024
 
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
+ACQUISITION_PROTOCOL_VERSION = 1
 PROTOCOL_VERSION = 2
 HEADER_SIZE = 44
 TRAILER_SIZE = 4
@@ -166,6 +167,7 @@ DATA_FLAG_MASK = (
 STATE_IDLE = 1
 STATE_CONFIGURED = 2
 STATE_RUNNING = 3
+STREAM_NONE = 0
 STREAM_BOTH = 3
 SOURCE_HARDWARE = 0
 OUTPUT_BANK_DISABLED = 0
@@ -246,6 +248,28 @@ OUTPUT_STATUS_RESPONSE_KINDS = frozenset(
 DATA_KINDS = frozenset({ADC_DATA, GPIO_DATA})
 RESPONSE_KINDS = frozenset(SUCCESS_PAYLOAD_SIZE)
 DRIVE_COMMAND_KINDS = frozenset({OUTPUT_ARM_REQUEST, START_REQUEST})
+V2_REQUEST_KINDS = frozenset(
+    {
+        INFO_REQUEST,
+        OUTPUT_BEGIN_REQUEST,
+        OUTPUT_APPEND_REQUEST,
+        OUTPUT_COMMIT_REQUEST,
+        OUTPUT_ARM_REQUEST,
+        OUTPUT_STATUS_REQUEST,
+        OUTPUT_CLEAR_REQUEST,
+    }
+)
+V2_RESPONSE_KINDS = frozenset(
+    {
+        INFO_RESPONSE,
+        OUTPUT_BEGIN_RESPONSE,
+        OUTPUT_APPEND_RESPONSE,
+        OUTPUT_COMMIT_RESPONSE,
+        OUTPUT_ARM_RESPONSE,
+        OUTPUT_STATUS_RESPONSE,
+        OUTPUT_CLEAR_RESPONSE,
+    }
+)
 
 
 class CampaignFailure(RuntimeError):
@@ -487,7 +511,7 @@ def encode_request(
     total = HEADER_SIZE + len(payload) + TRAILER_SIZE
     header = HEADER.pack(
         MAGIC,
-        PROTOCOL_VERSION,
+        PROTOCOL_VERSION if kind in V2_REQUEST_KINDS else ACQUISITION_PROTOCOL_VERSION,
         kind,
         0,
         HEADER_SIZE,
@@ -601,10 +625,14 @@ class FrameParser:
             first_ticks,
             item_count,
         ) = fields
-        require(magic == MAGIC and version == PROTOCOL_VERSION, "bad frame identity")
+        require(magic == MAGIC, "bad frame magic")
         require(header_length == HEADER_SIZE and reserved == 0, "bad fixed header")
         require(total == HEADER_SIZE + payload_length + TRAILER_SIZE, "bad length")
         if kind in DATA_KINDS:
+            require(
+                version == ACQUISITION_PROTOCOL_VERSION,
+                "data frame protocol version mismatch",
+            )
             expected_items = (
                 ADC_PAIRS_PER_FRAME if kind == ADC_DATA else GPIO_SAMPLES_PER_FRAME
             )
@@ -633,6 +661,17 @@ class FrameParser:
             )
             return total
         require(kind in RESPONSE_KINDS, "unexpected device frame kind")
+        require(
+            version in (ACQUISITION_PROTOCOL_VERSION, PROTOCOL_VERSION)
+            if kind == ERROR_RESPONSE
+            else version
+            == (
+                PROTOCOL_VERSION
+                if kind in V2_RESPONSE_KINDS
+                else ACQUISITION_PROTOCOL_VERSION
+            ),
+            "control response protocol version mismatch",
+        )
         require(checksum == BOOTSTRAP_CHECKSUM, "control checksum is not bootstrap")
         require(flags in (0, FLAG_RESPONSE_ERROR), "bad response flags")
         require(request_id != 0 and sequence == 0, "bad response correlation")
@@ -936,8 +975,21 @@ class OutputStatus:
     values: dict[str, int]
 
 
-def decode_output_status(frame: Frame, expected_kind: int) -> OutputStatus:
-    response_success(frame, expected_kind)
+def decode_output_status(
+    frame: Frame, expected_kind: int, *, allow_error: bool = False
+) -> OutputStatus:
+    if allow_error:
+        require(
+            frame.kind == expected_kind and frame.flags == FLAG_RESPONSE_ERROR,
+            "expected rejected output-status response",
+        )
+        status, reserved, error = RESPONSE_PREFIX.unpack_from(frame.payload)
+        require(
+            status == 1 and reserved == 0 and error != 0,
+            "rejected output-status prefix is invalid",
+        )
+    else:
+        response_success(frame, expected_kind)
     payload = frame.payload
     values = {
         name: int(struct.unpack_from("<" + kind, payload, offset)[0])
@@ -1034,6 +1086,32 @@ STATUS_FIELDS: dict[str, tuple[str, int]] = {
     "gpio_raw_drop_samples_projected": ("Q", 1212),
     "gpio_packer_drop_samples_projected": ("Q", 1220),
 }
+ACQUISITION_LOSS_FIELDS = (
+    "adc_items_dropped",
+    "gpio_items_dropped",
+    "gpio_raw_samples_lost",
+    "gpio_packer_samples_dropped",
+    "gpio_raw_ring_overruns",
+    "adc_raw_pairs_lost",
+    "adc_incomplete_conversions",
+    "adc_overwritten_conversions",
+    "adc_raw_ring_overruns",
+    "adc_frames_dropped",
+    "gpio_frames_dropped",
+    "packet_pool_exhaustions",
+    "packet_ready_queue_rejections",
+    "packet_transmit_queue_rejections",
+    "packet_pressure_evictions",
+    "packet_capacity_drops_without_evictable_frame",
+    "adc_frames_dropped_after_framing",
+    "adc_frames_dropped_after_promotion",
+    "gpio_frames_dropped_after_framing",
+    "gpio_frames_dropped_after_promotion",
+    "adc_raw_gap_pairs",
+    "adc_raw_drop_pairs_projected",
+    "gpio_raw_drop_samples_projected",
+    "gpio_packer_drop_samples_projected",
+)
 
 
 @dataclass(frozen=True)
@@ -1502,6 +1580,9 @@ class Campaign:
         allow_recovery_gaps: bool = False,
         expect_underrun: bool = False,
     ) -> CaseResult:
+        allow_observation_gaps = (
+            allow_recovery_gaps or self.observation_mode == "unconnected"
+        )
         parser_errors_at_start = self.link.parser.errors
         generation = self.allocate_generation()
         upload_program(self.link, program, generation)
@@ -1510,10 +1591,46 @@ class Campaign:
             run_id=generation,
             permit=self.permit,
         )
+        if arm.flags == FLAG_RESPONSE_ERROR:
+            rejected = decode_output_status(
+                arm, OUTPUT_ARM_RESPONSE, allow_error=True
+            )
+            protocol_error = _u16(arm.payload, 2)
+            emit_event(
+                "arm_rejected",
+                bank_mode=rejected.bank_mode,
+                generation=rejected.values["generation"],
+                invalid_operations=rejected.values["invalid_operations"],
+                output_error=rejected.output_error,
+                protocol_error=protocol_error,
+                resource_conflicts=rejected.values["resource_conflicts"],
+                start_errors=rejected.values["start_errors"],
+                state=rejected.state,
+            )
+            clear, _ = self.link.exchange(OUTPUT_CLEAR_REQUEST, run_id=generation)
+            cleared = decode_output_status(clear, OUTPUT_CLEAR_RESPONSE)
+            require(
+                cleared.state == OUTPUT_EMPTY
+                and cleared.bank_mode == OUTPUT_BANK_DISABLED,
+                "CLEAR after rejected ARM did not release the output program",
+            )
+            raise CampaignFailure(
+                "OUTPUT_ARM rejected: "
+                f"protocol_error={protocol_error}, "
+                f"output_error={rejected.output_error}, "
+                f"resource_conflicts={rejected.values['resource_conflicts']}, "
+                f"start_errors={rejected.values['start_errors']}"
+            )
         armed = decode_output_status(arm, OUTPUT_ARM_RESPONSE)
         require(
             armed.state == OUTPUT_ARMED and armed.bank_mode == OUTPUT_BANK_ENABLED,
             "OUTPUT_ARM did not atomically arm the bank",
+        )
+        emit_event(
+            "output_armed",
+            generation=generation,
+            state=armed.state,
+            bank_mode=armed.bank_mode,
         )
         configured, _ = self.link.exchange(
             CONFIGURE_REQUEST,
@@ -1525,11 +1642,56 @@ class Campaign:
                 DATA_FRAME_BYTES,
             ),
         )
+        if configured.flags == FLAG_RESPONSE_ERROR:
+            protocol_error = _u16(configured.payload, 2)
+            output_frame, _ = self.link.exchange(
+                OUTPUT_STATUS_REQUEST, run_id=generation
+            )
+            output_status = decode_output_status(
+                output_frame, OUTPUT_STATUS_RESPONSE
+            )
+            emit_event(
+                "configure_rejected",
+                output_bank_mode=output_status.bank_mode,
+                output_state=output_status.state,
+                protocol_error=protocol_error,
+                resource_conflicts=output_status.values["resource_conflicts"],
+                start_errors=output_status.values["start_errors"],
+            )
+            clear, _ = self.link.exchange(OUTPUT_CLEAR_REQUEST, run_id=generation)
+            decode_output_status(clear, OUTPUT_CLEAR_RESPONSE)
+            raise CampaignFailure(
+                f"CONFIGURE rejected after ARM: protocol_error={protocol_error}"
+            )
         response_success(configured, CONFIGURE_RESPONSE)
+        emit_event("acquisition_configured", generation=generation)
         start_data: list[Frame] = []
         started, _ = self.link.exchange(
             START_REQUEST, permit=self.permit, on_data=start_data.append
         )
+        if started.flags == FLAG_RESPONSE_ERROR:
+            protocol_error = _u16(started.payload, 2)
+            output_frame, _ = self.link.exchange(
+                OUTPUT_STATUS_REQUEST, run_id=generation
+            )
+            output_status = decode_output_status(
+                output_frame, OUTPUT_STATUS_RESPONSE
+            )
+            emit_event(
+                "start_rejected",
+                output_error=output_status.output_error,
+                output_state=output_status.state,
+                protocol_error=protocol_error,
+                resource_conflicts=output_status.values["resource_conflicts"],
+                start_errors=output_status.values["start_errors"],
+            )
+            stop, _ = self.link.exchange(STOP_REQUEST)
+            response_success(stop, STOP_RESPONSE)
+            clear, _ = self.link.exchange(OUTPUT_CLEAR_REQUEST, run_id=generation)
+            decode_output_status(clear, OUTPUT_CLEAR_RESPONSE)
+            raise CampaignFailure(
+                f"START rejected after ARM/CONFIGURE: protocol_error={protocol_error}"
+            )
         response_success(started, START_RESPONSE)
         run_id = started.run_id
         require(run_id != 0, "START returned a zero common run identity")
@@ -1539,7 +1701,7 @@ class Campaign:
             run_id,
             self.lag_ticks,
             self.lag_ticks is None,
-            allow_recovery_gaps,
+            allow_observation_gaps,
             grade_loopback=self.observation_mode == "loopback",
         )
         for frame in start_data:
@@ -1579,6 +1741,46 @@ class Campaign:
                     GET_STATUS_REQUEST, on_data=validator.accept
                 )
                 live = decode_acquisition_status(live_frame)
+                if not (
+                    live.device_state == STATE_RUNNING
+                    and live.stream_mask == STREAM_BOTH
+                    and live.source == SOURCE_HARDWARE
+                ):
+                    emit_event(
+                        "live_status_profile_mismatch",
+                        acquisition_faults={
+                            name: value
+                            for name, value in live.values.items()
+                            if value != 0
+                            and any(
+                                marker in name
+                                for marker in (
+                                    "error",
+                                    "lost",
+                                    "dropped",
+                                    "overrun",
+                                    "mismatch",
+                                    "exhaustion",
+                                    "rejection",
+                                    "eviction",
+                                )
+                            )
+                        },
+                        checksum_algorithm=live.checksum_algorithm,
+                        device_state=live.device_state,
+                        output_dma_errors=latest_output.values["dma_errors"],
+                        output_error=latest_output.output_error,
+                        output_fault_latched=latest_output.fault_latched,
+                        output_resource_conflicts=latest_output.values[
+                            "resource_conflicts"
+                        ],
+                        output_start_errors=latest_output.values["start_errors"],
+                        output_state=latest_output.state,
+                        output_underruns=latest_output.values["underruns"],
+                        run_id=live_frame.run_id,
+                        source=live.source,
+                        stream_mask=live.stream_mask,
+                    )
                 require(
                     live.device_state == STATE_RUNNING
                     and live.stream_mask == STREAM_BOTH
@@ -1663,9 +1865,9 @@ class Campaign:
             )
         self._validate_output_final(program, run_id, final_output, expect_underrun)
         self._validate_acquisition_final(
-            final_acquisition, validator, allow_recovery_gaps
+            final_acquisition, validator, allow_observation_gaps
         )
-        if not allow_recovery_gaps:
+        if not allow_observation_gaps:
             require(
                 self.link.parser.errors == parser_errors_at_start,
                 "host parser rejected wire bytes during a lossless case",
@@ -1810,8 +2012,8 @@ class Campaign:
     ) -> None:
         require(status.device_state == STATE_IDLE, "acquisition is not IDLE after STOP")
         require(
-            status.stream_mask == STREAM_BOTH and status.source == SOURCE_HARDWARE,
-            "final acquisition profile changed",
+            status.stream_mask == STREAM_NONE and status.source == SOURCE_HARDWARE,
+            "final acquisition profile is not the IDLE placeholder",
         )
         require(
             status.checksum_algorithm == validator.checksum_algorithm,
@@ -1852,39 +2054,25 @@ class Campaign:
             "packet_encoding_rejections",
             "usb_io_errors",
         )
+        nonzero_errors = {
+            name: values[name] for name in errors if values[name] != 0
+        }
+        if nonzero_errors:
+            emit_event("acquisition_error_counters", counters=nonzero_errors)
         require(
-            all(values[name] == 0 for name in errors),
+            not nonzero_errors,
             "acquisition error counter is nonzero",
         )
+        nonzero_losses = {
+            name: values[name]
+            for name in ACQUISITION_LOSS_FIELDS
+            if values[name] != 0
+        }
+        if nonzero_losses:
+            emit_event("acquisition_loss_counters", counters=nonzero_losses)
         if not allow_gaps:
-            losses = (
-                "adc_items_dropped",
-                "gpio_items_dropped",
-                "gpio_raw_samples_lost",
-                "gpio_packer_samples_dropped",
-                "gpio_raw_ring_overruns",
-                "adc_raw_pairs_lost",
-                "adc_incomplete_conversions",
-                "adc_overwritten_conversions",
-                "adc_raw_ring_overruns",
-                "adc_frames_dropped",
-                "gpio_frames_dropped",
-                "packet_pool_exhaustions",
-                "packet_ready_queue_rejections",
-                "packet_transmit_queue_rejections",
-                "packet_pressure_evictions",
-                "packet_capacity_drops_without_evictable_frame",
-                "adc_frames_dropped_after_framing",
-                "adc_frames_dropped_after_promotion",
-                "gpio_frames_dropped_after_framing",
-                "gpio_frames_dropped_after_promotion",
-                "adc_raw_gap_pairs",
-                "adc_raw_drop_pairs_projected",
-                "gpio_raw_drop_samples_projected",
-                "gpio_packer_drop_samples_projected",
-            )
             require(
-                all(values[name] == 0 for name in losses),
+                not nonzero_losses,
                 "unexpected acquisition loss observed",
             )
         require(
@@ -1959,6 +2147,11 @@ def build_result(
     p99 = max((case.status_latency_p99_ms for case in cases), default=None)
     maximum = max((case.status_latency_max_ms for case in cases), default=None)
     intervals = sum(case.output_intervals for case in cases)
+    acquisition_losses = {
+        name: sum(case.acquisition[name] for case in cases)
+        for name in ACQUISITION_LOSS_FIELDS
+        if any(case.acquisition[name] != 0 for case in cases)
+    }
     return {
         "schema_version": RESULT_SCHEMA_VERSION,
         "matrix_schema_version": 1,
@@ -1988,6 +2181,11 @@ def build_result(
                     "status_latency_p99_ms": case.status_latency_p99_ms,
                     "status_latency_max_ms": case.status_latency_max_ms,
                     "recovery": case.recovery,
+                    "acquisition_losses": {
+                        name: case.acquisition[name]
+                        for name in ACQUISITION_LOSS_FIELDS
+                        if case.acquisition[name] != 0
+                    },
                 }
                 for case in cases
             ],
@@ -1999,6 +2197,7 @@ def build_result(
             "status_latency_p99_ms": p99,
             "status_latency_max_ms": maximum,
             "host_rss_growth_bytes": memory.growth_bytes,
+            "acquisition_losses": acquisition_losses,
         },
         "acceptance": {
             "fixture_interlock": "PASS" if cases else "NOT_RUN",
@@ -2013,7 +2212,9 @@ def build_result(
             if not cases
             else "FAIL",
             "combined_acquisition": "PASS"
-            if cases and not failures
+            if cases and not failures and not acquisition_losses
+            else "FAIL"
+            if cases and acquisition_losses
             else "NOT_RUN"
             if not cases
             else "FAIL",
@@ -2180,13 +2381,28 @@ def main() -> int:
                 memory.growth_bytes <= MAX_RSS_GROWTH_BYTES,
                 "host RSS growth exceeded bound",
             )
-            result = "PASS"
-            reason = (
-                "authorized loopback campaign passed every bounded check"
-                if declaration.observation_mode == "loopback"
-                else "authorized unconnected output lifecycle smoke passed"
+            acquisition_losses_present = any(
+                case.acquisition[name] != 0
+                for case in cases
+                for name in ACQUISITION_LOSS_FIELDS
             )
-            exit_code = 0
+            if declaration.observation_mode == "loopback":
+                result = "PASS"
+                reason = "authorized loopback campaign passed every bounded check"
+                exit_code = 0
+            elif acquisition_losses_present:
+                result = "FAIL"
+                reason = (
+                    "unconnected output lifecycle completed with acquisition loss"
+                )
+                exit_code = 1
+            else:
+                result = "INCONCLUSIVE"
+                reason = (
+                    "unconnected output lifecycle passed; physical output was not "
+                    "observed"
+                )
+                exit_code = 0
     except Exception as error:  # noqa: BLE001 - preserve rig diagnosis
         message = f"{type(error).__name__}: {error}"
         failures.append(message)

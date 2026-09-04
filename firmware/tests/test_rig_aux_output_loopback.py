@@ -120,7 +120,7 @@ def response_wire(
     total = rig.HEADER_SIZE + len(payload) + rig.TRAILER_SIZE
     header = rig.HEADER.pack(
         rig.MAGIC,
-        rig.PROTOCOL_VERSION,
+        fields[1],
         kind,
         flags,
         rig.HEADER_SIZE,
@@ -206,6 +206,26 @@ def gpio_samples(program: Any, lag: int, count: int = 4096) -> list[tuple[int, i
 
 
 class FixtureInterlockTests(unittest.TestCase):
+    def test_requests_use_v1_controls_and_v2_output_extensions(self) -> None:
+        configure = rig.encode_request(
+            rig.CONFIGURE_REQUEST,
+            1,
+            rig.CONFIGURATION.pack(
+                rig.STREAM_BOTH,
+                rig.SOURCE_HARDWARE,
+                rig.BOOTSTRAP_CHECKSUM,
+                0,
+                rig.DATA_FRAME_BYTES,
+            ),
+        )
+        output = rig.encode_request(rig.OUTPUT_STATUS_REQUEST, 2)
+        info = rig.encode_request(rig.INFO_REQUEST, 3)
+        self.assertEqual(
+            rig.ACQUISITION_PROTOCOL_VERSION, rig.HEADER.unpack_from(configure)[1]
+        )
+        self.assertEqual(rig.PROTOCOL_VERSION, rig.HEADER.unpack_from(output)[1])
+        self.assertEqual(rig.PROTOCOL_VERSION, rig.HEADER.unpack_from(info)[1])
+
     def test_exact_fixture_authorizes_only_its_device_and_owner(self) -> None:
         declaration = rig.parse_fixture_declaration(fixture_json())
         self.assertIsNotNone(declaration)
@@ -278,6 +298,17 @@ class FixtureInterlockTests(unittest.TestCase):
             link.exchange(rig.INFO_REQUEST, permit=permit)
         self.assertEqual([rig.OUTPUT_ARM_REQUEST], device.requests)
 
+    def test_rejected_output_status_retains_diagnostic_telemetry(self) -> None:
+        request = rig.encode_request(rig.OUTPUT_ARM_REQUEST, 7, run_id=11)
+        frame = rig.FrameParser().feed(response_wire(request, error=7))[0]
+        status = rig.decode_output_status(
+            frame, rig.OUTPUT_ARM_RESPONSE, allow_error=True
+        )
+        self.assertEqual(rig.OUTPUT_EMPTY, status.state)
+        self.assertEqual(rig.OUTPUT_BANK_DISABLED, status.bank_mode)
+        with self.assertRaisesRegex(rig.CampaignFailure, "command was rejected"):
+            rig.decode_output_status(frame, rig.OUTPUT_ARM_RESPONSE)
+
     def test_static_guards_keep_permits_at_the_serial_boundary(self) -> None:
         rig_source = RIG_PATH.read_text(encoding="utf-8")
         target_source = (ROOT / "firmware/src/digital_output_teensy.cpp").read_text(
@@ -349,6 +380,33 @@ class LoopbackGradingTests(unittest.TestCase):
         )
         validator.finish()
         self.assertIsNone(validator.grader)
+
+    def test_final_acquisition_accepts_idle_placeholder_after_stop(self) -> None:
+        values = {name: 0 for name in rig.STATUS_FIELDS}
+        values.update(
+            {
+                "adc0_dma_results": 1,
+                "adc1_dma_results": 1,
+                "adc_pairs_captured": 1,
+                "gpio_samples_captured": 1,
+            }
+        )
+        status = rig.AcquisitionStatus(
+            rig.STATE_IDLE,
+            rig.STREAM_NONE,
+            rig.SOURCE_HARDWARE,
+            rig.BOOTSTRAP_CHECKSUM,
+            values,
+        )
+        validator = rig.CaptureValidator(
+            rig.walking_program(),
+            rig.BOOTSTRAP_CHECKSUM,
+            1,
+            None,
+            False,
+            grade_loopback=False,
+        )
+        rig.Campaign._validate_acquisition_final(status, validator, False)
 
     def test_stable_lag_is_unique_and_a_shift_is_rejected(self) -> None:
         program = rig.walking_program()
