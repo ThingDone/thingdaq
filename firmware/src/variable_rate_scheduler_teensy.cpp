@@ -88,11 +88,11 @@ auto &triggerQueue(std::size_t converter) {
       board::kAdcConverterConfigurations[converter].adc_etc_trigger];
 }
 
-volatile std::uint32_t &adcCfg(std::size_t converter) {
+auto &adcCfg(std::size_t converter) {
   return converter == 0U ? IMXRT_ADC1.CFG : IMXRT_ADC2.CFG;
 }
 
-volatile std::uint32_t &adcHc0(std::size_t converter) {
+auto &adcHc0(std::size_t converter) {
   return converter == 0U ? IMXRT_ADC1.HC0 : IMXRT_ADC2.HC0;
 }
 
@@ -137,7 +137,9 @@ bool registerReadbackMatches(const Schedule &schedule) {
       pairPit().TCTRL != PIT_TCTRL_CHN ||
       ADC_ETC_CTRL != ADC_ETC_CTRL_PRE_DIVIDER(
                           schedule.adc_etc_predivider) ||
-      ADC_ETC_DMA_CTRL != 0U) {
+      // Upper TRIGn_REQ bits are W1C completion status, not enables. Boot's
+      // completion diagnostic legitimately leaves 0x00110000 latched here.
+      (ADC_ETC_DMA_CTRL & 0xFFU) != 0U) {
     return false;
   }
   for (std::size_t converter = 0U; converter < kConverterCount;
@@ -149,7 +151,7 @@ bool registerReadbackMatches(const Schedule &schedule) {
         triggerQueue(converter).CTRL !=
             ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0U) ||
         triggerQueue(converter).COUNTER !=
-            ADC_ETC_TRIG_COUNTER_INIT_DELAY(
+            adcEtcInitialDelay(
                 converter == 0U ? schedule.adc0_initial_delay
                                 : schedule.adc1_initial_delay) ||
         triggerQueue(converter).CHAIN_1_0 !=
@@ -188,7 +190,7 @@ class TeensyRatePlatform final : public Platform {
       snapshot_.adc_hc0[converter] = adcHc0(converter);
     }
     snapshot_.adc_etc_ctrl = ADC_ETC_CTRL;
-    snapshot_.adc_etc_dma_ctrl = ADC_ETC_DMA_CTRL;
+    snapshot_.adc_etc_dma_ctrl = ADC_ETC_DMA_CTRL & 0xFFU;
     snapshot_.selected = g_selected_schedule;
     transaction_active_ = true;
     return true;
@@ -232,7 +234,7 @@ class TeensyRatePlatform final : public Platform {
          ++converter) {
       triggerQueue(converter).CTRL = ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0U);
       triggerQueue(converter).COUNTER =
-          ADC_ETC_TRIG_COUNTER_INIT_DELAY(
+          adcEtcInitialDelay(
               converter == 0U ? schedule.adc0_initial_delay
                               : schedule.adc1_initial_delay);
       triggerQueue(converter).CHAIN_1_0 =

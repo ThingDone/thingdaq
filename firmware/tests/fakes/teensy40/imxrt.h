@@ -52,6 +52,17 @@ class Register32 {
   std::uint32_t value_ = 0U;
 };
 
+class AdcEtcDmaControl : public Register32 {
+ public:
+  AdcEtcDmaControl &operator=(std::uint32_t value) {
+    // TRIGn_REQ [23:16] are W1C; TRIGn_ENABLE [7:0] are normal R/W.
+    const auto previous = static_cast<std::uint32_t>(*this);
+    reset((previous & 0x00FF0000U & ~value) | (value & 0xFFU));
+    recordRegisterWrite(this, value);
+    return *this;
+  }
+};
+
 }  // namespace fake_imxrt
 
 struct IMXRT_PIT_CHANNEL_t {
@@ -105,7 +116,7 @@ struct IMXRT_ADC_ETC_t {
   fake_imxrt::Register32 CTRL{};
   fake_imxrt::Register32 DONE0_1_IRQ{};
   fake_imxrt::Register32 DONE2_ERR_IRQ{};
-  fake_imxrt::Register32 DMA_CTRL{};
+  fake_imxrt::AdcEtcDmaControl DMA_CTRL{};
   std::array<IMXRT_ADC_ETC_TRIGGER_t, 8U> TRIG{};
 };
 
@@ -160,6 +171,8 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define DMAMUX_CHCFG0 fake_imxrt::dmamux_chcfg[0]
 #define IMXRT_DMA_TCD fake_imxrt::dma_tcd
 #define DMA_DCHPRI2 fake_imxrt::dma_dchpri[2]
+#define DMA_DCHPRI0 fake_imxrt::dma_dchpri[0]
+#define DMA_DCHPRI1 fake_imxrt::dma_dchpri[1]
 #define DMA_DCHPRI3 fake_imxrt::dma_dchpri[3]
 #define DMA_ERQ fake_imxrt::dma_erq
 #define DMA_CERQ fake_imxrt::dma_cerq

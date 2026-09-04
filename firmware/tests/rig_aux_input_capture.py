@@ -842,7 +842,7 @@ class SerialLink:
                     f"parser_errors={self.parser.errors} rx_prefix={received_prefix.hex()}"
                 )
             chunk, frames = self._read_chunk_and_frames()
-            received_prefix.extend(chunk[:max(0, 96 - len(received_prefix))])
+            received_prefix.extend(chunk[: max(0, 96 - len(received_prefix))])
             matched: Frame | None = None
             for frame in frames:
                 if frame.kind in DATA_KINDS:
@@ -1539,21 +1539,21 @@ def grade_capture_diagnostic(
         "unstable_samples": 0,
         "dma_err_final": 0,
         "aux_dma_err_final": 0,
-        "tcd_biter": LAYOUTS[AUX_DISABLED].gpio_items_per_frame,
+        "tcd_biter": LAYOUTS[AUX_INPUT].gpio_items_per_frame,
         "aux_tcd_citer": LAYOUTS[AUX_INPUT].gpio_items_per_frame,
         "aux_tcd_biter": LAYOUTS[AUX_INPUT].gpio_items_per_frame,
         "tcd_csr": TCD_ESG | TCD_INTMAJOR,
         "aux_tcd_csr": TCD_ESG | TCD_INTMAJOR,
-        "edma_priority": 0,
+        "edma_priority": 1,
         "aux_edma_priority": 0,
     }
     for name, expected in exact.items():
         evidence.equal(f"diagnostic.{name}", expected, snapshot[name])
     evidence.check(
         "diagnostic.tcd_citer",
-        f"0..{LAYOUTS[AUX_DISABLED].gpio_items_per_frame}",
+        f"0..{LAYOUTS[AUX_INPUT].gpio_items_per_frame}",
         snapshot["tcd_citer"],
-        0 <= snapshot["tcd_citer"] <= LAYOUTS[AUX_DISABLED].gpio_items_per_frame,
+        0 <= snapshot["tcd_citer"] <= LAYOUTS[AUX_INPUT].gpio_items_per_frame,
     )
     evidence.check(
         "diagnostic.flags",
@@ -2124,6 +2124,11 @@ CURRENT_STATUS_FIELDS = frozenset(
         "aux_bank_mode",
         "rate_profile",
         "gpio_item_bytes",
+        "adc_pair_rate_hz",
+        "gpio_sample_rate_hz",
+        "frame_coverage_ticks",
+        "packet_retention_us_combined",
+        "packet_retention_us_single_stream",
         "primary_gpio_raw_ready_depth",
         "aux_gpio_raw_ready_depth",
     }
@@ -2260,23 +2265,30 @@ def validate_status(
     final: bool,
 ) -> None:
     layout = LAYOUTS[case.aux_mode]
+    # STOP clears the applied configuration, not the completed run's counters.
+    # Grade current metadata against IDLE defaults; reconcile counters below
+    # against the original run layout/rate passed by the caller.
+    reported_profile = PROFILES[0] if final else profile
+    reported_mode = AUX_DISABLED if final else case.aux_mode
     expected_configuration = {
         "device_state": expected_state,
-        "stream_mask": case.stream_mask,
+        "stream_mask": STREAM_NONE if final else case.stream_mask,
         "source": SOURCE_HARDWARE,
-        "data_checksum_algorithm": expected_checksum,
+        "data_checksum_algorithm": DEFAULT_DATA_CHECKSUM
+        if final
+        else expected_checksum,
         "data_frame_bytes": MAX_FRAME_BYTES,
         "stats_generation": expected_generation,
         "protocol_version": PROTOCOL_VERSION,
-        "aux_bank_mode": case.aux_mode,
-        "rate_profile": profile.value,
-        "gpio_item_bytes": layout.gpio_item_bytes,
-        "adc_pair_rate_hz": profile.adc_rate_hz,
-        "gpio_sample_rate_hz": profile.gpio_rate_hz,
+        "aux_bank_mode": reported_mode,
+        "rate_profile": reported_profile.value,
+        "gpio_item_bytes": LAYOUTS[reported_mode].gpio_item_bytes,
+        "adc_pair_rate_hz": reported_profile.adc_rate_hz,
+        "gpio_sample_rate_hz": reported_profile.gpio_rate_hz,
         "frame_coverage_ticks": (
-            profile.input_coverage_ticks
-            if case.aux_mode == AUX_INPUT
-            else profile.disabled_coverage_ticks
+            reported_profile.input_coverage_ticks
+            if reported_mode == AUX_INPUT
+            else reported_profile.disabled_coverage_ticks
         ),
     }
     wrong = {
@@ -3279,7 +3291,9 @@ def run_acceptance(
         evidence.failures.append(f"{type(error).__name__}: {error}")
         emit_event("fatal", error=evidence.failures[-1])
         try:
-            failure_frame, _ = link.exchange(GET_STATUS_REQUEST, on_data=lambda _frame: None)
+            failure_frame, _ = link.exchange(
+                GET_STATUS_REQUEST, on_data=lambda _frame: None
+            )
             emit_event("failure_status", values=decode_status(failure_frame).values)
         except Exception as status_error:  # noqa: BLE001 - cleanup must still run
             emit_event("failure_status_unavailable", error=str(status_error))

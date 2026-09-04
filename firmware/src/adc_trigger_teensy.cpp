@@ -172,7 +172,7 @@ bool queuesValid() {
   }
   for (std::size_t index = 0U; index < kConverterCount; ++index) {
     if (triggerQueue(index).CTRL != ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0U) ||
-        triggerQueue(index).COUNTER != ADC_ETC_TRIG_COUNTER_INIT_DELAY(
+        triggerQueue(index).COUNTER != variable_rate::adcEtcInitialDelay(
                                            index == 0U
                                                ? schedule.adc0_initial_delay
                                                : schedule.adc1_initial_delay) ||
@@ -296,7 +296,7 @@ class TeensyPlatform final : public Platform {
     ADC_ETC_DMA_CTRL = 0U;
     for (std::size_t index = 0U; index < kConverterCount; ++index) {
       triggerQueue(index).CTRL = ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0U);
-      triggerQueue(index).COUNTER = ADC_ETC_TRIG_COUNTER_INIT_DELAY(
+      triggerQueue(index).COUNTER = variable_rate::adcEtcInitialDelay(
           index == 0U ? schedule.adc0_initial_delay
                       : schedule.adc1_initial_delay);
       triggerQueue(index).CHAIN_1_0 = chainConfiguration(index);

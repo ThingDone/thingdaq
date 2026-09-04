@@ -11,6 +11,7 @@
 #include <imxrt.h>
 
 #include "board_config.h"
+#include "edma_priority_teensy.h"
 #include "gpio_dma_route_teensy.h"
 
 #define THINGDAQ_ADC_DMA_TARGET_COLD_CODE(section_name) \
@@ -328,16 +329,8 @@ void configureDescriptors() {
 }
 
 void configurePriorities() {
-  for (std::size_t converter = 0U; converter < kConverterCount;
-       ++converter) {
-    const std::uint8_t priority =
-        g_pairs_per_buffer == protocol_v2::kInputAdcPairsPerFrame
-            ? board::kInputModeEdmaPriorities[converter]
-            : board::kAdcEdmaPriorities[converter];
-    priorityRegister(converter) = static_cast<std::uint8_t>(
-        DMA_DCHPRI_ECP |
-        DMA_DCHPRI_CHPRI(priority));
-  }
+  edma_priority::configureReservedChannels(
+      g_pairs_per_buffer == protocol_v2::kInputAdcPairsPerFrame);
 }
 
 bool hardwareDestinationMatches(std::size_t converter,

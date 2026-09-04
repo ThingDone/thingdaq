@@ -458,7 +458,7 @@ static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[7].teensy_pin ==
 static_assert(thingdaq::board::kGpio1PsrCaptureMask == 0x0FC30000U);
 static_assert(thingdaq::board::kGpio6ToGpio1Gpr26ClearMask ==
               thingdaq::board::kGpio1PsrCaptureMask);
-static_assert(thingdaq::board::kReservedRam1Bytes == 446368U);
+static_assert(thingdaq::board::kReservedRam1Bytes == 446372U);
 static_assert(thingdaq::board::countOf(
                   thingdaq::board::kIdleModeMemoryViews) == 1U);
 static_assert(thingdaq::board::kIdleModeMemoryViews[0].storage ==

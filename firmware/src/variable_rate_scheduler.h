@@ -27,6 +27,13 @@ constexpr bool operator!=(const ClockDomains &left,
 
 inline constexpr ClockDomains kContractClocks{};
 
+// RT1062 TRIGn_COUNTER.INIT_DELAY is bits 15:0. Teensy core 1.62's
+// ADC_ETC_TRIG_COUNTER_INIT_DELAY macro incorrectly masks to eight bits.
+// The lower rate profiles require 300 and 600 IPG cycles, not 44 and 88.
+constexpr std::uint32_t adcEtcInitialDelay(std::uint16_t cycles) {
+  return cycles;
+}
+
 enum class Status : std::uint8_t {
   kOk,
   kUnsupportedProfile,

@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "board_config.h"
+#include "edma_priority_teensy.h"
 
 namespace thingdaq::gpio_dma_route {
 
@@ -216,19 +217,13 @@ inline void clearAuxEdmaChannelState() {
 
 inline void configureEdmaPriority() {
   static_assert(board::kGpioEdmaChannel == 2U);
-  DMA_DCHPRI2 = static_cast<std::uint8_t>(
-      DMA_DCHPRI_ECP | DMA_DCHPRI_CHPRI(board::kGpioEdmaPriority));
+  edma_priority::configureReservedChannels(false);
 }
 
 inline void configurePairedEdmaPriorities() {
   static_assert(board::kGpioEdmaChannel == 2U);
   static_assert(board::kAuxGpioEdmaChannel == 3U);
-  DMA_DCHPRI2 = static_cast<std::uint8_t>(
-      DMA_DCHPRI_ECP |
-      DMA_DCHPRI_CHPRI(board::kPrimaryGpioInputEdmaPriority));
-  DMA_DCHPRI3 = static_cast<std::uint8_t>(
-      DMA_DCHPRI_ECP |
-      DMA_DCHPRI_CHPRI(board::kAuxGpioEdmaPriority));
+  edma_priority::configureReservedChannels(true);
 }
 
 inline std::uint8_t auxEdmaPriority() {

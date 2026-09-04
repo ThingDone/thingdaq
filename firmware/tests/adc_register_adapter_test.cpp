@@ -12,13 +12,7 @@
 // Supply the target adapter's selected variable-rate schedule through the
 // portable derivation path used by production.
 #include "../src/variable_rate_scheduler.cpp"
-namespace thingdaq::variable_rate {
-const Schedule &teensySelectedSchedule() {
-  static const Schedule schedule =
-      derive(protocol_v2::RateProfile::kAdc1mhzGpio4mhz).schedule;
-  return schedule;
-}
-}  // namespace thingdaq::variable_rate
+#include "../src/variable_rate_scheduler_teensy.cpp"
 
 // White-box inclusion is deliberate: this host executable exercises the
 // production register adapters themselves against the narrow fake i.MX RT1062
@@ -475,12 +469,33 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
 
 }  // namespace
 
+void testRateAdapterIgnoresLatchedStatusAndPreservesFullDelay() {
+  namespace rate = thingdaq::variable_rate;
+  resetFakeRegisters();
+  rate::TeensyRatePlatform platform;
+  rate::Scheduler scheduler(platform);
+  constexpr std::array<std::uint32_t, 4U> delays{75U, 150U, 300U, 600U};
+  for (std::uint8_t index = 0U; index < 4U; ++index) {
+    IMXRT_ADC_ETC.DMA_CTRL.reset(0x00110000U);
+    const auto result = scheduler.configure(static_cast<thingdaq::protocol_v2::RateProfile>(index));
+    expect(result.ok(), "latched boot completion flags do not reject rate setup");
+    expect(IMXRT_ADC_ETC.DMA_CTRL == 0x00110000U,
+           "rate setup leaves W1C completion evidence intact and DMA disabled");
+    expect(IMXRT_ADC_ETC.TRIG[4].COUNTER == delays[index],
+           "actual register delay retains all sixteen bits at every rate");
+    IMXRT_ADC_ETC.DMA_CTRL.reset(0x00110001U);
+    expect(!rate::registerReadbackMatches(scheduler.selected()),
+           "enabled requests are not ignored as status");
+  }
+}
+
 int main() {
   testFixedPinModuleRoutesAndLegalResolutionModes();
   testExactStoppedTriggerScheduleAndResourceIsolation();
   testDeterministicArmStopOrderAndOwnedConflict();
   testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked();
   testCombinedRegisterResourcesCoexistWithPriorityIsolation();
+  testRateAdapterIgnoresLatchedStatusAndPreservesFullDelay();
   if (failures != 0) {
     std::cerr << failures << " ADC register-adapter assertion(s) failed\n";
     return 1;

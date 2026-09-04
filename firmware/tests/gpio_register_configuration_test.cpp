@@ -299,7 +299,7 @@ void testOnlyReservedEdmaChannelChanges() {
     }
     expect(fake_imxrt::dmamux_chcfg[channel] == dmamux_before[channel] &&
                fake_imxrt::dma_tcd[channel].marker == tcd_before[channel] &&
-               fake_imxrt::dma_dchpri[channel] == priority_before[channel],
+               (channel < 4U || fake_imxrt::dma_dchpri[channel] == priority_before[channel]),
            "eDMA setup leaves every unreserved channel register untouched");
   }
 
@@ -362,14 +362,34 @@ void testPairedEdmaSetupRateChangesAndRepeatedTeardown() {
     }
     expect(fake_imxrt::dmamux_chcfg[channel] == dmamux_before[channel] &&
                fake_imxrt::dma_tcd[channel].marker == tcd_before[channel] &&
-               fake_imxrt::dma_dchpri[channel] == priority_before[channel],
+               (channel < 4U || fake_imxrt::dma_dchpri[channel] == priority_before[channel]),
            "paired lifecycle leaves every unreserved DMA resource unchanged");
   }
 }
 
 }  // namespace
 
+void testReservedPrioritiesAreUniqueAcrossModeChanges() {
+  resetFakeRegisters();
+  for (const bool auxiliary : {false, true, false, true}) {
+    if (auxiliary) { route::configurePairedEdmaPriorities(); }
+    else { route::configureEdmaPriority(); }
+    std::array<bool, 16U> seen{};
+    for (std::size_t channel = 0U; channel < 16U; ++channel) {
+      const auto priority = fake_imxrt::dma_dchpri[channel] & 15U;
+      expect(!seen[priority], "all priorities are unique, including inactive ADC/aux channels");
+      seen[priority] = true;
+    }
+    expect((DMA_DCHPRI0 & 15U) == (auxiliary ? 3U : 2U) &&
+               (DMA_DCHPRI1 & 15U) == (auxiliary ? 2U : 1U) &&
+               (DMA_DCHPRI2 & 15U) == (auxiliary ? 1U : 0U) &&
+               (DMA_DCHPRI3 & 15U) == (auxiliary ? 0U : 3U),
+           "reserved channel priorities match the selected input mode");
+  }
+}
+
 int main() {
+  testReservedPrioritiesAreUniqueAcrossModeChanges();
   testGpioAliasAndDirectionIsolation();
   testAuxiliaryAliasAndDirectionIsolation();
   testOnlyReservedPitAndClockGatesChange();

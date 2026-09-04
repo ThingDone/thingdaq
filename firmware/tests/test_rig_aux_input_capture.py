@@ -110,9 +110,13 @@ class AuxiliaryPhysicalDevice(SimulatedDevice):
         )
 
     def _handle_gpio_capture_diagnostic(self, request):  # type: ignore[no-untyped-def]
-        return self._success_response(
-            request, _fixture_frame("gpio-capture-diagnostic-response.bin").payload
+        payload = bytearray(
+            _fixture_frame("gpio-capture-diagnostic-response.bin").payload
         )
+        # The historical fixture inherited v1's primary-bank BITER/priority.
+        rig.struct.pack_into("<HH", payload, 132, 2024, 2024)
+        payload[138] = 1
+        return self._success_response(request, payload)
 
     def _encode_data_frame(  # type: ignore[no-untyped-def]
         self,
@@ -223,7 +227,9 @@ class AuxiliaryPhysicalDevice(SimulatedDevice):
         payload = bytearray(
             self.status().to_payload(protocol_version=request.header.version)
         )
-        configuration = self.configuration or self._counter_configuration
+        configuration = self.configuration or Configuration(
+            stream_mask=StreamMask.NONE, source=Source.HARDWARE
+        )
         if request.header.version == constants.PROTOCOL_VERSION and configuration:
             layout = configuration.gpio_layout
             timing = configuration.rate_timing
@@ -362,10 +368,14 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
             )
 
     def test_isolated_control_never_invokes_paired_diagnostic(self) -> None:
-        with patch.object(AuxiliaryPhysicalDevice, "_handle_gpio_capture_diagnostic",
-                          side_effect=AssertionError("paired bank must stay unused")):
-            result = self._run(rig.RUN_CASES["CONTROL_COMBINED"], rig.PROFILES[0],
-                               run_diagnostic=False)
+        with patch.object(
+            AuxiliaryPhysicalDevice,
+            "_handle_gpio_capture_diagnostic",
+            side_effect=AssertionError("paired bank must stay unused"),
+        ):
+            result = self._run(
+                rig.RUN_CASES["CONTROL_COMBINED"], rig.PROFILES[0], run_diagnostic=False
+            )
         self.assertEqual([], result.evidence.failures)
 
     def test_real_firmware_legacy_rejection_is_not_hidden_as_timeout(self) -> None:
@@ -429,6 +439,10 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
         diagnostic = rig.decode_capture_diagnostic(
             _fixture_frame("gpio-capture-diagnostic-response.bin")
         )
+        historical = rig.Evidence()
+        rig.grade_capture_diagnostic(historical, diagnostic, None)
+        self.assertTrue(historical.failures)
+        diagnostic.update(tcd_citer=2024, tcd_biter=2024, edma_priority=1)
         evidence = rig.Evidence()
         self.assertEqual(
             "NOT_RUN", rig.grade_capture_diagnostic(evidence, diagnostic, None)
