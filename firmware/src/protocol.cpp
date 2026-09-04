@@ -487,7 +487,11 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
     if (header.run_id != 0U) {
       return badPayload();
     }
-    if (header.total_length > protocol_v1::kMaxCommandFrameBytes) {
+    const std::size_t max_command =
+        header.version == protocol_v2::kProtocolVersion
+            ? protocol_v2::kMaxCommandFrameBytes
+            : protocol_v1::kMaxCommandFrameBytes;
+    if (header.total_length > max_command) {
       return badLength();
     }
   }

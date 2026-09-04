@@ -23,6 +23,7 @@ Campaign selectors:
   AUX_INPUT_WARMUP_SECONDS=0.25
   AUX_INPUT_STATUS_INTERVAL_SECONDS=0.5
   AUX_INPUT_CHECKSUM_ALGORITHM=ADLER32|CRC32C|CRC32_ISO_HDLC
+  AUX_INPUT_RUN_DIAGNOSTIC=1 (0 isolates streaming from the paired-bank diagnostic)
   EXPECTED_BUILD_ID=thingdaq-<16 lowercase hex>
   EXPECTED_HARDWARE_SERIAL=<nonzero uint32>
 
@@ -661,7 +662,8 @@ class FrameParser:
             first_sample_ticks,
             item_count,
         ) = fields
-        if magic != MAGIC or version != PROTOCOL_VERSION:
+        legacy_rejection = version == 1 and kind == ERROR_RESPONSE
+        if magic != MAGIC or (version != PROTOCOL_VERSION and not legacy_rejection):
             raise ProtocolFailure("invalid magic or protocol version")
         if header_length != HEADER_SIZE or reserved:
             raise ProtocolFailure("invalid fixed header fields")
@@ -832,12 +834,15 @@ class SerialLink:
         deadline = started + (COMMAND_DEADLINE_SECONDS if timeout is None else timeout)
         self._write_all(wire, deadline)
         expected_kind = REQUEST_RESPONSE_KIND[request_kind]
+        received_prefix = bytearray()
         while True:
             if time.monotonic() >= deadline:
                 raise DeadlineExpired(
-                    f"request {request_id} kind 0x{request_kind:02x} timed out"
+                    f"request {request_id} kind 0x{request_kind:02x} timed out; "
+                    f"parser_errors={self.parser.errors} rx_prefix={received_prefix.hex()}"
                 )
-            frames = self._read_once()
+            chunk, frames = self._read_chunk_and_frames()
+            received_prefix.extend(chunk[:max(0, 96 - len(received_prefix))])
             matched: Frame | None = None
             for frame in frames:
                 if frame.kind in DATA_KINDS:
@@ -2280,6 +2285,7 @@ def validate_status(
         if status.values[name] != expected
     }
     if wrong:
+        emit_event("status_failure_snapshot", final=final, values=status.values)
         raise ProtocolFailure(
             "STATUS configuration echo is contradictory: "
             + json.dumps(wrong, sort_keys=True)
@@ -2900,6 +2906,7 @@ def run_acceptance(
     expected_build_id: str | None,
     expected_hardware_serial: int | None,
     fixture: FixtureDeclaration | None,
+    run_diagnostic: bool = True,
 ) -> AcceptanceResult:
     if not 0 < capture_seconds <= MAX_CAPTURE_SECONDS:
         raise ValueError(f"capture_seconds must be in (0, {MAX_CAPTURE_SECONDS}]")
@@ -2919,6 +2926,8 @@ def run_acceptance(
         )
     if case.aux_mode == AUX_DISABLED and fixture is not None:
         raise ValueError("an auxiliary fixture declaration requires an INPUT run case")
+    if not run_diagnostic and fixture is not None:
+        raise ValueError("fixture grading requires the diagnostic")
 
     evidence = Evidence()
     link = SerialLink(port)
@@ -2954,17 +2963,21 @@ def run_acceptance(
         if evidence.failures:
             raise ProtocolFailure("static identity/resource grading failed")
 
-        diagnostic_frame, diagnostic_latency = link.exchange(
-            GPIO_CAPTURE_DIAGNOSTIC_REQUEST,
-            timeout=DIAGNOSTIC_DEADLINE_SECONDS,
-        )
-        stimulus_grade = grade_capture_diagnostic(
-            evidence,
-            decode_capture_diagnostic(diagnostic_frame),
-            fixture,
-        )
-        if evidence.failures:
-            raise ProtocolFailure("IDLE auxiliary diagnostic grading failed")
+        diagnostic_latency = 0.0
+        if run_diagnostic:
+            diagnostic_frame, diagnostic_latency = link.exchange(
+                GPIO_CAPTURE_DIAGNOSTIC_REQUEST,
+                timeout=DIAGNOSTIC_DEADLINE_SECONDS,
+            )
+            stimulus_grade = grade_capture_diagnostic(
+                evidence,
+                decode_capture_diagnostic(diagnostic_frame),
+                fixture,
+            )
+            if evidence.failures:
+                raise ProtocolFailure("IDLE auxiliary diagnostic grading failed")
+        else:
+            emit_event("diagnostic_not_run", reason="independent streaming experiment")
 
         reset_frame, _ = link.exchange(RESET_STATS_REQUEST)
         response_success(reset_frame, RESET_STATS_RESPONSE)
@@ -3265,6 +3278,11 @@ def run_acceptance(
     except Exception as error:  # noqa: BLE001 - remote evidence must retain diagnosis
         evidence.failures.append(f"{type(error).__name__}: {error}")
         emit_event("fatal", error=evidence.failures[-1])
+        try:
+            failure_frame, _ = link.exchange(GET_STATUS_REQUEST, on_data=lambda _frame: None)
+            emit_event("failure_status", values=decode_status(failure_frame).values)
+        except Exception as status_error:  # noqa: BLE001 - cleanup must still run
+            emit_event("failure_status_unavailable", error=str(status_error))
     finally:
         if not completed:
             try:
@@ -3396,6 +3414,10 @@ def main() -> int:
         checksum = _checksum_environment()
         fixture = load_fixture_declaration(os.environ.get("AUX_INPUT_FIXTURE_JSON"))
         expected_serial = _optional_uint32_environment("EXPECTED_HARDWARE_SERIAL")
+        diagnostic_setting = os.environ.get("AUX_INPUT_RUN_DIAGNOSTIC", "1")
+        if diagnostic_setting not in {"0", "1"}:
+            raise ValueError("AUX_INPUT_RUN_DIAGNOSTIC must be 0 or 1")
+        run_diagnostic = diagnostic_setting == "1"
     except (TypeError, ValueError) as error:
         emit_event("configuration_error", error=str(error))
         return 2
@@ -3435,12 +3457,14 @@ def main() -> int:
             expected_build_id=expected_build_id,
             expected_hardware_serial=expected_serial,
             fixture=fixture,
+            run_diagnostic=run_diagnostic,
         )
     finally:
         port.close()
     artifact = {
         "schema": "thingdaq.experiment-evidence/v1",
         "kind": "aux_input_capture",
+        "paired_diagnostic": "REQUIRED" if run_diagnostic else "NOT_RUN",
         "protocol_version": PROTOCOL_VERSION,
         "case": case.name,
         "aux_bank_mode": "INPUT" if case.aux_mode == AUX_INPUT else "DISABLED",

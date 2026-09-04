@@ -290,7 +290,7 @@ class CdcTransport {
 static_assert(board::kCommandQueueDepth > 0U);
 static_assert(board::kResponseQueueDepth > 0U);
 static_assert(board::kUsbRxScratchBytes >=
-              protocol_v1::kMaxCommandFrameBytes);
+              protocol_v2::kMaxCommandFrameBytes);
 static_assert(board::kUsbRxBudgetBytesPerLoop > 0U);
 static_assert(board::kUsbTxBudgetBytesPerVisit > 0U);
 static_assert(board::kUsbTxMinimumWriteBytes > 1U);

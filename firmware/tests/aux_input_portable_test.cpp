@@ -581,7 +581,42 @@ void testAuxiliaryPackerUsesDynamicPacketShapesAndCounters() {
 
 }  // namespace
 
+void testV2ConfigureThroughIncrementalParser() {
+  for (const auto &timing : protocol_v2::kRateProfiles) {
+    for (std::uint8_t mode = 0U; mode < 2U; ++mode) {
+      std::array<std::uint8_t, 16U> payload{{3U, 0U, 1U, mode}};
+      protocol::MutableByteView bytes{payload.data(), payload.size()};
+      protocol::storeU32(bytes, 4U, 4096U);
+      protocol::storeU32(bytes, 8U, timing.adc_pair_rate_hz);
+      protocol::storeU32(bytes, 12U, timing.gpio_sample_rate_hz);
+      protocol::FrameFields fields{};
+      fields.version = 2U;
+      fields.kind = protocol_v1::FrameKind::kConfigureRequest;
+      fields.request_id = 42U;
+      protocol::CommandFrame frame{};
+      const auto encoded = protocol::encodeFrame(
+          fields, {payload.data(), payload.size()}, frame);
+      expect(encoded.ok(), "v2 64-byte CONFIGURE encodes at every width/rate");
+      if (!encoded.ok()) { continue; }
+      for (std::size_t split = 0U; split <= frame.size(); ++split) {
+        protocol::IncrementalCommandParser parser{};
+        protocol::ParsedCommand command{};
+        auto result = parser.feed({frame.data(), split}, command);
+        expect(!result.rejection_ready, "first fragment is not rejected");
+        if (!result.command_ready) {
+          result = parser.feed({frame.data() + split, frame.size() - split}, command);
+        }
+        expect(result.command_ready && !result.rejection_ready &&
+                   command.request.configuration.rate_profile == timing.profile &&
+                   static_cast<std::uint8_t>(command.request.configuration.aux_bank_mode) == mode,
+               "real command parser accepts v2 CONFIGURE at every fragmentation boundary");
+      }
+    }
+  }
+}
+
 int main() {
+  testV2ConfigureThroughIncrementalParser();
   testExactSchedulesAndTransactionalRollback();
   testLayoutsAreClosedOverModesAndProfiles();
   testGenerationBarrierPackingAndStopTailConservation();

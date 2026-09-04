@@ -340,7 +340,7 @@ class PacedAuxSerial:
 
 
 class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
-    def _run(self, case, profile, *, fault: str | None = None):  # type: ignore[no-untyped-def]
+    def _run(self, case, profile, *, fault: str | None = None, run_diagnostic=True):  # type: ignore[no-untyped-def]
         port = PacedAuxSerial(fault=fault)
         with (
             patch.object(rig, "STARTUP_DRAIN_SECONDS", 0.001),
@@ -358,7 +358,27 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
                 expected_build_id="thingdaq-0123456789abcdef",
                 expected_hardware_serial=0x12345678,
                 fixture=None,
+                run_diagnostic=run_diagnostic,
             )
+
+    def test_isolated_control_never_invokes_paired_diagnostic(self) -> None:
+        with patch.object(AuxiliaryPhysicalDevice, "_handle_gpio_capture_diagnostic",
+                          side_effect=AssertionError("paired bank must stay unused")):
+            result = self._run(rig.RUN_CASES["CONTROL_COMBINED"], rig.PROFILES[0],
+                               run_diagnostic=False)
+        self.assertEqual([], result.evidence.failures)
+
+    def test_real_firmware_legacy_rejection_is_not_hidden_as_timeout(self) -> None:
+        wire = bytes.fromhex(
+            "efbeadde019f00802c0001003800000008000000000000000000000004000000"
+            "0000000000000000000000000100040011020000e20427e9"
+        )
+        parser = rig.FrameParser()
+        frames = parser.feed(wire)
+        self.assertEqual(0, parser.errors)
+        self.assertEqual(1, len(frames))
+        self.assertEqual(rig.ERROR_RESPONSE, frames[0].kind)
+        self.assertEqual(4, rig._u16(frames[0].payload, 2))
 
     def test_every_control_input_gpio_combined_profile_is_accepted(self) -> None:
         for case in rig.RUN_CASES.values():

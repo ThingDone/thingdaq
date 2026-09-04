@@ -413,7 +413,7 @@ inline constexpr EdmaAllocation kEdmaAllocations[] = {
      ResourceOwner::kAuxGpioCapture},
 };
 
-inline constexpr std::size_t kCommandParserCapacityBytes = 64U;
+inline constexpr std::size_t kCommandParserCapacityBytes = 68U;
 inline constexpr std::size_t kUsbRxScratchBytes = 128U;
 inline constexpr std::size_t kCommandQueueDepth = 4U;
 inline constexpr std::size_t kResponseQueueDepth = 4U;

@@ -911,7 +911,7 @@ Result encodeRejectedFrameResponse(std::uint32_t request_id,
 
 inline constexpr std::size_t kMagicBytes = sizeof(std::uint32_t);
 inline constexpr std::size_t kCommandParserStorageBytes =
-    protocol_v1::kMaxCommandFrameBytes + kMagicBytes - 1U;
+    protocol_v2::kMaxCommandFrameBytes + kMagicBytes - 1U;
 
 struct ParserCounters {
   std::uint64_t bytes_received = 0U;
@@ -972,6 +972,6 @@ class IncrementalCommandParser {
 static_assert(protocol_v1::kMaxCommandFrameBytes <=
               protocol_v1::kMaxControlFrameBytes);
 static_assert(kCommandParserStorageBytes ==
-              protocol_v1::kMaxCommandFrameBytes + 3U);
+              protocol_v2::kMaxCommandFrameBytes + 3U);
 
 }  // namespace thingdaq::protocol
