@@ -2802,6 +2802,9 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   }
   const bool version2 =
       request.protocol_version == protocol_v2::kProtocolVersion;
+  const bool auxiliary_input =
+      version2 && response.applied_configuration.aux_bank_mode ==
+                      protocol_v2::AuxBankMode::kInput;
   const protocol_v2::RateProfileTiming *timing =
       rate_profile::timingFor(response.applied_configuration.rate_profile);
   if (version2 && timing == nullptr) {
@@ -2922,7 +2925,8 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   payload[protocol_v1::kInfoResponseGpioDmamuxSourceOffset] =
       response.gpio_dmamux_source;
   payload[protocol_v1::kInfoResponseGpioEdmaPriorityOffset] =
-      response.gpio_edma_priority;
+      auxiliary_input ? protocol_v2::kInputModeEdmaPriorities[2]
+                      : response.gpio_edma_priority;
   payload[protocol_v1::kInfoResponseGpioXbarActiveEdgeOffset] =
       response.gpio_xbar_active_edge;
   storeU16(bytes, protocol_v1::kInfoResponseAdcCodeMinOffset,
@@ -2986,7 +2990,10 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   storeU16(bytes, protocol_v1::kInfoResponseSupportedConfigurationMaskOffset,
            response.supported_configuration_mask);
   storeU16(bytes, protocol_v1::kInfoResponseDataPayloadBytesOffset,
-           response.data_payload_bytes);
+           auxiliary_input
+               ? static_cast<std::uint16_t>(protocol_v2::kInputAdcPairsPerFrame *
+                                            protocol_v1::kAdcPairBytes)
+               : response.data_payload_bytes);
   storeU16(bytes, protocol_v1::kInfoResponseAdcPairsPerFrameOffset,
            version2
                ? static_cast<std::uint16_t>(
@@ -3018,7 +3025,8 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
     payload[protocol_v1::kInfoResponseAdcEdmaChannelsOffset + index] =
         response.adc_edma_channels[index];
     payload[protocol_v1::kInfoResponseAdcEdmaPrioritiesOffset + index] =
-        response.adc_edma_priorities[index];
+        auxiliary_input ? protocol_v2::kInputModeEdmaPriorities[index]
+                        : response.adc_edma_priorities[index];
     payload[protocol_v1::kInfoResponseAdcDmamuxSourcesOffset + index] =
         response.adc_dmamux_sources[index];
   }

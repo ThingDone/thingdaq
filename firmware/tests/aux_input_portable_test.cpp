@@ -615,7 +615,42 @@ void testV2ConfigureThroughIncrementalParser() {
   }
 }
 
+void testV2InfoPublishesActiveLayoutAndPriorities() {
+  for (const auto &timing : protocol_v2::kRateProfiles) {
+    for (std::uint8_t mode = 0U; mode < 2U; ++mode) {
+      protocol::Request request{};
+      request.kind = protocol_v1::CommandKind::kInfo;
+      request.protocol_version = protocol_v2::kProtocolVersion;
+      request.request_id = 1U;
+      protocol::InfoResponse info{};
+      info.applied_configuration.rate_profile = timing.profile;
+      info.applied_configuration.aux_bank_mode =
+          static_cast<protocol_v2::AuxBankMode>(mode);
+      protocol::ControlFrame encoded{};
+      expect(protocol::encodeInfoResponse(request, 0U, info, encoded).ok(),
+             "INFO encodes at every width/rate");
+      const protocol::ByteView payload{
+          encoded.data() + protocol_v1::kHeaderSize,
+          protocol_v2::kInfoResponsePayloadSize};
+      std::uint16_t payload_bytes = 0U;
+      expect(protocol::loadU16(payload, protocol_v1::kInfoResponseDataPayloadBytesOffset,
+                               payload_bytes) &&
+                 payload_bytes == (mode == 1U ? 2024U : 4048U),
+             "INFO publishes active ADC payload size");
+      expect(payload.data[protocol_v1::kInfoResponseGpioEdmaPriorityOffset] ==
+                 (mode == 1U ? 1U : 0U),
+             "INFO publishes active GPIO DMA priority");
+      expect(payload.data[protocol_v1::kInfoResponseAdcEdmaPrioritiesOffset] ==
+                 (mode == 1U ? 3U : 2U) &&
+                 payload.data[protocol_v1::kInfoResponseAdcEdmaPrioritiesOffset + 1U] ==
+                 (mode == 1U ? 2U : 1U),
+             "INFO publishes active ADC DMA priorities");
+    }
+  }
+}
+
 int main() {
+  testV2InfoPublishesActiveLayoutAndPriorities();
   testV2ConfigureThroughIncrementalParser();
   testExactSchedulesAndTransactionalRollback();
   testLayoutsAreClosedOverModesAndProfiles();
