@@ -1108,6 +1108,910 @@ def group_metrics(experiments: Sequence[Mapping[str, Any]]) -> list[dict[str, An
     return groups
 
 
+def _experiment_by_id(
+    experiments: Sequence[Mapping[str, Any]], experiment_id: str
+) -> Mapping[str, Any]:
+    matches = [
+        item for item in experiments if item.get("experiment_id") == experiment_id
+    ]
+    if len(matches) != 1:
+        _fail(f"cross-experiment analysis requires exactly one {experiment_id!r} input")
+    return matches[0]
+
+
+def _report_for(experiment: Mapping[str, Any]) -> Mapping[str, Any]:
+    report = experiment.get("report", experiment)
+    if not isinstance(report, Mapping):
+        _fail(f"{experiment.get('experiment_id')}: report must be an object")
+    return report
+
+
+def _evidence_by_id(
+    report: Mapping[str, Any], experiment_id: str, evidence_id: str
+) -> Mapping[str, Any]:
+    records = _require_list(report, "evidence", experiment_id)
+    matches = [
+        item
+        for item in records
+        if isinstance(item, Mapping) and item.get("id") == evidence_id
+    ]
+    if len(matches) != 1:
+        _fail(f"{experiment_id}: requires evidence {evidence_id!r}")
+    return matches[0]
+
+
+def _nested_mapping(
+    owner: Mapping[str, Any], location: str, *keys: str
+) -> Mapping[str, Any]:
+    value: Any = owner
+    traversed = location
+    for key in keys:
+        if not isinstance(value, Mapping):
+            _fail(f"{traversed}: must be an object")
+        value = value.get(key)
+        traversed = f"{traversed}.{key}"
+    if not isinstance(value, Mapping):
+        _fail(f"{traversed}: must be an object")
+    return value
+
+
+def _nested_list(owner: Mapping[str, Any], location: str, *keys: str) -> list[Any]:
+    value: Any = owner
+    traversed = location
+    for key in keys:
+        if not isinstance(value, Mapping):
+            _fail(f"{traversed}: must be an object")
+        value = value.get(key)
+        traversed = f"{traversed}.{key}"
+    if not isinstance(value, list):
+        _fail(f"{traversed}: must be an array")
+    return value
+
+
+def _metric_value(
+    report: Mapping[str, Any],
+    experiment_id: str,
+    name: str,
+    *,
+    evidence_level: str | None = None,
+) -> Any:
+    metrics = _require_list(report, "metrics", experiment_id)
+    matches = [
+        item
+        for item in metrics
+        if isinstance(item, Mapping)
+        and item.get("name") == name
+        and (evidence_level is None or item.get("evidence_level") == evidence_level)
+    ]
+    if len(matches) != 1:
+        suffix = f" at {evidence_level}" if evidence_level is not None else ""
+        _fail(f"{experiment_id}: requires one metric {name!r}{suffix}")
+    return matches[0].get("value")
+
+
+def _acceptance_state(
+    report: Mapping[str, Any], experiment_id: str, acceptance_id: str
+) -> dict[str, Any]:
+    acceptance = _require_list(report, "acceptance", experiment_id)
+    matches = [
+        item
+        for item in acceptance
+        if isinstance(item, Mapping) and item.get("id") == acceptance_id
+    ]
+    if len(matches) != 1:
+        _fail(f"{experiment_id}: requires acceptance {acceptance_id!r}")
+    return {
+        "state": matches[0].get("state"),
+        "reason": matches[0].get("reason"),
+    }
+
+
+def _declared_sha256(experiment: Mapping[str, Any], path: str) -> str:
+    records = experiment.get("declared_files")
+    if not isinstance(records, list):
+        _fail(f"{experiment.get('experiment_id')}: declared_files must be an array")
+    hashes = {
+        str(item.get("sha256"))
+        for item in records
+        if isinstance(item, Mapping) and item.get("path") == path
+    }
+    if len(hashes) != 1:
+        _fail(
+            f"{experiment.get('experiment_id')}: requires one declared hash for {path}"
+        )
+    return hashes.pop()
+
+
+def load_protocol_extension(
+    root: Path, experiment: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Read one declared protocol-v2 contract from the candidate Git object."""
+
+    experiment_id = str(experiment["experiment_id"])
+    path = "protocol/protocol-v2.json"
+    expected_sha256 = _declared_sha256(experiment, path)
+    commit = str(experiment["revision_commit"])
+    data = _git_blob(root, commit, path)
+    digest = _sha256(data)
+    _require_equal(digest, expected_sha256, f"{experiment_id}.protocol_v2_sha256")
+    contract = _json_object(data, f"{commit}:{path}")
+    _require_equal(contract.get("protocol_version"), 2, f"{experiment_id}.protocol")
+    _require_equal(
+        contract.get("extension"), experiment_id, f"{experiment_id}.extension"
+    )
+    return {
+        "path": path,
+        "sha256": digest,
+        "extension": contract["extension"],
+        "contract": contract,
+    }
+
+
+def _half_rational(value: str, location: str) -> str:
+    try:
+        numerator_text, denominator_text = value.split("/", 1)
+        numerator = int(numerator_text)
+        denominator = int(denominator_text)
+    except (ValueError, AttributeError) as error:
+        raise AggregationError(f"{location}: invalid exact rational") from error
+    if denominator <= 0 or numerator % 2 != 0:
+        _fail(f"{location}: cannot be halved exactly")
+    return f"{numerator // 2}/{denominator}"
+
+
+def _sum_rationals(left: str, right: str, location: str) -> str:
+    try:
+        left_numerator, left_denominator = (int(item) for item in left.split("/", 1))
+        right_numerator, right_denominator = (int(item) for item in right.split("/", 1))
+    except (ValueError, AttributeError) as error:
+        raise AggregationError(f"{location}: invalid exact rational") from error
+    if left_denominator != right_denominator or left_denominator <= 0:
+        _fail(f"{location}: rational denominators differ")
+    return f"{left_numerator + right_numerator}/{left_denominator}"
+
+
+def build_cross_experiment_analysis(
+    experiments: Sequence[Mapping[str, Any]],
+    protocol_extensions: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Derive the synthesis analysis from validated exact evidence fields."""
+
+    clock = _experiment_by_id(experiments, "clock-450mhz")
+    rle = _experiment_by_id(experiments, "rle-streaming")
+    aux_input = _experiment_by_id(experiments, "aux-input-bank")
+    aux_output = _experiment_by_id(experiments, "aux-output-bank")
+    clock_report = _report_for(clock)
+    rle_report = _report_for(rle)
+    input_report = _report_for(aux_input)
+    output_report = _report_for(aux_output)
+
+    rle_protocol = protocol_extensions["rle-streaming"]
+    input_protocol = protocol_extensions["aux-input-bank"]
+    output_protocol = protocol_extensions["aux-output-bank"]
+    rle_contract = _nested_mapping(rle_protocol, "rle_protocol", "contract")
+    input_contract = _nested_mapping(input_protocol, "input_protocol", "contract")
+    output_contract = _nested_mapping(output_protocol, "output_protocol", "contract")
+
+    clock_observations = _nested_mapping(clock, "clock-450mhz", "observations")
+    clock_identity = _nested_mapping(clock_report, "clock-450mhz", "identity")
+    clock_profile = _nested_mapping(
+        clock_identity, "clock-450mhz.identity", "clock_profile"
+    )
+    output_build = _evidence_by_id(output_report, "aux-output-bank", "firmware-build")
+    output_build_details = _nested_mapping(
+        output_build, "aux-output-bank.firmware-build", "build"
+    )
+    _require_equal(
+        output_build_details.get("fqbn"),
+        "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+        "aux-output-bank.firmware-build.fqbn",
+    )
+    output_physical = _evidence_by_id(
+        output_report, "aux-output-bank", "rig-no-output-combined"
+    )
+    output_run = _nested_mapping(
+        output_physical, "aux-output-bank.rig-no-output-combined", "run"
+    )
+
+    rle_physical = _evidence_by_id(
+        rle_report, "rle-streaming", "physical-accepted-campaign"
+    )
+    matched = _nested_mapping(
+        rle_physical, "rle-streaming.physical-accepted-campaign", "matched_physical"
+    )
+    matched_streams = _nested_mapping(
+        matched, "rle-streaming.physical-accepted-campaign.matched_physical", "streams"
+    )
+    rle_performance = _nested_mapping(
+        rle_physical, "rle-streaming.physical-accepted-campaign", "performance"
+    )
+    physical_streams: list[dict[str, Any]] = []
+    for stream_name in ("adc", "gpio", "combined"):
+        stream = _nested_mapping(
+            matched_streams, "matched_physical.streams", stream_name
+        )
+        grade = _nested_mapping(
+            stream, f"matched_physical.streams.{stream_name}", "grade"
+        )
+        raw = _nested_mapping(stream, f"matched_physical.streams.{stream_name}", "raw")
+        rle_auto = _nested_mapping(
+            stream, f"matched_physical.streams.{stream_name}", "rle_auto"
+        )
+        physical_streams.append(
+            {
+                "stream": stream_name.upper(),
+                "logical_payload_bytes": grade.get("logical_payload_bytes"),
+                "raw_complete_wire_bytes": grade.get("raw_complete_wire_bytes"),
+                "selected_complete_wire_bytes": grade.get(
+                    "selected_complete_wire_bytes"
+                ),
+                "complete_wire_ratio": grade.get("complete_wire_ratio"),
+                "complete_wire_reduction_ratio": grade.get(
+                    "complete_wire_reduction_ratio"
+                ),
+                "raw_frames": grade.get("raw_frames"),
+                "rle_frames": grade.get("rle_frames"),
+                "fallback_frames": rle_auto.get("raw_frames"),
+                "fallback_frequency": {
+                    "numerator": rle_auto.get("raw_frames"),
+                    "denominator": rle_auto.get("frames"),
+                },
+                "encode_cycles": grade.get("encode_cycles"),
+                "processing_utilization_delta_percentage_points": grade.get(
+                    "processing_utilization_delta_percentage_points"
+                ),
+                "raw_decode_bytes_per_second": raw.get("decode_bytes_per_second"),
+                "rle_auto_decode_bytes_per_second": rle_auto.get(
+                    "decode_bytes_per_second"
+                ),
+                "bandwidth_result": grade.get("bandwidth_reduction_result"),
+                "processing_result": grade.get("processing_utilization_result"),
+                "overall_value_result": grade.get("result"),
+            }
+        )
+
+    input_workload = _evidence_by_id(
+        input_report, "aux-input-bank", "aux-input-workload-analysis"
+    )
+    input_profiles = _require_list(
+        input_workload, "profiles", "aux-input-bank.aux-input-workload-analysis"
+    )
+    input_build = _evidence_by_id(input_report, "aux-input-bank", "firmware-build")
+    input_contract_body = _nested_mapping(
+        input_contract, "aux-input-bank.protocol-v2", "auxiliary_input"
+    )
+    input_layouts = _nested_mapping(
+        input_contract_body, "aux-input-bank.protocol-v2.auxiliary_input", "layouts"
+    )
+    disabled_layout = _nested_mapping(
+        input_layouts, "aux-input-bank.protocol-v2.layouts", "DISABLED"
+    )
+    enabled_layout = _nested_mapping(
+        input_layouts, "aux-input-bank.protocol-v2.layouts", "INPUT"
+    )
+    retention = _nested_mapping(
+        input_build, "aux-input-bank.firmware-build", "packet_retention"
+    )
+    retention_profiles = _nested_list(
+        retention, "aux-input-bank.firmware-build.packet_retention", "profiles"
+    )
+    retention_by_name = {
+        str(item.get("profile")): item
+        for item in retention_profiles
+        if isinstance(item, Mapping)
+    }
+    profile_comparison: list[dict[str, Any]] = []
+    for profile in input_profiles:
+        if not isinstance(profile, Mapping):
+            _fail("aux-input-bank profile must be an object")
+        profile_name = str(profile.get("profile"))
+        profile_retention = retention_by_name.get(profile_name)
+        if not isinstance(profile_retention, Mapping):
+            _fail(f"aux-input-bank: missing retention for {profile_name}")
+        modes = _nested_mapping(
+            profile_retention,
+            f"aux-input-bank.packet_retention.{profile_name}",
+            "modes",
+        )
+        disabled_retention = _nested_mapping(
+            modes, f"aux-input-bank.packet_retention.{profile_name}.modes", "DISABLED"
+        )
+        input_retention = _nested_mapping(
+            modes, f"aux-input-bank.packet_retention.{profile_name}.modes", "INPUT"
+        )
+        adc_framed = _nested_mapping(
+            profile,
+            f"aux-input-bank.profiles.{profile_name}",
+            "adc_framed_bytes_per_second",
+        )
+        gpio_framed_16 = _nested_mapping(
+            profile,
+            f"aux-input-bank.profiles.{profile_name}",
+            "gpio_framed_bytes_per_second",
+        )
+        adc_exact = str(adc_framed.get("exact"))
+        gpio_16_exact = str(gpio_framed_16.get("exact"))
+        gpio_8_exact = _half_rational(
+            gpio_16_exact, f"aux-input-bank.profiles.{profile_name}.gpio_framed"
+        )
+        profile_comparison.append(
+            {
+                "profile": profile_name,
+                "adc_pair_rate_hz": profile.get("adc_pair_rate_hz"),
+                "gpio_sample_rate_hz": profile.get("gpio_sample_rate_hz"),
+                "eight_input": {
+                    "gpio_width_bits": disabled_layout.get("gpio_width_bits"),
+                    "adc_payload_bytes_per_second": profile.get(
+                        "adc_payload_bytes_per_second"
+                    ),
+                    "gpio_payload_bytes_per_second": int(
+                        profile.get("gpio_payload_bytes_per_second", 0)
+                    )
+                    // 2,
+                    "combined_payload_bytes_per_second": int(
+                        profile.get("adc_payload_bytes_per_second", 0)
+                    )
+                    + int(profile.get("gpio_payload_bytes_per_second", 0)) // 2,
+                    "adc_framed_bytes_per_second_exact": adc_exact,
+                    "gpio_framed_bytes_per_second_exact": gpio_8_exact,
+                    "combined_framed_bytes_per_second_exact": _sum_rationals(
+                        adc_exact,
+                        gpio_8_exact,
+                        f"aux-input-bank.profiles.{profile_name}.eight_input",
+                    ),
+                    "combined_retention_microseconds": disabled_retention.get(
+                        "combined_retention_us"
+                    ),
+                },
+                "sixteen_input": {
+                    "gpio_width_bits": enabled_layout.get("gpio_width_bits"),
+                    "adc_payload_bytes_per_second": profile.get(
+                        "adc_payload_bytes_per_second"
+                    ),
+                    "gpio_payload_bytes_per_second": profile.get(
+                        "gpio_payload_bytes_per_second"
+                    ),
+                    "combined_payload_bytes_per_second": profile.get(
+                        "combined_payload_bytes_per_second"
+                    ),
+                    "adc_framed_bytes_per_second": adc_framed,
+                    "gpio_framed_bytes_per_second": gpio_framed_16,
+                    "combined_framed_bytes_per_second": profile.get(
+                        "combined_framed_bytes_per_second"
+                    ),
+                    "combined_retention_microseconds": input_retention.get(
+                        "combined_retention_us"
+                    ),
+                    "campaign_result": profile.get("campaign_result"),
+                    "reason": profile.get("reason"),
+                },
+            }
+        )
+
+    output_host = _evidence_by_id(
+        output_report, "aux-output-bank", "output-host-lifecycle"
+    )
+    output_resources = _evidence_by_id(
+        output_report, "aux-output-bank", "output-resource-and-memory-map"
+    )
+    output_loopback = _evidence_by_id(
+        output_report, "aux-output-bank", "protected-loopback-campaign"
+    )
+    output_controls = _evidence_by_id(
+        output_report, "aux-output-bank", "rig-nondriving-output-controls"
+    )
+    output_resource_map = _nested_mapping(
+        output_resources,
+        "aux-output-bank.output-resource-and-memory-map",
+        "resource_map",
+    )
+    output_memory = _nested_mapping(
+        output_resources, "aux-output-bank.output-resource-and-memory-map", "memory_map"
+    )
+    output_safety = _nested_mapping(
+        output_host, "aux-output-bank.output-host-lifecycle", "safety"
+    )
+
+    input_resources = _nested_mapping(
+        input_build, "aux-input-bank.firmware-build", "pin_and_dma_resources"
+    )
+    _require_equal(
+        input_resources.get("pins"),
+        output_resource_map.get("output_pins_by_logical_bit"),
+        "shared D16-D23 bank",
+    )
+    _require_equal(
+        input_resources.get("auxiliary_edma_channel"),
+        output_resource_map.get("edma_channel"),
+        "shared eDMA channel",
+    )
+    _require_equal(
+        input_resources.get("auxiliary_xbar_output"),
+        output_resource_map.get("xbar_output"),
+        "shared XBAR output",
+    )
+    protocol_hashes = {
+        experiment_id: str(protocol_extensions[experiment_id]["sha256"])
+        for experiment_id in (
+            "rle-streaming",
+            "aux-input-bank",
+            "aux-output-bank",
+        )
+    }
+    if len(set(protocol_hashes.values())) != len(protocol_hashes):
+        _fail("experimental protocol-v2 contracts must remain independent")
+
+    rle_compatibility = _evidence_by_id(
+        rle_report, "rle-streaming", "protocol-v1-compatibility"
+    )
+    rle_host = _evidence_by_id(rle_report, "rle-streaming", "host-corpus-benchmark")
+    rle_simulated = _evidence_by_id(rle_report, "rle-streaming", "simulated-rig-gate")
+    rle_endurance = _evidence_by_id(
+        rle_report, "rle-streaming", "physical-endurance-campaign"
+    )
+    rle_compression = _nested_mapping(
+        rle_contract, "rle-streaming.protocol-v2", "compression"
+    )
+    rle_configuration = {
+        "default": rle_compression.get("default_configuration_encoding"),
+        "opt_in": rle_compression.get("explicit_configuration_encoding"),
+        "mixed_selection_permitted": len(
+            _nested_mapping(
+                rle_compression,
+                "rle-streaming.protocol-v2.compression",
+                "configured_frame_encodings",
+            ).get("RLE_AUTO", [])
+        )
+        == 2,
+    }
+    output_contract_body = _nested_mapping(
+        output_contract, "aux-output-bank.protocol-v2", "auxiliary_output"
+    )
+    output_program = _nested_mapping(
+        output_contract_body, "aux-output-bank.protocol-v2.auxiliary_output", "program"
+    )
+
+    return {
+        "clock_450mhz": {
+            "source": {
+                "revision_commit": clock["revision_commit"],
+                "source_commit": clock_identity["source_commit"],
+                "evidence_id": "clock-450-physical-smoke",
+                "evidence_level": "rig",
+                "classification": clock.get("classification"),
+            },
+            "adc_resolution_bits": clock_identity["adc_resolution_bits"],
+            "clock_tree_hz": {
+                key: clock_profile[key]
+                for key in ("cpu_hz", "ipg_hz", "adc_hz", "pit_hz")
+            },
+            "rates": {
+                name: _metric_value(clock_report, "clock-450mhz", name)
+                for name in (
+                    "measurement_duration_seconds",
+                    "adc_pair_rate_hz",
+                    "gpio_sample_rate_hz",
+                    "combined_payload_rate_bytes_per_second",
+                )
+            },
+            "loss_and_errors": {
+                "zero_error_fields": len(clock_observations["zero_error_fields"]),
+                "zero_error_field_names": clock_observations["zero_error_fields"],
+                "parser_errors": _metric_value(
+                    clock_report, "clock-450mhz", "parser_errors"
+                ),
+                "transport_errors": _metric_value(
+                    clock_report, "clock-450mhz", "transport_errors"
+                ),
+                "stop_tail": clock_observations["stop_tail"],
+            },
+            "phase_and_completion": {
+                key: clock_observations[key]
+                for key in (
+                    "completion_counts",
+                    "completion_median_dwt_cycles",
+                    "completion_expected_dwt_cycles",
+                    "completion_tolerance_dwt_cycles",
+                )
+            },
+            "utilization_basis_points": {
+                "acquisition": clock_observations[
+                    "acquisition_utilization_basis_points"
+                ],
+                "usb": clock_observations["usb_utilization_basis_points"],
+            },
+            "queue_high_water_maxima": clock_observations["queue_high_water_maxima"],
+            "latency_seconds": {
+                "status": clock_observations["status_latency_seconds"],
+                "command": clock_observations["command_latency_seconds"],
+            },
+            "on_chip_temperature_millidegrees_celsius": clock_observations[
+                "temperature_millidegrees_celsius"
+            ],
+            "comparison_to_600mhz": {
+                "status": "SIDE_BY_SIDE_ONLY",
+                "derived_delta": None,
+                "reasons": [
+                    "No controlled same-board 600/450 MHz A/B campaign was executed.",
+                    "The 600 MHz observation comes from a different auxiliary-output artifact and campaign.",
+                    "The exact streaming durations differ, so the aggregate comparability key rejects a pooled performance result.",
+                ],
+                "clock_450mhz": {
+                    "artifact_sha256": clock_identity["hex_sha256"],
+                    "duration_seconds": _metric_value(
+                        clock_report, "clock-450mhz", "measurement_duration_seconds"
+                    ),
+                    "adc_pair_rate_hz": _metric_value(
+                        clock_report, "clock-450mhz", "adc_pair_rate_hz"
+                    ),
+                    "gpio_sample_rate_hz": _metric_value(
+                        clock_report, "clock-450mhz", "gpio_sample_rate_hz"
+                    ),
+                    "packet_owned_high_water": _metric_value(
+                        clock_report,
+                        "clock-450mhz",
+                        "packet_owned_high_water_frames",
+                    ),
+                    "command_latency_maximum_milliseconds": _metric_value(
+                        clock_report,
+                        "clock-450mhz",
+                        "command_latency_maximum_milliseconds",
+                    ),
+                },
+                "clock_600mhz_reference": {
+                    "source_experiment": "aux-output-bank",
+                    "artifact_sha256": output_physical["firmware_artifact_sha256"],
+                    "duration_seconds": output_run["measurement_seconds"],
+                    "adc_pair_rate_hz": output_run["adc_pair_rate_hz"],
+                    "gpio_sample_rate_hz": output_run["gpio_sample_rate_hz"],
+                    "packet_owned_high_water": output_run["packet_owned_high_water"],
+                    "command_latency_maximum_milliseconds": output_run[
+                        "all_commands_latency_max_ms"
+                    ],
+                },
+            },
+            "historical_528mhz_context": {
+                "canonical_input": False,
+                "role": "historical design context only",
+                "cpu_hz": 528_000_000,
+                "ipg_hz": 132_000_000,
+                "adc_hz": 33_000_000,
+                "pit_hz": 24_000_000,
+                "adc_resolution_bits": 10,
+                "source": "authorized committed clock ADR",
+            },
+            "unestablished": [
+                item["id"]
+                for item in clock_report["acceptance"]
+                if item["state"] == "NOT_RUN"
+            ],
+        },
+        "rle_streaming": {
+            "source": {
+                "revision_commit": rle["revision_commit"],
+                "source_commit": rle_report["identity"]["source_commit"],
+                "protocol_v2_sha256": rle_protocol["sha256"],
+            },
+            "raw_result": rle_report["result"],
+            "configuration": {
+                "default": rle_configuration.get("default"),
+                "opt_in": rle_configuration.get("opt_in"),
+                "mixed_selection_permitted": rle_configuration.get(
+                    "mixed_selection_permitted"
+                ),
+            },
+            "logical_equality": {
+                "host_corpus_raw_rle_equal": all(
+                    item.get("round_trip_equal") is True
+                    for item in _nested_list(
+                        rle_host,
+                        "rle-streaming.host-corpus-benchmark",
+                        "workloads",
+                    )
+                ),
+                "physical_selected_payload_conservation": all(
+                    isinstance(matched_streams.get(name), Mapping)
+                    and isinstance(matched_streams[name].get("conservation"), Mapping)
+                    for name in ("adc", "gpio", "combined")
+                ),
+                "physical_run_caveat": "RAW and RLE_AUTO live physical runs conserve their own logical payloads; changing live inputs are not asserted byte-identical across separate runs.",
+            },
+            "matched_physical": {
+                "raw_duration_seconds": matched.get("raw_steady_seconds"),
+                "rle_auto_duration_seconds": matched.get("rle_auto_steady_seconds"),
+                "streams": physical_streams,
+            },
+            "fallback": _nested_mapping(
+                rle_performance,
+                "rle-streaming.physical-accepted-campaign.performance",
+                "rle_auto",
+                "firmware",
+                "streams",
+            ),
+            "memory_queues_latency": {
+                "raw_queue_high_waters": _nested_mapping(
+                    rle_performance,
+                    "rle-streaming.performance",
+                    "raw",
+                    "firmware",
+                    "queue_high_waters",
+                ),
+                "rle_auto_queue_high_waters": _nested_mapping(
+                    rle_performance,
+                    "rle-streaming.performance",
+                    "rle_auto",
+                    "firmware",
+                    "queue_high_waters",
+                ),
+                "accepted_v2_maxima": _nested_mapping(
+                    rle_performance,
+                    "rle-streaming.performance",
+                    "accepted_v2_maxima",
+                ),
+                "raw_host_memory": _nested_mapping(
+                    rle_performance,
+                    "rle-streaming.performance",
+                    "raw",
+                    "host",
+                    "status",
+                    "memory",
+                ),
+                "rle_auto_host_memory": _nested_mapping(
+                    rle_performance,
+                    "rle-streaming.performance",
+                    "rle_auto",
+                    "host",
+                    "status",
+                    "memory",
+                ),
+            },
+            "evidence_tiers": [
+                {
+                    "workload": "simulated fake-device protocol and fault cases",
+                    "evidence_id": rle_simulated["id"],
+                    "level": rle_simulated["level"],
+                    "result": rle_simulated["result"],
+                },
+                {
+                    "workload": "host nine-workload codec corpus",
+                    "evidence_id": rle_host["id"],
+                    "level": rle_host["level"],
+                    "result": rle_host["result"],
+                },
+                {
+                    "workload": "physical synthetic patterns and matched live RAW/RLE_AUTO",
+                    "evidence_id": rle_physical["id"],
+                    "level": rle_physical["level"],
+                    "result": rle_physical["result"],
+                },
+            ],
+            "synthetic_rig_patterns": [
+                {
+                    key: item.get(key)
+                    for key in (
+                        "pattern",
+                        "complete_wire_ratios",
+                        "fallback_frames",
+                        "firmware_encode_load_ratio",
+                        "combined_decode_bytes_per_second",
+                        "packet_owned_high_water",
+                        "temporary_page_high_water",
+                    )
+                }
+                for item in _nested_list(
+                    rle_physical,
+                    "rle-streaming.physical-accepted-campaign",
+                    "synthetic_patterns",
+                )
+                if isinstance(item, Mapping)
+            ],
+            "protocol_v1_compatibility": {
+                "result": rle_compatibility["result"],
+                "level": rle_compatibility["level"],
+                "default_raw": rle_configuration.get("default") == "RAW",
+            },
+            "endurance": {
+                "result": rle_endurance["result"],
+                "reason": rle_endurance["reason"],
+                "lifecycle": _acceptance_state(
+                    rle_report, "rle-streaming", "lifecycle_complete"
+                ),
+                "stream_health": _acceptance_state(
+                    rle_report, "rle-streaming", "stream_health"
+                ),
+            },
+        },
+        "aux_input_bank": {
+            "source": {
+                "revision_commit": aux_input["revision_commit"],
+                "source_commit": input_report["identity"]["source_commit"],
+                "protocol_v2_sha256": input_protocol["sha256"],
+            },
+            "raw_result": input_report["result"],
+            "layouts": {
+                "eight_input": disabled_layout,
+                "sixteen_input": enabled_layout,
+            },
+            "rate_profiles": profile_comparison,
+            "highest_sustained_raw_profile": input_workload.get(
+                "highest_sustained_raw_profile"
+            ),
+            "eight_input_regression": _evidence_by_id(
+                input_report, "aux-input-bank", "rig-rate-campaign"
+            ).get("eight_input_regression"),
+            "processing_and_queues": {
+                "target_processing_load": "NOT_RUN",
+                "target_queue_high_waters": "NOT_RUN",
+                "host_packer_16bit_megabytes_per_second": _evidence_by_id(
+                    input_report, "aux-input-bank", "host-regression"
+                ).get("packer_16bit_megabytes_per_second"),
+                "host_parser_minimum_headroom_ratio": _evidence_by_id(
+                    input_report, "aux-input-bank", "host-regression"
+                ).get("parser_minimum_headroom_ratio"),
+            },
+            "memory": {
+                "packet_retention": retention,
+                "auxiliary_workspace": input_build.get("auxiliary_workspace"),
+                "raw_gpio_buffers": input_build.get("raw_gpio_buffers"),
+            },
+            "failure": {
+                "lifecycle": _acceptance_state(
+                    input_report, "aux-input-bank", "lifecycle_complete"
+                ),
+                "stream_health": _acceptance_state(
+                    input_report, "aux-input-bank", "stream_health"
+                ),
+                "counter_conservation": _acceptance_state(
+                    input_report, "aux-input-bank", "counter_conservation"
+                ),
+            },
+            "electrical_transition_scope": {
+                "state": "NOT_RUN",
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "ungraded": [
+                    "external D16-D23 pin order",
+                    "transition fidelity",
+                    "voltage thresholds",
+                    "timing and jitter",
+                    "signal integrity",
+                ],
+            },
+        },
+        "aux_output_bank": {
+            "source": {
+                "revision_commit": aux_output["revision_commit"],
+                "source_commit": output_report["identity"]["source_commit"],
+                "protocol_v2_sha256": output_protocol["sha256"],
+            },
+            "raw_result": output_report["result"],
+            "target_output_state_rate_hz": output_resources.get(
+                "target_output_state_rate_hz"
+            ),
+            "host_output_correctness": {
+                "result": output_host["result"],
+                "method": output_host["method"],
+                "fresh_results": output_host["fresh_results"],
+            },
+            "physical_output_correctness": {
+                "result": output_loopback["result"],
+                "reason": output_loopback["reason"],
+                "patterns": output_loopback.get("patterns"),
+            },
+            "loopback": {
+                "lag_ticks": output_loopback.get("loopback_lag_ticks"),
+                "lag_stability": output_loopback.get("loopback_lag_stability"),
+            },
+            "combined_adc_gpio_preservation": {
+                "scope": "auxiliary output disabled",
+                "result": output_physical["result"],
+                "run": output_run,
+            },
+            "refill_margin": {
+                key: output_memory[key]
+                for key in (
+                    "historical_maximum_service_gap_us",
+                    "packet_retention_us",
+                    "packet_and_usb_retention_us",
+                    "packet_margin_us",
+                    "packet_and_usb_margin_us",
+                )
+            },
+            "host_lifecycle_safety": output_safety,
+            "nondriving_controls": {
+                "result": output_controls["result"],
+                "drive_requests_written": output_controls["drive_requests_written"],
+                "final_state": output_controls["final_state"],
+                "output_bank_disabled": output_controls["output_bank_disabled"],
+            },
+            "fixture_safety_declaration": {
+                "state": output_loopback["result"],
+                "declaration_sha256": output_loopback["fixture_declaration_sha256"],
+                "drive_exercised": False,
+            },
+            "independent_signal_integrity": {
+                "state": "NOT_RUN",
+                "required_evidence": "logic analyzer or oscilloscope",
+            },
+        },
+        "shared_conflicts_and_synergies": [
+            {
+                "id": "d16_d23_whole_bank_direction",
+                "classification": "CONFLICT",
+                "finding": "D16-D23 are one whole bank and cannot be INPUT and OUTPUT simultaneously.",
+                "inputs": ["aux-input-bank", "aux-output-bank"],
+            },
+            {
+                "id": "dma_xbar_and_memory_ownership",
+                "classification": "CONFLICT",
+                "finding": "Auxiliary input and output both claim eDMA channel 3, DMAMUX source 31, XBAR output 1, and overlapping global memory/packet ownership that requires one integrated allocation.",
+                "resource_identity": {
+                    "edma_channel": input_resources["auxiliary_edma_channel"],
+                    "dmamux_source": input_resources["auxiliary_dmamux_source"],
+                    "xbar_output": input_resources["auxiliary_xbar_output"],
+                    "input_packet_frames": input_build["packet_buffers"][
+                        "total_frames"
+                    ],
+                    "output_packet_frames": output_run["packet_capacity"],
+                },
+                "inputs": ["aux-input-bank", "aux-output-bank"],
+            },
+            {
+                "id": "independent_protocol_v2_extensions",
+                "classification": "CONFLICT",
+                "finding": "RLE, auxiliary input, and auxiliary output are three different experimental protocol-v2 contracts, not one additive negotiated contract.",
+                "protocol_v2_sha256": protocol_hashes,
+                "inputs": [
+                    "rle-streaming",
+                    "aux-input-bank",
+                    "aux-output-bank",
+                ],
+            },
+            {
+                "id": "rle_terminology",
+                "classification": "DISTINCTION",
+                "finding": "Stream RLE_AUTO adaptively selects RAW or RLE independently per data frame; output program segments use duration/state run records for preloaded waveform expansion. They share run-length terminology but are not the same codec or wire format.",
+                "stream_mode": rle_configuration.get("opt_in"),
+                "output_segment_schema": output_program.get("segment_schema"),
+                "inputs": ["rle-streaming", "aux-output-bank"],
+            },
+            {
+                "id": "rate_dependent_frame_layouts",
+                "classification": "INTERACTION",
+                "finding": "Auxiliary INPUT changes ADC/GPIO item counts and ADC frame length while each selected rate profile changes frame coverage; any unified decoder must negotiate mode, width, frame layout, and rate together.",
+                "layouts": {
+                    "DISABLED": disabled_layout,
+                    "INPUT": enabled_layout,
+                },
+                "inputs": ["aux-input-bank", "rle-streaming"],
+            },
+            {
+                "id": "shared_raw_defaults",
+                "classification": "SYNERGY",
+                "finding": "Every branch retains the frozen protocol-v1 raw acquisition contract and keeps its experimental capability opt-in, providing a common rollback boundary.",
+                "protocol_v1_sha256": rle_report["identity"]["protocol_sha256"],
+                "inputs": [
+                    "rle-streaming",
+                    "aux-input-bank",
+                    "aux-output-bank",
+                    "clock-450mhz",
+                ],
+            },
+            {
+                "id": "combined_binary_not_tested",
+                "classification": "LIMITATION",
+                "finding": "Clock, RLE, auxiliary input, and auxiliary output were never built or tested together in one immutable binary.",
+                "verified": False,
+                "inputs": [
+                    "clock-450mhz",
+                    "rle-streaming",
+                    "aux-input-bank",
+                    "aux-output-bank",
+                ],
+            },
+        ],
+    }
+
+
 def _experiment_evidence_index(
     experiments: Sequence[Mapping[str, Any]],
 ) -> tuple[dict[tuple[str, str], Mapping[str, Any]], dict[str, Mapping[str, Any]]]:
@@ -1424,6 +2328,12 @@ def build_aggregate(
         summary_sha256=clock_summary_sha256,
     )
     all_experiments = [*report_inputs, clock]
+    protocol_extensions = {
+        item["experiment_id"]: load_protocol_extension(root, item)
+        for item in report_inputs
+        if item["experiment_id"]
+        in {"rle-streaming", "aux-input-bank", "aux-output-bank"}
+    }
     analysis, analysis_manifest = load_analysis(root, analysis_path, all_experiments)
     aggregate = {
         "schema_version": AGGREGATE_SCHEMA_VERSION,
@@ -1490,6 +2400,9 @@ def build_aggregate(
         ),
         "experiments": all_experiments,
         "metric_groups": group_metrics(all_experiments),
+        "cross_experiment_analysis": build_cross_experiment_analysis(
+            all_experiments, protocol_extensions
+        ),
         "conclusions": analysis["conclusions"],
         "recommendations": analysis["recommendations"],
         "claim_limitations": [
@@ -1610,6 +2523,154 @@ def render_markdown(aggregate: Mapping[str, Any]) -> str:
         lines.append(
             f"| {_markdown_cell(group['name'])} | **{group['status']}** | {_markdown_cell(values)} | {_markdown_cell(group['reasons'])} |"
         )
+
+    cross_analysis = aggregate.get("cross_experiment_analysis")
+    if isinstance(cross_analysis, Mapping):
+        clock = cross_analysis["clock_450mhz"]
+        lines.extend(
+            [
+                "",
+                "## Cross-experiment analysis",
+                "",
+                "### 450 MHz physical smoke",
+                "",
+                "| Category | Exact evidence |",
+                "| --- | --- |",
+                f"| Source and scope | {_markdown_cell(clock['source'])} |",
+                f"| ADC resolution / clock tree | {_markdown_cell({'adc_resolution_bits': clock['adc_resolution_bits'], 'clock_tree_hz': clock['clock_tree_hz']})} |",
+                f"| Acquisition rates | {_markdown_cell(clock['rates'])} |",
+                f"| Loss, errors, and STOP tail | {_markdown_cell(clock['loss_and_errors'])} |",
+                f"| Phase and completion | {_markdown_cell(clock['phase_and_completion'])} |",
+                f"| Utilization | {_markdown_cell(clock['utilization_basis_points'])} |",
+                f"| Queues and latency | {_markdown_cell({'queue_high_water_maxima': clock['queue_high_water_maxima'], 'latency_seconds': clock['latency_seconds']})} |",
+                f"| On-chip temperature | {_markdown_cell(clock['on_chip_temperature_millidegrees_celsius'])} |",
+                "",
+                "The 450 MHz and 600 MHz observations remain side by side; no delta is calculated.",
+                "",
+                f"- Comparison: **{_markdown_cell(clock['comparison_to_600mhz']['status'])}** — {_markdown_cell(clock['comparison_to_600mhz']['reasons'])}",
+                f"- 450 MHz: {_markdown_cell(clock['comparison_to_600mhz']['clock_450mhz'])}",
+                f"- 600 MHz reference: {_markdown_cell(clock['comparison_to_600mhz']['clock_600mhz_reference'])}",
+                f"- 528 MHz fallback: {_markdown_cell(clock['historical_528mhz_context'])}",
+                f"- Unestablished gates: {_markdown_cell(clock['unestablished'])}",
+            ]
+        )
+
+        rle = cross_analysis["rle_streaming"]
+        lines.extend(
+            [
+                "",
+                "### RAW versus RLE_AUTO",
+                "",
+                f"Raw result: **{_markdown_cell(rle['raw_result'])}**; configuration: {_markdown_cell(rle['configuration'])}",
+                "",
+                f"Logical equality boundary: {_markdown_cell(rle['logical_equality'])}",
+                "",
+                "| Stream | Logical bytes | RAW / selected wire bytes | Wire ratio / reduction | RAW / RLE / fallback frames (frequency) | Encode cycles / utilization delta (pp) | Decode RAW / RLE_AUTO (B/s) | Bandwidth / processing / overall |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+            ]
+        )
+        for stream in rle["matched_physical"]["streams"]:
+            lines.append(
+                f"| {_markdown_cell(stream['stream'])} | {_markdown_cell(stream['logical_payload_bytes'])} | {_markdown_cell(stream['raw_complete_wire_bytes'])} / {_markdown_cell(stream['selected_complete_wire_bytes'])} | {_markdown_cell(stream['complete_wire_ratio'])} / {_markdown_cell(stream['complete_wire_reduction_ratio'])} | {_markdown_cell(stream['raw_frames'])} / {_markdown_cell(stream['rle_frames'])} / {_markdown_cell(stream['fallback_frames'])} ({_markdown_cell(stream['fallback_frequency'])}) | {_markdown_cell(stream['encode_cycles'])} / {_markdown_cell(stream['processing_utilization_delta_percentage_points'])} | {_markdown_cell(stream['raw_decode_bytes_per_second'])} / {_markdown_cell(stream['rle_auto_decode_bytes_per_second'])} | {_markdown_cell(stream['bandwidth_result'])} / {_markdown_cell(stream['processing_result'])} / **{_markdown_cell(stream['overall_value_result'])}** |"
+            )
+        lines.extend(
+            [
+                "",
+                f"- Matched durations: RAW {_markdown_cell(rle['matched_physical']['raw_duration_seconds'])} s; RLE_AUTO {_markdown_cell(rle['matched_physical']['rle_auto_duration_seconds'])} s.",
+                f"- Fallback detail: {_markdown_cell(rle['fallback'])}",
+                f"- Memory, queues, and latency: {_markdown_cell(rle['memory_queues_latency'])}",
+                f"- Evidence tiers: {_markdown_cell(rle['evidence_tiers'])}",
+                f"- Synthetic rig patterns: {_markdown_cell(rle['synthetic_rig_patterns'])}",
+                f"- Protocol-v1 compatibility: {_markdown_cell(rle['protocol_v1_compatibility'])}",
+                f"- Endurance: {_markdown_cell(rle['endurance'])}",
+            ]
+        )
+
+        aux_input = cross_analysis["aux_input_bank"]
+        lines.extend(
+            [
+                "",
+                "### Eight-input versus 16-input acquisition",
+                "",
+                f"Raw result: **{_markdown_cell(aux_input['raw_result'])}**. Highest sustained 16-input raw profile: {_markdown_cell(aux_input['highest_sustained_raw_profile'])}. Eight-input regression: **{_markdown_cell(aux_input['eight_input_regression'])}**.",
+                "",
+                "| Profile (ADC / GPIO) | Eight-input payload / framed exact / retention | 16-input payload / framed exact / retention | Campaign result |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for profile in aux_input["rate_profiles"]:
+            eight = profile["eight_input"]
+            sixteen = profile["sixteen_input"]
+            eight_summary = {
+                "combined_payload_bytes_per_second": eight[
+                    "combined_payload_bytes_per_second"
+                ],
+                "combined_framed_bytes_per_second_exact": eight[
+                    "combined_framed_bytes_per_second_exact"
+                ],
+                "combined_retention_microseconds": eight[
+                    "combined_retention_microseconds"
+                ],
+            }
+            sixteen_summary = {
+                "combined_payload_bytes_per_second": sixteen[
+                    "combined_payload_bytes_per_second"
+                ],
+                "combined_framed_bytes_per_second_exact": sixteen[
+                    "combined_framed_bytes_per_second"
+                ]["exact"],
+                "combined_retention_microseconds": sixteen[
+                    "combined_retention_microseconds"
+                ],
+            }
+            lines.append(
+                f"| {_markdown_cell(profile['profile'])} ({_markdown_cell(profile['adc_pair_rate_hz'])} / {_markdown_cell(profile['gpio_sample_rate_hz'])}) | {_markdown_cell(eight_summary)} | {_markdown_cell(sixteen_summary)} | **{_markdown_cell(sixteen['campaign_result'])}** — {_markdown_cell(sixteen['reason'])} |"
+            )
+        lines.extend(
+            [
+                "",
+                f"- Frame layouts: {_markdown_cell(aux_input['layouts'])}",
+                f"- Processing and queues: {_markdown_cell(aux_input['processing_and_queues'])}",
+                f"- Memory retention and ownership: {_markdown_cell(aux_input['memory'])}",
+                f"- Reproduced failure: {_markdown_cell(aux_input['failure'])}",
+                f"- Electrical transition scope: {_markdown_cell(aux_input['electrical_transition_scope'])}",
+            ]
+        )
+
+        aux_output = cross_analysis["aux_output_bank"]
+        lines.extend(
+            [
+                "",
+                "### Auxiliary output",
+                "",
+                "| Category | Exact evidence |",
+                "| --- | --- |",
+                f"| Source / raw result | {_markdown_cell(aux_output['source'])} / **{_markdown_cell(aux_output['raw_result'])}** |",
+                f"| Host output correctness | {_markdown_cell(aux_output['host_output_correctness'])} |",
+                f"| Output correctness | {_markdown_cell(aux_output['physical_output_correctness'])} |",
+                f"| Loopback lag / stability | {_markdown_cell(aux_output['loopback'])} |",
+                f"| Combined ADC/GPIO preservation | {_markdown_cell(aux_output['combined_adc_gpio_preservation'])} |",
+                f"| Refill margin | {_markdown_cell(aux_output['refill_margin'])} |",
+                f"| STOP / hold / CLEAR / fault behavior | {_markdown_cell(aux_output['host_lifecycle_safety'])} |",
+                f"| Nondriving controls | {_markdown_cell(aux_output['nondriving_controls'])} |",
+                f"| Fixture safety declaration | {_markdown_cell(aux_output['fixture_safety_declaration'])} |",
+                f"| Independent signal integrity | {_markdown_cell(aux_output['independent_signal_integrity'])} |",
+                "",
+                "### Shared conflicts and synergies",
+                "",
+                "| Interaction | Classification | Finding | Exact detail |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for interaction in cross_analysis["shared_conflicts_and_synergies"]:
+            detail = {
+                key: value
+                for key, value in interaction.items()
+                if key not in {"id", "classification", "finding"}
+            }
+            lines.append(
+                f"| {_markdown_cell(interaction['id'])} | **{_markdown_cell(interaction['classification'])}** | {_markdown_cell(interaction['finding'])} | {_markdown_cell(detail)} |"
+            )
 
     lines.extend(["", "## Source outcomes and limitations", ""])
     for item in aggregate["experiments"]:

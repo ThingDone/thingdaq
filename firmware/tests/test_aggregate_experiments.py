@@ -377,6 +377,135 @@ class AggregateRenderingTests(unittest.TestCase):
             writer.assert_not_called()
 
 
+class AggregateExactCrossAnalysisTests(unittest.TestCase):
+    def test_exact_branch_inputs_build_required_cross_analysis(self) -> None:
+        required_local = (
+            ROOT / aggregate.DEFAULT_CLOCK_SERVICE_PATH,
+            ROOT / aggregate.DEFAULT_CLOCK_SUMMARY_PATH,
+        )
+        if not all(path.is_file() for path in required_local):
+            self.skipTest("authorized clock evidence is not present in this checkout")
+        try:
+            rendered = aggregate.build_aggregate(
+                ROOT,
+                aggregate.DEFAULT_INPUTS,
+                created=aggregate.DEFAULT_CREATED,
+                clock_revision="origin/experiment/clock-450mhz",
+                expected_clock_commit=aggregate.CLOCK_HEAD_COMMIT,
+                clock_adr_path=aggregate.DEFAULT_CLOCK_ADR_PATH,
+                clock_service_path=aggregate.DEFAULT_CLOCK_SERVICE_PATH,
+                clock_service_sha256=aggregate.CLOCK_SERVICE_SHA256,
+                clock_summary_path=aggregate.DEFAULT_CLOCK_SUMMARY_PATH,
+                clock_summary_sha256=aggregate.CLOCK_SUMMARY_SHA256,
+            )
+        except aggregate.AggregationError as error:
+            if "git rev-parse" in str(error) or "git cat-file" in str(error):
+                self.skipTest(f"candidate Git refs are unavailable: {error}")
+            raise
+
+        analysis = rendered["cross_experiment_analysis"]
+        clock = analysis["clock_450mhz"]
+        self.assertEqual(12, clock["adc_resolution_bits"])
+        self.assertEqual(450_000_000, clock["clock_tree_hz"]["cpu_hz"])
+        self.assertEqual([8, 8], clock["phase_and_completion"]["completion_counts"])
+        self.assertEqual("SIDE_BY_SIDE_ONLY", clock["comparison_to_600mhz"]["status"])
+        self.assertIsNone(clock["comparison_to_600mhz"]["derived_delta"])
+        self.assertFalse(clock["historical_528mhz_context"]["canonical_input"])
+
+        rle = analysis["rle_streaming"]
+        self.assertTrue(rle["logical_equality"]["host_corpus_raw_rle_equal"])
+        physical = {item["stream"]: item for item in rle["matched_physical"]["streams"]}
+        self.assertEqual(0.0, physical["ADC"]["complete_wire_reduction_ratio"])
+        self.assertEqual(
+            0.987548828125,
+            physical["GPIO"]["complete_wire_reduction_ratio"],
+        )
+        self.assertEqual("FAIL", physical["COMBINED"]["overall_value_result"])
+        self.assertEqual("PASS", rle["protocol_v1_compatibility"]["result"])
+        self.assertEqual("INCONCLUSIVE", rle["endurance"]["result"])
+
+        aux_input = analysis["aux_input_bank"]
+        self.assertIsNone(aux_input["highest_sustained_raw_profile"])
+        self.assertEqual("FAIL_BEFORE_START", aux_input["eight_input_regression"])
+        self.assertEqual(4, len(aux_input["rate_profiles"]))
+        maximum = aux_input["rate_profiles"][0]
+        self.assertEqual(
+            8_000_000,
+            maximum["eight_input"]["combined_payload_bytes_per_second"],
+        )
+        self.assertEqual(
+            12_000_000,
+            maximum["sixteen_input"]["combined_payload_bytes_per_second"],
+        )
+        self.assertEqual(
+            "NOT_RUN", aux_input["processing_and_queues"]["target_processing_load"]
+        )
+
+        aux_output = analysis["aux_output_bank"]
+        self.assertEqual("PASS", aux_output["host_output_correctness"]["result"])
+        self.assertEqual("NOT_RUN", aux_output["physical_output_correctness"]["result"])
+        self.assertEqual("NOT_RUN", aux_output["loopback"]["lag_stability"])
+        self.assertEqual("PASS", aux_output["combined_adc_gpio_preservation"]["result"])
+        self.assertEqual(
+            38_461, aux_output["refill_margin"]["packet_and_usb_margin_us"]
+        )
+        self.assertTrue(
+            aux_output["host_lifecycle_safety"]["stop_holds_observed_latch"]
+        )
+        self.assertEqual(0, aux_output["nondriving_controls"]["drive_requests_written"])
+
+        interactions = {
+            item["id"]: item for item in analysis["shared_conflicts_and_synergies"]
+        }
+        self.assertEqual(
+            3,
+            interactions["dma_xbar_and_memory_ownership"]["resource_identity"][
+                "edma_channel"
+            ],
+        )
+        self.assertEqual(
+            3,
+            len(
+                set(
+                    interactions["independent_protocol_v2_extensions"][
+                        "protocol_v2_sha256"
+                    ].values()
+                )
+            ),
+        )
+        self.assertFalse(interactions["combined_binary_not_tested"]["verified"])
+
+        markdown = aggregate.render_markdown(rendered)
+        headings = (
+            "## Cross-experiment analysis",
+            "### 450 MHz physical smoke",
+            "### RAW versus RLE_AUTO",
+            "### Eight-input versus 16-input acquisition",
+            "### Auxiliary output",
+            "### Shared conflicts and synergies",
+        )
+        for heading in headings:
+            self.assertEqual(1, markdown.splitlines().count(heading))
+
+    def test_protocol_extension_hash_mismatch_fails_closed(self) -> None:
+        payload = b'{"extension":"rle-streaming","protocol_version":2}\n'
+        experiment = {
+            "experiment_id": "rle-streaming",
+            "revision_commit": "1" * 40,
+            "declared_files": [
+                {
+                    "path": "protocol/protocol-v2.json",
+                    "sha256": "0" * 64,
+                }
+            ],
+        }
+        with (
+            patch.object(aggregate, "_git_blob", return_value=payload),
+            self.assertRaisesRegex(aggregate.AggregationError, "protocol_v2_sha256"),
+        ):
+            aggregate.load_protocol_extension(ROOT, experiment)
+
+
 class AggregateRepositorySafetyTests(unittest.TestCase):
     def test_aggregator_has_a_read_only_git_and_import_surface(self) -> None:
         source_path = ROOT / "firmware/tools/aggregate_experiments.py"
