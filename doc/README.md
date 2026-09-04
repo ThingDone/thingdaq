@@ -37,6 +37,7 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[ADR-008-Experimental-Aux-Output-Bank]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -82,7 +83,9 @@ physical acceptance.
 - `decisions/` contains architecture decision records, including
   [[ADR-001-Wire-Protocol]], [[ADR-002-Checksum-Selection]], and
   [[ADR-003-GPIO-Clock-DMA]], followed by the permanent converter, trigger,
-  and DMA resource contract in [[ADR-004-ADC-Trigger-DMA]].
+  and DMA resource contract in [[ADR-004-ADC-Trigger-DMA]]. The isolated
+  preloaded D16-D23 output contract is
+  [[ADR-008-Experimental-Aux-Output-Bank]].
 - `reference/` records durable user and implementation references: begin with
   [[Hardware-Safety]] before connecting signals, use [[API-Reference]] for the
   stable Python surface, and consult [[Foundation-Reuse-Inventory]] for the
