@@ -500,6 +500,82 @@ void testMaximumSegmentProgramAndFiniteWrapStress() {
          "small-duration maximum-capacity stress conserves all finite counters");
 }
 
+void testLongHoldDelayedServiceAndCommonRunAbort() {
+  Fixture fixture{};
+  expect(fixture.engine.begin(81U, 1U, 0U) == output::ProgramStatus::kOk &&
+             fixture.engine.append(81U, {5000U, 0xA5U}) ==
+                 output::ProgramStatus::kOk &&
+             fixture.engine.append(81U, {3U, 0x5AU}) ==
+                 output::ProgramStatus::kOk &&
+             fixture.engine.commit(81U, 2U, checksumFor(fixture.program)) ==
+                 output::ProgramStatus::kOk &&
+             fixture.engine.arm(81U) == output::OperationStatus::kOk,
+         "long-hold delayed-service fixture commits and prefills");
+  const output::Snapshot armed = fixture.engine.snapshot();
+  const std::uint8_t first = static_cast<std::uint8_t>(
+      armed.blocks[0].sequence == 0U ? 0U : 1U);
+  expect(fixture.engine.blockWords(first)[0] ==
+                 output::physicalMaskForLogicalState(0xA5U) &&
+             fixture.engine.blockWords(first)[1] == 0U &&
+             fixture.engine.blockWords(first)[1000] == 0U,
+         "a long absolute hold expands to one toggle followed by zero masks");
+
+  expect(fixture.engine.prepareStart(601U, 4000U) ==
+             output::StartStatus::kOk,
+         "common-run abort fixture prepares");
+  fixture.engine.commitCommonStart();
+  fixture.engine.rollbackPreparedStart();
+  expect(fixture.engine.snapshot().state == v2::OutputState::kArmed &&
+             fixture.engine.snapshot().telemetry.dma_states_emitted == 0U &&
+             fixture.engine.snapshot().ready_depth ==
+                 board::kAuxOutputDmaBlockCount,
+         "common-clock abort restores the complete immutable prefill");
+  expect(fixture.engine.prepareStart(602U, 5000U) ==
+             output::StartStatus::kOk,
+         "aborted long hold starts with a fresh common run identity");
+  fixture.engine.commitCommonStart();
+
+  for (std::size_t completion = 0U; completion < 3U; ++completion) {
+    const output::Snapshot before = fixture.engine.snapshot();
+    expect(fixture.engine.onDmaBlockComplete(
+               before.reading_block, 81U,
+               before.blocks[before.reading_block].lease) ==
+               output::OperationStatus::kOk,
+           "three blocks may complete before cooperative refill service");
+  }
+  const output::Snapshot delayed = fixture.engine.snapshot();
+  expect(delayed.reading_depth == 1U && delayed.ready_depth == 0U &&
+             delayed.refill_lead == board::kAuxOutputStatesPerBlock &&
+             !delayed.expansion_finished,
+         "delayed service reaches the final prefetched block without underrun");
+  const output::ServiceReport refilled = fixture.engine.service(99U);
+  expect(refilled.blocks_filled == 1U && refilled.states_expanded == 939U &&
+             refilled.expansion_finished,
+         "one bounded service visit refills the complete short tail");
+
+  while (fixture.engine.snapshot().state == v2::OutputState::kRunning) {
+    const output::Snapshot before = fixture.engine.snapshot();
+    expect(fixture.engine.onDmaBlockComplete(
+               before.reading_block, 81U,
+               before.blocks[before.reading_block].lease) ==
+               output::OperationStatus::kOk,
+           "long-hold tail completes without stale replay");
+  }
+  const output::Snapshot held = fixture.engine.snapshot();
+  expect(held.state == v2::OutputState::kHeld &&
+             held.run_id == 602U && held.telemetry.states_expanded == 5003U &&
+             held.telemetry.dma_states_emitted == 5003U &&
+             held.telemetry.transitions_emitted == 2U &&
+             held.telemetry.blocks_filled == 5U &&
+             held.telemetry.blocks_completed == 5U &&
+             held.telemetry.cache_flushes == 5U &&
+             held.telemetry.underruns == 0U &&
+             held.last_emitted_state_mask == 0x5AU &&
+             held.ready_depth == 0U && held.reading_depth == 0U &&
+             held.conservation_exact,
+         "long hold and delayed refill preserve exact terminal conservation");
+}
+
 }  // namespace
 
 int main() {
@@ -510,6 +586,7 @@ int main() {
   testBoundedRefillStopAndUnderrunFault();
   testRingWrapGenerationReuseAndCounterConservation();
   testMaximumSegmentProgramAndFiniteWrapStress();
+  testLongHoldDelayedServiceAndCommonRunAbort();
   testFailClosedTestOnlyInjectionsAndNoReplay();
   if (failures != 0) {
     std::cerr << failures << " digital output assertion(s) failed\n";
