@@ -92,3 +92,29 @@ def main():
         assert sys.modules["input_isolation_rig"].profiles == [0, 1, 2, 3, 0]
     finally:
         sys.modules.pop("input_isolation_rig", None)
+
+
+def test_explicit_profiles_skip_known_failure_but_stop_on_new_failure(monkeypatch):
+    monkeypatch.setenv("AUX_INPUT_RATE_PROFILE", "0")
+    source = """import os
+profiles = []
+def main():
+    profile = int(os.environ["AUX_INPUT_RATE_PROFILE"])
+    profiles.append(profile)
+    return 1 if profile == 3 else 0
+"""
+    try:
+        with pytest.raises(SystemExit) as stopped:
+            exec(isolation.make_program(source, {}, profiles=(1, 2, 3, 1)), {})  # noqa: S102 - locally authored test fixture
+        assert stopped.value.code == 1
+        assert sys.modules["input_isolation_rig"].profiles == [1, 2, 3]
+    finally:
+        sys.modules.pop("input_isolation_rig", None)
+
+
+def test_invalid_profile_sequences_are_rejected():
+    for sequence in ((), (-1,), (4,)):
+        with pytest.raises(ValueError, match="IDs 0..3"):
+            isolation.make_program("", {}, profiles=sequence)
+    with pytest.raises(ValueError, match="either cycle"):
+        isolation.make_program("", {}, cycle=True, profiles=(1,))

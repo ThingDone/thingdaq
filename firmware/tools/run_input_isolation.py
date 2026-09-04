@@ -62,7 +62,13 @@ def classify_result(result: dict) -> dict:
     }
 
 
-def make_program(source: str, settings: dict[str, str], *, cycle: bool = False) -> str:
+def make_program(
+    source: str,
+    settings: dict[str, str],
+    *,
+    cycle: bool = False,
+    profiles: tuple[int, ...] | None = None,
+) -> str:
     # Register a real module for dataclasses; avoid altering the validator text.
     program = (
         "import os, sys, types\n"
@@ -71,9 +77,14 @@ def make_program(source: str, settings: dict[str, str], *, cycle: bool = False) 
         "sys.modules[rig.__name__] = rig\n"
         f"exec(compile({source!r}, 'rig_aux_input_capture.py', 'exec'), rig.__dict__)\n"
     )
-    if cycle:
+    if cycle and profiles is not None:
+        raise ValueError("choose either cycle or explicit profiles")
+    sequence = (0, 1, 2, 3, 0) if cycle else profiles
+    if sequence is not None:
+        if not sequence or any(profile not in range(4) for profile in sequence):
+            raise ValueError("profiles must contain IDs 0..3")
         program += (
-            "for profile in (0, 1, 2, 3, 0):\n"
+            f"for profile in {sequence!r}:\n"
             "    os.environ['AUX_INPUT_RATE_PROFILE'] = str(profile)\n"
             "    result = rig.main()\n"
             "    if result: sys.exit(result)\n"
@@ -97,8 +108,13 @@ def main() -> int:
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--serial", type=int, default=20428100)
     parser.add_argument("--diagnostic", action="store_true")
-    parser.add_argument(
+    sequence_group = parser.add_mutually_exclusive_group()
+    sequence_group.add_argument(
         "--cycle", action="store_true", help="exercise 0,1,2,3,0 without reflashing"
+    )
+    sequence_group.add_argument(
+        "--profiles", type=int, nargs="+", choices=range(4),
+        help="explicit profile sequence without reflashing; stops on first failure",
     )
     parser.add_argument("--service", default="http://192.168.150.14:5000")
     parser.add_argument(
@@ -133,7 +149,9 @@ def main() -> int:
         "EXPECTED_HARDWARE_SERIAL": str(args.serial),
         "EXPECTED_BUILD_ID": build_id,
     }
-    program = make_program(source, settings, cycle=args.cycle)
+    profiles = tuple(args.profiles) if args.profiles is not None else None
+    sequence = [0, 1, 2, 3, 0] if args.cycle else list(profiles or (args.profile,))
+    program = make_program(source, settings, cycle=args.cycle, profiles=profiles)
     archive_bytes = io.BytesIO()
     with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("firmware.ino.hex", firmware)
@@ -183,7 +201,7 @@ def main() -> int:
             "build_id": build_id,
             "manifest_sha256": digest(manifest_bytes),
             "source": manifest["source"],
-            "profile_sequence": [0, 1, 2, 3, 0] if args.cycle else [args.profile],
+            "profile_sequence": sequence,
         },
     )
     (args.evidence_dir / "firmware.ino.hex").write_bytes(firmware)
@@ -203,7 +221,7 @@ def main() -> int:
         f"Started {test_id}: {args.case} profile={args.profile} seconds={args.seconds}",
         flush=True,
     )
-    deadline = time.monotonic() + (args.seconds + 5) * (5 if args.cycle else 1) + 120
+    deadline = time.monotonic() + (args.seconds + 5) * len(sequence) + 120
     while time.monotonic() < deadline:
         status = post("status", {"test_id": test_id})
         save("status.json", status)
