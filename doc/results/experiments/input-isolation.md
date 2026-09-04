@@ -1,5 +1,9 @@
 # Independent sampling-rate and input-width experiments
 
+Follow-up: [equal-rate inputs and 450 MHz CPU tests](input-rate-clock.md) now
+test 1 MHz on each ADC and all sixteen GPIO inputs independently of the original
+4:1 profiles below. Do not read this older matrix as a test of equal rates.
+
 ## Current answer
 
 Several independent software defects were hidden behind the original mandatory
