@@ -2,13 +2,14 @@
 type: reference
 title: ThingDAQ Evidence Index
 created: 2026-08-29
-updated: 2026-08-31
+updated: 2026-09-04
 tags:
   - thingdaq
   - evidence
   - validation
   - release-candidate
 related:
+  - '[[Clock-Compression-IO-Report]]'
   - '[[Phase-11-Soak-Evidence]]'
   - '[[Phase-12-Windows-Handoff]]'
   - '[[Phase-01-Prototype]]'
@@ -33,6 +34,16 @@ related:
 ---
 
 # ThingDAQ evidence index
+
+## Unified experimental evidence
+
+[[Clock-Compression-IO-Report]] synthesizes the immutable 450 MHz clock,
+stream RLE, auxiliary-input, and auxiliary-output branch evidence without
+merging their implementations. It preserves each raw result and evidence
+boundary, identifies shared protocol and firmware-resource conflicts, and
+records the evidence-backed recommendations, staged integration plan, rollback
+paths, and minimum compound qualification matrix. The independent branch
+results do not establish that these features work together in one binary.
 
 ## Current ThingDAQ 1.0 candidate
 

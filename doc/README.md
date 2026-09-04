@@ -2,12 +2,13 @@
 type: reference
 title: ThingDAQ Documentation Index
 created: 2026-08-27
-updated: 2026-08-31
+updated: 2026-09-04
 tags:
   - thingdaq
   - documentation
 related:
   - '[[Evidence-Index]]'
+  - '[[Clock-Compression-IO-Report]]'
   - '[[Phase-11-Soak-Evidence]]'
   - '[[Phase-12-Windows-Handoff]]'
   - '[[Quickstart]]'
@@ -90,7 +91,9 @@ physical acceptance.
 - `research/` records evidence gathered before implementation or selection,
   beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
-  including [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
+  including the branch-isolated clock, compression, and auxiliary-I/O synthesis
+  in [[Clock-Compression-IO-Report]], plus [[Phase-01-Prototype]] and
+  [[Phase-02-Protocol-Python]], followed
   by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical
   [[Phase-03-Control-Plane]] control acceptance and
