@@ -16,14 +16,15 @@ enabled and no loopback wiring is required.
 
 ## Current status
 
-The temperature feature is implemented and the instrumented 16-input smoke
-checks passed at both rates for 15 seconds each. The longer 450 MHz matrix is
-in progress; these short checks are **not** the final soak qualification.
+The temperature feature is implemented. The clean 8-input, 1 MHz capture passed
+600 seconds, including STOP, with die temperature 36.7 °C before, 50.8 °C after
+and 51.4 °C maximum. Both 16-input smoke checks also passed for 15 seconds.
+The remaining long captures are in progress, not yet qualified.
 
 | GPIO width | Rate on each ADC and GPIO | Planned continuous capture | Result |
 | --- | --- | --- | --- |
-| 8 pins | 1 MHz | 600 s | In progress |
-| 8 pins | 500 kHz | 600 s | In progress, same sequential job |
+| 8 pins | 1 MHz | 600 s | PASS |
+| 8 pins | 500 kHz | 600 s | Separate rerun in progress after service timeout |
 | 16 pins | 1 MHz | 600 s | Pending |
 | 16 pins | 500 kHz | 600 s | Pending |
 
@@ -71,6 +72,12 @@ Full wire details and implementation notes:
 - An immediate NOT_READY response was initially treated as fatal. A subsequent
   short run exposed this normal conversion interval; bounded host-side retries
   now handle it without blocking firmware or hiding persistent failure.
+- A two-cell, twenty-minute submission exceeded the documented 900-second
+  container limit (exit `-110`). The 1 MHz cell passed; the following 500 kHz
+  cell was interrupted without a final grade or STOP reconciliation. This is
+  **infrastructure timeout**, not a measured firmware failure or a passing
+  500 kHz soak. The runner now rejects oversized sequences before submission,
+  distinguishes negative container exits, and requires all planned cell results.
 
 All early failures and the passing smoke run are retained under
 `.maestro/playbooks/Working/input-isolation/temp-*`; each directory contains the
@@ -79,7 +86,8 @@ submitted program, exact binary/manifest, service responses and graded evidence.
 ## Offline validation
 
 The clean source passed **531 tests and 16,032 subtests**, with no skips. Main's
-submission runner passed nine tests, including explicit width/profile sequences.
+submission runner passed ten tests, including width/profile sequences, runtime
+budget checks and partial/timeout result classification.
 Equal-rate 450/600 MHz and the normal 600 MHz/4:1 firmware builds passed their
 unchanged build gates. Each retains 34,528 bytes of RAM1 local/stack headroom and
 4,096 bytes of RAM2 heap headroom.

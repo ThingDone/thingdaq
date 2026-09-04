@@ -100,6 +100,19 @@ def test_service_success_does_not_mean_firmware_passed():
     assert isolation.classify_result(result)["outcome"] == "TEST_FAIL"
     result["results"]["stdout"] = 'EVIDENCE {"result":"PASS"}\n'
     assert isolation.classify_result(result)["outcome"] == "PASS"
+    assert isolation.classify_result(result, expected_cells=2)["outcome"] == "INFRASTRUCTURE_FAIL"
+    result["results"]["exit_code"] = -110
+    summary = isolation.classify_result(result)
+    assert summary["outcome"] == "INFRASTRUCTURE_FAIL"
+    assert summary["evidence"] == [{"result": "PASS"}]
+
+
+def test_long_sequences_must_fit_below_container_limit():
+    assert isolation.validate_program_budget(600, 1) == 635
+    assert isolation.validate_program_budget(10, 20) == 330
+    for seconds, cells in ((600, 2), (600, 0), (float("nan"), 1), (float("inf"), 1)):
+        with pytest.raises(ValueError, match="split into separate jobs"):
+            isolation.validate_program_budget(seconds, cells)
 
 
 def test_cycle_changes_only_rate_without_reloading_firmware(monkeypatch):

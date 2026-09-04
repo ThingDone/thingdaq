@@ -53,21 +53,32 @@ def experiment_settings(manifest: dict) -> dict[str, str]:
             "AUX_INPUT_CPU_MHZ": str(cpu)}
 
 
-def classify_result(result: dict) -> dict:
+def validate_program_budget(seconds: float, cells: int) -> float:
+    # Same 120-second margin below the 900-second container limit documented
+    # by doc/guides/soak-harness.md. Keep separate long cells in separate jobs.
+    planned = 30 + (seconds + 5) * cells
+    if not 1 <= seconds <= 600 or cells < 1 or planned > 780:
+        raise ValueError("sequence exceeds the safe service runtime budget; split into separate jobs")
+    return planned
+
+
+def classify_result(result: dict, *, expected_cells: int | None = None) -> dict:
     details = result.get("results", {})
     evidence = [
         json.loads(line[9:])
         for line in details.get("stdout", "").splitlines()
         if line.startswith("EVIDENCE ")
     ]
-    if not details.get("completed") or not details.get("program_success"):
+    exit_code = details.get("exit_code")
+    if (not details.get("completed") or not details.get("program_success")
+            or (isinstance(exit_code, int) and exit_code < 0)):
         outcome = "INFRASTRUCTURE_FAIL"
     elif (
         details.get("exit_code") == 0
         and evidence
         and all(row.get("result") == "PASS" for row in evidence)
     ):
-        outcome = "PASS"
+        outcome = "PASS" if expected_cells is None or len(evidence) == expected_cells else "INFRASTRUCTURE_FAIL"
     else:
         outcome = "TEST_FAIL"
     return {
@@ -185,6 +196,10 @@ def main() -> int:
     settings.update(experiment_settings(manifest))
     profiles = tuple(args.profiles) if args.profiles is not None else None
     sequence = [0, 1, 2, 3, 0] if args.cycle else list(profiles or (args.profile,))
+    try:
+        planned_program_seconds = validate_program_budget(args.seconds, len(sequence))
+    except ValueError as error:
+        parser.error(str(error))
     cases = tuple(args.cases) if args.cases is not None else None
     if cases is not None and (not (args.cycle or profiles) or len(cases) != len(sequence)):
         parser.error("--cases needs one case per --profiles/--cycle cell")
@@ -241,6 +256,7 @@ def main() -> int:
             "input_experiment": experiment,
             "profile_sequence": sequence,
             "case_sequence": list(cases or (args.case,) * len(sequence)),
+            "planned_program_seconds": planned_program_seconds,
         },
     )
     (args.evidence_dir / "firmware.ino.hex").write_bytes(firmware)
@@ -267,7 +283,7 @@ def main() -> int:
         if status.get("status") not in {"running", "busy", "queued", "pending"}:
             result = post("results", {"test_id": test_id})
             save("results.json", result)
-            summary = classify_result(result)
+            summary = classify_result(result, expected_cells=len(sequence))
             save("summary.json", summary)
             details = result.get("results", {})
             if not details.get("program_success"):
