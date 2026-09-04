@@ -111,6 +111,60 @@ constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
   return false;
 }
 
+constexpr bool isV2OutputRequestRaw(std::uint8_t raw) {
+  return raw >= static_cast<std::uint8_t>(
+                    protocol_v2::FrameKind::kOutputBeginRequest) &&
+         raw <= static_cast<std::uint8_t>(
+                    protocol_v2::FrameKind::kOutputClearRequest);
+}
+
+constexpr bool isV2OutputResponseRaw(std::uint8_t raw) {
+  return raw >= static_cast<std::uint8_t>(
+                    protocol_v2::FrameKind::kOutputBeginResponse) &&
+         raw <= static_cast<std::uint8_t>(
+                    protocol_v2::FrameKind::kOutputClearResponse);
+}
+
+constexpr bool isV2KnownRaw(std::uint8_t raw) {
+  return raw == static_cast<std::uint8_t>(
+                    protocol_v2::FrameKind::kInfoRequest) ||
+         raw == static_cast<std::uint8_t>(
+                    protocol_v2::FrameKind::kInfoResponse) ||
+         raw == static_cast<std::uint8_t>(
+                    protocol_v2::FrameKind::kErrorResponse) ||
+         isV2OutputRequestRaw(raw) || isV2OutputResponseRaw(raw);
+}
+
+constexpr std::size_t v2PayloadSize(std::uint8_t raw) {
+  switch (static_cast<protocol_v2::FrameKind>(raw)) {
+    case protocol_v2::FrameKind::kInfoRequest:
+    case protocol_v2::FrameKind::kOutputArmRequest:
+    case protocol_v2::FrameKind::kOutputStatusRequest:
+    case protocol_v2::FrameKind::kOutputClearRequest:
+      return 0U;
+    case protocol_v2::FrameKind::kOutputBeginRequest:
+      return protocol_v2::kOutputBeginRequestPayloadSize;
+    case protocol_v2::FrameKind::kOutputAppendRequest:
+      return protocol_v2::kOutputAppendRequestPayloadSize;
+    case protocol_v2::FrameKind::kOutputCommitRequest:
+      return protocol_v2::kOutputCommitRequestPayloadSize;
+    case protocol_v2::FrameKind::kInfoResponse:
+      return protocol_v2::kInfoResponsePayloadSize;
+    case protocol_v2::FrameKind::kErrorResponse:
+      return protocol_v2::kErrorResponsePayloadSize;
+    case protocol_v2::FrameKind::kOutputAppendResponse:
+      return protocol_v2::kOutputAppendResponsePayloadSize;
+    case protocol_v2::FrameKind::kOutputBeginResponse:
+    case protocol_v2::FrameKind::kOutputCommitResponse:
+    case protocol_v2::FrameKind::kOutputArmResponse:
+    case protocol_v2::FrameKind::kOutputStatusResponse:
+    case protocol_v2::FrameKind::kOutputClearResponse:
+      return protocol_v2::kOutputStatusResponsePayloadSize;
+    default:
+      return static_cast<std::size_t>(-1);
+  }
+}
+
 constexpr bool isRequestKind(protocol_v1::FrameKind kind) {
   switch (kind) {
     case protocol_v1::FrameKind::kInfoRequest:
@@ -345,6 +399,59 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
 
 THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.header_validation")
 Result validateHeader(const FrameHeader &header, bool commands_only) {
+  const std::uint8_t raw_kind = static_cast<std::uint8_t>(header.kind);
+  if (header.version == protocol_v2::kProtocolVersion) {
+    if (!isV2KnownRaw(raw_kind) ||
+        (commands_only && raw_kind != static_cast<std::uint8_t>(
+                                          protocol_v2::FrameKind::kInfoRequest) &&
+         !isV2OutputRequestRaw(raw_kind))) {
+      return badKind();
+    }
+    const bool output_response = isV2OutputResponseRaw(raw_kind);
+    const bool generic_error_response =
+        raw_kind == static_cast<std::uint8_t>(
+                        protocol_v2::FrameKind::kErrorResponse);
+    const bool response_error =
+        (header.flags & static_cast<std::uint16_t>(
+                            protocol_v2::FrameFlag::kResponseError)) != 0U;
+    const std::uint16_t allowed_flags =
+        output_response || generic_error_response
+            ? static_cast<std::uint16_t>(
+                  protocol_v2::FrameFlag::kResponseError)
+            : 0U;
+    const std::size_t expected_payload =
+        output_response && response_error
+            ? protocol_v2::kOutputStatusResponsePayloadSize
+            : v2PayloadSize(raw_kind);
+    if (generic_error_response && !response_error) {
+      return badFlags();
+    }
+    if (header.header_length != protocol_v2::kHeaderSize ||
+        header.checksum_algorithm !=
+            static_cast<protocol_v1::ChecksumAlgorithm>(
+                protocol_v2::kBootstrapChecksumAlgorithm) ||
+        (header.flags & static_cast<std::uint16_t>(~allowed_flags)) != 0U ||
+        header.payload_length != expected_payload) {
+      return badLength();
+    }
+    const std::uint32_t framing = static_cast<std::uint32_t>(
+        protocol_v2::kHeaderSize + protocol_v2::kTrailerSize);
+    if (header.total_length != framing + header.payload_length ||
+        header.total_length > protocol_v2::kMaxControlFrameBytes ||
+        header.request_id == 0U || header.sequence != 0U ||
+        header.first_sample_ticks != 0U || header.item_count != 0U) {
+      return badPayload();
+    }
+    const bool output_kind = isV2OutputRequestRaw(raw_kind) ||
+                             isV2OutputResponseRaw(raw_kind);
+    if ((output_kind && header.run_id == 0U) ||
+        (!output_kind && header.run_id != 0U) ||
+        (isV2OutputRequestRaw(raw_kind) &&
+         header.total_length > protocol_v2::kMaxCommandFrameBytes)) {
+      return badPayload();
+    }
+    return Result::success();
+  }
   if (header.version != protocol_v1::kProtocolVersion) {
     return badVersion();
   }
@@ -450,20 +557,35 @@ Result decodeHeader(ByteView input, FrameHeader &header, bool commands_only) {
     return badMagic();
   }
   const std::uint8_t version = input.data[protocol_v1::kHeaderVersionOffset];
-  if (version != protocol_v1::kProtocolVersion) {
+  if (version != protocol_v1::kProtocolVersion &&
+      version != protocol_v2::kProtocolVersion) {
     return badVersion();
   }
   protocol_v1::FrameKind kind{};
-  if (!decodeKind(input.data[protocol_v1::kHeaderKindOffset], kind) ||
-      (commands_only && !isRequestKind(kind))) {
+  const std::uint8_t raw_kind = input.data[protocol_v1::kHeaderKindOffset];
+  if (version == protocol_v1::kProtocolVersion) {
+    if (!decodeKind(raw_kind, kind) ||
+        (commands_only && !isRequestKind(kind))) {
+      return badKind();
+    }
+  } else if (!isV2KnownRaw(raw_kind) ||
+             (commands_only &&
+              raw_kind != static_cast<std::uint8_t>(
+                              protocol_v2::FrameKind::kInfoRequest) &&
+              !isV2OutputRequestRaw(raw_kind))) {
     return badKind();
+  } else {
+    kind = static_cast<protocol_v1::FrameKind>(raw_kind);
   }
   const std::uint8_t raw_checksum =
       input.data[protocol_v1::kHeaderChecksumAlgorithmOffset];
   const auto checksum_algorithm =
       static_cast<protocol_v1::ChecksumAlgorithm>(raw_checksum);
   if (!isKnownChecksum(checksum_algorithm) ||
-      !checksumAllowedForKind(kind, checksum_algorithm)) {
+      (version == protocol_v1::kProtocolVersion &&
+       !checksumAllowedForKind(kind, checksum_algorithm)) ||
+      (version == protocol_v2::kProtocolVersion &&
+       checksum_algorithm != protocol_v1::kBootstrapChecksumAlgorithm)) {
     return unsupportedChecksum();
   }
   if (input.data[protocol_v1::kHeaderReservedOffset] != 0U) {
@@ -1794,6 +1916,44 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
   if (!payload.valid() || payload.size != header.payload_length) {
     return badLength();
   }
+  if (header.version == protocol_v2::kProtocolVersion) {
+    const auto kind = static_cast<protocol_v2::FrameKind>(
+        static_cast<std::uint8_t>(header.kind));
+    if (kind == protocol_v2::FrameKind::kOutputBeginRequest) {
+      std::uint32_t idle = 0U;
+      return loadU32(payload,
+                     protocol_v2::kOutputBeginRequestIdleStateMaskOffset,
+                     idle) &&
+                     (idle & ~protocol_v2::kOutputLegalStateMask) == 0U
+                 ? Result::success()
+                 : badPayload();
+    }
+    if (kind == protocol_v2::FrameKind::kOutputAppendRequest) {
+      std::uint32_t duration = 0U;
+      std::uint32_t state = 0U;
+      return loadU32(payload,
+                     protocol_v2::kOutputAppendRequestDurationSamplesOffset,
+                     duration) &&
+                     loadU32(payload,
+                             protocol_v2::kOutputAppendRequestLogicalStateMaskOffset,
+                             state) &&
+                     duration != 0U &&
+                     (state & ~protocol_v2::kOutputLegalStateMask) == 0U
+                 ? Result::success()
+                 : badPayload();
+    }
+    if (kind == protocol_v2::FrameKind::kOutputCommitRequest) {
+      std::uint32_t count = 0U;
+      return loadU32(payload,
+                     protocol_v2::kOutputCommitRequestSegmentCountOffset,
+                     count) &&
+                     count >= protocol_v2::kOutputMinimumCommittedSegments &&
+                     count <= protocol_v2::kOutputSegmentCapacity
+                 ? Result::success()
+                 : badPayload();
+    }
+    return Result::success();
+  }
   if (header.kind == protocol_v1::FrameKind::kAdcData) {
     for (std::size_t offset = 0U; offset < payload.size; offset += 2U) {
       std::uint16_t sample = 0U;
@@ -2062,6 +2222,7 @@ std::uint32_t adler32(ByteView input) {
   return checksum::adler32(input.data, input.size);
 }
 
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.benchmark_request_validation")
 bool validChecksumBenchmarkRequest(const ChecksumBenchmarkRequest &request) {
   if (!isSupportedChecksum(request.checksum_algorithm) ||
       request.batch_count == 0U ||
@@ -2258,6 +2419,7 @@ Result decodeFrame(ByteView input, DecodedFrame &frame) {
   return Result::success();
 }
 
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.control_frame_encode")
 Result encodeFrameTo(FrameFields fields, ByteView payload,
                      MutableByteView output, std::size_t &written) {
   written = 0U;
@@ -2287,6 +2449,7 @@ Result encodeFrameTo(FrameFields fields, ByteView payload,
   header.request_id = fields.request_id;
   header.first_sample_ticks = fields.first_sample_ticks;
   header.item_count = fields.item_count;
+  header.version = fields.version;
   Result result = validateHeader(header, false);
   if (!result.ok()) {
     return result;
@@ -2374,11 +2537,33 @@ Result decodeRequest(ByteView input, Request &request) {
   if (!result.ok()) {
     return result;
   }
+  const std::uint8_t raw_kind = static_cast<std::uint8_t>(frame.header.kind);
+  if (frame.header.version == protocol_v2::kProtocolVersion) {
+    Request decoded{};
+    decoded.protocol_version = frame.header.version;
+    decoded.wire_kind = raw_kind;
+    decoded.request_id = frame.header.request_id;
+    decoded.output_generation = frame.header.run_id;
+    if (raw_kind == static_cast<std::uint8_t>(
+                        protocol_v2::FrameKind::kInfoRequest)) {
+      decoded.kind = protocol_v1::CommandKind::kInfo;
+    } else if (!isV2OutputRequestRaw(raw_kind)) {
+      return badKind();
+    } else if (frame.payload.size != 0U &&
+               (!loadU32(frame.payload, 0U, decoded.output_value_0) ||
+                !loadU32(frame.payload, 4U, decoded.output_value_1))) {
+      return badPayload();
+    }
+    request = decoded;
+    return Result::success();
+  }
   protocol_v1::CommandKind command{};
   if (!commandForKind(frame.header.kind, command)) {
     return badKind();
   }
   Request decoded{};
+  decoded.protocol_version = frame.header.version;
+  decoded.wire_kind = raw_kind;
   decoded.kind = command;
   decoded.request_id = frame.header.request_id;
   if (command == protocol_v1::CommandKind::kConfigure) {
@@ -2414,6 +2599,186 @@ Result decodeRequest(ByteView input, Request &request) {
   }
   request = decoded;
   return Result::success();
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.v2_info_response")
+Result encodeV2InfoResponse(const Request &request,
+                            const InfoResponse &response,
+                            ControlFrame &output) {
+  if (request.protocol_version != protocol_v2::kProtocolVersion ||
+      request.wire_kind != static_cast<std::uint8_t>(
+                               protocol_v2::FrameKind::kInfoRequest)) {
+    return badPayload();
+  }
+  Request v1_request = request;
+  v1_request.protocol_version = protocol_v1::kProtocolVersion;
+  v1_request.wire_kind = static_cast<std::uint8_t>(
+      protocol_v1::FrameKind::kInfoRequest);
+  ControlFrame v1_frame{};
+  const Result encoded = encodeInfoResponse(v1_request, 0U, response, v1_frame);
+  if (!encoded.ok()) {
+    return encoded;
+  }
+  std::array<std::uint8_t, protocol_v2::kInfoResponsePayloadSize> payload{};
+  for (std::size_t index = 0U;
+       index < protocol_v1::kInfoResponsePayloadSize; ++index) {
+    payload[index] = v1_frame.data()[protocol_v1::kHeaderSize + index];
+  }
+  MutableByteView bytes = mutableView(payload);
+  payload[protocol_v2::kInfoResponseProtocolVersionOffset] =
+      protocol_v2::kProtocolVersion;
+  storeU32(bytes, protocol_v2::kInfoResponseCapabilityBitsOffset,
+           response.capability_bits |
+               static_cast<std::uint32_t>(
+                   protocol_v2::Capability::kPreloadedAuxiliaryOutput) |
+               static_cast<std::uint32_t>(
+                   protocol_v2::Capability::kCommonEpochOutput));
+  storeU32(bytes, protocol_v2::kInfoResponseMaxControlFrameBytesOffset,
+           protocol_v2::kMaxControlFrameBytes);
+  payload[protocol_v2::kInfoResponseOutputBankModeOffset] =
+      static_cast<std::uint8_t>(protocol_v2::OutputBankMode::kDisabled);
+  payload[protocol_v2::kInfoResponseOutputPinCountOffset] = 8U;
+  payload[protocol_v2::kInfoResponseOutputStateWidthBitsOffset] =
+      protocol_v2::kOutputStateWidthBits;
+  payload[protocol_v2::kInfoResponseOutputDurationQuantumUsOffset] =
+      protocol_v2::kOutputDurationQuantumUs;
+  for (std::size_t index = 0U;
+       index < protocol_v2::kInfoResponseOutputPinMapCount; ++index) {
+    payload[protocol_v2::kInfoResponseOutputPinMapOffset + index] =
+        protocol_v2::kOutputPinsByLogicalBit[index];
+    payload[protocol_v2::kInfoResponseOutputGpioBitsByLogicalBitOffset +
+            index] = protocol_v2::kOutputGpioBitsByLogicalBit[index];
+  }
+  storeU32(bytes, protocol_v2::kInfoResponseOutputRateHzOffset,
+           protocol_v2::kOutputRateHz);
+  storeU32(bytes, protocol_v2::kInfoResponseOutputPeriodTicksOffset,
+           protocol_v2::kOutputPeriodTicks);
+  storeU32(bytes, protocol_v2::kInfoResponseOutputCapacitySegmentsOffset,
+           protocol_v2::kOutputSegmentCapacity);
+  storeU32(bytes, protocol_v2::kInfoResponseOutputLegalStateMaskOffset,
+           protocol_v2::kOutputLegalStateMask);
+  FrameFields fields{};
+  fields.kind = static_cast<protocol_v1::FrameKind>(
+      protocol_v2::FrameKind::kInfoResponse);
+  fields.version = protocol_v2::kProtocolVersion;
+  fields.request_id = request.request_id;
+  return encodeFrame(fields, view(payload), output);
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.v2_output_append_response")
+Result encodeV2OutputAppendResponse(const Request &request,
+                                    std::uint32_t accepted_segment_count,
+                                    ControlFrame &output) {
+  std::array<std::uint8_t,
+             protocol_v2::kOutputAppendResponsePayloadSize> payload{};
+  MutableByteView bytes = mutableView(payload);
+  writeSuccessPrefix(bytes);
+  storeU32(bytes,
+           protocol_v2::kOutputAppendResponseAcceptedSegmentCountOffset,
+           accepted_segment_count);
+  storeU32(bytes, protocol_v2::kOutputAppendResponseDurationSamplesOffset,
+           request.output_value_0);
+  storeU32(bytes, protocol_v2::kOutputAppendResponseLogicalStateMaskOffset,
+           request.output_value_1);
+  FrameFields fields{};
+  fields.kind = static_cast<protocol_v1::FrameKind>(
+      protocol_v2::FrameKind::kOutputAppendResponse);
+  fields.version = protocol_v2::kProtocolVersion;
+  fields.run_id = request.output_generation;
+  fields.request_id = request.request_id;
+  return encodeFrame(fields, view(payload), output);
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.v2_output_status_response")
+Result encodeV2OutputStatusResponse(
+    const Request &request, const OutputStatusResponse &status,
+    protocol_v1::ErrorCode command_error,
+    protocol_v2::OutputError output_error, ControlFrame &output) {
+  std::array<std::uint8_t,
+             protocol_v2::kOutputStatusResponsePayloadSize> payload{};
+  MutableByteView bytes = mutableView(payload);
+  const bool failed = command_error != protocol_v1::ErrorCode::kOk;
+  if (failed) {
+    writeErrorPrefix(bytes, command_error);
+  } else {
+    writeSuccessPrefix(bytes);
+  }
+  payload[protocol_v2::kOutputStatusResponseOutputStateOffset] =
+      static_cast<std::uint8_t>(status.state);
+  payload[protocol_v2::kOutputStatusResponseOutputBankModeOffset] =
+      static_cast<std::uint8_t>(status.bank_mode);
+  payload[protocol_v2::kOutputStatusResponseFaultLatchedOffset] =
+      status.fault_latched ? 1U : 0U;
+#define STORE_OUTPUT_U32(field, value)                                   \
+  storeU32(bytes, protocol_v2::kOutputStatusResponse##field##Offset,      \
+           static_cast<std::uint32_t>(value))
+#define STORE_OUTPUT_U64(field, value)                                   \
+  storeU64(bytes, protocol_v2::kOutputStatusResponse##field##Offset,      \
+           static_cast<std::uint64_t>(value))
+  STORE_OUTPUT_U32(Generation, status.generation);
+  STORE_OUTPUT_U32(IdleStateMask, status.idle_state_mask);
+  STORE_OUTPUT_U32(CurrentStateMask, status.current_state_mask);
+  STORE_OUTPUT_U32(LastEmittedStateMask, status.last_emitted_state_mask);
+  STORE_OUTPUT_U32(RepeatCount, status.repeat_count);
+  STORE_OUTPUT_U32(CompletedRepeats, status.completed_repeats);
+  STORE_OUTPUT_U32(SegmentCount, status.segment_count);
+  STORE_OUTPUT_U32(AcceptedSegmentCount, status.accepted_segment_count);
+  STORE_OUTPUT_U32(ProgramChecksum, status.program_checksum);
+  STORE_OUTPUT_U32(CurrentSegmentIndex, status.current_segment_index);
+  STORE_OUTPUT_U64(TicksElapsed, status.ticks_elapsed);
+  STORE_OUTPUT_U32(
+      TransitionsEmitted,
+      status.transitions_emitted > std::numeric_limits<std::uint32_t>::max()
+          ? std::numeric_limits<std::uint32_t>::max()
+          : status.transitions_emitted);
+  payload[protocol_v2::kOutputStatusResponseOutputErrorOffset] =
+      static_cast<std::uint8_t>(failed ? output_error : status.output_error);
+  STORE_OUTPUT_U32(CurrentSegmentRemaining, status.current_segment_remaining);
+  STORE_OUTPUT_U32(CommonRunId, status.common_run_id);
+  STORE_OUTPUT_U64(RequestedDurationStates, status.requested_duration_states);
+  STORE_OUTPUT_U64(StatesExpanded, status.states_expanded);
+  STORE_OUTPUT_U64(DmaStatesQueued, status.dma_states_queued);
+  STORE_OUTPUT_U64(DmaStatesEmitted, status.dma_states_emitted);
+  STORE_OUTPUT_U64(HeldRemainderStates, status.held_remainder_states);
+  STORE_OUTPUT_U64(BlocksFilled, status.blocks_filled);
+  STORE_OUTPUT_U64(BlocksCompleted, status.blocks_completed);
+  STORE_OUTPUT_U64(StartTick, status.start_tick);
+  STORE_OUTPUT_U64(CompletionTick, status.completion_tick);
+  STORE_OUTPUT_U64(HoldTick, status.hold_tick);
+  storeU16(bytes, protocol_v2::kOutputStatusResponseReadyDepthOffset,
+           status.ready_depth);
+  storeU16(bytes, protocol_v2::kOutputStatusResponseReadyHighWaterOffset,
+           status.ready_high_water);
+  STORE_OUTPUT_U32(RefillLead, status.refill_lead);
+  STORE_OUTPUT_U32(RefillLeadHighWater, status.refill_lead_high_water);
+  STORE_OUTPUT_U32(CacheFlushes, status.cache_flushes);
+  STORE_OUTPUT_U32(StartOperations, status.start_operations);
+  STORE_OUTPUT_U32(StopOperations, status.stop_operations);
+  STORE_OUTPUT_U32(InvalidOperations, status.invalid_operations);
+  STORE_OUTPUT_U32(ResourceConflicts, status.resource_conflicts);
+  STORE_OUTPUT_U32(Underruns, status.underruns);
+  STORE_OUTPUT_U32(StaleCompletions, status.stale_completions);
+  STORE_OUTPUT_U32(DmaErrors, status.dma_errors);
+  STORE_OUTPUT_U32(StartErrors, status.start_errors);
+  STORE_OUTPUT_U32(StopErrors, status.stop_errors);
+  STORE_OUTPUT_U32(ConservationErrors, status.conservation_errors);
+  payload[protocol_v2::kOutputStatusResponseConservationExactOffset] =
+      status.conservation_exact ? 1U : 0U;
+#undef STORE_OUTPUT_U64
+#undef STORE_OUTPUT_U32
+  const auto request_kind = static_cast<protocol_v2::FrameKind>(
+      request.wire_kind);
+  FrameFields fields{};
+  fields.kind = static_cast<protocol_v1::FrameKind>(
+      protocol_v2::responseFrameKind(
+          static_cast<protocol_v2::CommandKind>(request_kind)));
+  fields.version = protocol_v2::kProtocolVersion;
+  fields.flags = failed ? static_cast<std::uint16_t>(
+                              protocol_v2::FrameFlag::kResponseError)
+                        : 0U;
+  fields.run_id = request.output_generation;
+  fields.request_id = request.request_id;
+  return encodeFrame(fields, view(payload), output);
 }
 
 THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.info_response")
@@ -3388,9 +3753,15 @@ Result encodeRejectedFrameResponse(std::uint32_t request_id,
   payload[protocol_v1::kErrorResponseRejectedKindOffset] = rejected_kind;
   payload[protocol_v1::kErrorResponseRejectedVersionOffset] = rejected_version;
   FrameFields fields{};
-  fields.kind = protocol_v1::FrameKind::kErrorResponse;
+  fields.kind = rejected_version == protocol_v2::kProtocolVersion
+                    ? static_cast<protocol_v1::FrameKind>(
+                          protocol_v2::FrameKind::kErrorResponse)
+                    : protocol_v1::FrameKind::kErrorResponse;
   fields.flags = kResponseErrorFlag;
   fields.request_id = request_id;
+  fields.version = rejected_version == protocol_v2::kProtocolVersion
+                       ? protocol_v2::kProtocolVersion
+                       : protocol_v1::kProtocolVersion;
   return encodeFrame(fields, view(payload), output);
 }
 

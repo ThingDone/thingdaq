@@ -68,7 +68,8 @@ class FirmwareRuntime {
             output},
         checksum_benchmark_(checksum_benchmark),
         gpio_clock_diagnostic_(gpio_clock_diagnostic),
-        gpio_capture_diagnostic_(gpio_capture_diagnostic) {}
+        gpio_capture_diagnostic_(gpio_capture_diagnostic),
+        output_(output) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -114,6 +115,8 @@ class FirmwareRuntime {
   static protocol::GpioCaptureDiagnosticResponse gpioDiagnosticResponse(
       const gpio_diagnostic::Runner &runner,
       const gpio_diagnostic::Snapshot &snapshot);
+  bool dispatchV2(const protocol::Request &request,
+                  protocol::ControlFrame &response);
 
   control::ControlState control_{};
   packet::PacketBufferPipeline packet_pipeline_;
@@ -124,6 +127,7 @@ class FirmwareRuntime {
   benchmark::Runner *checksum_benchmark_ = nullptr;
   gpio_clock::Runner *gpio_clock_diagnostic_ = nullptr;
   gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
+  digital_output::Participant *output_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
   usb::TransportSnapshot transport_stats_baseline_{};
   std::size_t transport_command_queue_high_water_ = 0U;

@@ -22,6 +22,7 @@ namespace adc_trigger = thingdaq::adc_trigger;
 namespace benchmark = thingdaq::benchmark;
 namespace board = thingdaq::board;
 namespace constants = thingdaq::protocol_v1;
+namespace constants_v2 = thingdaq::protocol_v2;
 namespace control = thingdaq::control;
 namespace digital_output = thingdaq::digital_output;
 namespace gpio_clock = thingdaq::gpio_clock;
@@ -60,6 +61,45 @@ wire::CommandFrame emptyRequest(constants::FrameKind kind,
   wire::CommandFrame frame{};
   expect(wire::encodeFrame(fields, {}, frame).ok(),
          "encode empty request");
+  return frame;
+}
+
+wire::CommandFrame outputRequest(constants_v2::FrameKind kind,
+                                 std::uint32_t request_id,
+                                 std::uint32_t generation,
+                                 std::uint32_t value_0 = 0U,
+                                 std::uint32_t value_1 = 0U) {
+  std::array<std::uint8_t, constants_v2::kOutputBeginRequestPayloadSize>
+      payload{};
+  std::size_t payload_size = 0U;
+  if (kind == constants_v2::FrameKind::kOutputBeginRequest ||
+      kind == constants_v2::FrameKind::kOutputAppendRequest ||
+      kind == constants_v2::FrameKind::kOutputCommitRequest) {
+    payload_size = payload.size();
+    expect(wire::storeU32({payload.data(), payload.size()}, 0U, value_0) &&
+               wire::storeU32({payload.data(), payload.size()}, 4U, value_1),
+           "encode output request payload");
+  }
+  wire::FrameFields fields{};
+  fields.kind = static_cast<constants::FrameKind>(kind);
+  fields.version = constants_v2::kProtocolVersion;
+  fields.run_id = generation;
+  fields.request_id = request_id;
+  wire::CommandFrame frame{};
+  expect(wire::encodeFrame(fields, {payload.data(), payload_size}, frame).ok(),
+         "encode protocol-v2 output request");
+  return frame;
+}
+
+wire::CommandFrame v2InfoRequest(std::uint32_t request_id) {
+  wire::FrameFields fields{};
+  fields.kind = static_cast<constants::FrameKind>(
+      constants_v2::FrameKind::kInfoRequest);
+  fields.version = constants_v2::kProtocolVersion;
+  fields.request_id = request_id;
+  wire::CommandFrame frame{};
+  expect(wire::encodeFrame(fields, {}, frame).ok(),
+         "encode protocol-v2 INFO request");
   return frame;
 }
 
@@ -723,6 +763,70 @@ class LifecycleOutput final : public digital_output::Participant {
   explicit LifecycleOutput(std::vector<std::string> &operations)
       : operations_(operations) {}
 
+  digital_output::ProgramStatus controlBegin(
+      std::uint32_t generation, std::uint32_t repeat_count,
+      std::uint32_t idle_state_mask) override {
+    if (generation == 0U) {
+      return digital_output::ProgramStatus::kInvalidGeneration;
+    }
+    program = {};
+    program.state = digital_output::ProgramState::kLoading;
+    program.generation = generation;
+    program.repeat_count = repeat_count;
+    program.idle_state_mask = idle_state_mask;
+    return digital_output::ProgramStatus::kOk;
+  }
+
+  digital_output::ProgramStatus controlAppend(
+      std::uint32_t generation,
+      const digital_output::Segment &segment) override {
+    if (generation != program.generation) {
+      return digital_output::ProgramStatus::kInvalidGeneration;
+    }
+    if (program.state != digital_output::ProgramState::kLoading) {
+      return digital_output::ProgramStatus::kInvalidLifecycle;
+    }
+    ++program.segment_count;
+    program.duration_samples += segment.duration_samples;
+    return digital_output::ProgramStatus::kOk;
+  }
+
+  digital_output::ProgramStatus controlCommit(
+      std::uint32_t generation, std::size_t expected_segment_count,
+      std::uint32_t expected_checksum) override {
+    if (generation != program.generation) {
+      return digital_output::ProgramStatus::kInvalidGeneration;
+    }
+    if (program.segment_count != expected_segment_count) {
+      return digital_output::ProgramStatus::kSegmentCountMismatch;
+    }
+    program.state = digital_output::ProgramState::kCommitted;
+    program.checksum = expected_checksum;
+    program.immutable = true;
+    return digital_output::ProgramStatus::kOk;
+  }
+
+  digital_output::OperationStatus controlArm(
+      std::uint32_t generation) override {
+    if (generation != program.generation) {
+      return digital_output::OperationStatus::kInvalidGeneration;
+    }
+    if (program.state != digital_output::ProgramState::kCommitted) {
+      return digital_output::OperationStatus::kInvalidLifecycle;
+    }
+    armed = true;
+    return digital_output::OperationStatus::kOk;
+  }
+
+  digital_output::OperationStatus controlClear() override {
+    if (running) {
+      return digital_output::OperationStatus::kInvalidLifecycle;
+    }
+    program = {};
+    armed = false;
+    return digital_output::OperationStatus::kOk;
+  }
+
   bool participatesInNextStart() const override { return armed; }
 
   digital_output::StartStatus inspectStart(
@@ -780,14 +884,33 @@ class LifecycleOutput final : public digital_output::Participant {
 
   digital_output::Snapshot snapshot() const override {
     digital_output::Snapshot result{};
+    result.program = program;
+    result.bank_mode = program.generation == 0U
+                           ? constants_v2::OutputBankMode::kDisabled
+                           : constants_v2::OutputBankMode::kOutput;
     result.state = fault
                        ? thingdaq::protocol_v2::OutputState::kFaulted
                        : running
                              ? thingdaq::protocol_v2::OutputState::kRunning
                              : armed
                                    ? thingdaq::protocol_v2::OutputState::kArmed
-                                   : thingdaq::protocol_v2::OutputState::kHeld;
+                                   : program.state ==
+                                             digital_output::ProgramState::kLoading
+                                         ? constants_v2::OutputState::kLoading
+                                         : program.state ==
+                                                   digital_output::ProgramState::kCommitted
+                                               ? constants_v2::OutputState::kCommitted
+                                               : constants_v2::OutputState::kEmpty;
     result.prepared = prepared;
+    result.requested_duration_states = program.duration_samples;
+    result.telemetry.states_expanded = states_expanded;
+    result.dma_states_queued = dma_states_queued;
+    result.telemetry.dma_states_emitted = dma_states_emitted;
+    result.telemetry.held_remainder_states = held_remainder_states;
+    result.refill_lead = refill_lead;
+    result.conservation_exact =
+        states_expanded ==
+        dma_states_emitted + refill_lead + held_remainder_states;
     return result;
   }
 
@@ -798,6 +921,12 @@ class LifecycleOutput final : public digital_output::Participant {
       digital_output::StartStatus::kOk;
   digital_output::StartStatus prepare_status =
       digital_output::StartStatus::kOk;
+  digital_output::ProgramSnapshot program{};
+  std::uint64_t states_expanded = 0U;
+  std::uint64_t dma_states_queued = 0U;
+  std::uint64_t dma_states_emitted = 0U;
+  std::uint64_t held_remainder_states = 0U;
+  std::size_t refill_lead = 0U;
   std::uint32_t observed_run_id = 0U;
   std::uint64_t observed_epoch_ticks = 0U;
   std::size_t last_service_limit = 0U;
@@ -2153,6 +2282,114 @@ void testRuntimeServicesOutputAtBothCooperativePoints() {
          "runtime visits output once before command/USB work and once between acquisition visits");
 }
 
+void testRuntimeDispatchesProtocolV2OutputControlAndTelemetry() {
+  FakeCdcStream stream{};
+  packet::OwnedPacketBufferStorage packet_storage{};
+  FakeTickClock clock{};
+  std::vector<std::string> operations{};
+  LifecycleOutput output{operations};
+  output.states_expanded = 25U;
+  output.dma_states_queued = 17U;
+  output.dma_states_emitted = 5U;
+  output.held_remainder_states = 8U;
+  output.refill_lead = 12U;
+  app::FirmwareRuntime firmware{
+      stream, packet_storage, clock, synthetic::Mode::kRealtime,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, &output};
+  expect(firmware.begin(0x12345678U),
+         "protocol-v2 output fixture boots");
+
+  stream.appendInput(v2InfoRequest(1U));
+  stream.appendInput(outputRequest(
+      constants_v2::FrameKind::kOutputBeginRequest, 2U, 7U, 2U, 3U));
+  stream.appendInput(outputRequest(
+      constants_v2::FrameKind::kOutputAppendRequest, 3U, 7U, 25U, 5U));
+  stream.appendInput(outputRequest(
+      constants_v2::FrameKind::kOutputCommitRequest, 4U, 7U, 1U,
+      0xA1B2C3D4U));
+  stream.appendInput(outputRequest(
+      constants_v2::FrameKind::kOutputArmRequest, 5U, 7U));
+  stream.appendInput(outputRequest(
+      constants_v2::FrameKind::kOutputStatusRequest, 6U, 7U));
+  stream.appendInput(outputRequest(
+      constants_v2::FrameKind::kOutputClearRequest, 7U, 7U));
+  stream.appendInput(outputRequest(
+      constants_v2::FrameKind::kOutputStatusRequest, 7U, 7U));
+  expect(drain(firmware, stream).quiescent,
+         "protocol-v2 output control sequence drains");
+
+  const std::vector<wire::DecodedFrame> frames = decodeOutput(stream.output);
+  expect(frames.size() == 8U,
+         "every protocol-v2 output request receives one response");
+  if (frames.size() != 8U) {
+    return;
+  }
+  const std::array<constants_v2::FrameKind, 8U> expected_kinds{
+      constants_v2::FrameKind::kInfoResponse,
+      constants_v2::FrameKind::kOutputBeginResponse,
+      constants_v2::FrameKind::kOutputAppendResponse,
+      constants_v2::FrameKind::kOutputCommitResponse,
+      constants_v2::FrameKind::kOutputArmResponse,
+      constants_v2::FrameKind::kOutputStatusResponse,
+      constants_v2::FrameKind::kOutputClearResponse,
+      constants_v2::FrameKind::kErrorResponse,
+  };
+  for (std::size_t index = 0U; index < frames.size(); ++index) {
+    expect(frames[index].header.version == constants_v2::kProtocolVersion &&
+               static_cast<std::uint8_t>(frames[index].header.kind) ==
+                   static_cast<std::uint8_t>(expected_kinds[index]) &&
+               frames[index].header.request_id ==
+                   (index == 7U ? 7U : index + 1U),
+           "protocol-v2 response preserves version, kind, and request ID");
+  }
+  expect(frames[0].payload.size == constants_v2::kInfoResponsePayloadSize &&
+             frames[0].payload.data[
+                 constants_v2::kInfoResponseProtocolVersionOffset] ==
+                 constants_v2::kProtocolVersion,
+         "protocol-v2 INFO advertises the output-capable contract");
+
+  std::uint32_t accepted_segments = 0U;
+  expect(responseError(frames[2]) == constants::ErrorCode::kOk &&
+             wire::loadU32(
+                 frames[2].payload,
+                 constants_v2::kOutputAppendResponseAcceptedSegmentCountOffset,
+                 accepted_segments) &&
+             accepted_segments == 1U,
+         "OUTPUT_APPEND acknowledges the accepted cursor");
+
+  std::uint64_t expanded = 0U;
+  std::uint64_t emitted = 0U;
+  std::uint64_t held = 0U;
+  std::uint32_t lead = 0U;
+  expect(responseError(frames[5]) == constants::ErrorCode::kOk &&
+             wire::loadU64(
+                 frames[5].payload,
+                 constants_v2::kOutputStatusResponseStatesExpandedOffset,
+                 expanded) &&
+             wire::loadU64(
+                 frames[5].payload,
+                 constants_v2::kOutputStatusResponseDmaStatesEmittedOffset,
+                 emitted) &&
+             wire::loadU64(
+                 frames[5].payload,
+                 constants_v2::kOutputStatusResponseHeldRemainderStatesOffset,
+                 held) &&
+             wire::loadU32(
+                 frames[5].payload,
+                 constants_v2::kOutputStatusResponseRefillLeadOffset, lead) &&
+             expanded == emitted + lead + held &&
+             frames[5].payload.data[
+                 constants_v2::kOutputStatusResponseConservationExactOffset] ==
+                 1U,
+         "OUTPUT_STATUS transports exact conservation telemetry");
+  expect(output.program.generation == 0U && !output.armed,
+         "OUTPUT_CLEAR releases the uploaded program after telemetry readback");
+  expect(responseError(frames[7]) ==
+             constants::ErrorCode::kInvalidRequestId,
+         "duplicate protocol-v2 request IDs fail with a versioned error frame");
+}
+
 void testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs() {
   FakeCdcStream stream{};
   stream.max_read_size = 128U;
@@ -2453,6 +2690,7 @@ int main() {
   testCombinedStartRollbackMatrixCoversEveryAdmissionPoint();
   testArmedOutputJoinsCommonStartStopAndFaultOrdering();
   testRuntimeServicesOutputAtBothCooperativePoints();
+  testRuntimeDispatchesProtocolV2OutputControlAndTelemetry();
   testPhysicalAdcLifecycleOrdersHardwareAndDrainsCompletePairs();
   testChecksumBenchmarkRoundTripPreservesIdleAcquisitionState();
   testGpioClockRoundTripPreservesIdleAcquisitionState();

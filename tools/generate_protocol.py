@@ -2049,9 +2049,12 @@ def encode_schema_payload(
             value = int(field["required"])
         else:
             expected_value_names.add(name)
-            if name not in values:
+            if name in values:
+                value = values[name]
+            elif "default" in field:
+                value = int(field["default"])
+            else:
                 raise ContractError(f"fixture schema {schema_name} is missing {name}")
-            value = values[name]
 
         if field_type in INTEGER_FORMATS:
             struct.pack_into("<" + INTEGER_FORMATS[field_type], payload, offset, value)

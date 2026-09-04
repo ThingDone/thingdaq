@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v2.json. Do not edit by hand.
-// Source SHA-256: f90bc70d4d13334b6f8d8210044e282e4a3c639de729a389d44c354b279dbcc4
+// Source SHA-256: d6aae4456917798e439e0f58e8c06555373a7e8dd731586bee3c6fa646245c1c
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v2 {
 
-inline constexpr char kSourceSha256[] = "f90bc70d4d13334b6f8d8210044e282e4a3c639de729a389d44c354b279dbcc4";
+inline constexpr char kSourceSha256[] = "d6aae4456917798e439e0f58e8c06555373a7e8dd731586bee3c6fa646245c1c";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 2U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -1146,7 +1146,7 @@ inline constexpr std::size_t kOutputAppendResponseErrorCodeOffset = 2U;
 inline constexpr std::size_t kOutputAppendResponseAcceptedSegmentCountOffset = 4U;
 inline constexpr std::size_t kOutputAppendResponseDurationSamplesOffset = 8U;
 inline constexpr std::size_t kOutputAppendResponseLogicalStateMaskOffset = 12U;
-inline constexpr std::size_t kOutputStatusResponsePayloadSize = 64U;
+inline constexpr std::size_t kOutputStatusResponsePayloadSize = 224U;
 inline constexpr std::size_t kOutputStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::size_t kOutputStatusResponseReserved0Offset = 1U;
 inline constexpr std::size_t kOutputStatusResponseErrorCodeOffset = 2U;
@@ -1169,6 +1169,38 @@ inline constexpr std::size_t kOutputStatusResponseTransitionsEmittedOffset = 56U
 inline constexpr std::size_t kOutputStatusResponseOutputErrorOffset = 60U;
 inline constexpr std::size_t kOutputStatusResponseReserved2Offset = 61U;
 inline constexpr std::size_t kOutputStatusResponseReserved3Offset = 62U;
+inline constexpr std::size_t kOutputStatusResponseCurrentSegmentRemainingOffset = 64U;
+inline constexpr std::size_t kOutputStatusResponseCommonRunIdOffset = 68U;
+inline constexpr std::size_t kOutputStatusResponseRequestedDurationStatesOffset = 72U;
+inline constexpr std::size_t kOutputStatusResponseStatesExpandedOffset = 80U;
+inline constexpr std::size_t kOutputStatusResponseDmaStatesQueuedOffset = 88U;
+inline constexpr std::size_t kOutputStatusResponseDmaStatesEmittedOffset = 96U;
+inline constexpr std::size_t kOutputStatusResponseHeldRemainderStatesOffset = 104U;
+inline constexpr std::size_t kOutputStatusResponseBlocksFilledOffset = 112U;
+inline constexpr std::size_t kOutputStatusResponseBlocksCompletedOffset = 120U;
+inline constexpr std::size_t kOutputStatusResponseStartTickOffset = 128U;
+inline constexpr std::size_t kOutputStatusResponseCompletionTickOffset = 136U;
+inline constexpr std::size_t kOutputStatusResponseHoldTickOffset = 144U;
+inline constexpr std::size_t kOutputStatusResponseReadyDepthOffset = 152U;
+inline constexpr std::size_t kOutputStatusResponseReadyHighWaterOffset = 154U;
+inline constexpr std::size_t kOutputStatusResponseRefillLeadOffset = 156U;
+inline constexpr std::size_t kOutputStatusResponseRefillLeadHighWaterOffset = 160U;
+inline constexpr std::size_t kOutputStatusResponseCacheFlushesOffset = 164U;
+inline constexpr std::size_t kOutputStatusResponseStartOperationsOffset = 168U;
+inline constexpr std::size_t kOutputStatusResponseStopOperationsOffset = 172U;
+inline constexpr std::size_t kOutputStatusResponseInvalidOperationsOffset = 176U;
+inline constexpr std::size_t kOutputStatusResponseResourceConflictsOffset = 180U;
+inline constexpr std::size_t kOutputStatusResponseUnderrunsOffset = 184U;
+inline constexpr std::size_t kOutputStatusResponseStaleCompletionsOffset = 188U;
+inline constexpr std::size_t kOutputStatusResponseDmaErrorsOffset = 192U;
+inline constexpr std::size_t kOutputStatusResponseStartErrorsOffset = 196U;
+inline constexpr std::size_t kOutputStatusResponseStopErrorsOffset = 200U;
+inline constexpr std::size_t kOutputStatusResponseConservationErrorsOffset = 204U;
+inline constexpr std::size_t kOutputStatusResponseConservationExactOffset = 208U;
+inline constexpr std::size_t kOutputStatusResponseReserved4Offset = 209U;
+inline constexpr std::size_t kOutputStatusResponseReserved5Offset = 210U;
+inline constexpr std::size_t kOutputStatusResponseReserved6Offset = 212U;
+inline constexpr std::size_t kOutputStatusResponseReserved7Offset = 216U;
 
 constexpr std::uint16_t allowedFlags(FrameKind kind) {
   switch (kind) {

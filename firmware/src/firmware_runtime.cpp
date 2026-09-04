@@ -14,6 +14,120 @@ std::uint32_t counterDelta(std::uint32_t current, std::uint32_t baseline) {
   return current - baseline;
 }
 
+struct OutputCommandError {
+  protocol_v1::ErrorCode command = protocol_v1::ErrorCode::kOk;
+  protocol_v2::OutputError output = protocol_v2::OutputError::kNone;
+};
+
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.output_program_error")
+OutputCommandError programError(digital_output::ProgramStatus status) {
+  using Status = digital_output::ProgramStatus;
+  switch (status) {
+    case Status::kOk:
+      return {};
+    case Status::kInvalidGeneration:
+      return {protocol_v1::ErrorCode::kInvalidPayload,
+              protocol_v2::OutputError::kGenerationMismatch};
+    case Status::kInvalidSegment:
+      return {protocol_v1::ErrorCode::kInvalidPayload,
+              protocol_v2::OutputError::kInvalidSegment};
+    case Status::kCapacityExceeded:
+      return {protocol_v1::ErrorCode::kInvalidPayload,
+              protocol_v2::OutputError::kCapacityExceeded};
+    case Status::kInvalidLifecycle:
+      return {protocol_v1::ErrorCode::kInvalidState,
+              protocol_v2::OutputError::kInvalidLifecycle};
+    case Status::kSegmentCountMismatch:
+      return {protocol_v1::ErrorCode::kInvalidPayload,
+              protocol_v2::OutputError::kTruncatedUpload};
+    case Status::kChecksumMismatch:
+      return {protocol_v1::ErrorCode::kChecksumMismatch,
+              protocol_v2::OutputError::kChecksumMismatch};
+  }
+  return {protocol_v1::ErrorCode::kInternalError,
+          protocol_v2::OutputError::kInvalidLifecycle};
+}
+
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.output_operation_error")
+OutputCommandError operationError(digital_output::OperationStatus status) {
+  using Status = digital_output::OperationStatus;
+  switch (status) {
+    case Status::kOk:
+      return {};
+    case Status::kInvalidGeneration:
+      return {protocol_v1::ErrorCode::kInvalidPayload,
+              protocol_v2::OutputError::kGenerationMismatch};
+    case Status::kReleaseFailed:
+      return {protocol_v1::ErrorCode::kInternalError,
+              protocol_v2::OutputError::kReleaseFailed};
+    case Status::kNotReady:
+      return {protocol_v1::ErrorCode::kBusy,
+              protocol_v2::OutputError::kInvalidLifecycle};
+    default:
+      return {protocol_v1::ErrorCode::kInvalidState,
+              protocol_v2::OutputError::kInvalidLifecycle};
+  }
+}
+
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.output_status_projection")
+protocol::OutputStatusResponse outputStatusResponse(
+    const digital_output::Snapshot &snapshot) {
+  protocol::OutputStatusResponse response{};
+  response.state = snapshot.state;
+  response.bank_mode = snapshot.bank_mode;
+  response.output_error = snapshot.error;
+  response.generation = snapshot.program.generation;
+  response.idle_state_mask = snapshot.program.idle_state_mask;
+  response.current_state_mask = snapshot.current_state_mask;
+  response.last_emitted_state_mask = snapshot.last_emitted_state_mask;
+  response.repeat_count = snapshot.program.repeat_count;
+  response.completed_repeats = snapshot.telemetry.completed_repeats;
+  response.segment_count =
+      static_cast<std::uint32_t>(snapshot.program.segment_count);
+  response.accepted_segment_count = response.segment_count;
+  response.program_checksum = snapshot.program.checksum;
+  response.current_segment_index = snapshot.current_segment_index;
+  response.current_segment_remaining = snapshot.current_segment_remaining;
+  response.common_run_id = snapshot.run_id;
+  response.ticks_elapsed =
+      snapshot.hold_tick >= snapshot.start_tick && snapshot.hold_tick != 0U
+          ? snapshot.hold_tick - snapshot.start_tick
+          : snapshot.telemetry.dma_states_emitted *
+                protocol_v2::kOutputPeriodTicks;
+  response.transitions_emitted = snapshot.telemetry.transitions_emitted;
+  response.requested_duration_states = snapshot.requested_duration_states;
+  response.states_expanded = snapshot.telemetry.states_expanded;
+  response.dma_states_queued = snapshot.dma_states_queued;
+  response.dma_states_emitted = snapshot.telemetry.dma_states_emitted;
+  response.held_remainder_states =
+      snapshot.telemetry.held_remainder_states;
+  response.blocks_filled = snapshot.telemetry.blocks_filled;
+  response.blocks_completed = snapshot.telemetry.blocks_completed;
+  response.start_tick = snapshot.start_tick;
+  response.completion_tick = snapshot.completion_tick;
+  response.hold_tick = snapshot.hold_tick;
+  response.ready_depth = static_cast<std::uint16_t>(snapshot.ready_depth);
+  response.ready_high_water =
+      static_cast<std::uint16_t>(snapshot.telemetry.ready_high_water);
+  response.refill_lead = static_cast<std::uint32_t>(snapshot.refill_lead);
+  response.refill_lead_high_water = static_cast<std::uint32_t>(
+      snapshot.telemetry.refill_lead_high_water);
+  response.cache_flushes = snapshot.telemetry.cache_flushes;
+  response.start_operations = snapshot.telemetry.start_operations;
+  response.stop_operations = snapshot.telemetry.stop_operations;
+  response.invalid_operations = snapshot.telemetry.invalid_operations;
+  response.resource_conflicts = snapshot.telemetry.resource_conflicts;
+  response.underruns = snapshot.telemetry.underruns;
+  response.stale_completions = snapshot.telemetry.stale_completions;
+  response.dma_errors = snapshot.telemetry.dma_errors;
+  response.start_errors = snapshot.telemetry.start_errors;
+  response.stop_errors = snapshot.telemetry.stop_errors;
+  response.conservation_errors = snapshot.telemetry.conservation_errors;
+  response.fault_latched = snapshot.fault_latched;
+  response.conservation_exact = snapshot.conservation_exact;
+  return response;
+}
+
 }  // namespace
 
 THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.begin")
@@ -52,6 +166,14 @@ LoopReport FirmwareRuntime::service() {
       } else {
         report.internal_error = true;
         control_.statistics().recordTransportError();
+        report.response_reservation_abandoned =
+            transport_.abandonResponseReservation();
+      }
+    } else if (command.request.protocol_version ==
+               protocol_v2::kProtocolVersion) {
+      response_ready = dispatchV2(command.request, response);
+      if (!response_ready) {
+        report.internal_error = true;
         report.response_reservation_abandoned =
             transport_.abandonResponseReservation();
       }
@@ -212,6 +334,94 @@ LoopReport FirmwareRuntime::service() {
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
   return report;
+}
+
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.v2_dispatch")
+bool FirmwareRuntime::dispatchV2(const protocol::Request &request,
+                                 protocol::ControlFrame &response) {
+  if (!control_.acceptExternalRequestId(request.request_id)) {
+    return protocol::encodeRejectedFrameResponse(
+               request.request_id, request.wire_kind,
+               request.protocol_version,
+               protocol_v1::ErrorCode::kInvalidRequestId, response)
+        .ok();
+  }
+  if (request.wire_kind == static_cast<std::uint8_t>(
+                               protocol_v2::FrameKind::kInfoRequest)) {
+    return protocol::encodeV2InfoResponse(
+               request, control_.protocolInfoResponse(), response)
+        .ok();
+  }
+
+  digital_output::Snapshot snapshot{};
+  OutputCommandError error{};
+  const auto kind =
+      static_cast<protocol_v2::FrameKind>(request.wire_kind);
+  const bool status_allowed =
+      control_.state() == protocol_v1::DeviceState::kIdle ||
+      control_.state() == protocol_v1::DeviceState::kConfigured ||
+      control_.state() == protocol_v1::DeviceState::kRunning;
+  const bool mutation_allowed =
+      control_.state() == protocol_v1::DeviceState::kIdle;
+  if (output_ == nullptr) {
+    error = {protocol_v1::ErrorCode::kUnsupportedConfiguration,
+             protocol_v2::OutputError::kInvalidLifecycle};
+  } else if (kind == protocol_v2::FrameKind::kOutputStatusRequest) {
+    snapshot = output_->snapshot();
+    if (!status_allowed) {
+      error = {protocol_v1::ErrorCode::kInvalidState,
+               protocol_v2::OutputError::kInvalidLifecycle};
+    } else if (snapshot.program.generation != 0U &&
+               snapshot.program.generation != request.output_generation) {
+      error = {protocol_v1::ErrorCode::kInvalidPayload,
+               protocol_v2::OutputError::kGenerationMismatch};
+    }
+  } else if (!mutation_allowed) {
+    snapshot = output_->snapshot();
+    error = {protocol_v1::ErrorCode::kInvalidState,
+             protocol_v2::OutputError::kInvalidLifecycle};
+  } else if (kind == protocol_v2::FrameKind::kOutputBeginRequest) {
+    error = programError(output_->controlBegin(
+        request.output_generation, request.output_value_0,
+        request.output_value_1));
+    snapshot = output_->snapshot();
+  } else if (kind == protocol_v2::FrameKind::kOutputAppendRequest) {
+    error = programError(output_->controlAppend(
+        request.output_generation,
+        {request.output_value_0, request.output_value_1}));
+    snapshot = output_->snapshot();
+    if (error.command == protocol_v1::ErrorCode::kOk) {
+      return protocol::encodeV2OutputAppendResponse(
+                 request,
+                 static_cast<std::uint32_t>(snapshot.program.segment_count),
+                 response)
+          .ok();
+    }
+  } else if (kind == protocol_v2::FrameKind::kOutputCommitRequest) {
+    error = programError(output_->controlCommit(
+        request.output_generation, request.output_value_0,
+        request.output_value_1));
+    snapshot = output_->snapshot();
+  } else if (kind == protocol_v2::FrameKind::kOutputArmRequest) {
+    error = operationError(output_->controlArm(request.output_generation));
+    snapshot = output_->snapshot();
+  } else if (kind == protocol_v2::FrameKind::kOutputClearRequest) {
+    snapshot = output_->snapshot();
+    if (snapshot.program.generation != 0U &&
+        snapshot.program.generation != request.output_generation) {
+      error = {protocol_v1::ErrorCode::kInvalidPayload,
+               protocol_v2::OutputError::kGenerationMismatch};
+    } else {
+      error = operationError(output_->controlClear());
+      snapshot = output_->snapshot();
+    }
+  } else {
+    return false;
+  }
+  return protocol::encodeV2OutputStatusResponse(
+             request, outputStatusResponse(snapshot), error.command,
+             error.output, response)
+      .ok();
 }
 
 THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.physical_fault")

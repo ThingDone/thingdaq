@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "generated/protocol_constants.h"
+#include "generated/protocol_v2_constants.h"
 
 namespace thingdaq::protocol {
 
@@ -94,6 +95,7 @@ struct FrameFields {
   std::uint32_t request_id = 0U;
   std::uint64_t first_sample_ticks = 0U;
   std::uint32_t item_count = 0U;
+  std::uint8_t version = protocol_v1::kProtocolVersion;
 };
 
 struct DecodedFrame {
@@ -215,6 +217,20 @@ struct Request {
   ChecksumBenchmarkRequest checksum_benchmark{};
   GpioClockDiagnosticRequest gpio_clock_diagnostic{};
   std::uint64_t nonce = 0U;
+  std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
+  std::uint8_t wire_kind =
+      static_cast<std::uint8_t>(protocol_v1::FrameKind::kInfoRequest);
+  std::uint32_t output_generation = 0U;
+  std::uint32_t output_value_0 = 0U;
+  std::uint32_t output_value_1 = 0U;
+
+  constexpr bool isV2Output() const {
+    return protocol_version == protocol_v2::kProtocolVersion &&
+           wire_kind >= static_cast<std::uint8_t>(
+                            protocol_v2::FrameKind::kOutputBeginRequest) &&
+           wire_kind <= static_cast<std::uint8_t>(
+                            protocol_v2::FrameKind::kOutputClearRequest);
+  }
 };
 
 struct ParsedCommand {
@@ -230,7 +246,67 @@ struct ParsedCommand {
   }
 };
 
+struct InfoResponse;
 Result decodeRequest(ByteView input, Request &request);
+
+struct OutputStatusResponse {
+  protocol_v2::OutputState state = protocol_v2::OutputState::kEmpty;
+  protocol_v2::OutputBankMode bank_mode =
+      protocol_v2::OutputBankMode::kDisabled;
+  protocol_v2::OutputError output_error = protocol_v2::OutputError::kNone;
+  std::uint32_t generation = 0U;
+  std::uint32_t idle_state_mask = 0U;
+  std::uint32_t current_state_mask = 0U;
+  std::uint32_t last_emitted_state_mask = 0U;
+  std::uint32_t repeat_count = 0U;
+  std::uint32_t completed_repeats = 0U;
+  std::uint32_t segment_count = 0U;
+  std::uint32_t accepted_segment_count = 0U;
+  std::uint32_t program_checksum = 0U;
+  std::uint32_t current_segment_index = 0U;
+  std::uint32_t current_segment_remaining = 0U;
+  std::uint32_t common_run_id = 0U;
+  std::uint64_t ticks_elapsed = 0U;
+  std::uint64_t transitions_emitted = 0U;
+  std::uint64_t requested_duration_states = 0U;
+  std::uint64_t states_expanded = 0U;
+  std::uint64_t dma_states_queued = 0U;
+  std::uint64_t dma_states_emitted = 0U;
+  std::uint64_t held_remainder_states = 0U;
+  std::uint64_t blocks_filled = 0U;
+  std::uint64_t blocks_completed = 0U;
+  std::uint64_t start_tick = 0U;
+  std::uint64_t completion_tick = 0U;
+  std::uint64_t hold_tick = 0U;
+  std::uint16_t ready_depth = 0U;
+  std::uint16_t ready_high_water = 0U;
+  std::uint32_t refill_lead = 0U;
+  std::uint32_t refill_lead_high_water = 0U;
+  std::uint32_t cache_flushes = 0U;
+  std::uint32_t start_operations = 0U;
+  std::uint32_t stop_operations = 0U;
+  std::uint32_t invalid_operations = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t underruns = 0U;
+  std::uint32_t stale_completions = 0U;
+  std::uint32_t dma_errors = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t conservation_errors = 0U;
+  bool fault_latched = false;
+  bool conservation_exact = true;
+};
+
+Result encodeV2InfoResponse(const Request &request,
+                            const InfoResponse &response,
+                            ControlFrame &output);
+Result encodeV2OutputStatusResponse(
+    const Request &request, const OutputStatusResponse &status,
+    protocol_v1::ErrorCode command_error,
+    protocol_v2::OutputError output_error, ControlFrame &output);
+Result encodeV2OutputAppendResponse(const Request &request,
+                                    std::uint32_t accepted_segment_count,
+                                    ControlFrame &output);
 
 // Raw register evidence captured while the exact ADC_ETC schedule is
 // configured but stopped. The final IRQ words are captured after the bounded
@@ -779,7 +855,10 @@ Result encodeRejectedFrameResponse(std::uint32_t request_id,
 
 inline constexpr std::size_t kMagicBytes = sizeof(std::uint32_t);
 inline constexpr std::size_t kCommandParserStorageBytes =
-    protocol_v1::kMaxCommandFrameBytes + kMagicBytes - 1U;
+    (protocol_v1::kMaxCommandFrameBytes > protocol_v2::kMaxCommandFrameBytes
+         ? protocol_v1::kMaxCommandFrameBytes
+         : protocol_v2::kMaxCommandFrameBytes) +
+    kMagicBytes - 1U;
 
 struct ParserCounters {
   std::uint64_t bytes_received = 0U;
@@ -839,7 +918,7 @@ class IncrementalCommandParser {
 
 static_assert(protocol_v1::kMaxCommandFrameBytes <=
               protocol_v1::kMaxControlFrameBytes);
-static_assert(kCommandParserStorageBytes ==
-              protocol_v1::kMaxCommandFrameBytes + 3U);
+static_assert(protocol_v2::kMaxCommandFrameBytes <=
+              protocol_v1::kMaxCommandFrameBytes);
 
 }  // namespace thingdaq::protocol

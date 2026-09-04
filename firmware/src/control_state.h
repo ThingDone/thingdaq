@@ -148,6 +148,11 @@ class ControlState {
   constexpr const stats::Statistics &statistics() const { return statistics_; }
   constexpr stats::Statistics &statistics() { return statistics_; }
 
+  protocol::InfoResponse protocolInfoResponse() const { return infoResponse(); }
+  bool acceptExternalRequestId(std::uint32_t request_id) {
+    return rememberRequestId(request_id);
+  }
+
   PendingEvents takePendingEvents();
 
   static constexpr std::uint32_t nextRunId(std::uint32_t current) {

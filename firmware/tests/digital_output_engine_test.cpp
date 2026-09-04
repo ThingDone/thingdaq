@@ -153,7 +153,9 @@ void testFiniteExpansionOwnershipAndCompletionHold() {
              armed.bank_mode == v2::OutputBankMode::kOutput &&
              armed.ready_depth == 1U && armed.reading_depth == 0U &&
              armed.refill_lead == 6U && armed.expansion_finished &&
-             fixture.cache.calls == 1U && fixture.cache.last_bytes == 24U,
+             fixture.cache.calls == 1U && fixture.cache.last_bytes == 24U &&
+             armed.requested_duration_states == 6U &&
+             armed.dma_states_queued == 6U && armed.conservation_exact,
          "ARM prefills the complete bounded finite schedule before START");
   const std::uint8_t ready = static_cast<std::uint8_t>(
       armed.blocks[0].state == output::BlockState::kDmaReady ? 0U : 1U);
@@ -194,6 +196,13 @@ void testFiniteExpansionOwnershipAndCompletionHold() {
   output::Snapshot running = fixture.engine.snapshot();
   const std::uint8_t reading = running.reading_block;
   const std::uint32_t lease = running.blocks[reading].lease;
+  const output::Snapshot live = fixture.engine.snapshotAtDmaProgress(2U, 1U);
+  expect(live.telemetry.dma_states_emitted == 2U &&
+             live.refill_lead == 4U && live.current_state_mask == 1U &&
+             live.current_segment_index == 1U &&
+             live.current_segment_remaining == 1U &&
+             live.conservation_exact,
+         "STATUS projects live TCD progress and the observed physical latch");
   expect(running.state == v2::OutputState::kRunning &&
              fixture.engine.onDmaBlockComplete(reading, 20U, lease) ==
                  output::OperationStatus::kInvalidCompletion &&
@@ -207,6 +216,9 @@ void testFiniteExpansionOwnershipAndCompletionHold() {
              held.telemetry.transitions_emitted == 4U &&
              held.telemetry.completed_repeats == 2U &&
              held.telemetry.blocks_completed == 1U &&
+             held.telemetry.start_operations == 2U &&
+             held.telemetry.held_remainder_states == 0U &&
+             held.conservation_exact &&
              held.current_segment_index == 1U &&
              held.current_segment_remaining == 0U &&
              held.completion_tick == 1048U && held.hold_tick == 1048U &&
@@ -265,6 +277,10 @@ void testBoundedRefillStopAndUnderrunFault() {
              held.last_emitted_state_mask == 2U &&
              held.telemetry.dma_states_emitted ==
                  board::kAuxOutputStatesPerBlock + 1U &&
+             held.telemetry.held_remainder_states ==
+                 4U * board::kAuxOutputStatesPerBlock - 1U &&
+             held.telemetry.stop_operations == 1U &&
+             held.conservation_exact &&
              held.hold_tick ==
                  500U + (board::kAuxOutputStatesPerBlock + 1U) *
                             v2::kOutputPeriodTicks &&
@@ -304,7 +320,9 @@ void testBoundedRefillStopAndUnderrunFault() {
                  board::kAuxOutputDmaBlockCount *
                      board::kAuxOutputStatesPerBlock &&
              faulted.last_emitted_state_mask == 2U &&
-             faulted.ready_depth == 0U && faulted.reading_depth == 0U,
+             faulted.ready_depth == 0U && faulted.reading_depth == 0U &&
+             faulted.telemetry.held_remainder_states == 0U &&
+             faulted.conservation_exact,
          "missing cooperative refills fail-stop instead of replaying stale data");
 
   Fixture dma_fault{};
@@ -322,8 +340,62 @@ void testBoundedRefillStopAndUnderrunFault() {
              dma_faulted.telemetry.dma_errors == 1U &&
              dma_faulted.telemetry.dma_states_emitted == 3U &&
              dma_faulted.last_emitted_state_mask == 1U &&
-             dma_faulted.hold_tick == 724U,
+             dma_faulted.hold_tick == 724U &&
+             dma_faulted.telemetry.held_remainder_states ==
+                 4U * board::kAuxOutputStatesPerBlock - 3U &&
+             dma_faulted.conservation_exact,
          "DMA fault latches exact emitted-prefix evidence and hold state");
+}
+
+void testFailClosedTestOnlyInjectionsAndNoReplay() {
+#if defined(THINGDAQ_TESTING)
+  Fixture fixture{};
+  uploadInfiniteAlternating(fixture, 61U);
+  const output::Snapshot armed = fixture.engine.snapshot();
+  const std::uint8_t stale_block = static_cast<std::uint8_t>(
+      armed.blocks[0].state == output::BlockState::kDmaReady ? 0U : 1U);
+  const std::uint32_t stale_lease = armed.blocks[stale_block].lease;
+  expect(fixture.engine.injectFaultForTest(
+             output::Engine::InjectedFault::kResourceConflict) ==
+             output::OperationStatus::kNotReady &&
+             fixture.engine.snapshot().state == v2::OutputState::kArmed &&
+             fixture.engine.snapshot().telemetry.resource_conflicts == 1U,
+         "test-only resource conflict rejects without driving or consuming");
+  expect(fixture.engine.prepareStart(401U, 80U) == output::StartStatus::kOk,
+         "injection fixture starts with one common run identity");
+  fixture.engine.commitCommonStart();
+  expect(fixture.engine.injectFaultForTest(
+             output::Engine::InjectedFault::kReadbackFailure, 2U) ==
+             output::OperationStatus::kOk,
+         "test-only readback failure latches a fail-closed DMA fault");
+  const output::Snapshot faulted = fixture.engine.snapshot();
+  expect(faulted.state == v2::OutputState::kFaulted &&
+             faulted.error == v2::OutputError::kDmaFault &&
+             faulted.last_emitted_state_mask == 2U &&
+             faulted.telemetry.dma_states_emitted == 0U &&
+             faulted.telemetry.held_remainder_states ==
+                 4U * board::kAuxOutputStatesPerBlock &&
+             faulted.conservation_exact,
+         "injected readback failure holds observed latch and conserves queue");
+  expect(fixture.engine.onDmaBlockComplete(stale_block, 61U, stale_lease) ==
+                 output::OperationStatus::kInvalidCompletion &&
+             fixture.engine.snapshot().telemetry.dma_states_emitted == 0U &&
+             fixture.engine.snapshot().telemetry.stale_completions == 1U,
+         "released DMA memory cannot be replayed by a stale completion");
+
+  Fixture underrun{};
+  uploadInfiniteAlternating(underrun, 62U);
+  expect(underrun.engine.prepareStart(402U, 160U) == output::StartStatus::kOk,
+         "underrun injection fixture prepares");
+  underrun.engine.commitCommonStart();
+  expect(underrun.engine.injectFaultForTest(
+             output::Engine::InjectedFault::kUnderrun, 1U) ==
+                 output::OperationStatus::kOk &&
+             underrun.engine.snapshot().error == v2::OutputError::kUnderrun &&
+             underrun.engine.snapshot().telemetry.underruns == 1U &&
+             underrun.engine.snapshot().conservation_exact,
+         "test-only underrun follows the production fail-closed accounting path");
+#endif
 }
 
 void testRingWrapGenerationReuseAndCounterConservation() {
@@ -438,6 +510,7 @@ int main() {
   testBoundedRefillStopAndUnderrunFault();
   testRingWrapGenerationReuseAndCounterConservation();
   testMaximumSegmentProgramAndFiniteWrapStress();
+  testFailClosedTestOnlyInjectionsAndNoReplay();
   if (failures != 0) {
     std::cerr << failures << " digital output assertion(s) failed\n";
     return 1;

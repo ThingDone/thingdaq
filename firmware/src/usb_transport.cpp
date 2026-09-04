@@ -31,8 +31,19 @@ std::uint32_t counterDelta(std::uint32_t current, std::uint32_t previous) {
   return current >= previous ? current - previous : current;
 }
 
-bool responseKind(protocol_v1::FrameKind kind) {
-  switch (kind) {
+bool responseKind(const protocol::FrameHeader &header) {
+  const std::uint8_t raw_kind = static_cast<std::uint8_t>(header.kind);
+  if (header.version == protocol_v2::kProtocolVersion) {
+    return raw_kind == static_cast<std::uint8_t>(
+                           protocol_v2::FrameKind::kInfoResponse) ||
+           raw_kind == static_cast<std::uint8_t>(
+                           protocol_v2::FrameKind::kErrorResponse) ||
+           (raw_kind >= static_cast<std::uint8_t>(
+                            protocol_v2::FrameKind::kOutputBeginResponse) &&
+            raw_kind <= static_cast<std::uint8_t>(
+                            protocol_v2::FrameKind::kOutputClearResponse));
+  }
+  switch (header.kind) {
     case protocol_v1::FrameKind::kInfoResponse:
     case protocol_v1::FrameKind::kConfigureResponse:
     case protocol_v1::FrameKind::kStartResponse:
@@ -372,7 +383,7 @@ bool CdcTransport::queueResponse(const protocol::ControlFrame &response) {
   protocol::DecodedFrame decoded{};
   if (response.size() == 0U ||
       !protocol::decodeFrame(response.view(), decoded).ok() ||
-      !responseKind(decoded.header.kind) || response_queue_.full() ||
+      !responseKind(decoded.header) || response_queue_.full() ||
       !response_queue_.push(response)) {
     saturatingIncrement(counters_.response_queue_rejections);
     recordIoError();

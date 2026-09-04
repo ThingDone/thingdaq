@@ -201,6 +201,7 @@ void Engine::commitCommonStart() {
   if (prepared_ && state_ == protocol_v2::OutputState::kArmed) {
     prepared_ = false;
     state_ = protocol_v2::OutputState::kRunning;
+    saturatingIncrement(telemetry_.start_operations);
   }
 }
 
@@ -242,6 +243,7 @@ StopReport Engine::stopAfterTriggersAtProgress(
   if (reading != kInvalidBlockIndex) {
     if (active_states_emitted > blocks_[reading].valid_states) {
       saturatingIncrement(telemetry_.stop_errors);
+      saturatingIncrement(telemetry_.conservation_errors);
       latchFault(protocol_v2::OutputError::kDmaFault, 0U);
       report.status = OperationStatus::kInvalidCompletion;
       report.held_state_mask = last_emitted_state_;
@@ -252,13 +254,14 @@ StopReport Engine::stopAfterTriggersAtProgress(
     applyEmittedPrefix(reading, active_states_emitted);
   } else if (active_states_emitted != 0U) {
     saturatingIncrement(telemetry_.stop_errors);
+    saturatingIncrement(telemetry_.conservation_errors);
     report.status = OperationStatus::kInvalidCompletion;
     report.held_state_mask = last_emitted_state_;
     critical_.exit(token);
     return report;
   }
 
-  releaseAllBlocks();
+  accountAndReleasePending(active_states_emitted);
   if (observed_logical_state != kUnknownLogicalState) {
     last_emitted_state_ = observed_logical_state & kLegalStateMask;
   }
@@ -272,6 +275,7 @@ StopReport Engine::stopAfterTriggersAtProgress(
   report.active_states_emitted = active_states_emitted;
   report.held_state_mask = last_emitted_state_;
   report.dma_quiesced = true;
+  saturatingIncrement(telemetry_.stop_operations);
   critical_.exit(token);
   return report;
 }
@@ -298,6 +302,13 @@ ServiceReport Engine::service(std::size_t block_limit) {
 
 THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.snapshot")
 Snapshot Engine::snapshot() const {
+  return snapshotAtDmaProgress(0U);
+}
+
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.snapshot_progress")
+Snapshot Engine::snapshotAtDmaProgress(
+    std::size_t active_states_emitted,
+    std::uint32_t observed_logical_state) const {
   Snapshot result{};
   const std::uint32_t token = critical_.enter();
   result.program = program_.snapshot();
@@ -317,6 +328,43 @@ Snapshot Engine::snapshot() const {
   result.reading_depth =
       result.reading_block == kInvalidBlockIndex ? 0U : 1U;
   result.refill_lead = refillLead();
+  if (result.reading_block != kInvalidBlockIndex) {
+    const BlockRecord &reading = blocks_[result.reading_block];
+    if (active_states_emitted > reading.valid_states) {
+      result.conservation_exact = false;
+      active_states_emitted = reading.valid_states;
+    }
+    for (std::size_t index = 0U; index < active_states_emitted; ++index) {
+      if (storage_.blocks[result.reading_block][index] != 0U) {
+        saturatingIncrement(result.telemetry.transitions_emitted);
+      }
+    }
+    saturatingAdd(result.telemetry.dma_states_emitted,
+                  static_cast<std::uint64_t>(active_states_emitted));
+    result.refill_lead -= active_states_emitted;
+  } else if (active_states_emitted != 0U) {
+    result.conservation_exact = false;
+  }
+  if (observed_logical_state != kUnknownLogicalState) {
+    result.current_state_mask = observed_logical_state & kLegalStateMask;
+    result.last_emitted_state_mask = result.current_state_mask;
+  }
+  result.dma_states_queued = result.telemetry.states_expanded;
+  if (result.program.repeat_count != protocol_v2::kOutputRepeatForever &&
+      result.program.duration_samples != 0U) {
+    const std::uint64_t repeats = result.program.repeat_count;
+    const std::uint64_t duration = result.program.duration_samples;
+    result.requested_duration_states =
+        repeats > std::numeric_limits<std::uint64_t>::max() / duration
+            ? std::numeric_limits<std::uint64_t>::max()
+            : repeats * duration;
+  }
+  result.conservation_exact =
+      result.conservation_exact &&
+      result.telemetry.conservation_errors == 0U &&
+      result.telemetry.states_expanded ==
+          result.telemetry.dma_states_emitted + result.refill_lead +
+              result.telemetry.held_remainder_states;
   result.prepared = prepared_;
   result.expansion_finished = expansion_finished_;
   result.fault_latched = error_ != protocol_v2::OutputError::kNone;
@@ -367,6 +415,7 @@ OperationStatus Engine::onDmaBlockComplete(std::uint8_t block_index,
       blocks_[block_index].upload_generation != upload_generation ||
       blocks_[block_index].lease != lease) {
     saturatingIncrement(telemetry_.invalid_operations);
+    saturatingIncrement(telemetry_.stale_completions);
     critical_.exit(token);
     return OperationStatus::kInvalidCompletion;
   }
@@ -410,6 +459,30 @@ OperationStatus Engine::recordDmaFault(
   critical_.exit(token);
   return OperationStatus::kOk;
 }
+
+#if defined(THINGDAQ_TESTING)
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.test_injection")
+OperationStatus Engine::injectFaultForTest(
+    InjectedFault fault, std::uint32_t observed_logical_state) {
+  const std::uint32_t token = critical_.enter();
+  if (fault == InjectedFault::kResourceConflict) {
+    saturatingIncrement(telemetry_.resource_conflicts);
+    critical_.exit(token);
+    return OperationStatus::kNotReady;
+  }
+  if (state_ != protocol_v2::OutputState::kRunning) {
+    saturatingIncrement(telemetry_.invalid_operations);
+    critical_.exit(token);
+    return OperationStatus::kInvalidLifecycle;
+  }
+  latchFault(fault == InjectedFault::kUnderrun
+                 ? protocol_v2::OutputError::kUnderrun
+                 : protocol_v2::OutputError::kDmaFault,
+             0U, observed_logical_state);
+  critical_.exit(token);
+  return OperationStatus::kOk;
+}
+#endif
 
 THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.fill")
 bool Engine::fillOneBlock(ServiceReport &report) {
@@ -461,7 +534,6 @@ bool Engine::fillOneBlock(ServiceReport &report) {
           record.valid_states * sizeof(std::uint32_t),
           record.valid_states)) {
     const std::uint32_t failed_token = critical_.enter();
-    record = {};
     latchFault(protocol_v2::OutputError::kDmaFault, 0U);
     critical_.exit(failed_token);
     return false;
@@ -569,14 +641,32 @@ void Engine::releaseAllBlocks() {
   }
 }
 
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.account_release")
+void Engine::accountAndReleasePending(std::size_t emitted_reading_prefix) {
+  const std::size_t pending = pendingStates();
+  const std::uint64_t remainder =
+      emitted_reading_prefix > pending
+          ? 0U
+          : static_cast<std::uint64_t>(pending - emitted_reading_prefix);
+  if (emitted_reading_prefix > pending) {
+    saturatingIncrement(telemetry_.conservation_errors);
+  }
+  saturatingAdd(telemetry_.held_remainder_states, remainder);
+  releaseAllBlocks();
+}
+
 THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.latch_fault")
 void Engine::latchFault(protocol_v2::OutputError error,
                         std::size_t active_states_emitted,
                         std::uint32_t observed_logical_state) {
   const std::uint8_t reading = readingBlock();
+  std::size_t accounted_emitted = 0U;
   if (reading != kInvalidBlockIndex &&
       active_states_emitted <= blocks_[reading].valid_states) {
     applyEmittedPrefix(reading, active_states_emitted);
+    accounted_emitted = active_states_emitted;
+  } else if (active_states_emitted != 0U) {
+    saturatingIncrement(telemetry_.conservation_errors);
   }
   if (observed_logical_state != kUnknownLogicalState) {
     last_emitted_state_ = observed_logical_state & kLegalStateMask;
@@ -586,7 +676,7 @@ void Engine::latchFault(protocol_v2::OutputError error,
   } else if (error == protocol_v2::OutputError::kDmaFault) {
     saturatingIncrement(telemetry_.dma_errors);
   }
-  releaseAllBlocks();
+  accountAndReleasePending(accounted_emitted);
   prepared_ = false;
   state_ = protocol_v2::OutputState::kFaulted;
   error_ = error;
@@ -643,6 +733,17 @@ std::size_t Engine::refillLead() const {
   for (const BlockRecord &record : blocks_) {
     if (record.state == BlockState::kDmaReady ||
         record.state == BlockState::kDmaReading) {
+      states += record.valid_states;
+    }
+  }
+  return states;
+}
+
+THINGDAQ_OUTPUT_ENGINE_COLD_CODE(".flashmem.output.engine.pending_states")
+std::size_t Engine::pendingStates() const {
+  std::size_t states = 0U;
+  for (const BlockRecord &record : blocks_) {
+    if (record.state != BlockState::kFree) {
       states += record.valid_states;
     }
   }

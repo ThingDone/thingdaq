@@ -43,6 +43,25 @@ class TeensyOutput final : public Participant {
   OperationStatus arm(std::uint32_t generation);
   OperationStatus clear();
 
+  ProgramStatus controlBegin(std::uint32_t generation,
+                             std::uint32_t repeat_count,
+                             std::uint32_t idle_state_mask) override {
+    return begin(generation, repeat_count, idle_state_mask);
+  }
+  ProgramStatus controlAppend(std::uint32_t generation,
+                              const Segment &segment) override {
+    return append(generation, segment);
+  }
+  ProgramStatus controlCommit(std::uint32_t generation,
+                              std::size_t expected_segment_count,
+                              std::uint32_t expected_checksum) override {
+    return commit(generation, expected_segment_count, expected_checksum);
+  }
+  OperationStatus controlArm(std::uint32_t generation) override {
+    return arm(generation);
+  }
+  OperationStatus controlClear() override { return clear(); }
+
   bool participatesInNextStart() const override;
   StartStatus inspectStart(std::uint32_t run_id) const override;
   StartStatus prepareStart(std::uint32_t run_id,

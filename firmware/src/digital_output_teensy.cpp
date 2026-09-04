@@ -72,6 +72,12 @@ void saturatingIncrement(Value &value) {
   }
 }
 
+template <typename Value>
+void saturatingAdd(Value &value, Value increment) {
+  const Value maximum = std::numeric_limits<Value>::max();
+  value = increment > maximum - value ? maximum : value + increment;
+}
+
 std::uint32_t readPrimask() {
   std::uint32_t value = 0U;
   __asm__ volatile("mrs %0, primask" : "=r"(value) : : "memory");
@@ -557,7 +563,14 @@ OperationStatus TeensyOutput::clear() {
   g_hardware_running = false;
   g_hardware_prepared = false;
   publishActiveBlock({});
-  return engine_.clear(releasePins());
+  const OperationStatus cleared = engine_.clear(releasePins());
+  if (cleared == OperationStatus::kOk) {
+    g_resource_conflicts = 0U;
+    g_target_start_errors = 0U;
+    g_target_stop_errors = 0U;
+    g_stale_dma_completions = 0U;
+  }
+  return cleared;
 }
 
 THINGDAQ_OUTPUT_TARGET_COLD_CODE(".flashmem.output.participates")
@@ -672,7 +685,21 @@ ServiceReport TeensyOutput::service(std::size_t block_limit) {
 }
 
 THINGDAQ_OUTPUT_TARGET_COLD_CODE(".flashmem.output.snapshot")
-Snapshot TeensyOutput::snapshot() const { return engine_.snapshot(); }
+Snapshot TeensyOutput::snapshot() const {
+  const bool progressing = g_hardware_running &&
+                           g_active_block != kInvalidBlockIndex &&
+                           liveTcdMatchesBlock(g_active_block);
+  Snapshot value = progressing
+                       ? engine_.snapshotAtDmaProgress(
+                             activeStatesEmitted(), observedLogicalLatch())
+                       : engine_.snapshot();
+  saturatingAdd(value.telemetry.resource_conflicts, g_resource_conflicts);
+  saturatingAdd(value.telemetry.start_errors, g_target_start_errors);
+  saturatingAdd(value.telemetry.stop_errors, g_target_stop_errors);
+  saturatingAdd(value.telemetry.stale_completions,
+                g_stale_dma_completions);
+  return value;
+}
 
 THINGDAQ_OUTPUT_TARGET_COLD_CODE(".flashmem.output.faulted")
 bool TeensyOutput::faulted() const { return engine_.faulted(); }
@@ -680,7 +707,7 @@ bool TeensyOutput::faulted() const { return engine_.faulted(); }
 THINGDAQ_OUTPUT_TARGET_COLD_CODE(".flashmem.output.hardware_snapshot")
 HardwareSnapshot TeensyOutput::hardwareSnapshot() const {
   HardwareSnapshot value{};
-  value.engine = engine_.snapshot();
+  value.engine = snapshot();
   value.gpr26 = IOMUXC_GPR_GPR26;
   value.gpio1_dr = GPIO1_DR;
   value.gpio1_gdir = GPIO1_GDIR;

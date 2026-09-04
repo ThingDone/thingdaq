@@ -105,6 +105,12 @@ struct Telemetry {
   std::uint32_t invalid_operations = 0U;
   std::uint32_t start_errors = 0U;
   std::uint32_t stop_errors = 0U;
+  std::uint32_t start_operations = 0U;
+  std::uint32_t stop_operations = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t stale_completions = 0U;
+  std::uint32_t conservation_errors = 0U;
+  std::uint64_t held_remainder_states = 0U;
   std::size_t ready_high_water = 0U;
   std::size_t refill_lead_high_water = 0U;
 };
@@ -128,10 +134,13 @@ struct Snapshot {
   std::size_t ready_depth = 0U;
   std::size_t reading_depth = 0U;
   std::size_t refill_lead = 0U;
+  std::uint64_t requested_duration_states = 0U;
+  std::uint64_t dma_states_queued = 0U;
   std::uint8_t reading_block = kInvalidBlockIndex;
   bool prepared = false;
   bool expansion_finished = false;
   bool fault_latched = false;
+  bool conservation_exact = true;
 };
 
 struct ServiceReport {
@@ -173,6 +182,35 @@ using CriticalSection = dma::CriticalSection;
 class Participant {
  public:
   virtual ~Participant() = default;
+  virtual ProgramStatus controlBegin(std::uint32_t generation,
+                                     std::uint32_t repeat_count,
+                                     std::uint32_t idle_state_mask) {
+    (void)generation;
+    (void)repeat_count;
+    (void)idle_state_mask;
+    return ProgramStatus::kInvalidLifecycle;
+  }
+  virtual ProgramStatus controlAppend(std::uint32_t generation,
+                                      const Segment &segment) {
+    (void)generation;
+    (void)segment;
+    return ProgramStatus::kInvalidLifecycle;
+  }
+  virtual ProgramStatus controlCommit(std::uint32_t generation,
+                                      std::size_t expected_segment_count,
+                                      std::uint32_t expected_checksum) {
+    (void)generation;
+    (void)expected_segment_count;
+    (void)expected_checksum;
+    return ProgramStatus::kInvalidLifecycle;
+  }
+  virtual OperationStatus controlArm(std::uint32_t generation) {
+    (void)generation;
+    return OperationStatus::kInvalidLifecycle;
+  }
+  virtual OperationStatus controlClear() {
+    return OperationStatus::kInvalidLifecycle;
+  }
   virtual bool participatesInNextStart() const = 0;
   virtual StartStatus inspectStart(std::uint32_t run_id) const = 0;
   virtual StartStatus prepareStart(std::uint32_t run_id,
@@ -211,6 +249,25 @@ class Engine final : public Participant {
   void rollbackArm();
   OperationStatus clear(bool release_succeeded = true);
 
+  ProgramStatus controlBegin(std::uint32_t generation,
+                             std::uint32_t repeat_count,
+                             std::uint32_t idle_state_mask) override {
+    return begin(generation, repeat_count, idle_state_mask);
+  }
+  ProgramStatus controlAppend(std::uint32_t generation,
+                              const Segment &segment) override {
+    return append(generation, segment);
+  }
+  ProgramStatus controlCommit(std::uint32_t generation,
+                              std::size_t expected_segment_count,
+                              std::uint32_t expected_checksum) override {
+    return commit(generation, expected_segment_count, expected_checksum);
+  }
+  OperationStatus controlArm(std::uint32_t generation) override {
+    return arm(generation);
+  }
+  OperationStatus controlClear() override { return clear(); }
+
   bool participatesInNextStart() const override;
   StartStatus inspectStart(std::uint32_t run_id) const override;
   StartStatus prepareStart(std::uint32_t run_id,
@@ -223,6 +280,9 @@ class Engine final : public Participant {
       std::uint32_t observed_logical_state = kUnknownLogicalState);
   ServiceReport service(std::size_t block_limit) override;
   Snapshot snapshot() const override;
+  Snapshot snapshotAtDmaProgress(
+      std::size_t active_states_emitted,
+      std::uint32_t observed_logical_state = kUnknownLogicalState) const;
   bool faulted() const override;
 
   OperationStatus onDmaBlockComplete(std::uint8_t block_index,
@@ -231,6 +291,17 @@ class Engine final : public Participant {
   OperationStatus recordDmaFault(
       std::size_t active_states_emitted,
       std::uint32_t observed_logical_state = kUnknownLogicalState);
+
+#if defined(THINGDAQ_TESTING)
+  enum class InjectedFault : std::uint8_t {
+    kUnderrun,
+    kResourceConflict,
+    kReadbackFailure,
+  };
+  OperationStatus injectFaultForTest(
+      InjectedFault fault,
+      std::uint32_t observed_logical_state = kUnknownLogicalState);
+#endif
 
   constexpr const std::uint32_t *blockWords(std::size_t index) const {
     return storage_.blocks[index].data();
@@ -247,6 +318,7 @@ class Engine final : public Participant {
   void applyEmittedPrefix(std::uint8_t block_index, std::size_t count);
   void updateCompletedRepeats();
   void releaseAllBlocks();
+  void accountAndReleasePending(std::size_t emitted_reading_prefix = 0U);
   void latchFault(protocol_v2::OutputError error,
                   std::size_t active_states_emitted,
                   std::uint32_t observed_logical_state =
@@ -255,6 +327,7 @@ class Engine final : public Participant {
   void refreshDepthHighWater();
   std::size_t readyDepth() const;
   std::size_t refillLead() const;
+  std::size_t pendingStates() const;
   std::uint8_t findReadyBlock() const;
   std::uint8_t readingBlock() const;
 

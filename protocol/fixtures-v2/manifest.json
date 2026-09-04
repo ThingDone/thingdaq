@@ -407,7 +407,7 @@
       "total_length": 56
     },
     {
-      "checksum": "0x47c205fd",
+      "checksum": "0x44ad063f",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -416,16 +416,15 @@
       "file": "output-begin-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a000002c000100700000004000000065000000000000006400000000000000000000000000000000000000010000006500000012000000000000000000000003000000000000000000000001000000000000000000000000000000000000000000000000000000fd05c247",
-      "frame_sha256": "b01e2fcd60ef9f65815715a8852ed969718b79da0652401b35339df316a58ebf",
+      "frame_sha256": "cdb9c49dc472e3ad9d4e6c9177210b6ab5157c09268c661cab6de09ba096f938",
       "item_count": 0,
       "kind": "OUTPUT_BEGIN_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "522571e742d2e1a7c45ab39c0d9b0e05495b7ec18ad8862ae778da72477347ef",
+      "payload_length": 224,
+      "payload_sha256": "8baef2273fe6a49bb20140a3b79b0861b778339b95a4ea307416c18b03ec6171",
       "request_id": 100,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
       "checksum": "0xd157049e",
@@ -483,7 +482,7 @@
       "total_length": 56
     },
     {
-      "checksum": "0x62b40719",
+      "checksum": "0x112e075b",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -492,16 +491,15 @@
       "file": "output-commit-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a200002c0001007000000040000000650000000000000066000000000000000000000000000000000000000200000065000000120000000000000000000000030000000000000002000000020000007856341200000000000000000000000000000000000000001907b462",
-      "frame_sha256": "6fcfe382c00a65162b5b22066541110344cc4574a7c5726d5f73e58c51ebbc3f",
+      "frame_sha256": "24e362096bd57c5c9a9bed35b56fd4c429e8bedcc32b2122dfde6a444e24e256",
       "item_count": 0,
       "kind": "OUTPUT_COMMIT_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "82798c0b16ea9e8e0000b3dd16f04d76122d8e9a94b9d83c99dace36f98d0fab",
+      "payload_length": 224,
+      "payload_sha256": "f71992833f14c63ab298f12410c9dbfe4da28d625c49da8f2f3227df3a5c8e98",
       "request_id": 102,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
       "checksum": "0xaaf90487",
@@ -521,7 +519,7 @@
       "total_length": 48
     },
     {
-      "checksum": "0x9f2e0867",
+      "checksum": "0x1e7708a9",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -530,16 +528,15 @@
       "file": "output-arm-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a300002c000100700000004000000065000000000000006700000000000000000000000000000000000000030100006500000012000000a5000000a50000000300000000000000020000000200000078563412000000000000000000000000000000000000000067082e9f",
-      "frame_sha256": "d4604a0091291ad9c151a9c8cc79a7ed02060b231f188fe5e108f2d1ea3818b5",
+      "frame_sha256": "aa21ea17fb4d706f6d6c440252a67f8188c45536d54110f7de1cdd55633df9b2",
       "item_count": 0,
       "kind": "OUTPUT_ARM_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "5db1c341b093550f320d69516c8afc452f8c3a62bbfa5896f8975c898b666159",
+      "payload_length": 224,
+      "payload_sha256": "87cf13b640ebefca960271c6415a723a5c9313498c39944b350eda6499fdbfa0",
       "request_id": 103,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
       "checksum": "0xab300489",
@@ -559,7 +556,7 @@
       "total_length": 48
     },
     {
-      "checksum": "0xa7f908e8",
+      "checksum": "0x77e2092a",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -568,16 +565,15 @@
       "file": "output-status-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a400002c000100700000004000000065000000000000006800000000000000000000000000000000000000040100006500000012000000a5000000a500000003000000010000000200000002000000785634120100000078000000000000000400000000000000e808f9a7",
-      "frame_sha256": "734c5951c38b0b51f4f48fb9a4f5116eab802dd0414356b8718a7de4a35bce25",
+      "frame_sha256": "404f76de64d54d7398cbcf57382a460f788961ffc6f6c414ba23a452cbce1648",
       "item_count": 0,
       "kind": "OUTPUT_STATUS_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "9f82d58a8bcf505e7ebcff4b4137c76514061b67968373910abd6af2d79185f9",
+      "payload_length": 224,
+      "payload_sha256": "9dae56d9d5b34abbb20b9bdb7861efbc8dcfbef4cb7a99c00a5dcc509c553ab6",
       "request_id": 104,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
       "checksum": "0xab67048b",
@@ -597,7 +593,7 @@
       "total_length": 48
     },
     {
-      "checksum": "0x30c5058b",
+      "checksum": "0xe66105cd",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -606,19 +602,18 @@
       "file": "output-clear-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a500002c0001007000000040000000650000000000000069000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008b05c530",
-      "frame_sha256": "55ee78fa41ad1026d704de7e0228284fe04f30c9ffa33998d08e8cb11b4e0f29",
+      "frame_sha256": "b0c01372dd780f20737d98b096b79c3a27bb74dcf19cb1855118b91c89cf0102",
       "item_count": 0,
       "kind": "OUTPUT_CLEAR_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b",
+      "payload_length": 224,
+      "payload_sha256": "36d69b42b792d815e14b3b9829c2144827bd7fe8b50f1f8be1ae13abca58da30",
       "request_id": 105,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
-      "checksum": "0x300e0589",
+      "checksum": "0xe46a05cb",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -627,19 +622,18 @@
       "file": "output-status-empty-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a400002c00010070000000400000006500000000000000680000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000089050e30",
-      "frame_sha256": "e46afa944929940bd28a7512365972d29cd75151a3d54e27b1934eac52085c2e",
+      "frame_sha256": "d8707eb4cdb27d100bfece34405b1ebed9e208ea8190879959e87b9958205acf",
       "item_count": 0,
       "kind": "OUTPUT_STATUS_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b",
+      "payload_length": 224,
+      "payload_sha256": "36d69b42b792d815e14b3b9829c2144827bd7fe8b50f1f8be1ae13abca58da30",
       "request_id": 104,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
-      "checksum": "0x4a9e0605",
+      "checksum": "0x4c890647",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -648,19 +642,18 @@
       "file": "output-status-loading-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a400002c00010070000000400000006500000000000000680000000000000000000000000000000000000001000000650000001200000000000000000000000300000000000000000000000100000000000000000000000000000000000000000000000000000005069e4a",
-      "frame_sha256": "b48f387de2a40e089dc8762317d0214e574d6c168dc085f7cfdf7fb040006d27",
+      "frame_sha256": "930c022e295c7588495ae49f69018b847c4f6a35a76b9e3a5a2e9a6358c9c362",
       "item_count": 0,
       "kind": "OUTPUT_STATUS_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "522571e742d2e1a7c45ab39c0d9b0e05495b7ec18ad8862ae778da72477347ef",
+      "payload_length": 224,
+      "payload_sha256": "8baef2273fe6a49bb20140a3b79b0861b778339b95a4ea307416c18b03ec6171",
       "request_id": 104,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
-      "checksum": "0x6422071d",
+      "checksum": "0x151c075f",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -669,19 +662,18 @@
       "file": "output-status-committed-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a400002c0001007000000040000000650000000000000068000000000000000000000000000000000000000200000065000000120000000000000000000000030000000000000002000000020000007856341200000000000000000000000000000000000000001d072264",
-      "frame_sha256": "7e826c757c34a41985aff0bb2db7013595549489dfd352a76e087f5c490022ab",
+      "frame_sha256": "7efabc69f54261c9385fadf5e3460440c131cb20f40f684dc98bdc1c3ca8108d",
       "item_count": 0,
       "kind": "OUTPUT_STATUS_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "82798c0b16ea9e8e0000b3dd16f04d76122d8e9a94b9d83c99dace36f98d0fab",
+      "payload_length": 224,
+      "payload_sha256": "f71992833f14c63ab298f12410c9dbfe4da28d625c49da8f2f3227df3a5c8e98",
       "request_id": 104,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
-      "checksum": "0x9fe50869",
+      "checksum": "0x206e08ab",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -690,19 +682,18 @@
       "file": "output-status-armed-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a400002c000100700000004000000065000000000000006800000000000000000000000000000000000000030100006500000012000000a5000000a5000000030000000000000002000000020000007856341200000000000000000000000000000000000000006908e59f",
-      "frame_sha256": "c95b674cd39ed0fdc73172729f224418b09502fdd52ade531c64146d9cea70ec",
+      "frame_sha256": "102c070dcefe3b78e22312c55b4795ec4d246add4edfc608382d4d289d3ed60f",
       "item_count": 0,
       "kind": "OUTPUT_STATUS_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "5db1c341b093550f320d69516c8afc452f8c3a62bbfa5896f8975c898b666159",
+      "payload_length": 224,
+      "payload_sha256": "87cf13b640ebefca960271c6415a723a5c9313498c39944b350eda6499fdbfa0",
       "request_id": 104,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
-      "checksum": "0xa7f908e8",
+      "checksum": "0x77e2092a",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -711,19 +702,18 @@
       "file": "output-status-running-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a400002c000100700000004000000065000000000000006800000000000000000000000000000000000000040100006500000012000000a5000000a500000003000000010000000200000002000000785634120100000078000000000000000400000000000000e808f9a7",
-      "frame_sha256": "734c5951c38b0b51f4f48fb9a4f5116eab802dd0414356b8718a7de4a35bce25",
+      "frame_sha256": "404f76de64d54d7398cbcf57382a460f788961ffc6f6c414ba23a452cbce1648",
       "item_count": 0,
       "kind": "OUTPUT_STATUS_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "9f82d58a8bcf505e7ebcff4b4137c76514061b67968373910abd6af2d79185f9",
+      "payload_length": 224,
+      "payload_sha256": "9dae56d9d5b34abbb20b9bdb7861efbc8dcfbef4cb7a99c00a5dcc509c553ab6",
       "request_id": 104,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
-      "checksum": "0xa83508e9",
+      "checksum": "0x78be092b",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -732,19 +722,18 @@
       "file": "output-status-held-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a400002c000100700000004000000065000000000000006800000000000000000000000000000000000000050100006500000012000000a5000000a500000003000000010000000200000002000000785634120100000078000000000000000400000000000000e90835a8",
-      "frame_sha256": "2259500a465fcd0f69e5754cca5ab9c2fd691bc241192fdbf8723d352bee5f99",
+      "frame_sha256": "0028ab4279aa9e8e622203e73f91dcd60f861157f0702d78046d2565a762c083",
       "item_count": 0,
       "kind": "OUTPUT_STATUS_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "0c473bfaab4442f560df9d97f41a6cde8909e018df1baca479a8a32f834f3412",
+      "payload_length": 224,
+      "payload_sha256": "7e30721bf6984f399b9cd65704e8c40e0d4bd776f6a6375ad7344b9548afb10e",
       "request_id": 104,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
-      "checksum": "0xa8c708f2",
+      "checksum": "0x7ef00934",
       "checksum_algorithm": "ADLER32",
       "expected": {
         "outcome": "success",
@@ -753,16 +742,15 @@
       "file": "output-status-faulted-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_hex": "efbeadde02a400002c000100700000004000000065000000000000006800000000000000000000000000000000000000060101006500000012000000a5000000a500000003000000010000000200000002000000785634120100000078000000000000000400000007000000f208c7a8",
-      "frame_sha256": "6687e4d6710f19441d20e99f4e679da62d49eee53916ed792d6fd5c969dba779",
+      "frame_sha256": "0ca7d0f38a8d5f0b1a150a753fa1aff8fe9f01732e50852cdb007fd13f5eaa0a",
       "item_count": 0,
       "kind": "OUTPUT_STATUS_RESPONSE",
-      "payload_length": 64,
-      "payload_sha256": "0d2ae668ea5a465279e633191c9f5f131ed86a153e2e17023465c0ea379cc0f6",
+      "payload_length": 224,
+      "payload_sha256": "fd3ef5409ea32b253dc8a3cebd6245f06bce5cfde69641fccba316a545a53acd",
       "request_id": 104,
       "run_id": 101,
       "sequence": 0,
-      "total_length": 112
+      "total_length": 272
     },
     {
       "checksum": "0xe6e7055c",
@@ -1027,6 +1015,6 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 2,
   "source": "protocol/protocol-v2.json",
-  "source_sha256": "f90bc70d4d13334b6f8d8210044e282e4a3c639de729a389d44c354b279dbcc4",
+  "source_sha256": "d6aae4456917798e439e0f58e8c06555373a7e8dd731586bee3c6fa646245c1c",
   "status": "experimental"
 }

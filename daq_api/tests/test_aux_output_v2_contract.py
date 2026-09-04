@@ -164,6 +164,59 @@ class AuxOutputV2ContractTests(unittest.TestCase):
             [23, 22, 17, 16, 26, 27, 24, 25],
             pins["standard_gpio_bits_by_logical_bit"],
         )
+
+    def test_output_status_freezes_complete_conservation_and_fault_surface(
+        self,
+    ) -> None:
+        pins = self.output["pin_bank"]
+        schema = self.v2["payload_schemas"]["output_status_response"]
+        fields = {field["name"]: field for field in schema["fields"]}
+        self.assertEqual(224, schema["size"])
+        for name in (
+            "current_segment_remaining",
+            "common_run_id",
+            "requested_duration_states",
+            "states_expanded",
+            "dma_states_queued",
+            "dma_states_emitted",
+            "held_remainder_states",
+            "blocks_completed",
+            "ready_depth",
+            "ready_high_water",
+            "refill_lead",
+            "refill_lead_high_water",
+            "cache_flushes",
+            "start_operations",
+            "stop_operations",
+            "invalid_operations",
+            "resource_conflicts",
+            "underruns",
+            "stale_completions",
+            "dma_errors",
+            "start_errors",
+            "stop_errors",
+            "conservation_errors",
+            "conservation_exact",
+        ):
+            with self.subTest(field=name):
+                self.assertIn(name, fields)
+        telemetry = self.output["telemetry"]
+        self.assertIn(
+            "states_expanded = dma_states_emitted", telemetry["live_conservation"]
+        )
+        self.assertIn(
+            "stale memory cannot be replayed", telemetry["terminal_conservation"]
+        )
+        self.assertTrue(
+            self.output["provisional_resources"]["target_registers_implemented"]
+        )
+        self.assertFalse(
+            self.output["provisional_resources"]["physical_output_authorized"]
+        )
+        self.assertIn(
+            "THINGDAQ_TESTING",
+            self.output["test_fault_injection"]["compile_gate"],
+        )
         self.assertEqual(0x0FC30000, pins["aggregate_mask"])
         self.assertEqual(
             (1, 6, 26),

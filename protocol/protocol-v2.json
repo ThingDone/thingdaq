@@ -229,6 +229,19 @@
       "release": "Only explicit OUTPUT_CLEAR while the common controller is IDLE returns all eight pads to high-impedance inputs.",
       "reset": "Reset, power loss, or bootloader entry never promises a held output state."
     },
+    "telemetry": {
+      "snapshot": "OUTPUT_STATUS reports the immutable program identity, segment/repeat cursor, common run identity, physical hold state and ticks, ring depth/high-water gauges, and saturating lifecycle, cache, conflict, underrun, stale-completion, DMA, and conservation counters.",
+      "queued_definition": "dma_states_queued is the cumulative number of logical states successfully expanded into a DMA source block; it is equal to states_expanded.",
+      "live_conservation": "states_expanded = dma_states_emitted + refill_lead + held_remainder_states. While ARMED or RUNNING, refill_lead is the not-yet-consumed DMA-visible word count and held_remainder_states is zero.",
+      "terminal_conservation": "After completion, STOP, or a fault, refill_lead is zero. held_remainder_states counts expanded words invalidated without emission, so the same equation remains exact and stale memory cannot be replayed.",
+      "requested_duration": "For a finite program requested_duration_states is the saturating product of whole-program duration and repeat_count; zero denotes an unbounded repeat-forever request.",
+      "fault_conservation": "A fault retains generation, common_run_id, emitted count, physically observed latch, hold tick, and discarded remainder. conservation_exact is true only when the queue equation holds and conservation_errors is zero.",
+      "counter_reset": "Output playback counters reset at ARM and all output program, fault, target, and telemetry state resets only after a successful fail-closed CLEAR."
+    },
+    "test_fault_injection": {
+      "compile_gate": "Portable underrun, resource-conflict, and readback-failure injection entry points exist only when THINGDAQ_TESTING is defined; the normal firmware sketch and build helper never define it.",
+      "safety": "Every injected active fault uses the production fail-closed latch path, accounts and invalidates every unconsumed DMA word, rejects stale completions, and never republishes released source memory."
+    },
     "provisional_resources": {
       "clock_pit_channel": 1,
       "xbar_input": 57,
@@ -248,7 +261,7 @@
       "packet_reserve_count": 91,
       "packet_retention_us": 98164,
       "packet_and_usb_retention_us": 99176,
-      "target_registers_implemented": false,
+      "target_registers_implemented": true,
       "physical_output_authorized": false
     }
   },
@@ -1904,7 +1917,7 @@
       ]
     },
     "output_status_response": {
-      "size": 64,
+      "size": 224,
       "fields": [
         {
           "name": "response_status",
@@ -2018,6 +2031,198 @@
           "name": "reserved_3",
           "offset": 62,
           "type": "u16",
+          "required": 0
+        },
+        {
+          "name": "current_segment_remaining",
+          "offset": 64,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "common_run_id",
+          "offset": 68,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "requested_duration_states",
+          "offset": 72,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "states_expanded",
+          "offset": 80,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "dma_states_queued",
+          "offset": 88,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "dma_states_emitted",
+          "offset": 96,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "held_remainder_states",
+          "offset": 104,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "blocks_filled",
+          "offset": 112,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "blocks_completed",
+          "offset": 120,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "start_tick",
+          "offset": 128,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "completion_tick",
+          "offset": 136,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "hold_tick",
+          "offset": 144,
+          "type": "u64",
+          "default": 0
+        },
+        {
+          "name": "ready_depth",
+          "offset": 152,
+          "type": "u16",
+          "default": 0
+        },
+        {
+          "name": "ready_high_water",
+          "offset": 154,
+          "type": "u16",
+          "default": 0
+        },
+        {
+          "name": "refill_lead",
+          "offset": 156,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "refill_lead_high_water",
+          "offset": 160,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "cache_flushes",
+          "offset": 164,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "start_operations",
+          "offset": 168,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "stop_operations",
+          "offset": 172,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "invalid_operations",
+          "offset": 176,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "resource_conflicts",
+          "offset": 180,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "underruns",
+          "offset": 184,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "stale_completions",
+          "offset": 188,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "dma_errors",
+          "offset": 192,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "start_errors",
+          "offset": 196,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "stop_errors",
+          "offset": 200,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "conservation_errors",
+          "offset": 204,
+          "type": "u32",
+          "default": 0
+        },
+        {
+          "name": "conservation_exact",
+          "offset": 208,
+          "type": "u8",
+          "default": 1
+        },
+        {
+          "name": "reserved_4",
+          "offset": 209,
+          "type": "u8",
+          "required": 0
+        },
+        {
+          "name": "reserved_5",
+          "offset": 210,
+          "type": "u16",
+          "required": 0
+        },
+        {
+          "name": "reserved_6",
+          "offset": 212,
+          "type": "u32",
+          "required": 0
+        },
+        {
+          "name": "reserved_7",
+          "offset": 216,
+          "type": "u64",
           "required": 0
         }
       ]

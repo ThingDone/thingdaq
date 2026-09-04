@@ -48,6 +48,7 @@ class DigitalOutputEngineTests(unittest.TestCase):
                     "-pedantic",
                     "-fno-exceptions",
                     "-fno-rtti",
+                    "-DTHINGDAQ_TESTING=1",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "digital_output_program.cpp"),
@@ -104,6 +105,22 @@ class DigitalOutputEngineTests(unittest.TestCase):
         for token in ("Arduino.h", "core_pins.h", "imxrt.h", "GPIO1_", "DMA_TCD"):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
+
+    def test_fault_injection_is_absent_from_normal_target_build(self) -> None:
+        source = (FIRMWARE_SOURCE / "digital_output_engine.h").read_text(
+            encoding="utf-8"
+        )
+        gate = source.index("#if defined(THINGDAQ_TESTING)")
+        injection = source.index("injectFaultForTest")
+        end = source.index("#endif", injection)
+        self.assertLess(gate, injection)
+        self.assertLess(injection, end)
+        sketch = (FIRMWARE_DIRECTORY / "firmware.ino").read_text(encoding="utf-8")
+        build_helper = (FIRMWARE_DIRECTORY / "tools/build_firmware.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("THINGDAQ_TESTING", sketch)
+        self.assertNotIn("THINGDAQ_TESTING", build_helper)
 
 
 if __name__ == "__main__":

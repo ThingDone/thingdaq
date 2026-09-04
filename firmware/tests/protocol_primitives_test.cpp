@@ -689,7 +689,7 @@ void expectDecodeError(const std::vector<std::uint8_t> &bytes,
 void testValidation(const std::string &fixture_directory) {
   const std::vector<std::uint8_t> info =
       readFixture(fixture_directory, "info-request.bin");
-  expectDecodeError(mutated(info, constants::kHeaderVersionOffset, 2U),
+  expectDecodeError(mutated(info, constants::kHeaderVersionOffset, 3U),
                     constants::ErrorCode::kUnsupportedVersion,
                     "reject bad version");
   expectDecodeError(mutated(info, constants::kHeaderKindOffset, 0xFEU),
@@ -787,7 +787,7 @@ void testParser(const std::string &fixture_directory) {
   const std::vector<std::uint8_t> response =
       readFixture(fixture_directory, "stop-response.bin");
   std::vector<std::vector<std::uint8_t>> corruptions{
-      mutated(info, constants::kHeaderVersionOffset, 2U),
+      mutated(info, constants::kHeaderVersionOffset, 3U),
       mutated(info, constants::kHeaderKindOffset, 0xFEU),
       mutated(info, constants::kHeaderFlagsOffset, 1U),
       mutated(info, constants::kHeaderHeaderLengthOffset, 43U),

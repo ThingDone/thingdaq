@@ -847,7 +847,7 @@ void testGarbageAndCorruptParserRecovery() {
            static_cast<std::uint32_t>(constants::kMaxCommandFrameBytes + 1U));
   std::vector<std::uint8_t> bad_version = bytes(info);
   bad_version[constants::kHeaderVersionOffset] =
-      static_cast<std::uint8_t>(constants::kProtocolVersion + 1U);
+      static_cast<std::uint8_t>(constants::kProtocolVersion + 2U);
   std::vector<std::uint8_t> bad_kind = bytes(info);
   bad_kind[constants::kHeaderKindOffset] = 0x7FU;
   std::vector<std::uint8_t> bad_flags = bytes(info);

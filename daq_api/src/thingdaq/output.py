@@ -312,12 +312,40 @@ class DigitalOutputStatus:
     ticks_elapsed: int
     transitions_emitted: int
     output_error: constants.OutputError
+    current_segment_remaining: int = 0
+    common_run_id: int = 0
+    requested_duration_states: int = 0
+    states_expanded: int = 0
+    dma_states_queued: int = 0
+    dma_states_emitted: int = 0
+    held_remainder_states: int = 0
+    blocks_filled: int = 0
+    blocks_completed: int = 0
+    start_tick: int = 0
+    completion_tick: int = 0
+    hold_tick: int = 0
+    ready_depth: int = 0
+    ready_high_water: int = 0
+    refill_lead: int = 0
+    refill_lead_high_water: int = 0
+    cache_flushes: int = 0
+    start_operations: int = 0
+    stop_operations: int = 0
+    invalid_operations: int = 0
+    resource_conflicts: int = 0
+    underruns: int = 0
+    stale_completions: int = 0
+    dma_errors: int = 0
+    start_errors: int = 0
+    stop_errors: int = 0
+    conservation_errors: int = 0
+    conservation_exact: bool = True
 
     @classmethod
     def from_payload(cls, payload: bytes) -> DigitalOutputStatus:
         if len(payload) != constants.OUTPUT_STATUS_RESPONSE_PAYLOAD_SIZE:
             raise ValueError("output status payload has the wrong size")
-        if payload[1] or payload[7] or any(payload[61:64]):
+        if payload[1] or payload[7] or any(payload[61:64]) or any(payload[209:224]):
             raise ValueError("output status reserved fields must be zero")
         masks = [
             struct.unpack_from("<I", payload, offset)[0] for offset in (12, 16, 20)
@@ -344,7 +372,37 @@ class DigitalOutputStatus:
             ticks_elapsed=struct.unpack_from("<Q", payload, 48)[0],
             transitions_emitted=struct.unpack_from("<I", payload, 56)[0],
             output_error=constants.OutputError(payload[60]),
+            current_segment_remaining=struct.unpack_from("<I", payload, 64)[0],
+            common_run_id=struct.unpack_from("<I", payload, 68)[0],
+            requested_duration_states=struct.unpack_from("<Q", payload, 72)[0],
+            states_expanded=struct.unpack_from("<Q", payload, 80)[0],
+            dma_states_queued=struct.unpack_from("<Q", payload, 88)[0],
+            dma_states_emitted=struct.unpack_from("<Q", payload, 96)[0],
+            held_remainder_states=struct.unpack_from("<Q", payload, 104)[0],
+            blocks_filled=struct.unpack_from("<Q", payload, 112)[0],
+            blocks_completed=struct.unpack_from("<Q", payload, 120)[0],
+            start_tick=struct.unpack_from("<Q", payload, 128)[0],
+            completion_tick=struct.unpack_from("<Q", payload, 136)[0],
+            hold_tick=struct.unpack_from("<Q", payload, 144)[0],
+            ready_depth=struct.unpack_from("<H", payload, 152)[0],
+            ready_high_water=struct.unpack_from("<H", payload, 154)[0],
+            refill_lead=struct.unpack_from("<I", payload, 156)[0],
+            refill_lead_high_water=struct.unpack_from("<I", payload, 160)[0],
+            cache_flushes=struct.unpack_from("<I", payload, 164)[0],
+            start_operations=struct.unpack_from("<I", payload, 168)[0],
+            stop_operations=struct.unpack_from("<I", payload, 172)[0],
+            invalid_operations=struct.unpack_from("<I", payload, 176)[0],
+            resource_conflicts=struct.unpack_from("<I", payload, 180)[0],
+            underruns=struct.unpack_from("<I", payload, 184)[0],
+            stale_completions=struct.unpack_from("<I", payload, 188)[0],
+            dma_errors=struct.unpack_from("<I", payload, 192)[0],
+            start_errors=struct.unpack_from("<I", payload, 196)[0],
+            stop_errors=struct.unpack_from("<I", payload, 200)[0],
+            conservation_errors=struct.unpack_from("<I", payload, 204)[0],
+            conservation_exact=bool(payload[208]),
         )
+        if payload[208] not in (0, 1):
+            raise ValueError("output conservation_exact must be zero or one")
         if result.generation == 0 and result.state is not constants.OutputState.EMPTY:
             raise ValueError("nonempty output status generation must be nonzero")
         output_mode_states = {
@@ -367,6 +425,22 @@ class DigitalOutputStatus:
             or result.accepted_segment_count < result.segment_count
         ):
             raise ValueError("output status segment counts are inconsistent")
+        expected_exact = (
+            result.dma_states_queued == result.states_expanded
+            and result.states_expanded
+            == result.dma_states_emitted
+            + result.refill_lead
+            + result.held_remainder_states
+            and result.conservation_errors == 0
+        )
+        error_response_without_telemetry = payload[0] == int(
+            constants.ResponseStatus.ERROR
+        ) and not any(payload[64:209])
+        if (
+            result.conservation_exact != expected_exact
+            and not error_response_without_telemetry
+        ):
+            raise ValueError("output status conservation flag disagrees with counters")
         return result
 
 

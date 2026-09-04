@@ -73,6 +73,16 @@ class OutputSimulatorTests(unittest.TestCase):
             self.assertEqual(3, complete.completed_repeats)
             self.assertEqual(9, complete.transitions_emitted)
             self.assertEqual(0x04, complete.last_emitted_state_mask)
+            self.assertEqual(run_id, complete.common_run_id)
+            self.assertEqual(12, complete.requested_duration_states)
+            self.assertEqual(12, complete.states_expanded)
+            self.assertEqual(12, complete.dma_states_queued)
+            self.assertEqual(12, complete.dma_states_emitted)
+            self.assertEqual(0, complete.held_remainder_states)
+            self.assertEqual(complete.blocks_filled, complete.blocks_completed)
+            self.assertEqual(96, complete.completion_tick)
+            self.assertEqual(96, complete.hold_tick)
+            self.assertTrue(complete.conservation_exact)
             self.assertEqual(
                 [0, 8, 24, 32, 40, 56, 64, 72, 88, 96],
                 [event.tick for event in device.output_trace if event.run_id == run_id],
@@ -141,6 +151,14 @@ class OutputSimulatorTests(unittest.TestCase):
             self.assertIs(OutputState.RUNNING, running.state)
             self.assertEqual(2, running.completed_repeats)
             self.assertEqual(6, running.transitions_emitted)
+            self.assertEqual(run_id, running.common_run_id)
+            self.assertEqual(6, running.dma_states_emitted)
+            self.assertEqual(4064, running.refill_lead)
+            self.assertEqual(
+                running.states_expanded,
+                running.dma_states_emitted + running.refill_lead,
+            )
+            self.assertTrue(running.conservation_exact)
             self.assertGreater(device.output_trace_dropped, 0)
             with self.assertRaises(SimulatorTraceUnavailableError):
                 device.sample_output(0, run_id=run_id)
@@ -150,6 +168,14 @@ class OutputSimulatorTests(unittest.TestCase):
             held = daq.output_status()
             self.assertIs(OutputState.HELD, held.state)
             self.assertEqual(0x22, held.last_emitted_state_mask)
+            self.assertEqual(0, held.refill_lead)
+            self.assertEqual(4064, held.held_remainder_states)
+            self.assertEqual(
+                held.states_expanded,
+                held.dma_states_emitted + held.held_remainder_states,
+            )
+            self.assertEqual(1, held.stop_operations)
+            self.assertTrue(held.conservation_exact)
             released = daq.output_clear()
             self.assertIs(OutputState.EMPTY, released.state)
             self.assertIs(OutputBankMode.DISABLED, released.bank_mode)
@@ -197,6 +223,10 @@ class OutputSimulatorTests(unittest.TestCase):
             self.assertIs(OutputState.FAULTED, fault.state)
             self.assertIs(OutputError.UNDERRUN, fault.output_error)
             self.assertEqual(0x02, fault.last_emitted_state_mask)
+            self.assertEqual(1, fault.underruns)
+            self.assertEqual(0, fault.refill_lead)
+            self.assertEqual(4064, fault.held_remainder_states)
+            self.assertTrue(fault.conservation_exact)
             self.assertIsNone(device.next_data_frame())
             self.assertIs(OutputTraceEvent.FAULT, device.output_trace[-1].event)
 

@@ -152,6 +152,24 @@ class SimulatedDevice:
         self._output_segment_index = 0
         self._output_transitions_emitted = 0
         self._output_error = v2_constants.OutputError.NONE
+        self._output_states_expanded = 0
+        self._output_states_emitted = 0
+        self._output_held_remainder = 0
+        self._output_blocks_filled = 0
+        self._output_blocks_completed = 0
+        self._output_start_tick = 0
+        self._output_completion_tick = 0
+        self._output_hold_tick = 0
+        self._output_start_operations = 0
+        self._output_stop_operations = 0
+        self._output_invalid_operations = 0
+        self._output_resource_conflicts = 0
+        self._output_underruns = 0
+        self._output_stale_completions = 0
+        self._output_dma_errors = 0
+        self._output_start_errors = 0
+        self._output_stop_errors = 0
+        self._output_conservation_errors = 0
         self._common_ticks = 0
         self._next_output_event_ticks = 0
         self._seen_output_generations: set[int] = set()
@@ -364,6 +382,30 @@ class SimulatedDevice:
         accepted = len(self._output_loading_segments)
         segment_count = 0 if program is None else len(program.segments)
         checksum = 0 if program is None else program.checksum
+        requested = self._output_requested_duration()
+        current_remaining = 0
+        if program is not None and self._output_state in {
+            v2_constants.OutputState.RUNNING,
+            v2_constants.OutputState.HELD,
+            v2_constants.OutputState.FAULTED,
+        }:
+            offset = self._output_states_emitted % program.duration_samples
+            for segment in program.segments:
+                if offset < segment.duration_samples:
+                    current_remaining = segment.duration_samples - offset
+                    break
+                offset -= segment.duration_samples
+        refill_lead = (
+            0
+            if self._output_state
+            in {v2_constants.OutputState.HELD, v2_constants.OutputState.FAULTED}
+            else self._output_states_expanded - self._output_states_emitted
+        )
+        exact = (
+            self._output_states_expanded
+            == self._output_states_emitted + refill_lead + self._output_held_remainder
+            and self._output_conservation_errors == 0
+        )
         return DigitalOutputStatus(
             state=self._output_state,
             bank_mode=self._output_bank_mode,
@@ -385,6 +427,44 @@ class SimulatedDevice:
             ticks_elapsed=self._common_ticks,
             transitions_emitted=self._output_transitions_emitted,
             output_error=self._output_error,
+            current_segment_remaining=current_remaining,
+            common_run_id=(
+                self._last_run_id
+                if self._output_start_operations
+                and self._output_state
+                in {
+                    v2_constants.OutputState.RUNNING,
+                    v2_constants.OutputState.HELD,
+                    v2_constants.OutputState.FAULTED,
+                }
+                else 0
+            ),
+            requested_duration_states=requested,
+            states_expanded=self._output_states_expanded,
+            dma_states_queued=self._output_states_expanded,
+            dma_states_emitted=self._output_states_emitted,
+            held_remainder_states=self._output_held_remainder,
+            blocks_filled=self._output_blocks_filled,
+            blocks_completed=self._output_blocks_completed,
+            start_tick=self._output_start_tick,
+            completion_tick=self._output_completion_tick,
+            hold_tick=self._output_hold_tick,
+            ready_depth=(refill_lead + 1015) // 1016,
+            ready_high_water=min(4, self._output_blocks_filled),
+            refill_lead=refill_lead,
+            refill_lead_high_water=min(4064, self._output_states_expanded),
+            cache_flushes=self._output_blocks_filled,
+            start_operations=self._output_start_operations,
+            stop_operations=self._output_stop_operations,
+            invalid_operations=self._output_invalid_operations,
+            resource_conflicts=self._output_resource_conflicts,
+            underruns=self._output_underruns,
+            stale_completions=self._output_stale_completions,
+            dma_errors=self._output_dma_errors,
+            start_errors=self._output_start_errors,
+            stop_errors=self._output_stop_errors,
+            conservation_errors=self._output_conservation_errors,
+            conservation_exact=exact,
         )
 
     def advance_time(self, ticks: int) -> int:
@@ -406,8 +486,10 @@ class SimulatedDevice:
             self._output_state is v2_constants.OutputState.RUNNING
             and self._next_output_event_ticks <= target
         ):
+            self._sync_output_dma_progress(self._next_output_event_ticks)
             self._common_ticks = self._next_output_event_ticks
             self._advance_output_boundary()
+        self._sync_output_dma_progress(target)
         self._common_ticks = target
         return self._common_ticks
 
@@ -488,8 +570,17 @@ class SimulatedDevice:
             or self._output_state is not v2_constants.OutputState.RUNNING
         ):
             raise SimulatorError("an output fault requires active playback")
+        self._sync_output_dma_progress(self._common_ticks)
         self._output_state = v2_constants.OutputState.FAULTED
         self._output_error = selected
+        self._output_held_remainder = (
+            self._output_states_expanded - self._output_states_emitted
+        )
+        self._output_hold_tick = self._common_ticks
+        if selected is v2_constants.OutputError.UNDERRUN:
+            self._output_underruns += 1
+        else:
+            self._output_dma_errors += 1
         self._state = constants.DeviceState.IDLE
         self._configuration = None
         self._record_output_transition(OutputTraceEvent.FAULT)
@@ -728,6 +819,19 @@ class SimulatedDevice:
         self._output_transitions_emitted = 0
         self._output_error = v2_constants.OutputError.NONE
         self._common_ticks = 0
+        requested = self._output_requested_duration()
+        self._output_states_expanded = min(requested, 4064) if requested else 4064
+        self._output_states_emitted = 0
+        self._output_held_remainder = 0
+        self._output_blocks_filled = (self._output_states_expanded + 1015) // 1016
+        self._output_blocks_completed = 0
+        self._output_start_tick = 0
+        self._output_completion_tick = 0
+        self._output_hold_tick = 0
+        self._output_start_operations = 0
+        self._output_stop_operations = 0
+        self._output_underruns = 0
+        self._output_dma_errors = 0
         self._record_output_transition(OutputTraceEvent.ARM_IDLE, run_id=0)
         return self._v2_output_status_response(request)
 
@@ -887,6 +991,12 @@ class SimulatedDevice:
             v2_constants.OutputState.ARMED,
             v2_constants.OutputState.RUNNING,
         }:
+            self._sync_output_dma_progress(self._common_ticks)
+            self._output_held_remainder = (
+                self._output_states_expanded - self._output_states_emitted
+            )
+            self._output_hold_tick = self._common_ticks
+            self._output_stop_operations += 1
             self._output_state = v2_constants.OutputState.HELD
         if self._output_state is v2_constants.OutputState.HELD:
             self._record_output_transition(OutputTraceEvent.STOP)
@@ -976,6 +1086,10 @@ class SimulatedDevice:
         self._output_segment_index = 0
         self._output_transitions_emitted = 0
         self._output_error = v2_constants.OutputError.NONE
+        self._output_start_tick = self._common_ticks
+        self._output_start_operations += 1
+        self._output_states_emitted = 1
+        self._refresh_output_queue()
         self._emit_output_segment(0)
 
     def _emit_output_segment(self, index: int) -> None:
@@ -1012,6 +1126,10 @@ class SimulatedDevice:
             and self._output_completed_repeats >= program.repeat_count
         ):
             self._output_state = v2_constants.OutputState.HELD
+            self._output_completion_tick = self._common_ticks
+            self._output_hold_tick = self._common_ticks
+            self._output_held_remainder = 0
+            self._output_blocks_completed = self._output_blocks_filled
             self._record_output_transition(OutputTraceEvent.COMPLETE)
             return
         self._emit_output_segment(0)
@@ -1058,8 +1176,54 @@ class SimulatedDevice:
         self._output_segment_index = 0
         self._output_transitions_emitted = 0
         self._output_error = v2_constants.OutputError.NONE
+        self._output_states_expanded = 0
+        self._output_states_emitted = 0
+        self._output_held_remainder = 0
+        self._output_blocks_filled = 0
+        self._output_blocks_completed = 0
+        self._output_start_tick = 0
+        self._output_completion_tick = 0
+        self._output_hold_tick = 0
+        self._output_start_operations = 0
+        self._output_stop_operations = 0
+        self._output_invalid_operations = 0
+        self._output_resource_conflicts = 0
+        self._output_underruns = 0
+        self._output_stale_completions = 0
+        self._output_dma_errors = 0
+        self._output_start_errors = 0
+        self._output_stop_errors = 0
+        self._output_conservation_errors = 0
         self._common_ticks = 0
         self._next_output_event_ticks = 0
+
+    def _output_requested_duration(self) -> int:
+        program = self._output_program
+        if (
+            program is None
+            or program.repeat_count == v2_constants.OUTPUT_REPEAT_FOREVER
+        ):
+            return 0
+        return program.duration_samples * program.repeat_count
+
+    def _refresh_output_queue(self) -> None:
+        requested = self._output_requested_duration()
+        target = self._output_states_emitted + 4064
+        expanded = min(requested, target) if requested else target
+        self._output_states_expanded = max(self._output_states_expanded, expanded)
+        self._output_blocks_filled = (self._output_states_expanded + 1015) // 1016
+        self._output_blocks_completed = self._output_states_emitted // 1016
+
+    def _sync_output_dma_progress(self, tick: int) -> None:
+        if self._output_state is not v2_constants.OutputState.RUNNING:
+            return
+        elapsed = max(0, tick - self._output_start_tick)
+        emitted = elapsed // v2_constants.OUTPUT_PERIOD_TICKS + 1
+        requested = self._output_requested_duration()
+        if requested:
+            emitted = min(emitted, requested)
+        self._output_states_emitted = max(self._output_states_emitted, emitted)
+        self._refresh_output_queue()
 
     def _reset_epoch(self) -> None:
         self._adc_sequence = 0
@@ -1231,6 +1395,60 @@ class SimulatedDevice:
                 v2_constants.OUTPUT_STATUS_RESPONSE_TRANSITIONS_EMITTED_OFFSET,
                 status.transitions_emitted,
             ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_CURRENT_SEGMENT_REMAINING_OFFSET,
+                status.current_segment_remaining,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_COMMON_RUN_ID_OFFSET,
+                status.common_run_id,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_REFILL_LEAD_OFFSET,
+                status.refill_lead,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_REFILL_LEAD_HIGH_WATER_OFFSET,
+                status.refill_lead_high_water,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_CACHE_FLUSHES_OFFSET,
+                status.cache_flushes,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_START_OPERATIONS_OFFSET,
+                status.start_operations,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_STOP_OPERATIONS_OFFSET,
+                status.stop_operations,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_INVALID_OPERATIONS_OFFSET,
+                status.invalid_operations,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_RESOURCE_CONFLICTS_OFFSET,
+                status.resource_conflicts,
+            ),
+            (v2_constants.OUTPUT_STATUS_RESPONSE_UNDERRUNS_OFFSET, status.underruns),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_STALE_COMPLETIONS_OFFSET,
+                status.stale_completions,
+            ),
+            (v2_constants.OUTPUT_STATUS_RESPONSE_DMA_ERRORS_OFFSET, status.dma_errors),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_START_ERRORS_OFFSET,
+                status.start_errors,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_STOP_ERRORS_OFFSET,
+                status.stop_errors,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_CONSERVATION_ERRORS_OFFSET,
+                status.conservation_errors,
+            ),
         )
         for offset, value in u32_fields:
             struct.pack_into("<I", payload, offset, value)
@@ -1239,6 +1457,53 @@ class SimulatedDevice:
             payload,
             v2_constants.OUTPUT_STATUS_RESPONSE_TICKS_ELAPSED_OFFSET,
             status.ticks_elapsed,
+        )
+        for offset, value in (
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_REQUESTED_DURATION_STATES_OFFSET,
+                status.requested_duration_states,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_STATES_EXPANDED_OFFSET,
+                status.states_expanded,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_DMA_STATES_QUEUED_OFFSET,
+                status.dma_states_queued,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_DMA_STATES_EMITTED_OFFSET,
+                status.dma_states_emitted,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_HELD_REMAINDER_STATES_OFFSET,
+                status.held_remainder_states,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_BLOCKS_FILLED_OFFSET,
+                status.blocks_filled,
+            ),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_BLOCKS_COMPLETED_OFFSET,
+                status.blocks_completed,
+            ),
+            (v2_constants.OUTPUT_STATUS_RESPONSE_START_TICK_OFFSET, status.start_tick),
+            (
+                v2_constants.OUTPUT_STATUS_RESPONSE_COMPLETION_TICK_OFFSET,
+                status.completion_tick,
+            ),
+            (v2_constants.OUTPUT_STATUS_RESPONSE_HOLD_TICK_OFFSET, status.hold_tick),
+        ):
+            struct.pack_into("<Q", payload, offset, value)
+        struct.pack_into(
+            "<HH",
+            payload,
+            v2_constants.OUTPUT_STATUS_RESPONSE_READY_DEPTH_OFFSET,
+            status.ready_depth,
+            status.ready_high_water,
+        )
+        payload[v2_constants.OUTPUT_STATUS_RESPONSE_CONSERVATION_EXACT_OFFSET] = int(
+            status.conservation_exact
         )
         payload[v2_constants.OUTPUT_STATUS_RESPONSE_OUTPUT_ERROR_OFFSET] = int(
             status.output_error if output_error is None else output_error
