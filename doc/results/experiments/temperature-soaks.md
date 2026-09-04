@@ -16,16 +16,17 @@ enabled and no loopback wiring is required.
 
 ## Current status
 
-The temperature feature is implemented. The clean 8-input, 1 MHz capture passed
-600 seconds, including STOP, with die temperature 36.7 °C before, 50.8 °C after
-and 51.4 °C maximum. Both 16-input smoke checks also passed for 15 seconds.
-The remaining long captures are in progress, not yet qualified.
+The temperature feature is implemented. Both clean 8-input captures passed
+600 seconds, including STOP. At 1 MHz, die temperature was 36.7 °C before,
+50.8 °C after and 51.4 °C maximum; at 500 kHz it was 42.8 °C before and 51.4 °C
+after/maximum. Both 16-input smoke checks also passed for 15 seconds.
+The 16-input long captures are in progress, not yet qualified.
 
 | GPIO width | Rate on each ADC and GPIO | Planned continuous capture | Result |
 | --- | --- | --- | --- |
 | 8 pins | 1 MHz | 600 s | PASS |
-| 8 pins | 500 kHz | 600 s | Separate rerun in progress after service timeout |
-| 16 pins | 1 MHz | 600 s | Pending |
+| 8 pins | 500 kHz | 600 s | PASS, separate rerun after service timeout |
+| 16 pins | 1 MHz | 600 s | In progress |
 | 16 pins | 500 kHz | 600 s | Pending |
 
 Repeated START/STOP, rate changes and 8↔16-input transitions without reflashing
