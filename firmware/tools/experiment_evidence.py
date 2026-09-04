@@ -1831,6 +1831,16 @@ def _validate_content_policy(value: object, location: str = "report") -> None:
         _raise(ReportValidationError, location, "contains a non-finite number")
 
 
+def validate_content_policy(value: object, location: str = "report") -> None:
+    """Reject credentials, mutable host identity, bulk data, and unsafe paths.
+
+    Aggregate and candidate-specific report tools share the Phase 01 content
+    boundary through this public wrapper instead of duplicating its policy.
+    """
+
+    _validate_content_policy(value, location)
+
+
 def _validate_identity(
     matrix: ExperimentMatrix,
     identity: Mapping[str, Any],
