@@ -3,6 +3,42 @@
   "extension": "aux-input-bank",
   "fixtures": [
     {
+      "checksum": "0x9b5203cc",
+      "checksum_algorithm": "ADLER32",
+      "expectation": "accept",
+      "file": "get-temperature-request.bin",
+      "first_sample_ticks": 0,
+      "flags": 0,
+      "frame_hex": "efbeadde021a00002c000100300000000000000000000000000000001a000000000000000000000000000000cc03529b",
+      "frame_sha256": "ff04162df75a50d4f1e3456b6b8f913d43132b46be29102c361e53e5001ed0e0",
+      "item_count": 0,
+      "kind": "GET_TEMPERATURE_REQUEST",
+      "payload_length": 0,
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "request_id": 26,
+      "run_id": 0,
+      "sequence": 0,
+      "total_length": 48
+    },
+    {
+      "checksum": "0xe854050e",
+      "checksum_algorithm": "ADLER32",
+      "expectation": "accept",
+      "file": "get-temperature-response.bin",
+      "first_sample_ticks": 0,
+      "flags": 0,
+      "frame_hex": "efbeadde029a00002c0001003c0000000c00000000000000000000001a000000000000000000000000000000000000000000000004a600000e0554e8",
+      "frame_sha256": "8424421e73e87fd5493aa472776b882b969654453a4e62bc6c8a9187bdb972b4",
+      "item_count": 0,
+      "kind": "GET_TEMPERATURE_RESPONSE",
+      "payload_length": 12,
+      "payload_sha256": "a780092c82384c85527e031a6fff057bf09d516eaf8ca4bc8f743e91bb0bb657",
+      "request_id": 26,
+      "run_id": 0,
+      "sequence": 0,
+      "total_length": 60
+    },
+    {
       "aux_bank_mode": "DISABLED",
       "checksum": "0x7860061b",
       "checksum_algorithm": "ADLER32",
@@ -1400,7 +1436,7 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 2,
   "source": "protocol/protocol-v2.json",
-  "source_sha256": "38d13bfef1dd2155e3adf49a182a099988733d13835bf64703ad78ee24a74a8d",
+  "source_sha256": "7ba1d86f589b6a481036df5ead4c4e1e2f6c16a1f76ab47ee52ad19369d13a15",
   "v1_source": "protocol/protocol-v1.json",
   "v1_source_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
 }

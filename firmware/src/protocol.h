@@ -8,8 +8,18 @@
 
 #include "generated/protocol_constants.h"
 #include "generated/protocol_v2_constants.h"
+#include "temperature.h"
 
 namespace thingdaq::protocol {
+
+// The runtime retains the common v1 enum type; these append-only wire IDs
+// are legal exclusively in a v2 envelope. Frozen v1 enums remain unchanged.
+inline constexpr auto kGetTemperature = static_cast<protocol_v1::CommandKind>(
+    protocol_v2::CommandKind::kGetTemperature);
+inline constexpr auto kTemperatureRequest = static_cast<protocol_v1::FrameKind>(
+    protocol_v2::FrameKind::kGetTemperatureRequest);
+inline constexpr auto kTemperatureResponse = static_cast<protocol_v1::FrameKind>(
+    protocol_v2::FrameKind::kGetTemperatureResponse);
 
 struct ByteView {
   const std::uint8_t *data = nullptr;
@@ -875,6 +885,8 @@ struct GpioCaptureDiagnosticResponse {
 // Returns false on an invalid request, zero nonempty work, or integer overflow.
 bool populateChecksumBenchmarkMetrics(ChecksumBenchmarkResponse &response);
 
+Result encodeTemperatureResponse(const Request &request, std::uint32_t run_id,
+                                 temperature::Reading reading, ControlFrame &output);
 Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                           const InfoResponse &response, ControlFrame &output);
 Result encodeConfigureResponse(const Request &request, std::uint32_t run_id,

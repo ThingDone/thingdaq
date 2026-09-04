@@ -7,7 +7,7 @@
     "protocol_version": 1,
     "source": "protocol/protocol-v1.json",
     "source_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
-    "rule": "Protocol v2 copies the frozen v1 contract and changes only the explicitly encoded auxiliary-input and exact-rate extension points; v1 sources, generated outputs, fixtures, bytes, and defaults remain authoritative and immutable."
+    "rule": "Protocol v2 copies the frozen v1 contract and adds explicitly encoded auxiliary-input, exact-rate and temperature extension points; v1 sources, generated outputs, fixtures, bytes, and defaults remain authoritative and immutable."
   },
   "generated_outputs": {
     "python_constants": "daq_api/src/thingdaq/_generated/protocol_v2_constants.py",
@@ -857,6 +857,15 @@
       "class": "error_response",
       "payload_schema": "error_response",
       "allowed_flags": ["RESPONSE_ERROR"]
+    },
+    {
+      "name": "GET_TEMPERATURE_REQUEST", "value": 26, "class": "request",
+      "payload_schema": "empty", "allowed_flags": [], "response_kind": "GET_TEMPERATURE_RESPONSE"
+    },
+    {
+      "name": "GET_TEMPERATURE_RESPONSE", "value": 154, "class": "response",
+      "payload_schema": "temperature_response", "error_payload_schema": "response_prefix",
+      "allowed_flags": ["RESPONSE_ERROR"]
     }
   ],
   "command_kinds": [
@@ -869,9 +878,17 @@
     {"name": "PING", "value": 22, "request_kind": "PING_REQUEST", "response_kind": "PING_RESPONSE", "optional": true},
     {"name": "CHECKSUM_BENCHMARK", "value": 23, "request_kind": "CHECKSUM_BENCHMARK_REQUEST", "response_kind": "CHECKSUM_BENCHMARK_RESPONSE", "optional": true},
     {"name": "GPIO_CLOCK_DIAGNOSTIC", "value": 24, "request_kind": "GPIO_CLOCK_DIAGNOSTIC_REQUEST", "response_kind": "GPIO_CLOCK_DIAGNOSTIC_RESPONSE", "optional": true},
-    {"name": "GPIO_CAPTURE_DIAGNOSTIC", "value": 25, "request_kind": "GPIO_CAPTURE_DIAGNOSTIC_REQUEST", "response_kind": "GPIO_CAPTURE_DIAGNOSTIC_RESPONSE", "optional": true}
+    {"name": "GPIO_CAPTURE_DIAGNOSTIC", "value": 25, "request_kind": "GPIO_CAPTURE_DIAGNOSTIC_REQUEST", "response_kind": "GPIO_CAPTURE_DIAGNOSTIC_RESPONSE", "optional": true},
+    {"name": "GET_TEMPERATURE", "value": 26, "request_kind": "GET_TEMPERATURE_REQUEST", "response_kind": "GET_TEMPERATURE_RESPONSE", "optional": true}
   ],
   "enums": {
+    "temperature_status": [
+      {"name": "VALID", "value": 0},
+      {"name": "UNAVAILABLE", "value": 1},
+      {"name": "NOT_READY", "value": 2},
+      {"name": "INVALID_CALIBRATION", "value": 3},
+      {"name": "OUT_OF_RANGE", "value": 4}
+    ],
     "response_status": [
       {"name": "OK", "value": 0},
       {"name": "ERROR", "value": 1}
@@ -1088,6 +1105,19 @@
     ]
   },
   "payload_schemas": {
+    "temperature_response": {
+      "size": 12,
+      "fields": [
+        {"name": "status", "type": "u8", "offset": 0},
+        {"name": "reserved0", "type": "u8", "offset": 1},
+        {"name": "error_code", "type": "u16", "offset": 2},
+        {"name": "temperature_status", "type": "u8", "offset": 4},
+        {"name": "reserved1", "type": "u8", "offset": 5},
+        {"name": "reserved2", "type": "u16", "offset": 6},
+        {"name": "millidegrees_c_bits", "type": "u32", "offset": 8,
+         "description": "Signed two's-complement millidegrees Celsius; -40000..150000 when VALID, zero otherwise. Snapshot of latest core TEMPMON conversion, not a forced fresh conversion."}
+      ]
+    },
     "empty": {"size": 0, "fields": []},
     "rate_profile_info": {
       "size": 48,
@@ -1956,6 +1986,19 @@
     }
   },
   "golden_fixtures": [
+    {
+      "name": "get-temperature-request", "kind": "GET_TEMPERATURE_REQUEST",
+      "request_id": 26, "payload": {"schema": "empty", "values": {}}
+    },
+    {
+      "name": "get-temperature-response", "kind": "GET_TEMPERATURE_RESPONSE",
+      "request_id": 26,
+      "payload": {"schema": "temperature_response", "values": {
+        "status": 0, "reserved0": 0, "error_code": 0,
+        "temperature_status": 0, "reserved1": 0, "reserved2": 0,
+        "millidegrees_c_bits": 42500
+      }}
+    },
     {
       "name": "adc-data",
       "kind": "ADC_DATA",

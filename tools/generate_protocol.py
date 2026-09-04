@@ -641,7 +641,6 @@ def validate_v2_contract(
         "flags",
         "bootstrap_checksum_algorithm",
         "default_checksum_algorithm",
-        "command_kinds",
     ):
         if contract[key] != v1_contract[key]:
             raise ContractError(f"protocol v2 unexpectedly changes frozen v1 {key}")
@@ -660,8 +659,21 @@ def validate_v2_contract(
         normalized = dict(entry)
         normalized.pop("payload_schema_by_aux_bank_mode", None)
         normalized_v2_kinds.append(normalized)
-    if normalized_v2_kinds != v1_contract["frame_kinds"]:
+    temperature_kinds = [
+        {"name": "GET_TEMPERATURE_REQUEST", "value": 26, "class": "request",
+         "payload_schema": "empty", "allowed_flags": [], "response_kind": "GET_TEMPERATURE_RESPONSE"},
+        {"name": "GET_TEMPERATURE_RESPONSE", "value": 154, "class": "response",
+         "payload_schema": "temperature_response", "error_payload_schema": "response_prefix",
+         "allowed_flags": ["RESPONSE_ERROR"]},
+    ]
+    if normalized_v2_kinds != v1_contract["frame_kinds"] + temperature_kinds:
         raise ContractError("protocol v2 unexpectedly changes frozen frame kinds")
+    if contract["command_kinds"] != v1_contract["command_kinds"] + [
+        {"name": "GET_TEMPERATURE", "value": 26,
+         "request_kind": "GET_TEMPERATURE_REQUEST",
+         "response_kind": "GET_TEMPERATURE_RESPONSE", "optional": True}
+    ]:
+        raise ContractError("protocol v2 unexpectedly changes frozen command kinds")
     for entry in contract["frame_kinds"][:2]:
         layouts_by_mode = entry.get("payload_schema_by_aux_bank_mode")
         if layouts_by_mode != {
@@ -1442,6 +1454,7 @@ def render_python_v2(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         "# Experimental protocol-v2 auxiliary-input extension.",
     ]
     extension.extend(python_enum("AuxBankMode", contract["enums"]["aux_bank_mode"]))
+    extension.extend(python_enum("TemperatureStatus", contract["enums"]["temperature_status"]))
     extension.extend(python_enum("RateProfile", contract["enums"]["rate_profile"]))
     extension.extend(
         [
@@ -2172,6 +2185,11 @@ def render_cpp_v2(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.extend(
         f"  k{snake_to_pascal(str(entry['name']))} = {int(entry['value'])}U,"
         for entry in contract["enums"]["aux_bank_mode"]
+    )
+    lines.extend(["};", "", "enum class TemperatureStatus : std::uint8_t {"])
+    lines.extend(
+        f"  k{snake_to_pascal(str(entry['name']))} = {int(entry['value'])}U,"
+        for entry in contract["enums"]["temperature_status"]
     )
     lines.extend(["};", "", "enum class RateProfile : std::uint8_t {"])
     lines.extend(

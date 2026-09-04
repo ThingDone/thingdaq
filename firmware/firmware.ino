@@ -47,7 +47,8 @@ thingdaq::runtime::FirmwareRuntime firmware_runtime{
     &thingdaq::adc_trigger::teensyScheduler(),
     &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer,
     &thingdaq::variable_rate::teensyRateScheduler(),
-    &thingdaq::gpio_join::teensyDualBankCapture(), &aux_gpio_packer};
+    &thingdaq::gpio_join::teensyDualBankCapture(), &aux_gpio_packer,
+    &thingdaq::temperature::readTeensy};
 }  // namespace
 
 void setup() {

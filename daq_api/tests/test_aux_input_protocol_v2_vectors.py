@@ -135,8 +135,8 @@ class AuxiliaryInputProtocolV2VectorTests(unittest.TestCase):
         self.assertEqual(v1_first, v1_second)
         self.assertEqual(v2_first, v2_second)
         self.assertEqual(26, len(v1_first))
-        self.assertEqual(73, len(v2_first))
-        self.assertEqual(99, len(combined))
+        self.assertEqual(75, len(v2_first))
+        self.assertEqual(101, len(combined))
         self.assertTrue(set(v1_first).isdisjoint(v2_first))
         for path, expected in combined.items():
             with self.subTest(path=path.relative_to(REPOSITORY_ROOT)):
@@ -204,7 +204,7 @@ class AuxiliaryInputProtocolV2VectorTests(unittest.TestCase):
 
     def test_every_fixture_has_an_independently_valid_envelope_and_hash(self) -> None:
         self.assertEqual(constants.HEADER_SIZE, _HEADER.size)
-        self.assertEqual(70, len(self.manifest["fixtures"]))
+        self.assertEqual(72, len(self.manifest["fixtures"]))
         self.assertEqual(
             set(self.entries),
             {path.name for path in FIXTURE_DIRECTORY.glob("*.bin")},

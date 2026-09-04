@@ -986,6 +986,11 @@ def _validate_v2_payload(header: V2FrameHeader, payload: bytes) -> None:
         _validate_response_prefix(header, payload)
         if header.flags & constants.FrameFlag.RESPONSE_ERROR:
             return
+    if header.kind is constants.FrameKind.GET_TEMPERATURE_REQUEST:
+        return
+    if header.kind is constants.FrameKind.GET_TEMPERATURE_RESPONSE:
+        decode_temperature_payload(payload)
+        return
     if header.kind is constants.FrameKind.INFO_RESPONSE:
         _validate_info_payload(payload)
         return
@@ -1050,6 +1055,39 @@ def _validate_v2_payload(header: V2FrameHeader, payload: bytes) -> None:
             )
         return
     _validate_v1_compatible_control(header, payload)
+
+
+@dataclass(frozen=True)
+class TemperatureReading:
+    """Latest calibrated die temperature, not ambient or a forced conversion."""
+
+    status: constants.TemperatureStatus
+    millidegrees_c: int | None
+
+    @property
+    def celsius(self) -> float | None:
+        return None if self.millidegrees_c is None else self.millidegrees_c / 1000
+
+
+def decode_temperature_payload(payload: bytes) -> TemperatureReading:
+    if len(payload) != constants.TEMPERATURE_RESPONSE_PAYLOAD_SIZE:
+        raise V2FrameValidationError("invalid temperature response size")
+    status, reserved, error, sensor, reserved1, reserved2, value = struct.unpack(
+        "<BBHBBHi", payload
+    )
+    if status or reserved or error or reserved1 or reserved2:
+        raise V2FrameValidationError("invalid temperature response prefix/reserved fields")
+    try:
+        sensor_status = constants.TemperatureStatus(sensor)
+    except ValueError as exc:
+        raise V2FrameValidationError("unknown temperature status") from exc
+    if sensor_status is constants.TemperatureStatus.VALID:
+        if not -40000 <= value <= 150000:
+            raise V2FrameValidationError("temperature outside sensor reporting range")
+        return TemperatureReading(sensor_status, value)
+    if value != 0:
+        raise V2FrameValidationError("unavailable temperature must have zero wire value")
+    return TemperatureReading(sensor_status, None)
 
 
 def encode_v2_frame(

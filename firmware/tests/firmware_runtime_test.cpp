@@ -2228,9 +2228,48 @@ void testGpioClockRoundTripPreservesIdleAcquisitionState() {
          "GPIO clock diagnostic is one isolated hardware call without an epoch");
 }
 
+void testTemperatureTraversesParserRuntimeAndUsbQueue() {
+  for (bool available : {false, true}) {
+    FakeCdcStream stream{};
+    packet::OwnedPacketBufferStorage packet_storage{};
+    FakeTickClock clock{};
+    thingdaq::temperature::Reader reader = available
+        ? +[]() -> thingdaq::temperature::Reading {
+            return {thingdaq::temperature::Status::kValid, 42500};
+          } : nullptr;
+    app::FirmwareRuntime firmware{
+        stream, packet_storage, clock, synthetic::Mode::kRealtime,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, reader};
+    expect(firmware.begin(20428100), "temperature runtime boots");
+    wire::FrameFields fields{};
+    fields.version = 2;
+    fields.kind = wire::kTemperatureRequest;
+    fields.request_id = 26;
+    wire::CommandFrame request{};
+    expect(wire::encodeFrame(fields, {}, request).ok(), "encode temperature request");
+    stream.appendInput(request);
+    expect(drain(firmware, stream).quiescent, "temperature response drains USB queue");
+    const auto frames = decodeOutput(stream.output);
+    expect(frames.size() == 1, "temperature is not dropped by response admission");
+    if (frames.size() == 1) {
+      expect(frames[0].header.kind == wire::kTemperatureResponse &&
+             frames[0].header.version == 2 && frames[0].header.request_id == 26,
+             "correlated v2 temperature response survives fragmented USB");
+      expect(frames[0].payload.data[4] == (available ? 0 : 1), "sensor availability explicit");
+      std::uint32_t value = 0;
+      expect(wire::loadU32(frames[0].payload, 8, value) && value == (available ? 42500U : 0U),
+             "runtime uses the supplied temperature reader");
+    }
+    expect(firmware.state() == constants::DeviceState::kIdle,
+           "temperature command does not change acquisition state");
+  }
+}
+
 }  // namespace
 
 int main() {
+  testTemperatureTraversesParserRuntimeAndUsbQueue();
   testCompleteControlPlane();
   testResetStatsWaitsForOlderControlResponses();
   testSyntheticDataCountersReachStatus();

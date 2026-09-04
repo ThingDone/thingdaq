@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import struct
 import sys
 import time
 import unittest
@@ -21,6 +22,7 @@ from thingdaq import (
 )
 from thingdaq._generated import protocol_v2_constants as constants
 from thingdaq.models import AuxiliaryGPIOStatus, Configuration, GPIOLayout
+from thingdaq.protocol_v2 import encode_v2_frame
 from thingdaq.simulator import SimulatedDevice
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -386,6 +388,36 @@ class PacedAuxSerial:
 
 
 class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
+    def test_temperature_retries_are_bounded_and_failed_samples_retained(self) -> None:
+        original = rig.SerialLink.exchange
+        for scenario in ("transient", "persistent", "hot"):
+            calls = []
+
+            def exchange(link, kind, *args, **kwargs):
+                if kind != rig.GET_TEMPERATURE_REQUEST:
+                    return original(link, kind, *args, **kwargs)
+                calls.append(kind)
+                sensor = 2 if scenario == "persistent" or (scenario == "transient" and len(calls) == 1) else 0
+                value = 0 if sensor else (80000 if scenario == "hot" else 42000)
+                wire = encode_v2_frame(
+                    constants.FrameKind.GET_TEMPERATURE_RESPONSE,
+                    struct.pack("<BBHBBHi", 0, 0, 0, sensor, 0, 0, value), request_id=26,
+                )
+                return rig.FrameParser().feed(wire)[0], 0.001
+
+            with self.subTest(scenario=scenario), patch.dict(os.environ, {"AUX_INPUT_TEMPERATURE": "1"}), patch.object(rig.SerialLink, "exchange", exchange):
+                result = self._run(rig.RUN_CASES["INPUT_COMBINED"], rig.PROFILES[-1], run_diagnostic=False)
+                samples = result.metrics["temperature_samples"]
+                self.assertEqual(len(calls), len(samples))
+                if scenario == "transient":
+                    self.assertEqual([], result.evidence.failures)
+                    self.assertEqual([2, 0, 0], [sample["status"] for sample in samples])
+                    self.assertEqual(["before", "before", "after"], [sample["phase"] for sample in samples])
+                else:
+                    self.assertTrue(result.evidence.failures)
+                    self.assertEqual(5 if scenario == "persistent" else 1, len(calls))
+                    self.assertIn("unavailable" if scenario == "persistent" else "safety ceiling", result.evidence.failures[0])
+
     def _run(self, case, profile, *, fault: str | None = None, run_diagnostic=True):  # type: ignore[no-untyped-def]
         port = PacedAuxSerial(fault=fault)
         with (

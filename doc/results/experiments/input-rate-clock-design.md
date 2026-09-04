@@ -47,8 +47,10 @@ guarantee. No overflow, gap, bank-skew, checksum or shutdown failures are waived
 **Do not use an ordinary protocol-v2 client with these equal-rate binaries.**
 They advertise a different table using experiment-local profile IDs; an ordinary
 client should reject it. Before release, introduce an explicit public contract
-for the chosen modes and corresponding API support. Frozen v1/v2 JSON and
-generated artifacts have not been rewritten or presented as a compatible change.
+for the chosen modes and corresponding API support. Rate/layout contract tables
+have not been rewritten to disguise the experimental rate change. The subsequent
+[temperature command](temperature-command.md) adds v2-only IDs; frozen v1 remains
+unchanged.
 
 ## Clock isolation
 

@@ -88,6 +88,11 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
                   response);
   }
 
+  if (request.kind == protocol::kGetTemperature) {
+    return encoded(request, protocol_v1::ErrorCode::kOk,
+                   protocol::encodeTemperatureResponse(request, run_id_, readiness.temperature, response),
+                   response);
+  }
   switch (request.kind) {
     case protocol_v1::CommandKind::kInfo:
       return encoded(request, protocol_v1::ErrorCode::kOk,

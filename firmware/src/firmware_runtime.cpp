@@ -61,6 +61,9 @@ LoopReport FirmwareRuntime::service() {
         publishPacketStatistics();
       }
       control::DispatchReadiness readiness{};
+      if (command.request.kind == protocol::kGetTemperature && temperature_reader_ != nullptr) {
+        readiness.temperature = temperature_reader_();
+      }
       if (command.request.kind ==
           protocol_v1::CommandKind::kResetStats) {
         readiness.statistics_reset_ready =

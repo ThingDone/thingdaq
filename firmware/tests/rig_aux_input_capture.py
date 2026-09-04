@@ -121,6 +121,8 @@ INFO_REQUEST = 0x10
 CONFIGURE_REQUEST = 0x11
 START_REQUEST = 0x12
 GET_STATUS_REQUEST = 0x13
+GET_TEMPERATURE_REQUEST = 0x1A
+GET_TEMPERATURE_RESPONSE = 0x9A
 STOP_REQUEST = 0x14
 RESET_STATS_REQUEST = 0x15
 GPIO_CAPTURE_DIAGNOSTIC_REQUEST = 0x19
@@ -151,6 +153,7 @@ REQUEST_RESPONSE_KIND = {
     CONFIGURE_REQUEST: CONFIGURE_RESPONSE,
     START_REQUEST: START_RESPONSE,
     GET_STATUS_REQUEST: GET_STATUS_RESPONSE,
+    GET_TEMPERATURE_REQUEST: GET_TEMPERATURE_RESPONSE,
     STOP_REQUEST: STOP_RESPONSE,
     RESET_STATS_REQUEST: RESET_STATS_RESPONSE,
     GPIO_CAPTURE_DIAGNOSTIC_REQUEST: GPIO_CAPTURE_DIAGNOSTIC_RESPONSE,
@@ -160,6 +163,7 @@ REQUEST_PAYLOAD_SIZE = {
     CONFIGURE_REQUEST: 16,
     START_REQUEST: 0,
     GET_STATUS_REQUEST: 0,
+    GET_TEMPERATURE_REQUEST: 0,
     STOP_REQUEST: 0,
     RESET_STATS_REQUEST: 0,
     GPIO_CAPTURE_DIAGNOSTIC_REQUEST: 0,
@@ -169,6 +173,7 @@ SUCCESS_PAYLOAD_SIZE = {
     CONFIGURE_RESPONSE: 20,
     START_RESPONSE: 20,
     GET_STATUS_RESPONSE: 1476,
+    GET_TEMPERATURE_RESPONSE: 12,
     STOP_RESPONSE: 8,
     RESET_STATS_RESPONSE: 8,
     GPIO_CAPTURE_DIAGNOSTIC_RESPONSE: 272,
@@ -752,7 +757,13 @@ class FrameParser:
         payload = frame.payload
         if is_error and frame.kind != ERROR_RESPONSE:
             return
-        if frame.kind == INFO_RESPONSE:
+        if frame.kind == GET_TEMPERATURE_RESPONSE:
+            sensor, reserved1, reserved2, value = struct.unpack_from("<BBHi", payload, 4)
+            if sensor > 4 or reserved1 or reserved2 or (sensor != 0 and value != 0):
+                raise ProtocolFailure("invalid temperature fields")
+            if sensor == 0 and not -40000 <= value <= 150000:
+                raise ProtocolFailure("temperature outside sensor reporting range")
+        elif frame.kind == INFO_RESPONSE:
             reserved_ranges = (
                 payload[1:2],
                 payload[61:62],
@@ -2986,6 +2997,37 @@ def run_acceptance(
     completed = False
     metrics: dict[str, object] = {}
     stimulus_grade = "NOT_RUN"
+    temperature_samples: list[dict[str, object]] = []
+    temperature_enabled = os.environ.get("AUX_INPUT_TEMPERATURE", "0") == "1"
+
+    def sample_temperature(phase: str) -> None:
+        if not temperature_enabled:
+            return
+        for attempt in range(5):
+            frame, latency = link.exchange(
+                GET_TEMPERATURE_REQUEST,
+                on_data=validator.accept if validator is not None else None,
+            )
+            response_success(frame, GET_TEMPERATURE_RESPONSE)
+            sensor, _reserved1, _reserved2, value = struct.unpack_from("<BBHi", frame.payload, 4)
+            sample = {"phase": phase, "host_monotonic_seconds": time.monotonic(),
+                      "status": sensor, "millidegrees_c": value if sensor == 0 else None,
+                      "latency_seconds": latency, "attempt": attempt + 1}
+            temperature_samples.append(sample)
+            emit_event("temperature", **sample)
+            if sensor == 2 and attempt < 4:
+                # FINISHED can clear while the periodic monitor converts. Retry
+                # on the host, continuing to drain acquisition data meanwhile.
+                retry_at = time.monotonic() + 0.007
+                while time.monotonic() < retry_at:
+                    link.pump_once(validator.accept if validator is not None else lambda _frame: None)
+                continue
+            if sensor != 0:
+                raise ProtocolFailure(f"temperature reading unavailable: status={sensor}")
+            # Conservative campaign abort, not a change to core thermal protection.
+            if value >= 80000:
+                raise ProtocolFailure(f"temperature safety ceiling reached: {value / 1000} C")
+            return
     try:
         link.drain_startup(STARTUP_DRAIN_SECONDS)
         synchronized = synchronize(link)
@@ -3015,6 +3057,7 @@ def run_acceptance(
             raise ProtocolFailure("static identity/resource grading failed")
 
         diagnostic_latency = 0.0
+        sample_temperature("before")
         if run_diagnostic:
             diagnostic_frame, diagnostic_latency = link.exchange(
                 GPIO_CAPTURE_DIAGNOSTIC_REQUEST,
@@ -3135,6 +3178,7 @@ def run_acceptance(
         timed_adc_items = 0
         timed_gpio_items = 0
         next_status = active_start
+        next_temperature = active_start + 10.0
         while True:
             now = time.monotonic()
             if timed_start is None and now >= active_start + warmup_seconds:
@@ -3148,6 +3192,9 @@ def run_acceptance(
                 )
             if timed_start is not None and now >= timed_start + capture_seconds:
                 break
+            if temperature_enabled and now >= next_temperature:
+                sample_temperature("running")
+                next_temperature = time.monotonic() + 10.0
             if now >= next_status:
                 status_frame, latency = link.exchange(
                     GET_STATUS_REQUEST, on_data=validator.accept
@@ -3222,6 +3269,7 @@ def run_acceptance(
         evidence.equal("stop.state", STATE_IDLE, stop_frame.payload[4])
         evidence.equal("stop.run_id", validator.run_id, stop_frame.run_id)
         link.drain_until_quiet(validator.accept)
+        sample_temperature("after")
         final_frame, final_latency = link.exchange(
             GET_STATUS_REQUEST, on_data=validator.accept
         )
@@ -3297,6 +3345,7 @@ def run_acceptance(
         evidence.equal("host.stale_responses", 0, link.stale_responses)
         evidence.equal("host.discarded_run_data", 0, link.discarded_data_frames)
         metrics = {
+            "temperature_samples": temperature_samples,
             "adc_frames": validator.adc.frames,
             "adc_rate_hz": adc_rate,
             "capture_seconds": elapsed,
@@ -3338,6 +3387,7 @@ def run_acceptance(
         except Exception as status_error:  # noqa: BLE001 - cleanup must still run
             emit_event("failure_status_unavailable", error=str(status_error))
     finally:
+        metrics["temperature_samples"] = temperature_samples
         if not completed:
             try:
                 cleanup, _ = link.exchange(STOP_REQUEST, on_data=lambda _frame: None)

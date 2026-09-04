@@ -82,6 +82,7 @@ EXPECTED_HARDWARE_INCLUDE_OWNERS = {
         "usb_serial.h",
     },
     FIRMWARE_SOURCE / "teensy_clock.cpp": {"Arduino.h"},
+    FIRMWARE_SOURCE / "temperature_teensy.cpp": {"Arduino.h"},
 }
 _QUOTED_INCLUDE = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.MULTILINE)
 _ANGLE_INCLUDE = re.compile(r"^\s*#\s*include\s+<([^>]+)>", re.MULTILINE)
