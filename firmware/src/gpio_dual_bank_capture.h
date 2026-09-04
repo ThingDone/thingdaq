@@ -77,6 +77,16 @@ enum class OperationStatus : std::uint8_t {
   kInvalidStopProgress,
 };
 
+enum class StartStatus : std::uint8_t {
+  kOk,
+  kAlreadyRunning,
+  kNotQuiescent,
+  kInvalidEpoch,
+  kUnsupportedProfile,
+  kResourceBusy,
+  kHardwareError,
+};
+
 enum class StopReason : std::uint8_t {
   kStop,
   kRollback,
@@ -206,8 +216,14 @@ struct Snapshot {
   std::size_t ready_depth = 0U;
   std::size_t reading_depth = 0U;
   std::size_t discard_depth = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t stale_dma_completions = 0U;
   bool running = false;
   bool quiescent = true;
+  bool hardware_prepared = false;
+  bool faulted = false;
 };
 
 class PairedRawSource {
@@ -216,6 +232,34 @@ class PairedRawSource {
   virtual AcquireResult acquireReady() = 0;
   virtual OperationStatus release(const BufferHandle &handle) = 0;
 };
+
+class HardwareCapture : public PairedRawSource {
+ public:
+  virtual StartStatus inspectStart(
+      std::uint32_t epoch, protocol_v2::RateProfile profile) = 0;
+  // Prepare both GPIO DMA paths against one epoch while PIT0 remains stopped.
+  virtual StartStatus prepare(
+      std::uint32_t epoch, protocol_v2::RateProfile profile) = 0;
+  // Standalone GPIO convenience path: prepare both banks, then enable PIT0.
+  virtual StartStatus start(
+      std::uint32_t epoch, protocol_v2::RateProfile profile) = 0;
+  // Combined-mode callers stop the common trigger before invoking this path.
+  virtual StopReport stopAfterTriggers(
+      StopReason reason = StopReason::kStop) = 0;
+  virtual StopReport stop(StopReason reason = StopReason::kStop) = 0;
+  virtual std::size_t serviceOwnership() = 0;
+  virtual Snapshot rawSnapshot() = 0;
+};
+
+// Direction is made safe on the DMA-visible alias before only the selected
+// fast-alias bits are cleared. Unrelated GPIO1 direction and select bits are
+// preserved exactly.
+inline void selectAuxiliaryStandardInputs(
+    volatile std::uint32_t &gpr26,
+    volatile std::uint32_t &gpio1_gdir) {
+  gpio1_gdir = gpio1_gdir & ~board::kGpio1PsrCaptureMask;
+  gpr26 = gpr26 & ~board::kGpio6ToGpio1Gpr26ClearMask;
+}
 
 // Fixed-capacity, generation-indexed join barrier for the two GPIO PSR DMA
 // streams. Only a complete pair with identical generation, timestamp, count,

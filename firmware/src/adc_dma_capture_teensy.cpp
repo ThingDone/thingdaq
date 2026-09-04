@@ -59,9 +59,11 @@ constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
 constexpr std::size_t kPairDispatchConverter = 1U;
 constexpr std::uint32_t kStopBoundaryPollLimit =
     protocol_v1::kAdcTriggerDiagnosticPollLimit;
-constexpr std::uint16_t kStopBoundaryArmMinimumPairs =
-    static_cast<std::uint16_t>(
-        (protocol_v1::kAdcPairsPerFrame * 3U) / 4U);
+constexpr std::uint16_t stopBoundaryArmMinimumPairs(
+    std::uint16_t pairs_per_buffer) {
+  return static_cast<std::uint16_t>(
+      (static_cast<std::uint32_t>(pairs_per_buffer) * 3U) / 4U);
+}
 constexpr std::uint32_t kAdcDmaChannelMask =
     (std::uint32_t{1U} <<
      board::kAdcConverterConfigurations[0].edma_channel) |
@@ -143,6 +145,8 @@ std::array<std::uint8_t, kDmaPipelineDepth> g_pipeline_destinations{
     kInvalidDestination, kInvalidDestination, kInvalidDestination,
     kInvalidDestination, kInvalidDestination, kInvalidDestination};
 std::uint32_t g_epoch = 0U;
+std::uint16_t g_pairs_per_buffer = static_cast<std::uint16_t>(
+    protocol_v1::kAdcPairsPerFrame);
 std::uint32_t g_adc_etc_error_flags = 0U;
 std::uint32_t g_adc_etc_error_interrupts = 0U;
 std::uint32_t g_resource_conflicts = 0U;
@@ -270,12 +274,12 @@ void configureDescriptor(IMXRT_DMA_TCD_t &descriptor,
                         ? 0
                         : static_cast<std::int16_t>(sizeof(SamplePair));
   descriptor.CITER_ELINKNO = static_cast<std::uint16_t>(
-      protocol_v1::kAdcPairsPerFrame);
+      g_pairs_per_buffer);
   descriptor.DLASTSGA =
       descriptorAddress(converter, descriptorSlot(next_generation));
   descriptor.CSR = kTcdControl;
   descriptor.BITER_ELINKNO = static_cast<std::uint16_t>(
-      protocol_v1::kAdcPairsPerFrame);
+      g_pairs_per_buffer);
 }
 
 void copyDescriptorToHardware(std::size_t converter,
@@ -326,9 +330,13 @@ void configureDescriptors() {
 void configurePriorities() {
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
+    const std::uint8_t priority =
+        g_pairs_per_buffer == protocol_v2::kInputAdcPairsPerFrame
+            ? board::kInputModeEdmaPriorities[converter]
+            : board::kAdcEdmaPriorities[converter];
     priorityRegister(converter) = static_cast<std::uint8_t>(
         DMA_DCHPRI_ECP |
-        DMA_DCHPRI_CHPRI(board::kAdcEdmaPriorities[converter]));
+        DMA_DCHPRI_CHPRI(priority));
   }
 }
 
@@ -345,7 +353,8 @@ bool hardwareDestinationMatches(std::size_t converter,
   const std::uintptr_t end =
       first + (destination == kOverflowDestination
                    ? sizeof(std::uint16_t)
-                   : protocol_v1::kDataPayloadBytes);
+                   : static_cast<std::size_t>(g_pairs_per_buffer) *
+                         sizeof(SamplePair));
   return current >= first && current <= end;
 }
 
@@ -428,20 +437,24 @@ bool configuredHardwareValid() {
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
     const IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
+    const std::uint8_t expected_priority =
+        g_pairs_per_buffer == protocol_v2::kInputAdcPairsPerFrame
+            ? board::kInputModeEdmaPriorities[converter]
+            : board::kAdcEdmaPriorities[converter];
     if (*dmamuxRegister(converter) != dmamuxConfiguration(converter) ||
         tcd.SADDR != adcResultAddress(converter) ||
         tcd.ATTR != kTcdAttributes ||
         tcd.NBYTES_MLNO != sizeof(std::uint16_t) ||
         tcd.DOFF != static_cast<std::int16_t>(sizeof(SamplePair)) ||
-        tcd.CITER_ELINKNO != protocol_v1::kAdcPairsPerFrame ||
-        tcd.BITER_ELINKNO != protocol_v1::kAdcPairsPerFrame ||
+        tcd.CITER_ELINKNO != g_pairs_per_buffer ||
+        tcd.BITER_ELINKNO != g_pairs_per_buffer ||
         tcd.CSR != kTcdControl ||
         tcd.DLASTSGA != descriptorAddress(
                              converter,
                              descriptorSlot(
                                  g_pipeline_generations[1])) ||
         (priorityRegister(converter) & 0x0FU) !=
-            board::kAdcEdmaPriorities[converter] ||
+            expected_priority ||
         !hardwareDestinationMatches(converter,
                                     g_current_destinations[converter])) {
       return false;
@@ -604,7 +617,7 @@ std::uint32_t activeMinorPairs(std::size_t converter) {
   const IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
   const std::uint16_t biter = tcd.BITER_ELINKNO;
   const std::uint16_t citer = tcd.CITER_ELINKNO;
-  if (biter != protocol_v1::kAdcPairsPerFrame || citer > biter) {
+  if (biter != g_pairs_per_buffer || citer > biter) {
     g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
     return 0U;
   }
@@ -634,9 +647,11 @@ bool waitForCompleteStopBoundary() {
     for (std::size_t converter = 0U;
          converter < kConverterCount && safe_to_arm; ++converter) {
       const IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
+      const std::uint16_t arm_minimum =
+          stopBoundaryArmMinimumPairs(g_pairs_per_buffer);
       safe_to_arm =
-          tcd.BITER_ELINKNO == protocol_v1::kAdcPairsPerFrame &&
-          tcd.CITER_ELINKNO > kStopBoundaryArmMinimumPairs &&
+          tcd.BITER_ELINKNO == g_pairs_per_buffer &&
+          tcd.CITER_ELINKNO > arm_minimum &&
           tcd.CITER_ELINKNO <= tcd.BITER_ELINKNO;
     }
     if (safe_to_arm) {
@@ -666,9 +681,14 @@ bool waitForCompleteStopBoundary() {
 }
 
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_inspect")
-StartStatus inspectHardwareStart(std::uint32_t epoch) {
+StartStatus inspectHardwareStart(std::uint32_t epoch,
+                                 std::uint32_t pairs_per_buffer) {
   if (epoch == 0U) {
     return StartStatus::kInvalidEpoch;
+  }
+  if (pairs_per_buffer == 0U ||
+      pairs_per_buffer > protocol_v1::kAdcPairsPerFrame) {
+    return StartStatus::kHardwareError;
   }
   if (g_hardware_prepared) {
     return StartStatus::kAlreadyRunning;
@@ -681,8 +701,10 @@ StartStatus inspectHardwareStart(std::uint32_t epoch) {
 }
 
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_prepare")
-StartStatus prepareHardware(std::uint32_t epoch) {
-  const StartStatus readiness = inspectHardwareStart(epoch);
+StartStatus prepareHardware(std::uint32_t epoch,
+                            std::uint32_t pairs_per_buffer) {
+  const StartStatus readiness = inspectHardwareStart(
+      epoch, pairs_per_buffer);
   if (readiness != StartStatus::kOk) {
     if (readiness == StartStatus::kResourceBusy) {
       saturatingIncrement(g_resource_conflicts);
@@ -693,7 +715,9 @@ StartStatus prepareHardware(std::uint32_t epoch) {
   }
 
   CCM_CCGR5 |= gpio_dma_route::kDmaGateMask;
-  const PrimeResult prime = g_ring.prime(epoch);
+  g_pairs_per_buffer = static_cast<std::uint16_t>(pairs_per_buffer);
+  const PrimeResult prime = g_ring.prime(epoch, 0U, 0U,
+                                         pairs_per_buffer);
   if (!prime.ok()) {
     saturatingIncrement(g_start_errors);
     return prime.status == OperationStatus::kInvalidEpoch
@@ -871,11 +895,23 @@ HardwareSnapshot hardwareSnapshot() {
 }  // namespace
 
 StartStatus TeensyAdcDmaCapture::inspectStart(std::uint32_t epoch) {
-  return inspectHardwareStart(epoch);
+  return inspectHardwareStart(
+      epoch, static_cast<std::uint32_t>(protocol_v1::kAdcPairsPerFrame));
+}
+
+StartStatus TeensyAdcDmaCapture::inspectStart(
+    std::uint32_t epoch, std::uint32_t pairs_per_buffer) {
+  return inspectHardwareStart(epoch, pairs_per_buffer);
 }
 
 StartStatus TeensyAdcDmaCapture::prepare(std::uint32_t epoch) {
-  return prepareHardware(epoch);
+  return prepareHardware(
+      epoch, static_cast<std::uint32_t>(protocol_v1::kAdcPairsPerFrame));
+}
+
+StartStatus TeensyAdcDmaCapture::prepare(
+    std::uint32_t epoch, std::uint32_t pairs_per_buffer) {
+  return prepareHardware(epoch, pairs_per_buffer);
 }
 
 bool TeensyAdcDmaCapture::stopAtBoundaryBeforeTriggers() {
@@ -930,7 +966,12 @@ static_assert(protocol_v1::kAdcPairsPerFrame <=
               std::numeric_limits<std::int16_t>::max());
 static_assert(kStopBoundaryTimeoutCycles == 6000000U);
 static_assert(kStopBoundaryPollLimit == 2000000U);
-static_assert(kStopBoundaryArmMinimumPairs == 759U);
+static_assert(stopBoundaryArmMinimumPairs(
+                  static_cast<std::uint16_t>(
+                      protocol_v1::kAdcPairsPerFrame)) == 759U);
+static_assert(stopBoundaryArmMinimumPairs(
+                  static_cast<std::uint16_t>(
+                      protocol_v2::kInputAdcPairsPerFrame)) == 379U);
 static_assert(board::kAdcConverterConfigurations[0].edma_channel == 0U);
 static_assert(board::kAdcConverterConfigurations[1].edma_channel == 1U);
 static_assert(board::kAdcConverterConfigurations[0].dmamux_source ==

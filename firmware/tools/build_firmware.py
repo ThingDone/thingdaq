@@ -84,7 +84,7 @@ BENCHMARK_BUFFER_BYTES = 4096
 BENCHMARK_BUFFER_ALIGNMENT = 32
 PACKET_BUFFER_SYMBOLS = {
     "DTCM_PRIMARY": (
-        "(anonymous namespace)::packet_storage_primary",
+        "thingdaq_packet_storage_primary",
         105 * 4096,
         0x20000000,
         0x20200000,
@@ -644,6 +644,12 @@ def benchmark_buffer_usage(nm_output: str) -> dict[str, Any]:
             "range_start": f"0x{region_start:08x}",
             "range_end_exclusive": f"0x{region_end:08x}",
         }
+    packet_record = symbols.get(PACKET_BUFFER_SYMBOLS["DTCM_PRIMARY"][0])
+    dtcm = regions["DTCM_PACKET"]
+    if packet_record is not None and packet_record[0] == int(dtcm["address"], 16):
+        dtcm["physical_allocation"] = "DTCM_PRIMARY_PACKET_PAGE_0"
+        dtcm["view_offset_bytes"] = 0
+        dtcm["lease"] = "IDLE benchmark only; packet/acquisition path must be quiescent"
     return {
         "working_ram_bytes": sum(item["bytes"] for item in regions.values()),
         "regions": regions,
@@ -1353,10 +1359,28 @@ def managed_memory_usage(nm_output: str) -> dict[str, Any]:
             }
         )
     allocations.sort(key=lambda item: int(item["address"], 16))
+    by_owner = {item["owner"]: item for item in allocations}
+    if (
+        by_owner["checksum_dtcm"]["address"]
+        != by_owner["packet_dtcm_primary"]["address"]
+    ):
+        raise BuildError("checksum DTCM view is not packet page zero")
     for previous, current in pairwise(allocations):
-        if int(current["address"], 16) < int(previous["end_exclusive"], 16):
+        overlaps = int(current["address"], 16) < int(previous["end_exclusive"], 16)
+        declared_idle_packet_view = (
+            previous["owner"] == "packet_dtcm_primary"
+            and current["owner"] == "checksum_dtcm"
+            and current["address"] == previous["address"]
+            and current["bytes"] == BENCHMARK_BUFFER_BYTES
+        )
+        if overlaps and not declared_idle_packet_view:
             raise BuildError(
                 f"managed allocation {previous['owner']} overlaps {current['owner']}"
+            )
+        if declared_idle_packet_view:
+            current["physical_allocation"] = previous["owner"]
+            current["lease"] = (
+                "IDLE benchmark only; packet/acquisition path must be quiescent"
             )
     return {
         "overlap_check": "passed",

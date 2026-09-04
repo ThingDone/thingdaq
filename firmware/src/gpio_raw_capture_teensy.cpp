@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <new>
 
 #include <core_pins.h>
 #include <imxrt.h>
@@ -13,6 +14,8 @@
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
 #include "gpio_dual_bank_capture.h"
+#include "gpio_raw_storage_teensy.h"
+#include "variable_rate_scheduler.h"
 
 #define THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
@@ -24,7 +27,7 @@ struct alignas(board::kCacheLineBytes) DescriptorBank {
       descriptors{};
 };
 
-RawBufferStorage g_gpio_raw_dma_buffers
+SharedRawBufferStorage g_gpio_raw_dma_buffers
     __attribute__((section(".dmabuffers"), used));
 RawOverflowSink g_gpio_raw_dma_overflow_sink
     __attribute__((section(".dmabuffers"), used));
@@ -95,10 +98,12 @@ class TeensyCriticalSection final : public CriticalSection {
 
 TeensyCacheMaintenance g_cache{};
 TeensyCriticalSection g_critical{};
-RawCaptureRing g_ring{g_gpio_raw_dma_buffers,
+RawCaptureRing g_ring{g_gpio_raw_dma_buffers.legacy,
                       g_gpio_raw_dma_overflow_sink,
                       g_cache, g_critical};
 TeensyRawCapture g_facade{};
+RawStorageOwner g_raw_storage_owner = RawStorageOwner::kNone;
+RawStorageOwner g_raw_storage_layout = RawStorageOwner::kLegacy;
 bool g_hardware_running = false;
 bool g_hardware_prepared = false;
 bool g_faulted = false;
@@ -106,6 +111,7 @@ std::uint32_t g_resource_conflicts = 0U;
 std::uint32_t g_start_errors = 0U;
 std::uint32_t g_stop_errors = 0U;
 std::uint32_t g_stale_dma_completions = 0U;
+std::uint32_t g_pit_load = kProductionPitLoad;
 
 void saturatingIncrement(std::uint32_t &value) {
   if (value != std::numeric_limits<std::uint32_t>::max()) {
@@ -277,12 +283,19 @@ bool waitForCompleteStopBoundary() {
 }
 
 THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
-StartStatus inspectHardwareStart() {
+StartStatus inspectHardwareStart(protocol_v2::RateProfile profile) {
+  if (!variable_rate::derive(profile).ok()) {
+    return StartStatus::kHardwareError;
+  }
   if (g_hardware_prepared || g_hardware_running) {
     return StartStatus::kAlreadyRunning;
   }
-  if (resourcesBusy()) {
+  if (resourcesBusy() ||
+      !rawStorageAvailable(RawStorageOwner::kLegacy)) {
     return StartStatus::kResourceBusy;
+  }
+  if (!rawStorageActive(RawStorageOwner::kLegacy)) {
+    return StartStatus::kOk;
   }
   return g_ring.snapshot().quiescent ? StartStatus::kOk
                                      : StartStatus::kNotQuiescent;
@@ -292,7 +305,7 @@ bool preparedHardwareValid() {
   const IMXRT_PIT_CHANNEL_t &pit =
       IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
   const IMXRT_DMA_TCD_t &tcd = gpio_dma_route::edmaTcd();
-  return pit.LDVAL == kProductionPitLoad && pit.TCTRL == 0U &&
+  return pit.LDVAL == g_pit_load && pit.TCTRL == 0U &&
          gpio_dma_route::selectedOutputBusy() &&
          gpio_dma_route::edmaRequestBusy() &&
          *gpio_dma_route::dmamuxChannelRegister() ==
@@ -308,8 +321,10 @@ bool preparedHardwareValid() {
 }
 
 THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_prepare")
-StartStatus prepareHardware() {
-  const StartStatus readiness = inspectHardwareStart();
+StartStatus prepareHardware(protocol_v2::RateProfile profile) {
+  const variable_rate::DeriveResult derived =
+      variable_rate::derive(profile);
+  const StartStatus readiness = inspectHardwareStart(profile);
   if (readiness != StartStatus::kOk) {
     if (readiness == StartStatus::kResourceBusy) {
       saturatingIncrement(g_resource_conflicts);
@@ -319,10 +334,15 @@ StartStatus prepareHardware() {
     return readiness;
   }
   gpio_dma_route::enableClockGates();
+  if (!claimRawStorage(RawStorageOwner::kLegacy)) {
+    saturatingIncrement(g_resource_conflicts);
+    return StartStatus::kResourceBusy;
+  }
 
   const PrimeResult prime = g_ring.prime();
   if (!prime.ok()) {
     forceSafeInputs();
+    releaseRawStorage(RawStorageOwner::kLegacy);
     saturatingIncrement(g_start_errors);
     return prime.status == OperationStatus::kAlreadyRunning
                ? StartStatus::kAlreadyRunning
@@ -333,7 +353,8 @@ StartStatus prepareHardware() {
   configureDescriptors(prime);
   gpio_dma_route::configureEdmaPriority();
 
-  gpio_dma_route::configureStoppedPit(kProductionPitLoad);
+  g_pit_load = derived.schedule.gpio_master_pit_load;
+  gpio_dma_route::configureStoppedPit(g_pit_load);
   gpio_dma_route::configureXbarRequest();
   forceSafeInputs();
 
@@ -356,6 +377,7 @@ StartStatus prepareHardware() {
     g_hardware_running = false;
     g_hardware_prepared = false;
     (void)g_ring.stop(0U);
+    releaseRawStorage(RawStorageOwner::kLegacy);
     g_faulted = true;
     saturatingIncrement(g_start_errors);
     return StartStatus::kHardwareError;
@@ -370,8 +392,8 @@ StartStatus prepareHardware() {
 }
 
 THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_start")
-StartStatus startHardware() {
-  const StartStatus prepared = prepareHardware();
+StartStatus startHardware(protocol_v2::RateProfile profile) {
+  const StartStatus prepared = prepareHardware(profile);
   if (prepared != StartStatus::kOk) {
     return prepared;
   }
@@ -384,6 +406,7 @@ StartStatus startHardware() {
     g_hardware_running = false;
     g_hardware_prepared = false;
     (void)g_ring.stop(0U);
+    releaseRawStorage(RawStorageOwner::kLegacy);
     forceSafeInputs();
     g_faulted = true;
     saturatingIncrement(g_start_errors);
@@ -446,6 +469,9 @@ StopReport stopHardwareImpl(bool preserve_complete_boundary) {
       report.status = OperationStatus::kInvalidCompletion;
     }
   }
+  if (g_ring.quiescent()) {
+    releaseRawStorage(RawStorageOwner::kLegacy);
+  }
   return report;
 }
 
@@ -494,11 +520,87 @@ HardwareSnapshot hardwareSnapshot() {
 
 }  // namespace
 
-StartStatus TeensyRawCapture::inspectStart() { return inspectHardwareStart(); }
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(
+    ".flashmem.gpio_raw.storage_available")
+bool rawStorageAvailable(RawStorageOwner owner) {
+  return owner != RawStorageOwner::kNone &&
+         (g_raw_storage_owner == RawStorageOwner::kNone ||
+          g_raw_storage_owner == owner);
+}
 
-StartStatus TeensyRawCapture::prepare() { return prepareHardware(); }
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.storage_active")
+bool rawStorageActive(RawStorageOwner owner) {
+  return g_raw_storage_layout == owner;
+}
 
-StartStatus TeensyRawCapture::start() { return startHardware(); }
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.storage_claim")
+bool claimRawStorage(RawStorageOwner owner) {
+  if (!rawStorageAvailable(owner)) {
+    return false;
+  }
+  if (g_raw_storage_layout != owner) {
+    if (owner == RawStorageOwner::kLegacy) {
+      ::new (static_cast<void *>(&g_gpio_raw_dma_buffers.legacy))
+          RawBufferStorage{};
+    } else if (owner == RawStorageOwner::kPaired) {
+      ::new (static_cast<void *>(&g_gpio_raw_dma_buffers.paired))
+          gpio_join::PairedRawStorage{};
+    } else {
+      return false;
+    }
+    g_raw_storage_layout = owner;
+  }
+  g_raw_storage_owner = owner;
+  return true;
+}
+
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.storage_release")
+void releaseRawStorage(RawStorageOwner owner) {
+  if (g_raw_storage_owner == owner) {
+    g_raw_storage_owner = RawStorageOwner::kNone;
+  }
+}
+
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.storage_legacy")
+RawBufferStorage &legacyRawStorage() {
+  return g_gpio_raw_dma_buffers.legacy;
+}
+
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.storage_paired")
+gpio_join::PairedRawStorage &pairedRawStorage() {
+  return g_gpio_raw_dma_buffers.paired;
+}
+
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(
+    ".flashmem.gpio_raw.storage_primary_descriptors")
+void *primaryRawDescriptorStorage() {
+  return g_gpio_raw_dma_descriptors.descriptors.data();
+}
+
+StartStatus TeensyRawCapture::inspectStart() {
+  return inspectHardwareStart(protocol_v2::kDefaultRateProfile);
+}
+
+StartStatus TeensyRawCapture::inspectStart(
+    protocol_v2::RateProfile profile) {
+  return inspectHardwareStart(profile);
+}
+
+StartStatus TeensyRawCapture::prepare() {
+  return prepareHardware(protocol_v2::kDefaultRateProfile);
+}
+
+StartStatus TeensyRawCapture::prepare(protocol_v2::RateProfile profile) {
+  return prepareHardware(profile);
+}
+
+StartStatus TeensyRawCapture::start() {
+  return startHardware(protocol_v2::kDefaultRateProfile);
+}
+
+StartStatus TeensyRawCapture::start(protocol_v2::RateProfile profile) {
+  return startHardware(profile);
+}
 
 StopReport TeensyRawCapture::stopAfterTriggers() {
   return stopHardwareAfterTriggers();
@@ -511,9 +613,15 @@ AcquireResult TeensyRawCapture::acquireReady() {
 }
 
 OperationStatus TeensyRawCapture::release(const BufferHandle &handle) {
-  return g_ring.release(handle);
+  const OperationStatus status = g_ring.release(handle);
+  if (status == OperationStatus::kOk && g_ring.quiescent()) {
+    releaseRawStorage(RawStorageOwner::kLegacy);
+  }
+  return status;
 }
 
+THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(
+    ".flashmem.gpio_raw.facade_raw_snapshot")
 Snapshot TeensyRawCapture::rawSnapshot() {
   Snapshot value = g_ring.snapshot();
   value.resource_conflicts = g_resource_conflicts;

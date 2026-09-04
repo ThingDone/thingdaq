@@ -2,6 +2,13 @@
 
 #include <limits>
 
+#if defined(__IMXRT1062__)
+#define THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(section_name)
+#endif
+
 namespace thingdaq::gpio_aux_packer {
 namespace {
 
@@ -33,6 +40,7 @@ constexpr std::uint16_t flag(protocol_v1::FrameFlag value) {
 
 }  // namespace
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.pack")
 std::size_t packDualBankBatch(const std::uint32_t *primary_words,
                               const std::uint32_t *auxiliary_words,
                               std::size_t sample_count,
@@ -54,6 +62,7 @@ std::size_t packDualBankBatch(const std::uint32_t *primary_words,
   return sample_count;
 }
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.start")
 OperationStatus AuxiliaryBatchPacker::startRun(
     std::uint32_t run_id,
     protocol_v1::ChecksumAlgorithm checksum_algorithm,
@@ -95,8 +104,10 @@ OperationStatus AuxiliaryBatchPacker::startRun(
   return OperationStatus::kOk;
 }
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.stop")
 void AuxiliaryBatchPacker::stopProduction() { running_ = false; }
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.service")
 ServiceReport AuxiliaryBatchPacker::service(
     packet::PacketBufferPipeline &pipeline, std::size_t buffer_limit) {
   ServiceReport report{};
@@ -139,6 +150,7 @@ ServiceReport AuxiliaryBatchPacker::service(
   return report;
 }
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.snapshot")
 Snapshot AuxiliaryBatchPacker::snapshot(
     const packet::PacketBufferPipeline &pipeline) const {
   Snapshot result{};
@@ -158,6 +170,7 @@ Snapshot AuxiliaryBatchPacker::snapshot(
   return result;
 }
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.matches")
 bool AuxiliaryBatchPacker::pipelineMatches(
     const packet::PacketBufferPipeline &pipeline) const {
   return pipeline.accepts(packet::Stream::kGpio, run_id_,
@@ -165,6 +178,7 @@ bool AuxiliaryBatchPacker::pipelineMatches(
          pipeline.layout() == layout_;
 }
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.consume")
 bool AuxiliaryBatchPacker::consume(
     const gpio_join::BufferHandle &handle,
     packet::PacketBufferPipeline &pipeline, ServiceReport &report) {
@@ -265,6 +279,7 @@ bool AuxiliaryBatchPacker::consume(
   return true;
 }
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.raw_gap")
 bool AuxiliaryBatchPacker::projectRawGap(
     std::uint64_t missing_frames,
     packet::PacketBufferPipeline &pipeline) {
@@ -290,6 +305,7 @@ bool AuxiliaryBatchPacker::projectRawGap(
   return true;
 }
 
+THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.progress")
 stats::GpioPackerProgress AuxiliaryBatchPacker::progress(
     const packet::PacketBufferPipeline &pipeline) const {
   stats::GpioPackerProgress result = progress_;
@@ -311,3 +327,5 @@ stats::GpioPackerProgress AuxiliaryBatchPacker::progress(
 }
 
 }  // namespace thingdaq::gpio_aux_packer
+
+#undef THINGDAQ_GPIO_AUX_PACKER_COLD_CODE

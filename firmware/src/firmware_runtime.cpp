@@ -22,6 +22,7 @@ bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
                                acquisition_controller_.initialize());
 }
 
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.service")
 LoopReport FirmwareRuntime::service() {
   LoopReport report{};
   report.receive = transport_.serviceReceive();
@@ -91,7 +92,7 @@ LoopReport FirmwareRuntime::service() {
       } else if (command.request.kind ==
                      protocol_v1::CommandKind::kChecksumBenchmark &&
                  control_.state() == protocol_v1::DeviceState::kIdle &&
-                 checksum_benchmark_ != nullptr) {
+                 checksum_benchmark_ != nullptr && dataPathQuiescent()) {
         benchmark_result =
             checksum_benchmark_->run(command.request.checksum_benchmark);
         if (benchmark_result.ok()) {
@@ -105,6 +106,12 @@ LoopReport FirmwareRuntime::service() {
           readiness.checksum_benchmark_error =
               protocol_v1::ErrorCode::kInternalError;
         }
+      } else if (command.request.kind ==
+                     protocol_v1::CommandKind::kChecksumBenchmark &&
+                 control_.state() == protocol_v1::DeviceState::kIdle &&
+                 checksum_benchmark_ != nullptr && !dataPathQuiescent()) {
+        readiness.checksum_benchmark_error =
+            protocol_v1::ErrorCode::kBusy;
       } else if (command.request.kind ==
                      protocol_v1::CommandKind::kGpioClockDiagnostic &&
                  control_.state() == protocol_v1::DeviceState::kIdle &&
@@ -245,11 +252,18 @@ void FirmwareRuntime::applyPendingEvents(
     }
   }
   if (events.has(control::Event::kStartEpoch)) {
+    const stream_layout::Result layout =
+        acquisition::Controller::runLayout(
+            control_.appliedConfiguration());
+    if (!layout.ok()) {
+      report.internal_error = true;
+      return;
+    }
     report.packet_start_status =
         packet_pipeline_.startRun(
             events.run_id,
             control_.appliedConfiguration().data_checksum_algorithm,
-            control_.appliedConfiguration().stream_mask);
+            control_.appliedConfiguration().stream_mask, layout.layout);
     report.packet_run_started =
         report.packet_start_status == packet::OperationStatus::kOk;
     if (!report.packet_run_started) {

@@ -4,6 +4,13 @@
 
 #include "rate_profile_table.h"
 
+#if defined(__IMXRT1062__)
+#define THINGDAQ_GPIO_DUAL_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define THINGDAQ_GPIO_DUAL_COLD_CODE(section_name)
+#endif
+
 namespace thingdaq::gpio_join {
 namespace {
 
@@ -44,6 +51,7 @@ bool validPeriod(std::uint32_t period) {
 
 }  // namespace
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.prime")
 PrimeResult DualBankCaptureRing::prime(
     std::uint32_t epoch, std::uint32_t sample_period_ticks,
     std::uint32_t initial_generation, std::uint64_t first_sample_ticks) {
@@ -129,6 +137,7 @@ PrimeResult DualBankCaptureRing::prime(
   return result;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.reserve")
 ReservationResult DualBankCaptureRing::reserveGeneration(
     std::uint32_t epoch, std::uint32_t generation) {
   ReservationResult result{};
@@ -156,6 +165,7 @@ ReservationResult DualBankCaptureRing::reserveGeneration(
   return result;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.complete")
 CompletionResult DualBankCaptureRing::onMajorLoopComplete(
     Bank bank, std::uint32_t epoch, std::uint32_t generation,
     std::uint8_t destination, std::uint64_t first_sample_ticks,
@@ -274,6 +284,7 @@ CompletionResult DualBankCaptureRing::onMajorLoopComplete(
   return result;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.acquire")
 AcquireResult DualBankCaptureRing::acquireReady() {
   (void)serviceDiscarded();
   AcquireResult result{};
@@ -320,6 +331,7 @@ AcquireResult DualBankCaptureRing::acquireReady() {
   return result;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.release")
 OperationStatus DualBankCaptureRing::release(const BufferHandle &handle) {
   std::uint32_t token = critical_.enter();
   if (!handleMatches(handle, BufferState::kReading)) {
@@ -347,6 +359,7 @@ OperationStatus DualBankCaptureRing::release(const BufferHandle &handle) {
   return OperationStatus::kOk;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.discard")
 std::size_t DualBankCaptureRing::serviceDiscarded(std::size_t limit) {
   std::size_t serviced = 0U;
   while (serviced < limit) {
@@ -381,6 +394,7 @@ std::size_t DualBankCaptureRing::serviceDiscarded(std::size_t limit) {
   return serviced;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.stop")
 StopReport DualBankCaptureRing::stop(
     const std::array<BankStopState, kBankCount> &banks,
     StopReason reason) {
@@ -489,6 +503,7 @@ StopReport DualBankCaptureRing::stop(
   return report;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.cancel")
 StopReport DualBankCaptureRing::cancel(std::uint32_t epoch,
                                        StopReason reason) {
   if (epoch == 0U || epoch != epoch_) {
@@ -504,6 +519,7 @@ StopReport DualBankCaptureRing::cancel(std::uint32_t epoch,
   return stop(banks, reason);
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.hardware_error")
 void DualBankCaptureRing::recordHardwareError(std::uint32_t epoch) {
   const std::uint32_t token = critical_.enter();
   if (running_ && epoch != 0U && epoch == epoch_) {
@@ -513,6 +529,7 @@ void DualBankCaptureRing::recordHardwareError(std::uint32_t epoch) {
   critical_.exit(token);
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.snapshot")
 Snapshot DualBankCaptureRing::snapshot() {
   Snapshot result{};
   const std::uint32_t token = critical_.enter();
@@ -534,6 +551,7 @@ Snapshot DualBankCaptureRing::snapshot() {
   return result;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.quiescent")
 bool DualBankCaptureRing::quiescent() {
   const std::uint32_t token = critical_.enter();
   const bool result = !running_ && allBuffersFree();
@@ -541,6 +559,7 @@ bool DualBankCaptureRing::quiescent() {
   return result;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.destination")
 std::uint32_t *DualBankCaptureRing::destinationWords(
     std::uint8_t destination, Bank bank) {
   if (!validBank(bank)) {
@@ -554,6 +573,7 @@ std::uint32_t *DualBankCaptureRing::destinationWords(
              : nullptr;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.destination_const")
 const std::uint32_t *DualBankCaptureRing::destinationWords(
     std::uint8_t destination, Bank bank) const {
   if (!validBank(bank)) {
@@ -567,6 +587,7 @@ const std::uint32_t *DualBankCaptureRing::destinationWords(
              : nullptr;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.find_generation")
 DualBankCaptureRing::GenerationSlot *DualBankCaptureRing::findGeneration(
     std::uint32_t generation) {
   for (GenerationSlot &slot : generations_) {
@@ -577,6 +598,7 @@ DualBankCaptureRing::GenerationSlot *DualBankCaptureRing::findGeneration(
   return nullptr;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.schedule_generation")
 DualBankCaptureRing::GenerationSlot *DualBankCaptureRing::scheduleGeneration(
     std::uint32_t generation) {
   GenerationSlot *const existing = findGeneration(generation);
@@ -616,6 +638,7 @@ DualBankCaptureRing::GenerationSlot *DualBankCaptureRing::scheduleGeneration(
   return available;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.take_free")
 std::uint8_t DualBankCaptureRing::takeFreeBuffer(
     std::uint32_t generation, std::uint64_t first_sample_ticks) {
   for (std::size_t attempt = 0U; attempt < records_.size(); ++attempt) {
@@ -636,6 +659,7 @@ std::uint8_t DualBankCaptureRing::takeFreeBuffer(
   return kOverflowDestination;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.finalize")
 void DualBankCaptureRing::finalizeGeneration(
     GenerationSlot &slot, CompletionResult &result) {
   result.completion_mask = slot.completion_mask;
@@ -706,6 +730,7 @@ void DualBankCaptureRing::finalizeGeneration(
   slot = {};
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.invalidate")
 void DualBankCaptureRing::markOutstandingInvalid() {
   for (GenerationSlot &slot : generations_) {
     if (slot.valid) {
@@ -714,6 +739,7 @@ void DualBankCaptureRing::markOutstandingInvalid() {
   }
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.mark_discard")
 void DualBankCaptureRing::markDiscardPending(const GenerationSlot &slot,
                                               StopReport *report) {
   if (!isBufferDestination(slot.destination)) {
@@ -731,6 +757,7 @@ void DualBankCaptureRing::markDiscardPending(const GenerationSlot &slot,
   }
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.count_state")
 std::size_t DualBankCaptureRing::countState(BufferState state) const {
   std::size_t result = 0U;
   for (const BufferRecord &record : records_) {
@@ -741,6 +768,7 @@ std::size_t DualBankCaptureRing::countState(BufferState state) const {
   return result;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.all_free")
 bool DualBankCaptureRing::allBuffersFree() const {
   for (const BufferRecord &record : records_) {
     if (record.state != BufferState::kFree) {
@@ -750,6 +778,7 @@ bool DualBankCaptureRing::allBuffersFree() const {
   return true;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.handle_matches")
 bool DualBankCaptureRing::handleMatches(const BufferHandle &handle,
                                         BufferState state) const {
   if (!handle.valid()) {
@@ -767,6 +796,7 @@ bool DualBankCaptureRing::handleMatches(const BufferHandle &handle,
              storage_.auxiliary[handle.buffer_index].words.data();
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.allocate_lease")
 std::uint32_t DualBankCaptureRing::allocateLease() {
   std::uint32_t result = next_lease_++;
   if (result == 0U) {
@@ -778,10 +808,12 @@ std::uint32_t DualBankCaptureRing::allocateLease() {
   return result;
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.invariant")
 void DualBankCaptureRing::noteInvariantError() {
   saturatingIncrement(progress_.invariant_errors);
 }
 
+THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.statistics")
 stats::GpioRawCaptureProgress statisticsProgress(
     const Snapshot &snapshot) {
   stats::GpioRawCaptureProgress result{};
@@ -806,3 +838,5 @@ stats::GpioRawCaptureProgress statisticsProgress(
 }
 
 }  // namespace thingdaq::gpio_join
+
+#undef THINGDAQ_GPIO_DUAL_COLD_CODE

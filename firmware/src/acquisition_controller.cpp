@@ -22,11 +22,46 @@ constexpr bool includesGpio(Profile profile) {
   return profile == Profile::kGpio || profile == Profile::kCombined;
 }
 
+constexpr bool usesAuxInput(
+    const protocol::Configuration &configuration) {
+  return configuration.aux_bank_mode ==
+         protocol_v2::AuxBankMode::kInput;
+}
+
+constexpr bool usesLegacySchedule(
+    const protocol::Configuration &configuration) {
+  return configuration.aux_bank_mode ==
+             protocol_v2::kDefaultAuxBankMode &&
+         configuration.rate_profile ==
+             protocol_v2::kDefaultRateProfile;
+}
+
+constexpr std::uint32_t adcPairsPerBuffer(
+    const protocol::Configuration &configuration) {
+  return static_cast<std::uint32_t>(
+      usesAuxInput(configuration)
+          ? protocol_v2::kInputAdcPairsPerFrame
+          : protocol_v2::kDisabledAdcPairsPerFrame);
+}
+
 void addConflict(Audit &audit, Conflict conflict) {
   audit.conflict_flags |= conflictBit(conflict);
 }
 
 }  // namespace
+
+THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.layout")
+stream_layout::Result Controller::runLayout(
+    const protocol::Configuration &configuration) {
+  if (usesLegacySchedule(configuration)) {
+    stream_layout::Result result{};
+    result.layout = stream_layout::legacy();
+    result.status = stream_layout::Status::kOk;
+    return result;
+  }
+  return stream_layout::experimental(configuration.aux_bank_mode,
+                                     configuration.rate_profile);
+}
 
 THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.initialize")
 protocol::AdcInitializationMetadata Controller::initialize() {
@@ -77,9 +112,16 @@ THINGDAQ_ACQUISITION_COLD_CODE(
 bool Controller::completeConfigurationValid(
     const protocol::Configuration &configuration) {
   const Profile profile = profileFor(configuration);
+  const stream_layout::Result layout = runLayout(configuration);
+  const std::uint32_t maximum_frame_bytes =
+      layout.layout.streams[0].frame_bytes >
+              layout.layout.streams[1].frame_bytes
+          ? layout.layout.streams[0].frame_bytes
+          : layout.layout.streams[1].frame_bytes;
   return (profile == Profile::kAdc || profile == Profile::kGpio ||
           profile == Profile::kCombined) &&
-         configuration.data_frame_bytes == protocol_v1::kDataFrameBytes &&
+         layout.ok() &&
+         configuration.data_frame_bytes == maximum_frame_bytes &&
          protocol::isSupportedChecksum(
              configuration.data_checksum_algorithm);
 }
@@ -107,6 +149,14 @@ Audit Controller::inspect(const protocol::Configuration &configuration,
     addConflict(audit, Conflict::kControllerBusy);
   }
 
+  const bool auxiliary = usesAuxInput(configuration);
+  if ((!usesLegacySchedule(configuration) && rate_scheduler_ == nullptr) ||
+      (rate_scheduler_ != nullptr &&
+       (rate_scheduler_->faulted() ||
+        rate_scheduler_->transactionActive()))) {
+    addConflict(audit, Conflict::kRateSchedulerUnavailable);
+  }
+
   if (includesAdc(audit.profile)) {
     if (adc_trigger_scheduler_ == nullptr || adc_capture_ == nullptr ||
         adc_packer_ == nullptr) {
@@ -123,7 +173,8 @@ Audit Controller::inspect(const protocol::Configuration &configuration,
       if (!adc_packer_->readyForStart()) {
         addConflict(audit, Conflict::kAdcPackerBusy);
       }
-      audit.adc_capture_status = adc_capture_->inspectStart(epoch);
+      audit.adc_capture_status = adc_capture_->inspectStart(
+          epoch, adcPairsPerBuffer(configuration));
       audit.adc_inspected = true;
       if (audit.adc_capture_status != adc_capture::StartStatus::kOk) {
         addConflict(audit, Conflict::kAdcCaptureUnavailable);
@@ -132,13 +183,30 @@ Audit Controller::inspect(const protocol::Configuration &configuration,
   }
 
   if (includesGpio(audit.profile)) {
-    if (gpio_capture_ == nullptr || gpio_packer_ == nullptr) {
+    if (auxiliary) {
+      if (aux_gpio_capture_ == nullptr || aux_gpio_packer_ == nullptr) {
+        addConflict(audit, Conflict::kAuxGpioComponentsMissing);
+      } else {
+        if (!aux_gpio_packer_->readyForStart()) {
+          addConflict(audit, Conflict::kAuxGpioPackerBusy);
+        }
+        audit.aux_gpio_capture_status =
+            aux_gpio_capture_->inspectStart(epoch,
+                                            configuration.rate_profile);
+        audit.aux_gpio_inspected = true;
+        if (audit.aux_gpio_capture_status !=
+            gpio_join::StartStatus::kOk) {
+          addConflict(audit, Conflict::kAuxGpioCaptureUnavailable);
+        }
+      }
+    } else if (gpio_capture_ == nullptr || gpio_packer_ == nullptr) {
       addConflict(audit, Conflict::kGpioComponentsMissing);
     } else {
       if (!gpio_packer_->readyForStart()) {
         addConflict(audit, Conflict::kGpioPackerBusy);
       }
-      audit.gpio_capture_status = gpio_capture_->inspectStart();
+      audit.gpio_capture_status =
+          gpio_capture_->inspectStart(configuration.rate_profile);
       audit.gpio_inspected = true;
       if (audit.gpio_capture_status != gpio_capture::StartStatus::kOk) {
         addConflict(audit, Conflict::kGpioCaptureUnavailable);
@@ -160,6 +228,11 @@ bool Controller::readyForStart(
       audit.gpio_capture_status == gpio_capture::StartStatus::kResourceBusy) {
     statistics_.recordGpioResourceConflict();
   }
+  if (audit.aux_gpio_inspected &&
+      audit.aux_gpio_capture_status ==
+          gpio_join::StartStatus::kResourceBusy) {
+    statistics_.recordGpioResourceConflict();
+  }
   return audit.ready();
 }
 
@@ -173,6 +246,13 @@ bool Controller::quiescent() const {
     return false;
   }
   if (gpio_capture_ != nullptr && !gpio_capture_->rawSnapshot().quiescent) {
+    return false;
+  }
+  if (aux_gpio_packer_ != nullptr && !aux_gpio_packer_->readyForStart()) {
+    return false;
+  }
+  if (aux_gpio_capture_ != nullptr &&
+      !aux_gpio_capture_->rawSnapshot().quiescent) {
     return false;
   }
   if (adc_trigger_scheduler_ != nullptr &&
@@ -203,7 +283,9 @@ bool Controller::start(const protocol::Configuration &configuration,
       packet_pipeline_.runId() != run_id ||
       packet_pipeline_.checksumAlgorithm() !=
           configuration.data_checksum_algorithm ||
-      packet_pipeline_.enabledStreamMask() != configuration.stream_mask) {
+      packet_pipeline_.enabledStreamMask() != configuration.stream_mask ||
+      !runLayout(configuration).ok() ||
+      packet_pipeline_.layout() != runLayout(configuration).layout) {
     report.internal_error = true;
     report.packet_stop = packet_pipeline_.stopProduction();
     report.packet_production_stopped = true;
@@ -216,7 +298,25 @@ bool Controller::start(const protocol::Configuration &configuration,
   physical_stream_mask_ = configuration.stream_mask;
   physical_run_id_ = run_id;
   physical_epoch_ticks_ = epoch_ticks;
+  physical_aux_bank_mode_ = configuration.aux_bank_mode;
+  physical_rate_profile_ = configuration.rate_profile;
   physical_start_pending_ = true;
+
+  if (rate_scheduler_ != nullptr) {
+    previous_rate_profile_ =
+        rate_scheduler_->configured()
+            ? rate_scheduler_->selected().profile
+            : protocol_v2::kDefaultRateProfile;
+    const variable_rate::ConfigureResult configured =
+        rate_scheduler_->configure(configuration.rate_profile);
+    report.rate_configure_status = configured.status;
+    report.rate_configured = configured.ok();
+    restore_rate_on_rollback_ = configured.ok();
+    if (!configured.ok()) {
+      rollbackStart(profile, report);
+      return false;
+    }
+  }
 
   if (includesAdc(profile)) {
     report.adc_packer_start_status = adc_packer_->startRun(
@@ -232,12 +332,24 @@ bool Controller::start(const protocol::Configuration &configuration,
   }
 
   if (includesGpio(profile)) {
-    report.gpio_packer_start_status = gpio_packer_->startRun(
-        run_id, configuration.data_checksum_algorithm, packet_pipeline_,
-        epoch_ticks);
-    report.gpio_packer_started =
-        report.gpio_packer_start_status == gpio_packer::OperationStatus::kOk;
-    if (!report.gpio_packer_started) {
+    if (usesAuxInput(configuration)) {
+      report.aux_gpio_packer_start_status = aux_gpio_packer_->startRun(
+          run_id, configuration.data_checksum_algorithm,
+          configuration.rate_profile, packet_pipeline_, epoch_ticks);
+      report.aux_gpio_packer_started =
+          report.aux_gpio_packer_start_status ==
+          gpio_aux_packer::OperationStatus::kOk;
+    } else {
+      report.gpio_packer_start_status = gpio_packer_->startRun(
+          run_id, configuration.data_checksum_algorithm, packet_pipeline_,
+          epoch_ticks);
+      report.gpio_packer_started =
+          report.gpio_packer_start_status ==
+          gpio_packer::OperationStatus::kOk;
+    }
+    if ((!usesAuxInput(configuration) && !report.gpio_packer_started) ||
+        (usesAuxInput(configuration) &&
+         !report.aux_gpio_packer_started)) {
       statistics_.recordGpioStartError();
       rollbackStart(profile, report);
       return false;
@@ -245,7 +357,8 @@ bool Controller::start(const protocol::Configuration &configuration,
   }
 
   if (includesAdc(profile)) {
-    report.adc_capture_start_status = adc_capture_->prepare(run_id);
+    report.adc_capture_start_status = adc_capture_->prepare(
+        run_id, adcPairsPerBuffer(configuration));
     report.adc_capture_prepared =
         report.adc_capture_start_status == adc_capture::StartStatus::kOk;
     if (!report.adc_capture_prepared) {
@@ -261,16 +374,41 @@ bool Controller::start(const protocol::Configuration &configuration,
   }
 
   if (includesGpio(profile)) {
-    report.gpio_capture_start_status =
-        profile == Profile::kCombined ? gpio_capture_->prepare()
-                                      : gpio_capture_->start();
-    report.gpio_capture_prepared =
-        report.gpio_capture_start_status == gpio_capture::StartStatus::kOk;
-    report.gpio_capture_started =
-        profile == Profile::kGpio && report.gpio_capture_prepared;
-    if (!report.gpio_capture_prepared) {
-      if (report.gpio_capture_start_status ==
-          gpio_capture::StartStatus::kResourceBusy) {
+    if (usesAuxInput(configuration)) {
+      report.aux_gpio_capture_start_status =
+          profile == Profile::kCombined
+              ? aux_gpio_capture_->prepare(run_id,
+                                           configuration.rate_profile)
+              : aux_gpio_capture_->start(run_id,
+                                         configuration.rate_profile);
+      report.aux_gpio_capture_prepared =
+          report.aux_gpio_capture_start_status ==
+          gpio_join::StartStatus::kOk;
+      report.aux_gpio_capture_started =
+          profile == Profile::kGpio &&
+          report.aux_gpio_capture_prepared;
+    } else {
+      report.gpio_capture_start_status =
+          profile == Profile::kCombined
+              ? gpio_capture_->prepare(configuration.rate_profile)
+              : gpio_capture_->start(configuration.rate_profile);
+      report.gpio_capture_prepared =
+          report.gpio_capture_start_status ==
+          gpio_capture::StartStatus::kOk;
+      report.gpio_capture_started =
+          profile == Profile::kGpio && report.gpio_capture_prepared;
+    }
+    const bool gpio_prepared =
+        usesAuxInput(configuration) ? report.aux_gpio_capture_prepared
+                                    : report.gpio_capture_prepared;
+    if (!gpio_prepared) {
+      const bool resource_busy =
+          usesAuxInput(configuration)
+              ? report.aux_gpio_capture_start_status ==
+                    gpio_join::StartStatus::kResourceBusy
+              : report.gpio_capture_start_status ==
+                    gpio_capture::StartStatus::kResourceBusy;
+      if (resource_busy) {
         statistics_.recordGpioResourceConflict();
       } else {
         statistics_.recordGpioStartError();
@@ -290,7 +428,11 @@ bool Controller::start(const protocol::Configuration &configuration,
       return false;
     }
     if (profile == Profile::kCombined) {
-      report.gpio_capture_started = true;
+      if (usesAuxInput(configuration)) {
+        report.aux_gpio_capture_started = true;
+      } else {
+        report.gpio_capture_started = true;
+      }
     }
   }
 
@@ -313,6 +455,11 @@ void Controller::rollbackStart(Profile profile, Report &report) {
                                       : gpio_capture_->stop();
     report.gpio_capture_stopped = true;
   }
+  if (includesGpio(profile) && report.aux_gpio_capture_prepared) {
+    report.aux_gpio_capture_stop = aux_gpio_capture_->stopAfterTriggers(
+        gpio_join::StopReason::kRollback);
+    report.aux_gpio_capture_stopped = true;
+  }
   if (includesAdc(profile) && report.adc_capture_prepared) {
     report.adc_capture_stop = adc_capture_->stopAfterTriggers();
     report.adc_capture_stopped = true;
@@ -321,9 +468,21 @@ void Controller::rollbackStart(Profile profile, Report &report) {
     report.gpio_packer_stop = gpio_packer_->stopProduction();
     report.gpio_packer_stopped = true;
   }
+  if (report.aux_gpio_packer_started) {
+    aux_gpio_packer_->stopProduction();
+    report.aux_gpio_packer_stopped = true;
+  }
   if (report.adc_packer_started) {
     report.adc_packer_stop = adc_packer_->stopProduction();
     report.adc_packer_stopped = true;
+  }
+  if (restore_rate_on_rollback_ && rate_scheduler_ != nullptr) {
+    const variable_rate::ConfigureResult restored =
+        rate_scheduler_->configure(previous_rate_profile_);
+    report.rate_restored = restored.ok();
+    if (!restored.ok()) {
+      report.internal_error = true;
+    }
   }
   report.packet_stop = packet_pipeline_.stopProduction();
   report.packet_production_stopped = true;
@@ -373,13 +532,26 @@ bool Controller::stopCombinedPaths(Report &report) {
     return false;
   }
 
-  report.gpio_capture_stop = gpio_capture_->stopAfterTriggers();
-  report.gpio_capture_stopped = true;
-  if (report.gpio_capture_stop.status != gpio_capture::OperationStatus::kOk &&
-      report.gpio_capture_stop.status !=
-          gpio_capture::OperationStatus::kNotRunning) {
-    statistics_.recordGpioStopError();
-    report.internal_error = true;
+  if (physical_aux_bank_mode_ == protocol_v2::AuxBankMode::kInput) {
+    report.aux_gpio_capture_stop = aux_gpio_capture_->stopAfterTriggers();
+    report.aux_gpio_capture_stopped = true;
+    if (report.aux_gpio_capture_stop.status !=
+            gpio_join::OperationStatus::kOk &&
+        report.aux_gpio_capture_stop.status !=
+            gpio_join::OperationStatus::kNotRunning) {
+      statistics_.recordGpioStopError();
+      report.internal_error = true;
+    }
+  } else {
+    report.gpio_capture_stop = gpio_capture_->stopAfterTriggers();
+    report.gpio_capture_stopped = true;
+    if (report.gpio_capture_stop.status !=
+            gpio_capture::OperationStatus::kOk &&
+        report.gpio_capture_stop.status !=
+            gpio_capture::OperationStatus::kNotRunning) {
+      statistics_.recordGpioStopError();
+      report.internal_error = true;
+    }
   }
 
   report.adc_capture_stop = adc_capture_->stopAfterTriggers();
@@ -416,13 +588,26 @@ bool Controller::stop(Report &report) {
       return false;
     }
   } else if (physical_stream_mask_ == gpio) {
-    report.gpio_capture_stop = gpio_capture_->stop();
-    report.gpio_capture_stopped = true;
-    if (report.gpio_capture_stop.status != gpio_capture::OperationStatus::kOk &&
-        report.gpio_capture_stop.status !=
-            gpio_capture::OperationStatus::kNotRunning) {
-      statistics_.recordGpioStopError();
-      report.internal_error = true;
+    if (physical_aux_bank_mode_ == protocol_v2::AuxBankMode::kInput) {
+      report.aux_gpio_capture_stop = aux_gpio_capture_->stop();
+      report.aux_gpio_capture_stopped = true;
+      if (report.aux_gpio_capture_stop.status !=
+              gpio_join::OperationStatus::kOk &&
+          report.aux_gpio_capture_stop.status !=
+              gpio_join::OperationStatus::kNotRunning) {
+        statistics_.recordGpioStopError();
+        report.internal_error = true;
+      }
+    } else {
+      report.gpio_capture_stop = gpio_capture_->stop();
+      report.gpio_capture_stopped = true;
+      if (report.gpio_capture_stop.status !=
+              gpio_capture::OperationStatus::kOk &&
+          report.gpio_capture_stop.status !=
+              gpio_capture::OperationStatus::kNotRunning) {
+        statistics_.recordGpioStopError();
+        report.internal_error = true;
+      }
     }
   } else {
     report.internal_error = true;
@@ -447,6 +632,12 @@ void Controller::serviceGpioPath(Report &report, bool draining) {
   const std::size_t raw_limit =
       draining ? board::kGpioRawDmaRingDepth
                : board::kGpioRawBuffersPerLoop;
+  if (physical_aux_bank_mode_ == protocol_v2::AuxBankMode::kInput) {
+    (void)aux_gpio_capture_->serviceOwnership();
+    report.aux_gpio_packer =
+        aux_gpio_packer_->service(packet_pipeline_, raw_limit);
+    return;
+  }
   const std::size_t frame_limit =
       draining ? board::kGpioPackedRingDepth
                : board::kGpioPackedFramesPerLoop;
@@ -469,6 +660,20 @@ bool Controller::adcPathDrained(Report &report) {
 
 THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.gpio_drain")
 bool Controller::gpioPathDrained(Report &report) {
+  if (physical_aux_bank_mode_ == protocol_v2::AuxBankMode::kInput) {
+    (void)aux_gpio_capture_->serviceOwnership();
+    const gpio_join::Snapshot capture =
+        aux_gpio_capture_->rawSnapshot();
+    gpio_aux_packer::Snapshot packer =
+        aux_gpio_packer_->snapshot(packet_pipeline_);
+    if (capture.ready_depth == 0U && capture.reading_depth == 0U &&
+        capture.discard_depth == 0U && packer.running) {
+      aux_gpio_packer_->stopProduction();
+      report.aux_gpio_packer_stopped = true;
+      packer = aux_gpio_packer_->snapshot(packet_pipeline_);
+    }
+    return capture.quiescent && packer.quiescent;
+  }
   const gpio_capture::Snapshot capture = gpio_capture_->rawSnapshot();
   gpio_packer::Snapshot packer = gpio_packer_->snapshot(packet_pipeline_);
   if (capture.ready_depth == 0U && capture.packing_depth == 0U &&
@@ -492,7 +697,12 @@ bool Controller::activePathFaulted() const {
   return ((physical_stream_mask_ & adc) != 0U &&
           adc_capture_ != nullptr && adc_capture_->rawSnapshot().faulted) ||
          ((physical_stream_mask_ & gpio) != 0U &&
-          gpio_capture_ != nullptr && gpio_capture_->rawSnapshot().faulted);
+          ((physical_aux_bank_mode_ == protocol_v2::AuxBankMode::kInput &&
+            aux_gpio_capture_ != nullptr &&
+            aux_gpio_capture_->rawSnapshot().faulted) ||
+           (physical_aux_bank_mode_ != protocol_v2::AuxBankMode::kInput &&
+            gpio_capture_ != nullptr &&
+            gpio_capture_->rawSnapshot().faulted)));
 }
 
 THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.clear")
@@ -500,6 +710,10 @@ void Controller::clearRunState() {
   physical_stream_mask_ = 0U;
   physical_run_id_ = 0U;
   physical_epoch_ticks_ = 0U;
+  physical_aux_bank_mode_ = protocol_v2::kDefaultAuxBankMode;
+  physical_rate_profile_ = protocol_v2::kDefaultRateProfile;
+  previous_rate_profile_ = protocol_v2::kDefaultRateProfile;
+  restore_rate_on_rollback_ = false;
   physical_run_active_ = false;
   physical_drain_pending_ = false;
   physical_start_pending_ = false;
@@ -535,7 +749,10 @@ void Controller::service(Report &report) {
   if ((!includes_adc && !includes_gpio) ||
       (includes_adc && (adc_capture_ == nullptr || adc_packer_ == nullptr)) ||
       (includes_gpio &&
-       (gpio_capture_ == nullptr || gpio_packer_ == nullptr))) {
+       ((physical_aux_bank_mode_ == protocol_v2::AuxBankMode::kInput &&
+         (aux_gpio_capture_ == nullptr || aux_gpio_packer_ == nullptr)) ||
+        (physical_aux_bank_mode_ != protocol_v2::AuxBankMode::kInput &&
+         (gpio_capture_ == nullptr || gpio_packer_ == nullptr))))) {
     report.internal_error = true;
     report.physical_drain_pending = physical_drain_pending_;
     return;
@@ -552,8 +769,12 @@ void Controller::service(Report &report) {
       ((includes_adc &&
         (report.adc_packer.source_error || report.adc_packer.pipeline_error)) ||
        (includes_gpio &&
-        (report.gpio_packer.source_error ||
-         report.gpio_packer.pipeline_error)))) {
+        ((physical_aux_bank_mode_ == protocol_v2::AuxBankMode::kInput &&
+          (report.aux_gpio_packer.source_error ||
+           report.aux_gpio_packer.pipeline_error)) ||
+         (physical_aux_bank_mode_ != protocol_v2::AuxBankMode::kInput &&
+          (report.gpio_packer.source_error ||
+           report.gpio_packer.pipeline_error)))))) {
     report.physical_fault_detected = true;
     report.internal_error = true;
     if (!stop(report)) {

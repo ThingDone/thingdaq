@@ -183,11 +183,26 @@ enum class StartStatus : std::uint8_t {
 class HardwareCapture : public RawWordSource {
  public:
   virtual StartStatus inspectStart() = 0;
+  virtual StartStatus inspectStart(protocol_v2::RateProfile profile) {
+    return profile == protocol_v2::kDefaultRateProfile
+               ? inspectStart()
+               : StartStatus::kHardwareError;
+  }
   // Configure the raw ring, cache ownership, eDMA, DMAMUX, XBAR request, and
   // input-safe GPIO mapping while leaving the common PIT0 source stopped.
   virtual StartStatus prepare() = 0;
+  virtual StartStatus prepare(protocol_v2::RateProfile profile) {
+    return profile == protocol_v2::kDefaultRateProfile
+               ? prepare()
+               : StartStatus::kHardwareError;
+  }
   // Standalone GPIO convenience path: prepare(), then enable PIT0.
   virtual StartStatus start() = 0;
+  virtual StartStatus start(protocol_v2::RateProfile profile) {
+    return profile == protocol_v2::kDefaultRateProfile
+               ? start()
+               : StartStatus::kHardwareError;
+  }
   // Combined STOP calls this only after the common PIT/ADC_ETC source has
   // stopped. Complete raw buffers remain drainable and partial work is
   // accounted exactly.

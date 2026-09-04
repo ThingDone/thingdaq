@@ -135,6 +135,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_benchmark_buffer_provenance_requires_real_regions(self) -> None:
         symbols = (
+            "200012c0 00069000 B thingdaq_packet_storage_primary\n"
             "200012c0 00001000 B "
             "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer\n"
             "20200000 00001000 B "
@@ -144,6 +145,10 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual(8_192, resources["working_ram_bytes"])
         self.assertEqual("0x200012c0", resources["regions"]["DTCM_PACKET"]["address"])
+        self.assertEqual(
+            "DTCM_PRIMARY_PACKET_PAGE_0",
+            resources["regions"]["DTCM_PACKET"]["physical_allocation"],
+        )
         self.assertEqual("0x20200000", resources["regions"]["OCRAM_DMA"]["address"])
         with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
             build_firmware.benchmark_buffer_usage(
@@ -154,7 +159,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_packet_buffer_provenance_requires_split_target_regions(self) -> None:
         symbols = (
-            "200022c0 00069000 b (anonymous namespace)::packet_storage_primary\n"
+            "200022c0 00069000 B thingdaq_packet_storage_primary\n"
             "20200000 0005f000 b (anonymous namespace)::packet_storage_reserve"
         )
         resources = build_firmware.packet_buffer_usage(symbols)

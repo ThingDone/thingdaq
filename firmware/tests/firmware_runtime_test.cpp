@@ -1361,7 +1361,14 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
   stream.max_write_size = 37U;
   packet::OwnedPacketBufferStorage packet_storage{};
   FakeTickClock clock{};
-  app::FirmwareRuntime firmware{stream, packet_storage, clock};
+  FakeBenchmarkPlatform benchmark_platform{};
+  benchmark::Buffer benchmark_dtcm{};
+  benchmark::Buffer benchmark_ocram{};
+  benchmark::Runner checksum_benchmark{
+      benchmark_platform, benchmark_dtcm, benchmark_ocram};
+  app::FirmwareRuntime firmware{
+      stream, packet_storage, clock, synthetic::Mode::kRealtime,
+      &checksum_benchmark};
   expect(firmware.begin(8080U), "drain-gate test completes BOOT");
 
   stream.appendInput(configureRequest(201U));
@@ -1378,6 +1385,7 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
          "full-size run-one data is partially active before STOP");
 
   stream.appendInput(emptyRequest(constants::FrameKind::kStopRequest, 203U));
+  stream.appendInput(checksumBenchmarkRequest(304U));
   stream.appendInput(
       configureRequest(204U, constants::ChecksumAlgorithm::kCrc32c));
   stream.appendInput(emptyRequest(constants::FrameKind::kStartRequest, 205U));
@@ -1392,6 +1400,7 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
   const std::vector<wire::DecodedFrame> first_run =
       decodeOutput(stream.output);
   std::size_t old_data_frames = 0U;
+  bool saw_busy_benchmark = false;
   bool saw_busy_configure = false;
   bool saw_unconfigured_start = false;
   for (const wire::DecodedFrame &frame : first_run) {
@@ -1400,6 +1409,10 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
       ++old_data_frames;
       expect(frame.header.run_id == 1U,
              "every drained data frame retains the stopped run ID");
+    }
+    if (frame.header.request_id == 304U) {
+      saw_busy_benchmark =
+          responseError(frame) == constants::ErrorCode::kBusy;
     }
     if (frame.header.kind == constants::FrameKind::kConfigureResponse &&
         frame.header.request_id == 204U) {
@@ -1412,9 +1425,10 @@ void testStopDrainGatesNextStartAndPreventsStaleRunData() {
           responseError(frame) == constants::ErrorCode::kInvalidState;
     }
   }
-  expect(old_data_frames == 2U && saw_busy_configure &&
-             saw_unconfigured_start,
-         "queued Adler-32 frames block a CRC-32C switch and its START");
+  expect(old_data_frames == 2U && saw_busy_benchmark &&
+             saw_busy_configure && saw_unconfigured_start &&
+             benchmark_platform.critical_entries == 0U,
+         "queued packet pages block the checksum lease, CRC-32C switch, and START");
 
   const std::size_t next_run_offset = stream.output.size();
   stream.appendInput(

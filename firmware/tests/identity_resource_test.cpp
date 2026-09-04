@@ -232,6 +232,9 @@ static_assert(thingdaq::board::validMemoryAllocations(
 static_assert(thingdaq::board::validMemoryViews(
     thingdaq::board::kInputModeMemoryViews,
     thingdaq::board::kMemoryAllocations));
+static_assert(thingdaq::board::validMemoryViews(
+    thingdaq::board::kIdleModeMemoryViews,
+    thingdaq::board::kMemoryAllocations));
 static_assert(thingdaq::board::validAcquisitionMemoryViews(
     thingdaq::board::kInputModeMemoryViews,
     thingdaq::board::kMemoryAllocations));
@@ -455,7 +458,13 @@ static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[7].teensy_pin ==
 static_assert(thingdaq::board::kGpio1PsrCaptureMask == 0x0FC30000U);
 static_assert(thingdaq::board::kGpio6ToGpio1Gpr26ClearMask ==
               thingdaq::board::kGpio1PsrCaptureMask);
-static_assert(thingdaq::board::kReservedRam1Bytes == 450464U);
+static_assert(thingdaq::board::kReservedRam1Bytes == 446368U);
+static_assert(thingdaq::board::countOf(
+                  thingdaq::board::kIdleModeMemoryViews) == 1U);
+static_assert(thingdaq::board::kIdleModeMemoryViews[0].storage ==
+              MemoryUse::kPacketBufferStorage);
+static_assert(thingdaq::board::kIdleModeMemoryViews[0].offset == 0U);
+static_assert(thingdaq::board::kIdleModeMemoryViews[0].bytes == 4096U);
 static_assert(thingdaq::board::kGpioRawDmaBufferBytes == 16192U);
 static_assert(thingdaq::board::kGpioRawDmaRingBytes == 64768U);
 static_assert(thingdaq::board::kInputGpioRawDmaBufferBytes == 8096U);

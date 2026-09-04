@@ -4,6 +4,13 @@
 
 #include "rate_profile_table.h"
 
+#if defined(__IMXRT1062__)
+#define THINGDAQ_VARIABLE_RATE_COLD_CODE(section_name) \
+  __attribute__((section(section_name), noinline, noipa, used))
+#else
+#define THINGDAQ_VARIABLE_RATE_COLD_CODE(section_name)
+#endif
+
 namespace thingdaq::variable_rate {
 namespace {
 
@@ -20,6 +27,7 @@ bool fitsU32(std::uint64_t value) {
   return value <= std::numeric_limits<std::uint32_t>::max();
 }
 
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.derive_known")
 DeriveResult deriveKnown(const protocol_v2::RateProfileTiming &timing,
                          ClockDomains clocks) {
   DeriveResult result{};
@@ -133,6 +141,7 @@ DeriveResult deriveKnown(const protocol_v2::RateProfileTiming &timing,
 
 }  // namespace
 
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.derive")
 DeriveResult derive(protocol_v2::RateProfile profile,
                     ClockDomains clocks) {
   const protocol_v2::RateProfileTiming *timing = timingFor(profile);
@@ -144,6 +153,7 @@ DeriveResult derive(protocol_v2::RateProfile profile,
   return deriveKnown(*timing, clocks);
 }
 
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.derive_rates")
 DeriveResult deriveForRates(std::uint32_t adc_pair_rate_hz,
                             std::uint32_t gpio_sample_rate_hz,
                             ClockDomains clocks) {
@@ -176,20 +186,24 @@ DeriveResult deriveForRates(std::uint32_t adc_pair_rate_hz,
   return result;
 }
 
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.readback_match")
 bool readbackMatches(const Schedule &expected, const Schedule &observed) {
   return expected == observed;
 }
 
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.configure")
 ConfigureResult Scheduler::configure(protocol_v2::RateProfile profile) {
   return configureDerived(derive(profile));
 }
 
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.configure_rates")
 ConfigureResult Scheduler::configureRates(
     std::uint32_t adc_pair_rate_hz, std::uint32_t gpio_sample_rate_hz) {
   return configureDerived(
       deriveForRates(adc_pair_rate_hz, gpio_sample_rate_hz));
 }
 
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.configure_derived")
 ConfigureResult Scheduler::configureDerived(const DeriveResult &derived) {
   ConfigureResult result{};
   result.requested = derived.schedule;
@@ -241,6 +255,7 @@ ConfigureResult Scheduler::configureDerived(const DeriveResult &derived) {
   return result;
 }
 
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.rollback")
 void Scheduler::rollback(ConfigureResult &result, Status failure) {
   result.rollback_attempted = true;
   result.rolled_back = platform_.rollbackTransaction();
@@ -255,3 +270,5 @@ void Scheduler::rollback(ConfigureResult &result, Status failure) {
 }
 
 }  // namespace thingdaq::variable_rate
+
+#undef THINGDAQ_VARIABLE_RATE_COLD_CODE

@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "generated/protocol_constants.h"
+#include "generated/protocol_v2_constants.h"
 
 namespace thingdaq::protocol {
 
@@ -181,6 +182,10 @@ struct Configuration {
       protocol_v1::kDefaultChecksumAlgorithm;
   std::uint32_t data_frame_bytes =
       static_cast<std::uint32_t>(protocol_v1::kDataFrameBytes);
+  protocol_v2::AuxBankMode aux_bank_mode =
+      protocol_v2::kDefaultAuxBankMode;
+  protocol_v2::RateProfile rate_profile =
+      protocol_v2::kDefaultRateProfile;
 };
 
 struct ChecksumBenchmarkRequest {

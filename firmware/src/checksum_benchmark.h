@@ -22,6 +22,22 @@ struct alignas(board::kCacheLineBytes) Buffer {
 static_assert(alignof(Buffer) == board::kCacheLineBytes);
 static_assert(sizeof(Buffer) == kBufferBytes);
 
+// A target may lease an equally sized byte range from another inactive
+// owner. Keeping that lease as a view avoids manufacturing a second C++
+// object at the same address.
+struct BufferView {
+  std::uint8_t *data = nullptr;
+  std::size_t size = 0U;
+
+  constexpr bool valid() const {
+    return data != nullptr && size == kBufferBytes;
+  }
+};
+
+inline BufferView bufferView(Buffer &buffer) {
+  return {buffer.bytes.data(), buffer.bytes.size()};
+}
+
 // Hardware effects stay behind this narrow seam so all measurement arithmetic,
 // vector construction, overflow handling, and optimization guards are covered
 // by portable host tests. A critical-section token must restore the caller's
@@ -55,6 +71,9 @@ struct RunResult {
 class Runner {
  public:
   Runner(Platform &platform, Buffer &dtcm_buffer, Buffer &ocram_buffer)
+      : Runner(platform, bufferView(dtcm_buffer), bufferView(ocram_buffer)) {}
+  Runner(Platform &platform, BufferView dtcm_buffer,
+         BufferView ocram_buffer)
       : platform_(platform),
         dtcm_buffer_(dtcm_buffer),
         ocram_buffer_(ocram_buffer) {}
@@ -63,22 +82,23 @@ class Runner {
 
  private:
   bool prepareVector(const protocol::ChecksumBenchmarkRequest &request,
-                     Buffer &buffer);
+                     BufferView buffer);
   std::uint32_t calibrateTimerOverhead();
-  bool warm(const protocol::ChecksumBenchmarkRequest &request, Buffer &buffer,
+  bool warm(const protocol::ChecksumBenchmarkRequest &request,
+            BufferView buffer,
             std::size_t input_bytes);
   bool measureChecksum(const protocol::ChecksumBenchmarkRequest &request,
-                       const Buffer &buffer, std::size_t input_bytes,
+                       BufferView buffer, std::size_t input_bytes,
                        std::uint32_t overhead_cycles,
                        std::uint32_t &checksum, std::uint32_t &raw_cycles,
                        std::uint32_t &net_cycles);
-  bool measureInvalidate(Buffer &buffer, std::size_t input_bytes,
+  bool measureInvalidate(BufferView buffer, std::size_t input_bytes,
                          std::uint32_t overhead_cycles,
                          std::uint32_t &net_cycles);
 
   Platform &platform_;
-  Buffer &dtcm_buffer_;
-  Buffer &ocram_buffer_;
+  BufferView dtcm_buffer_{};
+  BufferView ocram_buffer_{};
 };
 
 // Volatile publication plus compiler barriers make every measured result

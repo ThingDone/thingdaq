@@ -14,18 +14,24 @@
 #include "src/gpio_capture_diagnostic_teensy.h"
 #include "src/gpio_raw_capture_teensy.h"
 #include "src/gpio_batch_packer_teensy.h"
+#include "src/gpio_dual_bank_capture_teensy.h"
+#include "src/gpio_dual_bank_packer.h"
 #include "src/teensy_clock.h"
 #include "src/teensy_usb.h"
+#include "src/variable_rate_scheduler_teensy.h"
 namespace {
 // Packet banks stay CPU-owned; the CDC core copies into its own DMA TX ring.
 thingdaq::usb::TeensyCdcByteStream cdc_stream{};
-thingdaq::packet::PacketBufferPrimaryStorage packet_storage_primary{};
 DMAMEM thingdaq::packet::PacketBufferReserveStorage packet_storage_reserve{};
-thingdaq::packet::PacketBufferStorage packet_storage{packet_storage_primary, packet_storage_reserve};
+thingdaq::packet::PacketBufferStorage packet_storage{
+    thingdaq::benchmark::teensyPacketPrimaryStorage(),
+    packet_storage_reserve};
 thingdaq::gpio_packer::GpioBatchPacker gpio_packer{
     thingdaq::gpio_capture::teensyRawCapture(),
     thingdaq::gpio_packer::teensyPackedBufferStorage(),
     &thingdaq::gpio_packer::teensyCycleCounter()};
+thingdaq::gpio_aux_packer::AuxiliaryBatchPacker aux_gpio_packer{
+    thingdaq::gpio_join::teensyDualBankCapture()};
 thingdaq::adc_packer::AdcFramePacker adc_packer{
     thingdaq::adc_capture::teensyAdcDmaCapture()};
 thingdaq::clock::TeensyTickClock tick_clock{};
@@ -38,7 +44,9 @@ thingdaq::runtime::FirmwareRuntime firmware_runtime{
     &thingdaq::gpio_diagnostic::teensyRunner(),
     &thingdaq::adc::teensyInitializer(),
     &thingdaq::adc_trigger::teensyScheduler(),
-    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer};
+    &thingdaq::adc_capture::teensyAdcDmaCapture(), &adc_packer,
+    &thingdaq::variable_rate::teensyRateScheduler(),
+    &thingdaq::gpio_join::teensyDualBankCapture(), &aux_gpio_packer};
 }  // namespace
 
 void setup() {

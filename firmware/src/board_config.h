@@ -595,9 +595,6 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kPacketPipelineState, MemoryRegion::kDtcmRam1,
      kPacketPipelineStateBudgetBytes, kCacheLineBytes,
      ResourceOwner::kPacketizer},
-    {MemoryUse::kChecksumBenchmarkDtcmBuffer, MemoryRegion::kDtcmRam1,
-     kChecksumBenchmarkBufferBytes, kCacheLineBytes,
-     ResourceOwner::kChecksumBenchmark},
     {MemoryUse::kAdcDmaRing, MemoryRegion::kOcramRam2Dma,
      kAdcDmaRingBytes, kCacheLineBytes,
      ResourceOwner::kAdcCapture},
@@ -631,6 +628,17 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kChecksumBenchmarkOcramBuffer,
      MemoryRegion::kOcramRam2Dma, kChecksumBenchmarkBufferBytes,
      kCacheLineBytes, ResourceOwner::kChecksumBenchmark},
+};
+
+// The checksum benchmark runs only after the data path is fully quiescent, so
+// its cacheless working buffer is a bounded view of packet page zero rather
+// than a second 4 KiB DTCM allocation. Benchmark writes are harmless to a FREE
+// packet page; packetization replaces every byte in the selected frame layout
+// before that byte can be published.
+inline constexpr MemoryViewAllocation kIdleModeMemoryViews[] = {
+    {MemoryUse::kChecksumBenchmarkDtcmBuffer,
+     MemoryUse::kPacketBufferStorage, 0U,
+     kChecksumBenchmarkBufferBytes, ResourceOwner::kChecksumBenchmark},
 };
 
 // INPUT mode overlays two non-overlapping half-sized raw rings on the exact
@@ -1277,6 +1285,8 @@ static_assert(validGpioBitAllocations(kGpioBitAllocations),
               "GPIO port-bit allocation is unsupported or conflicts");
 static_assert(validMemoryViews(kInputModeMemoryViews, kMemoryAllocations),
               "mode-specific memory regions overlap or escape storage");
+static_assert(validMemoryViews(kIdleModeMemoryViews, kMemoryAllocations),
+              "IDLE memory views overlap or exceed physical storage");
 static_assert(validAcquisitionMemoryViews(kInputModeMemoryViews,
                                           kMemoryAllocations),
               "mode-specific memory views require aligned DMA-visible OCRAM");
@@ -1341,6 +1351,8 @@ static_assert(validMemoryAllocations(kMemoryAllocations),
               "memory allocations must be nonzero and alignment-safe");
 static_assert(validMemoryViews(kInputModeMemoryViews, kMemoryAllocations),
               "INPUT memory regions overlap or exceed physical storage");
+static_assert(validMemoryViews(kIdleModeMemoryViews, kMemoryAllocations),
+              "IDLE memory views overlap or exceed physical storage");
 static_assert(validAcquisitionMemoryRegions(kMemoryAllocations),
               "DMA/cache allocations use an unsafe region or alignment");
 static_assert(kAcquisitionResourceContract.valid(),

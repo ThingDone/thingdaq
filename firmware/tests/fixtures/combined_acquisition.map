@@ -3,7 +3,7 @@
 # demangled `nm --print-size` records together as one combined-budget input.
 Memory Usage on Teensy 4.0:
   FLASH: code:97596, data:24680, headers:8792   free for files:1900548
-   RAM1: variables:458176, code:32616, padding:152   free for local variables:33344
+   RAM1: variables:454080, code:32616, padding:152   free for local variables:37440
    RAM2: variables:520192  free for malloc/new:4096
 
 Memory Configuration
@@ -15,12 +15,12 @@ RAM              0x20200000         0x00080000         rw
 FLASH            0x60000000         0x001f0000         xr
 
 Linker output sections
-.bss            0x20001ec0    0x6df00
+.bss            0x20001ec0    0x6cf00
 .bss.dma        0x20200000    0x7f000
 
 Demangled nm --print-size records
-20001ec0 00069000 b (anonymous namespace)::packet_storage_primary
-2006aee0 00001000 B thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer
+20001ec0 00069000 B thingdaq_packet_storage_primary
+20001ec0 00001000 B thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer
 20200000 0005f000 b (anonymous namespace)::packet_storage_reserve
 2025f000 00000300 B thingdaq::adc_capture::g_adc_dma_descriptors
 2025f300 00000020 B thingdaq::adc_capture::g_adc_dma_overflow_sink
