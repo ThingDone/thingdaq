@@ -10,6 +10,7 @@
 #include <imxrt.h>
 
 #include "board_config.h"
+#include "edma_priority_teensy.h"
 #include "gpio_dma_route_teensy.h"
 
 #define THINGDAQ_OUTPUT_TARGET_COLD_CODE(section_name) \
@@ -430,9 +431,7 @@ bool configurePreparedHardware(const Snapshot &snapshot) {
     return false;
   }
 
-  DMA_DCHPRI3 = static_cast<std::uint8_t>(
-      DMA_DCHPRI_ECP |
-      DMA_DCHPRI_CHPRI(board::kAuxOutputEdmaPriority));
+  edma_priority::configureReservedChannels();
   volatile std::uint16_t *const selection = xbarSelectRegister();
   *selection = static_cast<std::uint16_t>(
       (*selection & static_cast<std::uint16_t>(~kXbarSelectionMask)) |

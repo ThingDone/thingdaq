@@ -292,6 +292,8 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define XBARA1_CTRL0 fake_imxrt::xbara1_ctrl[0]
 #define DMAMUX_CHCFG0 fake_imxrt::dmamux_chcfg[0]
 #define IMXRT_DMA_TCD fake_imxrt::dma_tcd
+#define DMA_DCHPRI0 fake_imxrt::dma_dchpri[0]
+#define DMA_DCHPRI1 fake_imxrt::dma_dchpri[1]
 #define DMA_DCHPRI2 fake_imxrt::dma_dchpri[2]
 #define DMA_DCHPRI3 fake_imxrt::dma_dchpri[3]
 #define DMA_ERQ fake_imxrt::dma_erq

@@ -222,15 +222,19 @@ void testOnlyReservedEdmaChannelChanges() {
              fake_imxrt::dma_tcd[board::kGpioEdmaChannel].SADDR.value() ==
                  0xDEADBEEFU,
          "DMAMUX, priority, and TCD access resolve to reserved channel 2");
+  expect(thingdaq::edma_priority::reservedChannelsConfigured(),
+         "all four acquisition eDMA priorities are unique and configured");
   for (std::size_t channel = 0U; channel < dmamux_before.size(); ++channel) {
-    if (channel == board::kGpioEdmaChannel) {
-      continue;
+    if (channel != board::kGpioEdmaChannel) {
+      expect(fake_imxrt::dmamux_chcfg[channel] == dmamux_before[channel] &&
+                 fake_imxrt::dma_tcd[channel].SADDR.value() ==
+                     tcd_before[channel],
+             "eDMA setup leaves every unreserved channel route untouched");
     }
-    expect(fake_imxrt::dmamux_chcfg[channel] == dmamux_before[channel] &&
-               fake_imxrt::dma_tcd[channel].SADDR.value() ==
-                   tcd_before[channel] &&
-               fake_imxrt::dma_dchpri[channel] == priority_before[channel],
-           "eDMA setup leaves every unreserved channel register untouched");
+    if (channel >= 4U) {
+      expect(fake_imxrt::dma_dchpri[channel] == priority_before[channel],
+             "eDMA setup leaves every unowned channel priority untouched");
+    }
   }
 
   route::disableEdmaRequest();
