@@ -45,6 +45,29 @@ def test_digest_is_sha256():
     )
 
 
+def test_explicit_cases_alternate_width_without_reloading(monkeypatch):
+    monkeypatch.setenv("AUX_INPUT_CASE", "CONTROL_COMBINED")
+    monkeypatch.setenv("AUX_INPUT_RATE_PROFILE", "0")
+    source = """import os
+observed = []
+def main():
+    observed.append((os.environ['AUX_INPUT_CASE'], int(os.environ['AUX_INPUT_RATE_PROFILE'])))
+    return 0
+"""
+    try:
+        with pytest.raises(SystemExit) as stopped:
+            exec(isolation.make_program(source, {}, profiles=(0, 1),
+                 cases=("CONTROL_COMBINED", "INPUT_COMBINED")), {})
+        assert stopped.value.code == 0
+        assert sys.modules["input_isolation_rig"].observed == [
+            ("CONTROL_COMBINED", 0), ("INPUT_COMBINED", 1)]
+    finally:
+        sys.modules.pop("input_isolation_rig", None)
+    for cases in (("INPUT_COMBINED",), ("INVALID", "INPUT_COMBINED")):
+        with pytest.raises(ValueError, match="one valid case"):
+            isolation.make_program(source, {}, profiles=(0, 1), cases=cases)
+
+
 def test_stale_build_is_rejected():
     manifest = {
         "artifacts": [

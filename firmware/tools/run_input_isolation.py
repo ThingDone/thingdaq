@@ -20,6 +20,7 @@ import zipfile
 from pathlib import Path
 
 BOARD = "teensy:avr:teensy40"
+CASES = ("CONTROL_GPIO", "CONTROL_COMBINED", "INPUT_GPIO", "INPUT_COMBINED")
 
 
 def digest(data: bytes) -> str:
@@ -84,6 +85,7 @@ def make_program(
     *,
     cycle: bool = False,
     profiles: tuple[int, ...] | None = None,
+    cases: tuple[str, ...] | None = None,
 ) -> str:
     # Register a real module for dataclasses; avoid altering the validator text.
     program = (
@@ -96,11 +98,18 @@ def make_program(
     if cycle and profiles is not None:
         raise ValueError("choose either cycle or explicit profiles")
     sequence = (0, 1, 2, 3, 0) if cycle else profiles
+    if cases is not None and (
+        sequence is None or len(cases) != len(sequence)
+        or any(case not in CASES for case in cases)
+    ):
+        raise ValueError("cases must name one valid case per selected profile")
     if sequence is not None:
         if not sequence or any(profile not in range(4) for profile in sequence):
             raise ValueError("profiles must contain IDs 0..3")
+        program += f"for index, profile in enumerate({sequence!r}):\n"
+        if cases is not None:
+            program += f"    os.environ['AUX_INPUT_CASE'] = {cases!r}[index]\n"
         program += (
-            f"for profile in {sequence!r}:\n"
             "    os.environ['AUX_INPUT_RATE_PROFILE'] = str(profile)\n"
             "    result = rig.main()\n"
             "    if result: sys.exit(result)\n"
@@ -119,7 +128,7 @@ def main() -> int:
     parser.add_argument("--evidence-dir", required=True, type=Path)
     parser.add_argument(
         "--case",
-        choices=("CONTROL_GPIO", "CONTROL_COMBINED", "INPUT_GPIO", "INPUT_COMBINED"),
+        choices=CASES,
         required=True,
     )
     parser.add_argument("--profile", type=int, choices=range(4), required=True)
@@ -136,6 +145,8 @@ def main() -> int:
         "--profiles", type=int, nargs="+", choices=range(4),
         help="explicit profile sequence without reflashing; stops on first failure",
     )
+    parser.add_argument("--cases", nargs="+", choices=CASES,
+                        help="one case per --profiles/--cycle cell; changes width without reflashing")
     parser.add_argument("--service", default="http://192.168.150.14:5000")
     parser.add_argument(
         "--auth-file", type=Path, default=Path("/home/bill/.fw_api_key")
@@ -174,7 +185,10 @@ def main() -> int:
     settings.update(experiment_settings(manifest))
     profiles = tuple(args.profiles) if args.profiles is not None else None
     sequence = [0, 1, 2, 3, 0] if args.cycle else list(profiles or (args.profile,))
-    program = make_program(source, settings, cycle=args.cycle, profiles=profiles)
+    cases = tuple(args.cases) if args.cases is not None else None
+    if cases is not None and (not (args.cycle or profiles) or len(cases) != len(sequence)):
+        parser.error("--cases needs one case per --profiles/--cycle cell")
+    program = make_program(source, settings, cycle=args.cycle, profiles=profiles, cases=cases)
     archive_bytes = io.BytesIO()
     with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("firmware.ino.hex", firmware)
@@ -226,6 +240,7 @@ def main() -> int:
             "source": manifest["source"],
             "input_experiment": experiment,
             "profile_sequence": sequence,
+            "case_sequence": list(cases or (args.case,) * len(sequence)),
         },
     )
     (args.evidence_dir / "firmware.ino.hex").write_bytes(firmware)
