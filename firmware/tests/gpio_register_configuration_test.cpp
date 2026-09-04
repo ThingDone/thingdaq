@@ -57,8 +57,8 @@ void resetFakeRegisters() {
   for (std::size_t index = 0U; index < 32U; ++index) {
     fake_imxrt::dmamux_chcfg[index] =
         static_cast<std::uint32_t>(0x7000U + index);
-    fake_imxrt::dma_tcd[index].marker =
-        static_cast<std::uint32_t>(0x8000U + index);
+    fake_imxrt::dma_tcd[index].SADDR.reset(
+        static_cast<std::uint32_t>(0x8000U + index));
     fake_imxrt::dma_dchpri[index] =
         static_cast<std::uint8_t>(0x40U + index);
   }
@@ -192,7 +192,7 @@ void testOnlyReservedEdmaChannelChanges() {
   std::array<std::uint8_t, 32U> priority_before{};
   for (std::size_t channel = 0U; channel < dmamux_before.size(); ++channel) {
     dmamux_before[channel] = fake_imxrt::dmamux_chcfg[channel];
-    tcd_before[channel] = fake_imxrt::dma_tcd[channel].marker;
+    tcd_before[channel] = fake_imxrt::dma_tcd[channel].SADDR.value();
     priority_before[channel] = fake_imxrt::dma_dchpri[channel];
   }
 
@@ -206,7 +206,7 @@ void testOnlyReservedEdmaChannelChanges() {
 
   route::clearEdmaChannelState();
   route::configureEdmaPriority();
-  route::edmaTcd().marker = 0xDEADBEEFU;
+  route::edmaTcd().SADDR.reset(0xDEADBEEFU);
   route::enableEdmaRequest();
 
   expect(fake_imxrt::dma_cerq == board::kGpioEdmaChannel &&
@@ -219,7 +219,7 @@ void testOnlyReservedEdmaChannelChanges() {
   expect(fake_imxrt::dmamux_chcfg[board::kGpioEdmaChannel] ==
                  route::kDmamuxConfiguration &&
              route::edmaPriority() == board::kGpioEdmaPriority &&
-             fake_imxrt::dma_tcd[board::kGpioEdmaChannel].marker ==
+             fake_imxrt::dma_tcd[board::kGpioEdmaChannel].SADDR.value() ==
                  0xDEADBEEFU,
          "DMAMUX, priority, and TCD access resolve to reserved channel 2");
   for (std::size_t channel = 0U; channel < dmamux_before.size(); ++channel) {
@@ -227,7 +227,8 @@ void testOnlyReservedEdmaChannelChanges() {
       continue;
     }
     expect(fake_imxrt::dmamux_chcfg[channel] == dmamux_before[channel] &&
-               fake_imxrt::dma_tcd[channel].marker == tcd_before[channel] &&
+               fake_imxrt::dma_tcd[channel].SADDR.value() ==
+                   tcd_before[channel] &&
                fake_imxrt::dma_dchpri[channel] == priority_before[channel],
            "eDMA setup leaves every unreserved channel register untouched");
   }

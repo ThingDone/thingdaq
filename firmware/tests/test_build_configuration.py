@@ -291,7 +291,27 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertEqual(37_449, retention["packet_margin_us"])
         self.assertEqual(38_461, retention["packet_and_usb_margin_us"])
         registry = build_firmware.resource_registry_manifest()
-        self.assertEqual("0x0fc30000", registry["output_bank"]["gpio_mask"])
+        self.assertEqual(
+            {
+                "owner": "aux_output",
+                "teensy_pins_by_logical_bit": list(range(16, 24)),
+                "gpio_standard_port": 1,
+                "gpio_fast_port": 6,
+                "gpio_bits_by_logical_bit": [23, 22, 17, 16, 26, 27, 24, 25],
+                "gpio_mask": "0x0fc30000",
+                "gpr_select_register": 26,
+                "clock_owner": "acquisition_clock:PIT1",
+                "xbar_input": 57,
+                "xbar_output": 1,
+                "dmamux_source": 31,
+                "edma_channel": 3,
+                "edma_priority": 1,
+                "irq_number": 3,
+                "vector_index": 19,
+                "irq_priority": 56,
+            },
+            registry["output_bank"],
+        )
         self.assertEqual(
             [3, 2, 1, 0],
             [entry["priority"] for entry in registry["edma_arbitration"]],
@@ -299,6 +319,24 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertTrue(
             registry["xbar_shared_register_rmw"]["unrelated_half_preserved"]
         )
+        self.assertEqual(
+            {
+                "program": "aux_output:dtcm_ram1",
+                "dma_ring": "aux_output:ocram_ram2_dma_read",
+                "dma_descriptors": "aux_output:ocram_ram2_dma_read",
+                "packet_primary": "packetizer:dtcm_ram1",
+                "packet_reserve": "packetizer:ocram_ram2_cpu",
+            },
+            registry["memory_ownership"],
+        )
+        self.assertEqual(retention, registry["retention"])
+
+        with self.assertRaisesRegex(
+            build_firmware.BuildError, "missing output program"
+        ):
+            build_firmware.output_program_buffer_usage("")
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing output DMA"):
+            build_firmware.output_dma_buffer_usage(symbols.splitlines()[0])
 
     def test_core_mismatch_stops_before_compile_or_upload(self) -> None:
         responses = [

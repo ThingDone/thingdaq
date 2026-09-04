@@ -79,9 +79,13 @@ void saturatingAdd(Value &value, Value increment) {
 }
 
 std::uint32_t readPrimask() {
+#if defined(THINGDAQ_HOST_REGISTER_TEST)
+  return fake_imxrt::interrupts_enabled ? 0U : 1U;
+#else
   std::uint32_t value = 0U;
   __asm__ volatile("mrs %0, primask" : "=r"(value) : : "memory");
   return value;
+#endif
 }
 
 void restorePrimask(std::uint32_t value) {
@@ -286,8 +290,14 @@ bool liveTcdMatchesBlock(std::uint8_t block_index) {
   const std::uint32_t *const begin =
       g_dma_storage->blocks[block_index].data();
   const std::uintptr_t current =
+#if defined(THINGDAQ_HOST_REGISTER_TEST)
+      hardwareTcd().SADDR.value();
+  const std::uintptr_t first = static_cast<std::uint32_t>(
+      reinterpret_cast<std::uintptr_t>(begin));
+#else
       reinterpret_cast<std::uintptr_t>(hardwareTcd().SADDR);
   const std::uintptr_t first = reinterpret_cast<std::uintptr_t>(begin);
+#endif
   const std::uintptr_t end =
       first + board::kAuxOutputDmaBlockBytes;
   return current >= first && current <= end &&

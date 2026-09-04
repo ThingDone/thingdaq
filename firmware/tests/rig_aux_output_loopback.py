@@ -1949,28 +1949,34 @@ def build_result(
     }
 
 
+def emit_not_run(reason: str) -> None:
+    """Emit the mandatory machine-readable result for preflight exits."""
+
+    print(
+        RESULT_PREFIX
+        + json.dumps(
+            {
+                "schema_version": RESULT_SCHEMA_VERSION,
+                "experiment_id": EXPERIMENT_ID,
+                "result": "NOT_RUN",
+                "reason": reason,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+
+
 def main() -> int:
     port_name = os.environ.get("SERIAL_PORT")
     if not port_name:
-        print(
-            RESULT_PREFIX
-            + json.dumps(
-                {
-                    "schema_version": 1,
-                    "experiment_id": EXPERIMENT_ID,
-                    "result": "NOT_RUN",
-                    "reason": "SERIAL_PORT is required",
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        )
+        emit_not_run("SERIAL_PORT is required")
         return 2
     mode = os.environ.get("AUX_OUTPUT_MODE", "smoke").strip().lower()
     if mode not in {"smoke", "endurance"}:
-        emit_event(
-            "configuration_error", error="AUX_OUTPUT_MODE must be smoke or endurance"
-        )
+        reason = "AUX_OUTPUT_MODE must be smoke or endurance"
+        emit_event("configuration_error", error=reason)
+        emit_not_run(reason)
         return 2
     try:
         declaration = parse_fixture_declaration(
@@ -1986,8 +1992,9 @@ def main() -> int:
         force_underrun = _boolean_environment(
             "AUX_OUTPUT_EXPECT_FORCED_UNDERRUN", False
         )
-    except ValueError as error:
+    except (TypeError, ValueError) as error:
         emit_event("configuration_error", error=str(error))
+        emit_not_run(str(error))
         return 2
     interlock = DriveInterlock(declaration)
     port: SerialPort | None = None

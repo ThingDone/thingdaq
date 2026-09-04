@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 
 namespace fake_imxrt {
 
@@ -52,6 +53,70 @@ class Register32 {
   std::uint32_t value_ = 0U;
 };
 
+// The i.MX RT1062 TCD stores 32-bit bus addresses even when this fake is
+// compiled by a 64-bit host compiler.  Retain the low word and provide the
+// pointer assignment/comparison surface used by the production adapter.
+class Address32 {
+ public:
+  Address32() = default;
+
+  template <typename Value>
+  Address32 &operator=(Value *value) {
+    value_ = static_cast<std::uint32_t>(
+        reinterpret_cast<std::uintptr_t>(value));
+    return *this;
+  }
+
+  Address32 &operator=(const Address32 &) = default;
+
+  template <typename Value>
+  bool operator==(Value *value) const {
+    return value_ == static_cast<std::uint32_t>(
+                         reinterpret_cast<std::uintptr_t>(value));
+  }
+
+  constexpr std::uint32_t value() const { return value_; }
+  constexpr void reset(std::uint32_t value = 0U) { value_ = value; }
+
+ private:
+  std::uint32_t value_ = 0U;
+};
+
+class GpioAliasRegister {
+ public:
+  enum class Operation { kSet, kClear, kToggle };
+
+  constexpr GpioAliasRegister(Register32 &target, Operation operation)
+      : target_(target), operation_(operation) {}
+
+  GpioAliasRegister &operator=(std::uint32_t value) {
+    last_value_ = value;
+    recordRegisterWrite(this, value);
+    if (!gpio_alias_writes_update_target) {
+      return *this;
+    }
+    const std::uint32_t current = target_;
+    if (operation_ == Operation::kSet) {
+      target_.reset(current | value);
+    } else if (operation_ == Operation::kClear) {
+      target_.reset(current & ~value);
+    } else {
+      target_.reset(current ^ value);
+    }
+    return *this;
+  }
+
+  operator std::uint32_t() const { return last_value_; }
+  void reset(std::uint32_t value = 0U) { last_value_ = value; }
+
+  static inline bool gpio_alias_writes_update_target = true;
+
+ private:
+  Register32 &target_;
+  Operation operation_;
+  std::uint32_t last_value_ = 0U;
+};
+
 }  // namespace fake_imxrt
 
 struct IMXRT_PIT_CHANNEL_t {
@@ -62,8 +127,20 @@ struct IMXRT_PIT_CHANNEL_t {
 };
 
 struct IMXRT_DMA_TCD_t {
-  volatile std::uint32_t marker = 0U;
+  fake_imxrt::Address32 SADDR{};
+  std::int16_t SOFF = 0;
+  std::uint16_t ATTR = 0U;
+  std::uint32_t NBYTES_MLNO = 0U;
+  std::int32_t SLAST = 0;
+  fake_imxrt::Address32 DADDR{};
+  std::int16_t DOFF = 0;
+  std::uint16_t CITER_ELINKNO = 0U;
+  std::int32_t DLASTSGA = 0;
+  std::uint16_t CSR = 0U;
+  std::uint16_t BITER_ELINKNO = 0U;
 };
+
+static_assert(sizeof(IMXRT_DMA_TCD_t) == 32U);
 
 struct IMXRT_ADCS_t {
   fake_imxrt::Register32 HC0{};
@@ -123,12 +200,68 @@ inline volatile std::uint32_t dmamux_chcfg[32]{};
 inline IMXRT_DMA_TCD_t dma_tcd[32]{};
 inline volatile std::uint8_t dma_dchpri[32]{};
 inline volatile std::uint32_t dma_erq = 0U;
-inline volatile std::uint8_t dma_cerq = 0U;
-inline volatile std::uint8_t dma_cerr = 0U;
-inline volatile std::uint8_t dma_ceei = 0U;
-inline volatile std::uint8_t dma_cint = 0U;
-inline volatile std::uint8_t dma_cdne = 0U;
-inline volatile std::uint8_t dma_serq = 0U;
+inline volatile std::uint32_t dma_err = 0U;
+inline volatile std::uint32_t dma_int = 0U;
+
+class DmaCommandRegister {
+ public:
+  enum class Operation {
+    kClearRequest,
+    kClearError,
+    kClearInterrupt,
+    kSetRequest,
+    kRecord
+  };
+
+  constexpr DmaCommandRegister(Operation operation) : operation_(operation) {}
+
+  DmaCommandRegister &operator=(std::uint8_t channel) {
+    value_ = channel;
+    if (channel < 32U) {
+      const std::uint32_t mask = std::uint32_t{1U} << channel;
+      if (operation_ == Operation::kClearRequest) {
+        dma_erq &= ~mask;
+      } else if (operation_ == Operation::kClearError) {
+        dma_err &= ~mask;
+      } else if (operation_ == Operation::kClearInterrupt) {
+        dma_int &= ~mask;
+      } else if (operation_ == Operation::kSetRequest) {
+        dma_erq |= mask;
+      }
+    }
+    return *this;
+  }
+
+  DmaCommandRegister &operator=(std::uint32_t channel) {
+    return *this = static_cast<std::uint8_t>(channel);
+  }
+
+  operator std::uint8_t() const { return value_; }
+  void reset(std::uint8_t value = 0U) { value_ = value; }
+
+ private:
+  Operation operation_;
+  std::uint8_t value_ = 0U;
+};
+
+inline DmaCommandRegister dma_cerq{DmaCommandRegister::Operation::kClearRequest};
+inline DmaCommandRegister dma_cerr{DmaCommandRegister::Operation::kClearError};
+inline DmaCommandRegister dma_ceei{DmaCommandRegister::Operation::kRecord};
+inline DmaCommandRegister dma_cint{
+    DmaCommandRegister::Operation::kClearInterrupt};
+inline DmaCommandRegister dma_cdne{DmaCommandRegister::Operation::kRecord};
+inline DmaCommandRegister dma_serq{DmaCommandRegister::Operation::kSetRequest};
+inline Register32 iomuxc_gpr_gpr26{};
+inline Register32 gpio1_dr{};
+inline Register32 gpio1_gdir{};
+inline GpioAliasRegister gpio1_dr_set{gpio1_dr,
+                                      GpioAliasRegister::Operation::kSet};
+inline GpioAliasRegister gpio1_dr_clear{gpio1_dr,
+                                        GpioAliasRegister::Operation::kClear};
+inline GpioAliasRegister gpio1_dr_toggle{
+    gpio1_dr, GpioAliasRegister::Operation::kToggle};
+inline std::array<std::pair<const void *, std::uint32_t>, 32U> cache_flushes{};
+inline std::size_t cache_flush_count = 0U;
 inline IMXRT_ADCS_t adc1{};
 inline IMXRT_ADCS_t adc2{};
 inline IMXRT_ADC_ETC_t adc_etc{};
@@ -160,13 +293,22 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define DMAMUX_CHCFG0 fake_imxrt::dmamux_chcfg[0]
 #define IMXRT_DMA_TCD fake_imxrt::dma_tcd
 #define DMA_DCHPRI2 fake_imxrt::dma_dchpri[2]
+#define DMA_DCHPRI3 fake_imxrt::dma_dchpri[3]
 #define DMA_ERQ fake_imxrt::dma_erq
+#define DMA_ERR fake_imxrt::dma_err
+#define DMA_INT fake_imxrt::dma_int
 #define DMA_CERQ fake_imxrt::dma_cerq
 #define DMA_CERR fake_imxrt::dma_cerr
 #define DMA_CEEI fake_imxrt::dma_ceei
 #define DMA_CINT fake_imxrt::dma_cint
 #define DMA_CDNE fake_imxrt::dma_cdne
 #define DMA_SERQ fake_imxrt::dma_serq
+#define IOMUXC_GPR_GPR26 fake_imxrt::iomuxc_gpr_gpr26
+#define GPIO1_DR fake_imxrt::gpio1_dr
+#define GPIO1_GDIR fake_imxrt::gpio1_gdir
+#define GPIO1_DR_SET fake_imxrt::gpio1_dr_set
+#define GPIO1_DR_CLEAR fake_imxrt::gpio1_dr_clear
+#define GPIO1_DR_TOGGLE fake_imxrt::gpio1_dr_toggle
 #define IMXRT_ADC1 fake_imxrt::adc1
 #define IMXRT_ADC2 fake_imxrt::adc2
 #define IMXRT_ADC_ETC fake_imxrt::adc_etc
@@ -216,6 +358,15 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define DMA_DCHPRI_ECP (std::uint8_t{1U} << 7U)
 #define DMA_DCHPRI_CHPRI(value) \
   (static_cast<std::uint8_t>(value) & std::uint8_t{0x0FU})
+#define DMA_TCD_ATTR_SSIZE(value) \
+  (static_cast<std::uint16_t>(value) << 8U)
+#define DMA_TCD_ATTR_DSIZE(value) \
+  (static_cast<std::uint16_t>(value) << 0U)
+#define DMA_TCD_CSR_START (std::uint16_t{1U} << 0U)
+#define DMA_TCD_CSR_INTMAJOR (std::uint16_t{1U} << 1U)
+#define DMA_TCD_CSR_DREQ (std::uint16_t{1U} << 3U)
+#define DMA_TCD_CSR_ESG (std::uint16_t{1U} << 4U)
+#define DMA_TCD_CSR_DONE (std::uint16_t{1U} << 7U)
 
 #define IOMUXC_PAD_DSE(value) \
   ((static_cast<std::uint32_t>(value) & 0x07U) << 3U)
@@ -285,6 +436,7 @@ using IRQ_NUMBER_t = std::uint8_t;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC0 = 118U;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC1 = 119U;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC_ERR = 121U;
+inline constexpr IRQ_NUMBER_t IRQ_DMA_CH3 = 3U;
 
 inline void attachInterruptVector(IRQ_NUMBER_t irq, void (*function)(void)) {
   fake_imxrt::interrupt_vectors[irq] = function;
@@ -311,3 +463,11 @@ inline void fakeNvicDisable(IRQ_NUMBER_t irq) {
 #define NVIC_CLEAR_PENDING(irq) fakeNvicClearPending((irq))
 #define NVIC_ENABLE_IRQ(irq) fakeNvicEnable((irq))
 #define NVIC_DISABLE_IRQ(irq) fakeNvicDisable((irq))
+
+inline void arm_dcache_flush_delete(void *address, std::uint32_t bytes) {
+  if (fake_imxrt::cache_flush_count < fake_imxrt::cache_flushes.size()) {
+    fake_imxrt::cache_flushes[fake_imxrt::cache_flush_count] =
+        {address, bytes};
+  }
+  ++fake_imxrt::cache_flush_count;
+}
