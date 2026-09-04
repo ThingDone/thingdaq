@@ -737,7 +737,15 @@ class SerialLink:
                 if frame.request_id != request_id:
                     self.stale_responses += 1
                     continue
-                require(frame.kind == expected_kind, "response kind mismatch")
+                error_code = (
+                    _u16(frame.payload, 2) if len(frame.payload) >= 4 else None
+                )
+                require(
+                    frame.kind in (expected_kind, ERROR_RESPONSE),
+                    "response kind mismatch: "
+                    f"expected 0x{expected_kind:02x}, received 0x{frame.kind:02x}, "
+                    f"error={error_code}",
+                )
                 require(matched is None, "duplicate response for one request")
                 matched = frame
             if matched is not None:
@@ -1383,7 +1391,9 @@ def malformed_upload_probe(link: SerialLink, generation: int) -> None:
         run_id=generation,
     )
     require(
-        malformed.flags == FLAG_RESPONSE_ERROR, "malformed output segment was accepted"
+        malformed.kind == ERROR_RESPONSE
+        and malformed.flags == FLAG_RESPONSE_ERROR,
+        "malformed output segment was accepted",
     )
     status, _ = link.exchange(OUTPUT_CLEAR_REQUEST, run_id=generation)
     cleared = decode_output_status(status, OUTPUT_CLEAR_RESPONSE)
@@ -2126,10 +2136,26 @@ def main() -> int:
         active_link = campaign.link if campaign is not None else link
         if active_link is not None:
             try:
-                stop, _ = active_link.exchange(
-                    STOP_REQUEST, timeout=COMMAND_DEADLINE_SECONDS
-                )
-                emit_event("final_stop_attempt", accepted=stop.flags == 0)
+                if campaign is None and info is not None:
+                    cleared_frame, _ = active_link.exchange(
+                        OUTPUT_CLEAR_REQUEST,
+                        run_id=0xA7000001,
+                        timeout=COMMAND_DEADLINE_SECONDS,
+                    )
+                    cleared = decode_output_status(
+                        cleared_frame, OUTPUT_CLEAR_RESPONSE
+                    )
+                    require(
+                        cleared.state == OUTPUT_EMPTY
+                        and cleared.bank_mode == OUTPUT_BANK_DISABLED,
+                        "final OUTPUT_CLEAR did not leave the bank disabled",
+                    )
+                    emit_event("final_clear_attempt", accepted=True)
+                else:
+                    stop, _ = active_link.exchange(
+                        STOP_REQUEST, timeout=COMMAND_DEADLINE_SECONDS
+                    )
+                    emit_event("final_stop_attempt", accepted=stop.flags == 0)
             except Exception as error:  # noqa: BLE001 - best effort is evidence
                 cleanup_message = f"{type(error).__name__}: {error}"
                 failures.append("final STOP failed: " + cleanup_message)

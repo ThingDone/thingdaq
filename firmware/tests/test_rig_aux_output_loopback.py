@@ -51,18 +51,20 @@ def response_wire(
     *,
     error: int = 0,
     hardware_serial: int = 0x10203040,
+    response_kind: int | None = None,
 ) -> bytes:
     fields = rig.HEADER.unpack_from(request)
     request_kind = fields[2]
     request_id = fields[11]
-    kind = rig.REQUEST_RESPONSE_KIND[request_kind]
+    kind = response_kind or rig.REQUEST_RESPONSE_KIND[request_kind]
     flags = rig.FLAG_RESPONSE_ERROR if error else 0
     if error:
         payload = bytearray(
             224
             if kind in rig.OUTPUT_STATUS_RESPONSE_KINDS
-            or kind == rig.OUTPUT_APPEND_RESPONSE
             else 4
+            if kind != rig.ERROR_RESPONSE
+            else rig.SUCCESS_PAYLOAD_SIZE[rig.ERROR_RESPONSE]
         )
         rig.RESPONSE_PREFIX.pack_into(payload, 0, 1, 0, error)
         payload = bytes(payload)
@@ -156,7 +158,14 @@ class FakeDevice:
             else 0
         )
         self.pending.extend(
-            response_wire(data, error=error, hardware_serial=self.hardware_serial)
+            response_wire(
+                data,
+                error=error,
+                hardware_serial=self.hardware_serial,
+                response_kind=rig.ERROR_RESPONSE
+                if error and kind == rig.OUTPUT_APPEND_REQUEST
+                else None,
+            )
         )
         return len(data)
 
@@ -371,7 +380,7 @@ class RecoveryAndReportTests(unittest.TestCase):
                         rig.OUTPUT_APPEND_REQUEST,
                         rig.OUTPUT_CLEAR_REQUEST,
                         rig.OUTPUT_STATUS_REQUEST,
-                        rig.STOP_REQUEST,
+                        rig.OUTPUT_CLEAR_REQUEST,
                     ],
                     device.requests,
                 )
