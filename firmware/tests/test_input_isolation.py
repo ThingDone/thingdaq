@@ -118,3 +118,20 @@ def test_invalid_profile_sequences_are_rejected():
             isolation.make_program("", {}, profiles=sequence)
     with pytest.raises(ValueError, match="either cycle"):
         isolation.make_program("", {}, cycle=True, profiles=(1,))
+
+
+def test_experimental_clock_and_rate_settings_follow_verified_manifest():
+    assert isolation.experiment_settings({}) == {
+        "AUX_INPUT_EQUAL_RATES": "0", "AUX_INPUT_CPU_MHZ": "600"}
+    manifest = {
+        "input_experiment": {"cpu_mhz": 450, "equal_rates": True},
+        "target": {"fqbn": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std"},
+    }
+    assert isolation.experiment_settings(manifest) == {
+        "AUX_INPUT_EQUAL_RATES": "1", "AUX_INPUT_CPU_MHZ": "450"}
+    manifest["input_experiment"]["cpu_mhz"] = 600
+    with pytest.raises(ValueError, match="disagrees"):
+        isolation.experiment_settings(manifest)
+    manifest["input_experiment"]["equal_rates"] = "false"
+    with pytest.raises(ValueError, match="unsupported"):
+        isolation.experiment_settings(manifest)

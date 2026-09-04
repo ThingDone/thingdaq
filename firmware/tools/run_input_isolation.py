@@ -2,7 +2,7 @@
 """Run one cold-boot input experiment; retain firmware, runner and raw evidence.
 
 Uses the auxiliary-input branch's existing standalone validator. No pin drives,
-loopback declaration, compression, output engine or CPU-clock changes are used.
+loopback declaration, compression or output engine is used.
 The paired-bank diagnostic is opt-in, not a prerequisite for eight-pin tests.
 The submission/preflight pattern follows the existing physical campaign helper.
 """
@@ -34,6 +34,22 @@ def verify_hex(firmware: bytes, manifest: dict) -> None:
         raise ValueError(
             "HEX does not match the build manifest; rebuild before submitting"
         )
+
+
+def experiment_settings(manifest: dict) -> dict[str, str]:
+    """Use only explicit build-manifest selections, never inferred filenames."""
+    experiment = manifest.get("input_experiment")
+    if experiment is None:
+        return {"AUX_INPUT_EQUAL_RATES": "0", "AUX_INPUT_CPU_MHZ": "600"}
+    cpu = experiment["cpu_mhz"]
+    equal = experiment["equal_rates"]
+    if cpu not in (600, 450) or not isinstance(equal, bool):
+        raise ValueError("unsupported input experiment clock/rate selection")
+    expected_fqbn = f"teensy:avr:teensy40:usb=serial,speed={cpu},opt=o2std"
+    if manifest["target"]["fqbn"] != expected_fqbn:
+        raise ValueError("experiment CPU disagrees with compiled target")
+    return {"AUX_INPUT_EQUAL_RATES": "1" if equal else "0",
+            "AUX_INPUT_CPU_MHZ": str(cpu)}
 
 
 def classify_result(result: dict) -> dict:
@@ -98,6 +114,8 @@ def make_program(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worktree", required=True, type=Path)
+    parser.add_argument("--build-dir", type=Path,
+                        help="explicit build directory; experimental settings come from its manifest")
     parser.add_argument("--evidence-dir", required=True, type=Path)
     parser.add_argument(
         "--case",
@@ -131,7 +149,7 @@ def main() -> int:
     if stat.S_IMODE(args.auth_file.stat().st_mode) & 0o077:
         parser.error("credential file must be private")
     auth = args.auth_file.read_text().strip()
-    build = (
+    build = args.build_dir or (
         args.worktree
         / "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std"
     )
@@ -149,6 +167,8 @@ def main() -> int:
         "EXPECTED_HARDWARE_SERIAL": str(args.serial),
         "EXPECTED_BUILD_ID": build_id,
     }
+    experiment = manifest.get("input_experiment")
+    settings.update(experiment_settings(manifest))
     profiles = tuple(args.profiles) if args.profiles is not None else None
     sequence = [0, 1, 2, 3, 0] if args.cycle else list(profiles or (args.profile,))
     program = make_program(source, settings, cycle=args.cycle, profiles=profiles)
@@ -201,6 +221,7 @@ def main() -> int:
             "build_id": build_id,
             "manifest_sha256": digest(manifest_bytes),
             "source": manifest["source"],
+            "input_experiment": experiment,
             "profile_sequence": sequence,
         },
     )
