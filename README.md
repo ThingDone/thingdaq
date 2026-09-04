@@ -68,6 +68,9 @@ Markdown. The printed 12 MB/s full-combined payload and protocol-framed byte
 rates are analytic load hypotheses, not physical USB acceptance.
 The validated two-run simulator/host result is retained in the
 [auxiliary-input prototype evidence](doc/results/experiments/aux-input-prototype.md).
+The subsequent target campaign and its reproducible pre-START DMA failure are
+recorded in the
+[final auxiliary-input report](doc/results/experiments/aux-input-bank.md).
 
 All examples default to the simulator. A script touches hardware only when
 `--real` is present:

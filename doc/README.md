@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Documentation Index
 created: 2026-08-27
-updated: 2026-09-02
+updated: 2026-09-04
 tags:
   - thingdaq
   - documentation
@@ -41,6 +41,7 @@ related:
   - '[[Experiment-Baseline]]'
   - '[[Aux-Input-Prototype]]'
   - '[[Phase-06-Aux-Input-Local-Gate]]'
+  - '[[Aux-Input-Bank]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -99,8 +100,10 @@ physical acceptance.
   beginning with the immutable [[Experiment-Baseline]], the isolated
   simulator/host [[Aux-Input-Prototype]] validation, and the complete
   target-branch compile and regression checkpoint in
-  [[Phase-06-Aux-Input-Local-Gate]]. The historical sequence includes
-  [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
+  [[Phase-06-Aux-Input-Local-Gate]]. [[Aux-Input-Bank]] records the subsequent
+  conclusive target-candidate failure, exact job lineage, and explicitly
+  untested lower-rate and external-stimulus claims. The historical sequence
+  includes [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
   by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical
   [[Phase-03-Control-Plane]] control acceptance and

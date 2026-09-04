@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Evidence Index
 created: 2026-08-29
-updated: 2026-09-02
+updated: 2026-09-04
 tags:
   - thingdaq
   - evidence
@@ -33,6 +33,7 @@ related:
   - '[[ADR-007-Experimental-Aux-Input-Bank]]'
   - '[[Aux-Input-Prototype]]'
   - '[[Phase-06-Aux-Input-Local-Gate]]'
+  - '[[Aux-Input-Bank]]'
 ---
 
 # ThingDAQ evidence index
@@ -80,11 +81,17 @@ target-branch local gate: 506 tests and 15,989 subtests, all 99 generated
 outputs, Ruff, MyPy, both 8-bit and 16-bit throughput gates, exact linked-memory
 ownership and retention checks, and two byte-identical pinned Teensy builds.
 
-This is not target-register, live-USB, external-stimulus, pad-mapping,
-electrical, ADC-performance, or signal-integrity evidence. The full-rate
-12 MB/s payload and `3084000000/253` framed B/s values remain analytic load
-hypotheses until the Phase 06 target and physical campaign; no clock, RLE, or
-output branch combination was tested.
+[[Aux-Input-Bank]] records the subsequent conclusive target-candidate **FAIL**.
+Two identity-pinned jobs using the same immutable HEX reproduced a paired-DMA
+diagnostic failure before START, so no raw rate profile qualified and the
+bounded campaign stopped before lower-rate, 60-second, 600-second, and
+profile-cycle runs. Both cleanup paths returned IDLE with final inputs safe;
+the service remained available, so this is not an infrastructure conclusion.
+
+No external stimulus was declared. The report therefore makes no
+external-transition, pin-order, electrical, ADC-performance, or
+signal-integrity claim, and no clock, RLE, or output branch combination was
+tested.
 
 ## Historical autonomous acceptance (superseded identity)
 
