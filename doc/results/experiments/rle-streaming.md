@@ -1,7 +1,7 @@
 ---
 type: report
 title: "ThingDAQ Negotiated RLE Experiment"
-created: 2026-09-02
+created: 2026-09-04
 tags:
   - thingdaq
   - experiment-evidence
@@ -23,140 +23,150 @@ related:
 
 **INCONCLUSIVE**
 
-The final negotiated-RLE candidate passes the complete local firmware, codec,
-fake-device, compatibility, resource, and deterministic-build gates. The live
-rig and physical-bandwidth conclusions remain **INCONCLUSIVE**: the Teensy did
-not enumerate in the prerequisite protocol-v1/RAW smoke or its one permitted
-infrastructure retry, so firmware was never programmed and no physical stream
-or target encode measurement began.
+The replacement-board `00003` campaign supersedes the obsolete no-programming
+physical rollup. Its immutable `final4` candidate passed ten strictly sequential
+short stages, including both negotiated smokes, all five synthetic patterns, and
+the matched 60-second physical RAW/RLE comparison. Rig correctness and the report
+remain **INCONCLUSIVE** because neither bounded 600-second endurance attempt
+completed without upstream serial byte loss. The separately measurable physical
+bandwidth-value conclusion is **FAIL**: combined wire volume fell 49.377441%, but
+encoder utilization increased 10.205324 percentage points, 0.205324 points above
+the fixed 10-point maximum.
 
-### Exact candidate identity
+### Exact replacement-board evidence identity
 
 | Identity | Exact value |
 | --- | --- |
 | Frozen baseline | `b23004defeca465da0ae2d2884c4fef71979e5d4` |
-| Verified branch checkpoint | `7c639104f78866eb7e6191b58b2bc5349342e480` on `experiment/rle-streaming` |
-| Source tree / firmware source | `04d07aab4a1440551c69a5cc1d135d59b0376a51` / `85f2698ba97fb1defe827c4c12b5cd1e746a7ccc518b7868d4135a5b50605d8b` |
-| Protocol v1 | SHA-256 `014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222` |
-| Protocol v2 | SHA-256 `2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3` |
-| Artifact provenance commit | `f831c89fe15abec05b89df2e6aa60f07a1dcf2b6` |
-| Build / target | `thingdaq-85f2698ba97fb1de` / `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
-| Candidate HEX | 386,057 bytes; SHA-256 `856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da` |
-| Campaign index | SHA-256 `760c99e79fe50a4634a17e7c6bb205af36f0ec4c9844ac91b1acec909873d515` |
-| Remote attempts | `d9c0e047-1152-4c63-b5dd-506a905bc7db`, `816e750c-002a-4212-b7f9-c1e390fecb27` |
+| Candidate branch/checkpoint | `experiment/rle-streaming` at `dca4343616a78ab71dedf08155359aeddd017859` |
+| Firmware source / build | `db824f42af030d7ed226900d3b68379962f7515f66734e51e4309773b04f5c4d` / `thingdaq-db824f42af030d7e` |
+| Build target / service target | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` / `teensy:avr:teensy40` |
+| Manifest | 13,025 bytes; SHA-256 `903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d` |
+| Candidate HEX | 388,911 bytes; SHA-256 `b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248` |
+| Protocol v1 / v2 | `014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222` / `2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3` |
+| Replacement hardware serial | `20428100` (observed, nonzero, stable, and non-grading) |
+| Campaign index | `rle-streaming-physical-campaign-00003`; SHA-256 `681c74f20f35012af01b438561de7c4d25ec0b91a3fb247d0e0255e35b960f21` |
+| Independent campaign validation | 9,091 checks; 107 unique sequential jobs |
 
-### Codec definition
+Only campaign `00003` supplies current physical conclusions. Campaigns `00001`
+and `00002` remain immutable superseded provenance with manifest SHA-256 values
+`677059aef906c136a0b5fb1f0def317b5fc246339173c018a2850f85b98babb0` and
+`9030098494c1e48a68e182f2b416203fd35a793b384c303cf9ee0106d66b9898`; none of their
+measurements or earlier board expectations enter the current grades.
 
-Protocol v2 retains the 44-byte header and four-byte checksum trailer. RAW
-carries the unchanged 4,048-byte payload. Each canonical little-endian RLE
-record is `u16 run_length` plus one complete item: six bytes for one four-byte
-ADC pair or three bytes for one packed GPIO byte. Runs are positive, coalesced,
-frame-local, and must decode to exactly 1,012 ADC pairs or 4,048 GPIO samples.
-Every frame independently preserves sequence, first timestamp, flags, and
-8,096-tick coverage. Firmware sizes first and selects RLE only when the complete
-wire frame is strictly smaller; ties, expansion, page pressure, or a counted
-encoder failure select intact RAW. The selected header and payload are checksummed
-before publication, and hosts validate bounded length and checksum before bounded
-canonical decompression. The largest selectable RLE representation is 674 ADC
-records / 4,092 wire bytes or 1,349 GPIO records / 4,095 wire bytes.
+### Accepted final4 sequence
 
-### Complete local gate
+| # | Stage | Service job | Result |
+| ---: | --- | --- | --- |
+| 1 | `final4-v1-raw-physical-combined-smoke` | `74a69541-ed2c-4ffb-9f01-c64c941b9dd3` | PASS |
+| 2 | `final4-resample-v2-raw-smoke` | `b780d490-fa3a-4248-998c-0b06fa61d91c` | PASS |
+| 3 | `final4-resample-v2-rle-auto-smoke` | `9ddbeb1d-41e6-4522-ad5b-9989632855fd` | PASS |
+| 4 | `final4-resample-synthetic-constant-rle-auto` | `9832bb0a-fe99-4802-92c6-9501f737112a` | PASS |
+| 5 | `final4-resample-synthetic-sparse-hold-rle-auto` | `25dcc047-cc6b-438a-81c2-15ccd6838ad0` | PASS |
+| 6 | `final4-resample-synthetic-slow-adc-rle-auto` | `a80b863d-8b11-4b2f-9a85-8d53c3345f61` | PASS |
+| 7 | `final4-resample-synthetic-alternating-rle-auto` | `d165c5d0-d6bc-4588-8f39-702896c5dae9` | PASS |
+| 8 | `final4-resample-synthetic-incompressible-rle-auto` | `b9cf56b7-9351-4566-9572-61075e0a0fee` | PASS |
+| 9 | `final4-resample-physical-combined-v2-raw-matched` | `1242edca-de9e-49d8-9093-15232c79686e` | PASS |
+| 10 | `final4-resample-physical-combined-v2-rle-auto-matched` | `9686bce1-f4aa-4974-9a34-2e6c01c62f85` | PASS |
 
-| Gate | Exact observation |
-| --- | --- |
-| Protocol generation | 70 v1/v2 outputs current |
-| Focused codec/protocol/rig | 72 passed, 1 skipped, 415 C++ subtests |
-| Parser/performance | 29 passed, 11,511 subtests; 4,099-byte parser high water; 2.0396x minimum full-rate headroom |
-| Documentation/layout | 8 passed, 643 subtests |
-| Complete regression | 500 passed, 8 skipped, 14,589 subtests |
-| Ruff / MyPy | 140 files format/lint clean; 29 source files type clean |
-| Repeated target build | Two byte-identical builds; `thingdaq-85f2698ba97fb1de` |
-| Memory / retention | flash 137,212 B; RAM1 491,488 B with 32,800 B local/stack headroom; RAM2 520,192 B with 4,096 B free; 105 DTCM + 95 OCRAM packet pages |
-| Default v1/RAW workflow | 2 ADC + 2 GPIO frames, zero gaps/drops/errors, final IDLE: `true` |
+Every accepted job programmed the exact candidate, emitted nonempty runner
+output, advertised build `thingdaq-db824f42af030d7e` and serial `20428100`, ran
+without active loss/error counters, attempted STOP, and confirmed final IDLE.
 
-### Corpus compression and conservation
+### Matched physical RAW versus RLE_AUTO
 
-Every workload contains eight complete frames. Ratios below use selected complete
-wire bytes divided by RAW complete-wire bytes; logical-to-wire ratios are also
-retained in JSON. Envelope conservation is exact: RAW wire equals logical payload
-plus 48 bytes per frame, and selected wire equals selected payload plus the same
-48-byte envelope per frame.
+The RAW and RLE_AUTO steady windows were
+60.004249938 and 60.004813458
+seconds. Complete-wire ratios use the RLE_AUTO selected wire bytes divided by
+the same run's RAW-equivalent complete wire bytes.
 
-| Stream | Workloads / frames | Logical / selected payload bytes | RAW / selected wire bytes | Exact selected/RAW wire ratio | Runs | RLE / fallback |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| ADC | 4 / 32 | 129,536 / 74,752 | 131,072 / 76,288 | 76288/131072 = 0.582031250 | 17,713 | 16 / 16 |
-| GPIO | 5 / 40 | 161,920 / 65,053 | 163,840 / 66,973 | 66973/163840 = 0.408770752 | 64,725 | 24 / 16 |
-| COMBINED | 9 / 72 | 291,456 / 139,805 | 294,912 / 143,261 | 143261/294912 = 0.485775418 | 82,438 | 40 / 32 |
+| Stream | Logical bytes | RLE payload bytes | RAW-equivalent / selected wire bytes | Ratio / reduction | RAW / RLE frames; runs | Encode cycles / utilization delta | Grade |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| ADC | 260,015,184 | 260,015,184 | 263,098,368 / 263,098,368 | 1.000000000 / 0.000000% | 64,233 / 0; 0 | 1,797,982,213 / 4.609870 pp | **FAIL** |
+| GPIO | 260,015,184 | 192,699 | 263,098,368 / 3,275,883 | 0.012451172 / 98.754883% | 0 / 64,233; 64,233 | 2,182,388,768 / 5.595455 pp | **PASS** |
+| COMBINED | 520,030,368 | 260,207,883 | 526,196,736 / 266,374,251 | 0.506225586 / 49.377441% | 64,233 / 64,233; 64,233 | 3,980,370,981 / 10.205324 pp | **FAIL** |
 
-| Workload | Stream | RAW / selected wire bytes | Exact ratio | Runs | RLE / fallback |
+ADC remained entirely RAW and therefore failed the 20% bandwidth rule. GPIO
+selected one canonical RLE run per frame and passed both value limits. Combined
+bandwidth passed, but the processing-cost limit failed without rounding.
+
+### Throughput, fallback, queues, latency, and memory
+
+| Path | RAW operand | RLE_AUTO operand |
+| --- | ---: | ---: |
+| ADC host decode B/s | 212643149.070423 | 215047155.102205 |
+| ADC wall logical B/s | 3999972.265935 | 3999937.600673 |
+| GPIO host decode B/s | 625681129.039770 | 285224981.058438 |
+| GPIO wall logical B/s | 3999972.265935 | 3999937.600673 |
+| COMBINED host decode B/s | 317411314.611757 | 245213819.867839 |
+| COMBINED wall logical B/s | 7999944.531869 | 7999875.201346 |
+| Combined firmware encode cycles | 0 | 3,980,370,981 |
+| Combined firmware encode load | 0.000000000 | 0.102053242 |
+| Packet-owned high water | 46 / 200 pages | 26 / 200 pages |
+| Temporary-page high water | 0 | 1 |
+| STATUS latency p99 / max | 2.267283 / 2.601606 ms | 4.250181 / 4.252566 ms |
+| Host RSS maximum | 22,003,712 bytes | 22,016,000 bytes |
+
+RLE_AUTO produced 64,233 ADC RAW fallbacks, all `not_smaller`, and zero GPIO fallbacks. Encoder-failure and temporary-page-unavailable fallbacks were zero for both streams. Across all nine accepted v2 jobs, packet ownership peaked at 119/200 pages, temporary ownership at 1/1 page, host RSS at 22,016,000 bytes, maximum STATUS latency at 24.876835 ms, and the slowest combined host decode path sustained 20387963.942916 logical B/s.
+
+Every accepted RAW and RLE stream exactly conserved logical payload, selected
+payload, 48-byte-per-frame envelope, representation partition, queued/transmitted
+bytes, and combined ADC+GPIO totals. The matched jobs reported zero checksum,
+header, payload, stale-response, transport, capacity, eviction, encoding, DMA,
+and queue-rejection errors. Their only incomplete items were explicitly
+reconciled STOP tails: RAW 496 ADC pairs / 1987 GPIO samples and RLE_AUTO 1010 / 4042.
+
+### Deterministic synthetic patterns
+
+| Pattern | Service job | ADC / GPIO / combined wire ratio | RAW / RLE frames; runs | Encode load | Combined decode B/s |
 | --- | --- | ---: | ---: | ---: | ---: |
-| `gpio-constant` | GPIO | 32,768 / 408 | 408/32768 = 0.012451172 | 8 | 8 / 0 |
-| `gpio-long-digital-holds` | GPIO | 32,768 / 597 | 597/32768 = 0.018218994 | 71 | 8 / 0 |
-| `gpio-sparse-single-bit-changes` | GPIO | 32,768 / 432 | 432/32768 = 0.013183594 | 16 | 8 / 0 |
-| `gpio-alternating-bytes` | GPIO | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 32,384 | 0 / 8 |
-| `gpio-pseudo-random-bytes` | GPIO | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 32,246 | 0 / 8 |
-| `adc-constant-pairs` | ADC | 32,768 / 432 | 432/32768 = 0.013183594 | 8 | 8 / 0 |
-| `adc-independent-slow-channels` | ADC | 32,768 / 10,320 | 10320/32768 = 0.314941406 | 1,656 | 8 / 0 |
-| `adc-quantization-noise` | ADC | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 7,953 | 0 / 8 |
-| `adc-high-entropy` | ADC | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 8,096 | 0 / 8 |
+| `constant` | `9832bb0a-fe99-4802-92c6-9501f737112a` | 0.013183594 / 0.012451172 / 0.012817383 | 0 / 21,800; 21,800 | 0.072158331 | 381187051.598560 |
+| `sparse-hold` | `25dcc047-cc6b-438a-81c2-15ccd6838ad0` | 0.014668945 / 0.013189154 / 0.013929049 | 0 / 20,286; 40,791 | 0.272728629 | 182244417.004642 |
+| `slow-adc` | `a80b863d-8b11-4b2f-9a85-8d53c3345f61` | 0.314941406 / 0.197021484 / 0.255981445 | 0 / 21,758; 5,004,340 | 0.377336967 | 20387963.942916 |
+| `alternating` | `d165c5d0-d6bc-4588-8f39-702896c5dae9` | 1.000000000 / 1.000000000 / 1.000000000 | 21,744 / 0; 0 | 0.083929605 | 1504230392.659250 |
+| `incompressible` | `b9cf56b7-9351-4566-9572-61075e0a0fee` | 1.000000000 / 1.000000000 / 1.000000000 | 21,746 / 0; 0 | 0.084122244 | 34786802.466302 |
 
-### Encode/decode throughput and load
+Constant, sparse-hold, and slow-ADC met their declared compression bounds;
+alternating and incompressible selected only RAW frames and never expanded.
+Formula, timestamp, sequence, checksum-before-decode, conservation, cleanup,
+and stable-identity checks passed for every accepted pattern.
 
-The host rows are the slowest measured batch in this report-generation run
-over the current protocol-v2 codec. They are host diagnostics, not firmware
-cycle measurements. Headroom uses the exact 4,000,000 logical B/s per-stream
-denominator. The complete local gate independently retained 1.5246x minimum
-decoder and 2.0396x parser headroom.
+### Endurance incident and separate conclusions
 
-| Host path | Limiting workload | Minimum logical B/s | Per-stream headroom |
-| --- | --- | ---: | ---: |
-| `raw_encode` | `adc-constant-pairs` | 39624005.638328 | 9.906001410x |
-| `rle_auto_encode` | `gpio-alternating-bytes` | 3791717.794384 | 0.947929449x |
-| `raw_decode` | `gpio-alternating-bytes` | 6190418.048660 | 1.547604512x |
-| `rle_auto_decode` | `gpio-alternating-bytes` | 6001442.924019 | 1.500360731x |
-| Host codec peak memory | all four paths | 33,711 bytes | 65,536-byte ceiling |
-| Firmware encode cycles/load | not observed | — | target never ran |
+| Attempt | Service job | Failure | Reader high water / capacity | STATUS samples | Cleanup |
+| --- | --- | --- | ---: | ---: | --- |
+| 1 | `936b1df9-1629-4f4f-87c7-1be44e8a5005` | ADC checksum mismatch | 32,768 / 524,288 bytes | 68 | STOP `true`, IDLE `true` |
+| 2 | `d1020be8-a74c-4997-8049-840f0c66cd6b` | 1,855 ADC-like bytes without a frame prefix | 32,768 / 524,288 bytes | 98 | STOP `true`, IDLE `true` |
 
-### Physical campaign and workload value
+Both queues ended at zero bytes/chunks, ruling out userspace queue saturation
+without locating the loss among the remote USB/TTY path, hub/cable, kernel
+buffering, container scheduling, or target-to-host transport. No passing
+600-second observation exists. The user authorized deferring another identical
+hardware attempt; this closes the machine task disposition but does not convert
+the campaign, endurance qualification, or merge recommendation into PASS.
 
-| Physical stream | Logical bytes | Encoded payload / complete wire | RLE / fallback / runs | Complete-wire ratio | Processing utilization |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| ADC | not observed | not observed | not observed | **INCONCLUSIVE** | not observed |
-| GPIO | not observed | not observed | not observed | **INCONCLUSIVE** | not observed |
-| Combined | not observed | not observed | not observed | **INCONCLUSIVE** | not observed |
-
-The physical value rule required matched RLE_AUTO complete-wire bytes at least
-20% below RAW without more than a 10 percentage-point processing-utilization
-increase. Neither operand was observed, so no ADC, GPIO, combined-bandwidth,
-or encode-load value conclusion is made.
-
-### Fallbacks, errors, queues, and incident
-
-The corpus selected 40 RLE and 32 size-driven RAW fallback frames; every
-alternating, pseudo-random, quantization-noise, and high-entropy frame fell
-back without expansion. Host/target-fake tests separately covered page-pressure
-and injected-encoder-failure fallback, one-page temporary ownership, exact
-saturating counters, mixed streams, partial USB writes, reconnect, STOP, and
-cleanup. The packet pool remained exactly 200 pages; the live service queue
-returned to zero after both attempts. No live firmware error, queue, fallback,
-latency, loss, or conservation value exists because the runner never started.
-
-Both jobs failed with `infrastructure_board_unavailable`: Board teensy:avr:teensy40 did not appear on any serial port within 20s of powering hub port 15.
-The service recovered after each attempt. Every v2 smoke, all five target
-synthetic patterns, the matched RAW/RLE_AUTO physical comparison, and the
-600-second endurance run were intentionally not submitted after the prerequisite
-failed.
+| Conclusion | Grade |
+| --- | --- |
+| Local correctness | **PASS** |
+| Protocol-v1 compatibility | **PASS** |
+| Accepted short-stage correctness | **PASS** |
+| 600-second endurance / overall rig correctness | **INCONCLUSIVE** |
+| ADC physical bandwidth value | **FAIL** |
+| GPIO physical bandwidth value | **PASS** |
+| Combined physical bandwidth value | **FAIL** |
+| Overall report | **INCONCLUSIVE** |
 
 ### Compatibility and limitations
 
-All 27 protocol-v1 source/generated/fixture paths are byte-identical to the frozen baseline; the v1 fixture tree is `58f3800a8450714f58ec486249521aacb68eb2e4`. RLE remains explicit protocol-v2-only negotiation, and STOP/reconnect restore v1/RAW defaults.
-Corpus savings are workload-specific. No target runtime, live USB acquisition,
-physical ADC/GPIO quality, external timing, or cross-experiment branch combination
-was established. See [[RLE-Prototype]], [[ADR-006-Experimental-RLE-Streaming]],
-[[Protocol-V1]], and [[Acquisition-Pipeline]] for the host prototype, negotiated
-contract, compatibility boundary, and acquisition ownership model.
+Protocol-v1 source, generated output, fixtures, and default RAW behavior remain
+byte-compatible with the frozen baseline. Compression conclusions apply only to
+the declared workloads and framing. The campaign does not establish ADC accuracy,
+noise, ENOB, linearity, external GPIO timing, signal integrity, or compatibility
+with the separate clock or auxiliary-bank branches. See [[RLE-Prototype]],
+[[ADR-006-Experimental-RLE-Streaming]], [[Protocol-V1]], and
+[[Acquisition-Pipeline]].
 
-Reason: The Teensy 4.0 did not enumerate within the remote service's fixed 20-second power-on window for the prerequisite protocol-v1/RAW physical-combined smoke or its one identical infrastructure retry. Neither attempt programmed firmware or started the rig, so every downstream v2, synthetic-pattern, matched physical, and endurance job was intentionally not submitted.
+Reason: The immutable final4 candidate passed the first ten strictly sequential stages through the matched physical RAW/RLE comparison. Both bounded 600-second endurance attempts then lost bytes upstream of a continuously drained 512 KiB userspace queue: the first detected one ADC checksum mismatch after 68 STATUS samples and the retry received 1,855 ADC-like payload bytes without the frame prefix after 98 samples. Both queues peaked at only 32 KiB, ended empty, and reached clean final IDLE. No passing 600-second observation exists, so rig correctness and the task remain inconclusive. The separately measurable physical value conclusion is FAIL because encoder utilization increased by 10.205324 percentage points, above the original 10-point maximum, despite a 49.377441% wire reduction.
 
 ## Identity and provenance
 
@@ -166,10 +176,10 @@ Reason: The Teensy 4.0 did not enumerate within the remote service's fixed 20-se
 | branch | experiment/rle-streaming |
 | baseline_branch | experiment/baseline-2026-09-01 |
 | baseline_commit | b23004defeca465da0ae2d2884c4fef71979e5d4 |
-| source_commit | 7c639104f78866eb7e6191b58b2bc5349342e480 |
-| source_tree | 04d07aab4a1440551c69a5cc1d135d59b0376a51 |
+| source_commit | dca4343616a78ab71dedf08155359aeddd017859 |
+| source_tree | 055d03da63298913b33f18edf0dfc06fa109d2c6 |
 | source_clean | true |
-| source_id | 85f2698ba97fb1defe827c4c12b5cd1e746a7ccc518b7868d4135a5b50605d8b |
+| source_id | db824f42af030d7ed226900d3b68379962f7515f66734e51e4309773b04f5c4d |
 | protocol_contract_path | protocol/protocol-v1.json |
 | protocol_version | 1 |
 | protocol_sha256 | 014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222 |
@@ -195,10 +205,12 @@ Reason: The Teensy 4.0 did not enumerate within the remote service's fixed 20-se
 
 | ID | Evidence level | Result | Method | Command |
 | --- | --- | --- | --- | --- |
-| evidence-framework | **host** | PASS | Fail-closed matrix validation, file/hash and Git identity verification, normalization, and two canonical shared-reporter renders. | `python3 firmware/tools/experiment_evidence.py --report doc/results/experiments/rle-streaming.json --json-output doc/results/experiments/rle-streaming.json --markdown-output doc/results/experiments/rle-streaming.md --check` |
+| evidence-framework | **host** | PASS | The campaign-specific validator first performed 9,091 fail-closed identity, artifact, sequencing, measurement, conservation, cleanup, no-secret, and no-bulk-data checks. The shared experiment reporter then validated files, schema, Git identity, normalization, and two canonical renders. | `python3 firmware/tools/experiment_evidence.py --report doc/results/experiments/rle-streaming.json --json-output doc/results/experiments/rle-streaming.json --markdown-output doc/results/experiments/rle-streaming.md --check` |
 | host-corpus-benchmark | **host** | PASS | Production protocol-v2 RAW/RLE_AUTO codec over the fixed nine-workload, 72-frame corpus with exact round-trip, no-expansion, throughput, and bounded-memory grading. | `python3 -m thingdaq.rle_benchmark --pretty` |
-| local-firmware-gate | **host** | PASS | Complete protocol, portable C++ codec, packet/USB/runtime, rig, parser/performance, style, typing, documentation, regression, deterministic-build, and default-v1 simulator gate. | `python3 -m pytest -q` |
-| physical-campaign | **rig** | INCONCLUSIVE | Credential-safe service preflight and strictly sequential bounded prerequisite submissions with one identical infrastructure retry; downstream stages were not submitted after the board remained unavailable. | `python3 firmware/tests/rig_rle_streaming.py` |
+| local-firmware-gate | **host** | PASS | Current final4 candidate validation: complete repository regression, focused runner regression, protocol drift, Ruff, focused MyPy, target build/linker gates, and unchanged v1 compatibility. | `python3 -m pytest -q` |
+| physical-accepted-campaign | **rig** | PASS | Ten strictly sequential final4 jobs programmed and ran the exact candidate; the campaign validator reconciled every accepted runner result, identity, checksum, formula, counter, queue, and cleanup field. | `python3 .maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py` |
+| physical-campaign | **rig** | INCONCLUSIVE | Replacement-board campaign 00003 with a fail-closed 9,091-check evidence validator; current conclusions combine the accepted short-stage evidence and the unresolved bounded endurance incident without importing measurements from superseded campaigns 00001 or 00002. | `python3 .maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py` |
+| physical-endurance-campaign | **rig** | INCONCLUSIVE | Two sequential 600-second RLE_AUTO attempts with repeated STATUS sampling, a dedicated fixed 512 KiB serial-reader queue, bounded retry, and mandatory STOP/final-IDLE cleanup. | `python3 .maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py` |
 | protocol-v1-compatibility | **host** | PASS | Byte comparison of the protocol-v1 contract and all generated v1 outputs and fixtures against the immutable baseline, plus a clean default v1/RAW simulator lifecycle. | `git diff --exit-code experiment/baseline-2026-09-01 HEAD -- protocol/protocol-v1.json protocol/fixtures daq_api/src/thingdaq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h` |
 | simulated-rig-gate | **simulated** | PASS | Stateful partial-I/O fake-device execution of all target patterns and fail-closed codec, counter, disconnect, and cleanup faults through the standalone rig. | `python3 -m pytest -q firmware/tests/test_rig_rle_streaming.py` |
 
@@ -206,36 +218,59 @@ Reason: The Teensy 4.0 did not enumerate within the remote service's fixed 20-se
 
 | Metric | Value | Unit | Denominator | Scope | Evidence level | Evidence |
 | --- | ---: | --- | --- | --- | --- | --- |
+| measurement_duration_seconds | 60.00481345807202 | second | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| adc_frames_observed | 64233 | frame | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| gpio_frames_observed | 64233 | frame | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| adc_payload_bytes | 260015184 | byte | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| gpio_payload_bytes | 260015184 | byte | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| combined_payload_bytes | 520030368 | byte | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| adc_framed_bytes | 263098368 | byte | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| gpio_framed_bytes | 3275883 | byte | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| combined_framed_bytes | 266374251 | byte | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| sequence_gap_frames | 0 | frame | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| adc_sequence_gap_frames | 0 | frame | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| gpio_sequence_gap_frames | 0 | frame | none | streaming_window | **rig** | ["physical-accepted-campaign"] |
+| host_queue_drops | 0 | event | none | run | **rig** | ["physical-accepted-campaign"] |
+| parser_errors | 0 | event | none | run | **rig** | ["physical-accepted-campaign"] |
+| transport_errors | 0 | event | none | run | **rig** | ["physical-accepted-campaign"] |
+| conservation_failures | 0 | event | none | final_status | **rig** | ["physical-accepted-campaign"] |
+| command_latency_p99_milliseconds | 4.250181140378118 | millisecond | command_latency_samples | run | **rig** | ["physical-accepted-campaign"] |
+| command_latency_maximum_milliseconds | 4.252566024661064 | millisecond | command_latency_samples | run | **rig** | ["physical-accepted-campaign"] |
+| packet_owned_high_water_frames | 26 | frame | none | run | **rig** | ["physical-accepted-campaign"] |
 | packet_buffer_capacity_frames | 200 | frame | none | artifact | **host** | ["local-firmware-gate"] |
-| flash_used_bytes | 137212 | byte | none | artifact | **host** | ["local-firmware-gate"] |
-| flash_headroom_bytes | 1894404 | byte | none | artifact | **host** | ["local-firmware-gate"] |
+| flash_used_bytes | 138236 | byte | none | artifact | **host** | ["local-firmware-gate"] |
+| flash_headroom_bytes | 1893380 | byte | none | artifact | **host** | ["local-firmware-gate"] |
 | ram1_used_bytes | 491488 | byte | none | artifact | **host** | ["local-firmware-gate"] |
 | ram1_headroom_bytes | 32800 | byte | none | artifact | **host** | ["local-firmware-gate"] |
 | ram2_used_bytes | 520192 | byte | none | artifact | **host** | ["local-firmware-gate"] |
 | ram2_headroom_bytes | 4096 | byte | none | artifact | **host** | ["local-firmware-gate"] |
 | cpu_clock_hz | 600000000 | hertz | none | artifact | **host** | ["local-firmware-gate"] |
 | logical_raw_bytes | 291456 | byte | none | declared_codec_workload | **host** | ["host-corpus-benchmark"] |
+| logical_raw_bytes | 520030368 | byte | none | declared_codec_workload | **rig** | ["physical-accepted-campaign"] |
 | encoded_wire_bytes | 143261 | byte | none | declared_codec_workload | **host** | ["host-corpus-benchmark"] |
+| encoded_wire_bytes | 266374251 | byte | none | declared_codec_workload | **rig** | ["physical-accepted-campaign"] |
 | encoded_to_raw_ratio | 0.49153560057092666 | ratio | logical_raw_bytes | declared_codec_workload | **host** | ["host-corpus-benchmark"] |
+| encoded_to_raw_ratio | 0.5122282608695652 | ratio | logical_raw_bytes | declared_codec_workload | **rig** | ["physical-accepted-campaign"] |
 | codec_throughput_bytes_per_second | 6001442.92401875 | byte_per_second | streaming_elapsed_seconds | declared_codec_benchmark | **host** | ["host-corpus-benchmark"] |
+| codec_throughput_bytes_per_second | 245213819.86783877 | byte_per_second | streaming_elapsed_seconds | declared_codec_benchmark | **rig** | ["physical-accepted-campaign"] |
 
 ## Acceptance
 
 | Check | Description | State | Expected | Observed | Reason | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | schema_valid | The matrix and report validate fail closed with no unknown state, level, metric, check, or limitation identifiers. | **PASS** | true | {"content_policy":true,"hashes":true,"matrix":true,"normalized_report":true} | — | ["evidence-framework"] |
-| identity_complete | Required Git, source, protocol, toolchain, branch, and baseline identities are present and syntactically valid. | **PASS** | ["repository","branch","baseline_branch","baseline_commit","source_commit","source_tree","source_clean","source_id","protocol_contract_path","protocol_version","protocol_sha256","toolchains"] | {"baseline_branch":"experiment/baseline-2026-09-01","baseline_commit":"b23004defeca465da0ae2d2884c4fef71979e5d4","branch":"experiment/rle-streaming","protocol_contract_path":"protocol/protocol-v1.json","protocol_sha256":"014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222","protocol_version":1,"repository":"https://github.com/ThingDone/thingdaq.git","source_clean":true,"source_commit":"7c639104f78866eb7e6191b58b2bc5349342e480","source_id":"85f2698ba97fb1defe827c4c12b5cd1e746a7ccc518b7868d4135a5b50605d8b","source_tree":"04d07aab4a1440551c69a5cc1d135d59b0376a51","toolchains":[{"identity":"arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z","name":"arduino-cli","version":"1.4.1"},{"identity":"arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203","name":"arm-none-eabi-g++","version":"15.2.1"},{"identity":"CPython 3.12.3","name":"python","version":"3.12.3"},{"identity":"teensy:avr 1.62.0","name":"teensy-core","version":"1.62.0"}]} | — | ["evidence-framework"] |
+| identity_complete | Required Git, source, protocol, toolchain, branch, and baseline identities are present and syntactically valid. | **PASS** | ["repository","branch","baseline_branch","baseline_commit","source_commit","source_tree","source_clean","source_id","protocol_contract_path","protocol_version","protocol_sha256","toolchains"] | {"baseline_branch":"experiment/baseline-2026-09-01","baseline_commit":"b23004defeca465da0ae2d2884c4fef71979e5d4","branch":"experiment/rle-streaming","protocol_contract_path":"protocol/protocol-v1.json","protocol_sha256":"014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222","protocol_version":1,"repository":"https://github.com/ThingDone/thingdaq.git","source_clean":true,"source_commit":"dca4343616a78ab71dedf08155359aeddd017859","source_id":"db824f42af030d7ed226900d3b68379962f7515f66734e51e4309773b04f5c4d","source_tree":"055d03da63298913b33f18edf0dfc06fa109d2c6","toolchains":[{"identity":"arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z","name":"arduino-cli","version":"1.4.1"},{"identity":"arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203","name":"arm-none-eabi-g++","version":"15.2.1"},{"identity":"CPython 3.12.3","name":"python","version":"3.12.3"},{"identity":"teensy:avr 1.62.0","name":"teensy-core","version":"1.62.0"}]} | — | ["evidence-framework"] |
 | provenance_clean | Tracked canonical evidence was generated from the declared clean source commit and tree. | **PASS** | true | true | — | ["evidence-framework"] |
-| artifact_hashes_verified | Every referenced input, firmware, map, manifest, and output artifact matches its declared SHA-256 and size. | **PASS** | {"firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json":"c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep":"c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf":"f29723328d722b4721ca4aea384b657986574e98e2e108098c3ac99e720faf60","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex":"856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map":"59fe7bb71a9ddb2defc77e5befdde101a5c6de45b9b9f724bd595e2a50cf1a2b"} | {"firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json":"c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep":"c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf":"f29723328d722b4721ca4aea384b657986574e98e2e108098c3ac99e720faf60","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex":"856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map":"59fe7bb71a9ddb2defc77e5befdde101a5c6de45b9b9f724bd595e2a50cf1a2b"} | — | ["local-firmware-gate"] |
+| artifact_hashes_verified | Every referenced input, firmware, map, manifest, and output artifact matches its declared SHA-256 and size. | **PASS** | {"firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json":"903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep":"c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf":"5b2793c8d43dc16640e6ad234e8f170ad7ce6f054c4b71d623b1e6f345516f74","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex":"b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map":"ac898ed5214200bb00ad8e6a8f7c3378dc20738f14e635ccf6f87f0dc3537897"} | {"firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json":"903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep":"c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf":"5b2793c8d43dc16640e6ad234e8f170ad7ce6f054c4b71d623b1e6f345516f74","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex":"b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248","firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map":"ac898ed5214200bb00ad8e6a8f7c3378dc20738f14e635ccf6f87f0dc3537897"} | — | ["local-firmware-gate"] |
 | firmware_build_no_upload | The exact declared firmware profile compiles with the pinned toolchain without enumerating hardware or uploading firmware. | **PASS** | true | {"compile_completed":true,"exact_fqbn":true,"firmware_inputs_clean":true,"network_unused":true,"repeated_outputs_identical":true,"serial_hardware_unused":true,"upload_unused":true} | — | ["local-firmware-gate"] |
 | deterministic_output | Two renders from identical normalized inputs are byte-identical JSON and Markdown. | **PASS** | {"firmware_build_1":"byte-identical","firmware_build_2":"byte-identical","report_json":"byte-identical","report_markdown":"byte-identical"} | {"firmware_build_1":"byte-identical","firmware_build_2":"byte-identical","report_json":"byte-identical","report_markdown":"byte-identical"} | — | ["evidence-framework","local-firmware-gate"] |
-| lifecycle_complete | INFO, CONFIGURE, START, bounded data capture, STATUS, STOP, and cleanup complete in the declared order. | **INCONCLUSIVE** | true | {"default_v1_raw_simulator":true,"physical_capture":null,"physical_configure":null,"physical_idle":null,"physical_info":null,"physical_start":null,"physical_status":null,"physical_stop":null,"simulated_fake_device":true} | The board never enumerated, so INFO, CONFIGURE, START, capture, STATUS, STOP, and firmware IDLE cleanup were not exercised on target. | ["physical-campaign","simulated-rig-gate"] |
-| synthetic_formulas_exact | Every validated synthetic ADC pair and GPIO sample matches the declared deterministic formula and chronology. | **INCONCLUSIVE** | all five target patterns match exact formulas and chronology | {"physical_target":null,"target_fake_and_source_tests":true} | All five formulas passed fake-device and target-source tests, but none ran on the physical target. | ["physical-campaign","simulated-rig-gate"] |
-| stream_health | Sequence gaps, loss, parser errors, transport errors, host-queue drops, and unexplained firmware errors are zero unless a named negative case declares and reconciles them. | **INCONCLUSIVE** | true | {"physical_codec_errors":null,"physical_complete_frame_loss":null,"physical_dma_cache_errors":null,"physical_parser_errors":null,"physical_sequence_gaps":null,"physical_transport_errors":null,"simulated_fake_device":true} | No live stream began, so rates, loss, parser, transport, DMA, cache, codec, latency, and utilization counters were not observed. | ["physical-campaign","simulated-rig-gate"] |
-| counter_conservation | All applicable frame, item, payload-byte, framed-byte, queue, loss, and source-stage equations are exact and nonsaturated. | **INCONCLUSIVE** | true | {"host_adc":{"frame_selection":{"left":32,"right":32},"logical_raw":{"left":129536,"right":129536},"raw_wire":{"left":131072,"right":131072},"selected_wire":{"left":76288,"right":76288}},"host_combined":{"frame_selection":{"left":72,"right":72},"logical_raw":{"left":291456,"right":291456},"raw_wire":{"left":294912,"right":294912},"selected_wire":{"left":143261,"right":143261}},"host_gpio":{"frame_selection":{"left":40,"right":40},"logical_raw":{"left":161920,"right":161920},"raw_wire":{"left":163840,"right":163840},"selected_wire":{"left":66973,"right":66973}},"physical":null,"simulated_fake_device":true} | Host corpus and fake-device equations were exact, but no physical logical, encoded-payload, wire, queue, or loss counters were emitted. | ["physical-campaign","simulated-rig-gate"] |
-| queue_bounds | Every observed queue depth and high-water value is at or below its same-artifact advertised capacity. | **INCONCLUSIVE** | {"packet_capacity_frames":200} | {"local_packet_capacity_frames":200,"local_temporary_page_maximum":1,"physical_host_high_water":null,"physical_packet_high_water":null,"service_queue_depth_after_attempts":0} | The 200-page local bound and service queue recovery passed, but target and host acquisition queue high-water values were never instantiated. | ["physical-campaign","simulated-rig-gate"] |
-| final_idle_cleanup | STOP and final cleanup leave IDLE with every required ownership and transport gauge at zero. | **INCONCLUSIVE** | true | {"default_v1_raw_simulator_idle":true,"physical_firmware_idle_confirmed":null,"physical_stop_attempted":false,"service_queue_depth":0,"service_recovered_after_each_attempt":true,"simulated_positive_cases_idle":true} | No firmware session existed to STOP or query for IDLE; only service recovery to queue depth zero was observable. | ["physical-campaign","simulated-rig-gate"] |
-| claim_scope_complete | Every required limitation is explicit and no conclusion exceeds the evidence level that supports it. | **PASS** | true | {"analog_performance_untested":true,"build_is_not_target_runtime":true,"compression_is_workload_dependent":true,"cross_branch_combinations_untested":true,"external_gpio_timing_untested":true,"firmware_encode_load_not_claimed":true,"physical_adc_ratio_not_claimed":true,"physical_bandwidth_benefit_inconclusive":true,"physical_gpio_ratio_not_claimed":true,"rig_correctness_inconclusive":true,"simulation_is_not_physical":true} | — | ["evidence-framework"] |
+| lifecycle_complete | INFO, CONFIGURE, START, bounded data capture, STATUS, STOP, and cleanup complete in the declared order. | **INCONCLUSIVE** | true | {"accepted_short_stages":10,"default_v1_raw_simulator":true,"passing_endurance_600_seconds":false,"physical_configure":true,"physical_idle":true,"physical_info":true,"physical_start":true,"physical_status":true,"physical_stop":true,"simulated_fake_device":true} | All ten accepted short stages and both failed endurance attempts completed STOP/final-IDLE cleanup, but no 600-second acquisition completed without upstream serial byte loss. | ["physical-campaign","simulated-rig-gate"] |
+| synthetic_formulas_exact | Every validated synthetic ADC pair and GPIO sample matches the declared deterministic formula and chronology. | **PASS** | all five target patterns match exact formulas and chronology | all five target patterns match exact formulas and chronology | — | ["physical-accepted-campaign","simulated-rig-gate"] |
+| stream_health | Sequence gaps, loss, parser errors, transport errors, host-queue drops, and unexplained firmware errors are zero unless a named negative case declares and reconciles them. | **INCONCLUSIVE** | true | {"accepted_short_stage_active_errors_zero":true,"accepted_short_stage_parser_errors":0,"accepted_short_stage_sequence_gaps":0,"accepted_short_stage_transport_errors":0,"endurance_checksum_mismatches":1,"endurance_missing_prefix_events":1,"endurance_userspace_queue_saturated":false,"failure_layer_localized":false,"simulated_fake_device":true} | All ten accepted short stages had zero active loss/error counters, but both endurance attempts lost wire bytes upstream of a nonsaturated userspace queue; the responsible remote transport layer is unresolved. | ["physical-campaign","simulated-rig-gate"] |
+| counter_conservation | All applicable frame, item, payload-byte, framed-byte, queue, loss, and source-stage equations are exact and nonsaturated. | **INCONCLUSIVE** | true | {"accepted_physical_raw":true,"accepted_physical_rle_auto":true,"accepted_synthetic_patterns":true,"host_corpus":true,"passing_endurance_600_seconds":null,"simulated_fake_device":true} | Logical, encoded-payload, selected-wire, frame-partition, queue, and cleanup equations were exact for every accepted stage; corrupted/incomplete endurance input prevented a complete 600-second conservation observation. | ["physical-campaign","simulated-rig-gate"] |
+| queue_bounds | Every observed queue depth and high-water value is at or below its same-artifact advertised capacity. | **PASS** | 200 | 119 | — | ["physical-accepted-campaign","simulated-rig-gate"] |
+| final_idle_cleanup | STOP and final cleanup leave IDLE with every required ownership and transport gauge at zero. | **PASS** | true | {"accepted_v2_runs_stop_and_idle":true,"endurance_attempts_stop_and_idle":true,"endurance_reader_empty":true,"service_queue_depth_zero":true,"simulated_positive_cases_idle":true} | — | ["physical-accepted-campaign","simulated-rig-gate"] |
+| claim_scope_complete | Every required limitation is explicit and no conclusion exceeds the evidence level that supports it. | **PASS** | true | {"analog_performance_untested":true,"bandwidth_value_fail_reported_separately":true,"build_is_not_target_runtime":true,"campaign_00003_only_for_current_physical_conclusions":true,"campaigns_00001_00002_superseded_only":true,"compression_is_workload_dependent":true,"cross_branch_combinations_untested":true,"endurance_pass_not_claimed":true,"external_gpio_timing_untested":true,"replacement_serial_is_non_grading":true,"rig_correctness_inconclusive":true,"simulation_is_not_physical":true} | — | ["evidence-framework"] |
 
 ## Claim limitations
 
@@ -252,17 +287,19 @@ Reason: The Teensy 4.0 did not enumerate within the remote service's fixed 20-se
 
 | Kind | Repository-relative path | Size (bytes) | SHA-256 |
 | --- | --- | ---: | --- |
-| firmware-build-manifest | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json` | 13026 | `c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae` |
+| firmware-build-manifest | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json` | 13025 | `903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d` |
 | firmware-eep | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep` | 34 | `c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77` |
-| firmware-elf | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf` | 1922896 | `f29723328d722b4721ca4aea384b657986574e98e2e108098c3ac99e720faf60` |
-| firmware-hex | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex` | 386057 | `856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da` |
-| firmware-map | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map` | 840531 | `59fe7bb71a9ddb2defc77e5befdde101a5c6de45b9b9f724bd595e2a50cf1a2b` |
+| firmware-elf | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf` | 1931952 | `5b2793c8d43dc16640e6ad234e8f170ad7ce6f054c4b71d623b1e6f345516f74` |
+| firmware-hex | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex` | 388911 | `b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248` |
+| firmware-map | `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map` | 841281 | `ac898ed5214200bb00ad8e6a8f7c3378dc20738f14e635ccf6f87f0dc3537897` |
 
 ### Commands
 
 - `evidence-framework` (host): `python3 firmware/tools/experiment_evidence.py --report doc/results/experiments/rle-streaming.json --json-output doc/results/experiments/rle-streaming.json --markdown-output doc/results/experiments/rle-streaming.md --check`
 - `host-corpus-benchmark` (host): `python3 -m thingdaq.rle_benchmark --pretty`
 - `local-firmware-gate` (host): `python3 -m pytest -q`
-- `physical-campaign` (rig): `python3 firmware/tests/rig_rle_streaming.py`
+- `physical-accepted-campaign` (rig): `python3 .maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py`
+- `physical-campaign` (rig): `python3 .maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py`
+- `physical-endurance-campaign` (rig): `python3 .maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py`
 - `protocol-v1-compatibility` (host): `git diff --exit-code experiment/baseline-2026-09-01 HEAD -- protocol/protocol-v1.json protocol/fixtures daq_api/src/thingdaq/_generated/protocol_constants.py firmware/src/generated/protocol_constants.h`
 - `simulated-rig-gate` (simulated): `python3 -m pytest -q firmware/tests/test_rig_rle_streaming.py`

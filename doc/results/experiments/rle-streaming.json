@@ -49,9 +49,9 @@
         "protocol_version": 1,
         "repository": "https://github.com/ThingDone/thingdaq.git",
         "source_clean": true,
-        "source_commit": "7c639104f78866eb7e6191b58b2bc5349342e480",
-        "source_id": "85f2698ba97fb1defe827c4c12b5cd1e746a7ccc518b7868d4135a5b50605d8b",
-        "source_tree": "04d07aab4a1440551c69a5cc1d135d59b0376a51",
+        "source_commit": "dca4343616a78ab71dedf08155359aeddd017859",
+        "source_id": "db824f42af030d7ed226900d3b68379962f7515f66734e51e4309773b04f5c4d",
+        "source_tree": "055d03da63298913b33f18edf0dfc06fa109d2c6",
         "toolchains": [
           {
             "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
@@ -103,19 +103,19 @@
         "local-firmware-gate"
       ],
       "expected": {
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d",
         "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "f29723328d722b4721ca4aea384b657986574e98e2e108098c3ac99e720faf60",
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da",
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "59fe7bb71a9ddb2defc77e5befdde101a5c6de45b9b9f724bd595e2a50cf1a2b"
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "5b2793c8d43dc16640e6ad234e8f170ad7ce6f054c4b71d623b1e6f345516f74",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "ac898ed5214200bb00ad8e6a8f7c3378dc20738f14e635ccf6f87f0dc3537897"
       },
       "id": "artifact_hashes_verified",
       "observed": {
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json": "903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d",
         "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "f29723328d722b4721ca4aea384b657986574e98e2e108098c3ac99e720faf60",
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da",
-        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "59fe7bb71a9ddb2defc77e5befdde101a5c6de45b9b9f724bd595e2a50cf1a2b"
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf": "5b2793c8d43dc16640e6ad234e8f170ad7ce6f054c4b71d623b1e6f345516f74",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+        "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map": "ac898ed5214200bb00ad8e6a8f7c3378dc20738f14e635ccf6f87f0dc3537897"
       },
       "operator": "hash_equal",
       "reason": null,
@@ -182,18 +182,19 @@
       "expected": true,
       "id": "lifecycle_complete",
       "observed": {
+        "accepted_short_stages": 10,
         "default_v1_raw_simulator": true,
-        "physical_capture": null,
-        "physical_configure": null,
-        "physical_idle": null,
-        "physical_info": null,
-        "physical_start": null,
-        "physical_status": null,
-        "physical_stop": null,
+        "passing_endurance_600_seconds": false,
+        "physical_configure": true,
+        "physical_idle": true,
+        "physical_info": true,
+        "physical_start": true,
+        "physical_status": true,
+        "physical_stop": true,
         "simulated_fake_device": true
       },
       "operator": "all",
-      "reason": "The board never enumerated, so INFO, CONFIGURE, START, capture, STATUS, STOP, and firmware IDLE cleanup were not exercised on target.",
+      "reason": "All ten accepted short stages and both failed endurance attempts completed STOP/final-IDLE cleanup, but no 600-second acquisition completed without upstream serial byte loss.",
       "required_evidence_levels": [
         "simulated",
         "rig"
@@ -203,22 +204,19 @@
     {
       "description": "Every validated synthetic ADC pair and GPIO sample matches the declared deterministic formula and chronology.",
       "evidence_ids": [
-        "physical-campaign",
+        "physical-accepted-campaign",
         "simulated-rig-gate"
       ],
       "expected": "all five target patterns match exact formulas and chronology",
       "id": "synthetic_formulas_exact",
-      "observed": {
-        "physical_target": null,
-        "target_fake_and_source_tests": true
-      },
+      "observed": "all five target patterns match exact formulas and chronology",
       "operator": "eq",
-      "reason": "All five formulas passed fake-device and target-source tests, but none ran on the physical target.",
+      "reason": null,
       "required_evidence_levels": [
         "simulated",
         "rig"
       ],
-      "state": "INCONCLUSIVE"
+      "state": "PASS"
     },
     {
       "description": "Sequence gaps, loss, parser errors, transport errors, host-queue drops, and unexplained firmware errors are zero unless a named negative case declares and reconciles them.",
@@ -229,16 +227,18 @@
       "expected": true,
       "id": "stream_health",
       "observed": {
-        "physical_codec_errors": null,
-        "physical_complete_frame_loss": null,
-        "physical_dma_cache_errors": null,
-        "physical_parser_errors": null,
-        "physical_sequence_gaps": null,
-        "physical_transport_errors": null,
+        "accepted_short_stage_active_errors_zero": true,
+        "accepted_short_stage_parser_errors": 0,
+        "accepted_short_stage_sequence_gaps": 0,
+        "accepted_short_stage_transport_errors": 0,
+        "endurance_checksum_mismatches": 1,
+        "endurance_missing_prefix_events": 1,
+        "endurance_userspace_queue_saturated": false,
+        "failure_layer_localized": false,
         "simulated_fake_device": true
       },
       "operator": "all",
-      "reason": "No live stream began, so rates, loss, parser, transport, DMA, cache, codec, latency, and utilization counters were not observed.",
+      "reason": "All ten accepted short stages had zero active loss/error counters, but both endurance attempts lost wire bytes upstream of a nonsaturated userspace queue; the responsible remote transport layer is unresolved.",
       "required_evidence_levels": [
         "simulated",
         "rig"
@@ -254,65 +254,15 @@
       "expected": true,
       "id": "counter_conservation",
       "observed": {
-        "host_adc": {
-          "frame_selection": {
-            "left": 32,
-            "right": 32
-          },
-          "logical_raw": {
-            "left": 129536,
-            "right": 129536
-          },
-          "raw_wire": {
-            "left": 131072,
-            "right": 131072
-          },
-          "selected_wire": {
-            "left": 76288,
-            "right": 76288
-          }
-        },
-        "host_combined": {
-          "frame_selection": {
-            "left": 72,
-            "right": 72
-          },
-          "logical_raw": {
-            "left": 291456,
-            "right": 291456
-          },
-          "raw_wire": {
-            "left": 294912,
-            "right": 294912
-          },
-          "selected_wire": {
-            "left": 143261,
-            "right": 143261
-          }
-        },
-        "host_gpio": {
-          "frame_selection": {
-            "left": 40,
-            "right": 40
-          },
-          "logical_raw": {
-            "left": 161920,
-            "right": 161920
-          },
-          "raw_wire": {
-            "left": 163840,
-            "right": 163840
-          },
-          "selected_wire": {
-            "left": 66973,
-            "right": 66973
-          }
-        },
-        "physical": null,
+        "accepted_physical_raw": true,
+        "accepted_physical_rle_auto": true,
+        "accepted_synthetic_patterns": true,
+        "host_corpus": true,
+        "passing_endurance_600_seconds": null,
         "simulated_fake_device": true
       },
       "operator": "exact_conservation",
-      "reason": "Host corpus and fake-device equations were exact, but no physical logical, encoded-payload, wire, queue, or loss counters were emitted.",
+      "reason": "Logical, encoded-payload, selected-wire, frame-partition, queue, and cleanup equations were exact for every accepted stage; corrupted/incomplete endurance input prevented a complete 600-second conservation observation.",
       "required_evidence_levels": [
         "simulated",
         "rig"
@@ -322,51 +272,42 @@
     {
       "description": "Every observed queue depth and high-water value is at or below its same-artifact advertised capacity.",
       "evidence_ids": [
-        "physical-campaign",
+        "physical-accepted-campaign",
         "simulated-rig-gate"
       ],
-      "expected": {
-        "packet_capacity_frames": 200
-      },
+      "expected": 200,
       "id": "queue_bounds",
-      "observed": {
-        "local_packet_capacity_frames": 200,
-        "local_temporary_page_maximum": 1,
-        "physical_host_high_water": null,
-        "physical_packet_high_water": null,
-        "service_queue_depth_after_attempts": 0
-      },
+      "observed": 119,
       "operator": "lte",
-      "reason": "The 200-page local bound and service queue recovery passed, but target and host acquisition queue high-water values were never instantiated.",
+      "reason": null,
       "required_evidence_levels": [
         "simulated",
         "rig"
       ],
-      "state": "INCONCLUSIVE"
+      "state": "PASS"
     },
     {
       "description": "STOP and final cleanup leave IDLE with every required ownership and transport gauge at zero.",
       "evidence_ids": [
-        "physical-campaign",
+        "physical-accepted-campaign",
         "simulated-rig-gate"
       ],
       "expected": true,
       "id": "final_idle_cleanup",
       "observed": {
-        "default_v1_raw_simulator_idle": true,
-        "physical_firmware_idle_confirmed": null,
-        "physical_stop_attempted": false,
-        "service_queue_depth": 0,
-        "service_recovered_after_each_attempt": true,
+        "accepted_v2_runs_stop_and_idle": true,
+        "endurance_attempts_stop_and_idle": true,
+        "endurance_reader_empty": true,
+        "service_queue_depth_zero": true,
         "simulated_positive_cases_idle": true
       },
       "operator": "all",
-      "reason": "No firmware session existed to STOP or query for IDLE; only service recovery to queue depth zero was observable.",
+      "reason": null,
       "required_evidence_levels": [
         "simulated",
         "rig"
       ],
-      "state": "INCONCLUSIVE"
+      "state": "PASS"
     },
     {
       "description": "Every required limitation is explicit and no conclusion exceeds the evidence level that supports it.",
@@ -377,14 +318,15 @@
       "id": "claim_scope_complete",
       "observed": {
         "analog_performance_untested": true,
+        "bandwidth_value_fail_reported_separately": true,
         "build_is_not_target_runtime": true,
+        "campaign_00003_only_for_current_physical_conclusions": true,
+        "campaigns_00001_00002_superseded_only": true,
         "compression_is_workload_dependent": true,
         "cross_branch_combinations_untested": true,
+        "endurance_pass_not_claimed": true,
         "external_gpio_timing_untested": true,
-        "firmware_encode_load_not_claimed": true,
-        "physical_adc_ratio_not_claimed": true,
-        "physical_bandwidth_benefit_inconclusive": true,
-        "physical_gpio_ratio_not_claimed": true,
+        "replacement_serial_is_non_grading": true,
         "rig_correctness_inconclusive": true,
         "simulation_is_not_physical": true
       },
@@ -404,8 +346,8 @@
     {
       "kind": "firmware-build-manifest",
       "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
-      "sha256": "c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae",
-      "size_bytes": 13026
+      "sha256": "903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d",
+      "size_bytes": 13025
     },
     {
       "kind": "firmware-eep",
@@ -416,26 +358,28 @@
     {
       "kind": "firmware-elf",
       "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf",
-      "sha256": "f29723328d722b4721ca4aea384b657986574e98e2e108098c3ac99e720faf60",
-      "size_bytes": 1922896
+      "sha256": "5b2793c8d43dc16640e6ad234e8f170ad7ce6f054c4b71d623b1e6f345516f74",
+      "size_bytes": 1931952
     },
     {
       "kind": "firmware-hex",
       "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
-      "sha256": "856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da",
-      "size_bytes": 386057
+      "sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+      "size_bytes": 388911
     },
     {
       "kind": "firmware-map",
       "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
-      "sha256": "59fe7bb71a9ddb2defc77e5befdde101a5c6de45b9b9f724bd595e2a50cf1a2b",
-      "size_bytes": 840531
+      "sha256": "ac898ed5214200bb00ad8e6a8f7c3378dc20738f14e635ccf6f87f0dc3537897",
+      "size_bytes": 841281
     }
   ],
-  "created": "2026-09-02",
+  "created": "2026-09-04",
   "evidence": [
     {
-      "campaign_index_sha256": "760c99e79fe50a4634a17e7c6bb205af36f0ec4c9844ac91b1acec909873d515",
+      "campaign_index_path": ".maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/campaign-index.json",
+      "campaign_index_sha256": "681c74f20f35012af01b438561de7c4d25ec0b91a3fb247d0e0255e35b960f21",
+      "campaign_validation_checks": 9091,
       "command": {
         "argv": [
           "python3",
@@ -467,7 +411,7 @@
         }
       ],
       "level": "host",
-      "method": "Fail-closed matrix validation, file/hash and Git identity verification, normalization, and two canonical shared-reporter renders.",
+      "method": "The campaign-specific validator first performed 9,091 fail-closed identity, artifact, sequencing, measurement, conservation, cleanup, no-secret, and no-bulk-data checks. The shared experiment reporter then validated files, schema, Git identity, normalization, and two canonical renders.",
       "reason": null,
       "render_repetitions": 2,
       "result": "PASS",
@@ -1575,7 +1519,7 @@
       ]
     },
     {
-      "checkpoint_commit": "7c639104f78866eb7e6191b58b2bc5349342e480",
+      "checkpoint_commit": "dca4343616a78ab71dedf08155359aeddd017859",
       "command": {
         "argv": [
           "python3",
@@ -1589,9 +1533,9 @@
         "user_input": false
       },
       "complete": {
-        "passed": 500,
+        "passed": 510,
         "skipped": 8,
-        "subtests": 14589
+        "subtests": 14875
       },
       "corpus_adaptive_no_expansion": true,
       "corpus_exact_raw_rle_decode_equality": true,
@@ -1599,9 +1543,9 @@
       "deterministic_builds": {
         "artifact_hashes": {
           "firmware.ino.eep": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
-          "firmware.ino.elf": "f29723328d722b4721ca4aea384b657986574e98e2e108098c3ac99e720faf60",
-          "firmware.ino.hex": "856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da",
-          "firmware.ino.map": "59fe7bb71a9ddb2defc77e5befdde101a5c6de45b9b9f724bd595e2a50cf1a2b"
+          "firmware.ino.elf": "5b2793c8d43dc16640e6ad234e8f170ad7ce6f054c4b71d623b1e6f345516f74",
+          "firmware.ino.hex": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+          "firmware.ino.map": "ac898ed5214200bb00ad8e6a8f7c3378dc20738f14e635ccf6f87f0dc3537897"
         },
         "byte_identical": true,
         "count": 2
@@ -1610,13 +1554,12 @@
         "passed": 8,
         "subtests": 643
       },
-      "firmware_build_id": "thingdaq-85f2698ba97fb1de",
-      "firmware_source_commit": "f831c89fe15abec05b89df2e6aa60f07a1dcf2b6",
-      "firmware_source_id": "85f2698ba97fb1defe827c4c12b5cd1e746a7ccc518b7868d4135a5b50605d8b",
-      "focused": {
-        "cpp_subtests": 415,
-        "passed": 72,
-        "skipped": 1
+      "firmware_build_id": "thingdaq-db824f42af030d7e",
+      "firmware_source_commit": "dca4343616a78ab71dedf08155359aeddd017859",
+      "firmware_source_id": "db824f42af030d7ed226900d3b68379962f7515f66734e51e4309773b04f5c4d",
+      "focused_runner_regression": {
+        "passed": 17,
+        "subtests": 270
       },
       "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
       "host_architecture": "x86_64",
@@ -1625,39 +1568,39 @@
       "inputs": [
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
-          "sha256": "c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae"
+          "sha256": "903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d"
         },
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.elf",
-          "sha256": "f29723328d722b4721ca4aea384b657986574e98e2e108098c3ac99e720faf60"
+          "sha256": "5b2793c8d43dc16640e6ad234e8f170ad7ce6f054c4b71d623b1e6f345516f74"
         },
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
-          "sha256": "856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da"
+          "sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248"
         },
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.map",
-          "sha256": "59fe7bb71a9ddb2defc77e5befdde101a5c6de45b9b9f724bd595e2a50cf1a2b"
+          "sha256": "ac898ed5214200bb00ad8e6a8f7c3378dc20738f14e635ccf6f87f0dc3537897"
         },
         {
           "path": "firmware/src/rle_encoder.cpp",
-          "sha256": "5c71c7a1da367b52a308d44ca17903749c79e95daf861c033accf7d0c7366677"
+          "sha256": "3df710d175c63824d4386dd1c50f7906885eae1e7af02c2ced5cf5c71c6af2e4"
         },
         {
           "path": "firmware/tests/rig_rle_streaming.py",
-          "sha256": "ccdc1647aba8d396a8eb91bc66dab08e43134e2e28b30bb4058c2880ee1cfbc2"
+          "sha256": "c901ca0ed4bf0a607efc6bbaa75562855920775d154f347f055a0727b85c9967"
         },
         {
           "path": "firmware/tests/rle_encoder_test.cpp",
-          "sha256": "4904403fbf46137f1da8d3be7c414e0ef12597c47abf3d6af31aaabe60499816"
+          "sha256": "8815d8a05dddbd24404556b70abd54b42b74a3462d4306c509504d51e3c28f92"
         },
         {
           "path": "firmware/tests/test_rig_rle_streaming.py",
-          "sha256": "6c725abc7d24d7d414c99bd39e813e32b6e84e17ab7426f6e4e3781855105f70"
+          "sha256": "17ff613a4c67d3b7a11e1b83f6fa327ca1cb487eadf05744ba8fb9aa60726156"
         },
         {
           "path": "firmware/tests/test_rle_encoder.py",
-          "sha256": "e6d0813d202a245efa8679b8ea8ff1985bb9606d675975816e85d52ce44b9587"
+          "sha256": "7347b5dd0a0dbed532e068e29e2b3124620a025009841382bd24a9de86f9e761"
         },
         {
           "path": "firmware/tools/build_firmware.py",
@@ -1680,22 +1623,22 @@
       "local_results": {
         "local_compatibility": "PASS",
         "local_correctness": "PASS",
-        "physical_bandwidth_benefit": "INCONCLUSIVE",
+        "physical_bandwidth_benefit": "FAIL",
         "rig_correctness": "INCONCLUSIVE"
       },
       "memory_bytes": {
-        "flash_headroom": 1894404,
-        "flash_used": 137212,
+        "flash_headroom": 1893380,
+        "flash_used": 138236,
         "ram1_headroom": 32800,
         "ram1_used": 491488,
         "ram2_headroom": 4096,
         "ram2_used": 520192
       },
-      "method": "Complete protocol, portable C++ codec, packet/USB/runtime, rig, parser/performance, style, typing, documentation, regression, deterministic-build, and default-v1 simulator gate.",
+      "method": "Current final4 candidate validation: complete repository regression, focused runner regression, protocol drift, Ruff, focused MyPy, target build/linker gates, and unchanged v1 compatibility.",
       "minimum_decoder_headroom": 1.5246,
       "mypy": {
-        "checked_sources": 29,
-        "clean": true
+        "clean": true,
+        "scope": "focused runner sources"
       },
       "packet_retention": {
         "dtcm_pages": 105,
@@ -1715,266 +1658,1653 @@
       "reason": null,
       "result": "PASS",
       "ruff": {
-        "checked_files": 140,
         "format": true,
         "lint": true
       },
       "toolchain_identity": "CPython 3.12.3; GNU g++ host wrappers; Teensy core 1.62.0; Arm GNU 15.2.1; Arduino CLI 1.4.1"
     },
     {
-      "accepted_runs": [],
-      "attempts": [
+      "accepted_runs": [
         {
-          "classification": "infrastructure_board_unavailable",
-          "counted_as_infrastructure_retry": false,
-          "exit_code": -100,
-          "firmware_programmed": false,
-          "job_id": "d9c0e047-1152-4c63-b5dd-506a905bc7db",
-          "message": "Board teensy:avr:teensy40 did not appear on any serial port within 20s of powering hub port 15",
-          "port_powered": true,
-          "program_success": null,
-          "runner_started": false,
-          "sequence": 1,
-          "stage": "v1-raw-physical-combined-smoke"
+          "all_metrics_pass": true,
+          "checks": 352,
+          "encoding": "RAW",
+          "finished_utc": "2026-09-03T21:46:01Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "hardware_serial": 20428100,
+          "job_id": "74a69541-ed2c-4ffb-9f01-c64c941b9dd3",
+          "order": 1,
+          "pattern": "physical",
+          "protocol_version": 1,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:45:34Z",
+          "submission_name": "final4-v1-raw-physical-combined-smoke"
         },
         {
-          "classification": "infrastructure_board_unavailable",
-          "counted_as_infrastructure_retry": true,
-          "exit_code": -100,
-          "firmware_programmed": false,
-          "job_id": "816e750c-002a-4212-b7f9-c1e390fecb27",
-          "message": "Board teensy:avr:teensy40 did not appear on any serial port within 20s of powering hub port 15",
-          "port_powered": true,
-          "program_success": null,
-          "runner_started": false,
-          "sequence": 2,
-          "stage": "v1-raw-physical-combined-smoke"
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 343274711.2171568,
+          "complete_wire_ratio": 1.0,
+          "encoding": "RAW",
+          "finished_utc": "2026-09-03T21:46:45Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.0,
+          "hardware_serial": 20428100,
+          "job_id": "b780d490-fa3a-4248-998c-0b06fa61d91c",
+          "order": 2,
+          "pattern": "physical",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:46:01Z",
+          "steady_capture_seconds": 10.002909855917096,
+          "submission_name": "final4-resample-v2-raw-smoke"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 252585371.67673218,
+          "complete_wire_ratio": 0.5062255859375,
+          "encoding": "RLE_AUTO",
+          "finished_utc": "2026-09-03T21:47:30Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.10217395965203233,
+          "hardware_serial": 20428100,
+          "job_id": "9ddbeb1d-41e6-4522-ad5b-9989632855fd",
+          "order": 3,
+          "pattern": "physical",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:46:46Z",
+          "steady_capture_seconds": 10.00570837710984,
+          "submission_name": "final4-resample-v2-rle-auto-smoke"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 381187051.59856045,
+          "complete_wire_ratio": 0.0128173828125,
+          "encoding": "RLE_AUTO",
+          "finished_utc": "2026-09-03T21:48:15Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.07215833093196648,
+          "hardware_serial": 20428100,
+          "job_id": "9832bb0a-fe99-4802-92c6-9501f737112a",
+          "order": 4,
+          "pattern": "constant",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:47:30Z",
+          "steady_capture_seconds": 10.030974688008428,
+          "submission_name": "final4-resample-synthetic-constant-rle-auto"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 182244417.00464156,
+          "complete_wire_ratio": 0.013929049456059597,
+          "encoding": "RLE_AUTO",
+          "finished_utc": "2026-09-03T21:49:01Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.2727286293305548,
+          "hardware_serial": 20428100,
+          "job_id": "25dcc047-cc6b-438a-81c2-15ccd6838ad0",
+          "order": 5,
+          "pattern": "sparse-hold",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:48:15Z",
+          "steady_capture_seconds": 10.036439941031858,
+          "submission_name": "final4-resample-synthetic-sparse-hold-rle-auto"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 20387963.94291566,
+          "complete_wire_ratio": 0.2559814453125,
+          "encoding": "RLE_AUTO",
+          "finished_utc": "2026-09-03T21:49:44Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.3773369669758122,
+          "hardware_serial": 20428100,
+          "job_id": "a80b863d-8b11-4b2f-9a85-8d53c3345f61",
+          "order": 6,
+          "pattern": "slow-adc",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:49:01Z",
+          "steady_capture_seconds": 10.010363441891968,
+          "submission_name": "final4-resample-synthetic-slow-adc-rle-auto"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 1504230392.6592495,
+          "complete_wire_ratio": 1.0,
+          "encoding": "RLE_AUTO",
+          "finished_utc": "2026-09-03T21:50:28Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.08392960495806741,
+          "hardware_serial": 20428100,
+          "job_id": "d165c5d0-d6bc-4588-8f39-702896c5dae9",
+          "order": 7,
+          "pattern": "alternating",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:49:45Z",
+          "steady_capture_seconds": 10.003039689036086,
+          "submission_name": "final4-resample-synthetic-alternating-rle-auto"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 34786802.46630194,
+          "complete_wire_ratio": 1.0,
+          "encoding": "RLE_AUTO",
+          "finished_utc": "2026-09-03T21:51:15Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.08412224379622806,
+          "hardware_serial": 20428100,
+          "job_id": "b9cf56b7-9351-4566-9572-61075e0a0fee",
+          "order": 8,
+          "pattern": "incompressible",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:50:28Z",
+          "steady_capture_seconds": 10.003806773107499,
+          "submission_name": "final4-resample-synthetic-incompressible-rle-auto"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 317411314.6117571,
+          "complete_wire_ratio": 1.0,
+          "encoding": "RAW",
+          "finished_utc": "2026-09-03T21:52:53Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.0,
+          "hardware_serial": 20428100,
+          "job_id": "1242edca-de9e-49d8-9093-15232c79686e",
+          "order": 9,
+          "pattern": "physical",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:51:15Z",
+          "steady_capture_seconds": 60.004249937832355,
+          "submission_name": "final4-resample-physical-combined-v2-raw-matched"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 245213819.86783877,
+          "complete_wire_ratio": 0.5062255859375,
+          "encoding": "RLE_AUTO",
+          "finished_utc": "2026-09-03T21:54:32Z",
+          "firmware_build_id": "thingdaq-db824f42af030d7e",
+          "firmware_encode_load_ratio": 0.10205324234404214,
+          "hardware_serial": 20428100,
+          "job_id": "9686bce1-f4aa-4974-9a34-2e6c01c62f85",
+          "order": 10,
+          "pattern": "physical",
+          "protocol_version": 2,
+          "result": "PASS",
+          "started_utc": "2026-09-03T21:52:53Z",
+          "steady_capture_seconds": 60.00481345807202,
+          "submission_name": "final4-resample-physical-combined-v2-rle-auto-matched"
         }
       ],
-      "campaign_id": "rle-streaming-physical-campaign-00001",
-      "campaign_index_sha256": "760c99e79fe50a4634a17e7c6bb205af36f0ec4c9844ac91b1acec909873d515",
+      "campaign_id": "rle-streaming-physical-campaign-00003",
+      "campaign_index_path": ".maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/campaign-index.json",
+      "campaign_index_sha256": "681c74f20f35012af01b438561de7c4d25ec0b91a3fb247d0e0255e35b960f21",
+      "campaign_validation_checks": 9091,
       "candidate": {
-        "artifact_provenance_commit": "f831c89fe15abec05b89df2e6aa60f07a1dcf2b6",
         "branch": "experiment/rle-streaming",
-        "build_id": "thingdaq-85f2698ba97fb1de",
-        "checkpoint_commit": "7c639104f78866eb7e6191b58b2bc5349342e480",
+        "build_id": "thingdaq-db824f42af030d7e",
+        "directory": "candidate-final4",
+        "firmware_inputs_clean": true,
+        "firmware_source_unchanged_by_runner_correction": true,
         "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
-        "hex_sha256": "856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da",
-        "hex_size_bytes": 386057,
-        "manifest_sha256": "c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae",
-        "source_id": "85f2698ba97fb1defe827c4c12b5cd1e746a7ccc518b7868d4135a5b50605d8b"
+        "git_commit": "dca4343616a78ab71dedf08155359aeddd017859",
+        "hex": {
+          "path": "candidate-final4/firmware/build/teensy.avr.teensy40/firmware.ino.hex",
+          "sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+          "size_bytes": 388911
+        },
+        "immutable_after_first_submission": true,
+        "manifest": {
+          "path": "candidate-final4/firmware/build/teensy.avr.teensy40/build-manifest.json",
+          "sha256": "903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d",
+          "size_bytes": 13025
+        },
+        "manifest_hex_sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+        "memory": {
+          "flash_code_bytes": 105908,
+          "flash_data_bytes": 23496,
+          "flash_headers_bytes": 8832,
+          "packet_frames": 200,
+          "packet_primary_frames": 105,
+          "packet_reserve_frames": 95,
+          "ram1_code_bytes": 32616,
+          "ram1_free_for_locals_bytes": 32800,
+          "ram1_padding_bytes": 152,
+          "ram1_variables_bytes": 458720,
+          "ram2_free_for_heap_bytes": 4096,
+          "ram2_variables_bytes": 520192
+        },
+        "source_id": "db824f42af030d7ed226900d3b68379962f7515f66734e51e4309773b04f5c4d",
+        "submission_board_id": "teensy:avr:teensy40"
       },
       "command": {
         "argv": [
           "python3",
-          "firmware/tests/rig_rle_streaming.py"
+          ".maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py"
         ],
-        "firmware_upload": true,
-        "network": true,
-        "serial_hardware": true,
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
         "user_input": false
       },
-      "decisions": {
-        "physical_bandwidth_benefit": {
-          "maximum_processing_utilization_increase": 0.1,
-          "reason": "No matched RAW/RLE_AUTO physical measurements exist.",
-          "required_complete_wire_reduction_ratio": 0.2,
-          "result": "INCONCLUSIVE"
+      "firmware_artifact_sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+      "firmware_build_id": "thingdaq-db824f42af030d7e",
+      "fixture_declaration_sha256": "c901ca0ed4bf0a607efc6bbaa75562855920775d154f347f055a0727b85c9967",
+      "hardware_serial": 20428100,
+      "health": {
+        "all_validated_active_errors_zero": true,
+        "cleanup": {
+          "accepted_v2_runs": 9,
+          "all_cleanup_error_lists_empty": true,
+          "all_final_idle_confirmed": true,
+          "all_stop_succeeded": true
         },
-        "rig_correctness": {
-          "reason": "No firmware runner execution occurred.",
-          "result": "INCONCLUSIVE"
+        "counter_conservation": {
+          "adc": {
+            "conservation": {
+              "raw_operand_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              },
+              "rle_operand_frame_partition": {
+                "left": 64233,
+                "right": 64233
+              },
+              "rle_operand_raw_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              },
+              "rle_operand_selected_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              }
+            },
+            "grade": {
+              "bandwidth_reduction_result": "FAIL",
+              "bandwidth_reduction_threshold": 0.2,
+              "complete_wire_ratio": 1.0,
+              "complete_wire_reduction_ratio": 0.0,
+              "encode_cycles": 1797982213,
+              "encoded_payload_bytes": 260015184,
+              "logical_payload_bytes": 260015184,
+              "maximum_processing_utilization_increase": 0.1,
+              "processing_utilization_delta_percentage_points": 4.609869667662673,
+              "processing_utilization_ratio": 0.046098696676626735,
+              "processing_utilization_result": "PASS",
+              "raw_complete_wire_bytes": 263098368,
+              "raw_frames": 64233,
+              "result": "FAIL",
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "selected_complete_wire_bytes": 263098368
+            },
+            "raw": {
+              "complete_wire_bytes": 263098368,
+              "decode_bytes_per_second": 212643149.0704229,
+              "encoded_payload_bytes": 260015184,
+              "frames": 64233,
+              "logical_payload_bytes": 260015184,
+              "raw_frames": 64233,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_logical_bytes_per_second": 3999972.265934705
+            },
+            "rle_auto": {
+              "complete_wire_bytes": 263098368,
+              "decode_bytes_per_second": 215047155.10220528,
+              "encoded_payload_bytes": 260015184,
+              "frames": 64233,
+              "logical_payload_bytes": 260015184,
+              "raw_equivalent_complete_wire_bytes": 263098368,
+              "raw_frames": 64233,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_logical_bytes_per_second": 3999937.600673013
+            }
+          },
+          "combined": {
+            "conservation": {
+              "raw_operand_envelope": {
+                "left": 526196736,
+                "right": 526196736
+              },
+              "rle_operand_frame_partition": {
+                "left": 128466,
+                "right": 128466
+              },
+              "rle_operand_raw_envelope": {
+                "left": 526196736,
+                "right": 526196736
+              },
+              "rle_operand_selected_envelope": {
+                "left": 266374251,
+                "right": 266374251
+              }
+            },
+            "grade": {
+              "bandwidth_reduction_result": "PASS",
+              "bandwidth_reduction_threshold": 0.2,
+              "complete_wire_ratio": 0.5062255859375,
+              "complete_wire_reduction_ratio": 0.4937744140625,
+              "encode_cycles": 3980370981,
+              "encoded_payload_bytes": 260207883,
+              "logical_payload_bytes": 520030368,
+              "maximum_processing_utilization_increase": 0.1,
+              "processing_utilization_delta_percentage_points": 10.205324234404214,
+              "processing_utilization_ratio": 0.10205324234404214,
+              "processing_utilization_result": "FAIL",
+              "raw_complete_wire_bytes": 526196736,
+              "raw_frames": 64233,
+              "result": "FAIL",
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "selected_complete_wire_bytes": 266374251
+            },
+            "raw": {
+              "complete_wire_bytes": 526196736,
+              "decode_bytes_per_second": 317411314.6117571,
+              "encoded_payload_bytes": 520030368,
+              "frames": 128466,
+              "logical_payload_bytes": 520030368,
+              "raw_frames": 128466,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_logical_bytes_per_second": 7999944.53186941
+            },
+            "rle_auto": {
+              "complete_wire_bytes": 266374251,
+              "decode_bytes_per_second": 245213819.86783877,
+              "encoded_payload_bytes": 260207883,
+              "frames": 128466,
+              "logical_payload_bytes": 520030368,
+              "raw_equivalent_complete_wire_bytes": 526196736,
+              "raw_frames": 64233,
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "wall_logical_bytes_per_second": 7999875.201346026
+            }
+          },
+          "gpio": {
+            "conservation": {
+              "raw_operand_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              },
+              "rle_operand_frame_partition": {
+                "left": 64233,
+                "right": 64233
+              },
+              "rle_operand_raw_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              },
+              "rle_operand_selected_envelope": {
+                "left": 3275883,
+                "right": 3275883
+              }
+            },
+            "grade": {
+              "bandwidth_reduction_result": "PASS",
+              "bandwidth_reduction_threshold": 0.2,
+              "complete_wire_ratio": 0.012451171875,
+              "complete_wire_reduction_ratio": 0.987548828125,
+              "encode_cycles": 2182388768,
+              "encoded_payload_bytes": 192699,
+              "logical_payload_bytes": 260015184,
+              "maximum_processing_utilization_increase": 0.1,
+              "processing_utilization_delta_percentage_points": 5.595454566741541,
+              "processing_utilization_ratio": 0.05595454566741541,
+              "processing_utilization_result": "PASS",
+              "raw_complete_wire_bytes": 263098368,
+              "raw_frames": 0,
+              "result": "PASS",
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "selected_complete_wire_bytes": 3275883
+            },
+            "raw": {
+              "complete_wire_bytes": 263098368,
+              "decode_bytes_per_second": 625681129.0397698,
+              "encoded_payload_bytes": 260015184,
+              "frames": 64233,
+              "logical_payload_bytes": 260015184,
+              "raw_frames": 64233,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_logical_bytes_per_second": 3999972.265934705
+            },
+            "rle_auto": {
+              "complete_wire_bytes": 3275883,
+              "decode_bytes_per_second": 285224981.0584376,
+              "encoded_payload_bytes": 192699,
+              "frames": 64233,
+              "logical_payload_bytes": 260015184,
+              "raw_equivalent_complete_wire_bytes": 263098368,
+              "raw_frames": 0,
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "wall_logical_bytes_per_second": 3999937.600673013
+            }
+          }
+        },
+        "validated_active_error_field_count": 70,
+        "validated_active_error_fields": {
+          "adc_dma_error_events": 0,
+          "adc_encode_failures": 0,
+          "adc_etc_error_events": 0,
+          "adc_etc_error_flags": 0,
+          "adc_fallback_encoder_failure": 0,
+          "adc_fallback_temporary_page_unavailable": 0,
+          "adc_frames_dropped": 0,
+          "adc_frames_dropped_after_framing": 0,
+          "adc_frames_dropped_after_promotion": 0,
+          "adc_frames_evicted": 0,
+          "adc_frames_evicted_after_promotion": 0,
+          "adc_overwritten_conversions": 0,
+          "adc_packer_chronology_errors": 0,
+          "adc_packer_pipeline_errors": 0,
+          "adc_packer_source_errors": 0,
+          "adc_payload_bytes_dropped": 0,
+          "adc_raw_gap_pairs": 0,
+          "adc_raw_invariant_errors": 0,
+          "adc_raw_ring_overruns": 0,
+          "adc_resource_conflicts": 0,
+          "adc_schedule_exhaustions": 0,
+          "adc_stale_completions": 0,
+          "adc_stale_interrupts": 0,
+          "adc_start_errors": 0,
+          "adc_stop_errors": 0,
+          "adc_trigger_error_count": 0,
+          "adc_trigger_error_flags": 0,
+          "bad_checksums": 0,
+          "bad_flags": 0,
+          "bad_lengths": 0,
+          "bad_payloads": 0,
+          "bad_request_ids": 0,
+          "bad_types": 0,
+          "bad_versions": 0,
+          "commands_rejected": 0,
+          "encode_failures": 0,
+          "gpio_encode_failures": 0,
+          "gpio_fallback_encoder_failure": 0,
+          "gpio_fallback_temporary_page_unavailable": 0,
+          "gpio_frames_dropped": 0,
+          "gpio_frames_dropped_after_framing": 0,
+          "gpio_frames_dropped_after_promotion": 0,
+          "gpio_frames_evicted": 0,
+          "gpio_frames_evicted_after_promotion": 0,
+          "gpio_hardware_errors": 0,
+          "gpio_packer_chronology_errors": 0,
+          "gpio_packer_pipeline_errors": 0,
+          "gpio_packer_source_errors": 0,
+          "gpio_payload_bytes_dropped": 0,
+          "gpio_raw_invariant_errors": 0,
+          "gpio_raw_ring_overruns": 0,
+          "gpio_resource_conflicts": 0,
+          "gpio_stale_dma_completions": 0,
+          "gpio_start_errors": 0,
+          "gpio_stop_errors": 0,
+          "packet_capacity_drops_without_evictable_frame": 0,
+          "packet_encoding_rejections": 0,
+          "packet_invalid_operations": 0,
+          "packet_pool_exhaustions": 0,
+          "packet_pressure_evictions": 0,
+          "packet_ready_queue_rejections": 0,
+          "packet_transmit_queue_rejections": 0,
+          "parser_errors": 0,
+          "response_queue_rejections": 0,
+          "response_reservations_abandoned": 0,
+          "state_errors": 0,
+          "temporary_page_exhaustions": 0,
+          "timeouts": 0,
+          "transport_errors": 0,
+          "usb_io_errors": 0
         }
       },
-      "firmware_artifact_sha256": "856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da",
-      "firmware_build_id": "thingdaq-85f2698ba97fb1de",
-      "fixture_declaration_sha256": "ccdc1647aba8d396a8eb91bc66dab08e43134e2e28b30bb4058c2880ee1cfbc2",
-      "hardware_serial": 20512460,
-      "id": "physical-campaign",
-      "infrastructure_incidents": [
-        {
-          "classification": "board_unavailable",
-          "job_ids": [
-            "d9c0e047-1152-4c63-b5dd-506a905bc7db",
-            "816e750c-002a-4212-b7f9-c1e390fecb27"
-          ],
-          "reason": "The Teensy 4.0 did not enumerate after port 15 power-on in either bounded attempt.",
-          "service_recovered_after_each_attempt": true
-        }
-      ],
+      "id": "physical-accepted-campaign",
       "inputs": [
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
-          "sha256": "c480d2c1c19446abda61c5fb056135d6269d53eaad7f9a11e2b0d7445c39f7ae"
+          "sha256": "903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d"
         },
         {
           "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
-          "sha256": "856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da"
+          "sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248"
         },
         {
           "path": "firmware/tests/rig_rle_streaming.py",
-          "sha256": "ccdc1647aba8d396a8eb91bc66dab08e43134e2e28b30bb4058c2880ee1cfbc2"
+          "sha256": "c901ca0ed4bf0a607efc6bbaa75562855920775d154f347f055a0727b85c9967"
         },
         {
           "path": "firmware/tests/test_rig_rle_streaming.py",
-          "sha256": "6c725abc7d24d7d414c99bd39e813e32b6e84e17ab7426f6e4e3781855105f70"
+          "sha256": "17ff613a4c67d3b7a11e1b83f6fa327ca1cb487eadf05744ba8fb9aa60726156"
+        },
+        {
+          "path": "protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
         },
         {
           "path": "protocol/protocol-v2.json",
           "sha256": "2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3"
         }
       ],
-      "job_id": "d9c0e047-1152-4c63-b5dd-506a905bc7db",
+      "job_id": "9686bce1-f4aa-4974-9a34-2e6c01c62f85",
       "level": "rig",
-      "method": "Credential-safe service preflight and strictly sequential bounded prerequisite submissions with one identical infrastructure retry; downstream stages were not submitted after the board remained unavailable.",
-      "not_run": [
-        {
-          "reason": "The prerequisite v1/RAW physical-combined smoke did not run.",
-          "stage": "v2-raw-smoke"
-        },
-        {
-          "reason": "The prerequisite v1/RAW physical-combined smoke did not run.",
-          "stage": "v2-rle-auto-smoke"
-        },
-        {
-          "patterns": [
-            "constant",
-            "sparse-hold",
-            "slow-adc",
-            "alternating",
-            "incompressible"
-          ],
-          "reason": "Both protocol-v2 smoke gates were not reached.",
-          "stage": "synthetic-patterns"
-        },
-        {
-          "reason": "The smoke and synthetic prerequisites were not reached.",
-          "stage": "matched-physical-combined-v2-raw"
-        },
-        {
-          "reason": "The smoke and synthetic prerequisites were not reached.",
-          "stage": "matched-physical-combined-v2-rle-auto"
-        },
-        {
-          "reason": "The matched physical comparison was not reached.",
-          "stage": "physical-combined-v2-rle-auto-endurance-600"
+      "matched_physical": {
+        "duration_difference_seconds": 0.0005635202396661043,
+        "raw_job_id": "1242edca-de9e-49d8-9093-15232c79686e",
+        "raw_steady_seconds": 60.004249937832355,
+        "requested_seconds": 60.0,
+        "rle_auto_job_id": "9686bce1-f4aa-4974-9a34-2e6c01c62f85",
+        "rle_auto_steady_seconds": 60.00481345807202,
+        "streams": {
+          "adc": {
+            "conservation": {
+              "raw_operand_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              },
+              "rle_operand_frame_partition": {
+                "left": 64233,
+                "right": 64233
+              },
+              "rle_operand_raw_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              },
+              "rle_operand_selected_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              }
+            },
+            "grade": {
+              "bandwidth_reduction_result": "FAIL",
+              "bandwidth_reduction_threshold": 0.2,
+              "complete_wire_ratio": 1.0,
+              "complete_wire_reduction_ratio": 0.0,
+              "encode_cycles": 1797982213,
+              "encoded_payload_bytes": 260015184,
+              "logical_payload_bytes": 260015184,
+              "maximum_processing_utilization_increase": 0.1,
+              "processing_utilization_delta_percentage_points": 4.609869667662673,
+              "processing_utilization_ratio": 0.046098696676626735,
+              "processing_utilization_result": "PASS",
+              "raw_complete_wire_bytes": 263098368,
+              "raw_frames": 64233,
+              "result": "FAIL",
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "selected_complete_wire_bytes": 263098368
+            },
+            "raw": {
+              "complete_wire_bytes": 263098368,
+              "decode_bytes_per_second": 212643149.0704229,
+              "encoded_payload_bytes": 260015184,
+              "frames": 64233,
+              "logical_payload_bytes": 260015184,
+              "raw_frames": 64233,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_logical_bytes_per_second": 3999972.265934705
+            },
+            "rle_auto": {
+              "complete_wire_bytes": 263098368,
+              "decode_bytes_per_second": 215047155.10220528,
+              "encoded_payload_bytes": 260015184,
+              "frames": 64233,
+              "logical_payload_bytes": 260015184,
+              "raw_equivalent_complete_wire_bytes": 263098368,
+              "raw_frames": 64233,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_logical_bytes_per_second": 3999937.600673013
+            }
+          },
+          "combined": {
+            "conservation": {
+              "raw_operand_envelope": {
+                "left": 526196736,
+                "right": 526196736
+              },
+              "rle_operand_frame_partition": {
+                "left": 128466,
+                "right": 128466
+              },
+              "rle_operand_raw_envelope": {
+                "left": 526196736,
+                "right": 526196736
+              },
+              "rle_operand_selected_envelope": {
+                "left": 266374251,
+                "right": 266374251
+              }
+            },
+            "grade": {
+              "bandwidth_reduction_result": "PASS",
+              "bandwidth_reduction_threshold": 0.2,
+              "complete_wire_ratio": 0.5062255859375,
+              "complete_wire_reduction_ratio": 0.4937744140625,
+              "encode_cycles": 3980370981,
+              "encoded_payload_bytes": 260207883,
+              "logical_payload_bytes": 520030368,
+              "maximum_processing_utilization_increase": 0.1,
+              "processing_utilization_delta_percentage_points": 10.205324234404214,
+              "processing_utilization_ratio": 0.10205324234404214,
+              "processing_utilization_result": "FAIL",
+              "raw_complete_wire_bytes": 526196736,
+              "raw_frames": 64233,
+              "result": "FAIL",
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "selected_complete_wire_bytes": 266374251
+            },
+            "raw": {
+              "complete_wire_bytes": 526196736,
+              "decode_bytes_per_second": 317411314.6117571,
+              "encoded_payload_bytes": 520030368,
+              "frames": 128466,
+              "logical_payload_bytes": 520030368,
+              "raw_frames": 128466,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_logical_bytes_per_second": 7999944.53186941
+            },
+            "rle_auto": {
+              "complete_wire_bytes": 266374251,
+              "decode_bytes_per_second": 245213819.86783877,
+              "encoded_payload_bytes": 260207883,
+              "frames": 128466,
+              "logical_payload_bytes": 520030368,
+              "raw_equivalent_complete_wire_bytes": 526196736,
+              "raw_frames": 64233,
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "wall_logical_bytes_per_second": 7999875.201346026
+            }
+          },
+          "gpio": {
+            "conservation": {
+              "raw_operand_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              },
+              "rle_operand_frame_partition": {
+                "left": 64233,
+                "right": 64233
+              },
+              "rle_operand_raw_envelope": {
+                "left": 263098368,
+                "right": 263098368
+              },
+              "rle_operand_selected_envelope": {
+                "left": 3275883,
+                "right": 3275883
+              }
+            },
+            "grade": {
+              "bandwidth_reduction_result": "PASS",
+              "bandwidth_reduction_threshold": 0.2,
+              "complete_wire_ratio": 0.012451171875,
+              "complete_wire_reduction_ratio": 0.987548828125,
+              "encode_cycles": 2182388768,
+              "encoded_payload_bytes": 192699,
+              "logical_payload_bytes": 260015184,
+              "maximum_processing_utilization_increase": 0.1,
+              "processing_utilization_delta_percentage_points": 5.595454566741541,
+              "processing_utilization_ratio": 0.05595454566741541,
+              "processing_utilization_result": "PASS",
+              "raw_complete_wire_bytes": 263098368,
+              "raw_frames": 0,
+              "result": "PASS",
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "selected_complete_wire_bytes": 3275883
+            },
+            "raw": {
+              "complete_wire_bytes": 263098368,
+              "decode_bytes_per_second": 625681129.0397698,
+              "encoded_payload_bytes": 260015184,
+              "frames": 64233,
+              "logical_payload_bytes": 260015184,
+              "raw_frames": 64233,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_logical_bytes_per_second": 3999972.265934705
+            },
+            "rle_auto": {
+              "complete_wire_bytes": 3275883,
+              "decode_bytes_per_second": 285224981.0584376,
+              "encoded_payload_bytes": 192699,
+              "frames": 64233,
+              "logical_payload_bytes": 260015184,
+              "raw_equivalent_complete_wire_bytes": 263098368,
+              "raw_frames": 0,
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "wall_logical_bytes_per_second": 3999937.600673013
+            }
+          }
         }
-      ],
-      "physical_measurements": {
-        "acquisition_service_utilization_ratio": null,
-        "adc": {
-          "complete_wire_bytes": null,
-          "complete_wire_ratio": null,
-          "encoded_payload_bytes": null,
-          "fallback_frame_count": null,
-          "logical_raw_bytes": null,
-          "raw_frame_count": null,
-          "rle_frame_count": null,
-          "run_count": null
-        },
-        "combined": {
-          "complete_wire_bytes": null,
-          "complete_wire_ratio": null,
-          "encoded_payload_bytes": null,
-          "fallback_frame_count": null,
-          "logical_raw_bytes": null,
-          "raw_frame_count": null,
-          "rle_frame_count": null,
-          "run_count": null
-        },
-        "command_latency_milliseconds": null,
-        "counter_conservation": null,
-        "fallback_reasons": null,
-        "final_idle": null,
-        "firmware_encode_cycles": null,
-        "firmware_encode_load_ratio": null,
-        "gpio": {
-          "complete_wire_bytes": null,
-          "complete_wire_ratio": null,
-          "encoded_payload_bytes": null,
-          "fallback_frame_count": null,
-          "logical_raw_bytes": null,
-          "raw_frame_count": null,
-          "rle_frame_count": null,
-          "run_count": null
-        },
-        "host_decode_throughput_bytes_per_second": null,
-        "loss_error_counters": null,
-        "measurement_duration_seconds": null,
-        "packet_queue_high_water": null,
-        "process_memory_bytes": null,
-        "temporary_page_high_water": null,
-        "usb_service_utilization_ratio": null
       },
-      "planned_sequence": [
-        "v1-raw-physical-combined-smoke",
-        "v2-raw-smoke",
-        "v2-rle-auto-smoke",
-        "synthetic-constant-rle-auto",
-        "synthetic-sparse-hold-rle-auto",
-        "synthetic-slow-adc-rle-auto",
-        "synthetic-alternating-rle-auto",
-        "synthetic-incompressible-rle-auto",
-        "physical-combined-v2-raw-matched",
-        "physical-combined-v2-rle-auto-matched",
-        "physical-combined-v2-rle-auto-endurance-600"
-      ],
-      "postflight": {
-        "coordinator_mode": "normal",
-        "docker_reachable": true,
-        "http_status": 200,
-        "hub_reachable": true,
-        "queue_depth": 0,
-        "service_status": "healthy",
-        "worker_thread_alive": true
-      },
-      "preflight": {
-        "coordinator_mode": "normal",
-        "docker_reachable": true,
-        "documented_teensy_target": true,
-        "http_status": 200,
-        "hub_reachable": true,
-        "passed_before_every_submission": true,
-        "queue_depth": 0,
-        "service_status": "healthy",
-        "worker_thread_alive": true
+      "method": "Ten strictly sequential final4 jobs programmed and ran the exact candidate; the campaign validator reconciled every accepted runner result, identity, checksum, formula, counter, queue, and cleanup field.",
+      "performance": {
+        "accepted_v2_maxima": {
+          "host_parser_buffer_high_water_bytes": 20479,
+          "host_rss_bytes": 22016000,
+          "packet_owned_high_water": 119,
+          "packet_transmit_high_water": 118,
+          "status_latency_milliseconds": 24.876834824681282,
+          "temporary_page_high_water": 1
+        },
+        "raw": {
+          "firmware": {
+            "combined_encode_cycles": 0,
+            "encode_cpu_load_fraction": 0.0,
+            "encode_cycles_per_logical_byte": 0.0,
+            "physical_stop_tail": {
+              "adc_pairs": 496,
+              "gpio_samples": 1987
+            },
+            "queue_high_waters": {
+              "adc_packet_ready_high_water": 1,
+              "adc_packet_transmit_high_water": 23,
+              "adc_raw_ready_high_water": 1,
+              "gpio_packed_ready_high_water": 1,
+              "gpio_packet_ready_high_water": 1,
+              "gpio_packet_transmit_high_water": 23,
+              "gpio_raw_ready_high_water": 1,
+              "packet_owned_high_water": 46,
+              "packet_ready_high_water": 2,
+              "packet_transmit_high_water": 46,
+              "temporary_page_high_water": 0,
+              "usb_command_queue_high_water": 1,
+              "usb_response_queue_high_water": 1
+            },
+            "service_counters": {
+              "packet_fairness_deferrals": 0,
+              "partial_usb_writes": 0,
+              "usb_rx_stall_events": 0,
+              "usb_short_capacity_deferrals": 0,
+              "usb_tx_stall_events": 435256
+            },
+            "streams": {
+              "adc": {
+                "encode_cycles": 0,
+                "fallback_frames": 0,
+                "fallback_reasons": {
+                  "encoder_failure": 0,
+                  "not_smaller": 0,
+                  "temporary_page_unavailable": 0
+                }
+              },
+              "gpio": {
+                "encode_cycles": 0,
+                "fallback_frames": 0,
+                "fallback_reasons": {
+                  "encoder_failure": 0,
+                  "not_smaller": 0,
+                  "temporary_page_unavailable": 0
+                }
+              }
+            }
+          },
+          "host": {
+            "combined": {
+              "decode_bytes_per_second": 317411314.6117571,
+              "decode_seconds": 1.638348553,
+              "encoded_payload_bytes": 520030368,
+              "encoded_payload_ratio": 1.0,
+              "framed_byte_ratio": 1.0,
+              "framed_bytes": 526196736,
+              "frames": 128466,
+              "logical_items": 325018980,
+              "logical_payload_bytes": 520030368,
+              "raw_framed_bytes": 526196736,
+              "raw_frames": 128466,
+              "raw_payload_bytes": 520030368,
+              "rle_frames": 0,
+              "rle_runs": 0,
+              "wall_framed_bytes_per_second": 8094805.534223592,
+              "wall_logical_bytes_per_second": 7999944.53186941
+            },
+            "parser": {
+              "buffer_high_water_bytes": 20479,
+              "bytes_discarded": 0,
+              "bytes_received": 526398564,
+              "checksum_errors": 0,
+              "frames_decoded": 128604,
+              "header_errors": 0,
+              "maximum_serial_read_bytes": 16384,
+              "payload_errors": 0,
+              "stale_responses": 0,
+              "startup_discarded_data_frames": 0
+            },
+            "status": {
+              "firmware_queue_high_waters": {
+                "adc_packet_ready_high_water": 1,
+                "adc_packet_transmit_high_water": 23,
+                "adc_raw_ready_high_water": 1,
+                "gpio_packed_ready_high_water": 1,
+                "gpio_packet_ready_high_water": 1,
+                "gpio_packet_transmit_high_water": 23,
+                "gpio_raw_ready_high_water": 1,
+                "packet_owned_high_water": 46,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 46,
+                "temporary_page_high_water": 0,
+                "usb_command_queue_high_water": 1,
+                "usb_response_queue_high_water": 1
+              },
+              "maximum_current_queue_depths": {
+                "adc_packet_filling_depth": 0,
+                "adc_packet_ready_depth": 0,
+                "adc_packet_transmit_depth": 12,
+                "adc_raw_ready_depth": 1,
+                "gpio_packed_ready_depth": 0,
+                "gpio_packet_filling_depth": 0,
+                "gpio_packet_ready_depth": 0,
+                "gpio_packet_transmit_depth": 11,
+                "gpio_raw_ready_depth": 1,
+                "packet_owned_depth": 23,
+                "packet_ready_depth": 0,
+                "packet_transmit_depth": 23,
+                "temporary_pages_owned": 0,
+                "usb_command_queue_depth": 0,
+                "usb_lower_priority_queue_depth": 23,
+                "usb_response_queue_depth": 0
+              },
+              "memory": {
+                "rss_end_bytes": 22003712,
+                "rss_growth_bytes": 8192,
+                "rss_maximum_bytes": 22003712,
+                "rss_start_bytes": 21995520
+              },
+              "service_counters": {
+                "packet_fairness_deferrals": 0,
+                "partial_usb_writes": 0,
+                "usb_rx_stall_events": 0,
+                "usb_short_capacity_deferrals": 0,
+                "usb_tx_stall_events": 435214
+              },
+              "status_latency_seconds": {
+                "maximum": 0.0026016058400273323,
+                "median": 0.002059507416561246,
+                "minimum": 0.0012398271355777979,
+                "p95": 0.0022116759791970253,
+                "p99": 0.002267282921820879
+              },
+              "status_samples": 130
+            },
+            "streams": {
+              "adc": {
+                "decode_bytes_per_second": 212643149.0704229,
+                "decode_seconds": 1.222777151,
+                "decoded_logical_adler32": 1636645114,
+                "encoded_payload_bytes": 260015184,
+                "encoded_payload_ratio": 1.0,
+                "first_sequence": 0,
+                "formula_full_frames": 0,
+                "formula_spot_items": 0,
+                "framed_byte_ratio": 1.0,
+                "framed_bytes": 263098368,
+                "frames": 64233,
+                "last_sequence": 64232,
+                "logical_items": 65003796,
+                "logical_payload_bytes": 260015184,
+                "raw_framed_bytes": 263098368,
+                "raw_frames": 64233,
+                "raw_payload_bytes": 260015184,
+                "rle_frames": 0,
+                "rle_runs": 0,
+                "wall_framed_bytes_per_second": 4047402.767111796,
+                "wall_logical_bytes_per_second": 3999972.265934705
+              },
+              "gpio": {
+                "decode_bytes_per_second": 625681129.0397698,
+                "decode_seconds": 0.415571402,
+                "decoded_logical_adler32": 686529220,
+                "encoded_payload_bytes": 260015184,
+                "encoded_payload_ratio": 1.0,
+                "first_sequence": 0,
+                "formula_full_frames": 0,
+                "formula_spot_items": 0,
+                "framed_byte_ratio": 1.0,
+                "framed_bytes": 263098368,
+                "frames": 64233,
+                "last_sequence": 64232,
+                "logical_items": 260015184,
+                "logical_payload_bytes": 260015184,
+                "raw_framed_bytes": 263098368,
+                "raw_frames": 64233,
+                "raw_payload_bytes": 260015184,
+                "rle_frames": 0,
+                "rle_runs": 0,
+                "wall_framed_bytes_per_second": 4047402.767111796,
+                "wall_logical_bytes_per_second": 3999972.265934705
+              }
+            }
+          }
+        },
+        "rle_auto": {
+          "firmware": {
+            "combined_encode_cycles": 3980370981,
+            "combined_fallback_frames": 64233,
+            "encode_cpu_load_fraction": 0.10205324234404214,
+            "encode_cycles_per_logical_byte": 7.654112578671559,
+            "physical_stop_tail": {
+              "adc_pairs": 1010,
+              "gpio_samples": 4042
+            },
+            "queue_high_waters": {
+              "adc_packet_ready_high_water": 1,
+              "adc_packet_transmit_high_water": 13,
+              "adc_raw_ready_high_water": 1,
+              "gpio_packed_ready_high_water": 1,
+              "gpio_packet_ready_high_water": 1,
+              "gpio_packet_transmit_high_water": 12,
+              "gpio_raw_ready_high_water": 1,
+              "packet_owned_high_water": 26,
+              "packet_ready_high_water": 2,
+              "packet_transmit_high_water": 25,
+              "temporary_page_high_water": 1,
+              "usb_command_queue_high_water": 1,
+              "usb_response_queue_high_water": 1
+            },
+            "service_counters": {
+              "packet_fairness_deferrals": 0,
+              "partial_usb_writes": 0,
+              "usb_rx_stall_events": 0,
+              "usb_short_capacity_deferrals": 0,
+              "usb_tx_stall_events": 1729
+            },
+            "streams": {
+              "adc": {
+                "encode_cycles": 1797982213,
+                "fallback_frames": 64233,
+                "fallback_reasons": {
+                  "encoder_failure": 0,
+                  "not_smaller": 64233,
+                  "temporary_page_unavailable": 0
+                }
+              },
+              "gpio": {
+                "encode_cycles": 2182388768,
+                "fallback_frames": 0,
+                "fallback_reasons": {
+                  "encoder_failure": 0,
+                  "not_smaller": 0,
+                  "temporary_page_unavailable": 0
+                }
+              }
+            }
+          },
+          "host": {
+            "combined": {
+              "decode_bytes_per_second": 245213819.86783877,
+              "decode_seconds": 2.120722104,
+              "encoded_payload_bytes": 260207883,
+              "encoded_payload_ratio": 0.5003705533596838,
+              "framed_byte_ratio": 0.5062255859375,
+              "framed_bytes": 266374251,
+              "frames": 128466,
+              "logical_items": 325018980,
+              "logical_payload_bytes": 520030368,
+              "raw_framed_bytes": 526196736,
+              "raw_frames": 64233,
+              "raw_payload_bytes": 520030368,
+              "rle_frames": 64233,
+              "rle_runs": 64233,
+              "wall_framed_bytes_per_second": 4097762.161559038,
+              "wall_logical_bytes_per_second": 7999875.201346026
+            },
+            "parser": {
+              "buffer_high_water_bytes": 20479,
+              "bytes_discarded": 0,
+              "bytes_received": 266576079,
+              "checksum_errors": 0,
+              "frames_decoded": 128604,
+              "header_errors": 0,
+              "maximum_serial_read_bytes": 16384,
+              "payload_errors": 0,
+              "stale_responses": 0,
+              "startup_discarded_data_frames": 0
+            },
+            "status": {
+              "firmware_queue_high_waters": {
+                "adc_packet_ready_high_water": 1,
+                "adc_packet_transmit_high_water": 13,
+                "adc_raw_ready_high_water": 1,
+                "gpio_packed_ready_high_water": 1,
+                "gpio_packet_ready_high_water": 1,
+                "gpio_packet_transmit_high_water": 12,
+                "gpio_raw_ready_high_water": 1,
+                "packet_owned_high_water": 26,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 25,
+                "temporary_page_high_water": 1,
+                "usb_command_queue_high_water": 1,
+                "usb_response_queue_high_water": 1
+              },
+              "maximum_current_queue_depths": {
+                "adc_packet_filling_depth": 0,
+                "adc_packet_ready_depth": 0,
+                "adc_packet_transmit_depth": 0,
+                "adc_raw_ready_depth": 1,
+                "gpio_packed_ready_depth": 0,
+                "gpio_packet_filling_depth": 0,
+                "gpio_packet_ready_depth": 0,
+                "gpio_packet_transmit_depth": 0,
+                "gpio_raw_ready_depth": 1,
+                "packet_owned_depth": 0,
+                "packet_ready_depth": 0,
+                "packet_transmit_depth": 0,
+                "temporary_pages_owned": 0,
+                "usb_command_queue_depth": 0,
+                "usb_lower_priority_queue_depth": 0,
+                "usb_response_queue_depth": 0
+              },
+              "memory": {
+                "rss_end_bytes": 22016000,
+                "rss_growth_bytes": 8192,
+                "rss_maximum_bytes": 22016000,
+                "rss_start_bytes": 22007808
+              },
+              "service_counters": {
+                "packet_fairness_deferrals": 0,
+                "partial_usb_writes": 0,
+                "usb_rx_stall_events": 0,
+                "usb_short_capacity_deferrals": 0,
+                "usb_tx_stall_events": 1729
+              },
+              "status_latency_seconds": {
+                "maximum": 0.004252566024661064,
+                "median": 0.003944393014535308,
+                "minimum": 0.0028462568297982216,
+                "p95": 0.0042125380132347345,
+                "p99": 0.0042501811403781176
+              },
+              "status_samples": 130
+            },
+            "streams": {
+              "adc": {
+                "decode_bytes_per_second": 215047155.10220528,
+                "decode_seconds": 1.20910776,
+                "decoded_logical_adler32": 472059290,
+                "encoded_payload_bytes": 260015184,
+                "encoded_payload_ratio": 1.0,
+                "first_sequence": 0,
+                "formula_full_frames": 0,
+                "formula_spot_items": 0,
+                "framed_byte_ratio": 1.0,
+                "framed_bytes": 263098368,
+                "frames": 64233,
+                "last_sequence": 64232,
+                "logical_items": 65003796,
+                "logical_payload_bytes": 260015184,
+                "raw_framed_bytes": 263098368,
+                "raw_frames": 64233,
+                "raw_payload_bytes": 260015184,
+                "rle_frames": 0,
+                "rle_runs": 0,
+                "wall_framed_bytes_per_second": 4047367.6907995706,
+                "wall_logical_bytes_per_second": 3999937.600673013
+              },
+              "gpio": {
+                "decode_bytes_per_second": 285224981.0584376,
+                "decode_seconds": 0.911614344,
+                "decoded_logical_adler32": 686529220,
+                "encoded_payload_bytes": 192699,
+                "encoded_payload_ratio": 0.0007411067193675889,
+                "first_sequence": 0,
+                "formula_full_frames": 0,
+                "formula_spot_items": 0,
+                "framed_byte_ratio": 0.012451171875,
+                "framed_bytes": 3275883,
+                "frames": 64233,
+                "last_sequence": 64232,
+                "logical_items": 260015184,
+                "logical_payload_bytes": 260015184,
+                "raw_framed_bytes": 263098368,
+                "raw_frames": 0,
+                "raw_payload_bytes": 260015184,
+                "rle_frames": 64233,
+                "rle_runs": 64233,
+                "wall_framed_bytes_per_second": 50394.47075946731,
+                "wall_logical_bytes_per_second": 3999937.600673013
+              }
+            }
+          }
+        }
       },
       "protocols": {
-        "prerequisite_encoding": "RAW",
-        "prerequisite_version": 1,
         "v1_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
         "v2_sha256": "2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3"
       },
-      "reason": "The Teensy 4.0 did not enumerate within the remote service's fixed 20-second power-on window for the prerequisite protocol-v1/RAW physical-combined smoke or its one identical infrastructure retry. Neither attempt programmed firmware or started the rig, so every downstream v2, synthetic-pattern, matched physical, and endurance job was intentionally not submitted.",
+      "reason": null,
+      "replacement_board_identity": {
+        "discovered_without_serial_expectation": true,
+        "historical_serials_are_non_grading": true,
+        "nonzero_uint32_verified": true,
+        "observed_hardware_serial": 20428100,
+        "stable_across_all_final4_jobs": true
+      },
+      "result": "PASS",
+      "scope_limitations": {
+        "firmware_programmed": true,
+        "hardware_serial_used_as_acceptance_rule": false,
+        "matched_physical_bandwidth_comparison_graded": true,
+        "matched_processing_utilization_comparison_graded": true,
+        "passing_600_second_endurance_observed": false,
+        "physical_data_collected": true,
+        "runner_executed": true,
+        "synthetic_target_patterns_executed": true
+      },
+      "synthetic_patterns": [
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 381187051.59856045,
+          "complete_wire_ratios": {
+            "adc": 0.01318359375,
+            "combined": 0.0128173828125,
+            "gpio": 0.012451171875
+          },
+          "fallback_frames": 0,
+          "firmware_encode_load_ratio": 0.07215833093196648,
+          "frames": {
+            "raw": 0,
+            "rle": 21800,
+            "runs": 21800
+          },
+          "job_id": "9832bb0a-fe99-4802-92c6-9501f737112a",
+          "packet_owned_high_water": 3,
+          "pattern": "constant",
+          "rss_maximum_bytes": 22007808,
+          "status_latency_p99_milliseconds": 24.054900975897908,
+          "steady_capture_seconds": 10.030974688008428,
+          "temporary_page_high_water": 1
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 182244417.00464156,
+          "complete_wire_ratios": {
+            "adc": 0.014668945023661638,
+            "combined": 0.013929049456059597,
+            "gpio": 0.013189153888457556
+          },
+          "fallback_frames": 0,
+          "firmware_encode_load_ratio": 0.2727286293305548,
+          "frames": {
+            "raw": 0,
+            "rle": 20286,
+            "runs": 40791
+          },
+          "job_id": "25dcc047-cc6b-438a-81c2-15ccd6838ad0",
+          "packet_owned_high_water": 3,
+          "pattern": "sparse-hold",
+          "rss_maximum_bytes": 21876736,
+          "status_latency_p99_milliseconds": 24.876834824681282,
+          "steady_capture_seconds": 10.036439941031858,
+          "temporary_page_high_water": 1
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 20387963.94291566,
+          "complete_wire_ratios": {
+            "adc": 0.31494140625,
+            "combined": 0.2559814453125,
+            "gpio": 0.197021484375
+          },
+          "fallback_frames": 0,
+          "firmware_encode_load_ratio": 0.3773369669758122,
+          "frames": {
+            "raw": 0,
+            "rle": 21758,
+            "runs": 5004340
+          },
+          "job_id": "a80b863d-8b11-4b2f-9a85-8d53c3345f61",
+          "packet_owned_high_water": 119,
+          "pattern": "slow-adc",
+          "rss_maximum_bytes": 21946368,
+          "status_latency_p99_milliseconds": 10.472126072272658,
+          "steady_capture_seconds": 10.010363441891968,
+          "temporary_page_high_water": 1
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 1504230392.6592495,
+          "complete_wire_ratios": {
+            "adc": 1.0,
+            "combined": 1.0,
+            "gpio": 1.0
+          },
+          "fallback_frames": 21744,
+          "firmware_encode_load_ratio": 0.08392960495806741,
+          "frames": {
+            "raw": 21744,
+            "rle": 0,
+            "runs": 0
+          },
+          "job_id": "d165c5d0-d6bc-4588-8f39-702896c5dae9",
+          "packet_owned_high_water": 38,
+          "pattern": "alternating",
+          "rss_maximum_bytes": 21999616,
+          "status_latency_p99_milliseconds": 2.115005860105157,
+          "steady_capture_seconds": 10.003039689036086,
+          "temporary_page_high_water": 0
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "combined_decode_bytes_per_second": 34786802.46630194,
+          "complete_wire_ratios": {
+            "adc": 1.0,
+            "combined": 1.0,
+            "gpio": 1.0
+          },
+          "fallback_frames": 21746,
+          "firmware_encode_load_ratio": 0.08412224379622806,
+          "frames": {
+            "raw": 21746,
+            "rle": 0,
+            "runs": 0
+          },
+          "job_id": "b9cf56b7-9351-4566-9572-61075e0a0fee",
+          "packet_owned_high_water": 114,
+          "pattern": "incompressible",
+          "rss_maximum_bytes": 21999616,
+          "status_latency_p99_milliseconds": 6.224846001714468,
+          "steady_capture_seconds": 10.003806773107499,
+          "temporary_page_high_water": 0
+        }
+      ]
+    },
+    {
+      "attempt_summary": {
+        "accepted_final4_runs": 10,
+        "attempt_count": 107,
+        "blocked_final4_endurance_attempts": 2,
+        "classification_counts": {
+          "infrastructure_board_unavailable": 4,
+          "infrastructure_loader_write_failure": 34,
+          "target_codec_validation_failure": 8,
+          "target_firmware_validation_failure": 6,
+          "target_runner_validation_failure": 4,
+          "target_validation_pass": 51
+        },
+        "disposition_counts": {
+          "accepted_final4_sequence": 10,
+          "blocked_final4_endurance_attempt": 2,
+          "superseded_diagnostic_history": 95
+        },
+        "unique_job_count": 107
+      },
+      "campaign_id": "rle-streaming-physical-campaign-00003",
+      "campaign_index_path": ".maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/campaign-index.json",
+      "campaign_index_sha256": "681c74f20f35012af01b438561de7c4d25ec0b91a3fb247d0e0255e35b960f21",
+      "campaign_validation_checks": 9091,
+      "cleanup_state": {
+        "accepted_v2_runs_final_idle": true,
+        "failed_endurance_runs_final_idle": true,
+        "serial_reader_final_bytes": 0,
+        "serial_reader_final_chunks": 0,
+        "service_queue_depth": 0
+      },
+      "command": {
+        "argv": [
+          "python3",
+          ".maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "component_evidence_ids": [
+        "physical-accepted-campaign",
+        "physical-endurance-campaign"
+      ],
+      "decisions": {
+        "physical_bandwidth_benefit": {
+          "maximum_processing_utilization_increase": 0.1,
+          "reason": "Combined wire reduction passed, but the 10.205324-percentage-point encode-utilization increase exceeded the 10-point limit.",
+          "required_complete_wire_reduction_ratio": 0.2,
+          "result": "FAIL"
+        },
+        "rig_correctness": {
+          "reason": "No passing 600-second endurance observation exists.",
+          "result": "INCONCLUSIVE"
+        }
+      },
+      "firmware_artifact_sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+      "firmware_build_id": "thingdaq-db824f42af030d7e",
+      "fixture_declaration_sha256": "c901ca0ed4bf0a607efc6bbaa75562855920775d154f347f055a0727b85c9967",
+      "hardware_serial": 20428100,
+      "id": "physical-campaign",
+      "incidents": [
+        {
+          "classification": "prior_loader_and_enumeration_failures",
+          "disposition": "retained as diagnostic history; not used for final grading",
+          "scope": "superseded attempts before final4"
+        },
+        {
+          "classification": "prior_runner_throughput_pressure",
+          "correction_commit": "dca4343616a78ab71dedf08155359aeddd017859",
+          "disposition": "superseded by the fresh final4 sequence",
+          "job_ids": [
+            "8511b95b-73db-4b33-b6d2-0a3e6920ca88",
+            "52f521b5-71a6-4fc8-95f1-3fa9244ed755",
+            "02ecd656-7cb1-471a-be22-0a5221fbdf1a",
+            "3ec9b521-5553-487f-a98a-a9adde9cdb5a"
+          ]
+        },
+        {
+          "classification": "upstream_serial_byte_loss_during_final4_endurance",
+          "disposition": "blocking; human service/USB path investigation required",
+          "evidence": "One checksummed ADC frame was corrupted and one later ADC frame lost its prefix. Both fixed queues peaked at 32 KiB of 512 KiB, ended empty, and cleanup reached IDLE.",
+          "job_ids": [
+            "936b1df9-1629-4f4f-87c7-1be44e8a5005",
+            "d1020be8-a74c-4997-8049-840f0c66cd6b"
+          ]
+        }
+      ],
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+          "sha256": "903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d"
+        },
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
+          "sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248"
+        },
+        {
+          "path": "firmware/tests/rig_rle_streaming.py",
+          "sha256": "c901ca0ed4bf0a607efc6bbaa75562855920775d154f347f055a0727b85c9967"
+        },
+        {
+          "path": "firmware/tests/test_rig_rle_streaming.py",
+          "sha256": "17ff613a4c67d3b7a11e1b83f6fa327ca1cb487eadf05744ba8fb9aa60726156"
+        },
+        {
+          "path": "protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+        },
+        {
+          "path": "protocol/protocol-v2.json",
+          "sha256": "2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3"
+        }
+      ],
+      "job_id": "9686bce1-f4aa-4974-9a34-2e6c01c62f85",
+      "level": "rig",
+      "levels": {
+        "local_compatibility": "PASS",
+        "local_correctness": "PASS",
+        "physical_bandwidth_benefit": "FAIL",
+        "rig_correctness": "INCONCLUSIVE"
+      },
+      "method": "Replacement-board campaign 00003 with a fail-closed 9,091-check evidence validator; current conclusions combine the accepted short-stage evidence and the unresolved bounded endurance incident without importing measurements from superseded campaigns 00001 or 00002.",
+      "preserved_history": [
+        {
+          "all_file_manifest_sha256": "677059aef906c136a0b5fb1f0def317b5fc246339173c018a2850f85b98babb0",
+          "campaign_id": "rle-streaming-physical-campaign-00001",
+          "disposition": "immutable_superseded_provenance_only",
+          "expected_manifest_sha256": "677059aef906c136a0b5fb1f0def317b5fc246339173c018a2850f85b98babb0",
+          "modified_during_rerun": false,
+          "path": "../rle-streaming-physical-campaign-00001"
+        },
+        {
+          "all_file_manifest_sha256": "9030098494c1e48a68e182f2b416203fd35a793b384c303cf9ee0106d66b9898",
+          "campaign_id": "rle-streaming-physical-campaign-00002",
+          "disposition": "immutable_superseded_provenance_only",
+          "expected_manifest_sha256": "9030098494c1e48a68e182f2b416203fd35a793b384c303cf9ee0106d66b9898",
+          "modified_during_rerun": false,
+          "path": "../rle-streaming-physical-campaign-00002"
+        }
+      ],
+      "protocols": {
+        "v1_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "v2_sha256": "2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3"
+      },
+      "reason": "The immutable final4 candidate passed the first ten strictly sequential stages through the matched physical RAW/RLE comparison. Both bounded 600-second endurance attempts then lost bytes upstream of a continuously drained 512 KiB userspace queue: the first detected one ADC checksum mismatch after 68 STATUS samples and the retry received 1,855 ADC-like payload bytes without the frame prefix after 98 samples. Both queues peaked at only 32 KiB, ended empty, and reached clean final IDLE. No passing 600-second observation exists, so rig correctness and the task remain inconclusive. The separately measurable physical value conclusion is FAIL because encoder utilization increased by 10.205324 percentage points, above the original 10-point maximum, despite a 49.377441% wire reduction.",
       "result": "INCONCLUSIVE",
-      "retry_policy": {
-        "accepted_jobs_are_sequential": true,
-        "http_request_timeout_seconds": 10,
-        "infrastructure_retries_used": 1,
-        "job_timeout_seconds": 180,
-        "maximum_infrastructure_retries_per_stage": 1,
-        "overlapping_jobs": false
+      "retention": {
+        "all_attempt_artifacts_hashed": true,
+        "bulk_acquisition_data_retained": false,
+        "credentials_retained": false,
+        "full_runner_summaries_retained": true
       },
       "scope_limitations": {
-        "adc_compression_ratio_observed": null,
-        "firmware_was_programmed": false,
-        "gpio_compression_ratio_observed": null,
-        "physical_bandwidth_comparison_possible": false,
-        "physical_correctness_graded": false,
-        "physical_data_collected": false,
-        "processing_utilization_comparison_possible": false,
-        "runner_executed": false,
-        "synthetic_target_patterns_executed": false
-      },
-      "service": {
-        "api_version": "v1",
-        "client_sha256": "23115388d9a62384cca074ac976c24986d77bd98538713901db3ec810e5c84ec",
-        "client_wrapper_sha256": "dbd39e6e8660b28d5e118c61e9436bbef34cb3c20788865e717e5a0140d8f06d",
-        "hub_slot": 15,
-        "name": "remote-firmware-testing",
-        "service_target": "teensy:avr:teensy40",
-        "version": "1.0.0"
+        "bulk_acquisition_data_retained": false,
+        "current_physical_source_campaign": "00003 only",
+        "endurance_qualified": false,
+        "overall_rig_correctness_graded": false,
+        "physical_bandwidth_value_graded": true,
+        "short_stage_correctness_graded": true,
+        "superseded_campaigns_used_for_current_measurements": false
       }
+    },
+    {
+      "attempts": [
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "failure_class": "codec",
+          "job_id": "936b1df9-1629-4f4f-87c7-1be44e8a5005",
+          "parser": {
+            "bytes_discarded": 1382,
+            "checksum_errors": 1,
+            "header_errors": 0,
+            "payload_errors": 0
+          },
+          "reason": "CodecFailure: checksum mismatch: expected 0xe991b5ff, received 0xd545b728; kind=0x01 encoding=0 total_length=4096 payload_length=4048 run_id=1 sequence=67290 request_id=0",
+          "result": "FAIL",
+          "serial_reader": {
+            "capacity_bytes": 524288,
+            "capacity_chunks": 32,
+            "enabled": true,
+            "final_bytes": 0,
+            "final_chunks": 0,
+            "high_water_bytes": 32768,
+            "high_water_chunks": 2,
+            "maximum_read_call_seconds": 0.020556780975311995,
+            "maximum_successful_read_gap_seconds": 0.12244782806374133,
+            "read_calls": 17070
+          },
+          "status_samples_before_failure": 68,
+          "submission_name": "final4-resample-physical-combined-v2-rle-auto-endurance-600"
+        },
+        {
+          "cleanup": {
+            "errors": [],
+            "idle_confirmed": true,
+            "idle_status_attempted": true,
+            "stop_attempted": true,
+            "stop_succeeded": true
+          },
+          "failure_class": "codec",
+          "job_id": "d1020be8-a74c-4997-8049-840f0c66cd6b",
+          "parser": {
+            "bytes_discarded": 2241,
+            "checksum_errors": 0,
+            "header_errors": 0,
+            "payload_errors": 0
+          },
+          "reason": "CodecFailure: wire bytes precede frame magic: discard_bytes=1855 buffered_bytes=1855 prefix_hex=5d0683065b0680065f0681065b0680065e0682065b068006690682065b068106 suffix_hex=065f0683065b068006600682065b068106600682065b068006600683065b0681 last_frame=(kind=0x02 encoding=1 run_id=1 sequence=97280 request_id=0 total_length=51)",
+          "result": "FAIL",
+          "serial_reader": {
+            "capacity_bytes": 524288,
+            "capacity_chunks": 32,
+            "enabled": true,
+            "final_bytes": 0,
+            "final_chunks": 0,
+            "high_water_bytes": 32768,
+            "high_water_chunks": 2,
+            "maximum_read_call_seconds": 0.0285673588514328,
+            "maximum_successful_read_gap_seconds": 0.12255018507130444,
+            "read_calls": 24665
+          },
+          "status_samples_before_failure": 98,
+          "submission_name": "final4-resample-physical-combined-v2-rle-auto-endurance-600-retry1"
+        }
+      ],
+      "blocking_condition": {
+        "classification": "upstream_serial_byte_loss_during_endurance",
+        "downstream_submission_safe": false,
+        "finite_recovery_exhausted": true,
+        "human_action_required": "Inspect the remote service host's USB/TTY receive path, hub/cable, kernel buffering, and container scheduling; provide a lossless sustained serial path, then resume only the 600-second final4 endurance stage with a new evidence suffix and the same immutable candidate.",
+        "userspace_queue_saturation_ruled_out": true
+      },
+      "campaign_id": "rle-streaming-physical-campaign-00003",
+      "campaign_index_path": ".maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/campaign-index.json",
+      "campaign_index_sha256": "681c74f20f35012af01b438561de7c4d25ec0b91a3fb247d0e0255e35b960f21",
+      "campaign_validation_checks": 9091,
+      "command": {
+        "argv": [
+          "python3",
+          ".maestro/playbooks/2026-09-01-Teensydaq/Working/rle-streaming-physical-campaign-00003/validate_completed_campaign.py"
+        ],
+        "firmware_upload": false,
+        "network": false,
+        "serial_hardware": false,
+        "user_input": false
+      },
+      "deferred_disposition": "The user authorized skipping another identical hardware retry; no additional job was submitted and no endurance PASS is claimed.",
+      "firmware_artifact_sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248",
+      "firmware_build_id": "thingdaq-db824f42af030d7e",
+      "fixture_declaration_sha256": "c901ca0ed4bf0a607efc6bbaa75562855920775d154f347f055a0727b85c9967",
+      "hardware_serial": 20428100,
+      "id": "physical-endurance-campaign",
+      "inputs": [
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/build-manifest.json",
+          "sha256": "903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d"
+        },
+        {
+          "path": "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/firmware.ino.hex",
+          "sha256": "b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248"
+        },
+        {
+          "path": "firmware/tests/rig_rle_streaming.py",
+          "sha256": "c901ca0ed4bf0a607efc6bbaa75562855920775d154f347f055a0727b85c9967"
+        },
+        {
+          "path": "firmware/tests/test_rig_rle_streaming.py",
+          "sha256": "17ff613a4c67d3b7a11e1b83f6fa327ca1cb487eadf05744ba8fb9aa60726156"
+        },
+        {
+          "path": "protocol/protocol-v1.json",
+          "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+        },
+        {
+          "path": "protocol/protocol-v2.json",
+          "sha256": "2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3"
+        }
+      ],
+      "job_id": "936b1df9-1629-4f4f-87c7-1be44e8a5005",
+      "level": "rig",
+      "method": "Two sequential 600-second RLE_AUTO attempts with repeated STATUS sampling, a dedicated fixed 512 KiB serial-reader queue, bounded retry, and mandatory STOP/final-IDLE cleanup.",
+      "passing_attempts": 0,
+      "protocols": {
+        "v1_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "v2_sha256": "2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3"
+      },
+      "reason": "Neither bounded 600-second attempt completed: one detected an ADC checksum mismatch and one received 1,855 ADC-like bytes without a frame prefix. The continuously drained reader stayed far below capacity and ended empty, so the loss is upstream of that queue but is not localized within the remote path.",
+      "requested_seconds": 600.0,
+      "result": "INCONCLUSIVE"
     },
     {
       "baseline_commit": "b23004defeca465da0ae2d2884c4fef71979e5d4",
@@ -2196,11 +3526,11 @@
       "inputs": [
         {
           "path": "firmware/tests/rig_rle_streaming.py",
-          "sha256": "ccdc1647aba8d396a8eb91bc66dab08e43134e2e28b30bb4058c2880ee1cfbc2"
+          "sha256": "c901ca0ed4bf0a607efc6bbaa75562855920775d154f347f055a0727b85c9967"
         },
         {
           "path": "firmware/tests/test_rig_rle_streaming.py",
-          "sha256": "6c725abc7d24d7d414c99bd39e813e32b6e84e17ab7426f6e4e3781855105f70"
+          "sha256": "17ff613a4c67d3b7a11e1b83f6fa327ca1cb487eadf05744ba8fb9aa60726156"
         },
         {
           "path": "protocol/protocol-v2.json",
@@ -2239,9 +3569,9 @@
     "protocol_version": 1,
     "repository": "https://github.com/ThingDone/thingdaq.git",
     "source_clean": true,
-    "source_commit": "7c639104f78866eb7e6191b58b2bc5349342e480",
-    "source_id": "85f2698ba97fb1defe827c4c12b5cd1e746a7ccc518b7868d4135a5b50605d8b",
-    "source_tree": "04d07aab4a1440551c69a5cc1d135d59b0376a51",
+    "source_commit": "dca4343616a78ab71dedf08155359aeddd017859",
+    "source_id": "db824f42af030d7ed226900d3b68379962f7515f66734e51e4309773b04f5c4d",
+    "source_tree": "055d03da63298913b33f18edf0dfc06fa109d2c6",
     "toolchains": [
       {
         "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
@@ -2327,6 +3657,215 @@
     {
       "denominator": "none",
       "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "measurement_duration_seconds",
+      "scope": "streaming_window",
+      "unit": "second",
+      "value": 60.00481345807202
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_frames_observed",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 64233
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_frames_observed",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 64233
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 260015184
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 260015184
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "combined_payload_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 520030368
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 263098368
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 3275883
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "combined_framed_bytes",
+      "scope": "streaming_window",
+      "unit": "byte",
+      "value": 266374251
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "sequence_gap_frames",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "adc_sequence_gap_frames",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "gpio_sequence_gap_frames",
+      "scope": "streaming_window",
+      "unit": "frame",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "host_queue_drops",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "parser_errors",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "transport_errors",
+      "scope": "run",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "conservation_failures",
+      "scope": "final_status",
+      "unit": "event",
+      "value": 0
+    },
+    {
+      "denominator": "command_latency_samples",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "command_latency_p99_milliseconds",
+      "scope": "run",
+      "unit": "millisecond",
+      "value": 4.250181140378118
+    },
+    {
+      "denominator": "command_latency_samples",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "command_latency_maximum_milliseconds",
+      "scope": "run",
+      "unit": "millisecond",
+      "value": 4.252566024661064
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "packet_owned_high_water_frames",
+      "scope": "run",
+      "unit": "frame",
+      "value": 26
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
         "local-firmware-gate"
       ],
       "evidence_level": "host",
@@ -2344,7 +3883,7 @@
       "name": "flash_used_bytes",
       "scope": "artifact",
       "unit": "byte",
-      "value": 137212
+      "value": 138236
     },
     {
       "denominator": "none",
@@ -2355,7 +3894,7 @@
       "name": "flash_headroom_bytes",
       "scope": "artifact",
       "unit": "byte",
-      "value": 1894404
+      "value": 1893380
     },
     {
       "denominator": "none",
@@ -2426,6 +3965,17 @@
     {
       "denominator": "none",
       "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "logical_raw_bytes",
+      "scope": "declared_codec_workload",
+      "unit": "byte",
+      "value": 520030368
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
         "host-corpus-benchmark"
       ],
       "evidence_level": "host",
@@ -2433,6 +3983,17 @@
       "scope": "declared_codec_workload",
       "unit": "byte",
       "value": 143261
+    },
+    {
+      "denominator": "none",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "encoded_wire_bytes",
+      "scope": "declared_codec_workload",
+      "unit": "byte",
+      "value": 266374251
     },
     {
       "denominator": "logical_raw_bytes",
@@ -2446,6 +4007,17 @@
       "value": 0.49153560057092666
     },
     {
+      "denominator": "logical_raw_bytes",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "encoded_to_raw_ratio",
+      "scope": "declared_codec_workload",
+      "unit": "ratio",
+      "value": 0.5122282608695652
+    },
+    {
       "denominator": "streaming_elapsed_seconds",
       "evidence_ids": [
         "host-corpus-benchmark"
@@ -2455,9 +4027,20 @@
       "scope": "declared_codec_benchmark",
       "unit": "byte_per_second",
       "value": 6001442.92401875
+    },
+    {
+      "denominator": "streaming_elapsed_seconds",
+      "evidence_ids": [
+        "physical-accepted-campaign"
+      ],
+      "evidence_level": "rig",
+      "name": "codec_throughput_bytes_per_second",
+      "scope": "declared_codec_benchmark",
+      "unit": "byte_per_second",
+      "value": 245213819.86783877
     }
   ],
-  "reason": "The Teensy 4.0 did not enumerate within the remote service's fixed 20-second power-on window for the prerequisite protocol-v1/RAW physical-combined smoke or its one identical infrastructure retry. Neither attempt programmed firmware or started the rig, so every downstream v2, synthetic-pattern, matched physical, and endurance job was intentionally not submitted.",
+  "reason": "The immutable final4 candidate passed the first ten strictly sequential stages through the matched physical RAW/RLE comparison. Both bounded 600-second endurance attempts then lost bytes upstream of a continuously drained 512 KiB userspace queue: the first detected one ADC checksum mismatch after 68 STATUS samples and the retry received 1,855 ADC-like payload bytes without the frame prefix after 98 samples. Both queues peaked at only 32 KiB, ended empty, and reached clean final IDLE. No passing 600-second observation exists, so rig correctness and the task remain inconclusive. The separately measurable physical value conclusion is FAIL because encoder utilization increased by 10.205324 percentage points, above the original 10-point maximum, despite a 49.377441% wire reduction.",
   "related": [
     "[[ADR-006-Experimental-RLE-Streaming]]",
     "[[Acquisition-Pipeline]]",
@@ -2467,6 +4050,6 @@
   ],
   "result": "INCONCLUSIVE",
   "schema_version": 1,
-  "summary": "The final negotiated-RLE candidate passes the complete local firmware, codec,\nfake-device, compatibility, resource, and deterministic-build gates. The live\nrig and physical-bandwidth conclusions remain **INCONCLUSIVE**: the Teensy did\nnot enumerate in the prerequisite protocol-v1/RAW smoke or its one permitted\ninfrastructure retry, so firmware was never programmed and no physical stream\nor target encode measurement began.\n\n### Exact candidate identity\n\n| Identity | Exact value |\n| --- | --- |\n| Frozen baseline | `b23004defeca465da0ae2d2884c4fef71979e5d4` |\n| Verified branch checkpoint | `7c639104f78866eb7e6191b58b2bc5349342e480` on `experiment/rle-streaming` |\n| Source tree / firmware source | `04d07aab4a1440551c69a5cc1d135d59b0376a51` / `85f2698ba97fb1defe827c4c12b5cd1e746a7ccc518b7868d4135a5b50605d8b` |\n| Protocol v1 | SHA-256 `014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222` |\n| Protocol v2 | SHA-256 `2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3` |\n| Artifact provenance commit | `f831c89fe15abec05b89df2e6aa60f07a1dcf2b6` |\n| Build / target | `thingdaq-85f2698ba97fb1de` / `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |\n| Candidate HEX | 386,057 bytes; SHA-256 `856006e31046e0166287ca281e407f54d71f25eae4f7fd32b04484c3532da6da` |\n| Campaign index | SHA-256 `760c99e79fe50a4634a17e7c6bb205af36f0ec4c9844ac91b1acec909873d515` |\n| Remote attempts | `d9c0e047-1152-4c63-b5dd-506a905bc7db`, `816e750c-002a-4212-b7f9-c1e390fecb27` |\n\n### Codec definition\n\nProtocol v2 retains the 44-byte header and four-byte checksum trailer. RAW\ncarries the unchanged 4,048-byte payload. Each canonical little-endian RLE\nrecord is `u16 run_length` plus one complete item: six bytes for one four-byte\nADC pair or three bytes for one packed GPIO byte. Runs are positive, coalesced,\nframe-local, and must decode to exactly 1,012 ADC pairs or 4,048 GPIO samples.\nEvery frame independently preserves sequence, first timestamp, flags, and\n8,096-tick coverage. Firmware sizes first and selects RLE only when the complete\nwire frame is strictly smaller; ties, expansion, page pressure, or a counted\nencoder failure select intact RAW. The selected header and payload are checksummed\nbefore publication, and hosts validate bounded length and checksum before bounded\ncanonical decompression. The largest selectable RLE representation is 674 ADC\nrecords / 4,092 wire bytes or 1,349 GPIO records / 4,095 wire bytes.\n\n### Complete local gate\n\n| Gate | Exact observation |\n| --- | --- |\n| Protocol generation | 70 v1/v2 outputs current |\n| Focused codec/protocol/rig | 72 passed, 1 skipped, 415 C++ subtests |\n| Parser/performance | 29 passed, 11,511 subtests; 4,099-byte parser high water; 2.0396x minimum full-rate headroom |\n| Documentation/layout | 8 passed, 643 subtests |\n| Complete regression | 500 passed, 8 skipped, 14,589 subtests |\n| Ruff / MyPy | 140 files format/lint clean; 29 source files type clean |\n| Repeated target build | Two byte-identical builds; `thingdaq-85f2698ba97fb1de` |\n| Memory / retention | flash 137,212 B; RAM1 491,488 B with 32,800 B local/stack headroom; RAM2 520,192 B with 4,096 B free; 105 DTCM + 95 OCRAM packet pages |\n| Default v1/RAW workflow | 2 ADC + 2 GPIO frames, zero gaps/drops/errors, final IDLE: `true` |\n\n### Corpus compression and conservation\n\nEvery workload contains eight complete frames. Ratios below use selected complete\nwire bytes divided by RAW complete-wire bytes; logical-to-wire ratios are also\nretained in JSON. Envelope conservation is exact: RAW wire equals logical payload\nplus 48 bytes per frame, and selected wire equals selected payload plus the same\n48-byte envelope per frame.\n\n| Stream | Workloads / frames | Logical / selected payload bytes | RAW / selected wire bytes | Exact selected/RAW wire ratio | Runs | RLE / fallback |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: |\n| ADC | 4 / 32 | 129,536 / 74,752 | 131,072 / 76,288 | 76288/131072 = 0.582031250 | 17,713 | 16 / 16 |\n| GPIO | 5 / 40 | 161,920 / 65,053 | 163,840 / 66,973 | 66973/163840 = 0.408770752 | 64,725 | 24 / 16 |\n| COMBINED | 9 / 72 | 291,456 / 139,805 | 294,912 / 143,261 | 143261/294912 = 0.485775418 | 82,438 | 40 / 32 |\n\n| Workload | Stream | RAW / selected wire bytes | Exact ratio | Runs | RLE / fallback |\n| --- | --- | ---: | ---: | ---: | ---: |\n| `gpio-constant` | GPIO | 32,768 / 408 | 408/32768 = 0.012451172 | 8 | 8 / 0 |\n| `gpio-long-digital-holds` | GPIO | 32,768 / 597 | 597/32768 = 0.018218994 | 71 | 8 / 0 |\n| `gpio-sparse-single-bit-changes` | GPIO | 32,768 / 432 | 432/32768 = 0.013183594 | 16 | 8 / 0 |\n| `gpio-alternating-bytes` | GPIO | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 32,384 | 0 / 8 |\n| `gpio-pseudo-random-bytes` | GPIO | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 32,246 | 0 / 8 |\n| `adc-constant-pairs` | ADC | 32,768 / 432 | 432/32768 = 0.013183594 | 8 | 8 / 0 |\n| `adc-independent-slow-channels` | ADC | 32,768 / 10,320 | 10320/32768 = 0.314941406 | 1,656 | 8 / 0 |\n| `adc-quantization-noise` | ADC | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 7,953 | 0 / 8 |\n| `adc-high-entropy` | ADC | 32,768 / 32,768 | 32768/32768 = 1.000000000 | 8,096 | 0 / 8 |\n\n### Encode/decode throughput and load\n\nThe host rows are the slowest measured batch in this report-generation run\nover the current protocol-v2 codec. They are host diagnostics, not firmware\ncycle measurements. Headroom uses the exact 4,000,000 logical B/s per-stream\ndenominator. The complete local gate independently retained 1.5246x minimum\ndecoder and 2.0396x parser headroom.\n\n| Host path | Limiting workload | Minimum logical B/s | Per-stream headroom |\n| --- | --- | ---: | ---: |\n| `raw_encode` | `adc-constant-pairs` | 39624005.638328 | 9.906001410x |\n| `rle_auto_encode` | `gpio-alternating-bytes` | 3791717.794384 | 0.947929449x |\n| `raw_decode` | `gpio-alternating-bytes` | 6190418.048660 | 1.547604512x |\n| `rle_auto_decode` | `gpio-alternating-bytes` | 6001442.924019 | 1.500360731x |\n| Host codec peak memory | all four paths | 33,711 bytes | 65,536-byte ceiling |\n| Firmware encode cycles/load | not observed | — | target never ran |\n\n### Physical campaign and workload value\n\n| Physical stream | Logical bytes | Encoded payload / complete wire | RLE / fallback / runs | Complete-wire ratio | Processing utilization |\n| --- | ---: | ---: | ---: | ---: | ---: |\n| ADC | not observed | not observed | not observed | **INCONCLUSIVE** | not observed |\n| GPIO | not observed | not observed | not observed | **INCONCLUSIVE** | not observed |\n| Combined | not observed | not observed | not observed | **INCONCLUSIVE** | not observed |\n\nThe physical value rule required matched RLE_AUTO complete-wire bytes at least\n20% below RAW without more than a 10 percentage-point processing-utilization\nincrease. Neither operand was observed, so no ADC, GPIO, combined-bandwidth,\nor encode-load value conclusion is made.\n\n### Fallbacks, errors, queues, and incident\n\nThe corpus selected 40 RLE and 32 size-driven RAW fallback frames; every\nalternating, pseudo-random, quantization-noise, and high-entropy frame fell\nback without expansion. Host/target-fake tests separately covered page-pressure\nand injected-encoder-failure fallback, one-page temporary ownership, exact\nsaturating counters, mixed streams, partial USB writes, reconnect, STOP, and\ncleanup. The packet pool remained exactly 200 pages; the live service queue\nreturned to zero after both attempts. No live firmware error, queue, fallback,\nlatency, loss, or conservation value exists because the runner never started.\n\nBoth jobs failed with `infrastructure_board_unavailable`: Board teensy:avr:teensy40 did not appear on any serial port within 20s of powering hub port 15.\nThe service recovered after each attempt. Every v2 smoke, all five target\nsynthetic patterns, the matched RAW/RLE_AUTO physical comparison, and the\n600-second endurance run were intentionally not submitted after the prerequisite\nfailed.\n\n### Compatibility and limitations\n\nAll 27 protocol-v1 source/generated/fixture paths are byte-identical to the frozen baseline; the v1 fixture tree is `58f3800a8450714f58ec486249521aacb68eb2e4`. RLE remains explicit protocol-v2-only negotiation, and STOP/reconnect restore v1/RAW defaults.\nCorpus savings are workload-specific. No target runtime, live USB acquisition,\nphysical ADC/GPIO quality, external timing, or cross-experiment branch combination\nwas established. See [[RLE-Prototype]], [[ADR-006-Experimental-RLE-Streaming]],\n[[Protocol-V1]], and [[Acquisition-Pipeline]] for the host prototype, negotiated\ncontract, compatibility boundary, and acquisition ownership model.",
+  "summary": "The replacement-board `00003` campaign supersedes the obsolete no-programming\nphysical rollup. Its immutable `final4` candidate passed ten strictly sequential\nshort stages, including both negotiated smokes, all five synthetic patterns, and\nthe matched 60-second physical RAW/RLE comparison. Rig correctness and the report\nremain **INCONCLUSIVE** because neither bounded 600-second endurance attempt\ncompleted without upstream serial byte loss. The separately measurable physical\nbandwidth-value conclusion is **FAIL**: combined wire volume fell 49.377441%, but\nencoder utilization increased 10.205324 percentage points, 0.205324 points above\nthe fixed 10-point maximum.\n\n### Exact replacement-board evidence identity\n\n| Identity | Exact value |\n| --- | --- |\n| Frozen baseline | `b23004defeca465da0ae2d2884c4fef71979e5d4` |\n| Candidate branch/checkpoint | `experiment/rle-streaming` at `dca4343616a78ab71dedf08155359aeddd017859` |\n| Firmware source / build | `db824f42af030d7ed226900d3b68379962f7515f66734e51e4309773b04f5c4d` / `thingdaq-db824f42af030d7e` |\n| Build target / service target | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` / `teensy:avr:teensy40` |\n| Manifest | 13,025 bytes; SHA-256 `903285a0642d689670dfb771d5cec7153d5558c951181657a7497d8b140e088d` |\n| Candidate HEX | 388,911 bytes; SHA-256 `b4ec27827331e8ed19075c78e74979192720711a0b3e8349b0b978f4c9add248` |\n| Protocol v1 / v2 | `014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222` / `2b9990ee46b3f9eff999d285c7e3fefb13947e79fda5d977b336ad75dab19aa3` |\n| Replacement hardware serial | `20428100` (observed, nonzero, stable, and non-grading) |\n| Campaign index | `rle-streaming-physical-campaign-00003`; SHA-256 `681c74f20f35012af01b438561de7c4d25ec0b91a3fb247d0e0255e35b960f21` |\n| Independent campaign validation | 9,091 checks; 107 unique sequential jobs |\n\nOnly campaign `00003` supplies current physical conclusions. Campaigns `00001`\nand `00002` remain immutable superseded provenance with manifest SHA-256 values\n`677059aef906c136a0b5fb1f0def317b5fc246339173c018a2850f85b98babb0` and\n`9030098494c1e48a68e182f2b416203fd35a793b384c303cf9ee0106d66b9898`; none of their\nmeasurements or earlier board expectations enter the current grades.\n\n### Accepted final4 sequence\n\n| # | Stage | Service job | Result |\n| ---: | --- | --- | --- |\n| 1 | `final4-v1-raw-physical-combined-smoke` | `74a69541-ed2c-4ffb-9f01-c64c941b9dd3` | PASS |\n| 2 | `final4-resample-v2-raw-smoke` | `b780d490-fa3a-4248-998c-0b06fa61d91c` | PASS |\n| 3 | `final4-resample-v2-rle-auto-smoke` | `9ddbeb1d-41e6-4522-ad5b-9989632855fd` | PASS |\n| 4 | `final4-resample-synthetic-constant-rle-auto` | `9832bb0a-fe99-4802-92c6-9501f737112a` | PASS |\n| 5 | `final4-resample-synthetic-sparse-hold-rle-auto` | `25dcc047-cc6b-438a-81c2-15ccd6838ad0` | PASS |\n| 6 | `final4-resample-synthetic-slow-adc-rle-auto` | `a80b863d-8b11-4b2f-9a85-8d53c3345f61` | PASS |\n| 7 | `final4-resample-synthetic-alternating-rle-auto` | `d165c5d0-d6bc-4588-8f39-702896c5dae9` | PASS |\n| 8 | `final4-resample-synthetic-incompressible-rle-auto` | `b9cf56b7-9351-4566-9572-61075e0a0fee` | PASS |\n| 9 | `final4-resample-physical-combined-v2-raw-matched` | `1242edca-de9e-49d8-9093-15232c79686e` | PASS |\n| 10 | `final4-resample-physical-combined-v2-rle-auto-matched` | `9686bce1-f4aa-4974-9a34-2e6c01c62f85` | PASS |\n\nEvery accepted job programmed the exact candidate, emitted nonempty runner\noutput, advertised build `thingdaq-db824f42af030d7e` and serial `20428100`, ran\nwithout active loss/error counters, attempted STOP, and confirmed final IDLE.\n\n### Matched physical RAW versus RLE_AUTO\n\nThe RAW and RLE_AUTO steady windows were\n60.004249938 and 60.004813458\nseconds. Complete-wire ratios use the RLE_AUTO selected wire bytes divided by\nthe same run's RAW-equivalent complete wire bytes.\n\n| Stream | Logical bytes | RLE payload bytes | RAW-equivalent / selected wire bytes | Ratio / reduction | RAW / RLE frames; runs | Encode cycles / utilization delta | Grade |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n| ADC | 260,015,184 | 260,015,184 | 263,098,368 / 263,098,368 | 1.000000000 / 0.000000% | 64,233 / 0; 0 | 1,797,982,213 / 4.609870 pp | **FAIL** |\n| GPIO | 260,015,184 | 192,699 | 263,098,368 / 3,275,883 | 0.012451172 / 98.754883% | 0 / 64,233; 64,233 | 2,182,388,768 / 5.595455 pp | **PASS** |\n| COMBINED | 520,030,368 | 260,207,883 | 526,196,736 / 266,374,251 | 0.506225586 / 49.377441% | 64,233 / 64,233; 64,233 | 3,980,370,981 / 10.205324 pp | **FAIL** |\n\nADC remained entirely RAW and therefore failed the 20% bandwidth rule. GPIO\nselected one canonical RLE run per frame and passed both value limits. Combined\nbandwidth passed, but the processing-cost limit failed without rounding.\n\n### Throughput, fallback, queues, latency, and memory\n\n| Path | RAW operand | RLE_AUTO operand |\n| --- | ---: | ---: |\n| ADC host decode B/s | 212643149.070423 | 215047155.102205 |\n| ADC wall logical B/s | 3999972.265935 | 3999937.600673 |\n| GPIO host decode B/s | 625681129.039770 | 285224981.058438 |\n| GPIO wall logical B/s | 3999972.265935 | 3999937.600673 |\n| COMBINED host decode B/s | 317411314.611757 | 245213819.867839 |\n| COMBINED wall logical B/s | 7999944.531869 | 7999875.201346 |\n| Combined firmware encode cycles | 0 | 3,980,370,981 |\n| Combined firmware encode load | 0.000000000 | 0.102053242 |\n| Packet-owned high water | 46 / 200 pages | 26 / 200 pages |\n| Temporary-page high water | 0 | 1 |\n| STATUS latency p99 / max | 2.267283 / 2.601606 ms | 4.250181 / 4.252566 ms |\n| Host RSS maximum | 22,003,712 bytes | 22,016,000 bytes |\n\nRLE_AUTO produced 64,233 ADC RAW fallbacks, all `not_smaller`, and zero GPIO fallbacks. Encoder-failure and temporary-page-unavailable fallbacks were zero for both streams. Across all nine accepted v2 jobs, packet ownership peaked at 119/200 pages, temporary ownership at 1/1 page, host RSS at 22,016,000 bytes, maximum STATUS latency at 24.876835 ms, and the slowest combined host decode path sustained 20387963.942916 logical B/s.\n\nEvery accepted RAW and RLE stream exactly conserved logical payload, selected\npayload, 48-byte-per-frame envelope, representation partition, queued/transmitted\nbytes, and combined ADC+GPIO totals. The matched jobs reported zero checksum,\nheader, payload, stale-response, transport, capacity, eviction, encoding, DMA,\nand queue-rejection errors. Their only incomplete items were explicitly\nreconciled STOP tails: RAW 496 ADC pairs / 1987 GPIO samples and RLE_AUTO 1010 / 4042.\n\n### Deterministic synthetic patterns\n\n| Pattern | Service job | ADC / GPIO / combined wire ratio | RAW / RLE frames; runs | Encode load | Combined decode B/s |\n| --- | --- | ---: | ---: | ---: | ---: |\n| `constant` | `9832bb0a-fe99-4802-92c6-9501f737112a` | 0.013183594 / 0.012451172 / 0.012817383 | 0 / 21,800; 21,800 | 0.072158331 | 381187051.598560 |\n| `sparse-hold` | `25dcc047-cc6b-438a-81c2-15ccd6838ad0` | 0.014668945 / 0.013189154 / 0.013929049 | 0 / 20,286; 40,791 | 0.272728629 | 182244417.004642 |\n| `slow-adc` | `a80b863d-8b11-4b2f-9a85-8d53c3345f61` | 0.314941406 / 0.197021484 / 0.255981445 | 0 / 21,758; 5,004,340 | 0.377336967 | 20387963.942916 |\n| `alternating` | `d165c5d0-d6bc-4588-8f39-702896c5dae9` | 1.000000000 / 1.000000000 / 1.000000000 | 21,744 / 0; 0 | 0.083929605 | 1504230392.659250 |\n| `incompressible` | `b9cf56b7-9351-4566-9572-61075e0a0fee` | 1.000000000 / 1.000000000 / 1.000000000 | 21,746 / 0; 0 | 0.084122244 | 34786802.466302 |\n\nConstant, sparse-hold, and slow-ADC met their declared compression bounds;\nalternating and incompressible selected only RAW frames and never expanded.\nFormula, timestamp, sequence, checksum-before-decode, conservation, cleanup,\nand stable-identity checks passed for every accepted pattern.\n\n### Endurance incident and separate conclusions\n\n| Attempt | Service job | Failure | Reader high water / capacity | STATUS samples | Cleanup |\n| --- | --- | --- | ---: | ---: | --- |\n| 1 | `936b1df9-1629-4f4f-87c7-1be44e8a5005` | ADC checksum mismatch | 32,768 / 524,288 bytes | 68 | STOP `true`, IDLE `true` |\n| 2 | `d1020be8-a74c-4997-8049-840f0c66cd6b` | 1,855 ADC-like bytes without a frame prefix | 32,768 / 524,288 bytes | 98 | STOP `true`, IDLE `true` |\n\nBoth queues ended at zero bytes/chunks, ruling out userspace queue saturation\nwithout locating the loss among the remote USB/TTY path, hub/cable, kernel\nbuffering, container scheduling, or target-to-host transport. No passing\n600-second observation exists. The user authorized deferring another identical\nhardware attempt; this closes the machine task disposition but does not convert\nthe campaign, endurance qualification, or merge recommendation into PASS.\n\n| Conclusion | Grade |\n| --- | --- |\n| Local correctness | **PASS** |\n| Protocol-v1 compatibility | **PASS** |\n| Accepted short-stage correctness | **PASS** |\n| 600-second endurance / overall rig correctness | **INCONCLUSIVE** |\n| ADC physical bandwidth value | **FAIL** |\n| GPIO physical bandwidth value | **PASS** |\n| Combined physical bandwidth value | **FAIL** |\n| Overall report | **INCONCLUSIVE** |\n\n### Compatibility and limitations\n\nProtocol-v1 source, generated output, fixtures, and default RAW behavior remain\nbyte-compatible with the frozen baseline. Compression conclusions apply only to\nthe declared workloads and framing. The campaign does not establish ADC accuracy,\nnoise, ENOB, linearity, external GPIO timing, signal integrity, or compatibility\nwith the separate clock or auxiliary-bank branches. See [[RLE-Prototype]],\n[[ADR-006-Experimental-RLE-Streaming]], [[Protocol-V1]], and\n[[Acquisition-Pipeline]].",
   "title": "ThingDAQ Negotiated RLE Experiment"
 }
