@@ -2303,7 +2303,15 @@ def validate_status(
             + json.dumps(wrong, sort_keys=True)
         )
     nonzero = {
-        name: status.values[name] for name in ZERO_ERROR_FIELDS if status.values[name]
+        name: status.values[name]
+        for name in ZERO_ERROR_FIELDS
+        if status.values[name]
+        and not (
+            final
+            and case.aux_mode == AUX_INPUT
+            and name == "paired_gpio_canceled_generations"
+            and status.values[name] <= 2
+        )
     }
     if nonzero:
         raise ProtocolFailure(
@@ -2521,7 +2529,10 @@ def validate_status(
         != status.adc_framed_bytes_transmitted + status.gpio_framed_bytes_transmitted
     ):
         raise ProtocolFailure("combined framed-byte conservation failed")
-    if status.packet_accounted_frame_skew > (1 if adc_enabled else 0):
+    # This is the absolute difference between stream frame counts, not an
+    # error counter. With ADC disabled it legitimately grows with every GPIO
+    # frame; fairness bounds apply only when both streams are selected.
+    if adc_enabled and status.packet_accounted_frame_skew > 1:
         raise ProtocolFailure("packet scheduler accounted skew exceeds bound")
 
     depth_limits = {

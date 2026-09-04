@@ -71,7 +71,8 @@ wire::ControlFrame pingResponse(std::uint32_t request_id,
 std::vector<std::uint8_t> dataFrame(constants::FrameKind kind,
                                     std::uint32_t run_id,
                                     std::uint32_t sequence,
-                                    std::uint64_t first_ticks) {
+                                    std::uint64_t first_ticks,
+                                    bool auxiliary = false) {
   std::array<std::uint8_t, constants::kDataPayloadBytes> payload{};
   if (kind == constants::FrameKind::kGpioData) {
     for (std::size_t index = 0U; index < payload.size(); ++index) {
@@ -79,6 +80,9 @@ std::vector<std::uint8_t> dataFrame(constants::FrameKind kind,
     }
   }
   wire::FrameFields fields{};
+  if (auxiliary) {
+    fields.version = thingdaq::protocol_v2::kProtocolVersion;
+  }
   fields.kind = kind;
   fields.run_id = run_id;
   fields.sequence = sequence;
@@ -92,7 +96,14 @@ std::vector<std::uint8_t> dataFrame(constants::FrameKind kind,
         static_cast<std::uint16_t>(constants::FrameFlag::kEpochStart);
   }
   wire::DataFrame frame{};
-  expect(wire::encodeFrame(fields, {payload.data(), payload.size()}, frame).ok(),
+  std::size_t payload_size = payload.size();
+  if (auxiliary) {
+    fields.item_count /= 2U;
+    if (kind == constants::FrameKind::kAdcData) {
+      payload_size /= 2U;
+    }
+  }
+  expect(wire::encodeFrame(fields, {payload.data(), payload_size}, frame).ok(),
          "encode complete lower-priority data frame");
   return bytes(frame);
 }
@@ -622,7 +633,27 @@ void testTransmitBudgets() {
   (void)malformed_transport.serviceTransmit();
   expect(malformed_lower.frames.empty() && malformed_stream.output.empty() &&
              malformed_transport.snapshot().io_errors == 1U,
-         "lower-priority admission rejects every non-4096-byte data frame");
+         "lower-priority admission rejects unsupported data frame sizes");
+}
+
+void testAuxiliaryVariableLengthFrames() {
+  const auto adc = dataFrame(constants::FrameKind::kAdcData, 7U, 0U, 0U, true);
+  const auto gpio = dataFrame(constants::FrameKind::kGpioData, 7U, 0U, 0U, true);
+  expect(adc.size() == 2072U && gpio.size() == 4096U,
+         "auxiliary frame shapes match the wire contract");
+  FakeLowerPrioritySource lower{};
+  lower.frames = {adc, gpio, adc};
+  FakeCdcStream stream{};
+  stream.write_plan = {0, 100, 412, 512};
+  stats::Statistics statistics{};
+  usb::CdcTransport transport(stream, statistics, &lower);
+  drainTransmit(transport);
+  std::vector<std::uint8_t> expected{};
+  append(expected, adc);
+  append(expected, gpio);
+  append(expected, adc);
+  expect(stream.output == expected && transport.snapshot().io_errors == 0U,
+         "USB preserves short ADC and full GPIO frames across zero/partial writes");
 }
 
 }  // namespace
@@ -636,6 +667,7 @@ int main() {
   testPartialAndZeroWritesPreserveFrames();
   testResponsePriorityAndActiveFrameOwnership();
   testTransmitBudgets();
+  testAuxiliaryVariableLengthFrames();
 
   if (failures == 0) {
     std::cout << "usb transport tests passed\n";

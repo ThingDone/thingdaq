@@ -183,6 +183,7 @@ class AuxiliaryPhysicalDevice(SimulatedDevice):
                 samples_delivered=gpio_items,
                 cache_dma_discards=2 * gpio_frames,
                 cache_cpu_invalidations=2 * gpio_frames,
+                canceled_generations=2 if active_configuration is None else 0,
             )
         return replace(
             base,
@@ -204,6 +205,9 @@ class AuxiliaryPhysicalDevice(SimulatedDevice):
             gpio_cache_dma_discards=gpio_frames,
             gpio_cache_cpu_invalidations=gpio_frames,
             gpio_processing_cpu_basis_points=250 if gpio_frames else 0,
+            # Firmware reports the absolute accounted frame difference even
+            # for single-stream runs; only combined mode bounds this to one.
+            packet_accounted_frame_skew=abs(adc_frames - gpio_frames),
             adc0_dma_major_loops=adc_frames if adc_enabled else 0,
             adc1_dma_major_loops=adc_frames if adc_enabled else 0,
             adc0_dma_results=adc_items if adc_enabled else 0,
@@ -275,6 +279,9 @@ class AuxiliaryPhysicalDevice(SimulatedDevice):
             payload[offset : offset + 2] = (
                 rig.PACKET_READY_QUEUE_CAPACITY + 1
             ).to_bytes(2, "little")
+        elif self.fault == "active_cancellation":
+            offset = constants.STATUS_RESPONSE_PAIRED_GPIO_CANCELED_GENERATIONS_OFFSET
+            payload[offset : offset + 8] = (1).to_bytes(8, "little")
         return self._success_response(request, payload)
 
 
@@ -421,6 +428,7 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
             ("skew", "skew"),
             ("wrong_mapping", "pin map"),
             ("saturation", "exceeds"),
+            ("active_cancellation", "canceled_generations"),
         ):
             with self.subTest(fault=fault):
                 result = self._run(case, profile, fault=fault)

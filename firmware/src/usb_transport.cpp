@@ -275,7 +275,8 @@ ServiceReport CdcTransport::serviceTransmit() {
       }
       selection.bytes = lower_priority_->frontFrame();
       if (!selection.bytes.valid() ||
-          selection.bytes.size != protocol_v1::kDataFrameBytes) {
+          (selection.bytes.size != protocol_v1::kDataFrameBytes &&
+           selection.bytes.size != protocol_v2::kMinDataFrameBytes)) {
         recordIoError();
         stalled = true;
         break;
@@ -540,7 +541,8 @@ CdcTransport::FrameSelection CdcTransport::selectTransmitFrame() {
   if (lower.size == 0U) {
     return {};
   }
-  if (!lower.valid() || lower.size != protocol_v1::kDataFrameBytes) {
+  if (!lower.valid() || (lower.size != protocol_v1::kDataFrameBytes &&
+                         lower.size != protocol_v2::kMinDataFrameBytes)) {
     recordIoError();
     lower_priority_->releaseFrontFrame();
     return {};
