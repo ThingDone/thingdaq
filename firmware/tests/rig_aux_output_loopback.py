@@ -5,8 +5,9 @@ The remote runner uploads this file by itself to a network-disabled Python
 container.  It intentionally uses only the Python standard library and
 PySerial and embeds every protocol-v2 value that it validates.
 
-Driving is fail-closed.  ``AUX_OUTPUT_FIXTURE_JSON`` must contain exactly this
-machine-readable declaration shape before OUTPUT_ARM or START can be written::
+Driving is fail-closed.  ``AUX_OUTPUT_FIXTURE_JSON`` must contain exactly one
+of the supported machine-readable declarations before OUTPUT_ARM or START can
+be written.  Protected loopback uses this shape::
 
     {
       "schema_version": 1,
@@ -22,6 +23,11 @@ machine-readable declaration shape before OUTPUT_ARM or START can be written::
         "teensy40-d16-d23-to-d6-d13-1mhz-v1"
       ]
     }
+
+An explicitly unconnected smoke test uses the same fields, but declares an
+empty ``connections`` array and authorizes only
+``teensy40-d16-d23-unconnected-smoke-v1``.  That mode validates the output
+lifecycle and internal counters without grading physical pin values.
 
 The declaration is compared with the hardware serial returned by INFO.  Logs
 contain only its SHA-256 identity and interlock result, never its raw content.
@@ -56,6 +62,7 @@ EVENT_PREFIX = "AUX_OUTPUT_LOOPBACK_EVENT "
 RESULT_SCHEMA_VERSION = 1
 EXPERIMENT_ID = "aux-output-bank"
 PROFILE_ID = "teensy40-d16-d23-to-d6-d13-1mhz-v1"
+UNCONNECTED_PROFILE_ID = "teensy40-d16-d23-unconnected-smoke-v1"
 FIXTURE_SCHEMA_VERSION = 1
 OUTPUT_PINS = tuple(range(16, 24))
 INPUT_PINS = tuple(range(6, 14))
@@ -63,6 +70,10 @@ OUTPUT_GPIO_BITS = (23, 22, 17, 16, 26, 27, 24, 25)
 MIN_SERIES_RESISTANCE_OHMS = 100
 MAX_SERIES_RESISTANCE_OHMS = 10_000
 MAX_FIXTURE_BYTES = 16_384
+# A submitted one-file runner may replace this with an exact declaration when
+# its service cannot inject environment variables.  The checked-in default is
+# deliberately non-authorizing.
+EMBEDDED_FIXTURE_DECLARATION: str | None = None
 
 BAUD_RATE = 115_200
 SERIAL_TIMEOUT_SECONDS = 0.02
@@ -303,6 +314,8 @@ def compute_checksum(data: bytes | bytearray | memoryview, algorithm: int) -> in
 class FixtureDeclaration:
     hardware_serial: int
     declaration_sha256: str
+    profile_id: str = PROFILE_ID
+    observation_mode: str = "loopback"
 
 
 def parse_fixture_declaration(raw: str | None) -> FixtureDeclaration | None:
@@ -350,10 +363,22 @@ def parse_fixture_declaration(raw: str | None) -> FixtureDeclaration | None:
     if value["external_drivers"] is not False:
         raise ValueError("fixture does not declare absence of external drivers")
     profiles = value["authorized_profiles"]
-    if not isinstance(profiles, list) or profiles != [PROFILE_ID]:
-        raise ValueError("fixture does not authorize the exact output profile")
+    if not isinstance(profiles, list) or profiles not in (
+        [PROFILE_ID],
+        [UNCONNECTED_PROFILE_ID],
+    ):
+        raise ValueError("fixture does not authorize one exact output profile")
+    profile_id = profiles[0]
     connections = value["connections"]
-    if not isinstance(connections, list) or len(connections) != 8:
+    if not isinstance(connections, list):
+        raise ValueError("fixture connections must be a JSON array")
+    if profile_id == UNCONNECTED_PROFILE_ID:
+        if connections:
+            raise ValueError("unconnected smoke requires zero declared connections")
+        return FixtureDeclaration(
+            int(serial_value), digest, profile_id, "unconnected"
+        )
+    if len(connections) != 8:
         raise ValueError("fixture does not declare exactly eight loopback wires")
     for index, connection in enumerate(connections):
         if not isinstance(connection, dict) or set(connection) != {
@@ -373,7 +398,7 @@ def parse_fixture_declaration(raw: str | None) -> FixtureDeclaration | None:
             <= MAX_SERIES_RESISTANCE_OHMS
         ):
             raise ValueError("fixture loopback order or series protection is invalid")
-    return FixtureDeclaration(int(serial_value), digest)
+    return FixtureDeclaration(int(serial_value), digest, profile_id, "loopback")
 
 
 @dataclass(frozen=True)
@@ -381,6 +406,7 @@ class _DrivePermit:
     hardware_serial: int
     declaration_sha256: str
     owner_identity: int
+    observation_mode: str
 
 
 class DriveInterlock:
@@ -406,6 +432,7 @@ class DriveInterlock:
             observed_hardware_serial,
             declaration.declaration_sha256,
             self._identity,
+            declaration.observation_mode,
         )
 
     def validate(self, permit: _DrivePermit | None) -> None:
@@ -416,6 +443,7 @@ class DriveInterlock:
             or permit.owner_identity != self._identity
             or permit.hardware_serial != declaration.hardware_serial
             or permit.declaration_sha256 != declaration.declaration_sha256
+            or permit.observation_mode != declaration.observation_mode
         ):
             raise InterlockDenied("drive command refused by fixture interlock")
 
@@ -1173,6 +1201,7 @@ class CaptureValidator:
     lag_ticks: int | None
     infer_lag: bool
     allow_gaps: bool = False
+    grade_loopback: bool = True
     adc: StreamTotals = field(default_factory=StreamTotals)
     gpio: StreamTotals = field(default_factory=StreamTotals)
     adc_min: list[int] = field(default_factory=lambda: [0xFFFF, 0xFFFF])
@@ -1215,6 +1244,8 @@ class CaptureValidator:
                 self.adc_max[0] = max(self.adc_max[0], adc0)
                 self.adc_max[1] = max(self.adc_max[1], adc1)
             return
+        if not self.grade_loopback:
+            return
         for index, state in enumerate(frame.payload):
             ticks = frame.first_sample_ticks + index * GPIO_SAMPLE_PERIOD_TICKS
             if self.grader is None:
@@ -1254,6 +1285,8 @@ class CaptureValidator:
             ),
             "ADC stream is empty",
         )
+        if not self.grade_loopback:
+            return
         grader = self.grader
         if grader is None:
             raise CampaignFailure("insufficient GPIO prefix to grade loopback")
@@ -1314,7 +1347,7 @@ class MemoryMonitor:
 class CaseResult:
     name: str
     run_id: int
-    lag_ticks: int
+    lag_ticks: int | None
     adc_frames: int
     gpio_frames: int
     output_intervals: int
@@ -1444,6 +1477,7 @@ class Campaign:
         self.permit = permit
         self.info = info
         self.memory = memory
+        self.observation_mode = permit.observation_mode
         self.lag_ticks: int | None = None
         self.next_generation = 0xA8000001
         self._prior_drive_requests_written = 0
@@ -1506,6 +1540,7 @@ class Campaign:
             self.lag_ticks,
             self.lag_ticks is None,
             allow_recovery_gaps,
+            grade_loopback=self.observation_mode == "loopback",
         )
         for frame in start_data:
             validator.accept(frame)
@@ -1617,13 +1652,15 @@ class Campaign:
         status_latencies.append(latency)
         final_acquisition = decode_acquisition_status(acquisition_frame)
         validator.finish()
-        require(validator.lag_ticks is not None, "loopback lag was not inferred")
-        if self.lag_ticks is None:
-            self.lag_ticks = validator.lag_ticks
-            emit_event("loopback_lag_inferred", lag_ticks=self.lag_ticks)
-        require(
-            validator.lag_ticks == self.lag_ticks, "loopback lag shifted between cases"
-        )
+        if self.observation_mode == "loopback":
+            require(validator.lag_ticks is not None, "loopback lag was not inferred")
+            if self.lag_ticks is None:
+                self.lag_ticks = validator.lag_ticks
+                emit_event("loopback_lag_inferred", lag_ticks=self.lag_ticks)
+            require(
+                validator.lag_ticks == self.lag_ticks,
+                "loopback lag shifted between cases",
+            )
         self._validate_output_final(program, run_id, final_output, expect_underrun)
         self._validate_acquisition_final(
             final_acquisition, validator, allow_recovery_gaps
@@ -1652,7 +1689,7 @@ class Campaign:
         self.memory.sample()
         intervals = int(validator.grader.intervals_graded if validator.grader else 0)
         lag_ticks = self.lag_ticks
-        if lag_ticks is None:
+        if self.observation_mode == "loopback" and lag_ticks is None:
             raise AssertionError("campaign lag disappeared after validation")
         emit_event(
             "case_complete",
@@ -1660,6 +1697,7 @@ class Campaign:
             case=program.name,
             gpio_frames=validator.gpio.frames,
             loopback_intervals=intervals,
+            observation_mode=self.observation_mode,
             recovery=(
                 "disconnect-reopen"
                 if disconnect_reopen
@@ -1914,6 +1952,8 @@ def build_result(
     failures: list[str],
     memory: MemoryMonitor,
     drive_requests_written: int,
+    profile_id: str = PROFILE_ID,
+    observation_mode: str = "loopback",
 ) -> dict[str, object]:
     lag = cases[0].lag_ticks if cases else None
     p99 = max((case.status_latency_p99_ms for case in cases), default=None)
@@ -1929,7 +1969,8 @@ def build_result(
             "hardware_serial": None if info is None else info.hardware_serial,
             "firmware_build_id": None if info is None else info.build_id,
             "fixture_declaration_sha256": fixture_sha256,
-            "output_profile": PROFILE_ID,
+            "output_profile": profile_id,
+            "observation_mode": observation_mode,
             "protocol_version": PROTOCOL_VERSION,
         },
         "evidence": {
@@ -1962,6 +2003,11 @@ def build_result(
         "acceptance": {
             "fixture_interlock": "PASS" if cases else "NOT_RUN",
             "loopback_schedule": "PASS"
+            if observation_mode == "loopback" and cases and not failures
+            else "NOT_RUN"
+            if observation_mode == "unconnected" or not cases
+            else "FAIL",
+            "output_lifecycle": "PASS"
             if cases and not failures
             else "NOT_RUN"
             if not cases
@@ -1980,6 +2026,11 @@ def build_result(
         "limitations": [
             "Loopback self-observation is not independent timing or signal-integrity evidence.",
             "ADC codes are range/conservation checked without claiming analog accuracy.",
+            *(
+                ["Unconnected smoke does not observe output pin state or waveform."]
+                if observation_mode == "unconnected"
+                else []
+            ),
         ],
     }
 
@@ -2016,6 +2067,7 @@ def main() -> int:
     try:
         declaration = parse_fixture_declaration(
             os.environ.get("AUX_OUTPUT_FIXTURE_JSON")
+            or EMBEDDED_FIXTURE_DECLARATION
         )
         host_stall = _bounded_float(
             "AUX_OUTPUT_HOST_STALL_SECONDS", 0.025, 0.0, MAX_HOST_STALL_SECONDS
@@ -2057,6 +2109,9 @@ def main() -> int:
             "preflight",
             fixture_declaration_sha256=interlock.declaration_sha256,
             fixture_present=declaration is not None,
+            observation_mode=(
+                "none" if declaration is None else declaration.observation_mode
+            ),
             output_bank_disabled=info.output_bank_mode == OUTPUT_BANK_DISABLED,
             protocol=PROTOCOL_VERSION,
         )
@@ -2126,7 +2181,11 @@ def main() -> int:
                 "host RSS growth exceeded bound",
             )
             result = "PASS"
-            reason = "authorized loopback campaign passed every bounded check"
+            reason = (
+                "authorized loopback campaign passed every bounded check"
+                if declaration.observation_mode == "loopback"
+                else "authorized unconnected output lifecycle smoke passed"
+            )
             exit_code = 0
     except Exception as error:  # noqa: BLE001 - preserve rig diagnosis
         message = f"{type(error).__name__}: {error}"
@@ -2188,6 +2247,10 @@ def main() -> int:
         failures=failures,
         memory=memory,
         drive_requests_written=drive_requests,
+        profile_id=(PROFILE_ID if declaration is None else declaration.profile_id),
+        observation_mode=(
+            "loopback" if declaration is None else declaration.observation_mode
+        ),
     )
     print(RESULT_PREFIX + json.dumps(report, sort_keys=True, separators=(",", ":")))
     return exit_code

@@ -46,6 +46,20 @@ def fixture_json(serial: int = 0x10203040) -> str:
     )
 
 
+def unconnected_fixture_json(serial: int = 0x10203040) -> str:
+    return json.dumps(
+        {
+            "schema_version": rig.FIXTURE_SCHEMA_VERSION,
+            "hardware_serial": serial,
+            "connections": [],
+            "io_voltage_volts": 3.3,
+            "external_drivers": False,
+            "authorized_profiles": [rig.UNCONNECTED_PROFILE_ID],
+        },
+        sort_keys=True,
+    )
+
+
 def response_wire(
     request: bytes,
     *,
@@ -206,6 +220,26 @@ class FixtureInterlockTests(unittest.TestCase):
         with self.assertRaisesRegex(rig.InterlockDenied, "no fixture"):
             rig.DriveInterlock(None).authorize(0x10203040)
 
+    def test_unconnected_fixture_authorizes_only_unconnected_observation(self) -> None:
+        declaration = rig.parse_fixture_declaration(unconnected_fixture_json())
+        self.assertIsNotNone(declaration)
+        assert declaration is not None
+        self.assertEqual("unconnected", declaration.observation_mode)
+        self.assertEqual(rig.UNCONNECTED_PROFILE_ID, declaration.profile_id)
+        permit = rig.DriveInterlock(declaration).authorize(0x10203040)
+        self.assertEqual("unconnected", permit.observation_mode)
+
+        value = json.loads(unconnected_fixture_json())
+        value["connections"] = [
+            {
+                "output_pin": 16,
+                "input_pin": 6,
+                "series_resistance_ohms": 470,
+            }
+        ]
+        with self.assertRaisesRegex(ValueError, "zero declared connections"):
+            rig.parse_fixture_declaration(json.dumps(value))
+
     def test_missing_or_mismatched_fixture_never_writes_a_drive_request(self) -> None:
         for interlock, permit in (
             (rig.DriveInterlock(None), None),
@@ -278,6 +312,44 @@ class FixtureInterlockTests(unittest.TestCase):
 
 
 class LoopbackGradingTests(unittest.TestCase):
+    def test_unconnected_validator_checks_streams_without_loopback_grading(self) -> None:
+        validator = rig.CaptureValidator(
+            rig.walking_program(),
+            rig.BOOTSTRAP_CHECKSUM,
+            9,
+            None,
+            False,
+            grade_loopback=False,
+        )
+        validator.accept(
+            rig.Frame(
+                rig.ADC_DATA,
+                0,
+                rig.BOOTSTRAP_CHECKSUM,
+                9,
+                0,
+                0,
+                0,
+                rig.ADC_PAIRS_PER_FRAME,
+                bytes(rig.DATA_PAYLOAD_BYTES),
+            )
+        )
+        validator.accept(
+            rig.Frame(
+                rig.GPIO_DATA,
+                0,
+                rig.BOOTSTRAP_CHECKSUM,
+                9,
+                0,
+                0,
+                0,
+                rig.GPIO_SAMPLES_PER_FRAME,
+                bytes([0xA5]) * rig.DATA_PAYLOAD_BYTES,
+            )
+        )
+        validator.finish()
+        self.assertIsNone(validator.grader)
+
     def test_stable_lag_is_unique_and_a_shift_is_rejected(self) -> None:
         program = rig.walking_program()
         stable = gpio_samples(program, 6)
