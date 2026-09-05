@@ -72,7 +72,9 @@ Host processing capacity remains a separate constraint. The Python SDK's
 combined 16-GPIO capture is not lossless under the test server's 0.5-core CPU
 quota, although the independent wire validator sustains the same firmware
 configuration. No wire-rate or capability bit promises a host throughput
-budget. Strict gap/overrun checks are not disabled to accommodate this limit.
+budget. One SDK run also reported parser rejections without raw-ring loss;
+their cause remains unconfirmed. Strict gap/overrun/parser checks are not
+disabled to accommodate these failures.
 
 ## Envelope and commands
 

@@ -46,6 +46,12 @@ related:
 > release settings. Use live INFO metadata. `TimestampAligner` does not support
 > the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
+## Current ThingDAQ 1.1.0
+
+[[Release-1.1.0]] records the fixed 1 MHz / 450 MHz artifact, physical
+qualification, thermal readings, SDK host-throughput limit and protocol audit.
+Use it instead of historical candidate hashes below.
+
 ## Unified experimental evidence
 
 [[Clock-Compression-IO-Report]] synthesizes the immutable 450 MHz clock,

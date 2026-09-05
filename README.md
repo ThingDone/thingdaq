@@ -3,12 +3,15 @@
 Release **1.1.0** uses **protocol v2**, a **450 MHz** core and fixed **1 MHz**
 rates on both ADCs and GPIO. Select 8 or 16 GPIO inputs; other acquisition
 rates are rejected. See the [current wire contract](doc/protocol/protocol-v2.md).
+Build identity, validation and limits are in the
+[v1.1.0 release report](doc/results/release-1.1.0.md).
 The optional equal-frame `TimestampAligner` is not supported for this new
 profile; acquisition blocks provide exact per-sample timestamps.
 
-The Python SDK's combined ADC + 16-GPIO path is not lossless on the remote
-test server's 0.5-core CPU quota. The independent wire validator sustains that
-firmware mode; a faster host's SDK throughput still needs qualification.
+The Python SDK's combined ADC + 16-GPIO path is not qualified as lossless on
+the remote test server's 0.5-core CPU quota: runs reported USB queue loss and,
+in one case, parser rejections. The independent wire validator sustains that
+firmware mode; the SDK errors and faster-host throughput need further qualification.
 Strict loss detection remains enabled—no missing data is silently accepted.
 
 ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,

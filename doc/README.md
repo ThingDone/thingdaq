@@ -59,6 +59,8 @@ related:
 > release settings. Use live INFO metadata. `TimestampAligner` does not support
 > the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
+The current release's artifact and validation record is [[Release-1.1.0]].
+
 Every Markdown artifact below `doc/` begins with YAML front matter containing
 `type`, `title`, `created`, `tags`, and `related`. Related artifacts use
 double-bracket document links so the project can be explored as a graph.

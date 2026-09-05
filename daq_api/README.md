@@ -42,8 +42,10 @@ and do not imply release hardware support.
 
 Physical SDK validation passes ADC-only, GPIO-only (8/16 inputs), and combined
 8-input capture on the remote test server. Combined ADC + 16-GPIO capture
-exceeds that server's 0.5-core CPU budget and reports firmware USB queue loss;
-it is not qualified as lossless there. The independent wire validator sustains
+reports firmware USB queue loss under that server's 0.5-core CPU quota;
+one run also reported parser rejections without raw-ring loss. Not all errors
+are proven to be caused by throttling. It is not qualified as lossless there.
+The independent wire validator sustains
 the same firmware configuration. SDK throughput on a faster host remains
 unverified. Keep strict loss checking enabled and validate the intended host.
 

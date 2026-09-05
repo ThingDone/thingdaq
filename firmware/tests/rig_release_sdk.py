@@ -146,6 +146,9 @@ def main():
                         evidence["reader_counters"] = dataclasses.asdict(
                             daq._reader.counters
                         )
+                        evidence["parser_counters"] = dataclasses.asdict(
+                            daq._reader.parser_counters
+                        )
                         evidence["failure_status"] = dataclasses.asdict(daq.status())
                         evidence["failure_host"] = dataclasses.asdict(daq.host_counters)
                         raise

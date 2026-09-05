@@ -1,0 +1,1286 @@
+{
+  "schema": "thingdaq.release-validation/v1",
+  "release": "v1.1.0",
+  "protocol_version": 2,
+  "firmware_qualification": "PASS",
+  "public_sdk_combined_16gpio_qualification": "FAIL_ON_TEST_HOST",
+  "electrical_stimulus": "NOT_CONNECTED",
+  "artifact": {
+    "path": "firmware.ino.hex",
+    "sha256": "23b0f2ef8023c52021b22b8c6642f801866dfe8b1aadc48affc6b1ac66c2157a",
+    "size_bytes": 446511
+  },
+  "manifest_sha256": "4ae3b9b33ae3d090878101a2cc54bbb21e5c606015c138b9494ded12421216d9",
+  "source": {
+    "commit": "e3e8417598de7494db3a93d7277ef8f0ec31bc8f",
+    "build_id": "thingdaq-636aebbecbf70691",
+    "source_id": "636aebbecbf7069173552894e1dcbb8444887c63bcf942cddc8cee87908d7994",
+    "timestamp": "2026-09-05T05:10:13Z"
+  },
+  "target": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+  "release_policy": {
+    "adc_dma_active_lookahead_generations": 4,
+    "core_hz": 450000000,
+    "fixed_1mhz": true,
+    "legacy_gpio_capture_diagnostic_enabled": false,
+    "protocol_version": 2,
+    "supported_rate_profile_mask": 16
+  },
+  "two_build_hex_match": true,
+  "two_build_manifest_match": true,
+  "local_validation": {
+    "pytest_passed": 562,
+    "pytest_subtests_passed": 16324,
+    "ruff": "PASS",
+    "mypy": "PASS",
+    "generated_protocol_files": 109,
+    "linked_memory_gates": "PASS",
+    "installed_wheel_demo": "PASS"
+  },
+  "final_jobs": [
+    {
+      "directory": "release-v110-publish-soak",
+      "test_id": "1fb826ca-90ec-440c-a747-be0c24a50fd3",
+      "outcome": "PASS",
+      "hex_sha256": "23b0f2ef8023c52021b22b8c6642f801866dfe8b1aadc48affc6b1ac66c2157a",
+      "cells": [
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 1186326,
+            "adc_rate_hz": 1000001.6115918941,
+            "aux_bank_samples_captured": 600279944,
+            "capture_seconds": 600.0092790299095,
+            "firmware_processing_cpu_basis_points": 1723,
+            "gpio_frames": 296581,
+            "gpio_rate_hz": 1000002.4549121854,
+            "host_peak_rss_growth_bytes": 126976,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.06190950493328273,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 150,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 600279944,
+            "paired_samples_transmitted": 600279944,
+            "primary_bank_samples_captured": 600279944,
+            "status_count": 1201,
+            "status_p99_seconds": 0.011101164855062962,
+            "stop_tail_adc_items": 68,
+            "stop_tail_gpio_items": 1080
+          },
+          "temperature": {
+            "valid_observations": 61,
+            "before_c": 39.737,
+            "after_c": 54.474,
+            "peak_c": 55.088
+          },
+          "failure_counters": {}
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-publish-transitions",
+      "test_id": "5717e52e-47dc-4b07-b6e2-7877ba295451",
+      "outcome": "PASS",
+      "hex_sha256": "23b0f2ef8023c52021b22b8c6642f801866dfe8b1aadc48affc6b1ac66c2157a",
+      "cells": [
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 20035,
+            "adc_rate_hz": 999999.8713080857,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 20.00117057398893,
+            "firmware_processing_cpu_basis_points": 1233,
+            "gpio_frames": 5008,
+            "gpio_rate_hz": 999999.8713080857,
+            "host_peak_rss_growth_bytes": 12288,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.0208932189270854,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 2,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 20272384,
+            "primary_bank_samples_captured": 0,
+            "status_count": 41,
+            "status_p99_seconds": 0.013441829942166805,
+            "stop_tail_adc_items": 357,
+            "stop_tail_gpio_items": 3393
+          },
+          "temperature": {
+            "valid_observations": 4,
+            "before_c": 50.176,
+            "after_c": 50.79,
+            "peak_c": 51.404
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 40077,
+            "adc_rate_hz": 999980.4383529832,
+            "aux_bank_samples_captured": 20278456,
+            "capture_seconds": 20.008643402019516,
+            "firmware_processing_cpu_basis_points": 1690,
+            "gpio_frames": 10019,
+            "gpio_rate_hz": 1000031.0164946226,
+            "host_peak_rss_growth_bytes": 49152,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.03551463596522808,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 63,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 20278456,
+            "paired_samples_transmitted": 20278456,
+            "primary_bank_samples_captured": 20278456,
+            "status_count": 41,
+            "status_p99_seconds": 0.01104097394272685,
+            "stop_tail_adc_items": 309,
+            "stop_tail_gpio_items": 815
+          },
+          "temperature": {
+            "valid_observations": 4,
+            "before_c": 51.404,
+            "after_c": 52.018,
+            "peak_c": 52.018
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 20035,
+            "adc_rate_hz": 1000001.5322039494,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 20.001137354178354,
+            "firmware_processing_cpu_basis_points": 1233,
+            "gpio_frames": 5008,
+            "gpio_rate_hz": 1000001.5322039494,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.020941870054230094,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 2,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 20272384,
+            "primary_bank_samples_captured": 0,
+            "status_count": 41,
+            "status_p99_seconds": 0.013388607883825898,
+            "stop_tail_adc_items": 279,
+            "stop_tail_gpio_items": 3315
+          },
+          "temperature": {
+            "valid_observations": 4,
+            "before_c": 52.632,
+            "after_c": 52.018,
+            "peak_c": 52.632
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 40074,
+            "adc_rate_hz": 1000046.4409996533,
+            "aux_bank_samples_captured": 20276432,
+            "capture_seconds": 20.00732283992693,
+            "firmware_processing_cpu_basis_points": 1690,
+            "gpio_frames": 10018,
+            "gpio_rate_hz": 1000097.0224796492,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.022492877207696438,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 28,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 20276432,
+            "paired_samples_transmitted": 20276432,
+            "primary_bank_samples_captured": 20276432,
+            "status_count": 41,
+            "status_p99_seconds": 0.010981354862451553,
+            "stop_tail_adc_items": 486,
+            "stop_tail_gpio_items": 1498
+          },
+          "temperature": {
+            "valid_observations": 4,
+            "before_c": 52.018,
+            "after_c": 53.246,
+            "peak_c": 53.246
+          },
+          "failure_counters": {}
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-publish-sdk",
+      "test_id": "5ccf656b-ddb6-46dc-a01e-57a835f44e0f",
+      "outcome": "TEST_FAIL",
+      "hex_sha256": "23b0f2ef8023c52021b22b8c6642f801866dfe8b1aadc48affc6b1ac66c2157a",
+      "cells": [
+        {
+          "case": "PUBLIC_SDK",
+          "result": "FAIL",
+          "error": "UnexpectedStreamValidationError: strict stream validation failed (parser_errors): observed 1 new rejected frame candidate(s)",
+          "metrics": {},
+          "sdk_completed_modes": [
+            {
+              "after_temperature": [
+                {
+                  "celsius": 49.562,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 5003328,
+                "gpio_samples": 0
+              },
+              "during_temperature": [
+                {
+                  "celsius": 49.562,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 1,
+              "seconds": 5,
+              "streams": 1
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 49.562,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 0,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": 50.176,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 2,
+              "seconds": 5,
+              "streams": 2
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 50.176,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 5004340,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": 50.176,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 3,
+              "seconds": 5,
+              "streams": 3
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 50.79,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 0,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": 50.176,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "INPUT",
+              "run_id": 4,
+              "seconds": 5,
+              "streams": 2
+            }
+          ],
+          "cpu_quota": "50000 100000",
+          "cpu_stat_before": "usage_usec 499197\nuser_usec 469364\nsystem_usec 29832\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 10\nnr_throttled 9\nthrottled_usec 444297\nnr_bursts 0\nburst_usec 0\n",
+          "cpu_stat_after": "usage_usec 7065426\nuser_usec 6153006\nsystem_usec 912419\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 241\nnr_throttled 28\nthrottled_usec 869086\nnr_bursts 0\nburst_usec 0\n",
+          "failure_timing": {
+            "cpu": 0.14945007099999952,
+            "wall": 0.2543578299228102
+          },
+          "parser_counters": {
+            "buffered_bytes": 1756,
+            "bytes_discarded": 2120,
+            "bytes_received": 62317472,
+            "checksum_errors": 1,
+            "corruption_events": 1,
+            "frames_decoded": 15484,
+            "header_errors": 0,
+            "high_water_mark": 4099,
+            "payload_errors": 0,
+            "resynchronizations": 1
+          },
+          "host_counters": {
+            "adc_block_queue_drops": 0,
+            "adc_item_queue_drops": 0,
+            "boundary_blocks_discarded": 43,
+            "disconnects": 0,
+            "gpio_block_queue_drops": 0,
+            "gpio_item_queue_drops": 0,
+            "host_block_queue_drops": 0,
+            "host_event_queue_drops": 0,
+            "late_responses": 0,
+            "loss_report_queue_drops": 0,
+            "parser_corruption_events": 1,
+            "parser_resynchronizations": 1,
+            "protocol_failures": 0,
+            "request_timeouts": 0,
+            "stale_blocks_discarded": 2
+          },
+          "failure_counters": {
+            "adc_raw_ring_overruns": 0,
+            "gpio_raw_ring_overruns": 0,
+            "packet_pressure_evictions": 0,
+            "adc_frames_dropped": 0,
+            "gpio_frames_dropped": 0
+          },
+          "legacy_capture_diagnostic": "REJECTED_BEFORE_CAPTURE",
+          "clock_diagnostic": {
+            "dwt_hz": 450000000,
+            "rate_hz": 1000000
+          }
+        }
+      ]
+    }
+  ],
+  "superseded_candidate_evidence": [
+    {
+      "directory": "release-v110-final-16gpio-combined-600s",
+      "test_id": "76e26db1-a254-4ab4-bc97-a64ff64b78a3",
+      "outcome": "PASS",
+      "hex_sha256": "8d1cd5c777c965bf03878d80d212947fdec5461be1375c8186b05fa8d653db9d",
+      "cells": [
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 1186318,
+            "adc_rate_hz": 999998.6876068774,
+            "aux_bank_samples_captured": 600275896,
+            "capture_seconds": 600.0069854450412,
+            "firmware_processing_cpu_basis_points": 1796,
+            "gpio_frames": 296579,
+            "gpio_rate_hz": 999999.5309303924,
+            "host_peak_rss_growth_bytes": 77824,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.03898151498287916,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 71,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 600275896,
+            "paired_samples_transmitted": 600275896,
+            "primary_bank_samples_captured": 600275896,
+            "status_count": 1201,
+            "status_p99_seconds": 0.011032485868781805,
+            "stop_tail_adc_items": 67,
+            "stop_tail_gpio_items": 1079
+          },
+          "temperature": {
+            "valid_observations": 61,
+            "before_c": 39.737,
+            "after_c": 54.474,
+            "peak_c": 55.088
+          },
+          "failure_counters": {}
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-final-width-transition",
+      "test_id": "a56b6176-2d0f-4426-bdb1-cf4b1e08e9c1",
+      "outcome": "TEST_FAIL",
+      "hex_sha256": "8d1cd5c777c965bf03878d80d212947fdec5461be1375c8186b05fa8d653db9d",
+      "cells": [
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 10160,
+            "adc_rate_hz": 1000015.918930221,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 10.007508691167459,
+            "firmware_processing_cpu_basis_points": 1236,
+            "gpio_frames": 2540,
+            "gpio_rate_hz": 999914.7948611615,
+            "host_peak_rss_growth_bytes": 8192,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.02091429987922311,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 2,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 10281920,
+            "primary_bank_samples_captured": 0,
+            "status_count": 21,
+            "status_p99_seconds": 0.013347840867936611,
+            "stop_tail_adc_items": 511,
+            "stop_tail_gpio_items": 511
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 38.509,
+            "after_c": 40.965,
+            "peak_c": 40.965
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "FAIL",
+          "checks": 106,
+          "failed_checks": [],
+          "failures": [
+            "ProtocolFailure: physical data carries invalid flags 0x000a"
+          ],
+          "metrics": {},
+          "temperature": {
+            "valid_observations": 1,
+            "before_c": 40.965,
+            "after_c": 40.965,
+            "peak_c": 40.965
+          },
+          "failure_counters": {}
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-final-width-repeat",
+      "test_id": "d00c259c-efa0-4954-a530-f28d3700a106",
+      "outcome": "PASS",
+      "hex_sha256": "8d1cd5c777c965bf03878d80d212947fdec5461be1375c8186b05fa8d653db9d",
+      "cells": [
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 10160,
+            "adc_rate_hz": 999992.280989029,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 10.007745249895379,
+            "firmware_processing_cpu_basis_points": 1236,
+            "gpio_frames": 2540,
+            "gpio_rate_hz": 999891.1593102962,
+            "host_peak_rss_growth_bytes": 8192,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.020991879981011152,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 2,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 10281920,
+            "primary_bank_samples_captured": 0,
+            "status_count": 21,
+            "status_p99_seconds": 0.013338644988834858,
+            "stop_tail_adc_items": 536,
+            "stop_tail_gpio_items": 536
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 39.737,
+            "after_c": 41.579,
+            "peak_c": 41.579
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 20316,
+            "adc_rate_hz": 1000003.754379133,
+            "aux_bank_samples_captured": 10279896,
+            "capture_seconds": 10.009654419962317,
+            "firmware_processing_cpu_basis_points": 1764,
+            "gpio_frames": 5079,
+            "gpio_rate_hz": 999902.6519876277,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.0209147110581398,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 21,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 10279896,
+            "paired_samples_transmitted": 10279896,
+            "primary_bank_samples_captured": 10279896,
+            "status_count": 21,
+            "status_p99_seconds": 0.010981156025081873,
+            "stop_tail_adc_items": 504,
+            "stop_tail_gpio_items": 504
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 41.579,
+            "after_c": 43.422,
+            "peak_c": 43.422
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 10160,
+            "adc_rate_hz": 1000005.7631137788,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 10.007610325003043,
+            "firmware_processing_cpu_basis_points": 1237,
+            "gpio_frames": 2540,
+            "gpio_rate_hz": 999904.6400717003,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.02094705286435783,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 2,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 10281920,
+            "primary_bank_samples_captured": 0,
+            "status_count": 21,
+            "status_p99_seconds": 0.013407405000180006,
+            "stop_tail_adc_items": 496,
+            "stop_tail_gpio_items": 496
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 43.422,
+            "after_c": 44.036,
+            "peak_c": 44.036
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 20314,
+            "adc_rate_hz": 1000092.1719803596,
+            "aux_bank_samples_captured": 10277872,
+            "capture_seconds": 10.008769471896812,
+            "firmware_processing_cpu_basis_points": 1764,
+            "gpio_frames": 5078,
+            "gpio_rate_hz": 999991.0606496569,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.020214465213939548,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 3,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 10277872,
+            "paired_samples_transmitted": 10277872,
+            "primary_bank_samples_captured": 10277872,
+            "status_count": 21,
+            "status_p99_seconds": 0.01086744200438261,
+            "stop_tail_adc_items": 279,
+            "stop_tail_gpio_items": 1291
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 44.036,
+            "after_c": 45.264,
+            "peak_c": 45.264
+          },
+          "failure_counters": {}
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-headroom-transition",
+      "test_id": "9119297c-f365-4ba9-ba86-d38d5ee79152",
+      "outcome": "PASS",
+      "hex_sha256": "868d36ef19b96b81f86228b09455cc292fb6037dd14d74441e33d0941f1dd967",
+      "cells": [
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 10160,
+            "adc_rate_hz": 999996.1109123732,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 10.00770692084916,
+            "firmware_processing_cpu_basis_points": 1237,
+            "gpio_frames": 2540,
+            "gpio_rate_hz": 999894.9888463491,
+            "host_peak_rss_growth_bytes": 8192,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.020921974908560514,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 2,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 10281920,
+            "primary_bank_samples_captured": 0,
+            "status_count": 21,
+            "status_p99_seconds": 0.013476368971168995,
+            "stop_tail_adc_items": 529,
+            "stop_tail_gpio_items": 529
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 38.509,
+            "after_c": 40.965,
+            "peak_c": 40.965
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 20317,
+            "adc_rate_hz": 999987.479275339,
+            "aux_bank_samples_captured": 10279896,
+            "capture_seconds": 10.009817330166698,
+            "firmware_processing_cpu_basis_points": 1782,
+            "gpio_frames": 5079,
+            "gpio_rate_hz": 999886.3785292795,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.021033789962530136,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 5,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 10279896,
+            "paired_samples_transmitted": 10279896,
+            "primary_bank_samples_captured": 10279896,
+            "status_count": 21,
+            "status_p99_seconds": 0.010791976004838943,
+            "stop_tail_adc_items": 146,
+            "stop_tail_gpio_items": 652
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 40.351,
+            "after_c": 42.808,
+            "peak_c": 42.808
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 10160,
+            "adc_rate_hz": 1000007.4066839501,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 10.007593876915053,
+            "firmware_processing_cpu_basis_points": 1237,
+            "gpio_frames": 2540,
+            "gpio_rate_hz": 999906.2834756698,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.020954590057954192,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 2,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 10281920,
+            "primary_bank_samples_captured": 0,
+            "status_count": 21,
+            "status_p99_seconds": 0.0134238600730896,
+            "stop_tail_adc_items": 524,
+            "stop_tail_gpio_items": 524
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 42.808,
+            "after_c": 43.422,
+            "peak_c": 43.422
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 20304,
+            "adc_rate_hz": 1000128.1602667824,
+            "aux_bank_samples_captured": 10273824,
+            "capture_seconds": 10.003349967999384,
+            "firmware_processing_cpu_basis_points": 1782,
+            "gpio_frames": 5076,
+            "gpio_rate_hz": 1000128.1602667824,
+            "host_peak_rss_growth_bytes": 57344,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.032641286961734295,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 64,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 10273824,
+            "paired_samples_transmitted": 10273824,
+            "primary_bank_samples_captured": 10273824,
+            "status_count": 21,
+            "status_p99_seconds": 0.010864829877391458,
+            "stop_tail_adc_items": 93,
+            "stop_tail_gpio_items": 93
+          },
+          "temperature": {
+            "valid_observations": 3,
+            "before_c": 43.422,
+            "after_c": 45.264,
+            "peak_c": 45.264
+          },
+          "failure_counters": {}
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-qualified-16gpio-combined-600s",
+      "test_id": "5b04f29c-073f-42eb-8383-64d8e7b34236",
+      "outcome": "PASS",
+      "hex_sha256": "868d36ef19b96b81f86228b09455cc292fb6037dd14d74441e33d0941f1dd967",
+      "cells": [
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 1186321,
+            "adc_rate_hz": 999998.5778886656,
+            "aux_bank_samples_captured": 600277920,
+            "capture_seconds": 600.0085692789871,
+            "firmware_processing_cpu_basis_points": 1782,
+            "gpio_frames": 296580,
+            "gpio_rate_hz": 999996.8912460877,
+            "host_peak_rss_growth_bytes": 77824,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.04351644008420408,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 79,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 600277920,
+            "paired_samples_transmitted": 600277920,
+            "primary_bank_samples_captured": 600277920,
+            "status_count": 1201,
+            "status_p99_seconds": 0.011064250022172928,
+            "stop_tail_adc_items": 192,
+            "stop_tail_gpio_items": 698
+          },
+          "temperature": {
+            "valid_observations": 61,
+            "before_c": 39.123,
+            "after_c": 54.474,
+            "peak_c": 55.088
+          },
+          "failure_counters": {}
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-qualified-transitions",
+      "test_id": "4ffc9a49-5f26-442f-8ca9-ead4737336d9",
+      "outcome": "PASS",
+      "hex_sha256": "868d36ef19b96b81f86228b09455cc292fb6037dd14d74441e33d0941f1dd967",
+      "cells": [
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 20035,
+            "adc_rate_hz": 1000002.0729351316,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 20.001126538962126,
+            "firmware_processing_cpu_basis_points": 1237,
+            "gpio_frames": 5008,
+            "gpio_rate_hz": 1000002.0729351316,
+            "host_peak_rss_growth_bytes": 12288,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.0206787281204015,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 4,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 20272384,
+            "primary_bank_samples_captured": 0,
+            "status_count": 41,
+            "status_p99_seconds": 0.01344497804529965,
+            "stop_tail_adc_items": 316,
+            "stop_tail_gpio_items": 3352
+          },
+          "temperature": {
+            "valid_observations": 4,
+            "before_c": 46.492,
+            "after_c": 48.334,
+            "peak_c": 48.948
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 40077,
+            "adc_rate_hz": 999987.9870481319,
+            "aux_bank_samples_captured": 20278456,
+            "capture_seconds": 20.008492361055687,
+            "firmware_processing_cpu_basis_points": 1782,
+            "gpio_frames": 10019,
+            "gpio_rate_hz": 1000038.5655715778,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.020916105015203357,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 16,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 20278456,
+            "paired_samples_transmitted": 20278456,
+            "primary_bank_samples_captured": 20278456,
+            "status_count": 41,
+            "status_p99_seconds": 0.01173793408088386,
+            "stop_tail_adc_items": 66,
+            "stop_tail_gpio_items": 572
+          },
+          "temperature": {
+            "valid_observations": 4,
+            "before_c": 48.948,
+            "after_c": 50.79,
+            "peak_c": 50.79
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "CONTROL_COMBINED",
+          "result": "PASS",
+          "checks": 128,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 20035,
+            "adc_rate_hz": 999998.2981545371,
+            "aux_bank_samples_captured": 0,
+            "capture_seconds": 20.001202038954943,
+            "firmware_processing_cpu_basis_points": 1236,
+            "gpio_frames": 5008,
+            "gpio_rate_hz": 999998.2981545371,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.020730669843032956,
+            "packet_ready_high_water": 2,
+            "packet_transmit_high_water": 2,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 0,
+            "paired_samples_transmitted": 20272384,
+            "primary_bank_samples_captured": 0,
+            "status_count": 41,
+            "status_p99_seconds": 0.013415387831628323,
+            "stop_tail_adc_items": 333,
+            "stop_tail_gpio_items": 3369
+          },
+          "temperature": {
+            "valid_observations": 4,
+            "before_c": 50.176,
+            "after_c": 50.79,
+            "peak_c": 50.79
+          },
+          "failure_counters": {}
+        },
+        {
+          "case": "INPUT_COMBINED",
+          "result": "PASS",
+          "checks": 131,
+          "failed_checks": [],
+          "failures": [],
+          "metrics": {
+            "adc_frames": 40077,
+            "adc_rate_hz": 999997.2303042837,
+            "aux_bank_samples_captured": 20278456,
+            "capture_seconds": 20.008307416923344,
+            "firmware_processing_cpu_basis_points": 1783,
+            "gpio_frames": 10019,
+            "gpio_rate_hz": 1000047.8092952453,
+            "host_peak_rss_growth_bytes": 0,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.020967365941032767,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 30,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 20278456,
+            "paired_samples_transmitted": 20278456,
+            "primary_bank_samples_captured": 20278456,
+            "status_count": 41,
+            "status_p99_seconds": 0.011013577925041318,
+            "stop_tail_adc_items": 127,
+            "stop_tail_gpio_items": 633
+          },
+          "temperature": {
+            "valid_observations": 4,
+            "before_c": 50.79,
+            "after_c": 51.404,
+            "peak_c": 52.018
+          },
+          "failure_counters": {}
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-final-sdk-25s",
+      "test_id": "7907730d-90c7-4e5a-a2b8-8fe07f75ba9f",
+      "outcome": "TEST_FAIL",
+      "hex_sha256": "8d1cd5c777c965bf03878d80d212947fdec5461be1375c8186b05fa8d653db9d",
+      "cells": [
+        {
+          "case": "PUBLIC_SDK",
+          "result": "FAIL",
+          "error": "UnexpectedStreamGapError: unexpected ADC_DATA gap before sequence 2070: 23 frame(s), 11638 item(s), origin=firmware",
+          "metrics": {},
+          "sdk_completed_modes": [
+            {
+              "after_temperature": [
+                {
+                  "celsius": 47.106,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 5003328,
+                "gpio_samples": 0
+              },
+              "during_temperature": [
+                {
+                  "celsius": 47.106,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 1,
+              "seconds": 5,
+              "streams": 1
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 47.72,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 0,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": null,
+                  "status": "NOT_READY"
+                },
+                {
+                  "celsius": 47.72,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 2,
+              "seconds": 5,
+              "streams": 2
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 47.72,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 5003328,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": 47.72,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 3,
+              "seconds": 5,
+              "streams": 3
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 48.948,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 0,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": 48.334,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "INPUT",
+              "run_id": 4,
+              "seconds": 5,
+              "streams": 2
+            }
+          ],
+          "cpu_quota": "50000 100000",
+          "cpu_stat_before": "usage_usec 500222\nuser_usec 470682\nsystem_usec 29540\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 10\nnr_throttled 9\nthrottled_usec 435061\nnr_bursts 0\nburst_usec 0\n",
+          "cpu_stat_after": "usage_usec 7691813\nuser_usec 6686832\nsystem_usec 1004980\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 252\nnr_throttled 41\nthrottled_usec 1556723\nnr_bursts 0\nburst_usec 0\n",
+          "failure_timing": {
+            "cpu": 0.6944733829999992,
+            "wall": 1.3486182352062315
+          },
+          "host_counters": {
+            "adc_block_queue_drops": 0,
+            "adc_item_queue_drops": 0,
+            "boundary_blocks_discarded": 42,
+            "disconnects": 0,
+            "gpio_block_queue_drops": 0,
+            "gpio_item_queue_drops": 0,
+            "host_block_queue_drops": 0,
+            "host_event_queue_drops": 0,
+            "late_responses": 0,
+            "loss_report_queue_drops": 0,
+            "parser_corruption_events": 0,
+            "parser_resynchronizations": 0,
+            "protocol_failures": 0,
+            "request_timeouts": 0,
+            "stale_blocks_discarded": 2
+          },
+          "failure_counters": {
+            "adc_raw_ring_overruns": 0,
+            "gpio_raw_ring_overruns": 0,
+            "packet_pressure_evictions": 83,
+            "adc_frames_dropped": 65,
+            "gpio_frames_dropped": 18
+          },
+          "clock_diagnostic": {
+            "dwt_hz": 450000000,
+            "rate_hz": 1000000
+          }
+        }
+      ]
+    },
+    {
+      "directory": "release-v110-interlock-sdk",
+      "test_id": "43bd53fb-5055-4c54-8d3d-51734840269c",
+      "outcome": "TEST_FAIL",
+      "hex_sha256": "23b0f2ef8023c52021b22b8c6642f801866dfe8b1aadc48affc6b1ac66c2157a",
+      "cells": [
+        {
+          "case": "PUBLIC_SDK",
+          "result": "FAIL",
+          "error": "UnexpectedStreamValidationError: strict stream validation failed (parser_errors): observed 2 new rejected frame candidate(s)",
+          "metrics": {},
+          "sdk_completed_modes": [
+            {
+              "after_temperature": [
+                {
+                  "celsius": 42.808,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 5003328,
+                "gpio_samples": 0
+              },
+              "during_temperature": [
+                {
+                  "celsius": 42.808,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 1,
+              "seconds": 5,
+              "streams": 1
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 44.036,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 0,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": 43.422,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 2,
+              "seconds": 5,
+              "streams": 2
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 44.65,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 5003328,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": 44.65,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "DISABLED",
+              "run_id": 3,
+              "seconds": 5,
+              "streams": 3
+            },
+            {
+              "after_temperature": [
+                {
+                  "celsius": 45.264,
+                  "status": "VALID"
+                }
+              ],
+              "counts": {
+                "adc_pairs": 0,
+                "gpio_samples": 5003328
+              },
+              "during_temperature": [
+                {
+                  "celsius": 44.65,
+                  "status": "VALID"
+                }
+              ],
+              "mode": "INPUT",
+              "run_id": 4,
+              "seconds": 5,
+              "streams": 2
+            }
+          ],
+          "cpu_quota": "50000 100000",
+          "cpu_stat_before": "usage_usec 506603\nuser_usec 479678\nsystem_usec 26925\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 9\nnr_throttled 9\nthrottled_usec 421770\nnr_bursts 0\nburst_usec 0\n",
+          "cpu_stat_after": "usage_usec 7344438\nuser_usec 6428038\nsystem_usec 916400\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 247\nnr_throttled 28\nthrottled_usec 1170426\nnr_bursts 0\nburst_usec 0\n",
+          "failure_timing": {
+            "cpu": 0.5011150739999994,
+            "wall": 0.9567474389914423
+          },
+          "host_counters": {
+            "adc_block_queue_drops": 0,
+            "adc_item_queue_drops": 0,
+            "boundary_blocks_discarded": 42,
+            "disconnects": 0,
+            "gpio_block_queue_drops": 0,
+            "gpio_item_queue_drops": 0,
+            "host_block_queue_drops": 0,
+            "host_event_queue_drops": 0,
+            "late_responses": 0,
+            "loss_report_queue_drops": 0,
+            "parser_corruption_events": 2,
+            "parser_resynchronizations": 1,
+            "protocol_failures": 0,
+            "request_timeouts": 0,
+            "stale_blocks_discarded": 3
+          },
+          "failure_counters": {
+            "adc_raw_ring_overruns": 0,
+            "gpio_raw_ring_overruns": 0,
+            "packet_pressure_evictions": 0,
+            "adc_frames_dropped": 0,
+            "gpio_frames_dropped": 0
+          },
+          "legacy_capture_diagnostic": "REJECTED_BEFORE_CAPTURE",
+          "clock_diagnostic": {
+            "dwt_hz": 450000000,
+            "rate_hz": 1000000
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "No declared external analog/digital stimulus; no accuracy or external timing qualification.",
+    "Public SDK combined 16-input capture failed on the 0.5-core test host. Packet-pressure loss and checksum/parser failures were observed; not every failure is proven to be caused by CPU throttling.",
+    "TimestampAligner does not support this unequal-duration frame profile. Use read_block()/blocks() and sample timestamps.",
+    "Legacy 4 MHz GPIO_CAPTURE_DIAGNOSTIC is disabled; GPIO_CLOCK_DIAGNOSTIC accepts only 1 MHz."
+  ]
+}
