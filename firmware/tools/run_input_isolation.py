@@ -114,6 +114,25 @@ def make_program(
         or any(case not in CASES for case in cases)
     ):
         raise ValueError("cases must name one valid case per selected profile")
+    if cases is not None:
+        # Observe the real START replies through the existing exchange path.
+        # A reboot between cells must not masquerade as a successful transition.
+        program += (
+            "last_started_run_id = None\n"
+            "original_exchange = rig.SerialLink.exchange\n"
+            "def tracked_exchange(link, kind, *args, **kwargs):\n"
+            "    global last_started_run_id\n"
+            "    frame, latency = original_exchange(link, kind, *args, **kwargs)\n"
+            "    if kind == rig.START_REQUEST:\n"
+            "        rig.response_success(frame, rig.START_RESPONSE)\n"
+            "        expected = (((last_started_run_id + 1) & 0xffffffff) or 1) if last_started_run_id is not None else frame.run_id\n"
+            "        if frame.run_id != expected:\n"
+            "            raise rig.ProtocolFailure(f'run ID reset/jump across sequence: expected {expected}, got {frame.run_id}')\n"
+            "        last_started_run_id = frame.run_id\n"
+            "        rig.emit_event('sequence_start', run_id=frame.run_id, case=os.environ['AUX_INPUT_CASE'], profile=os.environ['AUX_INPUT_RATE_PROFILE'])\n"
+            "    return frame, latency\n"
+            "rig.SerialLink.exchange = tracked_exchange\n"
+        )
     if sequence is not None:
         if not sequence or any(profile not in range(4) for profile in sequence):
             raise ValueError("profiles must contain IDs 0..3")

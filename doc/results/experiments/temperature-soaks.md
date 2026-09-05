@@ -33,6 +33,8 @@ Repeated START/STOP, rate changes and 8↔16-input transitions without reflashin
 will follow the continuous captures. All existing rate, timestamp, checksum,
 DMA, buffer-loss, paired-bank and final STOP-reconciliation checks remain in
 force. Partial samples discarded at STOP are distinguished from active loss.
+The explicit width-transition sequence also requires START run IDs to advance
+across cells, so a reboot cannot silently count as a successful transition.
 
 ## Temperature feature
 

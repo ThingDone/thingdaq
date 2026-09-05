@@ -49,9 +49,21 @@ def test_explicit_cases_alternate_width_without_reloading(monkeypatch):
     monkeypatch.setenv("AUX_INPUT_CASE", "CONTROL_COMBINED")
     monkeypatch.setenv("AUX_INPUT_RATE_PROFILE", "0")
     source = """import os
+from types import SimpleNamespace
+START_REQUEST, START_RESPONSE = 18, 146
+ProtocolFailure = ValueError
+events = []
+def response_success(frame, kind): pass
+def emit_event(name, **fields): events.append(fields)
+class SerialLink:
+    run_id = 0
+    def exchange(self, kind):
+        SerialLink.run_id += 1
+        return SimpleNamespace(run_id=SerialLink.run_id), 0.01
 observed = []
 def main():
     observed.append((os.environ['AUX_INPUT_CASE'], int(os.environ['AUX_INPUT_RATE_PROFILE'])))
+    SerialLink().exchange(START_REQUEST)
     return 0
 """
     try:
@@ -61,11 +73,19 @@ def main():
         assert stopped.value.code == 0
         assert sys.modules["input_isolation_rig"].observed == [
             ("CONTROL_COMBINED", 0), ("INPUT_COMBINED", 1)]
+        assert [event["run_id"] for event in sys.modules["input_isolation_rig"].events] == [1, 2]
     finally:
         sys.modules.pop("input_isolation_rig", None)
     for cases in (("INPUT_COMBINED",), ("INVALID", "INPUT_COMBINED")):
         with pytest.raises(ValueError, match="one valid case"):
             isolation.make_program(source, {}, profiles=(0, 1), cases=cases)
+    try:
+        reset_source = source.replace("SerialLink.run_id += 1", "SerialLink.run_id = 1")
+        with pytest.raises(ValueError, match="run ID reset/jump"):
+            exec(isolation.make_program(reset_source, {}, profiles=(0, 1),
+                 cases=("CONTROL_COMBINED", "INPUT_COMBINED")), {})
+    finally:
+        sys.modules.pop("input_isolation_rig", None)
 
 
 def test_stale_build_is_rejected():
