@@ -61,6 +61,12 @@ implemented by this experiment. The old ADC 1 MHz/GPIO 4 MHz configuration at
 450 MHz remains unqualified; passing the equal-rate tests does not rehabilitate
 that earlier failure.
 
+A subsequent [GPIO-only 4 MHz experiment](gpio-only-4mhz.md) disabled both ADC
+streams at 450 MHz. Its 30-second and ten-minute captures both reached STOP
+but failed the final bank-count comparison. This isolates a GPIO-side issue
+that remains even without ADC acquisition; it does not change the passing
+combined-input results above.
+
 ## Temperature feature
 
 Firmware/API codec work is on `experiment/input-rate-clock`, commit
