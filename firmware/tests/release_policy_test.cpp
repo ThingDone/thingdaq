@@ -1,11 +1,14 @@
 #include "control_state.h"
 #include "input_experiment_profile.h"
+#include "board_config.h"
 #include <cassert>
 
 using namespace thingdaq;
 int main() {
   static_assert(input_experiment::kReleaseFixed1MHz);
   static_assert(input_experiment::kCpuHz == 450000000U);
+  static_assert(board::kAdcDmaActivePipelineDepth == 4U);
+  static_assert(board::kAdcDmaRingDepth - board::kAdcDmaActivePipelineDepth == 4U);
   protocol::Configuration defaults{};
   assert(defaults.protocol_version == 2U);
   assert(static_cast<unsigned>(defaults.rate_profile) == 4U);

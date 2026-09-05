@@ -29,7 +29,7 @@ related:
 > the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
 > [!CAUTION]
-> This project targets Teensy 4.0 / i.MX RT1062 only. Treat A0/A1 and D6-D13
+> This project targets Teensy 4.0 / i.MX RT1062 only. Treat A0/A1, D6-D13 and D16-D23
 > as 0-3.3 V inputs. They are not 5 V tolerant. Software validation,
 > calibration, clipping, or simulator success cannot protect a physical pin.
 
@@ -43,16 +43,17 @@ external circuit before connection.
 | --- | --- | --- | --- |
 | ADC0 | A0 / D14 | NXP ADC1 channel 7 | 12-bit raw code, nominal 1 MS/s |
 | ADC1 | A1 / D15 | NXP ADC2 channel 8 | 12-bit raw code, nominal 1 MS/s, 500 ns after ADC0 |
-| GPIO bit 0 | D6 | packed digital input | nominal 4 MS/s |
-| GPIO bit 1 | D7 | packed digital input | nominal 4 MS/s |
-| GPIO bit 2 | D8 | packed digital input | nominal 4 MS/s |
-| GPIO bit 3 | D9 | packed digital input | nominal 4 MS/s |
-| GPIO bit 4 | D10 | packed digital input | nominal 4 MS/s |
-| GPIO bit 5 | D11 | packed digital input | nominal 4 MS/s |
-| GPIO bit 6 | D12 | packed digital input | nominal 4 MS/s |
-| GPIO bit 7 | D13 | packed digital input | nominal 4 MS/s |
+| GPIO bit 0 | D6 | packed digital input | nominal 1 MS/s |
+| GPIO bit 1 | D7 | packed digital input | nominal 1 MS/s |
+| GPIO bit 2 | D8 | packed digital input | nominal 1 MS/s |
+| GPIO bit 3 | D9 | packed digital input | nominal 1 MS/s |
+| GPIO bit 4 | D10 | packed digital input | nominal 1 MS/s |
+| GPIO bit 5 | D11 | packed digital input | nominal 1 MS/s |
+| GPIO bit 6 | D12 | packed digital input | nominal 1 MS/s |
+| GPIO bit 7 | D13 | packed digital input | nominal 1 MS/s |
+| GPIO bits 8–15 (optional INPUT bank) | D16–D23, in order | packed digital inputs | nominal 1 MS/s |
 
-Physical START and STOP keep D6-D13 in input mode. The fail-closed GPIO capture
+Physical START and STOP keep D6-D13 and the enabled D16-D23 bank in input mode. The fail-closed GPIO capture
 diagnostic is non-driving. That behavior does not make an externally unsafe
 voltage, contention path, or ground offset safe.
 
@@ -155,7 +156,7 @@ physical capture path; it is not a level translator or protection device.
 
 ## Tested versus untested claims
 
-Accepted physical tests on hardware serial 20512460 demonstrated:
+Historical v1 physical tests on hardware serial 20512460 demonstrated:
 
 - exact fixed INFO identity/capability metadata and Teensy 4.0 resource map;
 - bounded CONFIGURE/START/STATUS/STOP and repeated lifecycle recovery;

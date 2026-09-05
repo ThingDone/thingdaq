@@ -239,7 +239,8 @@ commands.
 
 `firmware/tools/build_firmware.py` hashes stable relative paths and bytes for
 `firmware/firmware.ino`, every non-hidden file under `firmware/src/`, and
-`protocol/protocol-v1.json`. The full lowercase SHA-256 is the source ID. The
+both `protocol/protocol-v1.json` and `protocol/protocol-v2.json`.
+The full lowercase SHA-256 is the source ID. The
 wire-safe build ID is `thingdaq-` followed by the first 16 source-ID digits and is
 therefore well inside INFO's 31-ASCII-byte limit.
 

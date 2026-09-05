@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Python Package
 created: 2026-08-27
-updated: 2026-09-02
+updated: 2026-09-05
 tags:
   - thingdaq
   - python
@@ -35,6 +35,13 @@ The optional `TimestampAligner` rejects the new equal-rate profile because
 one GPIO frame spans four ADC frames. Use `read_block()` / `blocks()` and
 per-sample timestamps. Historical simulator profiles remain available offline
 and do not imply release hardware support.
+
+Physical SDK validation passes ADC-only, GPIO-only (8/16 inputs), and combined
+8-input capture on the remote test server. Combined ADC + 16-GPIO capture
+exceeds that server's 0.5-core CPU budget and reports firmware USB queue loss;
+it is not qualified as lossless there. The independent wire validator sustains
+the same firmware configuration. SDK throughput on a faster host remains
+unverified. Keep strict loss checking enabled and validate the intended host.
 
 This directory contains the private, local-development Python distribution for
 the ThingDAQ host API. The single authoritative installable distribution name
@@ -192,9 +199,9 @@ and 125 kHz/500 kHz. `GPIOBlock` reports `packed_width_bits`, primary and
 auxiliary pin maps, and `sample()` values through `0xFFFF`; `channel()` exposes
 D6-D13 in bits 0-7 and, only in `INPUT` mode, D16-D23 in bits 8-15. NumPy views
 remain read-only zero-copy `uint8` for one bank and use explicit little-endian
-`<u2` for two banks. Alignment uses each selected period and mode-specific
-equal frame coverage while retaining profile, sequence, gap, and run
-boundaries.
+`<u2` for two banks. The optional aligner supports these historical
+equal-frame-duration profiles, not the new fifth profile: 1 MHz/1 MHz.
+For profile 4, use individual blocks and their sample timestamps.
 
 The simulator patterns `all-zero`, `walking-bit`, `counter`, and
 `high-transition` generate the primary and auxiliary bytes independently at

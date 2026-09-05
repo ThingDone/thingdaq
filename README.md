@@ -6,6 +6,11 @@ rates are rejected. See the [current wire contract](doc/protocol/protocol-v2.md)
 The optional equal-frame `TimestampAligner` is not supported for this new
 profile; acquisition blocks provide exact per-sample timestamps.
 
+The Python SDK's combined ADC + 16-GPIO path is not lossless on the remote
+test server's 0.5-core CPU quota. The independent wire validator sustains that
+firmware mode; a faster host's SDK throughput still needs qualification.
+Strict loss detection remains enabled—no missing data is silently accepted.
+
 ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,
 loss-visible acquisition on the Teensy 4.0 platform. It captures two
 phase-shifted ADC channels and either eight or sixteen packed digital inputs. The same public API
@@ -15,7 +20,7 @@ developed without hardware.
 
 > [!WARNING]
 > Read the [hardware-safety guide](doc/reference/hardware-safety.md) before
-> connecting a signal. A0/A1 and D6-D13 are 3.3 V inputs and are not 5 V
+> connecting a signal. A0/A1, D6-D13 and D16-D23 are 3.3 V inputs and are not 5 V
 > tolerant. Host calibration does not add electrical protection.
 
 ## Supported acquisition
@@ -163,7 +168,8 @@ The historical ThingDAQ firmware 1.0.0 candidate had a byte-identical two-build 
 generated validators, and passing local software/build gates. Because the USB
 identity, firmware build ID, host namespace, and packaging identity changed,
 the earlier physical results are engineering history rather than release
-acceptance for the renamed binary. A fresh physical campaign remains pending.
+acceptance for the renamed binary. Physical acceptance was pending at that
+historical freeze; use the v1.1.0 release report for current qualification.
 The identity-pinned standalone and installed `thingdaq-soak` entry paths are
 documented in the [soak harness guide](doc/guides/soak-harness.md). Both embed
 the deterministic `firmware/soak/validation-manifest.json` contract; a

@@ -177,12 +177,14 @@ source numbers. Acquisition code must bind these exact channels rather than
 use an unconstrained first-free allocator. ADC0/ADC1 use fixed priority values
 2/1, above GPIO's priority 0, use NVIC priority 48, and each own twelve 32-byte
 generation-indexed scatter/gather TCDs. Channel 0 reads `ADC1_R0` and channel 1 reads `ADC2_R0`;
-both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012`, and
+both transfer 16-bit results with `NBYTES=2`, `BITER=CITER=1,012` in 8-input
+mode or `506` in 16-input mode, and
 `DOFF=4` for consumer buffers. Both completion IRQs and the production
 ADC_ETC error IRQ share priority 48. Only the later ADC1 completion line
 dispatches and is used only as a wakeup. Its handler acknowledges both latches
 before inspection, waits for the live TCD positions to align, identifies the
-active entry in a six-generation prelinked pipeline from `DADDR` and
+active entry in a four-generation release pipeline (six in historical research
+builds) from `DADDR` and
 `DLASTSGA`, then consumes every inferred paired generation once in fixed
 ADC0-to-ADC1 order. Runtime updates touch only descriptors at least two
 generations ahead, never the active hardware TCD link. ADC0's NVIC line remains
@@ -386,11 +388,12 @@ FREE -> DMA_QUEUED -> DMA_ACTIVE -> READY -> PACKING -> RELEASING -> FREE
 
 One active and one look-ahead destination are always DMA-owned. If no consumer
 buffer is `FREE`, the future descriptor selects a separate 32-byte sink with
-`DOFF=0`; each 4,048-sample sink completion advances exact capture/loss/overrun
+`DOFF=0`; each 4,048-sample one-bank or 2,024-sample two-bank completion advances exact capture/loss/overrun
 counters while `READY`, `PACKING`, and `RELEASING` buffers remain untouched.
 Cache deletion occurs before a buffer becomes `FREE` or DMA-owned, and cache
 invalidation occurs after it atomically becomes `PACKING`; neither occurs in
-the roughly 988 Hz major-loop ISR. STOP disables the hardware first, accounts
+the major-loop ISR (about 247 Hz for 8 inputs or 494 Hz for 16 at 1 MHz).
+STOP disables the hardware first, accounts
 a partial active loop from its minor count, restores D6-D13 as GPIO2 inputs,
 and leaves complete CPU-owned buffers drainable before restart.
 

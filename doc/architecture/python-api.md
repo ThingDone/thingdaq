@@ -141,8 +141,9 @@ never relabeled as another.
 
 ## ADC model
 
-`ADCBlock` owns one immutable 4,048-byte payload containing 1,012 little-endian
-`(ADC0, ADC1)` pairs. `adc0` and `adc1` are lazy strided views, and `pair()`
+`ADCBlock` owns an immutable payload containing 1,012 little-endian pairs in
+8-input mode (4,048 bytes), or 506 pairs in 16-input mode (2,024 bytes), always
+ordered `(ADC0, ADC1)`. `adc0` and `adc1` are lazy strided views, and `pair()`
 preserves converter identity. The block carries actual INFO/STATUS metadata:
 source, hardware serial, resolution/range, firmware initialization calibration,
 trigger evidence, pair period, ADC1 phase, and latest acquisition status.
@@ -164,8 +165,10 @@ operations without becoming a baseline dependency.
 D6-D13 input snapshot at 1 MHz in release 1.1.0: D6 is bit 0 and D13 is bit 7.
 Auxiliary INPUT adds D16–D23 in bits 8–15 of each little-endian 16-bit sample. `samples` and
 `payload_view` retain the packed representation. `channel(pin)` returns one
-lazy Boolean view, so ordinary reads do not expand four million bytes per
-second into eight Boolean arrays. Sample `n` has nominal tick `t0 + 2n`.
+lazy Boolean view, so ordinary reads do not expand the packed bytes per
+second into eight Boolean arrays. Release sample `n` has nominal tick `t0 + 8n`.
+In 16-input mode, the same payload holds 2,024 little-endian two-byte samples;
+the upper eight bits map to D16–D23.
 
 ## Combined timestamp alignment
 

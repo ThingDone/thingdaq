@@ -319,9 +319,10 @@ E_s = T_s + Q_s + D^{after\ promotion}_s
 
 The shared ownership equation is
 `packet_owned_depth = Σ(F_s + R_s + Q_s)`. Logical-item and byte equations
-use the immutable frame layout: one ADC frame contains 1,012 sample pairs, one
-GPIO frame contains 4,048 packed eight-pin sample instants, each data payload
-is 4,048 bytes, and each complete framed record is 4,096 bytes. Raw ADC and
+use the selected immutable frame layout: in 8-input mode one ADC frame contains
+1,012 pairs and one GPIO frame 4,048 samples, each totaling 4,096 bytes. In
+16-input mode ADC frames contain 506 pairs (2,072 framed bytes), and GPIO frames
+contain 2,024 two-byte samples (4,096 framed bytes). Raw ADC and
 GPIO projections separately prove that DMA/ring/STOP/packer losses explain
 the source items that never reach the shared packet pool.
 
@@ -420,7 +421,9 @@ block references and returns memoryviews over their immutable payload bytes.
 ADC0/ADC1 channel views and packed GPIO bytes retain their existing layouts.
 `NominalEpoch` exposes START-relative tick zero and converts item ticks with the
 advertised 8 MHz frequency: ADC pair `n` remains at `t + 8n`, ADC1 at
-`t + 8n + 4`, and GPIO byte `m` at `t + 2m`. Its external-latency value remains
+`t + 8n + 4`. The legacy aligned helper uses GPIO ticks `t + 2m`; current release
+GPIO samples instead use `t + 8m` and must be consumed as timestamped blocks,
+not through `TimestampAligner`. Its external-latency value remains
 explicitly absent because neither GPIO-pad propagation nor ADC aperture
 latency has been measured.
 
@@ -452,10 +455,12 @@ bytes in RAM1 and 503,648 bytes in RAM2. Including the pinned core's four
 2,048-byte USB TX buffers brings the simultaneous RAM2 buffer total to 511,840
 bytes, still inside the 512 KiB region before the exact linker gate accounts
 for all remaining core globals.
-The current prelinked ADC pipeline build uses 456,992 bytes of RAM1 variables,
-32,728 bytes of RAM1 code, 40 bytes of alignment padding, and leaves 34,528
-bytes for locals/stack. It uses 520,192 bytes of RAM2 variables and leaves
-4,096 bytes of heap headroom. Cold controller lifecycle, diagnostic snapshot, and
+The release retains eight ADC buffers and twelve allocated descriptor slots,
+but uses four active look-ahead generations instead of the research adapter's
+six. In 16-input mode each ADC buffer spans 506 us; this leaves four buffers
+for foreground processing latency instead of two. It does not increase the
+sample rate or suppress overrun reporting. Exact linked memory totals are
+recorded in the release build manifest. Cold controller lifecycle, diagnostic snapshot, and
 non-measured checksum-vector preparation remain in flash so the additional
 telemetry does not consume another 32 KiB ITCM block.
 

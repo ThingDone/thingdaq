@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Evidence Index
 created: 2026-08-29
-updated: 2026-09-04
+updated: 2026-09-05
 tags:
   - thingdaq
   - evidence
@@ -56,9 +56,9 @@ records the evidence-backed recommendations, staged integration plan, rollback
 paths, and minimum compound qualification matrix. The independent branch
 results do not establish that these features work together in one binary.
 
-## Current ThingDAQ 1.0 candidate
+## Historical ThingDAQ 1.0 candidate freeze
 
-The rename is a breaking identity boundary. The current candidate has fresh
+The rename was a breaking identity boundary. This historical candidate had fresh
 ThingDAQ namespaces, commands, USB product text, generated validators, and a
 byte-identical two-build firmware freeze. Local software, protocol, packaging,
 and firmware-build gates pass. No physical or Windows acquisition campaign has

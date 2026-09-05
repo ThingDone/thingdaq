@@ -479,7 +479,7 @@ class TimestampAligner:
         if item.rate_profile is RateProfile.ADC_1MHZ_GPIO_1MHZ:
             raise TimestampAlignmentError(
                 "equal-rate acquisition has four ADC frames per GPIO frame; "
-                "use read_block()/iter_blocks() and the per-sample timestamps"
+                "use read_block()/blocks() and the per-sample timestamps"
             )
 
         self._validate_block_interval(item)

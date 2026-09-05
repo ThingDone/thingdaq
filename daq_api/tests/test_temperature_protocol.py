@@ -79,3 +79,19 @@ def test_fast_adc_range_check_covers_every_uint16():
     for code in range(65536):
         payload = struct.pack("<HH", code, code)
         assert adc_payload_codes_valid(payload) == (code <= 4095)
+
+
+def test_simulator_temperature_replay_uses_correlated_typed_error():
+    from thingdaq.simulator import SimulatedDevice
+
+    device = SimulatedDevice()
+    request = encode_v2_frame(c.FrameKind.GET_TEMPERATURE_REQUEST, request_id=26)
+    assert decode_v2_frame(device.receive(request)[0]).payload[0] == 0
+    rejected = decode_v2_frame(device.receive(request)[0])
+    assert rejected.header.kind is c.FrameKind.GET_TEMPERATURE_RESPONSE
+    assert rejected.header.request_id == 26
+    assert len(rejected.payload) == 4
+    assert (
+        int.from_bytes(rejected.payload[2:4], "little")
+        == c.ErrorCode.INVALID_REQUEST_ID
+    )

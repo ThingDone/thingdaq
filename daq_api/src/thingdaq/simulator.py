@@ -290,19 +290,17 @@ class SimulatedDevice:
         )
 
     def _handle_frame(self, request: CompatibleFrame) -> bytes | None:
-        if request.header.version == 2 and int(request.header.kind) == 0x1A:
-            # The offline simulator has no physical temperature sensor.
-            return encode_v2_frame(
-                v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE,
-                struct.pack("<BBHBBHi", 0, 0, 0, 1, 0, 0, 0),
-                request_id=request.header.request_id,
-                run_id=self._last_run_id,
-            )
+        temperature_request = (
+            request.header.version == 2 and int(request.header.kind) == 0x1A
+        )
         try:
             request_kind = constants.FrameKind(int(request.header.kind))
         except ValueError:
             request_kind = None
-        if request_kind not in constants.REQUEST_RESPONSE_KIND:
+        if (
+            not temperature_request
+            and request_kind not in constants.REQUEST_RESPONSE_KIND
+        ):
             if request.header.request_id == 0:
                 return None
             return self._generic_error(
@@ -318,6 +316,14 @@ class SimulatedDevice:
             )
             return self._typed_error(request, constants.ErrorCode.INVALID_REQUEST_ID)
         self._recent_request_ids.append(request.header.request_id)
+        if temperature_request:
+            # The offline simulator has no physical temperature sensor.
+            return encode_v2_frame(
+                v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE,
+                struct.pack("<BBHBBHi", 0, 0, 0, 1, 0, 0, 0),
+                request_id=request.header.request_id,
+                run_id=self._last_run_id,
+            )
 
         handlers = {
             constants.FrameKind.INFO_REQUEST: self._handle_info,
@@ -337,7 +343,7 @@ class SimulatedDevice:
                 self._handle_gpio_capture_diagnostic
             ),
         }
-        return handlers[request_kind](request)
+        return handlers[constants.FrameKind(int(request.header.kind))](request)
 
     def _handle_info(self, request: CompatibleFrame) -> bytes:
         use_v2 = request.header.version == v2_constants.PROTOCOL_VERSION
@@ -712,8 +718,13 @@ class SimulatedDevice:
         error: constants.ErrorCode,
     ) -> bytes:
         payload = _RESPONSE_PREFIX.pack(constants.ResponseStatus.ERROR, 0, error)
-        request_kind = constants.FrameKind(int(request.header.kind))
-        response_kind = constants.REQUEST_RESPONSE_KIND[request_kind]
+        response_kind = (
+            v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE
+            if request.header.version == 2 and int(request.header.kind) == 0x1A
+            else constants.REQUEST_RESPONSE_KIND[
+                constants.FrameKind(int(request.header.kind))
+            ]
+        )
         if request.header.version == v2_constants.PROTOCOL_VERSION:
             return encode_v2_frame(
                 v2_constants.FrameKind(int(response_kind)),
@@ -723,7 +734,7 @@ class SimulatedDevice:
                 request_id=request.header.request_id,
             )
         return encode_frame(
-            response_kind,
+            constants.FrameKind(int(response_kind)),
             payload,
             flags=constants.FrameFlag.RESPONSE_ERROR,
             run_id=self._last_run_id,

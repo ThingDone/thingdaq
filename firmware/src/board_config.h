@@ -423,6 +423,12 @@ inline constexpr std::size_t kResponseQueueDepth = 4U;
 // shared overflow sink.
 inline constexpr std::size_t kAdcDmaRingDepth = 8U;
 inline constexpr std::size_t kAdcDmaPipelineDepth = 6U;
+// At 1 MHz in INPUT mode a generation is only 506 us. Reserving six of
+// eight buffers ahead leaves just two for foreground framing. Use four
+// look-ahead generations in the fixed-rate release, retaining four buffers
+// for command/USB scheduling latency without changing allocated resources.
+inline constexpr std::size_t kAdcDmaActivePipelineDepth =
+    input_experiment::kReleaseFixed1MHz ? 4U : kAdcDmaPipelineDepth;
 inline constexpr std::size_t kAdcDmaDescriptorCount =
     2U * kAdcDmaPipelineDepth;
 inline constexpr std::size_t kAdcFramesPerLoop = 2U;
@@ -1386,6 +1392,8 @@ static_assert(kAdcDmaRingDepth >= 2U,
               "continuous paired ADC DMA needs two destinations");
 static_assert(kAdcDmaPipelineDepth >= 4U,
               "paired ADC DMA needs bounded interrupt-coalescing headroom");
+static_assert(kAdcDmaActivePipelineDepth >= 4U &&
+              kAdcDmaActivePipelineDepth <= kAdcDmaPipelineDepth);
 static_assert(kAdcDmaRingDepth >= kAdcDmaPipelineDepth + 2U,
               "ADC ring must retain two buffers beyond hardware look-ahead");
 static_assert(kAdcDmaDescriptorCount >= 2U * kAdcDmaPipelineDepth,

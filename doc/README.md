@@ -71,8 +71,8 @@ PJRC.COM, LLC or SparkFun Electronics; Teensy is a registered trademark of
 PJRC.COM, LLC. Hardware references are descriptive and do not form part of the
 ThingDAQ name.
 
-Result reports predate the rename unless they explicitly identify the current
-1.0.0 candidate. Their `tdaq-*` build IDs are immutable values emitted by the
+Result reports are historical unless explicitly identified as release 1.1.0
+validation. Older `tdaq-*` build IDs are immutable values emitted by the
 tested firmware and are retained verbatim for evidence integrity. Reusable
 commands, source paths, Python names, and prose use current ThingDAQ naming;
 consult the recorded commit when reproducing a historical artifact byte for

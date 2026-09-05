@@ -213,7 +213,8 @@ when a prior process left the device CONFIGURED or RUNNING.
 
 ## Interpret ADC data
 
-Each `ADCBlock` contains 1,012 immutable little-endian pairs. `adc0` is A0/D14
+Each `ADCBlock` contains 1,012 immutable little-endian pairs in 8-input mode,
+or 506 pairs in 16-input mode. `adc0` is A0/D14
 through logical ADC0; `adc1` is A1/D15 through logical ADC1. Each converter is
 nominally 1 MS/s. In the 8 MHz tick domain:
 
@@ -233,8 +234,8 @@ voltage; it is not electrical protection or proof of analog bandwidth.
 
 ## Interpret GPIO data
 
-Each `GPIOBlock` contains 4,048 packed bytes at 4 MS/s. One byte is one nominal
-simultaneous input snapshot:
+Each `GPIOBlock` contains 4,048 packed bytes at 1 MS/s in release 1.1.0.
+In 8-input mode, one byte is one input snapshot:
 
 | Bit | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -242,9 +243,15 @@ simultaneous input snapshot:
 
 `block.samples` keeps the one-byte form. `block.channel(6)` returns a lazy
 Boolean view of only D6; no eightfold expansion occurs unless requested.
-Sample `n` is at `first_sample_ticks + 2n`.
+In 16-input mode, each little-endian two-byte word is one sample; bits 8–15
+map to D16–D23. There are 2,024 samples per frame. Release sample `n` is at
+`first_sample_ticks + 8n`; use `block.sample_period_ticks` for other devices.
 
-## Align combined blocks
+## Historical equal-duration block alignment
+
+This helper applies to legacy profiles, not release 1.1.0. At equal ADC/GPIO
+sample rates, one GPIO frame spans four ADC frames. `TimestampAligner` rejects
+that profile; use each block's per-sample timestamps directly.
 
 ADC and GPIO frames each cover exactly 8,096 ticks. `TimestampAligner` pairs
 equal `(run_id, first_sample_ticks)` intervals without copying either payload.

@@ -575,6 +575,35 @@ void testStopAcrossEveryBufferOwnershipState() {
   }
 }
 
+void testReleaseLookaheadRetainsForegroundHeadroom() {
+  for (const std::uint32_t depth : {4U, 6U}) {
+    Fixture fixture{};
+    expect(fixture.ring.prime(71U, 0U, 0U, 506U).ok(),
+           "INPUT-rate headroom fixture primes");
+    for (std::uint32_t generation = 2U; generation < depth; ++generation) {
+      expect(fixture.ring.reserveGeneration(71U, generation).ok(),
+             "hardware look-ahead is reserved before START");
+    }
+    // Three completions arrive while foreground work is delayed. Hardware
+    // keeps appending one future descriptor per paired completion.
+    capture::ReservationResult future{};
+    for (std::uint32_t generation = 0U; generation < 3U; ++generation) {
+      for (std::uint8_t converter = 0U; converter < 2U; ++converter) {
+        expect(fixture.ring.onMajorLoopComplete(
+                   converter, 71U, generation,
+                   static_cast<std::uint8_t>(generation)).ok(),
+               "paired completion remains valid during foreground latency");
+      }
+      future = fixture.ring.reserveGeneration(71U, generation + depth);
+      expect(future.ok(), "future generation reservation remains live");
+    }
+    expect((future.destination == capture::kOverflowDestination) == (depth == 6U),
+           "four-entry release look-ahead survives latency that exhausts six-entry look-ahead");
+    expect(fixture.ring.snapshot().ready_depth == 3U,
+           "all three completed buffers remain available for framing");
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -586,6 +615,7 @@ int main() {
   testDmaGenerationWrapKeepsThePairBarrierUnambiguous();
   testStopDoesNotInventLossForUnstartedTaintedGenerations();
   testStopAcrossEveryBufferOwnershipState();
+  testReleaseLookaheadRetainsForegroundHeadroom();
   if (failures != 0) {
     std::cerr << failures << " ADC DMA capture assertion(s) failed\n";
     return 1;

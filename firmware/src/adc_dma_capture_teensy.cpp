@@ -57,7 +57,7 @@ constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     input_experiment::kCpuHz / 100U;
 constexpr std::uint32_t kDmaAlignmentWaitCycles =
     input_experiment::kCpuHz / 100000U;
-constexpr std::size_t kDmaPipelineDepth = board::kAdcDmaPipelineDepth;
+constexpr std::size_t kDmaPipelineDepth = board::kAdcDmaActivePipelineDepth;
 constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
 constexpr std::size_t kPairDispatchConverter = 1U;
 constexpr std::uint32_t kStopBoundaryPollLimit =
@@ -143,8 +143,8 @@ std::array<std::uint8_t, kConverterCount> g_current_destinations{
     kInvalidDestination, kInvalidDestination};
 std::array<std::uint8_t, kConverterCount> g_next_destinations{
     kInvalidDestination, kInvalidDestination};
-std::array<std::uint32_t, kDmaPipelineDepth> g_pipeline_generations{};
-std::array<std::uint8_t, kDmaPipelineDepth> g_pipeline_destinations{
+std::array<std::uint32_t, board::kAdcDmaPipelineDepth> g_pipeline_generations{};
+std::array<std::uint8_t, board::kAdcDmaPipelineDepth> g_pipeline_destinations{
     kInvalidDestination, kInvalidDestination, kInvalidDestination,
     kInvalidDestination, kInvalidDestination, kInvalidDestination};
 std::uint32_t g_epoch = 0U;
@@ -976,7 +976,8 @@ static_assert(board::kAdcConverterConfigurations[1].dmamux_source ==
 static_assert(board::kAdcEdmaPriorities[0] == 2U);
 static_assert(board::kAdcEdmaPriorities[1] == 1U);
 static_assert(kPairDispatchConverter == 1U);
-static_assert(kDmaPipelineDepth == 6U);
+static_assert(kDmaPipelineDepth ==
+              (input_experiment::kReleaseFixed1MHz ? 4U : 6U));
 static_assert(kDmaAlignmentWaitCycles == input_experiment::scaleDwt(6000U));
 
 }  // namespace thingdaq::adc_capture

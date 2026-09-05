@@ -61,6 +61,12 @@ enabled. Always check `supported_rate_profile_mask`. Release firmware rejects
 other rates before configuration changes. The GPIO clock diagnostic is also
 restricted to 1 MHz. The research-only builder is not a release builder.
 
+Host processing capacity remains a separate constraint. The Python SDK's
+combined 16-GPIO capture is not lossless under the test server's 0.5-core CPU
+quota, although the independent wire validator sustains the same firmware
+configuration. No wire-rate or capability bit promises a host throughput
+budget. Strict gap/overrun checks are not disabled to accommodate this limit.
+
 ## Envelope and commands
 
 All multibyte integers are little-endian. The envelope remains 44 bytes plus a
@@ -108,7 +114,10 @@ the ADC half-period reference is 225 DWT cycles at that core clock. Historical
 600 MHz template/golden metadata in the JSON is a codec reference, not a live
 release claim. Convert DWT measurements using the reported clock, not 600 MHz.
 Legacy shared nominal-throughput fields cannot describe unequal stream byte
-rates; derive active throughput from the rates and item sizes below.
+rates; derive active throughput from the rates and item sizes below. Likewise,
+GPIO clock diagnostic `production_rate_hz` retains the historical 4 MHz
+reference value; it is not permission to select 4 MHz. The release interlock
+accepts only 1 MHz and the diagnostic echoes `configured_rate_hz=1000000`.
 
 ## Data frames, timestamps and loss
 

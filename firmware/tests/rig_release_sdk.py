@@ -6,12 +6,16 @@ import dataclasses
 import json
 import os
 import time
+from pathlib import Path
 
 from thingdaq import (
     ADCBlock,
     AuxBankMode,
+    DAQConfiguration,
     DeviceCapabilityError,
+    DeviceCommandError,
     DeviceState,
+    ErrorCode,
     ExpectedDeviceIdentity,
     GPIOBlock,
     RateProfile,
@@ -19,6 +23,7 @@ from thingdaq import (
     StreamMask,
     ThingDAQ,
 )
+from thingdaq._generated import protocol_v2_constants as c
 
 
 def temperature(daq):
@@ -39,6 +44,10 @@ def main():
         "cells": [],
         "electrical_stimulus": "NOT_CONNECTED",
     }
+    for name in ("cpu.max", "cpu.stat"):
+        path = Path("/sys/fs/cgroup") / name
+        if path.exists():
+            evidence[name] = path.read_text()
     try:
         expected = ExpectedDeviceIdentity(
             hardware_serial=int(os.environ["EXPECTED_HARDWARE_SERIAL"]),
@@ -52,13 +61,26 @@ def main():
             expected_identity=expected,
             strict=True,
             max_buffered_blocks=2048,
-            read_size=262144,
+            read_size=16384,
         ) as daq:
             info = daq.info()
             assert info.protocol_version == 2
             assert info.adc_trigger.dwt_clock_hz == 450_000_000
             assert info.auxiliary.supported_rate_profile_mask == 16
             evidence["idle_temperature"] = temperature(daq)
+            clock = daq.gpio_clock_diagnostic()
+            assert clock.healthy and clock.dwt_counter_hz == 450_000_000
+            assert clock.configured_rate_hz == 1_000_000
+            evidence["clock_diagnostic"] = {
+                "rate_hz": clock.configured_rate_hz,
+                "dwt_hz": clock.dwt_counter_hz,
+            }
+            try:
+                daq.gpio_clock_diagnostic(rate_hz=4_000_000)
+            except DeviceCommandError as error:
+                assert error.error_code is ErrorCode.UNSUPPORTED_CONFIGURATION
+            else:
+                raise AssertionError("firmware accepted a 4 MHz diagnostic")
             for rejected in list(RateProfile)[:4]:
                 try:
                     daq.configure(rate_profile=rejected)
@@ -66,6 +88,18 @@ def main():
                     pass
                 else:
                     raise AssertionError(f"SDK accepted unsupported profile {rejected}")
+                raw = DAQConfiguration(
+                    stream_mask=StreamMask.ADC | StreamMask.GPIO,
+                    source=Source.HARDWARE,
+                    rate_profile=rejected,
+                )
+                response = daq._reader.request(
+                    c.FrameKind.CONFIGURE_REQUEST,
+                    raw.to_payload(protocol_version=2),
+                    protocol_version=2,
+                )
+                assert response.error_code is ErrorCode.UNSUPPORTED_CONFIGURATION
+                assert daq.status().device_state is DeviceState.IDLE
             previous_run = None
             cells = [
                 (AuxBankMode.DISABLED, StreamMask.ADC),
@@ -141,5 +175,8 @@ def main():
         evidence["error"] = f"{type(error).__name__}: {error}"
         evidence["cause"] = repr(getattr(error, "cause", None))
         evidence["recovery"] = repr(getattr(error, "evidence", None))
+    cpu_stat = Path("/sys/fs/cgroup/cpu.stat")
+    if cpu_stat.exists():
+        evidence["cpu.stat.after"] = cpu_stat.read_text()
     print("EVIDENCE " + json.dumps(evidence, sort_keys=True), flush=True)
     return 0 if evidence["result"] == "PASS" else 1
