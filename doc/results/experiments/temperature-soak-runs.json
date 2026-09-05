@@ -1,0 +1,1968 @@
+{
+  "schema": "thingdaq.temperature-soak-campaign/v1",
+  "status": "IN_PROGRESS",
+  "firmware_branch": "experiment/input-rate-clock",
+  "firmware_commit": "673e855eb91d61ad0ae82ce2d0aceb277c907ff2",
+  "scope": "450 MHz core; 8/16 unstimulated GPIO inputs plus both ADCs; equal 1 MHz or 500 kHz; no output, electrical-fidelity, ambient or lifetime qualification.",
+  "jobs": [
+    {
+      "provenance": {
+        "build_id": "thingdaq-26035200442f243d",
+        "hex_sha256": "eb1ae266589ab6a5b918b79e3b7fcd2ea61d3cc05051bb63a56d6ff8f85b26b6",
+        "manifest_sha256": "54831a688911a6f5d9840c45262cc1c63fd419cf05a61aa887848bed0fa6be31",
+        "runner_sha256": "c53abcefe03cf3dd814babd3d475e2a463ccf0d8305803041be54d097f33ea8c",
+        "program_sha256": "1e791748935fc5727927016ced91d4ad1b261e207fe6f92b88c085b7c38199b8",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "15.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "450",
+          "AUX_INPUT_EQUAL_RATES": "1",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-26035200442f243d",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        },
+        "profile_sequence": [
+          0,
+          1
+        ],
+        "case_sequence": null,
+        "source": {
+          "git_commit": "db5d775a2e087f78024fac6c6d1a314807793e12",
+          "source_id": "26035200442f243d482cba160a07c37750c57bd1b8ded3342e25fc44c3768b5e",
+          "firmware_inputs_clean": false
+        }
+      },
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 126216,
+          "data_bytes": 25704,
+          "free_for_files_bytes": 1870852,
+          "headers_bytes": 8844
+        },
+        "ram1": {
+          "code_bytes": 32648,
+          "free_for_locals_bytes": 34528,
+          "padding_bytes": 120,
+          "variables_bytes": 456992
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 76,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 15,
+            "failed_checks": [],
+            "failures": [
+              "DeadlineExpired: request 3 kind 0x1a timed out; parser_errors=0 rx_prefix="
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "temperature_samples": []
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "EXPERIMENT_ADC_GPIO_1000000HZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1",
+            "temperature_summary": {
+              "before_millidegrees_c": null,
+              "after_millidegrees_c": null,
+              "maximum_millidegrees_c": null,
+              "valid_readings": 0,
+              "not_ready_attempts": 0,
+              "maximum_request_latency_seconds": null
+            }
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id f4cd7353-f371-44f1-959a-449361168ba1",
+        "outcome": "TEST_FAIL",
+        "test_id": "f4cd7353-f371-44f1-959a-449361168ba1"
+      },
+      "service_result": {
+        "completed": true,
+        "program_success": true,
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id f4cd7353-f371-44f1-959a-449361168ba1"
+      },
+      "last_temperature_events": [],
+      "directory": ".maestro/playbooks/Working/input-isolation/temp-450-input-p01-smoke-15s",
+      "results_sha256": "c6133888f8258c375f1d71fa148218049a81746f2249edea190cd3708b0d3d85",
+      "summary_sha256": "83001bd033c2fecdedcf203ba9aeeb73a2053a5a0b9444b67bb8a5d4aad27f63",
+      "reviewed_outcome": "FAIL",
+      "review_note": "new temperature response omitted from USB admission; fixed",
+      "planned_cell_count": 2,
+      "reported_cell_count": 1
+    },
+    {
+      "provenance": {
+        "build_id": "thingdaq-b3a1a9229aa2cc3b",
+        "hex_sha256": "3b3f6e348aa7587294da48a29a4cee0c884d93daadc848144db7b2c40dd8e6ce",
+        "manifest_sha256": "527fdaafd36ea47062405cf4664af70ec7ea594236ba87fbcfd3d5cf412de7d3",
+        "runner_sha256": "c53abcefe03cf3dd814babd3d475e2a463ccf0d8305803041be54d097f33ea8c",
+        "program_sha256": "49eb54f477496f650e5b8a0665633b19d33f884ab8258a3b29220feda58f47c2",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "15.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "450",
+          "AUX_INPUT_EQUAL_RATES": "1",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-b3a1a9229aa2cc3b",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        },
+        "profile_sequence": [
+          0,
+          1
+        ],
+        "case_sequence": null,
+        "source": {
+          "git_commit": "db5d775a2e087f78024fac6c6d1a314807793e12",
+          "source_id": "b3a1a9229aa2cc3bc820f7ac3802ef37fd7f751e2f220cb03f887c9e98976a41",
+          "firmware_inputs_clean": false
+        }
+      },
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 126224,
+          "data_bytes": 25704,
+          "free_for_files_bytes": 1870852,
+          "headers_bytes": 8836
+        },
+        "ram1": {
+          "code_bytes": 32648,
+          "free_for_locals_bytes": 34528,
+          "padding_bytes": 120,
+          "variables_bytes": 456992
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 108,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 15,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: temperature reading unavailable: status=2"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "temperature_samples": [
+                {
+                  "host_monotonic_seconds": 1394609.607744424,
+                  "latency_seconds": 0.02080892096273601,
+                  "millidegrees_c": 35439,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "host_monotonic_seconds": 1394619.726747805,
+                  "latency_seconds": 0.010578630957752466,
+                  "millidegrees_c": 38509,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "host_monotonic_seconds": 1394625.116198309,
+                  "latency_seconds": 0.02085654786787927,
+                  "millidegrees_c": null,
+                  "phase": "after",
+                  "status": 2
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "EXPERIMENT_ADC_GPIO_1000000HZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1",
+            "temperature_summary": {
+              "before_millidegrees_c": 35439,
+              "after_millidegrees_c": null,
+              "maximum_millidegrees_c": 38509,
+              "valid_readings": 2,
+              "not_ready_attempts": 1,
+              "maximum_request_latency_seconds": 0.02085654786787927
+            }
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 9a4470a1-39d1-4ce3-942c-b8e5f727d35b",
+        "outcome": "TEST_FAIL",
+        "test_id": "9a4470a1-39d1-4ce3-942c-b8e5f727d35b"
+      },
+      "service_result": {
+        "completed": true,
+        "program_success": true,
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id 9a4470a1-39d1-4ce3-942c-b8e5f727d35b"
+      },
+      "last_temperature_events": [
+        {
+          "event": "temperature",
+          "host_monotonic_seconds": 1394609.607744424,
+          "latency_seconds": 0.02080892096273601,
+          "millidegrees_c": 35439,
+          "phase": "before",
+          "status": 0
+        },
+        {
+          "event": "temperature",
+          "host_monotonic_seconds": 1394619.726747805,
+          "latency_seconds": 0.010578630957752466,
+          "millidegrees_c": 38509,
+          "phase": "running",
+          "status": 0
+        },
+        {
+          "event": "temperature",
+          "host_monotonic_seconds": 1394625.116198309,
+          "latency_seconds": 0.02085654786787927,
+          "millidegrees_c": null,
+          "phase": "after",
+          "status": 2
+        }
+      ],
+      "directory": ".maestro/playbooks/Working/input-isolation/temp-450-input-p01-smoke-fixed-15s",
+      "results_sha256": "f31f95efea49f5497031dcfd09d4803842c32770ad43872a735cd04fb8a54845",
+      "summary_sha256": "f54f3f454ee781df39147ac11d2866c45054eb2a9b8726e10252de0450c01722",
+      "reviewed_outcome": "FAIL",
+      "review_note": "transient sensor NOT_READY; bounded host retries fixed",
+      "planned_cell_count": 2,
+      "reported_cell_count": 1
+    },
+    {
+      "provenance": {
+        "build_id": "thingdaq-b3a1a9229aa2cc3b",
+        "hex_sha256": "3b3f6e348aa7587294da48a29a4cee0c884d93daadc848144db7b2c40dd8e6ce",
+        "manifest_sha256": "527fdaafd36ea47062405cf4664af70ec7ea594236ba87fbcfd3d5cf412de7d3",
+        "runner_sha256": "46f2b9ca591a1b17b28c2815dac1e626da84b6d97896a2f3f96201f429145316",
+        "program_sha256": "cfddd3ccd663b478a630011ff5e94af51ee962cb3f414ef7d4d5be5a7126a32d",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "15.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "450",
+          "AUX_INPUT_EQUAL_RATES": "1",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-b3a1a9229aa2cc3b",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        },
+        "profile_sequence": [
+          0,
+          1
+        ],
+        "case_sequence": null,
+        "source": {
+          "git_commit": "db5d775a2e087f78024fac6c6d1a314807793e12",
+          "source_id": "b3a1a9229aa2cc3bc820f7ac3802ef37fd7f751e2f220cb03f887c9e98976a41",
+          "firmware_inputs_clean": false
+        }
+      },
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 126224,
+          "data_bytes": 25704,
+          "free_for_files_bytes": 1870852,
+          "headers_bytes": 8836
+        },
+        "ram1": {
+          "code_bytes": 32648,
+          "free_for_locals_bytes": 34528,
+          "padding_bytes": 120,
+          "variables_bytes": 456992
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 131,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 15,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 30194,
+              "adc_rate_hz": 999993.1395968378,
+              "aux_bank_samples_captured": 15277152,
+              "capture_seconds": 15.007556957891211,
+              "firmware_processing_cpu_basis_points": 1767,
+              "gpio_frames": 7548,
+              "gpio_rate_hz": 1000026.8559439701,
+              "host_peak_rss_growth_bytes": 16384,
+              "maximum_frame_skew": 3,
+              "maximum_receive_gap_seconds": 0.02624440100044012,
+              "packet_ready_high_water": 3,
+              "packet_transmit_high_water": 39,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 15277152,
+              "paired_samples_transmitted": 15277152,
+              "primary_bank_samples_captured": 15277152,
+              "status_count": 31,
+              "status_p99_seconds": 0.010861066170036793,
+              "stop_tail_adc_items": 72,
+              "stop_tail_gpio_items": 1084,
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394705.753618789,
+                  "latency_seconds": 0.022472731070593,
+                  "millidegrees_c": 37281,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394715.872326427,
+                  "latency_seconds": 0.010334171121940017,
+                  "millidegrees_c": 39737,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394721.259966909,
+                  "latency_seconds": 0.020746266935020685,
+                  "millidegrees_c": 40351,
+                  "phase": "after",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "EXPERIMENT_ADC_GPIO_1000000HZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1",
+            "temperature_summary": {
+              "before_millidegrees_c": 37281,
+              "after_millidegrees_c": 40351,
+              "maximum_millidegrees_c": 40351,
+              "valid_readings": 3,
+              "not_ready_attempts": 0,
+              "maximum_request_latency_seconds": 0.022472731070593
+            }
+          },
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 131,
+            "configured_rates_hz": {
+              "adc_pairs": 500000,
+              "gpio_samples": 500000
+            },
+            "duration_seconds": 15,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 15108,
+              "adc_rate_hz": 500014.6426433296,
+              "aux_bank_samples_captured": 7644648,
+              "capture_seconds": 15.011568381916732,
+              "firmware_processing_cpu_basis_points": 1396,
+              "gpio_frames": 3777,
+              "gpio_rate_hz": 500082.05731808266,
+              "host_peak_rss_growth_bytes": 0,
+              "maximum_frame_skew": 3,
+              "maximum_receive_gap_seconds": 0.021473729982972145,
+              "packet_ready_high_water": 2,
+              "packet_transmit_high_water": 2,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 7644648,
+              "paired_samples_transmitted": 7644648,
+              "primary_bank_samples_captured": 7644648,
+              "status_count": 31,
+              "status_p99_seconds": 0.022019108990207314,
+              "stop_tail_adc_items": 248,
+              "stop_tail_gpio_items": 248,
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394721.612385892,
+                  "latency_seconds": 0.020539674907922745,
+                  "millidegrees_c": 40351,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394731.755046662,
+                  "latency_seconds": 0.020427285926416516,
+                  "millidegrees_c": 42193,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394737.13050268,
+                  "latency_seconds": 0.020815785974264145,
+                  "millidegrees_c": 42193,
+                  "phase": "after",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "EXPERIMENT_ADC_GPIO_500000HZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1",
+            "temperature_summary": {
+              "before_millidegrees_c": 40351,
+              "after_millidegrees_c": 42193,
+              "maximum_millidegrees_c": 42193,
+              "valid_readings": 3,
+              "not_ready_attempts": 0,
+              "maximum_request_latency_seconds": 0.020815785974264145
+            }
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id b2c7d71f-c610-40f1-9a33-4e2fbeff9b9f",
+        "outcome": "PASS",
+        "test_id": "b2c7d71f-c610-40f1-9a33-4e2fbeff9b9f"
+      },
+      "service_result": {
+        "completed": true,
+        "program_success": true,
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id b2c7d71f-c610-40f1-9a33-4e2fbeff9b9f"
+      },
+      "last_temperature_events": [
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1394721.612385892,
+          "latency_seconds": 0.020539674907922745,
+          "millidegrees_c": 40351,
+          "phase": "before",
+          "status": 0
+        },
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1394731.755046662,
+          "latency_seconds": 0.020427285926416516,
+          "millidegrees_c": 42193,
+          "phase": "running",
+          "status": 0
+        },
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1394737.13050268,
+          "latency_seconds": 0.020815785974264145,
+          "millidegrees_c": 42193,
+          "phase": "after",
+          "status": 0
+        }
+      ],
+      "directory": ".maestro/playbooks/Working/input-isolation/temp-450-input-p01-smoke-retry-15s",
+      "results_sha256": "1eab4fd01b6d960d75532273ca669f244f9e3024ac1cd96e96820ca4377daf73",
+      "summary_sha256": "f02fc28974f59f339895ebf6c1ea7846ac3a12c446bec8f58291c4520d57aafe",
+      "reviewed_outcome": "PASS",
+      "review_note": null,
+      "planned_cell_count": 2,
+      "reported_cell_count": 2
+    },
+    {
+      "provenance": {
+        "build_id": "thingdaq-b3a1a9229aa2cc3b",
+        "hex_sha256": "3b3f6e348aa7587294da48a29a4cee0c884d93daadc848144db7b2c40dd8e6ce",
+        "manifest_sha256": "4e5609bcde838765bb024c49e4fa195408058627b2ce4877c8f2309da5d42266",
+        "runner_sha256": "46f2b9ca591a1b17b28c2815dac1e626da84b6d97896a2f3f96201f429145316",
+        "program_sha256": "47b66dd9981992dfefa83a69191c281a37e06d105508bb2893b01cdeac623a62",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "600.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "450",
+          "AUX_INPUT_EQUAL_RATES": "1",
+          "AUX_INPUT_RATE_PROFILE": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-b3a1a9229aa2cc3b",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        },
+        "profile_sequence": [
+          0,
+          1
+        ],
+        "case_sequence": null,
+        "source": {
+          "git_commit": "673e855eb91d61ad0ae82ce2d0aceb277c907ff2",
+          "source_id": "b3a1a9229aa2cc3bc820f7ac3802ef37fd7f751e2f220cb03f887c9e98976a41",
+          "firmware_inputs_clean": true
+        }
+      },
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 126224,
+          "data_bytes": 25704,
+          "free_for_files_bytes": 1870852,
+          "headers_bytes": 8836
+        },
+        "ram1": {
+          "code_bytes": 32648,
+          "free_for_locals_bytes": 34528,
+          "padding_bytes": 120,
+          "variables_bytes": 456992
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_COMBINED",
+            "checks": 128,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 600,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 593168,
+              "adc_rate_hz": 1000001.089176433,
+              "aux_bank_samples_captured": 0,
+              "capture_seconds": 600.0111104820389,
+              "firmware_processing_cpu_basis_points": 1243,
+              "gpio_frames": 148292,
+              "gpio_rate_hz": 999999.4025409985,
+              "host_peak_rss_growth_bytes": 65536,
+              "maximum_frame_skew": 3,
+              "maximum_receive_gap_seconds": 0.020871207118034363,
+              "packet_ready_high_water": 2,
+              "packet_transmit_high_water": 17,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 0,
+              "paired_samples_transmitted": 600286016,
+              "primary_bank_samples_captured": 0,
+              "status_count": 1201,
+              "status_p99_seconds": 0.013500452972948551,
+              "stop_tail_adc_items": 555,
+              "stop_tail_gpio_items": 555,
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394915.948520914,
+                  "latency_seconds": 0.020599312148988247,
+                  "millidegrees_c": 36667,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394926.069575156,
+                  "latency_seconds": 0.013141246978193521,
+                  "millidegrees_c": 39123,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394936.089600582,
+                  "latency_seconds": 0.01278087799437344,
+                  "millidegrees_c": 40351,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394946.109029202,
+                  "latency_seconds": 0.012864870950579643,
+                  "millidegrees_c": 40965,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394956.128990002,
+                  "latency_seconds": 0.013107717037200928,
+                  "millidegrees_c": 42193,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394966.1498787,
+                  "latency_seconds": 0.01344704208895564,
+                  "millidegrees_c": 42808,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394976.167702043,
+                  "latency_seconds": 0.012257415102794766,
+                  "millidegrees_c": 44036,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394986.1893491,
+                  "latency_seconds": 0.01314859907142818,
+                  "millidegrees_c": 44650,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1394996.209039955,
+                  "latency_seconds": 0.01315108290873468,
+                  "millidegrees_c": 45264,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395006.229065541,
+                  "latency_seconds": 0.012191422050818801,
+                  "millidegrees_c": 45878,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395016.249593662,
+                  "latency_seconds": 0.013173493091017008,
+                  "millidegrees_c": 45878,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395026.269401167,
+                  "latency_seconds": 0.013175307074561715,
+                  "millidegrees_c": 46492,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395036.289446649,
+                  "latency_seconds": 0.012316545005887747,
+                  "millidegrees_c": 46492,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395046.309084693,
+                  "latency_seconds": 0.012926846044138074,
+                  "millidegrees_c": 47106,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395056.329822138,
+                  "latency_seconds": 0.013229134026914835,
+                  "millidegrees_c": 47720,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395066.349899461,
+                  "latency_seconds": 0.013402985874563456,
+                  "millidegrees_c": 47720,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395076.368259752,
+                  "latency_seconds": 0.012805097037926316,
+                  "millidegrees_c": 47720,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395086.389434964,
+                  "latency_seconds": 0.013240969041362405,
+                  "millidegrees_c": 48334,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395096.410325187,
+                  "latency_seconds": 0.013441922143101692,
+                  "millidegrees_c": 48334,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395106.429228194,
+                  "latency_seconds": 0.012232229113578796,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395116.449835273,
+                  "latency_seconds": 0.013100591953843832,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395126.470941534,
+                  "latency_seconds": 0.013547386974096298,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395136.48975047,
+                  "latency_seconds": 0.012304566102102399,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395146.51008688,
+                  "latency_seconds": 0.013157617067918181,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395156.529897405,
+                  "latency_seconds": 0.013172994134947658,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395166.549811858,
+                  "latency_seconds": 0.011975646018981934,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395176.569758988,
+                  "latency_seconds": 0.012946475064381957,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395186.58937813,
+                  "latency_seconds": 0.013078938005492091,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395196.610478977,
+                  "latency_seconds": 0.013234599027782679,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395206.629923941,
+                  "latency_seconds": 0.012801809934899211,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1395206.655252477,
+                  "latency_seconds": 0.012144729029387236,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395216.676483356,
+                  "latency_seconds": 0.013385301921516657,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395226.695869098,
+                  "latency_seconds": 0.012923161033540964,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395236.715765297,
+                  "latency_seconds": 0.013275446835905313,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395246.736660848,
+                  "latency_seconds": 0.0132906308863312,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395256.755704527,
+                  "latency_seconds": 0.012117651989683509,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395266.776091334,
+                  "latency_seconds": 0.01321028103120625,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395276.794797241,
+                  "latency_seconds": 0.013108765939250588,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395286.816185081,
+                  "latency_seconds": 0.01224475703202188,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395296.83560232,
+                  "latency_seconds": 0.012840507086366415,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395306.856421482,
+                  "latency_seconds": 0.013109253020957112,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395316.876505378,
+                  "latency_seconds": 0.013496028957888484,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395326.896038515,
+                  "latency_seconds": 0.012976666912436485,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395336.916741477,
+                  "latency_seconds": 0.013154770946130157,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395346.936916995,
+                  "latency_seconds": 0.013433150947093964,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395356.95627016,
+                  "latency_seconds": 0.012681652093306184,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395366.976276789,
+                  "latency_seconds": 0.013184468960389495,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395376.997248962,
+                  "latency_seconds": 0.01335462392307818,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395387.015039305,
+                  "latency_seconds": 0.012294841930270195,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395397.03659271,
+                  "latency_seconds": 0.013068628963083029,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395407.056530821,
+                  "latency_seconds": 0.013136120978742838,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395417.07635295,
+                  "latency_seconds": 0.010976615827530622,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395427.0960807,
+                  "latency_seconds": 0.012893549865111709,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395437.116922234,
+                  "latency_seconds": 0.013224103022366762,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395447.136564074,
+                  "latency_seconds": 0.012979901162907481,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1395447.162107452,
+                  "latency_seconds": 0.012962979963049293,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395457.182840994,
+                  "latency_seconds": 0.013206440955400467,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395467.20305468,
+                  "latency_seconds": 0.013391498010605574,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395477.221244781,
+                  "latency_seconds": 0.012771893991157413,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395487.242463246,
+                  "latency_seconds": 0.013085195096209645,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395497.26344074,
+                  "latency_seconds": 0.013442919123917818,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395507.282220629,
+                  "latency_seconds": 0.012312676990404725,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1395507.308121778,
+                  "latency_seconds": 0.012981597101315856,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395516.462633853,
+                  "latency_seconds": 0.020752941956743598,
+                  "millidegrees_c": 50790,
+                  "phase": "after",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "EXPERIMENT_ADC_GPIO_1000000HZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1",
+            "temperature_summary": {
+              "before_millidegrees_c": 36667,
+              "after_millidegrees_c": 50790,
+              "maximum_millidegrees_c": 51404,
+              "valid_readings": 61,
+              "not_ready_attempts": 3,
+              "maximum_request_latency_seconds": 0.020752941956743598
+            }
+          }
+        ],
+        "exit_code": -110,
+        "message": "Container ran successfully for test_id 5782049f-7378-4836-95ab-d7492a5abfb9",
+        "outcome": "TEST_FAIL",
+        "test_id": "5782049f-7378-4836-95ab-d7492a5abfb9"
+      },
+      "service_result": {
+        "completed": true,
+        "program_success": true,
+        "exit_code": -110,
+        "message": "Container ran successfully for test_id 5782049f-7378-4836-95ab-d7492a5abfb9"
+      },
+      "last_temperature_events": [
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1395787.912937077,
+          "latency_seconds": 0.0221946919336915,
+          "millidegrees_c": 51404,
+          "phase": "running",
+          "status": 0
+        },
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1395797.94946209,
+          "latency_seconds": 0.022087284829467535,
+          "millidegrees_c": 51404,
+          "phase": "running",
+          "status": 0
+        },
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1395807.973173952,
+          "latency_seconds": 0.02204467891715467,
+          "millidegrees_c": 51404,
+          "phase": "running",
+          "status": 0
+        }
+      ],
+      "directory": ".maestro/playbooks/Working/input-isolation/temp-450-control-p01-clean-600s",
+      "results_sha256": "1167ba0d17e67541a9efb6d4f464010a65f091017e3368aa8990ef0ce1095336",
+      "summary_sha256": "ded3ce0b3de9a23322b4116175cb84608ae8547db1a4c4296c8d70c3d9358e47",
+      "reviewed_outcome": "INFRASTRUCTURE_TIMEOUT",
+      "review_note": "900s service limit killed second cell; raw summary says TEST_FAIL but exit=-110. Preserve raw evidence. First CONTROL_COMBINED p0 passed600s, before36.667 after50.790 max51.404C. Secondp1 incomplete.",
+      "planned_cell_count": 2,
+      "reported_cell_count": 1
+    },
+    {
+      "provenance": {
+        "build_id": "thingdaq-b3a1a9229aa2cc3b",
+        "hex_sha256": "3b3f6e348aa7587294da48a29a4cee0c884d93daadc848144db7b2c40dd8e6ce",
+        "manifest_sha256": "4e5609bcde838765bb024c49e4fa195408058627b2ce4877c8f2309da5d42266",
+        "runner_sha256": "46f2b9ca591a1b17b28c2815dac1e626da84b6d97896a2f3f96201f429145316",
+        "program_sha256": "a29d632a916a8cb72da38b4f47ae587aa1b658477e682301f0b0fbf3c063cd7e",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "600.0",
+          "AUX_INPUT_CASE": "CONTROL_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "450",
+          "AUX_INPUT_EQUAL_RATES": "1",
+          "AUX_INPUT_RATE_PROFILE": "1",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-b3a1a9229aa2cc3b",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        },
+        "profile_sequence": [
+          1
+        ],
+        "case_sequence": [
+          "CONTROL_COMBINED"
+        ],
+        "source": {
+          "git_commit": "673e855eb91d61ad0ae82ce2d0aceb277c907ff2",
+          "source_id": "b3a1a9229aa2cc3bc820f7ac3802ef37fd7f751e2f220cb03f887c9e98976a41",
+          "firmware_inputs_clean": true
+        }
+      },
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 126224,
+          "data_bytes": 25704,
+          "free_for_files_bytes": 1870852,
+          "headers_bytes": 8836
+        },
+        "ram1": {
+          "code_bytes": 32648,
+          "free_for_locals_bytes": 34528,
+          "padding_bytes": 120,
+          "variables_bytes": 456992
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "DISABLED",
+            "case": "CONTROL_COMBINED",
+            "checks": 128,
+            "configured_rates_hz": {
+              "adc_pairs": 500000,
+              "gpio_samples": 500000
+            },
+            "duration_seconds": 600,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 296588,
+              "adc_rate_hz": 500001.13230659673,
+              "aux_bank_samples_captured": 0,
+              "capture_seconds": 600.0053452199791,
+              "firmware_processing_cpu_basis_points": 1040,
+              "gpio_frames": 74147,
+              "gpio_rate_hz": 499997.7590033151,
+              "host_peak_rss_growth_bytes": 69632,
+              "maximum_frame_skew": 3,
+              "maximum_receive_gap_seconds": 0.023006075993180275,
+              "packet_ready_high_water": 2,
+              "packet_transmit_high_water": 9,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 0,
+              "paired_samples_transmitted": 300147056,
+              "primary_bank_samples_captured": 0,
+              "status_count": 1201,
+              "status_p99_seconds": 0.0226499589625746,
+              "stop_tail_adc_items": 275,
+              "stop_tail_gpio_items": 275,
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395912.643956753,
+                  "latency_seconds": 0.02080565900541842,
+                  "millidegrees_c": null,
+                  "phase": "before",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1395912.685293454,
+                  "latency_seconds": 0.020805666921660304,
+                  "millidegrees_c": 42808,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395922.825580017,
+                  "latency_seconds": 0.02184269903227687,
+                  "millidegrees_c": 44650,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395932.867977796,
+                  "latency_seconds": 0.022083729039877653,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1395932.911957155,
+                  "latency_seconds": 0.021961375139653683,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 3,
+                  "host_monotonic_seconds": 1395932.955756106,
+                  "latency_seconds": 0.021783360978588462,
+                  "millidegrees_c": 45264,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395942.987392246,
+                  "latency_seconds": 0.02246656478382647,
+                  "millidegrees_c": 45878,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395953.018403861,
+                  "latency_seconds": 0.021901741856709123,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1395953.062312767,
+                  "latency_seconds": 0.021866308990865946,
+                  "millidegrees_c": 47106,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395963.088256741,
+                  "latency_seconds": 0.022044841898605227,
+                  "millidegrees_c": 47106,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395973.122501508,
+                  "latency_seconds": 0.022111546015366912,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1395973.167269852,
+                  "latency_seconds": 0.02251841314136982,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 3,
+                  "host_monotonic_seconds": 1395973.211548101,
+                  "latency_seconds": 0.021869168849661946,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 4,
+                  "host_monotonic_seconds": 1395973.256546926,
+                  "latency_seconds": 0.022642659954726696,
+                  "millidegrees_c": 47720,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395983.286748367,
+                  "latency_seconds": 0.021753794979304075,
+                  "millidegrees_c": 47720,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1395993.31016894,
+                  "latency_seconds": 0.022074955981224775,
+                  "millidegrees_c": 48334,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396003.348689706,
+                  "latency_seconds": 0.022113440092653036,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396013.3742672,
+                  "latency_seconds": 0.022039133124053478,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396023.411043141,
+                  "latency_seconds": 0.021768851904198527,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396033.434689725,
+                  "latency_seconds": 0.021495637018233538,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396043.464470255,
+                  "latency_seconds": 0.02203054097481072,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396053.507488813,
+                  "latency_seconds": 0.022501361090689898,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396063.536433411,
+                  "latency_seconds": 0.022101845126599073,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396073.576760069,
+                  "latency_seconds": 0.022073180880397558,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396083.611454337,
+                  "latency_seconds": 0.022128697019070387,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1396083.655720874,
+                  "latency_seconds": 0.022115863859653473,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396093.684599885,
+                  "latency_seconds": 0.022496476070955396,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396103.710112871,
+                  "latency_seconds": 0.020629012025892735,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396113.740370113,
+                  "latency_seconds": 0.022227104986086488,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396123.764746485,
+                  "latency_seconds": 0.022507864981889725,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396133.791534274,
+                  "latency_seconds": 0.021944449981674552,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396143.827741744,
+                  "latency_seconds": 0.021785592194646597,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1396143.871613241,
+                  "latency_seconds": 0.021839826134964824,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396153.910448975,
+                  "latency_seconds": 0.021978264907374978,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396163.947937575,
+                  "latency_seconds": 0.021961043123155832,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396173.974826848,
+                  "latency_seconds": 0.020630333106964827,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396184.005752519,
+                  "latency_seconds": 0.022136038867756724,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396194.04556945,
+                  "latency_seconds": 0.02209841995500028,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396204.085226944,
+                  "latency_seconds": 0.022035096073523164,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396214.119679617,
+                  "latency_seconds": 0.022484865970909595,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396224.15426387,
+                  "latency_seconds": 0.021729025058448315,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396234.192197678,
+                  "latency_seconds": 0.021932577015832067,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396244.220651446,
+                  "latency_seconds": 0.022494741016998887,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396254.264358441,
+                  "latency_seconds": 0.022635089000687003,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396264.293788209,
+                  "latency_seconds": 0.021952772978693247,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396274.328035767,
+                  "latency_seconds": 0.02194741298444569,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396284.365992589,
+                  "latency_seconds": 0.021934449905529618,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396294.398167335,
+                  "latency_seconds": 0.022575902054086328,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396304.42046214,
+                  "latency_seconds": 0.021814111853018403,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1396304.464266029,
+                  "latency_seconds": 0.021984652848914266,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396314.499761888,
+                  "latency_seconds": 0.020644539035856724,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396324.534017738,
+                  "latency_seconds": 0.021898871986195445,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1396324.575498822,
+                  "latency_seconds": 0.02070790296420455,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 3,
+                  "host_monotonic_seconds": 1396324.616753383,
+                  "latency_seconds": 0.02062138100154698,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 4,
+                  "host_monotonic_seconds": 1396324.66031878,
+                  "latency_seconds": 0.021965099032968283,
+                  "millidegrees_c": 50790,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396334.701122025,
+                  "latency_seconds": 0.022075837943702936,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396344.728318606,
+                  "latency_seconds": 0.021992743015289307,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 1396344.772112346,
+                  "latency_seconds": 0.021953694988042116,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396354.811551049,
+                  "latency_seconds": 0.022034355904906988,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396364.85104556,
+                  "latency_seconds": 0.022071546176448464,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396374.877061277,
+                  "latency_seconds": 0.021883344976231456,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396384.910849892,
+                  "latency_seconds": 0.021912514930590987,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396394.952582981,
+                  "latency_seconds": 0.021875433856621385,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396404.987729995,
+                  "latency_seconds": 0.021756125148385763,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396415.022747087,
+                  "latency_seconds": 0.0219854807946831,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396425.050338178,
+                  "latency_seconds": 0.02178575610741973,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396435.085725682,
+                  "latency_seconds": 0.02238679095171392,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396445.11328659,
+                  "latency_seconds": 0.021936937933787704,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396455.136847422,
+                  "latency_seconds": 0.022004871163517237,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396465.175282249,
+                  "latency_seconds": 0.020748743088915944,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396475.205906249,
+                  "latency_seconds": 0.022491886978968978,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396485.248164292,
+                  "latency_seconds": 0.0225158529356122,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396495.277527147,
+                  "latency_seconds": 0.022001440869644284,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396505.313577038,
+                  "latency_seconds": 0.02216101484373212,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 1396513.207590875,
+                  "latency_seconds": 0.020412027835845947,
+                  "millidegrees_c": 51404,
+                  "phase": "after",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "EXPERIMENT_ADC_GPIO_500000HZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1",
+            "temperature_summary": {
+              "before_millidegrees_c": 42808,
+              "after_millidegrees_c": 51404,
+              "maximum_millidegrees_c": 51404,
+              "valid_readings": 61,
+              "not_ready_attempts": 14,
+              "maximum_request_latency_seconds": 0.022642659954726696
+            }
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 14790596-53c6-4396-9144-e9603c5418d3",
+        "outcome": "PASS",
+        "test_id": "14790596-53c6-4396-9144-e9603c5418d3"
+      },
+      "service_result": {
+        "completed": true,
+        "program_success": true,
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 14790596-53c6-4396-9144-e9603c5418d3"
+      },
+      "last_temperature_events": [
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1396495.277527147,
+          "latency_seconds": 0.022001440869644284,
+          "millidegrees_c": 51404,
+          "phase": "running",
+          "status": 0
+        },
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1396505.313577038,
+          "latency_seconds": 0.02216101484373212,
+          "millidegrees_c": 51404,
+          "phase": "running",
+          "status": 0
+        },
+        {
+          "attempt": 1,
+          "event": "temperature",
+          "host_monotonic_seconds": 1396513.207590875,
+          "latency_seconds": 0.020412027835845947,
+          "millidegrees_c": 51404,
+          "phase": "after",
+          "status": 0
+        }
+      ],
+      "directory": ".maestro/playbooks/Working/input-isolation/temp-450-control-p1-clean-600s",
+      "results_sha256": "24f20542b257df8ad4194ed8999d390fd547cde9a65ab13b4a59348723197995",
+      "summary_sha256": "c7ba44c07c8781ed1b6731608aeb442ae6e6b5d8af83db9b106ff13fce2434fa",
+      "reviewed_outcome": "PASS",
+      "review_note": "CONTROL_COMBINED p1 600s before42.808 after/max51.404C",
+      "planned_cell_count": 1,
+      "reported_cell_count": 1
+    }
+  ]
+}

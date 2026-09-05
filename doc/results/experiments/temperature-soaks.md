@@ -83,6 +83,9 @@ Full wire details and implementation notes:
 All early failures and the passing smoke run are retained under
 `.maestro/playbooks/Working/input-isolation/temp-*`; each directory contains the
 submitted program, exact binary/manifest, service responses and graded evidence.
+The [machine-readable run index](temperature-soak-runs.json) retains original
+grades alongside reviewed outcomes, file hashes, temperature samples and planned
+versus completed cell counts. It is updated as this campaign progresses.
 
 ## Offline validation
 
