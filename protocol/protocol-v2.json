@@ -13,6 +13,8 @@
     "gpio_sample_rate_hz": 1000000,
     "default_aux_bank_mode": "DISABLED",
     "supported_aux_bank_modes": ["DISABLED", "INPUT"],
+    "disabled_legacy_diagnostics": ["GPIO_CAPTURE_DIAGNOSTIC"],
+    "diagnostic_policy": "GPIO_CLOCK_DIAGNOSTIC accepts only 1 MHz. GPIO_CAPTURE_DIAGNOSTIC is a legacy 4 MHz path and is rejected with UNSUPPORTED_CONFIGURATION before execution; its capability bit is clear in live INFO. Its schema and golden frames remain defined for historical clients.",
     "legacy_requests": "Release firmware rejects protocol-v1 requests with UNSUPPORTED_VERSION.",
     "reference_metadata": "Top-level timing and diagnostic templates and golden seeds retain the 600 MHz legacy reference. Live INFO/STATUS advertise 450 MHz DWT; completion cycles scale by actual CPU / 600000000. Five table entries define known IDs, not supported configurations: the release mask enables only ID 4. Legacy shared nominal-throughput fields are reference values; compute active throughput separately for each stream from rates and item/frame sizes.",
     "retention_metadata": "STATUS packet retention fields are conservative bounds: 100 ADC-frame durations combined, 200 ADC-frame durations single-stream. Equal-rate GPIO frames span four ADC frames, so these are not maximum retention estimates."

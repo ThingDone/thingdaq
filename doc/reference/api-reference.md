@@ -18,6 +18,9 @@ related:
 
 # Python API reference
 
+Release 1.1.0 disables the legacy 4 MHz `gpio_capture_diagnostic()` command;
+its capability bit is clear. `gpio_clock_diagnostic()` accepts only 1 MHz.
+
 `ThingDAQ.get_temperature()` returns `TemperatureReading(status,
 millidegrees_c)`, with a `celsius` property. It works in IDLE, CONFIGURED and
 RUNNING on firmware 1.1.0, does not change acquisition, and returns `None`

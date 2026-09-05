@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v2.json. Do not edit by hand.
-// Source SHA-256: bd130fa45143266cd231c99935e3d52f33b452f9fea96f75c1cbbb415f67cb00
+// Source SHA-256: ef626114d028ef645481dd8ec0144e8e30eab8cc5463eea2e125075c089109ca
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v2 {
 
-inline constexpr char kSourceSha256[] = "bd130fa45143266cd231c99935e3d52f33b452f9fea96f75c1cbbb415f67cb00";
+inline constexpr char kSourceSha256[] = "ef626114d028ef645481dd8ec0144e8e30eab8cc5463eea2e125075c089109ca";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 2U;
 inline constexpr bool kWireIsLittleEndian = true;

@@ -1,14 +1,14 @@
 """Generated experimental protocol-v2 constants. Do not edit by hand.
 
 Source: protocol/protocol-v2.json
-Source SHA-256: bd130fa45143266cd231c99935e3d52f33b452f9fea96f75c1cbbb415f67cb00
+Source SHA-256: ef626114d028ef645481dd8ec0144e8e30eab8cc5463eea2e125075c089109ca
 """
 
 from __future__ import annotations
 
 from enum import IntEnum, IntFlag
 
-SOURCE_SHA256 = "bd130fa45143266cd231c99935e3d52f33b452f9fea96f75c1cbbb415f67cb00"
+SOURCE_SHA256 = "ef626114d028ef645481dd8ec0144e8e30eab8cc5463eea2e125075c089109ca"
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
 PROTOCOL_VERSION = 2

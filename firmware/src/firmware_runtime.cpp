@@ -138,6 +138,7 @@ LoopReport FirmwareRuntime::service() {
       } else if (command.request.kind ==
                      protocol_v1::CommandKind::kGpioCaptureDiagnostic &&
                  control_.state() == protocol_v1::DeviceState::kIdle &&
+                 !input_experiment::kReleaseFixed1MHz &&
                  gpio_capture_diagnostic_ != nullptr && dataPathQuiescent()) {
         gpio_capture_result =
             command.request.protocol_version == protocol_v2::kProtocolVersion

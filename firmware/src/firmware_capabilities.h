@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "firmware_identity.h"
+#include "input_experiment_profile.h"
 #include "generated/protocol_constants.h"
 
 namespace thingdaq::capabilities {
@@ -103,10 +104,11 @@ inline constexpr std::uint32_t kCapabilityBits =
     capabilityBit(protocol_v1::Capability::kPing) |
     capabilityBit(protocol_v1::Capability::kChecksumBenchmark) |
     capabilityBit(protocol_v1::Capability::kGpioClockDiagnostic) |
-    capabilityBit(protocol_v1::Capability::kGpioCaptureDiagnostic);
+    (input_experiment::kReleaseFixed1MHz ? 0U :
+     capabilityBit(protocol_v1::Capability::kGpioCaptureDiagnostic));
 inline constexpr std::uint16_t kGpioCaptureDiagnosticInfoFlags =
-    static_cast<std::uint16_t>(
-        protocol_v1::GpioCaptureDiagnosticFlag::kAvailable) |
+    (input_experiment::kReleaseFixed1MHz ? 0U : static_cast<std::uint16_t>(
+        protocol_v1::GpioCaptureDiagnosticFlag::kAvailable)) |
     static_cast<std::uint16_t>(
         protocol_v1::GpioCaptureDiagnosticFlag::kDeclarationValid);
 inline constexpr std::uint32_t kAdc0PhaseTicks = 0U;

@@ -61,6 +61,13 @@ enabled. Always check `supported_rate_profile_mask`. Release firmware rejects
 other rates before configuration changes. The GPIO clock diagnostic is also
 restricted to 1 MHz. The research-only builder is not a release builder.
 
+The legacy `GPIO_CAPTURE_DIAGNOSTIC` path (`0x19`) is disabled because it
+uses a fixed 4 MHz schedule. Its capability bit `0x100` is clear in live INFO
+(release capability mask `0x6FF`), and requests are rejected with
+UNSUPPORTED_CONFIGURATION before any capture starts. Its successful-response
+schema below remains defined for historical clients, not supported by this
+release. Use normal 1 MHz acquisition for non-driving input checks.
+
 Host processing capacity remains a separate constraint. The Python SDK's
 combined 16-GPIO capture is not lossless under the test server's 0.5-core CPU
 quota, although the independent wire validator sustains the same firmware

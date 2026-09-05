@@ -74,6 +74,10 @@ def test_release_info_450mhz_support_mask_and_idle_status():
     )
     payload = bytearray(decode_v2_frame(fixture.read_bytes()).payload)
     payload[c.INFO_RESPONSE_SUPPORTED_RATE_PROFILE_MASK_OFFSET] = 16
+    struct.pack_into("<I", payload, c.INFO_RESPONSE_CAPABILITY_BITS_OFFSET, 0x6FF)
+    struct.pack_into(
+        "<H", payload, c.INFO_RESPONSE_GPIO_CAPTURE_DIAGNOSTIC_FLAGS_OFFSET, 2
+    )
     struct.pack_into(
         "<I", payload, c.INFO_RESPONSE_ADC_TRIGGER_DWT_CLOCK_HZ_OFFSET, 450_000_000
     )
@@ -95,6 +99,9 @@ def test_release_info_450mhz_support_mask_and_idle_status():
     )
     info = DeviceInfo.from_payload(frame.payload)
     assert info.adc_trigger.dwt_clock_hz == 450_000_000
+    assert not int(info.capabilities.capability_bits) & int(
+        c.Capability.GPIO_CAPTURE_DIAGNOSTIC
+    )
     for profile in RateProfile:
         configuration = DAQConfiguration(
             stream_mask=StreamMask.ADC | StreamMask.GPIO,

@@ -31,6 +31,10 @@ Default hardware configuration selects 8 GPIO inputs; pass
 `celsius`; non-valid readings have `None` values. This is die, not ambient,
 temperature. Reading it does not change the acquisition state.
 
+The legacy `gpio_capture_diagnostic()` is unavailable in this release: its
+fixed 4 MHz path is disabled and its INFO capability bit is clear. The separate
+`gpio_clock_diagnostic()` remains available at 1 MHz only.
+
 The optional `TimestampAligner` rejects the new equal-rate profile because
 one GPIO frame spans four ADC frames. Use `read_block()` / `blocks()` and
 per-sample timestamps. Historical simulator profiles remain available offline

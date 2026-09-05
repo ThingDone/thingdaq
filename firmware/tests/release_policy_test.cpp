@@ -42,4 +42,9 @@ int main() {
   fields.version = 2U;
   assert(protocol::encodeFrame(fields, {}, wire).ok());
   assert(protocol::decodeRequest(wire.view(), request).ok());
+  static_assert((capabilities::kCapabilityBits &
+      capabilities::capabilityBit(protocol_v1::Capability::kGpioCaptureDiagnostic)) == 0U);
+  fields.kind = protocol_v1::FrameKind::kGpioCaptureDiagnosticRequest;
+  assert(protocol::encodeFrame(fields, {}, wire).ok());
+  assert(!protocol::decodeRequest(wire.view(), request).ok());
 }

@@ -100,6 +100,15 @@ def main():
                 )
                 assert response.error_code is ErrorCode.UNSUPPORTED_CONFIGURATION
                 assert daq.status().device_state is DeviceState.IDLE
+            assert not int(info.capabilities.capability_bits) & int(
+                c.Capability.GPIO_CAPTURE_DIAGNOSTIC
+            )
+            response = daq._reader.request(
+                c.FrameKind.GPIO_CAPTURE_DIAGNOSTIC_REQUEST, protocol_version=2
+            )
+            assert response.error_code is ErrorCode.UNSUPPORTED_CONFIGURATION
+            assert daq.status().device_state is DeviceState.IDLE
+            evidence["legacy_capture_diagnostic"] = "REJECTED_BEFORE_CAPTURE"
             previous_run = None
             cells = [
                 (AuxBankMode.DISABLED, StreamMask.ADC),

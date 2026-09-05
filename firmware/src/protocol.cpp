@@ -2826,7 +2826,8 @@ Result decodeRequest(ByteView input, Request &request) {
     }
   }
   if (input_experiment::kReleaseFixed1MHz &&
-      ((command == protocol_v1::CommandKind::kConfigure &&
+      (command == protocol_v1::CommandKind::kGpioCaptureDiagnostic ||
+       (command == protocol_v1::CommandKind::kConfigure &&
         decoded.configuration.rate_profile != protocol_v2::RateProfile::kAdc1mhzGpio1mhz) ||
        (command == protocol_v1::CommandKind::kGpioClockDiagnostic &&
         decoded.gpio_clock_diagnostic.rate_hz != 1000000U))) {

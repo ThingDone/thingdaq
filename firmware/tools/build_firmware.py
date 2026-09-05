@@ -1543,6 +1543,7 @@ def build(arduino_cli_name: str) -> Path:
             "protocol_version": 2 if RELEASE_BUILD else None,
             "supported_rate_profile_mask": 16 if RELEASE_BUILD else None,
             "adc_dma_active_lookahead_generations": 4 if RELEASE_BUILD else 6,
+            "legacy_gpio_capture_diagnostic_enabled": not RELEASE_BUILD,
         },
         "target": {
             "fqbn": FQBN,
