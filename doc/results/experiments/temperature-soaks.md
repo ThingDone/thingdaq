@@ -14,27 +14,52 @@ campaign holds the CPU at 450 MHz while independently varying input width
 and the GPIO bank**). Inputs remain electrically unstimulated; no outputs are
 enabled and no loopback wiring is required.
 
-## Current status
+## Results
 
-The temperature feature is implemented. Both clean 8-input captures passed
-600 seconds, including STOP. At 1 MHz, die temperature was 36.7 °C before,
-50.8 °C after and 51.4 °C maximum; at 500 kHz it was 42.8 °C before and 51.4 °C
-after/maximum. The 16-input, 1 MHz capture also passed 600 seconds, with 44.7 °C
-before and 55.1 °C after/maximum. The 16-input 500 kHz soak is still in progress.
+**All four ten-minute captures passed at 450 MHz**, including final STOP and
+counter reconciliation. **All twenty restart/transition captures also passed.**
 
-| GPIO width | Rate on each ADC and GPIO | Planned continuous capture | Result |
-| --- | --- | --- | --- |
-| 8 pins | 1 MHz | 600 s | PASS |
-| 8 pins | 500 kHz | 600 s | PASS, separate rerun after service timeout |
-| 16 pins | 1 MHz | 600 s | PASS |
-| 16 pins | 500 kHz | 600 s | In progress |
+| GPIO width | Rate on each ADC and GPIO | Capture | Temperature before → after | Peak | Result |
+| --- | --- | --- | --- | --- | --- |
+| 8 pins | 1 MHz | 600 s | 36.7 → 50.8 °C | 51.4 °C | PASS |
+| 8 pins | 500 kHz | 600 s | 42.8 → 51.4 °C | 51.4 °C | PASS |
+| 16 pins | 1 MHz | 600 s | 44.7 → 55.1 °C | 55.1 °C | PASS |
+| 16 pins | 500 kHz | 600 s | 47.1 → 55.1 °C | 55.7 °C | PASS |
 
-Repeated START/STOP, rate changes and 8↔16-input transitions without reflashing
-will follow the continuous captures. All existing rate, timestamp, checksum,
-DMA, buffer-loss, paired-bank and final STOP-reconciliation checks remain in
-force. Partial samples discarded at STOP are distinguished from active loss.
-The explicit width-transition sequence also requires START run IDs to advance
-across cells, so a reboot cannot silently count as a successful transition.
+All existing rate, timestamp, checksum, DMA, buffer-loss, paired-bank and final
+STOP-reconciliation checks remained in force. Partial samples discarded at STOP
+were distinguished from active loss. The 16-input/1 MHz run measured
+999,999.29 ADC pairs/s and 999,997.60 GPIO samples/s; both GPIO banks captured
+600,277,920 samples, with zero paired-generation skew events.
+
+Starting temperatures vary because of prior test history and power cycles.
+Both 16-input runs ended at 55.1 °C: reducing sampling to 500 kHz did not
+demonstrate a cooling benefit in these runs. No matched 600 MHz thermal capture
+or ambient-temperature measurement was performed.
+
+The transition check used twenty ten-second START/STOP captures, five
+repetitions of **8 inputs/1 MHz → 16 inputs/1 MHz → 16 inputs/500 kHz →
+8 inputs/500 kHz**, without reflashing. Exactly one of width/rate changes at
+each step. START run IDs advanced continuously from 1 through 20, ruling out a
+hidden reboot between cells. Its maximum observed temperature was 53.9 °C.
+
+The campaign retained eight jobs: 26 passing cell results (including two smoke
+checks), two early development failures, and a service-interrupted cell without
+a final grade. Unstarted follow-up smoke cells are not counted as results.
+The service finished healthy with an empty queue; the board was left in IDLE
+on the 450 MHz equal-rate firmware.
+
+## Recommended next step
+
+These results support **450 MHz core, selectable 8/16 GPIO inputs, and a 1 MHz
+maximum on each ADC channel and the GPIO bank** as the proposed input-acquisition
+configuration. A 500 kHz option is also supported by this matrix and reduces
+data bandwidth; these measurements do not establish a thermal advantage for it.
+
+The production rate cap and public API/profile integration have **not** been
+implemented by this experiment. The old ADC 1 MHz/GPIO 4 MHz configuration at
+450 MHz remains unqualified; passing the equal-rate tests does not rehabilitate
+that earlier failure.
 
 ## Temperature feature
 
@@ -69,6 +94,7 @@ Full wire details and implementation notes:
 - The first build exceeded the RAM1 stack-reserve gate because temperature
   conversion introduced a 64-bit division helper. Bounded 32-bit arithmetic and
   flash placement for command-only code restored the required memory headroom.
+  The low-stack build was rejected before flashing.
 - The first physical request was dropped by USB response admission, which still
   recognized only older IDs. The new ID is admitted and an end-to-end fragmented
   USB/runtime regression now covers both valid and unavailable sensor replies.
@@ -87,7 +113,8 @@ All early failures and the passing smoke run are retained under
 submitted program, exact binary/manifest, service responses and graded evidence.
 The [machine-readable run index](temperature-soak-runs.json) retains original
 grades alongside reviewed outcomes, file hashes, temperature samples and planned
-versus completed cell counts. It is updated as this campaign progresses.
+versus completed cell counts. All sixteen indexed result/summary file hashes
+were rechecked against the retained artifacts when closing the campaign.
 
 ## Offline validation
 
