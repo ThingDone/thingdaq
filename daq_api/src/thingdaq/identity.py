@@ -50,10 +50,10 @@ class ExpectedDeviceIdentity:
     build_id: str | None = None
     board_id: constants.BoardId | None = None
     mcu_id: constants.McuId | None = None
-    protocol_version: int = constants.PROTOCOL_VERSION
+    protocol_version: int | None = None
 
     def __post_init__(self) -> None:
-        if (
+        if self.protocol_version is not None and (
             not isinstance(self.protocol_version, int)
             or isinstance(self.protocol_version, bool)
             or not 0 <= self.protocol_version <= 0xFF
@@ -115,7 +115,7 @@ def validate_device_identity(
     """
 
     snapshot = DeviceIdentitySnapshot.from_info(info)
-    if snapshot.protocol_version != constants.PROTOCOL_VERSION:
+    if snapshot.protocol_version not in (1, 2):
         raise IdentityValidationError(
             f"protocol version {snapshot.protocol_version} is incompatible with "
             f"host protocol {constants.PROTOCOL_VERSION}"

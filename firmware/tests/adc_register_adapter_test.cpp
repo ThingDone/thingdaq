@@ -9,6 +9,11 @@
 #define __IMXRT1062__ 1
 #define THINGDAQ_HOST_REGISTER_TEST 1
 
+// Supply the target adapter's selected variable-rate schedule through the
+// portable derivation path used by production.
+#include "../src/variable_rate_scheduler.cpp"
+#include "../src/variable_rate_scheduler_teensy.cpp"
+
 // White-box inclusion is deliberate: this host executable exercises the
 // production register adapters themselves against the narrow fake i.MX RT1062
 // register surface, including helpers kept in their anonymous namespaces.
@@ -404,12 +409,12 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
   const std::uint32_t trigger_enable_mask =
       (std::uint32_t{1U} << v1::kAdcTriggerQueues[0]) |
       (std::uint32_t{1U} << v1::kAdcTriggerQueues[1]);
-  expect(board::countOf(board::kPinAllocations) == 10U &&
+  expect(board::countOf(board::kPinAllocations) == 18U &&
              board::countOf(board::kPitAllocations) == 2U &&
-             board::countOf(board::kXbarRoutes) == 3U &&
+             board::countOf(board::kXbarRoutes) == 4U &&
              board::countOf(board::kAdcEtcAllocations) == 2U &&
-             board::countOf(board::kEdmaAllocations) == 3U &&
-             board::countOf(board::kInterruptAllocations) == 4U &&
+             board::countOf(board::kEdmaAllocations) == 4U &&
+             board::countOf(board::kInterruptAllocations) == 5U &&
              board::kAcquisitionResourceContract.valid(),
          "the target registry allocates the complete combined resource set");
   expect(selectedXbarInput(board::kGpioXbarOutput) ==
@@ -464,12 +469,33 @@ void testCombinedRegisterResourcesCoexistWithPriorityIsolation() {
 
 }  // namespace
 
+void testRateAdapterIgnoresLatchedStatusAndPreservesFullDelay() {
+  namespace rate = thingdaq::variable_rate;
+  resetFakeRegisters();
+  rate::TeensyRatePlatform platform;
+  rate::Scheduler scheduler(platform);
+  constexpr std::array<std::uint32_t, 4U> delays{75U, 150U, 300U, 600U};
+  for (std::uint8_t index = 0U; index < 4U; ++index) {
+    IMXRT_ADC_ETC.DMA_CTRL.reset(0x00110000U);
+    const auto result = scheduler.configure(static_cast<thingdaq::protocol_v2::RateProfile>(index));
+    expect(result.ok(), "latched boot completion flags do not reject rate setup");
+    expect(IMXRT_ADC_ETC.DMA_CTRL == 0x00110000U,
+           "rate setup leaves W1C completion evidence intact and DMA disabled");
+    expect(IMXRT_ADC_ETC.TRIG[4].COUNTER == delays[index],
+           "actual register delay retains all sixteen bits at every rate");
+    IMXRT_ADC_ETC.DMA_CTRL.reset(0x00110001U);
+    expect(!rate::registerReadbackMatches(scheduler.selected()),
+           "enabled requests are not ignored as status");
+  }
+}
+
 int main() {
   testFixedPinModuleRoutesAndLegalResolutionModes();
   testExactStoppedTriggerScheduleAndResourceIsolation();
   testDeterministicArmStopOrderAndOwnedConflict();
   testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked();
   testCombinedRegisterResourcesCoexistWithPriorityIsolation();
+  testRateAdapterIgnoresLatchedStatusAndPreservesFullDelay();
   if (failures != 0) {
     std::cerr << failures << " ADC register-adapter assertion(s) failed\n";
     return 1;

@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "checksum_benchmark.h"
 
 #include <limits>
@@ -73,9 +75,12 @@ std::uint32_t publishedDigest() { return g_published_digest; }
 
 THINGDAQ_BENCHMARK_COLD_CODE(".flashmem.checksum_benchmark.prepare_vector")
 bool Runner::prepareVector(const protocol::ChecksumBenchmarkRequest &request,
-                           Buffer &buffer) {
-  for (std::size_t index = 0U; index < buffer.bytes.size(); ++index) {
-    buffer.bytes[index] =
+                           BufferView buffer) {
+  if (!buffer.valid()) {
+    return false;
+  }
+  for (std::size_t index = 0U; index < buffer.size; ++index) {
+    buffer.data[index] =
         static_cast<std::uint8_t>((index * 37U + 11U) & 0xFFU);
   }
 
@@ -84,7 +89,7 @@ bool Runner::prepareVector(const protocol::ChecksumBenchmarkRequest &request,
     constexpr std::array<std::uint8_t, 9U> canonical{
         '1', '2', '3', '4', '5', '6', '7', '8', '9'};
     for (std::size_t index = 0U; index < canonical.size(); ++index) {
-      buffer.bytes[index] = canonical[index];
+      buffer.data[index] = canonical[index];
     }
   }
 
@@ -107,7 +112,7 @@ bool Runner::prepareVector(const protocol::ChecksumBenchmarkRequest &request,
   fields.item_count =
       static_cast<std::uint32_t>(protocol_v1::kGpioSamplesPerFrame);
   return protocol::encodeDataFrameInPlace(
-             fields, {buffer.bytes.data(), buffer.bytes.size()},
+             fields, {buffer.data, buffer.size},
              protocol_v1::kDataPayloadBytes)
       .ok();
 }
@@ -131,20 +136,19 @@ std::uint32_t Runner::calibrateTimerOverhead() {
 }
 
 bool Runner::warm(const protocol::ChecksumBenchmarkRequest &request,
-                  Buffer &buffer, std::size_t input_bytes) {
+                  BufferView buffer, std::size_t input_bytes) {
   std::uint32_t checksum_value = 0U;
   for (std::uint16_t operation = 0U;
        operation < protocol_v1::kChecksumBenchmarkWarmupOperations;
        ++operation) {
     if (request.cache_state ==
         protocol_v1::BenchmarkCacheState::kColdInvalidated) {
-      platform_.invalidate(buffer.bytes.data(),
-                           alignedCacheBytes(input_bytes));
+      platform_.invalidate(buffer.data, alignedCacheBytes(input_bytes));
     }
-    compilerBarrier(buffer.bytes.data());
+    compilerBarrier(buffer.data);
     const protocol::Result result = protocol::computeChecksum(
-        request.checksum_algorithm,
-        {buffer.bytes.data(), input_bytes}, checksum_value);
+        request.checksum_algorithm, {buffer.data, input_bytes},
+        checksum_value);
     compilerBarrier(checksum_value);
     if (!result.ok()) {
       return false;
@@ -155,15 +159,15 @@ bool Runner::warm(const protocol::ChecksumBenchmarkRequest &request,
 }
 
 bool Runner::measureChecksum(
-    const protocol::ChecksumBenchmarkRequest &request, const Buffer &buffer,
+    const protocol::ChecksumBenchmarkRequest &request, BufferView buffer,
     std::size_t input_bytes, std::uint32_t overhead_cycles,
     std::uint32_t &checksum_value, std::uint32_t &raw_cycles,
     std::uint32_t &net_cycles) {
   const std::uint32_t token = platform_.enterCritical();
   const std::uint32_t begin = platform_.readCycles();
-  compilerBarrier(buffer.bytes.data());
+  compilerBarrier(buffer.data);
   const protocol::Result result = protocol::computeChecksum(
-      request.checksum_algorithm, {buffer.bytes.data(), input_bytes},
+      request.checksum_algorithm, {buffer.data, input_bytes},
       checksum_value);
   compilerBarrier(checksum_value);
   const std::uint32_t end = platform_.readCycles();
@@ -173,7 +177,7 @@ bool Runner::measureChecksum(
   return result.ok();
 }
 
-bool Runner::measureInvalidate(Buffer &buffer, std::size_t input_bytes,
+bool Runner::measureInvalidate(BufferView buffer, std::size_t input_bytes,
                                std::uint32_t overhead_cycles,
                                std::uint32_t &net_cycles) {
   if (input_bytes == 0U) {
@@ -181,7 +185,7 @@ bool Runner::measureInvalidate(Buffer &buffer, std::size_t input_bytes,
   }
   const std::uint32_t token = platform_.enterCritical();
   const std::uint32_t begin = platform_.readCycles();
-  platform_.invalidate(buffer.bytes.data(), alignedCacheBytes(input_bytes));
+  platform_.invalidate(buffer.data, alignedCacheBytes(input_bytes));
   const std::uint32_t end = platform_.readCycles();
   platform_.exitCritical(token);
   const std::uint32_t raw_cycles = end - begin;
@@ -200,12 +204,12 @@ RunResult Runner::run(const protocol::ChecksumBenchmarkRequest &request) {
 
   std::uint32_t counter_hz = 0U;
   if (!platform_.beginCycleCounter(counter_hz) ||
-      counter_hz != protocol_v1::kChecksumBenchmarkCycleCounterHz) {
+      counter_hz != input_experiment::kCpuHz) {
     result.status = RunStatus::kCounterUnavailable;
     return result;
   }
 
-  Buffer &buffer =
+  BufferView buffer =
       request.memory_region ==
               protocol_v1::BenchmarkMemoryRegion::kDtcmPacket
           ? dtcm_buffer_
@@ -221,7 +225,7 @@ RunResult Runner::run(const protocol::ChecksumBenchmarkRequest &request) {
     // Commit deterministic setup bytes to OCRAM once before warm-up. Repeated
     // invalidation costs below are the cache-state cost attributable to each
     // measured checksum, while this one-time preparation is intentionally not.
-    platform_.flushDelete(buffer.bytes.data(), alignedCacheBytes(input_bytes));
+    platform_.flushDelete(buffer.data, alignedCacheBytes(input_bytes));
   }
 
   const std::uint32_t overhead_cycles = calibrateTimerOverhead();

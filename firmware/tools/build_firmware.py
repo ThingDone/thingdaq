@@ -15,32 +15,35 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SKETCH_DIRECTORY = REPOSITORY_ROOT / "firmware"
-FQBN = "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std"
+FQBN = "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std"
+RELEASE_BUILD = True
 CORE_ID = "teensy:avr"
 CORE_VERSION = "1.62.0"
 COMPILER_VERSION = "15.2.1"
 EXPECTED_BUILD_PROPERTIES = {
     "build.board": "TEENSY40",
-    "build.fcpu": "600000000",
+    "build.fcpu": "450000000",
     "build.flags.optimize": "-O2",
     "build.usbtype": "USB_SERIAL",
 }
 OUTPUT_DIRECTORY = (
-    SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
+    SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_450.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 10
+MANIFEST_SCHEMA_VERSION = 11
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
     SKETCH_DIRECTORY / "firmware.ino",
     SKETCH_DIRECTORY / "src",
     REPOSITORY_ROOT / "protocol/protocol-v1.json",
+    REPOSITORY_ROOT / "protocol/protocol-v2.json",
 )
 SOURCE_DATE_EPOCH_MAX = 253_402_300_799  # 9999-12-31T23:59:59Z
 PROGRAM_FLASH_START = 0x60000000
@@ -82,7 +85,7 @@ BENCHMARK_BUFFER_BYTES = 4096
 BENCHMARK_BUFFER_ALIGNMENT = 32
 PACKET_BUFFER_SYMBOLS = {
     "DTCM_PRIMARY": (
-        "(anonymous namespace)::packet_storage_primary",
+        "thingdaq_packet_storage_primary",
         105 * 4096,
         0x20000000,
         0x20200000,
@@ -115,6 +118,23 @@ GPIO_RAW_DMA_BUFFER_SYMBOLS = {
     ),
 }
 GPIO_RAW_DMA_BUFFER_ALIGNMENT = 32
+GPIO_INPUT_RAW_RING_BYTES_PER_BANK = 4 * 2024 * 4
+GPIO_RAW_OVERFLOW_SINK_BYTES_PER_BANK = 32
+GPIO_RAW_DESCRIPTOR_BYTES_PER_BANK = 5 * 32
+GPIO_PAIRED_JOIN_STATE_BYTES = 768
+GPIO_PAIRED_JOIN_STATE_OFFSET = 0
+GPIO_AUX_DESCRIPTOR_OFFSET = (
+    GPIO_PAIRED_JOIN_STATE_OFFSET + GPIO_PAIRED_JOIN_STATE_BYTES
+)
+GPIO_PRIMARY_INPUT_OVERFLOW_SINK_OFFSET = (
+    GPIO_AUX_DESCRIPTOR_OFFSET + GPIO_RAW_DESCRIPTOR_BYTES_PER_BANK
+)
+GPIO_AUX_OVERFLOW_SINK_OFFSET = (
+    GPIO_PRIMARY_INPUT_OVERFLOW_SINK_OFFSET + GPIO_RAW_OVERFLOW_SINK_BYTES_PER_BANK
+)
+GPIO_AUX_INPUT_WORKSPACE_BYTES = (
+    GPIO_AUX_OVERFLOW_SINK_OFFSET + GPIO_RAW_OVERFLOW_SINK_BYTES_PER_BANK
+)
 ADC_DMA_BUFFER_SYMBOLS = {
     "RING": (
         "thingdaq::adc_capture::g_adc_dma_buffers",
@@ -135,7 +155,14 @@ GPIO_PACKED_BUFFER_BYTES = 4 * 4064
 GPIO_PACKED_BUFFER_ALIGNMENT = 32
 OCRAM_START = 0x20200000
 OCRAM_END = 0x20280000
+DTCM_START = 0x20000000
+DTCM_END = 0x20080000
 MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES = 32 * 1024
+MINIMUM_RAM2_FREE_FOR_HEAP_BYTES = 4 * 1024
+PACKET_BUFFER_BASELINE_FRAMES = 200
+PACKET_CAPACITY_CHANGE_NOTE: str | None = None
+PINNED_USB_TX_BUFFER_SYMBOL = "txbuffer"
+PINNED_USB_TX_BUFFER_BYTES = 4 * 2048
 
 
 class BuildError(RuntimeError):
@@ -357,6 +384,7 @@ def identity_definitions(base_definitions: str, identity: BuildIdentity) -> str:
         f"-DTHINGDAQ_BUILD_MINUTE={timestamp.minute}U",
         f"-DTHINGDAQ_BUILD_SECOND={timestamp.second}U",
         "-DTHINGDAQ_OPTIMIZATION_O2STD=1",
+        f"-DTHINGDAQ_RELEASE_FIXED_1MHZ={int(RELEASE_BUILD)}",
     )
     return " ".join((base_definitions, *identity_macros))
 
@@ -465,7 +493,7 @@ def parse_memory_usage(output: str) -> dict[str, dict[str, int]]:
 
 
 def validate_memory_headroom(memory_usage: dict[str, dict[str, int]]) -> None:
-    """Reject a linked image that leaves too little DTCM for locals/stack."""
+    """Reject a linked image that violates either explicit runtime margin."""
 
     available = memory_usage["ram1"]["free_for_locals_bytes"]
     if available < MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES:
@@ -473,6 +501,13 @@ def validate_memory_headroom(memory_usage: dict[str, dict[str, int]]) -> None:
             "RAM1 leaves only "
             f"{available} bytes for locals/stack; requires at least "
             f"{MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES}"
+        )
+    heap_available = memory_usage["ram2"]["free_for_heap_bytes"]
+    if heap_available < MINIMUM_RAM2_FREE_FOR_HEAP_BYTES:
+        raise BuildError(
+            "RAM2 leaves only "
+            f"{heap_available} bytes for heap; requires at least "
+            f"{MINIMUM_RAM2_FREE_FOR_HEAP_BYTES}"
         )
 
 
@@ -611,6 +646,12 @@ def benchmark_buffer_usage(nm_output: str) -> dict[str, Any]:
             "range_start": f"0x{region_start:08x}",
             "range_end_exclusive": f"0x{region_end:08x}",
         }
+    packet_record = symbols.get(PACKET_BUFFER_SYMBOLS["DTCM_PRIMARY"][0])
+    dtcm = regions["DTCM_PACKET"]
+    if packet_record is not None and packet_record[0] == int(dtcm["address"], 16):
+        dtcm["physical_allocation"] = "DTCM_PRIMARY_PACKET_PAGE_0"
+        dtcm["view_offset_bytes"] = 0
+        dtcm["lease"] = "IDLE benchmark only; packet/acquisition path must be quiescent"
     return {
         "working_ram_bytes": sum(item["bytes"] for item in regions.values()),
         "regions": regions,
@@ -741,14 +782,135 @@ def dma_allocation_usage(
 
 
 def gpio_raw_dma_buffer_usage(nm_output: str) -> dict[str, Any]:
-    """Verify the raw GPIO ring, pressure sink, and TCD bank."""
+    """Verify legacy and paired GPIO views over one fixed raw allocation."""
 
-    return dma_allocation_usage(
+    result = dma_allocation_usage(
         nm_output,
         GPIO_RAW_DMA_BUFFER_SYMBOLS,
         owner="raw GPIO",
         alignment=GPIO_RAW_DMA_BUFFER_ALIGNMENT,
     )
+    allocations = result["allocations"]
+    workspace = auxiliary_input_workspace_usage(nm_output)
+
+    def view(allocation: str, offset: int, size: int) -> dict[str, Any]:
+        physical = allocations[allocation]
+        start = int(physical["address"], 16) + offset
+        if offset < 0 or size <= 0 or offset + size > int(physical["bytes"]):
+            raise BuildError(f"GPIO {allocation} logical view escapes physical storage")
+        return {
+            "physical_allocation": allocation,
+            "address": f"0x{start:08x}",
+            "offset_bytes": offset,
+            "bytes": size,
+        }
+
+    legacy = {
+        "RING": view("RING", 0, int(allocations["RING"]["bytes"])),
+        "OVERFLOW_SINK": view(
+            "OVERFLOW_SINK", 0, GPIO_RAW_OVERFLOW_SINK_BYTES_PER_BANK
+        ),
+        "DESCRIPTORS": view("DESCRIPTORS", 0, GPIO_RAW_DESCRIPTOR_BYTES_PER_BANK),
+    }
+    input_primary = {
+        "RING": view("RING", 0, GPIO_INPUT_RAW_RING_BYTES_PER_BANK),
+        "OVERFLOW_SINK": workspace["views"]["PRIMARY_INPUT_OVERFLOW_SINK"],
+        "DESCRIPTORS": view("DESCRIPTORS", 0, GPIO_RAW_DESCRIPTOR_BYTES_PER_BANK),
+    }
+    input_auxiliary = {
+        "RING": view(
+            "RING",
+            GPIO_INPUT_RAW_RING_BYTES_PER_BANK,
+            GPIO_INPUT_RAW_RING_BYTES_PER_BANK,
+        ),
+        "OVERFLOW_SINK": workspace["views"]["AUXILIARY_OVERFLOW_SINK"],
+        "DESCRIPTORS": workspace["views"]["AUXILIARY_DESCRIPTORS"],
+    }
+    if 2 * GPIO_INPUT_RAW_RING_BYTES_PER_BANK != int(allocations["RING"]["bytes"]):
+        raise BuildError("paired GPIO rings do not exactly cover legacy raw storage")
+    result["mode_views"] = {
+        "DISABLED": {"PRIMARY": legacy},
+        "INPUT": {
+            "PRIMARY": input_primary,
+            "AUXILIARY": input_auxiliary,
+        },
+    }
+    result["shared_input_workspace"] = workspace
+    result["packet_storage_repartitioned"] = False
+    return result
+
+
+def auxiliary_input_workspace_usage(nm_output: str) -> dict[str, Any]:
+    """Map INPUT-only state into the IDLE-only OCRAM benchmark scratch."""
+
+    benchmark = benchmark_buffer_usage(nm_output)["regions"]["OCRAM_DMA"]
+    base = int(benchmark["address"], 16)
+    specifications = {
+        "PAIRED_JOIN_STATE": (
+            GPIO_PAIRED_JOIN_STATE_OFFSET,
+            GPIO_PAIRED_JOIN_STATE_BYTES,
+            "GPIO_JOIN",
+        ),
+        "AUXILIARY_DESCRIPTORS": (
+            GPIO_AUX_DESCRIPTOR_OFFSET,
+            GPIO_RAW_DESCRIPTOR_BYTES_PER_BANK,
+            "AUX_GPIO_CAPTURE",
+        ),
+        "PRIMARY_INPUT_OVERFLOW_SINK": (
+            GPIO_PRIMARY_INPUT_OVERFLOW_SINK_OFFSET,
+            GPIO_RAW_OVERFLOW_SINK_BYTES_PER_BANK,
+            "GPIO_CAPTURE",
+        ),
+        "AUXILIARY_OVERFLOW_SINK": (
+            GPIO_AUX_OVERFLOW_SINK_OFFSET,
+            GPIO_RAW_OVERFLOW_SINK_BYTES_PER_BANK,
+            "AUX_GPIO_CAPTURE",
+        ),
+    }
+    views: dict[str, dict[str, Any]] = {}
+    spans: list[tuple[int, int, str]] = []
+    for name, (offset, size, owner) in specifications.items():
+        if (
+            offset % GPIO_RAW_DMA_BUFFER_ALIGNMENT != 0
+            or size % GPIO_RAW_DMA_BUFFER_ALIGNMENT != 0
+            or offset + size > int(benchmark["bytes"])
+        ):
+            raise BuildError(f"auxiliary INPUT workspace view {name} is invalid")
+        views[name] = {
+            "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+            "physical_symbol": benchmark["symbol"],
+            "owner": owner,
+            "address": f"0x{base + offset:08x}",
+            "offset_bytes": offset,
+            "bytes": size,
+            "alignment_bytes": GPIO_RAW_DMA_BUFFER_ALIGNMENT,
+        }
+        spans.append((offset, offset + size, name))
+    spans.sort()
+    for previous, current in pairwise(spans):
+        if current[0] < previous[1]:
+            raise BuildError(
+                f"auxiliary INPUT workspace view {previous[2]} overlaps {current[2]}"
+            )
+    if max(end for _, end, _ in spans) != GPIO_AUX_INPUT_WORKSPACE_BYTES:
+        raise BuildError("auxiliary INPUT workspace accounting is incomplete")
+    return {
+        "physical_storage": benchmark,
+        "lease": "INPUT acquisition only; mutually exclusive with IDLE checksum benchmark",
+        "active_bytes": GPIO_AUX_INPUT_WORKSPACE_BYTES,
+        "unleased_bytes": int(benchmark["bytes"]) - GPIO_AUX_INPUT_WORKSPACE_BYTES,
+        "views": views,
+    }
+
+
+def gpio_paired_join_state_usage(nm_output: str) -> dict[str, Any]:
+    """Verify the fixed paired-join view inside aligned OCRAM storage."""
+
+    workspace = auxiliary_input_workspace_usage(nm_output)
+    return {
+        **workspace["views"]["PAIRED_JOIN_STATE"],
+        "lease": workspace["lease"],
+    }
 
 
 def adc_dma_buffer_usage(nm_output: str) -> dict[str, Any]:
@@ -783,7 +945,7 @@ def gpio_packed_buffer_usage(nm_output: str) -> dict[str, Any]:
         raise BuildError(f"packed GPIO ring is outside OCRAM: 0x{address:08x}")
     if symbol_type.upper() != "B":
         raise BuildError("packed GPIO ring is not zero-initialized writable storage")
-    return {
+    result = {
         "symbol": GPIO_PACKED_BUFFER_SYMBOL,
         "symbol_type": symbol_type,
         "address": f"0x{address:08x}",
@@ -794,6 +956,444 @@ def gpio_packed_buffer_usage(nm_output: str) -> dict[str, Any]:
         "alignment_bytes": GPIO_PACKED_BUFFER_ALIGNMENT,
         "range_start": f"0x{OCRAM_START:08x}",
         "range_end_exclusive": f"0x{OCRAM_END:08x}",
+    }
+    result["mode_layouts"] = {
+        "DISABLED": {
+            "gpio_item_bytes": 1,
+            "gpio_items_per_frame": 4048,
+            "payload_bytes": 4048,
+            "storage_bytes": size,
+        },
+        "INPUT": {
+            "gpio_item_bytes": 2,
+            "gpio_items_per_frame": 2024,
+            "payload_bytes": 4048,
+            "storage_bytes": size,
+        },
+    }
+    result["storage_repartitioned"] = False
+    return result
+
+
+def _protocol_v2_contract() -> dict[str, Any]:
+    """Load the canonical experimental contract used by target inspection."""
+
+    path = REPOSITORY_ROOT / "protocol/protocol-v2.json"
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise BuildError(
+            f"could not load experimental protocol contract: {error}"
+        ) from error
+    if not isinstance(value, dict):
+        raise BuildError("experimental protocol contract is not a JSON object")
+    return value
+
+
+def auxiliary_input_resource_contract(
+    contract: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Normalize and fail-close the target resources declared by protocol v2."""
+
+    source = _protocol_v2_contract() if contract is None else contract
+    try:
+        auxiliary = source["auxiliary_input"]
+        banks = auxiliary["pin_banks"]
+        primary = banks["primary"]
+        aux = banks["auxiliary"]
+        resources = auxiliary["provisional_resources"]
+        normalized = {
+            "owner": "AUX_GPIO_CAPTURE",
+            "pins": [int(value) for value in aux["teensy_pins"]],
+            "gpio1_bits_by_wire_bit": [
+                int(value) for value in aux["standard_gpio_bits_by_wire_bit"]
+            ],
+            "gpio1_capture_mask": int(aux["aggregate_mask"]),
+            "gpio1_standard_port": int(aux["standard_gpio"]),
+            "gpio6_fast_port": int(aux["fast_gpio"]),
+            "gpr26_fast_select": int(aux["fast_select_gpr"]),
+            "pit_channel": int(resources["clock_pit_channel"]),
+            "xbar_input": int(resources["xbar_input"]),
+            "primary_xbar_output": int(resources["primary_xbar_output"]),
+            "auxiliary_xbar_output": int(resources["auxiliary_xbar_output"]),
+            "primary_dmamux_source": int(resources["primary_dmamux_source"]),
+            "auxiliary_dmamux_source": int(resources["auxiliary_dmamux_source"]),
+            "primary_edma_channel": int(resources["primary_edma_channel"]),
+            "auxiliary_edma_channel": int(resources["auxiliary_edma_channel"]),
+            "edma_priority_order": [
+                str(value) for value in resources["enabled_mode_edma_priority_order"]
+            ],
+            "edma_priorities": [
+                int(value) for value in resources["enabled_mode_edma_priorities"]
+            ],
+            "gpio_dma_irq_priority": int(resources["gpio_dma_irq_priority"]),
+            "raw_ring_depth_per_bank": int(resources["raw_ring_depth_per_bank"]),
+            "raw_word_bytes_per_bank": int(resources["raw_word_bytes_per_bank"]),
+            "paired_join_required": bool(resources["paired_join_required"]),
+            "primary_gpio2_bits_by_wire_bit": [
+                int(value) for value in primary["standard_gpio_bits_by_wire_bit"]
+            ],
+        }
+    except (KeyError, TypeError, ValueError) as error:
+        raise BuildError(
+            f"experimental auxiliary resource contract is malformed: {error}"
+        ) from error
+
+    expected = {
+        "owner": "AUX_GPIO_CAPTURE",
+        "pins": list(range(16, 24)),
+        "gpio1_bits_by_wire_bit": [23, 22, 17, 16, 26, 27, 24, 25],
+        "gpio1_capture_mask": 0x0FC30000,
+        "gpio1_standard_port": 1,
+        "gpio6_fast_port": 6,
+        "gpr26_fast_select": 26,
+        "pit_channel": 0,
+        "xbar_input": 56,
+        "primary_xbar_output": 0,
+        "auxiliary_xbar_output": 1,
+        "primary_dmamux_source": 30,
+        "auxiliary_dmamux_source": 31,
+        "primary_edma_channel": 2,
+        "auxiliary_edma_channel": 3,
+        "edma_priority_order": ["ADC0", "ADC1", "PRIMARY_GPIO", "AUXILIARY_GPIO"],
+        "edma_priorities": [3, 2, 1, 0],
+        "gpio_dma_irq_priority": 64,
+        "raw_ring_depth_per_bank": 4,
+        "raw_word_bytes_per_bank": 4,
+        "paired_join_required": True,
+        "primary_gpio2_bits_by_wire_bit": [10, 17, 16, 11, 0, 2, 1, 3],
+    }
+    if normalized != expected:
+        raise BuildError(
+            "experimental auxiliary target resources differ from the pinned registry"
+        )
+    return {
+        **normalized,
+        "auxiliary_dma_interrupt": {
+            "irq": 3,
+            "vector": 19,
+            "priority": normalized["gpio_dma_irq_priority"],
+        },
+        "shared_xbar_selector": {
+            "register_index": 0,
+            "primary_rmw_mask": "0x00ff",
+            "auxiliary_rmw_mask": "0xff00",
+            "combined_rmw_mask": "0xffff",
+        },
+        "arbitration_scope": (
+            "fixed eDMA service order only; no pad-level simultaneity claim"
+        ),
+    }
+
+
+def packet_retention_usage(
+    packet_buffers: Mapping[str, Any],
+    contract: Mapping[str, Any] | None = None,
+    *,
+    capacity_change_note: str | None = PACKET_CAPACITY_CHANGE_NOTE,
+) -> dict[str, Any]:
+    """Quantify conservative one-/two-stream retention in ADC-frame units.
+
+    Legacy profiles have equal frame durations and these bounds are exact.
+    Profile 4 GPIO frames span four ADC frames; these deliberately preserve
+    the conservative STATUS bounds, not a maximum-retention prediction.
+    """
+
+    total_frames = int(packet_buffers["total_frames"])
+    if total_frames <= 0:
+        raise BuildError("packet capacity must be positive")
+    if total_frames != PACKET_BUFFER_BASELINE_FRAMES and not capacity_change_note:
+        raise BuildError(
+            "packet capacity changed from "
+            f"{PACKET_BUFFER_BASELINE_FRAMES} to {total_frames} frames without "
+            "a documented capacity-change note"
+        )
+    source = _protocol_v2_contract() if contract is None else contract
+    try:
+        timestamp_hz = int(source["timing"]["timestamp_hz"])
+        raw_profiles = source["rate_profiles"]
+        gpio_declared_frames = int(source["gpio_capture"]["packet_buffer_count"])
+        combined = source["combined_acquisition"]
+        combined_declared_frames = int(combined["packet_buffer_count"])
+        combined_declared_split = int(combined["packet_primary_count"]) + int(
+            combined["packet_reserve_count"]
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise BuildError(f"experimental rate contract is malformed: {error}") from error
+    if not (
+        total_frames
+        == gpio_declared_frames
+        == combined_declared_frames
+        == combined_declared_split
+    ):
+        raise BuildError(
+            "linked packet capacity disagrees with the experimental protocol contract"
+        )
+    if (
+        timestamp_hz <= 0
+        or not isinstance(raw_profiles, list)
+        or len(raw_profiles) != 5
+    ):
+        raise BuildError("experimental rate contract has invalid timing/profile count")
+
+    complete_combined_intervals = total_frames // 2
+    profiles: list[dict[str, Any]] = []
+    for raw in raw_profiles:
+        try:
+            name = str(raw["name"])
+            adc_rate = int(raw["adc_pair_rate_hz"])
+            gpio_rate = int(raw["gpio_sample_rate_hz"])
+            coverage = raw["frame_coverage_ticks"]
+            modes: dict[str, dict[str, int]] = {}
+            for mode in ("DISABLED", "INPUT"):
+                coverage_ticks = int(coverage[mode])
+                combined_ticks = coverage_ticks * complete_combined_intervals
+                single_ticks = coverage_ticks * total_frames
+                combined_us_numerator = combined_ticks * 1_000_000
+                single_us_numerator = single_ticks * 1_000_000
+                if (
+                    coverage_ticks <= 0
+                    or combined_us_numerator % timestamp_hz != 0
+                    or single_us_numerator % timestamp_hz != 0
+                ):
+                    raise BuildError(
+                        f"{name} {mode} retention is not integral in microseconds"
+                    )
+                modes[mode] = {
+                    "coverage_ticks": coverage_ticks,
+                    "combined_retention_us": combined_us_numerator // timestamp_hz,
+                    "single_stream_retention_us": single_us_numerator // timestamp_hz,
+                }
+        except (KeyError, TypeError, ValueError) as error:
+            raise BuildError(
+                f"experimental rate profile is malformed: {error}"
+            ) from error
+        profiles.append(
+            {
+                "profile": name,
+                "adc_pair_rate_hz": adc_rate,
+                "gpio_sample_rate_hz": gpio_rate,
+                "modes": modes,
+            }
+        )
+    return {
+        "capacity": {
+            "baseline_frames": PACKET_BUFFER_BASELINE_FRAMES,
+            "current_frames": total_frames,
+            "delta_frames": total_frames - PACKET_BUFFER_BASELINE_FRAMES,
+            "change_note": capacity_change_note,
+        },
+        "combined_frames_per_interval": 2,
+        "coverage_units": "ADC frames; conservative lower bounds for profile 4",
+        "combined_complete_intervals": complete_combined_intervals,
+        "unused_frames_after_complete_intervals": total_frames % 2,
+        "raw_ring_overlay_preserves_packet_capacity": True,
+        "profiles": profiles,
+    }
+
+
+def linker_map_memory_usage(
+    linker_map: str, memory_usage: Mapping[str, Mapping[str, int]]
+) -> dict[str, Any]:
+    """Verify linked DTCM/OCRAM sections against exact map regions and floors."""
+
+    regions: dict[str, tuple[int, int]] = {}
+    for name, origin_text, length_text in re.findall(
+        r"^(DTCM|RAM)\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+rw$",
+        linker_map,
+        flags=re.MULTILINE,
+    ):
+        start = int(origin_text, 16)
+        regions[name] = (start, start + int(length_text, 16))
+    expected_regions = {
+        "DTCM": (DTCM_START, DTCM_END),
+        "RAM": (OCRAM_START, OCRAM_END),
+    }
+    if regions != expected_regions:
+        raise BuildError("linker map DTCM/RAM regions differ from the pinned layout")
+
+    sections: dict[str, tuple[int, int]] = {}
+    for name in (".bss", ".bss.dma"):
+        match = re.search(
+            rf"^{re.escape(name)}\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)$",
+            linker_map,
+            flags=re.MULTILINE,
+        )
+        if match is None:
+            raise BuildError(f"linker map is missing output section {name}")
+        start = int(match.group(1), 16)
+        sections[name] = (start, start + int(match.group(2), 16))
+    if not DTCM_START <= sections[".bss"][0] <= sections[".bss"][1] <= DTCM_END:
+        raise BuildError("linked .bss section escapes DTCM")
+    dma_start, dma_end = sections[".bss.dma"]
+    if dma_start != OCRAM_START or not dma_start <= dma_end <= OCRAM_END:
+        raise BuildError("linked .bss.dma section escapes DMA-visible OCRAM")
+    linked_heap_bytes = OCRAM_END - dma_end
+    reported_heap_bytes = int(memory_usage["ram2"]["free_for_heap_bytes"])
+    reported_ram2_bytes = int(memory_usage["ram2"]["variables_bytes"])
+    if (
+        linked_heap_bytes != reported_heap_bytes
+        or dma_end - dma_start != reported_ram2_bytes
+    ):
+        raise BuildError("linker map and Teensy RAM2 summary disagree")
+    if linked_heap_bytes < MINIMUM_RAM2_FREE_FOR_HEAP_BYTES:
+        raise BuildError("linked .bss.dma violates the RAM2 heap floor")
+    return {
+        "regions": {
+            name: {
+                "start": f"0x{start:08x}",
+                "end_exclusive": f"0x{end:08x}",
+                "bytes": end - start,
+            }
+            for name, (start, end) in regions.items()
+        },
+        "sections": {
+            name: {
+                "start": f"0x{start:08x}",
+                "end_exclusive": f"0x{end:08x}",
+                "bytes": end - start,
+            }
+            for name, (start, end) in sections.items()
+        },
+        "ram1_minimum_free_for_locals_stack_bytes": (
+            MINIMUM_RAM1_FREE_FOR_LOCALS_BYTES
+        ),
+        "ram1_actual_free_for_locals_stack_bytes": int(
+            memory_usage["ram1"]["free_for_locals_bytes"]
+        ),
+        "ram2_minimum_free_for_heap_bytes": MINIMUM_RAM2_FREE_FOR_HEAP_BYTES,
+        "ram2_actual_free_for_heap_bytes": linked_heap_bytes,
+    }
+
+
+def managed_memory_usage(nm_output: str) -> dict[str, Any]:
+    """Reject overlaps among every project/pinned allocation in the campaign."""
+
+    expected: dict[str, tuple[str, int, int, int]] = {
+        "packet_dtcm_primary": (
+            *PACKET_BUFFER_SYMBOLS["DTCM_PRIMARY"][:2],
+            DTCM_START,
+            DTCM_END,
+        ),
+        "packet_ocram_reserve": (
+            *PACKET_BUFFER_SYMBOLS["OCRAM_RESERVE"][:2],
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "checksum_dtcm": (
+            BENCHMARK_BUFFER_SYMBOLS["DTCM_PACKET"][0],
+            BENCHMARK_BUFFER_BYTES,
+            DTCM_START,
+            DTCM_END,
+        ),
+        "checksum_ocram": (
+            BENCHMARK_BUFFER_SYMBOLS["OCRAM_DMA"][0],
+            BENCHMARK_BUFFER_BYTES,
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "gpio_clock_diagnostic": (
+            GPIO_CLOCK_DIAGNOSTIC_BUFFER_SYMBOL,
+            GPIO_CLOCK_DIAGNOSTIC_BUFFER_BYTES,
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "gpio_raw_storage": (
+            *GPIO_RAW_DMA_BUFFER_SYMBOLS["RING"],
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "gpio_overflow_sinks": (
+            *GPIO_RAW_DMA_BUFFER_SYMBOLS["OVERFLOW_SINK"],
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "gpio_descriptors": (
+            *GPIO_RAW_DMA_BUFFER_SYMBOLS["DESCRIPTORS"],
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "gpio_packed_storage": (
+            GPIO_PACKED_BUFFER_SYMBOL,
+            GPIO_PACKED_BUFFER_BYTES,
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "adc_raw_storage": (*ADC_DMA_BUFFER_SYMBOLS["RING"], OCRAM_START, OCRAM_END),
+        "adc_overflow_sink": (
+            *ADC_DMA_BUFFER_SYMBOLS["OVERFLOW_SINK"],
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "adc_descriptors": (
+            *ADC_DMA_BUFFER_SYMBOLS["DESCRIPTORS"],
+            OCRAM_START,
+            OCRAM_END,
+        ),
+        "pinned_usb_tx": (
+            PINNED_USB_TX_BUFFER_SYMBOL,
+            PINNED_USB_TX_BUFFER_BYTES,
+            OCRAM_START,
+            OCRAM_END,
+        ),
+    }
+    symbols = parse_nm_symbols(nm_output)
+    allocations: list[dict[str, Any]] = []
+    for owner, (symbol, expected_size, region_start, region_end) in expected.items():
+        record = symbols.get(symbol)
+        if record is None:
+            raise BuildError(f"firmware ELF is missing managed allocation {symbol}")
+        address, size, symbol_type = record
+        if size != expected_size:
+            raise BuildError(
+                f"{symbol} occupies {size} bytes, expected {expected_size}"
+            )
+        if (
+            address % 32 != 0
+            or not region_start <= address
+            or address + size > region_end
+        ):
+            raise BuildError(f"{symbol} violates its managed memory region")
+        if symbol_type.upper() != "B":
+            raise BuildError(f"{symbol} is not writable zero-initialized storage")
+        allocations.append(
+            {
+                "owner": owner,
+                "symbol": symbol,
+                "address": f"0x{address:08x}",
+                "end_exclusive": f"0x{address + size:08x}",
+                "bytes": size,
+                "region": "DTCM" if region_start == DTCM_START else "OCRAM",
+            }
+        )
+    allocations.sort(key=lambda item: int(item["address"], 16))
+    by_owner = {item["owner"]: item for item in allocations}
+    if (
+        by_owner["checksum_dtcm"]["address"]
+        != by_owner["packet_dtcm_primary"]["address"]
+    ):
+        raise BuildError("checksum DTCM view is not packet page zero")
+    for previous, current in pairwise(allocations):
+        overlaps = int(current["address"], 16) < int(previous["end_exclusive"], 16)
+        declared_idle_packet_view = (
+            previous["owner"] == "packet_dtcm_primary"
+            and current["owner"] == "checksum_dtcm"
+            and current["address"] == previous["address"]
+            and current["bytes"] == BENCHMARK_BUFFER_BYTES
+        )
+        if overlaps and not declared_idle_packet_view:
+            raise BuildError(
+                f"managed allocation {previous['owner']} overlaps {current['owner']}"
+            )
+        if declared_idle_packet_view:
+            current["physical_allocation"] = previous["owner"]
+            current["lease"] = (
+                "IDLE benchmark only; packet/acquisition path must be quiescent"
+            )
+    return {
+        "overlap_check": "passed",
+        "allocation_count": len(allocations),
+        "allocations": allocations,
     }
 
 
@@ -916,6 +1516,8 @@ def build(arduino_cli_name: str) -> Path:
         names = ", ".join(sorted(missing_artifacts))
         raise BuildError(f"compile produced no {names} artifact in {OUTPUT_DIRECTORY}")
     elf = next(path for path in artifacts if path.suffix.lower() == ".elf")
+    linker_map = next(path for path in artifacts if path.suffix.lower() == ".map")
+    linker_map_text = linker_map.read_text(encoding="utf-8")
     nm_result = run_command(
         [str(nm), "--print-size", "--size-sort", "--demangle", str(elf)]
     )
@@ -925,10 +1527,22 @@ def build(arduino_cli_name: str) -> Path:
     gpio_clock_diagnostic_buffer = gpio_clock_diagnostic_buffer_usage(nm_result.stdout)
     adc_dma_buffers = adc_dma_buffer_usage(nm_result.stdout)
     gpio_raw_dma_buffers = gpio_raw_dma_buffer_usage(nm_result.stdout)
+    auxiliary_input_workspace = auxiliary_input_workspace_usage(nm_result.stdout)
+    gpio_paired_join_state = gpio_paired_join_state_usage(nm_result.stdout)
     gpio_packed_buffers = gpio_packed_buffer_usage(nm_result.stdout)
+    auxiliary_resources = auxiliary_input_resource_contract()
+    packet_retention = packet_retention_usage(packet_buffers)
+    linker_memory = linker_map_memory_usage(linker_map_text, memory_usage)
+    managed_memory = managed_memory_usage(nm_result.stdout)
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
+        "release_policy": {
+            "fixed_1mhz": RELEASE_BUILD,
+            "core_hz": 450000000 if RELEASE_BUILD else None,
+            "protocol_version": 2 if RELEASE_BUILD else None,
+            "supported_rate_profile_mask": 16 if RELEASE_BUILD else None,
+        },
         "target": {
             "fqbn": FQBN,
             "core_id": CORE_ID,
@@ -954,7 +1568,13 @@ def build(arduino_cli_name: str) -> Path:
             "gpio_clock_diagnostic_buffer": gpio_clock_diagnostic_buffer,
             "adc_dma_buffers": adc_dma_buffers,
             "gpio_raw_dma_buffers": gpio_raw_dma_buffers,
+            "auxiliary_input_workspace": auxiliary_input_workspace,
+            "gpio_paired_join_state": gpio_paired_join_state,
             "gpio_packed_buffers": gpio_packed_buffers,
+            "auxiliary_input_resources": auxiliary_resources,
+            "packet_retention": packet_retention,
+            "linker_memory": linker_memory,
+            "managed_memory": managed_memory,
         },
         "source": {
             "source_id": identity.source_id,

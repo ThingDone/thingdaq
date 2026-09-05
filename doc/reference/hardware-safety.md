@@ -21,6 +21,13 @@ related:
 
 # ThingDAQ hardware safety for Teensy 4.0
 
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+
 > [!CAUTION]
 > This project targets Teensy 4.0 / i.MX RT1062 only. Treat A0/A1 and D6-D13
 > as 0-3.3 V inputs. They are not 5 V tolerant. Software validation,

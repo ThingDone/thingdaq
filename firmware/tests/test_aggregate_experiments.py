@@ -8,6 +8,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -388,7 +389,10 @@ class AggregateExactCrossAnalysisTests(unittest.TestCase):
         try:
             rendered = aggregate.build_aggregate(
                 ROOT,
-                aggregate.DEFAULT_INPUTS,
+                tuple(
+                    replace(spec, revision=spec.expected_commit or spec.revision)
+                    for spec in aggregate.DEFAULT_INPUTS
+                ),
                 created=aggregate.DEFAULT_CREATED,
                 clock_revision="origin/experiment/clock-450mhz",
                 expected_clock_commit=aggregate.CLOCK_HEAD_COMMIT,

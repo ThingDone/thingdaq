@@ -36,9 +36,9 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(10, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(11, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
-            "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+            "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
             build_firmware.FQBN,
         )
         self.assertEqual("/tools/arduino-cli", command[0])
@@ -96,6 +96,10 @@ class BuildConfigurationTests(unittest.TestCase):
         summary["ram1"]["free_for_locals_bytes"] = 32_767
         with self.assertRaisesRegex(build_firmware.BuildError, "locals/stack"):
             build_firmware.validate_memory_headroom(summary)
+        summary["ram1"]["free_for_locals_bytes"] = 32_768
+        summary["ram2"]["free_for_heap_bytes"] = 4_095
+        with self.assertRaisesRegex(build_firmware.BuildError, "RAM2.*heap"):
+            build_firmware.validate_memory_headroom(summary)
 
     def test_checksum_table_provenance_requires_flash_residency(self) -> None:
         symbols = (
@@ -131,6 +135,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_benchmark_buffer_provenance_requires_real_regions(self) -> None:
         symbols = (
+            "200012c0 00069000 B thingdaq_packet_storage_primary\n"
             "200012c0 00001000 B "
             "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer\n"
             "20200000 00001000 B "
@@ -140,6 +145,10 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual(8_192, resources["working_ram_bytes"])
         self.assertEqual("0x200012c0", resources["regions"]["DTCM_PACKET"]["address"])
+        self.assertEqual(
+            "DTCM_PRIMARY_PACKET_PAGE_0",
+            resources["regions"]["DTCM_PACKET"]["physical_allocation"],
+        )
         self.assertEqual("0x20200000", resources["regions"]["OCRAM_DMA"]["address"])
         with self.assertRaisesRegex(build_firmware.BuildError, "outside"):
             build_firmware.benchmark_buffer_usage(
@@ -150,7 +159,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_packet_buffer_provenance_requires_split_target_regions(self) -> None:
         symbols = (
-            "200022c0 00069000 b (anonymous namespace)::packet_storage_primary\n"
+            "200022c0 00069000 B thingdaq_packet_storage_primary\n"
             "20200000 0005f000 b (anonymous namespace)::packet_storage_reserve"
         )
         resources = build_firmware.packet_buffer_usage(symbols)
@@ -165,6 +174,66 @@ class BuildConfigurationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.packet_buffer_usage(symbols.splitlines()[0])
+
+    def test_packet_retention_is_exact_for_every_profile_and_mode(self) -> None:
+        packet_buffers = {"total_frames": 200}
+        retention = build_firmware.packet_retention_usage(packet_buffers)
+
+        self.assertEqual(100, retention["combined_complete_intervals"])
+        self.assertEqual(0, retention["capacity"]["delta_frames"])
+        self.assertTrue(retention["raw_ring_overlay_preserves_packet_capacity"])
+        self.assertEqual(5, len(retention["profiles"]))
+        expected = [
+            (101_200, 50_600),
+            (202_400, 101_200),
+            (404_800, 202_400),
+            (809_600, 404_800),
+        ]
+        for profile, (disabled_us, input_us) in zip(retention["profiles"], expected):
+            self.assertEqual(
+                disabled_us,
+                profile["modes"]["DISABLED"]["combined_retention_us"],
+            )
+            self.assertEqual(
+                input_us,
+                profile["modes"]["INPUT"]["combined_retention_us"],
+            )
+        with self.assertRaisesRegex(
+            build_firmware.BuildError, "without a documented capacity-change note"
+        ):
+            build_firmware.packet_retention_usage({"total_frames": 199})
+
+        mismatched_contract = build_firmware._protocol_v2_contract()
+        mismatched_contract["combined_acquisition"] = {
+            **mismatched_contract["combined_acquisition"],
+            "packet_buffer_count": 198,
+        }
+        with self.assertRaisesRegex(
+            build_firmware.BuildError, "disagrees with the experimental protocol"
+        ):
+            build_firmware.packet_retention_usage(packet_buffers, mismatched_contract)
+
+    def test_auxiliary_resource_manifest_matches_pinned_registry(self) -> None:
+        resources = build_firmware.auxiliary_input_resource_contract()
+
+        self.assertEqual(list(range(16, 24)), resources["pins"])
+        self.assertEqual(
+            [23, 22, 17, 16, 26, 27, 24, 25],
+            resources["gpio1_bits_by_wire_bit"],
+        )
+        self.assertEqual(0x0FC30000, resources["gpio1_capture_mask"])
+        self.assertEqual(1, resources["auxiliary_xbar_output"])
+        self.assertEqual(31, resources["auxiliary_dmamux_source"])
+        self.assertEqual(3, resources["auxiliary_edma_channel"])
+        self.assertEqual([3, 2, 1, 0], resources["edma_priorities"])
+        self.assertEqual(
+            {"irq": 3, "vector": 19, "priority": 64},
+            resources["auxiliary_dma_interrupt"],
+        )
+        self.assertEqual(
+            "0xff00",
+            resources["shared_xbar_selector"]["auxiliary_rmw_mask"],
+        )
 
     def test_gpio_clock_diagnostic_buffer_requires_isolated_ocram_line(self) -> None:
         symbols = (
@@ -187,6 +256,10 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_raw_gpio_dma_buffers_require_exact_aligned_ocram_storage(self) -> None:
         symbols = (
+            "200012c0 00001000 B "
+            "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer\n"
+            "20240000 00001000 B "
+            "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer\n"
             "2025f020 0000fd00 B "
             "thingdaq::gpio_capture::g_gpio_raw_dma_buffers\n"
             "2026ed20 00000020 B "
@@ -199,6 +272,29 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertEqual(64_960, resources["total_bytes"])
         self.assertEqual("0x2025f020", resources["allocations"]["RING"]["address"])
         self.assertEqual(160, resources["allocations"]["DESCRIPTORS"]["bytes"])
+        self.assertEqual(
+            "0x20266ea0",
+            resources["mode_views"]["INPUT"]["AUXILIARY"]["RING"]["address"],
+        )
+        self.assertEqual(
+            32_384,
+            resources["mode_views"]["INPUT"]["AUXILIARY"]["RING"]["bytes"],
+        )
+        self.assertEqual(
+            "0x20240300",
+            resources["mode_views"]["INPUT"]["AUXILIARY"]["DESCRIPTORS"]["address"],
+        )
+        self.assertEqual(
+            "0x202403c0",
+            resources["mode_views"]["INPUT"]["AUXILIARY"]["OVERFLOW_SINK"]["address"],
+        )
+        self.assertEqual(
+            "0x202403a0",
+            resources["mode_views"]["INPUT"]["PRIMARY"]["OVERFLOW_SINK"]["address"],
+        )
+        self.assertEqual(992, resources["shared_input_workspace"]["active_bytes"])
+        self.assertEqual(4, len(resources["shared_input_workspace"]["views"]))
+        self.assertFalse(resources["packet_storage_repartitioned"])
         with self.assertRaisesRegex(build_firmware.BuildError, "cache-line aligned"):
             build_firmware.gpio_raw_dma_buffer_usage(
                 symbols.replace("2026ed40 000000a0", "2026ed44 000000a0")
@@ -209,6 +305,38 @@ class BuildConfigurationTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
             build_firmware.gpio_raw_dma_buffer_usage(symbols.splitlines()[0])
+
+    def test_paired_join_state_requires_exact_aligned_ocram_reservation(self) -> None:
+        symbols = (
+            "200012c0 00001000 B "
+            "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer\n"
+            "20240000 00001000 B "
+            "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+        )
+        resource = build_firmware.gpio_paired_join_state_usage(symbols)
+
+        self.assertEqual(768, resource["bytes"])
+        self.assertEqual("0x20240000", resource["address"])
+        self.assertEqual("CHECKSUM_BENCHMARK_OCRAM", resource["physical_allocation"])
+        with self.assertRaisesRegex(build_firmware.BuildError, "cache-line aligned"):
+            build_firmware.gpio_paired_join_state_usage(
+                symbols.replace("20240000 00001000", "20240004 00001000")
+            )
+        with self.assertRaisesRegex(build_firmware.BuildError, "missing"):
+            build_firmware.gpio_paired_join_state_usage("")
+
+    def test_auxiliary_workspace_rejects_overlapping_views(self) -> None:
+        symbols = (
+            "200012c0 00001000 B "
+            "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer\n"
+            "20240000 00001000 B "
+            "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+        )
+        with (
+            patch.object(build_firmware, "GPIO_AUX_DESCRIPTOR_OFFSET", 736),
+            self.assertRaisesRegex(build_firmware.BuildError, "overlaps"),
+        ):
+            build_firmware.auxiliary_input_workspace_usage(symbols)
 
     def test_adc_dma_buffers_require_exact_aligned_ocram_storage(self) -> None:
         symbols = (
@@ -243,6 +371,8 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertEqual(4, resource["buffers"])
         self.assertEqual(4_064, resource["stride_bytes"])
         self.assertEqual("0x2026ede0", resource["address"])
+        self.assertEqual(2, resource["mode_layouts"]["INPUT"]["gpio_item_bytes"])
+        self.assertFalse(resource["storage_repartitioned"])
         with self.assertRaisesRegex(build_firmware.BuildError, "cache-line aligned"):
             build_firmware.gpio_packed_buffer_usage(
                 symbols.replace("2026ede0", "2026ede4")

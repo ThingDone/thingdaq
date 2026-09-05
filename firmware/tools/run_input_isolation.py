@@ -40,6 +40,17 @@ def verify_hex(firmware: bytes, manifest: dict) -> None:
 def experiment_settings(manifest: dict) -> dict[str, str]:
     """Use only explicit build-manifest selections, never inferred filenames."""
     experiment = manifest.get("input_experiment")
+    if manifest.get("release_policy", {}).get("fixed_1mhz") is True:
+        if (
+            manifest["target"]["fqbn"]
+            != "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std"
+        ):
+            raise ValueError("release CPU disagrees with compiled target")
+        return {
+            "AUX_INPUT_EQUAL_RATES": "0",
+            "AUX_INPUT_CPU_MHZ": "450",
+            "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+        }
     if experiment is None:
         return {"AUX_INPUT_EQUAL_RATES": "0", "AUX_INPUT_CPU_MHZ": "600"}
     cpu = experiment["cpu_mhz"]
@@ -49,8 +60,10 @@ def experiment_settings(manifest: dict) -> dict[str, str]:
     expected_fqbn = f"teensy:avr:teensy40:usb=serial,speed={cpu},opt=o2std"
     if manifest["target"]["fqbn"] != expected_fqbn:
         raise ValueError("experiment CPU disagrees with compiled target")
-    return {"AUX_INPUT_EQUAL_RATES": "1" if equal else "0",
-            "AUX_INPUT_CPU_MHZ": str(cpu)}
+    return {
+        "AUX_INPUT_EQUAL_RATES": "1" if equal else "0",
+        "AUX_INPUT_CPU_MHZ": str(cpu),
+    }
 
 
 def validate_program_budget(seconds: float, cells: int) -> float:
@@ -58,7 +71,9 @@ def validate_program_budget(seconds: float, cells: int) -> float:
     # by doc/guides/soak-harness.md. Keep separate long cells in separate jobs.
     planned = 30 + (seconds + 5) * cells
     if not 1 <= seconds <= 600 or cells < 1 or planned > 780:
-        raise ValueError("sequence exceeds the safe service runtime budget; split into separate jobs")
+        raise ValueError(
+            "sequence exceeds the safe service runtime budget; split into separate jobs"
+        )
     return planned
 
 
@@ -70,15 +85,22 @@ def classify_result(result: dict, *, expected_cells: int | None = None) -> dict:
         if line.startswith("EVIDENCE ")
     ]
     exit_code = details.get("exit_code")
-    if (not details.get("completed") or not details.get("program_success")
-            or (isinstance(exit_code, int) and exit_code < 0)):
+    if (
+        not details.get("completed")
+        or not details.get("program_success")
+        or (isinstance(exit_code, int) and exit_code < 0)
+    ):
         outcome = "INFRASTRUCTURE_FAIL"
     elif (
         details.get("exit_code") == 0
         and evidence
         and all(row.get("result") == "PASS" for row in evidence)
     ):
-        outcome = "PASS" if expected_cells is None or len(evidence) == expected_cells else "INFRASTRUCTURE_FAIL"
+        outcome = (
+            "PASS"
+            if expected_cells is None or len(evidence) == expected_cells
+            else "INFRASTRUCTURE_FAIL"
+        )
     else:
         outcome = "TEST_FAIL"
     return {
@@ -110,7 +132,8 @@ def make_program(
         raise ValueError("choose either cycle or explicit profiles")
     sequence = (0, 1, 2, 3, 0) if cycle else profiles
     if cases is not None and (
-        sequence is None or len(cases) != len(sequence)
+        sequence is None
+        or len(cases) != len(sequence)
         or any(case not in CASES for case in cases)
     ):
         raise ValueError("cases must name one valid case per selected profile")
@@ -134,8 +157,8 @@ def make_program(
             "rig.SerialLink.exchange = tracked_exchange\n"
         )
     if sequence is not None:
-        if not sequence or any(profile not in range(4) for profile in sequence):
-            raise ValueError("profiles must contain IDs 0..3")
+        if not sequence or any(profile not in range(5) for profile in sequence):
+            raise ValueError("profiles must contain IDs 0..4")
         program += f"for index, profile in enumerate({sequence!r}):\n"
         if cases is not None:
             program += f"    os.environ['AUX_INPUT_CASE'] = {cases!r}[index]\n"
@@ -153,30 +176,48 @@ def make_program(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worktree", required=True, type=Path)
-    parser.add_argument("--build-dir", type=Path,
-                        help="explicit build directory; experimental settings come from its manifest")
+    parser.add_argument(
+        "--build-dir",
+        type=Path,
+        help="explicit build directory; experimental settings come from its manifest",
+    )
     parser.add_argument("--evidence-dir", required=True, type=Path)
     parser.add_argument(
         "--case",
         choices=CASES,
         required=True,
     )
-    parser.add_argument("--profile", type=int, choices=range(4), required=True)
+    parser.add_argument("--profile", type=int, choices=range(5), required=True)
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--serial", type=int, default=20428100)
     parser.add_argument("--diagnostic", action="store_true")
-    parser.add_argument("--temperature", action="store_true",
-                        help="require die temperature before, during and after each run")
+    parser.add_argument(
+        "--temperature",
+        action="store_true",
+        help="require die temperature before, during and after each run",
+    )
+    parser.add_argument(
+        "--host-api",
+        action="store_true",
+        help="validate the public SDK against the release firmware",
+    )
     sequence_group = parser.add_mutually_exclusive_group()
     sequence_group.add_argument(
         "--cycle", action="store_true", help="exercise 0,1,2,3,0 without reflashing"
     )
     sequence_group.add_argument(
-        "--profiles", type=int, nargs="+", choices=range(4),
+        "--profiles",
+        type=int,
+        nargs="+",
+        choices=range(5),
         help="explicit profile sequence without reflashing; stops on first failure",
     )
-    parser.add_argument("--cases", nargs="+", choices=CASES,
-                        help="one case per --profiles/--cycle cell; changes width without reflashing")
+    parser.add_argument(
+        "--cases",
+        nargs="+",
+        choices=CASES,
+        help="one case per --profiles/--cycle cell; changes width without reflashing",
+    )
     parser.add_argument("--service", default="http://192.168.150.14:5000")
     parser.add_argument(
         "--auth-file", type=Path, default=Path("/home/bill/.fw_api_key")
@@ -200,7 +241,8 @@ def main() -> int:
     manifest_bytes = (build / "build-manifest.json").read_bytes()
     manifest = json.loads(manifest_bytes)
     verify_hex(firmware, manifest)
-    source = (args.worktree / "firmware/tests/rig_aux_input_capture.py").read_text()
+    validator = "rig_release_sdk.py" if args.host_api else "rig_aux_input_capture.py"
+    source = (args.worktree / "firmware/tests" / validator).read_text()
     build_id = manifest["source"]["build_id"]
     settings = {
         "AUX_INPUT_CASE": args.case,
@@ -220,9 +262,31 @@ def main() -> int:
     except ValueError as error:
         parser.error(str(error))
     cases = tuple(args.cases) if args.cases is not None else None
-    if cases is not None and (not (args.cycle or profiles) or len(cases) != len(sequence)):
+    if cases is not None and (
+        not (args.cycle or profiles) or len(cases) != len(sequence)
+    ):
         parser.error("--cases needs one case per --profiles/--cycle cell")
-    program = make_program(source, settings, cycle=args.cycle, profiles=profiles, cases=cases)
+    program = make_program(
+        source, settings, cycle=args.cycle, profiles=profiles, cases=cases
+    )
+    if args.host_api:
+        if args.cycle or profiles or cases:
+            parser.error("--host-api runs its own bounded mode sequence")
+        package_bytes = io.BytesIO()
+        with zipfile.ZipFile(package_bytes, "w", zipfile.ZIP_DEFLATED) as package:
+            for path in sorted((args.worktree / "daq_api/src/thingdaq").rglob("*.py")):
+                package.writestr(
+                    str(path.relative_to(args.worktree / "daq_api/src")),
+                    path.read_bytes(),
+                )
+        encoded = base64.b64encode(package_bytes.getvalue()).decode()
+        program = (
+            "import base64, pathlib, sys, tempfile\n"
+            "package_dir = tempfile.TemporaryDirectory(prefix='thingdaq-sdk-')\n"
+            "package_path = pathlib.Path(package_dir.name) / 'thingdaq.zip'\n"
+            f"package_path.write_bytes(base64.b64decode({encoded!r}))\n"
+            "sys.path.insert(0, str(package_path))\n"
+        ) + program
     archive_bytes = io.BytesIO()
     with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("firmware.ino.hex", firmware)

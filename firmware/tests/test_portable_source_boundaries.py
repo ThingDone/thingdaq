@@ -67,6 +67,14 @@ EXPECTED_HARDWARE_INCLUDE_OWNERS = {
         "core_pins.h",
         "imxrt.h",
     },
+    FIRMWARE_SOURCE / "gpio_dual_bank_capture_teensy.cpp": {
+        "core_pins.h",
+        "imxrt.h",
+    },
+    FIRMWARE_SOURCE / "variable_rate_scheduler_teensy.cpp": {
+        "core_pins.h",
+        "imxrt.h",
+    },
     FIRMWARE_SOURCE / "teensy_usb.cpp": {
         "Arduino.h",
         "usb_desc.h",
@@ -74,6 +82,7 @@ EXPECTED_HARDWARE_INCLUDE_OWNERS = {
         "usb_serial.h",
     },
     FIRMWARE_SOURCE / "teensy_clock.cpp": {"Arduino.h"},
+    FIRMWARE_SOURCE / "temperature_teensy.cpp": {"Arduino.h"},
 }
 _QUOTED_INCLUDE = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.MULTILINE)
 _ANGLE_INCLUDE = re.compile(r"^\s*#\s*include\s+<([^>]+)>", re.MULTILINE)

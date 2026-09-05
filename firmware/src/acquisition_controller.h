@@ -8,9 +8,13 @@
 #include "adc_initializer.h"
 #include "adc_trigger.h"
 #include "gpio_batch_packer.h"
+#include "gpio_dual_bank_capture.h"
+#include "gpio_dual_bank_packer.h"
 #include "gpio_raw_capture.h"
 #include "packet_buffer_pipeline.h"
 #include "statistics.h"
+#include "stream_layout.h"
+#include "variable_rate_scheduler.h"
 
 namespace thingdaq::acquisition {
 
@@ -43,6 +47,10 @@ enum class Conflict : std::uint32_t {
   kGpioCaptureUnavailable = 1U << 17U,
   kInvalidConfiguration = 1U << 18U,
   kInvalidRunId = 1U << 19U,
+  kAuxGpioComponentsMissing = 1U << 20U,
+  kAuxGpioPackerBusy = 1U << 21U,
+  kAuxGpioCaptureUnavailable = 1U << 22U,
+  kRateSchedulerUnavailable = 1U << 23U,
 };
 
 constexpr std::uint32_t conflictBit(Conflict conflict) {
@@ -57,9 +65,12 @@ struct Audit {
       adc_capture::StartStatus::kNotQuiescent;
   gpio_capture::StartStatus gpio_capture_status =
       gpio_capture::StartStatus::kNotQuiescent;
+  gpio_join::StartStatus aux_gpio_capture_status =
+      gpio_join::StartStatus::kNotQuiescent;
   std::uint32_t conflict_flags = 0U;
   bool adc_inspected = false;
   bool gpio_inspected = false;
+  bool aux_gpio_inspected = false;
 
   constexpr bool has(Conflict conflict) const {
     return (conflict_flags & conflictBit(conflict)) != 0U;
@@ -78,6 +89,8 @@ struct Report {
   gpio_packer::ServiceReport gpio_packer{};
   gpio_capture::StopReport gpio_capture_stop{};
   gpio_packer::StopReport gpio_packer_stop{};
+  gpio_aux_packer::ServiceReport aux_gpio_packer{};
+  gpio_join::StopReport aux_gpio_capture_stop{};
   adc_packer::ServiceReport adc_packer{};
   adc_capture::StopReport adc_capture_stop{};
   adc_packer::StopReport adc_packer_stop{};
@@ -85,6 +98,10 @@ struct Report {
       gpio_capture::StartStatus::kNotQuiescent;
   gpio_packer::OperationStatus gpio_packer_start_status =
       gpio_packer::OperationStatus::kNotRunning;
+  gpio_join::StartStatus aux_gpio_capture_start_status =
+      gpio_join::StartStatus::kNotQuiescent;
+  gpio_aux_packer::OperationStatus aux_gpio_packer_start_status =
+      gpio_aux_packer::OperationStatus::kNotRunning;
   adc_capture::StartStatus adc_capture_start_status =
       adc_capture::StartStatus::kNotQuiescent;
   adc_packer::OperationStatus adc_packer_start_status =
@@ -94,6 +111,11 @@ struct Report {
   bool gpio_capture_stopped = false;
   bool gpio_packer_started = false;
   bool gpio_packer_stopped = false;
+  bool aux_gpio_capture_started = false;
+  bool aux_gpio_capture_prepared = false;
+  bool aux_gpio_capture_stopped = false;
+  bool aux_gpio_packer_started = false;
+  bool aux_gpio_packer_stopped = false;
   bool adc_capture_prepared = false;
   bool adc_capture_boundary_stopped = false;
   bool adc_capture_stopped = false;
@@ -101,6 +123,10 @@ struct Report {
   bool adc_packer_stopped = false;
   bool adc_trigger_armed = false;
   bool adc_trigger_stopped = false;
+  bool rate_configured = false;
+  bool rate_restored = false;
+  variable_rate::Status rate_configure_status =
+      variable_rate::Status::kUnsupportedProfile;
   bool packet_production_stopped = false;
   bool physical_drain_pending = false;
   bool physical_fault_detected = false;
@@ -124,7 +150,10 @@ class Controller {
       adc::Initializer *adc_initializer = nullptr,
       adc_trigger::Scheduler *adc_trigger_scheduler = nullptr,
       adc_capture::HardwareCapture *adc_capture = nullptr,
-      adc_packer::AdcFramePacker *adc_packer = nullptr)
+      adc_packer::AdcFramePacker *adc_packer = nullptr,
+      variable_rate::Scheduler *rate_scheduler = nullptr,
+      gpio_join::HardwareCapture *aux_gpio_capture = nullptr,
+      gpio_aux_packer::AuxiliaryBatchPacker *aux_gpio_packer = nullptr)
       : statistics_(statistics),
         packet_pipeline_(packet_pipeline),
         gpio_capture_(gpio_capture),
@@ -132,7 +161,10 @@ class Controller {
         adc_initializer_(adc_initializer),
         adc_trigger_scheduler_(adc_trigger_scheduler),
         adc_capture_(adc_capture),
-        adc_packer_(adc_packer) {}
+        adc_packer_(adc_packer),
+        rate_scheduler_(rate_scheduler),
+        aux_gpio_capture_(aux_gpio_capture),
+        aux_gpio_packer_(aux_gpio_packer) {}
 
   protocol::AdcInitializationMetadata initialize();
   Audit inspect(const protocol::Configuration &configuration,
@@ -191,6 +223,9 @@ class Controller {
            profile == Profile::kCombined;
   }
 
+  static stream_layout::Result runLayout(
+      const protocol::Configuration &configuration);
+
  private:
   bool stopAdcPath(Report &report);
   bool stopCombinedPaths(Report &report);
@@ -213,9 +248,19 @@ class Controller {
   adc_trigger::Scheduler *adc_trigger_scheduler_ = nullptr;
   adc_capture::HardwareCapture *adc_capture_ = nullptr;
   adc_packer::AdcFramePacker *adc_packer_ = nullptr;
+  variable_rate::Scheduler *rate_scheduler_ = nullptr;
+  gpio_join::HardwareCapture *aux_gpio_capture_ = nullptr;
+  gpio_aux_packer::AuxiliaryBatchPacker *aux_gpio_packer_ = nullptr;
   std::uint8_t physical_stream_mask_ = 0U;
   std::uint32_t physical_run_id_ = 0U;
   std::uint64_t physical_epoch_ticks_ = 0U;
+  protocol_v2::AuxBankMode physical_aux_bank_mode_ =
+      protocol_v2::kDefaultAuxBankMode;
+  protocol_v2::RateProfile physical_rate_profile_ =
+      protocol_v2::kDefaultRateProfile;
+  protocol_v2::RateProfile previous_rate_profile_ =
+      protocol_v2::kDefaultRateProfile;
+  bool restore_rate_on_rollback_ = false;
   bool physical_run_active_ = false;
   bool physical_drain_pending_ = false;
   bool physical_start_pending_ = false;

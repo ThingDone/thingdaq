@@ -32,7 +32,13 @@ if __name__ == "__main__":
     monkeypatch.setenv("AUX_INPUT_TEMPERATURE", "0")
     try:
         with pytest.raises(SystemExit) as stopped:
-            exec(isolation.make_program(source, {"AUX_INPUT_RUN_DIAGNOSTIC": "0", "AUX_INPUT_TEMPERATURE": "1"}), {})  # noqa: S102 - locally authored test fixture
+            exec(  # noqa: S102 - locally authored runner regression
+                isolation.make_program(
+                    source,
+                    {"AUX_INPUT_RUN_DIAGNOSTIC": "0", "AUX_INPUT_TEMPERATURE": "1"},
+                ),
+                {},
+            )
         assert stopped.value.code == 7
     finally:
         sys.modules.pop("input_isolation_rig", None)
@@ -68,12 +74,23 @@ def main():
 """
     try:
         with pytest.raises(SystemExit) as stopped:
-            exec(isolation.make_program(source, {}, profiles=(0, 1),
-                 cases=("CONTROL_COMBINED", "INPUT_COMBINED")), {})
+            exec(  # noqa: S102 - locally authored runner regression
+                isolation.make_program(
+                    source,
+                    {},
+                    profiles=(0, 1),
+                    cases=("CONTROL_COMBINED", "INPUT_COMBINED"),
+                ),
+                {},
+            )
         assert stopped.value.code == 0
         assert sys.modules["input_isolation_rig"].observed == [
-            ("CONTROL_COMBINED", 0), ("INPUT_COMBINED", 1)]
-        assert [event["run_id"] for event in sys.modules["input_isolation_rig"].events] == [1, 2]
+            ("CONTROL_COMBINED", 0),
+            ("INPUT_COMBINED", 1),
+        ]
+        assert [
+            event["run_id"] for event in sys.modules["input_isolation_rig"].events
+        ] == [1, 2]
     finally:
         sys.modules.pop("input_isolation_rig", None)
     for cases in (("INPUT_COMBINED",), ("INVALID", "INPUT_COMBINED")):
@@ -82,8 +99,15 @@ def main():
     try:
         reset_source = source.replace("SerialLink.run_id += 1", "SerialLink.run_id = 1")
         with pytest.raises(ValueError, match="run ID reset/jump"):
-            exec(isolation.make_program(reset_source, {}, profiles=(0, 1),
-                 cases=("CONTROL_COMBINED", "INPUT_COMBINED")), {})
+            exec(  # noqa: S102 - locally authored runner regression
+                isolation.make_program(
+                    reset_source,
+                    {},
+                    profiles=(0, 1),
+                    cases=("CONTROL_COMBINED", "INPUT_COMBINED"),
+                ),
+                {},
+            )
     finally:
         sys.modules.pop("input_isolation_rig", None)
 
@@ -120,7 +144,10 @@ def test_service_success_does_not_mean_firmware_passed():
     assert isolation.classify_result(result)["outcome"] == "TEST_FAIL"
     result["results"]["stdout"] = 'EVIDENCE {"result":"PASS"}\n'
     assert isolation.classify_result(result)["outcome"] == "PASS"
-    assert isolation.classify_result(result, expected_cells=2)["outcome"] == "INFRASTRUCTURE_FAIL"
+    assert (
+        isolation.classify_result(result, expected_cells=2)["outcome"]
+        == "INFRASTRUCTURE_FAIL"
+    )
     result["results"]["exit_code"] = -110
     summary = isolation.classify_result(result)
     assert summary["outcome"] == "INFRASTRUCTURE_FAIL"
@@ -171,8 +198,8 @@ def main():
 
 
 def test_invalid_profile_sequences_are_rejected():
-    for sequence in ((), (-1,), (4,)):
-        with pytest.raises(ValueError, match="IDs 0..3"):
+    for sequence in ((), (-1,), (5,)):
+        with pytest.raises(ValueError, match="IDs 0..4"):
             isolation.make_program("", {}, profiles=sequence)
     with pytest.raises(ValueError, match="either cycle"):
         isolation.make_program("", {}, cycle=True, profiles=(1,))
@@ -180,13 +207,17 @@ def test_invalid_profile_sequences_are_rejected():
 
 def test_experimental_clock_and_rate_settings_follow_verified_manifest():
     assert isolation.experiment_settings({}) == {
-        "AUX_INPUT_EQUAL_RATES": "0", "AUX_INPUT_CPU_MHZ": "600"}
+        "AUX_INPUT_EQUAL_RATES": "0",
+        "AUX_INPUT_CPU_MHZ": "600",
+    }
     manifest = {
         "input_experiment": {"cpu_mhz": 450, "equal_rates": True},
         "target": {"fqbn": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std"},
     }
     assert isolation.experiment_settings(manifest) == {
-        "AUX_INPUT_EQUAL_RATES": "1", "AUX_INPUT_CPU_MHZ": "450"}
+        "AUX_INPUT_EQUAL_RATES": "1",
+        "AUX_INPUT_CPU_MHZ": "450",
+    }
     manifest["input_experiment"]["cpu_mhz"] = 600
     with pytest.raises(ValueError, match="disagrees"):
         isolation.experiment_settings(manifest)

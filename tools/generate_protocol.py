@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Generate protocol-v1 constants and deterministic golden frames."""
+"""Generate versioned protocol constants and deterministic golden frames."""
 
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import struct
@@ -15,6 +16,7 @@ from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
+V2_SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v2.json"
 PYTHON_OUTPUT_PATH = (
     REPOSITORY_ROOT / "daq_api/src/thingdaq/_generated/protocol_constants.py"
 )
@@ -40,11 +42,22 @@ class ContractError(ValueError):
     """Raised when the canonical source is internally inconsistent."""
 
 
-def load_contract() -> tuple[dict[str, Any], bytes]:
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate JSON keys instead of silently keeping the last value."""
+
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ContractError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
+def load_contract(path: Path = SOURCE_PATH) -> tuple[dict[str, Any], bytes]:
     """Read the canonical JSON source and return it with its exact bytes."""
 
-    source_bytes = SOURCE_PATH.read_bytes()
-    contract = json.loads(source_bytes)
+    source_bytes = path.read_bytes()
+    contract = json.loads(source_bytes, object_pairs_hook=_unique_json_object)
     if not isinstance(contract, dict):
         raise ContractError("protocol source root must be a JSON object")
     return contract, source_bytes
@@ -67,6 +80,13 @@ def enum_map(entries: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return result
 
 
+def checksum_enabled(contract: Mapping[str, Any], entry: Mapping[str, Any]) -> bool:
+    """Return whether a checksum is enabled in the contract's own version."""
+
+    key = f"enabled_in_v{int(contract['protocol_version'])}"
+    return bool(entry[key])
+
+
 def validate_enum_width(
     owner: str, entries: Sequence[Mapping[str, Any]], bits: int
 ) -> None:
@@ -81,7 +101,10 @@ def validate_enum_width(
             )
 
 
-def field_width(field: Mapping[str, Any]) -> int:
+def field_width(
+    field: Mapping[str, Any],
+    schemas: Mapping[str, Mapping[str, Any]] | None = None,
+) -> int:
     """Return the encoded width for a machine-readable field definition."""
 
     field_type = str(field["type"])
@@ -89,19 +112,36 @@ def field_width(field: Mapping[str, Any]) -> int:
         return INTEGER_WIDTHS[field_type]
     if field_type in {"bytes", "nul_ascii", "u8_array"}:
         return int(field["count"])
+    if field_type == "repeated_u16":
+        return int(field["count"]) * 2
     if field_type == "repeated_u16_pair":
         return int(field["count"]) * 4
+    if field_type == "repeated_schema":
+        if schemas is None:
+            raise ContractError("repeated_schema needs the payload schema table")
+        schema_name = str(field["schema"])
+        if schema_name not in schemas:
+            raise ContractError(f"unknown repeated payload schema: {schema_name}")
+        return int(field["count"]) * int(schemas[schema_name]["size"])
     raise ContractError(f"unsupported field type: {field_type}")
 
 
-def validate_fields(owner: str, size: int, fields: Sequence[Mapping[str, Any]]) -> None:
+def validate_fields(
+    owner: str,
+    size: int,
+    fields: Sequence[Mapping[str, Any]],
+    schemas: Mapping[str, Mapping[str, Any]] | None = None,
+) -> None:
     """Require fields to cover their declared byte region exactly once."""
 
+    names = [str(field["name"]) for field in fields]
+    if len(names) != len(set(names)):
+        raise ContractError(f"{owner} contains duplicate field names")
     occupancy: list[str | None] = [None] * size
     for field in fields:
         name = str(field["name"])
         offset = int(field["offset"])
-        width = field_width(field)
+        width = field_width(field, schemas)
         if offset < 0 or width < 0 or offset + width > size:
             raise ContractError(
                 f"{owner}.{name} at {offset}+{width} exceeds declared size {size}"
@@ -462,6 +502,7 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
             f"payload_schemas.{schema_name}",
             int(schema["size"]),
             schema["fields"],
+            schemas,
         )
     for kind in contract["frame_kinds"]:
         for schema_key in ("payload_schema", "error_payload_schema"):
@@ -565,6 +606,333 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
             raise ContractError(
                 f"{command['name']} golden response must echo its request ID"
             )
+
+
+def validate_v2_contract(
+    contract: Mapping[str, Any],
+    v1_contract: Mapping[str, Any],
+    v1_source_bytes: bytes,
+) -> None:
+    """Validate the isolated auxiliary-input extension and its generation plan."""
+
+    if int(contract["protocol_version"]) != 2:
+        raise ContractError("the auxiliary-input contract must be protocol version 2")
+    if contract.get("status") != "release-1.1.0" or contract.get("extension") != (
+        "aux-input-bank-fixed-1mhz-temperature"
+    ):
+        raise ContractError("protocol v2 must identify the release input contract")
+    if contract["byte_order"] != "little" or int(contract["magic"]) != 0xDEADBEEF:
+        raise ContractError("protocol v2 must retain the v1 little-endian envelope")
+
+    extends = contract["extends"]
+    v1_sha256 = hashlib.sha256(v1_source_bytes).hexdigest()
+    if (
+        int(extends["protocol_version"]) != 1
+        or extends["source"] != "protocol/protocol-v1.json"
+        or extends["source_sha256"] != v1_sha256
+    ):
+        raise ContractError("protocol v2 does not pin the exact protocol-v1 source")
+    for key in (
+        "magic",
+        "byte_order",
+        "scalar_types",
+        "header",
+        "trailer",
+        "flags",
+        "bootstrap_checksum_algorithm",
+        "default_checksum_algorithm",
+    ):
+        if contract[key] != v1_contract[key]:
+            raise ContractError(f"protocol v2 unexpectedly changes frozen v1 {key}")
+    v1_checksums = [
+        (str(entry["name"]), int(entry["value"]), bool(entry["enabled_in_v1"]))
+        for entry in v1_contract["checksum_algorithms"]
+    ]
+    v2_checksums = [
+        (str(entry["name"]), int(entry["value"]), bool(entry["enabled_in_v2"]))
+        for entry in contract["checksum_algorithms"]
+    ]
+    if v2_checksums != v1_checksums:
+        raise ContractError("protocol v2 changes the frozen checksum IDs or support")
+    normalized_v2_kinds = []
+    for entry in contract["frame_kinds"]:
+        normalized = dict(entry)
+        normalized.pop("payload_schema_by_aux_bank_mode", None)
+        normalized_v2_kinds.append(normalized)
+    temperature_kinds = [
+        {
+            "name": "GET_TEMPERATURE_REQUEST",
+            "value": 26,
+            "class": "request",
+            "payload_schema": "empty",
+            "allowed_flags": [],
+            "response_kind": "GET_TEMPERATURE_RESPONSE",
+        },
+        {
+            "name": "GET_TEMPERATURE_RESPONSE",
+            "value": 154,
+            "class": "response",
+            "payload_schema": "temperature_response",
+            "error_payload_schema": "response_prefix",
+            "allowed_flags": ["RESPONSE_ERROR"],
+        },
+    ]
+    if normalized_v2_kinds != v1_contract["frame_kinds"] + temperature_kinds:
+        raise ContractError("protocol v2 unexpectedly changes frozen frame kinds")
+    if contract["command_kinds"] != v1_contract["command_kinds"] + [
+        {
+            "name": "GET_TEMPERATURE",
+            "value": 26,
+            "request_kind": "GET_TEMPERATURE_REQUEST",
+            "response_kind": "GET_TEMPERATURE_RESPONSE",
+            "optional": True,
+        }
+    ]:
+        raise ContractError("protocol v2 unexpectedly changes frozen command kinds")
+    for entry in contract["frame_kinds"][:2]:
+        layouts_by_mode = entry.get("payload_schema_by_aux_bank_mode")
+        if layouts_by_mode != {
+            "DISABLED": entry["payload_schema"],
+            "INPUT": "adc_aux_data" if entry["name"] == "ADC_DATA" else "gpio_aux_data",
+        }:
+            raise ContractError("protocol v2 data-kind layout mapping is inconsistent")
+
+    generated = contract["generated_outputs"]
+    expected_output_keys = {
+        "python_constants",
+        "cpp_constants",
+        "fixture_directory",
+        "fixture_manifest",
+    }
+    if set(generated) != expected_output_keys:
+        raise ContractError("protocol v2 generated outputs are incomplete")
+    generated_paths = [Path(str(value)) for value in generated.values()]
+    if len(set(generated_paths)) != len(generated_paths):
+        raise ContractError("protocol v2 generated output paths must be disjoint")
+    for path in generated_paths:
+        if path.is_absolute() or ".." in path.parts:
+            raise ContractError(
+                "protocol v2 generated outputs must stay in the repository"
+            )
+    v1_paths = {
+        PYTHON_OUTPUT_PATH.relative_to(REPOSITORY_ROOT),
+        CPP_OUTPUT_PATH.relative_to(REPOSITORY_ROOT),
+        FIXTURE_DIRECTORY.relative_to(REPOSITORY_ROOT),
+        MANIFEST_PATH.relative_to(REPOSITORY_ROOT),
+    }
+    if set(generated_paths) & v1_paths:
+        raise ContractError("protocol v2 generated outputs overlap frozen v1 outputs")
+    fixture_directory = Path(str(generated["fixture_directory"]))
+    if Path(str(generated["fixture_manifest"])).parent != fixture_directory:
+        raise ContractError("protocol v2 fixture manifest is outside its directory")
+
+    scalar_types = contract["scalar_types"]
+    if set(scalar_types) != set(INTEGER_WIDTHS):
+        raise ContractError("protocol v2 scalar table is incomplete")
+    for name, width in INTEGER_WIDTHS.items():
+        scalar = scalar_types[name]
+        if int(scalar["width"]) != width or scalar["signed"] is not False:
+            raise ContractError(f"protocol v2 {name} scalar is inconsistent")
+
+    header = contract["header"]
+    trailer = contract["trailer"]
+    validate_fields("v2.header", int(header["size"]), header["fields"])
+    if int(trailer["size"]) != 4 or trailer["type"] != "u32":
+        raise ContractError("protocol v2 trailer must remain one uint32")
+    limits = contract["limits"]
+    if (
+        int(limits["data_frame_bytes"]) != 4096
+        or int(limits["max_data_frame_bytes"]) != 4096
+        or int(limits["min_data_frame_bytes"]) != 2072
+        or int(limits["min_frame_bytes"]) != int(header["size"]) + int(trailer["size"])
+        or int(limits["max_command_frame_bytes"])
+        != int(limits["min_frame_bytes"]) + int(limits["max_command_payload_bytes"])
+    ):
+        raise ContractError("protocol v2 frame bounds are inconsistent")
+
+    schemas = contract["payload_schemas"]
+    for schema_name, schema in schemas.items():
+        validate_fields(
+            f"v2.payload_schemas.{schema_name}",
+            int(schema["size"]),
+            schema["fields"],
+            schemas,
+        )
+    if (
+        int(schemas["configure_request"]["size"]) != 16
+        or int(schemas["configure_response"]["size"]) != 20
+        or int(schemas["info_response"]["size"]) != 680
+        or int(schemas["status_response"]["size"]) != 1476
+        or int(schemas["gpio_capture_diagnostic_response"]["size"]) != 272
+        or int(schemas["rate_profile_info"]["size"]) != 48
+    ):
+        raise ContractError("protocol v2 control extension sizes are inconsistent")
+
+    kind_specs = {str(entry["name"]): entry for entry in contract["frame_kinds"]}
+    kinds = enum_map(contract["frame_kinds"])
+    validate_enum_width("v2.frame_kinds", contract["frame_kinds"], 8)
+    observed_command_payload_max = 0
+    for command in contract["command_kinds"]:
+        request = kind_specs[str(command["request_kind"])]
+        response = kind_specs[str(command["response_kind"])]
+        if (
+            int(command["value"]) != int(request["value"])
+            or int(response["value"]) != (int(command["value"]) | 0x80)
+            or request.get("response_kind") != response["name"]
+        ):
+            raise ContractError(f"v2 command {command['name']} mapping is inconsistent")
+        request_size = int(schemas[str(request["payload_schema"])]["size"])
+        observed_command_payload_max = max(observed_command_payload_max, request_size)
+    if observed_command_payload_max != int(limits["max_command_payload_bytes"]):
+        raise ContractError("protocol v2 command payload bound is not exact")
+
+    for enum_name, bits in {
+        "response_status": 8,
+        "error_code": 16,
+        "device_state": 8,
+        "stream_mask": 8,
+        "configuration_profile": 16,
+        "capability_bits": 32,
+        "source": 8,
+        "aux_bank_mode": 8,
+        "rate_profile": 8,
+    }.items():
+        enum_map(contract["enums"][enum_name])
+        validate_enum_width(enum_name, contract["enums"][enum_name], bits)
+    modes = enum_map(contract["enums"]["aux_bank_mode"])
+    if modes != {"DISABLED": 0, "INPUT": 1}:
+        raise ContractError("protocol v2 auxiliary modes must be DISABLED and INPUT")
+    auxiliary = contract["auxiliary_input"]
+    if (
+        auxiliary["default_mode"] != "DISABLED"
+        or auxiliary["supported_modes"] != ["DISABLED", "INPUT"]
+        or auxiliary["direction_granularity"] != "whole_bank"
+        or auxiliary["output_supported"] is not False
+    ):
+        raise ContractError("protocol v2 auxiliary direction contract is unsafe")
+
+    layouts = auxiliary["layouts"]
+    data_layouts = contract["data_layouts"]
+    expected_layouts = {
+        "DISABLED": (8, 1, 4048, 1012, 4096),
+        "INPUT": (16, 2, 2024, 506, 2072),
+    }
+    for mode, (
+        width,
+        item_bytes,
+        gpio_items,
+        adc_items,
+        adc_frame_bytes,
+    ) in expected_layouts.items():
+        layout = layouts[mode]
+        if (
+            int(layout["gpio_width_bits"]) != width
+            or int(layout["gpio_bytes_per_item"]) != item_bytes
+            or int(layout["gpio_items_per_frame"]) != gpio_items
+            or int(layout["gpio_payload_bytes"]) != gpio_items * item_bytes
+            or int(layout["gpio_total_frame_bytes"]) != 4096
+            or int(layout["adc_items_per_frame"]) != adc_items
+            or int(layout["adc_payload_bytes"]) != adc_items * 4
+            or int(layout["adc_total_frame_bytes"]) != adc_frame_bytes
+        ):
+            raise ContractError(f"protocol v2 {mode} frame layout is inconsistent")
+    if (
+        data_layouts["gpio"]["pins_by_bit"] != list(range(6, 14))
+        or data_layouts["gpio_aux_input"]["pins_by_bit"]
+        != [*range(6, 14), *range(16, 24)]
+        or data_layouts["gpio_aux_input"]["byte_order"] != "little"
+    ):
+        raise ContractError("protocol v2 GPIO wire bit order is inconsistent")
+
+    timing = contract["timing"]
+    timestamp_hz = int(timing["timestamp_hz"])
+    pit_hz = int(timing["pit_clock_hz"])
+    ipg_hz = int(timing["ipg_clock_hz"])
+    dwt_hz = int(timing["dwt_clock_hz"])
+    rate_profiles = contract["rate_profiles"]
+    rate_enum = enum_map(contract["enums"]["rate_profile"])
+    if len(rate_profiles) != 5 or rate_enum != {
+        str(profile["name"]): int(profile["value"]) for profile in rate_profiles
+    }:
+        raise ContractError("protocol v2 rate profile enum and table disagree")
+    if int(timing["supported_rate_profile_mask"]) != sum(
+        1 << int(profile["value"]) for profile in rate_profiles
+    ):
+        raise ContractError("protocol v2 supported rate mask is inconsistent")
+    for profile in rate_profiles:
+        adc_rate = int(profile["adc_pair_rate_hz"])
+        gpio_rate = int(profile["gpio_sample_rate_hz"])
+        if (
+            gpio_rate != int(profile["gpio_to_adc_ratio"]) * adc_rate
+            or timestamp_hz % adc_rate
+            or timestamp_hz % gpio_rate
+            or pit_hz % gpio_rate
+            or ipg_hz % (2 * adc_rate)
+            or dwt_hz % (2 * adc_rate)
+            or int(profile["adc_pair_period_ticks"]) != timestamp_hz // adc_rate
+            or int(profile["adc1_phase_ticks"]) != timestamp_hz // (2 * adc_rate)
+            or int(profile["gpio_sample_period_ticks"]) != timestamp_hz // gpio_rate
+            or int(profile["gpio_master_pit_divider"]) != pit_hz // gpio_rate
+            or int(profile["gpio_master_pit_load"])
+            != int(profile["gpio_master_pit_divider"]) - 1
+            or int(profile["adc_pair_pit_divider"]) != gpio_rate // adc_rate
+            or int(profile["adc_pair_pit_load"]) != gpio_rate // adc_rate - 1
+            or int(profile["adc1_phase_ipg_cycles"]) != ipg_hz // (2 * adc_rate)
+            or int(profile["completion_expected_dwt_cycles"])
+            != dwt_hz // (2 * adc_rate)
+        ):
+            raise ContractError(f"rate profile {profile['name']} is not exact")
+        for mode, layout in layouts.items():
+            adc_coverage = int(layout["adc_items_per_frame"]) * int(
+                profile["adc_pair_period_ticks"]
+            )
+            gpio_coverage = int(layout["gpio_items_per_frame"]) * int(
+                profile["gpio_sample_period_ticks"]
+            )
+            if (
+                adc_coverage * (4 // int(profile["gpio_to_adc_ratio"])) != gpio_coverage
+                or int(profile["frame_coverage_ticks"][mode]) != adc_coverage
+            ):
+                raise ContractError(
+                    f"rate profile {profile['name']} {mode} coverage is inconsistent"
+                )
+
+    fixtures = contract["golden_fixtures"]
+    fixture_names = [str(fixture["name"]) for fixture in fixtures]
+    if len(fixture_names) != len(set(fixture_names)):
+        raise ContractError("protocol v2 seed fixture names must be unique")
+    if {str(fixture["kind"]) for fixture in fixtures} != set(kinds):
+        raise ContractError("protocol v2 seed fixtures must cover every frame kind")
+
+    plan = contract["golden_vector_plan"]
+    for switch in (
+        "generate_gpio_mode_profile_matrix",
+        "generate_configure_mode_profile_matrix",
+        "generate_info_mode_profile_matrix",
+    ):
+        if plan.get(switch) is not True:
+            raise ContractError(f"protocol v2 golden-vector plan must enable {switch}")
+    malformed = plan["malformed_cases"]
+    malformed_names = [str(case["name"]) for case in malformed]
+    if len(malformed_names) != len(set(malformed_names)):
+        raise ContractError("protocol v2 malformed fixture names must be unique")
+    valid_targets = {"configure_request", "configure_response", "info_response"}
+    if any(str(case["target"]) not in valid_targets for case in malformed):
+        raise ContractError("protocol v2 malformed fixture target is unknown")
+    if any(not str(case.get("expected_rejection", "")) for case in malformed):
+        raise ContractError("protocol v2 malformed fixtures need rejection reasons")
+    required_cases = {
+        "unsupported-rates",
+        "wrong-four-to-one-ratio",
+        "mixed-bank-mode",
+        "duplicate-aux-pins",
+        "bad-gpio-width",
+        "bad-frame-counts",
+        "nonintegral-timestamps",
+        "contradictory-configure-echo",
+    }
+    if not required_cases <= set(malformed_names):
+        raise ContractError("protocol v2 malformed fixture coverage is incomplete")
 
 
 def snake_to_pascal(name: str) -> str:
@@ -913,13 +1281,13 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         ]
     )
     for entry in checksums:
-        if entry["enabled_in_v1"]:
+        if checksum_enabled(contract, entry):
             lines.append(f"        ChecksumAlgorithm.{entry['name']},")
     lines.extend(["    }", ")", ""])
     supported_checksum_mask = sum(
         1 << checksum_values[str(entry["name"])]
         for entry in checksums
-        if entry["enabled_in_v1"]
+        if checksum_enabled(contract, entry)
     )
     lines.append(f"SUPPORTED_CHECKSUM_MASK = {supported_checksum_mask}")
     lines.append(
@@ -1076,6 +1444,141 @@ def render_python(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     lines.append("")
 
     return ("\n".join(lines).rstrip() + "\n").encode()
+
+
+def render_python_v2(contract: Mapping[str, Any], source_sha256: str) -> bytes:
+    """Render the disjoint experimental-v2 Python constants module."""
+
+    rendered = render_python(contract, source_sha256).decode()
+    rendered = rendered.replace(
+        '"""Generated protocol-v1 constants. Do not edit by hand.',
+        '"""Generated experimental protocol-v2 constants. Do not edit by hand.',
+        1,
+    ).replace(
+        "Source: protocol/protocol-v1.json", "Source: protocol/protocol-v2.json", 1
+    )
+
+    auxiliary = contract["auxiliary_input"]
+    resources = auxiliary["provisional_resources"]
+    banks = auxiliary["pin_banks"]
+    timing = contract["timing"]
+    layouts = auxiliary["layouts"]
+    extension: list[str] = [
+        "",
+        "",
+        "# Experimental protocol-v2 auxiliary-input extension.",
+    ]
+    extension.extend(python_enum("AuxBankMode", contract["enums"]["aux_bank_mode"]))
+    extension.extend(
+        python_enum("TemperatureStatus", contract["enums"]["temperature_status"])
+    )
+    extension.extend(python_enum("RateProfile", contract["enums"]["rate_profile"]))
+    extension.extend(
+        [
+            f"MIN_DATA_FRAME_BYTES = {int(contract['limits']['min_data_frame_bytes'])}",
+            f"PIT_CLOCK_HZ = {int(timing['pit_clock_hz'])}",
+            f"IPG_CLOCK_HZ = {int(timing['ipg_clock_hz'])}",
+            f"DWT_CLOCK_HZ = {int(timing['dwt_clock_hz'])}",
+            ("DEFAULT_AUX_BANK_MODE = AuxBankMode." + str(auxiliary["default_mode"])),
+            (
+                "DEFAULT_RATE_PROFILE = RateProfile."
+                + str(timing["default_rate_profile"])
+            ),
+            "SUPPORTED_AUX_BANK_MODES = frozenset(AuxBankMode)",
+            "SUPPORTED_RATE_PROFILES = frozenset(RateProfile)",
+            (
+                "SUPPORTED_AUX_BANK_MODE_MASK = "
+                + str(
+                    sum(
+                        1 << int(entry["value"])
+                        for entry in contract["enums"]["aux_bank_mode"]
+                    )
+                )
+            ),
+            (
+                "SUPPORTED_RATE_PROFILE_MASK = "
+                + str(int(timing["supported_rate_profile_mask"]))
+            ),
+            (
+                "PRIMARY_GPIO_PINS_BY_BIT = "
+                + repr(tuple(banks["primary"]["teensy_pins"]))
+            ),
+            (
+                "AUX_GPIO_PINS_BY_BIT = "
+                + repr(tuple(banks["auxiliary"]["teensy_pins"]))
+            ),
+            (
+                "GPIO_16_PINS_BY_BIT = "
+                + repr(tuple(contract["data_layouts"]["gpio_aux_input"]["pins_by_bit"]))
+            ),
+            (
+                "PRIMARY_GPIO_PORT_BITS_BY_WIRE_BIT = "
+                + repr(tuple(banks["primary"]["standard_gpio_bits_by_wire_bit"]))
+            ),
+            (
+                "AUX_GPIO_PORT_BITS_BY_WIRE_BIT = "
+                + repr(tuple(banks["auxiliary"]["standard_gpio_bits_by_wire_bit"]))
+            ),
+            f"PRIMARY_GPIO_CAPTURE_MASK = 0x{int(banks['primary']['aggregate_mask']):08X}",
+            f"AUX_GPIO_CAPTURE_MASK = 0x{int(banks['auxiliary']['aggregate_mask']):08X}",
+            f"PRIMARY_GPIO_STANDARD_PORT = {int(banks['primary']['standard_gpio'])}",
+            f"AUX_GPIO_STANDARD_PORT = {int(banks['auxiliary']['standard_gpio'])}",
+            f"PRIMARY_GPIO_FAST_PORT = {int(banks['primary']['fast_gpio'])}",
+            f"AUX_GPIO_FAST_PORT = {int(banks['auxiliary']['fast_gpio'])}",
+            f"PRIMARY_GPIO_FAST_SELECT_GPR = {int(banks['primary']['fast_select_gpr'])}",
+            f"AUX_GPIO_FAST_SELECT_GPR = {int(banks['auxiliary']['fast_select_gpr'])}",
+            f"AUX_GPIO_XBAR_OUTPUT = {int(resources['auxiliary_xbar_output'])}",
+            f"AUX_GPIO_DMAMUX_SOURCE = {int(resources['auxiliary_dmamux_source'])}",
+            f"AUX_GPIO_EDMA_CHANNEL = {int(resources['auxiliary_edma_channel'])}",
+            f"AUX_GPIO_EDMA_PRIORITY = {int(resources['enabled_mode_edma_priorities'][3])}",
+            f"AUX_GPIO_RAW_RING_DEPTH = {int(resources['raw_ring_depth_per_bank'])}",
+            f"GPIO_RAW_WORD_BYTES_PER_BANK = {int(resources['raw_word_bytes_per_bank'])}",
+            f"PAIRED_GPIO_JOIN_REQUIRED = {bool(resources['paired_join_required'])!r}",
+            "",
+            "AUX_BANK_LAYOUTS: dict[AuxBankMode, dict[str, int]] = {",
+        ]
+    )
+    for mode_name, layout in layouts.items():
+        extension.append(f"    AuxBankMode.{mode_name}: {{")
+        for key, value in layout.items():
+            extension.append(f'        "{key}": {int(value)},')
+        extension.append("    },")
+    extension.extend(
+        ["}", "", "RATE_PROFILE_TIMING: dict[RateProfile, dict[str, int]] = {"]
+    )
+    for profile in contract["rate_profiles"]:
+        extension.append(f"    RateProfile.{profile['name']}: {{")
+        for key in (
+            "adc_pair_rate_hz",
+            "gpio_sample_rate_hz",
+            "adc_pair_period_ticks",
+            "adc1_phase_ticks",
+            "gpio_sample_period_ticks",
+            "gpio_master_pit_divider",
+            "gpio_master_pit_load",
+            "adc_pair_pit_divider",
+            "adc_pair_pit_load",
+            "adc_etc_predivider",
+            "adc_etc_chain_length",
+            "adc0_initial_delay",
+            "adc1_initial_delay",
+            "adc0_effective_delay",
+            "adc1_effective_delay",
+            "adc1_phase_ipg_cycles",
+            "completion_expected_dwt_cycles",
+        ):
+            extension.append(f'        "{key}": {int(profile[key])},')
+        extension.append(
+            '        "disabled_frame_coverage_ticks": '
+            f"{int(profile['frame_coverage_ticks']['DISABLED'])},"
+        )
+        extension.append(
+            '        "input_frame_coverage_ticks": '
+            f"{int(profile['frame_coverage_ticks']['INPUT'])},"
+        )
+        extension.append("    },")
+    extension.extend(["}", ""])
+    return (rendered.rstrip() + "\n" + "\n".join(extension)).encode()
 
 
 def cpp_enum(
@@ -1497,7 +2000,7 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
                 sum(
                     1 << int(entry["value"])
                     for entry in checksums
-                    if entry["enabled_in_v1"]
+                    if checksum_enabled(contract, entry)
                 )
             )
             + "U;",
@@ -1674,6 +2177,187 @@ def render_cpp(contract: Mapping[str, Any], source_sha256: str) -> bytes:
     return "\n".join(lines).encode()
 
 
+def render_cpp_v2(contract: Mapping[str, Any], source_sha256: str) -> bytes:
+    """Render the disjoint experimental-v2 portable C++ constants header."""
+
+    rendered = render_cpp(contract, source_sha256).decode()
+    rendered = rendered.replace(
+        "// Generated from protocol/protocol-v1.json. Do not edit by hand.",
+        "// Generated from protocol/protocol-v2.json. Do not edit by hand.",
+        1,
+    ).replace("protocol_v1", "protocol_v2")
+    closing = "\n}  // namespace thingdaq::protocol_v2\n"
+    if closing not in rendered:
+        raise ContractError("cannot locate generated protocol-v2 namespace boundary")
+
+    auxiliary = contract["auxiliary_input"]
+    banks = auxiliary["pin_banks"]
+    resources = auxiliary["provisional_resources"]
+    timing = contract["timing"]
+    layouts = auxiliary["layouts"]
+    lines: list[str] = [
+        "",
+        "enum class AuxBankMode : std::uint8_t {",
+    ]
+    lines.extend(
+        f"  k{snake_to_pascal(str(entry['name']))} = {int(entry['value'])}U,"
+        for entry in contract["enums"]["aux_bank_mode"]
+    )
+    lines.extend(["};", "", "enum class TemperatureStatus : std::uint8_t {"])
+    lines.extend(
+        f"  k{snake_to_pascal(str(entry['name']))} = {int(entry['value'])}U,"
+        for entry in contract["enums"]["temperature_status"]
+    )
+    lines.extend(["};", "", "enum class RateProfile : std::uint8_t {"])
+    lines.extend(
+        f"  k{snake_to_pascal(str(entry['name']))} = {int(entry['value'])}U,"
+        for entry in contract["enums"]["rate_profile"]
+    )
+    lines.extend(
+        [
+            "};",
+            "",
+            "struct RateProfileTiming {",
+            "  RateProfile profile;",
+            "  std::uint32_t adc_pair_rate_hz;",
+            "  std::uint32_t gpio_sample_rate_hz;",
+            "  std::uint16_t adc_pair_period_ticks;",
+            "  std::uint16_t adc1_phase_ticks;",
+            "  std::uint16_t gpio_sample_period_ticks;",
+            "  std::uint16_t gpio_master_pit_divider;",
+            "  std::uint16_t gpio_master_pit_load;",
+            "  std::uint16_t adc_pair_pit_divider;",
+            "  std::uint16_t adc_pair_pit_load;",
+            "  std::uint16_t adc1_phase_ipg_cycles;",
+            "  std::uint32_t completion_expected_dwt_cycles;",
+            "  std::uint32_t disabled_frame_coverage_ticks;",
+            "  std::uint32_t input_frame_coverage_ticks;",
+            "};",
+            "",
+            (
+                "inline constexpr std::size_t kMinDataFrameBytes = "
+                f"{int(contract['limits']['min_data_frame_bytes'])}U;"
+            ),
+            f"inline constexpr std::uint32_t kPitClockHz = {int(timing['pit_clock_hz'])}U;",
+            f"inline constexpr std::uint32_t kIpgClockHz = {int(timing['ipg_clock_hz'])}U;",
+            f"inline constexpr std::uint32_t kDwtClockHz = {int(timing['dwt_clock_hz'])}U;",
+            (
+                "inline constexpr std::uint8_t kSupportedAuxBankModeMask = "
+                + str(
+                    sum(
+                        1 << int(entry["value"])
+                        for entry in contract["enums"]["aux_bank_mode"]
+                    )
+                )
+                + "U;"
+            ),
+            (
+                "inline constexpr std::uint8_t kSupportedRateProfileMask = "
+                f"{int(timing['supported_rate_profile_mask'])}U;"
+            ),
+            "inline constexpr AuxBankMode kDefaultAuxBankMode =",
+            f"    AuxBankMode::k{snake_to_pascal(str(auxiliary['default_mode']))};",
+            "inline constexpr RateProfile kDefaultRateProfile =",
+            f"    RateProfile::k{snake_to_pascal(str(timing['default_rate_profile']))};",
+            "inline constexpr std::uint8_t kPrimaryGpioPinsByBit[] = {"
+            + ", ".join(f"{int(value)}U" for value in banks["primary"]["teensy_pins"])
+            + "};",
+            "inline constexpr std::uint8_t kAuxGpioPinsByBit[] = {"
+            + ", ".join(f"{int(value)}U" for value in banks["auxiliary"]["teensy_pins"])
+            + "};",
+            "inline constexpr std::uint8_t kGpio16PinsByBit[] = {"
+            + ", ".join(
+                f"{int(value)}U"
+                for value in contract["data_layouts"]["gpio_aux_input"]["pins_by_bit"]
+            )
+            + "};",
+            "inline constexpr std::uint8_t kPrimaryGpioPortBitsByWireBit[] = {"
+            + ", ".join(
+                f"{int(value)}U"
+                for value in banks["primary"]["standard_gpio_bits_by_wire_bit"]
+            )
+            + "};",
+            "inline constexpr std::uint8_t kAuxGpioPortBitsByWireBit[] = {"
+            + ", ".join(
+                f"{int(value)}U"
+                for value in banks["auxiliary"]["standard_gpio_bits_by_wire_bit"]
+            )
+            + "};",
+            (
+                "inline constexpr std::uint32_t kPrimaryGpioCaptureMask = "
+                f"0x{int(banks['primary']['aggregate_mask']):08X}U;"
+            ),
+            (
+                "inline constexpr std::uint32_t kAuxGpioCaptureMask = "
+                f"0x{int(banks['auxiliary']['aggregate_mask']):08X}U;"
+            ),
+            f"inline constexpr std::uint8_t kAuxGpioXbarOutput = {int(resources['auxiliary_xbar_output'])}U;",
+            f"inline constexpr std::uint8_t kAuxGpioDmamuxSource = {int(resources['auxiliary_dmamux_source'])}U;",
+            f"inline constexpr std::uint8_t kAuxGpioEdmaChannel = {int(resources['auxiliary_edma_channel'])}U;",
+            "inline constexpr std::uint8_t kInputModeEdmaPriorities[] = {"
+            + ", ".join(
+                f"{int(value)}U" for value in resources["enabled_mode_edma_priorities"]
+            )
+            + "};",
+            f"inline constexpr std::uint8_t kAuxGpioRawRingDepth = {int(resources['raw_ring_depth_per_bank'])}U;",
+            f"inline constexpr std::uint8_t kGpioRawWordBytesPerBank = {int(resources['raw_word_bytes_per_bank'])}U;",
+            "inline constexpr bool kPairedGpioJoinRequired = true;",
+            (
+                "inline constexpr std::size_t kDisabledAdcPairsPerFrame = "
+                f"{int(layouts['DISABLED']['adc_items_per_frame'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kDisabledGpioSamplesPerFrame = "
+                f"{int(layouts['DISABLED']['gpio_items_per_frame'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kInputAdcPairsPerFrame = "
+                f"{int(layouts['INPUT']['adc_items_per_frame'])}U;"
+            ),
+            (
+                "inline constexpr std::size_t kInputGpioSamplesPerFrame = "
+                f"{int(layouts['INPUT']['gpio_items_per_frame'])}U;"
+            ),
+            "",
+            "inline constexpr RateProfileTiming kRateProfiles[] = {",
+        ]
+    )
+    for profile in contract["rate_profiles"]:
+        values = (
+            f"RateProfile::k{snake_to_pascal(str(profile['name']))}",
+            *(
+                f"{int(profile[key])}U"
+                for key in (
+                    "adc_pair_rate_hz",
+                    "gpio_sample_rate_hz",
+                    "adc_pair_period_ticks",
+                    "adc1_phase_ticks",
+                    "gpio_sample_period_ticks",
+                    "gpio_master_pit_divider",
+                    "gpio_master_pit_load",
+                    "adc_pair_pit_divider",
+                    "adc_pair_pit_load",
+                    "adc1_phase_ipg_cycles",
+                    "completion_expected_dwt_cycles",
+                )
+            ),
+            f"{int(profile['frame_coverage_ticks']['DISABLED'])}U",
+            f"{int(profile['frame_coverage_ticks']['INPUT'])}U",
+        )
+        lines.append("    {" + ", ".join(values) + "},")
+    lines.extend(
+        [
+            "};",
+            f"static_assert(sizeof(kRateProfiles) / sizeof(kRateProfiles[0]) == {len(contract['rate_profiles'])}U);",
+            "static_assert(kInputAdcPairsPerFrame * kAdcBytesPerPair == 2024U);",
+            "static_assert(kInputGpioSamplesPerFrame * 2U == kDataPayloadBytes);",
+            "",
+        ]
+    )
+    extension = "\n".join(lines)
+    return rendered.replace(closing, extension + closing, 1).encode()
+
+
 def encode_schema_payload(
     contract: Mapping[str, Any], schema_name: str, values: Mapping[str, Any]
 ) -> bytes:
@@ -1714,6 +2398,39 @@ def encode_schema_payload(
             if len(encoded) != int(field["count"]):
                 raise ContractError(f"{schema_name}.{name} has the wrong byte count")
             payload[offset : offset + len(encoded)] = encoded
+        elif field_type == "repeated_u16":
+            items = list(value)
+            if len(items) != int(field["count"]):
+                raise ContractError(f"{schema_name}.{name} has the wrong item count")
+            for index, item in enumerate(items):
+                struct.pack_into("<H", payload, offset + index * 2, int(item))
+        elif field_type == "repeated_u16_pair":
+            items = list(value)
+            if len(items) != int(field["count"]):
+                raise ContractError(f"{schema_name}.{name} has the wrong pair count")
+            for index, pair in enumerate(items):
+                if len(pair) != 2:
+                    raise ContractError(
+                        f"{schema_name}.{name}[{index}] is not a uint16 pair"
+                    )
+                struct.pack_into(
+                    "<HH",
+                    payload,
+                    offset + index * 4,
+                    int(pair[0]),
+                    int(pair[1]),
+                )
+        elif field_type == "repeated_schema":
+            items = list(value)
+            count = int(field["count"])
+            nested_schema = str(field["schema"])
+            nested_size = int(contract["payload_schemas"][nested_schema]["size"])
+            if len(items) != count:
+                raise ContractError(f"{schema_name}.{name} has the wrong record count")
+            for index, item in enumerate(items):
+                encoded = encode_schema_payload(contract, nested_schema, item)
+                start = offset + index * nested_size
+                payload[start : start + nested_size] = encoded
         else:
             raise ContractError(
                 f"generic fixture encoder does not support {field_type!r}"
@@ -1735,7 +2452,10 @@ def encode_fixture_payload(
     payload_spec = fixture["payload"]
     pattern = payload_spec.get("pattern")
     if pattern == "adc_interleaved_ramp":
-        layout = contract["data_layouts"]["adc"]
+        layout_name = (
+            "adc_aux_input" if fixture.get("aux_bank_mode") == "INPUT" else "adc"
+        )
+        layout = contract["data_layouts"][layout_name]
         count = int(layout["items_per_frame"])
         code_mask = (1 << int(layout["resolution_bits"])) - 1
         start_index = int(payload_spec["start_index"])
@@ -1754,6 +2474,16 @@ def encode_fixture_payload(
         count = int(contract["data_layouts"]["gpio"]["items_per_frame"])
         start_index = int(payload_spec["start_index"])
         return bytes((start_index + offset) & 0xFF for offset in range(count))
+    if pattern == "gpio_u16_bank_ramp":
+        count = int(contract["data_layouts"]["gpio_aux_input"]["items_per_frame"])
+        start_index = int(payload_spec["start_index"])
+        payload = bytearray(count * 2)
+        for offset in range(count):
+            sample_index = start_index + offset
+            primary = sample_index & 0xFF
+            auxiliary = (0x80 + 3 * sample_index) & 0xFF
+            struct.pack_into("<H", payload, offset * 2, primary | (auxiliary << 8))
+        return bytes(payload)
     if pattern is not None:
         raise ContractError(f"unknown golden payload pattern: {pattern}")
 
@@ -1778,8 +2508,310 @@ def compute_golden_checksum(data: bytes, algorithm_name: str) -> int:
     raise ContractError(f"no golden checksum implementation for {algorithm_name}")
 
 
+def _fixture_by_name(
+    fixtures: Sequence[Mapping[str, Any]], name: str
+) -> Mapping[str, Any]:
+    for fixture in fixtures:
+        if fixture["name"] == name:
+            return fixture
+    raise ContractError(f"missing golden fixture seed {name!r}")
+
+
+def _profile_slug(profile_name: str) -> str:
+    return profile_name.lower().replace("_", "-")
+
+
+def _v2_configuration_values(
+    contract: Mapping[str, Any], mode_name: str, profile: Mapping[str, Any]
+) -> dict[str, int]:
+    modes = enum_map(contract["enums"]["aux_bank_mode"])
+    return {
+        "stream_mask": 3,
+        "source": 1,
+        "data_checksum_algorithm": 1,
+        "aux_bank_mode": modes[mode_name],
+        "data_frame_bytes": int(contract["limits"]["data_frame_bytes"]),
+        "adc_pair_rate_hz": int(profile["adc_pair_rate_hz"]),
+        "gpio_sample_rate_hz": int(profile["gpio_sample_rate_hz"]),
+    }
+
+
+def _v2_info_values(
+    contract: Mapping[str, Any],
+    seed_values: Mapping[str, Any],
+    mode_name: str,
+    profile: Mapping[str, Any],
+) -> dict[str, Any]:
+    values = copy.deepcopy(dict(seed_values))
+    mode_value = enum_map(contract["enums"]["aux_bank_mode"])[mode_name]
+    layout = contract["auxiliary_input"]["layouts"][mode_name]
+    alignment = int(contract["combined_acquisition"]["dma_alignment_bytes"])
+    adc_payload_bytes = int(layout["adc_payload_bytes"])
+    aligned_adc_payload = ((adc_payload_bytes + alignment - 1) // alignment) * alignment
+    raw_ring_depth = int(contract["gpio_capture"]["raw_ring_depth"])
+    values.update(
+        {
+            "device_state": 2,
+            "adc_pair_rate_hz": int(profile["adc_pair_rate_hz"]),
+            "gpio_sample_rate_hz": int(profile["gpio_sample_rate_hz"]),
+            "adc_pair_period_ticks": int(profile["adc_pair_period_ticks"]),
+            "adc1_phase_ticks": int(profile["adc1_phase_ticks"]),
+            "gpio_sample_period_ticks": int(profile["gpio_sample_period_ticks"]),
+            "gpio_packed_width_bits": int(layout["gpio_width_bits"]),
+            "gpio_raw_samples_per_buffer": int(layout["gpio_items_per_frame"]),
+            "gpio_raw_ring_bytes": (
+                raw_ring_depth * int(layout["gpio_items_per_frame"]) * 4
+            ),
+            "gpio_edma_priority": 1 if mode_name == "INPUT" else 0,
+            "adc_trigger_gpio_master_rate_hz": int(profile["gpio_sample_rate_hz"]),
+            "adc_trigger_pair_rate_hz": int(profile["adc_pair_rate_hz"]),
+            "adc_trigger_gpio_master_pit_load": int(profile["gpio_master_pit_load"]),
+            "adc_trigger_pair_pit_load": int(profile["adc_pair_pit_load"]),
+            "adc_trigger_predivider": int(profile["adc_etc_predivider"]),
+            "adc_trigger_chain_length": int(profile["adc_etc_chain_length"]),
+            "adc0_trigger_initial_delay": int(profile["adc0_initial_delay"]),
+            "adc1_trigger_initial_delay": int(profile["adc1_initial_delay"]),
+            "adc0_trigger_effective_delay": int(profile["adc0_effective_delay"]),
+            "adc1_trigger_effective_delay": int(profile["adc1_effective_delay"]),
+            "adc_trigger_phase_ipg_cycles": int(profile["adc1_phase_ipg_cycles"]),
+            "adc_completion_expected_delta_cycles": int(
+                profile["completion_expected_dwt_cycles"]
+            ),
+            "applied_stream_mask": 3,
+            "applied_source": 1,
+            "data_payload_bytes": adc_payload_bytes,
+            "adc_pairs_per_frame": int(layout["adc_items_per_frame"]),
+            "gpio_samples_per_frame": int(layout["gpio_items_per_frame"]),
+            "frame_coverage_ticks": int(profile["frame_coverage_ticks"][mode_name]),
+            "adc_edma_priorities": [3, 2] if mode_name == "INPUT" else [2, 1],
+            "adc_pairs_per_buffer": int(layout["adc_items_per_frame"]),
+            "adc_dma_ring_bytes": (
+                int(contract["combined_acquisition"]["adc_dma_ring_depth"])
+                * aligned_adc_payload
+            ),
+            "selected_rate_profile": int(profile["value"]),
+            "applied_aux_bank_mode": mode_value,
+            "gpio_item_bytes": int(layout["gpio_bytes_per_item"]),
+        }
+    )
+    return values
+
+
+def _apply_nested_override(values: dict[str, Any], path: str, value: Any) -> None:
+    parts = path.split(".")
+    cursor: Any = values
+    for part in parts[:-1]:
+        cursor = cursor[int(part)] if isinstance(cursor, list) else cursor[part]
+    final = parts[-1]
+    if isinstance(cursor, list):
+        cursor[int(final)] = copy.deepcopy(value)
+    else:
+        cursor[final] = copy.deepcopy(value)
+
+
+def expand_v2_golden_fixtures(
+    contract: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Expand the compact v2 seeds into exhaustive deterministic wire vectors."""
+
+    seeds = copy.deepcopy(list(contract["golden_fixtures"]))
+    expanded: list[dict[str, Any]] = list(seeds)
+    plan = contract["golden_vector_plan"]
+    profiles = contract["rate_profiles"]
+    modes = tuple(contract["auxiliary_input"]["supported_modes"])
+    base_info = _fixture_by_name(seeds, "info-response")
+    base_info_values = base_info["payload"]["values"]
+
+    if plan["generate_gpio_mode_profile_matrix"]:
+        for mode_index, mode_name in enumerate(modes):
+            layout = contract["auxiliary_input"]["layouts"][mode_name]
+            for profile in profiles:
+                slug = _profile_slug(str(profile["name"]))
+                width = int(layout["gpio_width_bits"])
+                expanded.append(
+                    {
+                        "name": f"gpio-{width}bit-{slug}",
+                        "kind": "GPIO_DATA",
+                        "aux_bank_mode": mode_name,
+                        "rate_profile": str(profile["name"]),
+                        "flags": ["SYNTHETIC", "EPOCH_START"],
+                        "run_id": 100 + mode_index * 10 + int(profile["value"]),
+                        "sequence": 0,
+                        "request_id": 0,
+                        "first_sample_ticks": 0,
+                        "item_count": int(layout["gpio_items_per_frame"]),
+                        "payload": {
+                            "pattern": (
+                                "gpio_byte_ramp"
+                                if mode_name == "DISABLED"
+                                else "gpio_u16_bank_ramp"
+                            ),
+                            "start_index": 17 * int(profile["value"]),
+                        },
+                        "expectation": "accept",
+                        "case": "gpio-mode-profile-matrix",
+                    }
+                )
+
+    generated_requests: set[str] = set()
+    if plan["generate_configure_mode_profile_matrix"]:
+        for mode_index, mode_name in enumerate(modes):
+            for profile in profiles:
+                slug = _profile_slug(str(profile["name"]))
+                stem = f"configure-{mode_name.lower()}-{slug}"
+                request_name = f"{stem}-request"
+                request_id = 1000 + mode_index * 10 + int(profile["value"])
+                configuration = _v2_configuration_values(contract, mode_name, profile)
+                expanded.extend(
+                    [
+                        {
+                            "name": request_name,
+                            "kind": "CONFIGURE_REQUEST",
+                            "request_id": request_id,
+                            "payload": {
+                                "schema": "configure_request",
+                                "values": configuration,
+                            },
+                            "expectation": "accept",
+                            "case": "configure-mode-profile-matrix",
+                            "aux_bank_mode": mode_name,
+                            "rate_profile": str(profile["name"]),
+                        },
+                        {
+                            "name": f"{stem}-response",
+                            "kind": "CONFIGURE_RESPONSE",
+                            "request_id": request_id,
+                            "payload": {
+                                "schema": "configure_response",
+                                "values": {
+                                    "response_status": 0,
+                                    "error_code": 0,
+                                    **configuration,
+                                },
+                            },
+                            "expectation": "accept",
+                            "case": "configure-mode-profile-matrix",
+                            "correlates_to": request_name,
+                            "aux_bank_mode": mode_name,
+                            "rate_profile": str(profile["name"]),
+                        },
+                    ]
+                )
+                generated_requests.add(request_name)
+
+    if plan["generate_info_mode_profile_matrix"]:
+        for mode_index, mode_name in enumerate(modes):
+            for profile in profiles:
+                slug = _profile_slug(str(profile["name"]))
+                expanded.append(
+                    {
+                        "name": f"info-{mode_name.lower()}-{slug}-response",
+                        "kind": "INFO_RESPONSE",
+                        "request_id": 1100 + mode_index * 10 + int(profile["value"]),
+                        "payload": {
+                            "schema": "info_response",
+                            "values": _v2_info_values(
+                                contract, base_info_values, mode_name, profile
+                            ),
+                        },
+                        "expectation": "accept",
+                        "case": "info-mode-profile-matrix",
+                        "aux_bank_mode": mode_name,
+                        "rate_profile": str(profile["name"]),
+                    }
+                )
+
+    configure_seed = _fixture_by_name(seeds, "configure-request")
+    configure_response_seed = _fixture_by_name(seeds, "configure-response")
+    error_codes = enum_map(contract["enums"]["error_code"])
+    for index, malformed in enumerate(plan["malformed_cases"]):
+        name = str(malformed["name"])
+        target = str(malformed["target"])
+        request_id = 2000 + index
+        if target == "configure_request":
+            values = copy.deepcopy(configure_seed["payload"]["values"])
+            values.update(copy.deepcopy(malformed.get("overrides", {})))
+            request_name = f"malformed-{name}-configure-request"
+            expanded.append(
+                {
+                    "name": request_name,
+                    "kind": "CONFIGURE_REQUEST",
+                    "request_id": request_id,
+                    "payload": {"schema": "configure_request", "values": values},
+                    "expectation": "reject",
+                    "case": name,
+                    "expected_rejection": str(malformed["expected_rejection"]),
+                    "reason": str(malformed["reason"]),
+                    "expected_error_code": str(malformed["error_code"]),
+                }
+            )
+            expanded.append(
+                {
+                    "name": f"malformed-{name}-configure-error-response",
+                    "kind": "CONFIGURE_RESPONSE",
+                    "flags": ["RESPONSE_ERROR"],
+                    "request_id": request_id,
+                    "payload": {
+                        "schema": "response_prefix",
+                        "values": {
+                            "response_status": 1,
+                            "error_code": error_codes[str(malformed["error_code"])],
+                        },
+                    },
+                    "expectation": "accept-error",
+                    "case": name,
+                    "correlates_to": request_name,
+                    "expected_error_code": str(malformed["error_code"]),
+                }
+            )
+        elif target == "info_response":
+            values = copy.deepcopy(base_info_values)
+            values.update(copy.deepcopy(malformed.get("overrides", {})))
+            for path, value in malformed.get("nested_overrides", {}).items():
+                _apply_nested_override(values, str(path), value)
+            expanded.append(
+                {
+                    "name": f"malformed-{name}-info-response",
+                    "kind": "INFO_RESPONSE",
+                    "request_id": request_id,
+                    "payload": {"schema": "info_response", "values": values},
+                    "expectation": "reject",
+                    "case": name,
+                    "expected_rejection": str(malformed["expected_rejection"]),
+                    "reason": str(malformed["reason"]),
+                }
+            )
+        else:
+            values = copy.deepcopy(configure_response_seed["payload"]["values"])
+            values.update(copy.deepcopy(malformed.get("overrides", {})))
+            request_fixture = str(malformed["request_fixture"])
+            if request_fixture not in generated_requests:
+                raise ContractError(
+                    f"malformed fixture {name} references unknown {request_fixture}"
+                )
+            expanded.append(
+                {
+                    "name": f"malformed-{name}-configure-response",
+                    "kind": "CONFIGURE_RESPONSE",
+                    "request_id": 1000,
+                    "payload": {"schema": "configure_response", "values": values},
+                    "expectation": "reject-client",
+                    "case": name,
+                    "correlates_to": request_fixture,
+                    "expected_rejection": str(malformed["expected_rejection"]),
+                    "reason": str(malformed["reason"]),
+                }
+            )
+
+    names = [str(fixture["name"]) for fixture in expanded]
+    if len(names) != len(set(names)):
+        raise ContractError("expanded protocol-v2 fixture names are not unique")
+    return expanded
+
+
 def build_golden_frames(
     contract: Mapping[str, Any],
+    fixtures: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[dict[str, bytes], list[dict[str, Any]]]:
     """Build every deterministic binary frame and its manifest metadata."""
 
@@ -1801,7 +2833,8 @@ def build_golden_frames(
 
     outputs: dict[str, bytes] = {}
     manifest_entries: list[dict[str, Any]] = []
-    for fixture in contract["golden_fixtures"]:
+    selected_fixtures = contract["golden_fixtures"] if fixtures is None else fixtures
+    for fixture in selected_fixtures:
         fixture_name = str(fixture["name"])
         kind_name = str(fixture["kind"])
         kind_spec = kind_specs[kind_name]
@@ -1813,10 +2846,13 @@ def build_golden_frames(
         checksum_id = checksum_values[checksum_name]
         payload = encode_fixture_payload(contract, fixture)
         payload_spec = fixture["payload"]
-        if (
-            "schema" in payload_spec
-            and payload_spec["schema"] != kind_spec["payload_schema"]
-        ):
+        response_error = "RESPONSE_ERROR" in fixture.get("flags", [])
+        expected_schema = (
+            kind_spec.get("error_payload_schema", kind_spec["payload_schema"])
+            if response_error
+            else kind_spec["payload_schema"]
+        )
+        if "schema" in payload_spec and payload_spec["schema"] != expected_schema:
             raise ContractError(
                 f"fixture {fixture_name} schema disagrees with {kind_name}"
             )
@@ -1840,8 +2876,71 @@ def build_golden_frames(
         item_count = int(fixture.get("item_count", 0))
         total_length = int(header["size"]) + len(payload) + trailer_size
         if kind_spec["class"] == "data":
-            if total_length != int(limits["data_frame_bytes"]):
-                raise ContractError(f"fixture {fixture_name} is not 4096 bytes")
+            if int(contract["protocol_version"]) == 1:
+                expected_total_length = int(limits["data_frame_bytes"])
+                expected_item_count = (
+                    int(contract["data_layouts"]["adc"]["items_per_frame"])
+                    if kind_name == "ADC_DATA"
+                    else int(contract["data_layouts"]["gpio"]["items_per_frame"])
+                )
+                period_ticks = int(
+                    contract["timing"][
+                        "adc_pair_period_ticks"
+                        if kind_name == "ADC_DATA"
+                        else "gpio_sample_period_ticks"
+                    ]
+                )
+            else:
+                mode_name = str(fixture.get("aux_bank_mode", ""))
+                profile_name = str(fixture.get("rate_profile", ""))
+                if mode_name not in contract["auxiliary_input"]["layouts"]:
+                    raise ContractError(
+                        f"v2 data fixture {fixture_name} has no auxiliary mode"
+                    )
+                profiles = {
+                    str(profile["name"]): profile
+                    for profile in contract["rate_profiles"]
+                }
+                if profile_name not in profiles:
+                    raise ContractError(
+                        f"v2 data fixture {fixture_name} has no rate profile"
+                    )
+                layout = contract["auxiliary_input"]["layouts"][mode_name]
+                expected_total_length = int(
+                    layout[
+                        "adc_total_frame_bytes"
+                        if kind_name == "ADC_DATA"
+                        else "gpio_total_frame_bytes"
+                    ]
+                )
+                expected_item_count = int(
+                    layout[
+                        "adc_items_per_frame"
+                        if kind_name == "ADC_DATA"
+                        else "gpio_items_per_frame"
+                    ]
+                )
+                period_ticks = int(
+                    profiles[profile_name][
+                        "adc_pair_period_ticks"
+                        if kind_name == "ADC_DATA"
+                        else "gpio_sample_period_ticks"
+                    ]
+                )
+            if total_length != expected_total_length:
+                raise ContractError(
+                    f"fixture {fixture_name} has total length {total_length}; "
+                    f"expected {expected_total_length}"
+                )
+            if item_count != expected_item_count:
+                raise ContractError(
+                    f"fixture {fixture_name} has item count {item_count}; "
+                    f"expected {expected_item_count}"
+                )
+            if first_sample_ticks % period_ticks:
+                raise ContractError(
+                    f"fixture {fixture_name} timestamp is not profile-aligned"
+                )
             if request_id != 0:
                 raise ContractError(f"data fixture {fixture_name} has a request ID")
         else:
@@ -1900,6 +2999,19 @@ def build_golden_frames(
         }
         if len(frame) <= 256:
             manifest_entry["frame_hex"] = frame.hex()
+        if int(contract["protocol_version"]) == 2:
+            manifest_entry["expectation"] = str(fixture.get("expectation", "accept"))
+            for key in (
+                "aux_bank_mode",
+                "case",
+                "correlates_to",
+                "expected_error_code",
+                "expected_rejection",
+                "rate_profile",
+                "reason",
+            ):
+                if key in fixture:
+                    manifest_entry[key] = fixture[key]
         manifest_entries.append(manifest_entry)
 
     return outputs, manifest_entries
@@ -1934,6 +3046,65 @@ def expected_outputs(
     return outputs
 
 
+def expected_v2_outputs(
+    contract: Mapping[str, Any], source_bytes: bytes
+) -> dict[Path, bytes]:
+    """Return every disjoint generated protocol-v2 path and exact contents."""
+
+    source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+    fixtures = expand_v2_golden_fixtures(contract)
+    fixture_outputs, manifest_entries = build_golden_frames(contract, fixtures)
+    generated = contract["generated_outputs"]
+    fixture_directory = REPOSITORY_ROOT / str(generated["fixture_directory"])
+    manifest_path = REPOSITORY_ROOT / str(generated["fixture_manifest"])
+    manifest = {
+        "byte_order": contract["byte_order"],
+        "extension": contract["extension"],
+        "fixtures": manifest_entries,
+        "generator": "tools/generate_protocol.py",
+        "protocol_version": int(contract["protocol_version"]),
+        "source": "protocol/protocol-v2.json",
+        "source_sha256": source_sha256,
+        "v1_source": contract["extends"]["source"],
+        "v1_source_sha256": contract["extends"]["source_sha256"],
+    }
+    outputs = {
+        REPOSITORY_ROOT / str(generated["python_constants"]): render_python_v2(
+            contract, source_sha256
+        ),
+        REPOSITORY_ROOT / str(generated["cpp_constants"]): render_cpp_v2(
+            contract, source_sha256
+        ),
+        manifest_path: (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode(),
+    }
+    outputs.update(
+        {
+            fixture_directory / name: contents
+            for name, contents in fixture_outputs.items()
+        }
+    )
+    return outputs
+
+
+def expected_all_outputs(
+    v1_contract: Mapping[str, Any],
+    v1_source_bytes: bytes,
+    v2_contract: Mapping[str, Any],
+    v2_source_bytes: bytes,
+) -> dict[Path, bytes]:
+    """Return the union of frozen-v1 and experimental-v2 generated outputs."""
+
+    v1_outputs = expected_outputs(v1_contract, v1_source_bytes)
+    v2_outputs = expected_v2_outputs(v2_contract, v2_source_bytes)
+    overlap = set(v1_outputs) & set(v2_outputs)
+    if overlap:
+        raise ContractError(
+            "protocol-v1 and protocol-v2 generated paths overlap: "
+            + ", ".join(relative_paths(sorted(overlap)))
+        )
+    return {**v1_outputs, **v2_outputs}
+
+
 def relative_paths(paths: Iterable[Path]) -> list[str]:
     """Make generated paths concise and stable in command output."""
 
@@ -1948,15 +3119,17 @@ def check_outputs(outputs: Mapping[Path, bytes]) -> int:
         for path, expected in outputs.items()
         if not path.is_file() or path.read_bytes() != expected
     ]
-    if MANIFEST_PATH in outputs:
+    fixture_directories = {path.parent for path in outputs if path.suffix == ".bin"}
+    for fixture_directory in fixture_directories:
         expected_fixture_paths = {
-            path for path in outputs if path.parent == FIXTURE_DIRECTORY
+            path for path in outputs if path.parent == fixture_directory
         }
         drifted.extend(
             path
-            for path in FIXTURE_DIRECTORY.glob("*.bin")
+            for path in fixture_directory.glob("*.bin")
             if path not in expected_fixture_paths
         )
+    drifted = list(dict.fromkeys(drifted))
     if drifted:
         print("Generated protocol files are missing or stale:", file=sys.stderr)
         for relative_path in relative_paths(drifted):
@@ -1975,11 +3148,12 @@ def write_outputs(outputs: Mapping[Path, bytes]) -> int:
 
     changed: list[Path] = []
     removed: list[Path] = []
-    if MANIFEST_PATH in outputs:
+    fixture_directories = {path.parent for path in outputs if path.suffix == ".bin"}
+    for fixture_directory in fixture_directories:
         expected_fixture_paths = {
-            path for path in outputs if path.parent == FIXTURE_DIRECTORY
+            path for path in outputs if path.parent == fixture_directory
         }
-        for path in FIXTURE_DIRECTORY.glob("*.bin"):
+        for path in fixture_directory.glob("*.bin"):
             if path not in expected_fixture_paths:
                 path.unlink()
                 removed.append(path)
@@ -2007,15 +3181,34 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="report generated-file drift without changing the workspace",
     )
+    parser.add_argument(
+        "--protocol",
+        choices=("all", "v1", "v2"),
+        default="all",
+        help="select generated protocol outputs (default: all)",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     try:
-        contract, source_bytes = load_contract()
-        validate_contract(contract)
-        outputs = expected_outputs(contract, source_bytes)
+        v1_contract, v1_source_bytes = load_contract()
+        validate_contract(v1_contract)
+        if args.protocol == "v1":
+            outputs = expected_outputs(v1_contract, v1_source_bytes)
+        else:
+            v2_contract, v2_source_bytes = load_contract(V2_SOURCE_PATH)
+            validate_v2_contract(v2_contract, v1_contract, v1_source_bytes)
+            if args.protocol == "v2":
+                outputs = expected_v2_outputs(v2_contract, v2_source_bytes)
+            else:
+                outputs = expected_all_outputs(
+                    v1_contract,
+                    v1_source_bytes,
+                    v2_contract,
+                    v2_source_bytes,
+                )
     except (ContractError, KeyError, TypeError, json.JSONDecodeError) as error:
         print(f"Invalid protocol contract: {error}", file=sys.stderr)
         return 2

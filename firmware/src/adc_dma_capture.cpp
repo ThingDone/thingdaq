@@ -42,13 +42,19 @@ std::uint64_t absoluteDifference(std::uint64_t left,
 THINGDAQ_ADC_DMA_COLD_CODE(".flashmem.adc_dma.prime")
 PrimeResult PairCaptureRing::prime(std::uint32_t epoch,
                                    std::uint32_t initial_generation,
-                                   std::uint64_t first_pair) {
+                                   std::uint64_t first_pair,
+                                   std::uint32_t pairs_per_buffer) {
   PrimeResult result{};
   result.epoch = epoch;
   result.active_generation = initial_generation;
   result.queued_generation = initial_generation + 1U;
   if (epoch == 0U) {
     result.status = OperationStatus::kInvalidEpoch;
+    return result;
+  }
+  if (pairs_per_buffer == 0U ||
+      pairs_per_buffer > protocol_v1::kAdcPairsPerFrame) {
+    result.status = OperationStatus::kInvalidPairCount;
     return result;
   }
 
@@ -71,6 +77,7 @@ PrimeResult PairCaptureRing::prime(std::uint32_t epoch,
   next_schedule_generation_ = initial_generation;
   next_free_search_ = 0U;
   epoch_ = epoch;
+  pairs_per_buffer_ = pairs_per_buffer;
   running_ = true;
 
   GenerationSlot *const active = scheduleGeneration(initial_generation);
@@ -208,7 +215,7 @@ CompletionResult PairCaptureRing::onMajorLoopComplete(
   saturatingIncrement(progress_.channel_major_loops[converter]);
   saturatingAdd(
       progress_.channel_results[converter],
-      static_cast<std::uint64_t>(protocol_v1::kAdcPairsPerFrame));
+      static_cast<std::uint64_t>(pairs_per_buffer_));
 
   if (absoluteDifference(progress_.channel_major_loops[0],
                          progress_.channel_major_loops[1]) > 1U) {
@@ -296,14 +303,13 @@ AcquireResult PairCaptureRing::acquireReady() {
   result.handle.pairs = storage_.buffers[selected].pairs.data();
   result.handle.first_pair = record.first_pair;
   result.handle.pair_count = static_cast<std::uint32_t>(
-      protocol_v1::kAdcPairsPerFrame);
+      pairs_per_buffer_);
   result.handle.epoch = record.epoch;
   result.handle.lease = record.lease;
   result.handle.buffer_index = selected;
   saturatingIncrement(progress_.buffers_acquired);
   saturatingAdd(progress_.pairs_delivered,
-                static_cast<std::uint64_t>(
-                    protocol_v1::kAdcPairsPerFrame));
+                static_cast<std::uint64_t>(pairs_per_buffer_));
   critical_.exit(token);
 
   cache_.invalidateBeforeCpuRead(
@@ -381,8 +387,7 @@ StopReport PairCaptureRing::stop(
   bool valid_progress = true;
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
-    if (channels[converter].minor_pairs >
-            protocol_v1::kAdcPairsPerFrame ||
+    if (channels[converter].minor_pairs > pairs_per_buffer_ ||
         !isDmaDestination(channels[converter].destination) ||
         channels[converter].generation !=
             next_completion_generations_[converter]) {
@@ -406,14 +411,11 @@ StopReport PairCaptureRing::stop(
          ++converter) {
       const std::uint8_t bit = static_cast<std::uint8_t>(1U << converter);
       if ((slot.completion_mask & bit) != 0U) {
-        contributed[converter] = static_cast<std::uint32_t>(
-            protocol_v1::kAdcPairsPerFrame);
+        contributed[converter] = pairs_per_buffer_;
       } else if (channels[converter].generation == slot.generation) {
         contributed[converter] =
-            channels[converter].minor_pairs >
-                    protocol_v1::kAdcPairsPerFrame
-                ? static_cast<std::uint32_t>(
-                      protocol_v1::kAdcPairsPerFrame)
+            channels[converter].minor_pairs > pairs_per_buffer_
+                ? pairs_per_buffer_
                 : channels[converter].minor_pairs;
         if (channels[converter].destination != slot.destination) {
           slot.invalid_data = true;
@@ -488,6 +490,7 @@ Snapshot PairCaptureRing::snapshot() {
   }
   value.next_completion_generations = next_completion_generations_;
   value.epoch = epoch_;
+  value.pairs_per_buffer = pairs_per_buffer_;
   value.ready_depth = countState(BufferState::kReady);
   value.reading_depth = countState(BufferState::kReading);
   value.discard_depth = countState(BufferState::kDiscardPending) +
@@ -587,7 +590,7 @@ PairCaptureRing::GenerationSlot *PairCaptureRing::scheduleGeneration(
   next_schedule_generation_ = generation + 1U;
   saturatingAdd(
       next_first_pair_,
-      static_cast<std::uint64_t>(protocol_v1::kAdcPairsPerFrame));
+      static_cast<std::uint64_t>(pairs_per_buffer_));
   return available;
 }
 
@@ -642,19 +645,19 @@ void PairCaptureRing::finalizeGeneration(GenerationSlot &slot,
   saturatingIncrement(progress_.paired_major_loops);
   saturatingAdd(
       progress_.pairs_captured,
-      static_cast<std::uint64_t>(protocol_v1::kAdcPairsPerFrame));
+      static_cast<std::uint64_t>(pairs_per_buffer_));
 
   if (slot.destination == kOverflowDestination) {
     saturatingIncrement(progress_.ring_overruns);
     saturatingAdd(
         progress_.pairs_lost,
-        static_cast<std::uint64_t>(protocol_v1::kAdcPairsPerFrame));
+        static_cast<std::uint64_t>(pairs_per_buffer_));
   } else if (!isBufferDestination(slot.destination)) {
     noteInvariantError();
     saturatingIncrement(progress_.incomplete_buffers);
     saturatingAdd(
         progress_.pairs_lost,
-        static_cast<std::uint64_t>(protocol_v1::kAdcPairsPerFrame));
+        static_cast<std::uint64_t>(pairs_per_buffer_));
     result.pair_lost = true;
   } else {
     BufferRecord &record = records_[slot.destination];
@@ -676,7 +679,7 @@ void PairCaptureRing::finalizeGeneration(GenerationSlot &slot,
       saturatingIncrement(progress_.incomplete_buffers);
       saturatingAdd(
           progress_.pairs_lost,
-          static_cast<std::uint64_t>(protocol_v1::kAdcPairsPerFrame));
+          static_cast<std::uint64_t>(pairs_per_buffer_));
       result.pair_lost = true;
     } else if (ownership_matches) {
       record.state = BufferState::kReady;
@@ -712,7 +715,7 @@ bool PairCaptureRing::allBuffersFree() const {
 
 bool PairCaptureRing::handleMatches(const BufferHandle &handle,
                                     BufferState state) const {
-  if (!handle.valid()) {
+  if (!handle.validForPairCount(pairs_per_buffer_)) {
     return false;
   }
   const BufferRecord &record = records_[handle.buffer_index];

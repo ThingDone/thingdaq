@@ -1,8 +1,14 @@
 # ThingDAQ
 
+Release **1.1.0** uses **protocol v2**, a **450 MHz** core and fixed **1 MHz**
+rates on both ADCs and GPIO. Select 8 or 16 GPIO inputs; other acquisition
+rates are rejected. See the [current wire contract](doc/protocol/protocol-v2.md).
+The optional equal-frame `TimestampAligner` is not supported for this new
+profile; acquisition blocks provide exact per-sample timestamps.
+
 ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,
 loss-visible acquisition on the Teensy 4.0 platform. It captures two
-phase-shifted ADC channels and eight packed digital inputs. The same public API
+phase-shifted ADC channels and either eight or sixteen packed digital inputs. The same public API
 runs against a deterministic in-memory simulator, so discovery, configuration,
 parsing, timestamps, calibration, alignment, loss handling, and cleanup can be
 developed without hardware.
@@ -18,7 +24,7 @@ developed without hardware.
 | --- | --- | --- |
 | ADC0 on A0/D14 | 1 MS/s, nominal ticks `0, 8, 16, ...` | unchanged 12-bit raw codes |
 | ADC1 on A1/D15 | 1 MS/s, nominally 500 ns after ADC0 | unchanged 12-bit raw codes |
-| GPIO D6-D13 | 4 MS/s simultaneous packed snapshots | one byte per sample, D6 in bit 0 through D13 in bit 7 |
+| GPIO D6-D13, optionally D16-D23 | 1 MS/s packed snapshots | 8-bit or little-endian 16-bit samples |
 
 The timestamp domain is an unsigned, START-relative 8 MHz clock. Explicit ADC
 interleaving yields the nominal order `ADC0[0], ADC1[0], ADC0[1], ADC1[1], ...`.
@@ -43,7 +49,7 @@ Run the complete deterministic demo or a bounded CLI capture:
 ```
 
 Run the autonomous experiment baseline from a clean checkout. This exercises
-the maximum-rate simulator profile, compiles the exact pinned 600 MHz firmware
+the historical simulator profile and invokes the firmware builder
 without uploading it, and writes validated JSON and structured Markdown:
 
 ```bash
@@ -54,6 +60,23 @@ without uploading it, and writes validated JSON and structured Markdown:
 The baseline's simulator command-latency fields use a deterministic logical
 clock so normalized reports are reproducible. They are simulator bookkeeping,
 not host, live-USB, or target timing evidence.
+
+Run the isolated auxiliary-input workload matrix entirely offline:
+
+```bash
+.venv/bin/python daq_api/examples/aux_input_matrix.py
+.venv/bin/python daq_api/examples/aux_input_matrix.py \
+  --output .maestro/aux-input-demo
+```
+
+The optional output prefix writes temporary shared-schema JSON and structured
+Markdown. The printed 12 MB/s full-combined payload and protocol-framed byte
+rates are analytic load hypotheses, not physical USB acceptance.
+The validated two-run simulator/host result is retained in the
+[auxiliary-input prototype evidence](doc/results/experiments/aux-input-prototype.md).
+The subsequent target campaign and its reproducible pre-START DMA failure are
+recorded in the
+[final auxiliary-input report](doc/results/experiments/aux-input-bank.md).
 
 All examples default to the simulator. A script touches hardware only when
 `--real` is present:
@@ -136,7 +159,7 @@ post-campaign reproducibility gate are in the
 [cross-phase evidence index](doc/results/evidence-index.md). The prepared
 Phase 12 Windows handoff for that artifact is now historical and superseded.
 
-ThingDAQ firmware 1.0.0 has a fresh byte-identical two-build freeze, current
+The historical ThingDAQ firmware 1.0.0 candidate had a byte-identical two-build freeze,
 generated validators, and passing local software/build gates. Because the USB
 identity, firmware build ID, host namespace, and packaging identity changed,
 the earlier physical results are engineering history rather than release
@@ -170,7 +193,8 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 - [Hardware safety](doc/reference/hardware-safety.md)
 - [Calibration](doc/architecture/calibration.md)
 - [Optional NumPy integration](doc/architecture/numpy-integration.md)
-- [Protocol v1](doc/protocol/protocol-v1.md)
+- [Current protocol v2](doc/protocol/protocol-v2.md)
+- [Historical protocol v1](doc/protocol/protocol-v1.md)
 - [System overview](doc/architecture/system-overview.md)
 - [Phase 10 package workflow evidence](doc/results/phase-10-package-workflows.md)
 

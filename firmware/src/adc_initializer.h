@@ -1,5 +1,7 @@
 #pragma once
 
+#include "input_experiment_profile.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -11,7 +13,7 @@ namespace thingdaq::adc {
 
 inline constexpr std::size_t kConverterCount = board::kLogicalAdcCount;
 inline constexpr std::uint32_t kCalibrationDeadlineCycles =
-    (protocol_v1::kAdcCalibrationCycleCounterHz / 1000000U) *
+    (input_experiment::kCpuHz / 1000000U) *
     protocol_v1::kAdcCalibrationDeadlineUs;
 
 constexpr std::uint16_t configurationFlag(
@@ -188,7 +190,7 @@ class Initializer {
 };
 
 static_assert(kConverterCount == 2U);
-static_assert(kCalibrationDeadlineCycles == 6000000U);
+static_assert(kCalibrationDeadlineCycles == input_experiment::scaleDwt(6000000U));
 static_assert(selectResolution({}) == protocol_v1::kAdcPrimaryResolutionBits);
 static_assert(codeMaximum(protocol_v1::kAdcPrimaryResolutionBits) == 4095U);
 static_assert(codeMaximum(protocol_v1::kAdcFallbackResolutionBits) == 1023U);

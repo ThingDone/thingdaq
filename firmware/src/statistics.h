@@ -114,6 +114,42 @@ struct GpioRawCaptureProgress {
   std::uint32_t stale_dma_completions = 0U;
 };
 
+struct AuxiliaryGpioCaptureProgress {
+  std::array<std::uint64_t, 2U> bank_major_loops{};
+  std::array<std::uint64_t, 2U> bank_samples_captured{};
+  std::array<std::uint32_t, 2U> bank_ring_overruns{};
+  std::array<std::uint32_t, 2U> bank_stale_completions{};
+  std::uint64_t paired_major_loops = 0U;
+  std::uint64_t buffers_completed = 0U;
+  std::uint64_t buffers_acquired = 0U;
+  std::uint64_t buffers_released = 0U;
+  std::uint64_t samples_captured = 0U;
+  std::uint64_t samples_joined = 0U;
+  std::uint64_t samples_delivered = 0U;
+  std::uint64_t samples_lost = 0U;
+  std::uint64_t raw_ring_overruns = 0U;
+  std::uint64_t generation_skew_events = 0U;
+  std::uint64_t generation_skew_samples = 0U;
+  std::uint64_t canceled_generations = 0U;
+  std::uint64_t cancellation_samples = 0U;
+  std::uint64_t stop_tail_samples = 0U;
+  std::uint32_t timestamp_mismatches = 0U;
+  std::uint32_t count_mismatches = 0U;
+  std::uint32_t destination_mismatches = 0U;
+  std::uint32_t schedule_exhaustions = 0U;
+  std::uint32_t stale_completions = 0U;
+  std::uint32_t cache_dma_discards = 0U;
+  std::uint32_t cache_cpu_invalidations = 0U;
+  std::uint32_t hardware_errors = 0U;
+  std::uint32_t invariant_errors = 0U;
+  std::uint32_t resource_conflicts = 0U;
+  std::uint32_t start_errors = 0U;
+  std::uint32_t stop_errors = 0U;
+  std::uint32_t stale_dma_completions = 0U;
+  std::size_t ready_depth = 0U;
+  std::size_t ready_high_water = 0U;
+};
+
 // GPIO packing bridges raw acquisition and the common packet pipeline. The
 // projection fields identify pre-packet losses that have already consumed a
 // packet sequence/drop slot, preventing STATUS from counting the same samples
@@ -212,6 +248,7 @@ struct Snapshot {
   AdcCaptureProgress adc_capture{};
   AdcPackerProgress adc_packer{};
   GpioRawCaptureProgress gpio_raw_capture{};
+  AuxiliaryGpioCaptureProgress auxiliary_gpio_capture{};
   GpioPackerProgress gpio_packer{};
   PacketQueueProgress packet_queue{};
   UsbProgress usb{};
@@ -262,6 +299,8 @@ class Statistics {
   void publishAdcCapture(const AdcCaptureProgress &progress);
   void publishAdcPacker(const AdcPackerProgress &progress);
   void publishGpioRawCapture(const GpioRawCaptureProgress &progress);
+  void publishAuxiliaryGpioCapture(
+      const AuxiliaryGpioCaptureProgress &progress);
   void publishGpioPacker(const GpioPackerProgress &progress);
   void publishPacketQueues(const PacketQueueProgress &progress);
   void publishUsb(const UsbProgress &progress);

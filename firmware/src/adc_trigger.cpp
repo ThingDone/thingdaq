@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "adc_trigger.h"
 
 #include <cstdint>
@@ -94,7 +96,7 @@ const Snapshot &Scheduler::initialize(bool converters_ready) {
 
   std::uint32_t counter_hz = 0U;
   if (!platform_.beginCycleCounter(counter_hz) ||
-      counter_hz != protocol_v1::kAdcTriggerDwtClockHz) {
+      counter_hz != input_experiment::kCpuHz) {
     addError(snapshot_, protocol_v1::AdcTriggerError::kDwtUnavailable);
     return snapshot_;
   }

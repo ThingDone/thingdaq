@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include "stream_layout.h"
+
 #if defined(__IMXRT1062__)
 #define THINGDAQ_CONTROL_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
@@ -86,6 +88,11 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
                   response);
   }
 
+  if (request.kind == protocol::kGetTemperature) {
+    return encoded(request, protocol_v1::ErrorCode::kOk,
+                   protocol::encodeTemperatureResponse(request, run_id_, readiness.temperature, response),
+                   response);
+  }
   switch (request.kind) {
     case protocol_v1::CommandKind::kInfo:
       return encoded(request, protocol_v1::ErrorCode::kOk,
@@ -332,13 +339,31 @@ PendingEvents ControlState::takePendingEvents() {
 THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.configuration_validation")
 protocol_v1::ErrorCode ControlState::validateConfiguration(
     const protocol::Configuration &configuration) {
+  if (input_experiment::kReleaseFixed1MHz &&
+      (configuration.protocol_version != protocol_v2::kProtocolVersion ||
+       configuration.rate_profile != protocol_v2::RateProfile::kAdc1mhzGpio1mhz)) {
+    return protocol_v1::ErrorCode::kUnsupportedConfiguration;
+  }
   if ((configuration.stream_mask &
        static_cast<std::uint8_t>(~kKnownStreamMask)) != 0U ||
       !knownSource(configuration.source) ||
       configuration.data_checksum_algorithm ==
           protocol_v1::ChecksumAlgorithm::kNoneReserved ||
-      configuration.data_frame_bytes != protocol_v1::kDataFrameBytes) {
+      configuration.data_frame_bytes != protocol_v1::kDataFrameBytes ||
+      (configuration.protocol_version != protocol_v1::kProtocolVersion &&
+       configuration.protocol_version != protocol_v2::kProtocolVersion) ||
+      (configuration.protocol_version == protocol_v1::kProtocolVersion &&
+       (configuration.aux_bank_mode != protocol_v2::kDefaultAuxBankMode ||
+        configuration.rate_profile != protocol_v2::kDefaultRateProfile))) {
     return protocol_v1::ErrorCode::kInvalidPayload;
+  }
+
+  if (configuration.protocol_version == protocol_v2::kProtocolVersion) {
+    const stream_layout::Result layout = stream_layout::experimental(
+        configuration.aux_bank_mode, configuration.rate_profile);
+    if (!layout.ok()) {
+      return protocol_v1::ErrorCode::kUnsupportedConfiguration;
+    }
   }
 
   if (!protocol::isSupportedChecksum(

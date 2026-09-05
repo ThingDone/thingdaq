@@ -1,4 +1,4 @@
-"""Deterministic protocol-v1 device used by the in-memory transport."""
+"""Deterministic v1/v2 device used by the in-memory transport."""
 
 from __future__ import annotations
 
@@ -6,9 +6,27 @@ import struct
 from collections import deque
 
 from ._generated import protocol_constants as constants
-from .models import Configuration, Info, Status
-from .protocol import Frame, IncrementalFrameParser, encode_frame
-from .synthetic import synthetic_adc_payload, synthetic_gpio_payload
+from ._generated import protocol_v2_constants as v2_constants
+from .models import (
+    AdcTriggerMetadata,
+    AuxiliaryInputMetadata,
+    Configuration,
+    GPIOLayout,
+    Info,
+    RateProfileTiming,
+    Status,
+)
+from .protocol import encode_frame
+from .protocol_v2 import (
+    CompatibleFrame,
+    IncrementalCompatibleFrameParser,
+    encode_v2_frame,
+)
+from .synthetic import (
+    SyntheticGPIOPattern,
+    synthetic_adc_payload,
+    synthetic_gpio_payload,
+)
 
 _RESPONSE_PREFIX = struct.Struct("<BBH")
 _ERROR_RESPONSE = struct.Struct("<BBHBBH")
@@ -44,6 +62,7 @@ class SimulatedDevice:
         build_id: str = "thingdaq-simulator-v1",
         max_receive_bytes: int = constants.MAX_CONTROL_FRAME_BYTES,
         max_requests_per_receive: int = 8,
+        gpio_pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
     ) -> None:
         if max_receive_bytes < constants.MIN_FRAME_BYTES:
             raise ValueError("max_receive_bytes must hold at least one frame")
@@ -51,6 +70,10 @@ class SimulatedDevice:
             raise ValueError("max_requests_per_receive must be positive")
         if not isinstance(control_only, bool):
             raise TypeError("control_only must be a boolean")
+        try:
+            selected_gpio_pattern = SyntheticGPIOPattern(gpio_pattern)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("unknown synthetic GPIO pattern") from exc
         # Validate build identity through the public model once at construction.
         Info(device_state=constants.DeviceState.IDLE, build_id=build_id)
 
@@ -58,9 +81,12 @@ class SimulatedDevice:
         self._control_only = control_only
         self._max_receive_bytes = max_receive_bytes
         self._max_requests_per_receive = max_requests_per_receive
-        self._request_parser = IncrementalFrameParser()
+        self._request_parser = IncrementalCompatibleFrameParser()
+        self._gpio_pattern = selected_gpio_pattern
         self._state = constants.DeviceState.BOOT
         self._configuration: Configuration | None = None
+        self._counter_configuration: Configuration | None = None
+        self._wire_protocol_version = constants.PROTOCOL_VERSION
         self._last_run_id = 0
         self._adc_sequence = 0
         self._gpio_sequence = 0
@@ -170,16 +196,26 @@ class SimulatedDevice:
         """Return the current status model without going through the wire."""
 
         configuration = self._configuration
-        adc_items = self._adc_frames_emitted * constants.ADC_PAIRS_PER_FRAME
-        gpio_items = self._gpio_frames_emitted * constants.GPIO_SAMPLES_PER_FRAME
-        adc_payload_bytes = self._adc_frames_emitted * constants.DATA_PAYLOAD_BYTES
-        gpio_payload_bytes = self._gpio_frames_emitted * constants.DATA_PAYLOAD_BYTES
-        adc_framed_bytes = self._adc_frames_emitted * constants.DATA_FRAME_BYTES
-        gpio_framed_bytes = self._gpio_frames_emitted * constants.DATA_FRAME_BYTES
-        adc_frames_dropped = self._adc_items_dropped // constants.ADC_PAIRS_PER_FRAME
-        gpio_frames_dropped = (
-            self._gpio_items_dropped // constants.GPIO_SAMPLES_PER_FRAME
+        counter_configuration = self._counter_configuration
+        layout = GPIOLayout.from_mode(
+            counter_configuration.aux_bank_mode
+            if counter_configuration is not None
+            else v2_constants.DEFAULT_AUX_BANK_MODE
         )
+        metadata_configuration = configuration or counter_configuration
+        profile = (
+            metadata_configuration.rate_profile
+            if metadata_configuration is not None
+            else v2_constants.DEFAULT_RATE_PROFILE
+        )
+        adc_items = self._adc_frames_emitted * layout.adc_items_per_frame
+        gpio_items = self._gpio_frames_emitted * layout.items_per_frame
+        adc_payload_bytes = self._adc_frames_emitted * layout.adc_payload_bytes
+        gpio_payload_bytes = self._gpio_frames_emitted * layout.payload_bytes
+        adc_framed_bytes = self._adc_frames_emitted * layout.adc_total_frame_bytes
+        gpio_framed_bytes = self._gpio_frames_emitted * layout.total_frame_bytes
+        adc_frames_dropped = self._adc_items_dropped // layout.adc_items_per_frame
+        gpio_frames_dropped = self._gpio_items_dropped // layout.items_per_frame
         return Status(
             device_state=self._state,
             stream_mask=(
@@ -240,7 +276,7 @@ class SimulatedDevice:
             gpio_payload_bytes_framed=gpio_payload_bytes,
             gpio_payload_bytes_emitted=gpio_payload_bytes,
             gpio_payload_bytes_transmitted=gpio_payload_bytes,
-            gpio_payload_bytes_dropped=self._gpio_items_dropped,
+            gpio_payload_bytes_dropped=(self._gpio_items_dropped * layout.item_bytes),
             gpio_framed_bytes_framed=gpio_framed_bytes,
             gpio_framed_bytes_emitted=gpio_framed_bytes,
             gpio_framed_bytes_transmitted=gpio_framed_bytes,
@@ -249,10 +285,24 @@ class SimulatedDevice:
             ),
             data_payload_bytes_transmitted=(adc_payload_bytes + gpio_payload_bytes),
             data_framed_bytes_transmitted=(adc_framed_bytes + gpio_framed_bytes),
+            adc_trigger=AdcTriggerMetadata.for_rate_profile(profile),
+            configuration=configuration,
         )
 
-    def _handle_frame(self, request: Frame) -> bytes | None:
-        if request.header.kind not in constants.REQUEST_RESPONSE_KIND:
+    def _handle_frame(self, request: CompatibleFrame) -> bytes | None:
+        if request.header.version == 2 and int(request.header.kind) == 0x1A:
+            # The offline simulator has no physical temperature sensor.
+            return encode_v2_frame(
+                v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE,
+                struct.pack("<BBHBBHi", 0, 0, 0, 1, 0, 0, 0),
+                request_id=request.header.request_id,
+                run_id=self._last_run_id,
+            )
+        try:
+            request_kind = constants.FrameKind(int(request.header.kind))
+        except ValueError:
+            request_kind = None
+        if request_kind not in constants.REQUEST_RESPONSE_KIND:
             if request.header.request_id == 0:
                 return None
             return self._generic_error(
@@ -287,9 +337,15 @@ class SimulatedDevice:
                 self._handle_gpio_capture_diagnostic
             ),
         }
-        return handlers[request.header.kind](request)
+        return handlers[request_kind](request)
 
-    def _handle_info(self, request: Frame) -> bytes:
+    def _handle_info(self, request: CompatibleFrame) -> bytes:
+        use_v2 = request.header.version == v2_constants.PROTOCOL_VERSION
+        if use_v2 and self._control_only:
+            return self._typed_error(
+                request,
+                constants.ErrorCode.UNSUPPORTED_CONFIGURATION,
+            )
         if self._control_only:
             supported_stream_mask = constants.StreamMask.NONE
             supported_source_mask = 1 << int(constants.Source.HARDWARE)
@@ -317,6 +373,26 @@ class SimulatedDevice:
                 | constants.ConfigurationProfile.SYNTHETIC_COMBINED
             )
         configuration = self._configuration
+        if use_v2 and configuration is not None:
+            mode = configuration.aux_bank_mode
+            profile = configuration.rate_profile
+        else:
+            mode = v2_constants.DEFAULT_AUX_BANK_MODE
+            profile = v2_constants.DEFAULT_RATE_PROFILE
+        timing = RateProfileTiming.from_profile(profile)
+        layout = GPIOLayout.from_mode(mode)
+        auxiliary = None
+        if use_v2:
+            capability_bits = constants.Capability(
+                int(capability_bits)
+                | int(v2_constants.Capability.AUXILIARY_INPUT_BANK)
+                | int(v2_constants.Capability.EXACT_RATE_PROFILES)
+            )
+            auxiliary = AuxiliaryInputMetadata(
+                selected_rate_profile=profile,
+                applied_aux_bank_mode=mode,
+                gpio_item_bytes=layout.item_bytes,
+            )
         info = Info(
             device_state=self._state,
             build_id=self._build_id,
@@ -340,10 +416,48 @@ class SimulatedDevice:
             ),
             data_checksum_algorithm=self.status().data_checksum_algorithm,
             capability_bits=capability_bits,
+            protocol_version=(
+                v2_constants.PROTOCOL_VERSION if use_v2 else constants.PROTOCOL_VERSION
+            ),
+            max_control_frame_bytes=(
+                v2_constants.MAX_CONTROL_FRAME_BYTES
+                if use_v2
+                else constants.MAX_CONTROL_FRAME_BYTES
+            ),
+            adc_pair_rate_hz=timing.adc_pair_rate_hz,
+            gpio_sample_rate_hz=timing.gpio_sample_rate_hz,
+            adc_pair_period_ticks=timing.adc_pair_period_ticks,
+            adc1_phase_ticks=timing.adc1_phase_ticks,
+            gpio_sample_period_ticks=timing.gpio_sample_period_ticks,
+            adc_trigger=AdcTriggerMetadata.for_rate_profile(profile),
+            gpio_packed_width_bits=layout.packed_width_bits,
+            gpio_raw_samples_per_buffer=layout.items_per_frame,
+            gpio_raw_ring_bytes=(
+                layout.items_per_frame
+                * v2_constants.GPIO_RAW_WORD_BYTES_PER_BANK
+                * constants.GPIO_RAW_RING_DEPTH
+            ),
+            gpio_edma_priority=(1 if mode is v2_constants.AuxBankMode.INPUT else 0),
+            data_payload_bytes=layout.adc_payload_bytes,
+            adc_pairs_per_frame=layout.adc_items_per_frame,
+            gpio_samples_per_frame=layout.items_per_frame,
+            frame_coverage_ticks=timing.frame_coverage_ticks(mode),
+            adc_edma_priorities=(
+                (3, 2)
+                if mode is v2_constants.AuxBankMode.INPUT
+                else constants.ADC_EDMA_PRIORITIES
+            ),
+            adc_pairs_per_buffer=layout.adc_items_per_frame,
+            adc_dma_ring_bytes=(
+                ((layout.adc_payload_bytes + 31) // 32)
+                * 32
+                * constants.ADC_DMA_RING_DEPTH
+            ),
+            auxiliary=auxiliary,
         )
         return self._success_response(request, info.to_payload())
 
-    def _handle_configure(self, request: Frame) -> bytes:
+    def _handle_configure(self, request: CompatibleFrame) -> bytes:
         if self._state not in {
             constants.DeviceState.IDLE,
             constants.DeviceState.CONFIGURED,
@@ -351,6 +465,11 @@ class SimulatedDevice:
             return self._typed_error(request, constants.ErrorCode.INVALID_STATE)
 
         configuration = Configuration.from_payload(request.payload)
+        if configuration.protocol_version > request.header.version:
+            return self._typed_error(
+                request,
+                constants.ErrorCode.UNSUPPORTED_CONFIGURATION,
+            )
         if self._control_only:
             supported_configuration = configuration.is_control_only
         else:
@@ -373,13 +492,15 @@ class SimulatedDevice:
             )
 
         self._configuration = configuration
+        self._wire_protocol_version = request.header.version
         self._state = constants.DeviceState.CONFIGURED
         return self._success_response(
             request,
-            _SUCCESS_PREFIX + configuration.to_payload(),
+            _SUCCESS_PREFIX
+            + configuration.to_payload(protocol_version=request.header.version),
         )
 
-    def _handle_start(self, request: Frame) -> bytes:
+    def _handle_start(self, request: CompatibleFrame) -> bytes:
         if (
             self._state is not constants.DeviceState.CONFIGURED
             or self._configuration is None
@@ -393,16 +514,23 @@ class SimulatedDevice:
         self._state = constants.DeviceState.RUNNING
         return self._success_response(
             request,
-            _SUCCESS_PREFIX + self._configuration.to_payload(),
+            _SUCCESS_PREFIX
+            + self._configuration.to_payload(
+                protocol_version=self._wire_protocol_version
+            ),
             run_id=self._last_run_id,
         )
 
-    def _handle_status(self, request: Frame) -> bytes:
-        return self._success_response(request, self.status().to_payload())
+    def _handle_status(self, request: CompatibleFrame) -> bytes:
+        return self._success_response(
+            request,
+            self.status().to_payload(protocol_version=request.header.version),
+        )
 
-    def _handle_stop(self, request: Frame) -> bytes:
+    def _handle_stop(self, request: CompatibleFrame) -> bytes:
         self._state = constants.DeviceState.IDLE
         self._configuration = None
+        self._wire_protocol_version = constants.PROTOCOL_VERSION
         payload = bytearray(constants.STOP_RESPONSE_PAYLOAD_SIZE)
         payload[: len(_SUCCESS_PREFIX)] = _SUCCESS_PREFIX
         payload[constants.STOP_RESPONSE_DEVICE_STATE_OFFSET] = int(
@@ -410,12 +538,13 @@ class SimulatedDevice:
         )
         return self._success_response(request, payload)
 
-    def _handle_reset_stats(self, request: Frame) -> bytes:
+    def _handle_reset_stats(self, request: CompatibleFrame) -> bytes:
         if self._state not in {
             constants.DeviceState.IDLE,
             constants.DeviceState.CONFIGURED,
         }:
             return self._typed_error(request, constants.ErrorCode.INVALID_STATE)
+        self._counter_configuration = self._configuration
         self._reset_counters()
         payload = bytearray(constants.RESET_STATS_RESPONSE_PAYLOAD_SIZE)
         payload[: len(_SUCCESS_PREFIX)] = _SUCCESS_PREFIX
@@ -427,23 +556,23 @@ class SimulatedDevice:
         )
         return self._success_response(request, payload)
 
-    def _handle_ping(self, request: Frame) -> bytes:
+    def _handle_ping(self, request: CompatibleFrame) -> bytes:
         payload = bytearray(constants.PING_RESPONSE_PAYLOAD_SIZE)
         payload[: len(_SUCCESS_PREFIX)] = _SUCCESS_PREFIX
         payload[constants.PING_RESPONSE_NONCE_OFFSET :] = request.payload
         return self._success_response(request, payload)
 
-    def _handle_checksum_benchmark(self, request: Frame) -> bytes:
+    def _handle_checksum_benchmark(self, request: CompatibleFrame) -> bytes:
         # The offline simulator has no 600 MHz DWT or Teensy memory regions and
         # therefore deliberately does not advertise or fabricate this result.
         return self._typed_error(request, constants.ErrorCode.UNSUPPORTED_CONFIGURATION)
 
-    def _handle_gpio_clock_diagnostic(self, request: Frame) -> bytes:
+    def _handle_gpio_clock_diagnostic(self, request: CompatibleFrame) -> bytes:
         # The simulator has no PIT/XBARA/eDMA route and does not invent target
         # register snapshots or timing evidence.
         return self._typed_error(request, constants.ErrorCode.UNSUPPORTED_CONFIGURATION)
 
-    def _handle_gpio_capture_diagnostic(self, request: Frame) -> bytes:
+    def _handle_gpio_capture_diagnostic(self, request: CompatibleFrame) -> bytes:
         # The simulator intentionally does not claim physical capture evidence.
         return self._typed_error(request, constants.ErrorCode.UNSUPPORTED_CONFIGURATION)
 
@@ -454,6 +583,7 @@ class SimulatedDevice:
         self._gpio_first_ticks = 0
         self._adc_item_index = 0
         self._gpio_item_index = 0
+        self._counter_configuration = self._configuration
         self._reset_counters()
         self._next_stream_index = 0
 
@@ -473,21 +603,27 @@ class SimulatedDevice:
         flags = constants.FrameFlag.SYNTHETIC
         if self._adc_sequence == 0 and self._adc_first_ticks == 0:
             flags |= constants.FrameFlag.EPOCH_START
-        wire = encode_frame(
+        layout = configuration.gpio_layout
+        timing = configuration.rate_timing
+        payload = synthetic_adc_payload(
+            self._adc_item_index,
+            layout.adc_items_per_frame,
+        )
+        wire = self._encode_data_frame(
             constants.FrameKind.ADC_DATA,
-            synthetic_adc_payload(self._adc_item_index),
-            flags=flags,
-            checksum_algorithm=configuration.data_checksum_algorithm,
-            run_id=self._last_run_id,
-            sequence=self._adc_sequence,
-            first_sample_ticks=self._adc_first_ticks,
-            item_count=constants.ADC_PAIRS_PER_FRAME,
+            payload,
+            flags,
+            configuration,
+            self._adc_sequence,
+            self._adc_first_ticks,
+            layout.adc_items_per_frame,
         )
         self._adc_sequence = (self._adc_sequence + 1) & constants.UINT32_MAX
         self._adc_first_ticks = (
-            self._adc_first_ticks + constants.FRAME_COVERAGE_TICKS
+            self._adc_first_ticks
+            + timing.frame_coverage_ticks(configuration.aux_bank_mode)
         ) & constants.UINT64_MAX
-        self._adc_item_index += constants.ADC_PAIRS_PER_FRAME
+        self._adc_item_index += layout.adc_items_per_frame
         self._adc_frames_emitted = (self._adc_frames_emitted + 1) & constants.UINT64_MAX
         return wire
 
@@ -495,51 +631,110 @@ class SimulatedDevice:
         flags = constants.FrameFlag.SYNTHETIC
         if self._gpio_sequence == 0 and self._gpio_first_ticks == 0:
             flags |= constants.FrameFlag.EPOCH_START
-        wire = encode_frame(
+        layout = configuration.gpio_layout
+        timing = configuration.rate_timing
+        payload = synthetic_gpio_payload(
+            self._gpio_item_index,
+            layout.items_per_frame,
+            aux_bank_mode=configuration.aux_bank_mode,
+            pattern=self._gpio_pattern,
+        )
+        wire = self._encode_data_frame(
             constants.FrameKind.GPIO_DATA,
-            synthetic_gpio_payload(self._gpio_item_index),
-            flags=flags,
-            checksum_algorithm=configuration.data_checksum_algorithm,
-            run_id=self._last_run_id,
-            sequence=self._gpio_sequence,
-            first_sample_ticks=self._gpio_first_ticks,
-            item_count=constants.GPIO_SAMPLES_PER_FRAME,
+            payload,
+            flags,
+            configuration,
+            self._gpio_sequence,
+            self._gpio_first_ticks,
+            layout.items_per_frame,
         )
         self._gpio_sequence = (self._gpio_sequence + 1) & constants.UINT32_MAX
         self._gpio_first_ticks = (
-            self._gpio_first_ticks + constants.FRAME_COVERAGE_TICKS
+            self._gpio_first_ticks
+            + layout.items_per_frame * timing.gpio_sample_period_ticks
         ) & constants.UINT64_MAX
-        self._gpio_item_index += constants.GPIO_SAMPLES_PER_FRAME
+        self._gpio_item_index += layout.items_per_frame
         self._gpio_frames_emitted = (
             self._gpio_frames_emitted + 1
         ) & constants.UINT64_MAX
         return wire
 
+    def _encode_data_frame(
+        self,
+        kind: constants.FrameKind,
+        payload: bytes,
+        flags: constants.FrameFlag,
+        configuration: Configuration,
+        sequence: int,
+        first_sample_ticks: int,
+        item_count: int,
+    ) -> bytes:
+        arguments = {
+            "flags": int(flags),
+            "checksum_algorithm": int(configuration.data_checksum_algorithm),
+            "run_id": self._last_run_id,
+            "sequence": sequence,
+            "first_sample_ticks": first_sample_ticks,
+            "item_count": item_count,
+        }
+        if self._wire_protocol_version == v2_constants.PROTOCOL_VERSION:
+            return encode_v2_frame(
+                v2_constants.FrameKind(int(kind)),
+                payload,
+                **arguments,
+            )
+        return encode_frame(kind, payload, **arguments)
+
     def _success_response(
         self,
-        request: Frame,
+        request: CompatibleFrame,
         payload: bytes | bytearray,
         *,
         run_id: int | None = None,
     ) -> bytes:
-        return encode_frame(
-            constants.REQUEST_RESPONSE_KIND[request.header.kind],
-            payload,
-            run_id=self._last_run_id if run_id is None else run_id,
-            request_id=request.header.request_id,
-        )
+        request_kind = constants.FrameKind(int(request.header.kind))
+        response_kind = constants.REQUEST_RESPONSE_KIND[request_kind]
+        arguments = {
+            "run_id": self._last_run_id if run_id is None else run_id,
+            "request_id": request.header.request_id,
+        }
+        if request.header.version == v2_constants.PROTOCOL_VERSION:
+            return encode_v2_frame(
+                v2_constants.FrameKind(int(response_kind)),
+                payload,
+                **arguments,
+            )
+        return encode_frame(response_kind, payload, **arguments)
 
-    def _typed_error(self, request: Frame, error: constants.ErrorCode) -> bytes:
+    def _typed_error(
+        self,
+        request: CompatibleFrame,
+        error: constants.ErrorCode,
+    ) -> bytes:
         payload = _RESPONSE_PREFIX.pack(constants.ResponseStatus.ERROR, 0, error)
+        request_kind = constants.FrameKind(int(request.header.kind))
+        response_kind = constants.REQUEST_RESPONSE_KIND[request_kind]
+        if request.header.version == v2_constants.PROTOCOL_VERSION:
+            return encode_v2_frame(
+                v2_constants.FrameKind(int(response_kind)),
+                payload,
+                flags=v2_constants.FrameFlag.RESPONSE_ERROR,
+                run_id=self._last_run_id,
+                request_id=request.header.request_id,
+            )
         return encode_frame(
-            constants.REQUEST_RESPONSE_KIND[request.header.kind],
+            response_kind,
             payload,
             flags=constants.FrameFlag.RESPONSE_ERROR,
             run_id=self._last_run_id,
             request_id=request.header.request_id,
         )
 
-    def _generic_error(self, request: Frame, error: constants.ErrorCode) -> bytes:
+    def _generic_error(
+        self,
+        request: CompatibleFrame,
+        error: constants.ErrorCode,
+    ) -> bytes:
         payload = _ERROR_RESPONSE.pack(
             constants.ResponseStatus.ERROR,
             0,
@@ -548,6 +743,14 @@ class SimulatedDevice:
             request.header.version,
             0,
         )
+        if request.header.version == v2_constants.PROTOCOL_VERSION:
+            return encode_v2_frame(
+                v2_constants.FrameKind.ERROR_RESPONSE,
+                payload,
+                flags=v2_constants.FrameFlag.RESPONSE_ERROR,
+                run_id=self._last_run_id,
+                request_id=request.header.request_id,
+            )
         return encode_frame(
             constants.FrameKind.ERROR_RESPONSE,
             payload,
@@ -556,8 +759,12 @@ class SimulatedDevice:
             request_id=request.header.request_id,
         )
 
-    def _busy_response(self, request: Frame) -> bytes | None:
-        if request.header.kind in constants.REQUEST_RESPONSE_KIND:
+    def _busy_response(self, request: CompatibleFrame) -> bytes | None:
+        try:
+            kind = constants.FrameKind(int(request.header.kind))
+        except ValueError:
+            kind = None
+        if kind in constants.REQUEST_RESPONSE_KIND:
             return self._typed_error(request, constants.ErrorCode.BUSY)
         if request.header.request_id:
             return self._generic_error(request, constants.ErrorCode.BUSY)

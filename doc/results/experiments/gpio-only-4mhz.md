@@ -8,6 +8,13 @@ related: [temperature-soaks.md, input-rate-clock.md]
 
 # Sixteen GPIO inputs at 4 MHz
 
+> [!NOTE]
+> Historical contract/evidence: clocks, profiles, sizes and identities below
+> describe the named earlier firmware or experiment, not release 1.1.0.
+> The current release specification is [[Protocol-V2]] (450 MHz core, fixed
+> 1 MHz ADC and GPIO, optional 16 inputs). Old v1 soak harnesses are not v2
+> release validators; use the release input/SDK runners.
+
 This follow-up isolates digital capture: **16 GPIO inputs at 4 MHz, both ADC
 acquisition streams disabled, and a 450 MHz core**. It follows the successful
 [1 MHz/500 kHz combined-input soaks](temperature-soaks.md). Pins 6–13 and 16–23

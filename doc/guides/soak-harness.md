@@ -16,6 +16,13 @@ related:
 
 # Autonomous soak harness
 
+> [!NOTE]
+> Historical contract/evidence: clocks, profiles, sizes and identities below
+> describe the named earlier firmware or experiment, not release 1.1.0.
+> The current release specification is [[Protocol-V2]] (450 MHz core, fixed
+> 1 MHz ADC and GPIO, optional 16 inputs). Old v1 soak harnesses are not v2
+> release validators; use the release input/SDK runners.
+
 Phase 11 and both Windows entry paths use one canonical validator and generated
 implementations. Edit `firmware/soak/validator.py` or
 `firmware/soak/windows_driver.inc`, never a generated program directly. The

@@ -1,3 +1,5 @@
+#include "input_experiment_profile.h"
+
 #include "adc_trigger_teensy.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
@@ -10,6 +12,7 @@
 
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
+#include "variable_rate_scheduler_teensy.h"
 
 #define THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
@@ -22,8 +25,6 @@ namespace {
 constexpr std::uint32_t kTriggerEnableMask =
     (std::uint32_t{1U} << protocol_v1::kAdcTriggerQueues[0]) |
     (std::uint32_t{1U} << protocol_v1::kAdcTriggerQueues[1]);
-constexpr std::uint32_t kAdcEtcControlConfiguration =
-    ADC_ETC_CTRL_PRE_DIVIDER(protocol_v1::kAdcTriggerPredivider);
 constexpr std::uint32_t kAdcHardwareTriggerChannel = ADC_HC_ADCH(16U);
 constexpr std::uint32_t kDone0Mask =
     ADC_ETC_DONE0_1_IRQ_TRIG_DONE0(protocol_v1::kAdcTriggerQueues[0]);
@@ -139,7 +140,10 @@ bool resourcesBusy() {
 }
 
 bool clocksValid() {
-  return F_BUS_ACTUAL == protocol_v1::kAdcTriggerIpgClockHz &&
+  const variable_rate::Schedule &schedule =
+      variable_rate::teensySelectedSchedule();
+  return F_BUS_ACTUAL == schedule.clocks.ipg_hz &&
+         F_CPU_ACTUAL == schedule.clocks.dwt_hz &&
          (CCM_CSCMR1 & gpio_dma_route::kPerclkMask) ==
              gpio_dma_route::kPerclk24M &&
          (CCM_CCGR1 & (gpio_dma_route::kPitGateMask |
@@ -159,17 +163,21 @@ bool xbarValid() {
 THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
     ".flashmem.adc_trigger.target_queues_valid")
 bool queuesValid() {
-  if (ADC_ETC_CTRL != kAdcEtcControlConfiguration ||
-      masterPit().LDVAL != protocol_v1::kAdcTriggerGpioMasterPitLoad ||
-      pairPit().LDVAL != protocol_v1::kAdcTriggerPairPitLoad ||
+  const variable_rate::Schedule &schedule =
+      variable_rate::teensySelectedSchedule();
+  if (ADC_ETC_CTRL !=
+          ADC_ETC_CTRL_PRE_DIVIDER(schedule.adc_etc_predivider) ||
+      masterPit().LDVAL != schedule.gpio_master_pit_load ||
+      pairPit().LDVAL != schedule.adc_pair_pit_load ||
       masterPit().TCTRL != 0U || pairPit().TCTRL != PIT_TCTRL_CHN) {
     return false;
   }
   for (std::size_t index = 0U; index < kConverterCount; ++index) {
     if (triggerQueue(index).CTRL != ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0U) ||
-        triggerQueue(index).COUNTER != ADC_ETC_TRIG_COUNTER_INIT_DELAY(
-                                           protocol_v1::
-                                               kAdcTriggerInitialDelays[index]) ||
+        triggerQueue(index).COUNTER != variable_rate::adcEtcInitialDelay(
+                                           index == 0U
+                                               ? schedule.adc0_initial_delay
+                                               : schedule.adc1_initial_delay) ||
         triggerQueue(index).CHAIN_1_0 != chainConfiguration(index)) {
       return false;
     }
@@ -263,13 +271,15 @@ class TeensyPlatform final : public Platform {
       return result;
     }
 
+    const variable_rate::Schedule &schedule =
+        variable_rate::teensySelectedSchedule();
     gpio_dma_route::enableClockGates();
     CCM_CCGR1 |= kAdcClockGateMask;
     gpio_dma_route::configureStoppedPit(
-        protocol_v1::kAdcTriggerGpioMasterPitLoad);
+        schedule.gpio_master_pit_load);
     pairPit().TCTRL = 0U;
     pairPit().TFLG = PIT_TFLG_TIF;
-    pairPit().LDVAL = protocol_v1::kAdcTriggerPairPitLoad;
+    pairPit().LDVAL = schedule.adc_pair_pit_load;
     pairPit().TCTRL = PIT_TCTRL_CHN;
 
     for (std::size_t index = 0U; index < kConverterCount; ++index) {
@@ -281,13 +291,16 @@ class TeensyPlatform final : public Platform {
     // first write clears SOFTRST only; a second write is required to clear
     // TSC_BYPASS so ADC_ETC channel 1 can control ADC2.  PJRC's target ADC
     // setup uses the same two-write sequence.
-    ADC_ETC_CTRL = kAdcEtcControlConfiguration;
-    ADC_ETC_CTRL = kAdcEtcControlConfiguration;
+    const std::uint32_t adc_etc_control =
+        ADC_ETC_CTRL_PRE_DIVIDER(schedule.adc_etc_predivider);
+    ADC_ETC_CTRL = adc_etc_control;
+    ADC_ETC_CTRL = adc_etc_control;
     ADC_ETC_DMA_CTRL = 0U;
     for (std::size_t index = 0U; index < kConverterCount; ++index) {
       triggerQueue(index).CTRL = ADC_ETC_TRIG_CTRL_TRIG_CHAIN(0U);
-      triggerQueue(index).COUNTER = ADC_ETC_TRIG_COUNTER_INIT_DELAY(
-          protocol_v1::kAdcTriggerInitialDelays[index]);
+      triggerQueue(index).COUNTER = variable_rate::adcEtcInitialDelay(
+          index == 0U ? schedule.adc0_initial_delay
+                      : schedule.adc1_initial_delay);
       triggerQueue(index).CHAIN_1_0 = chainConfiguration(index);
     }
     IMXRT_ADC1.CFG |= ADC_CFG_ADTRG;
@@ -310,7 +323,8 @@ class TeensyPlatform final : public Platform {
         result.error_flags |=
             triggerError(protocol_v1::AdcTriggerError::kPerclkMismatch);
       }
-      if (F_BUS_ACTUAL != protocol_v1::kAdcTriggerIpgClockHz) {
+      if (F_BUS_ACTUAL != schedule.clocks.ipg_hz ||
+          F_CPU_ACTUAL != schedule.clocks.dwt_hz) {
         result.error_flags |=
             triggerError(protocol_v1::AdcTriggerError::kIpgClockMismatch);
       }
@@ -343,8 +357,8 @@ class TeensyPlatform final : public Platform {
       result.error_flags |= triggerError(
           protocol_v1::AdcTriggerError::kAdcEtcConfigMismatch);
       if (masterPit().LDVAL !=
-              protocol_v1::kAdcTriggerGpioMasterPitLoad ||
-          pairPit().LDVAL != protocol_v1::kAdcTriggerPairPitLoad) {
+              schedule.gpio_master_pit_load ||
+          pairPit().LDVAL != schedule.adc_pair_pit_load) {
         result.error_flags |=
             triggerError(protocol_v1::AdcTriggerError::kPitConfigMismatch);
       }
@@ -364,7 +378,7 @@ class TeensyPlatform final : public Platform {
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_counter_begin")
   bool beginCycleCounter(std::uint32_t &frequency_hz) override {
-    if (F_CPU_ACTUAL != protocol_v1::kAdcTriggerDwtClockHz) {
+    if (F_CPU_ACTUAL != input_experiment::kCpuHz) {
       frequency_hz = 0U;
       return false;
     }
@@ -396,8 +410,10 @@ class TeensyPlatform final : public Platform {
     pairPit().TCTRL = PIT_TCTRL_CHN;
     masterPit().TFLG = PIT_TFLG_TIF;
     pairPit().TFLG = PIT_TFLG_TIF;
-    masterPit().LDVAL = protocol_v1::kAdcTriggerGpioMasterPitLoad;
-    pairPit().LDVAL = protocol_v1::kAdcTriggerPairPitLoad;
+    const variable_rate::Schedule &schedule =
+        variable_rate::teensySelectedSchedule();
+    masterPit().LDVAL = schedule.gpio_master_pit_load;
+    pairPit().LDVAL = schedule.adc_pair_pit_load;
     ADC_ETC_DONE0_1_IRQ = kDone0Mask | kDone1Mask;
     ADC_ETC_DONE2_ERR_IRQ = kTriggerErrorMask;
     if (completion_diagnostic) {
@@ -422,7 +438,7 @@ class TeensyPlatform final : public Platform {
     if (completion_diagnostic) {
       __disable_irq();
     }
-    ADC_ETC_CTRL = kAdcEtcControlConfiguration |
+    ADC_ETC_CTRL = ADC_ETC_CTRL_PRE_DIVIDER(schedule.adc_etc_predivider) |
                    ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask);
     barrier();
     pairPit().TCTRL = PIT_TCTRL_CHN | PIT_TCTRL_TEN;
@@ -482,7 +498,8 @@ class TeensyPlatform final : public Platform {
   bool stop() override {
     masterPit().TCTRL = 0U;
     pairPit().TCTRL = PIT_TCTRL_CHN;
-    ADC_ETC_CTRL = kAdcEtcControlConfiguration;
+    ADC_ETC_CTRL = ADC_ETC_CTRL_PRE_DIVIDER(
+        variable_rate::teensySelectedSchedule().adc_etc_predivider);
     barrier();
     const std::uint32_t started = ARM_DWT_CYCCNT;
     std::uint32_t polls = 0U;
@@ -521,7 +538,7 @@ THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
     ".flashmem.adc_trigger.target_singleton")
 Scheduler &teensyScheduler() { return g_scheduler; }
 
-static_assert(F_CPU == protocol_v1::kAdcTriggerDwtClockHz,
+static_assert(F_CPU == input_experiment::kCpuHz,
               "ADC trigger diagnostic requires the pinned 600 MHz target");
 static_assert(XBARA1_IN_PIT_TRIGGER1 ==
               protocol_v1::kAdcTriggerXbarInputs[0]);

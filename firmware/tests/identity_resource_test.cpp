@@ -13,11 +13,13 @@ using thingdaq::board::AdcEtcAllocation;
 using thingdaq::board::AdcInputPad;
 using thingdaq::board::EdmaAllocation;
 using thingdaq::board::GpioPinMapping;
+using thingdaq::board::GpioBitAllocation;
 using thingdaq::board::InterruptAllocation;
 using thingdaq::board::InterruptUse;
 using thingdaq::board::MemoryAllocation;
 using thingdaq::board::MemoryRegion;
 using thingdaq::board::MemoryUse;
+using thingdaq::board::MemoryViewAllocation;
 using thingdaq::board::PinAllocation;
 using thingdaq::board::PitAllocation;
 using thingdaq::board::ResourceOwner;
@@ -30,6 +32,11 @@ constexpr PinAllocation kConflictingPins[] = {
 constexpr PinAllocation kOutOfRangePin[] = {
     {thingdaq::board::kTeensy40DigitalPinCount,
      ResourceOwner::kGpioCapture},
+};
+constexpr std::uint8_t kAuxOwnerPins[] = {16U, 17U};
+constexpr PinAllocation kSplitAuxPinOwners[] = {
+    {16U, ResourceOwner::kAuxGpioCapture},
+    {17U, ResourceOwner::kGpioCapture},
 };
 constexpr GpioPinMapping kDuplicateGpioBit[] = {
     {6U, 10U},
@@ -47,6 +54,14 @@ constexpr GpioPinMapping kWrongGpioPinOrder[] = {
     {11U, 2U},
     {12U, 1U},
     {13U, 3U},
+};
+constexpr GpioBitAllocation kDuplicatePortBit[] = {
+    {2U, 17U, ResourceOwner::kGpioCapture},
+    {2U, 17U, ResourceOwner::kAuxGpioCapture},
+};
+constexpr GpioBitAllocation kSameBitDifferentPorts[] = {
+    {2U, 17U, ResourceOwner::kGpioCapture},
+    {1U, 17U, ResourceOwner::kAuxGpioCapture},
 };
 constexpr AdcConverterConfiguration kIncompleteAdcConfiguration[] = {
     {0U, 0U, 14U, AdcInputPad::kGpioAdB1_02, 1U, 7U, 0U, 57U,
@@ -120,46 +135,82 @@ constexpr MemoryAllocation kCacheUnsafePackedRing[] = {
      ResourceOwner::kGpioPacker},
 };
 constexpr InterruptAllocation kDuplicateInterruptUse[] = {
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
      ResourceOwner::kAdc0Capture},
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 1U, 17U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
-    {InterruptUse::kGpioDmaCompletion, 64U,
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 64U,
      ResourceOwner::kGpioCapture},
+    {InterruptUse::kAuxGpioDmaCompletion, 3U, 19U, 64U,
+     ResourceOwner::kAuxGpioCapture},
 };
 constexpr InterruptAllocation kUnsafeInterruptPriority[] = {
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
      ResourceOwner::kAdc0Capture},
-    {InterruptUse::kAdc1DmaCompletion, 48U,
+    {InterruptUse::kAdc1DmaCompletion, 1U, 17U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
-    {InterruptUse::kGpioDmaCompletion, 40U,
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 40U,
      ResourceOwner::kGpioCapture},
+    {InterruptUse::kAuxGpioDmaCompletion, 3U, 19U, 64U,
+     ResourceOwner::kAuxGpioCapture},
 };
 constexpr InterruptAllocation kWrongInterruptOwner[] = {
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdc1DmaCompletion, 48U,
+    {InterruptUse::kAdc1DmaCompletion, 1U, 17U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
-    {InterruptUse::kGpioDmaCompletion, 64U,
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 64U,
      ResourceOwner::kGpioCapture},
+    {InterruptUse::kAuxGpioDmaCompletion, 3U, 19U, 64U,
+     ResourceOwner::kAuxGpioCapture},
 };
 constexpr InterruptAllocation kReorderedInterrupts[] = {
-    {InterruptUse::kGpioDmaCompletion, 64U,
+    {InterruptUse::kAuxGpioDmaCompletion, 3U, 19U, 64U,
+     ResourceOwner::kAuxGpioCapture},
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 64U,
      ResourceOwner::kGpioCapture},
-    {InterruptUse::kAdcEtcError, 48U, ResourceOwner::kAdcCapture},
-    {InterruptUse::kAdc1DmaCompletion, 48U,
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kAdc1DmaCompletion, 1U, 17U, 48U,
      ResourceOwner::kAdc1Capture},
-    {InterruptUse::kAdc0DmaCompletion, 48U,
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
      ResourceOwner::kAdc0Capture},
+};
+constexpr InterruptAllocation kDuplicateInterruptVector[] = {
+    {InterruptUse::kAdc0DmaCompletion, 0U, 16U, 48U,
+     ResourceOwner::kAdc0Capture},
+    {InterruptUse::kAdc1DmaCompletion, 1U, 16U, 48U,
+     ResourceOwner::kAdc1Capture},
+    {InterruptUse::kAdcEtcError, 121U, 137U, 48U,
+     ResourceOwner::kAdcCapture},
+    {InterruptUse::kGpioDmaCompletion, 2U, 18U, 64U,
+     ResourceOwner::kGpioCapture},
+    {InterruptUse::kAuxGpioDmaCompletion, 3U, 19U, 64U,
+     ResourceOwner::kAuxGpioCapture},
+};
+constexpr std::uint8_t kWrongInputPriorityOrder[] = {3U, 1U, 2U, 0U};
+constexpr MemoryViewAllocation kOverlappingMemoryViews[] = {
+    {MemoryUse::kPrimaryInputGpioRawDmaRing,
+     MemoryUse::kGpioRawDmaRing, 0U, 32768U,
+     ResourceOwner::kGpioCapture},
+    {MemoryUse::kAuxGpioRawDmaRing, MemoryUse::kGpioRawDmaRing,
+     32000U, 32768U, ResourceOwner::kAuxGpioCapture},
 };
 
 static_assert(thingdaq::board::validPins(
     thingdaq::board::kPinAllocations));
 static_assert(thingdaq::board::validGpioPinMappings(
     thingdaq::board::kGpioMappingsByPackedBit));
+static_assert(thingdaq::board::validGpioPinMappings(
+    thingdaq::board::kAuxGpioMappingsByPackedBit));
+static_assert(thingdaq::board::validGpioBitAllocations(
+    thingdaq::board::kGpioBitAllocations));
 static_assert(thingdaq::board::gpioPinOrderMatches(
     thingdaq::board::kGpioMappingsByPackedBit,
     thingdaq::board::kGpioPinsByBit));
@@ -178,6 +229,15 @@ static_assert(thingdaq::board::validEdmaPriorities(
     thingdaq::board::kGpioEdmaPriority));
 static_assert(thingdaq::board::validMemoryAllocations(
     thingdaq::board::kMemoryAllocations));
+static_assert(thingdaq::board::validMemoryViews(
+    thingdaq::board::kInputModeMemoryViews,
+    thingdaq::board::kMemoryAllocations));
+static_assert(thingdaq::board::validMemoryViews(
+    thingdaq::board::kIdleModeMemoryViews,
+    thingdaq::board::kMemoryAllocations));
+static_assert(thingdaq::board::validAcquisitionMemoryViews(
+    thingdaq::board::kInputModeMemoryViews,
+    thingdaq::board::kMemoryAllocations));
 static_assert(thingdaq::board::validInterruptAllocations(
     thingdaq::board::kInterruptAllocations));
 static_assert(thingdaq::board::validAcquisitionMemoryRegions(
@@ -185,10 +245,17 @@ static_assert(thingdaq::board::validAcquisitionMemoryRegions(
 static_assert(thingdaq::board::kAcquisitionResourceContract.valid());
 static_assert(!thingdaq::board::validPins(kConflictingPins));
 static_assert(!thingdaq::board::validPins(kOutOfRangePin));
+static_assert(!thingdaq::board::pinAllocationsMatch(
+    kAuxOwnerPins, kSplitAuxPinOwners, 0U,
+    ResourceOwner::kAuxGpioCapture));
 static_assert(!thingdaq::board::validGpioPinMappings(
     kDuplicateGpioBit));
 static_assert(!thingdaq::board::validGpioPinMappings(
     kOutOfRangeGpioBit));
+static_assert(!thingdaq::board::validGpioBitAllocations(
+    kDuplicatePortBit));
+static_assert(thingdaq::board::validGpioBitAllocations(
+    kSameBitDifferentPorts));
 static_assert(!thingdaq::board::gpioPinOrderMatches(
     kWrongGpioPinOrder, thingdaq::board::kGpioPinsByBit));
 static_assert(!thingdaq::board::validAdcConverterConfigurations(
@@ -209,6 +276,8 @@ static_assert(!thingdaq::board::validEdmaAllocations(kInvalidEdma));
 static_assert(!thingdaq::board::validEdmaAllocations(kOutOfRangeEdma));
 static_assert(!thingdaq::board::validEdmaPriorities(
     kConflictingEdmaPriorities, 2U));
+static_assert(!thingdaq::board::strictlyDescendingEdmaPriorities(
+    kWrongInputPriorityOrder));
 static_assert(
     !thingdaq::board::validMemoryAllocations(kConflictingMemory));
 static_assert(!thingdaq::board::validMemoryAllocations(kMisalignedMemory));
@@ -226,8 +295,12 @@ static_assert(!thingdaq::board::validInterruptAllocations(
     kUnsafeInterruptPriority));
 static_assert(!thingdaq::board::validInterruptAllocations(
     kWrongInterruptOwner));
+static_assert(!thingdaq::board::validInterruptAllocations(
+    kDuplicateInterruptVector));
 static_assert(thingdaq::board::validInterruptAllocations(
     kReorderedInterrupts));
+static_assert(!thingdaq::board::validMemoryViews(
+    kOverlappingMemoryViews, thingdaq::board::kMemoryAllocations));
 static_assert(thingdaq::board::alignUp(4048U, 32U) == 4064U);
 static_assert(thingdaq::board::kCommandParserCapacityBytes >=
               thingdaq::protocol::kCommandParserStorageBytes);
@@ -251,10 +324,10 @@ static_assert(thingdaq::board::kPacketIndexStorageBytes == 600U);
 static_assert(thingdaq::board::kCombinedAcquisitionRam1BufferBytes ==
               440832U);
 static_assert(thingdaq::board::kCombinedAcquisitionRam2BufferBytes ==
-              503648U);
+              504640U);
 static_assert(
     thingdaq::board::kCombinedAcquisitionAndUsbRam2BufferBytes ==
-    511840U);
+    512832U);
 static_assert(thingdaq::board::kReservedRam1Bytes <=
               thingdaq::board::kRam1BudgetBytes);
 static_assert(thingdaq::board::kReservedRam2Bytes <=
@@ -271,7 +344,7 @@ static_assert(thingdaq::control::kSyntheticConfiguration.stream_mask ==
 static_assert(thingdaq::control::kSyntheticConfiguration.source ==
               thingdaq::protocol_v1::Source::kSynthetic);
 static_assert(thingdaq::identity::kFirmwareVersion.major == 1U);
-static_assert(thingdaq::identity::kFirmwareVersion.minor == 0U);
+static_assert(thingdaq::identity::kFirmwareVersion.minor == 1U);
 static_assert(thingdaq::identity::kFirmwareVersion.patch == 0U);
 static_assert(thingdaq::board::kAdc0Pin == 14U);
 static_assert(thingdaq::board::kAdc1Pin == 15U);
@@ -313,6 +386,8 @@ static_assert(
         ResourceOwner::kAdc1Capture);
 static_assert(thingdaq::board::countOf(
                   thingdaq::board::kGpioMappingsByPackedBit) == 8U);
+static_assert(thingdaq::board::countOf(
+                  thingdaq::board::kAuxGpioMappingsByPackedBit) == 8U);
 static_assert(thingdaq::board::kGpioMappingsByPackedBit[0].teensy_pin ==
                   6U &&
               thingdaq::board::kGpioMappingsByPackedBit[0].gpio2_bit ==
@@ -348,9 +423,53 @@ static_assert(thingdaq::board::kGpioMappingsByPackedBit[7].teensy_pin ==
 static_assert(thingdaq::board::kGpio2PsrCaptureMask == 0x00030C0FU);
 static_assert(thingdaq::board::kGpio7ToGpio2Gpr27ClearMask ==
               thingdaq::board::kGpio2PsrCaptureMask);
-static_assert(thingdaq::board::kReservedRam1Bytes == 450464U);
+static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[0].teensy_pin ==
+                  16U &&
+              thingdaq::board::kAuxGpioMappingsByPackedBit[0].gpio2_bit ==
+                  23U);
+static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[1].teensy_pin ==
+                  17U &&
+              thingdaq::board::kAuxGpioMappingsByPackedBit[1].gpio2_bit ==
+                  22U);
+static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[2].teensy_pin ==
+                  18U &&
+              thingdaq::board::kAuxGpioMappingsByPackedBit[2].gpio2_bit ==
+                  17U);
+static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[3].teensy_pin ==
+                  19U &&
+              thingdaq::board::kAuxGpioMappingsByPackedBit[3].gpio2_bit ==
+                  16U);
+static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[4].teensy_pin ==
+                  20U &&
+              thingdaq::board::kAuxGpioMappingsByPackedBit[4].gpio2_bit ==
+                  26U);
+static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[5].teensy_pin ==
+                  21U &&
+              thingdaq::board::kAuxGpioMappingsByPackedBit[5].gpio2_bit ==
+                  27U);
+static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[6].teensy_pin ==
+                  22U &&
+              thingdaq::board::kAuxGpioMappingsByPackedBit[6].gpio2_bit ==
+                  24U);
+static_assert(thingdaq::board::kAuxGpioMappingsByPackedBit[7].teensy_pin ==
+                  23U &&
+              thingdaq::board::kAuxGpioMappingsByPackedBit[7].gpio2_bit ==
+                  25U);
+static_assert(thingdaq::board::kGpio1PsrCaptureMask == 0x0FC30000U);
+static_assert(thingdaq::board::kGpio6ToGpio1Gpr26ClearMask ==
+              thingdaq::board::kGpio1PsrCaptureMask);
+static_assert(thingdaq::board::kReservedRam1Bytes == 446372U);
+static_assert(thingdaq::board::countOf(
+                  thingdaq::board::kIdleModeMemoryViews) == 1U);
+static_assert(thingdaq::board::kIdleModeMemoryViews[0].storage ==
+              MemoryUse::kPacketBufferStorage);
+static_assert(thingdaq::board::kIdleModeMemoryViews[0].offset == 0U);
+static_assert(thingdaq::board::kIdleModeMemoryViews[0].bytes == 4096U);
 static_assert(thingdaq::board::kGpioRawDmaBufferBytes == 16192U);
 static_assert(thingdaq::board::kGpioRawDmaRingBytes == 64768U);
+static_assert(thingdaq::board::kInputGpioRawDmaBufferBytes == 8096U);
+static_assert(thingdaq::board::kPrimaryInputGpioRawDmaRingBytes == 32384U);
+static_assert(thingdaq::board::kAuxGpioRawDmaRingBytes == 32384U);
 static_assert(thingdaq::board::kAdcDmaBufferStrideBytes == 4064U);
 static_assert(thingdaq::board::kAdcDmaRingBytes == 32512U);
 static_assert(thingdaq::board::kAdcDmaOverflowSinkBytes == 32U);
@@ -363,6 +482,15 @@ static_assert(thingdaq::board::kAdcEdmaIrqPriority == 48U);
 static_assert(thingdaq::board::kGpioRawDmaOverflowSinkBytes == 32U);
 static_assert(thingdaq::board::kGpioRawDmaDescriptorCount == 5U);
 static_assert(thingdaq::board::kGpioRawDmaDescriptorBytes == 160U);
+static_assert(thingdaq::board::kAuxGpioRawDmaDescriptorBytes == 160U);
+static_assert(thingdaq::board::kAuxGpioRawDmaOverflowSinkBytes == 32U);
+static_assert(thingdaq::board::kGpioPairedJoinStateBudgetBytes == 768U);
+static_assert(thingdaq::board::kGpioPairedJoinStateOffsetBytes == 0U);
+static_assert(thingdaq::board::kAuxGpioRawDmaDescriptorOffsetBytes == 768U);
+static_assert(
+    thingdaq::board::kPrimaryInputGpioRawDmaOverflowSinkOffsetBytes == 928U);
+static_assert(thingdaq::board::kAuxGpioRawDmaOverflowSinkOffsetBytes == 960U);
+static_assert(thingdaq::board::kAuxInputWorkspaceBytes == 992U);
 static_assert(thingdaq::board::kGpioPackedRingDepth == 4U);
 static_assert(thingdaq::board::kGpioPackedBufferStrideBytes == 4064U);
 static_assert(thingdaq::board::kGpioPackerStateBudgetBytes == 2048U);
@@ -381,15 +509,36 @@ static_assert(thingdaq::board::kXbarDmaRequest94Output == 2U);
 static_assert(thingdaq::board::kXbarDmaRequest95Output == 3U);
 static_assert(thingdaq::board::kGpioXbarInput == 56U);
 static_assert(thingdaq::board::kGpioXbarOutput == 0U);
+static_assert(thingdaq::board::kAuxGpioXbarInput == 56U);
+static_assert(thingdaq::board::kAuxGpioXbarOutput == 1U);
+static_assert(thingdaq::board::kGpioXbarSelectionRegister == 0U);
+static_assert(thingdaq::board::kAuxGpioXbarSelectionRegister == 0U);
+static_assert(thingdaq::board::kGpioXbarSelectionMask == 0x00FFU);
+static_assert(thingdaq::board::kAuxGpioXbarSelectionMask == 0xFF00U);
+static_assert(thingdaq::board::replaceXbarSelection(
+                  0xAB00U, thingdaq::board::kGpioXbarOutput,
+                  thingdaq::board::kGpioXbarInput) == 0xAB38U);
+static_assert(thingdaq::board::replaceXbarSelection(
+                  0x00CDU, thingdaq::board::kAuxGpioXbarOutput,
+                  thingdaq::board::kAuxGpioXbarInput) == 0x38CDU);
 static_assert(thingdaq::board::kGpioXbarActiveEdge == 1U);
 static_assert(thingdaq::board::kGpioEdmaChannel == 2U);
+static_assert(thingdaq::board::kAuxGpioEdmaChannel == 3U);
 static_assert(thingdaq::board::kDmamuxXbar1Request0Source == 30U);
 static_assert(thingdaq::board::kDmamuxXbar1Request1Source == 31U);
 static_assert(thingdaq::board::kDmamuxXbar1Request2Source == 94U);
 static_assert(thingdaq::board::kDmamuxXbar1Request3Source == 95U);
 static_assert(thingdaq::board::kGpioDmamuxSource == 30U);
+static_assert(thingdaq::board::kAuxGpioDmamuxSource == 31U);
 static_assert(thingdaq::board::kGpioEdmaPriority == 0U);
+static_assert(thingdaq::board::kInputModeEdmaPriorities[0] == 3U);
+static_assert(thingdaq::board::kInputModeEdmaPriorities[1] == 2U);
+static_assert(thingdaq::board::kInputModeEdmaPriorities[2] == 1U);
+static_assert(thingdaq::board::kInputModeEdmaPriorities[3] == 0U);
 static_assert(thingdaq::board::kGpioEdmaIrqPriority == 64U);
+static_assert(thingdaq::board::kAuxGpioEdmaIrqPriority == 64U);
+static_assert(thingdaq::board::kInterruptAllocations[4].irq == 3U);
+static_assert(thingdaq::board::kInterruptAllocations[4].vector == 19U);
 static_assert(thingdaq::capabilities::kMetadata.supported_stream_mask == 3U);
 static_assert((thingdaq::capabilities::kMetadata.capability_bits &
                thingdaq::capabilities::kDataCapabilityMask) ==

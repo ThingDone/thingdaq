@@ -2,7 +2,7 @@
 type: reference
 title: Firmware Resource Map
 created: 2026-08-28
-updated: 2026-08-29
+updated: 2026-09-02
 tags:
   - thingdaq
   - teensy-4-0
@@ -15,10 +15,18 @@ related:
   - '[[ADR-001-Wire-Protocol]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[ADR-007-Experimental-Aux-Input-Bank]]'
   - '[[Acquisition-Pipeline]]'
 ---
 
 # Firmware resource map
+
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
 This is the human-readable projection of the compile-time registry in
 `firmware/src/board_config.h`. Numeric allocations are fixed so acquisition
@@ -34,6 +42,12 @@ physical ownership disabled. The existing synthetic generators use the same
 packet/checksum queues without claiming physical acquisition resources. See
 [[System-Overview]] for the lifecycle boundary and [[Protocol-V1]] with
 [[ADR-001-Wire-Protocol]] for the wire metadata.
+
+On `experiment/aux-input-bank`, the same registry also contains the fixed
+resource and memory reservations for the opt-in 16-input path described by
+[[ADR-007-Experimental-Aux-Input-Bank]]. Those entries are linked and
+map-verified, but the auxiliary target adapter and silicon evidence remain
+later Phase 06 work; they are not production-v1 behavior.
 
 ## Fixed platform
 
@@ -66,14 +80,27 @@ can observe. The installed core itself remains unmodified.
 | GPIO bit 5 | D11 | GPIO7 bit 2; selectively remap to GPIO2 bit 2 | GPIO capture |
 | GPIO bit 6 | D12 | GPIO7 bit 1; selectively remap to GPIO2 bit 1 | GPIO capture |
 | GPIO bit 7 | D13 | GPIO7 bit 3; selectively remap to GPIO2 bit 3 | GPIO capture |
+| Auxiliary bit 8 | D16 | GPIO6 bit 23; INPUT selectively remaps to GPIO1 bit 23 | Auxiliary GPIO capture |
+| Auxiliary bit 9 | D17 | GPIO6 bit 22; INPUT selectively remaps to GPIO1 bit 22 | Auxiliary GPIO capture |
+| Auxiliary bit 10 | D18 | GPIO6 bit 17; INPUT selectively remaps to GPIO1 bit 17 | Auxiliary GPIO capture |
+| Auxiliary bit 11 | D19 | GPIO6 bit 16; INPUT selectively remaps to GPIO1 bit 16 | Auxiliary GPIO capture |
+| Auxiliary bit 12 | D20 | GPIO6 bit 26; INPUT selectively remaps to GPIO1 bit 26 | Auxiliary GPIO capture |
+| Auxiliary bit 13 | D21 | GPIO6 bit 27; INPUT selectively remaps to GPIO1 bit 27 | Auxiliary GPIO capture |
+| Auxiliary bit 14 | D22 | GPIO6 bit 24; INPUT selectively remaps to GPIO1 bit 24 | Auxiliary GPIO capture |
+| Auxiliary bit 15 | D23 | GPIO6 bit 25; INPUT selectively remaps to GPIO1 bit 25 | Auxiliary GPIO capture |
 
-All ten pin IDs are compile-time range checked against the Teensy 4.0's 40
+All 18 pin IDs are compile-time range checked against the Teensy 4.0's 40
 digital pin IDs and checked for duplicates. The D6-through-D13 array is also
 compared byte-for-byte with the generated [[Protocol-V1]] GPIO pin map. The
 standard-port bits are independently range/duplicate checked, compile-time
 matched to the pinned `CORE_PIN*_BIT` values, and combined into the exact
 GPIO2/GPR27 mask `0x00030C0F`. Arduino target builds fail closed unless they
 identify a Teensy 4.0 with an i.MX RT1062.
+
+The optional D16-D23 input array is separately matched to protocol v2 and to
+GPIO1/GPR26 mask `0x0FC30000`. Port-plus-bit uniqueness is checked across both
+banks, so equal bit numbers on distinct GPIO ports remain legal while two
+owners cannot claim the same physical port bit.
 
 Both NXP ADC modules can see A0 and A1, so pin validity cannot select a
 converter. The compile-time `AdcConverterConfiguration` table additionally
@@ -86,17 +113,18 @@ exact-value assertions prevent a legal-but-wrong A0/A1 swap.
 
 | Resource | Numeric ID | Planned route | Owner |
 | --- | ---: | --- | --- |
-| PIT channel | 0 | 24 MHz / 6, verified exact 4 MHz GPIO event | GPIO capture |
-| PIT channel | 1 | Chained from PIT0 with `LDVAL=3`; selected exact 1 MHz ADC-pair event | Acquisition clock |
+| PIT channel | 0 | 24 MHz / 24, exact 1 MHz GPIO event | GPIO capture |
+| PIT channel | 1 | Chained from PIT0 with `LDVAL=0`; exact 1 MHz ADC-pair event | Acquisition clock |
 | XBAR input | 56 | `XBARA1_IN_PIT_TRIGGER0` | GPIO capture |
 | XBAR input | 57 | `XBARA1_IN_PIT_TRIGGER1`, deliberate fan-out | ADC0 and ADC1 capture |
 | XBAR output | 0 | `XBARA1_OUT_DMA_CH_MUX_REQ30`, rising-edge DMA | GPIO capture |
+| XBAR output | 1 | `XBARA1_OUT_DMA_CH_MUX_REQ31`, PIT0 fan-out reserved for INPUT | Auxiliary GPIO capture |
 | XBAR output | 103 | `XBARA1_OUT_ADC_ETC_TRIG00` | ADC0 capture |
 | XBAR output | 107 | `XBARA1_OUT_ADC_ETC_TRIG10` | ADC1 capture |
 | ADC_ETC trigger queue | 0 | NXP ADC1 / logical ADC0, async raw initial delay 0 | ADC0 capture |
 | ADC_ETC trigger queue | 4 | NXP ADC2 / logical ADC1, async raw initial delay 75 | ADC1 capture |
 
-The accepted GPIO route is 24 MHz PERCLK to PIT0 with `LDVAL=5`, then XBARA1
+The historical Phase 06 GPIO route was 24 MHz PERCLK to PIT0 with `LDVAL=5`, then XBARA1
 input 56 to rising-edge-only output 0 and DMAMUX source 30. Six timer clocks
 give the exact 4 MHz event. Final-image hardware job
 `db75db1e-45c0-4f66-a09a-bb4adee26b77` passed 1 kHz, 1 MHz, and three repeated
@@ -113,12 +141,17 @@ not claim PIT0/PIT1 while acquisition is active; an external library conflict
 cannot be discovered by a C++ constant alone and must be rejected during
 integration review.
 
+Experimental outputs 0 and 1 occupy the two bytes of XBARA1 selector register
+0. Their read-modify-write masks are fixed at `0x00FF` and `0xFF00`,
+respectively; compile-time examples prove that programming either route
+preserves the other byte.
+
 OctoWS2811 also owns XBARA1 outputs 0-2 and DMAMUX sources 30/31/94 when used;
 it is a reviewed pattern source and cannot coexist with this acquisition map.
 
 [[ADR-004-ADC-Trigger-DMA]] records the implemented but not yet
 silicon-verified ADC schedule.
-Chained PIT1 divides the verified 4 MHz PIT0 event by four. In the 150 MHz
+Release chained PIT1 passes the 1 MHz PIT0 event with divider one. In the 150 MHz
 ADC_ETC/IPG domain with predivider zero, raw initial delays 0 and 75 become
 effective delays of 1 and 76 cycles; their difference is exactly 75 cycles, or
 500 ns. This four-tick phase is digital trigger/timestamp metadata, not a
@@ -136,9 +169,10 @@ before making a physical analog-timing claim.
 | 0 | 24 | `DMAMUX_SOURCE_ADC1` | ADC0 capture |
 | 1 | 88 | `DMAMUX_SOURCE_ADC2` | ADC1 capture |
 | 2 | 30 | `DMAMUX_SOURCE_XBAR1_0` | GPIO capture |
+| 3 | 31 | `DMAMUX_SOURCE_XBAR1_1` | Auxiliary GPIO capture (INPUT) |
 
 All eDMA channels must be below 32, all DMAMUX sources below 128, and neither
-set may contain duplicates. Pinned core macros are asserted against all three
+set may contain duplicates. Pinned core macros are asserted against all four
 source numbers. Acquisition code must bind these exact channels rather than
 use an unconstrained first-free allocator. ADC0/ADC1 use fixed priority values
 2/1, above GPIO's priority 0, use NVIC priority 48, and each own twelve 32-byte
@@ -153,6 +187,12 @@ active entry in a six-generation prelinked pipeline from `DADDR` and
 ADC0-to-ADC1 order. Runtime updates touch only descriptors at least two
 generations ahead, never the active hardware TCD link. ADC0's NVIC line remains
 reserved but masked.
+
+When auxiliary INPUT is enabled, arbitration is reassigned in exact
+descending order ADC0 `3`, ADC1 `2`, primary GPIO `1`, auxiliary GPIO `0`.
+Channel 3 reserves IRQ 3/vector 19 at NVIC priority 64. This order keeps both
+ADC reads above both GPIO reads and primary before auxiliary; it does not claim
+that the two pads are sampled simultaneously.
 
 ## Queue and per-loop bounds
 
@@ -169,6 +209,10 @@ reserved but masked.
 | Raw GPIO DMA ring | 4 buffers | GPIO capture |
 | Raw GPIO pressure sink | 1 isolated cache line | GPIO capture |
 | Raw GPIO scatter/gather TCDs | 5 descriptors | GPIO capture |
+| Auxiliary raw GPIO ring | 4 × 2,024 words; upper-half view of existing raw storage | Auxiliary GPIO capture |
+| Auxiliary raw pressure sink | 1 cache-line view in shared INPUT workspace | Auxiliary GPIO capture |
+| Auxiliary raw scatter/gather TCDs | 5-descriptor view in shared INPUT workspace | Auxiliary GPIO capture |
+| Paired GPIO join state | 768-byte view in shared INPUT workspace | GPIO join |
 | Packed GPIO ring | 4 buffers | GPIO packer |
 | Raw batches consumed per loop | 2 buffers | GPIO packer |
 | Packed frames finalized per loop | 2 frames | GPIO packer / packetizer |
@@ -208,6 +252,12 @@ runtime. Normal real-time mode admits only coverage intervals elapsed on the
 shared 8 MHz epoch. The explicitly selected unpaced diagnostic remains bounded
 to two frames per service call and waits when no packet buffer is free.
 
+The unchanged 200-frame pool holds 100 complete ADC/GPIO intervals. In INPUT,
+that is exactly 50.600, 101.200, 202.400, or 404.800 ms from the fastest to the
+slowest declared profile; the corresponding DISABLED intervals are 101.200,
+202.400, 404.800, and 809.600 ms. The build rejects any capacity change without
+an explicit manifest note.
+
 ## Memory reservations
 
 | Use | Region | Calculation | Reserved bytes | Alignment | Owner |
@@ -234,11 +284,24 @@ to two frames per service call and waits when no packet buffer is free.
 | **RAM1 subtotal** |  |  | **450,464** |  |  |
 | **RAM2 subtotal** |  |  | **507,776** |  |  |
 
+INPUT adds no physical allocation. It uses these cache-line-aligned logical
+views, all verified inside existing OCRAM symbols:
+
+| Logical view | Physical storage | Offset | Bytes | Active owner |
+| --- | --- | ---: | ---: | --- |
+| Primary INPUT raw ring | Raw GPIO DMA ring | 0 | 32,384 | GPIO capture |
+| Auxiliary INPUT raw ring | Raw GPIO DMA ring | 32,384 | 32,384 | Auxiliary GPIO capture |
+| Paired join state | Checksum benchmark OCRAM buffer | 0 | 768 | GPIO join |
+| Auxiliary TCD bank | Checksum benchmark OCRAM buffer | 768 | 160 | Auxiliary GPIO capture |
+| Primary INPUT pressure sink | Checksum benchmark OCRAM buffer | 928 | 32 | GPIO capture |
+| Auxiliary pressure sink | Checksum benchmark OCRAM buffer | 960 | 32 | Auxiliary GPIO capture |
+
 The simultaneous combined-acquisition subset is 440,832 RAM1 bytes for the
 primary packet bank, packet records/index queues, and both packer-state budgets,
-plus 503,648 RAM2 bytes for the reserve packet bank and all ADC/raw-GPIO/packed
-GPIO DMA storage. Adding the pinned core's 8,192-byte USB TX ring makes the
-combined RAM2 buffer footprint 511,840 bytes. Compile-time assertions enforce
+plus 504,640 RAM2 bytes for the reserve packet bank, all ADC/raw-GPIO/packed
+GPIO DMA storage, and the active 992-byte INPUT workspace. Adding the pinned
+core's 8,192-byte USB TX ring makes the combined RAM2 buffer footprint 512,832
+bytes. Compile-time assertions enforce
 all three totals against their real memory regions; the linker/map gate remains
 authoritative for unrelated core globals and final stack/heap headroom.
 
@@ -249,7 +312,8 @@ that destination before USB DMA. The raw GPIO ring, pressure sink, TCD bank,
 and packed GPIO ring are distinct `.dmabuffers` allocations. The ADC pair
 ring, pressure sink, and two TCD banks are likewise concrete `.dmabuffers`
 allocations. Raw ownership uses explicit cache maintenance; the packed ring
-remains CPU-owned and cached.
+remains CPU-owned and cached. INPUT splits the raw ring into two disjoint
+32,384-byte views and retains the unchanged four 4,064-byte packed strides.
 Compile-time checks bind the two packet banks to 819,200 total bytes, cap
 pipeline metadata at 8,192 bytes, GPIO packer state at 2,048 bytes, and ADC
 packer state at 512 bytes, and
@@ -257,7 +321,9 @@ reject zero-sized, non-power-of-two, misaligned, or over-budget registry
 entries. The build manifest additionally checks the linked addresses and sizes
 of both packet banks, the isolated GPIO clock diagnostic cache line, all three
 ADC DMA allocations, all three raw GPIO DMA allocations, and the four-buffer
-packed ring.
+packed ring. Schema 11 also validates all 13 physical managed allocations,
+the INPUT workspace views, exact linker sections, both memory floors, and
+profile-specific packet retention.
 
 The optional IDLE-only checksum benchmark owns no PIT, XBAR, ADC_ETC, eDMA, or
 USB resource. Its ordinary global buffer is link-verified inside DTCM; its
@@ -266,7 +332,9 @@ isolated 4,096-byte allocations so a whole-line cache invalidation cannot harm
 another owner. The DWT counter is enabled without resetting it, each timed
 interval restores the prior interrupt mask, and no benchmark work overlaps an
 acquisition epoch. The build manifest records both addresses and the combined
-8,192-byte working set.
+8,192-byte working set. INPUT leases the first 992 bytes of the OCRAM buffer
+for join/TCD/sink state only while acquisition is active, so that lease and the
+IDLE-only benchmark cannot overlap in time.
 
 The optional GPIO clock diagnostic owns PIT0, XBARA1 input 56/output 0,
 DMAMUX source 30, and eDMA channel 2 only while IDLE. Its 32-byte aligned
@@ -340,7 +408,7 @@ then operates on contiguous pointers and gathers all eight GPIO2 bits with an
 unrolled shift/mask implementation. Canonical 4,048-sample assembly is
 independent of raw-buffer boundaries. A complete packed record preserves the
 first source-sample index and any preceding raw/packed loss; framing converts
-that index to the 8 MHz protocol timebase with exactly two ticks per sample and
+that index to the 8 MHz protocol timebase with eight ticks per sample in 1.1.0 and
 uses the packet epoch's run ID, independent GPIO sequence, selected checksum,
 and `GAP_BEFORE | OVERRUN_BEFORE` metadata. Complete source drops are inserted
 chronologically before the next retained frame so sequence, timestamp, and

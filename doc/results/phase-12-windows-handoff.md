@@ -21,6 +21,13 @@ related:
 
 # Phase 12 Windows validation handoff
 
+> [!NOTE]
+> Historical contract/evidence: clocks, profiles, sizes and identities below
+> describe the named earlier firmware or experiment, not release 1.1.0.
+> The current release specification is [[Protocol-V2]] (450 MHz core, fixed
+> 1 MHz ADC and GPIO, optional 16 inputs). Old v1 soak harnesses are not v2
+> release validators; use the release input/SDK runners.
+
 > [!IMPORTANT]
 > This handoff is a historical record for the pre-rename 0.7.0 candidate. Its
 > hashes do not match the current ThingDAQ files, and its planned Windows run

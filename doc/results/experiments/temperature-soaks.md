@@ -8,6 +8,13 @@ related: [input-rate-clock.md]
 
 # Temperature-instrumented input soak tests
 
+> [!NOTE]
+> Historical contract/evidence: clocks, profiles, sizes and identities below
+> describe the named earlier firmware or experiment, not release 1.1.0.
+> The current release specification is [[Protocol-V2]] (450 MHz core, fixed
+> 1 MHz ADC and GPIO, optional 16 inputs). Old v1 soak harnesses are not v2
+> release validators; use the release input/SDK runners.
+
 Follow-up to the [equal-rate input experiments](input-rate-clock.md). This
 campaign holds the CPU at 450 MHz while independently varying input width
 (8/16 GPIO pins) and the equal sampling rate (1 MHz/500 kHz on **each ADC channel

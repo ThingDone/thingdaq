@@ -8,6 +8,13 @@ related: []
 
 # Equal-rate sixteen-input and CPU-clock experiments
 
+> [!NOTE]
+> Historical contract/evidence: clocks, profiles, sizes and identities below
+> describe the named earlier firmware or experiment, not release 1.1.0.
+> The current release specification is [[Protocol-V2]] (450 MHz core, fixed
+> 1 MHz ADC and GPIO, optional 16 inputs). Old v1 soak harnesses are not v2
+> release validators; use the release input/SDK runners.
+
 Follow-up to [input isolation](input-isolation.md). The question is whether
 **each of the two ADC channels and all sixteen GPIO inputs** can sample at
 1 MHz, or at 500 kHz, with a 600 or 450 MHz CPU.

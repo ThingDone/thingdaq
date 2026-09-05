@@ -16,6 +16,13 @@ related:
 
 # System overview
 
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+
 ThingDAQ has three independently testable areas:
 
 - `firmware/` owns the Teensy 4.0 sketch boundary, portable C++ modules,
@@ -68,10 +75,10 @@ and future acquisition work.
 The required target is exact:
 
 ```text
-teensy:avr:teensy40:usb=serial,speed=600,opt=o2std
+teensy:avr:teensy40:usb=serial,speed=450,opt=o2std
 ```
 
-That means Teensy 4.0, i.MX RT1062/Cortex-M7, 600 MHz, USB Serial, standard
+That means Teensy 4.0, i.MX RT1062/Cortex-M7, 450 MHz, USB Serial, standard
 `-O2`, Teensy core 1.62.0, GNU C++17, and Arm GNU 15.2.1. The build helper
 checks resolved Arduino properties and compiler identity. The firmware header
 also rejects a wrong board, MCU, CPU frequency, USB mode, core compile macro,

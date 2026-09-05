@@ -95,6 +95,7 @@ struct Snapshot {
   std::uint32_t run_id = 0U;
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
       protocol_v1::kDefaultChecksumAlgorithm;
+  stream_layout::RunLayout layout = stream_layout::legacy();
   std::uint64_t next_source_sample = 0U;
   std::uint64_t start_epoch_ticks = 0U;
   std::uint64_t pending_dropped_frames = 0U;
@@ -220,6 +221,7 @@ class GpioBatchPacker final {
   std::uint8_t filling_buffer_ = kInvalidBuffer;
   protocol_v1::ChecksumAlgorithm checksum_algorithm_ =
       protocol_v1::kDefaultChecksumAlgorithm;
+  stream_layout::RunLayout layout_ = stream_layout::legacy();
   bool current_frame_invalid_ = false;
   bool input_gap_pending_ = false;
   bool packet_gap_pending_ = false;

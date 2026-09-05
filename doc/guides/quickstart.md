@@ -19,6 +19,13 @@ related:
 
 # ThingDAQ quickstart
 
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+
 Start with the simulator. It uses the real protocol encoder, parser,
 background reader, immutable block models, checksums, timestamps, loss policy,
 and public lifecycle without opening a serial port. Move to `--real` only after
@@ -75,6 +82,7 @@ path is opt-in and clearly represents a physical-device operation.
 | Combined timestamp alignment | `.venv/bin/python daq_api/examples/combined_alignment.py` | Safe A0/A1 and D6-D13 inputs |
 | Live STATUS and loss handling | `.venv/bin/python daq_api/examples/status_and_loss.py` | Safe inputs; performs a short physical combined capture |
 | Standalone simulator lifecycle | `.venv/bin/python daq_api/examples/simulator.py` | None; this example intentionally has no `--real` path |
+| Auxiliary-input workload matrix | `.venv/bin/python daq_api/examples/aux_input_matrix.py` | None; this example intentionally has no `--real` path |
 | Explicit clean shutdown | `.venv/bin/python daq_api/examples/clean_shutdown.py` | Safe A0/A1 input; demonstrates STOP in `finally` |
 
 For example:
@@ -87,6 +95,32 @@ For example:
 The calibration example's simulator coefficients are illustrative and exist
 only in memory. They are not a personal calibration, do not touch a default
 path, and must not be reused for a physical device. See [[Calibration]].
+
+## Validate the auxiliary-input workload matrix
+
+The offline auxiliary-input example covers historical and release profiles.
+It includes historical one-bank and 16-input GPIO-only 4 MHz cases, which are
+not supported by release hardware. Its no-argument path validates all four primary/auxiliary
+GPIO formulas, every ADC pair and half-period timestamp, frame chronology,
+STATUS byte conservation, STOP, and closed cleanup:
+
+```bash
+.venv/bin/python daq_api/examples/aux_input_matrix.py
+```
+
+It prints exact analytic payload/framed rates, logical packed-item and channel
+sample rates, frame coverage, projected load increases, and decoded examples.
+Generate a temporary shared-schema JSON/structured-Markdown pair only when
+needed:
+
+```bash
+.venv/bin/python daq_api/examples/aux_input_matrix.py \
+  --output .maestro/aux-input-demo
+```
+
+The reported 12 MB/s full-combined payload is explicitly a protocol-load
+hypothesis. Simulator execution does not establish host throughput, physical
+USB acceptance, target timing, pad behavior, or electrical performance.
 
 ## Minimal Python lifecycle
 

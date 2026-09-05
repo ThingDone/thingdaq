@@ -32,8 +32,11 @@ struct HardwareSnapshot {
 class TeensyRawCapture final : public HardwareCapture {
  public:
   StartStatus inspectStart() override;
+  StartStatus inspectStart(protocol_v2::RateProfile profile) override;
   StartStatus prepare() override;
+  StartStatus prepare(protocol_v2::RateProfile profile) override;
   StartStatus start() override;
+  StartStatus start(protocol_v2::RateProfile profile) override;
   StopReport stopAfterTriggers() override;
   StopReport stop() override;
   AcquireResult acquireReady() override;

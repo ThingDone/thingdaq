@@ -23,6 +23,13 @@ related:
 
 # Protocol v1
 
+> [!NOTE]
+> Historical contract/evidence: clocks, profiles, sizes and identities below
+> describe the named earlier firmware or experiment, not release 1.1.0.
+> The current release specification is [[Protocol-V2]] (450 MHz core, fixed
+> 1 MHz ADC and GPIO, optional 16 inputs). Old v1 soak harnesses are not v2
+> release validators; use the release input/SDK runners.
+
 This document is the normative human-readable ThingDAQ v1 wire contract.
 The authoritative machine-readable values live in
 `protocol/protocol-v1.json`; generated Python and C++ files must never be

@@ -65,6 +65,7 @@ enum class OperationStatus : std::uint8_t {
   kNoReadyBuffer,
   kInvalidHandle,
   kInvalidStopProgress,
+  kInvalidPairCount,
 };
 
 enum class StartStatus : std::uint8_t {
@@ -148,10 +149,16 @@ struct BufferHandle {
   std::uint32_t lease = 0U;
   std::uint8_t buffer_index = kInvalidDestination;
 
-  constexpr bool valid() const {
+  constexpr bool validForPairCount(std::uint32_t expected_pair_count) const {
     return pairs != nullptr && buffer_index < board::kAdcDmaRingDepth &&
-           pair_count == protocol_v1::kAdcPairsPerFrame && epoch != 0U &&
-           lease != 0U;
+           expected_pair_count != 0U &&
+           expected_pair_count <= protocol_v1::kAdcPairsPerFrame &&
+           pair_count == expected_pair_count && epoch != 0U && lease != 0U;
+  }
+
+  constexpr bool valid() const {
+    return validForPairCount(
+        static_cast<std::uint32_t>(protocol_v1::kAdcPairsPerFrame));
   }
 };
 
@@ -186,6 +193,8 @@ struct Snapshot {
   std::array<std::uint32_t, kConverterCount>
       next_completion_generations{};
   std::uint32_t epoch = 0U;
+  std::uint32_t pairs_per_buffer =
+      static_cast<std::uint32_t>(protocol_v1::kAdcPairsPerFrame);
   std::size_t ready_depth = 0U;
   std::size_t reading_depth = 0U;
   std::size_t discard_depth = 0U;
@@ -226,7 +235,10 @@ class PairCaptureRing final : public PairSource {
 
   PrimeResult prime(std::uint32_t epoch,
                     std::uint32_t initial_generation = 0U,
-                    std::uint64_t first_pair = 0U);
+                    std::uint64_t first_pair = 0U,
+                    std::uint32_t pairs_per_buffer =
+                        static_cast<std::uint32_t>(
+                            protocol_v1::kAdcPairsPerFrame));
   ReservationResult reserveGeneration(std::uint32_t epoch,
                                       std::uint32_t generation);
   CompletionResult onMajorLoopComplete(std::uint8_t converter,
@@ -299,6 +311,8 @@ class PairCaptureRing final : public PairSource {
   std::uint32_t next_schedule_generation_ = 0U;
   std::uint32_t next_lease_ = 1U;
   std::uint32_t epoch_ = 0U;
+  std::uint32_t pairs_per_buffer_ =
+      static_cast<std::uint32_t>(protocol_v1::kAdcPairsPerFrame);
   std::size_t next_free_search_ = 0U;
   bool running_ = false;
 };
@@ -306,7 +320,19 @@ class PairCaptureRing final : public PairSource {
 class HardwareCapture : public PairSource {
  public:
   virtual StartStatus inspectStart(std::uint32_t epoch) = 0;
+  virtual StartStatus inspectStart(std::uint32_t epoch,
+                                   std::uint32_t pairs_per_buffer) {
+    return pairs_per_buffer == protocol_v1::kAdcPairsPerFrame
+               ? inspectStart(epoch)
+               : StartStatus::kHardwareError;
+  }
   virtual StartStatus prepare(std::uint32_t epoch) = 0;
+  virtual StartStatus prepare(std::uint32_t epoch,
+                              std::uint32_t pairs_per_buffer) {
+    return pairs_per_buffer == protocol_v1::kAdcPairsPerFrame
+               ? prepare(epoch)
+               : StartStatus::kHardwareError;
+  }
   // The caller invokes this while ADC triggers are still active. The target
   // adapter must request a complete paired-DMA boundary and wait boundedly;
   // it must not tear down DMA resources here.

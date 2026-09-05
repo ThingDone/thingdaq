@@ -30,6 +30,12 @@ PORTABLE_SOURCES = (
     FIRMWARE_SOURCE / "gpio_raw_capture.h",
     FIRMWARE_SOURCE / "gpio_batch_packer.h",
     FIRMWARE_SOURCE / "gpio_batch_packer.cpp",
+    FIRMWARE_SOURCE / "gpio_dual_bank_capture.h",
+    FIRMWARE_SOURCE / "gpio_dual_bank_capture.cpp",
+    FIRMWARE_SOURCE / "gpio_dual_bank_packer.h",
+    FIRMWARE_SOURCE / "gpio_dual_bank_packer.cpp",
+    FIRMWARE_SOURCE / "variable_rate_scheduler.h",
+    FIRMWARE_SOURCE / "variable_rate_scheduler.cpp",
     FIRMWARE_SOURCE / "gpio_capture_diagnostic.h",
     FIRMWARE_SOURCE / "gpio_capture_diagnostic.cpp",
 )
@@ -73,6 +79,9 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "gpio_clock_diagnostic.cpp"),
                     str(FIRMWARE_SOURCE / "gpio_raw_capture.cpp"),
                     str(FIRMWARE_SOURCE / "gpio_batch_packer.cpp"),
+                    str(FIRMWARE_SOURCE / "gpio_dual_bank_capture.cpp"),
+                    str(FIRMWARE_SOURCE / "gpio_dual_bank_packer.cpp"),
+                    str(FIRMWARE_SOURCE / "variable_rate_scheduler.cpp"),
                     str(FIRMWARE_SOURCE / "gpio_capture_diagnostic.cpp"),
                     "-o",
                     str(executable),
@@ -130,7 +139,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
         self.assertIn("hardwareSerialNumber()", sketch)
         self.assertIn("firmware_runtime.service()", sketch)
         self.assertNotIn("Serial.", sketch)
-        self.assertLessEqual(len(sketch.splitlines()), 55)
+        self.assertLessEqual(len(sketch.splitlines()), 65)
 
 
 if __name__ == "__main__":

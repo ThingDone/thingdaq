@@ -20,6 +20,13 @@ related:
 
 # Python API architecture
 
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+
 The public host boundary is the synchronous, typed `ThingDAQ` facade plus
 immutable data/evidence models exported from `thingdaq`. Normal callers do
 not construct frames, own request IDs, run a parser, or coordinate a reader
@@ -57,7 +64,7 @@ A port path is transient. Stable selection uses INFO's nonzero, fuse-derived
 `hardware_serial`; the USB decimal serial is cross-checked when available.
 `ThingDAQ.open()` reopens the selected current endpoint and requires two
 identity-equal INFO responses through its own reader before mutation. Physical
-identity must be Teensy 4.0/i.MX RT1062, protocol v1, firmware at least 0.3.0,
+identity must be Teensy 4.0/i.MX RT1062, protocol v1 or v2, firmware at least 0.3.0,
 nonzero serial, and a source-derived `thingdaq-<16 hex>` build ID.
 `ExpectedDeviceIdentity` optionally pins exact serial, firmware, build, board,
 MCU, and protocol values.
@@ -74,7 +81,7 @@ counter evidence.
 
 - supported stream, source, checksum, and exact source/stream profile masks;
 - fixed protocol/frame/timestamp properties;
-- 1 MHz ADC pair rate, 4 MHz GPIO rate, ADC resolution/range, and 500 ns phase;
+- advertised ADC/GPIO rates (both 1 MHz in release 1.1.0), ADC resolution/range, and 500 ns phase;
 - physical pin/resource/layout metadata; and
 - optional diagnostics and RESET/PING capability bits.
 
@@ -154,7 +161,8 @@ operations without becoming a baseline dependency.
 ## GPIO model
 
 `GPIOBlock` owns 4,048 packed bytes. Each byte is a nominal simultaneous
-D6-D13 input snapshot at 4 MHz: D6 is bit 0 and D13 is bit 7. `samples` and
+D6-D13 input snapshot at 1 MHz in release 1.1.0: D6 is bit 0 and D13 is bit 7.
+Auxiliary INPUT adds D16–D23 in bits 8–15 of each little-endian 16-bit sample. `samples` and
 `payload_view` retain the packed representation. `channel(pin)` returns one
 lazy Boolean view, so ordinary reads do not expand four million bytes per
 second into eight Boolean arrays. Sample `n` has nominal tick `t0 + 2n`.

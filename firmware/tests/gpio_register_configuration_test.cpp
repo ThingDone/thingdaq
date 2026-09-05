@@ -8,12 +8,14 @@
 #define __IMXRT1062__ 1
 
 #include "gpio_dma_route_teensy.h"
+#include "gpio_dual_bank_capture.h"
 #include "gpio_raw_capture.h"
 
 namespace {
 
 namespace board = thingdaq::board;
 namespace capture = thingdaq::gpio_capture;
+namespace dual = thingdaq::gpio_join;
 namespace route = thingdaq::gpio_dma_route;
 
 int failures = 0;
@@ -80,6 +82,40 @@ void testGpioAliasAndDirectionIsolation() {
           ~board::kGpio7ToGpio2Gpr27ClearMask) == 0U &&
              ((gdir ^ gdir_before) & ~board::kGpio2PsrCaptureMask) == 0U,
          "GPR27 and GDIR preserve every unrelated bit");
+}
+
+void testAuxiliaryAliasAndDirectionIsolation() {
+  volatile std::uint32_t gpr26 = 0xD37AC5E9U;
+  volatile std::uint32_t gdir = 0x96E75ABDU;
+  const std::uint32_t gpr26_before = gpr26;
+  const std::uint32_t gdir_before = gdir;
+
+  dual::selectAuxiliaryStandardInputs(gpr26, gdir);
+
+  expect(board::kGpio1PsrCaptureMask == 0x0FC30000U &&
+             board::kGpio6ToGpio1Gpr26ClearMask == 0x0FC30000U,
+         "D16-D23 use the exact GPIO1/GPR26 mask");
+  expect(gpr26 ==
+                 (gpr26_before & ~board::kGpio6ToGpio1Gpr26ClearMask) &&
+             gdir == (gdir_before & ~board::kGpio1PsrCaptureMask),
+         "GPR26 and GPIO1 GDIR clear exactly the D16-D23 bits");
+  expect(((gpr26 ^ gpr26_before) &
+          ~board::kGpio6ToGpio1Gpr26ClearMask) == 0U &&
+             ((gdir ^ gdir_before) & ~board::kGpio1PsrCaptureMask) == 0U,
+         "auxiliary alias selection preserves every unrelated bit");
+  constexpr std::array<std::uint8_t, 8U> expected_bits{
+      23U, 22U, 17U, 16U, 26U, 27U, 24U, 25U};
+  bool mapping_matches = true;
+  for (std::size_t index = 0U; index < expected_bits.size(); ++index) {
+    mapping_matches = mapping_matches &&
+                      board::kAuxGpioPinsByBit[index] == 16U + index &&
+                      board::kAuxGpioMappingsByPackedBit[index].teensy_pin ==
+                          16U + index &&
+                      board::kAuxGpioMappingsByPackedBit[index].gpio2_bit ==
+                          expected_bits[index];
+  }
+  expect(mapping_matches,
+         "the target registry retains exact D16-D23 wire order and GPIO bits");
 }
 
 void testOnlyReservedPitAndClockGatesChange() {
@@ -185,6 +221,41 @@ void testOnlyReservedXbarOutputChanges() {
          "XBAR shutdown disables only the reserved output request");
 }
 
+void testPairedXbarSharedRegisterRmwAndTeardown() {
+  resetFakeRegisters();
+  const std::size_t selected_index = board::kGpioXbarOutput / 2U;
+  fake_imxrt::xbara1_sel[selected_index] = 0xA55AU;
+  fake_imxrt::xbara1_ctrl[selected_index] = 0xA5A5U;
+  const std::uint16_t control_before =
+      fake_imxrt::xbara1_ctrl[selected_index];
+
+  route::configurePairedXbarRequests();
+
+  const std::uint16_t exact_selection = static_cast<std::uint16_t>(
+      board::kGpioXbarInput |
+      static_cast<std::uint16_t>(board::kAuxGpioXbarInput << 8U));
+  expect(board::kGpioXbarOutput == 0U &&
+             board::kAuxGpioXbarOutput == 1U &&
+             board::kGpioXbarSelectionMask == 0x00FFU &&
+             board::kAuxGpioXbarSelectionMask == 0xFF00U &&
+             fake_imxrt::xbara1_sel[selected_index] == exact_selection,
+         "paired XBAR RMW assigns the two bytes of their shared selector exactly");
+  expect((fake_imxrt::xbara1_ctrl[selected_index] &
+          route::kPairedXbarConfigurationMask) ==
+                 route::kPairedXbarConfiguration &&
+             ((fake_imxrt::xbara1_ctrl[selected_index] ^ control_before) &
+              static_cast<std::uint16_t>(
+                  ~route::kPairedXbarConfigurationMask)) == 0U,
+         "paired XBAR setup preserves unrelated shared-control bits");
+
+  route::disablePairedXbarRequests();
+  expect((fake_imxrt::xbara1_ctrl[selected_index] &
+          route::kPairedXbarConfigurationMask) ==
+                 route::kPairedXbarStatusMask &&
+             !route::pairedOutputsBusy(),
+         "paired XBAR teardown disables both DMA edges without touching peers");
+}
+
 void testOnlyReservedEdmaChannelChanges() {
   resetFakeRegisters();
   std::array<std::uint32_t, 32U> dmamux_before{};
@@ -228,7 +299,7 @@ void testOnlyReservedEdmaChannelChanges() {
     }
     expect(fake_imxrt::dmamux_chcfg[channel] == dmamux_before[channel] &&
                fake_imxrt::dma_tcd[channel].marker == tcd_before[channel] &&
-               fake_imxrt::dma_dchpri[channel] == priority_before[channel],
+               (channel < 4U || fake_imxrt::dma_dchpri[channel] == priority_before[channel]),
            "eDMA setup leaves every unreserved channel register untouched");
   }
 
@@ -238,13 +309,94 @@ void testOnlyReservedEdmaChannelChanges() {
          "eDMA shutdown clears only the reserved channel request");
 }
 
+void testPairedEdmaSetupRateChangesAndRepeatedTeardown() {
+  resetFakeRegisters();
+  std::array<std::uint32_t, 32U> dmamux_before{};
+  std::array<std::uint32_t, 32U> tcd_before{};
+  std::array<std::uint8_t, 32U> priority_before{};
+  for (std::size_t channel = 0U; channel < dmamux_before.size(); ++channel) {
+    dmamux_before[channel] = fake_imxrt::dmamux_chcfg[channel];
+    tcd_before[channel] = fake_imxrt::dma_tcd[channel].marker;
+    priority_before[channel] = fake_imxrt::dma_dchpri[channel];
+  }
+
+  constexpr std::array<std::uint32_t, 4U> pit_loads{5U, 11U, 23U, 47U};
+  for (const std::uint32_t load : pit_loads) {
+    route::configureStoppedPit(load, false);
+    route::clearEdmaChannelState();
+    route::clearAuxEdmaChannelState();
+    route::configurePairedEdmaPriorities();
+    route::configurePairedXbarRequests();
+    route::edmaTcd().marker = 0x22000000U | load;
+    route::auxEdmaTcd().marker = 0x33000000U | load;
+    route::enablePairedEdmaRequests();
+
+    expect(fake_imxrt::pit_channels[board::kGpioPitChannel].LDVAL == load &&
+               fake_imxrt::dmamux_chcfg[board::kGpioEdmaChannel] ==
+                   route::kDmamuxConfiguration &&
+               fake_imxrt::dmamux_chcfg[board::kAuxGpioEdmaChannel] ==
+                   route::kAuxDmamuxConfiguration &&
+               route::edmaPriority() ==
+                   board::kPrimaryGpioInputEdmaPriority &&
+               route::auxEdmaPriority() == board::kAuxGpioEdmaPriority &&
+               fake_imxrt::dma_tcd[board::kGpioEdmaChannel].marker ==
+                   (0x22000000U | load) &&
+               fake_imxrt::dma_tcd[board::kAuxGpioEdmaChannel].marker ==
+                   (0x33000000U | load),
+           "every rate configures the exact paired channels, TCDs, and priorities");
+
+    route::disablePairedEdmaRequests();
+    route::disablePairedXbarRequests();
+    route::clearEdmaChannelState();
+    route::clearAuxEdmaChannelState();
+    expect(!route::pairedEdmaRequestBusy() && !route::pairedOutputsBusy() &&
+               fake_imxrt::dmamux_chcfg[board::kGpioEdmaChannel] == 0U &&
+               fake_imxrt::dmamux_chcfg[board::kAuxGpioEdmaChannel] == 0U,
+           "rollback/STOP leaves both routes reusable for the next profile");
+  }
+
+  for (std::size_t channel = 0U; channel < dmamux_before.size(); ++channel) {
+    if (channel == board::kGpioEdmaChannel ||
+        channel == board::kAuxGpioEdmaChannel) {
+      continue;
+    }
+    expect(fake_imxrt::dmamux_chcfg[channel] == dmamux_before[channel] &&
+               fake_imxrt::dma_tcd[channel].marker == tcd_before[channel] &&
+               (channel < 4U || fake_imxrt::dma_dchpri[channel] == priority_before[channel]),
+           "paired lifecycle leaves every unreserved DMA resource unchanged");
+  }
+}
+
 }  // namespace
 
+void testReservedPrioritiesAreUniqueAcrossModeChanges() {
+  resetFakeRegisters();
+  for (const bool auxiliary : {false, true, false, true}) {
+    if (auxiliary) { route::configurePairedEdmaPriorities(); }
+    else { route::configureEdmaPriority(); }
+    std::array<bool, 16U> seen{};
+    for (std::size_t channel = 0U; channel < 16U; ++channel) {
+      const auto priority = fake_imxrt::dma_dchpri[channel] & 15U;
+      expect(!seen[priority], "all priorities are unique, including inactive ADC/aux channels");
+      seen[priority] = true;
+    }
+    expect((DMA_DCHPRI0 & 15U) == (auxiliary ? 3U : 2U) &&
+               (DMA_DCHPRI1 & 15U) == (auxiliary ? 2U : 1U) &&
+               (DMA_DCHPRI2 & 15U) == (auxiliary ? 1U : 0U) &&
+               (DMA_DCHPRI3 & 15U) == (auxiliary ? 0U : 3U),
+           "reserved channel priorities match the selected input mode");
+  }
+}
+
 int main() {
+  testReservedPrioritiesAreUniqueAcrossModeChanges();
   testGpioAliasAndDirectionIsolation();
+  testAuxiliaryAliasAndDirectionIsolation();
   testOnlyReservedPitAndClockGatesChange();
   testOnlyReservedXbarOutputChanges();
+  testPairedXbarSharedRegisterRmwAndTeardown();
   testOnlyReservedEdmaChannelChanges();
+  testPairedEdmaSetupRateChangesAndRepeatedTeardown();
   if (failures != 0) {
     std::cerr << failures << " GPIO register assertion(s) failed\n";
     return 1;

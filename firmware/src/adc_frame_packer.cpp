@@ -47,6 +47,16 @@ OperationStatus AdcFramePacker::startRun(
       !protocol::isSupportedChecksum(checksum_algorithm)) {
     return OperationStatus::kPipelineNotReady;
   }
+  const stream_layout::RunLayout &selected_layout = pipeline.layout();
+  const stream_layout::FrameLayout &adc_layout =
+      selected_layout.forStream(stream_layout::Stream::kAdc);
+  if (!selected_layout.valid() ||
+      adc_layout.item_count > protocol_v1::kAdcPairsPerFrame ||
+      adc_layout.item_bytes != sizeof(adc_capture::SamplePair) ||
+      adc_layout.payload_bytes !=
+          adc_layout.item_count * adc_layout.item_bytes) {
+    return OperationStatus::kPipelineNotReady;
+  }
 
   progress_ = {};
   next_source_pair_ = 0U;
@@ -57,6 +67,7 @@ OperationStatus AdcFramePacker::startRun(
   pipeline_errors_ = 0U;
   chronology_errors_ = 0U;
   checksum_algorithm_ = checksum_algorithm;
+  layout_ = selected_layout;
   packet_gap_pending_ = false;
   running_ = true;
   return OperationStatus::kOk;
@@ -90,7 +101,10 @@ ServiceReport AdcFramePacker::service(
       report.waiting_for_buffer = true;
       break;
     }
-    if (!acquired.ok() || !acquired.handle.valid()) {
+    const std::uint32_t expected_pair_count =
+        layout_.forStream(stream_layout::Stream::kAdc).item_count;
+    if (!acquired.ok() ||
+        !acquired.handle.validForPairCount(expected_pair_count)) {
       saturatingIncrement(source_errors_);
       report.source_error = true;
       break;
@@ -120,6 +134,7 @@ Snapshot AdcFramePacker::snapshot(
   result.progress = progress(pipeline);
   result.run_id = run_id_;
   result.checksum_algorithm = checksum_algorithm_;
+  result.layout = layout_;
   result.next_source_pair = next_source_pair_;
   result.start_epoch_ticks = start_epoch_ticks_;
   result.service_calls = service_calls_;
@@ -139,8 +154,10 @@ THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.consume")
 bool AdcFramePacker::consume(
     const adc_capture::BufferHandle &handle,
     packet::PacketBufferPipeline &pipeline, ServiceReport &report) {
-  if (!handle.valid() || handle.epoch != run_id_ ||
-      handle.pair_count != protocol_v1::kAdcPairsPerFrame ||
+  const stream_layout::FrameLayout &adc_layout =
+      layout_.forStream(stream_layout::Stream::kAdc);
+  if (!handle.validForPairCount(adc_layout.item_count) ||
+      handle.epoch != run_id_ ||
       handle.first_pair >
           std::numeric_limits<std::uint64_t>::max() - handle.pair_count) {
     saturatingIncrement(source_errors_);
@@ -172,13 +189,19 @@ bool AdcFramePacker::consume(
   bool framed = begun.ok();
   if (framed) {
     protocol::MutableByteView payload = pipeline.writablePayload(begun.handle);
-    framed = payload.valid() &&
-             payload.size == protocol_v1::kDataPayloadBytes;
+    const bool timestamp_valid =
+        handle.first_pair <=
+        std::numeric_limits<std::uint64_t>::max() /
+            adc_layout.item_period_ticks;
+    framed = payload.valid() && payload.size == adc_layout.payload_bytes &&
+             timestamp_valid;
     if (framed) {
       std::memcpy(payload.data, handle.pairs, payload.size);
       packet::FrameCompletion completion{};
       completion.first_sample_ticks =
-          handle.first_pair * protocol_v1::kAdcPairPeriodTicks;
+          layout_.protocol_version == protocol_v1::kProtocolVersion
+              ? handle.first_pair * protocol_v1::kAdcPairPeriodTicks
+              : handle.first_pair * adc_layout.item_period_ticks;
       if (begun.handle.sequence == 0U && handle.first_pair == 0U) {
         completion.flags = flag(protocol_v1::FrameFlag::kEpochStart);
       }
@@ -192,6 +215,11 @@ bool AdcFramePacker::consume(
       framed = pipeline.finishFill(begun.handle, completion).ok();
     } else {
       (void)pipeline.cancelFill(begun.handle);
+      if (!timestamp_valid) {
+        saturatingIncrement(chronology_errors_);
+        saturatingIncrement(source_errors_);
+        report.source_error = true;
+      }
     }
   }
 
@@ -222,8 +250,8 @@ THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.raw_gap")
 bool AdcFramePacker::projectRawGap(
     std::uint64_t pair_count,
     packet::PacketBufferPipeline &pipeline) {
-  constexpr std::uint64_t pairs_per_frame =
-      protocol_v1::kAdcPairsPerFrame;
+  const std::uint64_t pairs_per_frame =
+      layout_.forStream(stream_layout::Stream::kAdc).item_count;
   const std::uint64_t complete_frames = pair_count / pairs_per_frame;
   const std::uint64_t projected_pairs = complete_frames * pairs_per_frame;
   if (pair_count != projected_pairs) {

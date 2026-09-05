@@ -16,6 +16,13 @@ related:
 
 # Phase 05 checksum correctness and corruption
 
+> [!NOTE]
+> Historical contract/evidence: clocks, profiles, sizes and identities below
+> describe the named earlier firmware or experiment, not release 1.1.0.
+> The current release specification is [[Protocol-V2]] (450 MHz core, fixed
+> 1 MHz ADC and GPIO, optional 16 inputs). Old v1 soak harnesses are not v2
+> release validators; use the release input/SDK runners.
+
 ## Outcome
 
 Adler-32, CRC-32C Castagnoli, and CRC-32/ISO-HDLC pass independent C++ and

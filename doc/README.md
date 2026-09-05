@@ -38,6 +38,11 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[ADR-007-Experimental-Aux-Input-Bank]]'
+  - '[[Experiment-Baseline]]'
+  - '[[Aux-Input-Prototype]]'
+  - '[[Phase-06-Aux-Input-Local-Gate]]'
+  - '[[Aux-Input-Bank]]'
   - '[[Phase-01-Prototype]]'
   - '[[Phase-02-Protocol-Python]]'
   - '[[Phase-03-Firmware-Local-Gate]]'
@@ -46,6 +51,13 @@ related:
 ---
 
 # ThingDAQ documentation
+
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
 Every Markdown artifact below `doc/` begins with YAML front matter containing
 `type`, `title`, `created`, `tags`, and `related`. Related artifacts use
@@ -83,7 +95,9 @@ physical acceptance.
 - `decisions/` contains architecture decision records, including
   [[ADR-001-Wire-Protocol]], [[ADR-002-Checksum-Selection]], and
   [[ADR-003-GPIO-Clock-DMA]], followed by the permanent converter, trigger,
-  and DMA resource contract in [[ADR-004-ADC-Trigger-DMA]].
+  and DMA resource contract in [[ADR-004-ADC-Trigger-DMA]]. The isolated
+  whole-bank 16-input and exact-rate contract is
+  [[ADR-007-Experimental-Aux-Input-Bank]].
 - `reference/` records durable user and implementation references: begin with
   [[Hardware-Safety]] before connecting signals, use [[API-Reference]] for the
   stable Python surface, and consult [[Foundation-Reuse-Inventory]] for the
@@ -92,8 +106,13 @@ physical acceptance.
   beginning with [[Checksum-Candidates]].
 - `results/` records reproducible test, build, benchmark, and hardware evidence,
   including the branch-isolated clock, compression, and auxiliary-I/O synthesis
-  in [[Clock-Compression-IO-Report]], plus [[Phase-01-Prototype]] and
-  [[Phase-02-Protocol-Python]], followed
+  in [[Clock-Compression-IO-Report]], the immutable [[Experiment-Baseline]], the isolated
+  simulator/host [[Aux-Input-Prototype]] validation, and the complete
+  target-branch compile and regression checkpoint in
+  [[Phase-06-Aux-Input-Local-Gate]]. [[Aux-Input-Bank]] records the subsequent
+  conclusive target-candidate failure, exact job lineage, and explicitly
+  untested lower-rate and external-stimulus claims. The historical sequence
+  includes [[Phase-01-Prototype]] and [[Phase-02-Protocol-Python]], followed
   by the compile-only
   [[Phase-03-Firmware-Local-Gate]] and physical
   [[Phase-03-Control-Plane]] control acceptance and

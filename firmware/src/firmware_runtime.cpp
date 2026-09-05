@@ -22,6 +22,7 @@ bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
                                acquisition_controller_.initialize());
 }
 
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.service")
 LoopReport FirmwareRuntime::service() {
   LoopReport report{};
   report.receive = transport_.serviceReceive();
@@ -60,6 +61,9 @@ LoopReport FirmwareRuntime::service() {
         publishPacketStatistics();
       }
       control::DispatchReadiness readiness{};
+      if (command.request.kind == protocol::kGetTemperature && temperature_reader_ != nullptr) {
+        readiness.temperature = temperature_reader_();
+      }
       if (command.request.kind ==
           protocol_v1::CommandKind::kResetStats) {
         readiness.statistics_reset_ready =
@@ -91,7 +95,7 @@ LoopReport FirmwareRuntime::service() {
       } else if (command.request.kind ==
                      protocol_v1::CommandKind::kChecksumBenchmark &&
                  control_.state() == protocol_v1::DeviceState::kIdle &&
-                 checksum_benchmark_ != nullptr) {
+                 checksum_benchmark_ != nullptr && dataPathQuiescent()) {
         benchmark_result =
             checksum_benchmark_->run(command.request.checksum_benchmark);
         if (benchmark_result.ok()) {
@@ -105,6 +109,12 @@ LoopReport FirmwareRuntime::service() {
           readiness.checksum_benchmark_error =
               protocol_v1::ErrorCode::kInternalError;
         }
+      } else if (command.request.kind ==
+                     protocol_v1::CommandKind::kChecksumBenchmark &&
+                 control_.state() == protocol_v1::DeviceState::kIdle &&
+                 checksum_benchmark_ != nullptr && !dataPathQuiescent()) {
+        readiness.checksum_benchmark_error =
+            protocol_v1::ErrorCode::kBusy;
       } else if (command.request.kind ==
                      protocol_v1::CommandKind::kGpioClockDiagnostic &&
                  control_.state() == protocol_v1::DeviceState::kIdle &&
@@ -129,7 +139,10 @@ LoopReport FirmwareRuntime::service() {
                      protocol_v1::CommandKind::kGpioCaptureDiagnostic &&
                  control_.state() == protocol_v1::DeviceState::kIdle &&
                  gpio_capture_diagnostic_ != nullptr && dataPathQuiescent()) {
-        gpio_capture_result = gpio_capture_diagnostic_->run();
+        gpio_capture_result =
+            command.request.protocol_version == protocol_v2::kProtocolVersion
+                ? gpio_capture_diagnostic_->runAuxiliary()
+                : gpio_capture_diagnostic_->run();
         if (gpio_capture_result.ok()) {
           gpio_capture_response = gpioDiagnosticResponse(
               *gpio_capture_diagnostic_, gpio_capture_result.snapshot);
@@ -245,11 +258,18 @@ void FirmwareRuntime::applyPendingEvents(
     }
   }
   if (events.has(control::Event::kStartEpoch)) {
+    const stream_layout::Result layout =
+        acquisition::Controller::runLayout(
+            control_.appliedConfiguration());
+    if (!layout.ok()) {
+      report.internal_error = true;
+      return;
+    }
     report.packet_start_status =
         packet_pipeline_.startRun(
             events.run_id,
             control_.appliedConfiguration().data_checksum_algorithm,
-            control_.appliedConfiguration().stream_mask);
+            control_.appliedConfiguration().stream_mask, layout.layout);
     report.packet_run_started =
         report.packet_start_status == packet::OperationStatus::kOk;
     if (!report.packet_run_started) {
@@ -509,6 +529,55 @@ FirmwareRuntime::gpioDiagnosticResponse(
   response.edma_priority_configured =
       snapshot.registers.edma_priority_configured;
   response.analysis_sample_limit = plan.analysis_sample_limit;
+  if (snapshot.auxiliary_capture) {
+    response.bank_count = 2U;
+    response.aux_bank_mode = protocol_v2::AuxBankMode::kInput;
+    response.selected_rate_profile = protocol_v2::kDefaultRateProfile;
+    response.aux_electrically_unstimulated =
+        snapshot.aux_electrically_unstimulated;
+    response.aux_external_transition_checks_run =
+        snapshot.aux_external_transition_checks_run;
+    response.configured_rate_hz = snapshot.configured_rate_hz;
+    response.aux_hardware_error_flags = snapshot.aux_hardware_error_flags;
+    response.aux_diagnostic_flags = response.diagnostic_flags;
+    response.aux_dma_samples_captured = snapshot.aux_dma_samples_captured;
+    response.aux_complete_samples_retained =
+        snapshot.aux_complete_samples_retained;
+    response.aux_samples_analyzed = snapshot.aux_samples_analyzed;
+    response.aux_stopped_partial_samples =
+        snapshot.aux_stopped_partial_samples;
+    response.aux_raw_word_and = snapshot.aux_raw_word_and;
+    response.aux_raw_word_or = snapshot.aux_raw_word_or;
+    response.aux_observed_transitions = snapshot.aux_observed_transitions;
+    response.aux_packed_value_and = snapshot.aux_packed_value_and;
+    response.aux_packed_value_or = snapshot.aux_packed_value_or;
+    response.aux_first_packed_value = snapshot.aux_first_packed_value;
+    response.aux_last_packed_value = snapshot.aux_last_packed_value;
+    response.gpr26_before = snapshot.registers.gpr26_before;
+    response.gpr26_configured = snapshot.registers.gpr26_configured;
+    response.gpr26_after = snapshot.registers.gpr26_after;
+    response.gpio1_gdir_before = snapshot.registers.gpio1_gdir_before;
+    response.gpio1_gdir_configured = snapshot.registers.gpio1_gdir_configured;
+    response.gpio1_gdir_after = snapshot.registers.gpio1_gdir_after;
+    response.gpio1_psr_before = snapshot.registers.gpio1_psr_before;
+    response.gpio1_psr_configured = snapshot.registers.gpio1_psr_configured;
+    response.gpio1_psr_after = snapshot.registers.gpio1_psr_after;
+    response.aux_dmamux_chcfg_configured =
+        snapshot.registers.aux_dmamux_chcfg_configured;
+    response.aux_dma_erq_configured =
+        snapshot.registers.aux_dma_erq_configured;
+    response.aux_dma_err_final = snapshot.registers.aux_dma_err_final;
+    response.aux_tcd_citer_configured =
+        snapshot.registers.aux_tcd_citer_configured;
+    response.aux_tcd_biter_configured =
+        snapshot.registers.aux_tcd_biter_configured;
+    response.aux_tcd_csr_configured =
+        snapshot.registers.aux_tcd_csr_configured;
+    response.aux_edma_priority_configured =
+        snapshot.registers.aux_edma_priority_configured;
+    response.cache_dma_discards = snapshot.cache_dma_discards;
+    response.cache_cpu_invalidations = snapshot.cache_cpu_invalidations;
+  }
   return response;
 }
 

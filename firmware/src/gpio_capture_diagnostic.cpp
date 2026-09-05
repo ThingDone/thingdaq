@@ -165,6 +165,15 @@ RunResult Runner::run() {
   return result;
 }
 
+RunResult Runner::runAuxiliary() {
+  RunResult result{};
+  const Plan selected = plan();
+  result.status = platform_.executeAuxiliary(selected, result.snapshot)
+                      ? RunStatus::kOk
+                      : RunStatus::kPlatformUnavailable;
+  return result;
+}
+
 }  // namespace thingdaq::gpio_diagnostic
 
 #undef THINGDAQ_GPIO_DIAGNOSTIC_COLD_CODE

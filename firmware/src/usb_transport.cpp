@@ -32,6 +32,7 @@ std::uint32_t counterDelta(std::uint32_t current, std::uint32_t previous) {
 }
 
 bool responseKind(protocol_v1::FrameKind kind) {
+  if (kind == protocol::kTemperatureResponse) return true;
   switch (kind) {
     case protocol_v1::FrameKind::kInfoResponse:
     case protocol_v1::FrameKind::kConfigureResponse:
@@ -275,7 +276,8 @@ ServiceReport CdcTransport::serviceTransmit() {
       }
       selection.bytes = lower_priority_->frontFrame();
       if (!selection.bytes.valid() ||
-          selection.bytes.size != protocol_v1::kDataFrameBytes) {
+          (selection.bytes.size != protocol_v1::kDataFrameBytes &&
+           selection.bytes.size != protocol_v2::kMinDataFrameBytes)) {
         recordIoError();
         stalled = true;
         break;
@@ -540,7 +542,8 @@ CdcTransport::FrameSelection CdcTransport::selectTransmitFrame() {
   if (lower.size == 0U) {
     return {};
   }
-  if (!lower.valid() || lower.size != protocol_v1::kDataFrameBytes) {
+  if (!lower.valid() || (lower.size != protocol_v1::kDataFrameBytes &&
+                         lower.size != protocol_v2::kMinDataFrameBytes)) {
     recordIoError();
     lower_priority_->releaseFrontFrame();
     return {};

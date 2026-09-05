@@ -18,6 +18,13 @@ related:
 
 # ThingDAQ Clock, Compression, and I/O Experiment Evidence
 
+> [!NOTE]
+> Historical contract/evidence: clocks, profiles, sizes and identities below
+> describe the named earlier firmware or experiment, not release 1.1.0.
+> The current release specification is [[Protocol-V2]] (450 MHz core, fixed
+> 1 MHz ADC and GPIO, optional 16 inputs). Old v1 soak harnesses are not v2
+> release validators; use the release input/SDK runners.
+
 > [!IMPORTANT]
 > Independent branch results are not evidence that the features work together in one binary.
 

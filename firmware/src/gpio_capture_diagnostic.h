@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -113,6 +114,22 @@ struct RegisterEvidence {
   std::uint16_t tcd_biter_configured = 0U;
   std::uint16_t tcd_csr_configured = 0U;
   std::uint8_t edma_priority_configured = 0U;
+  std::uint32_t gpr26_before = 0U;
+  std::uint32_t gpr26_configured = 0U;
+  std::uint32_t gpr26_after = 0U;
+  std::uint32_t gpio1_gdir_before = 0U;
+  std::uint32_t gpio1_gdir_configured = 0U;
+  std::uint32_t gpio1_gdir_after = 0U;
+  std::uint32_t gpio1_psr_before = 0U;
+  std::uint32_t gpio1_psr_configured = 0U;
+  std::uint32_t gpio1_psr_after = 0U;
+  std::uint32_t aux_dmamux_chcfg_configured = 0U;
+  std::uint32_t aux_dma_erq_configured = 0U;
+  std::uint32_t aux_dma_err_final = 0U;
+  std::uint16_t aux_tcd_citer_configured = 0U;
+  std::uint16_t aux_tcd_biter_configured = 0U;
+  std::uint16_t aux_tcd_csr_configured = 0U;
+  std::uint8_t aux_edma_priority_configured = 0U;
 };
 
 struct Snapshot {
@@ -142,12 +159,31 @@ struct Snapshot {
   bool output_drive_exercised = false;
   bool external_transition_validation_exercised = false;
   bool final_input_safe = false;
+  bool auxiliary_capture = false;
+  bool aux_electrically_unstimulated = false;
+  bool aux_external_transition_checks_run = false;
+  std::uint32_t configured_rate_hz = protocol_v1::kGpioSampleRateHz;
+  std::uint32_t aux_hardware_error_flags = 0U;
+  std::uint64_t aux_dma_samples_captured = 0U;
+  std::uint32_t aux_complete_samples_retained = 0U;
+  std::uint32_t aux_samples_analyzed = 0U;
+  std::uint32_t aux_stopped_partial_samples = 0U;
+  std::uint32_t aux_raw_word_and = 0U;
+  std::uint32_t aux_raw_word_or = 0U;
+  std::uint32_t aux_observed_transitions = 0U;
+  std::uint8_t aux_packed_value_and = 0U;
+  std::uint8_t aux_packed_value_or = 0U;
+  std::uint8_t aux_first_packed_value = 0U;
+  std::uint8_t aux_last_packed_value = 0U;
+  std::array<std::uint32_t, 2U> cache_dma_discards{};
+  std::array<std::uint32_t, 2U> cache_cpu_invalidations{};
 };
 
 class Platform {
  public:
   virtual ~Platform() = default;
   virtual bool execute(const Plan &plan, Snapshot &snapshot) = 0;
+  virtual bool executeAuxiliary(const Plan &, Snapshot &) { return false; }
 };
 
 enum class RunStatus : std::uint8_t {
@@ -168,6 +204,7 @@ class Runner {
       : declaration_(declaration), platform_(platform) {}
 
   RunResult run();
+  RunResult runAuxiliary();
   Plan plan() const { return makePlan(declaration_); }
   FixtureDeclaration declaration() const { return declaration_; }
 

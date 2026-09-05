@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Python Package
 created: 2026-08-27
-updated: 2026-08-30
+updated: 2026-09-02
 tags:
   - thingdaq
   - python
@@ -17,11 +17,24 @@ related:
   - '[[Foundation-Reuse-Inventory]]'
   - '[[Protocol-V1]]'
   - '[[ADR-001-Wire-Protocol]]'
+  - '[[ADR-007-Experimental-Aux-Input-Bank]]'
   - '[[Calibration]]'
   - '[[NumPy-Integration]]'
 ---
 
 # ThingDAQ Python package
+
+Release 1.1.0 uses [[Protocol-V2]]: fixed 1 MHz ADC/GPIO and a 450 MHz core.
+Default hardware configuration selects 8 GPIO inputs; pass
+`aux_bank_mode=AuxBankMode.INPUT` for 16. `daq.get_temperature()` returns a
+`TemperatureReading` with sensor `status`, signed `millidegrees_c` and
+`celsius`; non-valid readings have `None` values. This is die, not ambient,
+temperature. Reading it does not change the acquisition state.
+
+The optional `TimestampAligner` rejects the new equal-rate profile because
+one GPIO frame spans four ADC frames. Use `read_block()` / `blocks()` and
+per-sample timestamps. Historical simulator profiles remain available offline
+and do not imply release hardware support.
 
 This directory contains the private, local-development Python distribution for
 the ThingDAQ host API. The single authoritative installable distribution name
@@ -45,7 +58,7 @@ See [[System-Overview]] for the package boundary and
 ## Distribution and publication boundary
 
 The host API and firmware are versioned independently from the wire protocol;
-the current release candidate assigns semantic version `1.0.0` to both. The
+release 1.1.0 assigns semantic version `1.1.0` to both and uses wire protocol v2. The
 host value is single-sourced in `thingdaq._version`, exposed as
 `thingdaq.__version__`, and consumed by the build metadata declared in
 `pyproject.toml`. Firmware single-sources its value in
@@ -92,7 +105,8 @@ state, and `SOURCE_DATE_EPOCH`.
 
 The synchronous `ThingDAQ` facade operates on a small `ByteTransport`
 interface. `InMemoryTransport` connects that facade to `SimulatedDevice`
-through encoded protocol-v1 bytes, including arbitrary partial read/write
+through encoded protocol-v1 or negotiated protocol-v2 bytes,
+including arbitrary partial read/write
 boundaries. `SerialTransport` implements the same interface over PySerial, so
 command and streaming code does not depend on the concrete byte source. The
 facade itself always starts one `BackgroundReader`; the simulator does not use
@@ -137,21 +151,97 @@ available for protocol tooling under the explicitly expert-only
 compatibility.
 
 CONFIGURE is capability-driven. The facade rejects unsupported stream, source,
-checksum, exact source/stream profile, fixed-rate, and resolution requirements
-before writing CONFIGURE. Rate/resolution keywords are INFO preconditions and
-do not alter the fixed eight-byte protocol body. The successful device echo
-must equal the request, and START must repeat that same applied configuration.
-CLI human/JSON output reports the echoed body plus active fixed ADC/GPIO rate
-and resolution metadata.
+checksum, exact source/stream profile, rate profile, and resolution
+requirements before writing CONFIGURE. Release 1.1.0 negotiates v2 and defaults
+to 1 MHz ADC pairs and 1 MHz GPIO, using the extended 16-byte body. Legacy
+v1 devices retain their eight-byte CONFIGURE body; the simulator retains its
+historical defaults. Unsupported release rate requests fail before CONFIGURE. The CONFIGURE echo must equal the request; before START, the
+client obtains fresh INFO and requires the advertised capability table and
+applied configuration to remain exact. START must repeat the same applied
+configuration. CLI human/JSON output reports the mode, generated rate profile,
+rates, packed width, frame counts, and resolution metadata.
+
+### Simulator and historical-profile regression surface
+
+The simulator covers the historical profiles from
+[[ADR-007-Experimental-Aux-Input-Bank]] as well as the release equal-rate
+profile. Unlike release hardware, its default remains the legacy v1, 8-bit,
+1 MHz ADC-pair and 4 MHz GPIO regression configuration. The following is an
+offline historical-profile example, not a supported release hardware rate:
+
+```python
+from thingdaq import AuxBankMode, RateProfile, Source, ThingDAQ
+
+with ThingDAQ.simulated(gpio_pattern="walking-bit", strict=True) as daq:
+    applied = daq.configure(
+        adc=True,
+        gpio=True,
+        source=Source.SYNTHETIC,
+        aux_bank_mode=AuxBankMode.INPUT,
+        rate_profile=RateProfile.ADC_250KHZ_GPIO_1MHZ,
+    )
+    info = daq.info()  # exact supported table and applied mode/profile
+    daq.start()  # performs another exact INFO check before START
+    adc = daq.read_block()
+    gpio = daq.read_block()
+    status = daq.status()  # status.configuration == applied
+```
+
+The four historical profiles are 1 MHz/4 MHz, 500 kHz/2 MHz, 250 kHz/1 MHz,
+and 125 kHz/500 kHz. `GPIOBlock` reports `packed_width_bits`, primary and
+auxiliary pin maps, and `sample()` values through `0xFFFF`; `channel()` exposes
+D6-D13 in bits 0-7 and, only in `INPUT` mode, D16-D23 in bits 8-15. NumPy views
+remain read-only zero-copy `uint8` for one bank and use explicit little-endian
+`<u2` for two banks. Alignment uses each selected period and mode-specific
+equal frame coverage while retaining profile, sequence, gap, and run
+boundaries.
+
+The simulator patterns `all-zero`, `walking-bit`, `counter`, and
+`high-transition` generate the primary and auxiliary bytes independently at
+every profile. The same options are available through the CLI:
+
+```bash
+thingdaq monitor --simulate --duration 1 \
+  --aux-bank-mode input \
+  --rate-profile adc_250khz_gpio_1mhz \
+  --gpio-pattern high-transition \
+  --gpio-channel D6 --gpio-channel D23
+```
+
+Run the complete offline workload matrix with one command:
+
+```bash
+python examples/aux_input_matrix.py
+```
+
+The command executes the 8-bit and 16-bit layouts at all four exact combined
+profiles, plus the one-bank and 16-input GPIO-only 4 MHz cases. By default it
+validates two frames per enabled stream for all four GPIO formulas, including
+every decoded ADC value, ADC1 half-period timestamp, primary-bank byte,
+auxiliary-bank byte, sequence, frame timestamp, STATUS byte counter, STOP, and
+closed cleanup. It prints packed-item and per-channel logical sample rates,
+payload and exact rational framed byte rates, coverage, projected load increase,
+and decoded examples.
+
+An output prefix requests temporary shared-schema JSON and structured Markdown:
+
+```bash
+python examples/aux_input_matrix.py --output ../.maestro/aux-input-demo
+```
+
+The 12 MB/s full-combined payload and all protocol-framed rates are analytic
+load hypotheses checked against simulator structure. They are not measurements
+of host throughput, USB bus overhead, target execution, or physical USB
+acceptance.
 
 ## Runnable workflows
 
-The nine scripts in `examples/` cover discovery/serial selection, raw ADC
+The ten scripts in `examples/` cover discovery/serial selection, raw ADC
 channels, explicit interleaving, optional calibration, packed/selected GPIO,
 combined timestamp alignment, live STATUS/loss handling, standalone simulator
-use, and explicit clean shutdown. Every script's no-argument path uses the
-simulator. Physical access is opt-in via `--real`; calibration additionally
-requires an explicit user-owned path:
+use, the auxiliary-input workload matrix, and explicit clean shutdown. Every
+script's no-argument path uses the simulator. Physical access is opt-in via
+`--real`; calibration additionally requires an explicit user-owned path:
 
 ```bash
 python examples/raw_adc_channels.py
@@ -162,7 +252,8 @@ python examples/raw_adc_channels.py --real --hardware-serial 20512460
 
 The complete roster and physical prerequisites are in [[Quickstart]].
 
-`DeviceInfo`, `DeviceCapabilities`, `AdcCalibrationMetadata`,
+`DeviceInfo`, `DeviceCapabilities`, `AuxiliaryInputMetadata`, `GPIOLayout`,
+`RateProfileTiming`, `AdcCalibrationMetadata`,
 `AdcTriggerMetadata`, `AdcAcquisitionStatus`, `AdcBlockMetadata`,
 `DAQConfiguration`, `Status`, `ADCBlock`, `GPIOBlock`,
 `GpioClockDiagnosticRequest`, `GpioClockDiagnosticResult`,
@@ -180,10 +271,10 @@ capture diagnostic additionally requires a fully quiescent physical GPIO
 pipeline.
 
 `DeviceInfo.adc_trigger` and `Status.adc_trigger` expose the exact 24 MHz PIT
-root, 4 MHz master, chained 1 MHz pair schedule, queues 0/4, raw/effective
-delays 0/75 and 1/76, configured-register readbacks, completion counts, and
-typed trigger errors. `completion_timing_delta_ns` converts the first
-conversion-completion IRQ delta from the 600 MHz DWT counter; it is not an
+root, selected master/pair schedule, queues 0/4, generated phase and delay
+readbacks, configured-register readbacks, completion counts, and typed trigger
+errors. `completion_timing_delta_ns` converts the first
+conversion-completion IRQ delta using the reported DWT clock (450 MHz in 1.1.0); it is not an
 analog aperture measurement.
 
 `DeviceInfo.data_checksum_algorithm` reports the generated device default in
@@ -207,21 +298,22 @@ GPIO pad:
 
 ```python
 with ThingDAQ.open(hardware_serial=12345670) as daq:
-    evidence = daq.gpio_clock_diagnostic(rate_hz=4_000_000, event_count=8192)
+    evidence = daq.gpio_clock_diagnostic(rate_hz=1_000_000, event_count=8192)
     if not evidence.healthy:
         raise RuntimeError(evidence.hardware_error_flags)
     print(evidence.measured_rate_hz, evidence.count_error)
 ```
 
-Accepted rates must divide both the 24 MHz PIT clock and 600 MHz DWT clock
-exactly and cannot exceed the immutable 4 MHz production rate. The simulator
+Release firmware accepts only 1 MHz for this diagnostic, using the 24 MHz
+PIT clock and 450 MHz DWT clock. The simulator
 does not advertise this capability and raises `DeviceCapabilityError` instead
 of fabricating target register evidence. See [[Protocol-V1]] and
 [[ADR-003-GPIO-Clock-DMA]].
 
 Firmware supports ADC-only, GPIO-only, and combined physical streaming plus
 the fail-closed GPIO capture diagnostic. D6 through D13 map to bits 0 through 7
-at 4 MHz while A0/A1 retain one 1 MHz pair stream with a 500 ns ADC1 phase.
+at 1 MHz while A0/A1 retain one 1 MHz pair stream with a 500 ns ADC1 phase.
+Auxiliary INPUT adds D16–D23 at the same 1 MHz rate.
 INFO exposes the exact applied/supported profiles, rates, phases, pin map,
 aligned rings, frame sizes, queue capacities, and checksum. STATUS exposes all
 per-source/shared stage, byte, queue, firmware-diagnostic, and USB counters:
@@ -426,8 +518,11 @@ expansion. None of these operations imports or requires NumPy.
 
 The optional `thingdaq.numpy` module vectorizes the same models without
 changing that baseline. `block.as_numpy().pairs` is a read-only, zero-copy
-`(1012, 2)` `<u2` view in ADC0/ADC1 order, and a GPIO block's corresponding
-`packed` view is read-only, zero-copy `uint8`. Explicit methods generate
+`(item_count, 2)` `<u2` view in ADC0/ADC1 order (1,012 rows for the legacy
+layout and 506 for auxiliary-input mode), and a legacy GPIO block's
+corresponding `packed` view is read-only, zero-copy `uint8`. Auxiliary-input
+GPIO blocks instead use read-only, zero-copy little-endian `uint16`. Explicit
+methods generate
 interleaved ticks, calibrated `float64` voltages, or Boolean columns only for
 requested GPIO pins. The arrays retain the immutable payload owner and source
 block; no eight-channel GPIO expansion occurs unless the caller names all
@@ -505,8 +600,9 @@ for final_item in aligner.flush():
 ```
 
 Alignment keys are the nonzero run ID and first-sample timestamp. ADC and GPIO
-must each cover the fixed 8,096-tick interval and report the same physical or
-synthetic source. The event-time lateness window retains at most the configured
+must select the same protocol/mode/rate profile, cover the same generated frame
+interval, and report the same physical or synthetic source. The event-time
+lateness window retains at most the configured
 number of unresolved timestamps, accepts bounded out-of-order arrival, and
 emits `AlignmentLoss` before an `AlignedInterval` whose absent side is
 explicitly `None`. A skipped interval with neither side is one loss record with
@@ -536,8 +632,8 @@ unwritten suffix within the command's overall deadline. Its default 64 KiB
 reads are deliberately larger than USB packets because USB CDC is one byte
 stream, not a packet-preserving message API.
 
-`BackgroundReader` owns exactly one `IncrementalFrameParser`. One non-daemon
-thread continuously feeds arbitrary read chunks into it, matches concurrent
+`BackgroundReader` owns exactly one bounded compatible v1/v2 parser. One
+non-daemon thread continuously feeds arbitrary read chunks into it, matches concurrent
 responses by echoed request ID, and separates decoded ADC/GPIO blocks from
 other non-response frames. Pending requests, block queues, and event queues are
 all bounded. Request timeout removes the pending entry; an eventual unmatched

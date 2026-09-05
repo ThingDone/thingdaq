@@ -46,7 +46,11 @@ struct HardwareSnapshot {
 class TeensyAdcDmaCapture final : public HardwareCapture {
  public:
   StartStatus inspectStart(std::uint32_t epoch) override;
+  StartStatus inspectStart(std::uint32_t epoch,
+                           std::uint32_t pairs_per_buffer) override;
   StartStatus prepare(std::uint32_t epoch) override;
+  StartStatus prepare(std::uint32_t epoch,
+                      std::uint32_t pairs_per_buffer) override;
   bool stopAtBoundaryBeforeTriggers() override;
   StopReport stopAfterTriggers() override;
   std::size_t serviceOwnership() override;

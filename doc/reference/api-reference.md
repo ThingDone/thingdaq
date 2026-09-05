@@ -18,6 +18,19 @@ related:
 
 # Python API reference
 
+`ThingDAQ.get_temperature()` returns `TemperatureReading(status,
+millidegrees_c)`, with a `celsius` property. It works in IDLE, CONFIGURED and
+RUNNING on firmware 1.1.0, does not change acquisition, and returns `None`
+for a non-valid sensor reading. `TemperatureStatus` is exported from `thingdaq`.
+See [[Protocol-V2]] for wire details and the fixed-rate release policy.
+
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+
 This page describes the stable synchronous user surface. Import normal
 operations and immutable models from `thingdaq`; use
 `thingdaq.low_level` only for protocol tooling that intentionally owns raw

@@ -12,6 +12,7 @@ from types import TracebackType
 from typing import Literal, TypeAlias
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v2_constants as v2_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .discovery import (
     DEFAULT_DISCOVERY_TIMEOUT,
@@ -33,6 +34,8 @@ from .identity import (
 from .models import (
     AdcAcquisitionStatus,
     ADCBlock,
+    AdcBlockMetadata,
+    AuxBankMode,
     CommandResponse,
     DAQConfiguration,
     DeviceCapabilities,
@@ -46,6 +49,8 @@ from .models import (
     HostCounters,
     HostQueueLoss,
     LossCounters,
+    RateProfile,
+    RateProfileTiming,
     ResponseValue,
     Status,
     StreamAnomaly,
@@ -54,6 +59,7 @@ from .models import (
     analyze_stream_continuity,
 )
 from .protocol import ParserCounters
+from .protocol_v2 import TemperatureReading
 from .reader import (
     DEFAULT_MAX_QUEUED_BLOCKS,
     BackgroundReader,
@@ -66,7 +72,11 @@ from .reader import (
     StreamStoppedError,
 )
 from .simulator import SimulatedDevice
-from .synthetic import SyntheticPatternError, validate_synthetic_block
+from .synthetic import (
+    SyntheticGPIOPattern,
+    SyntheticPatternError,
+    validate_synthetic_block,
+)
 from .transport import ByteTransport, InMemoryTransport, SerialTransport
 
 DataBlock: TypeAlias = ADCBlock | GPIOBlock
@@ -165,7 +175,7 @@ class DeviceCommandError(ThingDAQError):
 
     def __init__(
         self,
-        command: constants.FrameKind,
+        command: constants.FrameKind | v2_constants.FrameKind,
         error_code: constants.ErrorCode,
         request_id: int,
     ) -> None:
@@ -324,6 +334,9 @@ class ThingDAQ:
         expected_identity: ExpectedDeviceIdentity | None = None,
         reopened_identity: DeviceIdentitySnapshot | None = None,
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
+        synthetic_gpio_pattern: SyntheticGPIOPattern | str = (
+            SyntheticGPIOPattern.COUNTER
+        ),
     ) -> None:
         if not isinstance(strict, bool):
             raise TypeError("strict must be a boolean")
@@ -345,6 +358,10 @@ class ThingDAQ:
             selected_session_policy = SessionRecoveryPolicy(session_policy)
         except (TypeError, ValueError) as error:
             raise ValueError("session_policy must be 'adopt' or 'stop'") from error
+        try:
+            selected_gpio_pattern = SyntheticGPIOPattern(synthetic_gpio_pattern)
+        except (TypeError, ValueError) as error:
+            raise ValueError("unknown synthetic GPIO pattern") from error
 
         self._transport = transport
         self._strict = strict
@@ -355,6 +372,8 @@ class ThingDAQ:
         self._reopened_identity = reopened_identity
         self._session_policy = selected_session_policy
         self._session_policy_applied = False
+        self._synthetic_gpio_pattern = selected_gpio_pattern
+        self._wire_protocol_version = constants.PROTOCOL_VERSION
         self._verified_identity: DeviceIdentitySnapshot | None = None
         self._reader = BackgroundReader(
             transport,
@@ -391,6 +410,9 @@ class ThingDAQ:
         self._stream_host_drop_baseline = 0
         self._stream_loss_report_drop_baseline = 0
         self._closed = False
+        self._adc_metadata_cache: (
+            tuple[DeviceInfo, Status | None, constants.Source, AdcBlockMetadata] | None
+        ) = None
         self._reader.start()
 
     @classmethod
@@ -424,6 +446,9 @@ class ThingDAQ:
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
+        synthetic_gpio_pattern: SyntheticGPIOPattern | str = (
+            SyntheticGPIOPattern.COUNTER
+        ),
     ) -> ThingDAQ:
         """Open a transport, discovered device, port, or selected serial number.
 
@@ -522,6 +547,7 @@ class ThingDAQ:
             expected_identity=expected_identity,
             reopened_identity=reopened_identity,
             session_policy=session_policy,
+            synthetic_gpio_pattern=synthetic_gpio_pattern,
         )
         try:
             daq.synchronize(
@@ -557,11 +583,15 @@ class ThingDAQ:
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
         synchronization_attempts: int = 4,
         synchronization_retry_delay: float = 0.05,
+        gpio_pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
     ) -> ThingDAQ:
         """Open the public API over the deterministic protocol simulator."""
 
         transport = InMemoryTransport(
-            device=SimulatedDevice(control_only=control_only),
+            device=SimulatedDevice(
+                control_only=control_only,
+                gpio_pattern=gpio_pattern,
+            ),
             read_chunk_size=read_chunk_size,
             write_chunk_size=write_chunk_size,
             stream_interval=stream_interval,
@@ -581,6 +611,7 @@ class ThingDAQ:
             session_policy=session_policy,
             synchronization_attempts=synchronization_attempts,
             synchronization_retry_delay=synchronization_retry_delay,
+            synthetic_gpio_pattern=gpio_pattern,
         )
 
     @property
@@ -789,6 +820,7 @@ class ThingDAQ:
                 self._reader.activate_run(
                     self._run_id,
                     configuration.data_checksum_algorithm,
+                    configuration,
                 )
                 self._initialize_stream_expectations(
                     configuration,
@@ -819,6 +851,8 @@ class ThingDAQ:
         adc_pair_rate_hz: int | None = None,
         gpio_sample_rate_hz: int | None = None,
         adc_resolution_bits: int | None = None,
+        aux_bank_mode: AuxBankMode | int | None = None,
+        rate_profile: RateProfile | int | None = None,
     ) -> DAQConfiguration:
         """Apply an advertised configuration without starting acquisition.
 
@@ -838,17 +872,80 @@ class ThingDAQ:
                 constants.DeviceState.CONFIGURED,
             )
             if configuration is None:
+                capabilities = self.capabilities
+                auxiliary = capabilities.auxiliary if capabilities is not None else None
                 if not isinstance(adc, bool) or not isinstance(gpio, bool):
                     raise TypeError("adc and gpio selectors must be booleans")
                 if isinstance(source, bool):
                     raise TypeError("source must be HARDWARE, SYNTHETIC, or None")
                 if isinstance(checksum_algorithm, bool):
                     raise TypeError("checksum_algorithm must be a checksum enum or ID")
+                if isinstance(aux_bank_mode, bool) or isinstance(rate_profile, bool):
+                    raise TypeError("aux_bank_mode/rate_profile cannot be booleans")
+                selected_mode = (
+                    AuxBankMode.DISABLED
+                    if aux_bank_mode is None
+                    else AuxBankMode(aux_bank_mode)
+                )
+                if rate_profile is not None:
+                    selected_profile = RateProfile(rate_profile)
+                elif adc_pair_rate_hz is not None or gpio_sample_rate_hz is not None:
+                    matching_profiles = tuple(
+                        timing.profile
+                        for timing in (
+                            RateProfileTiming.from_profile(profile)
+                            for profile in RateProfile
+                        )
+                        if (
+                            auxiliary is None
+                            or auxiliary.supported_rate_profile_mask
+                            & (1 << int(timing.profile))
+                        )
+                        and (
+                            adc_pair_rate_hz is None
+                            or timing.adc_pair_rate_hz == adc_pair_rate_hz
+                        )
+                        and (
+                            gpio_sample_rate_hz is None
+                            or timing.gpio_sample_rate_hz == gpio_sample_rate_hz
+                        )
+                    )
+                    selected_profile = (
+                        matching_profiles[0]
+                        if len(matching_profiles) == 1
+                        else v2_constants.DEFAULT_RATE_PROFILE
+                    )
+                else:
+                    selected_profile = (
+                        auxiliary.selected_rate_profile
+                        if auxiliary is not None
+                        else v2_constants.DEFAULT_RATE_PROFILE
+                    )
+                timing = RateProfileTiming.from_profile(selected_profile)
+                if rate_profile is not None and (
+                    (
+                        adc_pair_rate_hz is not None
+                        and adc_pair_rate_hz != timing.adc_pair_rate_hz
+                    )
+                    or (
+                        gpio_sample_rate_hz is not None
+                        and gpio_sample_rate_hz != timing.gpio_sample_rate_hz
+                    )
+                ):
+                    raise ValueError(
+                        "rate requirements disagree with the selected exact profile"
+                    )
                 stream_mask = constants.StreamMask.NONE
                 if adc:
                     stream_mask |= constants.StreamMask.ADC
                 if gpio:
                     stream_mask |= constants.StreamMask.GPIO
+                requires_v2 = (
+                    selected_mode is not AuxBankMode.DISABLED
+                    or selected_profile is not v2_constants.DEFAULT_RATE_PROFILE
+                )
+                if requires_v2:
+                    self._read_info(protocol_version=v2_constants.PROTOCOL_VERSION)
                 capabilities = self.capabilities
                 selected_checksum = constants.ChecksumAlgorithm(checksum_algorithm)
                 if source is None:
@@ -866,6 +963,8 @@ class ThingDAQ:
                                 stream_mask=stream_mask,
                                 source=candidate,
                                 data_checksum_algorithm=selected_checksum,
+                                aux_bank_mode=selected_mode,
+                                rate_profile=selected_profile,
                             )
                             if capabilities.supports_configuration(
                                 candidate_configuration
@@ -876,9 +975,26 @@ class ThingDAQ:
                     stream_mask=stream_mask,
                     source=constants.Source(source),
                     data_checksum_algorithm=selected_checksum,
+                    aux_bank_mode=selected_mode,
+                    rate_profile=selected_profile,
                 )
             elif not isinstance(configuration, DAQConfiguration):
                 raise TypeError("configuration must be DAQConfiguration")
+            else:
+                if aux_bank_mode is not None and AuxBankMode(aux_bank_mode) is not (
+                    configuration.aux_bank_mode
+                ):
+                    raise ValueError(
+                        "aux_bank_mode disagrees with the supplied configuration"
+                    )
+                if rate_profile is not None and RateProfile(rate_profile) is not (
+                    configuration.rate_profile
+                ):
+                    raise ValueError(
+                        "rate_profile disagrees with the supplied configuration"
+                    )
+                if configuration.uses_protocol_v2:
+                    self._read_info(protocol_version=v2_constants.PROTOCOL_VERSION)
             self._validate_configuration_capabilities(
                 configuration,
                 adc_pair_rate_hz=adc_pair_rate_hz,
@@ -888,7 +1004,10 @@ class ThingDAQ:
 
             response = self._command(
                 constants.FrameKind.CONFIGURE_REQUEST,
-                configuration.to_payload(),
+                configuration.to_payload(
+                    protocol_version=configuration.protocol_version
+                ),
+                protocol_version=configuration.protocol_version,
             )
             if not isinstance(response.value, DAQConfiguration):
                 raise UnexpectedMessageError(
@@ -896,6 +1015,7 @@ class ThingDAQ:
                 )
             self._state = constants.DeviceState.CONFIGURED
             self._configuration = response.value
+            self._wire_protocol_version = configuration.protocol_version
             self._run_id = response.run_id
             self._last_status = None
             if response.value != configuration:
@@ -919,6 +1039,23 @@ class ThingDAQ:
             requested_configuration = self._configuration
             if requested_configuration is None:  # pragma: no cover - state guard
                 raise UnexpectedMessageError("START has no requested configuration")
+            if requested_configuration.uses_protocol_v2:
+                applied_info, _ = self._read_info(
+                    protocol_version=v2_constants.PROTOCOL_VERSION
+                )
+                if applied_info.applied_configuration != requested_configuration:
+                    raise UnexpectedMessageError(
+                        "INFO applied configuration differs from CONFIGURE before "
+                        f"START: configured={requested_configuration!r}, "
+                        f"INFO={applied_info.applied_configuration!r}"
+                    )
+                if not applied_info.capabilities.supports_configuration(
+                    requested_configuration
+                ):
+                    raise DeviceCapabilityError(
+                        "INFO no longer advertises the configured auxiliary/rate profile",
+                        error_code=constants.ErrorCode.UNSUPPORTED_CONFIGURATION,
+                    )
             host_baseline = self.host_counters
             parser_error_baseline = self._reader.parser_counters.corruption_events
             response = self._command(constants.FrameKind.START_REQUEST)
@@ -954,6 +1091,20 @@ class ThingDAQ:
             self._last_status = None
             return self._run_id
 
+    def get_temperature(self) -> TemperatureReading:
+        """Read calibrated die temperature and sensor status without changing acquisition."""
+        with self._lock:
+            self._require_verified_identity()
+            response = self._command(
+                v2_constants.FrameKind.GET_TEMPERATURE_REQUEST,
+                protocol_version=v2_constants.PROTOCOL_VERSION,
+            )
+            if not isinstance(response.value, TemperatureReading):
+                raise UnexpectedMessageError(
+                    "temperature response has no sensor reading"
+                )
+            return response.value
+
     def status(self) -> Status:
         """Return current state, active configuration, and firmware counters."""
 
@@ -964,16 +1115,22 @@ class ThingDAQ:
             status = response.value
             self._state = status.device_state
             self._run_id = response.run_id
-            self._last_status = status
             if status.device_state is constants.DeviceState.IDLE:
                 self._configuration = None
             else:
-                self._configuration = DAQConfiguration(
-                    stream_mask=status.stream_mask,
-                    source=status.source,
-                    data_checksum_algorithm=status.data_checksum_algorithm,
-                    data_frame_bytes=status.data_frame_bytes,
-                )
+                configuration = self._configuration
+                if configuration is None and self._device_info is not None:
+                    configuration = self._device_info.applied_configuration
+                if configuration is None:
+                    configuration = DAQConfiguration(
+                        stream_mask=status.stream_mask,
+                        source=status.source,
+                        data_checksum_algorithm=status.data_checksum_algorithm,
+                        data_frame_bytes=status.data_frame_bytes,
+                    )
+                status = replace(status, configuration=configuration)
+                self._configuration = configuration
+            self._last_status = status
             return status
 
     def reset_stats(self) -> int:
@@ -1012,11 +1169,17 @@ class ThingDAQ:
     def gpio_clock_diagnostic(
         self,
         *,
-        rate_hz: int = constants.GPIO_CLOCK_PRODUCTION_RATE_HZ,
+        rate_hz: int | None = None,
         event_count: int = constants.GPIO_CLOCK_MAX_EVENT_COUNT,
     ) -> GpioClockDiagnosticResult:
         """Measure the isolated PIT/XBARA/eDMA trigger path while IDLE."""
 
+        if rate_hz is None:
+            rate_hz = (
+                self._device_info.gpio_sample_rate_hz
+                if self._device_info is not None
+                else constants.GPIO_CLOCK_PRODUCTION_RATE_HZ
+            )
         request = GpioClockDiagnosticRequest(rate_hz=rate_hz, event_count=event_count)
         with self._lock:
             self._require_verified_identity()
@@ -1082,6 +1245,8 @@ class ThingDAQ:
                 raise UnexpectedMessageError("STOP response did not enter IDLE")
             self._state = constants.DeviceState.IDLE
             self._configuration = None
+            assert self._verified_identity is not None
+            self._wire_protocol_version = self._verified_identity.protocol_version
             self._run_id = response.run_id
             self._clear_stream_expectations(preserve_inferred=True)
             self._pending_items.clear()
@@ -1355,17 +1520,24 @@ class ThingDAQ:
 
     def _command(
         self,
-        kind: constants.FrameKind,
+        kind: constants.FrameKind | v2_constants.FrameKind,
         payload: bytes = b"",
         *,
         timeout: float | None = None,
+        protocol_version: int | None = None,
     ) -> CommandResponse[ResponseValue]:
         self._ensure_open()
+        selected_version = (
+            self._wire_protocol_version
+            if protocol_version is None
+            else protocol_version
+        )
         try:
             response = self._reader.request(
                 kind,
                 payload,
                 timeout=self._command_timeout if timeout is None else timeout,
+                protocol_version=selected_version,
             )
         except RequestTimeoutError as error:
             raise CommandTimeoutError(error, self._recovery_evidence()) from error
@@ -1376,22 +1548,63 @@ class ThingDAQ:
             raise
         if not response.ok:
             raise DeviceCommandError(kind, response.error_code, response.request_id)
-        expected_kind = constants.REQUEST_RESPONSE_KIND[kind]
+        expected_kind = (
+            v2_constants.REQUEST_RESPONSE_KIND[kind]
+            if kind is v2_constants.FrameKind.GET_TEMPERATURE_REQUEST
+            else constants.REQUEST_RESPONSE_KIND[constants.FrameKind(int(kind))]
+        )
         if response.kind is not expected_kind:
             raise UnexpectedMessageError(
                 f"expected {expected_kind.name}, received {response.kind.name}"
             )
         return response
 
-    def _read_info(self) -> tuple[DeviceInfo, DeviceIdentitySnapshot]:
-        response = self._command(constants.FrameKind.INFO_REQUEST)
+    def _read_info(
+        self,
+        *,
+        protocol_version: int | None = None,
+    ) -> tuple[DeviceInfo, DeviceIdentitySnapshot]:
+        selected_version = (
+            self._wire_protocol_version
+            if protocol_version is None
+            else protocol_version
+        )
+        try:
+            response = self._command(
+                constants.FrameKind.INFO_REQUEST,
+                protocol_version=selected_version,
+            )
+        except DeviceCommandError as error:
+            if (
+                selected_version != constants.PROTOCOL_VERSION
+                or error.error_code != constants.ErrorCode.UNSUPPORTED_VERSION
+            ):
+                raise
+            selected_version = v2_constants.PROTOCOL_VERSION
+            response = self._command(
+                constants.FrameKind.INFO_REQUEST, protocol_version=selected_version
+            )
         if not isinstance(response.value, DeviceInfo):
             raise UnexpectedMessageError("INFO response has no DeviceInfo value")
         info = response.value
-        try:
-            identity = validate_device_identity(info, self._expected_identity)
-        except IdentityValidationError as error:
-            raise DeviceIdentityMismatchError(str(error)) from error
+        if selected_version == constants.PROTOCOL_VERSION:
+            try:
+                identity = validate_device_identity(info, self._expected_identity)
+            except IdentityValidationError as error:
+                raise DeviceIdentityMismatchError(str(error)) from error
+        else:
+            if info.protocol_version != v2_constants.PROTOCOL_VERSION:
+                raise DeviceIdentityMismatchError(
+                    "extended INFO did not echo protocol version 2"
+                )
+            try:
+                identity = validate_device_identity(info, self._expected_identity)
+            except IdentityValidationError as error:
+                raise DeviceIdentityMismatchError(str(error)) from error
+            if self._verified_identity is not None:
+                identity = replace(
+                    identity, protocol_version=self._verified_identity.protocol_version
+                )
         if self._reopened_identity is not None and identity != self._reopened_identity:
             raise DeviceIdentityMismatchError(
                 "reopened firmware identity differs from the discovery probe"
@@ -1403,6 +1616,7 @@ class ThingDAQ:
 
         previous_run_id = self._run_id
         self._device_info = info
+        self._wire_protocol_version = selected_version
         self._state = info.device_state
         self._run_id = response.run_id
         if previous_run_id != response.run_id:
@@ -1514,20 +1728,21 @@ class ThingDAQ:
             )
         if (
             adc_pair_rate_hz is not None
-            and adc_pair_rate_hz != capabilities.adc_pair_rate_hz
+            and adc_pair_rate_hz != configuration.adc_pair_rate_hz
         ):
             raise DeviceCapabilityError(
                 f"requested ADC pair rate {adc_pair_rate_hz} Hz is unsupported; "
-                f"INFO advertises exactly {capabilities.adc_pair_rate_hz} Hz"
+                f"selected profile requires exactly "
+                f"{configuration.adc_pair_rate_hz} Hz"
             )
         if (
             gpio_sample_rate_hz is not None
-            and gpio_sample_rate_hz != capabilities.gpio_sample_rate_hz
+            and gpio_sample_rate_hz != configuration.gpio_sample_rate_hz
         ):
             raise DeviceCapabilityError(
                 f"requested GPIO sample rate {gpio_sample_rate_hz} Hz is "
-                f"unsupported; INFO advertises exactly "
-                f"{capabilities.gpio_sample_rate_hz} Hz"
+                f"unsupported; selected profile requires exactly "
+                f"{configuration.gpio_sample_rate_hz} Hz"
             )
         if (
             adc_resolution_bits is not None
@@ -1610,22 +1825,35 @@ class ThingDAQ:
                 raise UnexpectedMessageError(
                     "ADC_DATA arrived without active configuration/INFO metadata"
                 )
-            acquisition: AdcAcquisitionStatus | None = None
             status = self._last_status
-            if (
-                status is not None
-                and status.device_state is constants.DeviceState.RUNNING
-                and status.source is configuration.source
-                and status.stream_mask & constants.StreamMask.ADC
-            ):
-                acquisition = status.adc_acquisition
             try:
+                cached = self._adc_metadata_cache
+                if (
+                    cached is None
+                    or cached[0] is not info
+                    or cached[1] is not status
+                    or cached[2] is not configuration.source
+                ):
+                    acquisition: AdcAcquisitionStatus | None = None
+                    if (
+                        status is not None
+                        and status.device_state is constants.DeviceState.RUNNING
+                        and status.source is configuration.source
+                        and status.stream_mask & constants.StreamMask.ADC
+                    ):
+                        acquisition = status.adc_acquisition
+                    cached = (
+                        info,
+                        status,
+                        configuration.source,
+                        info.adc_block_metadata(
+                            configuration.source, acquisition=acquisition
+                        ),
+                    )
+                    self._adc_metadata_cache = cached
                 block = replace(
                     block,
-                    metadata=info.adc_block_metadata(
-                        configuration.source,
-                        acquisition=acquisition,
-                    ),
+                    metadata=cached[3],
                     gap=None,
                 )
             except (TypeError, ValueError) as error:
@@ -1718,7 +1946,10 @@ class ThingDAQ:
             and self._configuration.source is constants.Source.SYNTHETIC
         ):
             try:
-                validate_synthetic_block(block)
+                validate_synthetic_block(
+                    block,
+                    gpio_pattern=self._synthetic_gpio_pattern,
+                )
             except SyntheticPatternError as error:
                 raise UnexpectedStreamValidationError(
                     "synthetic_pattern",
@@ -1783,16 +2014,34 @@ class ThingDAQ:
                 dropped_frames = status.gpio_frames_dropped
                 dropped_items = status.gpio_items_dropped
                 dropped_bytes = status.gpio_payload_bytes_dropped
-                expected_bytes = inferred_items
+                gpio_item_bytes = (
+                    self._configuration.gpio_layout.item_bytes
+                    if self._configuration is not None
+                    else 1
+                )
+                expected_bytes = inferred_items * gpio_item_bytes
+            layout = (
+                self._configuration.gpio_layout
+                if self._configuration is not None
+                else None
+            )
             items_per_frame = (
-                constants.ADC_PAIRS_PER_FRAME
+                (
+                    constants.ADC_PAIRS_PER_FRAME
+                    if layout is None
+                    else layout.adc_items_per_frame
+                )
                 if kind is constants.FrameKind.ADC_DATA
-                else constants.GPIO_SAMPLES_PER_FRAME
+                else (
+                    constants.GPIO_SAMPLES_PER_FRAME
+                    if layout is None
+                    else layout.items_per_frame
+                )
             )
             bytes_per_item = (
                 constants.ADC_BYTES_PER_PAIR
                 if kind is constants.FrameKind.ADC_DATA
-                else 1
+                else (1 if layout is None else layout.item_bytes)
             )
             counter_units_match = (
                 dropped_items == dropped_frames * items_per_frame
@@ -1862,7 +2111,11 @@ class ThingDAQ:
                 actual_frames = firmware.gpio_frames_dropped
                 actual_items = firmware.gpio_items_dropped
                 actual_bytes = firmware.gpio_payload_bytes_dropped
-                expected_bytes = inferred_items
+                expected_bytes = inferred_items * (
+                    self._configuration.gpio_layout.item_bytes
+                    if self._configuration is not None
+                    else 1
+                )
             if (
                 actual_frames != inferred_frames
                 or actual_items != inferred_items

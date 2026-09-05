@@ -12,6 +12,7 @@ namespace {
 
 namespace wire = thingdaq::protocol;
 namespace constants = thingdaq::protocol_v1;
+namespace experimental_constants = thingdaq::protocol_v2;
 
 int failures = 0;
 
@@ -622,9 +623,13 @@ void testGoldenEncode(const std::string &fixture_directory,
 
 void testFixedCapacityBoundaries() {
   static_assert(wire::CommandFrame::capacity() ==
-                constants::kMaxCommandFrameBytes);
+                experimental_constants::kMaxCommandFrameBytes);
   static_assert(wire::ControlFrame::capacity() ==
-                constants::kMaxControlFrameBytes);
+                experimental_constants::kMaxControlFrameBytes);
+  static_assert(constants::kMaxCommandFrameBytes <=
+                wire::CommandFrame::capacity());
+  static_assert(constants::kMaxControlFrameBytes <=
+                wire::ControlFrame::capacity());
   static_assert(wire::DataFrame::capacity() == constants::kMaxDataFrameBytes);
 
   wire::FrameFields fields{};
@@ -673,6 +678,118 @@ void testFixedCapacityBoundaries() {
          "fixed frame clears itself after an oversized length");
 }
 
+void testProtocolV2MetadataResponses() {
+  wire::Request request{};
+  request.request_id = 700U;
+  request.protocol_version = experimental_constants::kProtocolVersion;
+
+  wire::InfoResponse info{};
+  info.device_state = constants::DeviceState::kIdle;
+  info.supported_stream_mask = 3U;
+  info.supported_source_mask = 3U;
+  info.applied_configuration.aux_bank_mode =
+      experimental_constants::AuxBankMode::kInput;
+  info.applied_configuration.rate_profile =
+      experimental_constants::RateProfile::kAdc500khzGpio2mhz;
+  info.applied_configuration.protocol_version =
+      experimental_constants::kProtocolVersion;
+  wire::ControlFrame encoded{};
+  expect(wire::encodeInfoResponse(request, 0U, info, encoded).ok(),
+         "encode protocol-v2 INFO response");
+  wire::DecodedFrame decoded{};
+  expect(wire::decodeFrame(encoded.view(), decoded).ok() &&
+             decoded.header.version == experimental_constants::kProtocolVersion &&
+             decoded.payload.size ==
+                 experimental_constants::kInfoResponsePayloadSize &&
+             decoded.payload.data[
+                 experimental_constants::kInfoResponseGpioItemBytesOffset] ==
+                 2U &&
+             decoded.payload.data[
+                 experimental_constants::kInfoResponseAuxGpioPinMapOffset] ==
+                 16U &&
+             decoded.payload.data[
+                 experimental_constants::kInfoResponseAuxGpioPinMapOffset +
+                 7U] == 23U &&
+             decoded.payload.data[experimental_constants::
+                                      kInfoResponsePrimaryGpioEdmaChannelOffset] ==
+                 2U &&
+             decoded.payload.data[experimental_constants::
+                                      kInfoResponseAuxGpioEdmaChannelOffset] ==
+                 3U &&
+             decoded.payload.data[experimental_constants::
+                                      kInfoResponsePrimaryGpioDmamuxSourceOffset] ==
+                 30U &&
+             decoded.payload.data[experimental_constants::
+                                      kInfoResponseAuxGpioDmamuxSourceOffset] ==
+                 31U &&
+             decoded.payload.data[experimental_constants::
+                                      kInfoResponsePrimaryGpioEdmaPriorityOffset] ==
+                 1U &&
+             decoded.payload.data[experimental_constants::
+                                      kInfoResponseAuxGpioEdmaPriorityOffset] ==
+                 0U &&
+             decoded.payload.data[experimental_constants::
+                                      kInfoResponsePrimaryGpioRawRingDepthOffset] ==
+                 4U &&
+             decoded.payload.data[experimental_constants::
+                                      kInfoResponseAuxGpioRawRingDepthOffset] ==
+                 4U,
+         "protocol-v2 INFO reports selected width, D16-D23 map, and both DMA routes");
+
+  request.kind = constants::CommandKind::kGetStatus;
+  wire::StatusResponse status{};
+  status.configuration = info.applied_configuration;
+  status.auxiliary_gpio.bank_major_loops = {11U, 12U};
+  status.auxiliary_gpio.bank_samples_captured = {101U, 102U};
+  status.auxiliary_gpio.bank_ring_overruns = {2U, 3U};
+  status.auxiliary_gpio.bank_stale_completions = {4U, 5U};
+  expect(wire::encodeStatusResponse(request, 9U, status, encoded).ok(),
+         "encode protocol-v2 STATUS response");
+  expect(wire::decodeFrame(encoded.view(), decoded).ok() &&
+             decoded.payload.size ==
+                 experimental_constants::kStatusResponsePayloadSize,
+         "decode expanded protocol-v2 STATUS response");
+  std::uint32_t per_bank = 0U;
+  std::uint32_t retention = 0U;
+  expect(wire::loadU32(
+             decoded.payload,
+             experimental_constants::
+                 kStatusResponseAuxGpioStaleCompletionsOffset,
+             per_bank) &&
+             per_bank == 5U,
+         "protocol-v2 STATUS exposes per-bank stale completions");
+  expect(wire::loadU32(
+             decoded.payload,
+             experimental_constants::
+                 kStatusResponsePacketRetentionUsCombinedOffset,
+             retention) &&
+             retention == 101200U,
+         "protocol-v2 STATUS reports exact selected-profile packet retention");
+
+  request.kind = constants::CommandKind::kGpioCaptureDiagnostic;
+  wire::GpioCaptureDiagnosticResponse diagnostic{};
+  diagnostic.bank_count = 2U;
+  diagnostic.aux_bank_mode = experimental_constants::AuxBankMode::kInput;
+  diagnostic.aux_electrically_unstimulated = true;
+  diagnostic.aux_external_transition_checks_run = false;
+  diagnostic.aux_dma_samples_captured = 4048U;
+  diagnostic.aux_complete_samples_retained = 2024U;
+  diagnostic.aux_samples_analyzed = 256U;
+  expect(wire::encodeGpioCaptureDiagnosticResponse(
+             request, 0U, diagnostic, encoded)
+             .ok() &&
+             wire::decodeFrame(encoded.view(), decoded).ok() &&
+             decoded.payload.size == experimental_constants::
+                                         kGpioCaptureDiagnosticResponsePayloadSize &&
+             decoded.payload.data[experimental_constants::
+                                      kGpioCaptureDiagnosticResponseAuxElectricallyUnstimulatedOffset] ==
+                 1U &&
+             decoded.payload.data[experimental_constants::
+                                      kGpioCaptureDiagnosticResponseAuxExternalTransitionChecksRunOffset] ==
+                 0U,
+         "protocol-v2 diagnostic records unstimulated scope without transition claim");
+}
+
 std::vector<std::uint8_t> mutated(const std::vector<std::uint8_t> &source,
                                   std::size_t offset, std::uint8_t value) {
   std::vector<std::uint8_t> result = source;
@@ -689,7 +806,7 @@ void expectDecodeError(const std::vector<std::uint8_t> &bytes,
 void testValidation(const std::string &fixture_directory) {
   const std::vector<std::uint8_t> info =
       readFixture(fixture_directory, "info-request.bin");
-  expectDecodeError(mutated(info, constants::kHeaderVersionOffset, 2U),
+  expectDecodeError(mutated(info, constants::kHeaderVersionOffset, 3U),
                     constants::ErrorCode::kUnsupportedVersion,
                     "reject bad version");
   expectDecodeError(mutated(info, constants::kHeaderKindOffset, 0xFEU),
@@ -787,7 +904,7 @@ void testParser(const std::string &fixture_directory) {
   const std::vector<std::uint8_t> response =
       readFixture(fixture_directory, "stop-response.bin");
   std::vector<std::vector<std::uint8_t>> corruptions{
-      mutated(info, constants::kHeaderVersionOffset, 2U),
+      mutated(info, constants::kHeaderVersionOffset, 3U),
       mutated(info, constants::kHeaderKindOffset, 0xFEU),
       mutated(info, constants::kHeaderFlagsOffset, 1U),
       mutated(info, constants::kHeaderHeaderLengthOffset, 43U),
@@ -911,6 +1028,7 @@ int main(int argc, char **argv) {
   }
   testGoldenEncode(argv[1], response_directory);
   testFixedCapacityBoundaries();
+  testProtocolV2MetadataResponses();
   testValidation(argv[1]);
   testParser(argv[1]);
   if (failures != 0) {

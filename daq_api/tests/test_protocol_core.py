@@ -129,6 +129,27 @@ class ProtocolCoreTests(unittest.TestCase):
                 self.assertLessEqual(parser.high_water_mark, parser.max_buffered_bytes)
                 self.assertEqual(0, parser.buffered_bytes)
 
+    def test_partial_frame_reuses_its_validated_header(self) -> None:
+        wire = (FIXTURE_DIRECTORY / "gpio-data.bin").read_bytes()
+        parser = IncrementalFrameParser()
+        decode_header = parser._decode_header
+        header_calls = 0
+
+        def counted_decode_header(data: bytearray, offset: int):  # type: ignore[no-untyped-def]
+            nonlocal header_calls
+            header_calls += 1
+            return decode_header(data, offset)
+
+        parser._decode_header = counted_decode_header
+        decoded = []
+        for offset in range(len(wire)):
+            decoded.extend(parser.feed(wire[offset : offset + 1]))
+
+        self.assertEqual([wire], [frame.to_bytes() for frame in decoded])
+        self.assertEqual(1, header_calls)
+        self.assertEqual(1, parser.frames_decoded)
+        self.assertEqual(0, parser.buffered_bytes)
+
     def test_parser_accepts_zero_and_contiguous_or_strided_bytes_like_chunks(
         self,
     ) -> None:

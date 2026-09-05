@@ -55,7 +55,12 @@ class FirmwareRuntime {
                   adc::Initializer *adc_initializer = nullptr,
                   adc_trigger::Scheduler *adc_trigger_scheduler = nullptr,
                   adc_capture::HardwareCapture *adc_capture = nullptr,
-                  adc_packer::AdcFramePacker *adc_packer = nullptr)
+                  adc_packer::AdcFramePacker *adc_packer = nullptr,
+                  variable_rate::Scheduler *rate_scheduler = nullptr,
+                  gpio_join::HardwareCapture *aux_gpio_capture = nullptr,
+                  gpio_aux_packer::AuxiliaryBatchPacker *aux_gpio_packer =
+                      nullptr,
+                  temperature::Reader temperature_reader = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
@@ -63,10 +68,12 @@ class FirmwareRuntime {
         transport_{stream, control_.statistics(), &packet_pipeline_},
         acquisition_controller_{
             control_.statistics(), packet_pipeline_, gpio_capture, gpio_packer,
-            adc_initializer, adc_trigger_scheduler, adc_capture, adc_packer},
+            adc_initializer, adc_trigger_scheduler, adc_capture, adc_packer,
+            rate_scheduler, aux_gpio_capture, aux_gpio_packer},
         checksum_benchmark_(checksum_benchmark),
         gpio_clock_diagnostic_(gpio_clock_diagnostic),
-        gpio_capture_diagnostic_(gpio_capture_diagnostic) {}
+        gpio_capture_diagnostic_(gpio_capture_diagnostic),
+        temperature_reader_(temperature_reader) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -122,6 +129,7 @@ class FirmwareRuntime {
   benchmark::Runner *checksum_benchmark_ = nullptr;
   gpio_clock::Runner *gpio_clock_diagnostic_ = nullptr;
   gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
+  temperature::Reader temperature_reader_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
   usb::TransportSnapshot transport_stats_baseline_{};
   std::size_t transport_command_queue_high_water_ = 0U;

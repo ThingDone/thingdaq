@@ -207,6 +207,27 @@ void Statistics::publishGpioRawCapture(
   refreshDataProjection();
 }
 
+THINGDAQ_STATISTICS_COLD_CODE(
+    ".flashmem.statistics.publish_aux_gpio_capture")
+void Statistics::publishAuxiliaryGpioCapture(
+    const AuxiliaryGpioCaptureProgress &progress) {
+  const AuxiliaryGpioCaptureProgress previous =
+      counters_.auxiliary_gpio_capture;
+  counters_.auxiliary_gpio_capture = progress;
+  counters_.auxiliary_gpio_capture.hardware_errors = maximum(
+      previous.hardware_errors, progress.hardware_errors);
+  counters_.auxiliary_gpio_capture.invariant_errors = maximum(
+      previous.invariant_errors, progress.invariant_errors);
+  counters_.auxiliary_gpio_capture.resource_conflicts = maximum(
+      previous.resource_conflicts, progress.resource_conflicts);
+  counters_.auxiliary_gpio_capture.start_errors = maximum(
+      previous.start_errors, progress.start_errors);
+  counters_.auxiliary_gpio_capture.stop_errors = maximum(
+      previous.stop_errors, progress.stop_errors);
+  counters_.auxiliary_gpio_capture.stale_dma_completions = maximum(
+      previous.stale_dma_completions, progress.stale_dma_completions);
+}
+
 THINGDAQ_STATISTICS_COLD_CODE(".flashmem.statistics.publish_gpio_packer")
 void Statistics::publishGpioPacker(const GpioPackerProgress &progress) {
   counters_.gpio_packer = progress;
@@ -487,6 +508,50 @@ protocol::StatusResponse Statistics::wireStatus(
       narrowDepth(counters_.usb.active_frame_bytes_sent);
   response.usb.active_frame_size =
       narrowDepth(counters_.usb.active_frame_size);
+  const AuxiliaryGpioCaptureProgress &aux =
+      counters_.auxiliary_gpio_capture;
+  response.auxiliary_gpio.bank_major_loops = aux.bank_major_loops;
+  response.auxiliary_gpio.bank_samples_captured =
+      aux.bank_samples_captured;
+  response.auxiliary_gpio.bank_ring_overruns = aux.bank_ring_overruns;
+  response.auxiliary_gpio.bank_stale_completions =
+      aux.bank_stale_completions;
+  response.auxiliary_gpio.paired_major_loops = aux.paired_major_loops;
+  response.auxiliary_gpio.buffers_completed = aux.buffers_completed;
+  response.auxiliary_gpio.buffers_acquired = aux.buffers_acquired;
+  response.auxiliary_gpio.buffers_released = aux.buffers_released;
+  response.auxiliary_gpio.samples_captured = aux.samples_captured;
+  response.auxiliary_gpio.samples_joined = aux.samples_joined;
+  response.auxiliary_gpio.samples_delivered = aux.samples_delivered;
+  response.auxiliary_gpio.samples_lost = aux.samples_lost;
+  response.auxiliary_gpio.raw_ring_overruns = aux.raw_ring_overruns;
+  response.auxiliary_gpio.generation_skew_events =
+      aux.generation_skew_events;
+  response.auxiliary_gpio.generation_skew_samples =
+      aux.generation_skew_samples;
+  response.auxiliary_gpio.canceled_generations = aux.canceled_generations;
+  response.auxiliary_gpio.cancellation_samples = aux.cancellation_samples;
+  response.auxiliary_gpio.stop_tail_samples = aux.stop_tail_samples;
+  response.auxiliary_gpio.timestamp_mismatches = aux.timestamp_mismatches;
+  response.auxiliary_gpio.count_mismatches = aux.count_mismatches;
+  response.auxiliary_gpio.destination_mismatches =
+      aux.destination_mismatches;
+  response.auxiliary_gpio.schedule_exhaustions = aux.schedule_exhaustions;
+  response.auxiliary_gpio.stale_completions = aux.stale_completions;
+  response.auxiliary_gpio.cache_dma_discards = aux.cache_dma_discards;
+  response.auxiliary_gpio.cache_cpu_invalidations =
+      aux.cache_cpu_invalidations;
+  response.auxiliary_gpio.hardware_errors = aux.hardware_errors;
+  response.auxiliary_gpio.invariant_errors = aux.invariant_errors;
+  response.auxiliary_gpio.resource_conflicts = aux.resource_conflicts;
+  response.auxiliary_gpio.start_errors = aux.start_errors;
+  response.auxiliary_gpio.stop_errors = aux.stop_errors;
+  response.auxiliary_gpio.stale_dma_completions =
+      aux.stale_dma_completions;
+  response.auxiliary_gpio.ready_depth = {
+      narrowDepth(aux.ready_depth), narrowDepth(aux.ready_depth)};
+  response.auxiliary_gpio.ready_high_water = {
+      narrowDepth(aux.ready_high_water), narrowDepth(aux.ready_high_water)};
   return response;
 }
 

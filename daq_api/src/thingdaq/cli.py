@@ -45,18 +45,21 @@ from .discovery import (
 from .identity import ExpectedDeviceIdentity
 from .models import (
     ADCBlock,
+    AuxBankMode,
     DAQConfiguration,
     DeviceCapabilities,
     DeviceInfo,
     GPIOBlock,
     HostQueueLoss,
     LossCounters,
+    RateProfile,
     Status,
     StreamAnomaly,
     StreamGap,
 )
 from .protocol import ProtocolError
 from .reader import DeviceDisconnectedError, ReaderError, ReaderProtocolError
+from .synthetic import SyntheticGPIOPattern
 from .transport import (
     SerialPortBusyError,
     TransportDisconnectedError,
@@ -124,10 +127,10 @@ def _gpio_pin(value: str) -> int:
         pin = int(normalized, 10)
     except ValueError as error:
         raise argparse.ArgumentTypeError(
-            "GPIO channel must be one of D6 through D13"
+            "GPIO channel must be D6-D13 or D16-D23"
         ) from error
-    if pin not in constants.GPIO_PINS_BY_BIT:
-        raise argparse.ArgumentTypeError("GPIO channel must be one of D6 through D13")
+    if pin not in {*range(6, 14), *range(16, 24)}:
+        raise argparse.ArgumentTypeError("GPIO channel must be D6-D13 or D16-D23")
     return pin
 
 
@@ -179,6 +182,12 @@ def _add_connection_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="use the in-memory synthetic-stream simulator",
     )
+    parser.add_argument(
+        "--gpio-pattern",
+        choices=tuple(pattern.value for pattern in SyntheticGPIOPattern),
+        default=SyntheticGPIOPattern.COUNTER.value,
+        help="simulator GPIO formula (default: counter)",
+    )
 
 
 def _add_acquisition_arguments(parser: argparse.ArgumentParser) -> None:
@@ -214,6 +223,17 @@ def _add_acquisition_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         help="require this exact INFO-advertised ADC resolution before CONFIGURE",
     )
+    parser.add_argument(
+        "--aux-bank-mode",
+        choices=("disabled", "input"),
+        default="disabled",
+        help="whole auxiliary GPIO bank mode (default: disabled)",
+    )
+    parser.add_argument(
+        "--rate-profile",
+        choices=tuple(profile.name.lower() for profile in RateProfile),
+        help="generated exact ADC/GPIO rate profile",
+    )
 
 
 def _add_capture_output_arguments(parser: argparse.ArgumentParser) -> None:
@@ -247,7 +267,7 @@ def _add_capture_output_arguments(parser: argparse.ArgumentParser) -> None:
         action="append",
         type=_gpio_pin,
         default=[],
-        metavar="D6..D13",
+        metavar="D6..D13|D16..D23",
         help="show one selected GPIO channel; repeat for multiple channels",
     )
     parser.add_argument(
@@ -263,7 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="thingdaq",
-        description="Inspect and control ThingDAQ protocol-v1 devices.",
+        description="Inspect and control ThingDAQ protocol-v1/v2 devices.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -344,6 +364,10 @@ def _open_device(arguments: argparse.Namespace) -> ThingDAQ:
         arguments.port is not None or arguments.hardware_serial is not None
     ):
         raise ValueError("--simulate cannot be combined with a hardware target")
+    if not arguments.simulate and arguments.gpio_pattern != (
+        SyntheticGPIOPattern.COUNTER.value
+    ):
+        raise ValueError("--gpio-pattern applies only with --simulate")
 
     expected = ExpectedDeviceIdentity(
         hardware_serial=arguments.hardware_serial,
@@ -361,6 +385,7 @@ def _open_device(arguments: argparse.Namespace) -> ThingDAQ:
             expected_identity=expected,
             synchronization_attempts=arguments.sync_attempts,
             synchronization_retry_delay=arguments.sync_retry_delay,
+            gpio_pattern=arguments.gpio_pattern,
         )
 
     device: SerialPortCandidate | str | None
@@ -421,6 +446,12 @@ def _configuration_from_arguments(
     source = (
         None if arguments.source is None else constants.Source[arguments.source.upper()]
     )
+    aux_bank_mode = AuxBankMode.__members__[arguments.aux_bank_mode.upper()]
+    rate_profile = (
+        None
+        if arguments.rate_profile is None
+        else RateProfile.__members__[arguments.rate_profile.upper()]
+    )
     return daq.configure(
         adc=bool(stream_mask & constants.StreamMask.ADC),
         gpio=bool(stream_mask & constants.StreamMask.GPIO),
@@ -429,6 +460,8 @@ def _configuration_from_arguments(
         adc_pair_rate_hz=arguments.adc_pair_rate_hz,
         gpio_sample_rate_hz=arguments.gpio_sample_rate_hz,
         adc_resolution_bits=arguments.adc_resolution_bits,
+        aux_bank_mode=aux_bank_mode,
+        rate_profile=rate_profile,
     )
 
 
@@ -594,6 +627,7 @@ def _gpio_preview(
             "sample_index": index,
             "timestamp_ticks": block.sample_ticks(index),
             "packed": block.sample(index),
+            "packed_width_bits": block.packed_width_bits,
             "channels": {f"D{pin}": channel[index] for pin, channel in channels},
         }
         for index in range(selected)
@@ -625,12 +659,15 @@ def _print_preview(rows: list[dict[str, object]], output: TextIO) -> None:
         assert isinstance(channels, dict)
         packed = row["packed"]
         assert isinstance(packed, int)
+        packed_width_bits = row["packed_width_bits"]
+        assert isinstance(packed_width_bits, int)
         selected_channels = " ".join(
             f"{pin}={int(bool(value))}" for pin, value in channels.items()
         )
         print(
             f"gpio sequence={row['sequence']} sample={row['sample_index']} "
-            f"ticks={row['timestamp_ticks']} packed=0x{packed:02x}"
+            f"ticks={row['timestamp_ticks']} "
+            f"packed=0x{packed:0{packed_width_bits // 4}x}"
             + (f" {selected_channels}" if selected_channels else ""),
             file=output,
         )
@@ -738,6 +775,44 @@ def _print_info(info: DeviceInfo, output: TextIO) -> None:
         f"gpio_capture_diagnostic_mode={info.gpio_capture_diagnostic_mode.name}",
         file=output,
     )
+    if info.auxiliary is not None:
+        auxiliary = info.auxiliary
+        print(
+            f"selected_rate_profile={auxiliary.selected_rate_profile.name}",
+            file=output,
+        )
+        print(
+            f"applied_aux_bank_mode={auxiliary.applied_aux_bank_mode.name}",
+            file=output,
+        )
+        print(
+            "supported_rate_profiles="
+            + ",".join(
+                timing.profile.name for timing in auxiliary.supported_rate_profiles
+            ),
+            file=output,
+        )
+        print(
+            "supported_aux_bank_modes="
+            + ",".join(mode.name for mode in auxiliary.supported_aux_bank_modes),
+            file=output,
+        )
+        print(f"gpio_item_bytes={auxiliary.gpio_item_bytes}", file=output)
+        print(
+            "auxiliary_gpio_pin_map="
+            + ",".join(map(str, auxiliary.auxiliary_gpio_pins_by_bit)),
+            file=output,
+        )
+        for timing in auxiliary.supported_rate_profiles:
+            prefix = f"rate_profile[{timing.profile.name}]"
+            print(
+                f"{prefix}.adc_pair_rate_hz={timing.adc_pair_rate_hz} "
+                f"{prefix}.gpio_sample_rate_hz={timing.gpio_sample_rate_hz} "
+                f"{prefix}.adc_pair_period_ticks={timing.adc_pair_period_ticks} "
+                f"{prefix}.gpio_sample_period_ticks="
+                f"{timing.gpio_sample_period_ticks}",
+                file=output,
+            )
 
 
 def _print_status(status: Status, run_id: int, output: TextIO) -> None:
@@ -793,6 +868,7 @@ def _print_configuration(
     capabilities: DeviceCapabilities | None = None,
 ) -> None:
     print(f"state={state.name}", file=output)
+    print(f"protocol_version={configuration.protocol_version}", file=output)
     print(f"profile={configuration.profile.name}", file=output)
     print(
         f"streams={_flag_names(configuration.stream_mask, constants.StreamMask)}",
@@ -801,17 +877,29 @@ def _print_configuration(
     print(f"source={configuration.source.name}", file=output)
     print(f"checksum={configuration.data_checksum_algorithm.name}", file=output)
     print(f"data_frame_bytes={configuration.data_frame_bytes}", file=output)
+    print(f"aux_bank_mode={configuration.aux_bank_mode.name}", file=output)
+    print(f"rate_profile={configuration.rate_profile.name}", file=output)
+    if configuration.stream_mask & constants.StreamMask.ADC:
+        print(f"adc_pair_rate_hz={configuration.adc_pair_rate_hz}", file=output)
+        print(
+            f"adc_pairs_per_frame={configuration.gpio_layout.adc_items_per_frame}",
+            file=output,
+        )
     if (
         capabilities is not None
         and configuration.stream_mask & constants.StreamMask.ADC
     ):
-        print(f"adc_pair_rate_hz={capabilities.adc_pair_rate_hz}", file=output)
         print(f"adc_resolution_bits={capabilities.adc_resolution_bits}", file=output)
-    if (
-        capabilities is not None
-        and configuration.stream_mask & constants.StreamMask.GPIO
-    ):
-        print(f"gpio_sample_rate_hz={capabilities.gpio_sample_rate_hz}", file=output)
+    if configuration.stream_mask & constants.StreamMask.GPIO:
+        print(f"gpio_sample_rate_hz={configuration.gpio_sample_rate_hz}", file=output)
+        print(
+            f"gpio_packed_width_bits={configuration.gpio_layout.packed_width_bits}",
+            file=output,
+        )
+        print(
+            f"gpio_samples_per_frame={configuration.gpio_layout.items_per_frame}",
+            file=output,
+        )
 
 
 def _configuration_details(
@@ -821,23 +909,27 @@ def _configuration_details(
     """Return the echoed wire body plus active fixed-rate INFO metadata."""
 
     details: dict[str, object] = {
+        "protocol_version": configuration.protocol_version,
         "profile": configuration.profile,
         "stream_mask": configuration.stream_mask,
         "source": configuration.source,
         "data_checksum_algorithm": configuration.data_checksum_algorithm,
         "data_frame_bytes": configuration.data_frame_bytes,
+        "aux_bank_mode": configuration.aux_bank_mode,
+        "rate_profile": configuration.rate_profile,
     }
+    if configuration.stream_mask & constants.StreamMask.ADC:
+        details["adc_pair_rate_hz"] = configuration.adc_pair_rate_hz
+        details["adc_pairs_per_frame"] = configuration.gpio_layout.adc_items_per_frame
     if (
         capabilities is not None
         and configuration.stream_mask & constants.StreamMask.ADC
     ):
-        details["adc_pair_rate_hz"] = capabilities.adc_pair_rate_hz
         details["adc_resolution_bits"] = capabilities.adc_resolution_bits
-    if (
-        capabilities is not None
-        and configuration.stream_mask & constants.StreamMask.GPIO
-    ):
-        details["gpio_sample_rate_hz"] = capabilities.gpio_sample_rate_hz
+    if configuration.stream_mask & constants.StreamMask.GPIO:
+        details["gpio_sample_rate_hz"] = configuration.gpio_sample_rate_hz
+        details["gpio_packed_width_bits"] = configuration.gpio_layout.packed_width_bits
+        details["gpio_samples_per_frame"] = configuration.gpio_layout.items_per_frame
     return details
 
 
@@ -872,6 +964,10 @@ def _run_monitor(
         command_started = monotonic()
         configuration = _configuration_from_arguments(daq, arguments)
         command_latencies_ms.append((monotonic() - command_started) * 1_000)
+        if any(pin >= 16 for pin in gpio_pins) and (
+            configuration.aux_bank_mode is not AuxBankMode.INPUT
+        ):
+            raise ValueError("D16-D23 require --aux-bank-mode input")
         if not json_output:
             _print_configuration(
                 configuration,

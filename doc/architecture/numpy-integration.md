@@ -19,6 +19,13 @@ related:
 
 # Optional NumPy integration
 
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+
 The core `thingdaq` package does not import or require NumPy. Its immutable
 `ADCBlock`, `GPIOBlock`, lazy channel views, explicit interleaving, calibration,
 and timestamp helpers remain the complete behavior used by the network-disabled

@@ -31,9 +31,20 @@ related:
   - '[[ADR-002-Checksum-Selection]]'
   - '[[ADR-003-GPIO-Clock-DMA]]'
   - '[[ADR-004-ADC-Trigger-DMA]]'
+  - '[[ADR-007-Experimental-Aux-Input-Bank]]'
+  - '[[Aux-Input-Prototype]]'
+  - '[[Phase-06-Aux-Input-Local-Gate]]'
+  - '[[Aux-Input-Bank]]'
 ---
 
 # ThingDAQ evidence index
+
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
 ## Unified experimental evidence
 
@@ -70,6 +81,35 @@ serve as release acceptance for ThingDAQ 1.0.
 Use [[soak-harness]] to generate and run new evidence against this identity.
 Do not compare a current report to the hashes in the historical sections
 below.
+
+## Experimental auxiliary-input prototype
+
+[[Aux-Input-Prototype]] records the isolated `experiment/aux-input-bank`
+protocol, Python, simulator, and portable-host-C++ gate. All four exact rate
+profiles and both GPIO widths passed deterministic sample, timestamp,
+configuration, alignment, and conservation checks. Two full-rate parser runs
+retained at least 1.949990 times the analytic 12.189723 MB/s framed-load
+hypothesis, and two dual-bank packer runs retained at least 215.368 times the
+8 MB/s GPIO payload target. The pinned default 600 MHz firmware still builds
+without upload, while all 27 protocol-v1 source/generated/fixture paths remain
+byte-identical to the immutable baseline.
+
+[[Phase-06-Aux-Input-Local-Gate]] advances that evidence through the complete
+target-branch local gate: 506 tests and 15,989 subtests, all 99 generated
+outputs, Ruff, MyPy, both 8-bit and 16-bit throughput gates, exact linked-memory
+ownership and retention checks, and two byte-identical pinned Teensy builds.
+
+[[Aux-Input-Bank]] records the subsequent conclusive target-candidate **FAIL**.
+Two identity-pinned jobs using the same immutable HEX reproduced a paired-DMA
+diagnostic failure before START, so no raw rate profile qualified and the
+bounded campaign stopped before lower-rate, 60-second, 600-second, and
+profile-cycle runs. Both cleanup paths returned IDLE with final inputs safe;
+the service remained available, so this is not an infrastructure conclusion.
+
+No external stimulus was declared. The report therefore makes no
+external-transition, pin-order, electrical, ADC-performance, or
+signal-integrity claim, and no clock, RLE, or output branch combination was
+tested.
 
 ## Historical autonomous acceptance (superseded identity)
 

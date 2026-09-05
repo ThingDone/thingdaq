@@ -18,6 +18,13 @@ related:
 
 # Host-side ADC calibration
 
+> [!IMPORTANT]
+> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
+> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
+> examples below are historical; their 600 MHz / 4 MHz claims are not current
+> release settings. Use live INFO metadata. `TimestampAligner` does not support
+> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+
 ThingDAQ preserves the received ADC0/A0 and ADC1/A1 codes exactly. Host
 calibration is a separate, explicit view that converts each converter's raw
 codes to estimated volts at its Teensy input pin. It never rewrites a frame,
