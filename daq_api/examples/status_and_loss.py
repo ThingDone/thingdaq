@@ -7,7 +7,7 @@ physical capture and therefore requires an attached, safely wired Teensy 4.0.
 from __future__ import annotations
 
 from _common import configure_exact, example_parser, open_example
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     GPIOBlock,
     HostQueueLoss,

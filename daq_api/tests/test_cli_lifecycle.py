@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import get_type_hints
 from unittest.mock import patch
 
-import thingdaq
-from thingdaq import (
+import thingdone_daq
+from thingdone_daq import (
     CalibrationRecord,
     ConverterCalibration,
     DeviceState,
@@ -24,7 +24,7 @@ from thingdaq import (
     low_level,
     save_calibration,
 )
-from thingdaq.cli import CaptureInterruptedError, CliExitCode, build_parser, main
+from thingdone_daq.cli import CaptureInterruptedError, CliExitCode, build_parser, main
 
 
 def _calibration_record() -> CalibrationRecord:
@@ -43,13 +43,13 @@ def _calibration_record() -> CalibrationRecord:
 
 class PublicNamespaceTests(unittest.TestCase):
     def test_root_exports_are_explicit_and_low_level_access_is_named(self) -> None:
-        self.assertIn("__version__", thingdaq.__all__)
-        self.assertIn("low_level", thingdaq.__all__)
-        self.assertIs(thingdaq.Frame, low_level.Frame)
-        self.assertIs(thingdaq.BackgroundReader, low_level.BackgroundReader)
-        self.assertIs(thingdaq.SerialTransport, low_level.SerialTransport)
+        self.assertIn("__version__", thingdone_daq.__all__)
+        self.assertIn("low_level", thingdone_daq.__all__)
+        self.assertIs(thingdone_daq.Frame, low_level.Frame)
+        self.assertIs(thingdone_daq.BackgroundReader, low_level.BackgroundReader)
+        self.assertIs(thingdone_daq.SerialTransport, low_level.SerialTransport)
         self.assertIs(
-            thingdaq.FrameKind,
+            thingdone_daq.FrameKind,
             low_level.protocol_constants.FrameKind,
         )
 
@@ -89,84 +89,86 @@ class PublicNamespaceTests(unittest.TestCase):
             "UnexpectedMessageError",
             "low_level",
         }
-        exported = thingdaq.__all__
+        exported = thingdone_daq.__all__
 
         self.assertEqual(len(exported), len(set(exported)))
         self.assertTrue(required_exports.issubset(exported))
         for name in required_exports:
             with self.subTest(name=name):
-                self.assertTrue(hasattr(thingdaq, name))
+                self.assertTrue(hasattr(thingdone_daq, name))
 
         method_returns = {
             ThingDAQ.__enter__: ThingDAQ,
             ThingDAQ.open: ThingDAQ,
             ThingDAQ.simulated: ThingDAQ,
-            ThingDAQ.info: thingdaq.DeviceInfo,
-            ThingDAQ.configure: thingdaq.DAQConfiguration,
+            ThingDAQ.info: thingdone_daq.DeviceInfo,
+            ThingDAQ.configure: thingdone_daq.DAQConfiguration,
             ThingDAQ.start: int,
-            ThingDAQ.status: thingdaq.Status,
+            ThingDAQ.status: thingdone_daq.Status,
             ThingDAQ.stop: DeviceState,
         }
         for method, expected in method_returns.items():
             with self.subTest(method=method.__name__):
                 self.assertIs(expected, get_type_hints(method)["return"])
         self.assertIs(
-            thingdaq.ConverterCalibration,
-            get_type_hints(thingdaq.estimate_offset_gain)["return"],
+            thingdone_daq.ConverterCalibration,
+            get_type_hints(thingdone_daq.estimate_offset_gain)["return"],
         )
         self.assertIs(
-            thingdaq.CalibratedAdcChannels,
+            thingdone_daq.CalibratedAdcChannels,
             get_type_hints(
-                thingdaq.calibrated_channels,
-                localns={"ADCBlock": thingdaq.ADCBlock},
+                thingdone_daq.calibrated_channels,
+                localns={"ADCBlock": thingdone_daq.ADCBlock},
             )["return"],
         )
 
     def test_documented_exception_hierarchy_is_stable(self) -> None:
         facade_errors = (
-            thingdaq.DAQClosedError,
-            thingdaq.CommandTimeoutError,
-            thingdaq.DAQShutdownError,
-            thingdaq.BlockTimeoutError,
-            thingdaq.DeviceCommandError,
-            thingdaq.MultipleDevicesFoundError,
-            thingdaq.DeviceIdentityMismatchError,
-            thingdaq.DeviceSynchronizationError,
-            thingdaq.UnexpectedMessageError,
-            thingdaq.UnexpectedStreamGapError,
-            thingdaq.UnexpectedHostQueueLossError,
-            thingdaq.UnexpectedStreamAnomalyError,
+            thingdone_daq.DAQClosedError,
+            thingdone_daq.CommandTimeoutError,
+            thingdone_daq.DAQShutdownError,
+            thingdone_daq.BlockTimeoutError,
+            thingdone_daq.DeviceCommandError,
+            thingdone_daq.MultipleDevicesFoundError,
+            thingdone_daq.DeviceIdentityMismatchError,
+            thingdone_daq.DeviceSynchronizationError,
+            thingdone_daq.UnexpectedMessageError,
+            thingdone_daq.UnexpectedStreamGapError,
+            thingdone_daq.UnexpectedHostQueueLossError,
+            thingdone_daq.UnexpectedStreamAnomalyError,
         )
         for error_type in facade_errors:
             with self.subTest(error=error_type.__name__):
-                self.assertTrue(issubclass(error_type, thingdaq.ThingDAQError))
+                self.assertTrue(issubclass(error_type, thingdone_daq.ThingDAQError))
 
-        self.assertTrue(issubclass(thingdaq.DAQStateError, thingdaq.DeviceCommandError))
+        self.assertTrue(
+            issubclass(thingdone_daq.DAQStateError, thingdone_daq.DeviceCommandError)
+        )
         self.assertTrue(
             issubclass(
-                thingdaq.DeviceCapabilityError,
-                thingdaq.DeviceCommandError,
+                thingdone_daq.DeviceCapabilityError,
+                thingdone_daq.DeviceCommandError,
             )
         )
         self.assertTrue(
             issubclass(
-                thingdaq.UnexpectedStreamValidationError,
-                thingdaq.UnexpectedMessageError,
+                thingdone_daq.UnexpectedStreamValidationError,
+                thingdone_daq.UnexpectedMessageError,
             )
         )
         self.assertTrue(
-            issubclass(thingdaq.DeviceNotFoundError, thingdaq.DiscoveryError)
+            issubclass(thingdone_daq.DeviceNotFoundError, thingdone_daq.DiscoveryError)
         )
         self.assertTrue(
             issubclass(
-                thingdaq.CalibrationFormatError,
-                thingdaq.CalibrationError,
+                thingdone_daq.CalibrationFormatError,
+                thingdone_daq.CalibrationError,
             )
         )
         self.assertTrue(
             issubclass(
-                thingdaq.CalibrationMismatchError,
-                thingdaq.CalibrationError,
+                thingdone_daq.CalibrationMismatchError,
+                thingdone_daq.CalibrationError,
             )
         )
 
@@ -243,8 +245,8 @@ class JsonCliLifecycleTests(unittest.TestCase):
         )
         stdout = io.StringIO()
         with (
-            patch("thingdaq.cli.enumerate_candidates", return_value=(candidate,)),
-            patch("thingdaq.cli._open_device") as open_device,
+            patch("thingdone_daq.cli.enumerate_candidates", return_value=(candidate,)),
+            patch("thingdone_daq.cli._open_device") as open_device,
             redirect_stdout(stdout),
         ):
             exit_code = main(["list", "--json"])
@@ -359,7 +361,7 @@ class JsonCliLifecycleTests(unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
         with (
-            patch("thingdaq.cli._open_device", return_value=daq),
+            patch("thingdone_daq.cli._open_device", return_value=daq),
             patch.object(
                 daq,
                 "read_block",

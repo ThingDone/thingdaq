@@ -14,7 +14,7 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from thingdaq import (
+from thingdone_daq import (
     BoardId,
     Capability,
     Info,
@@ -22,7 +22,7 @@ from thingdaq import (
     SimulatedDevice,
     StreamMask,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG_SCRIPT = ROOT / "firmware" / "tests" / "rig_synthetic_stream.py"
@@ -209,8 +209,8 @@ class RigScriptIndependenceTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("import thingdaq", source)
-        self.assertNotIn("from thingdaq", source)
+        self.assertNotIn("import thingdone_daq", source)
+        self.assertNotIn("from thingdone_daq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
         self.assertIn('"SYNTHETIC_CAPTURE_SECONDS"', source)

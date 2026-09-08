@@ -7,7 +7,7 @@ import struct
 import unittest
 from dataclasses import replace
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AdcBlockMetadata,
     AdcCalibrationMetadata,
@@ -26,7 +26,7 @@ from thingdaq import (
     ThingDAQ,
     UnexpectedStreamValidationError,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 
 def _payload(*pairs: tuple[int, int]) -> bytes:

@@ -58,8 +58,8 @@ and pure-Python parity.
 Run the complete offline flight and a short strict-loss CLI capture:
 
 ```bash
-.venv/bin/thingdaq-demo --frames 2
-.venv/bin/thingdaq capture --simulate --duration 1 --strict-loss \
+.venv/bin/thingdone-daq-demo --frames 2
+.venv/bin/thingdone-daq capture --simulate --duration 1 --strict-loss \
   --gpio-channel D6 --gpio-channel D13
 ```
 
@@ -125,7 +125,7 @@ USB acceptance, target timing, pad behavior, or electrical performance.
 ## Minimal Python lifecycle
 
 ```python
-from thingdaq import ADCBlock, GPIOBlock, Source, ThingDAQ
+from thingdone_daq import ADCBlock, GPIOBlock, Source, ThingDAQ
 
 with ThingDAQ.simulated(strict=True) as daq:
     info = daq.info()
@@ -177,7 +177,7 @@ The CLI exposes the same preflight and then prints the applied body plus active
 fixed-rate metadata:
 
 ```bash
-.venv/bin/thingdaq configure --simulate --streams both \
+.venv/bin/thingdone-daq configure --simulate --streams both \
   --source synthetic --checksum adler32 \
   --adc-pair-rate-hz 1000000 --gpio-sample-rate-hz 4000000 \
   --adc-resolution-bits 12
@@ -189,7 +189,7 @@ Metadata-only enumeration lists plausible PJRC USB Serial endpoints without
 opening them:
 
 ```bash
-.venv/bin/thingdaq list
+.venv/bin/thingdone-daq list
 ```
 
 `discover()` then opens only matching candidates for a short read-only INFO
@@ -197,7 +197,7 @@ probe. A `DiscoveredDevice.port` is a current endpoint, not identity. Select by
 the stable nonzero fuse-derived INFO `hardware_serial`:
 
 ```python
-from thingdaq import ThingDAQ, discover, select_device
+from thingdone_daq import ThingDAQ, discover, select_device
 
 devices = discover(timeout=0.2)
 selected = select_device(devices, hardware_serial=20512460)

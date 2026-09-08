@@ -9,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import serial
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     BackgroundReader,
     ByteTransport,
@@ -34,8 +34,8 @@ from thingdaq import (
     encode_frame,
     synthetic_adc_payload,
 )
-from thingdaq._generated import protocol_constants as constants
-from thingdaq.models import ResponseValue
+from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.models import ResponseValue
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 1.0) -> None:

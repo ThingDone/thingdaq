@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import unittest
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     FrameFlag,
     FrameKind,
@@ -24,7 +24,7 @@ from thingdaq import (
     encode_frame,
     synthetic_adc_payload,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 
 def _adc(

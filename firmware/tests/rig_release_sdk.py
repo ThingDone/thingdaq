@@ -8,7 +8,7 @@ import os
 import time
 from pathlib import Path
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AuxBankMode,
     DAQConfiguration,
@@ -23,7 +23,7 @@ from thingdaq import (
     StreamMask,
     ThingDAQ,
 )
-from thingdaq._generated import protocol_v2_constants as c
+from thingdone_daq._generated import protocol_v2_constants as c
 
 
 def temperature(daq):

@@ -7,7 +7,7 @@ attached Teensy 4.0 and may require ``--hardware-serial`` when several exist.
 from __future__ import annotations
 
 from _common import example_parser, open_example, print_target, require_info
-from thingdaq import ThingDAQ, discover, select_device
+from thingdone_daq import ThingDAQ, discover, select_device
 
 
 def main() -> int:

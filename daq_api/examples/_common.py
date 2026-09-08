@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from thingdaq import (
+from thingdone_daq import (
     ChecksumAlgorithm,
     DAQConfiguration,
     DeviceInfo,

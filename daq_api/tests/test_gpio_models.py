@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from collections.abc import Sequence
 
-from thingdaq import (
+from thingdone_daq import (
     BoardId,
     Capability,
     ConfigurationProfile,
@@ -27,7 +27,7 @@ from thingdaq import (
     decode_frame,
     encode_frame,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 
 class GpioGapDevice(SimulatedDevice):

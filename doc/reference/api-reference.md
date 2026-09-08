@@ -24,7 +24,7 @@ its capability bit is clear. `gpio_clock_diagnostic()` accepts only 1 MHz.
 `ThingDAQ.get_temperature()` returns `TemperatureReading(status,
 millidegrees_c)`, with a `celsius` property. It works in IDLE, CONFIGURED and
 RUNNING on firmware 1.1.0, does not change acquisition, and returns `None`
-for a non-valid sensor reading. `TemperatureStatus` is exported from `thingdaq`.
+for a non-valid sensor reading. `TemperatureStatus` is exported from `thingdone_daq`.
 See [[Protocol-V2]] for wire details and the fixed-rate release policy.
 
 > [!IMPORTANT]
@@ -35,14 +35,14 @@ See [[Protocol-V2]] for wire details and the fixed-rate release policy.
 > the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
 This page describes the stable synchronous user surface. Import normal
-operations and immutable models from `thingdaq`; use
-`thingdaq.low_level` only for protocol tooling that intentionally owns raw
+operations and immutable models from `thingdone_daq`; use
+`thingdone_daq.low_level` only for protocol tooling that intentionally owns raw
 frames, parsers, readers, or byte transports.
 
 ## Entry points
 
 ```python
-from thingdaq import ThingDAQ, discover, enumerate_candidates, select_device
+from thingdone_daq import ThingDAQ, discover, enumerate_candidates, select_device
 ```
 
 | Entry point | Behavior |
@@ -267,7 +267,7 @@ available.
 
 ## CLI and examples
 
-The `thingdaq` console script provides metadata-only `list`, INFO (`info` or
+The `thingdone_daq` console script provides metadata-only `list`, INFO (`info` or
 `probe`), STATUS, reconciliation, configure/start/stop/reset, and bounded
 monitor/capture commands. `--json` emits one machine-readable document.
 Capture can select raw or explicitly calibrated ADC previews, selected GPIO

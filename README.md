@@ -41,7 +41,14 @@ pins, source, or front end.
 
 ## Start without hardware
 
-Create an environment and install the private local package:
+For application integration, install `thingdone-daq` from PyPI and import
+`thingdone_daq`:
+
+```bash
+python -m pip install thingdone-daq
+```
+
+For development from this checkout:
 
 ```bash
 python3 -m venv .venv
@@ -51,8 +58,8 @@ python3 -m venv .venv
 Run the complete deterministic demo or a bounded CLI capture:
 
 ```bash
-.venv/bin/thingdaq-demo --frames 2
-.venv/bin/thingdaq capture --simulate --duration 1 --strict-loss \
+.venv/bin/thingdone-daq-demo --frames 2
+.venv/bin/thingdone-daq capture --simulate --duration 1 --strict-loss \
   --gpio-channel D6 --gpio-channel D13
 ```
 
@@ -101,7 +108,7 @@ physical discovery by hardware serial, and lifecycle guidance.
 ## Minimal API
 
 ```python
-from thingdaq import ADCBlock, GPIOBlock, Source, ThingDAQ
+from thingdone_daq import ADCBlock, GPIOBlock, Source, ThingDAQ
 
 with ThingDAQ.simulated(strict=True) as daq:
     applied = daq.configure(
@@ -134,9 +141,9 @@ echo; a changed CONFIGURE or START echo is rejected.
 Metadata-only enumeration never opens candidate ports:
 
 ```bash
-.venv/bin/thingdaq list
-.venv/bin/thingdaq info --hardware-serial 20512460
-.venv/bin/thingdaq monitor --hardware-serial 20512460 \
+.venv/bin/thingdone-daq list
+.venv/bin/thingdone-daq info --hardware-serial 20512460
+.venv/bin/thingdone-daq monitor --hardware-serial 20512460 \
   --streams both --source hardware --duration 10 --strict-loss
 ```
 
@@ -173,7 +180,7 @@ identity, firmware build ID, host namespace, and packaging identity changed,
 the earlier physical results are engineering history rather than release
 acceptance for the renamed binary. Physical acceptance was pending at that
 historical freeze; use the v1.1.0 release report for current qualification.
-The identity-pinned standalone and installed `thingdaq-soak` entry paths are
+The identity-pinned standalone and installed `thingdone-daq-soak` entry paths are
 documented in the [soak harness guide](doc/guides/soak-harness.md). Both embed
 the deterministic `firmware/soak/validation-manifest.json` contract; a
 different INFO identity is rejected unless the explicit diagnostic override is
@@ -211,7 +218,7 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 
 - `firmware/`: Teensy 4.0 sketch, portable C++ components, build tooling, and
   host-compiled firmware tests.
-- `daq_api/`: installable `thingdaq` package, CLI, simulator, examples, and
+- `daq_api/`: installable `thingdone_daq` package, CLI, simulator, examples, and
   Python tests.
 - `protocol/`: canonical machine-readable contract and cross-language golden
   frames.
@@ -224,16 +231,19 @@ Common local gates:
 .venv/bin/python tools/generate_protocol.py --check
 .venv/bin/python -m ruff format --check daq_api firmware tools
 .venv/bin/python -m ruff check daq_api firmware tools
-.venv/bin/python -m mypy daq_api/src/thingdaq
+.venv/bin/python -m mypy daq_api/src/thingdone_daq
 .venv/bin/python -m pytest
 python3 firmware/tools/build_firmware.py
 ```
 
 ## Distribution and trademark boundary
 
-The distribution remains marked `Private :: Do Not Upload` until package-index
-availability and publication readiness are reviewed. Repository workflows must
-not reserve, upload, or publish it.
+The Python distribution is `thingdone-daq`; the import package is
+`thingdone_daq`. See the [Python package README](daq_api/README.md) and
+[Python changelog](daq_api/CHANGELOG.md). Firmware, protocol, and Python SDK
+versions are independent. Other language SDKs can share `protocol/` and its
+golden fixtures; the [SDK documentation plan](doc/architecture/sdk-layout.md)
+describes language-specific documentation boundaries.
 
 ThingDAQ is an independent project and is not affiliated with or endorsed by
 PJRC.COM, LLC or SparkFun Electronics. Teensy® is a registered trademark of

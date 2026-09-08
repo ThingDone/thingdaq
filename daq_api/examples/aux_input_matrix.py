@@ -11,7 +11,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AuxBankMode,
     GPIOBlock,
@@ -26,7 +26,7 @@ from thingdaq import (
     synthetic_gpio_bank_bytes,
     validate_synthetic_block,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = REPOSITORY_ROOT / "experiments/experiment-matrix.json"
@@ -911,7 +911,7 @@ def write_report(
                     _input_record(
                         reporter,
                         REPOSITORY_ROOT
-                        / "daq_api/src/thingdaq/_generated/protocol_v2_constants.py",
+                        / "daq_api/src/thingdone_daq/_generated/protocol_v2_constants.py",
                     ),
                     _input_record(reporter, Path(__file__).resolve()),
                 ],
@@ -943,19 +943,19 @@ def write_report(
                     _input_record(reporter, PROTOCOL_V2_PATH),
                     _input_record(
                         reporter,
-                        REPOSITORY_ROOT / "daq_api/src/thingdaq/client.py",
+                        REPOSITORY_ROOT / "daq_api/src/thingdone_daq/client.py",
                     ),
                     _input_record(
                         reporter,
-                        REPOSITORY_ROOT / "daq_api/src/thingdaq/models.py",
+                        REPOSITORY_ROOT / "daq_api/src/thingdone_daq/models.py",
                     ),
                     _input_record(
                         reporter,
-                        REPOSITORY_ROOT / "daq_api/src/thingdaq/simulator.py",
+                        REPOSITORY_ROOT / "daq_api/src/thingdone_daq/simulator.py",
                     ),
                     _input_record(
                         reporter,
-                        REPOSITORY_ROOT / "daq_api/src/thingdaq/synthetic.py",
+                        REPOSITORY_ROOT / "daq_api/src/thingdone_daq/synthetic.py",
                     ),
                     _input_record(reporter, Path(__file__).resolve()),
                 ],

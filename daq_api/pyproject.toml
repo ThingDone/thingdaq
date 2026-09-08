@@ -3,13 +3,9 @@ requires = ["setuptools==84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# This is the single authoritative distribution-name setting. The ``-local``
-# suffix keeps this private build separate from the stable ``thingdaq`` import
-# package. Review index availability before any public-package submission.
-# Repository tooling never uploads a distribution.
-name = "thingdaq-local"
+name = "thingdone-daq"
 dynamic = ["version"]
-description = "Typed local Python API for ThingDAQ acquisition hardware"
+description = "Typed Python API for ThingDAQ acquisition hardware"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = "MIT"
 license-files = ["LICENSE"]
@@ -20,7 +16,6 @@ dependencies = [
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Operating System :: OS Independent",
-    "Private :: Do Not Upload",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -30,10 +25,19 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+authors = [{ name = "THING DONE LLC" }]
+keywords = ["daq", "data-acquisition", "teensy", "adc", "gpio"]
+
+[project.urls]
+Documentation = "https://github.com/ThingDone/thingdaq/blob/main/doc/reference/api-reference.md"
+Repository = "https://github.com/ThingDone/thingdaq"
+Issues = "https://github.com/ThingDone/thingdaq/issues"
+Changelog = "https://github.com/ThingDone/thingdaq/blob/main/daq_api/CHANGELOG.md"
+
 [project.scripts]
-thingdaq = "thingdaq.cli:main"
-thingdaq-demo = "thingdaq.demo:main"
-thingdaq-soak = "thingdaq.soak:main"
+"thingdone-daq" = "thingdone_daq.cli:main"
+thingdone-daq-demo = "thingdone_daq.demo:main"
+thingdone-daq-soak = "thingdone_daq.soak:main"
 
 [project.optional-dependencies]
 numpy = [
@@ -45,21 +49,22 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.8",
     "types-pyserial>=3.5",
+    "twine>=6.1",
 ]
 
 [tool.setuptools]
 include-package-data = false
 
 [tool.setuptools.dynamic]
-version = { attr = "thingdaq._version.__version__" }
+version = { attr = "thingdone_daq._version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["thingdaq", "thingdaq.*"]
+include = ["thingdone_daq", "thingdone_daq.*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-thingdaq = ["py.typed"]
+thingdone_daq = ["py.typed"]
 
 [tool.setuptools.exclude-package-data]
 "*" = [

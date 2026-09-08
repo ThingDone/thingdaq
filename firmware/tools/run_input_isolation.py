@@ -218,10 +218,8 @@ def main() -> int:
         choices=CASES,
         help="one case per --profiles/--cycle cell; changes width without reflashing",
     )
-    parser.add_argument("--service", default="http://192.168.150.14:5000")
-    parser.add_argument(
-        "--auth-file", type=Path, default=Path("/home/bill/.fw_api_key")
-    )
+    parser.add_argument("--service", required=True, help="test-rig service URL")
+    parser.add_argument("--auth-file", type=Path, default=Path.home() / ".fw_api_key")
     args = parser.parse_args()
     # Only live submission needs the service client's optional HTTP dependency.
     import requests
@@ -274,7 +272,9 @@ def main() -> int:
             parser.error("--host-api runs its own bounded mode sequence")
         package_bytes = io.BytesIO()
         with zipfile.ZipFile(package_bytes, "w", zipfile.ZIP_DEFLATED) as package:
-            for path in sorted((args.worktree / "daq_api/src/thingdaq").rglob("*.py")):
+            for path in sorted(
+                (args.worktree / "daq_api/src/thingdone_daq").rglob("*.py")
+            ):
                 package.writestr(
                     str(path.relative_to(args.worktree / "daq_api/src")),
                     path.read_bytes(),
@@ -283,7 +283,7 @@ def main() -> int:
         program = (
             "import base64, pathlib, sys, tempfile\n"
             "package_dir = tempfile.TemporaryDirectory(prefix='thingdaq-sdk-')\n"
-            "package_path = pathlib.Path(package_dir.name) / 'thingdaq.zip'\n"
+            "package_path = pathlib.Path(package_dir.name) / 'thingdone_daq.zip'\n"
             f"package_path.write_bytes(base64.b64decode({encoded!r}))\n"
             "sys.path.insert(0, str(package_path))\n"
         ) + program

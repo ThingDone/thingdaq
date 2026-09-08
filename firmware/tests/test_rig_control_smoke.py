@@ -17,7 +17,7 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from thingdaq import (
+from thingdone_daq import (
     BoardId,
     Capability,
     ConfigurationProfile,
@@ -223,8 +223,8 @@ class RigScriptIndependenceTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("import thingdaq", source)
-        self.assertNotIn("from thingdaq", source)
+        self.assertNotIn("import thingdone_daq", source)
+        self.assertNotIn("from thingdone_daq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
 

@@ -16,7 +16,7 @@ from types import ModuleType
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 STANDALONE_PATH = REPOSITORY_ROOT / "daq_api/scripts/windows_soak.py"
-INSTALLED_PATH = REPOSITORY_ROOT / "daq_api/src/thingdaq/soak.py"
+INSTALLED_PATH = REPOSITORY_ROOT / "daq_api/src/thingdone_daq/soak.py"
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"
 CONFIG_BLOCK = re.compile(
     r"^# <soak-generated-config>\n.*?^# </soak-generated-config>$",

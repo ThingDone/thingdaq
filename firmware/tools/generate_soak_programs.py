@@ -23,7 +23,7 @@ PROTOCOL_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
 VALIDATION_MANIFEST_PATH = REPOSITORY_ROOT / "firmware/soak/validation-manifest.json"
 OUTPUT_DIRECTORY = REPOSITORY_ROOT / "firmware/tests/generated"
 WINDOWS_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/scripts/windows_soak.py"
-PACKAGE_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/src/thingdaq/soak.py"
+PACKAGE_OUTPUT_PATH = REPOSITORY_ROOT / "daq_api/src/thingdone_daq/soak.py"
 OUTPUTS = {
     "synthetic": "rig_soak_synthetic.py",
     "physical-combined": "rig_soak_physical_combined.py",

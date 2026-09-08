@@ -18,9 +18,9 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from thingdaq._generated import protocol_constants as constants
-from thingdaq.models import Configuration, DeviceInfo, Status
-from thingdaq.simulator import SimulatedDevice
+from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.models import Configuration, DeviceInfo, Status
+from thingdone_daq.simulator import SimulatedDevice
 
 from firmware.soak import validator as canonical_validator
 from firmware.tests.test_rig_combined_capture import (
@@ -1085,8 +1085,8 @@ class SoakGeneratorTests(unittest.TestCase):
             with self.subTest(mode=mode):
                 self.assertEqual(ALLOWED_STANDALONE_IMPORTS, _imports(source))
                 self.assertNotIn("numpy", source.lower())
-                self.assertNotIn("from thingdaq", source)
-                self.assertNotIn("import thingdaq", source)
+                self.assertNotIn("from thingdone_daq", source)
+                self.assertNotIn("import thingdone_daq", source)
                 isolated = subprocess.run(
                     [
                         sys.executable,
@@ -1118,8 +1118,8 @@ class SoakGeneratorTests(unittest.TestCase):
         source = path.read_text(encoding="utf-8")
         self.assertEqual(ALLOWED_WINDOWS_IMPORTS, _imports(source))
         self.assertNotIn("numpy", source.lower())
-        self.assertNotIn("from thingdaq", source)
-        self.assertNotIn("import thingdaq", source)
+        self.assertNotIn("from thingdone_daq", source)
+        self.assertNotIn("import thingdone_daq", source)
         windows = _load_module(path, "generated_windows_soak_contract")
         settings = windows.load_settings()
         self.assertEqual("windows-standalone", windows.GENERATED_CONFIG["entry_point"])

@@ -18,7 +18,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
 V2_SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v2.json"
 PYTHON_OUTPUT_PATH = (
-    REPOSITORY_ROOT / "daq_api/src/thingdaq/_generated/protocol_constants.py"
+    REPOSITORY_ROOT / "daq_api/src/thingdone_daq/_generated/protocol_constants.py"
 )
 CPP_OUTPUT_PATH = REPOSITORY_ROOT / "firmware/src/generated/protocol_constants.h"
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"

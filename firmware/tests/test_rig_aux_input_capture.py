@@ -13,17 +13,17 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from thingdaq import (
+from thingdone_daq import (
     AuxBankMode,
     DeviceState,
     FrameFlag,
     Source,
     StreamMask,
 )
-from thingdaq._generated import protocol_v2_constants as constants
-from thingdaq.models import AuxiliaryGPIOStatus, Configuration, GPIOLayout
-from thingdaq.protocol_v2 import encode_v2_frame
-from thingdaq.simulator import SimulatedDevice
+from thingdone_daq._generated import protocol_v2_constants as constants
+from thingdone_daq.models import AuxiliaryGPIOStatus, Configuration, GPIOLayout
+from thingdone_daq.protocol_v2 import encode_v2_frame
+from thingdone_daq.simulator import SimulatedDevice
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG_SCRIPT = ROOT / "firmware/tests/rig_aux_input_capture.py"

@@ -86,7 +86,7 @@ class DocumentationIntegrityTests(unittest.TestCase):
                 if "ThingDAQ.simulated" in code:
                     runnable.append((document, line, code))
 
-        self.assertEqual(4, len(runnable))
+        self.assertEqual(5, len(runnable))
         environment = {
             key: value
             for key in ("LANG", "LC_ALL", "PATH", "SYSTEMROOT", "TMPDIR")

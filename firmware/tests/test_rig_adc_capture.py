@@ -17,11 +17,11 @@ from types import ModuleType
 from typing import TypedDict
 from unittest.mock import patch
 
-from thingdaq._generated import protocol_constants as constants
-from thingdaq.models import AdcTriggerMetadata, Configuration, DeviceInfo, Status
-from thingdaq.protocol import encode_frame
-from thingdaq.simulator import SimulatedDevice
-from thingdaq.synthetic import synthetic_adc_payload
+from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.models import AdcTriggerMetadata, Configuration, DeviceInfo, Status
+from thingdone_daq.protocol import encode_frame
+from thingdone_daq.simulator import SimulatedDevice
+from thingdone_daq.synthetic import synthetic_adc_payload
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG_SCRIPT = ROOT / "firmware" / "tests" / "rig_adc_capture.py"
@@ -327,8 +327,8 @@ class RigScriptIndependenceTests(unittest.TestCase):
             },
             imports,
         )
-        self.assertNotIn("import thingdaq", source)
-        self.assertNotIn("from thingdaq", source)
+        self.assertNotIn("import thingdone_daq", source)
+        self.assertNotIn("from thingdone_daq", source)
         self.assertNotIn("protocol-v1.json", source)
         self.assertIn('os.environ.get("SERIAL_PORT")', source)
         self.assertIn('"ADC_CAPTURE_SECONDS"', source)

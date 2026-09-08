@@ -8,7 +8,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     Capability,
     CommandTimeoutError,
@@ -34,7 +34,7 @@ from thingdaq import (
     TransportTimeoutError,
     decode_frame,
 )
-from thingdaq.cli import CliExitCode, _execute, build_parser, main
+from thingdone_daq.cli import CliExitCode, _execute, build_parser, main
 
 
 class ResetNoiseTransport(InMemoryTransport):
@@ -273,7 +273,7 @@ class ControlCliTests(unittest.TestCase):
             location="1-2.3",
         )
         list_output = io.StringIO()
-        with patch("thingdaq.cli.enumerate_candidates", return_value=(candidate,)):
+        with patch("thingdone_daq.cli.enumerate_candidates", return_value=(candidate,)):
             result = _execute(
                 argparse.Namespace(action="list"),
                 list_output,
@@ -336,7 +336,7 @@ class ControlCliTests(unittest.TestCase):
             ]
         )
         with (
-            patch("thingdaq.cli._open_device", return_value=daq),
+            patch("thingdone_daq.cli._open_device", return_value=daq),
             patch.object(
                 daq,
                 "read_block",
@@ -387,7 +387,7 @@ class ControlCliTests(unittest.TestCase):
                 stdout = io.StringIO()
                 stderr = io.StringIO()
                 with (
-                    patch("thingdaq.cli._execute", side_effect=error),
+                    patch("thingdone_daq.cli._execute", side_effect=error),
                     redirect_stdout(stdout),
                     redirect_stderr(stderr),
                 ):

@@ -28,10 +28,10 @@ related:
 > the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
 The public host boundary is the synchronous, typed `ThingDAQ` facade plus
-immutable data/evidence models exported from `thingdaq`. Normal callers do
+immutable data/evidence models exported from `thingdone_daq`. Normal callers do
 not construct frames, own request IDs, run a parser, or coordinate a reader
 thread. Those expert primitives remain available in the explicitly named
-`thingdaq.low_level` namespace.
+`thingdone_daq.low_level` namespace.
 
 ## Layering
 

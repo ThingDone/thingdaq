@@ -103,7 +103,7 @@ path outside the repository:
 from datetime import datetime, timezone
 from pathlib import Path
 
-from thingdaq import (
+from thingdone_daq import (
     CalibrationRecord,
     ThingDAQ,
     estimate_offset_gain,
@@ -126,7 +126,7 @@ record = CalibrationRecord(
     notes="Both pins driven from the same buffered source",
 )
 
-path = Path.home() / ".config" / "thingdaq" / "calibration.json"
+path = Path.home() / ".config" / "thingdone_daq" / "calibration.json"
 save_calibration(path, record)  # the parent directory must already exist
 selected = load_calibration(path, serial, profile)
 

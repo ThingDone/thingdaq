@@ -5,7 +5,7 @@ from __future__ import annotations
 import struct
 import unittest
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AdcBlockMetadata,
     AdcTriggerMetadata,
@@ -38,7 +38,7 @@ from thingdaq import (
     synthetic_gpio_value,
     validate_synthetic_gpio_payload,
 )
-from thingdaq._generated import protocol_v2_constants as constants
+from thingdone_daq._generated import protocol_v2_constants as constants
 
 _SUCCESS_PREFIX = bytes(4)
 

@@ -16,10 +16,10 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
-from thingdaq._generated import protocol_constants as constants
-from thingdaq.models import Configuration, Info, Status
-from thingdaq.protocol import encode_frame
-from thingdaq.synthetic import synthetic_adc_payload, synthetic_gpio_payload
+from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.models import Configuration, Info, Status
+from thingdone_daq.protocol import encode_frame
+from thingdone_daq.synthetic import synthetic_adc_payload, synthetic_gpio_payload
 
 ROOT = Path(__file__).resolve().parents[2]
 HOST_SCRIPT = ROOT / "firmware" / "tests" / "rig_host_stall_recovery.py"
@@ -686,8 +686,8 @@ class RigIndependenceAndCodecTests(unittest.TestCase):
                     imports.add(node.module.split(".", 1)[0])
             with self.subTest(script=path.name):
                 self.assertEqual(allowed, imports)
-                self.assertNotIn("import thingdaq", source)
-                self.assertNotIn("from thingdaq", source)
+                self.assertNotIn("import thingdone_daq", source)
+                self.assertNotIn("from thingdone_daq", source)
                 self.assertNotIn("protocol-v1.json", source)
                 self.assertIn('os.environ.get("SERIAL_PORT")', source)
 

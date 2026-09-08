@@ -16,7 +16,7 @@ import unittest
 from collections.abc import Iterable
 from pathlib import Path
 
-from thingdaq import (
+from thingdone_daq import (
     ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
     GPIOBlock,
@@ -27,7 +27,7 @@ from thingdaq import (
     decode_frame,
     encode_frame,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIRMWARE_SOURCE = REPOSITORY_ROOT / "firmware/src"

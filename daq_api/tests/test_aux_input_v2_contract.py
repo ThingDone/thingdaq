@@ -25,7 +25,7 @@ _FROZEN_V1_SHA256 = {
     "protocol/fixtures/manifest.json": (
         "e354b6dd7749b4dcea9ee233297f5712f645c2d0a1444d990e22f02303c99568"
     ),
-    "daq_api/src/thingdaq/_generated/protocol_constants.py": (
+    "daq_api/src/thingdone_daq/_generated/protocol_constants.py": (
         "a5dc4cd73dd12e291c03d536c2937d14ad1d0ca84b9c8a2860ad2797fbf15961"
     ),
     "firmware/src/generated/protocol_constants.h": (
@@ -88,7 +88,7 @@ class AuxInputV2ContractTests(unittest.TestCase):
         self.assertEqual("protocol/protocol-v1.json", self.v2["extends"]["source"])
 
         v1_outputs = {
-            "daq_api/src/thingdaq/_generated/protocol_constants.py",
+            "daq_api/src/thingdone_daq/_generated/protocol_constants.py",
             "firmware/src/generated/protocol_constants.h",
             "protocol/fixtures",
             "protocol/fixtures/manifest.json",

@@ -52,7 +52,7 @@ EXCLUDED_REPOSITORY_PATHS = {
     # This generated package entry point embeds the validation manifest, which
     # records the candidate-freeze digest. Protecting it here would make the
     # freeze hash its own transitive input. Generator --check covers its bytes.
-    "daq_api/src/thingdaq/soak.py",
+    "daq_api/src/thingdone_daq/soak.py",
 }
 REQUIRED_ARTIFACT_SUFFIXES = {".elf", ".hex", ".map"}
 SHA256_LENGTH = 64

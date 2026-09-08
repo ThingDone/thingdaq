@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from thingdaq import (
+from thingdone_daq import (
     ChecksumAlgorithm,
     DAQConfiguration,
     DeviceCapabilityError,

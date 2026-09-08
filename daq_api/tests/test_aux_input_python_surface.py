@@ -8,8 +8,8 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 
-import thingdaq
-from thingdaq import (
+import thingdone_daq
+from thingdone_daq import (
     ADCBlock,
     AdcBlockMetadata,
     AdcTriggerMetadata,
@@ -41,10 +41,10 @@ from thingdaq import (
     synthetic_gpio_payload,
     synthetic_gpio_value,
 )
-from thingdaq._generated import protocol_constants as v1_constants
-from thingdaq._generated import protocol_v2_constants as v2_constants
-from thingdaq.cli import CliExitCode, build_parser, main
-from thingdaq.protocol_v2 import decode_v2_frame, encode_v2_frame
+from thingdone_daq._generated import protocol_constants as v1_constants
+from thingdone_daq._generated import protocol_v2_constants as v2_constants
+from thingdone_daq.cli import CliExitCode, build_parser, main
+from thingdone_daq.protocol_v2 import decode_v2_frame, encode_v2_frame
 
 
 def _configuration(
@@ -613,10 +613,10 @@ class SimulatorAndCliSurfaceTests(unittest.TestCase):
             "synthetic_gpio_bank_bytes",
             "synthetic_gpio_value",
         }
-        self.assertTrue(required.issubset(thingdaq.__all__))
+        self.assertTrue(required.issubset(thingdone_daq.__all__))
         for name in required:
             with self.subTest(name=name):
-                self.assertTrue(hasattr(thingdaq, name))
+                self.assertTrue(hasattr(thingdone_daq, name))
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -14,7 +14,7 @@ from typing import Any
 from unittest.mock import patch
 
 import serial.tools.list_ports
-from thingdaq import (
+from thingdone_daq import (
     Frame,
     FrameFlag,
     FrameKind,
@@ -24,7 +24,7 @@ from thingdaq import (
     decode_frame,
     encode_frame,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 from firmware.tools import baseline_prototype as baseline
 from firmware.tools import experiment_evidence

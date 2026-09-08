@@ -29,8 +29,10 @@ class SoakCandidateFreezeTests(unittest.TestCase):
         self.assertIn("firmware/soak/validator.py", relative)
         self.assertIn("firmware/tests/generated/rig_soak_synthetic.py", relative)
         self.assertIn("firmware/src/generated/protocol_constants.h", relative)
-        self.assertIn("daq_api/src/thingdaq/_generated/protocol_constants.py", relative)
-        self.assertNotIn("daq_api/src/thingdaq/soak.py", relative)
+        self.assertIn(
+            "daq_api/src/thingdone_daq/_generated/protocol_constants.py", relative
+        )
+        self.assertNotIn("daq_api/src/thingdone_daq/soak.py", relative)
         self.assertIn("protocol/fixtures/manifest.json", relative)
         self.assertIn("firmware/tools/freeze_soak_candidate.py", relative)
         self.assertFalse(any("__pycache__" in path for path in relative))

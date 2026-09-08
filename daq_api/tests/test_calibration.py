@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from thingdaq import (
+from thingdone_daq import (
     CALIBRATION_SCHEMA_VERSION,
     MAX_CALIBRATION_FILE_BYTES,
     ADCBlock,
@@ -31,7 +31,7 @@ from thingdaq import (
     load_calibration,
     save_calibration,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 
 def _record(
@@ -209,7 +209,7 @@ class CalibrationPersistenceTests(unittest.TestCase):
 
             with (
                 patch(
-                    "thingdaq.calibration.os.replace",
+                    "thingdone_daq.calibration.os.replace",
                     side_effect=OSError("injected replace failure"),
                 ),
                 self.assertRaisesRegex(OSError, "injected replace failure"),
@@ -229,7 +229,7 @@ class CalibrationPersistenceTests(unittest.TestCase):
 
             with (
                 patch(
-                    "thingdaq.calibration.os.fsync",
+                    "thingdone_daq.calibration.os.fsync",
                     side_effect=OSError("injected fsync failure"),
                 ),
                 self.assertRaisesRegex(OSError, "injected fsync failure"),

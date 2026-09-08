@@ -7,7 +7,7 @@ with D6-D13 used only within the hardware-safety limits.
 from __future__ import annotations
 
 from _common import configure_exact, example_parser, open_example, print_applied
-from thingdaq import GPIOBlock
+from thingdone_daq import GPIOBlock
 
 
 def main() -> int:

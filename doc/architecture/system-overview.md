@@ -357,7 +357,7 @@ fails closed before any state-changing operation.
 images; current firmware rejects that legacy profile in favor of nonempty
 synthetic or GPIO-only physical acquisition. `ThingDAQ.simulated(control_only=True)` continues to
 exercise the older schema. The
-`thingdaq` command-line entry point lists candidates, probes identity, prints
+`thingdone-daq` command-line entry point lists candidates, probes identity, prints
 status, configures the advertised physical GPIO profile (with a legacy
 control-only fallback), starts, stops, and resets safe counters. Its one-shot
 configure/start commands deliberately close the PySerial handle without STOP

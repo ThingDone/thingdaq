@@ -6,7 +6,7 @@ import struct
 import unittest
 from pathlib import Path
 
-from thingdaq import (
+from thingdone_daq import (
     Capability,
     DeviceCapabilityError,
     ErrorCode,
@@ -21,7 +21,7 @@ from thingdaq import (
     decode_response,
     encode_frame,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"

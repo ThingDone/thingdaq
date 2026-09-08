@@ -1602,7 +1602,7 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 2,
   "source": "protocol/protocol-v2.json",
-  "source_sha256": "ef626114d028ef645481dd8ec0144e8e30eab8cc5463eea2e125075c089109ca",
+  "source_sha256": "aa7fa0c5d4dde56d7ade95b64f620138e96390e2790a49b8b2be25909608ddae",
   "v1_source": "protocol/protocol-v1.json",
   "v1_source_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
 }

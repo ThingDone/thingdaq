@@ -1,4 +1,4 @@
-"""Tests for the local-only Python distribution configuration."""
+"""Tests for the public Python distribution configuration."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import tomllib
-from thingdaq import __version__
+from thingdone_daq import __version__
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT_PATH = PACKAGE_ROOT / "pyproject.toml"
@@ -16,7 +16,7 @@ MANIFEST_PATH = PACKAGE_ROOT / "MANIFEST.in"
 PACKAGE_README_PATH = PACKAGE_ROOT / "README.md"
 PACKAGE_LICENSE_PATH = PACKAGE_ROOT / "LICENSE"
 REPOSITORY_LICENSE_PATH = PACKAGE_ROOT.parent / "LICENSE"
-TYPED_MARKER_PATH = PACKAGE_ROOT / "src/thingdaq/py.typed"
+TYPED_MARKER_PATH = PACKAGE_ROOT / "src/thingdone_daq/py.typed"
 
 
 class PackageConfigurationTests(unittest.TestCase):
@@ -27,16 +27,20 @@ class PackageConfigurationTests(unittest.TestCase):
         with PYPROJECT_PATH.open("rb") as pyproject_file:
             cls.pyproject = tomllib.load(pyproject_file)
 
-    def test_distribution_is_an_explicit_local_placeholder(self) -> None:
+    def test_distribution_is_ready_for_pypi(self) -> None:
         project = self.pyproject["project"]
 
-        self.assertTrue(project["name"].endswith("-local"))
+        self.assertEqual("thingdone-daq", project["name"])
         self.assertEqual(
             {"file": "README.md", "content-type": "text/markdown"},
             project["readme"],
         )
         self.assertEqual(">=3.10,<3.15", project["requires-python"])
-        self.assertIn("Private :: Do Not Upload", project["classifiers"])
+        self.assertNotIn("Private :: Do Not Upload", project["classifiers"])
+        self.assertEqual(
+            {"Documentation", "Repository", "Issues", "Changelog"},
+            set(project["urls"]),
+        )
 
     def test_semantic_version_has_one_runtime_source(self) -> None:
         project = self.pyproject["project"]
@@ -45,7 +49,7 @@ class PackageConfigurationTests(unittest.TestCase):
         self.assertNotIn("version", project)
         self.assertEqual(["version"], project["dynamic"])
         self.assertEqual(
-            "thingdaq._version.__version__",
+            "thingdone_daq._version.__version__",
             dynamic["version"]["attr"],
         )
         self.assertIsNotNone(
@@ -79,7 +83,7 @@ class PackageConfigurationTests(unittest.TestCase):
         )
         self.assertTrue(any(item.startswith("numpy") for item in extras["numpy"]))
 
-        for tool in ("build", "mypy", "pytest", "ruff"):
+        for tool in ("build", "mypy", "pytest", "ruff", "twine"):
             with self.subTest(tool=tool):
                 self.assertTrue(
                     any(item.startswith(tool) for item in extras["dev"]),
@@ -89,14 +93,13 @@ class PackageConfigurationTests(unittest.TestCase):
         self.assertFalse(
             any(item.startswith("numpy") for item in project["dependencies"])
         )
-        self.assertFalse(any(item.startswith("twine") for item in extras["dev"]))
 
     def test_control_demo_and_soak_console_entry_points_are_installed(self) -> None:
         scripts = self.pyproject["project"]["scripts"]
 
-        self.assertEqual("thingdaq.cli:main", scripts["thingdaq"])
-        self.assertEqual("thingdaq.demo:main", scripts["thingdaq-demo"])
-        self.assertEqual("thingdaq.soak:main", scripts["thingdaq-soak"])
+        self.assertEqual("thingdone_daq.cli:main", scripts["thingdone-daq"])
+        self.assertEqual("thingdone_daq.demo:main", scripts["thingdone-daq-demo"])
+        self.assertEqual("thingdone_daq.soak:main", scripts["thingdone-daq-soak"])
 
     def test_runtime_package_data_is_an_explicit_typed_only_allowlist(self) -> None:
         setuptools = self.pyproject["tool"]["setuptools"]
@@ -104,7 +107,7 @@ class PackageConfigurationTests(unittest.TestCase):
         self.assertFalse(setuptools["include-package-data"])
         self.assertEqual(
             ["py.typed"],
-            setuptools["package-data"]["thingdaq"],
+            setuptools["package-data"]["thingdone_daq"],
         )
         excluded_data = setuptools["exclude-package-data"]["*"]
         for pattern in (".env", "*.bin", "*.json", "*.key", "captures/*"):
@@ -115,8 +118,8 @@ class PackageConfigurationTests(unittest.TestCase):
     def test_source_manifest_excludes_non_runtime_inputs(self) -> None:
         manifest = MANIFEST_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("recursive-include src/thingdaq *.py", manifest)
-        self.assertIn("include src/thingdaq/py.typed", manifest)
+        self.assertIn("recursive-include src/thingdone_daq *.py", manifest)
+        self.assertIn("include src/thingdone_daq/py.typed", manifest)
         self.assertIn("recursive-include examples *.py", manifest)
         for excluded in (
             "prune tests",
@@ -128,7 +131,7 @@ class PackageConfigurationTests(unittest.TestCase):
             with self.subTest(excluded=excluded):
                 self.assertIn(excluded, manifest)
 
-    def test_mit_license_and_private_publication_boundary_are_explicit(self) -> None:
+    def test_mit_license_and_public_package_identity_are_explicit(self) -> None:
         project = self.pyproject["project"]
         readme = PACKAGE_README_PATH.read_text(encoding="utf-8")
         package_license = PACKAGE_LICENSE_PATH.read_text(encoding="utf-8")
@@ -139,8 +142,10 @@ class PackageConfigurationTests(unittest.TestCase):
         self.assertEqual(repository_license, package_license)
         self.assertIn("Copyright (c) 2026 THING DONE LLC", package_license)
         self.assertIn("Teensy®", readme)
-        self.assertIn("publication readiness require review", readme)
-        self.assertIn("Do not reserve, upload, or publish", readme)
+        self.assertIn("pip install thingdone-daq", readme)
+        self.assertIn("from thingdone_daq import", readme)
+        self.assertNotIn("[[", readme)
+        self.assertTrue(readme.startswith("# thingdone-daq"))
 
 
 if __name__ == "__main__":

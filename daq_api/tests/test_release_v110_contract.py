@@ -6,7 +6,7 @@ import json
 import struct
 from pathlib import Path
 
-from thingdaq import (
+from thingdone_daq import (
     AuxBankMode,
     DAQConfiguration,
     DeviceInfo,
@@ -15,10 +15,10 @@ from thingdaq import (
     StreamMask,
     ThingDAQ,
 )
-from thingdaq._generated import protocol_v2_constants as c
-from thingdaq.protocol_v2 import decode_v2_frame, encode_v2_frame
-from thingdaq.simulator import SimulatedDevice
-from thingdaq.transport import InMemoryTransport
+from thingdone_daq._generated import protocol_v2_constants as c
+from thingdone_daq.protocol_v2 import decode_v2_frame, encode_v2_frame
+from thingdone_daq.simulator import SimulatedDevice
+from thingdone_daq.transport import InMemoryTransport
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -123,7 +123,7 @@ def test_cached_metadata_is_immutable_and_rejects_bool_profile_aliases():
     import dataclasses
 
     import pytest
-    from thingdaq.models import AdcBlockMetadata, RateProfileTiming
+    from thingdone_daq.models import AdcBlockMetadata, RateProfileTiming
 
     first = AdcBlockMetadata.for_rate_profile(
         RateProfile.ADC_1MHZ_GPIO_1MHZ, Source.HARDWARE

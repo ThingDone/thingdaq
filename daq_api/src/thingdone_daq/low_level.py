@@ -1,7 +1,7 @@
 """Expert-only protocol, reader, and transport building blocks.
 
-Normal applications should use :class:`thingdaq.ThingDAQ` and the typed
-models exported from :mod:`thingdaq`.  This namespace keeps raw frame and
+Normal applications should use :class:`thingdone_daq.ThingDAQ` and the typed
+models exported from :mod:`thingdone_daq`.  This namespace keeps raw frame and
 byte-transport access available for protocol tooling without making callers
 construct frames for ordinary discovery, configuration, or capture workflows.
 """

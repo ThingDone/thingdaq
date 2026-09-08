@@ -11,7 +11,7 @@ from dataclasses import replace
 from typing import Literal
 from unittest.mock import patch
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     BackgroundReader,
     CommandResponse,
@@ -44,7 +44,7 @@ from thingdaq import (
     reconcile_run_counters,
     synthetic_adc_payload,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 _Fault = Literal["missing", "duplicate", "reordered", "cross_run"]
 
@@ -633,7 +633,7 @@ class ReconnectAndWrapRecoveryTests(unittest.TestCase):
 
         with (
             patch(
-                "thingdaq.client.discover_devices",
+                "thingdone_daq.client.discover_devices",
                 return_value=(renamed_endpoint,),
             ),
             ThingDAQ.open(

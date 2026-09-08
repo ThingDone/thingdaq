@@ -6,7 +6,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AdcConverter,
     BoardId,
@@ -40,7 +40,7 @@ from thingdaq import (
     decode_frame,
     encode_frame,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 
 class PhysicalInfoDevice(SimulatedDevice):
@@ -223,7 +223,7 @@ class PublicOpenTests(unittest.TestCase):
 
         with (
             patch(
-                "thingdaq.client.discover_devices",
+                "thingdone_daq.client.discover_devices",
                 return_value=(discovered,),
             ),
             ThingDAQ.open(

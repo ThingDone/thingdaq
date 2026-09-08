@@ -5,9 +5,9 @@ from __future__ import annotations
 import unittest
 from typing import TypedDict
 
-from thingdaq import AdcTriggerMetadata, DeviceInfo, Status
-from thingdaq._generated import protocol_constants as constants
-from thingdaq.protocol import FrameValidationError
+from thingdone_daq import AdcTriggerMetadata, DeviceInfo, Status
+from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.protocol import FrameValidationError
 
 READY_FLAGS = (
     constants.AdcConfigurationFlag.INITIALIZED

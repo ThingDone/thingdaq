@@ -12,7 +12,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AdcBlockMetadata,
     CalibrationRecord,
@@ -21,7 +21,7 @@ from thingdaq import (
     synthetic_adc_payload,
     synthetic_gpio_payload,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_SOURCE = REPOSITORY_ROOT / "daq_api" / "src"
@@ -57,7 +57,7 @@ class NumPyIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         import numpy
-        from thingdaq import numpy as teensy_numpy
+        from thingdone_daq import numpy as teensy_numpy
 
         cls.numpy = numpy
         cls.teensy_numpy = teensy_numpy
@@ -311,7 +311,7 @@ class NoNumPyIntegrationTests(unittest.TestCase):
                 return original_import(name, globals, locals, fromlist, level)
             builtins.__import__ = guarded_import
 
-            from thingdaq import (
+            from thingdone_daq import (
                 ADCBlock, AdcBlockMetadata, CalibrationRecord,
                 ConverterCalibration, GPIOBlock, synthetic_adc_payload,
                 synthetic_gpio_payload,

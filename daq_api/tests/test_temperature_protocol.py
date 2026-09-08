@@ -3,8 +3,8 @@
 import struct
 
 import pytest
-from thingdaq._generated import protocol_v2_constants as c
-from thingdaq.protocol_v2 import (
+from thingdone_daq._generated import protocol_v2_constants as c
+from thingdone_daq.protocol_v2 import (
     IncrementalV2FrameParser,
     V2FrameValidationError,
     decode_temperature_payload,
@@ -61,7 +61,7 @@ def test_request_is_empty():
 
 
 def test_public_temperature_command_idle_configured_and_running():
-    from thingdaq import Source, TemperatureStatus, ThingDAQ
+    from thingdone_daq import Source, TemperatureStatus, ThingDAQ
 
     with ThingDAQ.simulated() as daq:
         assert daq.get_temperature().status is TemperatureStatus.UNAVAILABLE
@@ -74,7 +74,7 @@ def test_public_temperature_command_idle_configured_and_running():
 
 
 def test_fast_adc_range_check_covers_every_uint16():
-    from thingdaq.protocol import adc_payload_codes_valid
+    from thingdone_daq.protocol import adc_payload_codes_valid
 
     for code in range(65536):
         payload = struct.pack("<HH", code, code)
@@ -82,7 +82,7 @@ def test_fast_adc_range_check_covers_every_uint16():
 
 
 def test_simulator_temperature_replay_uses_correlated_typed_error():
-    from thingdaq.simulator import SimulatedDevice
+    from thingdone_daq.simulator import SimulatedDevice
 
     device = SimulatedDevice()
     request = encode_v2_frame(c.FrameKind.GET_TEMPERATURE_REQUEST, request_id=26)

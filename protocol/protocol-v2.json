@@ -26,7 +26,7 @@
     "rule": "Protocol v2 copies the frozen v1 contract and adds explicitly encoded auxiliary-input, exact-rate and temperature extension points; v1 sources, generated outputs, fixtures, bytes, and defaults remain authoritative and immutable."
   },
   "generated_outputs": {
-    "python_constants": "daq_api/src/thingdaq/_generated/protocol_v2_constants.py",
+    "python_constants": "daq_api/src/thingdone_daq/_generated/protocol_v2_constants.py",
     "cpp_constants": "firmware/src/generated/protocol_v2_constants.h",
     "fixture_directory": "protocol/fixtures-v2",
     "fixture_manifest": "protocol/fixtures-v2/manifest.json"

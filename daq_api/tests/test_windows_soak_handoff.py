@@ -18,7 +18,7 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 import serial
-from thingdaq import soak as installed_soak
+from thingdone_daq import soak as installed_soak
 
 from firmware.tests.test_soak_endurance_tools import (
     ACCELERATED_ADC_PAIR_RATE_HZ,
@@ -2022,7 +2022,7 @@ class WindowsReportParityAndCompatibilityTests(unittest.TestCase):
             "requests",
             "socket",
             "subprocess",
-            "thingdaq",
+            "thingdone_daq",
             "tools",
             "urllib",
         ):

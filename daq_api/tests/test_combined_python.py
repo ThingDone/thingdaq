@@ -20,7 +20,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import serial
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AlignedInterval,
     AlignmentItem,
@@ -57,8 +57,8 @@ from thingdaq import (
     synthetic_gpio_payload,
     validate_synthetic_block,
 )
-from thingdaq._generated import protocol_constants as constants
-from thingdaq.cli import CliExitCode, _execute, build_parser, main
+from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.cli import CliExitCode, _execute, build_parser, main
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_SOURCE = REPOSITORY_ROOT / "daq_api" / "src"
@@ -601,7 +601,7 @@ class CombinedMixedStreamTests(unittest.TestCase):
                 return original_import(name, *args, **kwargs)
             builtins.__import__ = guarded_import
 
-            from thingdaq import (
+            from thingdone_daq import (
                 ADCBlock, AlignedInterval, FrameFlag, GPIOBlock,
                 TimestampAligner, synthetic_adc_payload, synthetic_gpio_payload,
             )
@@ -818,7 +818,7 @@ class CombinedCliSerialTests(unittest.TestCase):
             ]
         )
         output = io.StringIO()
-        with patch("thingdaq.cli._open_device", return_value=daq):
+        with patch("thingdone_daq.cli._open_device", return_value=daq):
             result = _execute(arguments, output)
 
         rendered = output.getvalue()
@@ -861,7 +861,7 @@ class CombinedCliSerialTests(unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
         with (
-            patch("thingdaq.cli._open_device", return_value=daq),
+            patch("thingdone_daq.cli._open_device", return_value=daq),
             patch.object(daq, "stop", wraps=daq.stop) as stop,
             redirect_stdout(stdout),
             redirect_stderr(stderr),

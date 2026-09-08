@@ -8,7 +8,7 @@ import unittest
 import zlib
 from pathlib import Path
 
-from thingdaq import (
+from thingdone_daq import (
     ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
     CommandResponse,
@@ -21,7 +21,7 @@ from thingdaq import (
     decode_message,
     encode_frame,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIRECTORY = REPOSITORY_ROOT / "protocol/fixtures"

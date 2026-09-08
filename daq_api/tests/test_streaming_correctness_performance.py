@@ -16,7 +16,7 @@ from functools import lru_cache
 from itertools import islice
 from statistics import median
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AdcConverter,
     CommandResponse,
@@ -40,8 +40,8 @@ from thingdaq import (
     synthetic_gpio_byte,
     synthetic_gpio_payload,
 )
-from thingdaq._generated import protocol_constants as constants
-from thingdaq.protocol import ParserCounters
+from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.protocol import ParserCounters
 
 TARGET_FRAMED_BYTES_PER_SECOND = (
     2

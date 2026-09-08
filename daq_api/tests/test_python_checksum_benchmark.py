@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from thingdaq import (
+from thingdone_daq import (
     HOST_SUPPORTED_CHECKSUM_ALGORITHMS,
     ADCBlock,
     ChecksumAlgorithm,
@@ -16,9 +16,9 @@ from thingdaq import (
     checksum_backend,
     compute_checksum,
 )
-from thingdaq._generated import protocol_constants as constants
-from thingdaq.checksum import _compute_checksum_fallback
-from thingdaq.checksum_benchmark import (
+from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.checksum import _compute_checksum_fallback
+from thingdone_daq.checksum_benchmark import (
     HostChecksumBenchmarkResult,
     benchmark_checksum_throughput,
     benchmark_report,
@@ -55,7 +55,7 @@ class PythonChecksumBackendTests(unittest.TestCase):
 
     def test_missing_backend_fails_with_the_wire_algorithm_id(self) -> None:
         with (
-            patch("thingdaq.protocol.compute_checksum_value", return_value=None),
+            patch("thingdone_daq.protocol.compute_checksum_value", return_value=None),
             self.assertRaisesRegex(
                 UnsupportedChecksumError,
                 "unsupported checksum algorithm 2",

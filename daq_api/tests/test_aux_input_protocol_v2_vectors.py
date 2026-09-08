@@ -12,11 +12,11 @@ import zlib
 from pathlib import Path
 from typing import Any, ClassVar
 
-from thingdaq import GpioCaptureDiagnosticResult, Status, ThingDAQ, low_level
-from thingdaq._generated import protocol_constants as v1_constants
-from thingdaq._generated import protocol_v2_constants as constants
-from thingdaq.protocol import Frame as V1Frame
-from thingdaq.protocol_v2 import (
+from thingdone_daq import GpioCaptureDiagnosticResult, Status, ThingDAQ, low_level
+from thingdone_daq._generated import protocol_constants as v1_constants
+from thingdone_daq._generated import protocol_v2_constants as constants
+from thingdone_daq.protocol import Frame as V1Frame
+from thingdone_daq.protocol_v2 import (
     MAX_V2_BUFFERED_BYTES,
     IncrementalV2FrameParser,
     V2ConfigurationEchoError,
@@ -57,7 +57,7 @@ _FROZEN_V1_SHA256 = {
     "protocol/fixtures/manifest.json": (
         "e354b6dd7749b4dcea9ee233297f5712f645c2d0a1444d990e22f02303c99568"
     ),
-    "daq_api/src/thingdaq/_generated/protocol_constants.py": (
+    "daq_api/src/thingdone_daq/_generated/protocol_constants.py": (
         "a5dc4cd73dd12e291c03d536c2937d14ad1d0ca84b9c8a2860ad2797fbf15961"
     ),
     "firmware/src/generated/protocol_constants.h": (

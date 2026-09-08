@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AlignedInterval,
     AlignmentLoss,
@@ -21,7 +21,7 @@ from thingdaq import (
     synthetic_adc_payload,
     synthetic_gpio_payload,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 
 def _flags(sequence: int, source: Source) -> FrameFlag:

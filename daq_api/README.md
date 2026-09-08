@@ -1,30 +1,6 @@
----
-type: reference
-title: ThingDAQ Python Package
-created: 2026-08-27
-updated: 2026-09-05
-tags:
-  - thingdaq
-  - python
-  - package
-  - local-development
-related:
-  - '[[Quickstart]]'
-  - '[[Python-API]]'
-  - '[[API-Reference]]'
-  - '[[Hardware-Safety]]'
-  - '[[System-Overview]]'
-  - '[[Foundation-Reuse-Inventory]]'
-  - '[[Protocol-V1]]'
-  - '[[ADR-001-Wire-Protocol]]'
-  - '[[ADR-007-Experimental-Aux-Input-Bank]]'
-  - '[[Calibration]]'
-  - '[[NumPy-Integration]]'
----
+# thingdone-daq: ThingDAQ Python API
 
-# ThingDAQ Python package
-
-Release 1.1.0 uses [[Protocol-V2]]: fixed 1 MHz ADC/GPIO and a 450 MHz core.
+Release 1.1.0 uses [Protocol-V2](https://github.com/ThingDone/thingdaq/blob/main/doc/protocol/protocol-v2.md): fixed 1 MHz ADC/GPIO and a 450 MHz core.
 Default hardware configuration selects 8 GPIO inputs; pass
 `aux_bank_mode=AuxBankMode.INPUT` for 16. `daq.get_temperature()` returns a
 `TemperatureReading` with sensor `status`, signed `millidegrees_c` and
@@ -49,13 +25,32 @@ The independent wire validator sustains
 the same firmware configuration. SDK throughput on a faster host remains
 unverified. Keep strict loss checking enabled and validate the intended host.
 
-This directory contains the private, local-development Python distribution for
-the ThingDAQ host API. The single authoritative installable distribution name
-is `[project].name` in `pyproject.toml`, while the stable import package is
-`thingdaq`.
+Install **thingdone-daq** and import **thingdone_daq** (Python 3.10–3.14):
 
-Start with [[Quickstart]], read [[Hardware-Safety]] before connecting signals,
-and use [[API-Reference]] for the stable public surface.
+```bash
+python -m pip install thingdone-daq
+# Optional NumPy array support:
+python -m pip install 'thingdone-daq[numpy]'
+```
+
+```python
+from thingdone_daq import ThingDAQ
+
+with ThingDAQ.simulated() as daq:
+    print(daq.info())
+```
+
+The CLI commands are `thingdone-daq`, `thingdone-daq-demo`, and
+`thingdone-daq-soak`. Run `thingdone-daq-demo --frame-count 2` for an offline
+check, or `thingdone-daq list` to enumerate hardware candidates.
+
+Migrating from the private package: replace `from thingdaq ...` with
+`from thingdone_daq ...`, and replace the `thingdaq` command prefix with
+`thingdone-daq`. The public `ThingDAQ` class and hardware wire protocol retain
+their names and behavior. No legacy import alias is installed.
+
+Start with [Quickstart](https://github.com/ThingDone/thingdaq/blob/main/doc/guides/quickstart.md), read [Hardware-Safety](https://github.com/ThingDone/thingdaq/blob/main/doc/reference/hardware-safety.md) before connecting signals,
+and use [API-Reference](https://github.com/ThingDone/thingdaq/blob/main/doc/reference/api-reference.md) for the stable public surface.
 
 The base installation includes PySerial for the bounded hardware transport.
 NumPy remains optional, and test, lint, type-check, and package-build tools are
@@ -65,15 +60,15 @@ available through development extras:
 python3 -m pip install --editable '.[dev,numpy]'
 ```
 
-See [[System-Overview]] for the package boundary and
-[[Foundation-Reuse-Inventory]] for the implementation-pattern audit.
+See [System-Overview](https://github.com/ThingDone/thingdaq/blob/main/doc/architecture/system-overview.md) for the package boundary and
+[Foundation-Reuse-Inventory](https://github.com/ThingDone/thingdaq/blob/main/doc/reference/Foundation-Reuse-Inventory.md) for the implementation-pattern audit.
 
 ## Distribution and publication boundary
 
 The host API and firmware are versioned independently from the wire protocol;
 release 1.1.0 assigns semantic version `1.1.0` to both and uses wire protocol v2. The
-host value is single-sourced in `thingdaq._version`, exposed as
-`thingdaq.__version__`, and consumed by the build metadata declared in
+host value is single-sourced in `thingdone_daq._version`, exposed as
+`thingdone_daq.__version__`, and consumed by the build metadata declared in
 `pyproject.toml`. Firmware single-sources its value in
 `firmware/src/firmware_identity.h` and reports it through INFO. The supported
 interpreter range is CPython 3.10 through 3.14; the base dependency is PySerial,
@@ -88,19 +83,16 @@ Python examples. Tests, captures, firmware
 builds, credentials, local calibration records, the canonical protocol JSON,
 the generator, and golden fixtures are deliberately excluded. The latter three
 are repository validation inputs, not runtime inputs: installed code uses the
-tracked `thingdaq._generated.protocol_constants` module.
+tracked `thingdone_daq._generated.protocol_constants` module.
 
-The local distribution remains marked `Private :: Do Not Upload`; package-index
-availability and publication readiness require review before any PyPI
-submission. Do not reserve, upload, or publish this distribution from
-repository workflows. ThingDAQ is independent and is not affiliated with or
+ThingDAQ is independent and is not affiliated with or
 endorsed by PJRC.COM, LLC or SparkFun Electronics. Teensy® is a registered
 trademark of PJRC.COM, LLC and identifies the supported hardware platform, not
 the ThingDAQ product name.
 The distribution declares the SPDX `MIT` license expression and includes the
 project license in both wheel and source-distribution artifacts.
 
-Build both local artifacts from the repository root with a source-derived,
+Build both release artifacts from the repository root with a source-derived,
 fixed archive epoch:
 
 ```bash
@@ -126,7 +118,7 @@ facade itself always starts one `BackgroundReader`; the simulator does not use
 a second command decoder or direct-read shortcut:
 
 ```python
-from thingdaq import ADCBlock, HostQueueLoss, StreamAnomaly, StreamGap, ThingDAQ
+from thingdone_daq import ADCBlock, HostQueueLoss, StreamAnomaly, StreamGap, ThingDAQ
 
 with ThingDAQ.simulated(read_chunk_size=47) as daq:
     info = daq.info()
@@ -157,10 +149,10 @@ with ThingDAQ.simulated(read_chunk_size=47) as daq:
 `ThingDAQ.open(...)` and `ThingDAQ.simulated(...)` return the same typed
 context manager. Exiting it attempts bounded STOP when needed, closes the
 reader/transport deterministically, and preserves typed shutdown evidence.
-Normal applications import the facade and immutable models from `thingdaq`.
+Normal applications import the facade and immutable models from `thingdone_daq`.
 Raw frames, parsers, the background reader, and byte transports remain
 available for protocol tooling under the explicitly expert-only
-`thingdaq.low_level` namespace; existing root imports remain stable for
+`thingdone_daq.low_level` namespace; existing root imports remain stable for
 compatibility.
 
 CONFIGURE is capability-driven. The facade rejects unsupported stream, source,
@@ -177,13 +169,13 @@ rates, packed width, frame counts, and resolution metadata.
 ### Simulator and historical-profile regression surface
 
 The simulator covers the historical profiles from
-[[ADR-007-Experimental-Aux-Input-Bank]] as well as the release equal-rate
+[ADR-007-Experimental-Aux-Input-Bank](https://github.com/ThingDone/thingdaq/blob/main/doc/decisions/adr-007-experimental-aux-input-bank.md) as well as the release equal-rate
 profile. Unlike release hardware, its default remains the legacy v1, 8-bit,
 1 MHz ADC-pair and 4 MHz GPIO regression configuration. The following is an
 offline historical-profile example, not a supported release hardware rate:
 
 ```python
-from thingdaq import AuxBankMode, RateProfile, Source, ThingDAQ
+from thingdone_daq import AuxBankMode, RateProfile, Source, ThingDAQ
 
 with ThingDAQ.simulated(gpio_pattern="walking-bit", strict=True) as daq:
     applied = daq.configure(
@@ -214,7 +206,7 @@ The simulator patterns `all-zero`, `walking-bit`, `counter`, and
 every profile. The same options are available through the CLI:
 
 ```bash
-thingdaq monitor --simulate --duration 1 \
+thingdone-daq monitor --simulate --duration 1 \
   --aux-bank-mode input \
   --rate-profile adc_250khz_gpio_1mhz \
   --gpio-pattern high-transition \
@@ -263,7 +255,7 @@ python examples/status_and_loss.py
 python examples/raw_adc_channels.py --real --hardware-serial 20512460
 ```
 
-The complete roster and physical prerequisites are in [[Quickstart]].
+The complete roster and physical prerequisites are in [Quickstart](https://github.com/ThingDone/thingdaq/blob/main/doc/guides/quickstart.md).
 
 `DeviceInfo`, `DeviceCapabilities`, `AuxiliaryInputMetadata`, `GPIOLayout`,
 `RateProfileTiming`, `AdcCalibrationMetadata`,
@@ -302,7 +294,7 @@ no pass/fail speed field because host-specific performance is not a wire
 compatibility decision:
 
 ```bash
-python -m thingdaq.checksum_benchmark --algorithms all
+python -m thingdone_daq.checksum_benchmark --algorithms all
 ```
 
 On firmware 0.6.0 or newer, the target-only clock diagnostic returns one
@@ -320,8 +312,8 @@ with ThingDAQ.open(hardware_serial=12345670) as daq:
 Release firmware accepts only 1 MHz for this diagnostic, using the 24 MHz
 PIT clock and 450 MHz DWT clock. The simulator
 does not advertise this capability and raises `DeviceCapabilityError` instead
-of fabricating target register evidence. See [[Protocol-V1]] and
-[[ADR-003-GPIO-Clock-DMA]].
+of fabricating target register evidence. See [Protocol-V1](https://github.com/ThingDone/thingdaq/blob/main/doc/protocol/protocol-v1.md) and
+[ADR-003-GPIO-Clock-DMA](https://github.com/ThingDone/thingdaq/blob/main/doc/decisions/adr-003-gpio-clock-dma.md).
 
 Firmware supports ADC-only, GPIO-only, and combined physical streaming plus
 the fail-closed GPIO capture diagnostic. D6 through D13 map to bits 0 through 7
@@ -332,7 +324,7 @@ aligned rings, frame sizes, queue capacities, and checksum. STATUS exposes all
 per-source/shared stage, byte, queue, firmware-diagnostic, and USB counters:
 
 ```python
-from thingdaq import Source, ThingDAQ
+from thingdone_daq import Source, ThingDAQ
 
 with ThingDAQ.open(hardware_serial=12345670) as daq:
     evidence = daq.gpio_capture_diagnostic()
@@ -355,7 +347,7 @@ selected port is INFO-probed again so hot re-enumeration cannot silently open a
 different unit:
 
 ```python
-from thingdaq import ExpectedDeviceIdentity, ThingDAQ, discover
+from thingdone_daq import ExpectedDeviceIdentity, ThingDAQ, discover
 
 devices = discover(timeout=0.2)
 with ThingDAQ.open(devices[0]) as daq:
@@ -390,7 +382,7 @@ sequence-zero gap; it remains visible in the firmware STATUS counters. Select
 `STOP` when a new process must force a known IDLE boundary instead:
 
 ```python
-from thingdaq import SessionRecoveryPolicy, ThingDAQ
+from thingdone_daq import SessionRecoveryPolicy, ThingDAQ
 
 adopted = ThingDAQ.open(
     hardware_serial=12345670,
@@ -433,20 +425,20 @@ with ThingDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
 CONFIGURE/START/STATUS/STOP/RESET_STATS schemas without serial hardware. The
 default simulator retains its synthetic ADC/GPIO behavior.
 
-The installed `thingdaq` command exposes bounded one-shot hardware controls:
+The installed `thingdone-daq` command exposes bounded one-shot hardware controls:
 
 ```bash
-thingdaq list
-thingdaq probe --hardware-serial 12345670 --expect-build-id thingdaq-e27556de5b898f28
-thingdaq status --hardware-serial 12345670
-thingdaq configure --hardware-serial 12345670 --streams both --source hardware
-thingdaq start --hardware-serial 12345670
-thingdaq stop --hardware-serial 12345670
-thingdaq reset-stats --hardware-serial 12345670
-thingdaq reconcile --hardware-serial 12345670
-thingdaq monitor --hardware-serial 12345670 --streams both --source hardware --duration 10
-thingdaq capture --simulate --streams both --source synthetic --duration 2 --strict-loss --gpio-channel D6 --gpio-channel D13
-thingdaq info --simulate --json
+thingdone-daq list
+thingdone-daq probe --hardware-serial 12345670 --expect-build-id thingdaq-e27556de5b898f28
+thingdone-daq status --hardware-serial 12345670
+thingdone-daq configure --hardware-serial 12345670 --streams both --source hardware
+thingdone-daq start --hardware-serial 12345670
+thingdone-daq stop --hardware-serial 12345670
+thingdone-daq reset-stats --hardware-serial 12345670
+thingdone-daq reconcile --hardware-serial 12345670
+thingdone-daq monitor --hardware-serial 12345670 --streams both --source hardware --duration 10
+thingdone-daq capture --simulate --streams both --source synthetic --duration 2 --strict-loss --gpio-channel D6 --gpio-channel D13
+thingdone-daq info --simulate --json
 ```
 
 `list` uses VID/PID metadata and opens nothing. Every other command performs
@@ -477,7 +469,7 @@ views and can be repeated. Set `--sample-limit 0` for telemetry only.
 Calibrated preview is opt-in and requires an explicit user path:
 
 ```bash
-thingdaq capture --hardware-serial 12345670 --streams adc --source hardware \
+thingdone-daq capture --hardware-serial 12345670 --streams adc --source hardware \
   --adc-output calibrated --calibration /explicit/path/calibration.json \
   --analog-front-end-profile buffered-input --duration 10 --strict-loss --json
 ```
@@ -529,7 +521,7 @@ increase either input's analog bandwidth. GPIO payloads remain packed, and
 `block.channel(pin)` lazily extracts D6-D13 without an eager eightfold Boolean
 expansion. None of these operations imports or requires NumPy.
 
-The optional `thingdaq.numpy` module vectorizes the same models without
+The optional `thingdone_daq.numpy` module vectorizes the same models without
 changing that baseline. `block.as_numpy().pairs` is a read-only, zero-copy
 `(item_count, 2)` `<u2` view in ADC0/ADC1 order (1,012 rows for the legacy
 layout and 506 for auxiliary-input mode), and a legacy GPIO block's
@@ -539,7 +531,7 @@ methods generate
 interleaved ticks, calibrated `float64` voltages, or Boolean columns only for
 requested GPIO pins. The arrays retain the immutable payload owner and source
 block; no eight-channel GPIO expansion occurs unless the caller names all
-eight pins. See [[NumPy-Integration]] for endianness, alignment, lifetime,
+eight pins. See [NumPy-Integration](https://github.com/ThingDone/thingdaq/blob/main/doc/architecture/numpy-integration.md) for endianness, alignment, lifetime,
 allocation, and pure-Python parity details.
 
 Per-unit host calibration is a separate opt-in layer. Immutable schema-v1
@@ -552,7 +544,7 @@ channels. `block.calibrated_interleaved(record, ...)` retains each sample's
 `raw_code` beside its calibrated `voltage`. Neither operation changes the raw
 payload or timestamps; schema-v1 timing skew is provenance-only and is not
 applied. The formulas, safe-store contract, workflow, and limitations are in
-[[Calibration]].
+[Calibration](https://github.com/ThingDone/thingdaq/blob/main/doc/architecture/calibration.md).
 
 `Status.adc_acquisition` exposes the complete physical dual-DMA, pair,
 framing, loss, ADC_ETC/eDMA conversion-error, lifecycle, and packer snapshot.
@@ -595,7 +587,7 @@ Applications that need equal-time cross-stream records feed data blocks and
 combined payload:
 
 ```python
-from thingdaq import AlignedInterval, AlignmentLoss, TimestampAligner
+from thingdone_daq import AlignedInterval, AlignmentLoss, TimestampAligner
 
 aligner = TimestampAligner(max_pending_intervals=8)
 
@@ -684,7 +676,7 @@ counters without changing production `loss_counters()` behavior.
 For a complete bounded run, use the reusable soak layer:
 
 ```python
-from thingdaq import ThingDAQ, run_synthetic_soak
+from thingdone_daq import ThingDAQ, run_synthetic_soak
 
 with ThingDAQ.open(hardware_serial=12345670, strict=True) as daq:
     metrics = run_synthetic_soak(
@@ -713,18 +705,18 @@ soaks normally use `duration=`.
 
 ## Identity-pinned Windows soak command
 
-The installed distribution includes `thingdaq-soak`, an identity-pinned
+The installed distribution includes `thingdone-daq-soak`, an identity-pinned
 Windows COM-port validator equivalent to the standalone
 `scripts/windows_soak.py` handoff. The console script executes the generated
-implementation packaged as `thingdaq.soak`; it does not locate or import the
+implementation packaged as `thingdone_daq.soak`; it does not locate or import the
 repository script. Both paths accept the same operational arguments and write
 the same complete JSON plus structured-Markdown report schema:
 
 ```powershell
-thingdaq-soak --duration 3600 --mode combined `
+thingdone-daq-soak --duration 3600 --mode combined `
   --output thingdaq-windows-soak
 
-thingdaq-soak --smoke --mode synthetic `
+thingdone-daq-soak --smoke --mode synthetic `
   --hardware-serial 20512460 --output thingdaq-smoke
 ```
 
@@ -741,7 +733,7 @@ the mismatched INFO fields, and force `release_eligible` to `false` even if the
 stream itself passes:
 
 ```powershell
-thingdaq-soak --diagnostic-identity-override `
+thingdone-daq-soak --diagnostic-identity-override `
   --hardware-serial 12345670 --smoke --output non-release-diagnostic
 ```
 
@@ -750,14 +742,14 @@ parsing, formula validation, rate/latency metrics, and deterministic fixture
 grading without opening a COM port:
 
 ```powershell
-thingdaq-soak --conformance-check
+thingdone-daq-soak --conformance-check
 ```
 
 Repository validation additionally runs
 `firmware/tools/check_soak_conformance.py` to compare the installed and
 standalone implementations byte-for-byte outside role metadata and against the
-golden protocol fixtures. See [[soak-harness]] and
-[[Phase-11-Soak-Evidence]] for the accepted identity and claim boundaries.
+golden protocol fixtures. See [soak-harness](https://github.com/ThingDone/thingdaq/blob/main/doc/guides/soak-harness.md) and
+[Phase-11-Soak-Evidence](https://github.com/ThingDone/thingdaq/blob/main/doc/results/phase-11-soak-evidence.md) for the accepted identity and claim boundaries.
 
 ## Metadata-first device discovery
 
@@ -778,7 +770,7 @@ again, and `DeviceIdentity` plus `select_device()` use the hardware serial
 rather than treating a COM number or `/dev` path as persistent identity:
 
 ```python
-from thingdaq import discover, enumerate_candidates, select_device
+from thingdone_daq import discover, enumerate_candidates, select_device
 
 candidates = enumerate_candidates()  # metadata only; opens nothing
 devices = discover(timeout=0.2)
@@ -799,6 +791,6 @@ counters, and the clean IDLE landing. Every sample is checked and a mismatch
 returns a nonzero exit status:
 
 ```bash
-python -m thingdaq.demo --frame-count 2 --parser-chunk-size 17
-thingdaq-demo --frame-count 2 --parser-chunk-size 17
+python -m thingdone_daq.demo --frame-count 2 --parser-chunk-size 17
+thingdone-daq-demo --frame-count 2 --parser-chunk-size 17
 ```

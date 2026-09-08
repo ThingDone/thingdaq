@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from _common import configure_exact, example_parser, open_example, require_info
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     CalibrationRecord,
     ConverterCalibration,

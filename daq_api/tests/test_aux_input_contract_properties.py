@@ -8,7 +8,7 @@ import unittest
 import zlib
 from pathlib import Path
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AuxBankMode,
     DAQConfiguration,
@@ -18,9 +18,9 @@ from thingdaq import (
     Source,
     StreamMask,
 )
-from thingdaq._generated import protocol_constants as v1_constants
-from thingdaq._generated import protocol_v2_constants as constants
-from thingdaq.protocol_v2 import (
+from thingdone_daq._generated import protocol_constants as v1_constants
+from thingdone_daq._generated import protocol_v2_constants as constants
+from thingdone_daq.protocol_v2 import (
     IncrementalCompatibleFrameParser,
     V2ConfigurationEchoError,
     V2FrameValidationError,
@@ -443,7 +443,8 @@ class CompatibilityAndFragmentationPropertyTests(unittest.TestCase):
     def test_complete_v1_contract_tree_is_byte_frozen(self) -> None:
         paths = [
             REPOSITORY_ROOT / "protocol/protocol-v1.json",
-            REPOSITORY_ROOT / "daq_api/src/thingdaq/_generated/protocol_constants.py",
+            REPOSITORY_ROOT
+            / "daq_api/src/thingdone_daq/_generated/protocol_constants.py",
             REPOSITORY_ROOT / "firmware/src/generated/protocol_constants.h",
             *sorted(V1_FIXTURE_ROOT.glob("*")),
         ]
@@ -452,7 +453,14 @@ class CompatibilityAndFragmentationPropertyTests(unittest.TestCase):
         for path in paths:
             if not path.is_file():
                 continue
-            relative = path.relative_to(REPOSITORY_ROOT).as_posix().encode()
+            # The frozen digest includes historical filenames. Relocate only
+            # the Python namespace; continue checking every original byte.
+            relative = (
+                path.relative_to(REPOSITORY_ROOT)
+                .as_posix()
+                .replace("src/thingdone_daq/", "src/thingdaq/")
+                .encode()
+            )
             contents = path.read_bytes()
             digest.update(len(relative).to_bytes(4, "little"))
             digest.update(relative)

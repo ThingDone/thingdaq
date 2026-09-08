@@ -21,7 +21,7 @@ _IMPORT_ROOT = Path(__file__).resolve().parents[2]
 if str(_IMPORT_ROOT) not in sys.path:
     sys.path.insert(0, str(_IMPORT_ROOT))
 
-from thingdaq import (
+from thingdone_daq import (
     DEFAULT_MAX_QUEUED_BLOCKS,
     DeviceInfo,
     DeviceState,
@@ -34,7 +34,7 @@ from thingdaq import (
     run_synthetic_soak,
     snapshot_firmware_faults,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 from firmware.tools import build_firmware, experiment_evidence
 
@@ -1146,10 +1146,10 @@ def _evidence_records(
     simulator_inputs = [
         matrix_path,
         protocol_path,
-        REPOSITORY_ROOT / "daq_api/src/thingdaq/client.py",
-        REPOSITORY_ROOT / "daq_api/src/thingdaq/simulator.py",
-        REPOSITORY_ROOT / "daq_api/src/thingdaq/streaming.py",
-        REPOSITORY_ROOT / "daq_api/src/thingdaq/synthetic.py",
+        REPOSITORY_ROOT / "daq_api/src/thingdone_daq/client.py",
+        REPOSITORY_ROOT / "daq_api/src/thingdone_daq/simulator.py",
+        REPOSITORY_ROOT / "daq_api/src/thingdone_daq/streaming.py",
+        REPOSITORY_ROOT / "daq_api/src/thingdone_daq/synthetic.py",
         Path(__file__),
     ]
     map_artifact = next(

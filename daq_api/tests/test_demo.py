@@ -14,9 +14,9 @@ from unittest.mock import patch
 
 import serial
 import tomllib
-from thingdaq import DeviceState, InMemoryTransport, ThingDAQ
-from thingdaq.demo import main, run_demo
-from thingdaq.models import AdcChannelView
+from thingdone_daq import DeviceState, InMemoryTransport, ThingDAQ
+from thingdone_daq.demo import main, run_demo
+from thingdone_daq.models import AdcChannelView
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
@@ -112,7 +112,7 @@ class OfflineDemoTests(unittest.TestCase):
             [
                 sys.executable,
                 "-m",
-                "thingdaq.demo",
+                "thingdone_daq.demo",
                 "--frame-count",
                 "1",
                 "--parser-chunk-size",
@@ -130,8 +130,8 @@ class OfflineDemoTests(unittest.TestCase):
         with (PACKAGE_ROOT / "pyproject.toml").open("rb") as pyproject_file:
             pyproject = tomllib.load(pyproject_file)
         self.assertEqual(
-            "thingdaq.demo:main",
-            pyproject["project"]["scripts"]["thingdaq-demo"],
+            "thingdone_daq.demo:main",
+            pyproject["project"]["scripts"]["thingdone-daq-demo"],
         )
 
 

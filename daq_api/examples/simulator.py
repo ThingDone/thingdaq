@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from thingdaq import ADCBlock, ChecksumAlgorithm, GPIOBlock, ThingDAQ
+from thingdone_daq import ADCBlock, ChecksumAlgorithm, GPIOBlock, ThingDAQ
 
 
 def main() -> int:

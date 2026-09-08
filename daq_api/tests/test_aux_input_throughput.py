@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from statistics import median
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     AuxBankMode,
     DAQConfiguration,
@@ -30,8 +30,8 @@ from thingdaq import (
     synthetic_adc_payload,
     synthetic_gpio_payload,
 )
-from thingdaq._generated import protocol_v2_constants as constants
-from thingdaq.protocol_v2 import (
+from thingdone_daq._generated import protocol_v2_constants as constants
+from thingdone_daq.protocol_v2 import (
     IncrementalCompatibleFrameParser,
     encode_v2_frame,
 )

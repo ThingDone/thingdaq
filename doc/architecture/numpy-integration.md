@@ -26,18 +26,18 @@ related:
 > release settings. Use live INFO metadata. `TimestampAligner` does not support
 > the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
-The core `thingdaq` package does not import or require NumPy. Its immutable
+The core `thingdone_daq` package does not import or require NumPy. Its immutable
 `ADCBlock`, `GPIOBlock`, lazy channel views, explicit interleaving, calibration,
 and timestamp helpers remain the complete behavior used by the network-disabled
 remote rig. Installing the `numpy` extra adds a vectorized representation of
 the same raw blocks and metadata:
 
 ```bash
-python -m pip install 'thingdaq-local[numpy]'
+python -m pip install 'thingdone-daq[numpy]'
 ```
 
 `ADCBlock.as_numpy()` and `GPIOBlock.as_numpy()` import the optional
-`thingdaq.numpy` module only when called. Importing `thingdaq`, reading and
+`thingdone_daq.numpy` module only when called. Importing `thingdone_daq`, reading and
 aligning blocks, validating synthetic streams, or applying the pure-Python
 calibration API never probes for or imports NumPy. If an array view is requested
 without the extra, the operation raises an actionable `ImportError`; the block
@@ -95,7 +95,7 @@ silently producing 32 million Boolean values per second.
 ## Vectorized workflow
 
 ```python
-from thingdaq.numpy import adc_view, gpio_view
+from thingdone_daq.numpy import adc_view, gpio_view
 
 adc_arrays = adc_view(adc_block)  # same as adc_block.as_numpy()
 raw_pairs = adc_arrays.pairs  # read-only, zero-copy, shape (1012, 2)

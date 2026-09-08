@@ -282,7 +282,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the public parser without opening serial hardware."""
 
     parser = argparse.ArgumentParser(
-        prog="thingdaq",
+        prog="thingdone-daq",
         description="Inspect and control ThingDAQ protocol-v1/v2 devices.",
     )
     commands = parser.add_subparsers(dest="command", required=True)

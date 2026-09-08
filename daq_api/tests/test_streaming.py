@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from thingdaq import (
+from thingdone_daq import (
     ADCBlock,
     DeviceState,
     FrameKind,
@@ -22,7 +22,7 @@ from thingdaq import (
     validate_synthetic_adc_payload,
     validate_synthetic_gpio_payload,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 
 class FormulaCorruptDevice(SimulatedDevice):

@@ -6,7 +6,7 @@ import threading
 import unittest
 from dataclasses import dataclass
 
-from thingdaq import (
+from thingdone_daq import (
     BoardId,
     ByteTransport,
     DeviceNotFoundError,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from thingdaq import (
+from thingdone_daq import (
     AdcBlock,
     ByteTransport,
     Capability,
@@ -32,7 +32,7 @@ from thingdaq import (
     synthetic_adc1_code,
     synthetic_gpio_byte,
 )
-from thingdaq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_constants as constants
 
 
 class SimulatedDeviceTests(unittest.TestCase):
