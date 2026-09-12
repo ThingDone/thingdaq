@@ -15,7 +15,13 @@ from ._generated import protocol_constants as constants
 from ._generated import protocol_v2_constants as v2_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .protocol import Frame, FrameValidationError, adc_payload_codes_valid
-from .protocol_v2 import TemperatureReading, V2Frame, decode_temperature_payload
+from .protocol_v2 import (
+    RuntimeHealth,
+    TemperatureReading,
+    V2Frame,
+    decode_runtime_health_payload,
+    decode_temperature_payload,
+)
 
 if TYPE_CHECKING:
     from .calibration import (
@@ -7565,6 +7571,7 @@ def analyze_stream_continuity(
 
 ResponseValue = (
     Info
+    | RuntimeHealth
     | TemperatureReading
     | Configuration
     | Status
@@ -7580,10 +7587,10 @@ DecodedMessage = AdcBlock | GpioBlock | CommandResponse[ResponseValue] | Frame |
 def decode_response(frame: Frame | V2Frame) -> CommandResponse[ResponseValue]:
     """Decode any typed or generic response into a request-correlated model."""
 
-    if (
-        isinstance(frame, V2Frame)
-        and frame.header.kind is v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE
-    ):
+    if isinstance(frame, V2Frame) and frame.header.kind in {
+        v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE,
+        v2_constants.FrameKind.GET_RUNTIME_HEALTH_RESPONSE,
+    }:
         status, _, error = _RESPONSE_PREFIX.unpack_from(frame.payload)
         return CommandResponse(
             kind=frame.header.kind,
@@ -7591,7 +7598,16 @@ def decode_response(frame: Frame | V2Frame) -> CommandResponse[ResponseValue]:
             run_id=frame.header.run_id,
             status=constants.ResponseStatus(status),
             error_code=constants.ErrorCode(error),
-            value=decode_temperature_payload(frame.payload) if status == 0 else None,
+            value=(
+                (
+                    decode_temperature_payload(frame.payload)
+                    if frame.header.kind
+                    is v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE
+                    else decode_runtime_health_payload(frame.payload)
+                )
+                if status == 0
+                else None
+            ),
         )
     try:
         kind = constants.FrameKind(int(frame.header.kind))
@@ -7662,10 +7678,10 @@ def decode_message(
 ) -> DecodedMessage:
     """Decode data and response frames; validated request frames remain frames."""
 
-    if (
-        isinstance(frame, V2Frame)
-        and frame.header.kind is v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE
-    ):
+    if isinstance(frame, V2Frame) and frame.header.kind in {
+        v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE,
+        v2_constants.FrameKind.GET_RUNTIME_HEALTH_RESPONSE,
+    }:
         return decode_response(frame)
     try:
         kind = constants.FrameKind(int(frame.header.kind))

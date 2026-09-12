@@ -12,6 +12,7 @@
 
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
+#include "interrupt_guard_teensy.h"
 #include "variable_rate_scheduler_teensy.h"
 
 #define THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(section_name) \
@@ -42,22 +43,6 @@ volatile std::uint32_t g_trigger_error_flags = 0U;
 volatile std::uint32_t g_trigger_error_count = 0U;
 std::uint32_t g_done0_1_irq_final = 0U;
 std::uint32_t g_done2_err_irq_final = 0U;
-
-std::uint32_t readPrimask() {
-#if defined(THINGDAQ_HOST_REGISTER_TEST)
-  return fake_imxrt::interrupts_enabled ? 0U : 1U;
-#else
-  std::uint32_t value = 0U;
-  __asm__ volatile("mrs %0, primask" : "=r"(value));
-  return value;
-#endif
-}
-
-void restorePrimask(std::uint32_t value) {
-  if ((value & 1U) == 0U) {
-    __enable_irq();
-  }
-}
 
 void barrier() { gpio_dma_route::barrier(); }
 
@@ -193,8 +178,7 @@ bool convertersHardwareTriggered() {
 }
 
 void resetDiagnosticState() {
-  const std::uint32_t primask = readPrimask();
-  __disable_irq();
+  const interrupts::Guard interrupt_guard;
   for (std::size_t index = 0U; index < kConverterCount; ++index) {
     g_completion_counts[index] = 0U;
     g_first_completion_cycles[index] = 0U;
@@ -203,7 +187,6 @@ void resetDiagnosticState() {
   g_trigger_error_count = 0U;
   g_done0_1_irq_final = 0U;
   g_done2_err_irq_final = 0U;
-  restorePrimask(primask);
 }
 
 THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
@@ -433,11 +416,7 @@ class TeensyPlatform final : public Platform {
       NVIC_CLEAR_PENDING(IRQ_ADC_ETC0);
       NVIC_CLEAR_PENDING(IRQ_ADC_ETC1);
     }
-    const std::uint32_t diagnostic_primask =
-        completion_diagnostic ? readPrimask() : 0U;
-    if (completion_diagnostic) {
-      __disable_irq();
-    }
+    const interrupts::Guard diagnostic_guard(completion_diagnostic);
     ADC_ETC_CTRL = ADC_ETC_CTRL_PRE_DIVIDER(schedule.adc_etc_predivider) |
                    ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask);
     barrier();
@@ -452,20 +431,15 @@ class TeensyPlatform final : public Platform {
     if (completion_diagnostic && armed) {
       captureCompletionStatusTransitions();
     }
-    if (completion_diagnostic) {
-      restorePrimask(diagnostic_primask);
-    }
     return armed;
   }
 
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_completion_counts")
   std::array<std::uint32_t, kConverterCount> completionCounts() override {
-    const std::uint32_t primask = readPrimask();
-    __disable_irq();
+    const interrupts::Guard interrupt_guard;
     const std::array<std::uint32_t, kConverterCount> result{
         g_completion_counts[0], g_completion_counts[1]};
-    restorePrimask(primask);
     return result;
   }
 
@@ -473,11 +447,9 @@ class TeensyPlatform final : public Platform {
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
       ".flashmem.adc_trigger.target_completion_cycles")
   firstCompletionCycles() override {
-    const std::uint32_t primask = readPrimask();
-    __disable_irq();
+    const interrupts::Guard interrupt_guard;
     const std::array<std::uint32_t, kConverterCount> result{
         g_first_completion_cycles[0], g_first_completion_cycles[1]};
-    restorePrimask(primask);
     return result;
   }
 

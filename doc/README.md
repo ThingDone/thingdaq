@@ -60,6 +60,8 @@ related:
 > the new unequal-duration ADC/GPIO frames; use block sample timestamps.
 
 The current release's artifact and validation record is [[Release-1.1.0]].
+The subsequent reliability investigation and runtime stack command are described
+in [[Firmware-Runtime-Hardening]].
 
 Every Markdown artifact below `doc/` begins with YAML front matter containing
 `type`, `title`, `created`, `tags`, and `related`. Related artifacts use

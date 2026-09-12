@@ -37,6 +37,48 @@ void expect(bool condition, const std::string &message) {
   }
 }
 
+void testInterruptGuardPreservesCallerAndEarlyReturns() {
+  using thingdaq::interrupts::Guard;
+  fake_imxrt::interrupts_enabled = true;
+  {
+    const Guard outer;
+    expect(!fake_imxrt::interrupts_enabled, "guard masks interrupts");
+    {
+      const Guard inner;
+      expect(!fake_imxrt::interrupts_enabled, "nested guard stays masked");
+    }
+    expect(!fake_imxrt::interrupts_enabled,
+           "nested destruction preserves outer mask");
+  }
+  expect(fake_imxrt::interrupts_enabled, "outer guard restores enabled caller");
+  const auto early_return = []() {
+    const Guard guard;
+    return fake_imxrt::interrupts_enabled;
+  };
+  expect(!early_return() && fake_imxrt::interrupts_enabled,
+         "early return restores the interrupt mask");
+  fake_imxrt::interrupts_enabled = false;
+  {
+    const Guard guard;
+  }
+  expect(!fake_imxrt::interrupts_enabled,
+         "guard preserves a caller that already disabled interrupts");
+  fake_imxrt::interrupts_enabled = true;
+  {
+    const Guard inactive(false);
+    expect(fake_imxrt::interrupts_enabled,
+           "conditional inactive guard leaves caller alone");
+    Guard shortened;
+    shortened.release();
+    expect(fake_imxrt::interrupts_enabled,
+           "explicit release ends the hardware window");
+    fake_imxrt::interrupts_enabled = false;
+  }
+  expect(!fake_imxrt::interrupts_enabled,
+         "released and inactive destructors never unmask a later window");
+  fake_imxrt::interrupts_enabled = true;
+}
+
 void resetFakeRegisters() {
   fake_imxrt::ccm_cscmr1 = 0U;
   fake_imxrt::ccm_ccgr1 = 0U;
@@ -490,6 +532,7 @@ void testRateAdapterIgnoresLatchedStatusAndPreservesFullDelay() {
 }
 
 int main() {
+  testInterruptGuardPreservesCallerAndEarlyReturns();
   testFixedPinModuleRoutesAndLegalResolutionModes();
   testExactStoppedTriggerScheduleAndResourceIsolation();
   testDeterministicArmStopOrderAndOwnedConflict();

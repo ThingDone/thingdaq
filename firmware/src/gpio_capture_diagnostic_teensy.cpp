@@ -24,6 +24,7 @@ namespace {
 
 constexpr std::uint32_t kDiagnosticTimeoutCycles =
     input_experiment::kCpuHz / 100U;
+constexpr std::uint32_t kDiagnosticPollLimit = 65536U;
 
 void forceSafeInputs() {
   gpio_capture::selectStandardGpioInputs(IOMUXC_GPR_GPR27, GPIO2_GDIR);
@@ -167,9 +168,12 @@ class TeensyPlatform final : public Platform {
 
     snapshot.dma_capture_exercised = true;
     const std::uint32_t capture_begin = ARM_DWT_CYCCNT;
+    std::uint32_t polls = 0U;
     gpio_capture::HardwareSnapshot active = capture.snapshot();
     while (active.ring.ready_depth == 0U && !active.faulted &&
-           ARM_DWT_CYCCNT - capture_begin < kDiagnosticTimeoutCycles) {
+           ARM_DWT_CYCCNT - capture_begin < kDiagnosticTimeoutCycles &&
+           polls < kDiagnosticPollLimit) {
+      ++polls;
       active = capture.snapshot();
     }
     snapshot.dwt_elapsed_cycles = ARM_DWT_CYCCNT - capture_begin;
@@ -252,9 +256,12 @@ class TeensyPlatform final : public Platform {
     }
     snapshot.dma_capture_exercised = true;
     const std::uint32_t capture_begin = ARM_DWT_CYCCNT;
+    std::uint32_t polls = 0U;
     gpio_join::HardwareSnapshot active = capture.snapshot();
     while (active.ring.ready_depth == 0U && !active.ring.faulted &&
-           ARM_DWT_CYCCNT - capture_begin < kDiagnosticTimeoutCycles) {
+           ARM_DWT_CYCCNT - capture_begin < kDiagnosticTimeoutCycles &&
+           polls < kDiagnosticPollLimit) {
+      ++polls;
       active = capture.snapshot();
     }
     snapshot.dwt_elapsed_cycles = ARM_DWT_CYCCNT - capture_begin;

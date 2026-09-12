@@ -60,7 +60,8 @@ class FirmwareRuntime {
                   gpio_join::HardwareCapture *aux_gpio_capture = nullptr,
                   gpio_aux_packer::AuxiliaryBatchPacker *aux_gpio_packer =
                       nullptr,
-                  temperature::Reader temperature_reader = nullptr)
+                  temperature::Reader temperature_reader = nullptr,
+                  health::Reader health_reader = nullptr)
       : control_{},
         packet_pipeline_{packet_storage},
         synthetic_source_{source_mode},
@@ -73,7 +74,7 @@ class FirmwareRuntime {
         checksum_benchmark_(checksum_benchmark),
         gpio_clock_diagnostic_(gpio_clock_diagnostic),
         gpio_capture_diagnostic_(gpio_capture_diagnostic),
-        temperature_reader_(temperature_reader) {}
+        temperature_reader_(temperature_reader), health_reader_(health_reader) {}
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();
@@ -130,6 +131,7 @@ class FirmwareRuntime {
   gpio_clock::Runner *gpio_clock_diagnostic_ = nullptr;
   gpio_diagnostic::Runner *gpio_capture_diagnostic_ = nullptr;
   temperature::Reader temperature_reader_ = nullptr;
+  health::Reader health_reader_ = nullptr;
   std::uint32_t packet_stats_generation_ = 0U;
   usb::TransportSnapshot transport_stats_baseline_{};
   std::size_t transport_command_queue_high_water_ = 0U;

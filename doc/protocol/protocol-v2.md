@@ -101,6 +101,7 @@ Adler-32; data supports Adler-32 (default), CRC32C and CRC32/ISO-HDLC.
 | GPIO_CLOCK_DIAGNOSTIC | `0x18` / `0x98` | 8 / 140 |
 | GPIO_CAPTURE_DIAGNOSTIC | `0x19` / `0x99` | 0 / 272 |
 | GET_TEMPERATURE | `0x1A` / `0x9A` | 0 / 12 |
+| GET_RUNTIME_HEALTH | `0x1B` / `0x9B` | 0 / 32 |
 
 Successful response payloads begin with `u8 status=0`, `u8 reserved=0`,
 `u16 error=0`. Typed errors contain only this 4-byte prefix, with ERROR status,
@@ -185,3 +186,27 @@ Historical reports and ADRs retain the firmware, protocol, clocks and fixtures
 actually tested. They are not release specifications. Unconnected-pin tests
 validate acquisition/transport/control continuity, not external pin order,
 analog accuracy, bandwidth or electrical timing. See [[Hardware-Safety]].
+
+## Runtime health extension
+
+The firmware hardening build adds `GET_RUNTIME_HEALTH`, an empty v2 request
+accepted in IDLE, CONFIGURED and RUNNING without altering acquisition or
+resetting statistics. Earlier firmware may reject this optional command.
+Its successful payload has the usual response prefix, followed by:
+
+| Offset | Type | Field |
+| ---: | --- | --- |
+| 4 | u32 | flags: bit 0 stack probe available, bit 1 watchdog enabled; others zero |
+| 8 | u32 | stack_total_bytes |
+| 12 | u32 | stack_min_free_bytes |
+| 16 | u32 | stack_max_used_bytes |
+| 20 | u32 | raw boot SRC_SRSR reset cause |
+| 24 | u32 | watchdog_timeout_ms (nominal) |
+| 28 | u32 | reserved, zero |
+
+The stack fields satisfy `min_free <= total` and `max_used = total - min_free`.
+Unavailable stack data has zero in all three fields. Disabled watchdogs have
+zero timeout. The simulator returns all-zero unavailable diagnostics. V1 is
+unchanged and rejects these kinds. See [[Firmware-Runtime-Hardening]] for
+watermark limits and long-test usage, and [[Watchdog-and-Poll-Bounds]] for reset
+bits, watchdog timing and remaining target validation.

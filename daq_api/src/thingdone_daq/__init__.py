@@ -196,7 +196,7 @@ from .protocol import (
     decode_frame,
     encode_frame,
 )
-from .protocol_v2 import TemperatureReading
+from .protocol_v2 import RuntimeHealth, TemperatureReading
 from .reader import (
     DEFAULT_MAX_QUEUED_BLOCKS,
     BackgroundReader,
@@ -403,6 +403,7 @@ __all__ = [
     "RequestTimeoutError",
     "ResponseStatus",
     "RunCounterReconciliation",
+    "RuntimeHealth",
     "SerialPortBusyError",
     "SerialPortCandidate",
     "SerialTransport",

@@ -290,15 +290,20 @@ class SimulatedDevice:
         )
 
     def _handle_frame(self, request: CompatibleFrame) -> bytes | None:
-        temperature_request = (
-            request.header.version == 2 and int(request.header.kind) == 0x1A
+        diagnostic_request = (
+            request.header.version == v2_constants.PROTOCOL_VERSION
+            and request.header.kind
+            in {
+                v2_constants.FrameKind.GET_TEMPERATURE_REQUEST,
+                v2_constants.FrameKind.GET_RUNTIME_HEALTH_REQUEST,
+            }
         )
         try:
             request_kind = constants.FrameKind(int(request.header.kind))
         except ValueError:
             request_kind = None
         if (
-            not temperature_request
+            not diagnostic_request
             and request_kind not in constants.REQUEST_RESPONSE_KIND
         ):
             if request.header.request_id == 0:
@@ -316,11 +321,19 @@ class SimulatedDevice:
             )
             return self._typed_error(request, constants.ErrorCode.INVALID_REQUEST_ID)
         self._recent_request_ids.append(request.header.request_id)
-        if temperature_request:
-            # The offline simulator has no physical temperature sensor.
+        if diagnostic_request:
+            # No physical sensor, target stack, watchdog, or reset register.
+            response_kind = v2_constants.REQUEST_RESPONSE_KIND[
+                v2_constants.FrameKind(int(request.header.kind))
+            ]
+            payload = (
+                struct.pack("<BBHBBHi", 0, 0, 0, 1, 0, 0, 0)
+                if response_kind is v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE
+                else bytes(v2_constants.RUNTIME_HEALTH_RESPONSE_PAYLOAD_SIZE)
+            )
             return encode_v2_frame(
-                v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE,
-                struct.pack("<BBHBBHi", 0, 0, 0, 1, 0, 0, 0),
+                response_kind,
+                payload,
                 request_id=request.header.request_id,
                 run_id=self._last_run_id,
             )
@@ -719,8 +732,10 @@ class SimulatedDevice:
     ) -> bytes:
         payload = _RESPONSE_PREFIX.pack(constants.ResponseStatus.ERROR, 0, error)
         response_kind = (
-            v2_constants.FrameKind.GET_TEMPERATURE_RESPONSE
-            if request.header.version == 2 and int(request.header.kind) == 0x1A
+            v2_constants.REQUEST_RESPONSE_KIND[
+                v2_constants.FrameKind(int(request.header.kind))
+            ]
+            if request.header.version == v2_constants.PROTOCOL_VERSION
             else constants.REQUEST_RESPONSE_KIND[
                 constants.FrameKind(int(request.header.kind))
             ]

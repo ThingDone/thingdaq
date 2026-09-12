@@ -6,10 +6,12 @@
 
 #define ARDUINO_TEENSY40 1
 #define __IMXRT1062__ 1
+#define THINGDAQ_HOST_REGISTER_TEST 1
 
 #include "gpio_dma_route_teensy.h"
 #include "gpio_dual_bank_capture.h"
 #include "gpio_raw_capture.h"
+#include "interrupt_vectors_teensy.h"
 
 namespace {
 
@@ -388,7 +390,61 @@ void testReservedPrioritiesAreUniqueAcrossModeChanges() {
   }
 }
 
+void previousVectorHandler() {}
+void legacyVectorHandler() {}
+void pairedVectorHandler() {}
+
+void testInterruptVectorOwnershipAndRollback() {
+  using thingdaq::interrupts::VectorLease;
+  VectorLease legacy{IRQ_DMA_CH2};
+  VectorLease paired{IRQ_DMA_CH2};
+  VectorLease auxiliary{IRQ_DMA_CH3};
+  VectorLease invalid{static_cast<IRQ_NUMBER_t>(4U)};
+  fake_imxrt::interrupts_enabled = true;
+  fake_imxrt::interrupt_vectors[IRQ_DMA_CH2] = previousVectorHandler;
+  fake_imxrt::interrupt_pending[IRQ_DMA_CH2] = true;
+  fake_imxrt::interrupt_enabled[IRQ_DMA_CH2] = true;
+  expect(legacy.available() && legacy.claim(legacyVectorHandler),
+         "legacy capture claims the reserved vector");
+  expect(legacy.owned() && !paired.available() &&
+             !paired.claim(pairedVectorHandler) &&
+             !legacy.claim(legacyVectorHandler),
+         "the competing facade and repeated claims cannot replace an owner");
+  expect(!fake_imxrt::interrupt_pending[IRQ_DMA_CH2] &&
+             !fake_imxrt::interrupt_enabled[IRQ_DMA_CH2] &&
+             fake_imxrt::interrupt_vectors[IRQ_DMA_CH2] == legacyVectorHandler &&
+             fake_imxrt::interrupts_enabled,
+         "claim installs with a disabled clean IRQ and restores caller PRIMASK");
+  paired.release();
+  expect(fake_imxrt::interrupt_vectors[IRQ_DMA_CH2] == legacyVectorHandler,
+         "a failed claimant cannot detach another facade's vector");
+  legacy.release();
+  expect(paired.available() &&
+             fake_imxrt::interrupt_vectors[IRQ_DMA_CH2] == previousVectorHandler,
+         "STOP or rollback restores the previous vector and frees its slot");
+  fake_imxrt::interrupts_enabled = false;
+  expect(paired.claim(pairedVectorHandler) &&
+             auxiliary.claim(pairedVectorHandler),
+         "paired capture can claim both released channels");
+  fake_imxrt::interrupt_pending[IRQ_DMA_CH2] = true;
+  fake_imxrt::interrupt_enabled[IRQ_DMA_CH2] = true;
+  paired.release();
+  paired.release();
+  auxiliary.release();
+  expect(!fake_imxrt::interrupts_enabled &&
+             !fake_imxrt::interrupt_pending[IRQ_DMA_CH2] &&
+             !fake_imxrt::interrupt_enabled[IRQ_DMA_CH2] &&
+             fake_imxrt::interrupt_vectors[IRQ_DMA_CH2] == previousVectorHandler &&
+             legacy.available() && auxiliary.available(),
+         "repeated teardown preserves a masked caller and clears pending IRQs");
+  expect(!invalid.available() && !invalid.claim(legacyVectorHandler) &&
+             !legacy.claim(nullptr) && legacy.available(),
+         "unreserved vectors and null handlers fail without acquiring resources");
+  fake_imxrt::interrupts_enabled = true;
+}
+
 int main() {
+  testInterruptVectorOwnershipAndRollback();
   testReservedPrioritiesAreUniqueAcrossModeChanges();
   testGpioAliasAndDirectionIsolation();
   testAuxiliaryAliasAndDirectionIsolation();

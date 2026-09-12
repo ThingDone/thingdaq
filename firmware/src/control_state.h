@@ -111,6 +111,7 @@ struct DispatchReadiness {
   protocol_v1::ErrorCode gpio_capture_error =
       protocol_v1::ErrorCode::kUnsupportedConfiguration;
   temperature::Reading temperature{};
+  health::Reading runtime_health{};
 };
 
 class ControlState {

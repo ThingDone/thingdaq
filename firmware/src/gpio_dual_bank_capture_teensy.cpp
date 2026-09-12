@@ -14,6 +14,8 @@
 #include "board_config.h"
 #include "checksum_benchmark_teensy.h"
 #include "gpio_dma_route_teensy.h"
+#include "interrupt_guard_teensy.h"
+#include "interrupt_vectors_teensy.h"
 #include "gpio_raw_capture.h"
 #include "gpio_raw_storage_teensy.h"
 #include "variable_rate_scheduler.h"
@@ -57,40 +59,24 @@ class TeensyCacheMaintenance final : public dma::CacheMaintenance {
   }
 };
 
-std::uint32_t readPrimask() {
-#if defined(THINGDAQ_HOST_REGISTER_TEST)
-  return fake_imxrt::interrupts_enabled ? 0U : 1U;
-#else
-  std::uint32_t value = 0U;
-  __asm__ volatile("mrs %0, primask" : "=r"(value) : : "memory");
-  return value;
-#endif
-}
-
-void restorePrimask(std::uint32_t value) {
-  if ((value & 1U) == 0U) {
-    __enable_irq();
-  }
-}
-
 class TeensyCriticalSection final : public dma::CriticalSection {
  public:
   THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(
       ".flashmem.gpio_dual.critical_enter")
   std::uint32_t enter() override {
-    const std::uint32_t primask = readPrimask();
-    __disable_irq();
-    return primask;
+    return interrupts::saveAndDisable();
   }
 
   THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(
       ".flashmem.gpio_dual.critical_exit")
-  void exit(std::uint32_t token) override { restorePrimask(token); }
+  void exit(std::uint32_t token) override { interrupts::restore(token); }
 };
 
 TeensyCacheMaintenance g_cache{};
 TeensyCriticalSection g_critical{};
 TeensyDualBankCapture g_facade{};
+interrupts::VectorLease g_primary_vector{IRQ_DMA_CH2};
+interrupts::VectorLease g_auxiliary_vector{IRQ_DMA_CH3};
 DualBankCaptureRing *g_ring = nullptr;
 AuxDescriptorBank *g_aux_descriptors = nullptr;
 PairedOverflowSink *g_overflow_sink = nullptr;
@@ -117,8 +103,10 @@ std::uint32_t g_gpr27_unrelated = 0U;
 protocol_v2::RateProfile g_profile = protocol_v2::kDefaultRateProfile;
 bool g_workspace_claimed = false;
 bool g_hardware_prepared = false;
-bool g_hardware_running = false;
-bool g_faulted = false;
+volatile bool g_hardware_running = false;
+// Read by main while completion/error ISRs can change it. Multi-field
+// snapshots additionally hold interrupts::Guard for a coherent record.
+volatile bool g_faulted = false;
 bool g_pins_verified = false;
 bool g_route_verified = false;
 
@@ -565,20 +553,27 @@ bool constructWorkspace() {
   if (g_workspace_claimed) {
     return false;
   }
+  // The raw union member must be alive before the ring binds its references.
+  const bool paired_storage_active = gpio_capture::rawStorageOwned(
+      gpio_capture::RawStorageOwner::kPaired);
+  if (!paired_storage_active) {
+#if !defined(NDEBUG)
+    // Assert this internal ordering contract without linking libc's formatted
+    // assertion reporting (and its stdio/heap dependencies) into RAM1.
+    __builtin_trap();
+#endif
+    return false;
+  }
   std::uint8_t *const base = workspaceBase();
-  g_ring = ::new (static_cast<void *>(
-      base + board::kGpioPairedJoinStateOffsetBytes))
-      DualBankCaptureRing{gpio_capture::pairedRawStorage(),
-                          *(::new (static_cast<void *>(
-                              base + board::
-                                  kPrimaryInputGpioRawDmaOverflowSinkOffsetBytes))
-                                PairedOverflowSink{}),
-                          g_cache, g_critical};
-  g_overflow_sink = reinterpret_cast<PairedOverflowSink *>(
-      base + board::kPrimaryInputGpioRawDmaOverflowSinkOffsetBytes);
-  g_aux_descriptors = ::new (static_cast<void *>(
-      base + board::kAuxGpioRawDmaDescriptorOffsetBytes))
-      AuxDescriptorBank{};
+  void *const overflow_storage =
+      base + board::kPrimaryInputGpioRawDmaOverflowSinkOffsetBytes;
+  g_overflow_sink = new (overflow_storage) PairedOverflowSink{};
+  void *const ring_storage = base + board::kGpioPairedJoinStateOffsetBytes;
+  g_ring = new (ring_storage) DualBankCaptureRing{
+      gpio_capture::pairedRawStorage(), *g_overflow_sink, g_cache, g_critical};
+  void *const descriptor_storage =
+      base + board::kAuxGpioRawDmaDescriptorOffsetBytes;
+  g_aux_descriptors = new (descriptor_storage) AuxDescriptorBank{};
   g_workspace_claimed = true;
   return true;
 }
@@ -613,6 +608,7 @@ void cacheHardwareFields(Snapshot &snapshot) {
 THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(
     ".flashmem.gpio_dual.current_snapshot")
 Snapshot currentSnapshot() {
+  const interrupts::Guard interrupt_guard;
   Snapshot value = g_ring == nullptr ? g_cached_snapshot
                                      : g_ring->snapshot();
   cacheHardwareFields(value);
@@ -626,6 +622,8 @@ void rollbackPreparation() {
   disableDmaAndRoute();
   disableInterrupts();
   clearInterrupts();
+  g_primary_vector.release();
+  g_auxiliary_vector.release();
   for (Bank bank : {Bank::kPrimary, Bank::kAuxiliary}) {
     clearChannel(bank);
   }
@@ -658,7 +656,8 @@ StartStatus inspectHardwareStart(std::uint32_t epoch,
   }
   if (!gpio_capture::rawStorageAvailable(
           gpio_capture::RawStorageOwner::kPaired) ||
-      resourcesBusy() || g_workspace_claimed) {
+      resourcesBusy() || g_workspace_claimed ||
+      !g_primary_vector.available() || !g_auxiliary_vector.available()) {
     return StartStatus::kResourceBusy;
   }
   return StartStatus::kOk;
@@ -678,10 +677,19 @@ StartStatus prepareHardware(std::uint32_t epoch,
   }
   const variable_rate::DeriveResult derived =
       variable_rate::derive(profile);
+  if (!g_primary_vector.claim(primaryDmaIsr) ||
+      !g_auxiliary_vector.claim(auxiliaryDmaIsr)) {
+    g_primary_vector.release();
+    g_auxiliary_vector.release();
+    saturatingIncrement(g_resource_conflicts);
+    return StartStatus::kResourceBusy;
+  }
   if (!derived.ok() ||
       !gpio_capture::claimRawStorage(
           gpio_capture::RawStorageOwner::kPaired) ||
       !constructWorkspace()) {
+    g_primary_vector.release();
+    g_auxiliary_vector.release();
     gpio_capture::releaseRawStorage(
         gpio_capture::RawStorageOwner::kPaired);
     saturatingIncrement(g_start_errors);
@@ -734,8 +742,6 @@ StartStatus prepareHardware(std::uint32_t epoch,
   gpio_dma_route::configurePairedXbarRequests();
   forceSafeInputs();
 
-  attachInterruptVector(IRQ_DMA_CH2, primaryDmaIsr);
-  attachInterruptVector(IRQ_DMA_CH3, auxiliaryDmaIsr);
   NVIC_SET_PRIORITY(IRQ_DMA_CH2, board::kGpioEdmaIrqPriority);
   NVIC_SET_PRIORITY(IRQ_DMA_CH3, board::kAuxGpioEdmaIrqPriority);
   clearInterrupts();
@@ -801,8 +807,7 @@ StopReport stopHardwareAfterTriggers(StopReason reason) {
 
   disableDmaAndRoute();
   disableInterrupts();
-  const std::uint32_t primask = readPrimask();
-  __disable_irq();
+  interrupts::Guard interrupt_guard;
   for (Bank bank : {Bank::kPrimary, Bank::kAuxiliary}) {
     if ((DMA_INT & channelMask(bank)) != 0U && !publishCompletion(bank)) {
       g_ring->recordHardwareError(g_epoch);
@@ -821,6 +826,8 @@ StopReport stopHardwareAfterTriggers(StopReason reason) {
     clearChannel(bank);
   }
   clearInterrupts();
+  g_primary_vector.release();
+  g_auxiliary_vector.release();
   gpio_dma_route::barrier();
   g_hardware_prepared = false;
   g_hardware_running = false;
@@ -832,7 +839,7 @@ StopReport stopHardwareAfterTriggers(StopReason reason) {
     g_ring->recordHardwareError(g_epoch);
     g_faulted = true;
   }
-  restorePrimask(primask);
+  interrupt_guard.release();
 
   const StopReason effective_reason =
       g_faulted ? StopReason::kFault : reason;
@@ -855,10 +862,9 @@ StopReport stopHardwareAfterTriggers(StopReason reason) {
 THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(
     ".flashmem.gpio_dual.hardware_snapshot")
 HardwareSnapshot hardwareSnapshot() {
+  const interrupts::Guard interrupt_guard;
   HardwareSnapshot value{};
   value.ring = currentSnapshot();
-  const std::uint32_t primask = readPrimask();
-  __disable_irq();
   for (Bank bank : {Bank::kPrimary, Bank::kAuxiliary}) {
     const std::size_t index = bankIndex(bank);
     HardwareBankSnapshot &target = value.banks[index];
@@ -896,7 +902,6 @@ HardwareSnapshot hardwareSnapshot() {
   value.pins_verified = g_pins_verified;
   value.route_verified = g_route_verified;
   value.hardware_running = g_hardware_running;
-  restorePrimask(primask);
   return value;
 }
 

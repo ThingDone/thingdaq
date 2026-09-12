@@ -418,13 +418,14 @@ class BackgroundReader:
         }
         try:
             selected_kind = (
-                v2_constants.FrameKind.GET_TEMPERATURE_REQUEST
-                if protocol_version == 2 and int(kind) == 0x1A
+                v2_constants.FrameKind(kind)
+                if protocol_version == v2_constants.PROTOCOL_VERSION
+                and int(kind) not in constants.REQUEST_RESPONSE_KIND
                 else constants.FrameKind(kind)
             )
         except ValueError as error:
             raise ValueError(f"unknown request frame kind {int(kind)}") from error
-        if selected_kind is v2_constants.FrameKind.GET_TEMPERATURE_REQUEST:
+        if isinstance(selected_kind, v2_constants.FrameKind):
             request_kinds = {
                 int(key): value
                 for key, value in v2_constants.REQUEST_RESPONSE_KIND.items()

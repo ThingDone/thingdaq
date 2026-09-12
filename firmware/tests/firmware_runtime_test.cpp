@@ -2266,9 +2266,48 @@ void testTemperatureTraversesParserRuntimeAndUsbQueue() {
   }
 }
 
+void testHealthTraversesParserRuntimeAndUsbQueue() {
+  for (bool available : {false, true}) {
+    FakeCdcStream stream{};
+    packet::OwnedPacketBufferStorage packet_storage{};
+    FakeTickClock clock{};
+    thingdaq::health::Reader reader = available
+        ? +[]() -> thingdaq::health::Reading {
+            return {3, 34000, 28000, 6000, 16, 4000};
+          } : nullptr;
+    app::FirmwareRuntime firmware{
+        stream, packet_storage, clock, synthetic::Mode::kRealtime,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, reader};
+    expect(firmware.begin(20428100), "health runtime boots");
+    wire::FrameFields fields{};
+    fields.version = 2;
+    fields.kind = wire::kRuntimeHealthRequest;
+    fields.request_id = 26;
+    wire::CommandFrame request{};
+    expect(wire::encodeFrame(fields, {}, request).ok(), "encode health request");
+    stream.appendInput(request);
+    expect(drain(firmware, stream).quiescent, "health response drains USB queue");
+    const auto frames = decodeOutput(stream.output);
+    expect(frames.size() == 1, "health is not dropped by response admission");
+    if (frames.size() == 1) {
+      expect(frames[0].header.kind == wire::kRuntimeHealthResponse &&
+             frames[0].header.version == 2 && frames[0].header.request_id == 26,
+             "correlated v2 health response survives fragmented USB");
+      expect(frames[0].payload.data[4] == (available ? 3 : 0), "sensor availability explicit");
+      std::uint32_t value = 0;
+      expect(wire::loadU32(frames[0].payload, 8, value) && value == (available ? 34000U : 0U),
+             "runtime uses the supplied health reader");
+    }
+    expect(firmware.state() == constants::DeviceState::kIdle,
+           "health command does not change acquisition state");
+  }
+}
+
 }  // namespace
 
 int main() {
+  testHealthTraversesParserRuntimeAndUsbQueue();
   testTemperatureTraversesParserRuntimeAndUsbQueue();
   testCompleteControlPlane();
   testResetStatsWaitsForOlderControlResponses();

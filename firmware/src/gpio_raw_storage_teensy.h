@@ -27,6 +27,7 @@ extern SharedRawBufferStorage g_gpio_raw_dma_buffers;
 
 bool rawStorageAvailable(RawStorageOwner owner);
 bool rawStorageActive(RawStorageOwner owner);
+bool rawStorageOwned(RawStorageOwner owner);
 bool claimRawStorage(RawStorageOwner owner);
 void releaseRawStorage(RawStorageOwner owner);
 RawBufferStorage &legacyRawStorage();

@@ -994,7 +994,10 @@ def _validate_v2_payload(header: V2FrameHeader, payload: bytes) -> None:
         _validate_response_prefix(header, payload)
         if header.flags & constants.FrameFlag.RESPONSE_ERROR:
             return
-    if header.kind is constants.FrameKind.GET_TEMPERATURE_REQUEST:
+    if header.kind in (
+        constants.FrameKind.GET_TEMPERATURE_REQUEST,
+        constants.FrameKind.GET_RUNTIME_HEALTH_REQUEST,
+    ):
         return
     if header.kind in (
         constants.FrameKind.CHECKSUM_BENCHMARK_RESPONSE,
@@ -1021,6 +1024,9 @@ def _validate_v2_payload(header: V2FrameHeader, payload: bytes) -> None:
         return
     if header.kind is constants.FrameKind.GET_TEMPERATURE_RESPONSE:
         decode_temperature_payload(payload)
+        return
+    if header.kind is constants.FrameKind.GET_RUNTIME_HEALTH_RESPONSE:
+        decode_runtime_health_payload(payload)
         return
     if header.kind is constants.FrameKind.INFO_RESPONSE:
         _validate_info_payload(payload)
@@ -1086,6 +1092,40 @@ def _validate_v2_payload(header: V2FrameHeader, payload: bytes) -> None:
             )
         return
     _validate_v1_compatible_control(header, payload)
+
+
+@dataclass(frozen=True)
+class RuntimeHealth:
+    """Boot-lifetime stack watermark and watchdog/reset diagnostics."""
+
+    stack_available: bool
+    watchdog_enabled: bool
+    stack_total_bytes: int
+    stack_min_free_bytes: int
+    stack_max_used_bytes: int
+    reset_cause: int
+    watchdog_timeout_ms: int
+
+
+def decode_runtime_health_payload(payload: bytes) -> RuntimeHealth:
+    if len(payload) != constants.RUNTIME_HEALTH_RESPONSE_PAYLOAD_SIZE:
+        raise V2FrameValidationError("invalid runtime health response size")
+    status, reserved, error, flags, total, free, used, reset, timeout, reserved1 = (
+        struct.unpack("<BBH7I", payload)
+    )
+    if status or reserved or error or reserved1 or flags & ~3:
+        raise V2FrameValidationError(
+            "invalid runtime health prefix/flags/reserved fields"
+        )
+    if free > total or used != total - free:
+        raise V2FrameValidationError("contradictory stack watermark")
+    if bool(flags & 1) != (total > 0):
+        raise V2FrameValidationError("stack availability disagrees with capacity")
+    if bool(flags & 2) != (timeout > 0):
+        raise V2FrameValidationError("watchdog status disagrees with timeout")
+    return RuntimeHealth(
+        bool(flags & 1), bool(flags & 2), total, free, used, reset, timeout
+    )
 
 
 @dataclass(frozen=True)

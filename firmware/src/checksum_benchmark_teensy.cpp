@@ -7,6 +7,7 @@
 #include <core_pins.h>
 #include <imxrt.h>
 
+#include "interrupt_guard_teensy.h"
 #include "packet_buffer_pipeline.h"
 
 // Packet page zero is the target benchmark's DTCM view. Keep a sized linker
@@ -52,18 +53,14 @@ class TeensyPlatform final : public Platform {
   }
 
   std::uint32_t enterCritical() override {
-    std::uint32_t token = 0U;
-    __asm__ volatile("mrs %0, primask\n\tcpsid i"
-                     : "=r"(token)
-                     :
-                     : "memory");
+    const std::uint32_t token = interrupts::saveAndDisable();
     __asm__ volatile("dsb\n\tisb" : : : "memory");
     return token;
   }
 
   void exitCritical(std::uint32_t token) override {
     __asm__ volatile("dsb\n\tisb" : : : "memory");
-    __asm__ volatile("msr primask, %0" : : "r"(token) : "memory");
+    interrupts::restore(token);
   }
 
   void flushDelete(void *address, std::size_t size) override {

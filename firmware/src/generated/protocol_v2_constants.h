@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v2.json. Do not edit by hand.
-// Source SHA-256: aa7fa0c5d4dde56d7ade95b64f620138e96390e2790a49b8b2be25909608ddae
+// Source SHA-256: 1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v2 {
 
-inline constexpr char kSourceSha256[] = "aa7fa0c5d4dde56d7ade95b64f620138e96390e2790a49b8b2be25909608ddae";
+inline constexpr char kSourceSha256[] = "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 2U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -167,6 +167,8 @@ enum class FrameKind : std::uint8_t {
   kErrorResponse = 159U,
   kGetTemperatureRequest = 26U,
   kGetTemperatureResponse = 154U,
+  kGetRuntimeHealthRequest = 27U,
+  kGetRuntimeHealthResponse = 155U,
 };
 
 enum class CommandKind : std::uint8_t {
@@ -181,6 +183,7 @@ enum class CommandKind : std::uint8_t {
   kGpioClockDiagnostic = 24U,
   kGpioCaptureDiagnostic = 25U,
   kGetTemperature = 26U,
+  kGetRuntimeHealth = 27U,
 };
 
 enum class FrameFlag : std::uint16_t {
@@ -433,6 +436,17 @@ inline constexpr std::uint32_t kKnownAdcInitializationErrorMask = 2047U;
 inline constexpr std::uint16_t kKnownAdcTriggerConfigurationFlagMask = 255U;
 inline constexpr std::uint32_t kKnownAdcTriggerErrorMask = 32767U;
 
+inline constexpr std::size_t kRuntimeHealthResponsePayloadSize = 32U;
+inline constexpr std::size_t kRuntimeHealthResponseStatusOffset = 0U;
+inline constexpr std::size_t kRuntimeHealthResponseReserved0Offset = 1U;
+inline constexpr std::size_t kRuntimeHealthResponseErrorCodeOffset = 2U;
+inline constexpr std::size_t kRuntimeHealthResponseFlagsOffset = 4U;
+inline constexpr std::size_t kRuntimeHealthResponseStackTotalBytesOffset = 8U;
+inline constexpr std::size_t kRuntimeHealthResponseStackMinFreeBytesOffset = 12U;
+inline constexpr std::size_t kRuntimeHealthResponseStackMaxUsedBytesOffset = 16U;
+inline constexpr std::size_t kRuntimeHealthResponseResetCauseOffset = 20U;
+inline constexpr std::size_t kRuntimeHealthResponseWatchdogTimeoutMsOffset = 24U;
+inline constexpr std::size_t kRuntimeHealthResponseReserved1Offset = 28U;
 inline constexpr std::size_t kTemperatureResponsePayloadSize = 12U;
 inline constexpr std::size_t kTemperatureResponseStatusOffset = 0U;
 inline constexpr std::size_t kTemperatureResponseReserved0Offset = 1U;
@@ -1268,6 +1282,10 @@ constexpr std::uint16_t allowedFlags(FrameKind kind) {
       return 0U;
     case FrameKind::kGetTemperatureResponse:
       return static_cast<std::uint16_t>(FrameFlag::kResponseError);
+    case FrameKind::kGetRuntimeHealthRequest:
+      return 0U;
+    case FrameKind::kGetRuntimeHealthResponse:
+      return static_cast<std::uint16_t>(FrameFlag::kResponseError);
   }
   return 0U;
 }
@@ -1296,6 +1314,8 @@ constexpr FrameKind requestFrameKind(CommandKind command) {
       return FrameKind::kGpioCaptureDiagnosticRequest;
     case CommandKind::kGetTemperature:
       return FrameKind::kGetTemperatureRequest;
+    case CommandKind::kGetRuntimeHealth:
+      return FrameKind::kGetRuntimeHealthRequest;
   }
   return FrameKind::kInfoRequest;
 }
@@ -1324,6 +1344,8 @@ constexpr FrameKind responseFrameKind(CommandKind command) {
       return FrameKind::kGpioCaptureDiagnosticResponse;
     case CommandKind::kGetTemperature:
       return FrameKind::kGetTemperatureResponse;
+    case CommandKind::kGetRuntimeHealth:
+      return FrameKind::kGetRuntimeHealthResponse;
   }
   return FrameKind::kInfoResponse;
 }

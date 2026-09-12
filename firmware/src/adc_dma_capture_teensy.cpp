@@ -15,6 +15,8 @@
 #include "board_config.h"
 #include "edma_priority_teensy.h"
 #include "gpio_dma_route_teensy.h"
+#include "interrupt_guard_teensy.h"
+#include "interrupt_vectors_teensy.h"
 
 #define THINGDAQ_ADC_DMA_TARGET_COLD_CODE(section_name) \
   __attribute__((section(section_name), noinline, noipa, used))
@@ -48,6 +50,8 @@ void *retainDmaAllocations() {
 }
 
 void *volatile g_dma_allocation_link_anchor = retainDmaAllocations();
+interrupts::VectorLease g_pair_vector{IRQ_DMA_CH1};
+interrupts::VectorLease g_error_vector{IRQ_ADC_ETC_ERR};
 
 constexpr std::uint16_t kTcdAttributes =
     DMA_TCD_ATTR_SSIZE(1U) | DMA_TCD_ATTR_DSIZE(1U);
@@ -85,18 +89,6 @@ constexpr std::array<std::uint32_t, kConverterCount> kAdcEtcErrorMasks{
 constexpr std::uint32_t kAdcEtcErrorMask =
     kAdcEtcErrorMasks[0] | kAdcEtcErrorMasks[1];
 
-std::uint32_t readPrimask() {
-  std::uint32_t value = 0U;
-  __asm__ volatile("mrs %0, primask" : "=r"(value) : : "memory");
-  return value;
-}
-
-void restorePrimask(std::uint32_t value) {
-  if ((value & 1U) == 0U) {
-    __enable_irq();
-  }
-}
-
 void barrier() { gpio_dma_route::barrier(); }
 
 template <typename Integer>
@@ -123,13 +115,11 @@ class TeensyCriticalSection final : public CriticalSection {
  public:
   THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.critical_enter")
   std::uint32_t enter() override {
-    const std::uint32_t primask = readPrimask();
-    __disable_irq();
-    return primask;
+    return interrupts::saveAndDisable();
   }
 
   THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.critical_exit")
-  void exit(std::uint32_t token) override { restorePrimask(token); }
+  void exit(std::uint32_t token) override { interrupts::restore(token); }
 };
 
 TeensyCacheMaintenance g_cache{};
@@ -157,7 +147,9 @@ std::uint32_t g_start_errors = 0U;
 std::uint32_t g_stop_errors = 0U;
 std::uint32_t g_stale_interrupts = 0U;
 bool g_hardware_prepared = false;
-bool g_faulted = false;
+// Read by main while completion/error ISRs can change it. Multi-field
+// snapshots additionally hold interrupts::Guard for a coherent record.
+volatile bool g_faulted = false;
 
 std::uint32_t address32(const volatile void *address) {
   return static_cast<std::uint32_t>(
@@ -494,14 +486,17 @@ THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_wait")
 std::size_t waitForAlignedPipeline() {
   const std::uint32_t started = ARM_DWT_CYCCNT;
+  std::uint32_t polls = 0U;
   do {
+    ++polls;
     const std::size_t adc0 = hardwarePipelineIndex(0U);
     const std::size_t adc1 = hardwarePipelineIndex(1U);
     if (adc0 == adc1 && adc0 != 0U &&
         adc0 < kDmaPipelineDepth - 1U) {
       return adc0;
     }
-  } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles);
+  } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles &&
+           polls < kDmaAlignmentWaitCycles);
   return kInvalidPipelineIndex;
 }
 
@@ -594,8 +589,6 @@ void clearInterruptState() {
 }
 
 void enableInterrupts() {
-  attachInterruptVector(IRQ_DMA_CH1, adcPairDmaIsr);
-  attachInterruptVector(IRQ_ADC_ETC_ERR, adcEtcErrorIsr);
   NVIC_SET_PRIORITY(IRQ_DMA_CH0, board::kAdcEdmaIrqPriority);
   NVIC_SET_PRIORITY(IRQ_DMA_CH1, board::kAdcEdmaIrqPriority);
   // All acquisition-state writers use one preemption priority. Main context
@@ -633,8 +626,7 @@ bool waitForCompleteStopBoundary() {
   while (ARM_DWT_CYCCNT - started < kStopBoundaryTimeoutCycles &&
          polls < kStopBoundaryPollLimit && !armed) {
     ++polls;
-    const std::uint32_t primask = readPrimask();
-    __disable_irq();
+    const interrupts::Guard interrupt_guard;
     bool safe_to_arm =
         (DMA_ERQ & kAdcDmaChannelMask) == kAdcDmaChannelMask &&
         g_current_generations[0] == g_current_generations[1] &&
@@ -659,7 +651,6 @@ bool waitForCompleteStopBoundary() {
       barrier();
       armed = true;
     }
-    restorePrimask(primask);
   }
 
   while ((DMA_ERQ & kAdcDmaChannelMask) != 0U &&
@@ -688,7 +679,8 @@ StartStatus inspectHardwareStart(std::uint32_t epoch,
   if (g_hardware_prepared) {
     return StartStatus::kAlreadyRunning;
   }
-  if (!triggersStopped() || resourcesBusy()) {
+  if (!triggersStopped() || resourcesBusy() ||
+      !g_pair_vector.available() || !g_error_vector.available()) {
     return StartStatus::kResourceBusy;
   }
   return g_ring.snapshot().quiescent ? StartStatus::kOk
@@ -709,11 +701,20 @@ StartStatus prepareHardware(std::uint32_t epoch,
     return readiness;
   }
 
+  if (!g_pair_vector.claim(adcPairDmaIsr) ||
+      !g_error_vector.claim(adcEtcErrorIsr)) {
+    g_pair_vector.release();
+    g_error_vector.release();
+    saturatingIncrement(g_resource_conflicts);
+    return StartStatus::kResourceBusy;
+  }
   CCM_CCGR5 |= gpio_dma_route::kDmaGateMask;
   g_pairs_per_buffer = static_cast<std::uint16_t>(pairs_per_buffer);
   const PrimeResult prime = g_ring.prime(epoch, 0U, 0U,
                                          pairs_per_buffer);
   if (!prime.ok()) {
+    g_pair_vector.release();
+    g_error_vector.release();
     saturatingIncrement(g_start_errors);
     return prime.status == OperationStatus::kInvalidEpoch
                ? StartStatus::kInvalidEpoch
@@ -735,6 +736,8 @@ StartStatus prepareHardware(std::uint32_t epoch,
     g_pipeline_destinations[index] = reserved.destination;
   }
   if (!pipeline_reserved) {
+    g_pair_vector.release();
+    g_error_vector.release();
     const std::array<ChannelStopState, kConverterCount> stopped{{
         {prime.active_generation, 0U, prime.active_destination},
         {prime.active_generation, 0U, prime.active_destination},
@@ -778,6 +781,8 @@ StartStatus prepareHardware(std::uint32_t epoch,
     disableRequests();
     disableInterrupts();
     clearInterruptState();
+    g_pair_vector.release();
+    g_error_vector.release();
     std::array<ChannelStopState, kConverterCount> stopped{};
     for (std::size_t converter = 0U; converter < kConverterCount;
          ++converter) {
@@ -813,8 +818,7 @@ StopReport stopHardwareAfterTriggers() {
 
   disableRequests();
   disableInterrupts();
-  const std::uint32_t primask = readPrimask();
-  __disable_irq();
+  interrupts::Guard interrupt_guard;
   if ((DMA_INT & channelMask(kPairDispatchConverter)) != 0U) {
     (void)servicePendingDmaPair();
   }
@@ -828,8 +832,10 @@ StopReport stopHardwareAfterTriggers() {
     clearChannelState(converter);
   }
   clearInterruptState();
+  g_pair_vector.release();
+  g_error_vector.release();
   g_hardware_prepared = false;
-  restorePrimask(primask);
+  interrupt_guard.release();
 
   report = g_ring.stop(stopped);
   (void)g_ring.serviceDiscarded();
@@ -846,8 +852,7 @@ StopReport stopHardwareAfterTriggers() {
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.target_snapshot")
 HardwareSnapshot hardwareSnapshot() {
   HardwareSnapshot value{};
-  const std::uint32_t primask = readPrimask();
-  __disable_irq();
+  const interrupts::Guard interrupt_guard;
   value.ring = g_ring.snapshot();
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
@@ -883,7 +888,6 @@ HardwareSnapshot hardwareSnapshot() {
   value.stale_interrupts = g_stale_interrupts;
   value.hardware_prepared = g_hardware_prepared;
   value.faulted = g_faulted;
-  restorePrimask(primask);
   return value;
 }
 
@@ -931,16 +935,14 @@ OperationStatus TeensyAdcDmaCapture::release(
 }
 
 Snapshot TeensyAdcDmaCapture::rawSnapshot() {
+  const interrupts::Guard interrupt_guard;
   Snapshot value = g_ring.snapshot();
-  const std::uint32_t primask = readPrimask();
-  __disable_irq();
   value.resource_conflicts = g_resource_conflicts;
   value.start_errors = g_start_errors;
   value.stop_errors = g_stop_errors;
   value.stale_interrupts = g_stale_interrupts;
   value.hardware_prepared = g_hardware_prepared;
   value.faulted = g_faulted;
-  restorePrimask(primask);
   return value;
 }
 

@@ -86,6 +86,7 @@ constexpr std::uint8_t magicByte(std::size_t index) {
 }
 
 constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
+  if (kind == kRuntimeHealthRequest || kind == kRuntimeHealthResponse) return true;
   if (kind == kTemperatureRequest || kind == kTemperatureResponse) return true;
   switch (kind) {
     case protocol_v1::FrameKind::kAdcData:
@@ -117,6 +118,7 @@ constexpr bool isKnownKind(protocol_v1::FrameKind kind) {
 }
 
 constexpr bool isRequestKind(protocol_v1::FrameKind kind) {
+  if (kind == kRuntimeHealthRequest) return true;
   if (kind == kTemperatureRequest) return true;
   switch (kind) {
     case protocol_v1::FrameKind::kInfoRequest:
@@ -160,6 +162,7 @@ constexpr bool checksumAllowedForKind(
 }
 
 constexpr bool isTypedResponseKind(protocol_v1::FrameKind kind) {
+  if (kind == kRuntimeHealthResponse) return true;
   if (kind == kTemperatureResponse) return true;
   switch (kind) {
     case protocol_v1::FrameKind::kInfoResponse:
@@ -247,6 +250,10 @@ bool decodeKind(std::uint8_t raw, protocol_v1::FrameKind &kind) {
 THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.command_kind")
 bool commandForKind(protocol_v1::FrameKind kind,
                     protocol_v1::CommandKind &command) {
+  if (kind == kRuntimeHealthRequest) {
+    command = kGetRuntimeHealth;
+    return true;
+  }
   if (kind == kTemperatureRequest) {
     command = kGetTemperature;
     return true;
@@ -292,6 +299,10 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
   if (response_error && isTypedResponseKind(kind)) {
     size = protocol_v1::kResponsePrefixPayloadSize;
     return true;
+  }
+  if (kind == kRuntimeHealthRequest || kind == kRuntimeHealthResponse) {
+    size = kind == kRuntimeHealthRequest ? 0U : protocol_v2::kRuntimeHealthResponsePayloadSize;
+    return version == protocol_v2::kProtocolVersion;
   }
   if (kind == kTemperatureRequest || kind == kTemperatureResponse) {
     size = kind == kTemperatureRequest ? 0U : protocol_v2::kTemperatureResponsePayloadSize;
@@ -380,7 +391,8 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
     return badKind();
   }
   if (header.version != protocol_v2::kProtocolVersion &&
-      (header.kind == kTemperatureRequest || header.kind == kTemperatureResponse))
+      (header.kind == kTemperatureRequest || header.kind == kTemperatureResponse ||
+       header.kind == kRuntimeHealthRequest || header.kind == kRuntimeHealthResponse))
     return badKind();
   if (header.header_length != protocol_v1::kHeaderSize) {
     return badLength();
@@ -388,7 +400,8 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
   if (!checksumAllowedForKind(header.kind, header.checksum_algorithm)) {
     return unsupportedChecksum();
   }
-  const std::uint16_t allowed = header.kind == kTemperatureResponse
+  const std::uint16_t allowed = (header.kind == kTemperatureResponse ||
+                                 header.kind == kRuntimeHealthResponse)
       ? kResponseErrorFlag : protocol_v1::allowedFlags(header.kind);
   if ((header.flags & static_cast<std::uint16_t>(~allowed)) != 0U) {
     return badFlags();
@@ -2043,6 +2056,17 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
     return Result::success();
   }
 
+  if (header.kind == kRuntimeHealthResponse) {
+    std::uint32_t flags = 0, total = 0, free = 0, used = 0, timeout = 0, reserved = 0;
+    if (!loadU32(payload, 4, flags) || !loadU32(payload, 8, total) ||
+        !loadU32(payload, 12, free) || !loadU32(payload, 16, used) ||
+        !loadU32(payload, 24, timeout) || !loadU32(payload, 28, reserved)) return badPayload();
+    if ((flags & ~3U) != 0U || reserved != 0U || free > total || used != total - free ||
+        ((flags & health::kStackAvailable) == 0U && total != 0U) ||
+        ((flags & health::kStackAvailable) != 0U && total == 0U) ||
+        (((flags & health::kWatchdogEnabled) != 0U) != (timeout != 0U))) return badPayload();
+    return Result::success();
+  }
   if (header.kind == kTemperatureResponse) {
     const auto status = payload.data[4];
     std::uint32_t bits = 0;
@@ -2435,6 +2459,9 @@ bool validGpioClockDiagnosticRequest(
          major_count <= std::numeric_limits<std::int16_t>::max();
 }
 
+// Post-measurement reporting has no hot-path residency requirement. Keep the
+// 32 KiB ITCM bank available to capture and watchdog configuration code.
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.benchmark_metrics")
 bool populateChecksumBenchmarkMetrics(ChecksumBenchmarkResponse &response) {
   if (!validChecksumBenchmarkRequest(response.request) ||
       response.net_checksum_cycles > response.raw_checksum_cycles ||
@@ -4193,7 +4220,8 @@ Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
   if (!isKnownError(error) || error == protocol_v1::ErrorCode::kOk) {
     return badPayload();
   }
-  const protocol_v1::FrameKind request_kind = request.kind == kGetTemperature
+  const protocol_v1::FrameKind request_kind = request.kind == kGetRuntimeHealth
+      ? kRuntimeHealthRequest : request.kind == kGetTemperature
       ? kTemperatureRequest : protocol_v1::requestFrameKind(request.kind);
   protocol_v1::CommandKind checked{};
   if (!commandForKind(request_kind, checked) || checked != request.kind) {
@@ -4202,10 +4230,26 @@ Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
   std::array<std::uint8_t, protocol_v1::kResponsePrefixPayloadSize> payload{};
   writeErrorPrefix(mutableView(payload), error);
   return encodeFrame(
-      responseFields(request.kind == kGetTemperature ? kTemperatureResponse
+      responseFields(request.kind == kGetRuntimeHealth ? kRuntimeHealthResponse
+                     : request.kind == kGetTemperature ? kTemperatureResponse
                      : protocol_v1::responseFrameKind(request.kind), request,
                      run_id, kResponseErrorFlag),
       view(payload), output);
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.runtime_health_response")
+Result encodeRuntimeHealthResponse(const Request &request, std::uint32_t run_id,
+                                   health::Reading reading, ControlFrame &output) {
+  if (request.kind != kGetRuntimeHealth || request.protocol_version != 2) return badKind();
+  std::array<std::uint8_t, protocol_v2::kRuntimeHealthResponsePayloadSize> payload{};
+  const auto bytes = mutableView(payload);
+  storeU32(bytes, 4, reading.flags);
+  storeU32(bytes, 8, reading.stack_total_bytes);
+  storeU32(bytes, 12, reading.stack_min_free_bytes);
+  storeU32(bytes, 16, reading.stack_max_used_bytes);
+  storeU32(bytes, 20, reading.reset_cause);
+  storeU32(bytes, 24, reading.watchdog_timeout_ms);
+  return encodeFrame(responseFields(kRuntimeHealthResponse, request, run_id), view(payload), output);
 }
 
 THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.temperature_response")

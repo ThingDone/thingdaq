@@ -7,6 +7,11 @@ Default hardware configuration selects 8 GPIO inputs; pass
 `celsius`; non-valid readings have `None` values. This is die, not ambient,
 temperature. Reading it does not change the acquisition state.
 
+With the firmware hardening build, `daq.get_runtime_health()` reports the
+boot-lifetime stack watermark, watchdog status and reset cause. It can be read
+through the same client during acquisition; see the
+[runtime health guide](../doc/results/firmware-runtime-hardening.md).
+
 The legacy `gpio_capture_diagnostic()` is unavailable in this release: its
 fixed 4 MHz path is disabled and its INFO capability bit is clear. The separate
 `gpio_clock_diagnostic()` remains available at 1 MHz only.

@@ -9,11 +9,18 @@
 #include "generated/protocol_constants.h"
 #include "generated/protocol_v2_constants.h"
 #include "temperature.h"
+#include "runtime_health.h"
 
 namespace thingdaq::protocol {
 
 // The runtime retains the common v1 enum type; these append-only wire IDs
 // are legal exclusively in a v2 envelope. Frozen v1 enums remain unchanged.
+inline constexpr auto kGetRuntimeHealth = static_cast<protocol_v1::CommandKind>(
+    protocol_v2::CommandKind::kGetRuntimeHealth);
+inline constexpr auto kRuntimeHealthRequest = static_cast<protocol_v1::FrameKind>(
+    protocol_v2::FrameKind::kGetRuntimeHealthRequest);
+inline constexpr auto kRuntimeHealthResponse = static_cast<protocol_v1::FrameKind>(
+    protocol_v2::FrameKind::kGetRuntimeHealthResponse);
 inline constexpr auto kGetTemperature = static_cast<protocol_v1::CommandKind>(
     protocol_v2::CommandKind::kGetTemperature);
 inline constexpr auto kTemperatureRequest = static_cast<protocol_v1::FrameKind>(
@@ -889,6 +896,8 @@ struct GpioCaptureDiagnosticResponse {
 // Returns false on an invalid request, zero nonempty work, or integer overflow.
 bool populateChecksumBenchmarkMetrics(ChecksumBenchmarkResponse &response);
 
+Result encodeRuntimeHealthResponse(const Request &request, std::uint32_t run_id,
+                                   health::Reading reading, ControlFrame &output);
 Result encodeTemperatureResponse(const Request &request, std::uint32_t run_id,
                                  temperature::Reading reading, ControlFrame &output);
 Result encodeInfoResponse(const Request &request, std::uint32_t run_id,

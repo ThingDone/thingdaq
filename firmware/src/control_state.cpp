@@ -88,6 +88,11 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
                   response);
   }
 
+  if (request.kind == protocol::kGetRuntimeHealth) {
+    return encoded(request, protocol_v1::ErrorCode::kOk,
+                   protocol::encodeRuntimeHealthResponse(request, run_id_, readiness.runtime_health, response),
+                   response);
+  }
   if (request.kind == protocol::kGetTemperature) {
     return encoded(request, protocol_v1::ErrorCode::kOk,
                    protocol::encodeTemperatureResponse(request, run_id_, readiness.temperature, response),

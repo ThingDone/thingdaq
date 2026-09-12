@@ -27,6 +27,14 @@ RUNNING on firmware 1.1.0, does not change acquisition, and returns `None`
 for a non-valid sensor reading. `TemperatureStatus` is exported from `thingdone_daq`.
 See [[Protocol-V2]] for wire details and the fixed-rate release policy.
 
+`ThingDAQ.get_runtime_health()` returns an immutable `RuntimeHealth` with
+`stack_available`, `watchdog_enabled`, `stack_total_bytes`,
+`stack_min_free_bytes`, `stack_max_used_bytes`, `reset_cause` and
+`watchdog_timeout_ms`. It requires the firmware hardening build and works during
+acquisition. The watermark persists until reboot; RESET_STATS does not clear it.
+Use the acquisition's existing `ThingDAQ` instance to query it. See
+[[Firmware-Runtime-Hardening]] for measurement limits and long-test guidance.
+
 > [!IMPORTANT]
 > Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
 > 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1

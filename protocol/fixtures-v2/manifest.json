@@ -3,6 +3,42 @@
   "extension": "aux-input-bank-fixed-1mhz-temperature",
   "fixtures": [
     {
+      "checksum": "0x9b8903ce",
+      "checksum_algorithm": "ADLER32",
+      "expectation": "accept",
+      "file": "get-runtime-health-request.bin",
+      "first_sample_ticks": 0,
+      "flags": 0,
+      "frame_hex": "efbeadde021b00002c000100300000000000000000000000000000001b000000000000000000000000000000ce03899b",
+      "frame_sha256": "7035d566ec7fcfebcba30cdc6da85211cbd73c0ca23bbec0182ff486e6956fb1",
+      "item_count": 0,
+      "kind": "GET_RUNTIME_HEALTH_REQUEST",
+      "payload_length": 0,
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "request_id": 27,
+      "run_id": 0,
+      "sequence": 0,
+      "total_length": 48
+    },
+    {
+      "checksum": "0x862107f8",
+      "checksum_algorithm": "ADLER32",
+      "expectation": "accept",
+      "file": "get-runtime-health-response.bin",
+      "first_sample_ticks": 0,
+      "flags": 0,
+      "frame_hex": "efbeadde029b00002c000100500000002000000000000000000000001b0000000000000000000000000000000000000003000000d0840000606d00007017000010000000a00f000000000000f8072186",
+      "frame_sha256": "a4f6d2279fb62fbaf7368d96ff46c1ad6c97dcc7411cef854b27505c144f6fd6",
+      "item_count": 0,
+      "kind": "GET_RUNTIME_HEALTH_RESPONSE",
+      "payload_length": 32,
+      "payload_sha256": "02cc48c58a4b7fae93d027aa50a3557122fbf57b4e54b5897a4e06ce6e3b9208",
+      "request_id": 27,
+      "run_id": 0,
+      "sequence": 0,
+      "total_length": 80
+    },
+    {
       "checksum": "0x9b5203cc",
       "checksum_algorithm": "ADLER32",
       "expectation": "accept",
@@ -1602,7 +1638,7 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 2,
   "source": "protocol/protocol-v2.json",
-  "source_sha256": "aa7fa0c5d4dde56d7ade95b64f620138e96390e2790a49b8b2be25909608ddae",
+  "source_sha256": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
   "v1_source": "protocol/protocol-v1.json",
   "v1_source_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
 }

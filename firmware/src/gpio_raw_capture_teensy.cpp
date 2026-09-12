@@ -15,6 +15,8 @@
 
 #include "board_config.h"
 #include "gpio_dma_route_teensy.h"
+#include "interrupt_guard_teensy.h"
+#include "interrupt_vectors_teensy.h"
 #include "gpio_dual_bank_capture.h"
 #include "gpio_raw_storage_teensy.h"
 #include "variable_rate_scheduler.h"
@@ -62,12 +64,6 @@ constexpr std::uint32_t kProductionPitLoad =
 constexpr std::uint32_t kStopBoundaryTimeoutCycles =
     input_experiment::kCpuHz / 100U;
 
-std::uint32_t readPrimask() {
-  std::uint32_t value = 0U;
-  __asm__ volatile("mrs %0, primask" : "=r"(value) : : "memory");
-  return value;
-}
-
 class TeensyCacheMaintenance final : public CacheMaintenance {
  public:
   THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.cache_discard")
@@ -85,16 +81,12 @@ class TeensyCriticalSection final : public CriticalSection {
  public:
   THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.critical_enter")
   std::uint32_t enter() override {
-    const std::uint32_t primask = readPrimask();
-    __disable_irq();
-    return primask;
+    return interrupts::saveAndDisable();
   }
 
   THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.critical_exit")
   void exit(std::uint32_t token) override {
-    if ((token & 1U) == 0U) {
-      __enable_irq();
-    }
+    interrupts::restore(token);
   }
 };
 
@@ -104,11 +96,14 @@ RawCaptureRing g_ring{g_gpio_raw_dma_buffers.legacy,
                       g_gpio_raw_dma_overflow_sink,
                       g_cache, g_critical};
 TeensyRawCapture g_facade{};
+interrupts::VectorLease g_dma_vector{IRQ_DMA_CH2};
 RawStorageOwner g_raw_storage_owner = RawStorageOwner::kNone;
 RawStorageOwner g_raw_storage_layout = RawStorageOwner::kLegacy;
-bool g_hardware_running = false;
+volatile bool g_hardware_running = false;
 bool g_hardware_prepared = false;
-bool g_faulted = false;
+// Read by main while completion/error ISRs can change it. Multi-field
+// snapshots additionally hold interrupts::Guard for a coherent record.
+volatile bool g_faulted = false;
 std::uint32_t g_resource_conflicts = 0U;
 std::uint32_t g_start_errors = 0U;
 std::uint32_t g_stop_errors = 0U;
@@ -278,8 +273,11 @@ bool waitForCompleteStopBoundary() {
   gpio_dma_route::barrier();
 
   const std::uint32_t started = ARM_DWT_CYCCNT;
+  std::uint32_t polls = 0U;
   while ((DMA_ERQ & gpio_dma_route::kEdmaChannelMask) != 0U &&
-         ARM_DWT_CYCCNT - started < kStopBoundaryTimeoutCycles) {
+         ARM_DWT_CYCCNT - started < kStopBoundaryTimeoutCycles &&
+         polls < protocol_v1::kAdcTriggerDiagnosticPollLimit) {
+    ++polls;
   }
   return (DMA_ERQ & gpio_dma_route::kEdmaChannelMask) == 0U;
 }
@@ -292,7 +290,7 @@ StartStatus inspectHardwareStart(protocol_v2::RateProfile profile) {
   if (g_hardware_prepared || g_hardware_running) {
     return StartStatus::kAlreadyRunning;
   }
-  if (resourcesBusy() ||
+  if (resourcesBusy() || !g_dma_vector.available() ||
       !rawStorageAvailable(RawStorageOwner::kLegacy)) {
     return StartStatus::kResourceBusy;
   }
@@ -335,8 +333,13 @@ StartStatus prepareHardware(protocol_v2::RateProfile profile) {
     }
     return readiness;
   }
+  if (!g_dma_vector.claim(dmaMajorLoopIsr)) {
+    saturatingIncrement(g_resource_conflicts);
+    return StartStatus::kResourceBusy;
+  }
   gpio_dma_route::enableClockGates();
   if (!claimRawStorage(RawStorageOwner::kLegacy)) {
+    g_dma_vector.release();
     saturatingIncrement(g_resource_conflicts);
     return StartStatus::kResourceBusy;
   }
@@ -344,6 +347,7 @@ StartStatus prepareHardware(protocol_v2::RateProfile profile) {
   const PrimeResult prime = g_ring.prime();
   if (!prime.ok()) {
     forceSafeInputs();
+    g_dma_vector.release();
     releaseRawStorage(RawStorageOwner::kLegacy);
     saturatingIncrement(g_start_errors);
     return prime.status == OperationStatus::kAlreadyRunning
@@ -360,7 +364,6 @@ StartStatus prepareHardware(protocol_v2::RateProfile profile) {
   gpio_dma_route::configureXbarRequest();
   forceSafeInputs();
 
-  attachInterruptVector(IRQ_DMA_CH2, dmaMajorLoopIsr);
   NVIC_SET_PRIORITY(IRQ_DMA_CH2, board::kGpioEdmaIrqPriority);
   NVIC_CLEAR_PENDING(IRQ_DMA_CH2);
   NVIC_ENABLE_IRQ(IRQ_DMA_CH2);
@@ -379,6 +382,7 @@ StartStatus prepareHardware(protocol_v2::RateProfile profile) {
     g_hardware_running = false;
     g_hardware_prepared = false;
     (void)g_ring.stop(0U);
+    g_dma_vector.release();
     releaseRawStorage(RawStorageOwner::kLegacy);
     g_faulted = true;
     saturatingIncrement(g_start_errors);
@@ -408,6 +412,7 @@ StartStatus startHardware(protocol_v2::RateProfile profile) {
     g_hardware_running = false;
     g_hardware_prepared = false;
     (void)g_ring.stop(0U);
+    g_dma_vector.release();
     releaseRawStorage(RawStorageOwner::kLegacy);
     forceSafeInputs();
     g_faulted = true;
@@ -419,6 +424,15 @@ StartStatus startHardware(protocol_v2::RateProfile profile) {
 
 THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_stop")
 StopReport stopHardwareImpl(bool preserve_complete_boundary) {
+  if (!g_dma_vector.owned()) {
+    StopReport report{};
+    if (rawStorageActive(RawStorageOwner::kLegacy)) {
+      const Snapshot before = g_ring.snapshot();
+      report.ready_buffers_to_drain = before.ready_depth;
+      report.packing_buffers_to_release = before.packing_depth;
+    }
+    return report;
+  }
   IMXRT_PIT_CHANNEL_t &pit =
       IMXRT_PIT_CHANNELS[board::kGpioPitChannel];
   const bool source_was_stopped = (pit.TCTRL & PIT_TCTRL_TEN) == 0U;
@@ -426,8 +440,7 @@ StopReport stopHardwareImpl(bool preserve_complete_boundary) {
       preserve_complete_boundary && g_hardware_running && !g_faulted;
   const bool boundary_stop_completed =
       boundary_stop_requested && waitForCompleteStopBoundary();
-  const std::uint32_t primask = readPrimask();
-  __disable_irq();
+  interrupts::Guard interrupt_guard;
   disableHardware();
   NVIC_DISABLE_IRQ(IRQ_DMA_CH2);
 
@@ -452,9 +465,8 @@ StopReport stopHardwareImpl(bool preserve_complete_boundary) {
   forceSafeInputs();
   g_hardware_running = false;
   g_hardware_prepared = false;
-  if ((primask & 1U) == 0U) {
-    __enable_irq();
-  }
+  g_dma_vector.release();
+  interrupt_guard.release();
 
   StopReport report = g_ring.stop(partial_samples);
   if (report.status == OperationStatus::kNotRunning && !before.running) {
@@ -488,6 +500,7 @@ StopReport stopHardwareAfterTriggers() {
 
 THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.target_snapshot")
 HardwareSnapshot hardwareSnapshot() {
+  const interrupts::Guard interrupt_guard;
   HardwareSnapshot value{};
   value.ring = g_ring.snapshot();
   value.ring.resource_conflicts = g_resource_conflicts;
@@ -535,6 +548,10 @@ bool rawStorageActive(RawStorageOwner owner) {
   return g_raw_storage_layout == owner;
 }
 
+bool rawStorageOwned(RawStorageOwner owner) {
+  return owner != RawStorageOwner::kNone && g_raw_storage_owner == owner;
+}
+
 THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(".flashmem.gpio_raw.storage_claim")
 bool claimRawStorage(RawStorageOwner owner) {
   if (!rawStorageAvailable(owner)) {
@@ -542,11 +559,11 @@ bool claimRawStorage(RawStorageOwner owner) {
   }
   if (g_raw_storage_layout != owner) {
     if (owner == RawStorageOwner::kLegacy) {
-      ::new (static_cast<void *>(&g_gpio_raw_dma_buffers.legacy))
-          RawBufferStorage{};
+      void *const storage = &g_gpio_raw_dma_buffers.legacy;
+      new (storage) RawBufferStorage{};
     } else if (owner == RawStorageOwner::kPaired) {
-      ::new (static_cast<void *>(&g_gpio_raw_dma_buffers.paired))
-          gpio_join::PairedRawStorage{};
+      void *const storage = &g_gpio_raw_dma_buffers.paired;
+      new (storage) gpio_join::PairedRawStorage{};
     } else {
       return false;
     }
@@ -625,6 +642,7 @@ OperationStatus TeensyRawCapture::release(const BufferHandle &handle) {
 THINGDAQ_GPIO_RAW_TARGET_COLD_CODE(
     ".flashmem.gpio_raw.facade_raw_snapshot")
 Snapshot TeensyRawCapture::rawSnapshot() {
+  const interrupts::Guard interrupt_guard;
   Snapshot value = g_ring.snapshot();
   value.resource_conflicts = g_resource_conflicts;
   value.start_errors = g_start_errors;

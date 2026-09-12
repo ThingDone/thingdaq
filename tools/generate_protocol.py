@@ -677,7 +677,28 @@ def validate_v2_contract(
             "allowed_flags": ["RESPONSE_ERROR"],
         },
     ]
-    if normalized_v2_kinds != v1_contract["frame_kinds"] + temperature_kinds:
+    health_kinds = [
+        {
+            "name": "GET_RUNTIME_HEALTH_REQUEST",
+            "value": 27,
+            "class": "request",
+            "payload_schema": "empty",
+            "allowed_flags": [],
+            "response_kind": "GET_RUNTIME_HEALTH_RESPONSE",
+        },
+        {
+            "name": "GET_RUNTIME_HEALTH_RESPONSE",
+            "value": 155,
+            "class": "response",
+            "payload_schema": "runtime_health_response",
+            "error_payload_schema": "response_prefix",
+            "allowed_flags": ["RESPONSE_ERROR"],
+        },
+    ]
+    if (
+        normalized_v2_kinds
+        != v1_contract["frame_kinds"] + temperature_kinds + health_kinds
+    ):
         raise ContractError("protocol v2 unexpectedly changes frozen frame kinds")
     if contract["command_kinds"] != v1_contract["command_kinds"] + [
         {
@@ -686,7 +707,14 @@ def validate_v2_contract(
             "request_kind": "GET_TEMPERATURE_REQUEST",
             "response_kind": "GET_TEMPERATURE_RESPONSE",
             "optional": True,
-        }
+        },
+        {
+            "name": "GET_RUNTIME_HEALTH",
+            "value": 27,
+            "request_kind": "GET_RUNTIME_HEALTH_REQUEST",
+            "response_kind": "GET_RUNTIME_HEALTH_RESPONSE",
+            "optional": True,
+        },
     ]:
         raise ContractError("protocol v2 unexpectedly changes frozen command kinds")
     for entry in contract["frame_kinds"][:2]:

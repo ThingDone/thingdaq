@@ -134,9 +134,17 @@ class TeensyPlatform final : public Platform {
 
     gpio_dma_route::barrier();
     const std::uint32_t measurement_begin = ARM_DWT_CYCCNT;
+    std::uint32_t polls = 0U;
     pit.TCTRL = PIT_TCTRL_TEN;
     snapshot.pit_tctrl_configured = pit.TCTRL;
     while (ARM_DWT_CYCCNT - measurement_begin < plan.measurement_cycles) {
+      // Every iteration costs at least one CPU cycle. This independent cap
+      // therefore cannot shorten a healthy measurement, but a stopped DWT
+      // cannot leave the request/PIT running forever.
+      if (++polls >= plan.measurement_cycles) {
+        addError(snapshot, protocol_v1::GpioClockError::kDwtUnavailable);
+        break;
+      }
       if ((tcd.CSR & DMA_TCD_CSR_DONE) != 0U) {
         addError(snapshot, protocol_v1::GpioClockError::kDuplicateTrigger);
         addError(snapshot, protocol_v1::GpioClockError::kMeasurementOverflow);

@@ -32,7 +32,8 @@ std::uint32_t counterDelta(std::uint32_t current, std::uint32_t previous) {
 }
 
 bool responseKind(protocol_v1::FrameKind kind) {
-  if (kind == protocol::kTemperatureResponse) return true;
+  if (kind == protocol::kTemperatureResponse ||
+      kind == protocol::kRuntimeHealthResponse) return true;
   switch (kind) {
     case protocol_v1::FrameKind::kInfoResponse:
     case protocol_v1::FrameKind::kConfigureResponse:

@@ -59,7 +59,7 @@ from .models import (
     analyze_stream_continuity,
 )
 from .protocol import ParserCounters
-from .protocol_v2 import TemperatureReading
+from .protocol_v2 import RuntimeHealth, TemperatureReading
 from .reader import (
     DEFAULT_MAX_QUEUED_BLOCKS,
     BackgroundReader,
@@ -1091,6 +1091,20 @@ class ThingDAQ:
             self._last_status = None
             return self._run_id
 
+    def get_runtime_health(self) -> RuntimeHealth:
+        """Read boot-lifetime stack usage and watchdog/reset status during acquisition."""
+        with self._lock:
+            self._require_verified_identity()
+            response = self._command(
+                v2_constants.FrameKind.GET_RUNTIME_HEALTH_REQUEST,
+                protocol_version=v2_constants.PROTOCOL_VERSION,
+            )
+            if not isinstance(response.value, RuntimeHealth):
+                raise UnexpectedMessageError(
+                    "runtime health response has no health record"
+                )
+            return response.value
+
     def get_temperature(self) -> TemperatureReading:
         """Read calibrated die temperature and sensor status without changing acquisition."""
         with self._lock:
@@ -1549,8 +1563,8 @@ class ThingDAQ:
         if not response.ok:
             raise DeviceCommandError(kind, response.error_code, response.request_id)
         expected_kind = (
-            v2_constants.REQUEST_RESPONSE_KIND[kind]
-            if kind is v2_constants.FrameKind.GET_TEMPERATURE_REQUEST
+            v2_constants.REQUEST_RESPONSE_KIND[v2_constants.FrameKind(int(kind))]
+            if int(kind) not in constants.REQUEST_RESPONSE_KIND
             else constants.REQUEST_RESPONSE_KIND[constants.FrameKind(int(kind))]
         )
         if response.kind is not expected_kind:

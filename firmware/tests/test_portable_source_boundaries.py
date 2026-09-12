@@ -34,6 +34,7 @@ HARDWARE_API_HEADERS = {
     "usb_serial.h",
 }
 EXPECTED_HARDWARE_INCLUDE_OWNERS = {
+    FIRMWARE_SOURCE / "interrupt_guard_teensy.h": {"core_pins.h"},
     FIRMWARE_SOURCE / "board_config.h": {"core_pins.h", "imxrt.h"},
     FIRMWARE_SOURCE / "adc_initializer_teensy.cpp": {
         "core_pins.h",
@@ -83,6 +84,8 @@ EXPECTED_HARDWARE_INCLUDE_OWNERS = {
     },
     FIRMWARE_SOURCE / "teensy_clock.cpp": {"Arduino.h"},
     FIRMWARE_SOURCE / "temperature_teensy.cpp": {"Arduino.h"},
+    FIRMWARE_SOURCE / "runtime_health_teensy.cpp": {"Arduino.h"},
+    FIRMWARE_SOURCE / "watchdog_teensy.cpp": {"imxrt.h"},
 }
 _QUOTED_INCLUDE = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.MULTILINE)
 _ANGLE_INCLUDE = re.compile(r"^\s*#\s*include\s+<([^>]+)>", re.MULTILINE)
