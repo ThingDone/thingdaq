@@ -1,4 +1,7 @@
 #include "gpio_dual_bank_packer.h"
+#if defined(THINGDAQ_EXPERIMENT_C_PACKER)
+#include "gpio_pack_c.h"
+#endif
 
 #include <limits>
 
@@ -46,6 +49,10 @@ std::size_t packDualBankBatch(const std::uint32_t *primary_words,
                               std::size_t sample_count,
                               std::uint8_t *destination,
                               std::size_t destination_capacity) {
+#if defined(THINGDAQ_EXPERIMENT_C_PACKER)
+  return thingdaq_pack_dual_c(primary_words, auxiliary_words, sample_count,
+                            destination, destination_capacity);
+#else
   if ((sample_count != 0U &&
        (primary_words == nullptr || auxiliary_words == nullptr ||
         destination == nullptr)) ||
@@ -60,6 +67,7 @@ std::size_t packDualBankBatch(const std::uint32_t *primary_words,
         static_cast<std::uint8_t>(packed >> 8U);
   }
   return sample_count;
+#endif
 }
 
 THINGDAQ_GPIO_AUX_PACKER_COLD_CODE(".flashmem.gpio_aux_packer.start")

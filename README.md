@@ -200,6 +200,7 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 
 - [Documentation index](doc/README.md)
 - [Evidence index](doc/results/evidence-index.md)
+- [M7 C, atomics, optimization and ITCM experiments](doc/results/m7-performance-experiments.md)
 - [Phase 11 autonomous soak evidence](doc/results/phase-11-soak-evidence.md)
 - [Phase 12 Windows validation handoff](doc/results/phase-12-windows-handoff.md)
 - [Quickstart](doc/guides/quickstart.md)

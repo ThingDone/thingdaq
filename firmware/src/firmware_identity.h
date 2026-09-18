@@ -91,9 +91,12 @@
 #if __cplusplus < 201703L
 #error "ThingDAQ requires the pinned core's GNU C++17 mode"
 #endif
+#if !defined(THINGDAQ_EXPERIMENT_OPTIMIZATION) || \
+    THINGDAQ_EXPERIMENT_OPTIMIZATION != 1
 #if !defined(THINGDAQ_OPTIMIZATION_O2STD) || \
     THINGDAQ_OPTIMIZATION_O2STD != 1
 #error "ThingDAQ requires the validated standard -O2 build"
+#endif
 #endif
 #if __GNUC__ != 15 || __GNUC_MINOR__ != 2
 #error "ThingDAQ requires Arm GNU 15.2.1"

@@ -1,0 +1,866 @@
+{
+  "baseline_commit": "370ae2ad11c9a20927d9c02f10cb83c0f421a10d",
+  "baseline_memory": {
+    "flash": {
+      "code_bytes": 129728,
+      "data_bytes": 25744,
+      "free_for_files_bytes": 1867780,
+      "headers_bytes": 8364
+    },
+    "ram1": {
+      "code_bytes": 32520,
+      "free_for_locals_bytes": 34464,
+      "padding_bytes": 248,
+      "variables_bytes": 457056
+    },
+    "ram2": {
+      "free_for_heap_bytes": 4096,
+      "variables_bytes": 520192
+    }
+  },
+  "benchmarks": [
+    {
+      "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+      "elf_sha256": "2d2e4432c88be35684f290ca3d3abe6c834a92c32e57787771895d2d095baa66",
+      "hardware_timing": null,
+      "kernels": {
+        "dtcm_auxiliary": {
+          "address": "0x200016c0",
+          "data_bytes": 8096
+        },
+        "dtcm_primary": {
+          "address": "0x20003660",
+          "data_bytes": 8096
+        },
+        "events": {
+          "address": "0x20006958",
+          "data_bytes": 4
+        },
+        "ocram_auxiliary": {
+          "address": "0x20200000",
+          "data_bytes": 8096
+        },
+        "ocram_primary": {
+          "address": "0x20201fa0",
+          "data_bytes": 8096
+        },
+        "pack_c_flash": {
+          "address": "0x6000160c",
+          "code_bytes": 214
+        },
+        "pack_c_itcm": {
+          "address": "0x20",
+          "code_bytes": 214
+        },
+        "pack_cpp_flash": {
+          "address": "0x600016e2",
+          "code_bytes": 214
+        },
+        "pack_cpp_itcm": {
+          "address": "0xf6",
+          "code_bytes": 214
+        }
+      },
+      "optimization": "Os",
+      "sources": {
+        "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+        "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+        "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+        "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+        "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+        "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+        "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+        "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+        "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+      }
+    },
+    {
+      "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+      "elf_sha256": "53e7303dc7b8ffe5df52fc215889a88c1a3cf918732c756bbf27a05d2064b865",
+      "hardware_timing": null,
+      "kernels": {
+        "dtcm_auxiliary": {
+          "address": "0x200016c0",
+          "data_bytes": 8096
+        },
+        "dtcm_primary": {
+          "address": "0x20003660",
+          "data_bytes": 8096
+        },
+        "events": {
+          "address": "0x20006960",
+          "data_bytes": 4
+        },
+        "ocram_auxiliary": {
+          "address": "0x20200000",
+          "data_bytes": 8096
+        },
+        "ocram_primary": {
+          "address": "0x20201fa0",
+          "data_bytes": 8096
+        },
+        "pack_c_flash": {
+          "address": "0x6000161c",
+          "code_bytes": 206
+        },
+        "pack_c_itcm": {
+          "address": "0x20",
+          "code_bytes": 206
+        },
+        "pack_cpp_flash": {
+          "address": "0x600016ea",
+          "code_bytes": 206
+        },
+        "pack_cpp_itcm": {
+          "address": "0xee",
+          "code_bytes": 206
+        }
+      },
+      "optimization": "O1",
+      "sources": {
+        "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+        "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+        "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+        "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+        "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+        "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+        "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+        "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+        "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+      }
+    },
+    {
+      "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+      "elf_sha256": "4886045be9857d01cff641e1103279d1c2095bc9183d3d0fe22dd55cb1dbbff8",
+      "hardware_timing": null,
+      "kernels": {
+        "dtcm_auxiliary": {
+          "address": "0x200016e0",
+          "data_bytes": 8096
+        },
+        "dtcm_primary": {
+          "address": "0x20003680",
+          "data_bytes": 8096
+        },
+        "events": {
+          "address": "0x20006964",
+          "data_bytes": 4
+        },
+        "ocram_auxiliary": {
+          "address": "0x20200000",
+          "data_bytes": 8096
+        },
+        "ocram_primary": {
+          "address": "0x20201fa0",
+          "data_bytes": 8096
+        },
+        "pack_c_flash": {
+          "address": "0x60001614",
+          "code_bytes": 218
+        },
+        "pack_c_itcm": {
+          "address": "0x20",
+          "code_bytes": 218
+        },
+        "pack_cpp_flash": {
+          "address": "0x600016f0",
+          "code_bytes": 218
+        },
+        "pack_cpp_itcm": {
+          "address": "0xfc",
+          "code_bytes": 218
+        }
+      },
+      "optimization": "O2",
+      "sources": {
+        "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+        "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+        "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+        "gpio_pack_c.inc": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+        "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+        "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+        "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+        "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+        "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+        "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+      }
+    },
+    {
+      "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+      "elf_sha256": "9ccbec2930703d651792a392ee662b9c431c7f1f66fe7e1317d02167fab845e4",
+      "hardware_timing": null,
+      "kernels": {
+        "dtcm_auxiliary": {
+          "address": "0x200016e0",
+          "data_bytes": 8096
+        },
+        "dtcm_primary": {
+          "address": "0x20003680",
+          "data_bytes": 8096
+        },
+        "events": {
+          "address": "0x20006af8",
+          "data_bytes": 4
+        },
+        "ocram_auxiliary": {
+          "address": "0x20200000",
+          "data_bytes": 8096
+        },
+        "ocram_primary": {
+          "address": "0x20201fa0",
+          "data_bytes": 8096
+        },
+        "pack_c_flash": {
+          "address": "0x60001614",
+          "code_bytes": 218
+        },
+        "pack_c_itcm": {
+          "address": "0x20",
+          "code_bytes": 218
+        },
+        "pack_cpp_flash": {
+          "address": "0x600016f0",
+          "code_bytes": 218
+        },
+        "pack_cpp_itcm": {
+          "address": "0xfc",
+          "code_bytes": 218
+        }
+      },
+      "optimization": "O3",
+      "sources": {
+        "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+        "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+        "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+        "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+        "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+        "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+        "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+        "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+        "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+      }
+    }
+  ],
+  "build_timestamp_epoch": 1789243570,
+  "build_timestamp_utc": "2026-09-12T20:06:10Z",
+  "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+  "date": "2026-09-18",
+  "hardware_timing": null,
+  "matrix": [
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-5322c0960aaa239b",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "88f99f965540fcdad8e969a69aba3a8a1905be6c62c2cd5a1f88ebdfefe58ef9",
+      "hardware_timing": null,
+      "kernel": "cpp-flash",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 104080,
+          "data_bytes": 25736,
+          "free_for_files_bytes": 1893380,
+          "headers_bytes": 8420
+        },
+        "ram1": {
+          "code_bytes": 28984,
+          "free_for_locals_bytes": 34496,
+          "padding_bytes": 3784,
+          "variables_bytes": 457024
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "Os",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x60009d64",
+          "code_bytes": 220
+        }
+      },
+      "rejection": "thingdaq::checksum::adler32(unsigned char const*, unsigned int) occupies 98 code bytes, expected 120",
+      "release_qualified": false,
+      "variant": "Os-cpp-flash"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-3821c370d158bb89",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "55998ce42bb413110db6dd710fcea388b1e6267aa6f7bb4cdf7510759b4ec641",
+      "hardware_timing": null,
+      "kernel": "c-flash",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 104072,
+          "data_bytes": 25736,
+          "free_for_files_bytes": 1893380,
+          "headers_bytes": 8428
+        },
+        "ram1": {
+          "code_bytes": 28984,
+          "free_for_locals_bytes": 34496,
+          "padding_bytes": 3784,
+          "variables_bytes": 457024
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "Os",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x60009d64",
+          "code_bytes": 4
+        },
+        "thingdaq_pack_dual_c": {
+          "address": "0x6000a432",
+          "code_bytes": 214
+        }
+      },
+      "rejection": "thingdaq::checksum::adler32(unsigned char const*, unsigned int) occupies 98 code bytes, expected 120",
+      "release_qualified": false,
+      "variant": "Os-c-flash"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-62a7713706609de5",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "bdc41282a9ab9587bb1bea3dcdf0e7999cede647de9c9b8390accb29f9e31add",
+      "hardware_timing": null,
+      "kernel": "c-itcm",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 104096,
+          "data_bytes": 25736,
+          "free_for_files_bytes": 1893380,
+          "headers_bytes": 8404
+        },
+        "ram1": {
+          "code_bytes": 29208,
+          "free_for_locals_bytes": 34496,
+          "padding_bytes": 3560,
+          "variables_bytes": 457024
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "Os",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x60009d64",
+          "code_bytes": 4
+        },
+        "thingdaq_pack_dual_c": {
+          "address": "0x20",
+          "code_bytes": 214
+        }
+      },
+      "rejection": "thingdaq::checksum::adler32(unsigned char const*, unsigned int) occupies 98 code bytes, expected 120",
+      "release_qualified": false,
+      "variant": "Os-c-itcm"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-b1bdf26a98c9bad4",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "8c9d6f78a8fb96f703424abfcc72152718384f266fd7462dd2263970147d0068",
+      "hardware_timing": null,
+      "kernel": "cpp-flash",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 125328,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1871876,
+          "headers_bytes": 8668
+        },
+        "ram1": {
+          "code_bytes": 32712,
+          "free_for_locals_bytes": 34496,
+          "padding_bytes": 56,
+          "variables_bytes": 457024
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O1",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000c0c4",
+          "code_bytes": 240
+        }
+      },
+      "rejection": "thingdaq::checksum::adler32(unsigned char const*, unsigned int) occupies 108 code bytes, expected 120",
+      "release_qualified": false,
+      "variant": "O1-cpp-flash"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-0a2f830ec55b5f53",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "e9c74aad6ce760911ed2b1dc1bf10419f028e0b74a416a67e2f278fee0863d9b",
+      "hardware_timing": null,
+      "kernel": "c-flash",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 125312,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1871876,
+          "headers_bytes": 8684
+        },
+        "ram1": {
+          "code_bytes": 32712,
+          "free_for_locals_bytes": 34496,
+          "padding_bytes": 56,
+          "variables_bytes": 457024
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O1",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000c0c4",
+          "code_bytes": 16
+        },
+        "thingdaq_pack_dual_c": {
+          "address": "0x6000cbc0",
+          "code_bytes": 206
+        }
+      },
+      "rejection": "thingdaq::checksum::adler32(unsigned char const*, unsigned int) occupies 108 code bytes, expected 120",
+      "release_qualified": false,
+      "variant": "O1-c-flash"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-21c32a75b855a492",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "9f4cce2f245c7c6bcf86d0d5c65c7669e7c99ad62f8a2add4fed279f2ee7594a",
+      "hardware_timing": null,
+      "kernel": "c-itcm",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 125320,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1871876,
+          "headers_bytes": 8676
+        },
+        "ram1": {
+          "code_bytes": 32920,
+          "free_for_locals_bytes": 1728,
+          "padding_bytes": 32616,
+          "variables_bytes": 457024
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O1",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000c0c4",
+          "code_bytes": 16
+        },
+        "thingdaq_pack_dual_c": {
+          "address": "0x20",
+          "code_bytes": 206
+        }
+      },
+      "rejection": "RAM1 leaves only 1728 bytes for locals/stack; requires at least 32768",
+      "release_qualified": false,
+      "variant": "O1-c-itcm"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": true,
+      "build_id": "thingdaq-270c9b0d0c961a99",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "f385f751d4a371c9a2ac1c85a6f218fbd6647f15a109ea07aa7fbfbe6b46ce84",
+      "hardware_timing": null,
+      "kernel": "cpp-flash",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 129728,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1867780,
+          "headers_bytes": 8364
+        },
+        "ram1": {
+          "code_bytes": 32520,
+          "free_for_locals_bytes": 34464,
+          "padding_bytes": 248,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O2",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000c744",
+          "code_bytes": 240
+        }
+      },
+      "release_qualified": false,
+      "variant": "O2-cpp-flash"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": true,
+      "build_id": "thingdaq-bd4f06c430bba70a",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "4487e5a137f3d5cd7c256a8485408c72ec31cc014ce8fe3edd57ecfe36b58808",
+      "hardware_timing": null,
+      "kernel": "c-flash",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 129712,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1867780,
+          "headers_bytes": 8380
+        },
+        "ram1": {
+          "code_bytes": 32520,
+          "free_for_locals_bytes": 34464,
+          "padding_bytes": 248,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O2",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000c744",
+          "code_bytes": 4
+        },
+        "thingdaq_pack_dual_c": {
+          "address": "0x6000d1b8",
+          "code_bytes": 218
+        }
+      },
+      "release_qualified": false,
+      "variant": "O2-c-flash"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": true,
+      "build_id": "thingdaq-81f6c3d9fa4f7ca8",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "f1b534b4e8e884987d974c8a9e9ac1f154c29a254517ba8ae22240adfb28e4ae",
+      "hardware_timing": null,
+      "kernel": "c-itcm",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 129728,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1867780,
+          "headers_bytes": 8364
+        },
+        "ram1": {
+          "code_bytes": 32744,
+          "free_for_locals_bytes": 34464,
+          "padding_bytes": 24,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O2",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000c744",
+          "code_bytes": 4
+        },
+        "thingdaq_pack_dual_c": {
+          "address": "0x20",
+          "code_bytes": 218
+        }
+      },
+      "release_qualified": false,
+      "variant": "O2-c-itcm"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-b5a6a696f0774f59",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "5a53db26941f2e7ac238db006c79d57711d32b55c59ef3e4bb5a0553781b2c36",
+      "hardware_timing": null,
+      "kernel": "cpp-flash",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 144784,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1852420,
+          "headers_bytes": 8668
+        },
+        "ram1": {
+          "code_bytes": 37720,
+          "free_for_locals_bytes": 1696,
+          "padding_bytes": 27816,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O3",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000e1d8",
+          "code_bytes": 240
+        }
+      },
+      "rejection": "RAM1 leaves only 1696 bytes for locals/stack; requires at least 32768",
+      "release_qualified": false,
+      "variant": "O3-cpp-flash"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-acff7b8f01bd196b",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "7853ed8d877279ca72266440cdaaaf39e811a1906ccf3c79333eb17b01b6ef08",
+      "hardware_timing": null,
+      "kernel": "c-flash",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 144768,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1852420,
+          "headers_bytes": 8684
+        },
+        "ram1": {
+          "code_bytes": 37720,
+          "free_for_locals_bytes": 1696,
+          "padding_bytes": 27816,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O3",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000e1d8",
+          "code_bytes": 4
+        },
+        "thingdaq_pack_dual_c": {
+          "address": "0x6000ed20",
+          "code_bytes": 218
+        }
+      },
+      "rejection": "RAM1 leaves only 1696 bytes for locals/stack; requires at least 32768",
+      "release_qualified": false,
+      "variant": "O3-c-flash"
+    },
+    {
+      "base_source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+      "build_gates_passed": false,
+      "build_id": "thingdaq-7a964572e7ca7cf5",
+      "builder_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8",
+      "elf_sha256": "60f77c80c9e6bc6573c773ffcc9e8f1b5a471ae1f4f0784147d0fe03aeb1b779",
+      "hardware_timing": null,
+      "kernel": "c-itcm",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 144776,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1852420,
+          "headers_bytes": 8676
+        },
+        "ram1": {
+          "code_bytes": 37944,
+          "free_for_locals_bytes": 1696,
+          "padding_bytes": 27592,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "optimization": "O3",
+      "packer_symbols": {
+        "thingdaq::gpio_aux_packer::packDualBankBatch(unsigned long const*, unsigned long const*, unsigned int, unsigned char*, unsigned int)": {
+          "address": "0x6000e1d8",
+          "code_bytes": 4
+        },
+        "thingdaq_pack_dual_c": {
+          "address": "0x20",
+          "code_bytes": 218
+        }
+      },
+      "rejection": "RAM1 leaves only 1696 bytes for locals/stack; requires at least 32768",
+      "release_qualified": false,
+      "variant": "O3-c-itcm"
+    }
+  ],
+  "objects": {
+    "atomic_disassembly_verified": true,
+    "compiler": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+    "event_source_sha256": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+    "rows": [
+      {
+        "code_bytes": 214,
+        "language": "c",
+        "machine_code_sha256": "f9ef468edb83f3bf053678bdae0f6e3a17f3fd2bc96e58533baeda40769ebc25",
+        "optimization": "Os",
+        "placement": "flash"
+      },
+      {
+        "code_bytes": 214,
+        "language": "c++",
+        "machine_code_sha256": "f9ef468edb83f3bf053678bdae0f6e3a17f3fd2bc96e58533baeda40769ebc25",
+        "optimization": "Os",
+        "placement": "flash"
+      },
+      {
+        "code_bytes": 214,
+        "language": "c",
+        "machine_code_sha256": "f9ef468edb83f3bf053678bdae0f6e3a17f3fd2bc96e58533baeda40769ebc25",
+        "optimization": "Os",
+        "placement": "itcm"
+      },
+      {
+        "code_bytes": 214,
+        "language": "c++",
+        "machine_code_sha256": "f9ef468edb83f3bf053678bdae0f6e3a17f3fd2bc96e58533baeda40769ebc25",
+        "optimization": "Os",
+        "placement": "itcm"
+      },
+      {
+        "code_bytes": 206,
+        "language": "c",
+        "machine_code_sha256": "8b9f8abc007bbe9d83a256520f923ccd7240d096586214e63e4a193eeac94d64",
+        "optimization": "O1",
+        "placement": "flash"
+      },
+      {
+        "code_bytes": 206,
+        "language": "c++",
+        "machine_code_sha256": "8b9f8abc007bbe9d83a256520f923ccd7240d096586214e63e4a193eeac94d64",
+        "optimization": "O1",
+        "placement": "flash"
+      },
+      {
+        "code_bytes": 206,
+        "language": "c",
+        "machine_code_sha256": "8b9f8abc007bbe9d83a256520f923ccd7240d096586214e63e4a193eeac94d64",
+        "optimization": "O1",
+        "placement": "itcm"
+      },
+      {
+        "code_bytes": 206,
+        "language": "c++",
+        "machine_code_sha256": "8b9f8abc007bbe9d83a256520f923ccd7240d096586214e63e4a193eeac94d64",
+        "optimization": "O1",
+        "placement": "itcm"
+      },
+      {
+        "code_bytes": 218,
+        "language": "c",
+        "machine_code_sha256": "51e022f1249de0f9235b72aefa0ada0ae7972963c4e457a4911d09c04a7dbdc4",
+        "optimization": "O2",
+        "placement": "flash"
+      },
+      {
+        "code_bytes": 218,
+        "language": "c++",
+        "machine_code_sha256": "51e022f1249de0f9235b72aefa0ada0ae7972963c4e457a4911d09c04a7dbdc4",
+        "optimization": "O2",
+        "placement": "flash"
+      },
+      {
+        "code_bytes": 218,
+        "language": "c",
+        "machine_code_sha256": "51e022f1249de0f9235b72aefa0ada0ae7972963c4e457a4911d09c04a7dbdc4",
+        "optimization": "O2",
+        "placement": "itcm"
+      },
+      {
+        "code_bytes": 218,
+        "language": "c++",
+        "machine_code_sha256": "51e022f1249de0f9235b72aefa0ada0ae7972963c4e457a4911d09c04a7dbdc4",
+        "optimization": "O2",
+        "placement": "itcm"
+      },
+      {
+        "code_bytes": 218,
+        "language": "c",
+        "machine_code_sha256": "51e022f1249de0f9235b72aefa0ada0ae7972963c4e457a4911d09c04a7dbdc4",
+        "optimization": "O3",
+        "placement": "flash"
+      },
+      {
+        "code_bytes": 218,
+        "language": "c++",
+        "machine_code_sha256": "51e022f1249de0f9235b72aefa0ada0ae7972963c4e457a4911d09c04a7dbdc4",
+        "optimization": "O3",
+        "placement": "flash"
+      },
+      {
+        "code_bytes": 218,
+        "language": "c",
+        "machine_code_sha256": "51e022f1249de0f9235b72aefa0ada0ae7972963c4e457a4911d09c04a7dbdc4",
+        "optimization": "O3",
+        "placement": "itcm"
+      },
+      {
+        "code_bytes": 218,
+        "language": "c++",
+        "machine_code_sha256": "51e022f1249de0f9235b72aefa0ada0ae7972963c4e457a4911d09c04a7dbdc4",
+        "optimization": "O3",
+        "placement": "itcm"
+      }
+    ],
+    "source_sha256": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+    "target_flags": [
+      "-mthumb",
+      "-mcpu=cortex-m7",
+      "-mfloat-abi=hard",
+      "-mfpu=fpv5-d16"
+    ],
+    "timing": "not measured; code size and instruction inspection only"
+  },
+  "schema_version": 1,
+  "source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+  "target": {
+    "core_id": "teensy:avr",
+    "core_version": "1.62.0",
+    "fqbn": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+    "resolved_build_properties": {
+      "build.board": "TEENSY40",
+      "build.fcpu": "450000000",
+      "build.flags.optimize": "-O2",
+      "build.usbtype": "USB_SERIAL"
+    },
+    "warnings": "all"
+  },
+  "tool_sha256": "6bc7d47b1bbe6ca457ed60d3ebb9441e40607aa5f0e03ab38d694e9b55d567c8"
+}
