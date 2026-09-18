@@ -41,7 +41,7 @@ constexpr std::uint32_t adcPairsPerBuffer(
     const protocol::Configuration &configuration) {
   return static_cast<std::uint32_t>(
       usesAuxInput(configuration)
-          ? protocol_v2::kInputAdcPairsPerFrame
+          ? rate_profile::kInputAdcPairsPerFrame
           : protocol_v2::kDisabledAdcPairsPerFrame);
 }
 
@@ -358,6 +358,9 @@ bool Controller::start(const protocol::Configuration &configuration,
   }
 
   if (includesAdc(profile)) {
+#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+    adc_capture_->setAuxInputMode(usesAuxInput(configuration));
+#endif
     report.adc_capture_start_status = adc_capture_->prepare(
         run_id, adcPairsPerBuffer(configuration));
     report.adc_capture_prepared =

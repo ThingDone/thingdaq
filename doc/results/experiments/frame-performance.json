@@ -1,0 +1,173 @@
+{
+  "schema": "thingdaq.frame-experiment/v1",
+  "date": "2026-09-18",
+  "branch": "experiment/larger-adc-frames",
+  "qualified_base": "v1.1.0",
+  "conclusion": "Live performance unmeasured; programming failed before capture. Larger image not submitted.",
+  "builds": {
+    "smaller_frames": {
+      "build_id": "thingdaq-bf3cc7acb836dfe0",
+      "source_id": "bf3cc7acb836dfe044ee61e4440f8ffe44262472d2461dfb5b39cd082577090f",
+      "base_commit": "8dd4929e93c63350bf5306481f0e459bf918dfcd",
+      "hex": {
+        "path": "firmware.ino.hex",
+        "sha256": "cf4eee1992a558a84c9eb2302b6b3a804d4360a78c9af9766497eb4d77b5a2ab",
+        "size_bytes": 446511
+      },
+      "target": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 124280,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1872900,
+          "headers_bytes": 8692
+        },
+        "ram1": {
+          "code_bytes": 32584,
+          "free_for_locals_bytes": 34528,
+          "padding_bytes": 184,
+          "variables_bytes": 456992
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "checksum_experiment": {
+        "base_source_id": "036ef4883f6544aed3e9f89e783cb62de1c6ab4dbfd09fcb2bcfb9b92b9b7b9e",
+        "builder_sha256": "614246bc822f09f1064cee5179457bbdc5b8e7d2b259028d190394fd61d32897",
+        "control_checksums": "unchanged",
+        "data_integrity_checked": false,
+        "identity_policy": "sha256(source_id:checksum-experiment-v1:mode)",
+        "mode": "none",
+        "wire_compatible": false
+      },
+      "frame_experiment": null
+    },
+    "larger_frames": {
+      "build_id": "thingdaq-f0ec13cc42c5e848",
+      "source_id": "f0ec13cc42c5e848b858e2476f4932eb1a7a0b229432b3fb54ab08fc6ab2f76e",
+      "base_commit": "8dd4929e93c63350bf5306481f0e459bf918dfcd",
+      "hex": {
+        "path": "firmware.ino.hex",
+        "sha256": "e6f64f37d56725ba156a92a943684c0a610b036b80a5804ad37b5a9c28102139",
+        "size_bytes": 446524
+      },
+      "target": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 124304,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1872900,
+          "headers_bytes": 8668
+        },
+        "ram1": {
+          "code_bytes": 32600,
+          "free_for_locals_bytes": 34528,
+          "padding_bytes": 168,
+          "variables_bytes": 456992
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "checksum_experiment": {
+        "base_source_id": "036ef4883f6544aed3e9f89e783cb62de1c6ab4dbfd09fcb2bcfb9b92b9b7b9e",
+        "builder_sha256": "614246bc822f09f1064cee5179457bbdc5b8e7d2b259028d190394fd61d32897",
+        "control_checksums": "unchanged",
+        "data_integrity_checked": false,
+        "identity_policy": "sha256(source_id:checksum-experiment-v1:mode:adc-frame-4096)",
+        "mode": "none",
+        "wire_compatible": false
+      },
+      "frame_experiment": {
+        "gpio_frame_bytes": 4096,
+        "input_adc_frame_bytes": 4096,
+        "input_adc_pairs_per_frame": 1012,
+        "packet_pool_bytes": 819200,
+        "wire_compatible": false
+      }
+    }
+  },
+  "calculated_not_measured": {
+    "adc_pairs_per_second": 1000000,
+    "gpio_samples_per_second": 1000000,
+    "payload_bytes_per_second": 6000000,
+    "smaller_total_frame_bytes_per_second": 6118577.075098814,
+    "larger_total_frame_bytes_per_second": 6071146.245059288,
+    "framed_byte_reduction_percent": 0.7751937984496229,
+    "combined_frame_count_reduction_percent": 40,
+    "extra_adc_frame_coverage_microseconds": 506,
+    "excludes": "USB transaction overhead and control traffic"
+  },
+  "live_attempt": {
+    "test_id": "284894cb-2586-4a29-a5c2-261148308280",
+    "outcome": "INFRASTRUCTURE_FAIL",
+    "case": "INPUT_COMBINED",
+    "profile": 4,
+    "seconds_per_cell": 10,
+    "planned_cells": 3,
+    "completed_cells": 0,
+    "submitted_firmware": {
+      "build_id": "thingdaq-e31051d44e59d73c",
+      "source_id": "e31051d44e59d73c11c513b6f7adfc1bc610c89953aaf5cbf4c0fb01ef0ab612",
+      "base_commit": "308b9c11aab7ffead58da3a842ed4f4f7c81f828",
+      "hex": {
+        "path": "firmware.ino.hex",
+        "sha256": "97eaf85a9f2dd112c2af766598cf5418ce240e6d7735dd31e21a0fd341ec2bb7",
+        "size_bytes": 446511
+      },
+      "target": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 124280,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1872900,
+          "headers_bytes": 8692
+        },
+        "ram1": {
+          "code_bytes": 32584,
+          "free_for_locals_bytes": 34528,
+          "padding_bytes": 184,
+          "variables_bytes": 456992
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "checksum_experiment": {
+        "base_source_id": "16d211800266ca8ab987686cc7487b21daec608f61a98e37ea4f7de98472fef4",
+        "builder_sha256": "15c8d6ce885d42c8492a5d3f1cc06597fd7b2cbe25dff081099cc1759f061d99",
+        "control_checksums": "unchanged",
+        "data_integrity_checked": false,
+        "identity_policy": "sha256(source_id:checksum-experiment-v1:mode)",
+        "mode": "none",
+        "wire_compatible": false
+      },
+      "frame_experiment": null
+    },
+    "service_reported_healthy": true,
+    "completed": true,
+    "program_success": false,
+    "exit_code": -130,
+    "message": "Error loading program for test_id 284894cb-2586-4a29-a5c2-261148308280: -110",
+    "loader_stdout": "Teensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/284894cb-2586-4a29-a5c2-261148308280/firmware.ino.hex\": 158720 bytes, 7.8% usage\nUnable to soft reboot with USB error: error sending control message: Protocol error\nWaiting for Teensy device...\n (hint: press the reset button)\n\nTeensy loader timed out after 75 seconds.",
+    "raw_directory": "doc/results/raw/frame-performance/adc2072-none",
+    "larger_frame_firmware_submitted": false,
+    "board_identity_after_attempt": "not re-identified"
+  },
+  "validation": {
+    "tests": 47,
+    "subtests": 549,
+    "larger_frame_native_encode_decode": true,
+    "equal_time_packet_accounting": true,
+    "host_two_to_one_interleaving_and_bad_timestamp_detection": true,
+    "ordinary_build_regressions": true,
+    "target_memory_gates": "PASS",
+    "ruff": "PASS",
+    "generated_protocol_check": "PASS (109 files)",
+    "electrical_transition_checks": "NOT_RUN"
+  }
+}

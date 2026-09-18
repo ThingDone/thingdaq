@@ -218,10 +218,14 @@ def main() -> int:
         choices=CASES,
         help="one case per --profiles/--cycle cell; changes width without reflashing",
     )
-    parser.add_argument("--service", default="http://192.168.150.14:5000")
+    parser.add_argument("--service", required=True, help="test-rig service URL")
     parser.add_argument(
-        "--auth-file", type=Path, default=Path("/home/bill/.fw_api_key")
+        "--checksum-experiment",
+        action="store_true",
+        help="explicitly enable the matching host for a checksum research build",
     )
+    parser.add_argument("--auth-file", type=Path, default=Path.home() / ".fw_api_key")
+    parser.add_argument("--frame-experiment", action="store_true")
     args = parser.parse_args()
     # Only live submission needs the service client's optional HTTP dependency.
     import requests
@@ -240,9 +244,37 @@ def main() -> int:
     firmware = (build / "firmware.ino.hex").read_bytes()
     manifest_bytes = (build / "build-manifest.json").read_bytes()
     manifest = json.loads(manifest_bytes)
+    checksum_experiment = manifest.get("checksum_experiment")
+    frame_experiment = manifest.get("frame_experiment")
+    if bool(frame_experiment) != args.frame_experiment:
+        parser.error(
+            "frame research builds require --frame-experiment and its manifest"
+        )
+    if frame_experiment and (
+        not checksum_experiment
+        or args.host_api
+        or frame_experiment.get("input_adc_frame_bytes") != 4096
+        or frame_experiment.get("input_adc_pairs_per_frame") != 1012
+    ):
+        parser.error("unsupported frame experiment or host; use standalone validation")
+    if bool(checksum_experiment) != args.checksum_experiment:
+        parser.error(
+            "checksum research builds require --checksum-experiment (and its manifest)"
+        )
     verify_hex(firmware, manifest)
     validator = "rig_release_sdk.py" if args.host_api else "rig_aux_input_capture.py"
     source = (args.worktree / "firmware/tests" / validator).read_text()
+    if checksum_experiment:
+        mode = checksum_experiment["mode"]
+        if mode not in ("baseline", "unrolled", "none"):
+            parser.error("unknown checksum experiment mode")
+        adapter = (
+            args.worktree / "firmware/tests/checksum_experiment_adapter.py"
+        ).read_text()
+        source += (
+            f"\nCHECKSUM_EXPERIMENT_MODE = {mode!r}\n"
+            f"FRAME_EXPERIMENT = {bool(frame_experiment)!r}\n" + adapter
+        )
     build_id = manifest["source"]["build_id"]
     settings = {
         "AUX_INPUT_CASE": args.case,
@@ -274,7 +306,9 @@ def main() -> int:
             parser.error("--host-api runs its own bounded mode sequence")
         package_bytes = io.BytesIO()
         with zipfile.ZipFile(package_bytes, "w", zipfile.ZIP_DEFLATED) as package:
-            for path in sorted((args.worktree / "daq_api/src/thingdaq").rglob("*.py")):
+            for path in sorted(
+                (args.worktree / "daq_api/src/thingdone_daq").rglob("*.py")
+            ):
                 package.writestr(
                     str(path.relative_to(args.worktree / "daq_api/src")),
                     path.read_bytes(),
@@ -283,7 +317,7 @@ def main() -> int:
         program = (
             "import base64, pathlib, sys, tempfile\n"
             "package_dir = tempfile.TemporaryDirectory(prefix='thingdaq-sdk-')\n"
-            "package_path = pathlib.Path(package_dir.name) / 'thingdaq.zip'\n"
+            "package_path = pathlib.Path(package_dir.name) / 'thingdone_daq.zip'\n"
             f"package_path.write_bytes(base64.b64decode({encoded!r}))\n"
             "sys.path.insert(0, str(package_path))\n"
         ) + program
@@ -337,6 +371,8 @@ def main() -> int:
             "manifest_sha256": digest(manifest_bytes),
             "source": manifest["source"],
             "input_experiment": experiment,
+            "checksum_experiment": checksum_experiment,
+            "frame_experiment": frame_experiment,
             "profile_sequence": sequence,
             "case_sequence": list(cases or (args.case,) * len(sequence)),
             "planned_program_seconds": planned_program_seconds,

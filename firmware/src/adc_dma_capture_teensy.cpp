@@ -330,9 +330,21 @@ void configureDescriptors() {
   }
 }
 
+#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+bool g_aux_input_mode = false;
+#endif
+
+bool auxiliaryPriorities() {
+#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+  return g_aux_input_mode;
+#else
+  return g_pairs_per_buffer == protocol_v2::kInputAdcPairsPerFrame;
+#endif
+}
+
 void configurePriorities() {
   edma_priority::configureReservedChannels(
-      g_pairs_per_buffer == protocol_v2::kInputAdcPairsPerFrame);
+      auxiliaryPriorities());
 }
 
 bool hardwareDestinationMatches(std::size_t converter,
@@ -433,7 +445,7 @@ bool configuredHardwareValid() {
        ++converter) {
     const IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
     const std::uint8_t expected_priority =
-        g_pairs_per_buffer == protocol_v2::kInputAdcPairsPerFrame
+        auxiliaryPriorities()
             ? board::kInputModeEdmaPriorities[converter]
             : board::kAdcEdmaPriorities[converter];
     if (*dmamuxRegister(converter) != dmamuxConfiguration(converter) ||
@@ -888,6 +900,12 @@ HardwareSnapshot hardwareSnapshot() {
 }
 
 }  // namespace
+
+#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+void TeensyAdcDmaCapture::setAuxInputMode(bool enabled) {
+  g_aux_input_mode = enabled;
+}
+#endif
 
 StartStatus TeensyAdcDmaCapture::inspectStart(std::uint32_t epoch) {
   return inspectHardwareStart(

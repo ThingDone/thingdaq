@@ -25,6 +25,11 @@
 #endif
 
 namespace thingdaq::input_experiment {
+#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+inline constexpr std::uint32_t kAdcFrameMultiplier = 2U;
+#else
+inline constexpr std::uint32_t kAdcFrameMultiplier = 1U;
+#endif
 inline constexpr bool kReleaseFixed1MHz = THINGDAQ_RELEASE_FIXED_1MHZ != 0;
 inline constexpr std::uint32_t kCpuHz = THINGDAQ_EXPERIMENT_CPU_HZ;
 static_assert(!kReleaseFixed1MHz || kCpuHz == 450000000U,

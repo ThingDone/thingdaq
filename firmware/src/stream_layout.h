@@ -92,9 +92,13 @@ struct RunLayout {
     const std::uint32_t gpio_coverage_multiplier =
         (input_experiment::kEqualRates || rate_profile == protocol_v2::RateProfile::kAdc1mhzGpio1mhz) &&
                 protocol_version == protocol_v2::kProtocolVersion ? 4U : 1U;
+    const std::uint32_t adc_multiplier =
+        protocol_version == protocol_v2::kProtocolVersion &&
+                aux_bank_mode == protocol_v2::AuxBankMode::kInput
+            ? input_experiment::kAdcFrameMultiplier : 1U;
     if (!streams[0].valid() || !streams[1].valid() ||
         streams[0].coverage_ticks * gpio_coverage_multiplier !=
-            streams[1].coverage_ticks) {
+            streams[1].coverage_ticks * adc_multiplier) {
       return false;
     }
     if (protocol_version == protocol_v1::kProtocolVersion) {
@@ -132,7 +136,7 @@ struct RunLayout {
     }
     const std::uint32_t adc_items = static_cast<std::uint32_t>(
         disabled ? protocol_v2::kDisabledAdcPairsPerFrame
-                 : protocol_v2::kInputAdcPairsPerFrame);
+                 : rate_profile::kInputAdcPairsPerFrame);
     const std::uint32_t gpio_items = static_cast<std::uint32_t>(
         disabled ? protocol_v2::kDisabledGpioSamplesPerFrame
                  : protocol_v2::kInputGpioSamplesPerFrame);
@@ -149,7 +153,8 @@ struct RunLayout {
            streams[1].item_bytes == gpio_item_bytes &&
            streams[1].item_period_ticks ==
                timing->gpio_sample_period_ticks &&
-           streams[1].coverage_ticks == coverage * gpio_coverage_multiplier &&
+           streams[1].coverage_ticks * adc_multiplier ==
+               coverage * gpio_coverage_multiplier &&
            streams[1].payload_bytes == protocol_v2::kDataPayloadBytes;
   }
 };
@@ -233,7 +238,7 @@ constexpr Result experimental(protocol_v2::AuxBankMode mode,
 
   const bool input = mode == protocol_v2::AuxBankMode::kInput;
   const std::uint32_t adc_items = static_cast<std::uint32_t>(
-      input ? protocol_v2::kInputAdcPairsPerFrame
+      input ? rate_profile::kInputAdcPairsPerFrame
             : protocol_v2::kDisabledAdcPairsPerFrame);
   const std::uint32_t gpio_items = static_cast<std::uint32_t>(
       input ? protocol_v2::kInputGpioSamplesPerFrame
@@ -277,7 +282,11 @@ static_assert(experimental(protocol_v2::AuxBankMode::kInput,
 static_assert(experimental(protocol_v2::AuxBankMode::kInput,
                            protocol_v2::RateProfile::kAdc1mhzGpio4mhz)
                   .layout.streams[0]
-                  .frame_bytes == protocol_v2::kMinDataFrameBytes);
+                  .frame_bytes ==
+              protocol_v1::kHeaderSize + protocol_v1::kTrailerSize +
+                  protocol_v2::kInputAdcPairsPerFrame *
+                      input_experiment::kAdcFrameMultiplier *
+                      protocol_v2::kAdcBytesPerPair);
 
 }  // namespace thingdaq::stream_layout
 

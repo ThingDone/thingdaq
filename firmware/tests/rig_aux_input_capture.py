@@ -2734,14 +2734,16 @@ class AcquisitionValidator:
         else:
             raise ProtocolFailure(f"unexpected data kind 0x{frame.kind:02x}")
         if self.case.stream_mask == STREAM_BOTH:
-            weight = 4 if EXPERIMENT_EQUAL_RATES or self.profile.value == 4 else 1
+            weight = (
+                self.layout.gpio_items_per_frame * self.profile.gpio_period_ticks
+            ) / (self.layout.adc_items_per_frame * self.profile.adc_period_ticks)
             self.maximum_frame_skew = max(
                 self.maximum_frame_skew,
                 abs(self.adc.frames - weight * self.gpio.frames),
             )
-            if self.maximum_frame_skew > weight:
+            if self.maximum_frame_skew > max(1, weight):
                 raise ProtocolFailure(
-                    "combined host time-coverage skew exceeds one GPIO frame"
+                    "combined host time-coverage skew exceeds one data frame"
                 )
 
     def _continuity(

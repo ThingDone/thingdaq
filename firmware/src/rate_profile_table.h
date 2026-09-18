@@ -16,9 +16,12 @@
 namespace thingdaq::rate_profile {
 
 inline constexpr std::size_t kCount = 5U;
+inline constexpr std::size_t kInputAdcPairsPerFrame =
+    protocol_v2::kInputAdcPairsPerFrame * input_experiment::kAdcFrameMultiplier;
 
 constexpr protocol_v2::RateProfileTiming experimentTiming(
     protocol_v2::RateProfileTiming timing) {
+  timing.input_frame_coverage_ticks *= input_experiment::kAdcFrameMultiplier;
   timing.completion_expected_dwt_cycles =
       input_experiment::scaleDwt(timing.completion_expected_dwt_cycles);
   if (input_experiment::kEqualRates && timing.gpio_sample_rate_hz != timing.adc_pair_rate_hz) {

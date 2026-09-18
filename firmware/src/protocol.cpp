@@ -431,11 +431,11 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
                    : protocol_v2::kDisabledGpioSamplesPerFrame);
       const bool input =
           header.payload_length ==
-              (adc ? protocol_v2::kInputAdcPairsPerFrame *
+              (adc ? rate_profile::kInputAdcPairsPerFrame *
                          protocol_v2::kAdcBytesPerPair
                    : protocol_v2::kInputGpioSamplesPerFrame * 2U) &&
           header.item_count ==
-              (adc ? protocol_v2::kInputAdcPairsPerFrame
+              (adc ? rate_profile::kInputAdcPairsPerFrame
                    : protocol_v2::kInputGpioSamplesPerFrame);
       const std::uint32_t item_bytes = adc ? 4U : (input ? 2U : 1U);
       if ((!disabled && !input) ||
@@ -2272,9 +2272,10 @@ bool dataFrameShapeMatchesContract(protocol_v1::FrameKind kind,
         shape.item_bytes ==
             (adc ? protocol_v2::kAdcBytesPerPair : 1U);
     const bool input =
-        coverage == timing.input_frame_coverage_ticks * coverage_multiplier &&
+        coverage * (adc ? 1U : input_experiment::kAdcFrameMultiplier) ==
+            timing.input_frame_coverage_ticks * coverage_multiplier &&
         shape.item_count ==
-            (adc ? protocol_v2::kInputAdcPairsPerFrame
+            (adc ? rate_profile::kInputAdcPairsPerFrame
                  : protocol_v2::kInputGpioSamplesPerFrame) &&
         shape.item_bytes ==
             (adc ? protocol_v2::kAdcBytesPerPair : 2U);
@@ -3049,7 +3050,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
            response.supported_configuration_mask);
   storeU16(bytes, protocol_v1::kInfoResponseDataPayloadBytesOffset,
            auxiliary_input
-               ? static_cast<std::uint16_t>(protocol_v2::kInputAdcPairsPerFrame *
+               ? static_cast<std::uint16_t>(rate_profile::kInputAdcPairsPerFrame *
                                             protocol_v1::kAdcPairBytes)
                : response.data_payload_bytes);
   storeU16(bytes, protocol_v1::kInfoResponseAdcPairsPerFrameOffset,
@@ -3057,7 +3058,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                ? static_cast<std::uint16_t>(
                      response.applied_configuration.aux_bank_mode ==
                              protocol_v2::AuxBankMode::kInput
-                         ? protocol_v2::kInputAdcPairsPerFrame
+                         ? rate_profile::kInputAdcPairsPerFrame
                          : protocol_v2::kDisabledAdcPairsPerFrame)
                : response.adc_pairs_per_frame);
   storeU16(bytes, protocol_v1::kInfoResponseGpioSamplesPerFrameOffset,
@@ -3097,7 +3098,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                ? static_cast<std::uint16_t>(
                      response.applied_configuration.aux_bank_mode ==
                              protocol_v2::AuxBankMode::kInput
-                         ? protocol_v2::kInputAdcPairsPerFrame
+                         ? rate_profile::kInputAdcPairsPerFrame
                          : protocol_v2::kDisabledAdcPairsPerFrame)
                : response.adc_pairs_per_buffer);
   storeU32(bytes, protocol_v1::kInfoResponseAdcDmaRingBytesOffset,
@@ -3105,7 +3106,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                ? static_cast<std::uint32_t>(
                      ((response.applied_configuration.aux_bank_mode ==
                                protocol_v2::AuxBankMode::kInput
-                           ? protocol_v2::kInputAdcPairsPerFrame
+                           ? rate_profile::kInputAdcPairsPerFrame
                            : protocol_v2::kDisabledAdcPairsPerFrame) *
                               protocol_v1::kAdcPairBytes +
                           31U) /
@@ -3200,7 +3201,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
              protocol_v2::kInfoResponseDisabledGpioSamplesPerFrameOffset,
              protocol_v2::kDisabledGpioSamplesPerFrame);
     storeU16(bytes, protocol_v2::kInfoResponseInputAdcPairsPerFrameOffset,
-             protocol_v2::kInputAdcPairsPerFrame);
+             rate_profile::kInputAdcPairsPerFrame);
     storeU16(bytes, protocol_v2::kInfoResponseInputGpioSamplesPerFrameOffset,
              protocol_v2::kInputGpioSamplesPerFrame);
     for (std::size_t index = 0U; index < rate_profile::kCount; ++index) {

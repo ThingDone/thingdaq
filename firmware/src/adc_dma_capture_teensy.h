@@ -45,6 +45,9 @@ struct HardwareSnapshot {
 
 class TeensyAdcDmaCapture final : public HardwareCapture {
  public:
+#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+  void setAuxInputMode(bool enabled) override;
+#endif
   StartStatus inspectStart(std::uint32_t epoch) override;
   StartStatus inspectStart(std::uint32_t epoch,
                            std::uint32_t pairs_per_buffer) override;

@@ -670,11 +670,17 @@ std::uint64_t PacketBufferPipeline::accountedFrames(
 }
 
 std::uint64_t PacketBufferPipeline::coverageFrames(std::size_t index) const {
-  // Existing layouts remain 1:1. Equal-rate v2 has four short ADC frames
-  // per GPIO frame; fairness and reported skew use GPIO-frame time units.
+  // Compare equal time coverage, including the experiment's doubled ADC
+  // frame. Use shifts by constant divisors rather than 64-bit tick products.
   const bool weighted = (input_experiment::kEqualRates ||
       layout_.rate_profile == protocol_v2::RateProfile::kAdc1mhzGpio1mhz) &&
       layout_.protocol_version == protocol_v2::kProtocolVersion;
+  if (input_experiment::kAdcFrameMultiplier == 2U &&
+      layout_.protocol_version == protocol_v2::kProtocolVersion &&
+      layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput) {
+    return weighted == (index == 0U) ? accountedFrames(index) / 2U
+                                     : accountedFrames(index);
+  }
   return accountedFrames(index) / (weighted && index == 0U ? 4U : 1U);
 }
 
