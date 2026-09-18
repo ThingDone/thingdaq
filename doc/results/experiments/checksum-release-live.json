@@ -1,0 +1,161 @@
+{
+  "schema": "thingdaq.checksum-release-live/v1",
+  "source_branch": "experiment/checksum-release-v110",
+  "source_commit": "8dd4929",
+  "runner_commit": "9aded82",
+  "scope": "Ten-second independent-validator capture on release v1.1.0, ADC plus 16 GPIO, 450 MHz core, 1 MHz inputs",
+  "none": {
+    "result": {
+      "evidence": [
+        {
+          "aux_bank_mode": "INPUT",
+          "case": "INPUT_COMBINED",
+          "checks": 131,
+          "configured_rates_hz": {
+            "adc_pairs": 1000000,
+            "gpio_samples": 1000000
+          },
+          "duration_seconds": 10.0,
+          "failed_checks": [],
+          "failures": [],
+          "fixture": {
+            "authorized": false,
+            "classification": "ELECTRICALLY_UNSTIMULATED",
+            "external_transition_checks": "NOT_RUN"
+          },
+          "kind": "aux_input_capture",
+          "metrics": {
+            "adc_frames": 20310,
+            "adc_rate_hz": 999863.1947136938,
+            "aux_bank_samples_captured": 10275848,
+            "capture_seconds": 10.008025150746107,
+            "firmware_processing_cpu_basis_points": 1559,
+            "gpio_frames": 5077,
+            "gpio_rate_hz": 999863.1947136938,
+            "host_peak_rss_growth_bytes": 16384,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.023013323079794645,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 36,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 10275848,
+            "paired_samples_transmitted": 10275848,
+            "primary_bank_samples_captured": 10275848,
+            "status_count": 21,
+            "status_p99_seconds": 0.010923407971858978,
+            "stop_tail_adc_items": 493,
+            "stop_tail_gpio_items": 1505,
+            "temperature_samples": []
+          },
+          "paired_diagnostic": "NOT_RUN",
+          "protocol_version": 2,
+          "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+          "result": "PASS",
+          "schema": "thingdaq.experiment-evidence/v1"
+        }
+      ],
+      "exit_code": 0,
+      "message": "Container ran successfully for test_id e49d1ad1-46d6-4529-a541-63ebcd43b7e3",
+      "outcome": "PASS",
+      "test_id": "e49d1ad1-46d6-4529-a541-63ebcd43b7e3"
+    },
+    "build": {
+      "source_id": "e31051d44e59d73c11c513b6f7adfc1bc610c89953aaf5cbf4c0fb01ef0ab612",
+      "build_id": "thingdaq-e31051d44e59d73c",
+      "timestamp_epoch": 1788585013,
+      "hex": {
+        "path": "firmware.ino.hex",
+        "sha256": "97eaf85a9f2dd112c2af766598cf5418ce240e6d7735dd31e21a0fd341ec2bb7",
+        "size_bytes": 446511
+      },
+      "experiment": {
+        "base_source_id": "16d211800266ca8ab987686cc7487b21daec608f61a98e37ea4f7de98472fef4",
+        "builder_sha256": "15c8d6ce885d42c8492a5d3f1cc06597fd7b2cbe25dff081099cc1759f061d99",
+        "control_checksums": "unchanged",
+        "data_integrity_checked": false,
+        "identity_policy": "sha256(source_id:checksum-experiment-v1:mode)",
+        "mode": "none",
+        "wire_compatible": false
+      }
+    }
+  },
+  "baseline": {
+    "result": {
+      "evidence": [
+        {
+          "aux_bank_mode": "INPUT",
+          "case": "INPUT_COMBINED",
+          "checks": 131,
+          "configured_rates_hz": {
+            "adc_pairs": 1000000,
+            "gpio_samples": 1000000
+          },
+          "duration_seconds": 10.0,
+          "failed_checks": [],
+          "failures": [],
+          "fixture": {
+            "authorized": false,
+            "classification": "ELECTRICALLY_UNSTIMULATED",
+            "external_transition_checks": "NOT_RUN"
+          },
+          "kind": "aux_input_capture",
+          "metrics": {
+            "adc_frames": 20301,
+            "adc_rate_hz": 1000000.2798329392,
+            "aux_bank_samples_captured": 10271800,
+            "capture_seconds": 10.002099201083183,
+            "firmware_processing_cpu_basis_points": 1689,
+            "gpio_frames": 5075,
+            "gpio_rate_hz": 1000050.8692132109,
+            "host_peak_rss_growth_bytes": 12288,
+            "maximum_frame_skew": 3,
+            "maximum_receive_gap_seconds": 0.02134720329195261,
+            "packet_ready_high_water": 3,
+            "packet_transmit_high_water": 40,
+            "paired_generation_skew_events": 0,
+            "paired_samples_joined": 10271800,
+            "paired_samples_transmitted": 10271800,
+            "primary_bank_samples_captured": 10271800,
+            "status_count": 21,
+            "status_p99_seconds": 0.010965291876345873,
+            "stop_tail_adc_items": 381,
+            "stop_tail_gpio_items": 887,
+            "temperature_samples": []
+          },
+          "paired_diagnostic": "NOT_RUN",
+          "protocol_version": 2,
+          "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+          "result": "PASS",
+          "schema": "thingdaq.experiment-evidence/v1"
+        }
+      ],
+      "exit_code": 0,
+      "message": "Container ran successfully for test_id 8c764a60-46e9-4816-848c-c4b4fe33c5a9",
+      "outcome": "PASS",
+      "test_id": "8c764a60-46e9-4816-848c-c4b4fe33c5a9"
+    },
+    "build": {
+      "source_id": "636aebbecbf7069173552894e1dcbb8444887c63bcf942cddc8cee87908d7994",
+      "build_id": "thingdaq-636aebbecbf70691",
+      "hex": {
+        "path": "firmware.ino.hex",
+        "sha256": "23b0f2ef8023c52021b22b8c6642f801866dfe8b1aadc48affc6b1ac66c2157a",
+        "size_bytes": 446511
+      }
+    }
+  },
+  "processing_metric": {
+    "wire_name": "gpio_processing_cpu_basis_points",
+    "scope": "AuxiliaryBatchPacker active cycles divided by elapsed cycles; not whole-core or host CPU",
+    "baseline_percent": 16.89,
+    "none_percent": 15.59,
+    "decrease_percentage_points": 1.3
+  },
+  "limitations": [
+    "One short run per variant; no maximum-throughput or endurance claim",
+    "Data corruption detection disabled in none mode; control checksums retained",
+    "Independent validator, not public Python SDK",
+    "No external stimulus; analog accuracy and external GPIO timing not tested"
+  ],
+  "final_board_firmware": "Published v1.1.0 baseline, checksums enabled"
+}

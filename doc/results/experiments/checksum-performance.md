@@ -19,12 +19,14 @@ Branch: `experiment/checksum-performance`, based on `370ae2a`.
 in live acquisition throughput.** Removing checksum computation improved the
 local v2 parser's median throughput by **20.5–24.1%**. An exact, four-byte
 Adler-32 loop reduced native-host firmware checksum time by **26.7–28.2%**
-without changing the checksum. Cortex-M7 performance remains unmeasured because
-the baseline disconnected and subsequent firmware uploads failed.
+without changing the checksum. A subsequent live comparison on the qualified
+v1.1.0 release passed with and without data checksums. The GPIO processing
+counter fell from 16.89% to 15.59%; delivered sample rates remained 1 MHz.
+Isolated Cortex-M7 checksum timings remain unmeasured.
 
 Retain Adler-32 for production. The unrolled implementation is the promising
 candidate for the next hardware comparison; checksum removal loses corruption
-detection and did not establish a live-stream benefit in this experiment.
+detection and has not demonstrated higher live sample throughput.
 Production builds and public SDK behavior remain unchanged. No acquisition
 clock or supported sample rate was increased.
 
@@ -86,7 +88,7 @@ only dispatch/loop overhead; its equivalent byte rate is not memory bandwidth.
 The pinned Teensy compiler emits a 236-byte unrolled Adler body versus 120 bytes
 for baseline. Exact symbol-size and linked-memory checks remain enforced.
 
-## Hardware attempts and limits
+## Initial hardware attempts and limits
 
 All attempts used the existing remote service and Teensy 4.0 serial `20428100`,
 450 MHz core and release profile 4. The service initially reported healthy and
@@ -110,11 +112,61 @@ the current runtime-hardening commit, whose existing report explicitly says
 it had not yet been hardware-qualified. No unrelated watchdog/USB change was
 made to get this experiment to pass.
 
-There is no valid on-device checksum timing, paired live-throughput result,
-lossless no-checksum run, or new maximum sample-rate claim. The last confirmed
-successful flash was the baseline (checksums enabled); the two modified
-variants were not confirmed flashed. Resolve the device/loader availability
-and baseline stability before resuming the A/B campaign.
+Those initial attempts yielded no on-device checksum timing or usable paired
+capture. The following release-based comparison supersedes their blocked
+hardware status without discarding the original failures.
+
+## Release-based live comparison
+
+After fixture recovery, the published v1.1.0 firmware passed a five-second
+baseline (job `5dbc502b-96c9-486f-be3d-0521cd47e6e2`). The original experimental
+builds included later runtime-hardening changes, so this follow-up isolated
+checksum removal on the exact release source instead.
+
+Branch `experiment/checksum-release-v110`, commit `8dd4929`, is based on tag
+`v1.1.0`. Its only firmware source change is the 13-line conditional data-frame
+bypass in `protocol::computeChecksum`; the second changed file is the isolated
+builder. No runtime-hardening changes or Adler unrolling are included. The
+matching host adapter and runner come from `experiment/checksum-performance`
+at `9aded82`. Control checksums, framing, sequences and loss checks remain active.
+
+Both runs used the same independent validator, Teensy serial `20428100`,
+450 MHz core, profile 4, combined ADC + 16 GPIO, and ten-second captures.
+The no-checksum run was followed by a published-release baseline, leaving the
+board with standard checksums enabled. Compact evidence, firmware hashes and
+build identities are in [checksum-release-live.json](checksum-release-live.json).
+
+| Measurement | Published baseline | Release with data checksum disabled |
+| --- | ---: | ---: |
+| Job | `8c764a60-46e9-4816-848c-c4b4fe33c5a9` | `e49d1ad1-46d6-4529-a541-63ebcd43b7e3` |
+| Result | PASS, 131 checks | PASS, 131 checks under experimental validation |
+| Capture duration | 10.0021 s | 10.0080 s |
+| ADC pairs/s | 1,000,000.28 | 999,863.19 |
+| GPIO samples/s | 1,000,050.87 | 999,863.19 |
+| GPIO processing occupancy | 16.89% | 15.59% |
+| Packet transmit queue peak | 40 frames | 36 frames |
+| STATUS p99 | 10.97 ms | 10.92 ms |
+
+There were no reported frame gaps, paired-generation skew, loss/conservation
+failures or disconnects. Data corruption detection was intentionally absent in
+the no-checksum run; its PASS must not be read as a data-integrity qualification.
+No external electrical stimulus was connected.
+
+The report field `firmware_processing_cpu_basis_points` originates from the
+wire field `gpio_processing_cpu_basis_points`. It measures the GPIO auxiliary
+packer's active cycles divided by elapsed cycles, not whole-core or host CPU.
+The observed decrease is 1.30 percentage points (about 7.7% relative). With one
+short run per variant, queue and latency differences are descriptive, not a
+statistical improvement claim. This confirms that checksum-disabled live
+capture works on the qualified release; it does not identify the cause of the
+earlier failures, qualify the public SDK, or establish a higher maximum rate.
+
+The release-based build passed pinned toolchain and linked-memory gates.
+Nine portable checksum/protocol tests passed with 348 subtests, and the
+experimental control/data boundary test passed against the release sources.
+Ruff and formatting passed. Rebuild the isolated variant with the builder on
+its branch using `SOURCE_DATE_EPOCH=1788585013` and `--mode none`; submit it with
+the existing experiment runner using `--checksum-experiment`.
 
 ## Validation
 
