@@ -1,0 +1,633 @@
+{
+  "build_gate": "PASS for all three modes; normal pinned builder gates retained",
+  "builds": [
+    {
+      "artifacts": [
+        {
+          "path": "firmware.ino.elf",
+          "sha256": "80dca3c4b5d2a326b034a3fa7cef24e608302363d681b197bbbc2c119e5aa518",
+          "size_bytes": 2385048
+        },
+        {
+          "path": "firmware.ino.hex",
+          "sha256": "67c1beea440b98cfd5aa7c80db3322bd1e560ecb6cebffaeafb91bed9a11d90b",
+          "size_bytes": 460924
+        }
+      ],
+      "checksum_experiment": {
+        "base_source_id": "ebe5f98d0270616e48113fc94460034bd3fee9644e4e7b6b180dc67cb192a92b",
+        "builder_sha256": "1f248aae78b8c3e76dd772860765a75bd7427fe792a0e1a38fef41fbf9ecdff3",
+        "control_checksums": "unchanged",
+        "data_integrity_checked": true,
+        "identity_policy": "sha256(source_id:checksum-experiment-v1:mode)",
+        "mode": "baseline",
+        "wire_compatible": true
+      },
+      "checksum_resources": {
+        "algorithms": {
+          "ADLER32": {
+            "code_address": "0x0000134c",
+            "code_symbol": "thingdaq::checksum::adler32(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "arithmetic (no lookup table)",
+            "implementation_code_bytes": 120,
+            "table_flash_bytes": 0,
+            "table_ram_bytes": 0
+          },
+          "CRC32C": {
+            "address": "0x6001b080",
+            "code_address": "0x000013c4",
+            "code_symbol": "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "thingdaq::checksum::detail::kCrc32cTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          },
+          "CRC32_ISO_HDLC": {
+            "address": "0x60019080",
+            "code_address": "0x000014f8",
+            "code_symbol": "thingdaq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "thingdaq::checksum::detail::kCrc32IsoHdlcTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          }
+        },
+        "placement": "memory-mapped program flash (.progmem.checksum.*)",
+        "shared_dispatch": {
+          "address": "0x0000162c",
+          "code_bytes": 84,
+          "symbol": "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
+          "symbol_type": "T"
+        },
+        "total_implementation_code_bytes": 736,
+        "total_table_flash_bytes": 16384,
+        "total_table_ram_bytes": 0
+      },
+      "compiler": {
+        "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "path": "/home/bill/.arduino15/packages/teensy/tools/teensy-compile/15.2.1/arm/bin/arm-none-eabi-g++"
+      },
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 129728,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1867780,
+          "headers_bytes": 8364
+        },
+        "ram1": {
+          "code_bytes": 32520,
+          "free_for_locals_bytes": 34464,
+          "padding_bytes": 248,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "source": {
+        "build_id": "thingdaq-0647168b3666a146",
+        "firmware_input_changes": [
+          " M firmware/src/checksum.cpp",
+          " M firmware/src/checksum.h",
+          " M firmware/src/protocol.cpp"
+        ],
+        "firmware_inputs_clean": false,
+        "git_commit": "370ae2ad11c9a20927d9c02f10cb83c0f421a10d",
+        "inputs": [
+          "firmware/firmware.ino",
+          "firmware/src/acquisition_controller.cpp",
+          "firmware/src/acquisition_controller.h",
+          "firmware/src/adc_dma_capture.cpp",
+          "firmware/src/adc_dma_capture.h",
+          "firmware/src/adc_dma_capture_teensy.cpp",
+          "firmware/src/adc_dma_capture_teensy.h",
+          "firmware/src/adc_frame_packer.cpp",
+          "firmware/src/adc_frame_packer.h",
+          "firmware/src/adc_initializer.cpp",
+          "firmware/src/adc_initializer.h",
+          "firmware/src/adc_initializer_teensy.cpp",
+          "firmware/src/adc_initializer_teensy.h",
+          "firmware/src/adc_trigger.cpp",
+          "firmware/src/adc_trigger.h",
+          "firmware/src/adc_trigger_teensy.cpp",
+          "firmware/src/adc_trigger_teensy.h",
+          "firmware/src/board_config.h",
+          "firmware/src/checksum.cpp",
+          "firmware/src/checksum.h",
+          "firmware/src/checksum_benchmark.cpp",
+          "firmware/src/checksum_benchmark.h",
+          "firmware/src/checksum_benchmark_teensy.cpp",
+          "firmware/src/checksum_benchmark_teensy.h",
+          "firmware/src/control_state.cpp",
+          "firmware/src/control_state.h",
+          "firmware/src/dma_buffer_ownership.h",
+          "firmware/src/edma_priority_teensy.h",
+          "firmware/src/firmware_capabilities.h",
+          "firmware/src/firmware_identity.h",
+          "firmware/src/firmware_runtime.cpp",
+          "firmware/src/firmware_runtime.h",
+          "firmware/src/generated/protocol_constants.h",
+          "firmware/src/generated/protocol_v2_constants.h",
+          "firmware/src/gpio_batch_packer.cpp",
+          "firmware/src/gpio_batch_packer.h",
+          "firmware/src/gpio_batch_packer_teensy.cpp",
+          "firmware/src/gpio_batch_packer_teensy.h",
+          "firmware/src/gpio_capture_diagnostic.cpp",
+          "firmware/src/gpio_capture_diagnostic.h",
+          "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+          "firmware/src/gpio_capture_diagnostic_teensy.h",
+          "firmware/src/gpio_clock_diagnostic.cpp",
+          "firmware/src/gpio_clock_diagnostic.h",
+          "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+          "firmware/src/gpio_clock_diagnostic_teensy.h",
+          "firmware/src/gpio_dma_route_teensy.h",
+          "firmware/src/gpio_dual_bank_capture.cpp",
+          "firmware/src/gpio_dual_bank_capture.h",
+          "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+          "firmware/src/gpio_dual_bank_capture_teensy.h",
+          "firmware/src/gpio_dual_bank_packer.cpp",
+          "firmware/src/gpio_dual_bank_packer.h",
+          "firmware/src/gpio_raw_capture.cpp",
+          "firmware/src/gpio_raw_capture.h",
+          "firmware/src/gpio_raw_capture_teensy.cpp",
+          "firmware/src/gpio_raw_capture_teensy.h",
+          "firmware/src/gpio_raw_storage_teensy.h",
+          "firmware/src/input_experiment_profile.h",
+          "firmware/src/interrupt_guard_teensy.h",
+          "firmware/src/interrupt_vectors_teensy.h",
+          "firmware/src/packet_buffer_pipeline.cpp",
+          "firmware/src/packet_buffer_pipeline.h",
+          "firmware/src/protocol.cpp",
+          "firmware/src/protocol.h",
+          "firmware/src/rate_profile_table.h",
+          "firmware/src/runtime_health.h",
+          "firmware/src/runtime_health_teensy.cpp",
+          "firmware/src/statistics.cpp",
+          "firmware/src/statistics.h",
+          "firmware/src/stream_layout.h",
+          "firmware/src/synthetic_source.cpp",
+          "firmware/src/synthetic_source.h",
+          "firmware/src/teensy_clock.cpp",
+          "firmware/src/teensy_clock.h",
+          "firmware/src/teensy_usb.cpp",
+          "firmware/src/teensy_usb.h",
+          "firmware/src/temperature.h",
+          "firmware/src/temperature_teensy.cpp",
+          "firmware/src/usb_transport.cpp",
+          "firmware/src/usb_transport.h",
+          "firmware/src/variable_rate_scheduler.cpp",
+          "firmware/src/variable_rate_scheduler.h",
+          "firmware/src/variable_rate_scheduler_teensy.cpp",
+          "firmware/src/variable_rate_scheduler_teensy.h",
+          "firmware/src/watchdog_teensy.cpp",
+          "firmware/src/watchdog_teensy.h",
+          "protocol/protocol-v1.json",
+          "protocol/protocol-v2.json"
+        ],
+        "source_id": "0647168b3666a146b4d051dd248f5cf81e6f093933e40c596fae49bd8fb95252",
+        "timestamp_epoch": 1789243570,
+        "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+        "timestamp_utc": "2026-09-12T20:06:10Z"
+      },
+      "target": {
+        "core_id": "teensy:avr",
+        "core_version": "1.62.0",
+        "fqbn": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+        "resolved_build_properties": {
+          "build.board": "TEENSY40",
+          "build.fcpu": "450000000",
+          "build.flags.optimize": "-O2",
+          "build.usbtype": "USB_SERIAL"
+        },
+        "warnings": "all"
+      }
+    },
+    {
+      "artifacts": [
+        {
+          "path": "firmware.ino.elf",
+          "sha256": "13f6909836e80e96d2c15ca416195ac964c84e92487858f101a890ce10963197",
+          "size_bytes": 2385548
+        },
+        {
+          "path": "firmware.ino.hex",
+          "sha256": "d7a75e04865cdbad9cb70f952d8a95a07d6c11897b730c77cf6c10beaba3c1c5",
+          "size_bytes": 460924
+        }
+      ],
+      "checksum_experiment": {
+        "base_source_id": "ebe5f98d0270616e48113fc94460034bd3fee9644e4e7b6b180dc67cb192a92b",
+        "builder_sha256": "1f248aae78b8c3e76dd772860765a75bd7427fe792a0e1a38fef41fbf9ecdff3",
+        "control_checksums": "unchanged",
+        "data_integrity_checked": true,
+        "identity_policy": "sha256(source_id:checksum-experiment-v1:mode)",
+        "mode": "unrolled",
+        "wire_compatible": true
+      },
+      "checksum_resources": {
+        "algorithms": {
+          "ADLER32": {
+            "code_address": "0x0000134c",
+            "code_symbol": "thingdaq::checksum::adler32(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "arithmetic (no lookup table)",
+            "implementation_code_bytes": 236,
+            "table_flash_bytes": 0,
+            "table_ram_bytes": 0
+          },
+          "CRC32C": {
+            "address": "0x6001b080",
+            "code_address": "0x00001438",
+            "code_symbol": "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "thingdaq::checksum::detail::kCrc32cTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          },
+          "CRC32_ISO_HDLC": {
+            "address": "0x60019080",
+            "code_address": "0x0000156c",
+            "code_symbol": "thingdaq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "thingdaq::checksum::detail::kCrc32IsoHdlcTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          }
+        },
+        "placement": "memory-mapped program flash (.progmem.checksum.*)",
+        "shared_dispatch": {
+          "address": "0x000016a0",
+          "code_bytes": 84,
+          "symbol": "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
+          "symbol_type": "T"
+        },
+        "total_implementation_code_bytes": 852,
+        "total_table_flash_bytes": 16384,
+        "total_table_ram_bytes": 0
+      },
+      "compiler": {
+        "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "path": "/home/bill/.arduino15/packages/teensy/tools/teensy-compile/15.2.1/arm/bin/arm-none-eabi-g++"
+      },
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 129856,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1867780,
+          "headers_bytes": 8236
+        },
+        "ram1": {
+          "code_bytes": 32648,
+          "free_for_locals_bytes": 34464,
+          "padding_bytes": 120,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "source": {
+        "build_id": "thingdaq-6d7b15cd5905a99a",
+        "firmware_input_changes": [
+          " M firmware/src/checksum.cpp",
+          " M firmware/src/checksum.h",
+          " M firmware/src/protocol.cpp"
+        ],
+        "firmware_inputs_clean": false,
+        "git_commit": "370ae2ad11c9a20927d9c02f10cb83c0f421a10d",
+        "inputs": [
+          "firmware/firmware.ino",
+          "firmware/src/acquisition_controller.cpp",
+          "firmware/src/acquisition_controller.h",
+          "firmware/src/adc_dma_capture.cpp",
+          "firmware/src/adc_dma_capture.h",
+          "firmware/src/adc_dma_capture_teensy.cpp",
+          "firmware/src/adc_dma_capture_teensy.h",
+          "firmware/src/adc_frame_packer.cpp",
+          "firmware/src/adc_frame_packer.h",
+          "firmware/src/adc_initializer.cpp",
+          "firmware/src/adc_initializer.h",
+          "firmware/src/adc_initializer_teensy.cpp",
+          "firmware/src/adc_initializer_teensy.h",
+          "firmware/src/adc_trigger.cpp",
+          "firmware/src/adc_trigger.h",
+          "firmware/src/adc_trigger_teensy.cpp",
+          "firmware/src/adc_trigger_teensy.h",
+          "firmware/src/board_config.h",
+          "firmware/src/checksum.cpp",
+          "firmware/src/checksum.h",
+          "firmware/src/checksum_benchmark.cpp",
+          "firmware/src/checksum_benchmark.h",
+          "firmware/src/checksum_benchmark_teensy.cpp",
+          "firmware/src/checksum_benchmark_teensy.h",
+          "firmware/src/control_state.cpp",
+          "firmware/src/control_state.h",
+          "firmware/src/dma_buffer_ownership.h",
+          "firmware/src/edma_priority_teensy.h",
+          "firmware/src/firmware_capabilities.h",
+          "firmware/src/firmware_identity.h",
+          "firmware/src/firmware_runtime.cpp",
+          "firmware/src/firmware_runtime.h",
+          "firmware/src/generated/protocol_constants.h",
+          "firmware/src/generated/protocol_v2_constants.h",
+          "firmware/src/gpio_batch_packer.cpp",
+          "firmware/src/gpio_batch_packer.h",
+          "firmware/src/gpio_batch_packer_teensy.cpp",
+          "firmware/src/gpio_batch_packer_teensy.h",
+          "firmware/src/gpio_capture_diagnostic.cpp",
+          "firmware/src/gpio_capture_diagnostic.h",
+          "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+          "firmware/src/gpio_capture_diagnostic_teensy.h",
+          "firmware/src/gpio_clock_diagnostic.cpp",
+          "firmware/src/gpio_clock_diagnostic.h",
+          "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+          "firmware/src/gpio_clock_diagnostic_teensy.h",
+          "firmware/src/gpio_dma_route_teensy.h",
+          "firmware/src/gpio_dual_bank_capture.cpp",
+          "firmware/src/gpio_dual_bank_capture.h",
+          "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+          "firmware/src/gpio_dual_bank_capture_teensy.h",
+          "firmware/src/gpio_dual_bank_packer.cpp",
+          "firmware/src/gpio_dual_bank_packer.h",
+          "firmware/src/gpio_raw_capture.cpp",
+          "firmware/src/gpio_raw_capture.h",
+          "firmware/src/gpio_raw_capture_teensy.cpp",
+          "firmware/src/gpio_raw_capture_teensy.h",
+          "firmware/src/gpio_raw_storage_teensy.h",
+          "firmware/src/input_experiment_profile.h",
+          "firmware/src/interrupt_guard_teensy.h",
+          "firmware/src/interrupt_vectors_teensy.h",
+          "firmware/src/packet_buffer_pipeline.cpp",
+          "firmware/src/packet_buffer_pipeline.h",
+          "firmware/src/protocol.cpp",
+          "firmware/src/protocol.h",
+          "firmware/src/rate_profile_table.h",
+          "firmware/src/runtime_health.h",
+          "firmware/src/runtime_health_teensy.cpp",
+          "firmware/src/statistics.cpp",
+          "firmware/src/statistics.h",
+          "firmware/src/stream_layout.h",
+          "firmware/src/synthetic_source.cpp",
+          "firmware/src/synthetic_source.h",
+          "firmware/src/teensy_clock.cpp",
+          "firmware/src/teensy_clock.h",
+          "firmware/src/teensy_usb.cpp",
+          "firmware/src/teensy_usb.h",
+          "firmware/src/temperature.h",
+          "firmware/src/temperature_teensy.cpp",
+          "firmware/src/usb_transport.cpp",
+          "firmware/src/usb_transport.h",
+          "firmware/src/variable_rate_scheduler.cpp",
+          "firmware/src/variable_rate_scheduler.h",
+          "firmware/src/variable_rate_scheduler_teensy.cpp",
+          "firmware/src/variable_rate_scheduler_teensy.h",
+          "firmware/src/watchdog_teensy.cpp",
+          "firmware/src/watchdog_teensy.h",
+          "protocol/protocol-v1.json",
+          "protocol/protocol-v2.json"
+        ],
+        "source_id": "6d7b15cd5905a99af333ecca7609286d3bff998bc6d9e6dc05e87dae033f8932",
+        "timestamp_epoch": 1789243570,
+        "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+        "timestamp_utc": "2026-09-12T20:06:10Z"
+      },
+      "target": {
+        "core_id": "teensy:avr",
+        "core_version": "1.62.0",
+        "fqbn": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+        "resolved_build_properties": {
+          "build.board": "TEENSY40",
+          "build.fcpu": "450000000",
+          "build.flags.optimize": "-O2",
+          "build.usbtype": "USB_SERIAL"
+        },
+        "warnings": "all"
+      }
+    },
+    {
+      "artifacts": [
+        {
+          "path": "firmware.ino.elf",
+          "sha256": "ffea3e1cefc016821e47b3be38661a3e1ebe0e2f5eea6cb40e1a66be4ca612a8",
+          "size_bytes": 2384816
+        },
+        {
+          "path": "firmware.ino.hex",
+          "sha256": "b6a3ce01e7d762e4a6823e71160a43f9927e5965372148822440d2a3522ea6a8",
+          "size_bytes": 460924
+        }
+      ],
+      "checksum_experiment": {
+        "base_source_id": "ebe5f98d0270616e48113fc94460034bd3fee9644e4e7b6b180dc67cb192a92b",
+        "builder_sha256": "1f248aae78b8c3e76dd772860765a75bd7427fe792a0e1a38fef41fbf9ecdff3",
+        "control_checksums": "unchanged",
+        "data_integrity_checked": false,
+        "identity_policy": "sha256(source_id:checksum-experiment-v1:mode)",
+        "mode": "none",
+        "wire_compatible": false
+      },
+      "checksum_resources": {
+        "algorithms": {
+          "ADLER32": {
+            "code_address": "0x0000134c",
+            "code_symbol": "thingdaq::checksum::adler32(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "arithmetic (no lookup table)",
+            "implementation_code_bytes": 120,
+            "table_flash_bytes": 0,
+            "table_ram_bytes": 0
+          },
+          "CRC32C": {
+            "address": "0x6001b080",
+            "code_address": "0x000013c4",
+            "code_symbol": "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "thingdaq::checksum::detail::kCrc32cTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          },
+          "CRC32_ISO_HDLC": {
+            "address": "0x60019080",
+            "code_address": "0x000014f8",
+            "code_symbol": "thingdaq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "thingdaq::checksum::detail::kCrc32IsoHdlcTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          }
+        },
+        "placement": "memory-mapped program flash (.progmem.checksum.*)",
+        "shared_dispatch": {
+          "address": "0x0000162c",
+          "code_bytes": 84,
+          "symbol": "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
+          "symbol_type": "T"
+        },
+        "total_implementation_code_bytes": 736,
+        "total_table_flash_bytes": 16384,
+        "total_table_ram_bytes": 0
+      },
+      "compiler": {
+        "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "path": "/home/bill/.arduino15/packages/teensy/tools/teensy-compile/15.2.1/arm/bin/arm-none-eabi-g++"
+      },
+      "memory_usage": {
+        "flash": {
+          "code_bytes": 129760,
+          "data_bytes": 25744,
+          "free_for_files_bytes": 1867780,
+          "headers_bytes": 8332
+        },
+        "ram1": {
+          "code_bytes": 32552,
+          "free_for_locals_bytes": 34464,
+          "padding_bytes": 216,
+          "variables_bytes": 457056
+        },
+        "ram2": {
+          "free_for_heap_bytes": 4096,
+          "variables_bytes": 520192
+        }
+      },
+      "source": {
+        "build_id": "thingdaq-33e51a234499d2a8",
+        "firmware_input_changes": [
+          " M firmware/src/checksum.cpp",
+          " M firmware/src/checksum.h",
+          " M firmware/src/protocol.cpp"
+        ],
+        "firmware_inputs_clean": false,
+        "git_commit": "370ae2ad11c9a20927d9c02f10cb83c0f421a10d",
+        "inputs": [
+          "firmware/firmware.ino",
+          "firmware/src/acquisition_controller.cpp",
+          "firmware/src/acquisition_controller.h",
+          "firmware/src/adc_dma_capture.cpp",
+          "firmware/src/adc_dma_capture.h",
+          "firmware/src/adc_dma_capture_teensy.cpp",
+          "firmware/src/adc_dma_capture_teensy.h",
+          "firmware/src/adc_frame_packer.cpp",
+          "firmware/src/adc_frame_packer.h",
+          "firmware/src/adc_initializer.cpp",
+          "firmware/src/adc_initializer.h",
+          "firmware/src/adc_initializer_teensy.cpp",
+          "firmware/src/adc_initializer_teensy.h",
+          "firmware/src/adc_trigger.cpp",
+          "firmware/src/adc_trigger.h",
+          "firmware/src/adc_trigger_teensy.cpp",
+          "firmware/src/adc_trigger_teensy.h",
+          "firmware/src/board_config.h",
+          "firmware/src/checksum.cpp",
+          "firmware/src/checksum.h",
+          "firmware/src/checksum_benchmark.cpp",
+          "firmware/src/checksum_benchmark.h",
+          "firmware/src/checksum_benchmark_teensy.cpp",
+          "firmware/src/checksum_benchmark_teensy.h",
+          "firmware/src/control_state.cpp",
+          "firmware/src/control_state.h",
+          "firmware/src/dma_buffer_ownership.h",
+          "firmware/src/edma_priority_teensy.h",
+          "firmware/src/firmware_capabilities.h",
+          "firmware/src/firmware_identity.h",
+          "firmware/src/firmware_runtime.cpp",
+          "firmware/src/firmware_runtime.h",
+          "firmware/src/generated/protocol_constants.h",
+          "firmware/src/generated/protocol_v2_constants.h",
+          "firmware/src/gpio_batch_packer.cpp",
+          "firmware/src/gpio_batch_packer.h",
+          "firmware/src/gpio_batch_packer_teensy.cpp",
+          "firmware/src/gpio_batch_packer_teensy.h",
+          "firmware/src/gpio_capture_diagnostic.cpp",
+          "firmware/src/gpio_capture_diagnostic.h",
+          "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+          "firmware/src/gpio_capture_diagnostic_teensy.h",
+          "firmware/src/gpio_clock_diagnostic.cpp",
+          "firmware/src/gpio_clock_diagnostic.h",
+          "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+          "firmware/src/gpio_clock_diagnostic_teensy.h",
+          "firmware/src/gpio_dma_route_teensy.h",
+          "firmware/src/gpio_dual_bank_capture.cpp",
+          "firmware/src/gpio_dual_bank_capture.h",
+          "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+          "firmware/src/gpio_dual_bank_capture_teensy.h",
+          "firmware/src/gpio_dual_bank_packer.cpp",
+          "firmware/src/gpio_dual_bank_packer.h",
+          "firmware/src/gpio_raw_capture.cpp",
+          "firmware/src/gpio_raw_capture.h",
+          "firmware/src/gpio_raw_capture_teensy.cpp",
+          "firmware/src/gpio_raw_capture_teensy.h",
+          "firmware/src/gpio_raw_storage_teensy.h",
+          "firmware/src/input_experiment_profile.h",
+          "firmware/src/interrupt_guard_teensy.h",
+          "firmware/src/interrupt_vectors_teensy.h",
+          "firmware/src/packet_buffer_pipeline.cpp",
+          "firmware/src/packet_buffer_pipeline.h",
+          "firmware/src/protocol.cpp",
+          "firmware/src/protocol.h",
+          "firmware/src/rate_profile_table.h",
+          "firmware/src/runtime_health.h",
+          "firmware/src/runtime_health_teensy.cpp",
+          "firmware/src/statistics.cpp",
+          "firmware/src/statistics.h",
+          "firmware/src/stream_layout.h",
+          "firmware/src/synthetic_source.cpp",
+          "firmware/src/synthetic_source.h",
+          "firmware/src/teensy_clock.cpp",
+          "firmware/src/teensy_clock.h",
+          "firmware/src/teensy_usb.cpp",
+          "firmware/src/teensy_usb.h",
+          "firmware/src/temperature.h",
+          "firmware/src/temperature_teensy.cpp",
+          "firmware/src/usb_transport.cpp",
+          "firmware/src/usb_transport.h",
+          "firmware/src/variable_rate_scheduler.cpp",
+          "firmware/src/variable_rate_scheduler.h",
+          "firmware/src/variable_rate_scheduler_teensy.cpp",
+          "firmware/src/variable_rate_scheduler_teensy.h",
+          "firmware/src/watchdog_teensy.cpp",
+          "firmware/src/watchdog_teensy.h",
+          "protocol/protocol-v1.json",
+          "protocol/protocol-v2.json"
+        ],
+        "source_id": "33e51a234499d2a851e1c24cc7c5533c146b4aa47f6ec500340ce89252af31eb",
+        "timestamp_epoch": 1789243570,
+        "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+        "timestamp_utc": "2026-09-12T20:06:10Z"
+      },
+      "target": {
+        "core_id": "teensy:avr",
+        "core_version": "1.62.0",
+        "fqbn": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+        "resolved_build_properties": {
+          "build.board": "TEENSY40",
+          "build.fcpu": "450000000",
+          "build.flags.optimize": "-O2",
+          "build.usbtype": "USB_SERIAL"
+        },
+        "warnings": "all"
+      }
+    }
+  ],
+  "schema": "checksum-experiment-builds-v1"
+}

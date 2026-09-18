@@ -30,7 +30,11 @@ inline constexpr std::size_t kCrcTableBytes =
 // These values are pinned-build symbol sizes validated by build_firmware.py.
 // They deliberately exclude the shared narrow dispatch body and the separately
 // reported lookup table so a benchmark result never conflates code and data.
+#if defined(THINGDAQ_EXPERIMENT_ADLER_UNROLL)
+inline constexpr std::size_t kAdler32CodeBytes = 236U;
+#else
 inline constexpr std::size_t kAdler32CodeBytes = 120U;
+#endif
 inline constexpr std::size_t kCrc32cCodeBytes = 308U;
 inline constexpr std::size_t kCrc32IsoHdlcCodeBytes = 308U;
 

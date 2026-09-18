@@ -107,6 +107,19 @@ std::uint32_t adler32(const std::uint8_t *data, std::size_t size) {
                                   ? remaining
                                   : reduction_block_bytes;
     const std::size_t end = offset + block;
+#if defined(THINGDAQ_EXPERIMENT_ADLER_UNROLL)
+    // Experiment: process four bytes per branch with independent weighted
+    // contributions. The 5552-byte bound and exact Adler-32 result are retained.
+    while (end - offset >= 4U) {
+      const std::uint32_t a = data[offset];
+      const std::uint32_t b = data[offset + 1U];
+      const std::uint32_t c = data[offset + 2U];
+      const std::uint32_t d = data[offset + 3U];
+      second += 4U * first + 4U * a + 3U * b + 2U * c + d;
+      first += a + b + c + d;
+      offset += 4U;
+    }
+#endif
     while (offset < end) {
       first += data[offset];
       second += first;

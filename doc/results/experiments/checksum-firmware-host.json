@@ -1,0 +1,587 @@
+{
+  "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "inputs_sha256": {
+    "firmware/src/checksum.cpp": "6c9551905e84c6d0adb05b162344f83e0dc73f6f0e2f83297e1360edd76a54b2",
+    "firmware/src/protocol.cpp": "c4f07cc456fe199d02d3c62d809e52b0e3d0d95389927ff4aeb4c86376e2e29e",
+    "firmware/tests/checksum_performance_benchmark.cpp": "ab99ff6d8861e7a34e43e92fa347220f0452cf41054cc1b2e90988b1125bb08b"
+  },
+  "none_mode_note": "No payload bytes are read in none mode; mb_s is only equivalent coverage, not memory bandwidth.",
+  "optimization": "-O2, separate translation units, no LTO",
+  "platform": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+  "rows": [
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 4033.717823883355,
+      "mode": "baseline",
+      "ns_per_call": 512.6784,
+      "repeat": 0,
+      "seconds": 0.010253568
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 3509.6711510177533,
+      "mode": "baseline",
+      "ns_per_call": 1165.9212,
+      "repeat": 0,
+      "seconds": 0.023318424
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 4802.452687829196,
+      "mode": "unrolled",
+      "ns_per_call": 430.6133,
+      "repeat": 0,
+      "seconds": 0.008612266
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 5084.9011985803045,
+      "mode": "unrolled",
+      "ns_per_call": 804.7354,
+      "repeat": 0,
+      "seconds": 0.016094708
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 852590.1341963679,
+      "mode": "none",
+      "ns_per_call": 2.42555,
+      "repeat": 0,
+      "seconds": 4.8511e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 1690524.8807089296,
+      "mode": "none",
+      "ns_per_call": 2.42055,
+      "repeat": 0,
+      "seconds": 4.8411e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 5033.478840951439,
+      "mode": "unrolled",
+      "ns_per_call": 410.84905,
+      "repeat": 1,
+      "seconds": 0.008216981
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 5638.423291814034,
+      "mode": "unrolled",
+      "ns_per_call": 725.7348,
+      "repeat": 1,
+      "seconds": 0.014514696
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 1065430.19062339,
+      "mode": "none",
+      "ns_per_call": 1.941,
+      "repeat": 1,
+      "seconds": 3.882e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 2113036.069298495,
+      "mode": "none",
+      "ns_per_call": 1.93655,
+      "repeat": 1,
+      "seconds": 3.8731e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 4041.6327258115707,
+      "mode": "baseline",
+      "ns_per_call": 511.6744,
+      "repeat": 1,
+      "seconds": 0.010233488
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 3701.4024715273777,
+      "mode": "baseline",
+      "ns_per_call": 1105.5269,
+      "repeat": 1,
+      "seconds": 0.022110538
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 852607.7097505669,
+      "mode": "none",
+      "ns_per_call": 2.4255,
+      "repeat": 2,
+      "seconds": 4.851e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 1690559.801693865,
+      "mode": "none",
+      "ns_per_call": 2.4205,
+      "repeat": 2,
+      "seconds": 4.841e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 4160.382336722597,
+      "mode": "baseline",
+      "ns_per_call": 497.0697,
+      "repeat": 2,
+      "seconds": 0.009941394
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 4230.467210751755,
+      "mode": "baseline",
+      "ns_per_call": 967.26905,
+      "repeat": 2,
+      "seconds": 0.019345381
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 6010.708827661817,
+      "mode": "unrolled",
+      "ns_per_call": 344.0526,
+      "repeat": 2,
+      "seconds": 0.006881052
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 6047.138866145207,
+      "mode": "unrolled",
+      "ns_per_call": 676.68365,
+      "repeat": 2,
+      "seconds": 0.013533673
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 3050.304506824909,
+      "mode": "baseline",
+      "ns_per_call": 677.9651,
+      "repeat": 3,
+      "seconds": 0.013559302
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 4279.066450336085,
+      "mode": "baseline",
+      "ns_per_call": 956.28335,
+      "repeat": 3,
+      "seconds": 0.019125667
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 5991.0311251159355,
+      "mode": "unrolled",
+      "ns_per_call": 345.18265,
+      "repeat": 3,
+      "seconds": 0.006903653
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 5959.357097216382,
+      "mode": "unrolled",
+      "ns_per_call": 686.65125,
+      "repeat": 3,
+      "seconds": 0.013733025
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 852414.4184992065,
+      "mode": "none",
+      "ns_per_call": 2.42605,
+      "repeat": 3,
+      "seconds": 4.8521e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 1690524.8807089296,
+      "mode": "none",
+      "ns_per_call": 2.42055,
+      "repeat": 3,
+      "seconds": 4.8411e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 5619.520169607336,
+      "mode": "unrolled",
+      "ns_per_call": 368.00295,
+      "repeat": 4,
+      "seconds": 0.007360059
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 5863.103412850599,
+      "mode": "unrolled",
+      "ns_per_call": 697.9239,
+      "repeat": 4,
+      "seconds": 0.013958478
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 939572.9213993639,
+      "mode": "none",
+      "ns_per_call": 2.201,
+      "repeat": 4,
+      "seconds": 4.402e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 1862921.3994673467,
+      "mode": "none",
+      "ns_per_call": 2.19655,
+      "repeat": 4,
+      "seconds": 4.3931e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 3950.3565492871453,
+      "mode": "baseline",
+      "ns_per_call": 523.49705,
+      "repeat": 4,
+      "seconds": 0.010469941
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 4450.191944434808,
+      "mode": "baseline",
+      "ns_per_call": 919.5109,
+      "repeat": 4,
+      "seconds": 0.018390218
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 1065979.381443299,
+      "mode": "none",
+      "ns_per_call": 1.94,
+      "repeat": 5,
+      "seconds": 3.88e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 2113636.3636363633,
+      "mode": "none",
+      "ns_per_call": 1.936,
+      "repeat": 5,
+      "seconds": 3.872e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 4177.962198937468,
+      "mode": "baseline",
+      "ns_per_call": 494.97815,
+      "repeat": 5,
+      "seconds": 0.009899563
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 4421.578013865408,
+      "mode": "baseline",
+      "ns_per_call": 925.46145,
+      "repeat": 5,
+      "seconds": 0.018509229
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 5992.602265800598,
+      "mode": "unrolled",
+      "ns_per_call": 345.09215,
+      "repeat": 5,
+      "seconds": 0.006901843
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 6075.421187259343,
+      "mode": "unrolled",
+      "ns_per_call": 673.53355,
+      "repeat": 5,
+      "seconds": 0.013470671
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 4518.928091901187,
+      "mode": "baseline",
+      "ns_per_call": 457.63065,
+      "repeat": 6,
+      "seconds": 0.009152613
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 4566.235013135736,
+      "mode": "baseline",
+      "ns_per_call": 896.1431,
+      "repeat": 6,
+      "seconds": 0.017922862
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 5511.608826089952,
+      "mode": "unrolled",
+      "ns_per_call": 375.20805,
+      "repeat": 6,
+      "seconds": 0.007504161
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 5603.776441365046,
+      "mode": "unrolled",
+      "ns_per_call": 730.22185,
+      "repeat": 6,
+      "seconds": 0.014604437
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 847871.0973534777,
+      "mode": "none",
+      "ns_per_call": 2.43905,
+      "repeat": 6,
+      "seconds": 4.8781e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 1681494.1135378357,
+      "mode": "none",
+      "ns_per_call": 2.43355,
+      "repeat": 6,
+      "seconds": 4.8671e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 5444.452825251099,
+      "mode": "unrolled",
+      "ns_per_call": 379.83615,
+      "repeat": 7,
+      "seconds": 0.007596723
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 6066.747116793999,
+      "mode": "unrolled",
+      "ns_per_call": 674.49655,
+      "repeat": 7,
+      "seconds": 0.013489931
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 1065677.2564479143,
+      "mode": "none",
+      "ns_per_call": 1.94055,
+      "repeat": 7,
+      "seconds": 3.8811e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 2113090.627420604,
+      "mode": "none",
+      "ns_per_call": 1.9365,
+      "repeat": 7,
+      "seconds": 3.873e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 3924.9246188619195,
+      "mode": "baseline",
+      "ns_per_call": 526.8891,
+      "repeat": 7,
+      "seconds": 0.010537782
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 4264.979241318351,
+      "mode": "baseline",
+      "ns_per_call": 959.44195,
+      "repeat": 7,
+      "seconds": 0.019188839
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 790807.0591384486,
+      "mode": "none",
+      "ns_per_call": 2.61505,
+      "repeat": 8,
+      "seconds": 5.2301e-05
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 0,
+      "iterations": 20000,
+      "mb_s": 2113090.627420604,
+      "mode": "none",
+      "ns_per_call": 1.9365,
+      "repeat": 8,
+      "seconds": 3.873e-05
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 4294.492541745666,
+      "mode": "baseline",
+      "ns_per_call": 481.547,
+      "repeat": 8,
+      "seconds": 0.00963094
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 3996.344302054875,
+      "mode": "baseline",
+      "ns_per_call": 1023.9358,
+      "repeat": 8,
+      "seconds": 0.020478716
+    },
+    {
+      "coverage_bytes": 2068,
+      "digest": 42968834866096,
+      "iterations": 20000,
+      "mb_s": 4784.381262438119,
+      "mode": "unrolled",
+      "ns_per_call": 432.2398,
+      "repeat": 8,
+      "seconds": 0.008644796
+    },
+    {
+      "coverage_bytes": 4092,
+      "digest": 42896014609872,
+      "iterations": 20000,
+      "mb_s": 5936.84700758319,
+      "mode": "unrolled",
+      "ns_per_call": 689.25475,
+      "repeat": 8,
+      "seconds": 0.013785095
+    }
+  ],
+  "schema": "checksum-firmware-host-experiment-v1",
+  "scope": "native host; not Cortex-M7 or USB throughput",
+  "summary": [
+    {
+      "coverage_bytes": 2068,
+      "median_ns_per_call": 511.6744,
+      "mode": "baseline"
+    },
+    {
+      "coverage_bytes": 4092,
+      "median_ns_per_call": 959.44195,
+      "mode": "baseline"
+    },
+    {
+      "coverage_bytes": 2068,
+      "median_ns_per_call": 375.20805,
+      "mode": "unrolled"
+    },
+    {
+      "coverage_bytes": 4092,
+      "median_ns_per_call": 689.25475,
+      "mode": "unrolled"
+    },
+    {
+      "coverage_bytes": 2068,
+      "median_ns_per_call": 2.4255,
+      "mode": "none"
+    },
+    {
+      "coverage_bytes": 4092,
+      "median_ns_per_call": 2.19655,
+      "mode": "none"
+    }
+  ]
+}

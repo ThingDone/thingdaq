@@ -178,6 +178,8 @@ def main():
                         "run_id": run_id,
                         "counts": counts,
                         "seconds": duration,
+                        "elapsed_seconds": time.monotonic() - started,
+                        "process_cpu_seconds": time.process_time() - cpu_started,
                         "during_temperature": during,
                         "after_temperature": temperature(daq),
                     }

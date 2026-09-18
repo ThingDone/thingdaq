@@ -219,6 +219,11 @@ def main() -> int:
         help="one case per --profiles/--cycle cell; changes width without reflashing",
     )
     parser.add_argument("--service", required=True, help="test-rig service URL")
+    parser.add_argument(
+        "--checksum-experiment",
+        action="store_true",
+        help="explicitly enable the matching host for a checksum research build",
+    )
     parser.add_argument("--auth-file", type=Path, default=Path.home() / ".fw_api_key")
     args = parser.parse_args()
     # Only live submission needs the service client's optional HTTP dependency.
@@ -238,9 +243,22 @@ def main() -> int:
     firmware = (build / "firmware.ino.hex").read_bytes()
     manifest_bytes = (build / "build-manifest.json").read_bytes()
     manifest = json.loads(manifest_bytes)
+    checksum_experiment = manifest.get("checksum_experiment")
+    if bool(checksum_experiment) != args.checksum_experiment:
+        parser.error(
+            "checksum research builds require --checksum-experiment (and its manifest)"
+        )
     verify_hex(firmware, manifest)
     validator = "rig_release_sdk.py" if args.host_api else "rig_aux_input_capture.py"
     source = (args.worktree / "firmware/tests" / validator).read_text()
+    if checksum_experiment:
+        mode = checksum_experiment["mode"]
+        if mode not in ("baseline", "unrolled", "none"):
+            parser.error("unknown checksum experiment mode")
+        adapter = (
+            args.worktree / "firmware/tests/checksum_experiment_adapter.py"
+        ).read_text()
+        source += f"\nCHECKSUM_EXPERIMENT_MODE = {mode!r}\n" + adapter
     build_id = manifest["source"]["build_id"]
     settings = {
         "AUX_INPUT_CASE": args.case,
@@ -337,6 +355,7 @@ def main() -> int:
             "manifest_sha256": digest(manifest_bytes),
             "source": manifest["source"],
             "input_experiment": experiment,
+            "checksum_experiment": checksum_experiment,
             "profile_sequence": sequence,
             "case_sequence": list(cases or (args.case,) * len(sequence)),
             "planned_program_seconds": planned_program_seconds,
