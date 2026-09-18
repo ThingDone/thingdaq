@@ -2519,6 +2519,19 @@ Result computeChecksum(protocol_v1::ChecksumAlgorithm algorithm, ByteView input,
     default:
       return unsupportedChecksum();
   }
+#if defined(THINGDAQ_EXPERIMENT_NO_DATA_CHECKSUM)
+  // Deliberately incompatible research build: retain framing and a zero trailer,
+  // but omit the data-frame scan. Control traffic still uses its real checksum.
+  // Only the experiment runner enables the matching host behavior.
+  if (input.size >= protocol_v1::kHeaderSize &&
+      (input.data[protocol_v1::kHeaderKindOffset] ==
+           static_cast<std::uint8_t>(protocol_v1::FrameKind::kAdcData) ||
+       input.data[protocol_v1::kHeaderKindOffset] ==
+           static_cast<std::uint8_t>(protocol_v1::FrameKind::kGpioData))) {
+    result_checksum = 0U;
+    return Result::success();
+  }
+#endif
   return checksum::compute(implementation, input.data, input.size,
                            result_checksum)
              ? Result::success()
