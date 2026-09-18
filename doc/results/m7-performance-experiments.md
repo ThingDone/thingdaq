@@ -14,7 +14,10 @@ related:
 # M7 C, atomics, optimization and ITCM experiments
 
 This is a compiler and correctness experiment, **not a measured hardware speedup**.
-No local Teensy serial device was attached. No image was uploaded. The release
+No local Teensy serial device was attached; no image was uploaded during this
+compiler-only phase. The subsequent [remote hardware test](m7-hardware-tests.md)
+encountered a baseline USB disconnect followed by programming failures, so timing
+remains unmeasured. The release
 build keeps its existing C++ packer, optimization and synchronization behavior.
 The experimental C packer is enabled only by an explicit build definition.
 

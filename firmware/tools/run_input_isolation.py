@@ -27,6 +27,83 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def service_preflight(service: str) -> dict:
+    """Require the established rig's healthy, idle state before each job."""
+    import requests
+
+    response = requests.get(f"{service}/health", timeout=10)
+    response.raise_for_status()
+    health = response.json()
+    expected = {
+        "coordinator_mode": "normal",
+        "queue_depth": 0,
+        "worker_thread_alive": True,
+        "docker_reachable": True,
+        "hub_reachable": True,
+    }
+    if health.get("status") != "healthy" or any(
+        health.get("checks", {}).get(key) != value for key, value in expected.items()
+    ):
+        raise RuntimeError("service not idle/healthy; no submission made")
+    return health
+
+
+def submit_program(
+    service: str,
+    auth: str,
+    firmware: bytes,
+    program: str,
+    evidence_dir: Path,
+    timeout_seconds: float,
+) -> dict:
+    """Submit once, retain raw replies, and wait for a terminal rig result.
+
+    A submission or polling timeout is ambiguous: callers must inspect the
+    saved job before submitting again. Never automatically retry /start.
+    """
+    import requests
+
+    def save(name, value):
+        (evidence_dir / name).write_text(
+            json.dumps(value, indent=2, sort_keys=True) + "\n"
+        )
+
+    def post(endpoint, fields):
+        response = requests.post(
+            f"{service}/{endpoint}", json={"auth": auth, **fields}, timeout=30
+        )
+        response.raise_for_status()
+        return response.json()
+
+    save("preflight.json", service_preflight(service))
+    archive_bytes = io.BytesIO()
+    with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("firmware.ino.hex", firmware)
+    started = post(
+        "start",
+        {
+            "python": program,
+            "board": BOARD,
+            "binary": base64.b64encode(archive_bytes.getvalue()).decode(),
+        },
+    )
+    save("start.json", started)
+    test_id = started["test_id"]
+    print(f"Started {test_id}: {evidence_dir.name}", flush=True)
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        status = post("status", {"test_id": test_id})
+        save("status.json", status)
+        if status.get("status") not in {"running", "busy", "queued", "pending"}:
+            result = post("results", {"test_id": test_id})
+            save("results.json", result)
+            return result
+        time.sleep(1)
+    raise RuntimeError(
+        f"job {test_id} exceeded deadline; inspect before further submissions"
+    )
+
+
 def verify_hex(firmware: bytes, manifest: dict) -> None:
     record = next(
         row for row in manifest["artifacts"] if row["path"] == "firmware.ino.hex"
@@ -287,35 +364,13 @@ def main() -> int:
             f"package_path.write_bytes(base64.b64decode({encoded!r}))\n"
             "sys.path.insert(0, str(package_path))\n"
         ) + program
-    archive_bytes = io.BytesIO()
-    with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("firmware.ino.hex", firmware)
 
     def get(endpoint):
         response = requests.get(f"{args.service}/{endpoint}", timeout=10)
         response.raise_for_status()
         return response.json()
 
-    def post(endpoint, fields):
-        response = requests.post(
-            f"{args.service}/{endpoint}", json={"auth": auth, **fields}, timeout=30
-        )
-        response.raise_for_status()
-        return response.json()
-
-    health = get("health")
-    checks = health.get("checks", {})
-    expected = {
-        "coordinator_mode": "normal",
-        "queue_depth": 0,
-        "worker_thread_alive": True,
-        "docker_reachable": True,
-        "hub_reachable": True,
-    }
-    if health.get("status") != "healthy" or any(
-        checks.get(k) != v for k, v in expected.items()
-    ):
-        raise RuntimeError("service not idle/healthy; no submission made")
+    health = service_preflight(args.service)
     args.evidence_dir.mkdir(parents=True)
 
     def save(name, value):
@@ -345,42 +400,25 @@ def main() -> int:
     (args.evidence_dir / "firmware.ino.hex").write_bytes(firmware)
     (args.evidence_dir / "build-manifest.json").write_bytes(manifest_bytes)
     (args.evidence_dir / "rig-program.py").write_text(program)
-    started = post(
-        "start",
-        {
-            "python": program,
-            "board": BOARD,
-            "binary": base64.b64encode(archive_bytes.getvalue()).decode(),
-        },
+    result = submit_program(
+        args.service,
+        auth,
+        firmware,
+        program,
+        args.evidence_dir,
+        (args.seconds + 5) * len(sequence) + 120,
     )
-    save("start.json", started)
-    test_id = started["test_id"]
-    print(
-        f"Started {test_id}: {args.case} profile={args.profile} seconds={args.seconds}",
-        flush=True,
-    )
-    deadline = time.monotonic() + (args.seconds + 5) * len(sequence) + 120
-    while time.monotonic() < deadline:
-        status = post("status", {"test_id": test_id})
-        save("status.json", status)
-        if status.get("status") not in {"running", "busy", "queued", "pending"}:
-            result = post("results", {"test_id": test_id})
-            save("results.json", result)
-            summary = classify_result(result, expected_cells=len(sequence))
-            save("summary.json", summary)
-            details = result.get("results", {})
-            if not details.get("program_success"):
-                print(f"Infrastructure failure: {details.get('message')}", flush=True)
-            for line in details.get("stdout", "").splitlines():
-                if line.startswith("EVIDENCE ") or any(
-                    word in line for word in ('"fatal"', '"debug_trace"')
-                ):
-                    print(line, flush=True)
-            return 0 if summary["outcome"] == "PASS" else 1
-        time.sleep(1)
-    raise RuntimeError(
-        f"job {test_id} exceeded deadline; inspect before further submissions"
-    )
+    summary = classify_result(result, expected_cells=len(sequence))
+    save("summary.json", summary)
+    details = result.get("results", {})
+    if not details.get("program_success"):
+        print(f"Infrastructure failure: {details.get('message')}", flush=True)
+    for line in details.get("stdout", "").splitlines():
+        if line.startswith("EVIDENCE ") or any(
+            word in line for word in ('"fatal"', '"debug_trace"')
+        ):
+            print(line, flush=True)
+    return 0 if summary["outcome"] == "PASS" else 1
 
 
 if __name__ == "__main__":

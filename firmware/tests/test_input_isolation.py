@@ -1,8 +1,10 @@
 """Offline coverage for the cold-boot experiment submission wrapper."""
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -224,3 +226,73 @@ def test_experimental_clock_and_rate_settings_follow_verified_manifest():
     manifest["input_experiment"]["equal_rates"] = "false"
     with pytest.raises(ValueError, match="unsupported"):
         isolation.experiment_settings(manifest)
+
+
+def test_submission_retains_result_without_treating_service_success_as_pass(
+    monkeypatch, tmp_path
+):
+    import requests
+
+    calls = []
+    result = {
+        "results": {"completed": True, "program_success": False, "exit_code": -130}
+    }
+
+    def post(url, **kwargs):
+        calls.append(url.rsplit("/", 1)[1])
+        values = {
+            "start": {"test_id": "test-job"},
+            "status": {"status": "success"},
+            "results": result,
+        }
+        return SimpleNamespace(
+            raise_for_status=lambda: None, json=lambda: values[calls[-1]]
+        )
+
+    monkeypatch.setattr(isolation, "service_preflight", lambda _: {"status": "healthy"})
+    monkeypatch.setattr(requests, "post", post)
+    observed = isolation.submit_program(
+        "http://unused.invalid", "test-key", b"hex", "pass", tmp_path, 1
+    )
+    assert observed == result
+    assert calls == ["start", "status", "results"]
+    assert json.loads((tmp_path / "results.json").read_text()) == result
+    assert isolation.classify_result(observed)["outcome"] == "INFRASTRUCTURE_FAIL"
+
+
+def test_ambiguous_submission_timeout_is_never_retried(monkeypatch, tmp_path):
+    import requests
+
+    calls = []
+
+    def post(url, **kwargs):
+        calls.append(url)
+        raise requests.Timeout("ambiguous submission")
+
+    monkeypatch.setattr(isolation, "service_preflight", lambda _: {"status": "healthy"})
+    monkeypatch.setattr(requests, "post", post)
+    with pytest.raises(requests.Timeout):
+        isolation.submit_program(
+            "http://unused.invalid", "test-key", b"hex", "pass", tmp_path, 1
+        )
+    assert calls == ["http://unused.invalid/start"]
+
+
+def test_busy_preflight_prevents_submission(monkeypatch, tmp_path):
+    import requests
+
+    monkeypatch.setattr(
+        requests,
+        "get",
+        lambda *a, **k: SimpleNamespace(
+            raise_for_status=lambda: None,
+            json=lambda: {"status": "healthy", "checks": {"queue_depth": 1}},
+        ),
+    )
+    monkeypatch.setattr(
+        requests, "post", lambda *a, **k: pytest.fail("must not submit")
+    )
+    with pytest.raises(RuntimeError, match="not idle/healthy"):
+        isolation.submit_program(
+            "http://unused.invalid", "test-key", b"hex", "pass", tmp_path, 1
+        )
