@@ -1,4 +1,5 @@
 #include "usb_transport.h"
+#include "rate_profile_table.h"
 
 #include <limits>
 
@@ -25,6 +26,15 @@ void saturatingIncrement(Integer &value) {
 
 constexpr std::size_t minimum(std::size_t left, std::size_t right) {
   return left < right ? left : right;
+}
+
+constexpr bool supportedDataFrameSize(std::size_t size) {
+  return size == protocol_v1::kDataFrameBytes ||
+         size == protocol_v2::kMinDataFrameBytes ||
+         (input_experiment::kAdcWireBytesPerPair == 3U &&
+          size == protocol_v1::kHeaderSize +
+                      rate_profile::kInputAdcPairsPerFrame * 3U +
+                      protocol_v1::kTrailerSize);
 }
 
 std::uint32_t counterDelta(std::uint32_t current, std::uint32_t previous) {
@@ -276,8 +286,7 @@ ServiceReport CdcTransport::serviceTransmit() {
       }
       selection.bytes = lower_priority_->frontFrame();
       if (!selection.bytes.valid() ||
-          (selection.bytes.size != protocol_v1::kDataFrameBytes &&
-           selection.bytes.size != protocol_v2::kMinDataFrameBytes)) {
+          !supportedDataFrameSize(selection.bytes.size)) {
         recordIoError();
         stalled = true;
         break;
@@ -542,8 +551,7 @@ CdcTransport::FrameSelection CdcTransport::selectTransmitFrame() {
   if (lower.size == 0U) {
     return {};
   }
-  if (!lower.valid() || (lower.size != protocol_v1::kDataFrameBytes &&
-                         lower.size != protocol_v2::kMinDataFrameBytes)) {
+  if (!lower.valid() || !supportedDataFrameSize(lower.size)) {
     recordIoError();
     lower_priority_->releaseFrontFrame();
     return {};

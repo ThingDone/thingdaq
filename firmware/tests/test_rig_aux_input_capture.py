@@ -13,6 +13,7 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
+from checksum_experiment_adapter import _experiment_expand_adc, _experiment_pack_adc12
 from thingdaq import (
     AuxBankMode,
     DeviceState,
@@ -46,6 +47,64 @@ rig = _load_rig()
 
 
 class EqualRateValidatorTests(unittest.TestCase):
+    def test_packed_adc_keeps_raw_dma_width_and_stream_timing(self):
+        packed = _load_rig()
+        _experiment_expand_adc(vars(packed))
+        _experiment_pack_adc12(vars(packed))
+        layout = packed.LAYOUTS[packed.AUX_INPUT]
+        self.assertEqual(4, packed.ADC_BYTES_PER_PAIR)
+        self.assertEqual(3, packed.ADC_WIRE_BYTES_PER_PAIR)
+        self.assertEqual(
+            (1012, 3036, 3084),
+            (
+                layout.adc_items_per_frame,
+                layout.adc_payload_bytes,
+                layout.adc_total_frame_bytes,
+            ),
+        )
+        self.assertEqual(
+            frozenset({(3084, 3036, 1012)}), packed.ALLOWED_DATA_SHAPES[packed.ADC_DATA]
+        )
+        validator = packed.AcquisitionValidator(
+            1,
+            packed.CHECKSUM_ADLER32,
+            packed.RUN_CASES["INPUT_COMBINED"],
+            packed.PROFILE_BY_VALUE[4],
+            None,
+        )
+        for sequence in range(2):
+            validator.accept(
+                packed.Frame(
+                    packed.ADC_DATA,
+                    packed.FLAG_EPOCH_START if sequence == 0 else 0,
+                    packed.CHECKSUM_ADLER32,
+                    1,
+                    sequence,
+                    0,
+                    sequence * 1012 * 8,
+                    1012,
+                    bytes(3036),
+                    0,
+                )
+            )
+        validator.accept(
+            packed.Frame(
+                packed.GPIO_DATA,
+                packed.FLAG_EPOCH_START,
+                packed.CHECKSUM_ADLER32,
+                1,
+                0,
+                0,
+                0,
+                2024,
+                bytes(4048),
+                0,
+            )
+        )
+        self.assertEqual(validator.adc.expected_ticks, validator.gpio.expected_ticks)
+        with self.assertRaises(ValueError):
+            packed.validate_adc_payload(bytes(3035))
+
     def test_equal_rate_clock_metadata_and_weighted_continuity(self):
         with patch.dict(
             os.environ, {"AUX_INPUT_EQUAL_RATES": "1", "AUX_INPUT_CPU_MHZ": "450"}

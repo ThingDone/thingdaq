@@ -66,6 +66,47 @@ def _experiment_measure_host(original):
     return run
 
 
+def decode_adc12_pairs(payload):
+    """Independent byte-oriented inverse of the firmware's three-word loop."""
+    import struct
+
+    if not payload or len(payload) % 12:
+        raise ValueError("packed ADC payload must contain complete four-pair groups")
+    for low, middle, high in struct.iter_unpack("<BBB", payload):
+        yield low | ((middle & 15) << 8), (middle >> 4) | (high << 4)
+
+
+def _experiment_pack_adc12(namespace):
+    from dataclasses import replace
+
+    layouts = namespace["LAYOUTS"]
+    for mode, layout in list(layouts.items()):
+        if layout.adc_items_per_frame % 4:
+            raise ValueError("packed ADC needs four-pair-aligned frames")
+        layouts[mode] = replace(
+            layout,
+            adc_payload_bytes=layout.adc_items_per_frame * 3,
+            adc_total_frame_bytes=layout.adc_items_per_frame * 3 + 48,
+        )
+    namespace["ADC_WIRE_BYTES_PER_PAIR"] = 3
+    namespace["ALLOWED_DATA_SHAPES"][namespace["ADC_DATA"]] = frozenset(
+        (
+            layout.adc_total_frame_bytes,
+            layout.adc_payload_bytes,
+            layout.adc_items_per_frame,
+        )
+        for layout in layouts.values()
+    )
+
+    def validate(payload):
+        # Exercise the decoder for every sample. All encoded bit patterns are
+        # legal 12-bit values; sequence/checksum checks remain in the parser.
+        for _adc0, _adc1 in decode_adc12_pairs(payload):
+            pass
+
+    namespace["validate_adc_payload"] = validate
+
+
 def _experiment_device_benchmarks():
     import dataclasses
     import os
@@ -126,6 +167,8 @@ if "CHECKSUM_EXPERIMENT_MODE" in globals():
     _experiment_install(_experiment_mode, globals())
     if globals().get("FRAME_EXPERIMENT", False):
         _experiment_expand_adc(globals())
+    if globals().get("ADC12_PACKED_EXPERIMENT", False):
+        _experiment_pack_adc12(globals())
     if "run_acceptance" in globals():
         run_acceptance = _experiment_measure_host(globals()["run_acceptance"])
     _experiment_original_main = globals()["main"]

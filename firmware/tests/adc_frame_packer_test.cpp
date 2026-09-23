@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <fstream>
 #include <limits>
 #include <string>
 
@@ -308,7 +309,7 @@ void testPairCountAndCounterBoundariesFailClosed() {
   }
 }
 
-void testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod() {
+void testExperimentalInputLayoutAndSelectedPeriod(const char *output_path) {
   FakePairSource source{};
   packet::OwnedPacketBufferStorage storage{};
   packet::PacketBufferPipeline pipeline{storage};
@@ -317,6 +318,7 @@ void testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod() {
   constexpr auto profile = v2::RateProfile::kAdc125khzGpio500khz;
   const layout::Result selected =
       layout::experimental(v2::AuxBankMode::kInput, profile);
+  const auto pair_count = selected.layout.streams[0].item_count;
   expect(selected.ok() &&
              pipeline.startRun(run_id, v1::ChecksumAlgorithm::kCrc32c,
                                packet::kAdcStreamMask,
@@ -326,24 +328,23 @@ void testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod() {
                           pipeline) == packer::OperationStatus::kOk,
          "the existing ADC packer binds to a generated INPUT layout");
   source.push(0U, run_id, 0x0100U,
-              static_cast<std::uint32_t>(v2::kInputAdcPairsPerFrame));
-  source.push(2U * v2::kInputAdcPairsPerFrame, run_id, 0x0200U,
-              static_cast<std::uint32_t>(v2::kInputAdcPairsPerFrame));
+              pair_count);
+  source.push(2U * pair_count, run_id, 0x0200U, pair_count);
 
   const packer::ServiceReport serviced = adc.service(pipeline, 2U);
   expect(serviced.buffers_consumed == 2U &&
              serviced.pairs_consumed ==
-                 2U * v2::kInputAdcPairsPerFrame &&
+                 2U * pair_count &&
              serviced.frames_framed == 2U && source.releases == 2U &&
              pipeline.serviceReadyFrames(2U).frames_promoted == 2U,
-         "506-pair source leases frame through the existing ADC owner");
+         "selected source leases frame through the existing ADC owner");
 
   wire::ByteView frame = pipeline.frontFrame();
   std::uint32_t item_count = 0U;
   std::uint32_t payload_bytes = 0U;
   std::uint32_t sequence = 0U;
   std::uint64_t first_ticks = 0U;
-  expect(frame.size == v2::kMinDataFrameBytes &&
+  expect(frame.size == selected.layout.streams[0].frame_bytes &&
              frame.data[v1::kHeaderVersionOffset] ==
                  v2::kProtocolVersion &&
              wire::loadU32(frame, v1::kHeaderItemCountOffset,
@@ -352,10 +353,19 @@ void testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod() {
                            payload_bytes) &&
              wire::loadU64(frame, v1::kHeaderFirstSampleTicksOffset,
                            first_ticks) &&
-             item_count == v2::kInputAdcPairsPerFrame &&
+             item_count == pair_count &&
              payload_bytes == selected.layout.streams[0].payload_bytes &&
              first_ticks == 0U,
-         "the first INPUT ADC frame carries its exact short v2 shape");
+         "the first INPUT ADC frame carries its exact selected v2 shape");
+  wire::DecodedFrame decoded{};
+  expect(wire::decodeFrame(frame, decoded).ok(),
+         "selected v2 ADC shape and CRC validate through the production decoder");
+  if (output_path != nullptr) {
+    std::ofstream output(output_path, std::ios::binary);
+    output.write(reinterpret_cast<const char *>(decoded.payload.data),
+                 static_cast<std::streamsize>(decoded.payload.size));
+    expect(output.good(), "export payload for independent Python decoding");
+  }
   pipeline.releaseFrontFrame();
 
   frame = pipeline.frontFrame();
@@ -364,7 +374,7 @@ void testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod() {
                            first_ticks) &&
              sequence == 2U &&
              first_ticks ==
-                 2U * v2::kInputAdcPairsPerFrame * 64U,
+                 2U * pair_count * 64U,
          "a missing short frame consumes one sequence and the selected 64-tick period");
   pipeline.releaseFrontFrame();
 
@@ -374,25 +384,82 @@ void testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod() {
   expect(counters.frames_produced == 3U &&
              counters.frames_framed == 2U &&
              counters.frames_dropped == 1U &&
-             counters.items_dropped == v2::kInputAdcPairsPerFrame &&
+             counters.items_dropped == pair_count &&
              snapshot.progress.raw_gap_pairs ==
-                 v2::kInputAdcPairsPerFrame &&
+                 pair_count &&
              snapshot.progress.raw_drop_pairs_projected ==
-                 v2::kInputAdcPairsPerFrame &&
+                 pair_count &&
              snapshot.layout == selected.layout,
          "short-frame ADC production and raw loss conserve exact items");
+  if (selected.layout.streams[0].item_bytes == 3U) {
+    source.push(3U * pair_count, run_id, 0x1000U, pair_count);
+    const auto rejected = adc.service(pipeline, 1U);
+    expect(rejected.source_error && rejected.frames_framed == 0U &&
+               pipeline.readyFrames() == 0U && source.releases == 3U &&
+               adc.snapshot(pipeline).progress.source_errors == 1U,
+           "invalid ADC codes release their DMA lease and never publish a packed frame");
+  }
   (void)adc.stopProduction();
   (void)pipeline.stopProduction();
 }
 
+void testTwelveBitWordPacking() {
+  std::array<capture::SamplePair, 4U> pairs{};
+  alignas(4) std::array<std::uint8_t, 20U> guarded{};
+  guarded.fill(0xA5U);
+  const wire::MutableByteView output{guarded.data() + 4U, 12U};
+  // Exhaust all 4096 codes in every sample position. Differing neighbors expose
+  // cross-word and cross-sample bleed; reference construction is bit-by-bit.
+  for (std::uint32_t code = 0U; code < 4096U; ++code) {
+    for (std::size_t pair = 0U; pair < pairs.size(); ++pair) {
+      pairs[pair].adc0 = static_cast<std::uint16_t>((code + pair * 701U) & 4095U);
+      pairs[pair].adc1 = static_cast<std::uint16_t>((code + pair * 503U + 2047U) & 4095U);
+    }
+    std::array<std::uint8_t, 12U> reference{};
+    for (std::size_t sample = 0U; sample < 8U; ++sample) {
+      const auto value = sample % 2U == 0U ? pairs[sample / 2U].adc0
+                                          : pairs[sample / 2U].adc1;
+      for (std::size_t bit = 0U; bit < 12U; ++bit) {
+        const auto offset = sample * 12U + bit;
+        reference[offset / 8U] |= static_cast<std::uint8_t>(
+            ((static_cast<std::uint32_t>(value) >> bit) & 1U) << (offset % 8U));
+      }
+    }
+    expect(packer::pack12BitPairs(output, pairs.data(), pairs.size()),
+           "every 12-bit code packs in every sample position");
+    for (std::size_t byte = 0U; byte < reference.size(); ++byte)
+      expect(output.data[byte] == reference[byte], "word packing matches bitstream reference");
+  }
+  expect(guarded[0] == 0xA5U && guarded[3] == 0xA5U &&
+             guarded[16] == 0xA5U && guarded[19] == 0xA5U,
+         "packing preserves both output guard regions");
+  expect(!packer::pack12BitPairs({nullptr, 12U}, pairs.data(), 4U) &&
+             !packer::pack12BitPairs(output, nullptr, 4U) &&
+             !packer::pack12BitPairs(output, pairs.data(), 0U) &&
+             !packer::pack12BitPairs(output, pairs.data(), 3U) &&
+             !packer::pack12BitPairs({output.data, 11U}, pairs.data(), 4U) &&
+             !packer::pack12BitPairs({output.data, 13U}, pairs.data(), 4U) &&
+             !packer::pack12BitPairs({output.data + 1U, 12U}, pairs.data(), 4U),
+         "invalid pointers, shape and alignment fail closed");
+  for (std::size_t sample = 0U; sample < 8U; ++sample) {
+    pairs.fill({0U, 0U});
+    auto &value = sample % 2U == 0U ? pairs[sample / 2U].adc0
+                                   : pairs[sample / 2U].adc1;
+    value = 0x1000U;
+    expect(!packer::pack12BitPairs(output, pairs.data(), 4U),
+           "non-12-bit input is rejected instead of truncated");
+  }
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char **argv) {
+  testTwelveBitWordPacking();
   testPhysicalPairFramingTimestampsAndGapProjection();
   testStaleEpochCannotCrossRuns();
   testAlignedFrameBoundaryAtLargestSafeTimestamp();
   testPairCountAndCounterBoundariesFailClosed();
-  testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod();
+  testExperimentalInputLayoutAndSelectedPeriod(argc > 1 ? argv[1] : nullptr);
   if (failures != 0) {
     std::cerr << failures << " ADC frame packer assertion(s) failed\n";
     return 1;

@@ -37,6 +37,14 @@
 #endif
 
 namespace thingdaq::input_experiment {
+#if defined(THINGDAQ_EXPERIMENT_ADC12_PACKED)
+#if !defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+#error "ADC12 packing requires four-pair-aligned large ADC frames"
+#endif
+inline constexpr std::uint32_t kAdcWireBytesPerPair = 3U;
+#else
+inline constexpr std::uint32_t kAdcWireBytesPerPair = 4U;
+#endif
 inline constexpr std::uint32_t kUsbWriteBytes = THINGDAQ_EXPERIMENT_USB_WRITE_BYTES;
 inline constexpr std::uint32_t kPipelineBatchScale = THINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE;
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)

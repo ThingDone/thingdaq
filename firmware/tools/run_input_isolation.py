@@ -227,6 +227,7 @@ def main() -> int:
     parser.add_argument("--auth-file", type=Path, default=Path.home() / ".fw_api_key")
     parser.add_argument("--frame-experiment", action="store_true")
     parser.add_argument("--usb-throughput", action="store_true")
+    parser.add_argument("--adc12-packed", action="store_true")
     args = parser.parse_args()
     # Only live submission needs the service client's optional HTTP dependency.
     import requests
@@ -248,6 +249,16 @@ def main() -> int:
     checksum_experiment = manifest.get("checksum_experiment")
     frame_experiment = manifest.get("frame_experiment")
     usb_experiment = manifest.get("usb_throughput_experiment")
+    adc_packing = manifest.get("adc_packing_experiment")
+    if bool(adc_packing) != args.adc12_packed:
+        parser.error("packed ADC builds require --adc12-packed and its manifest")
+    if adc_packing and (
+        adc_packing.get("format") != "adc12-le-word-v1"
+        or not frame_experiment
+        or usb_experiment
+        or args.host_api
+    ):
+        parser.error("unsupported packed ADC format or host")
     if bool(usb_experiment) != args.usb_throughput:
         parser.error("USB throughput builds require --usb-throughput and its manifest")
     if args.usb_throughput and (
@@ -267,7 +278,8 @@ def main() -> int:
     if frame_experiment and (
         not checksum_experiment
         or args.host_api
-        or frame_experiment.get("input_adc_frame_bytes") != 4096
+        or frame_experiment.get("input_adc_frame_bytes")
+        != (3084 if adc_packing else 4096)
         or frame_experiment.get("input_adc_pairs_per_frame") != 1012
     ):
         parser.error("unsupported frame experiment or host; use standalone validation")
@@ -289,7 +301,8 @@ def main() -> int:
         ).read_text()
         source += (
             f"\nCHECKSUM_EXPERIMENT_MODE = {mode!r}\n"
-            f"FRAME_EXPERIMENT = {bool(frame_experiment)!r}\n" + adapter
+            f"FRAME_EXPERIMENT = {bool(frame_experiment)!r}\n"
+            f"ADC12_PACKED_EXPERIMENT = {bool(adc_packing)!r}\n" + adapter
         )
     build_id = manifest["source"]["build_id"]
     settings = {
@@ -393,6 +406,7 @@ def main() -> int:
             "frame_experiment": frame_experiment,
             "usb_throughput_experiment": usb_experiment,
             "acquisition_usb_experiment": manifest.get("acquisition_usb_experiment"),
+            "adc_packing_experiment": adc_packing,
             "profile_sequence": sequence,
             "case_sequence": list(cases or (args.case,) * len(sequence)),
             "planned_program_seconds": planned_program_seconds,

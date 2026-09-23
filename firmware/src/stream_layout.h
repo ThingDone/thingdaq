@@ -145,7 +145,7 @@ struct RunLayout {
         disabled ? timing->disabled_frame_coverage_ticks
                  : timing->input_frame_coverage_ticks;
     return streams[0].item_count == adc_items &&
-           streams[0].item_bytes == protocol_v2::kAdcBytesPerPair &&
+           streams[0].item_bytes == input_experiment::kAdcWireBytesPerPair &&
            streams[0].item_period_ticks ==
                timing->adc_pair_period_ticks &&
            streams[0].coverage_ticks == coverage &&
@@ -244,7 +244,7 @@ constexpr Result experimental(protocol_v2::AuxBankMode mode,
       input ? protocol_v2::kInputGpioSamplesPerFrame
             : protocol_v2::kDisabledGpioSamplesPerFrame);
   result.layout.streams[0] = makeFrameLayout(
-      adc_items, protocol_v2::kAdcBytesPerPair,
+      adc_items, input_experiment::kAdcWireBytesPerPair,
       timing->adc_pair_period_ticks);
   result.layout.streams[1] = makeFrameLayout(
       gpio_items, input ? 2U : 1U, timing->gpio_sample_period_ticks);
@@ -286,7 +286,7 @@ static_assert(experimental(protocol_v2::AuxBankMode::kInput,
               protocol_v1::kHeaderSize + protocol_v1::kTrailerSize +
                   protocol_v2::kInputAdcPairsPerFrame *
                       input_experiment::kAdcFrameMultiplier *
-                      protocol_v2::kAdcBytesPerPair);
+                      input_experiment::kAdcWireBytesPerPair);
 
 }  // namespace thingdaq::stream_layout
 

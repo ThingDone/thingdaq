@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "protocol.h"
+#include "stream_layout.h"
 #include "statistics.h"
 #include "teensy_usb.h"
 #include "usb_transport.h"
@@ -100,7 +101,8 @@ std::vector<std::uint8_t> dataFrame(constants::FrameKind kind,
   if (auxiliary) {
     fields.item_count /= 2U;
     if (kind == constants::FrameKind::kAdcData) {
-      payload_size /= 2U;
+      fields.item_count = thingdaq::rate_profile::kInputAdcPairsPerFrame;
+      payload_size = fields.item_count * thingdaq::input_experiment::kAdcWireBytesPerPair;
     }
   }
   expect(wire::encodeFrame(fields, {payload.data(), payload_size}, frame).ok(),
@@ -642,7 +644,9 @@ void testTransmitBudgets() {
 void testAuxiliaryVariableLengthFrames() {
   const auto adc = dataFrame(constants::FrameKind::kAdcData, 7U, 0U, 0U, true);
   const auto gpio = dataFrame(constants::FrameKind::kGpioData, 7U, 0U, 0U, true);
-  expect(adc.size() == 2072U && gpio.size() == 4096U,
+  constexpr auto adc_size = 48U + thingdaq::rate_profile::kInputAdcPairsPerFrame *
+                                      thingdaq::input_experiment::kAdcWireBytesPerPair;
+  expect(adc.size() == adc_size && gpio.size() == 4096U,
          "auxiliary frame shapes match the wire contract");
   FakeLowerPrioritySource lower{};
   lower.frames = {adc, gpio, adc};

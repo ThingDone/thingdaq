@@ -425,19 +425,23 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
     if (header.version == protocol_v2::kProtocolVersion) {
       const bool adc = header.kind == protocol_v1::FrameKind::kAdcData;
       const bool disabled =
-          header.payload_length == protocol_v2::kDataPayloadBytes &&
+          header.payload_length ==
+              (adc ? protocol_v2::kDisabledAdcPairsPerFrame *
+                         input_experiment::kAdcWireBytesPerPair
+                   : protocol_v2::kDataPayloadBytes) &&
           header.item_count ==
               (adc ? protocol_v2::kDisabledAdcPairsPerFrame
                    : protocol_v2::kDisabledGpioSamplesPerFrame);
       const bool input =
           header.payload_length ==
               (adc ? rate_profile::kInputAdcPairsPerFrame *
-                         protocol_v2::kAdcBytesPerPair
+                         input_experiment::kAdcWireBytesPerPair
                    : protocol_v2::kInputGpioSamplesPerFrame * 2U) &&
           header.item_count ==
               (adc ? rate_profile::kInputAdcPairsPerFrame
                    : protocol_v2::kInputGpioSamplesPerFrame);
-      const std::uint32_t item_bytes = adc ? 4U : (input ? 2U : 1U);
+      const std::uint32_t item_bytes =
+          adc ? input_experiment::kAdcWireBytesPerPair : (input ? 2U : 1U);
       if ((!disabled && !input) ||
           header.total_length != protocol_v1::kHeaderSize +
                                      header.item_count * item_bytes +
@@ -1999,6 +2003,14 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
     return badLength();
   }
   if (header.kind == protocol_v1::FrameKind::kAdcData) {
+    if (header.version == protocol_v2::kProtocolVersion &&
+        input_experiment::kAdcWireBytesPerPair == 3U) {
+      // Every 12-bit pattern is a valid code. The packer checks source range;
+      // this path checks complete word groups and the declared sample count.
+      return payload.size % 12U == 0U &&
+                     payload.size / 3U == header.item_count
+                 ? Result::success() : badPayload();
+    }
     for (std::size_t offset = 0U; offset < payload.size; offset += 2U) {
       std::uint16_t sample = 0U;
       if (!loadU16(payload, offset, sample) ||
@@ -2270,7 +2282,7 @@ bool dataFrameShapeMatchesContract(protocol_v1::FrameKind kind,
             (adc ? protocol_v2::kDisabledAdcPairsPerFrame
                  : protocol_v2::kDisabledGpioSamplesPerFrame) &&
         shape.item_bytes ==
-            (adc ? protocol_v2::kAdcBytesPerPair : 1U);
+            (adc ? input_experiment::kAdcWireBytesPerPair : 1U);
     const bool input =
         coverage * (adc ? 1U : input_experiment::kAdcFrameMultiplier) ==
             timing.input_frame_coverage_ticks * coverage_multiplier &&
@@ -2278,7 +2290,7 @@ bool dataFrameShapeMatchesContract(protocol_v1::FrameKind kind,
             (adc ? rate_profile::kInputAdcPairsPerFrame
                  : protocol_v2::kInputGpioSamplesPerFrame) &&
         shape.item_bytes ==
-            (adc ? protocol_v2::kAdcBytesPerPair : 2U);
+            (adc ? input_experiment::kAdcWireBytesPerPair : 2U);
     if (disabled || input) {
       return true;
     }
@@ -3049,9 +3061,11 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   storeU16(bytes, protocol_v1::kInfoResponseSupportedConfigurationMaskOffset,
            response.supported_configuration_mask);
   storeU16(bytes, protocol_v1::kInfoResponseDataPayloadBytesOffset,
-           auxiliary_input
-               ? static_cast<std::uint16_t>(rate_profile::kInputAdcPairsPerFrame *
-                                            protocol_v1::kAdcPairBytes)
+           version2
+               ? static_cast<std::uint16_t>(
+                     (auxiliary_input ? rate_profile::kInputAdcPairsPerFrame
+                                      : protocol_v2::kDisabledAdcPairsPerFrame) *
+                     input_experiment::kAdcWireBytesPerPair)
                : response.data_payload_bytes);
   storeU16(bytes, protocol_v1::kInfoResponseAdcPairsPerFrameOffset,
            version2

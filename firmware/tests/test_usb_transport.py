@@ -47,15 +47,26 @@ class FirmwareUsbTransportTests(unittest.TestCase):
                 "-o",
                 str(executable),
             ]
-            for write_bytes, batch_scale in (
-                (1024, 1),
-                (2048, 1),
-                (4096, 1),
-                (4096, 2),
+            for write_bytes, batch_scale, packed in (
+                (1024, 1, False),
+                (2048, 1, False),
+                (4096, 1, False),
+                (4096, 2, False),
+                (1024, 1, True),
             ):
-                with self.subTest(write_bytes=write_bytes, batch_scale=batch_scale):
+                with self.subTest(
+                    write_bytes=write_bytes, batch_scale=batch_scale, packed=packed
+                ):
                     compile_result = subprocess.run(
                         command
+                        + (
+                            [
+                                "-DTHINGDAQ_EXPERIMENT_LARGE_ADC_FRAME=1",
+                                "-DTHINGDAQ_EXPERIMENT_ADC12_PACKED=1",
+                            ]
+                            if packed
+                            else []
+                        )
                         + [
                             f"-DTHINGDAQ_EXPERIMENT_USB_WRITE_BYTES={write_bytes}",
                             f"-DTHINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE={batch_scale}",

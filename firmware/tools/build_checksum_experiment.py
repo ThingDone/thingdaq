@@ -32,9 +32,14 @@ def main() -> int:
     )
     parser.add_argument("--arduino-cli", default="arduino-cli")
     parser.add_argument("--usb-throughput", action="store_true")
+    parser.add_argument("--adc12-packed", action="store_true")
     parser.add_argument("--usb-write-bytes", type=int, choices=(1024, 2048, 4096))
     parser.add_argument("--pipeline-batch-scale", type=int, choices=(1, 2), default=1)
     args = parser.parse_args()
+    if args.adc12_packed and (not args.large_adc_frame or args.usb_throughput):
+        parser.error(
+            "--adc12-packed requires --large-adc-frame without --usb-throughput"
+        )
     if args.pipeline_batch_scale != 1 and args.usb_write_bytes is None:
         parser.error("--pipeline-batch-scale requires --usb-write-bytes")
     if args.usb_throughput and args.usb_write_bytes is not None:
@@ -52,6 +57,8 @@ def main() -> int:
     )
     if acquisition_suffix:
         frame_suffix += f":acquisition-v1{acquisition_suffix}"
+    if args.adc12_packed:
+        frame_suffix += ":adc12-word-packed-v1"
     base.OUTPUT_DIRECTORY = (
         base.SKETCH_DIRECTORY
         / "build"
@@ -61,6 +68,7 @@ def main() -> int:
             else f"checksum-{mode}"
             + ("-adc4096" if args.large_adc_frame else "")
             + acquisition_suffix
+            + ("-adc12" if args.adc12_packed else "")
         )
     )
     original_identity = base.build_identity
@@ -82,6 +90,7 @@ def main() -> int:
         + (f" -D{MODES[mode]}=1" if MODES[mode] else "")
         + (" -DTHINGDAQ_EXPERIMENT_LARGE_ADC_FRAME=1" if args.large_adc_frame else "")
         + (" -DTHINGDAQ_EXPERIMENT_USB_THROUGHPUT=1" if args.usb_throughput else "")
+        + (" -DTHINGDAQ_EXPERIMENT_ADC12_PACKED=1" if args.adc12_packed else "")
         + (
             f" -DTHINGDAQ_EXPERIMENT_USB_WRITE_BYTES={args.usb_write_bytes}"
             f" -DTHINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE={args.pipeline_batch_scale}"
@@ -107,7 +116,7 @@ def main() -> int:
     }
     if args.large_adc_frame:
         manifest["frame_experiment"] = {
-            "input_adc_frame_bytes": 4096,
+            "input_adc_frame_bytes": 3084 if args.adc12_packed else 4096,
             "input_adc_pairs_per_frame": 1012,
             "gpio_frame_bytes": 4096,
             "packet_pool_bytes": 819200,
@@ -150,6 +159,23 @@ def main() -> int:
             "tx_calls_per_visit": 8,
             "tx_visits_per_loop": 2,
             "packet_pool_bytes": 819200,
+        }
+        manifest["checksum_experiment"]["identity_policy"] = (
+            f"sha256(source_id:checksum-experiment-v1:{mode}{frame_suffix})"
+        )
+    if args.adc12_packed:
+        manifest["adc_packing_experiment"] = {
+            "format": "adc12-le-word-v1",
+            "sample_bits": 12,
+            "pairs_per_group": 4,
+            "input_bytes_per_group": 16,
+            "output_bytes_per_group": 12,
+            "wire_bytes_per_pair": 3,
+            "raw_dma_bytes_per_pair": 4,
+            "adc_pairs_per_frame": 1012,
+            "adc_payload_bytes": 3036,
+            "adc_frame_bytes": 3084,
+            "wire_compatible": False,
         }
         manifest["checksum_experiment"]["identity_policy"] = (
             f"sha256(source_id:checksum-experiment-v1:{mode}{frame_suffix})"

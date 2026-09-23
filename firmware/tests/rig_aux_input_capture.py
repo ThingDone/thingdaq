@@ -213,6 +213,7 @@ EXPECTED_CAPABILITIES = 0x000006FF if RELEASE_FIXED_1MHZ else 0x000007FF
 
 ADC_CONTAINER_BYTES = 2
 ADC_BYTES_PER_PAIR = 4
+ADC_WIRE_BYTES_PER_PAIR = ADC_BYTES_PER_PAIR
 ADC_RESOLUTION_BITS = 12
 ADC_DMA_RING_DEPTH = 8
 ADC_EDMA_CHANNELS = (0, 1)
@@ -1460,7 +1461,11 @@ def grade_active_info(
         else profile.disabled_coverage_ticks
     )
     raw_ring_bytes = layout.gpio_items_per_frame * 4 * GPIO_RAW_RING_DEPTH
-    adc_ring_bytes = math.ceil(layout.adc_payload_bytes / 32) * 32 * ADC_DMA_RING_DEPTH
+    adc_ring_bytes = (
+        math.ceil(layout.adc_items_per_frame * ADC_BYTES_PER_PAIR / 32)
+        * 32
+        * ADC_DMA_RING_DEPTH
+    )
     exact: dict[str, object] = {
         "device_state": expected_state,
         "data_checksum_algorithm": expected_checksum,
@@ -2546,7 +2551,7 @@ def validate_status(
         raise ProtocolFailure("legacy/pipeline ADC conservation failed")
 
     for prefix, enabled, items, item_bytes in (
-        ("adc", adc_enabled, layout.adc_items_per_frame, ADC_BYTES_PER_PAIR),
+        ("adc", adc_enabled, layout.adc_items_per_frame, ADC_WIRE_BYTES_PER_PAIR),
         ("gpio", True, layout.gpio_items_per_frame, layout.gpio_item_bytes),
     ):
         generated = status.values[f"{prefix}_frames_generated"]
@@ -2670,6 +2675,11 @@ def validate_status(
         raise ProtocolFailure("single-stream packet retention is contradictory")
 
 
+def validate_adc_payload(payload: bytes) -> None:
+    if max(payload[1::2], default=0) > ((1 << ADC_RESOLUTION_BITS) - 1) >> 8:
+        raise ProtocolFailure("ADC frame contains an out-of-range code")
+
+
 @dataclass
 class StreamTotals:
     frames: int = 0
@@ -2786,8 +2796,7 @@ class AcquisitionValidator:
             or len(frame.payload) != self.layout.adc_payload_bytes
         ):
             raise ProtocolFailure("ADC frame shape differs from active layout")
-        if max(frame.payload[1::2], default=0) > ((1 << ADC_RESOLUTION_BITS) - 1) >> 8:
-            raise ProtocolFailure("ADC frame contains an out-of-range code")
+        validate_adc_payload(frame.payload)
         self._advance(self.adc, frame, self.layout.adc_total_frame_bytes)
 
     def _accept_gpio(self, frame: Frame) -> None:

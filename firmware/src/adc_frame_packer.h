@@ -10,6 +10,13 @@
 
 namespace thingdaq::adc_packer {
 
+// Four interleaved 12-bit ADC pairs (16 bytes) become three little-endian
+// words (12 bytes). Requires exact size, four-pair groups and 4-byte output
+// alignment. Rejects invalid codes; output may be partial on such failure.
+bool pack12BitPairs(protocol::MutableByteView destination,
+                    const adc_capture::SamplePair *pairs,
+                    std::size_t pair_count);
+
 enum class OperationStatus : std::uint8_t {
   kOk,
   kInvalidRunId,
@@ -51,9 +58,9 @@ struct Snapshot {
 };
 
 // Main-loop bridge from complete dual-DMA generations to immutable packet
-// buffers. Each source buffer is already one canonical ADC payload, so this
-// owner preserves its adc0/adc1 halfword order with one bounded copy and
-// releases the DMA lease before USB can retain the resulting frame.
+// buffers. Preserve adc0/adc1 order with one bounded copy (or the experimental
+// lossless 12-bit packing pass), then release the DMA lease before USB can
+// retain the resulting frame.
 class AdcFramePacker final {
  public:
   explicit constexpr AdcFramePacker(adc_capture::PairSource &source)

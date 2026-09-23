@@ -30,6 +30,41 @@ constexpr std::uint16_t flag(protocol_v1::FrameFlag value) {
 
 }  // namespace
 
+THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.pack12")
+bool pack12BitPairs(protocol::MutableByteView destination,
+                    const adc_capture::SamplePair *pairs,
+                    std::size_t pair_count) {
+  if (!destination.valid() || pairs == nullptr || pair_count == 0U ||
+      pair_count % 4U != 0U || pair_count > destination.size / 3U ||
+      destination.size != pair_count * 3U ||
+      reinterpret_cast<std::uintptr_t>(destination.data) % 4U != 0U) {
+    return false;
+  }
+  for (std::size_t i = 0U; i < pair_count; i += 4U) {
+    const std::uint32_t v0 = pairs[i].adc0, v1 = pairs[i].adc1;
+    const std::uint32_t v2 = pairs[i + 1U].adc0, v3 = pairs[i + 1U].adc1;
+    const std::uint32_t v4 = pairs[i + 2U].adc0, v5 = pairs[i + 2U].adc1;
+    const std::uint32_t v6 = pairs[i + 3U].adc0, v7 = pairs[i + 3U].adc1;
+    if (((v0 | v1 | v2 | v3 | v4 | v5 | v6 | v7) & ~0xFFFU) != 0U)
+      return false;
+    const std::uint32_t words[3] = {
+        v0 | (v1 << 12U) | (v2 << 24U),
+        (v2 >> 8U) | (v3 << 4U) | (v4 << 16U) | (v5 << 28U),
+        (v5 >> 4U) | (v6 << 8U) | (v7 << 20U),
+    };
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    // Constant-size memcpy permits word stores without aliasing a byte array
+    // as uint32_t objects. Alignment was checked before entering the loop.
+    std::memcpy(__builtin_assume_aligned(destination.data + i * 3U, 4),
+                words, sizeof(words));
+#else
+    for (std::size_t word = 0U; word < 3U; ++word)
+      (void)protocol::storeU32(destination, i * 3U + word * 4U, words[word]);
+#endif
+  }
+  return true;
+}
+
 THINGDAQ_ADC_PACKER_COLD_CODE(".flashmem.adc_packer.start")
 OperationStatus AdcFramePacker::startRun(
     std::uint32_t run_id,
@@ -52,7 +87,10 @@ OperationStatus AdcFramePacker::startRun(
       selected_layout.forStream(stream_layout::Stream::kAdc);
   if (!selected_layout.valid() ||
       adc_layout.item_count > protocol_v1::kAdcPairsPerFrame ||
-      adc_layout.item_bytes != sizeof(adc_capture::SamplePair) ||
+      adc_layout.item_bytes !=
+          (selected_layout.protocol_version == protocol_v2::kProtocolVersion
+               ? input_experiment::kAdcWireBytesPerPair
+               : sizeof(adc_capture::SamplePair)) ||
       adc_layout.payload_bytes !=
           adc_layout.item_count * adc_layout.item_bytes) {
     return OperationStatus::kPipelineNotReady;
@@ -195,8 +233,15 @@ bool AdcFramePacker::consume(
             adc_layout.item_period_ticks;
     framed = payload.valid() && payload.size == adc_layout.payload_bytes &&
              timestamp_valid;
+    if (framed && adc_layout.item_bytes == 3U &&
+        !pack12BitPairs(payload, handle.pairs, handle.pair_count)) {
+      framed = false;
+      saturatingIncrement(source_errors_);
+      report.source_error = true;
+    }
     if (framed) {
-      std::memcpy(payload.data, handle.pairs, payload.size);
+      if (adc_layout.item_bytes == sizeof(adc_capture::SamplePair))
+        std::memcpy(payload.data, handle.pairs, payload.size);
       packet::FrameCompletion completion{};
       completion.first_sample_ticks =
           layout_.protocol_version == protocol_v1::kProtocolVersion
