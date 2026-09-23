@@ -431,7 +431,7 @@ inline constexpr std::size_t kAdcDmaActivePipelineDepth =
     input_experiment::kReleaseFixed1MHz ? 4U : kAdcDmaPipelineDepth;
 inline constexpr std::size_t kAdcDmaDescriptorCount =
     2U * kAdcDmaPipelineDepth;
-inline constexpr std::size_t kAdcFramesPerLoop = 2U;
+inline constexpr std::size_t kAdcFramesPerLoop = 2U * input_experiment::kPipelineBatchScale;
 inline constexpr std::size_t kAdcPackerStateBudgetBytes = 512U;
 inline constexpr std::size_t kGpioRawDmaRingDepth = 4U;
 inline constexpr std::size_t kGpioRawDmaDescriptorCount =
@@ -441,8 +441,8 @@ inline constexpr std::size_t kAuxGpioRawDmaRingDepth =
 inline constexpr std::size_t kAuxGpioRawDmaDescriptorCount =
     kAuxGpioRawDmaRingDepth + 1U;
 inline constexpr std::size_t kGpioPackedRingDepth = 4U;
-inline constexpr std::size_t kGpioRawBuffersPerLoop = 2U;
-inline constexpr std::size_t kGpioPackedFramesPerLoop = 2U;
+inline constexpr std::size_t kGpioRawBuffersPerLoop = 2U * input_experiment::kPipelineBatchScale;
+inline constexpr std::size_t kGpioPackedFramesPerLoop = 2U * input_experiment::kPipelineBatchScale;
 inline constexpr std::size_t kGpioPackerStateBudgetBytes = 2048U;
 // The generation table and ownership records are CPU state. INPUT mode leases
 // the beginning of the IDLE-only checksum benchmark's aligned OCRAM buffer, so
@@ -461,7 +461,7 @@ inline constexpr std::size_t kPacketBufferCount =
     kPacketBufferPrimaryCount + kPacketBufferReserveCount;
 inline constexpr std::size_t kPacketReadyQueueDepth = kPacketBufferCount;
 inline constexpr std::size_t kPacketTransmitQueueDepth = kPacketBufferCount;
-inline constexpr std::size_t kPacketPromotionsPerLoop = 4U;
+inline constexpr std::size_t kPacketPromotionsPerLoop = 4U * input_experiment::kPipelineBatchScale;
 // One elapsed coverage interval makes one ADC/GPIO pair due. Limiting a visit
 // to that pair halves the longest checksum burst while retaining same-visit
 // promotion/transmission and fast bounded catch-up on the next loop.
@@ -491,7 +491,9 @@ inline constexpr std::size_t kUsbTxBudgetBytesPerLoop =
 // possible. A visit waits for at least one high-speed USB packet of capacity
 // instead of deliberately degrading into byte-at-a-time calls. Unexpected
 // backend prefixes are still retained and resumed exactly.
-inline constexpr std::size_t kUsbTxMaxWriteBytes = 1024U;
+// Explicit research builds may raise the per-call bound to 2 or 4 KiB.
+// Capacity checks, the 8 KiB visit budget, and two visits per loop still apply.
+inline constexpr std::size_t kUsbTxMaxWriteBytes = input_experiment::kUsbWriteBytes;
 inline constexpr std::size_t kUsbTxMinimumWriteBytes = 512U;
 inline constexpr std::size_t kUsbRxCallsPerLoop = 8U;
 inline constexpr std::size_t kUsbTxCallsPerVisit = 8U;

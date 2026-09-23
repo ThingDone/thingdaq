@@ -17,6 +17,18 @@
 #ifndef THINGDAQ_EXPERIMENT_EQUAL_RATES
 #define THINGDAQ_EXPERIMENT_EQUAL_RATES 0
 #endif
+#ifndef THINGDAQ_EXPERIMENT_USB_WRITE_BYTES
+#define THINGDAQ_EXPERIMENT_USB_WRITE_BYTES 1024
+#endif
+#ifndef THINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE
+#define THINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE 1
+#endif
+#if THINGDAQ_EXPERIMENT_USB_WRITE_BYTES != 1024 && THINGDAQ_EXPERIMENT_USB_WRITE_BYTES != 2048 && THINGDAQ_EXPERIMENT_USB_WRITE_BYTES != 4096
+#error "unsupported acquisition USB write experiment"
+#endif
+#if THINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE != 1 && THINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE != 2
+#error "unsupported acquisition batch experiment"
+#endif
 #if THINGDAQ_EXPERIMENT_CPU_HZ != 600000000U && THINGDAQ_EXPERIMENT_CPU_HZ != 450000000U
 #error "input experiment supports only the reviewed 600/150 and 450/150 MHz clocks"
 #endif
@@ -25,6 +37,8 @@
 #endif
 
 namespace thingdaq::input_experiment {
+inline constexpr std::uint32_t kUsbWriteBytes = THINGDAQ_EXPERIMENT_USB_WRITE_BYTES;
+inline constexpr std::uint32_t kPipelineBatchScale = THINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE;
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
 inline constexpr std::uint32_t kAdcFrameMultiplier = 2U;
 #else

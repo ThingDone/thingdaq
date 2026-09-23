@@ -26,48 +26,60 @@ class FirmwareUsbTransportTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(prefix="thingdaq-usb-") as directory:
             executable = Path(directory) / "usb-transport-test"
-            compile_result = subprocess.run(
-                [
-                    compiler,
-                    "-std=c++17",
-                    "-Wall",
-                    "-Wextra",
-                    "-Werror",
-                    "-Wconversion",
-                    "-Wsign-conversion",
-                    "-pedantic",
-                    "-fno-exceptions",
-                    "-fno-rtti",
-                    f"-I{FIRMWARE_SOURCE}",
-                    str(CPP_TEST),
-                    str(FIRMWARE_SOURCE / "usb_transport.cpp"),
-                    str(FIRMWARE_SOURCE / "teensy_usb.cpp"),
-                    str(FIRMWARE_SOURCE / "statistics.cpp"),
-                    str(FIRMWARE_SOURCE / "protocol.cpp"),
-                    str(FIRMWARE_SOURCE / "checksum.cpp"),
-                    "-o",
-                    str(executable),
-                ],
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertEqual(
-                0,
-                compile_result.returncode,
-                compile_result.stdout + compile_result.stderr,
-            )
-            run_result = subprocess.run(
-                [str(executable)],
-                capture_output=True,
-                check=False,
-                text=True,
-            )
-            self.assertEqual(
-                0,
-                run_result.returncode,
-                run_result.stdout + run_result.stderr,
-            )
+            command = [
+                compiler,
+                "-std=c++17",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-Wconversion",
+                "-Wsign-conversion",
+                "-pedantic",
+                "-fno-exceptions",
+                "-fno-rtti",
+                f"-I{FIRMWARE_SOURCE}",
+                str(CPP_TEST),
+                str(FIRMWARE_SOURCE / "usb_transport.cpp"),
+                str(FIRMWARE_SOURCE / "teensy_usb.cpp"),
+                str(FIRMWARE_SOURCE / "statistics.cpp"),
+                str(FIRMWARE_SOURCE / "protocol.cpp"),
+                str(FIRMWARE_SOURCE / "checksum.cpp"),
+                "-o",
+                str(executable),
+            ]
+            for write_bytes, batch_scale in (
+                (1024, 1),
+                (2048, 1),
+                (4096, 1),
+                (4096, 2),
+            ):
+                with self.subTest(write_bytes=write_bytes, batch_scale=batch_scale):
+                    compile_result = subprocess.run(
+                        command
+                        + [
+                            f"-DTHINGDAQ_EXPERIMENT_USB_WRITE_BYTES={write_bytes}",
+                            f"-DTHINGDAQ_EXPERIMENT_PIPELINE_BATCH_SCALE={batch_scale}",
+                        ],
+                        capture_output=True,
+                        check=False,
+                        text=True,
+                    )
+                    self.assertEqual(
+                        0,
+                        compile_result.returncode,
+                        compile_result.stdout + compile_result.stderr,
+                    )
+                    run_result = subprocess.run(
+                        [str(executable)],
+                        capture_output=True,
+                        check=False,
+                        text=True,
+                    )
+                    self.assertEqual(
+                        0,
+                        run_result.returncode,
+                        run_result.stdout + run_result.stderr,
+                    )
 
     def test_portable_transport_has_no_arduino_or_heap_dependency(self) -> None:
         portable_source = "\n".join(

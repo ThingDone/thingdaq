@@ -3416,6 +3416,16 @@ def run_acceptance(
             "status_p99_seconds": percentile(status_latencies, 0.99),
             "stop_tail_adc_items": final_status.adc_stop_pairs_discarded,
             "stop_tail_gpio_items": final_status.gpio_stop_samples_discarded,
+            "adc_resolution_bits": final_status.adc_resolution_bits,
+            "adc_container_bytes": final_status.adc_container_bytes,
+            "adc_raw_ready_high_water": final_status.adc_raw_ready_high_water,
+            "primary_gpio_raw_ready_high_water": final_status.primary_gpio_raw_ready_high_water,
+            "aux_gpio_raw_ready_high_water": final_status.aux_gpio_raw_ready_high_water,
+            "usb_tx_stall_events": final_status.usb_tx_stall_events,
+            "usb_short_capacity_deferrals": final_status.usb_short_capacity_deferrals,
+            "partial_usb_writes": final_status.partial_usb_writes,
+            "data_payload_bytes_transmitted": final_status.data_payload_bytes_transmitted,
+            "data_framed_bytes_transmitted": final_status.data_framed_bytes_transmitted,
         }
         emit_event(
             "final_counters",

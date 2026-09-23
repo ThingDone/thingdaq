@@ -392,6 +392,7 @@ def main() -> int:
             "checksum_experiment": checksum_experiment,
             "frame_experiment": frame_experiment,
             "usb_throughput_experiment": usb_experiment,
+            "acquisition_usb_experiment": manifest.get("acquisition_usb_experiment"),
             "profile_sequence": sequence,
             "case_sequence": list(cases or (args.case,) * len(sequence)),
             "planned_program_seconds": planned_program_seconds,

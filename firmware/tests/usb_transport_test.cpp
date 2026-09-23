@@ -567,10 +567,13 @@ void testTransmitBudgets() {
   usb::CdcTransport transport(stream, statistics, &lower);
 
   const usb::ServiceReport first = transport.serviceTransmit();
+  constexpr std::size_t expected_calls =
+      thingdaq::board::kUsbTxBudgetBytesPerVisit /
+      thingdaq::board::kUsbTxMaxWriteBytes;
   expect(first.bytes_written == thingdaq::board::kUsbTxBudgetBytesPerVisit &&
              first.byte_budget_exhausted &&
-             first.frames_completed == 2U && first.io_calls == 8U &&
-             stream.write_requests.size() == 8U &&
+             first.frames_completed == 2U && first.io_calls == expected_calls &&
+             stream.write_requests.size() == expected_calls &&
              std::all_of(stream.write_requests.begin(),
                          stream.write_requests.end(), [](std::size_t request) {
                            return request ==
