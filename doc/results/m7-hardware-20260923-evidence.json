@@ -1,0 +1,4018 @@
+{
+  "cpu_hz": 450000000,
+  "date": "2026-09-23",
+  "linked_kernel_machine_code_sha256": {
+    "benchmark-Os": {
+      "pack_c_flash": "f9ef468edb83f3bf053678bdae0f6e3a17f3fd2bc96e58533baeda40769ebc25",
+      "pack_c_itcm": "f9ef468edb83f3bf053678bdae0f6e3a17f3fd2bc96e58533baeda40769ebc25",
+      "pack_cpp_flash": "f9ef468edb83f3bf053678bdae0f6e3a17f3fd2bc96e58533baeda40769ebc25",
+      "pack_cpp_itcm": "f9ef468edb83f3bf053678bdae0f6e3a17f3fd2bc96e58533baeda40769ebc25"
+    },
+    "benchmark-O1": {
+      "pack_c_flash": "8b9f8abc007bbe9d83a256520f923ccd7240d096586214e63e4a193eeac94d64",
+      "pack_c_itcm": "8b9f8abc007bbe9d83a256520f923ccd7240d096586214e63e4a193eeac94d64",
+      "pack_cpp_flash": "8b9f8abc007bbe9d83a256520f923ccd7240d096586214e63e4a193eeac94d64",
+      "pack_cpp_itcm": "8b9f8abc007bbe9d83a256520f923ccd7240d096586214e63e4a193eeac94d64"
+    },
+    "benchmark-O2": {
+      "pack_c_flash": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_c_itcm": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_cpp_flash": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_cpp_itcm": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232"
+    },
+    "benchmark-O3": {
+      "pack_c_flash": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_c_itcm": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_cpp_flash": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_cpp_itcm": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232"
+    },
+    "benchmark-O2-align32": {
+      "pack_c_flash": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_c_itcm": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_cpp_flash": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232",
+      "pack_cpp_itcm": "92eb9d1bec0ba31fc342673f4164d34443010fa3dff0e98b8092a8900d134232"
+    }
+  },
+  "hardware_serial": 20428100,
+  "jobs": [
+    {
+      "aggregate": [
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 52684,
+          "observed_max_cycles": 52721,
+          "observed_min_cycles": 52684,
+          "operation": "c_flash",
+          "pass_medians": [
+            52684,
+            52684,
+            52684,
+            52684,
+            52684
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 52684,
+          "observed_max_cycles": 52728,
+          "observed_min_cycles": 52684,
+          "operation": "c_flash",
+          "pass_medians": [
+            52684,
+            52684,
+            52684,
+            52684,
+            52684
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 54694,
+          "observed_max_cycles": 54727,
+          "observed_min_cycles": 54694,
+          "operation": "c_itcm",
+          "pass_medians": [
+            54694,
+            54694,
+            54694,
+            54694,
+            54694
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 54694,
+          "observed_max_cycles": 54727,
+          "observed_min_cycles": 54694,
+          "operation": "c_itcm",
+          "pass_medians": [
+            54694,
+            54694,
+            54694,
+            54694,
+            54694
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 52683,
+          "observed_max_cycles": 52718,
+          "observed_min_cycles": 52683,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            52683,
+            52683,
+            52683,
+            52683,
+            52683
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 52683,
+          "observed_max_cycles": 52718,
+          "observed_min_cycles": 52683,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            52683,
+            52683,
+            52683,
+            52683,
+            52683
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 52670,
+          "observed_max_cycles": 52718,
+          "observed_min_cycles": 52670,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            52670,
+            52670,
+            52670,
+            52670,
+            52670
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 52670,
+          "observed_max_cycles": 52717,
+          "observed_min_cycles": 52670,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            52670,
+            52670,
+            52670,
+            52670,
+            52670
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 10779,
+          "observed_max_cycles": 11305,
+          "observed_min_cycles": 10779,
+          "operation": "primask_publish_take",
+          "pass_medians": [
+            10779,
+            10779,
+            10779,
+            10779,
+            10779
+          ],
+          "units": 256
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 7962,
+          "observed_max_cycles": 8497,
+          "observed_min_cycles": 7962,
+          "operation": "atomic_publish_take",
+          "pass_medians": [
+            7962,
+            7962,
+            7962,
+            7962,
+            7962
+          ],
+          "units": 256
+        }
+      ],
+      "artifact_sha256": {
+        "benchmark-manifest.json": "d8bec92117ea7cea54bf16c194aa16498c84e733fc70ff897337f44f7970eb41",
+        "firmware.ino.hex": "b36ba8476121e91d0dec0a84166f7a702939415238676bd5e4c4fd797c12c120",
+        "preflight.json": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+        "provenance.json": "5f133bf640329c21f6981ba1030653e8cd9279111a7c449d6aa9be2c5683895a",
+        "results.json": "090e8556ffed2e473526b61b94eeb0d6103d99f47d0e0a55d954d93cd2e54c13",
+        "rig-program.py": "b6a1f7598f4285b95a84830e14999158f2d549422e03f08bac3bebacf9bfd3f5",
+        "start.json": "88487565afa96aec0adbcedcc084b814fe764828e4050952cf4d0101d1126e97",
+        "status.json": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+        "summary.json": "bfe4a2c9e672192e98323cd7f2e7f6f2a5c07050244fcecb524296bd952bb4ec"
+      },
+      "manifest": {
+        "command": [
+          "arduino-cli",
+          "compile",
+          "--fqbn",
+          "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+          "--clean",
+          "--warnings",
+          "all",
+          "--build-path",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-Os/compile",
+          "--build-property",
+          "build.flags.optimize=-Os",
+          "--build-property",
+          "build.flags.defs=-D__IMXRT1062__ -DTEENSYDUINO=160 -DTHINGDAQ_BENCH_OPT=Os",
+          "--output-dir",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-Os",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-Os/m7_performance"
+        ],
+        "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "elf_sha256": "2d2e4432c88be35684f290ca3d3abe6c834a92c32e57787771895d2d095baa66",
+        "hardware_timing": null,
+        "kernels": {
+          "dtcm_auxiliary": {
+            "address": "0x200016c0",
+            "data_bytes": 8096
+          },
+          "dtcm_primary": {
+            "address": "0x20003660",
+            "data_bytes": 8096
+          },
+          "events": {
+            "address": "0x20006958",
+            "data_bytes": 4
+          },
+          "ocram_auxiliary": {
+            "address": "0x20200000",
+            "data_bytes": 8096
+          },
+          "ocram_primary": {
+            "address": "0x20201fa0",
+            "data_bytes": 8096
+          },
+          "pack_c_flash": {
+            "address": "0x6000160c",
+            "code_bytes": 214
+          },
+          "pack_c_itcm": {
+            "address": "0x20",
+            "code_bytes": 214
+          },
+          "pack_cpp_flash": {
+            "address": "0x600016e2",
+            "code_bytes": 214
+          },
+          "pack_cpp_itcm": {
+            "address": "0xf6",
+            "code_bytes": 214
+          }
+        },
+        "optimization": "Os",
+        "sources": {
+          "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+          "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+          "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+          "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+          "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+          "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+          "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+          "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+          "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+        }
+      },
+      "name": "benchmark-Os",
+      "provenance": {
+        "elf_sha256": "2d2e4432c88be35684f290ca3d3abe6c834a92c32e57787771895d2d095baa66",
+        "hardware_serial": 20428100,
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "b36ba8476121e91d0dec0a84166f7a702939415238676bd5e4c4fd797c12c120",
+        "manifest_sha256": "d8bec92117ea7cea54bf16c194aa16498c84e733fc70ff897337f44f7970eb41",
+        "optimization": "Os",
+        "program_sha256": "b6a1f7598f4285b95a84830e14999158f2d549422e03f08bac3bebacf9bfd3f5",
+        "service": "http://192.168.150.14:5000"
+      },
+      "raw_directory": "doc/results/raw/m7-hardware-20260923/benchmark-Os",
+      "service_result": {
+        "board": "teensy:avr:teensy40",
+        "completed": true,
+        "exit_code": 0,
+        "hub_id": "0x00000000",
+        "hub_port": 15,
+        "message": "Container ran successfully for test_id 6456db35-44c7-4527-878c-b3ff1d9e01ce",
+        "program_success": true,
+        "test_id": "6456db35-44c7-4527-878c-b3ff1d9e01ce",
+        "timestamp": "2026-09-23 18:46:07"
+      },
+      "summary": {
+        "evidence": [
+          {
+            "optimization": "Os",
+            "passes": [
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52728,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 54727,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 54727,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52715,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52718,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52702,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11304,
+                  "median_cycles": 10779,
+                  "min_cycles": 10779,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8484,
+                  "median_cycles": 7962,
+                  "min_cycles": 7962,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52721,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 54708,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 54727,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52718,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52715,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52718,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52703,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11305,
+                  "median_cycles": 10779,
+                  "min_cycles": 10779,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8484,
+                  "median_cycles": 7962,
+                  "min_cycles": 7962,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 54727,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 54727,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52715,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52715,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52703,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52703,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11303,
+                  "median_cycles": 10779,
+                  "min_cycles": 10779,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8486,
+                  "median_cycles": 7962,
+                  "min_cycles": 7962,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 54708,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 54727,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52715,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52715,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52703,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52702,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11305,
+                  "median_cycles": 10779,
+                  "min_cycles": 10779,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8487,
+                  "median_cycles": 7962,
+                  "min_cycles": 7962,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52717,
+                  "median_cycles": 52684,
+                  "min_cycles": 52684,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 54727,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 54727,
+                  "median_cycles": 54694,
+                  "min_cycles": 54694,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52715,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52715,
+                  "median_cycles": 52683,
+                  "min_cycles": 52683,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 52703,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 52703,
+                  "median_cycles": 52670,
+                  "min_cycles": 52670,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11304,
+                  "median_cycles": 10779,
+                  "min_cycles": 10779,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8497,
+                  "median_cycles": 7962,
+                  "min_cycles": 7962,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ]
+            ],
+            "result": "PASS",
+            "usb_serial": "20428100",
+            "validator": "m7-dwt"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 6456db35-44c7-4527-878c-b3ff1d9e01ce",
+        "outcome": "PASS",
+        "test_id": "6456db35-44c7-4527-878c-b3ff1d9e01ce"
+      }
+    },
+    {
+      "aggregate": [
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 62803,
+          "observed_max_cycles": 62835,
+          "observed_min_cycles": 62803,
+          "operation": "c_flash",
+          "pass_medians": [
+            62803,
+            62803,
+            62803,
+            62803,
+            62803
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 62803,
+          "observed_max_cycles": 62854,
+          "observed_min_cycles": 62803,
+          "operation": "c_flash",
+          "pass_medians": [
+            62803,
+            62803,
+            62803,
+            62803,
+            62803
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 62789,
+          "observed_max_cycles": 62823,
+          "observed_min_cycles": 62789,
+          "operation": "c_itcm",
+          "pass_medians": [
+            62789,
+            62789,
+            62789,
+            62789,
+            62789
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 62789,
+          "observed_max_cycles": 62838,
+          "observed_min_cycles": 62789,
+          "operation": "c_itcm",
+          "pass_medians": [
+            62789,
+            62789,
+            62789,
+            62789,
+            62789
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 62803,
+          "observed_max_cycles": 62851,
+          "observed_min_cycles": 62803,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            62803,
+            62803,
+            62803,
+            62803,
+            62803
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 62803,
+          "observed_max_cycles": 62851,
+          "observed_min_cycles": 62803,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            62803,
+            62803,
+            62803,
+            62803,
+            62803
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 62790,
+          "observed_max_cycles": 62823,
+          "observed_min_cycles": 62790,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            62790,
+            62790,
+            62790,
+            62790,
+            62790
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 62790,
+          "observed_max_cycles": 62823,
+          "observed_min_cycles": 62790,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            62790,
+            62790,
+            62790,
+            62790,
+            62790
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 10780,
+          "observed_max_cycles": 11353,
+          "observed_min_cycles": 10780,
+          "operation": "primask_publish_take",
+          "pass_medians": [
+            10780,
+            10780,
+            10780,
+            10780,
+            10780
+          ],
+          "units": 256
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 7964,
+          "observed_max_cycles": 8568,
+          "observed_min_cycles": 7964,
+          "operation": "atomic_publish_take",
+          "pass_medians": [
+            7964,
+            7964,
+            7964,
+            7964,
+            7964
+          ],
+          "units": 256
+        }
+      ],
+      "artifact_sha256": {
+        "benchmark-manifest.json": "c615eb4f0f72ab62cf0e8252f3482b2f453a0f84386cca8985abbda21f6154ae",
+        "firmware.ino.hex": "1a71b7c0d171b31f8198eaa6ce788192d6319ece548ab163a0359ed3ba713258",
+        "preflight.json": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+        "provenance.json": "b9112216237089d6ed71713797ef8e8e2ad1724ee623a8020b80f160ba81d72a",
+        "results.json": "02c827aa86c1338f7325a5868fbf4312c9189e9b002c2c49e6b6fc59d19df6e0",
+        "rig-program.py": "8a65f03646561b71354d7a97e3c6ac9613fd804da4c1e6798b4dd2c374d2cc3a",
+        "start.json": "9d2bd223c5891b3204601bb1ae9c957d65d431b9bbee24bdcf8e62529a3798b9",
+        "status.json": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+        "summary.json": "d999a463261a8c60c06186f9ad5cfef7950585dd7518ebee41602ddf252e8864"
+      },
+      "manifest": {
+        "command": [
+          "arduino-cli",
+          "compile",
+          "--fqbn",
+          "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+          "--clean",
+          "--warnings",
+          "all",
+          "--build-path",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O1/compile",
+          "--build-property",
+          "build.flags.optimize=-O1",
+          "--build-property",
+          "build.flags.defs=-D__IMXRT1062__ -DTEENSYDUINO=160 -DTHINGDAQ_BENCH_OPT=O1",
+          "--output-dir",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O1",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O1/m7_performance"
+        ],
+        "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "elf_sha256": "53e7303dc7b8ffe5df52fc215889a88c1a3cf918732c756bbf27a05d2064b865",
+        "hardware_timing": null,
+        "kernels": {
+          "dtcm_auxiliary": {
+            "address": "0x200016c0",
+            "data_bytes": 8096
+          },
+          "dtcm_primary": {
+            "address": "0x20003660",
+            "data_bytes": 8096
+          },
+          "events": {
+            "address": "0x20006960",
+            "data_bytes": 4
+          },
+          "ocram_auxiliary": {
+            "address": "0x20200000",
+            "data_bytes": 8096
+          },
+          "ocram_primary": {
+            "address": "0x20201fa0",
+            "data_bytes": 8096
+          },
+          "pack_c_flash": {
+            "address": "0x6000161c",
+            "code_bytes": 206
+          },
+          "pack_c_itcm": {
+            "address": "0x20",
+            "code_bytes": 206
+          },
+          "pack_cpp_flash": {
+            "address": "0x600016ea",
+            "code_bytes": 206
+          },
+          "pack_cpp_itcm": {
+            "address": "0xee",
+            "code_bytes": 206
+          }
+        },
+        "optimization": "O1",
+        "sources": {
+          "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+          "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+          "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+          "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+          "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+          "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+          "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+          "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+          "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+        }
+      },
+      "name": "benchmark-O1",
+      "provenance": {
+        "elf_sha256": "53e7303dc7b8ffe5df52fc215889a88c1a3cf918732c756bbf27a05d2064b865",
+        "hardware_serial": 20428100,
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "1a71b7c0d171b31f8198eaa6ce788192d6319ece548ab163a0359ed3ba713258",
+        "manifest_sha256": "c615eb4f0f72ab62cf0e8252f3482b2f453a0f84386cca8985abbda21f6154ae",
+        "optimization": "O1",
+        "program_sha256": "8a65f03646561b71354d7a97e3c6ac9613fd804da4c1e6798b4dd2c374d2cc3a",
+        "service": "http://192.168.150.14:5000"
+      },
+      "raw_directory": "doc/results/raw/m7-hardware-20260923/benchmark-O1",
+      "service_result": {
+        "board": "teensy:avr:teensy40",
+        "completed": true,
+        "exit_code": 0,
+        "hub_id": "0x00000000",
+        "hub_port": 15,
+        "message": "Container ran successfully for test_id 3882b2da-76d0-43e1-ae9e-d0221cd9f7b3",
+        "program_success": true,
+        "test_id": "3882b2da-76d0-43e1-ae9e-d0221cd9f7b3",
+        "timestamp": "2026-09-23 18:46:21"
+      },
+      "summary": {
+        "evidence": [
+          {
+            "optimization": "O1",
+            "passes": [
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62854,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62822,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11352,
+                  "median_cycles": 10780,
+                  "min_cycles": 10780,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8538,
+                  "median_cycles": 7964,
+                  "min_cycles": 7964,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62851,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11353,
+                  "median_cycles": 10780,
+                  "min_cycles": 10780,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8568,
+                  "median_cycles": 7964,
+                  "min_cycles": 7964,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62822,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62837,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11353,
+                  "median_cycles": 10780,
+                  "min_cycles": 10780,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8536,
+                  "median_cycles": 7964,
+                  "min_cycles": 7964,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62838,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62851,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11352,
+                  "median_cycles": 10780,
+                  "min_cycles": 10780,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8537,
+                  "median_cycles": 7964,
+                  "min_cycles": 7964,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62822,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62822,
+                  "median_cycles": 62789,
+                  "min_cycles": 62789,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62835,
+                  "median_cycles": 62803,
+                  "min_cycles": 62803,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 62822,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 62823,
+                  "median_cycles": 62790,
+                  "min_cycles": 62790,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 11353,
+                  "median_cycles": 10780,
+                  "min_cycles": 10780,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8536,
+                  "median_cycles": 7964,
+                  "min_cycles": 7964,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ]
+            ],
+            "result": "PASS",
+            "usb_serial": "20428100",
+            "validator": "m7-dwt"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 3882b2da-76d0-43e1-ae9e-d0221cd9f7b3",
+        "outcome": "PASS",
+        "test_id": "3882b2da-76d0-43e1-ae9e-d0221cd9f7b3"
+      }
+    },
+    {
+      "aggregate": [
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 50651,
+          "observed_max_cycles": 50682,
+          "observed_min_cycles": 50651,
+          "operation": "c_flash",
+          "pass_medians": [
+            50651,
+            50651,
+            50651,
+            50651,
+            50651
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 50651,
+          "observed_max_cycles": 50683,
+          "observed_min_cycles": 50651,
+          "operation": "c_flash",
+          "pass_medians": [
+            50651,
+            50651,
+            50651,
+            50651,
+            50651
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 48614,
+          "observed_max_cycles": 48647,
+          "observed_min_cycles": 48614,
+          "operation": "c_itcm",
+          "pass_medians": [
+            48614,
+            48614,
+            48614,
+            48614,
+            48614
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 48614,
+          "observed_max_cycles": 48647,
+          "observed_min_cycles": 48614,
+          "operation": "c_itcm",
+          "pass_medians": [
+            48614,
+            48614,
+            48614,
+            48614,
+            48614
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 48627,
+          "observed_max_cycles": 48659,
+          "observed_min_cycles": 48627,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            48627,
+            48627,
+            48627,
+            48627,
+            48627
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 48627,
+          "observed_max_cycles": 48663,
+          "observed_min_cycles": 48627,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            48627,
+            48627,
+            48627,
+            48627,
+            48627
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 50638,
+          "observed_max_cycles": 50683,
+          "observed_min_cycles": 50638,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            50638,
+            50638,
+            50638,
+            50638,
+            50638
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 50638,
+          "observed_max_cycles": 50682,
+          "observed_min_cycles": 50638,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            50638,
+            50638,
+            50638,
+            50638,
+            50638
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 10261,
+          "observed_max_cycles": 10841,
+          "observed_min_cycles": 10261,
+          "operation": "primask_publish_take",
+          "pass_medians": [
+            10261,
+            10261,
+            10261,
+            10261,
+            10261
+          ],
+          "units": 256
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 7955,
+          "observed_max_cycles": 8503,
+          "observed_min_cycles": 7955,
+          "operation": "atomic_publish_take",
+          "pass_medians": [
+            7955,
+            7955,
+            7955,
+            7955,
+            7955
+          ],
+          "units": 256
+        }
+      ],
+      "artifact_sha256": {
+        "benchmark-manifest.json": "5ad711ece995fcee3115729ad3e24fc3358778281e0fe07951e59d55233b20ee",
+        "firmware.ino.hex": "1751fe9b98e93ba95f3156ae0566f5505cef97909593dd68b5ef0e88a0fde83e",
+        "preflight.json": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+        "provenance.json": "f14b886a8e5c471e13ea520e969a7f195e9efa47a4c46783642525cb8f5ecb37",
+        "results.json": "010b59c7496fc5f35b7c608dc05cf1c17addb3bf13321c739410314f7efb2edf",
+        "rig-program.py": "8ca0b52527878413eadb2d54b3531029885d956f0765d80c0ba8bbc1ae4029bd",
+        "start.json": "3ade87a92e912bfc68f5c68b90a162aa9c7c74f3785db87ac763b1cb58fb74cf",
+        "status.json": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+        "summary.json": "90dc74482019696976c1569a260b4fdcd5a6dd9ffa97edf1125c04c74f8d974b"
+      },
+      "manifest": {
+        "command": [
+          "arduino-cli",
+          "compile",
+          "--fqbn",
+          "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+          "--clean",
+          "--warnings",
+          "all",
+          "--build-path",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O2/compile",
+          "--build-property",
+          "build.flags.optimize=-O2",
+          "--build-property",
+          "build.flags.defs=-D__IMXRT1062__ -DTEENSYDUINO=160 -DTHINGDAQ_BENCH_OPT=O2",
+          "--output-dir",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O2",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O2/m7_performance"
+        ],
+        "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "elf_sha256": "4886045be9857d01cff641e1103279d1c2095bc9183d3d0fe22dd55cb1dbbff8",
+        "hardware_timing": null,
+        "kernels": {
+          "dtcm_auxiliary": {
+            "address": "0x200016e0",
+            "data_bytes": 8096
+          },
+          "dtcm_primary": {
+            "address": "0x20003680",
+            "data_bytes": 8096
+          },
+          "events": {
+            "address": "0x20006964",
+            "data_bytes": 4
+          },
+          "ocram_auxiliary": {
+            "address": "0x20200000",
+            "data_bytes": 8096
+          },
+          "ocram_primary": {
+            "address": "0x20201fa0",
+            "data_bytes": 8096
+          },
+          "pack_c_flash": {
+            "address": "0x60001614",
+            "code_bytes": 218
+          },
+          "pack_c_itcm": {
+            "address": "0x20",
+            "code_bytes": 218
+          },
+          "pack_cpp_flash": {
+            "address": "0x600016f0",
+            "code_bytes": 218
+          },
+          "pack_cpp_itcm": {
+            "address": "0xfc",
+            "code_bytes": 218
+          }
+        },
+        "optimization": "O2",
+        "sources": {
+          "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+          "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+          "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+          "gpio_pack_c.inc": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+          "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+          "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+          "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+          "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+          "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+          "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+        }
+      },
+      "name": "benchmark-O2",
+      "provenance": {
+        "elf_sha256": "4886045be9857d01cff641e1103279d1c2095bc9183d3d0fe22dd55cb1dbbff8",
+        "hardware_serial": 20428100,
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "1751fe9b98e93ba95f3156ae0566f5505cef97909593dd68b5ef0e88a0fde83e",
+        "manifest_sha256": "5ad711ece995fcee3115729ad3e24fc3358778281e0fe07951e59d55233b20ee",
+        "optimization": "O2",
+        "program_sha256": "8ca0b52527878413eadb2d54b3531029885d956f0765d80c0ba8bbc1ae4029bd",
+        "service": "http://192.168.150.14:5000"
+      },
+      "raw_directory": "doc/results/raw/m7-hardware-20260923/benchmark-O2",
+      "service_result": {
+        "board": "teensy:avr:teensy40",
+        "completed": true,
+        "exit_code": 0,
+        "hub_id": "0x00000000",
+        "hub_port": 15,
+        "message": "Container ran successfully for test_id b68572af-e166-44f9-a626-d47f936aeefa",
+        "program_success": true,
+        "test_id": "b68572af-e166-44f9-a626-d47f936aeefa",
+        "timestamp": "2026-09-23 18:44:59"
+      },
+      "summary": {
+        "evidence": [
+          {
+            "optimization": "O2",
+            "passes": [
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50682,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48659,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50682,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10841,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8500,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50682,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50682,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48663,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10810,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8501,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50681,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50682,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10809,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8502,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50681,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50681,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48663,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10808,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8499,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50682,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50682,
+                  "median_cycles": 50651,
+                  "min_cycles": 50651,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10809,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8503,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ]
+            ],
+            "result": "PASS",
+            "usb_serial": "20428100",
+            "validator": "m7-dwt"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id b68572af-e166-44f9-a626-d47f936aeefa",
+        "outcome": "PASS",
+        "test_id": "b68572af-e166-44f9-a626-d47f936aeefa"
+      }
+    },
+    {
+      "aggregate": [
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 50652,
+          "observed_max_cycles": 50683,
+          "observed_min_cycles": 50652,
+          "operation": "c_flash",
+          "pass_medians": [
+            50652,
+            50652,
+            50652,
+            50652,
+            50652
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 50652,
+          "observed_max_cycles": 50683,
+          "observed_min_cycles": 50652,
+          "operation": "c_flash",
+          "pass_medians": [
+            50652,
+            50652,
+            50652,
+            50652,
+            50652
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 48614,
+          "observed_max_cycles": 48646,
+          "observed_min_cycles": 48614,
+          "operation": "c_itcm",
+          "pass_medians": [
+            48614,
+            48614,
+            48614,
+            48614,
+            48614
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 48614,
+          "observed_max_cycles": 48647,
+          "observed_min_cycles": 48614,
+          "operation": "c_itcm",
+          "pass_medians": [
+            48614,
+            48614,
+            48614,
+            48614,
+            48614
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 48627,
+          "observed_max_cycles": 48659,
+          "observed_min_cycles": 48627,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            48627,
+            48627,
+            48627,
+            48627,
+            48627
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 48627,
+          "observed_max_cycles": 48658,
+          "observed_min_cycles": 48627,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            48627,
+            48627,
+            48627,
+            48627,
+            48627
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 50638,
+          "observed_max_cycles": 50670,
+          "observed_min_cycles": 50638,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            50638,
+            50638,
+            50638,
+            50638,
+            50638
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 50638,
+          "observed_max_cycles": 50684,
+          "observed_min_cycles": 50638,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            50638,
+            50638,
+            50638,
+            50638,
+            50638
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 10258,
+          "observed_max_cycles": 10805,
+          "observed_min_cycles": 10258,
+          "operation": "primask_publish_take",
+          "pass_medians": [
+            10258,
+            10258,
+            10258,
+            10258,
+            10258
+          ],
+          "units": 256
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 7955,
+          "observed_max_cycles": 8514,
+          "observed_min_cycles": 7955,
+          "operation": "atomic_publish_take",
+          "pass_medians": [
+            7955,
+            7955,
+            7955,
+            7955,
+            7955
+          ],
+          "units": 256
+        }
+      ],
+      "artifact_sha256": {
+        "benchmark-manifest.json": "9420234b215e1277fcf4b8aca1e7b77fb3e2ab9149b06341b29cf1d24321c843",
+        "firmware.ino.hex": "fa2351da852c226e6c5051fab9a6f8acc6485479f98106cf4ca619806885671f",
+        "preflight.json": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+        "provenance.json": "0e8798a169ed00c830c9ddd79f97d90687906693531d4bda8a685c3eb2903b63",
+        "results.json": "e2e871a8178b338a0511cb9d3ad18e710045e80730ef86771a570abc4fce254e",
+        "rig-program.py": "ce217b9e0516a5620bbf9b20841a01ad71bbcfe34ff32b0fc5fa6aa94a761c9c",
+        "start.json": "049cce9b7566ace14c210bab699aa2801883f3315539a57ce8889ed0743efa70",
+        "status.json": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+        "summary.json": "91a9f5a53de6e625e04dc2405c79aadd6832fa9af0df2d85363a2c103b24594b"
+      },
+      "manifest": {
+        "command": [
+          "arduino-cli",
+          "compile",
+          "--fqbn",
+          "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+          "--clean",
+          "--warnings",
+          "all",
+          "--build-path",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O3/compile",
+          "--build-property",
+          "build.flags.optimize=-O3",
+          "--build-property",
+          "build.flags.defs=-D__IMXRT1062__ -DTEENSYDUINO=160 -DTHINGDAQ_BENCH_OPT=O3",
+          "--output-dir",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O3",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O3/m7_performance"
+        ],
+        "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "elf_sha256": "9ccbec2930703d651792a392ee662b9c431c7f1f66fe7e1317d02167fab845e4",
+        "hardware_timing": null,
+        "kernels": {
+          "dtcm_auxiliary": {
+            "address": "0x200016e0",
+            "data_bytes": 8096
+          },
+          "dtcm_primary": {
+            "address": "0x20003680",
+            "data_bytes": 8096
+          },
+          "events": {
+            "address": "0x20006af8",
+            "data_bytes": 4
+          },
+          "ocram_auxiliary": {
+            "address": "0x20200000",
+            "data_bytes": 8096
+          },
+          "ocram_primary": {
+            "address": "0x20201fa0",
+            "data_bytes": 8096
+          },
+          "pack_c_flash": {
+            "address": "0x60001614",
+            "code_bytes": 218
+          },
+          "pack_c_itcm": {
+            "address": "0x20",
+            "code_bytes": 218
+          },
+          "pack_cpp_flash": {
+            "address": "0x600016f0",
+            "code_bytes": 218
+          },
+          "pack_cpp_itcm": {
+            "address": "0xfc",
+            "code_bytes": 218
+          }
+        },
+        "optimization": "O3",
+        "sources": {
+          "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+          "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+          "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+          "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+          "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+          "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+          "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+          "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+          "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+        }
+      },
+      "name": "benchmark-O3",
+      "provenance": {
+        "elf_sha256": "9ccbec2930703d651792a392ee662b9c431c7f1f66fe7e1317d02167fab845e4",
+        "hardware_serial": 20428100,
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "fa2351da852c226e6c5051fab9a6f8acc6485479f98106cf4ca619806885671f",
+        "manifest_sha256": "9420234b215e1277fcf4b8aca1e7b77fb3e2ab9149b06341b29cf1d24321c843",
+        "optimization": "O3",
+        "program_sha256": "ce217b9e0516a5620bbf9b20841a01ad71bbcfe34ff32b0fc5fa6aa94a761c9c",
+        "service": "http://192.168.150.14:5000"
+      },
+      "raw_directory": "doc/results/raw/m7-hardware-20260923/benchmark-O3",
+      "service_result": {
+        "board": "teensy:avr:teensy40",
+        "completed": true,
+        "exit_code": 0,
+        "hub_id": "0x00000000",
+        "hub_port": 15,
+        "message": "Container ran successfully for test_id dbfbb31f-da65-47f3-8244-0d7468105500",
+        "program_success": true,
+        "test_id": "dbfbb31f-da65-47f3-8244-0d7468105500",
+        "timestamp": "2026-09-23 18:46:50"
+      },
+      "summary": {
+        "evidence": [
+          {
+            "optimization": "O3",
+            "passes": [
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10804,
+                  "median_cycles": 10258,
+                  "min_cycles": 10258,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8500,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50684,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10805,
+                  "median_cycles": 10258,
+                  "min_cycles": 10258,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8514,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48645,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10804,
+                  "median_cycles": 10258,
+                  "min_cycles": 10258,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8504,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48645,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10802,
+                  "median_cycles": 10258,
+                  "min_cycles": 10258,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8503,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50652,
+                  "min_cycles": 50652,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48659,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 50670,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 50683,
+                  "median_cycles": 50638,
+                  "min_cycles": 50638,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10803,
+                  "median_cycles": 10258,
+                  "min_cycles": 10258,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8499,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ]
+            ],
+            "result": "PASS",
+            "usb_serial": "20428100",
+            "validator": "m7-dwt"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id dbfbb31f-da65-47f3-8244-0d7468105500",
+        "outcome": "PASS",
+        "test_id": "dbfbb31f-da65-47f3-8244-0d7468105500"
+      }
+    },
+    {
+      "aggregate": [
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 48627,
+          "observed_max_cycles": 48659,
+          "observed_min_cycles": 48627,
+          "operation": "c_flash",
+          "pass_medians": [
+            48627,
+            48627,
+            48627,
+            48627,
+            48627
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 48627,
+          "observed_max_cycles": 48660,
+          "observed_min_cycles": 48627,
+          "operation": "c_flash",
+          "pass_medians": [
+            48627,
+            48627,
+            48627,
+            48627,
+            48627
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 48614,
+          "observed_max_cycles": 48647,
+          "observed_min_cycles": 48614,
+          "operation": "c_itcm",
+          "pass_medians": [
+            48614,
+            48614,
+            48614,
+            48614,
+            48614
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 48614,
+          "observed_max_cycles": 48659,
+          "observed_min_cycles": 48614,
+          "operation": "c_itcm",
+          "pass_medians": [
+            48614,
+            48614,
+            48614,
+            48614,
+            48614
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 48627,
+          "observed_max_cycles": 48659,
+          "observed_min_cycles": 48627,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            48627,
+            48627,
+            48627,
+            48627,
+            48627
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 48627,
+          "observed_max_cycles": 48658,
+          "observed_min_cycles": 48627,
+          "operation": "cpp_flash",
+          "pass_medians": [
+            48627,
+            48627,
+            48627,
+            48627,
+            48627
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 48614,
+          "observed_max_cycles": 48646,
+          "observed_min_cycles": 48614,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            48614,
+            48614,
+            48614,
+            48614,
+            48614
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "ocram",
+          "median_of_pass_medians": 48614,
+          "observed_max_cycles": 48647,
+          "observed_min_cycles": 48614,
+          "operation": "cpp_itcm",
+          "pass_medians": [
+            48614,
+            48614,
+            48614,
+            48614,
+            48614
+          ],
+          "units": 2024
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 10261,
+          "observed_max_cycles": 10806,
+          "observed_min_cycles": 10261,
+          "operation": "primask_publish_take",
+          "pass_medians": [
+            10261,
+            10261,
+            10261,
+            10261,
+            10261
+          ],
+          "units": 256
+        },
+        {
+          "data_region": "dtcm",
+          "median_of_pass_medians": 7955,
+          "observed_max_cycles": 8529,
+          "observed_min_cycles": 7955,
+          "operation": "atomic_publish_take",
+          "pass_medians": [
+            7955,
+            7955,
+            7955,
+            7955,
+            7955
+          ],
+          "units": 256
+        }
+      ],
+      "artifact_sha256": {
+        "benchmark-manifest.json": "74ee68bef6f9d1a116bc9d4d0284a94c86391ddd1b6bf1ed8dc29ad4619c88bb",
+        "firmware.ino.hex": "25125784d5e20f717698ff284f97637597b7829bb6bffc55091207773ce00e84",
+        "preflight.json": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+        "provenance.json": "5fcbfc773afa473147ac40d0c787aa7e1a90af738828976e3670bda2fb471b15",
+        "results.json": "322eb51f10892a0413e1117723b1f963d5b2ff216db509a0fc593be38d618f00",
+        "rig-program.py": "8ca0b52527878413eadb2d54b3531029885d956f0765d80c0ba8bbc1ae4029bd",
+        "start.json": "5c6a4e8f7d2489cfaafa6bfacc12c6b8a0a4d4a2f7b0d1d2c7a541c9e777f0a7",
+        "status.json": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+        "summary.json": "85caf7aa83b2778e7e65b4241d990c4ba68b2c5ae44ff0b1c18e213665686b6b"
+      },
+      "manifest": {
+        "command": [
+          "arduino-cli",
+          "compile",
+          "--fqbn",
+          "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+          "--clean",
+          "--warnings",
+          "all",
+          "--build-path",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O2-align32/compile",
+          "--build-property",
+          "build.flags.optimize=-O2 -falign-functions=32",
+          "--build-property",
+          "build.flags.defs=-D__IMXRT1062__ -DTEENSYDUINO=160 -DTHINGDAQ_BENCH_OPT=O2",
+          "--output-dir",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O2-align32",
+          "/home/bill/agents/thingdaq_worktrees/thingdaq_codex2/firmware/build/m7-performance/benchmark-O2-align32/m7_performance"
+        ],
+        "compiler": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+        "elf_sha256": "a6ed2e8c208f1353a75cbc08f0fc47c538a5e5bc7a2c10d2b514ea8ea4862e8e",
+        "function_alignment_bytes": 32,
+        "hardware_timing": null,
+        "kernels": {
+          "dtcm_auxiliary": {
+            "address": "0x200016e0",
+            "data_bytes": 8096
+          },
+          "dtcm_primary": {
+            "address": "0x20003680",
+            "data_bytes": 8096
+          },
+          "events": {
+            "address": "0x20006964",
+            "data_bytes": 4
+          },
+          "ocram_auxiliary": {
+            "address": "0x20200000",
+            "data_bytes": 8096
+          },
+          "ocram_primary": {
+            "address": "0x20201fa0",
+            "data_bytes": 8096
+          },
+          "pack_c_flash": {
+            "address": "0x60001640",
+            "code_bytes": 218
+          },
+          "pack_c_itcm": {
+            "address": "0x20",
+            "code_bytes": 218
+          },
+          "pack_cpp_flash": {
+            "address": "0x60001720",
+            "code_bytes": 218
+          },
+          "pack_cpp_itcm": {
+            "address": "0x100",
+            "code_bytes": 218
+          }
+        },
+        "optimization": "O2",
+        "sources": {
+          "event_word.c": "0a2e8dad4cd9ba201fa994e3b68b87947a2b16cd81d6f419f67204d1ce955e8e",
+          "event_word.h": "16a672ad43cdc5e498bf932a910cb3b446066f58779c66364831dc6f7d8233e0",
+          "gpio_pack_c.h": "4c4abcb6f0b3f27c399c4ffe4314f040d00c912a4328403ede6c6bd508648cc1",
+          "gpio_pack_c_body.h": "4a26e37fbdf44c935760ae6ca7635f391db02e5ecf4a9fad7b9399bf948cd127",
+          "m7_performance.ino": "2a5ed1d2ee34897e34397d89a6cb6de1a1c6cc15c1e509965f9db2f62a380141",
+          "pack_c_flash.c": "805b41d462dd3372f1e161aa01e020f0664fa98d138e73df835d92ac3d3422c0",
+          "pack_c_itcm.c": "8d8e66d67c37a425b6237a10362a29df477f43f86a1a47bf607775ab650e6cae",
+          "pack_cpp_flash.cpp": "e228ace20062367fbdd209b495a5d32f66064f9086807ad151671fd254f335e9",
+          "pack_cpp_itcm.cpp": "ad550d2ae2c47f937ffdab88731b3b3e37e4bd1326d6396490196a890e0afea1"
+        }
+      },
+      "name": "benchmark-O2-align32",
+      "provenance": {
+        "elf_sha256": "a6ed2e8c208f1353a75cbc08f0fc47c538a5e5bc7a2c10d2b514ea8ea4862e8e",
+        "hardware_serial": 20428100,
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "25125784d5e20f717698ff284f97637597b7829bb6bffc55091207773ce00e84",
+        "manifest_sha256": "74ee68bef6f9d1a116bc9d4d0284a94c86391ddd1b6bf1ed8dc29ad4619c88bb",
+        "optimization": "O2",
+        "program_sha256": "8ca0b52527878413eadb2d54b3531029885d956f0765d80c0ba8bbc1ae4029bd",
+        "service": "http://192.168.150.14:5000"
+      },
+      "raw_directory": "doc/results/raw/m7-hardware-20260923/benchmark-O2-align32",
+      "service_result": {
+        "board": "teensy:avr:teensy40",
+        "completed": true,
+        "exit_code": 0,
+        "hub_id": "0x00000000",
+        "hub_port": 15,
+        "message": "Container ran successfully for test_id 78a76af6-8c27-45cc-a93b-48c0d644bd9d",
+        "program_success": true,
+        "test_id": "78a76af6-8c27-45cc-a93b-48c0d644bd9d",
+        "timestamp": "2026-09-23 18:49:42"
+      },
+      "summary": {
+        "evidence": [
+          {
+            "optimization": "O2",
+            "passes": [
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48659,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48659,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10805,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8498,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48659,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10804,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8498,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48660,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10806,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8529,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48659,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10805,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8499,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ],
+              [
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48659,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "c_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48647,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "c_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48658,
+                  "median_cycles": 48627,
+                  "min_cycles": 48627,
+                  "operation": "cpp_flash",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "ocram",
+                  "digest": 1784290555,
+                  "max_cycles": 48646,
+                  "median_cycles": 48614,
+                  "min_cycles": 48614,
+                  "operation": "cpp_itcm",
+                  "units": 2024
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 10801,
+                  "median_cycles": 10261,
+                  "min_cycles": 10261,
+                  "operation": "primask_publish_take",
+                  "units": 256
+                },
+                {
+                  "data_region": "dtcm",
+                  "digest": 256,
+                  "max_cycles": 8497,
+                  "median_cycles": 7955,
+                  "min_cycles": 7955,
+                  "operation": "atomic_publish_take",
+                  "units": 256
+                }
+              ]
+            ],
+            "result": "PASS",
+            "usb_serial": "20428100",
+            "validator": "m7-dwt"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 78a76af6-8c27-45cc-a93b-48c0d644bd9d",
+        "outcome": "PASS",
+        "test_id": "78a76af6-8c27-45cc-a93b-48c0d644bd9d"
+      }
+    },
+    {
+      "artifact_sha256": {
+        "build-manifest.json": "ba197072be9f6972d5d0ce84accebf23d1632f11a3b492a782abde0f3f82d558",
+        "firmware.ino.hex": "99144d2b3f196918b845b6261fd5ea1fc9ca03ebd1a6cb9c258e37378fc81400",
+        "preflight.json": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+        "provenance.json": "213fc853263765b765ef18401b14a782c8d44d693ffe69e310de0f7740fb490f",
+        "results.json": "f5eb208b48eb4d8c05a2daf93701b875820068f9af19a96949ae775d3bb9e453",
+        "rig-program.py": "80f6cceb4827f9c048f61d13b836d0df3839a222319ea0dedb50f376847f8e11",
+        "start.json": "5933fe21bd930fd3f549f6b170c4a401a8c8b525acb5fc8c73232a6f820cd10b",
+        "status.json": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+        "summary.json": "dc2eb7eedb148f4643fc5ede13aa3f4199c02546457aaf9f0f415ae9b74eb260"
+      },
+      "name": "baseline-acquisition",
+      "provenance": {
+        "build_id": "thingdaq-6f2c6b332efc9280",
+        "case_sequence": [
+          "INPUT_COMBINED"
+        ],
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "99144d2b3f196918b845b6261fd5ea1fc9ca03ebd1a6cb9c258e37378fc81400",
+        "input_experiment": null,
+        "manifest_sha256": "ba197072be9f6972d5d0ce84accebf23d1632f11a3b492a782abde0f3f82d558",
+        "planned_program_seconds": 95,
+        "profile_sequence": [
+          4
+        ],
+        "program_sha256": "80f6cceb4827f9c048f61d13b836d0df3839a222319ea0dedb50f376847f8e11",
+        "runner_sha256": "43f559f7f68f40b15e563a8a64632e5fc223876390a239d0dbdfe679cddac22b",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "60.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "450",
+          "AUX_INPUT_EQUAL_RATES": "0",
+          "AUX_INPUT_RATE_PROFILE": "4",
+          "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+          "AUX_INPUT_RUNTIME_HEALTH": "1",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-6f2c6b332efc9280",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-6f2c6b332efc9280",
+          "firmware_input_changes": [
+            " M firmware/src/firmware_identity.h",
+            " M firmware/src/gpio_dual_bank_packer.cpp",
+            "?? firmware/src/gpio_pack_c.c",
+            "?? firmware/src/gpio_pack_c.h"
+          ],
+          "firmware_inputs_clean": false,
+          "git_commit": "370ae2ad11c9a20927d9c02f10cb83c0f421a10d",
+          "inputs": [
+            "firmware/firmware.ino",
+            "firmware/src/acquisition_controller.cpp",
+            "firmware/src/acquisition_controller.h",
+            "firmware/src/adc_dma_capture.cpp",
+            "firmware/src/adc_dma_capture.h",
+            "firmware/src/adc_dma_capture_teensy.cpp",
+            "firmware/src/adc_dma_capture_teensy.h",
+            "firmware/src/adc_frame_packer.cpp",
+            "firmware/src/adc_frame_packer.h",
+            "firmware/src/adc_initializer.cpp",
+            "firmware/src/adc_initializer.h",
+            "firmware/src/adc_initializer_teensy.cpp",
+            "firmware/src/adc_initializer_teensy.h",
+            "firmware/src/adc_trigger.cpp",
+            "firmware/src/adc_trigger.h",
+            "firmware/src/adc_trigger_teensy.cpp",
+            "firmware/src/adc_trigger_teensy.h",
+            "firmware/src/board_config.h",
+            "firmware/src/checksum.cpp",
+            "firmware/src/checksum.h",
+            "firmware/src/checksum_benchmark.cpp",
+            "firmware/src/checksum_benchmark.h",
+            "firmware/src/checksum_benchmark_teensy.cpp",
+            "firmware/src/checksum_benchmark_teensy.h",
+            "firmware/src/control_state.cpp",
+            "firmware/src/control_state.h",
+            "firmware/src/dma_buffer_ownership.h",
+            "firmware/src/edma_priority_teensy.h",
+            "firmware/src/firmware_capabilities.h",
+            "firmware/src/firmware_identity.h",
+            "firmware/src/firmware_runtime.cpp",
+            "firmware/src/firmware_runtime.h",
+            "firmware/src/generated/protocol_constants.h",
+            "firmware/src/generated/protocol_v2_constants.h",
+            "firmware/src/gpio_batch_packer.cpp",
+            "firmware/src/gpio_batch_packer.h",
+            "firmware/src/gpio_batch_packer_teensy.cpp",
+            "firmware/src/gpio_batch_packer_teensy.h",
+            "firmware/src/gpio_capture_diagnostic.cpp",
+            "firmware/src/gpio_capture_diagnostic.h",
+            "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+            "firmware/src/gpio_capture_diagnostic_teensy.h",
+            "firmware/src/gpio_clock_diagnostic.cpp",
+            "firmware/src/gpio_clock_diagnostic.h",
+            "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+            "firmware/src/gpio_clock_diagnostic_teensy.h",
+            "firmware/src/gpio_dma_route_teensy.h",
+            "firmware/src/gpio_dual_bank_capture.cpp",
+            "firmware/src/gpio_dual_bank_capture.h",
+            "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+            "firmware/src/gpio_dual_bank_capture_teensy.h",
+            "firmware/src/gpio_dual_bank_packer.cpp",
+            "firmware/src/gpio_dual_bank_packer.h",
+            "firmware/src/gpio_pack_c.c",
+            "firmware/src/gpio_pack_c.h",
+            "firmware/src/gpio_raw_capture.cpp",
+            "firmware/src/gpio_raw_capture.h",
+            "firmware/src/gpio_raw_capture_teensy.cpp",
+            "firmware/src/gpio_raw_capture_teensy.h",
+            "firmware/src/gpio_raw_storage_teensy.h",
+            "firmware/src/input_experiment_profile.h",
+            "firmware/src/interrupt_guard_teensy.h",
+            "firmware/src/interrupt_vectors_teensy.h",
+            "firmware/src/packet_buffer_pipeline.cpp",
+            "firmware/src/packet_buffer_pipeline.h",
+            "firmware/src/protocol.cpp",
+            "firmware/src/protocol.h",
+            "firmware/src/rate_profile_table.h",
+            "firmware/src/runtime_health.h",
+            "firmware/src/runtime_health_teensy.cpp",
+            "firmware/src/statistics.cpp",
+            "firmware/src/statistics.h",
+            "firmware/src/stream_layout.h",
+            "firmware/src/synthetic_source.cpp",
+            "firmware/src/synthetic_source.h",
+            "firmware/src/teensy_clock.cpp",
+            "firmware/src/teensy_clock.h",
+            "firmware/src/teensy_usb.cpp",
+            "firmware/src/teensy_usb.h",
+            "firmware/src/temperature.h",
+            "firmware/src/temperature_teensy.cpp",
+            "firmware/src/usb_transport.cpp",
+            "firmware/src/usb_transport.h",
+            "firmware/src/variable_rate_scheduler.cpp",
+            "firmware/src/variable_rate_scheduler.h",
+            "firmware/src/variable_rate_scheduler_teensy.cpp",
+            "firmware/src/variable_rate_scheduler_teensy.h",
+            "firmware/src/watchdog_teensy.cpp",
+            "firmware/src/watchdog_teensy.h",
+            "protocol/protocol-v1.json",
+            "protocol/protocol-v2.json"
+          ],
+          "source_id": "6f2c6b332efc9280de2ecb2bd1a3020046730938ee028f595d7fc580067f6912",
+          "timestamp_epoch": 1789243570,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-09-12T20:06:10Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "raw_directory": "doc/results/raw/m7-hardware-20260923/baseline-acquisition",
+      "service_result": {
+        "board": "teensy:avr:teensy40",
+        "completed": true,
+        "exit_code": 1,
+        "hub_id": "0x00000000",
+        "hub_port": 15,
+        "message": "Container ran successfully for test_id d6041987-2adb-488b-a442-1c1737310d8f",
+        "program_success": true,
+        "test_id": "d6041987-2adb-488b-a442-1c1737310d8f",
+        "timestamp": "2026-09-23 18:50:24"
+      },
+      "service_stdout": "Teensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/d6041987-2adb-488b-a442-1c1737310d8f/firmware.ino.hex\": 163840 bytes, 8.1% usage\nSoft reboot performed\nWaiting for Teensy device...\n (hint: press the reset button)\nFound HalfKay Bootloader\nRead \"/remote_firmware_testing/work_results/d6041987-2adb-488b-a442-1c1737310d8f/firmware.ino.hex\": 163840 bytes, 8.1% usage\nProgramming.............................................................................................................................................................\nBooting\nEVENT {\"phase\": \"idle\", \"reset_cause\": 1, \"stack_available\": true, \"stack_max_used_bytes\": 5768, \"stack_min_free_bytes\": 28664, \"stack_total_bytes\": 34432, \"watchdog_enabled\": false, \"watchdog_timeout_ms\": 0}\nEVIDENCE {\"cause\": \"None\", \"cells\": [], \"cpu.max\": \"50000 100000\\n\", \"cpu.stat\": \"usage_usec 510507\\nuser_usec 479777\\nsystem_usec 30729\\nnice_usec 0\\ncore_sched.force_idle_usec 0\\nnr_periods 10\\nnr_throttled 9\\nthrottled_usec 445520\\nnr_bursts 0\\nburst_usec 0\\n\", \"cpu.stat.after\": \"usage_usec 526985\\nuser_usec 494111\\nsystem_usec 32874\\nnice_usec 0\\ncore_sched.force_idle_usec 0\\nnr_periods 13\\nnr_throttled 9\\nthrottled_usec 445520\\nnr_bursts 0\\nburst_usec 0\\n\", \"electrical_stimulus\": \"NOT_CONNECTED\", \"error\": \"AssertionError: \", \"recovery\": \"None\", \"result\": \"FAIL\", \"runtime_health\": [{\"phase\": \"idle\", \"reset_cause\": 1, \"stack_available\": true, \"stack_max_used_bytes\": 5768, \"stack_min_free_bytes\": 28664, \"stack_total_bytes\": 34432, \"watchdog_enabled\": false, \"watchdog_timeout_ms\": 0}], \"validator\": \"public-sdk\"}\n",
+      "summary": {
+        "evidence": [
+          {
+            "cause": "None",
+            "cells": [],
+            "cpu.max": "50000 100000\n",
+            "cpu.stat": "usage_usec 510507\nuser_usec 479777\nsystem_usec 30729\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 10\nnr_throttled 9\nthrottled_usec 445520\nnr_bursts 0\nburst_usec 0\n",
+            "cpu.stat.after": "usage_usec 526985\nuser_usec 494111\nsystem_usec 32874\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 13\nnr_throttled 9\nthrottled_usec 445520\nnr_bursts 0\nburst_usec 0\n",
+            "electrical_stimulus": "NOT_CONNECTED",
+            "error": "AssertionError: ",
+            "recovery": "None",
+            "result": "FAIL",
+            "runtime_health": [
+              {
+                "phase": "idle",
+                "reset_cause": 1,
+                "stack_available": true,
+                "stack_max_used_bytes": 5768,
+                "stack_min_free_bytes": 28664,
+                "stack_total_bytes": 34432,
+                "watchdog_enabled": false,
+                "watchdog_timeout_ms": 0
+              }
+            ],
+            "validator": "public-sdk"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id d6041987-2adb-488b-a442-1c1737310d8f",
+        "outcome": "TEST_FAIL",
+        "test_id": "d6041987-2adb-488b-a442-1c1737310d8f"
+      }
+    }
+  ],
+  "service": "http://192.168.150.14:5000",
+  "source_commit_before_run": "959afd1",
+  "postflight": {
+    "observed_at_utc": "2026-09-23T22:53:20.277101+00:00",
+    "health": {
+      "checks": {
+        "coordinator_mode": "normal",
+        "docker_reachable": true,
+        "hub_reachable": true,
+        "hubs": {
+          "0x00000000": true
+        },
+        "queue_depth": 0,
+        "worker_thread_alive": true
+      },
+      "status": "healthy"
+    }
+  }
+}

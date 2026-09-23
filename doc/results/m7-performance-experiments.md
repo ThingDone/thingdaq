@@ -15,9 +15,11 @@ related:
 
 This is a compiler and correctness experiment, **not a measured hardware speedup**.
 No local Teensy serial device was attached; no image was uploaded during this
-compiler-only phase. The subsequent [remote hardware test](m7-hardware-tests.md)
-encountered a baseline USB disconnect followed by programming failures, so timing
-remains unmeasured. The release
+compiler-only phase. The first [remote hardware test](m7-hardware-tests.md)
+encountered a baseline USB disconnect followed by programming failures. After
+board recovery, the [September 23 hardware campaign](m7-hardware-20260923.md)
+obtained timing measurements and exposed a baseline watchdog health failure
+before acquisition. The release
 build keeps its existing C++ packer, optimization and synchronization behavior.
 The experimental C packer is enabled only by an explicit build definition.
 

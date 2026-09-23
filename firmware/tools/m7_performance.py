@@ -159,9 +159,10 @@ def objects(cli: str) -> None:
     print(destination / "results.json")
 
 
-def benchmark(cli: str, opt: str) -> None:
+def benchmark(cli: str, opt: str, alignment: int = 0) -> None:
     """Build a separate four-kernel DWT sketch; never upload automatically."""
-    directory = OUT / f"benchmark-{opt}"
+    suffix = f"-align{alignment}" if alignment else ""
+    directory = OUT / f"benchmark-{opt}{suffix}"
     sketch = directory / "m7_performance"
     sketch.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(EXPERIMENT / "m7_performance.ino", sketch / "m7_performance.ino")
@@ -201,7 +202,8 @@ def benchmark(cli: str, opt: str) -> None:
         "--build-path",
         str(directory / "compile"),
         "--build-property",
-        f"build.flags.optimize=-{opt}",
+        f"build.flags.optimize=-{opt}"
+        + (f" -falign-functions={alignment}" if alignment else ""),
         "--build-property",
         f"build.flags.defs={props['build.flags.defs']} -DTHINGDAQ_BENCH_OPT={opt}",
         "--output-dir",
@@ -226,6 +228,10 @@ def benchmark(cli: str, opt: str) -> None:
             )
             if not valid:
                 raise base.BuildError(f"{name} linked in wrong memory region")
+            if alignment and address % alignment:
+                raise base.BuildError(
+                    f"{name} does not meet requested function alignment"
+                )
             placements[name] = {"address": hex(address), "code_bytes": size}
     for name, start, end in (
         ("dtcm_primary", base.DTCM_START, base.DTCM_END),
@@ -246,6 +252,7 @@ def benchmark(cli: str, opt: str) -> None:
             "command": command,
             "compiler": compiler_identity,
             "optimization": opt,
+            "function_alignment_bytes": alignment,
             "kernels": placements,
             "elf_sha256": base.sha256(elf),
             "hardware_timing": None,
@@ -380,10 +387,19 @@ def main() -> int:
     mode.add_argument("--variant", action="store_true")
     parser.add_argument("--optimization", choices=OPTIONS, default="O2")
     parser.add_argument(
+        "--benchmark-alignment",
+        type=int,
+        choices=(0, 32),
+        default=0,
+        help="control function alignment for the standalone benchmark",
+    )
+    parser.add_argument(
         "--kernel", choices=("cpp-flash", "c-flash", "c-itcm"), default="cpp-flash"
     )
     parser.add_argument("--arduino-cli", default="arduino-cli")
     args = parser.parse_args()
+    if args.benchmark_alignment and not args.benchmark:
+        parser.error("--benchmark-alignment requires --benchmark")
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "tmp").mkdir(exist_ok=True)
     os.environ["TMPDIR"] = str(OUT / "tmp")
@@ -391,7 +407,7 @@ def main() -> int:
     if args.objects:
         objects(args.arduino_cli)
     elif args.benchmark:
-        benchmark(args.arduino_cli, args.optimization)
+        benchmark(args.arduino_cli, args.optimization, args.benchmark_alignment)
     elif args.variant:
         return 0 if variant(args.arduino_cli, args.optimization, args.kernel) else 1
     else:

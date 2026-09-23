@@ -37,6 +37,18 @@ def temperature(daq):
     raise AssertionError(f"no valid die temperature: {readings}")
 
 
+def sample_health(daq, evidence, phase):
+    if os.environ.get("AUX_INPUT_RUNTIME_HEALTH") != "1":
+        return
+    health = daq.get_runtime_health()
+    row = {"phase": phase, **dataclasses.asdict(health)}
+    evidence.setdefault("runtime_health", []).append(row)
+    print("EVENT " + json.dumps(row, sort_keys=True), flush=True)
+    assert health.stack_available, f"stack watermark unavailable at {phase}"
+    assert health.watchdog_enabled, f"watchdog not enabled/validated at {phase}"
+    assert health.stack_min_free_bytes > 0, f"stack watermark exhausted at {phase}"
+
+
 def main():
     evidence = {
         "result": "FAIL",
@@ -67,6 +79,7 @@ def main():
             assert info.protocol_version == 2
             assert info.adc_trigger.dwt_clock_hz == 450_000_000
             assert info.auxiliary.supported_rate_profile_mask == 16
+            sample_health(daq, evidence, "idle")
             evidence["idle_temperature"] = temperature(daq)
             clock = daq.gpio_clock_diagnostic()
             assert clock.healthy and clock.dwt_counter_hz == 450_000_000
@@ -118,6 +131,9 @@ def main():
                 (AuxBankMode.INPUT, StreamMask.ADC | StreamMask.GPIO),
             ]
             for mode, streams in cells:
+                label = f"{mode.name}:{int(streams)}"
+                evidence["active_cell"] = label
+                sample_health(daq, evidence, f"before:{label}")
                 daq.reset_stats()
                 configuration = daq.configure(
                     source=Source.HARDWARE,
@@ -135,6 +151,7 @@ def main():
                 counts = {"adc_pairs": 0, "gpio_samples": 0}
                 sampled = False
                 during = []
+                during_status = None
                 while time.monotonic() - started < duration:
                     try:
                         block = daq.read_block(timeout=1)
@@ -164,6 +181,9 @@ def main():
                         counts["gpio_samples"] += block.item_count
                     if not sampled and time.monotonic() - started > duration / 2:
                         during = temperature(daq)
+                        if os.environ.get("AUX_INPUT_RUNTIME_HEALTH") == "1":
+                            sample_health(daq, evidence, f"during:{label}")
+                            during_status = dataclasses.asdict(daq.status())
                         sampled = True
                 assert bool(counts["adc_pairs"]) == bool(streams & StreamMask.ADC)
                 assert bool(counts["gpio_samples"]) == bool(streams & StreamMask.GPIO)
@@ -171,6 +191,7 @@ def main():
                 assert not losses.has_loss, repr(losses)
                 assert daq.stop() is DeviceState.IDLE
                 assert daq.status().device_state is DeviceState.IDLE
+                sample_health(daq, evidence, f"after:{label}")
                 evidence["cells"].append(
                     {
                         "mode": mode.name,
@@ -179,6 +200,7 @@ def main():
                         "counts": counts,
                         "seconds": duration,
                         "during_temperature": during,
+                        "during_status": during_status,
                         "after_temperature": temperature(daq),
                     }
                 )

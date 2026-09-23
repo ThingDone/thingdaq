@@ -278,6 +278,11 @@ def main() -> int:
         action="store_true",
         help="validate the public SDK against the release firmware",
     )
+    parser.add_argument(
+        "--runtime-health",
+        action="store_true",
+        help="sample stack/watchdog health and packer CPU in --host-api runs",
+    )
     sequence_group = parser.add_mutually_exclusive_group()
     sequence_group.add_argument(
         "--cycle", action="store_true", help="exercise 0,1,2,3,0 without reflashing"
@@ -298,6 +303,8 @@ def main() -> int:
     parser.add_argument("--service", required=True, help="test-rig service URL")
     parser.add_argument("--auth-file", type=Path, default=Path.home() / ".fw_api_key")
     args = parser.parse_args()
+    if args.runtime_health and not args.host_api:
+        parser.error("--runtime-health requires --host-api")
     # Only live submission needs the service client's optional HTTP dependency.
     import requests
 
@@ -325,6 +332,7 @@ def main() -> int:
         "AUX_INPUT_CAPTURE_SECONDS": str(args.seconds),
         "AUX_INPUT_RUN_DIAGNOSTIC": "1" if args.diagnostic else "0",
         "AUX_INPUT_TEMPERATURE": "1" if args.temperature else "0",
+        "AUX_INPUT_RUNTIME_HEALTH": "1" if args.runtime_health else "0",
         "EXPECTED_HARDWARE_SERIAL": str(args.serial),
         "EXPECTED_BUILD_ID": build_id,
     }

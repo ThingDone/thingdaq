@@ -107,7 +107,10 @@ public command, simulator, fragmented frames and device errors. V1 generated
 bytes remain frozen; v2 adds two golden fixtures. Cppcheck 2.13.0 now parses both
 placement-construction files with the real target defines.
 
-These changes have not been flashed or qualified on hardware. The required
+At the time of this compiler/host validation these changes had not been flashed
+or qualified on hardware. The later [September 23 preflight](m7-hardware-20260923.md)
+verified an idle stack watermark but reported the watchdog unvalidated/disabled
+and stopped before acquisition. Hardware qualification remains incomplete. The required
 watchdog-reset injection, stalled-DWT injection, worst-case operation timing,
 and sustained acquisition watermark measurements are listed in
 [[Watchdog-and-Poll-Bounds]]. Host register fakes cannot establish actual clock

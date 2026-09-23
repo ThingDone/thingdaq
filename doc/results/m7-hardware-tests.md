@@ -13,6 +13,11 @@ related:
 
 # M7 hardware test results
 
+This report preserves the September 18 attempt. The subsequent
+[September 23 campaign](m7-hardware-20260923.md) obtained all standalone timings
+after board recovery, then stopped acquisition at a baseline watchdog health
+failure. The observations below describe the earlier run only.
+
 The baseline acquisition test failed with a USB disconnect. Two subsequent
 programming attempts failed before their Python tests could run. No M7 timing
 measurements or experimental acquisition comparisons were obtained. The rig
