@@ -2,6 +2,7 @@
 type: result
 title: Larger ADC Frame Experiment
 created: 2026-09-18
+updated: 2026-09-23
 tags:
   - performance
   - frames
@@ -16,9 +17,12 @@ Branch: `experiment/larger-adc-frames`, based on the qualified v1.1.0
 checksum experiment at `8dd4929`. This excludes the unqualified runtime
 hardening changes on newer main.
 
-**The larger-frame variant builds and passes local checks, but live performance
-is unmeasured.** The rig failed to load the previously tested smaller-frame
-firmware before any capture began. The larger-frame image was not submitted.
+**Larger ADC frames reduced measured processing cost while sustaining the same
+1 MHz acquisition rates.** After fixture recovery on 2026-09-23, all nine
+comparison captures passed. Median host acceptance CPU time fell by 20.2%,
+and the GPIO processing counter fell from 15.59% to 14.37%. This establishes
+additional processing headroom; maximum sustainable acquisition throughput
+was not tested. The earlier programming failure is retained below.
 
 ## Change and expected effect
 
@@ -45,10 +49,9 @@ framed USB bytes by approximately 0.775%. The calculation counts the 44-byte
 header and retained 4-byte trailer; it excludes USB transaction overhead and
 control traffic. It predicts 47,430.83 fewer framed bytes per second, not a
 measured increase in acquisition rate. The cost is an extra 506 microseconds
-of ADC frame-fill time. Lower frame-processing overhead is a hypothesis to
-measure on the device and host.
+of ADC frame-fill time. The live comparison below measures processing cost.
 
-Both planned comparison variants disable data checksum calculation and retain
+Both comparison variants disable data checksum calculation and retain
 zero trailers. Controls remain checksummed. Neither is a production protocol
 change. The ordinary SDK is not adapted to this research wire format.
 
@@ -84,7 +87,7 @@ with the frame flag both enabled and disabled, and verifies unchanged packet
 storage and equal-time packet accounting. The host test accepts the new
 two-to-one interleaving and rejects an incorrect ADC timestamp progression.
 
-## Live attempt
+## Initial live attempt, 2026-09-18
 
 Job `284894cb-2586-4a29-a5c2-261148308280` requested three ten-second
 INPUT_COMBINED captures at profile 4 using the previously successful
@@ -94,7 +97,7 @@ The service health check was healthy and idle.
 The loader could not soft-reboot the Teensy: USB control transfer returned
 “Protocol error.” It then waited for the device and timed out after 75 seconds.
 The runner classified this as `INFRASTRUCTURE_FAIL`; there are no capture
-measurements. No further flash was attempted, and the currently running image
+measurements. No further flash was attempted that day, and the running image
 was not re-identified. The last previously verified image was the published
 checksummed v1.1.0 baseline.
 
@@ -102,7 +105,71 @@ Complete local raw evidence is in
 `/home/bill/agents/teensy_daq/doc/results/raw/frame-performance/adc2072-none/`.
 The compact tracked JSON preserves the firmware identities and loader output.
 
-## Reproduction after fixture recovery
+## Live comparison after fixture recovery, 2026-09-23
+
+The user reset the fixture. We ran three ten-second captures with smaller
+frames, three with larger frames, and three more with smaller frames to
+check drift. Each group used a fresh firmware upload; its three captures
+shared one boot. All nine captures passed 131 checks each, including loss
+accounting, frame sequences, timestamps, ADC ranges, and paired-bank counters.
+No sequence gaps, reported sample loss, or disconnects occurred.
+
+Both images were built from the same firmware source fingerprint on this
+branch, with data checksums disabled, a 450 MHz core, sixteen GPIO inputs,
+and profile 4: 1 million ADC pairs and 1 million GPIO samples per second.
+The sole build selection difference was the larger-ADC-frame flag.
+
+| Median metric | Small frames, before (3 runs) | Large frames (3 runs) | Small frames, after (3 runs) |
+| --- | ---: | ---: | ---: |
+| Host acceptance CPU seconds | 3.384 | 2.695 | 3.370 |
+| Host CPU as percent of one core | 31.28% | 24.93% | 31.16% |
+| GPIO processing counter | 15.59% | 14.37% | 15.59% |
+| ADC pairs per second | 999988 | 1000002 | 999998 |
+| GPIO samples per second | 999887 | 1000103 | 999897 |
+| ADC frames per complete capture | 20316 | 10152 | 20316 |
+| GPIO frames per complete capture | 5079 | 5076 | 5079 |
+| STATUS p99 latency | 11.012 ms | 11.089 ms | 10.980 ms |
+| Transmit queue peak, frames | 33 | 2 | 14 |
+
+Pooling the six smaller-frame captures gives median host CPU time of 3.3773
+seconds versus 2.6945 seconds for larger frames: **20.2% less host CPU time**.
+Normalized by each cell's wall time, median CPU utilization falls from 31.22%
+to 24.93% of one core, a 20.1% relative reduction. CPU time ranges are
+3.0910–3.4673 seconds for smaller frames and 2.6928–2.9273 seconds for larger
+frames. Host timing includes acceptance setup, warmup, capture, and drain
+(about 10.81–10.82 seconds wall time), not only the timed ten-second window.
+
+The GPIO processing counter drops by **1.22 percentage points**, or **7.8%
+relative**. It measures the auxiliary GPIO packer's active-cycle accounting;
+it is not total MCU utilization. No inference about total ADC/MCU CPU cost
+or maximum USB throughput is justified by that counter alone.
+
+The return to the original CPU levels in the final smaller-frame group
+supports a frame-size effect rather than simple time drift. This remains a
+short comparison on one board and one host, without randomized order or a
+long-duration soak. STATUS latency did not materially improve. Queue peaks
+are frame counts, whose byte sizes differ between variants. Frame counts
+include warmup and drain; rates use the timed capture window. Data corruption
+detection remains disabled in both experimental conditions, and no external
+electrical stimulus was declared.
+
+| Group | Rig job | Build ID |
+| --- | --- | --- |
+| Smaller, before | `5c9878b1-1186-4cce-a463-51029be22315` | `thingdaq-bf3cc7acb836dfe0` |
+| Larger | `a1143cce-1112-411b-be2a-c96b77032e68` | `thingdaq-f0ec13cc42c5e848` |
+| Smaller, after | `ece2bd06-9abf-4907-a1ac-e2c97342836f` | `thingdaq-bf3cc7acb836dfe0` |
+
+All repetitions, identities, SHA-256 hashes, aggregate calculations, and
+restoration evidence are retained in [frame-performance-live.json](frame-performance-live.json).
+Full local artifacts remain under
+`/home/bill/agents/teensy_daq/doc/results/raw/frame-performance/2026-09-23-*`.
+
+The published checksummed v1.1.0 firmware, build
+`thingdaq-636aebbecbf70691`, was restored afterward. Job
+`54af157f-f01f-4969-8608-d357a7b2e6ee` passed a further ten-second capture
+and all 131 checks. The board is therefore back on the published baseline.
+
+## Reproduction
 
 From this branch's checkout, build both variants with the pinned timestamp:
 
