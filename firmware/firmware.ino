@@ -1,10 +1,4 @@
-/*
- * ThingDAQ Phase 07 synchronized GPIO and dual-ADC runtime.
- *
- * Native USB and its chip-derived serial descriptor are initialized by the
- * pinned Teensy core before global C++ construction and setup(). The portable
- * runtime owns all bounded parser, state, statistics, and transport work.
- */
+// ThingDAQ synchronized runtime; the pinned core owns native USB initialization.
 #include "src/firmware_runtime.h"
 #include "src/adc_dma_capture_teensy.h"
 #include "src/adc_initializer_teensy.h"
@@ -19,6 +13,7 @@
 #include "src/teensy_clock.h"
 #include "src/teensy_usb.h"
 #include "src/variable_rate_scheduler_teensy.h"
+#include "src/usb_throughput_experiment.h"
 namespace {
 // Packet banks stay CPU-owned; the CDC core copies into its own DMA TX ring.
 thingdaq::usb::TeensyCdcByteStream cdc_stream{};
@@ -59,7 +54,12 @@ void setup() {
 }
 
 void loop() {
-  // Service one bounded cooperative control/data-path iteration. Teensy's
-  // main() calls yield afterward.
+#if defined(THINGDAQ_EXPERIMENT_USB_THROUGHPUT)
+  if (thingdaq::usb_throughput::active()) {
+    thingdaq::usb_throughput::service(
+        cdc_stream, thingdaq::benchmark::teensyPacketPrimaryStorage());
+    return;
+  }
+#endif
   (void)firmware_runtime.service();
 }

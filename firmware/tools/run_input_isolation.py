@@ -226,6 +226,7 @@ def main() -> int:
     )
     parser.add_argument("--auth-file", type=Path, default=Path.home() / ".fw_api_key")
     parser.add_argument("--frame-experiment", action="store_true")
+    parser.add_argument("--usb-throughput", action="store_true")
     args = parser.parse_args()
     # Only live submission needs the service client's optional HTTP dependency.
     import requests
@@ -246,6 +247,19 @@ def main() -> int:
     manifest = json.loads(manifest_bytes)
     checksum_experiment = manifest.get("checksum_experiment")
     frame_experiment = manifest.get("frame_experiment")
+    usb_experiment = manifest.get("usb_throughput_experiment")
+    if bool(usb_experiment) != args.usb_throughput:
+        parser.error("USB throughput builds require --usb-throughput and its manifest")
+    if args.usb_throughput and (
+        args.host_api
+        or args.cycle
+        or args.profiles
+        or args.cases
+        or not 1 <= args.seconds <= 15
+    ):
+        parser.error(
+            "USB throughput uses its own sequence; choose 1..15 seconds per cell"
+        )
     if bool(frame_experiment) != args.frame_experiment:
         parser.error(
             "frame research builds require --frame-experiment and its manifest"
@@ -263,8 +277,10 @@ def main() -> int:
         )
     verify_hex(firmware, manifest)
     validator = "rig_release_sdk.py" if args.host_api else "rig_aux_input_capture.py"
+    if args.usb_throughput:
+        validator = "rig_usb_throughput.py"
     source = (args.worktree / "firmware/tests" / validator).read_text()
-    if checksum_experiment:
+    if checksum_experiment and not args.usb_throughput:
         mode = checksum_experiment["mode"]
         if mode not in ("baseline", "unrolled", "none"):
             parser.error("unknown checksum experiment mode")
@@ -291,6 +307,8 @@ def main() -> int:
     sequence = [0, 1, 2, 3, 0] if args.cycle else list(profiles or (args.profile,))
     try:
         planned_program_seconds = validate_program_budget(args.seconds, len(sequence))
+        if args.usb_throughput:
+            planned_program_seconds = validate_program_budget(args.seconds, 18)
     except ValueError as error:
         parser.error(str(error))
     cases = tuple(args.cases) if args.cases is not None else None
@@ -373,6 +391,7 @@ def main() -> int:
             "input_experiment": experiment,
             "checksum_experiment": checksum_experiment,
             "frame_experiment": frame_experiment,
+            "usb_throughput_experiment": usb_experiment,
             "profile_sequence": sequence,
             "case_sequence": list(cases or (args.case,) * len(sequence)),
             "planned_program_seconds": planned_program_seconds,
@@ -396,6 +415,8 @@ def main() -> int:
         flush=True,
     )
     deadline = time.monotonic() + (args.seconds + 5) * len(sequence) + 120
+    if args.usb_throughput:
+        deadline = time.monotonic() + planned_program_seconds + 120
     while time.monotonic() < deadline:
         status = post("status", {"test_id": test_id})
         save("status.json", status)

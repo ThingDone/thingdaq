@@ -31,13 +31,22 @@ def main() -> int:
         help="research-only: double 16-input ADC payload to 4048 bytes",
     )
     parser.add_argument("--arduino-cli", default="arduino-cli")
+    parser.add_argument("--usb-throughput", action="store_true")
     args = parser.parse_args()
+    if args.usb_throughput and (args.large_adc_frame or args.mode != "none"):
+        parser.error("--usb-throughput requires --mode none without --large-adc-frame")
     mode = args.mode
     frame_suffix = ":adc-frame-4096" if args.large_adc_frame else ""
+    if args.usb_throughput:
+        frame_suffix = ":usb-throughput-v1"
     base.OUTPUT_DIRECTORY = (
         base.SKETCH_DIRECTORY
         / "build"
-        / (f"checksum-{mode}" + ("-adc4096" if args.large_adc_frame else ""))
+        / (
+            "usb-throughput"
+            if args.usb_throughput
+            else f"checksum-{mode}" + ("-adc4096" if args.large_adc_frame else "")
+        )
     )
     original_identity = base.build_identity
     original_definitions = base.identity_definitions
@@ -57,6 +66,7 @@ def main() -> int:
         original_definitions(definitions, selected)
         + (f" -D{MODES[mode]}=1" if MODES[mode] else "")
         + (" -DTHINGDAQ_EXPERIMENT_LARGE_ADC_FRAME=1" if args.large_adc_frame else "")
+        + (" -DTHINGDAQ_EXPERIMENT_USB_THROUGHPUT=1" if args.usb_throughput else "")
     )
     # Keep transient compiler products inside this checkout as well.
     base.compile_command = lambda *parameters: (
@@ -85,6 +95,28 @@ def main() -> int:
         manifest["checksum_experiment"]["wire_compatible"] = False
         manifest["checksum_experiment"]["identity_policy"] = (
             "sha256(source_id:checksum-experiment-v1:mode:adc-frame-4096)"
+        )
+    if args.usb_throughput:
+        manifest["usb_throughput_experiment"] = {
+            "interface": "TDUSB1",
+            "wire_compatible": False,
+            "working_bytes": 8192,
+            "allocation": "borrowed idle DTCM packet pages",
+            "modes": {
+                "1": "gpio-4k",
+                "2": "gpio-8k",
+                "3": "separate-4k",
+                "4": "coalesced-8k",
+                "5": "combined-8k",
+            },
+            "header_bytes": 32,
+            "synthetic_prebuilt_payload": True,
+        }
+        manifest["checksum_experiment"]["control_checksums"] = (
+            "ASCII diagnostic interface has no checksum"
+        )
+        manifest["checksum_experiment"]["identity_policy"] = (
+            "sha256(source_id:checksum-experiment-v1:mode:usb-throughput-v1)"
         )
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     print(manifest_path)
