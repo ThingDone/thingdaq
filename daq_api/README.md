@@ -23,9 +23,9 @@ and do not imply release hardware support.
 
 Physical SDK validation passes ADC-only, GPIO-only (8/16 inputs), and combined
 8-input capture on the remote test server. Combined16 reproduces firmware USB
-queue loss under its 0.5-core CPU quota. Two allocated cores pass short captures
-and width transitions, but a longer SDK attempt timed out after 50.08 seconds
-with two firmware ADC DMA error events and zero CPU throttling. Sustained
+queue loss under its 0.5-core CPU quota. Two allocated cores pass short captures,
+width transitions and a 600-second SDK repeat, but another SDK attempt timed out
+after 50.08 seconds with two firmware ADC DMA error events and zero CPU throttling. Sustained
 combined16 SDK operation therefore remains unqualified. The independent wire
 validator passes 600 seconds with two cores on the same firmware.
 Historical parser rejections were not reproduced; their cause remains unresolved.

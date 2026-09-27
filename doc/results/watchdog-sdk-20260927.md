@@ -28,7 +28,9 @@ five-mode sequence. Allocating two cores passed a 60-second cold capture and sev
 a subsequent planned 600-second SDK capture **failed after 50.084 seconds with
 zero CPU throttling**: a block timeout, two firmware ADC DMA error events and
 an IDLE firmware state. Adequate CPU allocation does not eliminate every
-combined16 failure. Sustained SDK operation remains unqualified.
+combined16 failure. A subsequent standard-collector repeat passed 600 seconds,
+so this adequate-CPU failure is intermittent; sustained SDK operation remains
+unqualified.
 
 Historical checksum/parser rejections were **not reproduced**; their cause
 remains unresolved. The adequate-CPU failure below is a distinct observed
@@ -49,7 +51,11 @@ failure mode, not proof of the cause of those historical rejections.
 The SDK comparisons and independent wire soak use this identical frozen HEX.
 The earlier four-mode watchdog control run has the same firmware source/build
 ID but an earlier build timestamp and a separately archived HEX hash. No SDK
-library or checksum implementation was changed for this campaign.
+library or checksum implementation was changed for this campaign. The sorted
+SDK source-file hash inventory is identical in every SDK comparison:
+`bb923fdf3fc0aa9fac92b2acfce91f3dbf2f8cb27e59dde57092fc184809dbf2`.
+ZIP archive hashes differ because their entry timestamps differ; the
+uncompressed Python source contents match exactly.
 
 ## Watchdog diagnosis and recovery
 
@@ -91,6 +97,7 @@ outside this campaign.
 | `82209c47-6492-48c8-8ab7-2436cd967fba` | Original five cells, 5 s each | 0.5 | First four PASS; combined16 FAIL at 1.483 s |
 | `dc300634-1597-4e8c-9c69-851f262c2e1d` | ADC, GPIO8, combined8, GPIO16, combined16, combined8, combined16; 20 s each | 2.0 | All seven PASS |
 | `775fe2fc-d3db-45cc-8790-9775715ddff6` | Cold combined16, planned 600 s | 2.0 | FAIL at 50.084 s; block timeout and firmware ADC DMA errors |
+| `5e5f2e3a-023e-4b75-a2e7-314bf43da1d0` | Cold combined16, standard collector, 600 s | 2.0 | PASS; intermittent failure did not recur |
 
 The first failed snapshot had 28 packet-pressure evictions (21 ADC, 7 GPIO);
 the transition failure snapshot had 253 (201 ADC, 52 GPIO). Both had zero raw
@@ -128,8 +135,21 @@ evidence encountered through the SDK workload, not a proven SDK parser bug.
 This run had a bounded on-error hook to retain up to four rejected frame byte
 sequences while calling the original parser error handler. It changes no
 successful-frame path or acceptance rule; an offline corruption/recovery test
-verified its behavior. The hook never fired (`rejected_frames = []`). A repeat
-using the unmodified standard collector is recorded when complete.
+verified its behavior. The hook never fired (`rejected_frames = []`).
+
+The repeat using the unmodified standard collector, job
+`5e5f2e3a-023e-4b75-a2e7-314bf43da1d0`, passed 600 seconds and received
+600,002,656 ADC pairs and 600,002,656 GPIO samples. It decoded 1,482,276 frames
+from 3,671,235,460 bytes with zero corruption, discarded bytes or observed loss.
+Process CPU was 401.420 seconds (about 0.669 cores). CPU throttling deltas were
+zero; the pre-existing 4,861 us counter value did not change. All four health
+samples showed watchdog enabled, reset cause `0x1`, and at least 27,856 bytes
+of free stack. The failed run began at 51.404 °C; the repeat began at 44.036 °C
+and ended at 55.088 °C. No temperature causality is established.
+
+The passing repeat demonstrates that the failure is intermittent, not resolved.
+The next fault investigation needs ADC pairing/service-failure branch and
+register snapshots; these runs do not isolate that trigger.
 
 One additional diagnostic attempted to continue reading after strict gap
 exceptions at half a core. It observed three gap exceptions before the SDK's
@@ -235,7 +255,10 @@ Full replies, programs, HEX/ELF files and manifests are under ignored
 `doc/results/raw/watchdog-sdk-20260927/`; local validation logs are under
 `firmware/build/`. Three early programming timeouts are retained as
 infrastructure failures, separate from acquisition results. No simultaneous
-board jobs or retries of ambiguous submissions were used.
+board jobs or retries of ambiguous submissions were used. Final service
+postflight was healthy, normal mode, queue depth zero, with no running job
+containers. The last programmed image is the fixed production HEX above;
+temporary CPU allocations ended with their containers.
 
 There was no external electrical stimulus. This campaign does not measure
 analog accuracy, external GPIO transition fidelity or pad-level simultaneity.

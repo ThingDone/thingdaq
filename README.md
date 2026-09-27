@@ -10,10 +10,10 @@ profile; acquisition blocks provide exact per-sample timestamps.
 
 The Python SDK's combined ADC + 16-GPIO path remains unqualified for sustained
 lossless capture. Its queue-loss failure reproduces under a 0.5-core host quota.
-Two allocated cores pass short captures and width transitions, but a longer
-SDK attempt timed out after 50.08 seconds with firmware ADC DMA error counters
-and zero host throttling. The independent wire validator passes a 600-second
-current-firmware baseline with two cores. See the
+Two allocated cores pass short captures, width transitions and a 600-second
+SDK repeat, but another SDK attempt timed out after 50.08 seconds with firmware
+ADC DMA error counters and zero host throttling. The independent wire validator
+also passes a 600-second current-firmware baseline with two cores. See the
 [current watchdog baseline and SDK CPU comparison](doc/results/watchdog-sdk-20260927.md).
 Strict loss detection remains enabled; historical parser rejections remain unexplained.
 
