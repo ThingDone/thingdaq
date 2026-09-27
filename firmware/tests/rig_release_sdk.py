@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import platform
 import time
 from pathlib import Path
 
@@ -49,6 +50,37 @@ def sample_health(daq, evidence, phase):
     assert health.stack_min_free_bytes > 0, f"stack watermark exhausted at {phase}"
 
 
+SDK_CASES = {
+    "adc": (AuxBankMode.DISABLED, StreamMask.ADC),
+    "gpio8": (AuxBankMode.DISABLED, StreamMask.GPIO),
+    "combined8": (AuxBankMode.DISABLED, StreamMask.ADC | StreamMask.GPIO),
+    "gpio16": (AuxBankMode.INPUT, StreamMask.GPIO),
+    "combined16": (AuxBankMode.INPUT, StreamMask.ADC | StreamMask.GPIO),
+}
+
+
+def selected_cases():
+    names = os.environ.get("AUX_INPUT_SDK_CASES", ",".join(SDK_CASES)).split(",")
+    if not names or any(name not in SDK_CASES for name in names):
+        raise ValueError(f"unknown SDK cases: {names}")
+    return [(name, *SDK_CASES[name]) for name in names]
+
+
+def host_cpu():
+    result = {
+        "affinity": sorted(os.sched_getaffinity(0)),
+        "loadavg": os.getloadavg(),
+        "cpu_count": os.cpu_count(),
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+    }
+    for name in ("cpu.max", "cpu.stat", "cpuset.cpus.effective"):
+        path = Path("/sys/fs/cgroup") / name
+        if path.exists():
+            result[name] = path.read_text()
+    return result
+
+
 def main():
     evidence = {
         "result": "FAIL",
@@ -67,7 +99,9 @@ def main():
             firmware_version=(1, 1, 0),
             protocol_version=2,
         )
-        duration = float(os.environ["AUX_INPUT_CAPTURE_SECONDS"]) / 5
+        cases = selected_cases()
+        duration = float(os.environ["AUX_INPUT_CAPTURE_SECONDS"]) / len(cases)
+        evidence["host_before"] = host_cpu()
         with ThingDAQ.open(
             os.environ["SERIAL_PORT"],
             expected_identity=expected,
@@ -123,16 +157,12 @@ def main():
             assert daq.status().device_state is DeviceState.IDLE
             evidence["legacy_capture_diagnostic"] = "REJECTED_BEFORE_CAPTURE"
             previous_run = None
-            cells = [
-                (AuxBankMode.DISABLED, StreamMask.ADC),
-                (AuxBankMode.DISABLED, StreamMask.GPIO),
-                (AuxBankMode.DISABLED, StreamMask.ADC | StreamMask.GPIO),
-                (AuxBankMode.INPUT, StreamMask.GPIO),
-                (AuxBankMode.INPUT, StreamMask.ADC | StreamMask.GPIO),
-            ]
-            for mode, streams in cells:
+            for name, mode, streams in cases:
                 label = f"{mode.name}:{int(streams)}"
                 evidence["active_cell"] = label
+                evidence["active_case"] = name
+                cpu_before = host_cpu()
+                evidence["active_host_before"] = cpu_before
                 sample_health(daq, evidence, f"before:{label}")
                 daq.reset_stats()
                 configuration = daq.configure(
@@ -194,6 +224,15 @@ def main():
                 sample_health(daq, evidence, f"after:{label}")
                 evidence["cells"].append(
                     {
+                        "case": name,
+                        "host_before": cpu_before,
+                        "host_after": host_cpu(),
+                        "wall_seconds": time.monotonic() - started,
+                        "cpu_seconds": time.process_time() - cpu_started,
+                        "losses": dataclasses.asdict(losses),
+                        "parser_counters": dataclasses.asdict(
+                            daq._reader.parser_counters
+                        ),
                         "mode": mode.name,
                         "streams": int(streams),
                         "run_id": run_id,
@@ -209,6 +248,7 @@ def main():
         evidence["error"] = f"{type(error).__name__}: {error}"
         evidence["cause"] = repr(getattr(error, "cause", None))
         evidence["recovery"] = repr(getattr(error, "evidence", None))
+    evidence["host_after"] = host_cpu()
     cpu_stat = Path("/sys/fs/cgroup/cpu.stat")
     if cpu_stat.exists():
         evidence["cpu.stat.after"] = cpu_stat.read_text()

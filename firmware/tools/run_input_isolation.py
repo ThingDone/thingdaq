@@ -283,6 +283,12 @@ def main() -> int:
         action="store_true",
         help="sample stack/watchdog health and packer CPU in --host-api runs",
     )
+    parser.add_argument(
+        "--sdk-cases",
+        nargs="+",
+        choices=("adc", "gpio8", "combined8", "gpio16", "combined16"),
+        help="SDK cells in order; --seconds is divided across selected cells",
+    )
     sequence_group = parser.add_mutually_exclusive_group()
     sequence_group.add_argument(
         "--cycle", action="store_true", help="exercise 0,1,2,3,0 without reflashing"
@@ -303,6 +309,8 @@ def main() -> int:
     parser.add_argument("--service", required=True, help="test-rig service URL")
     parser.add_argument("--auth-file", type=Path, default=Path.home() / ".fw_api_key")
     args = parser.parse_args()
+    if args.sdk_cases and not args.host_api:
+        parser.error("--sdk-cases requires --host-api")
     if args.runtime_health and not args.host_api:
         parser.error("--runtime-health requires --host-api")
     # Only live submission needs the service client's optional HTTP dependency.
@@ -336,12 +344,23 @@ def main() -> int:
         "EXPECTED_HARDWARE_SERIAL": str(args.serial),
         "EXPECTED_BUILD_ID": build_id,
     }
+    if args.sdk_cases:
+        settings["AUX_INPUT_SDK_CASES"] = ",".join(args.sdk_cases)
     experiment = manifest.get("input_experiment")
     settings.update(experiment_settings(manifest))
     profiles = tuple(args.profiles) if args.profiles is not None else None
     sequence = [0, 1, 2, 3, 0] if args.cycle else list(profiles or (args.profile,))
     try:
         planned_program_seconds = validate_program_budget(args.seconds, len(sequence))
+        if args.host_api:
+            # SDK --seconds is a total, but every selected cell has control and
+            # cleanup overhead. Its single EVIDENCE row is not its cell count.
+            sdk_cells = len(args.sdk_cases) if args.sdk_cases else 5
+            planned_program_seconds = 30 + args.seconds + 5 * sdk_cells
+            if args.seconds / sdk_cells < 1 or planned_program_seconds > 780:
+                raise ValueError(
+                    "SDK cells need at least one second each and a safe service runtime budget"
+                )
     except ValueError as error:
         parser.error(str(error))
     cases = tuple(args.cases) if args.cases is not None else None
@@ -414,7 +433,7 @@ def main() -> int:
         firmware,
         program,
         args.evidence_dir,
-        (args.seconds + 5) * len(sequence) + 120,
+        planned_program_seconds + 90,
     )
     summary = classify_result(result, expected_cells=len(sequence))
     save("summary.json", summary)

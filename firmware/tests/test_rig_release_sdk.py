@@ -54,3 +54,24 @@ def test_health_retains_observation_before_acceptance(
     assert evidence["runtime_health"][0]["stack_min_free_bytes"] == free
     assert evidence["runtime_health"][0]["phase"] == "idle"
     assert capsys.readouterr().out.startswith("EVENT ")
+
+
+def test_sdk_case_selection_preserves_order_and_repetition(monkeypatch):
+    monkeypatch.setenv("AUX_INPUT_SDK_CASES", "combined16,combined8,combined16")
+    assert [row[0] for row in rig.selected_cases()] == [
+        "combined16",
+        "combined8",
+        "combined16",
+    ]
+
+
+@pytest.mark.parametrize("selection", ["", "typo", "combined16,"])
+def test_sdk_case_selection_rejects_unknown_cells(monkeypatch, selection):
+    monkeypatch.setenv("AUX_INPUT_SDK_CASES", selection)
+    with pytest.raises(ValueError, match="unknown SDK cases"):
+        rig.selected_cases()
+
+
+def test_sdk_default_case_selection(monkeypatch):
+    monkeypatch.delenv("AUX_INPUT_SDK_CASES", raising=False)
+    assert [row[0] for row in rig.selected_cases()] == list(rig.SDK_CASES)
