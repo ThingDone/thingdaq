@@ -23,12 +23,12 @@ and do not imply release hardware support.
 
 Physical SDK validation passes ADC-only, GPIO-only (8/16 inputs), and combined
 8-input capture on the remote test server. Combined ADC + 16-GPIO capture
-reports firmware USB queue loss under that server's 0.5-core CPU quota;
-one run also reported parser rejections without raw-ring loss. Not all errors
-are proven to be caused by throttling. It is not qualified as lossless there.
-The independent wire validator sustains
-the same firmware configuration. SDK throughput on a faster host remains
-unverified. Keep strict loss checking enabled and validate the intended host.
+reproduces firmware USB queue loss under its 0.5-core CPU quota. With two cores
+allocated, the current firmware/SDK passed 60 seconds of combined 16-input
+capture and repeated 8/16-input transitions with zero throttling or loss.
+Historical parser rejections were not reproduced; their cause remains unresolved.
+See the [current baseline and CPU comparison](../doc/results/watchdog-sdk-20260927.md).
+Keep strict loss checking enabled and validate the intended host.
 
 Install **thingdone-daq** and import **thingdone_daq** (Python 3.10–3.14):
 

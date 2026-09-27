@@ -36,6 +36,11 @@ required memory floors are unchanged. ITCM code occupies 32,520 bytes in the
 verified build, below the 32 KiB bank boundary; RAM2 keeps its existing
 4,096-byte heap margin.
 
+The [September 27 follow-up](watchdog-sdk-20260927.md) resolves the watchdog
+preflight failure: configuration acknowledgment arrived after the original
+poll deadline. The fixed adapter passed a deliberate stall/reset/reconnect test,
+and the production SDK captures report an enabled four-second watchdog.
+
 ## Runtime command and long tests
 
 Use `daq.get_runtime_health()` on the same `ThingDAQ` object already owning the

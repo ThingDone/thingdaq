@@ -8,11 +8,13 @@ Build identity, validation and limits are in the
 The optional equal-frame `TimestampAligner` is not supported for this new
 profile; acquisition blocks provide exact per-sample timestamps.
 
-The Python SDK's combined ADC + 16-GPIO path is not qualified as lossless on
-the remote test server's 0.5-core CPU quota: runs reported USB queue loss and,
-in one case, parser rejections. The independent wire validator sustains that
-firmware mode; the SDK errors and faster-host throughput need further qualification.
-Strict loss detection remains enabled—no missing data is silently accepted.
+The Python SDK's combined ADC + 16-GPIO path reproduces firmware USB queue
+loss under the remote test server's 0.5-core CPU quota. With two cores allocated,
+the current firmware/SDK passed a 60-second capture and repeated 8/16-input
+transitions with zero throttling or loss. Historical parser rejections were
+not reproduced and their cause remains unresolved. See the
+[current watchdog baseline and SDK CPU comparison](doc/results/watchdog-sdk-20260927.md).
+Strict loss detection remains enabled.
 
 ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,
 loss-visible acquisition on the Teensy 4.0 platform. It captures two

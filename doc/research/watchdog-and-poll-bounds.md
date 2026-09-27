@@ -71,8 +71,10 @@ Both failed handshakes terminate without relying on a clock. GPIO diagnostic
 and ADC portable tests continue to exercise their existing timeout/error
 handling, but do not simulate a DWT that stops halfway through a real transfer.
 
-The changes require these on-device checks before claiming hardware recovery
-or long-soak qualification:
+The following checklist describes the hardware evidence needed beyond host
+register tests. The [September 27 follow-up](../results/watchdog-sdk-20260927.md)
+now records successful configuration, healthy SDK captures and a deliberate
+main-loop stall/reset/reconnect test. On-device stalled-DWT tests remain open:
 
 1. Run legal maximum-size checksum and clock diagnostic requests while idle,
    then repeated acquisition start/stop. Verify runtime health reports an

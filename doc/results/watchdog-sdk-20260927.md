@@ -6,63 +6,189 @@ tags:
   - thingdaq
   - watchdog
   - validation
+related:
+  - '[[Firmware-Runtime-Hardening]]'
+  - '[[Release-1.1.0]]'
 ---
 
-# Watchdog initialization and current baseline
+# Current watchdog baseline and SDK CPU comparison
 
-Current `main` at `e2cfbee` reproduced the watchdog preflight failure before
-acquisition, job `f73d888a-1812-4bf8-800f-97a363d5dbee`. The original firmware
-build `thingdaq-6f2c6b332efc9280` reported watchdog disabled, timeout zero and
-reset cause `0x1`. No acquisition cell ran.
+The watchdog preflight failure is fixed. The original initialization deadline
+expired before hardware acknowledged a successfully written configuration;
+refreshes were then withheld from an enabled watchdog. The repaired adapter
+passed a deliberate main-loop stall/reset/reconnect test. Production firmware
+passed the four previously healthy SDK modes, and combined 16-input SDK
+capture also passed with adequate CPU allocation.
 
-A dedicated non-driving sketch using the actual watchdog adapter read CS
-`0x2520` before initialization, `0x31a3` immediately after the failed call, and
-`0x35a3` later. TOVAL was already 512. The missing RCS acknowledgment bit
-arrived after the original 100,000-poll deadline. This was a false negative
-that prevented refreshes of an already enabled watchdog. Job
-`23faba53-0f63-407a-a6e6-553172d33da3` retains the register evidence.
+The separate SDK reproduction found firmware USB queue loss at the normal
+0.5-core quota, both from a cold combined 16-input start and after the original
+five-mode sequence. Allocating two cores to the same test container eliminated
+the reproduced failure: a 60-second cold capture and seven 20-second mode cells
+passed, including 8 → 16 → 8 → 16 combined-input transitions. All adequate-CPU
+captures had zero throttling, parser errors, host queue drops and observed loss.
+Historical checksum/parser rejections were **not reproduced**; their cause
+remains unresolved. This result does not attribute those historical errors to
+CPU throttling or qualify every possible host.
+
+## Frozen production image
+
+| Item | Value |
+| --- | --- |
+| Firmware source commit | `cb833a5fcd80ae8f51d8bf524d3d5101bf92fb71` (firmware inputs clean) |
+| Build ID | `thingdaq-b0fafcaf165da96b` |
+| HEX SHA-256 | `9be428933c8d2cfb962e339c7d1f19272fff51b77c5de333ceab8320682cbbd6` |
+| Target | Teensy 4.0, USB serial `20428100`, 450 MHz, fixed 1 MHz ADC/GPIO |
+| Toolchain | Teensy core 1.62.0; Arm GNU 15.2.1; standard `-O2` |
+| RAM1 locals/stack | 34,464 bytes; 34,432 monitored after MPU guard exclusion |
+| RAM2 heap margin | 4,096 bytes |
+
+The SDK comparisons and independent wire soak use this identical frozen HEX.
+The earlier four-mode watchdog control run has the same firmware source/build
+ID but an earlier build timestamp and a separately archived HEX hash. No SDK
+library or checksum implementation was changed for this campaign.
+
+## Watchdog diagnosis and recovery
+
+Current `main` at `e2cfbee` reproduced the preflight failure before acquisition,
+job `f73d888a-1812-4bf8-800f-97a363d5dbee`. Original build
+`thingdaq-6f2c6b332efc9280` reported watchdog disabled, timeout zero and reset
+cause `0x1`. No acquisition cell ran.
+
+A dedicated non-driving sketch using the actual adapter read CS `0x2520`
+before initialization, `0x31a3` immediately after the failed call, and `0x35a3`
+later. TOVAL was already 512. RCS, the configuration-success bit, arrived after
+the original 100,000-poll deadline. Job
+`23faba53-0f63-407a-a6e6-553172d33da3` retains that register evidence.
 
 The bound is now 2,000,000 polls, still independent of DWT progress. The host
-fake models delayed RCS and tests an acknowledgment beyond the old bound;
-unlock/configuration failures, command width, interrupt masking and readback
+fake models delayed RCS and tests acknowledgment beyond the old bound.
+Unlock/configuration failures, command width, interrupt masking and readback
 checks remain enforced. Neither watchdog timeout nor acceptance was weakened.
 
-The fixed adapter passed the physical watchdog test on Teensy serial
-`20428100`, 450 MHz, job `f8d87f59-512d-4f51-a5df-7f9a16ec0597`:
+The fixed adapter passed job `f8d87f59-512d-4f51-a5df-7f9a16ec0597`:
 
 - Initialization acknowledged in 12,335,804 DWT cycles (27.413 ms).
 - Healthy refreshes continued for more than the four-second timeout.
-- A deliberately stalled main loop disconnected USB after 4.135 seconds.
+- Deliberately stalling main disconnected USB after 4.135 seconds.
 - USB reconnected by 4.660 seconds, watchdog enabled, reset cause `0x80`.
 
-This is a dedicated fault-injection sketch, not an acquisition soak. The
-production build passes the pinned target build and memory gates. Subsequent
-production acquisition and SDK CPU comparisons are recorded separately below
-when complete.
+The probe's printed `serial` is a raw OCOTP word; the fixed probe independently
+checked public USB serial `20428100` on the host. This is dedicated
+fault-injection evidence. On-device tests that stall DWT mid-diagnostic remain
+outside this campaign.
 
-[Machine-readable evidence](watchdog-sdk-20260927-evidence.json) preserves the
-observations. Complete programs, HEX files, manifests, responses and logs are
-under ignored `doc/results/raw/watchdog-sdk-20260927/` and `firmware/build/`.
-The probe's printed `serial` field is the raw OCOTP word, not the public USB
-serial; the fixed probe's host independently checked USB serial `20428100`.
+## Production SDK results
 
-The rig had upload timeouts before the original probe and two production
-attempts. These were terminal programming failures, not acquisition results.
-No simultaneous board jobs or automatic retries of ambiguous submissions were
-used. The later successful small fixed probe restored a refreshing image.
+| Job | Workload | CPU quota | Result |
+| --- | --- | ---: | --- |
+| `1760c794-e831-4817-ae9b-03bfdf23570a` | ADC, GPIO8, combined8, GPIO16; 15 s each | 0.5 | PASS; all watchdog/stack samples healthy |
+| `6ccde963-02b7-4c11-92c4-db8aadfe9840` | Cold combined16, planned 60 s | 0.5 | FAIL at 0.885 s; firmware-origin ADC gap |
+| `dc179cd7-833d-46c0-9ba0-25d55cb845fb` | Cold combined16, 60 s | 2.0 | PASS |
+| `82209c47-6492-48c8-8ab7-2436cd967fba` | Original five cells, 5 s each | 0.5 | First four PASS; combined16 FAIL at 1.483 s |
+| `dc300634-1597-4e8c-9c69-851f262c2e1d` | ADC, GPIO8, combined8, GPIO16, combined16, combined8, combined16; 20 s each | 2.0 | All seven PASS |
 
-## Local validation boundaries
+The first failed snapshot had 28 packet-pressure evictions (21 ADC, 7 GPIO);
+the transition failure snapshot had 253 (201 ADC, 52 GPIO). Both had zero raw
+ring overruns, parser corruption and host block-queue drops. These snapshots
+can include losses after the first gap that triggered strict failure. The
+first gap itself was 19 ADC frames; the sequence failure first reported 74.
+CPU throttling increased in both half-core failures.
 
-The watchdog regression and focused SDK/runner tests pass. A broad local run
-passed 610 tests and 16,360 subtests but was not wholly green: existing SDK
-throughput/paced-simulator checks failed on local CPython 3.12.3, the unrelated
-untracked `doc/results/firmware-analysis-2026-09-12.md` lacks required YAML, and
-an in-progress report link was not yet present. The link is now resolved.
-No performance threshold was lowered and no unrelated file was changed.
+The adequate-CPU runs observed **zero throttled periods and microseconds**,
+with affinity to all four host CPUs. Combined16 consumed about 0.66 CPU cores
+on average, versus about 0.46 for combined8. The seven-cell run recorded
+CPython 3.13.15 on Linux x86-64. Its 22 runtime-health samples and the cold
+run's four samples all reported watchdog enabled, 4,000 ms timeout and reset
+cause `0x1`; minimum free monitored stack was 27,856 bytes.
 
-## Hardware reference
+One additional diagnostic attempted to continue reading after strict gap
+exceptions at half a core. It observed three gap exceptions before the SDK's
+strict cleanup left the device IDLE, ending after 1.067 s. It is retained as a
+failed diagnostic, not a 20-second capture or a relaxed acceptance pass. Its
+parser also recorded zero corruption.
+
+The service default remains 0.5 cores. A campaign controller matched only its
+own job's `/storage` mount to the returned test ID, recorded Docker quota
+before/after, and temporarily set that container's quota to 200,000 us per
+100,000 us period for the adequate-CPU runs. Submitted programs waited before
+opening serial and asserted exact `cpu.max`. CPU counters were recorded before
+and after acquisition. The service configuration and unrelated containers
+were not changed; job containers are removed by normal service cleanup.
+
+## Independent wire baseline
+
+The first 600-second combined16 wire attempt at the ordinary 0.5-core quota
+failed after approximately 350.57 seconds, job
+`5c5e293d-5829-40cb-a020-d6600b51a305`. It expected ADC sequence 692820 at tick
+2804535360, but received sequence 692821 at tick 2804539408 without a loss
+flag. The failure STATUS reported no firmware loss/error counters, and STOP
+returned IDLE. This is a failed long baseline, not a watchdog reset or a
+passing soak. The original collector did not snapshot host parser counters
+before cleanup, so the evidence cannot distinguish a rejected/corrupt frame
+from a complete frame lost in transport.
+
+The collector now retains parser counters and stream totals at the first
+failure, plus the already available failure STATUS, before cleanup changes
+those observations. A repeat with two cores allocated uses the same frozen
+production HEX and unchanged acceptance gates; its final result is recorded
+here after completion.
+
+## Local validation
+
+The initial broad run exposed allocation tracing leaking out of the accelerated
+soak tests, slowing later SDK performance checks. A direct reproduction showed
+`tracemalloc` false before those tests and true after them. Test cleanup now
+restores the caller's tracing state. Running those tests followed immediately
+by the performance tests passes: nine tests and five subtests, tracing false
+before and after. Isolated performance tests also pass on both untouched
+`e2cfbee` and current code; no performance threshold was lowered.
+
+A complete validation uses an isolated worktree containing only tracked files
+and these changes. This keeps the user's pre-existing untracked
+`doc/results/firmware-analysis-2026-09-12.md` out of the documentation scan;
+that file lacks required YAML and was left untouched. The suites pass in
+separate processes: **227 firmware tests / 836 subtests**, and **384 SDK tests /
+15,535 subtests**. One historical clock-evidence check skips in the clean
+checkout because its ignored campaign artifacts are absent; it passed in the
+original workspace run. A joint run after the tracing fix still narrowly
+missed a wall-time paced-stream threshold under workstation load (two Blender
+jobs plus a busy Python process); the unchanged check passes in the standalone
+SDK suite. These failed joint-run logs are retained. Target build/memory gates,
+focused watchdog/runner tests, Ruff and whitespace checks pass.
+
+## Reproduction and retained evidence
+
+Build current firmware with `python3 firmware/tools/build_firmware.py`. At the
+rig's default quota, isolate the SDK workload using:
+
+```bash
+python3 firmware/tools/run_input_isolation.py \
+  --worktree . \
+  --build-dir firmware/build/teensy.avr.teensy40.usb_serial.speed_450.opt_o2std \
+  --evidence-dir doc/results/raw/watchdog-sdk-next \
+  --case INPUT_COMBINED --profile 4 --seconds 60 \
+  --host-api --runtime-health --sdk-cases combined16 \
+  --service http://192.168.150.14:5000
+```
+
+For the wire baseline, omit the three SDK options, select `--seconds 600`,
+and add `--temperature`. Each submission needs a new evidence directory.
+The CPU controller and exact submitted programs are retained in the raw
+campaign directory, including the pre-acquisition quota assertion and
+job-specific Docker allocation receipt. Credentials are read from the private
+key file and are never included in evidence.
+
+[Machine-readable evidence](watchdog-sdk-20260927-evidence.json) retains job IDs,
+source/image/program hashes, CPU deltas, runtime health and failure counters.
+Full replies, programs, HEX/ELF files and manifests are under ignored
+`doc/results/raw/watchdog-sdk-20260927/`; local validation logs are under
+`firmware/build/`. Three early programming timeouts are retained as
+infrastructure failures, separate from acquisition results. No simultaneous
+board jobs or retries of ambiguous submissions were used.
+
+There was no external electrical stimulus. This campaign does not measure
+analog accuracy, external GPIO transition fidelity or pad-level simultaneity.
 
 The [NXP RT1060 reference manual, rev. 3](https://www.pjrc.com/teensy/IMXRT1060RM_rev3.pdf),
 sections 58.3.5 and 58.5.1.2, describes clock-transition delay and the RCS
-acknowledgment. The physical observations above establish this target's
-initialization timing; the previous immediate-acknowledgment fake did not.
+acknowledgment. The register probe establishes this target's observed timing.

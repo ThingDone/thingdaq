@@ -19,6 +19,10 @@ the core at 450 MHz and each ADC and GPIO input at 1 MS/s. Eight GPIO inputs
 are the default; sixteen are selectable. Profiles other than ID 4, v1
 requests, output modes, and the 4 MHz GPIO diagnostic are rejected.
 
+The later [current-main watchdog baseline and SDK CPU comparison](watchdog-sdk-20260927.md)
+fixes the watchdog initialization preflight and adds adequate-CPU SDK evidence.
+The frozen release results and historical failures below remain unchanged.
+
 ## Frozen artifact
 
 | Item | Value |
