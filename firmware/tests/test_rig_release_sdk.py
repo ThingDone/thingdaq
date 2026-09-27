@@ -22,16 +22,17 @@ def test_health_sampling_is_opt_in(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("available", "watchdog", "free", "failure"),
+    ("available", "watchdog", "timeout", "free", "failure"),
     (
-        (True, True, 28664, None),
-        (True, False, 28664, "watchdog not enabled/validated"),
-        (False, True, 0, "stack watermark unavailable"),
-        (True, True, 0, "stack watermark exhausted"),
+        (True, False, 0, 28664, None),
+        (True, True, 4000, 28664, "watchdog unexpectedly enabled"),
+        (True, False, 4000, 28664, "disabled watchdog has timeout"),
+        (False, False, 0, 0, "stack watermark unavailable"),
+        (True, False, 0, 0, "stack watermark exhausted"),
     ),
 )
 def test_health_retains_observation_before_acceptance(
-    monkeypatch, capsys, available, watchdog, free, failure
+    monkeypatch, capsys, available, watchdog, timeout, free, failure
 ):
     monkeypatch.setenv("AUX_INPUT_RUNTIME_HEALTH", "1")
     health = RuntimeHealth(
@@ -41,7 +42,7 @@ def test_health_retains_observation_before_acceptance(
         stack_min_free_bytes=free,
         stack_max_used_bytes=34432 - free if available else 0,
         reset_cause=1,
-        watchdog_timeout_ms=4000 if watchdog else 0,
+        watchdog_timeout_ms=timeout,
     )
     daq = SimpleNamespace(get_runtime_health=lambda: health)
     evidence = {}

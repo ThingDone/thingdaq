@@ -53,7 +53,9 @@ void setup() {
   // Do not initialize the Arduino serial facade, wait for DTR, or emit a
   // banner. Both ADC modules are explicitly reconfigured and independently
   // calibrated under a DWT deadline before the bounded BOOT completion.
-  (void)thingdaq::watchdog::begin();
+  // Temporarily leave the watchdog uninitialized while the intermittent ADC
+  // fault remains unresolved; see doc/results/watchdog-disabled-20260927.md.
+  // (void)thingdaq::watchdog::begin();
   (void)firmware_runtime.begin(thingdaq::usb::hardwareSerialNumber());
 }
 

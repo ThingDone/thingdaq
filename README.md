@@ -13,9 +13,15 @@ lossless capture. Its queue-loss failure reproduces under a 0.5-core host quota.
 Two allocated cores pass short captures, width transitions and a 600-second
 SDK repeat, but another SDK attempt timed out after 50.08 seconds with firmware
 ADC DMA error counters and zero host throttling. The independent wire validator
-also passes a 600-second current-firmware baseline with two cores. See the
+also passed a 600-second watchdog-enabled firmware baseline with two cores. See the
 [current watchdog baseline and SDK CPU comparison](doc/results/watchdog-sdk-20260927.md).
 Strict loss detection remains enabled; historical parser rejections remain unexplained.
+
+Watchdog initialization is temporarily disabled in current firmware while the
+intermittent ADC fault remains unresolved. A disabled-watchdog build passed a
+600-second SDK capture, but watchdog causation is unproven. Runtime health
+reports watchdog disabled and timeout zero; reset cause is not captured while
+initialization is skipped. See the [decision and test evidence](doc/results/watchdog-disabled-20260927.md).
 
 ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,
 loss-visible acquisition on the Teensy 4.0 platform. It captures two

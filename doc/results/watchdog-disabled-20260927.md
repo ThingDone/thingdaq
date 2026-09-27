@@ -12,11 +12,35 @@ related:
 
 # SDK capture with watchdog initialization disabled
 
+## Current decision
+
+After this comparison, watchdog initialization is temporarily disabled in
+current production source at the user's direction. `setup()` skips
+`watchdog::begin()`; the guarded main-loop `refresh()` call remains but performs
+no peripheral write. The SDK rig preflight now requires watchdog disabled and
+timeout zero, while retaining stack, parser, and loss checks. Reset-cause
+capture is also inactive, so its zero value is not reset-register evidence.
+
+This is a temporary operating decision, not a demonstrated fix. The
+intermittent ADC fault's cause remains unproven; neither watchdog overhead nor
+host CPU contention has been established as its trigger. Further investigation
+is deferred. The experiment and restoration results below describe the earlier
+test sequence; no additional hardware run accompanied this source-policy change.
+
+The source-policy change passed the pinned firmware build, 24 focused tests
+with 773 subtests (rig health acceptance, watchdog adapter, runtime health,
+source boundaries, and documentation), Ruff, and whitespace checks. Build
+`thingdaq-b86c963eb8e1c895` retains 34,464 bytes for RAM1 locals/stack and
+4,096 bytes of RAM2 heap margin. Disassembly confirms no watchdog call in setup.
+
+## Experiment scope
+
 This diagnostic tests whether the combined 16-input SDK capture reproduces
 the previously observed ADC acquisition fault when watchdog initialization is
 omitted. See the [preceding campaign](watchdog-sdk-20260927.md) for the
 50.084-second failure and the subsequent 600-second pass with the watchdog
-enabled. This comparison does not change the production watchdog policy.
+enabled. The comparison initially restored the enabled firmware; the subsequent
+source-policy decision is recorded above.
 
 ## Controlled change
 

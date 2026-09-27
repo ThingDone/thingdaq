@@ -14,6 +14,11 @@ related:
 
 # Firmware runtime hardening review
 
+The watchdog integration below is historical: current source temporarily
+skips initialization under the [September 27 decision](watchdog-disabled-20260927.md).
+Runtime health now reports watchdog disabled with zero timeout; stack
+monitoring and independent poll bounds remain active.
+
 Three independent investigations reviewed watchdog/poll bounds, interrupt
 synchronization, and vector/storage ownership. The integrating review added
 stack instrumentation and the complete firmware-to-Python command path.
@@ -61,7 +66,8 @@ import time
 health = daq.get_runtime_health()
 print(json.dumps({"time": time.time(), **asdict(health)}), flush=True)
 assert health.stack_available
-assert health.watchdog_enabled
+assert not health.watchdog_enabled  # Current temporary firmware policy.
+assert health.watchdog_timeout_ms == 0
 ```
 
 Record a baseline after connection, samples during the workload, and a final

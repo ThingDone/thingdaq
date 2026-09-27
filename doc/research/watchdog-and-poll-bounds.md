@@ -13,6 +13,12 @@ related:
 
 # Runtime watchdog and independent poll bounds
 
+Current firmware temporarily skips watchdog initialization; see the
+[decision and comparison](../results/watchdog-disabled-20260927.md).
+The adapter described below remains available, but watchdog recovery and
+reset-cause capture are inactive until its initialization call is restored.
+Independent poll bounds remain active.
+
 The firmware audit confirmed that there was no application watchdog setup or
 refresh. Five hardware waits depended only on DWT advancing: GPIO stop,
 single-bank and dual-bank GPIO capture diagnostics, GPIO clock measurement,
@@ -26,7 +32,7 @@ ADC alignment returns its existing invalid-pipeline result. Clock measurement
 reports `DwtUnavailable` and still disables PIT, DMA requests and XBAR requests.
 No bounded wait refreshes the watchdog.
 
-## RTWDOG configuration
+## RTWDOG configuration when enabled
 
 `firmware/src/watchdog_teensy.cpp` configures WDOG3 with a nominal four-second
 timeout. It uses clock selector 1, the 256 prescaler and 512 counter ticks.
@@ -54,8 +60,8 @@ fails closed; see the [current baseline report](../results/watchdog-sdk-20260927
 verifies configuration and timeout readback before enabling refreshes. The
 configured 32-bit command mode makes each refresh one peripheral write.
 
-The main loop refreshes only after a cooperative runtime service iteration
-returns. WAIT and STOP operation are enabled; debug-halt operation is disabled
+When initialization is enabled, the main loop refreshes only after a cooperative
+runtime service iteration returns. WAIT and STOP operation are enabled; debug-halt operation is disabled
 to permit debugging. There is no ISR feed or timer feed that could hide a
 blocked main loop. Setup enables the watchdog before runtime initialization;
 earlier core startup and C++ constructors are outside this coverage.

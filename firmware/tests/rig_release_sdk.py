@@ -46,7 +46,9 @@ def sample_health(daq, evidence, phase):
     evidence.setdefault("runtime_health", []).append(row)
     print("EVENT " + json.dumps(row, sort_keys=True), flush=True)
     assert health.stack_available, f"stack watermark unavailable at {phase}"
-    assert health.watchdog_enabled, f"watchdog not enabled/validated at {phase}"
+    # Current firmware deliberately skips watchdog initialization.
+    assert not health.watchdog_enabled, f"watchdog unexpectedly enabled at {phase}"
+    assert health.watchdog_timeout_ms == 0, f"disabled watchdog has timeout at {phase}"
     assert health.stack_min_free_bytes > 0, f"stack watermark exhausted at {phase}"
 
 
