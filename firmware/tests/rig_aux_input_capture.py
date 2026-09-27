@@ -3427,11 +3427,29 @@ def run_acceptance(
     except Exception as error:  # noqa: BLE001 - remote evidence must retain diagnosis
         evidence.failures.append(f"{type(error).__name__}: {error}")
         emit_event("fatal", error=evidence.failures[-1])
+        # Snapshot before cleanup consumes additional frames or resynchronizes.
+        # A rejected wire frame can surface first as a subsequent sequence gap.
+        metrics["failure_parser"] = {
+            name: getattr(link.parser, name)
+            for name in (
+                "bytes_received",
+                "frames_decoded",
+                "header_errors",
+                "checksum_errors",
+                "payload_errors",
+                "bytes_discarded",
+                "high_water_bytes",
+            )
+        }
+        if validator is not None:
+            metrics["failure_adc"] = vars(validator.adc).copy()
+            metrics["failure_gpio"] = vars(validator.gpio).copy()
         try:
             failure_frame, _ = link.exchange(
                 GET_STATUS_REQUEST, on_data=lambda _frame: None
             )
-            emit_event("failure_status", values=decode_status(failure_frame).values)
+            metrics["failure_status"] = decode_status(failure_frame).values
+            emit_event("failure_status", values=metrics["failure_status"])
         except Exception as status_error:  # noqa: BLE001 - cleanup must still run
             emit_event("failure_status_unavailable", error=str(status_error))
     finally:

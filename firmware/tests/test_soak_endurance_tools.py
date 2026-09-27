@@ -1622,6 +1622,15 @@ class SoakValidatorFailureTests(unittest.TestCase):
 
 
 class AcceleratedCampaignTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Generated runners leave boundary tracing active at exit. Restore the
+        # caller's state so later throughput tests measure the normal parser.
+        tracing = canonical_validator.tracemalloc
+        if tracing.is_tracing():
+            self.addCleanup(tracing.start, tracing.get_traceback_limit())
+        else:
+            self.addCleanup(tracing.stop)
+
     def test_failure_retains_active_epoch_and_host_pressure_evidence(self) -> None:
         rig = _load_module(
             GENERATED_DIRECTORY / generator.OUTPUTS["physical-combined"],

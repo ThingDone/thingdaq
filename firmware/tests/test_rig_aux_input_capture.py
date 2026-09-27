@@ -540,6 +540,11 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
                     expected,
                     " ".join(result.evidence.failures).lower(),
                 )
+                self.assertIn("failure_parser", result.metrics)
+                self.assertIn("checksum_errors", result.metrics["failure_parser"])
+                if fault == "loss":
+                    self.assertIn("failure_status", result.metrics)
+                    self.assertIn("expected_sequence", result.metrics["failure_adc"])
 
     def test_skew_wrong_mapping_and_saturation_fake_runs_are_rejected(self) -> None:
         case = rig.RUN_CASES["INPUT_COMBINED"]
