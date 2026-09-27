@@ -1,0 +1,85 @@
+{
+  "runs": [
+    {
+      "name": "current-preflight",
+      "test_id": "f73d888a-1812-4bf8-800f-97a363d5dbee",
+      "program_success": true,
+      "exit_code": 1,
+      "evidence": [
+        {
+          "cause": "None",
+          "cells": [],
+          "cpu.max": "50000 100000\n",
+          "cpu.stat": "usage_usec 499449\nuser_usec 472799\nsystem_usec 26650\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 9\nnr_throttled 9\nthrottled_usec 421268\nnr_bursts 0\nburst_usec 0\n",
+          "cpu.stat.after": "usage_usec 517330\nuser_usec 489633\nsystem_usec 27696\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 12\nnr_throttled 9\nthrottled_usec 421268\nnr_bursts 0\nburst_usec 0\n",
+          "electrical_stimulus": "NOT_CONNECTED",
+          "error": "AssertionError: watchdog not enabled/validated at idle",
+          "recovery": "None",
+          "result": "FAIL",
+          "runtime_health": [
+            {
+              "phase": "idle",
+              "reset_cause": 1,
+              "stack_available": true,
+              "stack_max_used_bytes": 5768,
+              "stack_min_free_bytes": 28664,
+              "stack_total_bytes": 34432,
+              "watchdog_enabled": false,
+              "watchdog_timeout_ms": 0
+            }
+          ],
+          "validator": "public-sdk"
+        }
+      ]
+    },
+    {
+      "name": "fixed-controls-half",
+      "test_id": "18faff96-9f4c-4b3f-b52a-b1654adfb81a",
+      "program_success": false,
+      "exit_code": -130,
+      "evidence": []
+    },
+    {
+      "name": "fixed-controls-half-retry",
+      "test_id": "5ccf0cae-b608-418b-997d-6346d3080423",
+      "program_success": false,
+      "exit_code": -130,
+      "evidence": []
+    },
+    {
+      "name": "probe-fixed-reset",
+      "test_id": "f8d87f59-512d-4f51-a5df-7f9a16ec0597",
+      "program_success": true,
+      "exit_code": 0,
+      "evidence": [
+        {
+          "result": "PASS",
+          "before": "PROBE serial=1780475611 before=00002520 after=000035a3 toval=512 later=000035a3 enabled=1 reset=00000001 cycles=12335804",
+          "stall": "PROBE serial=1780475611 before=00002520 after=000035a3 toval=512 later=000035a3 enabled=1 reset=00000001 cycles=12335804",
+          "disconnect_seconds": 4.13511628517881,
+          "after": "PROBE serial=1780475611 before=00002520 after=000035a3 toval=512 later=000035a3 enabled=1 reset=00000080 cycles=12340286",
+          "reconnect_seconds": 4.659824534319341
+        }
+      ]
+    },
+    {
+      "name": "probe-original",
+      "test_id": "196bf294-0837-43c6-8b3c-2c0cafbc42a3",
+      "program_success": false,
+      "exit_code": -130,
+      "evidence": []
+    },
+    {
+      "name": "probe-original-retry",
+      "test_id": "23faba53-0f63-407a-a6e6-553172d33da3",
+      "program_success": true,
+      "exit_code": 0,
+      "evidence": [
+        {
+          "result": "PASS",
+          "probe": "PROBE serial=1780475611 before=00002520 after=000031a3 toval=512 later=000035a3 enabled=0 reset=00000001"
+        }
+      ]
+    }
+  ]
+}

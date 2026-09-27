@@ -14,7 +14,12 @@ namespace {
 constexpr std::uint32_t kClockHz = 32768U;
 constexpr std::uint32_t kPrescaler = 256U;
 constexpr std::uint32_t kTimeoutTicks = 512U;
-constexpr std::uint32_t kConfigurationPollLimit = 100000U;
+// RCS crosses into the selected watchdog clock domain. With the /256
+// prescaler it can arrive milliseconds after the register writes/readback.
+// Keep an independent bound (no DWT dependency), with ample margin at the
+// supported 450/600 MHz CPU clocks. The original 100,000 polls expired on
+// hardware before RCS, leaving an enabled watchdog that was never refreshed.
+constexpr std::uint32_t kConfigurationPollLimit = 2000000U;
 constexpr std::uint32_t kUnlock = 0xD928C520U;
 constexpr std::uint32_t kRefresh = 0xB480A602U;
 constexpr std::uint32_t kConfiguration =

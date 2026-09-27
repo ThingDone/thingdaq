@@ -43,6 +43,7 @@ class WatchdogTests(unittest.TestCase):
                 "narrow",
                 "wide",
                 "masked",
+                "delayed-config",
                 "unlock-failure",
                 "config-failure",
             ):

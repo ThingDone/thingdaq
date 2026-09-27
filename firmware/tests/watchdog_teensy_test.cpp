@@ -13,6 +13,7 @@ int main(int argc, char **argv) {
   fake_watchdog::control = mode == "wide" ? WDOG_CS_CMD32EN : 0U;
   fake_watchdog::accept_unlock = mode != "unlock-failure";
   fake_watchdog::accept_configuration = mode != "config-failure";
+  fake_watchdog::configuration_delay_reads = mode == "delayed-config" ? 150000U : 0U;
   SRC_SRSR = 0x181U;
   SRC_SCR = 0x50001234U;
   fake_imxrt::interrupts_enabled = mode != "masked";
@@ -27,7 +28,7 @@ int main(int argc, char **argv) {
   assert(SRC_SRSR == 0x81U);
   assert(SRC_SCR == 0xA0001234U);
   assert(thingdaq::watchdog::timeoutMs() == 4000U);
-  assert(fake_watchdog::reads <= 100020U);
+  assert(fake_watchdog::reads <= 2000020U);
 
   const auto writes_before_retry = fake_imxrt::register_write_count;
   assert(thingdaq::watchdog::begin() == expected);

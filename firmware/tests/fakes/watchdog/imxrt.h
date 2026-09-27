@@ -23,6 +23,8 @@ inline bool accept_unlock = true;
 inline bool accept_configuration = true;
 inline std::uint32_t control = 0U;
 inline std::uint32_t reads = 0U;
+inline std::uint32_t configuration_delay_reads = 0U;
+inline bool configuration_pending = false;
 inline fake_imxrt::Register32 reset_cause{};
 inline fake_imxrt::Register32 reset_control{};
 inline fake_imxrt::Register32 timeout{};
@@ -31,11 +33,20 @@ inline fake_imxrt::Register32 window{};
 struct Control {
   operator std::uint32_t() const {
     ++reads;
+    if (configuration_pending && accept_configuration) {
+      if (configuration_delay_reads == 0U) {
+        control |= WDOG_CS_RCS;
+        configuration_pending = false;
+      } else {
+        --configuration_delay_reads;
+      }
+    }
     return control;
   }
   Control &operator=(std::uint32_t value) {
     fake_imxrt::recordRegisterWrite(this, value);
-    control = value | (accept_configuration ? WDOG_CS_RCS : 0U);
+    control = value;
+    configuration_pending = true;
     return *this;
   }
 };

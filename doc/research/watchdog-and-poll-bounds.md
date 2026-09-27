@@ -44,7 +44,13 @@ reset using the documented 0xA encoding.
 The unlock sequence honors the peripheral's initial 16-bit or 32-bit command
 mode. Unlock and configuration occur under the shared interrupt guard and
 within ITCM, preserving the documented 128 bus-clock configuration window.
-Both handshake waits have independent poll limits. Successful initialization
+Both handshake waits have independent poll limits. The configuration acknowledgment
+can lag successful register readback by milliseconds; the wait now permits two
+million polls. On the physical 450 MHz target, the original 100,000-poll bound
+expired with CS `0x31a3`, then CS became `0x35a3` (RCS set) later. That false
+initialization failure withheld refreshes from an already enabled watchdog.
+The bound remains independent of DWT, and an unacknowledged configuration still
+fails closed; see the [current baseline report](../results/watchdog-sdk-20260927.md). Successful initialization
 verifies configuration and timeout readback before enabling refreshes. The
 configured 32-bit command mode makes each refresh one peripheral write.
 
@@ -58,7 +64,8 @@ earlier core startup and C++ constructors are outside this coverage.
 
 The host register test executes the actual watchdog adapter with simulated
 registers. It covers both initial command widths, preservation of an already
-masked caller, failure to unlock, failure to accept configuration, stable
+masked caller, failure to unlock, delayed acknowledgment beyond the old bound, failure to
+accept configuration, stable
 reset-cause capture, idempotent initialization, and exactly one refresh write.
 Both failed handshakes terminate without relying on a clock. GPIO diagnostic
 and ADC portable tests continue to exercise their existing timeout/error
