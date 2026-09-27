@@ -36,6 +36,10 @@ Historical checksum/parser rejections were **not reproduced**; their cause
 remains unresolved. The adequate-CPU failure below is a distinct observed
 failure mode, not proof of the cause of those historical rejections.
 
+The subsequent [watchdog-disabled comparison](watchdog-disabled-20260927.md)
+tests a temporary build that omits watchdog initialization, with the same SDK
+and a verified two-core quota.
+
 ## Frozen production image
 
 | Item | Value |
