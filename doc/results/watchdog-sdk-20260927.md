@@ -23,13 +23,16 @@ captures also passed with adequate CPU allocation.
 
 The separate SDK reproduction found firmware USB queue loss at the normal
 0.5-core quota, both from a cold combined 16-input start and after the original
-five-mode sequence. Allocating two cores to the same test container eliminated
-the reproduced failure: a 60-second cold capture and seven 20-second mode cells
-passed, including 8 → 16 → 8 → 16 combined-input transitions. All adequate-CPU
-captures had zero throttling, parser errors, host queue drops and observed loss.
+five-mode sequence. Allocating two cores passed a 60-second cold capture and seven
+20-second cells, including 8 → 16 → 8 → 16 combined-input transitions. However,
+a subsequent planned 600-second SDK capture **failed after 50.084 seconds with
+zero CPU throttling**: a block timeout, two firmware ADC DMA error events and
+an IDLE firmware state. Adequate CPU allocation does not eliminate every
+combined16 failure. Sustained SDK operation remains unqualified.
+
 Historical checksum/parser rejections were **not reproduced**; their cause
-remains unresolved. This result does not attribute those historical errors to
-CPU throttling or qualify every possible host.
+remains unresolved. The adequate-CPU failure below is a distinct observed
+failure mode, not proof of the cause of those historical rejections.
 
 ## Frozen production image
 
@@ -87,6 +90,7 @@ outside this campaign.
 | `dc179cd7-833d-46c0-9ba0-25d55cb845fb` | Cold combined16, 60 s | 2.0 | PASS |
 | `82209c47-6492-48c8-8ab7-2436cd967fba` | Original five cells, 5 s each | 0.5 | First four PASS; combined16 FAIL at 1.483 s |
 | `dc300634-1597-4e8c-9c69-851f262c2e1d` | ADC, GPIO8, combined8, GPIO16, combined16, combined8, combined16; 20 s each | 2.0 | All seven PASS |
+| `775fe2fc-d3db-45cc-8790-9775715ddff6` | Cold combined16, planned 600 s | 2.0 | FAIL at 50.084 s; block timeout and firmware ADC DMA errors |
 
 The first failed snapshot had 28 packet-pressure evictions (21 ADC, 7 GPIO);
 the transition failure snapshot had 253 (201 ADC, 52 GPIO). Both had zero raw
@@ -95,12 +99,37 @@ can include losses after the first gap that triggered strict failure. The
 first gap itself was 19 ADC frames; the sequence failure first reported 74.
 CPU throttling increased in both half-core failures.
 
-The adequate-CPU runs observed **zero throttled periods and microseconds**,
+Both short adequate-CPU jobs observed **zero throttled periods and microseconds**,
 with affinity to all four host CPUs. Combined16 consumed about 0.66 CPU cores
 on average, versus about 0.46 for combined8. The seven-cell run recorded
 CPython 3.13.15 on Linux x86-64. Its 22 runtime-health samples and the cold
 run's four samples all reported watchdog enabled, 4,000 ms timeout and reset
 cause `0x1`; minimum free monitored stack was 27,856 bytes.
+
+### Failure with adequate CPU
+
+Job `775fe2fc-d3db-45cc-8790-9775715ddff6` retained `cpu.max = 200000 100000`,
+affinity to all four CPUs, and zero throttled periods/microseconds both before
+and after its failure. It used 33.107 process CPU seconds in 50.084 wall
+seconds. `read_block(timeout=1)` raised `BlockTimeoutError` after the stream
+ceased; the reader had an empty queue, no disconnect, no parser error and no
+host queue loss. STATUS remained responsive and reported IDLE with
+`adc_dma_error_events = 2`, no packet-pressure evictions, and bounded stop
+tails of 45 ADC pairs and 543 GPIO samples.
+
+The SDK does not issue STOP for a block-wait timeout; this STATUS sample was
+taken before context-manager cleanup. The firmware runtime independently
+recovers physical faults to IDLE. The ADC adapter's DMA error counter also
+covers paired-pipeline alignment/service-budget failures, so the two events do
+not identify a physical DMA bus error or the exact triggering branch. Raw
+DMA/pipeline register state was not captured. This is firmware-side fault
+evidence encountered through the SDK workload, not a proven SDK parser bug.
+
+This run had a bounded on-error hook to retain up to four rejected frame byte
+sequences while calling the original parser error handler. It changes no
+successful-frame path or acceptance rule; an offline corruption/recovery test
+verified its behavior. The hook never fired (`rejected_frames = []`). A repeat
+using the unmodified standard collector is recorded when complete.
 
 One additional diagnostic attempted to continue reading after strict gap
 exceptions at half a core. It observed three gap exceptions before the SDK's

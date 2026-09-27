@@ -22,10 +22,12 @@ per-sample timestamps. Historical simulator profiles remain available offline
 and do not imply release hardware support.
 
 Physical SDK validation passes ADC-only, GPIO-only (8/16 inputs), and combined
-8-input capture on the remote test server. Combined ADC + 16-GPIO capture
-reproduces firmware USB queue loss under its 0.5-core CPU quota. With two cores
-allocated, the current firmware/SDK passed 60 seconds of combined 16-input
-capture and repeated 8/16-input transitions with zero throttling or loss.
+8-input capture on the remote test server. Combined16 reproduces firmware USB
+queue loss under its 0.5-core CPU quota. Two allocated cores pass short captures
+and width transitions, but a longer SDK attempt timed out after 50.08 seconds
+with two firmware ADC DMA error events and zero CPU throttling. Sustained
+combined16 SDK operation therefore remains unqualified. The independent wire
+validator passes 600 seconds with two cores on the same firmware.
 Historical parser rejections were not reproduced; their cause remains unresolved.
 See the [current baseline and CPU comparison](../doc/results/watchdog-sdk-20260927.md).
 Keep strict loss checking enabled and validate the intended host.
