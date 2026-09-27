@@ -16,9 +16,10 @@ related:
 The watchdog preflight failure is fixed. The original initialization deadline
 expired before hardware acknowledged a successfully written configuration;
 refreshes were then withheld from an enabled watchdog. The repaired adapter
-passed a deliberate main-loop stall/reset/reconnect test. Production firmware
-passed the four previously healthy SDK modes, and combined 16-input SDK
-capture also passed with adequate CPU allocation.
+passed a deliberate main-loop stall/reset/reconnect test. The current firmware
+passed a **600-second combined16 independent wire baseline with two cores
+allocated**, plus the four previously healthy SDK modes. Combined16 SDK
+captures also passed with adequate CPU allocation.
 
 The separate SDK reproduction found firmware USB queue loss at the normal
 0.5-core quota, both from a cold combined 16-input start and after the original
@@ -118,7 +119,7 @@ were not changed; job containers are removed by normal service cleanup.
 ## Independent wire baseline
 
 The first 600-second combined16 wire attempt at the ordinary 0.5-core quota
-failed after approximately 350.57 seconds, job
+failed at approximately 350.57 seconds of stream time, job
 `5c5e293d-5829-40cb-a020-d6600b51a305`. It expected ADC sequence 692820 at tick
 2804535360, but received sequence 692821 at tick 2804539408 without a loss
 flag. The failure STATUS reported no firmware loss/error counters, and STOP
@@ -129,9 +130,30 @@ from a complete frame lost in transport.
 
 The collector now retains parser counters and stream totals at the first
 failure, plus the already available failure STATUS, before cleanup changes
-those observations. A repeat with two cores allocated uses the same frozen
-production HEX and unchanged acceptance gates; its final result is recorded
-here after completion.
+those observations. The repeat with two cores allocated **passed 600.008 s**,
+job `b11e3c2f-d98f-4c87-a65c-dceafa67ed4f`, using the same frozen production HEX
+and unchanged acceptance gates: 131 checks, no failures, no parser/stream loss,
+matched paired-bank conservation and clean STOP.
+
+| Wire baseline measurement | Result |
+| --- | ---: |
+| ADC pair rate | 999,999.755 pairs/s |
+| GPIO rate | 1,000,000.598 samples/s |
+| Accepted ADC / GPIO frames | 1,186,321 / 296,580 |
+| Paired samples captured, joined and transmitted | 600,277,920 each |
+| STATUS observations / p99 latency | 1,201 / 11.02 ms |
+| Maximum host receive gap | 20.80 ms |
+| Packet ready / transmit high water | 3 / 7 |
+| GPIO processing CPU | 17.06% |
+| Host peak RSS growth | 0 bytes |
+| Bounded STOP tails, ADC pairs / GPIO samples | 422 / 1,023 |
+| Die temperature range | 44.036–55.088 °C |
+
+The wire repeat's CPU receipt records the two-core quota. A mid-run snapshot
+had one throttled period totaling 22,246 us, unchanged in a later observation;
+its timing relative to initial quota adjustment was not captured. The SDK
+comparisons independently retain before/after CPU deltas. This passing baseline
+does **not** turn the failed half-core soak into a pass.
 
 ## Local validation
 
