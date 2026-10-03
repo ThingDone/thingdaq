@@ -440,6 +440,7 @@ def _configuration_from_arguments(
         "adler32": constants.ChecksumAlgorithm.ADLER32,
         "crc32c": constants.ChecksumAlgorithm.CRC32C,
         "crc32-iso-hdlc": constants.ChecksumAlgorithm.CRC32_ISO_HDLC,
+        "adler32-dual-lane": constants.ChecksumAlgorithm.ADLER32_DUAL_LANE,
     }
     stream_mask = stream_masks[arguments.streams]
     checksum = checksum_algorithms[arguments.checksum]

@@ -165,7 +165,9 @@ static_assert(kMetadata.supported_checksum_mask ==
                (1U << static_cast<std::uint8_t>(
                           protocol_v1::ChecksumAlgorithm::kCrc32c)) |
                (1U << static_cast<std::uint8_t>(
-                          protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc))));
+                          protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc)) |
+               (1U << static_cast<std::uint8_t>(
+                          protocol_v1::ChecksumAlgorithm::kAdler32DualLane))));
 static_assert((kMetadata.supported_checksum_mask &
                (1U << static_cast<std::uint8_t>(
                     protocol_v1::kDefaultChecksumAlgorithm))) != 0U);

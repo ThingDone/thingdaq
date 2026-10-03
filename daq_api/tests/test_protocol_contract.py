@@ -72,6 +72,7 @@ class ProtocolContractTests(unittest.TestCase):
         self.assertEqual(1, constants.ChecksumAlgorithm.ADLER32)
         self.assertEqual(2, constants.ChecksumAlgorithm.CRC32C)
         self.assertEqual(3, constants.ChecksumAlgorithm.CRC32_ISO_HDLC)
+        self.assertEqual(4, constants.ChecksumAlgorithm.ADLER32_DUAL_LANE)
         self.assertEqual(
             constants.ChecksumAlgorithm.ADLER32,
             constants.BOOTSTRAP_CHECKSUM_ALGORITHM,
@@ -90,11 +91,12 @@ class ProtocolContractTests(unittest.TestCase):
                     constants.ChecksumAlgorithm.ADLER32,
                     constants.ChecksumAlgorithm.CRC32C,
                     constants.ChecksumAlgorithm.CRC32_ISO_HDLC,
+                    constants.ChecksumAlgorithm.ADLER32_DUAL_LANE,
                 }
             ),
             constants.SUPPORTED_CHECKSUM_ALGORITHMS,
         )
-        self.assertEqual(0b1110, constants.SUPPORTED_CHECKSUM_MASK)
+        self.assertEqual(0b11110, constants.SUPPORTED_CHECKSUM_MASK)
         self.assertTrue(
             constants.SUPPORTED_CHECKSUM_MASK
             & (1 << int(constants.DEFAULT_CHECKSUM_ALGORITHM))

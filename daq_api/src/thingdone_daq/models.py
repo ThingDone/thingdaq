@@ -1920,11 +1920,10 @@ class ChecksumBenchmarkResult:
             "cache_setup_cycles",
         ):
             _unsigned(name, getattr(self, name), 64)
-        expected_table_bytes = (
-            0
-            if self.request.checksum_algorithm is constants.ChecksumAlgorithm.ADLER32
-            else 8192
-        )
+        expected_table_bytes = 0 if self.request.checksum_algorithm in (
+            constants.ChecksumAlgorithm.ADLER32,
+            constants.ChecksumAlgorithm.ADLER32_DUAL_LANE,
+        ) else 8192
         calibrated_overhead = self.request.operations * self.timer_overhead_cycles
         if (
             self.buffer_bytes != self.request.buffer_bytes

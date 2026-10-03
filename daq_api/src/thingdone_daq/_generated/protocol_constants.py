@@ -1,14 +1,14 @@
 """Generated protocol-v1 constants. Do not edit by hand.
 
 Source: protocol/protocol-v1.json
-Source SHA-256: 014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222
+Source SHA-256: 6f3620263efdb5620ae746eb89bb020f534e91af378739c7a254f55bf2ca8413
 """
 
 from __future__ import annotations
 
 from enum import IntEnum, IntFlag
 
-SOURCE_SHA256 = "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+SOURCE_SHA256 = "6f3620263efdb5620ae746eb89bb020f534e91af378739c7a254f55bf2ca8413"
 MAGIC = 0xDEADBEEF
 MAGIC_BYTES = b"\xef\xbe\xad\xde"
 PROTOCOL_VERSION = 1
@@ -200,6 +200,7 @@ class ChecksumAlgorithm(IntEnum):
     ADLER32 = 1
     CRC32C = 2
     CRC32_ISO_HDLC = 3
+    ADLER32_DUAL_LANE = 4
 
 
 class ResponseStatus(IntEnum):
@@ -436,10 +437,11 @@ SUPPORTED_CHECKSUM_ALGORITHMS = frozenset(
         ChecksumAlgorithm.ADLER32,
         ChecksumAlgorithm.CRC32C,
         ChecksumAlgorithm.CRC32_ISO_HDLC,
+        ChecksumAlgorithm.ADLER32_DUAL_LANE,
     }
 )
 
-SUPPORTED_CHECKSUM_MASK = 14
+SUPPORTED_CHECKSUM_MASK = 30
 KNOWN_FRAME_FLAG_MASK = 32783
 KNOWN_CAPABILITY_MASK = 511
 KNOWN_CONFIGURATION_PROFILE_MASK = 63

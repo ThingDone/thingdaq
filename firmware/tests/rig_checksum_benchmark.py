@@ -79,15 +79,22 @@ CRC32C_ORACLE_DRAIN_MARGIN_FRAMES = (
 CHECKSUM_ADLER32 = 1
 CHECKSUM_CRC32C = 2
 CHECKSUM_CRC32_ISO_HDLC = 3
+CHECKSUM_ADLER32_DUAL_LANE = 4
 BOOTSTRAP_CHECKSUM = CHECKSUM_ADLER32
 SUPPORTED_CHECKSUMS = frozenset(
-    {CHECKSUM_ADLER32, CHECKSUM_CRC32C, CHECKSUM_CRC32_ISO_HDLC}
+    {
+        CHECKSUM_ADLER32,
+        CHECKSUM_CRC32C,
+        CHECKSUM_CRC32_ISO_HDLC,
+        CHECKSUM_ADLER32_DUAL_LANE,
+    }
 )
 SUPPORTED_CHECKSUM_MASK = sum(1 << value for value in SUPPORTED_CHECKSUMS)
 CHECKSUM_NAMES = {
     CHECKSUM_ADLER32: "ADLER32",
     CHECKSUM_CRC32C: "CRC32C",
     CHECKSUM_CRC32_ISO_HDLC: "CRC32_ISO_HDLC",
+    CHECKSUM_ADLER32_DUAL_LANE: "ADLER32_DUAL_LANE",
 }
 
 TIMESTAMP_HZ = 8_000_000
@@ -267,6 +274,13 @@ EXPECTED_VECTOR_CHECKSUMS = {
         VECTOR_BUFFER_512: 0xC4E2FF01,
         VECTOR_FRAME_COVERAGE: 0x4F2DE54E,
     },
+    CHECKSUM_ADLER32_DUAL_LANE: {
+        VECTOR_EMPTY: 0x00000001,
+        VECTOR_CANONICAL_123456789: 0x091E01DE,
+        VECTOR_BUFFER_64: 0xF7ED2021,
+        VECTOR_BUFFER_512: 0xC4E2FF01,
+        VECTOR_FRAME_COVERAGE: 0x7F03E551,
+    },
     CHECKSUM_CRC32C: {
         VECTOR_EMPTY: 0x00000000,
         VECTOR_CANONICAL_123456789: 0xE3069283,
@@ -339,7 +353,7 @@ def _reference_reflected_crc32(data: bytes, polynomial: int) -> int:
 def reference_checksum(data: bytes, algorithm: int) -> int:
     """Compute vectors through an intentionally slow bitwise reference."""
 
-    if algorithm == CHECKSUM_ADLER32:
+    if algorithm in (CHECKSUM_ADLER32, CHECKSUM_ADLER32_DUAL_LANE):
         return _reference_adler32(data)
     if algorithm == CHECKSUM_CRC32C:
         return _reference_reflected_crc32(data, 0x82F63B78)
@@ -392,7 +406,7 @@ def compute_checksum(
 ) -> int:
     """Compute exactly the named wire variant for continuous trailer checks."""
 
-    if algorithm == CHECKSUM_ADLER32:
+    if algorithm in (CHECKSUM_ADLER32, CHECKSUM_ADLER32_DUAL_LANE):
         return zlib.adler32(data, 1) & 0xFFFFFFFF
     if algorithm == CHECKSUM_CRC32C:
         return _table_crc32(data, CRC32C_TABLE)
@@ -1410,9 +1424,10 @@ def decode_benchmark_measurement(
         target_framed_bytes_per_second=_u32(payload, 92),
     )
     operations = selection.operations
-    expected_table_bytes = (
-        0 if selection.checksum_algorithm == CHECKSUM_ADLER32 else 8_192
-    )
+    expected_table_bytes = 0 if selection.checksum_algorithm in (
+        CHECKSUM_ADLER32,
+        CHECKSUM_ADLER32_DUAL_LANE,
+    ) else 8_192
     calibrated_overhead = operations * measurement.timer_overhead_cycles
     expected_digest = expected_benchmark_digest(
         EXPECTED_VECTOR_CHECKSUMS[selection.checksum_algorithm][selection.vector],

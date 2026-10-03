@@ -164,6 +164,7 @@ trailer:
 | 1 | `ADLER32` | Enabled; fixed bootstrap and production data default selected by [[ADR-002-Checksum-Selection]] |
 | 2 | `CRC32C` | Enabled for negotiated data frames |
 | 3 | `CRC32_ISO_HDLC` | Enabled for negotiated data frames |
+| 4 | `ADLER32_DUAL_LANE` | Experimental RFC 1950-equivalent dual-lane implementation for negotiated data frames |
 
 Adler-32 is the RFC 1950 algorithm with initial value 1 and modulus 65,521.
 It covers every byte from the first magic byte through the final payload byte,
@@ -175,7 +176,7 @@ endian. Standard checks include Adler-32 of an empty byte string =
 The checksum detects accidental corruption and framing mistakes; it provides
 no authenticity or security. All request and response frames use bootstrap
 Adler-32, including INFO and CONFIGURE traffic before a data algorithm has
-been selected. INFO advertises checksum-mask bits 1, 2, and 3; CONFIGURE and
+been selected. INFO advertises checksum-mask bits 1, 2, 3, and 4; CONFIGURE and
 STATUS carry the selected data algorithm, and each ADC/GPIO header repeats it.
 A receiver rejects an unknown ID, a disabled ID, or a control frame labeled
 with a non-bootstrap ID before waiting for its body. CRC-32C uses reflected

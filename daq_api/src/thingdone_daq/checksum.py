@@ -146,6 +146,7 @@ _CHECKSUM_FUNCTIONS: Mapping[constants.ChecksumAlgorithm, _ChecksumFunction] = (
     MappingProxyType(
         {
             constants.ChecksumAlgorithm.ADLER32: _accelerated_adler32,
+            constants.ChecksumAlgorithm.ADLER32_DUAL_LANE: _accelerated_adler32,
             constants.ChecksumAlgorithm.CRC32C: _pure_crc32c,
             constants.ChecksumAlgorithm.CRC32_ISO_HDLC: (_accelerated_crc32_iso_hdlc),
         }
@@ -155,6 +156,7 @@ _FALLBACK_FUNCTIONS: Mapping[constants.ChecksumAlgorithm, _ChecksumFunction] = (
     MappingProxyType(
         {
             constants.ChecksumAlgorithm.ADLER32: _pure_adler32,
+            constants.ChecksumAlgorithm.ADLER32_DUAL_LANE: _pure_adler32,
             constants.ChecksumAlgorithm.CRC32C: _pure_crc32c,
             constants.ChecksumAlgorithm.CRC32_ISO_HDLC: _pure_crc32_iso_hdlc,
         }
@@ -166,6 +168,12 @@ _CHECKSUM_BACKENDS: Mapping[constants.ChecksumAlgorithm, ChecksumBackend] = (
             constants.ChecksumAlgorithm.ADLER32: ChecksumBackend(
                 algorithm=constants.ChecksumAlgorithm.ADLER32,
                 implementation="zlib.adler32",
+                accelerated=True,
+                fallback_implementation="python.adler32",
+            ),
+            constants.ChecksumAlgorithm.ADLER32_DUAL_LANE: ChecksumBackend(
+                algorithm=constants.ChecksumAlgorithm.ADLER32_DUAL_LANE,
+                implementation="zlib.adler32 (dual-lane wire-equivalent)",
                 accelerated=True,
                 fallback_implementation="python.adler32",
             ),

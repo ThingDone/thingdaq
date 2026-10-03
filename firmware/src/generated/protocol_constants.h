@@ -1,5 +1,5 @@
 // Generated from protocol/protocol-v1.json. Do not edit by hand.
-// Source SHA-256: 014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222
+// Source SHA-256: 6f3620263efdb5620ae746eb89bb020f534e91af378739c7a254f55bf2ca8413
 #pragma once
 
 #include <cstddef>
@@ -7,7 +7,7 @@
 
 namespace thingdaq::protocol_v1 {
 
-inline constexpr char kSourceSha256[] = "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222";
+inline constexpr char kSourceSha256[] = "6f3620263efdb5620ae746eb89bb020f534e91af378739c7a254f55bf2ca8413";
 inline constexpr std::uint32_t kMagic = 0xDEADBEEFU;
 inline constexpr std::uint8_t kProtocolVersion = 1U;
 inline constexpr bool kWireIsLittleEndian = true;
@@ -193,6 +193,7 @@ enum class ChecksumAlgorithm : std::uint8_t {
   kAdler32 = 1U,
   kCrc32c = 2U,
   kCrc32IsoHdlc = 3U,
+  kAdler32DualLane = 4U,
 };
 
 enum class ResponseStatus : std::uint8_t {
@@ -416,7 +417,7 @@ inline constexpr ChecksumAlgorithm kBootstrapChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
 inline constexpr ChecksumAlgorithm kDefaultChecksumAlgorithm =
     ChecksumAlgorithm::kAdler32;
-inline constexpr std::uint32_t kSupportedChecksumMask = 14U;
+inline constexpr std::uint32_t kSupportedChecksumMask = 30U;
 inline constexpr std::uint16_t kKnownFrameFlagMask = 32783U;
 inline constexpr std::uint32_t kKnownCapabilityMask = 511U;
 inline constexpr std::uint16_t kKnownConfigurationProfileMask = 63U;

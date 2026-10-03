@@ -559,9 +559,10 @@ def _validate_checksum_benchmark_response(
     max_batch_cycles = u32(
         constants.CHECKSUM_BENCHMARK_RESPONSE_MAX_BATCH_CYCLES_OFFSET
     )
-    expected_table_bytes = (
-        0 if checksum is constants.ChecksumAlgorithm.ADLER32 else 8192
-    )
+    expected_table_bytes = 0 if checksum in (
+        constants.ChecksumAlgorithm.ADLER32,
+        constants.ChecksumAlgorithm.ADLER32_DUAL_LANE,
+    ) else 8192
     expected_buffer_bytes = _benchmark_vector_bytes(vector)
     expected_processed_bytes = operations * expected_buffer_bytes
     calibrated_overhead = operations * overhead_cycles

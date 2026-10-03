@@ -483,6 +483,8 @@ def validate_contract(contract: Mapping[str, Any]) -> None:
         raise ContractError("CRC-32C must retain protocol checksum ID 2")
     if checksums.get("CRC32_ISO_HDLC") != 3:
         raise ContractError("CRC-32/ISO-HDLC must retain protocol checksum ID 3")
+    if checksums.get("ADLER32_DUAL_LANE") != 4:
+        raise ContractError("dual-lane Adler-32 must retain experimental checksum ID 4")
     if any(checksums[name] >= 32 for name in enabled_checksums):
         raise ContractError("enabled checksum IDs must fit the uint32 capability mask")
     bootstrap_checksum = contract.get("bootstrap_checksum_algorithm")

@@ -138,8 +138,19 @@ class HardwareBenchmarkDevice(SimulatedDevice):
             12: selection.buffer_bytes,
             16: rig.BENCHMARK_CYCLE_COUNTER_HZ,
             20: overhead_cycles,
-            24: 120 if selection.checksum_algorithm == rig.CHECKSUM_ADLER32 else 308,
-            28: (0 if selection.checksum_algorithm == rig.CHECKSUM_ADLER32 else 8_192),
+            24: (
+                120
+                if selection.checksum_algorithm == rig.CHECKSUM_ADLER32
+                else 260
+                if selection.checksum_algorithm == rig.CHECKSUM_ADLER32_DUAL_LANE
+                else 308
+            ),
+            28: (
+                0
+                if selection.checksum_algorithm
+                in (rig.CHECKSUM_ADLER32, rig.CHECKSUM_ADLER32_DUAL_LANE)
+                else 8_192
+            ),
             32: rig.BENCHMARK_WORKING_RAM_BYTES,
             36: rig.expected_benchmark_digest(
                 rig.EXPECTED_VECTOR_CHECKSUMS[selection.checksum_algorithm][
@@ -289,6 +300,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
             ("ADLER32", rig.CHECKSUM_ADLER32),
             ("crc32c", rig.CHECKSUM_CRC32C),
             ("CRC32-ISO-HDLC", rig.CHECKSUM_CRC32_ISO_HDLC),
+            ("adler32-dual-lane", rig.CHECKSUM_ADLER32_DUAL_LANE),
             ("0x2", rig.CHECKSUM_CRC32C),
         ):
             with (
@@ -317,7 +329,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
 
     def test_vectors_and_profile_matrix_are_fixed_and_bounded(self) -> None:
         records = rig.validate_independent_vectors()
-        self.assertEqual(15, len(records))
+        self.assertEqual(20, len(records))
         self.assertEqual(
             0xE3069283,
             rig.reference_checksum(b"123456789", rig.CHECKSUM_CRC32C),
@@ -548,9 +560,9 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
 
         report = output.getvalue()
         self.assertEqual(0, exit_code, report)
-        self.assertEqual(15, report.count('"event":"independent_vector"'))
-        self.assertEqual(42, report.count('"event":"device_checksum_benchmark"'))
-        self.assertEqual(3, report.count("CANDIDATE "))
+        self.assertEqual(20, report.count('"event":"independent_vector"'))
+        self.assertEqual(56, report.count('"event":"device_checksum_benchmark"'))
+        self.assertEqual(4, report.count("CANDIDATE "))
         self.assertIn(
             '"firmware_internal_depth_available_in_protocol_v1":false', report
         )
@@ -562,10 +574,11 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
                 rig.CHECKSUM_ADLER32,
                 rig.CHECKSUM_CRC32C,
                 rig.CHECKSUM_CRC32_ISO_HDLC,
+                rig.CHECKSUM_ADLER32_DUAL_LANE,
             ],
             fake.device.configured_checksums,
         )
-        self.assertEqual(42, len(fake.device.benchmark_requests))
+        self.assertEqual(56, len(fake.device.benchmark_requests))
         self.assertIn('"crc32c_full_data_checks":0', report)
         self.assertIn('"crc32c_synthetic_combined_checks":', report)
         self.assertIn(
@@ -604,7 +617,7 @@ class RigChecksumBenchmarkTests(unittest.TestCase):
             )
 
         self.assertEqual("PASS", summary["result"])
-        self.assertEqual(3, summary["advertised_candidate_count"])
+        self.assertEqual(4, summary["advertised_candidate_count"])
         self.assertEqual([rig.CHECKSUM_CRC32C], summary["campaign_candidate_ids"])
         self.assertEqual(1, summary["candidate_count"])
         self.assertEqual([rig.CHECKSUM_CRC32C], fake.device.configured_checksums)

@@ -204,16 +204,16 @@
       "total_length": 48
     },
     {
-      "checksum": "0xa9c62df1",
+      "checksum": "0xc0c62e01",
       "checksum_algorithm": "ADLER32",
       "file": "info-response.bin",
       "first_sample_ticks": 0,
       "flags": 0,
-      "frame_sha256": "71fe422700015d43b340aa35d079869370362ffaa8b2a67829f1785725b474c7",
+      "frame_sha256": "572dae00eb6a2754ce081c957c49482486e250bd018d30ca6fd9a1df1d3e7798",
       "item_count": 0,
       "kind": "INFO_RESPONSE",
       "payload_length": 376,
-      "payload_sha256": "a715fe0168b3aebc8cd8c8e9debcb7e44a9b60b8b89c6a87ba93ef1aa40bd629",
+      "payload_sha256": "6599a7aeb7eeeb4a122131804a931f56a5494905399598b56b90eacab6576bab",
       "request_id": 1,
       "run_id": 0,
       "sequence": 0,
@@ -392,5 +392,5 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 1,
   "source": "protocol/protocol-v1.json",
-  "source_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
+  "source_sha256": "6f3620263efdb5620ae746eb89bb020f534e91af378739c7a254f55bf2ca8413"
 }

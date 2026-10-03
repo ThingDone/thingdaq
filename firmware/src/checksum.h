@@ -9,6 +9,7 @@ namespace thingdaq::checksum {
 // Protocol negotiation maps enabled wire algorithms to this narrow interface.
 enum class Algorithm : std::uint8_t {
   kAdler32,
+  kAdler32DualLane,
   kCrc32c,
   kCrc32IsoHdlc,
 };
@@ -31,18 +32,26 @@ inline constexpr std::size_t kCrcTableBytes =
 // They deliberately exclude the shared narrow dispatch body and the separately
 // reported lookup table so a benchmark result never conflates code and data.
 inline constexpr std::size_t kAdler32CodeBytes = 120U;
+inline constexpr std::size_t kAdler32DualLaneCodeBytes = 260U;
 inline constexpr std::size_t kCrc32cCodeBytes = 308U;
 inline constexpr std::size_t kCrc32IsoHdlcCodeBytes = 308U;
 
 // Callers must pass a non-null pointer for nonempty input. A null pointer is
 // valid for the canonical empty input.
 std::uint32_t adler32(const std::uint8_t *data, std::size_t size);
+// Exact RFC 1950 result, computed with two independent accumulator lanes per
+// bounded block and combined with the Adler concatenation identity.
+std::uint32_t adler32DualLane(const std::uint8_t *data, std::size_t size);
+// Exact RFC 1950 result using a four-byte weighted-sum loop. This is retained
+// as the implementation baseline for the dual-lane experiment, not a wire ID.
+std::uint32_t adler32Unrolled(const std::uint8_t *data, std::size_t size);
 std::uint32_t crc32c(const std::uint8_t *data, std::size_t size);
 std::uint32_t crc32IsoHdlc(const std::uint8_t *data, std::size_t size);
 
 inline constexpr std::size_t tableBytes(Algorithm algorithm) {
   switch (algorithm) {
     case Algorithm::kAdler32:
+    case Algorithm::kAdler32DualLane:
       return 0U;
     case Algorithm::kCrc32c:
     case Algorithm::kCrc32IsoHdlc:
@@ -55,6 +64,8 @@ inline constexpr std::size_t implementationCodeBytes(Algorithm algorithm) {
   switch (algorithm) {
     case Algorithm::kAdler32:
       return kAdler32CodeBytes;
+    case Algorithm::kAdler32DualLane:
+      return kAdler32DualLaneCodeBytes;
     case Algorithm::kCrc32c:
       return kCrc32cCodeBytes;
     case Algorithm::kCrc32IsoHdlc:

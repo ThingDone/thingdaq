@@ -148,6 +148,7 @@ constexpr bool isKnownChecksum(protocol_v1::ChecksumAlgorithm algorithm) {
     case protocol_v1::ChecksumAlgorithm::kAdler32:
     case protocol_v1::ChecksumAlgorithm::kCrc32c:
     case protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc:
+    case protocol_v1::ChecksumAlgorithm::kAdler32DualLane:
       return true;
   }
   return false;
@@ -1690,6 +1691,7 @@ Result validateChecksumBenchmarkResponse(ByteView payload) {
   std::uint32_t expected_table_bytes = 0U;
   switch (decoded.request.checksum_algorithm) {
     case protocol_v1::ChecksumAlgorithm::kAdler32:
+    case protocol_v1::ChecksumAlgorithm::kAdler32DualLane:
       expected_table_bytes = 0U;
       break;
     case protocol_v1::ChecksumAlgorithm::kCrc32c:
@@ -2540,6 +2542,9 @@ Result computeChecksum(protocol_v1::ChecksumAlgorithm algorithm, ByteView input,
       break;
     case protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc:
       implementation = checksum::Algorithm::kCrc32IsoHdlc;
+      break;
+    case protocol_v1::ChecksumAlgorithm::kAdler32DualLane:
+      implementation = checksum::Algorithm::kAdler32DualLane;
       break;
     case protocol_v1::ChecksumAlgorithm::kNoneReserved:
       return unsupportedChecksum();

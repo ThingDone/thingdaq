@@ -118,6 +118,82 @@ std::uint32_t adler32(const std::uint8_t *data, std::size_t size) {
   return (second << 16U) | first;
 }
 
+THINGDAQ_CHECKSUM_CODE_STORAGE(".text.checksum.adler32_unrolled")
+std::uint32_t adler32Unrolled(const std::uint8_t *data, std::size_t size) {
+  constexpr std::size_t reduction_block_bytes = 5552U;
+  std::uint32_t first = kAdler32Initial;
+  std::uint32_t second = 0U;
+  while (size != 0U) {
+    const std::size_t block =
+        size < reduction_block_bytes ? size : reduction_block_bytes;
+    const std::uint8_t *const end = data + block;
+    while (static_cast<std::size_t>(end - data) >= 4U) {
+      const std::uint32_t a = data[0];
+      const std::uint32_t b = data[1];
+      const std::uint32_t c = data[2];
+      const std::uint32_t d = data[3];
+      second += 4U * first + 4U * a + 3U * b + 2U * c + d;
+      first += a + b + c + d;
+      data += 4U;
+    }
+    while (data != end) {
+      first += *data++;
+      second += first;
+    }
+    first %= kAdler32Modulus;
+    second %= kAdler32Modulus;
+    size -= block;
+  }
+  return (second << 16U) | first;
+}
+
+THINGDAQ_CHECKSUM_CODE_STORAGE(".text.checksum.adler32_dual_lane")
+std::uint32_t adler32DualLane(const std::uint8_t *data, std::size_t size) {
+  constexpr std::size_t reduction_block_bytes = 5552U;
+  std::uint32_t first = kAdler32Initial;
+  std::uint32_t second = 0U;
+  while (size != 0U) {
+    const std::size_t block =
+        size < reduction_block_bytes ? size : reduction_block_bytes;
+    const std::size_t lane_1_bytes = block / 2U;
+    const std::size_t lane_2_bytes = block - lane_1_bytes;
+    const std::uint8_t *lane_1 = data;
+    const std::uint8_t *lane_2 = data + lane_1_bytes;
+    std::uint32_t lane_1_first = kAdler32Initial;
+    std::uint32_t lane_1_second = 0U;
+    std::uint32_t lane_2_first = kAdler32Initial;
+    std::uint32_t lane_2_second = 0U;
+
+    for (std::size_t index = 0U; index < lane_1_bytes; ++index) {
+      lane_1_first += lane_1[index];
+      lane_1_second += lane_1_first;
+      lane_2_first += lane_2[index];
+      lane_2_second += lane_2_first;
+    }
+    if (lane_2_bytes != lane_1_bytes) {
+      lane_2_first += lane_2[lane_1_bytes];
+      lane_2_second += lane_2_first;
+    }
+
+    // Adler(A || B): A = A_A + A_B - 1,
+    // B = B_A + B_B + len(B) * (A_A - 1), all modulo 65521.
+    const std::uint32_t block_first =
+        (lane_1_first + lane_2_first - 1U) % kAdler32Modulus;
+    const std::uint32_t block_second =
+        (lane_1_second + lane_2_second +
+         static_cast<std::uint32_t>(lane_2_bytes) * (lane_1_first - 1U)) %
+        kAdler32Modulus;
+    second =
+        (second + block_second +
+         static_cast<std::uint32_t>(block) * (first - 1U)) %
+        kAdler32Modulus;
+    first = (first + block_first - 1U) % kAdler32Modulus;
+    data += block;
+    size -= block;
+  }
+  return (second << 16U) | first;
+}
+
 THINGDAQ_CHECKSUM_CODE_STORAGE(".text.checksum.crc32c")
 THINGDAQ_CHECKSUM_CRC_OPTIMIZE
 std::uint32_t crc32c(const std::uint8_t *data, std::size_t size) {
@@ -139,6 +215,9 @@ bool compute(Algorithm algorithm, const std::uint8_t *data, std::size_t size,
   switch (algorithm) {
     case Algorithm::kAdler32:
       result = adler32(data, size);
+      return true;
+    case Algorithm::kAdler32DualLane:
+      result = adler32DualLane(data, size);
       return true;
     case Algorithm::kCrc32c:
       result = crc32c(data, size);

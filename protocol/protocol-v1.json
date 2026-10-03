@@ -330,6 +330,12 @@
       "value": 3,
       "enabled_in_v1": true,
       "description": "CRC-32/ISO-HDLC, reflected input/output, initial value 0xffffffff, and final XOR 0xffffffff; retained for negotiated data and captured benchmark evidence."
+    },
+    {
+      "name": "ADLER32_DUAL_LANE",
+      "value": 4,
+      "enabled_in_v1": true,
+      "description": "Experimental exact RFC 1950 Adler-32 result computed with independent half-block accumulator lanes and the Adler concatenation identity; data frames only."
     }
   ],
   "bootstrap_checksum_algorithm": "ADLER32",
@@ -1524,7 +1530,7 @@
           "protocol_version": 1,
           "supported_stream_mask": 3,
           "supported_source_mask": 3,
-          "supported_checksum_mask": 14,
+          "supported_checksum_mask": 30,
           "capability_bits": 511,
           "timestamp_hz": 8000000,
           "data_frame_bytes": 4096,

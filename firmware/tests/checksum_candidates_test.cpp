@@ -34,6 +34,16 @@ std::uint32_t referenceReflectedCrc(const std::uint8_t *data,
   return remainder ^ 0xFFFFFFFFU;
 }
 
+std::uint32_t referenceAdler32(const std::uint8_t *data, std::size_t size) {
+  std::uint32_t first = 1U;
+  std::uint32_t second = 0U;
+  for (std::size_t index = 0U; index < size; ++index) {
+    first = (first + data[index]) % 65521U;
+    second = (second + first) % 65521U;
+  }
+  return (second << 16U) | first;
+}
+
 void testParametersAndCanonicalVectors() {
   static_assert(candidate::kAdler32Initial == 1U);
   static_assert(candidate::kAdler32Modulus == 65521U);
@@ -54,6 +64,10 @@ void testParametersAndCanonicalVectors() {
 
   expect(candidate::adler32(nullptr, 0U) == 0x00000001U,
          "empty Adler-32");
+  expect(candidate::adler32DualLane(nullptr, 0U) == 0x00000001U,
+         "empty dual-lane Adler-32");
+  expect(candidate::adler32Unrolled(nullptr, 0U) == 0x00000001U,
+         "empty unrolled Adler-32");
   expect(candidate::crc32c(nullptr, 0U) == 0x00000000U,
          "empty CRC-32C");
   expect(candidate::crc32IsoHdlc(nullptr, 0U) == 0x00000000U,
@@ -63,11 +77,41 @@ void testParametersAndCanonicalVectors() {
       '1', '2', '3', '4', '5', '6', '7', '8', '9'};
   expect(candidate::adler32(digits.data(), digits.size()) == 0x091E01DEU,
          "123456789 Adler-32");
+  expect(candidate::adler32DualLane(digits.data(), digits.size()) ==
+             0x091E01DEU,
+         "123456789 dual-lane Adler-32");
+  expect(candidate::adler32Unrolled(digits.data(), digits.size()) ==
+             0x091E01DEU,
+         "123456789 unrolled Adler-32");
   expect(candidate::crc32c(digits.data(), digits.size()) == 0xE3069283U,
          "123456789 CRC-32C");
   expect(candidate::crc32IsoHdlc(digits.data(), digits.size()) ==
              0xCBF43926U,
          "123456789 CRC-32/ISO-HDLC");
+}
+
+void testAdlerVariantsAgainstIndependentReference() {
+  std::array<std::uint8_t, 11105U> storage{};
+  for (std::size_t index = 0U; index < storage.size(); ++index) {
+    storage[index] = static_cast<std::uint8_t>(
+        (index * 251U + index / 3U + 0xA5U) & 0xFFU);
+  }
+  constexpr std::array<std::size_t, 18U> lengths{
+      0U,    1U,    2U,    3U,    4U,    7U,    8U,    9U,   31U,
+      64U,   511U,  512U,  2047U, 4092U, 5551U, 5552U, 5553U, 11104U};
+  for (std::size_t alignment = 0U; alignment < 2U; ++alignment) {
+    for (const std::size_t length : lengths) {
+      if (alignment + length > storage.size()) continue;
+      const std::uint8_t *const input = storage.data() + alignment;
+      const std::uint32_t expected = referenceAdler32(input, length);
+      expect(candidate::adler32(input, length) == expected,
+             "standard Adler/reference agreement");
+      expect(candidate::adler32Unrolled(input, length) == expected,
+             "unrolled Adler/reference agreement");
+      expect(candidate::adler32DualLane(input, length) == expected,
+             "dual-lane Adler/reference agreement");
+    }
+  }
 }
 
 void testTablesAgainstIndependentBitwiseReferences() {
@@ -105,6 +149,10 @@ void testNarrowDispatch() {
                             input.size(), result) &&
              result == candidate::adler32(input.data(), input.size()),
          "Adler-32 dispatch");
+  expect(candidate::compute(candidate::Algorithm::kAdler32DualLane,
+                            input.data(), input.size(), result) &&
+             result == candidate::adler32(input.data(), input.size()),
+         "dual-lane Adler-32 dispatch");
   expect(candidate::compute(candidate::Algorithm::kCrc32c, input.data(),
                             input.size(), result) &&
              result == candidate::crc32c(input.data(), input.size()),
@@ -125,6 +173,7 @@ void testNarrowDispatch() {
 
 int main() {
   testParametersAndCanonicalVectors();
+  testAdlerVariantsAgainstIndependentReference();
   testTablesAgainstIndependentBitwiseReferences();
   testNarrowDispatch();
   if (failures == 0) {

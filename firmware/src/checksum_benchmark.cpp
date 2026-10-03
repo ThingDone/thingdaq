@@ -31,6 +31,8 @@ constexpr checksum::Algorithm checksumAlgorithm(
       return checksum::Algorithm::kCrc32c;
     case protocol_v1::ChecksumAlgorithm::kCrc32IsoHdlc:
       return checksum::Algorithm::kCrc32IsoHdlc;
+    case protocol_v1::ChecksumAlgorithm::kAdler32DualLane:
+      return checksum::Algorithm::kAdler32DualLane;
     case protocol_v1::ChecksumAlgorithm::kNoneReserved:
       break;
   }

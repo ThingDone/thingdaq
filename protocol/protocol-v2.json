@@ -22,7 +22,7 @@
   "extends": {
     "protocol_version": 1,
     "source": "protocol/protocol-v1.json",
-    "source_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+    "source_sha256": "6f3620263efdb5620ae746eb89bb020f534e91af378739c7a254f55bf2ca8413",
     "rule": "Protocol v2 copies the frozen v1 contract and adds explicitly encoded auxiliary-input, exact-rate and temperature extension points; v1 sources, generated outputs, fixtures, bytes, and defaults remain authoritative and immutable."
   },
   "generated_outputs": {
@@ -703,6 +703,12 @@
       "value": 3,
       "enabled_in_v2": true,
       "description": "CRC-32/ISO-HDLC, reflected input/output, initial value 0xffffffff, and final XOR 0xffffffff; retained for negotiated data and captured benchmark evidence."
+    },
+    {
+      "name": "ADLER32_DUAL_LANE",
+      "value": 4,
+      "enabled_in_v2": true,
+      "description": "Experimental exact RFC 1950 Adler-32 result computed with independent half-block accumulator lanes and the Adler concatenation identity; data frames only."
     }
   ],
   "bootstrap_checksum_algorithm": "ADLER32",
@@ -2207,7 +2213,7 @@
           "protocol_version": 2,
           "supported_stream_mask": 3,
           "supported_source_mask": 3,
-          "supported_checksum_mask": 14,
+          "supported_checksum_mask": 30,
           "capability_bits": 2047,
           "timestamp_hz": 8000000,
           "data_frame_bytes": 4096,
