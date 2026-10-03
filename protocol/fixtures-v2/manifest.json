@@ -1638,7 +1638,7 @@
   "generator": "tools/generate_protocol.py",
   "protocol_version": 2,
   "source": "protocol/protocol-v2.json",
-  "source_sha256": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+  "source_sha256": "5ceb7563badb42bc0646ef6a27689ee992bbafc193f4378719bbcd7f1d81bce9",
   "v1_source": "protocol/protocol-v1.json",
   "v1_source_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222"
 }
