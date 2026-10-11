@@ -23,6 +23,12 @@ intermittent ADC fault remains unresolved. A disabled-watchdog build passed a
 reports watchdog disabled and timeout zero; reset cause is not captured while
 initialization is skipped. See the [decision and test evidence](doc/results/watchdog-disabled-20260927.md).
 
+Current source uses an optimized, wire-compatible Adler-32 implementation.
+Checksummed larger ADC frames are available as an opt-in research build, using
+the independent wire validator rather than the public SDK. See the
+[integration and reliability evidence](doc/results/experiments/reliability-20261011.md)
+and [ADC clock feasibility analysis](doc/research/adc-clock-options.md).
+
 ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,
 loss-visible acquisition on the Teensy 4.0 platform. It captures two
 phase-shifted ADC channels and either eight or sixteen packed digital inputs. The same public API

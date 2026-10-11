@@ -102,6 +102,7 @@ TIMESTAMP_HZ = 8_000_000
 EXPERIMENT_EQUAL_RATES = os.environ.get("AUX_INPUT_EQUAL_RATES", "0") == "1"
 RELEASE_FIXED_1MHZ = os.environ.get("AUX_INPUT_RELEASE_FIXED_1MHZ", "0") == "1"
 EXPERIMENT_CPU_HZ = int(os.environ.get("AUX_INPUT_CPU_MHZ", "600")) * 1_000_000
+EXPERIMENT_LARGE_ADC_FRAME = os.environ.get("AUX_INPUT_LARGE_ADC_FRAME", "0") == "1"
 if EXPERIMENT_CPU_HZ not in (600_000_000, 450_000_000):
     raise ValueError("only reviewed 600/150 and 450/150 MHz profiles are supported")
 STREAM_NONE = 0
@@ -358,7 +359,7 @@ PROFILES = tuple(
         profile.adc_phase_ipg_cycles,
         profile.completion_dwt_cycles * EXPERIMENT_CPU_HZ // 600_000_000,
         profile.disabled_coverage_ticks,
-        profile.input_coverage_ticks,
+        profile.input_coverage_ticks * (2 if EXPERIMENT_LARGE_ADC_FRAME else 1),
     )
     for profile in PROFILES
 )
@@ -381,7 +382,11 @@ class Layout:
 
 LAYOUTS = {
     AUX_DISABLED: Layout(AUX_DISABLED, 8, 1, 4048, 4048, 4096, 1012, 4048, 4096),
-    AUX_INPUT: Layout(AUX_INPUT, 16, 2, 2024, 4048, 4096, 506, 2024, 2072),
+    AUX_INPUT: (
+        Layout(AUX_INPUT, 16, 2, 2024, 4048, 4096, 1012, 4048, 4096)
+        if EXPERIMENT_LARGE_ADC_FRAME
+        else Layout(AUX_INPUT, 16, 2, 2024, 4048, 4096, 506, 2024, 2072)
+    ),
 }
 ALLOWED_DATA_SHAPES = {
     ADC_DATA: frozenset(
@@ -2734,14 +2739,16 @@ class AcquisitionValidator:
         else:
             raise ProtocolFailure(f"unexpected data kind 0x{frame.kind:02x}")
         if self.case.stream_mask == STREAM_BOTH:
-            weight = 4 if EXPERIMENT_EQUAL_RATES or self.profile.value == 4 else 1
+            weight = (
+                self.layout.gpio_items_per_frame * self.profile.gpio_period_ticks
+            ) / (self.layout.adc_items_per_frame * self.profile.adc_period_ticks)
             self.maximum_frame_skew = max(
                 self.maximum_frame_skew,
                 abs(self.adc.frames - weight * self.gpio.frames),
             )
-            if self.maximum_frame_skew > weight:
+            if self.maximum_frame_skew > max(1, weight):
                 raise ProtocolFailure(
-                    "combined host time-coverage skew exceeds one GPIO frame"
+                    "combined host time-coverage skew exceeds one data frame"
                 )
 
     def _continuity(

@@ -154,6 +154,16 @@ def validate_program_budget(seconds: float, cells: int) -> float:
     return planned
 
 
+def frame_experiment_settings(manifest: dict, *, enabled: bool, host_api: bool) -> dict:
+    """Require explicit opt-in to a checksummed, incompatible research layout."""
+    selected = manifest.get("input_experiment", {}).get("large_adc_frame", False)
+    if not isinstance(selected, bool) or enabled != selected:
+        raise ValueError("--frame-experiment must match the manifest's large_adc_frame")
+    if selected and host_api:
+        raise ValueError("larger ADC frames require the independent wire validator")
+    return {"AUX_INPUT_LARGE_ADC_FRAME": "1" if selected else "0"}
+
+
 def classify_result(result: dict, *, expected_cells: int | None = None) -> dict:
     details = result.get("results", {})
     evidence = [
@@ -268,6 +278,7 @@ def main() -> int:
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--serial", type=int, default=20428100)
     parser.add_argument("--diagnostic", action="store_true")
+    parser.add_argument("--frame-experiment", action="store_true")
     parser.add_argument(
         "--temperature",
         action="store_true",
@@ -348,6 +359,14 @@ def main() -> int:
         settings["AUX_INPUT_SDK_CASES"] = ",".join(args.sdk_cases)
     experiment = manifest.get("input_experiment")
     settings.update(experiment_settings(manifest))
+    try:
+        settings.update(
+            frame_experiment_settings(
+                manifest, enabled=args.frame_experiment, host_api=args.host_api
+            )
+        )
+    except ValueError as error:
+        parser.error(str(error))
     profiles = tuple(args.profiles) if args.profiles is not None else None
     sequence = [0, 1, 2, 3, 0] if args.cycle else list(profiles or (args.profile,))
     try:

@@ -67,3 +67,23 @@ def test_build_identity_distinguishes_clock_and_ratio(monkeypatch):
         identity.timestamp_epoch == original.timestamp_epoch for identity in identities
     )
     assert builder.experiment_identity(original, 600, False) == identities[0]
+    small = builder.experiment_identity(original, 450, False, release_fixed_1mhz=True)
+    large = builder.experiment_identity(
+        original, 450, False, release_fixed_1mhz=True, large_adc_frame=True
+    )
+    assert len({small.build_id, large.build_id, *(i.build_id for i in identities)}) == 6
+
+
+def test_large_frame_manifest_retention_matches_fixed_release_layout(monkeypatch):
+    monkeypatch.syspath_prepend(str(ROOT / "firmware/tools"))
+    builder = importlib.import_module("build_input_experiment")
+    retention = builder.large_frame_retention({"total_frames": 200})
+    assert len(retention["profiles"]) == 1
+    profile = retention["profiles"][0]
+    assert profile["adc_pair_rate_hz"] == profile["gpio_sample_rate_hz"] == 1_000_000
+    for mode in ("DISABLED", "INPUT"):
+        assert profile["modes"][mode] == {
+            "coverage_ticks": 8096,
+            "combined_retention_us": 101200,
+            "single_stream_retention_us": 202400,
+        }

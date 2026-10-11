@@ -129,6 +129,26 @@ def test_stale_build_is_rejected():
         isolation.verify_hex(b"bad", manifest)
 
 
+def test_large_frame_manifest_requires_matching_opt_in_and_wire_validator():
+    manifest = {"input_experiment": {"large_adc_frame": True}}
+    assert isolation.frame_experiment_settings(
+        manifest, enabled=True, host_api=False
+    ) == {"AUX_INPUT_LARGE_ADC_FRAME": "1"}
+    for enabled, host_api in ((False, False), (True, True)):
+        with pytest.raises(ValueError):
+            isolation.frame_experiment_settings(
+                manifest, enabled=enabled, host_api=host_api
+            )
+    with pytest.raises(ValueError):
+        isolation.frame_experiment_settings({}, enabled=True, host_api=False)
+    with pytest.raises(ValueError):
+        isolation.frame_experiment_settings(
+            {"input_experiment": {"large_adc_frame": "false"}},
+            enabled=False,
+            host_api=False,
+        )
+
+
 def test_service_success_does_not_mean_firmware_passed():
     result = {
         "status": "success",

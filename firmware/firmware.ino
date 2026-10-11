@@ -50,9 +50,8 @@ thingdaq::runtime::FirmwareRuntime firmware_runtime{
 }  // namespace
 
 void setup() {
-  // Do not initialize the Arduino serial facade, wait for DTR, or emit a
-  // banner. Both ADC modules are explicitly reconfigured and independently
-  // calibrated under a DWT deadline before the bounded BOOT completion.
+  // No serial facade/DTR wait/banner; both ADCs are independently configured
+  // and calibrated under a DWT deadline before bounded BOOT completion.
   // Temporarily leave the watchdog uninitialized while the intermittent ADC
   // fault remains unresolved; see doc/results/watchdog-disabled-20260927.md.
   // (void)thingdaq::watchdog::begin();
@@ -60,8 +59,7 @@ void setup() {
 }
 
 void loop() {
-  // Service one bounded cooperative control/data-path iteration. Teensy's
-  // main() calls yield afterward.
+  // One bounded control/data-path iteration; Teensy's main() yields afterward.
   (void)firmware_runtime.service();
   thingdaq::watchdog::refresh();
 }

@@ -319,6 +319,10 @@ class PairCaptureRing final : public PairSource {
 
 class HardwareCapture : public PairSource {
  public:
+#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+  // Frame length no longer distinguishes eight- and sixteen-input modes.
+  virtual void setAuxInputMode(bool) {}
+#endif
   virtual StartStatus inspectStart(std::uint32_t epoch) = 0;
   virtual StartStatus inspectStart(std::uint32_t epoch,
                                    std::uint32_t pairs_per_buffer) {
