@@ -131,11 +131,15 @@ std::uint32_t adler32(const std::uint8_t *data, std::size_t size) {
         (lane_1_second + lane_2_second +
          static_cast<std::uint32_t>(lane_2_bytes) * (lane_1_first - 1U)) %
         kAdler32Modulus;
+    // The preceding reduction can produce first == 0. Subtraction in the
+    // concatenation identity is modulo 65521, not unsigned modulo 2^32.
+    const std::uint32_t previous_sum =
+        first == 0U ? kAdler32Modulus - 1U : first - 1U;
     second =
         (second + block_second +
-         static_cast<std::uint32_t>(block) * (first - 1U)) %
+         static_cast<std::uint32_t>(block) * previous_sum) %
         kAdler32Modulus;
-    first = (first + block_first - 1U) % kAdler32Modulus;
+    first = (previous_sum + block_first) % kAdler32Modulus;
     data += block;
     size -= block;
   }

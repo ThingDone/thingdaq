@@ -128,10 +128,21 @@ void testAdlerReductionBoundaries() {
   constexpr std::array<std::size_t, 18U> lengths{
       0U, 1U, 2U, 3U, 4U, 7U, 8U, 9U, 44U, 2024U, 4092U, 4096U,
       5551U, 5552U, 5553U, 11104U, 11105U, 22208U};
-  for (std::size_t pattern = 0U; pattern < 3U; ++pattern) {
+  for (std::size_t pattern = 0U; pattern < 4U; ++pattern) {
     for (std::size_t index = 0U; index < storage.size(); ++index) {
       storage[index] = pattern == 0U ? 0U : pattern == 1U ? 255U :
           static_cast<std::uint8_t>((index * 251U + index / 3U) & 255U);
+    }
+    if (pattern == 3U) {
+      // Sum 65520 makes the first accumulator zero at the NMAX boundary.
+      // Concatenating another block must subtract one modulo 65521, not 2^32.
+      storage.fill(0U);
+      for (std::size_t block = 0U; block < 4U; ++block) {
+        for (std::size_t index = 0U; index < 256U; ++index) {
+          storage[block * 5552U + index] = 255U;
+        }
+        storage[block * 5552U + 256U] = 240U;
+      }
     }
     for (std::size_t alignment = 0U; alignment < 2U; ++alignment) {
       for (const std::size_t length : lengths) {
