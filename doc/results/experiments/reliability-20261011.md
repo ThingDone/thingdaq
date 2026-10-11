@@ -49,6 +49,7 @@ that the real decoder still rejects it.
 | Unchanged September 27 main | `thingdaq-b86c963eb8e1c895` | 60 s | FAIL: ADC DMA fault after 1,016,601 captured pairs |
 | Dual-lane Adler, original frames | `thingdaq-b70388a72be23267` | 60 s | PASS: 131 checks |
 | Dual-lane Adler, larger ADC frames | `thingdaq-2e5796cfcae55c9f` | 60 s | PASS: 131 checks |
+| Same larger-frame image, separate upload | `thingdaq-2e5796cfcae55c9f` | 600 s | PASS: 131 checks |
 
 The baseline snapshot has two ADC DMA error events, one completion mismatch,
 zero parser checksum errors, zero packet-pool exhaustions and zero ADC raw-ring
@@ -65,6 +66,71 @@ increased maximum sample rate is established by these runs. These first images
 precede the later multi-block Adler edge-case correction and comment-only
 sketch cleanup; subsequent final-image tests are recorded separately.
 
+The initial larger-frame endurance run captured for 600.010 seconds, with
+593,164 ADC frames and 296,582 GPIO frames including warmup/drain. Measured
+timed rates were 999,999.15 ADC pairs/s and 999,997.46 GPIO samples/s. The last
+temperature sample was 56.930 degrees C. No capture acceptance limit changed.
+
+## Corrected implementation target benchmark
+
+The original baseline and corrected final default image were flashed
+separately and benchmarked through the public SDK's standard ID 1 command.
+Each case uses the existing Phase-05 shape: 4,092-byte frame coverage, four
+batches of 256 operations, on Teensy 4.0 at 450 MHz. Both jobs passed and
+reported watchdog disabled, 28,664 stack bytes free, and no lookup table.
+
+| Memory/cache | Original cycles/byte | Corrected dual-lane cycles/byte | Reduction in checksum time |
+| --- | ---: | ---: | ---: |
+| Hot DTCM | 4.023941 | 3.030792 | 24.68% |
+| Cold-invalidated OCRAM | 4.812332 | 3.792480 | 21.19% |
+
+These compare `thingdaq-b86c963eb8e1c895` with `thingdaq-fce489cabb418f9d`.
+They measure checksum execution, not total MCU CPU, USB throughput, or a
+higher physical sample rate. The cold metric includes the benchmark's cache
+handling. The raw results retain complete returned timing fields.
+
+## Final candidate endurance
+
+The corrected larger-frame image `thingdaq-c32f1eb37ab5dcac` passed a separate
+600-second combined 16-input run, job `94d2ff4f-1247-49a1-8db7-38cb1906ae98`,
+with all 131 checks passing. The run measured 600.0049 seconds, 999,997.98 ADC
+pairs/s and 999,999.67 GPIO samples/s. Including warmup and drain, the validator
+accepted 593,158 ADC frames and 296,579 GPIO frames. No checksum, sequence,
+DMA, conservation or loss acceptance check failed. Maximum observed host
+receive gap was 24.54 ms; the transmit queue high-water mark was 28 frames.
+Die temperature was 47.106 degrees C before and 58.158 after, with a sampled
+maximum of 58.772 degrees C.
+
+This final image includes the modular Adler correction and comment-only sketch
+cleanup. Its firmware source fingerprint and that of the corrected default
+image were checked against the committed inputs at `e57a3cd`. The frozen build
+manifests honestly retain their earlier dirty-worktree provenance; the images
+were not rebuilt or relabeled after testing. Both checksummed larger-frame
+images passed ten minutes, but only this second image is the final candidate.
+These two passes do not establish an MTBF or explain the failed baseline.
+
+The same final larger-frame image then passed four 20-second combined cells
+in the order 8 -> 16 -> 8 -> 16 inputs without reflashing between cells, job
+`23887e0c-3055-43de-9d1c-984920e6199e`. The eight-input cells passed 128 checks
+each and the sixteen-input cells passed 131 each (518 total). This exercises
+the explicit auxiliary-bank DMA priority selection, STOP/reconfiguration,
+frame shapes, checksums and stream conservation across width changes.
+
+The rig was then restored to the normal-frame optimized-Adler build
+`thingdaq-fce489cabb418f9d`. Public-SDK job
+`a88b21ba-d0b1-4cf5-8446-5cda72b2def2` passed four 20-second combined cells
+in the order 8 -> 16 -> 8 -> 16 inputs, with no observed stream gaps,
+queue losses, or parser corruption. Only this job's container received a
+two-core CPU quota (200,000 / 100,000 microseconds); the service default was
+unchanged. This is short-duration SDK validation of the normal frame format,
+not larger-frame SDK support or a long-duration SDK qualification. The final
+rig-service health check reported healthy with an empty job queue.
+
+The [machine-readable evidence](reliability-20261011.json) records every
+completed job, including the failed baseline, identities, artifact/program
+hashes, temperature samples, and acceptance results. Full local submissions
+and service replies remain under `doc/results/raw/reliability-20261011/`.
+
 ## Local checks
 
 The initial firmware/checksum/build suites passed 30 tests and 351 subtests.
@@ -80,7 +146,9 @@ gate without changing runtime behavior. The untracked file was left untouched.
 The same candidate files in an existing clean worktree passed 252 tests and
 1,726 subtests, with one skip. The checksum edge-case fix and documentation
 then passed 13 tests and 1,101 subtests there. That worktree was restored to its
-original branch and clean tracked state after verification.
+original branch and clean tracked state after verification. The final build
+configuration fixtures and documentation checks passed 23 tests and 751
+subtests; fixture symbol addresses now account for the larger Adler function.
 
 ## Reproduction
 
@@ -101,7 +169,7 @@ unnegotiated layout.
 
 ## Qualification boundary
 
-All tests use Teensy 4.0 serial 20428100, 450 MHz core, 37.5 MHz IPG-derived
+Acquisition tests use Teensy 4.0 serial 20428100, 450 MHz core, 37.5 MHz IPG-derived
 ADC clock, 24 MHz crystal-derived PIT triggers and fixed 1 MS/s ADC/GPIO.
 The watchdog remains disabled. No external electrical stimulus is connected;
 streaming results do not qualify analog accuracy, aperture timing, or external
