@@ -103,7 +103,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
     def test_checksum_table_provenance_requires_flash_residency(self) -> None:
         symbols = (
-            "00000304 00000078 T "
+            "00000304 00000104 T "
             "thingdaq::checksum::adler32(unsigned char const*, unsigned int)\n"
             "0000037c 00000134 T "
             "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)\n"
@@ -120,7 +120,7 @@ class BuildConfigurationTests(unittest.TestCase):
         resources = build_firmware.checksum_resource_usage(symbols)
 
         self.assertEqual(16_384, resources["total_table_flash_bytes"])
-        self.assertEqual(736, resources["total_implementation_code_bytes"])
+        self.assertEqual(876, resources["total_implementation_code_bytes"])
         self.assertEqual(0, resources["total_table_ram_bytes"])
         self.assertEqual(
             8_192,

@@ -95,25 +95,49 @@ std::uint32_t reflectedCrc32(const std::uint8_t *data, std::size_t size) {
 
 THINGDAQ_CHECKSUM_CODE_STORAGE(".text.checksum.adler32")
 std::uint32_t adler32(const std::uint8_t *data, std::size_t size) {
-  // RFC 1950/zlib's NMAX bound keeps both sums inside uint32_t while moving
-  // division out of the per-byte high-rate framing loop.
+  // Two independent accumulator chains retain exact RFC 1950 values.
+  // NMAX also bounds the concatenation arithmetic for worst-case 0xFF input.
   constexpr std::size_t reduction_block_bytes = 5552U;
   std::uint32_t first = kAdler32Initial;
   std::uint32_t second = 0U;
-  std::size_t offset = 0U;
-  while (offset < size) {
-    const std::size_t remaining = size - offset;
-    const std::size_t block = remaining < reduction_block_bytes
-                                  ? remaining
-                                  : reduction_block_bytes;
-    const std::size_t end = offset + block;
-    while (offset < end) {
-      first += data[offset];
-      second += first;
-      ++offset;
+  while (size != 0U) {
+    const std::size_t block =
+        size < reduction_block_bytes ? size : reduction_block_bytes;
+    const std::size_t lane_1_bytes = block / 2U;
+    const std::size_t lane_2_bytes = block - lane_1_bytes;
+    const std::uint8_t *lane_1 = data;
+    const std::uint8_t *lane_2 = data + lane_1_bytes;
+    std::uint32_t lane_1_first = kAdler32Initial;
+    std::uint32_t lane_1_second = 0U;
+    std::uint32_t lane_2_first = kAdler32Initial;
+    std::uint32_t lane_2_second = 0U;
+
+    for (std::size_t index = 0U; index < lane_1_bytes; ++index) {
+      lane_1_first += lane_1[index];
+      lane_1_second += lane_1_first;
+      lane_2_first += lane_2[index];
+      lane_2_second += lane_2_first;
     }
-    first %= kAdler32Modulus;
-    second %= kAdler32Modulus;
+    if (lane_2_bytes != lane_1_bytes) {
+      lane_2_first += lane_2[lane_1_bytes];
+      lane_2_second += lane_2_first;
+    }
+
+    // Adler(A || B): A = A_A + A_B - 1,
+    // B = B_A + B_B + len(B) * (A_A - 1), all modulo 65521.
+    const std::uint32_t block_first =
+        (lane_1_first + lane_2_first - 1U) % kAdler32Modulus;
+    const std::uint32_t block_second =
+        (lane_1_second + lane_2_second +
+         static_cast<std::uint32_t>(lane_2_bytes) * (lane_1_first - 1U)) %
+        kAdler32Modulus;
+    second =
+        (second + block_second +
+         static_cast<std::uint32_t>(block) * (first - 1U)) %
+        kAdler32Modulus;
+    first = (first + block_first - 1U) % kAdler32Modulus;
+    data += block;
+    size -= block;
   }
   return (second << 16U) | first;
 }

@@ -121,12 +121,41 @@ void testNarrowDispatch() {
          "dispatch rejects invalid nonempty view without changing output");
 }
 
+void testAdlerReductionBoundaries() {
+  // Include worst-case sums and multiple NMAX blocks, with both lane parities
+  // and unaligned input. Reduce each byte independently in the oracle.
+  std::array<std::uint8_t, 22210U> storage{};
+  constexpr std::array<std::size_t, 18U> lengths{
+      0U, 1U, 2U, 3U, 4U, 7U, 8U, 9U, 44U, 2024U, 4092U, 4096U,
+      5551U, 5552U, 5553U, 11104U, 11105U, 22208U};
+  for (std::size_t pattern = 0U; pattern < 3U; ++pattern) {
+    for (std::size_t index = 0U; index < storage.size(); ++index) {
+      storage[index] = pattern == 0U ? 0U : pattern == 1U ? 255U :
+          static_cast<std::uint8_t>((index * 251U + index / 3U) & 255U);
+    }
+    for (std::size_t alignment = 0U; alignment < 2U; ++alignment) {
+      for (const std::size_t length : lengths) {
+        const auto *data = storage.data() + alignment;
+        std::uint32_t first = 1U;
+        std::uint32_t second = 0U;
+        for (std::size_t index = 0U; index < length; ++index) {
+          first = (first + data[index]) % 65521U;
+          second = (second + first) % 65521U;
+        }
+        expect(candidate::adler32(data, length) == ((second << 16U) | first),
+               "dual-lane Adler matches independent per-byte reduction");
+      }
+    }
+  }
+}
+
 }  // namespace
 
 int main() {
   testParametersAndCanonicalVectors();
   testTablesAgainstIndependentBitwiseReferences();
   testNarrowDispatch();
+  testAdlerReductionBoundaries();
   if (failures == 0) {
     std::cout << "checksum candidate tests passed\n";
   }

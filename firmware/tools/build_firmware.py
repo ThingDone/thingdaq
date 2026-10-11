@@ -61,7 +61,7 @@ CHECKSUM_CODE_SYMBOLS = {
     ),
 }
 CHECKSUM_CODE_BYTES = {
-    "ADLER32": 120,
+    "ADLER32": 260,
     "CRC32C": 308,
     "CRC32_ISO_HDLC": 308,
 }
