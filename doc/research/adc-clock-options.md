@@ -80,5 +80,8 @@ experiment should start at 500 kS/s, keep ADACK running, calibrate each ADC,
 verify every selected clock/register value, and measure missed triggers,
 completion timing and temperature. Its lower rate does not satisfy the higher
 sample-rate objective. A 528 MHz / 33 MHz IPG-derived ADC experiment instead
-tests a faster CPU with substantially less ADC timing margin. Neither is
-currently qualified or enabled by the build tools.
+tests a faster CPU with substantially less ADC timing margin. The IPG-derived
+528 MHz candidate is now enabled only through the explicit
+research builder; the ADACK candidate remains unimplemented. See
+[[Clock528-20261013]] for the hardware test results. Neither is qualified for
+production.

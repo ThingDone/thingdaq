@@ -27,7 +27,8 @@ Current source uses an optimized, wire-compatible Adler-32 implementation.
 Checksummed larger ADC frames are available as an opt-in research build, using
 the independent wire validator rather than the public SDK. See the
 [integration and reliability evidence](doc/results/experiments/reliability-20261011.md)
-and [ADC clock feasibility analysis](doc/research/adc-clock-options.md).
+[ADC clock feasibility analysis](doc/research/adc-clock-options.md),
+and [528 MHz acquisition test results](doc/results/experiments/clock528-20261013.md).
 
 ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,
 loss-visible acquisition on the Teensy 4.0 platform. It captures two
