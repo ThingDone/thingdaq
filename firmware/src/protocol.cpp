@@ -789,8 +789,8 @@ Result validateAdcMetadata(ByteView payload,
       offsets.calibration_deadline_us,
   };
   const std::uint32_t clock_expected[] = {
-      protocol_v1::kAdcIpgClockHz,
-      protocol_v1::kAdcClockHz,
+      input_experiment::kIpgHz,
+      input_experiment::kAdcHz,
       protocol_v1::kAdcCalibrationDeadlineUs,
   };
   for (std::size_t index = 0U;
@@ -900,7 +900,7 @@ Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
       input_experiment::kCpuHz,
       protocol_v1::kAdcTriggerGpioMasterRateHz,
       protocol_v1::kAdcTriggerPairRateHz,
-      protocol_v1::kAdcTriggerIpgClockHz,
+      input_experiment::kIpgHz,
       input_experiment::scaleDwt(protocol_v1::kAdcCompletionExpectedDwtCycles),
       input_experiment::scaleDwt(protocol_v1::kAdcCompletionToleranceDwtCycles)};
   std::uint32_t value32 = 0U;
@@ -937,11 +937,11 @@ Result validateAdcTriggerMetadata(ByteView payload, std::size_t base) {
       kInitialDelays, kInitialDelays + 2U, kEffectiveDelays,
       kEffectiveDelays + 2U, kPhaseIpgCycles};
   const std::uint16_t fixed16_expected[] = {
-      protocol_v1::kAdcTriggerInitialDelays[0],
-      protocol_v1::kAdcTriggerInitialDelays[1],
-      protocol_v1::kAdcTriggerEffectiveDelays[0],
-      protocol_v1::kAdcTriggerEffectiveDelays[1],
-      protocol_v1::kAdcTriggerPhaseIpgCycles};
+      input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[0]),
+      input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[1]),
+      (input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[0]) + 1U),
+      (input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[1]) + 1U),
+      input_experiment::scaleIpg(protocol_v1::kAdcTriggerPhaseIpgCycles)};
   for (std::size_t index = 0U;
        index < sizeof(fixed16_offsets) / sizeof(fixed16_offsets[0]); ++index) {
     if (!loadU16(payload, base + fixed16_offsets[index], value16) ||

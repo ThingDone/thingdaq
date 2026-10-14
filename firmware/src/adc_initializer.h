@@ -83,8 +83,8 @@ struct Settings {
   std::uint8_t sample_time_adck = protocol_v1::kAdcSampleTimeAdck;
   std::uint8_t conversion_mode = conversionMode(
       protocol_v1::kAdcPrimaryResolutionBits);
-  std::uint32_t ipg_clock_hz = protocol_v1::kAdcIpgClockHz;
-  std::uint32_t adc_clock_hz = protocol_v1::kAdcClockHz;
+  std::uint32_t ipg_clock_hz = input_experiment::kIpgHz;
+  std::uint32_t adc_clock_hz = input_experiment::kAdcHz;
   std::uint32_t calibration_deadline_us =
       protocol_v1::kAdcCalibrationDeadlineUs;
 };

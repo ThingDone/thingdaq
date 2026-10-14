@@ -308,7 +308,7 @@ struct AdcTriggerMetadata {
   std::uint32_t gpio_master_rate_hz =
       protocol_v1::kAdcTriggerGpioMasterRateHz;
   std::uint32_t pair_rate_hz = protocol_v1::kAdcTriggerPairRateHz;
-  std::uint32_t ipg_clock_hz = protocol_v1::kAdcTriggerIpgClockHz;
+  std::uint32_t ipg_clock_hz = input_experiment::kIpgHz;
   std::uint8_t gpio_master_pit_channel =
       protocol_v1::kAdcTriggerGpioMasterPitChannel;
   std::uint8_t pair_pit_channel =
@@ -328,12 +328,12 @@ struct AdcTriggerMetadata {
       protocol_v1::kAdcTriggerQueues[0],
       protocol_v1::kAdcTriggerQueues[1]};
   std::array<std::uint16_t, 2U> initial_delays{
-      protocol_v1::kAdcTriggerInitialDelays[0],
-      protocol_v1::kAdcTriggerInitialDelays[1]};
+      input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[0]),
+      input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[1])};
   std::array<std::uint16_t, 2U> effective_delays{
-      protocol_v1::kAdcTriggerEffectiveDelays[0],
-      protocol_v1::kAdcTriggerEffectiveDelays[1]};
-  std::uint16_t phase_ipg_cycles = protocol_v1::kAdcTriggerPhaseIpgCycles;
+      (input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[0]) + 1U),
+      (input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[1]) + 1U)};
+  std::uint16_t phase_ipg_cycles = input_experiment::scaleIpg(protocol_v1::kAdcTriggerPhaseIpgCycles);
   AdcTriggerHardwareEvidence evidence{};
   std::array<std::uint32_t, 2U> completion_counts{};
   std::uint32_t completion_delta_cycles = 0U;
@@ -388,8 +388,8 @@ struct AdcInitializationMetadata {
       protocol_v1::kAdcPeripherals[0], protocol_v1::kAdcPeripherals[1]};
   std::array<std::uint8_t, 2U> channels{protocol_v1::kAdcChannels[0],
                                         protocol_v1::kAdcChannels[1]};
-  std::uint32_t ipg_clock_hz = protocol_v1::kAdcIpgClockHz;
-  std::uint32_t adc_clock_hz = protocol_v1::kAdcClockHz;
+  std::uint32_t ipg_clock_hz = input_experiment::kIpgHz;
+  std::uint32_t adc_clock_hz = input_experiment::kAdcHz;
   std::uint32_t calibration_deadline_us =
       protocol_v1::kAdcCalibrationDeadlineUs;
   std::array<std::uint32_t, 2U> calibration_cycles{};

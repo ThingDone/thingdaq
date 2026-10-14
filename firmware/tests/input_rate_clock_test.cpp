@@ -4,10 +4,34 @@
 #include "variable_rate_scheduler.h"
 #include "firmware_identity.h"
 #include "gpio_clock_diagnostic.h"
+#include "adc_initializer.h"
+#include "adc_trigger.h"
 
 namespace td = thingdaq;
 int main() {
   assert(td::identity::kExpectedCpuHz == THINGDAQ_EXPERIMENT_CPU_HZ);
+  constexpr unsigned ipg = THINGDAQ_EXPERIMENT_CPU_HZ == 528000000U ? 132000000U : 150000000U;
+  const td::adc::Settings adc{};
+  assert(adc.ipg_clock_hz == ipg);
+  assert(adc.adc_clock_hz == ipg / 4U);
+  assert(adc.resolution_bits == 12U);
+  const td::adc_trigger::Snapshot trigger{};
+  assert(trigger.phase_ipg_cycles == ipg / 2000000U);
+  assert(trigger.initial_delays[1] == ipg / 2000000U);
+  assert(trigger.effective_delays[1] == ipg / 2000000U + 1U);
+  td::protocol::Request info_request{};
+  info_request.kind = td::protocol_v1::CommandKind::kInfo;
+  info_request.request_id = 1U;
+  info_request.protocol_version = 2U;
+  td::protocol::InfoResponse info{};
+  info.supported_stream_mask = 3U;
+  info.supported_source_mask = 3U;
+  info.applied_configuration.protocol_version = 2U;
+  info.applied_configuration.rate_profile = td::protocol_v2::RateProfile::kAdc1mhzGpio1mhz;
+  td::protocol::ControlFrame info_frame{};
+  assert(td::protocol::encodeInfoResponse(info_request, 0U, info, info_frame).ok());
+  td::protocol::DecodedFrame decoded_info{};
+  assert(td::protocol::decodeFrame(info_frame.view(), decoded_info).ok());
   const td::protocol::GpioClockDiagnosticRequest clock_request{};
   const auto clock_plan = td::gpio_clock::makePlan(clock_request);
   assert(clock_plan.measurement_cycles ==
@@ -38,9 +62,9 @@ int main() {
     auto derived = td::variable_rate::derive(timing.profile);
     assert(derived.ok());
     assert(derived.schedule.clocks.dwt_hz == THINGDAQ_EXPERIMENT_CPU_HZ);
-    assert(derived.schedule.clocks.ipg_hz == 150000000U);
+    assert(derived.schedule.clocks.ipg_hz == ipg);
     assert(derived.schedule.adc1_phase_ipg_cycles ==
-           150000000U / (2U * timing.adc_pair_rate_hz));
+           ipg / (2U * timing.adc_pair_rate_hz));
     assert(timing.gpio_sample_rate_hz == timing.adc_pair_rate_hz *
            ratio);
     assert(timing.adc_pair_pit_divider == ratio);

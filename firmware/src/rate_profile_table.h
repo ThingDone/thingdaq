@@ -21,6 +21,8 @@ inline constexpr std::size_t kInputAdcPairsPerFrame =
 
 constexpr protocol_v2::RateProfileTiming experimentTiming(
     protocol_v2::RateProfileTiming timing) {
+  timing.adc1_phase_ipg_cycles =
+      input_experiment::scaleIpg(timing.adc1_phase_ipg_cycles);
   timing.input_frame_coverage_ticks *= input_experiment::kAdcFrameMultiplier;
   timing.completion_expected_dwt_cycles =
       input_experiment::scaleDwt(timing.completion_expected_dwt_cycles);

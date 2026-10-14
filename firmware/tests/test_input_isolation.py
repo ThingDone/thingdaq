@@ -316,3 +316,23 @@ def test_busy_preflight_prevents_submission(monkeypatch, tmp_path):
         isolation.submit_program(
             "http://unused.invalid", "test-key", b"hex", "pass", tmp_path, 1
         )
+
+
+@pytest.mark.parametrize("cpu", [450, 528])
+def test_fixed_rate_clock_manifest_requires_matching_target(cpu):
+    manifest = {
+        "input_experiment": {"cpu_mhz": cpu, "equal_rates": False},
+        "release_policy": {"fixed_1mhz": True, "core_hz": cpu * 1_000_000},
+        "target": {"fqbn": f"teensy:avr:teensy40:usb=serial,speed={cpu},opt=o2std"},
+    }
+    assert isolation.experiment_settings(manifest) == {
+        "AUX_INPUT_EQUAL_RATES": "0",
+        "AUX_INPUT_CPU_MHZ": str(cpu),
+        "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+    }
+    if cpu == 528:
+        with pytest.raises(ValueError, match="independent wire"):
+            isolation.frame_experiment_settings(manifest, enabled=False, host_api=True)
+    manifest["release_policy"]["core_hz"] = 600_000_000
+    with pytest.raises(ValueError, match="disagrees"):
+        isolation.experiment_settings(manifest)

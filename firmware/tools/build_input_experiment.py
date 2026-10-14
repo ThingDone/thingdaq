@@ -3,7 +3,7 @@
 
 Not a public protocol revision: profile IDs are experiment-local, and standard
 v2 hosts must reject a different advertised table. The optional larger frame
-keeps checksums and uses the fixed 450 MHz / 1 MHz release policy. Use the
+keeps checksums and uses the fixed 1 MHz release scheduling policy. Use the
 matching isolation validator and explicit --frame-experiment opt-in.
 """
 
@@ -52,15 +52,15 @@ def large_frame_retention(packet_buffers: dict) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--cpu-mhz", type=int, choices=(600, 450), required=True)
+    parser.add_argument("--cpu-mhz", type=int, choices=(600, 450, 528), required=True)
     parser.add_argument("--equal-rates", action="store_true")
     parser.add_argument("--release-fixed-1mhz", action="store_true")
     parser.add_argument("--large-adc-frame", action="store_true")
     parser.add_argument("--arduino-cli", default="arduino-cli")
     args = parser.parse_args()
-    if args.release_fixed_1mhz and (args.cpu_mhz != 450 or args.equal_rates):
+    if args.release_fixed_1mhz and (args.cpu_mhz not in (450, 528) or args.equal_rates):
         parser.error(
-            "--release-fixed-1mhz requires --cpu-mhz 450 without --equal-rates"
+            "--release-fixed-1mhz requires --cpu-mhz 450 or 528 without --equal-rates"
         )
     if args.large_adc_frame and not args.release_fixed_1mhz:
         parser.error("--large-adc-frame requires --release-fixed-1mhz")
@@ -100,14 +100,14 @@ def main() -> int:
         )
     manifest["input_experiment"] = {
         "cpu_mhz": args.cpu_mhz,
-        "ipg_hz": 150_000_000,
-        "adc_clock_hz": 37_500_000,
+        "ipg_hz": 132_000_000 if args.cpu_mhz == 528 else 150_000_000,
+        "adc_clock_hz": 33_000_000 if args.cpu_mhz == 528 else 37_500_000,
         "pit_hz": 24_000_000,
         "equal_rates": args.equal_rates,
         "release_fixed_1mhz": args.release_fixed_1mhz,
         "large_adc_frame": args.large_adc_frame,
         "data_checksum": "standard-adler32",
-        "public_protocol_compatible": not args.large_adc_frame
+        "public_protocol_compatible": args.cpu_mhz != 528 and not args.large_adc_frame
         and (args.release_fixed_1mhz or (not args.equal_rates and args.cpu_mhz == 600)),
         "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag])",
         "base_source_id": original_identity().source_id,

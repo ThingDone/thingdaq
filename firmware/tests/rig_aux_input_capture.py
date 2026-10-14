@@ -103,8 +103,10 @@ EXPERIMENT_EQUAL_RATES = os.environ.get("AUX_INPUT_EQUAL_RATES", "0") == "1"
 RELEASE_FIXED_1MHZ = os.environ.get("AUX_INPUT_RELEASE_FIXED_1MHZ", "0") == "1"
 EXPERIMENT_CPU_HZ = int(os.environ.get("AUX_INPUT_CPU_MHZ", "600")) * 1_000_000
 EXPERIMENT_LARGE_ADC_FRAME = os.environ.get("AUX_INPUT_LARGE_ADC_FRAME", "0") == "1"
-if EXPERIMENT_CPU_HZ not in (600_000_000, 450_000_000):
-    raise ValueError("only reviewed 600/150 and 450/150 MHz profiles are supported")
+if EXPERIMENT_CPU_HZ not in (600_000_000, 450_000_000, 528_000_000):
+    raise ValueError("only 600/150, 450/150 and 528/132 MHz profiles are supported")
+EXPERIMENT_IPG_HZ = 132_000_000 if EXPERIMENT_CPU_HZ == 528_000_000 else 150_000_000
+EXPERIMENT_ADC_HZ = EXPERIMENT_IPG_HZ // 4
 STREAM_NONE = 0
 STREAM_ADC = 1
 STREAM_GPIO = 2
@@ -356,7 +358,7 @@ PROFILES = tuple(
         profile.pit_divider
         * (4 if EXPERIMENT_EQUAL_RATES and profile.value != 4 else 1)
         - 1,
-        profile.adc_phase_ipg_cycles,
+        EXPERIMENT_IPG_HZ // (2 * profile.adc_rate_hz),
         profile.completion_dwt_cycles * EXPERIMENT_CPU_HZ // 600_000_000,
         profile.disabled_coverage_ticks,
         profile.input_coverage_ticks * (2 if EXPERIMENT_LARGE_ADC_FRAME else 1),
@@ -2387,8 +2389,11 @@ def validate_status(
     if adc_enabled:
         for name, expected in {
             "adc_trigger_dwt_clock_hz": EXPERIMENT_CPU_HZ,
-            "adc_ipg_clock_hz": 150_000_000,
-            "adc_clock_hz": 37_500_000,
+            "adc_resolution_bits": ADC_RESOLUTION_BITS,
+            "adc_clock_source": 1,
+            "adc_clock_divider": 4,
+            "adc_ipg_clock_hz": EXPERIMENT_IPG_HZ,
+            "adc_clock_hz": EXPERIMENT_ADC_HZ,
             "adc_trigger_pit_clock_hz": 24_000_000,
         }.items():
             if status.values[name] != expected:

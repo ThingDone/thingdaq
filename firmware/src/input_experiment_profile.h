@@ -17,8 +17,10 @@
 #ifndef THINGDAQ_EXPERIMENT_EQUAL_RATES
 #define THINGDAQ_EXPERIMENT_EQUAL_RATES 0
 #endif
-#if THINGDAQ_EXPERIMENT_CPU_HZ != 600000000U && THINGDAQ_EXPERIMENT_CPU_HZ != 450000000U
-#error "input experiment supports only the reviewed 600/150 and 450/150 MHz clocks"
+#if THINGDAQ_EXPERIMENT_CPU_HZ != 600000000U && \
+    THINGDAQ_EXPERIMENT_CPU_HZ != 450000000U && \
+    THINGDAQ_EXPERIMENT_CPU_HZ != 528000000U
+#error "input experiment supports only 600/150, 450/150 and 528/132 MHz clocks"
 #endif
 #if THINGDAQ_EXPERIMENT_EQUAL_RATES != 0 && THINGDAQ_EXPERIMENT_EQUAL_RATES != 1
 #error "invalid equal-rate experiment selection"
@@ -32,8 +34,14 @@ inline constexpr std::uint32_t kAdcFrameMultiplier = 1U;
 #endif
 inline constexpr bool kReleaseFixed1MHz = THINGDAQ_RELEASE_FIXED_1MHZ != 0;
 inline constexpr std::uint32_t kCpuHz = THINGDAQ_EXPERIMENT_CPU_HZ;
-static_assert(!kReleaseFixed1MHz || kCpuHz == 450000000U,
-              "release firmware requires a 450 MHz core");
+static_assert(!kReleaseFixed1MHz || kCpuHz == 450000000U || kCpuHz == 528000000U,
+              "fixed-rate firmware requires 450 MHz or the explicit 528 MHz experiment");
+inline constexpr std::uint32_t kIpgHz = kCpuHz == 528000000U ? 132000000U : 150000000U;
+inline constexpr std::uint32_t kAdcHz = kIpgHz / 4U;
+constexpr std::uint16_t scaleIpg(std::uint16_t cycles_at_150mhz) {
+  return static_cast<std::uint16_t>(
+      static_cast<std::uint64_t>(cycles_at_150mhz) * kIpgHz / 150000000U);
+}
 inline constexpr bool kEqualRates = THINGDAQ_EXPERIMENT_EQUAL_RATES != 0;
 inline constexpr std::uint32_t kGpioRateMultiplier = kEqualRates ? 1U : 4U;
 constexpr std::uint32_t scaleDwt(std::uint32_t cycles_at_600mhz) {

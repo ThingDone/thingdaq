@@ -244,15 +244,15 @@ THINGDAQ_ADC_TARGET_CODE(".flashmem.adc_init.target_singleton")
 Initializer &teensyInitializer() { return g_initializer; }
 
 static_assert(F_CPU == input_experiment::kCpuHz,
-              "ADC initialization requires the pinned 600 MHz target");
+              "ADC initialization requires the selected CPU clock");
 static_assert(A0 == board::kAdc0Pin);
 static_assert(A1 == board::kAdc1Pin);
 static_assert(board::kAdc0Peripheral == 1U);
 static_assert(board::kAdc1Peripheral == 2U);
 static_assert(board::kAdc0InputChannel == 7U);
 static_assert(board::kAdc1InputChannel == 8U);
-static_assert(protocol_v1::kAdcClockHz * protocol_v1::kAdcClockDivider ==
-              protocol_v1::kAdcIpgClockHz);
+static_assert(input_experiment::kAdcHz * protocol_v1::kAdcClockDivider ==
+              input_experiment::kIpgHz);
 
 }  // namespace thingdaq::adc
 

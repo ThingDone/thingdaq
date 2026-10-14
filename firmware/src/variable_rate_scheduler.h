@@ -11,7 +11,7 @@ namespace thingdaq::variable_rate {
 struct ClockDomains {
   std::uint32_t timestamp_hz = protocol_v2::kTimestampHz;
   std::uint32_t pit_hz = protocol_v2::kPitClockHz;
-  std::uint32_t ipg_hz = protocol_v2::kIpgClockHz;
+  std::uint32_t ipg_hz = input_experiment::kIpgHz;
   std::uint32_t dwt_hz = input_experiment::kCpuHz;
 };
 
@@ -176,7 +176,7 @@ class Scheduler final {
 
 static_assert(kContractClocks.timestamp_hz == protocol_v2::kTimestampHz);
 static_assert(kContractClocks.pit_hz == protocol_v2::kPitClockHz);
-static_assert(kContractClocks.ipg_hz == protocol_v2::kIpgClockHz);
+static_assert(kContractClocks.ipg_hz == input_experiment::kIpgHz);
 static_assert(kContractClocks.dwt_hz == input_experiment::kCpuHz);
 
 }  // namespace thingdaq::variable_rate

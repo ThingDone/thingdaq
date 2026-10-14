@@ -9,9 +9,12 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.parametrize("cpu", [600_000_000, 450_000_000])
+@pytest.mark.parametrize("cpu", [600_000_000, 450_000_000, 528_000_000])
 @pytest.mark.parametrize("equal", [0, 1])
-def test_input_rate_clock(cpu, equal, tmp_path):
+@pytest.mark.parametrize("release", [False, True])
+def test_input_rate_clock(cpu, equal, release, tmp_path):
+    if release and (cpu == 600_000_000 or equal):
+        pytest.skip("fixed-rate policy supports 450/528 MHz without equal-rate override")
     source = ROOT / "firmware/src"
     executable = tmp_path / "input-rate-clock"
     compiled = subprocess.run(
@@ -24,6 +27,7 @@ def test_input_rate_clock(cpu, equal, tmp_path):
             "-Werror",
             f"-DTHINGDAQ_EXPERIMENT_CPU_HZ={cpu}U",
             f"-DTHINGDAQ_EXPERIMENT_EQUAL_RATES={equal}",
+            f"-DTHINGDAQ_RELEASE_FIXED_1MHZ={int(release)}",
             f"-I{source}",
             str(ROOT / "firmware/tests/input_rate_clock_test.cpp"),
             *(
@@ -59,10 +63,10 @@ def test_build_identity_distinguishes_clock_and_ratio(monkeypatch):
     )
     identities = [
         builder.experiment_identity(original, cpu, equal)
-        for cpu in (600, 450)
+        for cpu in (600, 450, 528)
         for equal in (False, True)
     ]
-    assert len({identity.build_id for identity in identities}) == 4
+    assert len({identity.build_id for identity in identities}) == 6
     assert all(
         identity.timestamp_epoch == original.timestamp_epoch for identity in identities
     )
@@ -71,7 +75,7 @@ def test_build_identity_distinguishes_clock_and_ratio(monkeypatch):
     large = builder.experiment_identity(
         original, 450, False, release_fixed_1mhz=True, large_adc_frame=True
     )
-    assert len({small.build_id, large.build_id, *(i.build_id for i in identities)}) == 6
+    assert len({small.build_id, large.build_id, *(i.build_id for i in identities)}) == 8
 
 
 def test_large_frame_manifest_retention_matches_fixed_release_layout(monkeypatch):

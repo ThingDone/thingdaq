@@ -57,7 +57,7 @@ struct Snapshot {
   std::uint32_t gpio_master_rate_hz =
       protocol_v1::kAdcTriggerGpioMasterRateHz;
   std::uint32_t pair_rate_hz = protocol_v1::kAdcTriggerPairRateHz;
-  std::uint32_t ipg_clock_hz = protocol_v1::kAdcTriggerIpgClockHz;
+  std::uint32_t ipg_clock_hz = input_experiment::kIpgHz;
   std::uint8_t gpio_master_pit_channel =
       protocol_v1::kAdcTriggerGpioMasterPitChannel;
   std::uint8_t pair_pit_channel =
@@ -77,12 +77,12 @@ struct Snapshot {
       protocol_v1::kAdcTriggerQueues[0],
       protocol_v1::kAdcTriggerQueues[1]};
   std::array<std::uint16_t, kConverterCount> initial_delays{
-      protocol_v1::kAdcTriggerInitialDelays[0],
-      protocol_v1::kAdcTriggerInitialDelays[1]};
+      input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[0]),
+      input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[1])};
   std::array<std::uint16_t, kConverterCount> effective_delays{
-      protocol_v1::kAdcTriggerEffectiveDelays[0],
-      protocol_v1::kAdcTriggerEffectiveDelays[1]};
-  std::uint16_t phase_ipg_cycles = protocol_v1::kAdcTriggerPhaseIpgCycles;
+      (input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[0]) + 1U),
+      (input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[1]) + 1U)};
+  std::uint16_t phase_ipg_cycles = input_experiment::scaleIpg(protocol_v1::kAdcTriggerPhaseIpgCycles);
   HardwareEvidence evidence{};
   std::array<std::uint32_t, kConverterCount> completion_counts{};
   std::uint32_t completion_delta_cycles = 0U;
@@ -149,17 +149,17 @@ static_assert(protocol_v1::kAdcTriggerGpioMasterRateHz /
                           protocol_v1::kAdcTriggerPairRateHz -
                       1U ==
                   protocol_v1::kAdcTriggerPairPitLoad);
-static_assert(protocol_v1::kAdcTriggerEffectiveDelays[1] -
-                      protocol_v1::kAdcTriggerEffectiveDelays[0] ==
-                  75U);
-static_assert(protocol_v1::kAdcTriggerPhaseIpgCycles *
+static_assert((input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[1]) + 1U) -
+                      (input_experiment::scaleIpg(protocol_v1::kAdcTriggerInitialDelays[0]) + 1U) ==
+                  input_experiment::scaleIpg(75U));
+static_assert(input_experiment::scaleIpg(protocol_v1::kAdcTriggerPhaseIpgCycles) *
                       protocol_v1::kTimestampHz /
-                      protocol_v1::kAdcTriggerIpgClockHz ==
+                      input_experiment::kIpgHz ==
                   protocol_v1::kAdc1PhaseTicks);
 static_assert(static_cast<std::uint64_t>(
-                  protocol_v1::kAdcTriggerPhaseIpgCycles) *
+                  input_experiment::scaleIpg(protocol_v1::kAdcTriggerPhaseIpgCycles)) *
                       input_experiment::kCpuHz /
-                      protocol_v1::kAdcTriggerIpgClockHz ==
+                      input_experiment::kIpgHz ==
                   input_experiment::scaleDwt(protocol_v1::kAdcCompletionExpectedDwtCycles));
 static_assert(protocol_v1::kAdcTriggerQueues[0] !=
               protocol_v1::kAdcTriggerQueues[1]);

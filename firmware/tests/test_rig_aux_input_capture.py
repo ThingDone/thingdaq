@@ -46,6 +46,19 @@ rig = _load_rig()
 
 
 class EqualRateValidatorTests(unittest.TestCase):
+    def test_528_clock_projection_preserves_trigger_rate_and_resolution(self):
+        with patch.dict(os.environ, {"AUX_INPUT_CPU_MHZ": "528"}):
+            candidate = _load_rig()
+        profile = candidate.PROFILES[4]
+        self.assertEqual(132_000_000, candidate.EXPERIMENT_IPG_HZ)
+        self.assertEqual(33_000_000, candidate.EXPERIMENT_ADC_HZ)
+        self.assertEqual(12, candidate.ADC_RESOLUTION_BITS)
+        self.assertEqual(66, profile.adc_phase_ipg_cycles)
+        self.assertEqual(264, profile.completion_dwt_cycles)
+        self.assertEqual(24, profile.pit_divider)
+        self.assertEqual(1_000_000, profile.adc_rate_hz)
+        self.assertEqual(1_000_000, profile.gpio_rate_hz)
+
     def test_equal_rate_clock_metadata_and_weighted_continuity(self):
         with patch.dict(
             os.environ, {"AUX_INPUT_EQUAL_RATES": "1", "AUX_INPUT_CPU_MHZ": "450"}

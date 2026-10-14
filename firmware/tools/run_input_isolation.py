@@ -118,21 +118,25 @@ def experiment_settings(manifest: dict) -> dict[str, str]:
     """Use only explicit build-manifest selections, never inferred filenames."""
     experiment = manifest.get("input_experiment")
     if manifest.get("release_policy", {}).get("fixed_1mhz") is True:
+        cpu = 450 if experiment is None else experiment["cpu_mhz"]
+        if cpu not in (450, 528) or (experiment and experiment["equal_rates"] is not False):
+            raise ValueError("unsupported fixed-rate clock/rate selection")
         if (
             manifest["target"]["fqbn"]
-            != "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std"
+            != f"teensy:avr:teensy40:usb=serial,speed={cpu},opt=o2std"
+            or manifest["release_policy"].get("core_hz") != cpu * 1_000_000
         ):
             raise ValueError("release CPU disagrees with compiled target")
         return {
             "AUX_INPUT_EQUAL_RATES": "0",
-            "AUX_INPUT_CPU_MHZ": "450",
+            "AUX_INPUT_CPU_MHZ": str(cpu),
             "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
         }
     if experiment is None:
         return {"AUX_INPUT_EQUAL_RATES": "0", "AUX_INPUT_CPU_MHZ": "600"}
     cpu = experiment["cpu_mhz"]
     equal = experiment["equal_rates"]
-    if cpu not in (600, 450) or not isinstance(equal, bool):
+    if cpu not in (600, 450, 528) or not isinstance(equal, bool):
         raise ValueError("unsupported input experiment clock/rate selection")
     expected_fqbn = f"teensy:avr:teensy40:usb=serial,speed={cpu},opt=o2std"
     if manifest["target"]["fqbn"] != expected_fqbn:
@@ -156,7 +160,10 @@ def validate_program_budget(seconds: float, cells: int) -> float:
 
 def frame_experiment_settings(manifest: dict, *, enabled: bool, host_api: bool) -> dict:
     """Require explicit opt-in to a checksummed, incompatible research layout."""
-    selected = manifest.get("input_experiment", {}).get("large_adc_frame", False)
+    experiment = manifest.get("input_experiment", {})
+    if host_api and experiment.get("cpu_mhz") == 528:
+        raise ValueError("528 MHz requires the independent wire validator")
+    selected = experiment.get("large_adc_frame", False)
     if not isinstance(selected, bool) or enabled != selected:
         raise ValueError("--frame-experiment must match the manifest's large_adc_frame")
     if selected and host_api:
