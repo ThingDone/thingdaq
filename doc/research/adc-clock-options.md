@@ -85,3 +85,9 @@ tests a faster CPU with substantially less ADC timing margin. The IPG-derived
 research builder; the ADACK candidate remains unimplemented. See
 [[Clock528-20261013]] for the hardware test results. Neither is qualified for
 production.
+
+The deeper [[Adc528-Recovery-20261013]] investigation subsequently demonstrated
+12-bit continuous DMA at approximately 1.178571 MS/s per converter with the
+528/132/33 MHz clocks. Repeated exact-1-MHz triggering still failed. Continuous
+conversion removes the per-conversion restart cost, but changes sampling rate,
+channel-phase and timestamp assumptions; it is not a drop-in clock-only fix.

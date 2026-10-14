@@ -133,8 +133,10 @@ bounded cooperative service, never by an ISR. When all eight consumer buffers
 are owned, both channels use separate halfwords of an isolated 32-byte sink
 with zero destination stride. Each completed sink generation advances one
 ring-overrun event and exactly 1,012 lost pairs while acquisition remains live.
-ADC_ETC trigger-error bits count overwritten converter results and taint the
-active generation; mismatched completions, unequal STOP progress, DMA faults,
+ADC_ETC trigger-error bits report rejected triggers while previous trigger work
+is unfinished (RT1060 reference manual section 67.3.1), and taint the active
+generation. They do not directly count overwritten ADC result registers;
+legacy firmware counter names are unchanged. Mismatched completions, unequal STOP progress, DMA faults,
 schedule exhaustion, and rejected stale interrupts have independent counters.
 Complete corrupt blocks and partial STOP work contribute exact discarded-pair
 counts.
