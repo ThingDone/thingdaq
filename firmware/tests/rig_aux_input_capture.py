@@ -615,6 +615,26 @@ class FrameParser:
         self.payload_errors = 0
         self.bytes_discarded = 0
         self.high_water_bytes = 0
+        self.rejected_frames: list[dict[str, object]] = []
+
+    def record_rejection(self, category: str, reason: str, length: int) -> None:
+        # Keep diagnostic storage bounded; never change rejection or grading.
+        if len(self.rejected_frames) >= 4:
+            return
+        sample = {
+            "category": category,
+            "reason": reason,
+            "host_monotonic_seconds": time.monotonic(),
+            "bytes_received": self.bytes_received,
+            "frames_decoded": self.frames_decoded,
+            "wire_hex": bytes(
+                self.buffer[
+                    self._scan_start : self._scan_start + min(length, MAX_FRAME_BYTES)
+                ]
+            ).hex(),
+        }
+        self.rejected_frames.append(sample)
+        emit_event("parser_rejection", **sample)
 
     @property
     def errors(self) -> int:
@@ -638,8 +658,9 @@ class FrameParser:
             fields = HEADER.unpack_from(self.buffer, self._scan_start)
             try:
                 total_length = self._validate_header(fields)
-            except ProtocolFailure:
+            except ProtocolFailure as error:
                 self.header_errors += 1
+                self.record_rejection("header", str(error), HEADER_SIZE)
                 self._discard(1)
                 continue
             if self._buffered_bytes() < total_length:
@@ -650,8 +671,9 @@ class FrameParser:
             checksum_view = memoryview(self.buffer)[self._scan_start : payload_end]
             try:
                 expected = compute_checksum(checksum_view, fields[5])
-            except ProtocolFailure:
+            except ProtocolFailure as error:
                 self.header_errors += 1
+                self.record_rejection("header", str(error), HEADER_SIZE)
                 self._discard(1)
                 continue
             finally:
@@ -659,6 +681,11 @@ class FrameParser:
             actual = TRAILER.unpack_from(self.buffer, payload_end)[0]
             if actual != expected:
                 self.checksum_errors += 1
+                self.record_rejection(
+                    "checksum",
+                    f"expected {expected:#x}, received {actual:#x}",
+                    total_length,
+                )
                 self._discard(1)
                 continue
             payload_view = memoryview(self.buffer)[payload_start:payload_end]
@@ -680,8 +707,9 @@ class FrameParser:
             )
             try:
                 self._validate_payload(frame)
-            except ProtocolFailure:
+            except ProtocolFailure as error:
                 self.payload_errors += 1
+                self.record_rejection("payload", str(error), total_length)
                 self._discard(1)
                 continue
             self._scan_start += total_length
@@ -3465,6 +3493,19 @@ def run_acceptance(
         except Exception as status_error:  # noqa: BLE001 - cleanup must still run
             emit_event("failure_status_unavailable", error=str(status_error))
     finally:
+        metrics["parser"] = {
+            name: getattr(link.parser, name)
+            for name in (
+                "bytes_received",
+                "frames_decoded",
+                "header_errors",
+                "checksum_errors",
+                "payload_errors",
+                "bytes_discarded",
+                "high_water_bytes",
+            )
+        }
+        metrics["rejected_frames"] = link.parser.rejected_frames
         metrics["temperature_samples"] = temperature_samples
         if not completed:
             try:

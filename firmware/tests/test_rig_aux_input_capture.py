@@ -518,6 +518,40 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
             )
         self.assertEqual([], result.evidence.failures)
 
+    def test_rejected_frame_evidence_is_bounded_and_preserves_resynchronization(
+        self,
+    ) -> None:
+        valid = (FIXTURES / "gpio-data.bin").read_bytes()
+        corrupt = bytearray(valid)
+        corrupt[-1] ^= 1
+        parser = rig.FrameParser()
+        with patch.object(rig, "emit_event") as event:
+            for _ in range(6):
+                recovered = parser.feed(bytes(corrupt) + valid)
+                self.assertEqual(1, len(recovered))
+            self.assertEqual(4, event.call_count)
+        self.assertEqual(6, parser.checksum_errors)
+        self.assertEqual(6, parser.errors)
+        self.assertEqual(4, len(parser.rejected_frames))
+        self.assertEqual("checksum", parser.rejected_frames[0]["category"])
+        self.assertEqual(bytes(corrupt).hex(), parser.rejected_frames[0]["wire_hex"])
+
+    def test_final_parser_evidence_survives_acceptance_check_failure(self) -> None:
+        # A non-exception acceptance failure previously lost parser categories.
+        original_init = rig.FrameParser.__init__
+
+        def with_prior_error(parser):
+            original_init(parser)
+            parser.header_errors = 1
+
+        with patch.object(rig.FrameParser, "__init__", with_prior_error):
+            result = self._run(
+                rig.RUN_CASES["INPUT_COMBINED"], rig.PROFILES[-1], run_diagnostic=False
+            )
+        self.assertIn("host.parser_errors: expected 0, got 1", result.evidence.failures)
+        self.assertEqual(1, result.metrics["parser"]["header_errors"])
+        self.assertEqual([], result.metrics["rejected_frames"])
+
     def test_real_firmware_legacy_rejection_is_not_hidden_as_timeout(self) -> None:
         wire = bytes.fromhex(
             "efbeadde019f00802c0001003800000008000000000000000000000004000000"
