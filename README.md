@@ -26,9 +26,12 @@ initialization is skipped. See the [decision and test evidence](doc/results/watc
 Current source uses an optimized, wire-compatible Adler-32 implementation.
 Checksummed larger ADC frames are available as an opt-in research build, using
 the independent wire validator rather than the public SDK. See the
-[integration and reliability evidence](doc/results/experiments/reliability-20261011.md)
+[integration and reliability evidence](doc/results/experiments/reliability-20261011.md),
 [ADC clock feasibility analysis](doc/research/adc-clock-options.md),
-and [528 MHz acquisition test results](doc/results/experiments/clock528-20261013.md).
+[528 MHz acquisition test results](doc/results/experiments/clock528-20261013.md),
+and [600 MHz thermal repeats](doc/results/experiments/clock600-thermal-20261016.md).
+The 600 MHz research image peaked at 68.6 °C over three ten-minute combined
+16-input captures; two passed and one failed a parser-error check.
 
 ThingDAQ (Thing Done DAQ) is firmware and a typed Python API for synchronized,
 loss-visible acquisition on the Teensy 4.0 platform. It captures two
