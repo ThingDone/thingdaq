@@ -119,7 +119,9 @@ def experiment_settings(manifest: dict) -> dict[str, str]:
     experiment = manifest.get("input_experiment")
     if manifest.get("release_policy", {}).get("fixed_1mhz") is True:
         cpu = 450 if experiment is None else experiment["cpu_mhz"]
-        if cpu not in (450, 528) or (experiment and experiment["equal_rates"] is not False):
+        if cpu not in (450, 528, 600) or (
+            experiment and experiment["equal_rates"] is not False
+        ):
             raise ValueError("unsupported fixed-rate clock/rate selection")
         if (
             manifest["target"]["fqbn"]
@@ -161,8 +163,11 @@ def validate_program_budget(seconds: float, cells: int) -> float:
 def frame_experiment_settings(manifest: dict, *, enabled: bool, host_api: bool) -> dict:
     """Require explicit opt-in to a checksummed, incompatible research layout."""
     experiment = manifest.get("input_experiment", {})
-    if host_api and experiment.get("cpu_mhz") == 528:
-        raise ValueError("528 MHz requires the independent wire validator")
+    if host_api and (
+        experiment.get("cpu_mhz") == 528
+        or (experiment.get("release_fixed_1mhz") and experiment.get("cpu_mhz") != 450)
+    ):
+        raise ValueError("research clocks require the independent wire validator")
     selected = experiment.get("large_adc_frame", False)
     if not isinstance(selected, bool) or enabled != selected:
         raise ValueError("--frame-experiment must match the manifest's large_adc_frame")

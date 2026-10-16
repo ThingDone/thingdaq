@@ -58,10 +58,8 @@ def main() -> int:
     parser.add_argument("--large-adc-frame", action="store_true")
     parser.add_argument("--arduino-cli", default="arduino-cli")
     args = parser.parse_args()
-    if args.release_fixed_1mhz and (args.cpu_mhz not in (450, 528) or args.equal_rates):
-        parser.error(
-            "--release-fixed-1mhz requires --cpu-mhz 450 or 528 without --equal-rates"
-        )
+    if args.release_fixed_1mhz and args.equal_rates:
+        parser.error("--release-fixed-1mhz cannot be combined with --equal-rates")
     if args.large_adc_frame and not args.release_fixed_1mhz:
         parser.error("--large-adc-frame requires --release-fixed-1mhz")
     base.RELEASE_BUILD = args.release_fixed_1mhz
@@ -107,8 +105,17 @@ def main() -> int:
         "release_fixed_1mhz": args.release_fixed_1mhz,
         "large_adc_frame": args.large_adc_frame,
         "data_checksum": "standard-adler32",
-        "public_protocol_compatible": args.cpu_mhz != 528 and not args.large_adc_frame
-        and (args.release_fixed_1mhz or (not args.equal_rates and args.cpu_mhz == 600)),
+        "public_protocol_compatible": (
+            not args.large_adc_frame
+            and (
+                (args.release_fixed_1mhz and args.cpu_mhz == 450)
+                or (
+                    not args.release_fixed_1mhz
+                    and not args.equal_rates
+                    and args.cpu_mhz == 600
+                )
+            )
+        ),
         "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag])",
         "base_source_id": original_identity().source_id,
         "builder_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),

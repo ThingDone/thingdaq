@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 @pytest.mark.parametrize("equal", [0, 1])
 @pytest.mark.parametrize("release", [False, True])
 def test_input_rate_clock(cpu, equal, release, tmp_path):
-    if release and (cpu == 600_000_000 or equal):
-        pytest.skip("fixed-rate policy supports 450/528 MHz without equal-rate override")
+    if release and equal:
+        pytest.skip("fixed-rate policy does not support the equal-rate override")
     source = ROOT / "firmware/src"
     executable = tmp_path / "input-rate-clock"
     compiled = subprocess.run(

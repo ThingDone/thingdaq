@@ -34,8 +34,9 @@ inline constexpr std::uint32_t kAdcFrameMultiplier = 1U;
 #endif
 inline constexpr bool kReleaseFixed1MHz = THINGDAQ_RELEASE_FIXED_1MHZ != 0;
 inline constexpr std::uint32_t kCpuHz = THINGDAQ_EXPERIMENT_CPU_HZ;
-static_assert(!kReleaseFixed1MHz || kCpuHz == 450000000U || kCpuHz == 528000000U,
-              "fixed-rate firmware requires 450 MHz or the explicit 528 MHz experiment");
+static_assert(!kReleaseFixed1MHz || kCpuHz == 450000000U ||
+                  kCpuHz == 528000000U || kCpuHz == 600000000U,
+              "unsupported fixed-rate core clock");
 inline constexpr std::uint32_t kIpgHz = kCpuHz == 528000000U ? 132000000U : 150000000U;
 inline constexpr std::uint32_t kAdcHz = kIpgHz / 4U;
 constexpr std::uint16_t scaleIpg(std::uint16_t cycles_at_150mhz) {
