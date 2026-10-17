@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import random
 import struct
 import sys
 import time
@@ -102,6 +103,74 @@ class EqualRateValidatorTests(unittest.TestCase):
             validator.accept(frame(equal.ADC_DATA, 8 + i))
         with self.assertRaisesRegex(equal.ProtocolFailure, "coverage skew"):
             validator.accept(frame(equal.ADC_DATA, 12))
+
+
+class FragmentedFrameParserTests(unittest.TestCase):
+    def test_data_and_control_frames_at_every_byte_split(self):
+        wires = [
+            (FIXTURES / name).read_bytes()
+            for name in (
+                "adc-data.bin",
+                "gpio-data.bin",
+                "get-status-response.bin",
+                "get-temperature-response.bin",
+                "stop-response.bin",
+            )
+        ]
+        # Exercise the long-capture timestamp boundary with embedded magic in
+        # a legal GPIO payload; it must never be mistaken for another header.
+        layout = rig.LAYOUTS[rig.AUX_INPUT]
+        sequence = (1 << 32) // (layout.gpio_items_per_frame * 8) + 1
+        wires.append(
+            encode_v2_frame(
+                rig.GPIO_DATA,
+                (rig.MAGIC_BYTES * (layout.gpio_payload_bytes // 4)),
+                run_id=1,
+                sequence=sequence,
+                first_sample_ticks=sequence * layout.gpio_items_per_frame * 8,
+                item_count=layout.gpio_items_per_frame,
+            )
+        )
+        for wire in wires:
+            expected = rig.FrameParser().feed(wire)
+            self.assertEqual(1, len(expected))
+            for split in range(len(wire) + 1):
+                parser = rig.FrameParser()
+                actual = parser.feed(wire[:split]) + parser.feed(wire[split:])
+                self.assertEqual(expected, actual, f"length={len(wire)}, split={split}")
+                self.assertEqual(0, parser.errors)
+                self.assertEqual(0, parser.bytes_discarded)
+                self.assertEqual(b"", parser.buffer)
+
+    def test_mixed_fixture_stream_under_seeded_read_boundaries(self):
+        wires = []
+        for path in sorted(FIXTURES.glob("*.bin")):
+            wire = path.read_bytes()
+            if len(wire) < rig.HEADER_SIZE:
+                continue
+            kind = rig.HEADER.unpack_from(wire)[2]
+            if kind in rig.RESPONSE_KINDS or kind in rig.DATA_KINDS:
+                wires.append(wire)
+        self.assertGreater(len(wires), 40)
+        blob = b"".join(wires) * 3
+        expected = []
+        parser = rig.FrameParser()
+        for wire in wires * 3:
+            expected.extend(parser.feed(wire))
+        self.assertEqual(0, parser.errors)
+        for seed in range(20):
+            randomizer = random.Random(seed)
+            parser = rig.FrameParser()
+            actual = []
+            offset = 0
+            while offset < len(blob):
+                length = randomizer.randint(1, rig.SERIAL_READ_BYTES)
+                actual.extend(parser.feed(blob[offset : offset + length]))
+                offset += length
+            self.assertEqual(expected, actual, f"seed={seed}")
+            self.assertEqual(0, parser.errors)
+            self.assertEqual(0, parser.bytes_discarded)
+            self.assertEqual(b"", parser.buffer)
 
 
 def _fixture_frame(name: str):  # type: ignore[no-untyped-def]
