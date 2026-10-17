@@ -18,6 +18,11 @@ related:
 GPIO inputs at 1 MS/s each. Runs 2 and 3 passed all 131 checks. Run 1 failed
 one parser-error check, so this is not a three-pass reliability qualification.
 
+[Follow-up parser investigation](parser600-investigation-20261017.md): three
+additional ten-minute captures and forty short session/START/STOP repeats passed.
+The original rejection did not recur; its missing bytes prevent root-cause
+classification, and run 1 remains failed.
+
 | Run | Capture | Die temperature before → after | Sampled maximum | Acceptance |
 | --- | ---: | --- | ---: | --- |
 | Smoke | 60 s | 37.3 → 49.6 °C | 49.6 °C | PASS, 131 checks |
