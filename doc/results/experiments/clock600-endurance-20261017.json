@@ -1,0 +1,24 @@
+{
+  "campaign_script_sha256": "00a65a64a66dd929ede8eea6780e5932c3e2388246bc73c669776af44739a1ab",
+  "firmware_sha256": "f22d53f3df1c364e46da425b33e6c42cfec71dd133c38dc1a84a5b1ec6ebc6e9",
+  "preflight_health": {
+    "checks": {
+      "coordinator_mode": "normal",
+      "docker_reachable": true,
+      "hub_reachable": true,
+      "hubs": {
+        "0x00000000": true
+      },
+      "queue_depth": 0,
+      "worker_thread_alive": true
+    },
+    "status": "healthy"
+  },
+  "requested_runs": 18,
+  "requested_seconds_per_run": 600,
+  "runs": [],
+  "schema": "thingdaq.repeated-thermal/v1",
+  "started_utc": "2026-10-17T22:18:27.588858+00:00",
+  "status": "RUNNING",
+  "updated_utc": "2026-10-17T22:18:27.670942+00:00"
+}
