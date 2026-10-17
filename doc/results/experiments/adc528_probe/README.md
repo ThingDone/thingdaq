@@ -1,3 +1,12 @@
+---
+type: reference
+title: Standalone ADC Timing Probe
+created: 2026-10-13
+tags: [firmware, adc, clocks]
+related:
+  - '[[Adc528-Recovery-20261013]]'
+---
+
 # Standalone ADC timing probe
 
 This characterization sketch reuses the production ADC initializer and trigger
