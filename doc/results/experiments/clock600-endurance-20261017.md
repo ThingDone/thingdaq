@@ -8,7 +8,7 @@ related: ['[[Clock600-Thermal-20261016]]', '[[Parser600-Investigation-20261017]]
 
 # 600 MHz three-hour repeated capture campaign
 
-Status: **RUNNING**. Completed 0 of 18 requested ten-minute captures.
+Status: **STOPPED**. Completed 1 of 18 requested ten-minute captures.
 
 The exact archived `thingdaq-6c8a85596662e413` image captures both 12-bit ADCs and all sixteen GPIO inputs at 1 MS/s, with normal ADC frames, standard Adler-32, 600 MHz CPU / 150 MHz IPG / 37.5 MHz ADC / 24 MHz PIT. Watchdog remains disabled.
 
@@ -18,6 +18,9 @@ The rig reflashes/resets between jobs. There is no intentional cooldown, but pro
 
 | Run | Before (°C) | After STOP (°C) | Peak sampled (°C) | Result |
 | ---: | ---: | ---: | ---: | --- |
+| 1 | 36.667 | unavailable | 48.948 | TEST_FAIL |
+
+Campaign stopped: Run 1 failed; evidence preserved; no further runs submitted
 
 ## Scope and next work
 
