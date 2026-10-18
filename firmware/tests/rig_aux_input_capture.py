@@ -36,6 +36,7 @@ numeric 'fixture_identity' and 'stimulus_identity' values, declare
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 import os
@@ -104,6 +105,8 @@ TIMESTAMP_HZ = 8_000_000
 EXPERIMENT_EQUAL_RATES = os.environ.get("AUX_INPUT_EQUAL_RATES", "0") == "1"
 RELEASE_FIXED_1MHZ = os.environ.get("AUX_INPUT_RELEASE_FIXED_1MHZ", "0") == "1"
 EXPERIMENT_CPU_HZ = int(os.environ.get("AUX_INPUT_CPU_MHZ", "600")) * 1_000_000
+EXPERIMENT_GPIO_RLE = os.environ.get("AUX_INPUT_GPIO_RLE", "0") == "1"
+GPIO_RLE_VERSION = 0x82
 EXPERIMENT_LARGE_ADC_FRAME = os.environ.get("AUX_INPUT_LARGE_ADC_FRAME", "0") == "1"
 if EXPERIMENT_CPU_HZ not in (600_000_000, 450_000_000, 528_000_000):
     raise ValueError("only 600/150, 450/150 and 528/132 MHz profiles are supported")
@@ -570,6 +573,27 @@ class Frame:
     item_count: int
     payload: bytes
     checksum: int
+    wire_bytes: int = 0
+    gpio_rle: bool = False
+
+
+def decode_gpio_rle(payload: bytes, item_count: int) -> bytes:
+    """Validate all records before allocating the bounded logical GPIO payload."""
+    if item_count != 2024 or not payload or len(payload) % 4 or len(payload) >= 4048:
+        raise ProtocolFailure("invalid GPIO RLE shape")
+    total = 0
+    previous = None
+    for count, value in struct.iter_unpack("<HH", payload):
+        if count == 0 or total + count > item_count or value == previous:
+            raise ProtocolFailure("invalid GPIO RLE run/count/canonicality")
+        total += count
+        previous = value
+    if total != item_count:
+        raise ProtocolFailure("GPIO RLE decoded count mismatch")
+    return b"".join(
+        struct.pack("<H", value) * count
+        for count, value in struct.iter_unpack("<HH", payload)
+    )
 
 
 def encode_request(kind: int, request_id: int, payload: bytes = b"") -> bytes:
@@ -695,7 +719,18 @@ class FrameParser:
                 payload = payload_view.tobytes()
             finally:
                 payload_view.release()
+            is_rle = fields[1] == GPIO_RLE_VERSION
+            if is_rle:
+                try:
+                    payload = decode_gpio_rle(payload, fields[13])
+                except ProtocolFailure as error:
+                    self.payload_errors += 1
+                    self.record_rejection("payload", str(error), total_length)
+                    self._discard(1)
+                    continue
             frame = Frame(
+                wire_bytes=total_length,
+                gpio_rle=is_rle,
                 kind=fields[2],
                 flags=fields[3],
                 checksum_algorithm=fields[5],
@@ -752,7 +787,10 @@ class FrameParser:
             item_count,
         ) = fields
         legacy_rejection = version == 1 and kind == ERROR_RESPONSE
-        if magic != MAGIC or (version != PROTOCOL_VERSION and not legacy_rejection):
+        rle = EXPERIMENT_GPIO_RLE and version == GPIO_RLE_VERSION and kind == GPIO_DATA
+        if magic != MAGIC or (
+            version != PROTOCOL_VERSION and not legacy_rejection and not rle
+        ):
             raise ProtocolFailure("invalid magic or protocol version")
         if header_length != HEADER_SIZE or reserved:
             raise ProtocolFailure("invalid fixed header fields")
@@ -764,9 +802,15 @@ class FrameParser:
                 raise ProtocolFailure(
                     f"host lacks checksum support for algorithm {checksum}"
                 )
-            if (total_length, payload_length, item_count) not in ALLOWED_DATA_SHAPES[
-                kind
-            ]:
+            valid_shape = (
+                item_count == 2024
+                and 4 <= payload_length < 4048
+                and payload_length % 4 == 0
+                if rle
+                else (total_length, payload_length, item_count)
+                in ALLOWED_DATA_SHAPES[kind]
+            )
+            if not valid_shape:
                 raise ProtocolFailure("data frame does not have a declared v2 shape")
             if flags & ~DATA_FLAG_MASK:
                 raise ProtocolFailure("data frame carries a reserved flag")
@@ -2625,6 +2669,33 @@ def validate_status(
                 else layout.gpio_total_frame_bytes
             ),
         }
+        if EXPERIMENT_GPIO_RLE and prefix == "gpio" and case.aux_mode == AUX_INPUT:
+            # Logical payload remains exact above. Selected wire sizes vary, so
+            # constrain each stage and each queued difference; final drain also
+            # reconciles every actual byte against independently parsed frames.
+            stages = []
+            for stage, frames in (
+                ("framed", framed),
+                ("emitted", emitted),
+                ("transmitted", transmitted),
+            ):
+                name = f"gpio_framed_bytes_{stage}"
+                del exact[name]
+                wire = status.values[name]
+                if not frames * 52 <= wire <= frames * 4096:
+                    raise ProtocolFailure(
+                        "GPIO selected wire bytes outside frame bounds"
+                    )
+                stages.append((frames, wire))
+            for (left_count, left_bytes), (
+                right_count,
+                right_bytes,
+            ) in itertools.pairwise(stages):
+                queued = left_count - right_count
+                if not queued * 52 <= left_bytes - right_bytes <= queued * 4096:
+                    raise ProtocolFailure(
+                        "GPIO selected wire stage conservation failed"
+                    )
         for name, expected in exact.items():
             if status.values[name] != expected:
                 raise ProtocolFailure(
@@ -2739,6 +2810,8 @@ class AcquisitionValidator:
         self.fixture = fixture
         self.adc = StreamTotals()
         self.gpio = StreamTotals()
+        self.gpio_rle_frames = 0
+        self.gpio_raw_frames = 0
         self.maximum_frame_skew = 0
         self.maximum_receive_gap_seconds = 0.0
         self.primary_and = 0xFF
@@ -2875,7 +2948,15 @@ class AcquisitionValidator:
                     self.primary_transitions |= changed & 0xFF
                     self.aux_transitions |= changed >> 8
                 self._last_gpio = value
-        self._advance(self.gpio, frame, self.layout.gpio_total_frame_bytes)
+        if frame.gpio_rle:
+            if not EXPERIMENT_GPIO_RLE or self.case.aux_mode != AUX_INPUT:
+                raise ProtocolFailure("GPIO RLE outside the experimental 16-bit layout")
+            self.gpio_rle_frames += 1
+        else:
+            self.gpio_raw_frames += 1
+        self._advance(
+            self.gpio, frame, frame.wire_bytes or self.layout.gpio_total_frame_bytes
+        )
 
 
 class MemoryTracker:
@@ -3518,6 +3599,13 @@ def run_acceptance(
             "capture_seconds": elapsed,
             "firmware_processing_cpu_basis_points": final_status.gpio_processing_cpu_basis_points,
             "gpio_frames": validator.gpio.frames,
+            "gpio_rle_frames": validator.gpio_rle_frames,
+            "gpio_raw_frames": validator.gpio_raw_frames,
+            "gpio_logical_payload_bytes": validator.gpio.payload_bytes,
+            "gpio_actual_wire_bytes": validator.gpio.framed_bytes,
+            "gpio_raw_equivalent_wire_bytes": validator.gpio.frames
+            * validator.layout.gpio_total_frame_bytes,
+            "adc_actual_wire_bytes": validator.adc.framed_bytes,
             "gpio_rate_hz": gpio_rate,
             "host_peak_rss_growth_bytes": memory.growth,
             "maximum_frame_skew": validator.maximum_frame_skew,

@@ -206,6 +206,13 @@ struct FinishFillResult {
 };
 
 struct SourceCounters {
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+  // Selected wire bytes; logical item/payload counters remain uncompressed.
+  std::uint64_t wire_bytes_framed = 0U;
+  std::uint64_t wire_bytes_emitted = 0U;
+  std::uint64_t wire_bytes_transmitted = 0U;
+  std::uint64_t wire_bytes_evicted = 0U;
+#endif
   std::uint64_t frames_produced = 0U;
   std::uint64_t items_produced = 0U;
   std::uint64_t frames_framed = 0U;
@@ -231,10 +238,9 @@ struct SourceCounters {
   std::size_t transmit_queue_high_water = 0U;
 };
 
-// Byte totals are a derived view of the item/frame counters. Payload bytes
-// exclude protocol overhead; framed bytes include the complete 4,096-byte
-// wire frame. Keeping both prevents a nominal 8 MB/s payload target from
-// being confused with the slightly larger CDC data-frame rate.
+// Payload bytes describe uncompressed logical items. Framed bytes include the
+// selected wire envelope and payload: fixed layout ordinarily, accumulated
+// per record in the opt-in GPIO RLE experiment.
 struct SourceByteCounters {
   std::uint64_t payload_bytes_produced = 0U;
   std::uint64_t payload_bytes_framed = 0U;
@@ -417,6 +423,10 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::uint64_t coverageFrames(std::size_t source_index) const;
   std::uint64_t accountedFrames(std::size_t source_index) const;
   BufferIndex takeFreeBuffer();
+  bool validFrameSize(const BufferRecord &record) const;
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+  void compressGpio(BufferIndex index);
+#endif
   BufferIndex oldestEvictableCompleteBuffer() const;
   bool evictCompleteBuffer(BufferIndex index);
   void dropBuffer(BufferIndex index, bool pressure_eviction);

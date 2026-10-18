@@ -176,6 +176,24 @@ def frame_experiment_settings(manifest: dict, *, enabled: bool, host_api: bool) 
     return {"AUX_INPUT_LARGE_ADC_FRAME": "1" if selected else "0"}
 
 
+def gpio_rle_settings(manifest: dict, *, enabled: bool, host_api: bool) -> dict:
+    experiment = manifest.get("input_experiment", {})
+    selected = experiment.get("gpio_rle", False)
+    if not isinstance(selected, bool) or selected != enabled:
+        raise ValueError("--gpio-rle must match the manifest's gpio_rle")
+    if selected and (
+        host_api
+        or not experiment.get("large_adc_frame")
+        or not experiment.get("release_fixed_1mhz")
+        or experiment.get("cpu_mhz") != 600
+        or experiment.get("gpio_rle_wire_version") != 130
+    ):
+        raise ValueError(
+            "GPIO RLE requires its private wire validator and qualified baseline"
+        )
+    return {"AUX_INPUT_GPIO_RLE": "1" if selected else "0"}
+
+
 def classify_result(result: dict, *, expected_cells: int | None = None) -> dict:
     details = result.get("results", {})
     evidence = [
@@ -291,6 +309,7 @@ def main() -> int:
     parser.add_argument("--serial", type=int, default=20428100)
     parser.add_argument("--diagnostic", action="store_true")
     parser.add_argument("--frame-experiment", action="store_true")
+    parser.add_argument("--gpio-rle", action="store_true")
     parser.add_argument(
         "--lifecycle-checks",
         action="store_true",
@@ -385,6 +404,9 @@ def main() -> int:
             frame_experiment_settings(
                 manifest, enabled=args.frame_experiment, host_api=args.host_api
             )
+        )
+        settings.update(
+            gpio_rle_settings(manifest, enabled=args.gpio_rle, host_api=args.host_api)
         )
     except ValueError as error:
         parser.error(str(error))

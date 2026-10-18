@@ -57,6 +57,9 @@ All 1,168 checks passed, with zero parser errors/discards and a 69.825 °C peak.
 The report compares wire overhead, GPIO-processing CPU and queue high-water
 against baseline without claiming total CPU improvement. GPIO-only RLE is now
 the next authorized stage, using this larger-frame configuration as baseline.
+The [opt-in implementation](../architecture/gpio-rle-experiment.md) passes local
+codec/ownership/validator tests and target resource gates. Two failed RAM1
+builds are preserved; physical RLE qualification is still pending.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when

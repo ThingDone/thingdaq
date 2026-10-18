@@ -1,6 +1,7 @@
 #include "usb_transport.h"
 
 #include <limits>
+#include "input_experiment_profile.h"
 
 #if defined(__IMXRT1062__)
 #define THINGDAQ_USB_COLD_CODE(section_name) \
@@ -29,6 +30,30 @@ constexpr std::size_t minimum(std::size_t left, std::size_t right) {
 
 std::uint32_t counterDelta(std::uint32_t current, std::uint32_t previous) {
   return current >= previous ? current - previous : current;
+}
+
+// The experimental short view must identify itself as GPIO RLE16. Control
+// responses still pass through queueResponse's full ordinary protocol decoder.
+THINGDAQ_USB_COLD_CODE(".flashmem.usb.data_view")
+bool validDataView(protocol::ByteView bytes) {
+  if (!bytes.valid()) return false;
+  const bool fixed_size = bytes.size == protocol_v1::kDataFrameBytes ||
+      bytes.size == protocol_v2::kMinDataFrameBytes;
+  if constexpr (!input_experiment::kGpioRle) return fixed_size;
+  if (bytes.size <= protocol_v1::kHeaderVersionOffset ||
+      bytes.data[protocol_v1::kHeaderVersionOffset] != input_experiment::kGpioRleVersion)
+    return fixed_size;
+  constexpr std::size_t envelope = protocol_v1::kHeaderSize + protocol_v1::kTrailerSize;
+  if (bytes.size < envelope + 4U || bytes.size >= protocol_v1::kDataFrameBytes ||
+      (bytes.size - envelope) % 4U != 0U ||
+      bytes.data[protocol_v1::kHeaderVersionOffset] != input_experiment::kGpioRleVersion ||
+      bytes.data[protocol_v1::kHeaderKindOffset] !=
+          static_cast<std::uint8_t>(protocol_v1::FrameKind::kGpioData)) return false;
+  std::uint32_t total = 0U, payload = 0U, items = 0U;
+  return protocol::loadU32(bytes, protocol_v1::kHeaderTotalLengthOffset, total) &&
+      protocol::loadU32(bytes, protocol_v1::kHeaderPayloadLengthOffset, payload) &&
+      protocol::loadU32(bytes, protocol_v1::kHeaderItemCountOffset, items) &&
+      total == bytes.size && payload == bytes.size - envelope && items == 2024U;
 }
 
 bool responseKind(protocol_v1::FrameKind kind) {
@@ -276,9 +301,7 @@ ServiceReport CdcTransport::serviceTransmit() {
         break;
       }
       selection.bytes = lower_priority_->frontFrame();
-      if (!selection.bytes.valid() ||
-          (selection.bytes.size != protocol_v1::kDataFrameBytes &&
-           selection.bytes.size != protocol_v2::kMinDataFrameBytes)) {
+      if (!validDataView(selection.bytes)) {
         recordIoError();
         stalled = true;
         break;
@@ -548,8 +571,7 @@ CdcTransport::FrameSelection CdcTransport::selectTransmitFrame() {
   if (lower.size == 0U) {
     return {};
   }
-  if (!lower.valid() || (lower.size != protocol_v1::kDataFrameBytes &&
-                         lower.size != protocol_v2::kMinDataFrameBytes)) {
+  if (!validDataView(lower)) {
     recordIoError();
     lower_priority_->releaseFrontFrame();
     return {};

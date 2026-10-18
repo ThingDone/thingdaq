@@ -27,6 +27,20 @@
 #endif
 
 namespace thingdaq::input_experiment {
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+inline constexpr bool kGpioRle = true;
+static_assert(THINGDAQ_RELEASE_FIXED_1MHZ && THINGDAQ_EXPERIMENT_CPU_HZ == 600000000U,
+              "GPIO RLE requires the qualified 600 MHz fixed-rate baseline");
+#if !defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
+#error "GPIO RLE requires the qualified larger ADC layout"
+#endif
+#else
+inline constexpr bool kGpioRle = false;
+#endif
+// Private GPIO-RLE16 wire version; ordinary v2 decoders reject it. RAW fallback
+// and all ADC/control frames retain v2. No reserved header byte is repurposed.
+inline constexpr std::uint8_t kGpioRleVersion = 0x82U;
+
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
 inline constexpr std::uint32_t kAdcFrameMultiplier = 2U;
 #else
