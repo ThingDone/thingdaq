@@ -67,6 +67,13 @@ reached records are immutable until prepare. These bounded checkpoints narrow
 whether the discrepancy begins at startup, grows gradually or appears later.
 Cause and correction remain unresolved; no acceptance gate is relaxed.
 
+The [sustained phase diagnostic](../results/experiments/gpio-rle600-phase-sustained-20261018.md)
+passed three ten-minute captures and forty restart cells (6,278 checks,
+67.983 °C peak, zero parser errors/discards). The fault record was not triggered;
+instrumentation is still not a demonstrated correction. Full qualification on
+the same image follows in fresh evidence, including smoke, sustained repeats
+and forty restart cells. Historical failures remain part of the final assessment.
+
 ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.
 

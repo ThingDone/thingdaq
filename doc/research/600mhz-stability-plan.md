@@ -143,6 +143,16 @@ restart cells, stopping on first failure. Decode the 96-word phase history if
 triggered. All ten failed physical campaigns and both failed builds remain
 preserved; full RLE qualification and its comparison report are pending.
 
+The [sustained phase diagnostic also passed](../results/experiments/gpio-rle600-phase-sustained-20261018.md):
+three ten-minute captures and forty restart cells, 6,278 checks, 67.983 °C peak,
+zero parser errors/discards. No fault record was triggered. The same immutable
+image now advances to the full physical qualification sequence in fresh evidence:
+60-second smoke, three ten-minute captures, then forty ten-second restart cells.
+The earlier intermittent DMA divergence remains unresolved; a passing campaign
+does not establish that instrumentation corrected it. All ten failed campaigns
+and both failed builds remain preserved. After qualification, report measured
+compression and resource costs against the larger-ADC baseline with these limits.
+
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when
 this finite plan completes. The detailed local continuation record is
