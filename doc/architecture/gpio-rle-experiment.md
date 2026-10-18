@@ -26,6 +26,11 @@ identified an equal-active-index wait timeout even though both converters had
 a completed common buffer. The handler now consumes only that common prefix
 within the existing safe window and at most one generation of skew. Fresh
 reproduction and full qualification remain required.
+The next attempt [failed boot completion timing before acquisition](../results/experiments/gpio-rle600-boot-timing-failure-20261018.md).
+Timer enable through first-DONE observation now executes in ITCM, avoiding
+a flash-code interval before timestamp polling; timing tolerances remain
+unchanged. This candidate still requires fresh physical qualification.
+
 ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.
 

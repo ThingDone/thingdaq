@@ -71,6 +71,11 @@ short reproduction, which [identified an equal-index wait timeout](../results/ex
 with a completed common buffer and no DMA hardware error. The handler now
 processes only the common completed prefix within bounded skew/headroom.
 Fresh reproduction and full qualification remain required; RLE is pending.
+The next attempt [failed boot completion timing before acquisition](../results/experiments/gpio-rle600-boot-timing-failure-20261018.md).
+Timer enable through first-DONE observation now executes in ITCM, avoiding
+a flash-code interval before timestamp polling; timing tolerances remain
+unchanged. This candidate still requires fresh physical qualification.
+
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when

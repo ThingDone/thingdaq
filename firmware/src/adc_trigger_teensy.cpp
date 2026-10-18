@@ -241,6 +241,25 @@ void captureCompletionStatusTransitions() {
   }
 }
 
+// Enter ITCM before enabling the first trigger. A cold flash readback path
+// between timer start and the polling function can let both DONE bits latch
+// before the first observation, producing a false zero phase difference.
+THINGDAQ_ADC_TRIGGER_TARGET_HOT_CODE
+bool armTimersAndObserve(bool completion_diagnostic) {
+  pairPit().TCTRL = PIT_TCTRL_CHN | PIT_TCTRL_TEN;
+  masterPit().TCTRL = PIT_TCTRL_TEN;
+  barrier();
+  const bool armed =
+      (ADC_ETC_CTRL & ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask)) ==
+          ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask) &&
+      (pairPit().TCTRL & PIT_TCTRL_TEN) != 0U &&
+      (masterPit().TCTRL & PIT_TCTRL_TEN) != 0U;
+  if (completion_diagnostic && armed) {
+    captureCompletionStatusTransitions();
+  }
+  return armed;
+}
+
 class TeensyPlatform final : public Platform {
  public:
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(
@@ -420,18 +439,7 @@ class TeensyPlatform final : public Platform {
     ADC_ETC_CTRL = ADC_ETC_CTRL_PRE_DIVIDER(schedule.adc_etc_predivider) |
                    ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask);
     barrier();
-    pairPit().TCTRL = PIT_TCTRL_CHN | PIT_TCTRL_TEN;
-    masterPit().TCTRL = PIT_TCTRL_TEN;
-    barrier();
-    const bool armed =
-        (ADC_ETC_CTRL & ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask)) ==
-            ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask) &&
-        (pairPit().TCTRL & PIT_TCTRL_TEN) != 0U &&
-        (masterPit().TCTRL & PIT_TCTRL_TEN) != 0U;
-    if (completion_diagnostic && armed) {
-      captureCompletionStatusTransitions();
-    }
-    return armed;
+    return armTimersAndObserve(completion_diagnostic);
   }
 
   THINGDAQ_ADC_TRIGGER_TARGET_COLD_CODE(

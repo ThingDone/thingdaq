@@ -15,6 +15,24 @@ CPP_TEST = REPOSITORY_ROOT / "firmware/tests/adc_register_adapter_test.cpp"
 
 
 class AdcRegisterAdapterTests(unittest.TestCase):
+    def test_timer_enable_through_completion_observation_stays_in_itcm(self) -> None:
+        source = (FIRMWARE_SOURCE / "adc_trigger_teensy.cpp").read_text()
+        start = source.index("bool armTimersAndObserve(bool completion_diagnostic)")
+        end = source.index("\n}\n", start)
+        hot = source[start:end]
+        self.assertTrue(
+            source[:start].rstrip().endswith("THINGDAQ_ADC_TRIGGER_TARGET_HOT_CODE")
+        )
+        self.assertLess(
+            hot.index("masterPit().TCTRL = PIT_TCTRL_TEN"),
+            hot.index("captureCompletionStatusTransitions()"),
+        )
+        cold_start = source.index("bool armFromStopped(bool completion_diagnostic)")
+        cold_end = source.index(
+            "return armTimersAndObserve(completion_diagnostic)", cold_start
+        )
+        self.assertNotIn("TCTRL = PIT_TCTRL_TEN", source[cold_start:cold_end])
+
     def test_routes_timing_order_and_resource_isolation(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:
