@@ -19,7 +19,14 @@ for ADC1 in default private RLE builds; ADC2_R0, descriptors, rates, priorities
 and codec remain unchanged. Private INFO advertises the selected source.
 The trigger adapter preserves ACK-cleared mode through final-conversion drain;
 ADC teardown disables the source and clears mode. Public non-RLE builds retain
-the original route. Corrected-image physical qualification is running.
+the original route. The [corrected-image qualification](../results/experiments/gpio-rle600-etc-fixed-20261018.md)
+passed 64 cells / 9,536 checks, including sixty START/STOP cycles and three
+ten-minute captures. Peak was 64.913 °C, with zero parser errors/discards or
+rejections and all 640 phase observations within ±1 sample. On unstimulated
+GPIO, sustained wire savings were 98.7305% (32.9101% combined data); GPIO-service
+CPU median was 17.31% versus 15.72% for larger ADC/RAW GPIO, not total CPU.
+The report preserves the failed controls and per-cell results. No hardware
+change was required.
 
 The [earlier planned physical qualification](../results/experiments/gpio-rle600-phase-qualification-20261018.md)
 passed 44 cells and 6,424 checks with a 67.983 °C peak, but did not establish

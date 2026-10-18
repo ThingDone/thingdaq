@@ -11,7 +11,9 @@ related: []
 **For Bill:** the 600 MHz endurance PASS stands. Two controlled comparisons
 identify the original ADC1 DMA request route as the cause of the progressive
 sample deficit. The ACK-cleared ADC_ETC route passed 7/7 short captures while
-the original route failed twice. The RLE default is corrected in `441d5bc`; sustained qualification is running. No hardware change is required.
+the original route failed twice. Fix `441d5bc` passed the [corrected-image qualification](../results/experiments/gpio-rle600-etc-fixed-20261018.md):
+64 captures, 9,536 checks, 64.913 degrees C peak and no recurrence. No hardware
+change is required.
 
 The [preemption probe reproduced the fault](../results/experiments/gpio-rle600-preempt-ab-failure-20261018.md)
 in its third capture, with GPIO preemption restricted. Early history now
@@ -152,16 +154,29 @@ this selection from the immutable build manifest. Public non-RLE builds and
 their source-88 contract are unchanged. Both converters still read the same
 ADC result registers with the same descriptors and phase schedule. GPIO RLE
 encoding is unchanged. Source/enable/mode readback, original error checks and
-the 80 degrees C campaign abort remain mandatory in the next qualification.
+the 80 degrees C campaign abort remained mandatory throughout the corrected-image
+qualification.
 
-## Corrected-image qualification checkpoint
+## Corrected-image qualification result
 
 Clean source `441d5bc`, image `thingdaq-24c275c126c4e0d8`, passed the
-60-second smoke capture and sixty five-second START/STOP cells without reflash:
-61 cells, 9,089 checks, peak 62.457 degrees C. All actual source/enable/mode
-readbacks and bounded early/final ADC phase observations passed. Three
-600-second captures are now running sequentially; their outcome is pending.
-Raw evidence: `doc/results/raw/gpio-rle600-etc-fixed-20261018`.
+60-second smoke capture, sixty five-second START/STOP cells without reflash,
+and three ten-minute captures: 64 cells, 9,536 checks, 8,883,491,344 received
+bytes, peak 64.913 degrees C. All actual source/enable/mode readbacks passed.
+All 640 early/final ADC phase observations were within -1 to +1 sample;
+no progressive deficit recurred. Parser errors, discarded bytes and rejection
+windows were zero. Each capture completed STOP/drain/IDLE and idempotent STOP.
+The three sustained peaks were 64.299, 64.913 and 64.913 degrees C; after-STOP
+temperature was 64.299 degrees C for each. The [final report](../results/experiments/gpio-rle600-etc-fixed-20261018.md)
+contains every cell's temperature, counters, phase history and provenance.
+
+All five remote statuses are success; the runner exited. Artifact hashes,
+frozen host sources and saved evidence reconciled, and read-only postflight
+found an empty queue and no active containers. Raw evidence remains in
+`doc/results/raw/gpio-rle600-etc-fixed-20261018`. The earlier failed campaigns
+remain failures, including both original-route negative controls. No hardware
+change was needed. Public non-RLE routes and external-stimulus qualification
+remain outside this correction's scope.
 
 The complete firmware suite passed 324 tests and 838 subtests, with three
 unsupported build combinations skipped. The initial bare pytest invocation

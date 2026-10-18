@@ -34,22 +34,30 @@ clock/compression/output integration proposal for current work.
 4. GPIO output is deferred and excluded from this work. No output pin driving
    or auxiliary-output integration is planned.
 
-Current status: **ADC1 DMA request-source defect corrected; RLE qualification running**.
+Current status: **ADC1 DMA request-source defect corrected; RLE qualification PASS**.
 Bill subsequently requested continued diagnosis and fixes for the intermittent
-GPIO RLE ADC DMA faults. The [active investigation](gpio-rle-dma-investigation.md)
+GPIO RLE ADC DMA faults. The [completed investigation](gpio-rle-dma-investigation.md)
 records progressive ADC1 sample loss and two same-image request-source
 comparisons: ACK-cleared ADC_ETC 7/7 PASS, original ADC2 COCO five PASS and
 two FAIL. Fix `441d5bc` makes the ACK-cleared route the private RLE default.
-Smoke, sixty restart cells and three ten-minute captures are being qualified
-on the corrected image. No hardware change is currently required; GPIO output
-remains deferred.
+The [corrected-image qualification](../results/experiments/gpio-rle600-etc-fixed-20261018.md)
+passed smoke, sixty restart cells and three ten-minute captures: 64 cells,
+9,536 checks, zero parser errors/discards/rejections and a 64.913 °C peak.
+All 640 retained phase observations were within ±1 sample; no progressive
+ADC1 deficit recurred. No hardware change was needed; GPIO output remains
+deferred. Sustained GPIO wire savings were 98.7305%, or 32.9101% of combined
+data bytes on unstimulated inputs. GPIO-service CPU was 17.31% versus 15.72%
+for larger ADC/RAW GPIO; this is not total CPU utilization. The report records
+all per-cell temperatures, lifecycle timings, rejected controls and claim limits.
 The [earlier GPIO RLE qualification](../results/experiments/gpio-rle600-phase-qualification-20261018.md)
 passed five jobs / 44 cells and 6,424 checks, with zero parser errors/discards
 and a 67.983 °C peak. Sustained GPIO wire savings were 98.7305% (32.9101%
 combined data traffic); GPIO-service CPU rose from 15.72% to 16.86%.
 That earlier instrumented PASS did not resolve the intermittent ADC DMA
 divergence or establish a causal correction. The new request-source diagnosis
-and corrected-image qualification supersede that unresolved assessment. All ten failed physical campaigns and both failed builds are preserved.
+and corrected-image qualification supersede that unresolved assessment. The
+ten earlier failed physical campaigns, three new diagnostic failures and both
+failed builds are preserved.
 The earlier finite qualification schedule was cancelled after the report was
 committed. Bill's subsequent request authorizes further diagnostic captures.
 
