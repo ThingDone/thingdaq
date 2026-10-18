@@ -2272,6 +2272,9 @@ DMA_FAULT_FIELDS = (
     "polls",
     "elapsed_cycles",
     "dma_es",
+    "page",
+    "word0",
+    "word1",
 )
 
 CURRENT_STATUS_FIELDS = frozenset(
@@ -2346,12 +2349,15 @@ def decode_status(frame: Frame) -> StatusSnapshot:
             zip(
                 ("adc_fault_" + name for name in DMA_FAULT_FIELDS),
                 (
-                    packed & 255,
-                    (packed >> 8) & 15,
-                    (packed >> 12) & 15,
-                    packed >> 16,
-                    elapsed,
-                    dma_es,
+                    packed & 127,
+                    0 if packed & 128 else (packed >> 8) & 15,
+                    0 if packed & 128 else (packed >> 12) & 15,
+                    0 if packed & 128 else packed >> 16,
+                    0 if packed & 128 else elapsed,
+                    0 if packed & 128 else dma_es,
+                    packed >> 8 if packed & 128 else 0,
+                    elapsed if packed & 128 else 0,
+                    dma_es if packed & 128 else 0,
                 ),
             )
         )
@@ -3730,6 +3736,28 @@ def run_acceptance(
                     "cleanup_stop_failed",
                     error=f"{type(cleanup_error).__name__}: {cleanup_error}",
                 )
+            if EXPERIMENT_GPIO_RLE and metrics.get("failure_status", {}).get(
+                "adc_fault_reason", 0
+            ):
+                saved_request_id = link.next_request_id
+                metrics["adc_fault_detail"] = []
+                try:
+                    for page in range(1, 19):
+                        link.next_request_id = 0xFADC0000 + page
+                        frame, _ = link.exchange(
+                            GET_STATUS_REQUEST, on_data=lambda _frame: None
+                        )
+                        values = decode_status(frame).values
+                        if values["adc_fault_page"] != page:
+                            raise ProtocolFailure("DMA fault detail page mismatch")
+                        metrics["adc_fault_detail"].extend(
+                            (values["adc_fault_word0"], values["adc_fault_word1"])
+                        )
+                    emit_event("adc_fault_detail", words=metrics["adc_fault_detail"])
+                except Exception as detail_error:  # noqa: BLE001 - retain original failure
+                    emit_event("adc_fault_detail_unavailable", error=str(detail_error))
+                finally:
+                    link.next_request_id = saved_request_id
     return AcceptanceResult(evidence, metrics, stimulus_grade)
 
 

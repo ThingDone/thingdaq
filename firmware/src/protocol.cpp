@@ -3774,7 +3774,7 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
 #undef STORE_AUX_STATUS_U64
   }
   if (version2) {
-    const auto fault = adc_capture::fault_trace::snapshot();
+    const auto fault = adc_capture::fault_trace::snapshot(request.request_id);
     for (std::size_t i = 0; i < fault.size(); ++i) {
       storeU32(bytes, protocol_v2::kStatusResponsePayloadSize + i * 4U, fault[i]);
     }

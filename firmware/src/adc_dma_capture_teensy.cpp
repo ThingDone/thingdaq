@@ -501,6 +501,32 @@ void recordFaultTrace(std::uint32_t reason, std::uint32_t adc0 = 0U,
                       std::uint32_t polls = 0U) {
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if (fault_trace::words[0] != 0U) return;
+  // Failure-only register reads: captured before automatic STOP clears TCDs.
+  // DMA continues while these are sampled; this is not an atomic bus snapshot.
+  std::size_t word = 0U;
+  for (std::size_t converter = 0U; converter < kConverterCount; ++converter) {
+    const IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
+    fault_trace::detail[word++] = address32(tcd.DADDR);
+    fault_trace::detail[word++] = static_cast<std::uint32_t>(tcd.DLASTSGA);
+    fault_trace::detail[word++] = tcd.CITER_ELINKNO;
+    fault_trace::detail[word++] = tcd.CSR;
+  }
+  fault_trace::detail[word++] = g_pipeline_generations[0];
+  std::uint32_t destinations = 0U;
+  for (std::size_t i = 0U; i < kDmaPipelineDepth; ++i) {
+    destinations |= (g_pipeline_destinations[i] & 0xFU) << (i * 4U);
+  }
+  fault_trace::detail[word++] = destinations;
+  fault_trace::detail[word++] = DMA_INT;
+  fault_trace::detail[word++] = DMA_ERR;
+  for (std::size_t converter = 0U; converter < kConverterCount; ++converter) {
+    for (std::size_t i = 0U; i < kDmaPipelineDepth; ++i) {
+      const IMXRT_DMA_TCD_t &descriptor = g_adc_dma_descriptors
+          .descriptors[converter][descriptorSlot(g_pipeline_generations[i])];
+      fault_trace::detail[word++] = address32(descriptor.DADDR);
+      fault_trace::detail[word++] = static_cast<std::uint32_t>(descriptor.DLASTSGA);
+    }
+  }
   fault_trace::words[1] = elapsed;
   fault_trace::words[2] = DMA_ES;
   barrier();

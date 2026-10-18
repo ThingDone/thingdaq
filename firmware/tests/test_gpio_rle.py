@@ -229,18 +229,29 @@ def wire(wire_bundle):
 def test_private_fault_status_roundtrip_and_reset(monkeypatch, wire_bundle):
     rig = rig_module(monkeypatch)
     parser = rig.FrameParser()
-    frames = parser.feed(wire_bundle[1])
-    assert len(frames) == 3 and parser.errors == parser.bytes_discarded == 0
+    frames = [
+        frame
+        for offset in range(0, len(wire_bundle[1]), 4096)
+        for frame in parser.feed(wire_bundle[1][offset : offset + 4096])
+    ]
+    assert len(frames) == 57 and parser.errors == parser.bytes_discarded == 0
     statuses = [rig.decode_status(frame).values for frame in frames]
-    for index in (0, 2):
+    for index in (*range(19), *range(38, 57)):
         assert all(
             statuses[index]["adc_fault_" + name] == 0 for name in rig.DMA_FAULT_FIELDS
         )
-    assert statuses[1]["adc_fault_reason"] == 1
+    assert statuses[19]["adc_fault_reason"] == 1
     for name, expected in zip(rig.DMA_FAULT_FIELDS, (1, 2, 3, 4, 17, 34)):
-        assert statuses[1]["adc_fault_" + name] == expected
+        assert statuses[19]["adc_fault_" + name] == expected
+    for page in range(1, 19):
+        values = statuses[19 + page]
+        assert values["adc_fault_reason"] == 1
+        assert values["adc_fault_page"] == page
+        assert values["adc_fault_word0"] == (2 * page - 1) * 23
+        assert values["adc_fault_word1"] == 2 * page * 23
     assert "adc_fault_reason" in rig.ZERO_ERROR_FIELDS
     ordinary = rig_module(monkeypatch, False)
     parser = ordinary.FrameParser()
-    assert parser.feed(wire_bundle[1]) == []
+    for offset in range(0, len(wire_bundle[1]), 4096):
+        assert parser.feed(wire_bundle[1][offset : offset + 4096]) == []
     assert parser.header_errors > 0

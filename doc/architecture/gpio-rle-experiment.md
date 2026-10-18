@@ -29,7 +29,12 @@ reproduction and full qualification remain required.
 The next attempt [failed boot completion timing before acquisition](../results/experiments/gpio-rle600-boot-timing-failure-20261018.md).
 Timer enable through first-DONE observation now executes in ITCM, avoiding
 a flash-code interval before timestamp polling; timing tolerances remain
-unchanged. This candidate still requires fresh physical qualification.
+unchanged. That candidate passed eight restart cells and smoke, then
+[failed the pipeline window guard](../results/experiments/gpio-rle600-window-failure-20261018.md)
+with observed indices 3/1 and DMA_ES zero. The cause remains unresolved.
+Failure-only TCD/descriptor detail is now retained and retrieved after STOP
+through explicit private STATUS pages; acceptance limits remain unchanged.
+Fresh diagnostic reproduction and qualification are required.
 
 ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.

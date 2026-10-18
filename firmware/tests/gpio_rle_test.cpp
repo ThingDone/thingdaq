@@ -115,10 +115,25 @@ int main(int argc, char **argv) {
           adc_capture::fault_trace::words[i] = static_cast<std::uint32_t>(i * 17);
         if (state == 1) adc_capture::fault_trace::words[0] = 1U | (2U << 8U) | (3U << 12U) | (4U << 16U);
       }
+      for (std::size_t i = 0; i < adc_capture::fault_trace::kDetailWords; ++i) {
+        // Unpublished data must remain hidden; reset must clear the detail too.
+        if (state != 2) adc_capture::fault_trace::detail[i] = static_cast<std::uint32_t>((i + 1) * 23);
+      }
+      request.request_id = 1;
       protocol::ControlFrame status;
       assert(protocol::encodeStatusResponse(request, 0, response, status).ok());
       status_out.write(reinterpret_cast<const char *>(status.view().data),
                        static_cast<std::streamsize>(status.size()));
+      for (std::uint32_t page = 1; page <= 18; ++page) {
+        request.request_id = adc_capture::fault_trace::kDetailRequestBase + page;
+        assert(protocol::encodeStatusResponse(request, 0, response, status).ok());
+        status_out.write(reinterpret_cast<const char *>(status.view().data),
+                         static_cast<std::streamsize>(status.size()));
+      }
+      assert(adc_capture::fault_trace::snapshot(0xFADC0000U) ==
+             adc_capture::fault_trace::snapshot());
+      assert(adc_capture::fault_trace::snapshot(0xFADC0013U) ==
+             adc_capture::fault_trace::snapshot());
     }
   }
   codec();
