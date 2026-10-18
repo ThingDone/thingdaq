@@ -99,6 +99,14 @@ the instrumentation does not establish a correction. A bounded repeat on the
 same immutable image will attempt to reproduce the unresolved divergence,
 preserving all seven previous failed physical campaigns and two failed builds.
 
+The [bounded history repeat](../results/experiments/gpio-rle600-history-repeat-20261018.md)
+also passed forty restart cells and one ten-minute capture (5,986 checks,
+67.983 °C peak, zero parser errors/discards). The intermittent divergence
+remains unresolved; the diagnostic instrumentation is not a demonstrated fix.
+The next bounded campaign uses the same image for three ten-minute captures
+followed by forty restart cells, stopping on first failure. This expands
+sustained coverage before restart stress without changing acceptance gates.
+Full RLE qualification and the final comparison report remain pending.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when
