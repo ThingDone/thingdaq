@@ -45,6 +45,7 @@ def test_dma_preempt_probe_only_changes_gpio_ability_in_odd_input_epochs(
 def rig_module(monkeypatch, enabled=True):
     monkeypatch.setenv("AUX_INPUT_LARGE_ADC_FRAME", "1")
     monkeypatch.setenv("AUX_INPUT_GPIO_RLE", str(int(enabled)))
+    monkeypatch.setenv("AUX_INPUT_ADC_ETC_REQUEST", str(int(enabled)))
     spec = importlib.util.spec_from_file_location(
         "gpio_rle_rig", ROOT / "firmware/tests/rig_aux_input_capture.py"
     )
@@ -135,14 +136,25 @@ def wire_bundle(tmp_path_factory):
     assert result.returncode == 0, result.stdout + result.stderr
     output = directory / "wire.bin"
     status = directory / "status.bin"
+    info = directory / "info.bin"
     result = subprocess.run(
-        [str(executable), str(output), str(status)],
+        [str(executable), str(output), str(status), str(info)],
         capture_output=True,
         text=True,
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    return output.read_bytes(), status.read_bytes()
+    return output.read_bytes(), status.read_bytes(), info.read_bytes()
+
+
+def test_corrected_rle_advertises_its_actual_adc1_request_route(
+    monkeypatch, wire_bundle
+):
+    rig = rig_module(monkeypatch)
+    parser = rig.FrameParser()
+    frames = parser.feed(wire_bundle[2])
+    assert parser.errors == 0 and len(frames) == 1
+    assert rig.decode_info(frames[0])["adc_dmamux_sources"] == (24, 23)
 
 
 def test_real_firmware_mixed_frames_decode_exactly(monkeypatch, wire):

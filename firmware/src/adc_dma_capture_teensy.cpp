@@ -155,6 +155,8 @@ volatile bool g_faulted = false;
 // Same-image request-source A/B: odd epochs use ADC_ETC trigger 4's ACK-cleared
 // request for ADC1; even epochs retain the original ADC2 COCO request.
 bool g_adc_etc_request = false;
+#elif defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+constexpr bool g_adc_etc_request = input_experiment::kAdcEtcRequest;
 #endif
 
 std::uint32_t address32(const volatile void *address) {
@@ -173,7 +175,7 @@ volatile std::uint32_t *dmamuxRegister(std::size_t converter) {
 }
 
 std::uint32_t dmamuxConfiguration(std::size_t converter) {
-#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if (converter == 1U && g_adc_etc_request)
     return DMAMUX_CHCFG_ENBL | DMAMUX_SOURCE_ADC_ETC;
 #endif
@@ -227,7 +229,7 @@ bool triggersStopped() {
 }
 
 bool resourcesBusy() {
-#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if ((ADC_ETC_DMA_CTRL & 0xFFU) != 0U) return true;
 #endif
   if ((DMA_ERQ & kAdcDmaChannelMask) != 0U ||
@@ -258,7 +260,7 @@ void clearChannelState(std::size_t converter) {
 void disableRequests() {
   ADC1_GC &= ~ADC_GC_DMAEN;
   ADC2_GC &= ~ADC_GC_DMAEN;
-#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   ADC_ETC_DMA_CTRL = ADC_ETC_DMA_CTRL_TRIQ_REQ(4U);
   ADC_ETC_CTRL &= ~ADC_ETC_CTRL_DMA_MODE_SEL;
 #endif
@@ -444,7 +446,7 @@ bool appendFutureGeneration() {
 }
 
 bool configuredHardwareValid() {
-#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if ((ADC_ETC_DMA_CTRL & 0xFFU) !=
       (g_adc_etc_request ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U)) return false;
 #endif
@@ -893,7 +895,7 @@ StartStatus prepareHardware(std::uint32_t epoch,
 
   ADC1_GC |= ADC_GC_DMAEN;
   ADC2_GC |= ADC_GC_DMAEN;
-#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   // Clear stale trigger-4 requests before enabling its aggregate DMA source.
   // ADC2's result register and TCD remain identical in both probe conditions.
   ADC_ETC_DMA_CTRL = ADC_ETC_DMA_CTRL_TRIQ_REQ(4U) |
@@ -1122,7 +1124,8 @@ static_assert(board::kAdcConverterConfigurations[1].edma_channel == 1U);
 static_assert(board::kAdcConverterConfigurations[0].dmamux_source ==
               DMAMUX_SOURCE_ADC1);
 static_assert(board::kAdcConverterConfigurations[1].dmamux_source ==
-              DMAMUX_SOURCE_ADC2);
+              (input_experiment::kAdcEtcRequest ? DMAMUX_SOURCE_ADC_ETC
+                                               : DMAMUX_SOURCE_ADC2));
 static_assert(board::kAdcEdmaPriorities[0] == 2U);
 static_assert(board::kAdcEdmaPriorities[1] == 1U);
 static_assert(kPairDispatchConverter == 1U);

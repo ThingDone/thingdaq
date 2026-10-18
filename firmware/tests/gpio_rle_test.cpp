@@ -99,7 +99,7 @@ void start(packet::PacketBufferPipeline &p, std::uint32_t id) {
       packet::kGpioStreamMask, layout.layout) == packet::OperationStatus::kOk);
 }
 int main(int argc, char **argv) {
-  assert(argc == 2 || argc == 3);
+  assert(argc >= 2 && argc <= 4);
   adc_capture::fault_trace::reset();
   for (std::uint32_t i = 1; i <= 3; ++i)
     adc_capture::fault_trace::rememberProgress(
@@ -161,7 +161,7 @@ int main(int argc, char **argv) {
   adc_capture::fault_trace::retainStoppedProgress();
   assert(adc_capture::fault_trace::detail[42] == 4042U);
   adc_capture::fault_trace::reset();
-  if (argc == 3) {
+  if (argc >= 3) {
     std::ofstream status_out(argv[2], std::ios::binary);
     protocol::Request request{};
     request.kind = protocol_v1::CommandKind::kGetStatus;
@@ -202,6 +202,20 @@ int main(int argc, char **argv) {
       assert(adc_capture::fault_trace::snapshot(0xFADC0031U) ==
              adc_capture::fault_trace::snapshot());
     }
+  }
+  if (argc == 4) {
+    protocol::Request request{};
+    request.kind = protocol_v1::CommandKind::kInfo;
+    request.protocol_version = 2;
+    request.request_id = 1;
+    protocol::InfoResponse response{};
+    protocol::ControlFrame frame;
+    assert(response.adc_dmamux_sources[1] == 23U);
+    assert(board::kAdcConverterConfigurations[1].dmamux_source == 23U);
+    assert(protocol::encodeInfoResponse(request, 0, response, frame).ok());
+    std::ofstream info_out(argv[3], std::ios::binary);
+    info_out.write(reinterpret_cast<const char *>(frame.view().data),
+                   static_cast<std::streamsize>(frame.size()));
   }
   codec();
   packet::OwnedPacketBufferStorage storage;

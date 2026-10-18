@@ -220,6 +220,28 @@ def test_long_sequences_must_fit_below_container_limit():
             isolation.validate_program_budget(seconds, cells)
 
 
+def test_corrected_rle_selects_adc_etc_metadata_without_a_probe():
+    manifest = {
+        "input_experiment": {
+            "gpio_rle": True,
+            "large_adc_frame": True,
+            "release_fixed_1mhz": True,
+            "cpu_mhz": 600,
+            "gpio_rle_wire_version": 130,
+            "adc_etc_request": True,
+        }
+    }
+    assert isolation.gpio_rle_settings(manifest, enabled=True, host_api=False) == {
+        "AUX_INPUT_GPIO_RLE": "1",
+        "AUX_INPUT_ADC_ETC_REQUEST": "1",
+    }
+    manifest["input_experiment"]["adc_etc_probe"] = True
+    with pytest.raises(ValueError):
+        isolation.gpio_rle_settings(
+            manifest, enabled=True, host_api=False, adc_phase=True
+        )
+
+
 def test_cycle_changes_only_rate_without_reloading_firmware(monkeypatch):
     monkeypatch.setenv("AUX_INPUT_RATE_PROFILE", "0")
     source = """import os

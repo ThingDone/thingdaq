@@ -215,7 +215,7 @@ inline constexpr AdcConverterConfiguration kAdcConverterConfigurations[] = {
      kDmamuxAdc1Source, ResourceOwner::kAdc0Capture},
     {1U, 1U, 15U, AdcInputPad::kGpioAdB1_03, 2U, 8U, 4U,
      kXbarPitTrigger1Input, kXbarAdcEtcTrigger4Output, 1U,
-     kDmamuxAdc2Source, ResourceOwner::kAdc1Capture},
+     input_experiment::kAdc1DmamuxSource, ResourceOwner::kAdc1Capture},
 };
 
 inline constexpr std::uint8_t kAdc0Pin =
@@ -1330,7 +1330,7 @@ static_assert(kAdcConverterConfigurations[1].xbar_output ==
               kXbarAdcEtcTrigger4Output);
 static_assert(kAdcConverterConfigurations[1].edma_channel == 1U);
 static_assert(kAdcConverterConfigurations[1].dmamux_source ==
-              kDmamuxAdc2Source);
+              input_experiment::kAdc1DmamuxSource);
 static_assert(kGpio2PsrCaptureMask == 0x00030C0FU,
               "GPIO2 capture and GPR27 masks must cover only D6-D13");
 static_assert(kGpio7ToGpio2Gpr27ClearMask == kGpio2PsrCaptureMask,
@@ -1477,7 +1477,7 @@ static_assert(kAdcEdmaPriorities[0] ==
 static_assert(kAdcConverterConfigurations[0].dmamux_source ==
               protocol_v1::kAdcDmamuxSources[0]);
 static_assert(kAdcConverterConfigurations[1].dmamux_source ==
-              protocol_v1::kAdcDmamuxSources[1]);
+              input_experiment::kAdc1DmamuxSource);
 static_assert(kAdcEdmaIrqPriority == protocol_v1::kAdcDmaIrqPriority);
 static_assert(kGpioEdmaIrqPriority == protocol_v1::kGpioDmaIrqPriority);
 static_assert(kPacketBufferCount == protocol_v1::kPacketBufferCount);

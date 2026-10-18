@@ -1364,7 +1364,8 @@ Result validateInfo(ByteView payload) {
         payload.data[protocol_v1::kInfoResponseAdcEdmaPrioritiesOffset + index] !=
             protocol_v1::kAdcEdmaPriorities[index] ||
         payload.data[protocol_v1::kInfoResponseAdcDmamuxSourcesOffset + index] !=
-            protocol_v1::kAdcDmamuxSources[index]) {
+            (index == 1U ? input_experiment::kAdc1DmamuxSource
+                         : protocol_v1::kAdcDmamuxSources[index])) {
       return badPayload();
     }
   }

@@ -8,16 +8,20 @@ related: []
 
 # GPIO RLE ADC DMA divergence
 
-**For Bill:** the 600 MHz endurance PASS stands. The intermittent ADC DMA
-divergence under GPIO RLE is still unresolved; the latest RLE PASS is not a
-causal fix. Investigation resumed at Bill's request. No hardware change is
-currently required.
+**For Bill:** the 600 MHz endurance PASS stands. Two controlled comparisons
+identify the original ADC1 DMA request route as the cause of the progressive
+sample deficit. The ACK-cleared ADC_ETC route passed 7/7 short captures while
+the original route failed twice. The RLE default is being corrected and needs
+sustained qualification. No hardware change is required.
 
 The [preemption probe reproduced the fault](../results/experiments/gpio-rle600-preempt-ab-failure-20261018.md)
 in its third capture, with GPIO preemption restricted. Early history now
 establishes progressive ADC1 transfer deficit: about one sample per 2,024
 GPIO samples, reaching 1,025 at generation 2,048. GPIO DPA alone is
-insufficient. A same-binary ADC1 request-source comparison is the next test.
+insufficient. The [request-source comparisons](../results/experiments/gpio-rle600-adc-request-ab-20261018.md)
+then reproduced the fault only on the original ADC2 route. Detailed sections
+below retain the sequence of hypotheses and checks; they are not all current
+open questions.
 
 ## Retained evidence and new analysis
 
@@ -137,3 +141,15 @@ host tests passed 89 tests plus 55 subtests; subsequent manifest-identity,
 probe opt-in and documentation checks passed 28 tests plus 980 subtests.
 The register test executes the production arm/STOP adapter and verifies that
 the ETC handshake survives trigger shutdown until DMA teardown.
+
+## RLE correction
+
+Normal GPIO RLE builds now select the ACK-cleared ADC_ETC trigger-4 request
+for ADC1 on every epoch. Explicit diagnostic probes retain their original
+comparison policies. The board resource table and private INFO metadata now
+advertise source 23 for the corrected build; the matching host validator gets
+this selection from the immutable build manifest. Public non-RLE builds and
+their source-88 contract are unchanged. Both converters still read the same
+ADC result registers with the same descriptors and phase schedule. GPIO RLE
+encoding is unchanged. Source/enable/mode readback, original error checks and
+the 80 degrees C campaign abort remain mandatory in the next qualification.

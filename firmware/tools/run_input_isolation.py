@@ -195,11 +195,14 @@ def gpio_rle_settings(
         )
     probe = experiment.get("gpio_preempt_probe", False)
     etc_probe = experiment.get("adc_etc_probe", False)
+    etc_request = experiment.get("adc_etc_request", False)
     if (
         not isinstance(probe, bool)
         or not isinstance(etc_probe, bool)
         or ((probe or etc_probe) and not selected)
         or (probe and etc_probe)
+        or not isinstance(etc_request, bool)
+        or (etc_request and (not selected or probe or etc_probe))
     ):
         raise ValueError("invalid GPIO preemption probe manifest flag")
     if adc_phase and not selected:
@@ -213,6 +216,8 @@ def gpio_rle_settings(
         settings["AUX_INPUT_GPIO_PREEMPT_PROBE"] = "1"
     if etc_probe:
         settings["AUX_INPUT_ADC_ETC_PROBE"] = "1"
+    if etc_request:
+        settings["AUX_INPUT_ADC_ETC_REQUEST"] = "1"
     return settings
 
 

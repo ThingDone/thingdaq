@@ -106,6 +106,7 @@ EXPERIMENT_EQUAL_RATES = os.environ.get("AUX_INPUT_EQUAL_RATES", "0") == "1"
 RELEASE_FIXED_1MHZ = os.environ.get("AUX_INPUT_RELEASE_FIXED_1MHZ", "0") == "1"
 EXPERIMENT_CPU_HZ = int(os.environ.get("AUX_INPUT_CPU_MHZ", "600")) * 1_000_000
 EXPERIMENT_GPIO_RLE = os.environ.get("AUX_INPUT_GPIO_RLE", "0") == "1"
+EXPERIMENT_ADC_ETC_REQUEST = os.environ.get("AUX_INPUT_ADC_ETC_REQUEST", "0") == "1"
 GPIO_RLE_VERSION = 0x82
 EXPERIMENT_LARGE_ADC_FRAME = os.environ.get("AUX_INPUT_LARGE_ADC_FRAME", "0") == "1"
 if EXPERIMENT_CPU_HZ not in (600_000_000, 450_000_000, 528_000_000):
@@ -224,7 +225,7 @@ ADC_BYTES_PER_PAIR = 4
 ADC_RESOLUTION_BITS = 12
 ADC_DMA_RING_DEPTH = 8
 ADC_EDMA_CHANNELS = (0, 1)
-ADC_DMAMUX_SOURCES = (24, 88)
+ADC_DMAMUX_SOURCES = (24, 23 if EXPERIMENT_ADC_ETC_REQUEST else 88)
 ADC_DMA_IRQ_PRIORITY = 48
 
 GPIO_DIAGNOSTIC_AVAILABLE = 1
@@ -3714,8 +3715,11 @@ def run_acceptance(
                     expected_priorities,
                     metrics["adc_stopped_detail"][0],
                 )
-            if os.environ.get("AUX_INPUT_ADC_ETC_PROBE", "0") == "1":
-                etc = bool(validator.run_id & 1)
+            if (
+                EXPERIMENT_ADC_ETC_REQUEST
+                or os.environ.get("AUX_INPUT_ADC_ETC_PROBE", "0") == "1"
+            ):
+                etc = EXPERIMENT_ADC_ETC_REQUEST or bool(validator.run_id & 1)
                 words = metrics["adc_stopped_detail"]
                 evidence.equal(
                     "adc_phase.adc1_mux", 0x80000017 if etc else 0x80000058, words[1]

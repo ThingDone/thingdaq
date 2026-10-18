@@ -493,7 +493,7 @@ struct InfoResponse {
       protocol_v1::kAdcEdmaPriorities[1]};
   std::array<std::uint8_t, 2U> adc_dmamux_sources{
       protocol_v1::kAdcDmamuxSources[0],
-      protocol_v1::kAdcDmamuxSources[1]};
+      input_experiment::kAdc1DmamuxSource};
   std::uint8_t adc_dma_irq_priority = protocol_v1::kAdcDmaIrqPriority;
   std::uint8_t gpio_dma_irq_priority = protocol_v1::kGpioDmaIrqPriority;
   std::uint16_t adc_pairs_per_buffer = protocol_v1::kAdcPairsPerBuffer;

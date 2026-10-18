@@ -150,6 +150,9 @@ def main() -> int:
         "gpio_rle_wire_version": 130 if args.gpio_rle else None,
         "gpio_preempt_probe": args.gpio_preempt_probe,
         "adc_etc_probe": args.adc_etc_probe,
+        "adc_etc_request": bool(
+            args.gpio_rle and not (args.adc_etc_probe or args.gpio_preempt_probe)
+        ),
         "data_checksum": "standard-adler32",
         "public_protocol_compatible": (
             not args.large_adc_frame

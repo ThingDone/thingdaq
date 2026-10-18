@@ -48,6 +48,17 @@ static_assert(THINGDAQ_RELEASE_FIXED_1MHZ && THINGDAQ_EXPERIMENT_CPU_HZ == 60000
 #else
 inline constexpr bool kGpioRle = false;
 #endif
+// Private RLE captures use ADC_ETC's ACK-cleared request for logical ADC1.
+// Explicit A/B probes retain the original advertised route; their actual
+// per-epoch selection is verified through stopped diagnostic readback.
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE) && \
+    !defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE) && \
+    !defined(THINGDAQ_EXPERIMENT_GPIO_PREEMPT_PROBE)
+inline constexpr bool kAdcEtcRequest = true;
+#else
+inline constexpr bool kAdcEtcRequest = false;
+#endif
+inline constexpr std::uint8_t kAdc1DmamuxSource = kAdcEtcRequest ? 23U : 88U;
 // Private GPIO-RLE16 wire version; ordinary v2 decoders reject it. RAW fallback
 // and all ADC/control frames retain v2. No reserved header byte is repurposed.
 inline constexpr std::uint8_t kGpioRleVersion = 0x82U;
