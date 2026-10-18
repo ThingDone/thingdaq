@@ -11,16 +11,21 @@ related: []
 This implements the final authorized stage of the
 [600 MHz qualification plan](../research/600mhz-stability-plan.md), after the
 [larger ADC qualification](../results/experiments/large-adc600-20261018.md).
-The [final planned physical qualification](../results/experiments/gpio-rle600-phase-qualification-20261018.md)
-passed five jobs / 44 cells, 6,424 checks, zero parser errors/discards and a
-67.983 °C peak. Sustained GPIO wire savings were 98.7305%, combined data wire
-savings 32.9101%, and GPIO-service CPU median 16.86% versus 15.72% for larger
-ADC with RAW GPIO. Physical inputs were electrically unstimulated; no physical
-RAW fallback occurred. Historical intermittent DMA divergence remains unresolved;
-this passing instrumented campaign is not a demonstrated causal correction.
-Current clean-source `30e7bfc` resource gates retain 33,760 bytes RAM1 stack/local
-and 4,096 bytes RAM2 heap headroom. Full counters and comparison limits are in
-the final report. The finite authorized experiment is complete.
+The [subsequent DMA investigation](../research/gpio-rle-dma-investigation.md)
+isolates progressive ADC1 sample loss to the original ADC2 COCO DMA request.
+Two same-image comparisons passed 7/7 ACK-cleared ADC_ETC captures and reproduced
+two original-route failures. Fix `441d5bc` selects ADC_ETC trigger 4 (DMAMUX 23)
+for ADC1 in default private RLE builds; ADC2_R0, descriptors, rates, priorities
+and codec remain unchanged. Private INFO advertises the selected source.
+The trigger adapter preserves ACK-cleared mode through final-conversion drain;
+ADC teardown disables the source and clears mode. Public non-RLE builds retain
+the original route. Corrected-image physical qualification is running.
+
+The [earlier planned physical qualification](../results/experiments/gpio-rle600-phase-qualification-20261018.md)
+passed 44 cells and 6,424 checks with a 67.983 °C peak, but did not establish
+a correction. It remains historical evidence. Current RLE target resource gates
+retain 33,760 bytes RAM1 stack/local and 4,096 bytes RAM2 heap headroom.
+No GPIO outputs or public SDK promotion are included.
 
 The following preserves the implementation and diagnostic history; pending/next
 statements describe their respective historical checkpoints. The [first smoke failure](../results/experiments/gpio-rle600-start-boundary-failure-20261018.md)

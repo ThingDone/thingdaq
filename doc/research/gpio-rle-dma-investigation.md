@@ -11,8 +11,7 @@ related: []
 **For Bill:** the 600 MHz endurance PASS stands. Two controlled comparisons
 identify the original ADC1 DMA request route as the cause of the progressive
 sample deficit. The ACK-cleared ADC_ETC route passed 7/7 short captures while
-the original route failed twice. The RLE default is being corrected and needs
-sustained qualification. No hardware change is required.
+the original route failed twice. The RLE default is corrected in `441d5bc`; sustained qualification is running. No hardware change is required.
 
 The [preemption probe reproduced the fault](../results/experiments/gpio-rle600-preempt-ab-failure-20261018.md)
 in its third capture, with GPIO preemption restricted. Early history now
@@ -40,7 +39,7 @@ ADC1 transfer per 2,024-sample GPIO block. That relationship is a hypothesis,
 not a measured loss count: the onset and progression were not recorded in
 those images, and DMA registers are sampled sequentially.
 
-The current immutable image `thingdaq-45d59c363f7aa067` was inspected at the
+The pre-fix immutable image `thingdaq-45d59c363f7aa067` was inspected at the
 machine-code level. `hardwarePipelineIndex()` loads DLASTSGA at ITCM address
 `0x1044` after each successful destination match and inside the loop. Although
 the pinned core's TCD type does not mark that field volatile, the inspected
@@ -51,10 +50,11 @@ The NXP RT1060 reference manual, revision 3, sections 66.5.4.2 and 66.8.3,
 states that ADC DMA requests follow COCO and that ADC_ETC hardware triggering
 automatically clears COCO when a phase completes. Section 67.3.1 describes
 ADC_ETC storing the conversion result and generating its own DMA request.
-Our adapter instead enables ADC_GC_DMAEN, routes DMAMUX_SOURCE_ADC1/ADC2,
-reads ADC1_R0/ADC2_R0, and leaves ADC_ETC_DMA_CTRL zero. Loss of a short ADC
+At the start of this investigation, the adapter enabled ADC_GC_DMAEN, routed
+DMAMUX_SOURCE_ADC1/ADC2, read ADC1_R0/ADC2_R0, and left ADC_ETC_DMA_CTRL zero. Loss of a short ADC
 request during DMA arbitration or scatter/gather fetch is therefore a
-specific mechanism to test. It is not established as this board's cause.
+specific mechanism to test. The later controlled comparison below isolates
+the request route; the exact bus-arbitration cycle remains uninstrumented.
 Reference: [NXP RT1060 manual hosted by PJRC](https://www.pjrc.com/teensy/IMXRT1060RM_rev3.pdf).
 
 ERR011164 found in discussions of other RT parts must not be assumed to
@@ -153,3 +153,19 @@ their source-88 contract are unchanged. Both converters still read the same
 ADC result registers with the same descriptors and phase schedule. GPIO RLE
 encoding is unchanged. Source/enable/mode readback, original error checks and
 the 80 degrees C campaign abort remain mandatory in the next qualification.
+
+## Corrected-image qualification checkpoint
+
+Clean source `441d5bc`, image `thingdaq-24c275c126c4e0d8`, passed the
+60-second smoke capture and sixty five-second START/STOP cells without reflash:
+61 cells, 9,089 checks, peak 62.457 degrees C. All actual source/enable/mode
+readbacks and bounded early/final ADC phase observations passed. Three
+600-second captures are now running sequentially; their outcome is pending.
+Raw evidence: `doc/results/raw/gpio-rle600-etc-fixed-20261018`.
+
+The complete firmware suite passed 324 tests and 838 subtests, with three
+unsupported build combinations skipped. The initial bare pytest invocation
+failed collection because of its import path; the passing invocation used
+`python -m pytest` from the repository root. Corrected RLE and ordinary
+non-RLE 600 MHz larger-ADC target builds both pass the normal gates. RLE
+headroom remains 33,760/4,096 bytes (RAM1/RAM2); non-RLE has 34,464/4,096.
