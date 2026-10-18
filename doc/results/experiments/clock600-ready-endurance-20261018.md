@@ -8,7 +8,11 @@ related: ['[[Clock600-Thermal-20261016]]', '[[Parser600-Investigation-20261017]]
 
 # 600 MHz three-hour repeated capture with bounded temperature retries
 
-Status: **RUNNING**. Attempted 0 of 18 requested ten-minute captures; 0 passed.
+**For Bill:** 18/18 ten-minute captures passed; campaign **PASS**. Maximum sampled die temperature: **69.211 °C**. 0 parser errors, 0 discarded bytes, 0 retained rejection windows (NONE). 2,358 checks over 66,143,843,828 received bytes. Both ADCs and all 16 GPIO inputs ran at 1 MS/s with 600 MHz core.
+
+Earlier failures remain separately classified: the original October 17 rejected bytes proved firmware USB corruption (24 new bytes lost, 72 stale bytes transmitted), fixed in `9e7fb90`. The subsequent campaign in `742249c` passed eight runs and stopped on temperature NOT_READY, with no parser rejections; host retry policy fixed in `8be8cce`. The October 16 isolated parser event remains unclassified because its rejected bytes were not retained.
+
+Status: **PASS**. Attempted 18 of 18 requested ten-minute captures; 18 passed.
 
 This campaign restarts the eighteen-run request after correcting the host temperature-readiness retry policy. Both previous failed campaigns remain separate. Firmware is unchanged from USB autoflush fix `9e7fb90`. The exact archived `thingdaq-75ac69ba3e2bb588` image captures both 12-bit ADCs and all sixteen GPIO inputs at 1 MS/s, with normal ADC frames, standard Adler-32, 600 MHz CPU / 150 MHz IPG / 37.5 MHz ADC / 24 MHz PIT. Watchdog remains disabled.
 
@@ -18,6 +22,24 @@ The rig reflashes/resets between jobs. There is no intentional cooldown, but pro
 
 | Run | Before (°C) | After STOP (°C) | Peak sampled (°C) | Result |
 | ---: | ---: | ---: | ---: | --- |
+| 1 | 43.422 | 66.755 | 66.755 | PASS |
+| 2 | 60.615 | 67.983 | 68.597 | PASS |
+| 3 | 62.457 | 68.597 | 68.597 | PASS |
+| 4 | 61.843 | 68.597 | 69.211 | PASS |
+| 5 | 62.457 | 68.597 | 69.211 | PASS |
+| 6 | 63.071 | 68.597 | 69.211 | PASS |
+| 7 | 62.457 | 68.597 | 69.211 | PASS |
+| 8 | 62.457 | 68.597 | 69.211 | PASS |
+| 9 | 62.457 | 69.211 | 69.211 | PASS |
+| 10 | 63.071 | 69.211 | 69.211 | PASS |
+| 11 | 63.071 | 68.597 | 69.211 | PASS |
+| 12 | 62.457 | 68.597 | 69.211 | PASS |
+| 13 | 62.457 | 68.597 | 69.211 | PASS |
+| 14 | 62.457 | 68.597 | 69.211 | PASS |
+| 15 | 62.457 | 69.211 | 69.211 | PASS |
+| 16 | 62.457 | 68.597 | 69.211 | PASS |
+| 17 | 62.457 | 69.211 | 69.211 | PASS |
+| 18 | 63.071 | 68.597 | 69.211 | PASS |
 
 ## Scope and next work
 
