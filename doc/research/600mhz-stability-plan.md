@@ -34,7 +34,21 @@ clock/compression/output integration proposal for current work.
 4. GPIO output is deferred and excluded from this work. No output pin driving
    or auxiliary-output integration is planned.
 
-Current status: all eighteen ten-minute endurance captures passed, with
+Current status: **all authorized experimental stages and final reports complete**.
+The [final GPIO RLE qualification](../results/experiments/gpio-rle600-phase-qualification-20261018.md)
+passed five jobs / 44 cells and 6,424 checks, with zero parser errors/discards
+and a 67.983 °C peak. Sustained GPIO wire savings were 98.7305% (32.9101%
+combined data traffic); GPIO-service CPU rose from 15.72% to 16.86%.
+Historical intermittent ADC DMA divergence remains unresolved: passing this
+instrumented campaign is not a demonstrated correction or production-reliability
+claim. All ten failed physical campaigns and both failed builds are preserved.
+The finite continuation schedule is ready for cancellation after this report is
+validated, committed, pushed and archived; no further captures are planned.
+
+The following records the completed sequence and its historical decisions;
+references to next or pending work below describe the state at those checkpoints.
+
+All eighteen ten-minute endurance captures passed, with
 2,358 checks, 66,143,843,828 received bytes, zero parser errors or discarded
 bytes, and a maximum sampled die temperature of 69.211 °C. The
 [final endurance report](../results/experiments/clock600-ready-endurance-20261018.md)
@@ -153,7 +167,6 @@ does not establish that instrumentation corrected it. All ten failed campaigns
 and both failed builds remain preserved. After qualification, report measured
 compression and resource costs against the larger-ADC baseline with these limits.
 
-Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
-11 minutes, diagnoses failures, and advances these gates. It is removed when
-this finite plan completes. The detailed local continuation record is
-`.maestro/600mhz-continuation.md`.
+The same-agent Maestro Cue continuation `teensy-600mhz-qualification` served
+these finite gates. Completion and schedule cancellation are recorded in
+`.maestro/600mhz-continuation.md` after final archive and push.

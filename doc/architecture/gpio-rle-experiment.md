@@ -11,7 +11,19 @@ related: []
 This implements the final authorized stage of the
 [600 MHz qualification plan](../research/600mhz-stability-plan.md), after the
 [larger ADC qualification](../results/experiments/large-adc600-20261018.md).
-Hardware qualification is pending; the [first smoke failure](../results/experiments/gpio-rle600-start-boundary-failure-20261018.md)
+The [final planned physical qualification](../results/experiments/gpio-rle600-phase-qualification-20261018.md)
+passed five jobs / 44 cells, 6,424 checks, zero parser errors/discards and a
+67.983 °C peak. Sustained GPIO wire savings were 98.7305%, combined data wire
+savings 32.9101%, and GPIO-service CPU median 16.86% versus 15.72% for larger
+ADC with RAW GPIO. Physical inputs were electrically unstimulated; no physical
+RAW fallback occurred. Historical intermittent DMA divergence remains unresolved;
+this passing instrumented campaign is not a demonstrated causal correction.
+Current clean-source `30e7bfc` resource gates retain 33,760 bytes RAM1 stack/local
+and 4,096 bytes RAM2 heap headroom. Full counters and comparison limits are in
+the final report. The finite authorized experiment is complete.
+
+The following preserves the implementation and diagnostic history; pending/next
+statements describe their respective historical checkpoints. The [first smoke failure](../results/experiments/gpio-rle600-start-boundary-failure-20261018.md)
 identified a host START buffering assumption and remains classified FAIL.
 After that host fix, smoke and three ten-minute captures passed, but the
 [restart job failed with ADC DMA pipeline counters](../results/experiments/gpio-rle600-dma-failure-20261018.md).
