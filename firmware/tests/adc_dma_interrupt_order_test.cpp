@@ -76,6 +76,7 @@ int main(int argc, char **argv) {
   bool expected_ok = true;
   unsigned expected_completions = 1;
   unsigned expected_errors = 0;
+  std::array<std::size_t, 2> remaining{0, 0};
   if (scenario == "latched-accounted-completion") {
     inject_before_observation = true;
     expected_completions = 2;
@@ -85,9 +86,18 @@ int main(int argc, char **argv) {
   } else if (scenario == "no-new-progress") {
     active = {0, 0};
     expected_completions = 0;
+  } else if (scenario == "adc0-one-ahead" || scenario == "adc1-one-ahead" ||
+             scenario == "adc0-ahead-no-common" || scenario == "adc1-ahead-no-common") {
+    const bool first = scenario.find("adc0") == 0;
+    const bool no_common = scenario.find("no-common") != std::string::npos;
+    active = first ? std::array<std::size_t, 2>{2, 1}
+                   : std::array<std::size_t, 2>{1, 2};
+    remaining = first ? std::array<std::size_t, 2>{1, 0}
+                      : std::array<std::size_t, 2>{0, 1};
+    if (no_common) { active = remaining; expected_completions = 0; }
   } else if (scenario == "skew" || scenario == "outside-window" ||
              scenario == "invalid-destination" || scenario == "dma-error") {
-    if (scenario == "skew") active = {1, 0};
+    if (scenario == "skew") active = {2, 0};
     if (scenario == "outside-window")
       active = {kDmaPipelineDepth - 1, kDmaPipelineDepth - 1};
     if (scenario == "invalid-destination")
@@ -108,7 +118,16 @@ int main(int argc, char **argv) {
   assert(completions == expected_completions);
   assert(g_ring.errors == expected_errors);
   if (expected_ok) {
-    assert(active[0] == 0 && active[1] == 0);
+    assert(active == remaining);
     assert((DMA_INT & 2U) == 0);
+    if (remaining[0] != remaining[1]) {
+      // A later dispatch accounts the deferred pair exactly once. No callback
+      // may run until both channels actually completed that generation.
+      active = {1, 1};
+      DMA_INT |= 2U;
+      assert(servicePendingDmaPair());
+      assert(completions == expected_completions + 1);
+      assert(active[0] == 0 && active[1] == 0 && g_ring.errors == 0);
+    }
   }
 }

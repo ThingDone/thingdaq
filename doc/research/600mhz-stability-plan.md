@@ -67,7 +67,10 @@ the original fault's exact ordering remains unproven. Fresh qualification of
 the new firmware failed again in the fourth restart cell after seven passing
 cells (1,022 checks). The [recurrence report](../results/experiments/gpio-rle600-dma-recurrence-20261018.md)
 preserves all five jobs. A private first-fault diagnostic suffix now supports
-short reproduction before further qualification; physical RLE remains pending.
+short reproduction, which [identified an equal-index wait timeout](../results/experiments/gpio-rle600-alignment-failure-20261018.md)
+with a completed common buffer and no DMA hardware error. The handler now
+processes only the common completed prefix within bounded skew/headroom.
+Fresh reproduction and full qualification remain required; RLE is pending.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when

@@ -514,7 +514,7 @@ void recordFaultTrace(std::uint32_t reason, std::uint32_t adc0 = 0U,
 
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_wait")
-std::size_t waitForAlignedPipeline() {
+std::size_t waitForSafePipelineProgress() {
   const std::uint32_t started = ARM_DWT_CYCCNT;
   std::uint32_t polls = 0U;
   std::size_t adc0 = 0U;
@@ -523,11 +523,16 @@ std::size_t waitForAlignedPipeline() {
     ++polls;
     adc0 = hardwarePipelineIndex(0U);
     adc1 = hardwarePipelineIndex(1U);
-    // A completion arriving after CINT but before the preceding progress
-    // observation may already have been consumed. Its latched interrupt is
-    // only a wakeup: matching index zero means no unaccounted generation.
-    if (adc0 == adc1 && adc0 < kDmaPipelineDepth - 1U) {
-      return adc0;
+    // The channels can advance independently while the CPU observes them.
+    // Only the common prefix is complete: never wait for identical *active*
+    // descriptors when both channels have already finished a buffer. Retain
+    // one descriptor of headroom and reject more than one generation of skew.
+    // Zero common progress is an already-accounted wakeup; a later dispatch
+    // accounts the deferred pair after both converters finish it.
+    if (adc0 < kDmaPipelineDepth - 1U &&
+        adc1 < kDmaPipelineDepth - 1U &&
+        (adc0 > adc1 ? adc0 - adc1 : adc1 - adc0) <= 1U) {
+      return adc0 < adc1 ? adc0 : adc1;
     }
   } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles &&
            polls < kDmaAlignmentWaitCycles);
@@ -556,7 +561,7 @@ bool servicePendingDmaPair() {
                    .edma_channel;
     DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel;
     barrier();
-    const std::size_t completed_generations = waitForAlignedPipeline();
+    const std::size_t completed_generations = waitForSafePipelineProgress();
     if (completed_generations == kInvalidPipelineIndex ||
         (DMA_ERR & kAdcDmaChannelMask) != 0U) {
       recordFaultTrace(2U);

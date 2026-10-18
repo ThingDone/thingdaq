@@ -14,7 +14,7 @@ def interrupt_order_executable(tmp_path_factory, request):
     source = (ROOT / "firmware/src/adc_dma_capture_teensy.cpp").read_text()
     functions = []
     for signature in (
-        "std::size_t waitForAlignedPipeline()",
+        "std::size_t waitForSafePipelineProgress()",
         "bool servicePendingDmaPair()",
     ):
         start = source.index(signature)
@@ -49,6 +49,10 @@ def interrupt_order_executable(tmp_path_factory, request):
         "latched-accounted-completion",
         "new-completion-during-processing",
         "no-new-progress",
+        "adc0-one-ahead",
+        "adc1-one-ahead",
+        "adc0-ahead-no-common",
+        "adc1-ahead-no-common",
         "skew",
         "outside-window",
         "invalid-destination",

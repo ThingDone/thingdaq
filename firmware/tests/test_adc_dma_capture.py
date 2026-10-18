@@ -154,7 +154,7 @@ class AdcDmaCaptureTests(unittest.TestCase):
             "DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel"
         )
         barrier = service.index("barrier();")
-        aligned = service.index("waitForAlignedPipeline()")
+        aligned = service.index("waitForSafePipelineProgress()")
         inferred = service.index("processInferredPairCompletion()")
         paired_isr = source[source.index("void adcPairDmaIsr()") :]
         enable = source[source.index("void enableInterrupts()") :]

@@ -21,8 +21,11 @@ hardware-error, skew, window or ring checks. The historical fault's exact
 ordering remains unproven. The [next campaign reproduced the ADC fault](../results/experiments/gpio-rle600-dma-recurrence-20261018.md)
 in its fourth restart cell after seven passing cells. A private 12-byte STATUS
 suffix now preserves first-fault DMA error status and alignment state through
-cleanup; ordinary STATUS framing is unchanged. Short reproduction and fresh
-qualification remain required.
+cleanup; ordinary STATUS framing is unchanged. The [instrumented reproduction](../results/experiments/gpio-rle600-alignment-failure-20261018.md)
+identified an equal-active-index wait timeout even though both converters had
+a completed common buffer. The handler now consumes only that common prefix
+within the existing safe window and at most one generation of skew. Fresh
+reproduction and full qualification remain required.
 ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.
 
