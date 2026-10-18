@@ -34,7 +34,11 @@ clock/compression/output integration proposal for current work.
 4. GPIO output is deferred and excluded from this work. No output pin driving
    or auxiliary-output integration is planned.
 
-Current status: **all authorized experimental stages and final reports complete**.
+Current status: **qualification reports complete; DMA fault investigation reopened**.
+Bill subsequently requested continued diagnosis and fixes for the intermittent
+GPIO RLE ADC DMA faults. The [active investigation](gpio-rle-dma-investigation.md)
+records new evidence, bounded reproduction and diagnostic changes. No hardware
+change is currently required; GPIO output remains deferred.
 The [final GPIO RLE qualification](../results/experiments/gpio-rle600-phase-qualification-20261018.md)
 passed five jobs / 44 cells and 6,424 checks, with zero parser errors/discards
 and a 67.983 °C peak. Sustained GPIO wire savings were 98.7305% (32.9101%
@@ -42,8 +46,8 @@ combined data traffic); GPIO-service CPU rose from 15.72% to 16.86%.
 Historical intermittent ADC DMA divergence remains unresolved: passing this
 instrumented campaign is not a demonstrated correction or production-reliability
 claim. All ten failed physical campaigns and both failed builds are preserved.
-The finite continuation schedule is ready for cancellation after this report is
-validated, committed, pushed and archived; no further captures are planned.
+The earlier finite qualification schedule was cancelled after the report was
+committed. Bill's subsequent request authorizes further diagnostic captures.
 
 The following records the completed sequence and its historical decisions;
 references to next or pending work below describe the state at those checkpoints.

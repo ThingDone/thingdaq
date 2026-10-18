@@ -141,6 +141,25 @@ int main(int argc, char **argv) {
   adc_capture::fault_trace::retainProgress();
   for (std::size_t i = 36; i < 96; ++i)
     assert(adc_capture::fault_trace::detail[i] == 0);
+  // Healthy history is hidden until STOP and has no fault summary. Idempotent
+  // STOP cannot replace it; STOP after a fault cannot overwrite fault detail.
+  adc_capture::fault_trace::rememberProgress(2048U, 0x11U, 123U, 0U,
+                                            0x03F203F3U, 100U);
+  assert(adc_capture::fault_trace::snapshot(0xFADC0016U)[0] == 0U);
+  adc_capture::fault_trace::retainStoppedProgress();
+  assert(adc_capture::fault_trace::snapshot()[0] == 0U);
+  assert(adc_capture::fault_trace::snapshot(0xFADC0016U)[0] == 0x1680U);
+  assert(adc_capture::fault_trace::snapshot(0xFADC0016U)[1] == 2048U);
+  adc_capture::fault_trace::progress_history.fill(999U);
+  adc_capture::fault_trace::retainStoppedProgress();
+  assert(adc_capture::fault_trace::detail[42] == 2048U);
+  adc_capture::fault_trace::reset();
+  assert(adc_capture::fault_trace::snapshot(0xFADC0016U)[0] == 0U);
+  adc_capture::fault_trace::words[0] = 1U;
+  adc_capture::fault_trace::detail[42] = 4042U;
+  adc_capture::fault_trace::retainStoppedProgress();
+  assert(adc_capture::fault_trace::detail[42] == 4042U);
+  adc_capture::fault_trace::reset();
   if (argc == 3) {
     std::ofstream status_out(argv[2], std::ios::binary);
     protocol::Request request{};
@@ -149,7 +168,7 @@ int main(int argc, char **argv) {
     request.request_id = 1;
     protocol::StatusResponse response{};
     response.configuration.rate_profile = protocol_v2::RateProfile::kAdc1mhzGpio1mhz;
-    for (unsigned state = 0; state < 3; ++state) {
+    for (unsigned state = 0; state < 4; ++state) {
       adc_capture::fault_trace::reset();
       if (state != 2) {
         for (std::size_t i = 1; i < adc_capture::fault_trace::kWords; ++i)
@@ -159,6 +178,12 @@ int main(int argc, char **argv) {
       for (std::size_t i = 0; i < adc_capture::fault_trace::kDetailWords; ++i) {
         // Unpublished data must remain hidden; reset must clear the detail too.
         if (state != 2) adc_capture::fault_trace::detail[i] = static_cast<std::uint32_t>((i + 1) * 23);
+      }
+      if (state == 3) {
+        adc_capture::fault_trace::reset();
+        adc_capture::fault_trace::rememberProgress(2048U, 0x11U, 123U, 0U,
+                                                  0x03F203F3U, 100U);
+        adc_capture::fault_trace::retainStoppedProgress();
       }
       request.request_id = 1;
       protocol::ControlFrame status;

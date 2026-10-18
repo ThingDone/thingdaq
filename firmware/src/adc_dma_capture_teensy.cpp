@@ -921,6 +921,7 @@ StopReport stopHardwareAfterTriggers() {
   if ((DMA_INT & channelMask(kPairDispatchConverter)) != 0U) {
     (void)servicePendingDmaPair();
   }
+  fault_trace::retainStoppedProgress();
 
   std::array<ChannelStopState, kConverterCount> stopped{};
   for (std::size_t converter = 0U; converter < kConverterCount;
