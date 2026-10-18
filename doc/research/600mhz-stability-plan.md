@@ -107,6 +107,15 @@ The next bounded campaign uses the same image for three ten-minute captures
 followed by forty restart cells, stopping on first failure. This expands
 sustained coverage before restart stress without changing acceptance gates.
 Full RLE qualification and the final comparison report remain pending.
+The expanded [sustained diagnostic failed in its first capture](../results/experiments/gpio-rle600-history-failure-20261018.md)
+after approximately four seconds; no later job was submitted. This eighth
+physical failure retained indices 3/1 and two preceding accepted 2/1
+observations, 607,280 cycles apart. RAM descriptor links match expectations;
+the cause remains unresolved. The next diagnostic adds per-observation CITER
+and start/end DWT plus fault-entry DWT and hardware counters, with unchanged
+acceptance limits. A fresh forty-cycle restart test followed by one ten-minute
+capture will collect this expanded record; no automatic full qualification or
+finalizer follows. All failed evidence remains preserved.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when

@@ -40,9 +40,17 @@ The [descriptor repeat failed](../results/experiments/gpio-rle600-descriptor-fai
 in its third restart cell. Hardware destination/link pairs confirm indices
 3/1; CPU-visible RAM descriptors match expectations. The cause remains
 unresolved. RLE-only diagnostics now retain the last two accepted progress
-observations before completion accounting (base generation, indices, DWT,
-pending IRQs), frozen at first fault and cleared on prepare. Detail words
-36–43 extend retrieval to 22 private pages without enlarging any response.
+observations before completion accounting, frozen at first fault and cleared
+on prepare. The [history failure](../results/experiments/gpio-rle600-history-failure-20261018.md)
+showed indices 2/1 twice before 3/1, but lacked the sample counters and final
+timestamp needed to distinguish service latency from DMA progress discrepancy.
+Each observation now stores base generation, indices, end DWT, pending IRQs,
+packed CITER values (ADC0 low 16 bits), and start DWT. Detail words 36–47
+contain the two six-word records; words 28–35 hold fault-entry DWT, DMA_HRS,
+ADC0 NBYTES/BITER, ADC1 NBYTES/BITER, and ADC1/ADC2 GS. Sequential reads are
+not atomic; the observation timestamps bound their read interval. NBYTES is
+a live hardware value, not a saved initial transfer size. Retrieval uses 24
+private pages without enlarging any response.
 This adds bounded service-path work and is diagnostic instrumentation, not
 a demonstrated fix. Acceptance limits and ordinary builds are unchanged.
 

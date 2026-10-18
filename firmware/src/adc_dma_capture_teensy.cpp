@@ -501,6 +501,7 @@ void recordFaultTrace(std::uint32_t reason, std::uint32_t adc0 = 0U,
                       std::uint32_t polls = 0U) {
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if (fault_trace::words[0] != 0U) return;
+  fault_trace::detail[28] = ARM_DWT_CYCCNT;
   // Failure-only register reads: captured before automatic STOP clears TCDs.
   // DMA continues while these are sampled; this is not an atomic bus snapshot.
   std::size_t word = 0U;
@@ -527,6 +528,13 @@ void recordFaultTrace(std::uint32_t reason, std::uint32_t adc0 = 0U,
       fault_trace::detail[word++] = static_cast<std::uint32_t>(descriptor.DLASTSGA);
     }
   }
+  fault_trace::detail[29] = DMA_HRS;
+  fault_trace::detail[30] = hardwareTcd(0U).NBYTES_MLNO;
+  fault_trace::detail[31] = hardwareTcd(0U).BITER_ELINKNO;
+  fault_trace::detail[32] = hardwareTcd(1U).NBYTES_MLNO;
+  fault_trace::detail[33] = hardwareTcd(1U).BITER_ELINKNO;
+  fault_trace::detail[34] = IMXRT_ADC1.GS;
+  fault_trace::detail[35] = IMXRT_ADC2.GS;
   fault_trace::words[1] = elapsed;
   fault_trace::words[2] = DMA_ES;
   fault_trace::retainProgress();
@@ -548,8 +556,18 @@ std::size_t waitForSafePipelineProgress() {
   std::size_t adc1 = 0U;
   do {
     ++polls;
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+    const std::uint32_t observation_started = ARM_DWT_CYCCNT;
+#endif
     adc0 = hardwarePipelineIndex(0U);
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+    const std::uint32_t remaining0 = hardwareTcd(0U).CITER_ELINKNO;
+#endif
     adc1 = hardwarePipelineIndex(1U);
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+    const std::uint32_t remaining1 = hardwareTcd(1U).CITER_ELINKNO;
+    const std::uint32_t observation_finished = ARM_DWT_CYCCNT;
+#endif
     // The channels can advance independently while the CPU observes them.
     // Only the common prefix is complete: never wait for identical *active*
     // descriptors when both channels have already finished a buffer. Retain
@@ -563,7 +581,8 @@ std::size_t waitForSafePipelineProgress() {
       fault_trace::rememberProgress(
           g_pipeline_generations[0],
           static_cast<std::uint32_t>(adc0 | (adc1 << 4U)),
-          ARM_DWT_CYCCNT, DMA_INT);
+          observation_finished, DMA_INT,
+          remaining0 | (remaining1 << 16U), observation_started);
 #endif
       return adc0 < adc1 ? adc0 : adc1;
     }

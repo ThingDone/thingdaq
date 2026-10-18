@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include "adc_dma_fault.h"
 
 constexpr std::size_t kDmaPipelineDepth = TEST_PIPELINE_DEPTH;
 constexpr std::size_t kInvalidPipelineIndex = kDmaPipelineDepth;
@@ -36,6 +37,15 @@ struct Clock {
   std::uint32_t ticks = 0;
   operator std::uint32_t() { return ticks++; }
 } ARM_DWT_CYCCNT;
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+namespace fault_trace = thingdaq::adc_capture::fault_trace;
+std::array<std::uint32_t, kDmaPipelineDepth> g_pipeline_generations{17U};
+struct Tcd { std::uint16_t CITER_ELINKNO; };
+const Tcd &hardwareTcd(std::size_t converter) {
+  static const std::array<Tcd, 2> tcds{{{999U}, {998U}}};
+  return tcds[converter];
+}
+#endif
 void barrier() {}
 void recordFaultTrace(std::uint32_t, std::uint32_t = 0, std::uint32_t = 0,
                       std::uint32_t = 0, std::uint32_t = 0) {}
@@ -118,6 +128,12 @@ int main(int argc, char **argv) {
   assert(completions == expected_completions);
   assert(g_ring.errors == expected_errors);
   if (expected_ok) {
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+    fault_trace::retainProgress();
+    assert(fault_trace::detail[42] == 17U);
+    assert(fault_trace::detail[46] == (999U | (998U << 16U)));
+    assert(fault_trace::detail[44] - fault_trace::detail[47] == 1U);
+#endif
     assert(active == remaining);
     assert((DMA_INT & 2U) == 0);
     if (remaining[0] != remaining[1]) {

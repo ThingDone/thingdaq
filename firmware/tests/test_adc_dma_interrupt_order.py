@@ -8,8 +8,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.fixture(scope="module", params=[4, 6])
+@pytest.fixture(scope="module", params=[(4, False), (6, False), (4, True)])
 def interrupt_order_executable(tmp_path_factory, request):
+    depth, diagnostic = request.param
     directory = tmp_path_factory.mktemp("adc-interrupt-order")
     source = (ROOT / "firmware/src/adc_dma_capture_teensy.cpp").read_text()
     functions = []
@@ -30,8 +31,10 @@ def interrupt_order_executable(tmp_path_factory, request):
             "-Wall",
             "-Wextra",
             "-Werror",
-            f"-DTEST_PIPELINE_DEPTH={request.param}",
+            f"-DTEST_PIPELINE_DEPTH={depth}",
+            *(["-DTHINGDAQ_EXPERIMENT_GPIO_RLE=1"] if diagnostic else []),
             f"-I{directory}",
+            f"-I{ROOT / 'firmware/src'}",
             str(ROOT / "firmware/tests/adc_dma_interrupt_order_test.cpp"),
             "-o",
             str(executable),
