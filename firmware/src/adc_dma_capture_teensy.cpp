@@ -529,6 +529,7 @@ void recordFaultTrace(std::uint32_t reason, std::uint32_t adc0 = 0U,
   }
   fault_trace::words[1] = elapsed;
   fault_trace::words[2] = DMA_ES;
+  fault_trace::retainProgress();
   barrier();
   fault_trace::words[0] = reason | ((adc0 & 0xFU) << 8U) |
                           ((adc1 & 0xFU) << 12U) |
@@ -558,6 +559,12 @@ std::size_t waitForSafePipelineProgress() {
     if (adc0 < kDmaPipelineDepth - 1U &&
         adc1 < kDmaPipelineDepth - 1U &&
         (adc0 > adc1 ? adc0 - adc1 : adc1 - adc0) <= 1U) {
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+      fault_trace::rememberProgress(
+          g_pipeline_generations[0],
+          static_cast<std::uint32_t>(adc0 | (adc1 << 4U)),
+          ARM_DWT_CYCCNT, DMA_INT);
+#endif
       return adc0 < adc1 ? adc0 : adc1;
     }
   } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles &&

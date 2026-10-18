@@ -36,6 +36,16 @@ Failure-only TCD/descriptor detail is now retained and retrieved after STOP
 through explicit private STATUS pages; acceptance limits remain unchanged.
 Fresh diagnostic reproduction and qualification are required.
 
+The [descriptor repeat failed](../results/experiments/gpio-rle600-descriptor-failure-20261018.md)
+in its third restart cell. Hardware destination/link pairs confirm indices
+3/1; CPU-visible RAM descriptors match expectations. The cause remains
+unresolved. RLE-only diagnostics now retain the last two accepted progress
+observations before completion accounting (base generation, indices, DWT,
+pending IRQs), frozen at first fault and cleared on prepare. Detail words
+36–43 extend retrieval to 22 private pages without enlarging any response.
+This adds bounded service-path work and is diagnostic instrumentation, not
+a demonstrated fix. Acceptance limits and ordinary builds are unchanged.
+
 ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.
 

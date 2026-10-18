@@ -85,8 +85,13 @@ The first [descriptor diagnostic campaign](../results/experiments/gpio-rle600-de
 passed eight restart cells and one ten-minute capture (1,314 checks,
 64.299 °C peak, zero parser errors/discards). It did not reproduce the failure
 and does not establish a fix. A bounded repeat increases restart coverage to
-forty cells, followed by another ten-minute capture on the same image; full
-qualification and the final RLE report remain pending.
+forty cells, followed by another ten-minute capture on the same image. It
+[failed in the third restart cell](../results/experiments/gpio-rle600-descriptor-failure-20261018.md)
+after two PASS cells (292 checks, 47.720 °C peak). Retained hardware addresses
+confirm indices 3/1, while CPU-visible descriptor links/destinations match
+expectations. The cause remains unresolved. The next diagnostic retains the
+last two accepted progress observations to narrow when divergence begins;
+full qualification and the final RLE report remain pending.
 
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every

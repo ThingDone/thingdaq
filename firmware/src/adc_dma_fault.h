@@ -9,14 +9,33 @@ namespace thingdaq::adc_capture::fault_trace {
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
 inline constexpr std::size_t kWords = 3;
 inline volatile std::uint32_t words[kWords]{};
-// Opt-in requests 0xFADC0001..0012 read two immutable diagnostic words.
+// Opt-in requests 0xFADC0001..0016 read two immutable diagnostic words.
 // Normal STATUS retains its original 12-byte summary and frame-size limit.
-inline constexpr std::size_t kDetailWords = 36;
+inline constexpr std::size_t kDetailWords = 44;
 inline constexpr std::uint32_t kDetailRequestBase = 0xFADC0000U;
 inline volatile std::uint32_t detail[kDetailWords]{};
+// Two most recent accepted progress observations, oldest first. Each holds
+// software base generation, packed indices, DWT cycles and pending DMA IRQs.
+// Only the serialized DMA service writes this; prepare resets it while stopped.
+inline std::array<std::uint32_t, 8> progress_history{};
+inline void rememberProgress(std::uint32_t generation, std::uint32_t indices,
+                             std::uint32_t cycles, std::uint32_t pending) {
+  if (words[0] != 0U) return;
+  for (std::size_t i = 0; i < 4; ++i)
+    progress_history[i] = progress_history[i + 4];
+  progress_history[4] = generation;
+  progress_history[5] = indices;
+  progress_history[6] = cycles;
+  progress_history[7] = pending;
+}
+inline void retainProgress() {
+  for (std::size_t i = 0; i < progress_history.size(); ++i)
+    detail[36 + i] = progress_history[i];
+}
 inline void reset() {
   for (std::size_t i = 0; i < kWords; ++i) words[i] = 0;
   for (std::size_t i = 0; i < kDetailWords; ++i) detail[i] = 0;
+  progress_history.fill(0U);
 }
 inline std::array<std::uint32_t, kWords> snapshot(std::uint32_t request_id = 0) {
   std::array<std::uint32_t, kWords> result{};

@@ -100,6 +100,22 @@ void start(packet::PacketBufferPipeline &p, std::uint32_t id) {
 }
 int main(int argc, char **argv) {
   assert(argc == 2 || argc == 3);
+  adc_capture::fault_trace::reset();
+  for (std::uint32_t i = 1; i <= 3; ++i)
+    adc_capture::fault_trace::rememberProgress(i, i + 10, i + 20, i + 30);
+  adc_capture::fault_trace::retainProgress();
+  for (std::size_t i = 0; i < 4; ++i) {
+    assert(adc_capture::fault_trace::detail[36 + i] == 2 + i * 10);
+    assert(adc_capture::fault_trace::detail[40 + i] == 3 + i * 10);
+  }
+  adc_capture::fault_trace::words[0] = 1;
+  adc_capture::fault_trace::rememberProgress(99, 99, 99, 99);
+  adc_capture::fault_trace::retainProgress();
+  assert(adc_capture::fault_trace::detail[40] == 3);
+  adc_capture::fault_trace::reset();
+  adc_capture::fault_trace::retainProgress();
+  for (std::size_t i = 36; i < 44; ++i)
+    assert(adc_capture::fault_trace::detail[i] == 0);
   if (argc == 3) {
     std::ofstream status_out(argv[2], std::ios::binary);
     protocol::Request request{};
@@ -124,7 +140,7 @@ int main(int argc, char **argv) {
       assert(protocol::encodeStatusResponse(request, 0, response, status).ok());
       status_out.write(reinterpret_cast<const char *>(status.view().data),
                        static_cast<std::streamsize>(status.size()));
-      for (std::uint32_t page = 1; page <= 18; ++page) {
+      for (std::uint32_t page = 1; page <= 22; ++page) {
         request.request_id = adc_capture::fault_trace::kDetailRequestBase + page;
         assert(protocol::encodeStatusResponse(request, 0, response, status).ok());
         status_out.write(reinterpret_cast<const char *>(status.view().data),
@@ -132,7 +148,7 @@ int main(int argc, char **argv) {
       }
       assert(adc_capture::fault_trace::snapshot(0xFADC0000U) ==
              adc_capture::fault_trace::snapshot());
-      assert(adc_capture::fault_trace::snapshot(0xFADC0013U) ==
+      assert(adc_capture::fault_trace::snapshot(0xFADC0017U) ==
              adc_capture::fault_trace::snapshot());
     }
   }
