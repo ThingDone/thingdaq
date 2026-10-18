@@ -428,6 +428,10 @@ bool appendFutureGeneration() {
 }
 
 bool configuredHardwareValid() {
+  if ((priorityRegister(1U) & DMA_DCHPRI_ECP) !=
+      edma_priority::adc1Preemption(auxiliaryPriorities())) {
+    return false;
+  }
   if ((DMA_ERQ & kAdcDmaChannelMask) != kAdcDmaChannelMask ||
       (ADC1_GC & ADC_GC_DMAEN) == 0U ||
       (ADC2_GC & ADC_GC_DMAEN) == 0U ||

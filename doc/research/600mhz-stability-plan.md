@@ -116,6 +116,15 @@ and start/end DWT plus fault-entry DWT and hardware counters, with unchanged
 acceptance limits. A fresh forty-cycle restart test followed by one ten-minute
 capture will collect this expanded record; no automatic full qualification or
 finalizer follows. All failed evidence remains preserved.
+The [counter diagnostic failed in its second restart cell](../results/experiments/gpio-rle600-counter-failure-20261018.md)
+after one PASS (146 checks, 44.036 °C peak). The two preceding observations
+imply an ADC0 lead of 2,021/2,022 samples despite read spans under one
+microsecond. This narrows the investigation beyond long sequential-read
+latency; the cause remains unproven. A controlled candidate disables DMA
+channel preemption for ADC1 only in the private combined-input RLE image,
+retaining all priorities, sample rates, deadlines and acceptance limits.
+Fresh bounded restart and ten-minute tests will assess this hypothesis before
+any full qualification. The ninth failed campaign remains preserved.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when

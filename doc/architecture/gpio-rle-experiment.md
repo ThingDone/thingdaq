@@ -54,6 +54,15 @@ private pages without enlarging any response.
 This adds bounded service-path work and is diagnostic instrumentation, not
 a demonstrated fix. Acceptance limits and ordinary builds are unchanged.
 
+The [counter diagnostic failure](../results/experiments/gpio-rle600-counter-failure-20261018.md)
+shows apparent sample-progress divergence despite sub-microsecond register
+read spans. A controlled candidate clears ADC1 channel ECP only for the
+private RLE combined-input mode, preventing higher-priority DMA from suspending
+that channel. Channel priorities and all capture guards remain unchanged;
+stopped setup verifies the selected ECP bit. Other builds and non-auxiliary
+setup retain the prior ECP configuration. Preemption-related request delay is
+a hypothesis, not an established historical cause or qualified correction.
+
 ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.
 
