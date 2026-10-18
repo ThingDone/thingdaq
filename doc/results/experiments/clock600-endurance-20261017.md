@@ -8,7 +8,9 @@ related: ['[[Clock600-Thermal-20261016]]', '[[Parser600-Investigation-20261017]]
 
 # 600 MHz three-hour repeated capture campaign
 
-Status: **STOPPED**. Completed 1 of 18 requested ten-minute captures.
+Status: **STOPPED**. Attempted 1 of 18 requested ten-minute captures; **zero full ten-minute captures completed**. Run 1 failed after approximately 70 seconds, and runs 2–18 were not started.
+
+The host recorded two checksum rejections and discarded 2,120 bytes before detecting an ADC sequence gap: expected frame 138621 at tick 561137808, received frame 138622 at tick 561141856. Both rejected byte samples are retained in the JSON evidence. This establishes a failed capture, but does not yet establish whether the initiating defect is in the host parser, firmware framing, or transport. The firmware failure snapshot reports zero ADC DMA errors and zero ADC raw-ring overruns. Cleanup STOP returned IDLE; no post-STOP temperature was collected on the failure path. The highest sampled temperature was 48.948 °C, below the 80 °C abort threshold.
 
 The exact archived `thingdaq-6c8a85596662e413` image captures both 12-bit ADCs and all sixteen GPIO inputs at 1 MS/s, with normal ADC frames, standard Adler-32, 600 MHz CPU / 150 MHz IPG / 37.5 MHz ADC / 24 MHz PIT. Watchdog remains disabled.
 
