@@ -188,6 +188,9 @@ inline void runAdcTriggerDiagnosticPollHook() {
 #define ADC_ETC_DONE0_1_IRQ (IMXRT_ADC_ETC.DONE0_1_IRQ)
 #define ADC_ETC_DONE2_ERR_IRQ (IMXRT_ADC_ETC.DONE2_ERR_IRQ)
 #define ADC_ETC_DMA_CTRL (IMXRT_ADC_ETC.DMA_CTRL)
+#define ADC_ETC_CTRL_DMA_MODE_SEL (1U << 29U)
+#define ADC_ETC_DMA_CTRL_TRIQ_ENABLE(n) (1U << ((n) & 7U))
+#define ADC_ETC_DMA_CTRL_TRIQ_REQ(n) (1U << (16U + ((n) & 7U)))
 #define ARM_DEMCR fake_imxrt::arm_demcr
 #define ARM_DWT_CTRL fake_imxrt::arm_dwt_ctrl
 #define ARM_DWT_CYCCNT fake_imxrt::arm_dwt_cyccnt

@@ -15,6 +15,36 @@ CPP_TEST = REPOSITORY_ROOT / "firmware/tests/adc_register_adapter_test.cpp"
 
 
 class AdcRegisterAdapterTests(unittest.TestCase):
+    def test_etc_probe_preserves_dma_handshake_until_capture_teardown(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="thingdaq-adc-request-") as directory:
+            executable = Path(directory) / "adc-request"
+            subprocess.run(
+                [
+                    "g++",
+                    "-std=c++17",
+                    "-O2",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-DTHINGDAQ_EXPERIMENT_ADC_ETC_PROBE=1",
+                    "-DTHINGDAQ_EXPERIMENT_GPIO_RLE=1",
+                    "-DTHINGDAQ_EXPERIMENT_LARGE_ADC_FRAME=1",
+                    "-DTHINGDAQ_RELEASE_FIXED_1MHZ=1",
+                    "-DTHINGDAQ_EXPERIMENT_CPU_HZ=600000000U",
+                    f"-I{FAKE_TEENSY_INCLUDE}",
+                    f"-I{FIRMWARE_SOURCE}",
+                    str(
+                        REPOSITORY_ROOT
+                        / "firmware/tests/adc_request_probe_register_test.cpp"
+                    ),
+                    "-o",
+                    str(executable),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([str(executable)], check=True, capture_output=True)
+
     def test_timer_enable_through_completion_observation_stays_in_itcm(self) -> None:
         source = (FIRMWARE_SOURCE / "adc_trigger_teensy.cpp").read_text()
         start = source.index("bool armTimersAndObserve(bool completion_diagnostic)")

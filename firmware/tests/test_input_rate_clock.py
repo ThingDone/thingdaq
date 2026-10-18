@@ -94,6 +94,16 @@ def test_build_identity_distinguishes_clock_and_ratio(monkeypatch):
         gpio_preempt_probe=True,
     )
     assert probe.build_id != rle.build_id
+    etc_probe = builder.experiment_identity(
+        original,
+        600,
+        False,
+        release_fixed_1mhz=True,
+        large_adc_frame=True,
+        gpio_rle=True,
+        adc_etc_probe=True,
+    )
+    assert etc_probe.build_id not in (probe.build_id, rle.build_id)
 
 
 def test_large_frame_manifest_retention_matches_fixed_release_layout(monkeypatch):

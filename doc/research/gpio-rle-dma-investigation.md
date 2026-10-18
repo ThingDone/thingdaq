@@ -13,6 +13,12 @@ divergence under GPIO RLE is still unresolved; the latest RLE PASS is not a
 causal fix. Investigation resumed at Bill's request. No hardware change is
 currently required.
 
+The [preemption probe reproduced the fault](../results/experiments/gpio-rle600-preempt-ab-failure-20261018.md)
+in its third capture, with GPIO preemption restricted. Early history now
+establishes progressive ADC1 transfer deficit: about one sample per 2,024
+GPIO samples, reaching 1,025 at generation 2,048. GPIO DPA alone is
+insufficient. A same-binary ADC1 request-source comparison is the next test.
+
 ## Retained evidence and new analysis
 
 The counter, preemption and history failures all stopped at software base
@@ -71,7 +77,9 @@ STOP as well as after a fault. `stopHardwareAfterTriggers()` seals it after
 disabling requests/IRQs and servicing the last pending completion. Normal
 STATUS still reports zero fault; explicit private pages have reason zero.
 On healthy captures words 36–95 contain progress history; the follow-up
-preemption probe records DCHPRI0–3 in word 0, low byte first. Words 1–35
+preemption probe records DCHPRI0–3 in word 0, low byte first. The request-source
+probe additionally retains ADC1 DMAMUX, ETC DMA control and ETC control before
+DMA teardown in words 1–3. Words 4–35
 remain zero and are not a hardware fault snapshot. Failed records retain
 priority, idempotent STOP does not overwrite them, and prepare clears the
 record. Acquisition ISR recording is unchanged. This is instrumentation,
@@ -108,3 +116,24 @@ builds retain the original policy. The build identity and manifest explicitly
 mark the probe. Healthy STOP captures the four priority registers for host
 verification. This is a controlled diagnostic, not a production fix, and a
 PASS without a reproduced control failure cannot establish causality.
+
+## ADC1 request-source probe
+
+The opt-in `--adc-etc-probe` build uses ADC_ETC trigger 4's DMA request
+(DMAMUX source 23) on odd run IDs and the original ADC2 request (source 88)
+on even IDs. It excludes the preemption probe, so priority policy is constant.
+The DMA source address remains ADC2_R0 with identical halfword transfers,
+descriptors and sample rate. DMA_MODE_SEL is enabled only for the ETC route:
+its request clears on DMA ACK instead of following automatically cleared
+ADC COCO. Trigger STOP preserves the handshake until the final conversion
+drains; ADC DMA teardown disables ETC requests and clears mode. Setup rejects
+a busy ETC DMA source, clears stale trigger-4 requests and verifies enables
+and mux before triggers start. The host grades source, enable and mode
+readback against run ID after each successful STOP.
+
+The request-source probe passes the target build with unchanged 33,760-byte
+RAM1 and 4,096-byte RAM2 free-space floors. Adapter, DMA service, codec and
+host tests passed 89 tests plus 55 subtests; subsequent manifest-identity,
+probe opt-in and documentation checks passed 28 tests plus 980 subtests.
+The register test executes the production arm/STOP adapter and verifies that
+the ETC handshake survives trigger shutdown until DMA teardown.

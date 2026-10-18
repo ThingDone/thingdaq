@@ -151,6 +151,11 @@ bool g_hardware_prepared = false;
 // Read by main while completion/error ISRs can change it. Multi-field
 // snapshots additionally hold interrupts::Guard for a coherent record.
 volatile bool g_faulted = false;
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+// Same-image request-source A/B: odd epochs use ADC_ETC trigger 4's ACK-cleared
+// request for ADC1; even epochs retain the original ADC2 COCO request.
+bool g_adc_etc_request = false;
+#endif
 
 std::uint32_t address32(const volatile void *address) {
   return static_cast<std::uint32_t>(
@@ -167,7 +172,11 @@ volatile std::uint32_t *dmamuxRegister(std::size_t converter) {
          board::kAdcConverterConfigurations[converter].edma_channel;
 }
 
-constexpr std::uint32_t dmamuxConfiguration(std::size_t converter) {
+std::uint32_t dmamuxConfiguration(std::size_t converter) {
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+  if (converter == 1U && g_adc_etc_request)
+    return DMAMUX_CHCFG_ENBL | DMAMUX_SOURCE_ADC_ETC;
+#endif
   return DMAMUX_CHCFG_ENBL |
          board::kAdcConverterConfigurations[converter].dmamux_source;
 }
@@ -218,6 +227,9 @@ bool triggersStopped() {
 }
 
 bool resourcesBusy() {
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+  if ((ADC_ETC_DMA_CTRL & 0xFFU) != 0U) return true;
+#endif
   if ((DMA_ERQ & kAdcDmaChannelMask) != 0U ||
       (ADC1_GC & ADC_GC_DMAEN) != 0U ||
       (ADC2_GC & ADC_GC_DMAEN) != 0U) {
@@ -246,6 +258,10 @@ void clearChannelState(std::size_t converter) {
 void disableRequests() {
   ADC1_GC &= ~ADC_GC_DMAEN;
   ADC2_GC &= ~ADC_GC_DMAEN;
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+  ADC_ETC_DMA_CTRL = ADC_ETC_DMA_CTRL_TRIQ_REQ(4U);
+  ADC_ETC_CTRL &= ~ADC_ETC_CTRL_DMA_MODE_SEL;
+#endif
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
     DMA_CERQ = board::kAdcConverterConfigurations[converter].edma_channel;
@@ -428,6 +444,10 @@ bool appendFutureGeneration() {
 }
 
 bool configuredHardwareValid() {
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+  if ((ADC_ETC_DMA_CTRL & 0xFFU) !=
+      (g_adc_etc_request ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U)) return false;
+#endif
   if ((DMA_ERQ & kAdcDmaChannelMask) != kAdcDmaChannelMask ||
       (ADC1_GC & ADC_GC_DMAEN) == 0U ||
       (ADC2_GC & ADC_GC_DMAEN) == 0U ||
@@ -853,6 +873,9 @@ StartStatus prepareHardware(std::uint32_t epoch,
        ++converter) {
     clearChannelState(converter);
   }
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+  g_adc_etc_request = (epoch & 1U) != 0U;
+#endif
   configureDescriptors();
   edma_priority::selectCaptureEpoch(epoch);
   configurePriorities();
@@ -870,6 +893,12 @@ StartStatus prepareHardware(std::uint32_t epoch,
 
   ADC1_GC |= ADC_GC_DMAEN;
   ADC2_GC |= ADC_GC_DMAEN;
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+  // Clear stale trigger-4 requests before enabling its aggregate DMA source.
+  // ADC2's result register and TCD remain identical in both probe conditions.
+  ADC_ETC_DMA_CTRL = ADC_ETC_DMA_CTRL_TRIQ_REQ(4U) |
+      (g_adc_etc_request ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U);
+#endif
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
     *dmamuxRegister(converter) = dmamuxConfiguration(converter);
@@ -916,6 +945,11 @@ StopReport stopHardwareAfterTriggers() {
     return report;
   }
 
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+  const std::uint32_t adc1_mux = *dmamuxRegister(1U);
+  const std::uint32_t etc_dma = ADC_ETC_DMA_CTRL;
+  const std::uint32_t etc_control = ADC_ETC_CTRL;
+#endif
   disableRequests();
   disableInterrupts();
   interrupts::Guard interrupt_guard;
@@ -927,7 +961,8 @@ StopReport stopHardwareAfterTriggers() {
       static_cast<std::uint32_t>(DMA_DCHPRI0) |
       (static_cast<std::uint32_t>(DMA_DCHPRI1) << 8U) |
       (static_cast<std::uint32_t>(DMA_DCHPRI2) << 16U) |
-      (static_cast<std::uint32_t>(DMA_DCHPRI3) << 24U));
+      (static_cast<std::uint32_t>(DMA_DCHPRI3) << 24U),
+      adc1_mux, etc_dma, etc_control);
 #endif
 
   std::array<ChannelStopState, kConverterCount> stopped{};

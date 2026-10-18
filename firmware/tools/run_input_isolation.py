@@ -194,17 +194,25 @@ def gpio_rle_settings(
             "GPIO RLE requires its private wire validator and qualified baseline"
         )
     probe = experiment.get("gpio_preempt_probe", False)
-    if not isinstance(probe, bool) or (probe and not selected):
+    etc_probe = experiment.get("adc_etc_probe", False)
+    if (
+        not isinstance(probe, bool)
+        or not isinstance(etc_probe, bool)
+        or ((probe or etc_probe) and not selected)
+        or (probe and etc_probe)
+    ):
         raise ValueError("invalid GPIO preemption probe manifest flag")
     if adc_phase and not selected:
         raise ValueError("--adc-phase requires --gpio-rle")
-    if probe and not adc_phase:
-        raise ValueError("GPIO preemption probe requires --adc-phase readback")
+    if (probe or etc_probe) and not adc_phase:
+        raise ValueError("DMA probe requires --adc-phase readback")
     settings = {"AUX_INPUT_GPIO_RLE": "1" if selected else "0"}
     if adc_phase:
         settings["AUX_INPUT_ADC_PHASE"] = "1"
     if probe:
         settings["AUX_INPUT_GPIO_PREEMPT_PROBE"] = "1"
+    if etc_probe:
+        settings["AUX_INPUT_ADC_ETC_PROBE"] = "1"
     return settings
 
 

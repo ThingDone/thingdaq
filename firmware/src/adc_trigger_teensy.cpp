@@ -438,6 +438,12 @@ class TeensyPlatform final : public Platform {
     const interrupts::Guard diagnostic_guard(completion_diagnostic);
     ADC_ETC_CTRL = ADC_ETC_CTRL_PRE_DIVIDER(schedule.adc_etc_predivider) |
                    ADC_ETC_CTRL_TRIG_ENABLE(kTriggerEnableMask);
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+    // Pulse mode means the ETC request clears on DMA acknowledgement, unlike
+    // the ADC COCO request automatically cleared by ETC phase completion.
+    if ((ADC_ETC_DMA_CTRL & ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U)) != 0U)
+      ADC_ETC_CTRL |= ADC_ETC_CTRL_DMA_MODE_SEL;
+#endif
     barrier();
     return armTimersAndObserve(completion_diagnostic);
   }
@@ -479,7 +485,13 @@ class TeensyPlatform final : public Platform {
     masterPit().TCTRL = 0U;
     pairPit().TCTRL = PIT_TCTRL_CHN;
     ADC_ETC_CTRL = ADC_ETC_CTRL_PRE_DIVIDER(
-        variable_rate::teensySelectedSchedule().adc_etc_predivider);
+        variable_rate::teensySelectedSchedule().adc_etc_predivider)
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE)
+        // Preserve request handshake mode until the last conversion drains.
+        // The ADC DMA owner's teardown clears this after triggers stop.
+        | (ADC_ETC_CTRL & ADC_ETC_CTRL_DMA_MODE_SEL)
+#endif
+        ;
     barrier();
     const std::uint32_t started = ARM_DWT_CYCCNT;
     std::uint32_t polls = 0U;

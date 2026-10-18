@@ -3714,6 +3714,20 @@ def run_acceptance(
                     expected_priorities,
                     metrics["adc_stopped_detail"][0],
                 )
+            if os.environ.get("AUX_INPUT_ADC_ETC_PROBE", "0") == "1":
+                etc = bool(validator.run_id & 1)
+                words = metrics["adc_stopped_detail"]
+                evidence.equal(
+                    "adc_phase.adc1_mux", 0x80000017 if etc else 0x80000058, words[1]
+                )
+                evidence.equal(
+                    "adc_phase.etc_dma_enable", 0x10 if etc else 0, words[2] & 0xFF
+                )
+                evidence.equal(
+                    "adc_phase.etc_dma_mode",
+                    0x20000000 if etc else 0,
+                    words[3] & 0x20000000,
+                )
             emit_event(
                 "adc_stopped_detail",
                 run_id=validator.run_id,

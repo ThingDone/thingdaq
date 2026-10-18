@@ -60,11 +60,17 @@ inline void retainProgress() {
   for (std::size_t i = 0; i < phase_history.size(); ++i)
     detail[48 + i] = phase_history[i];
 }
-inline void retainStoppedProgress(std::uint32_t priorities = 0U) {
+inline void retainStoppedProgress(std::uint32_t priorities = 0U,
+                                  std::uint32_t adc1_mux = 0U,
+                                  std::uint32_t etc_dma = 0U,
+                                  std::uint32_t etc_control = 0U) {
   if (words[0] != 0U || stopped_progress) return;
   // Healthy record word 0 is DCHPRI0..3 (low byte first). Fault records keep
   // their existing DADDR interpretation; the summary reason distinguishes them.
   detail[0] = priorities;
+  detail[1] = adc1_mux;
+  detail[2] = etc_dma;
+  detail[3] = etc_control;
   retainProgress();
   stopped_progress = true;
 }

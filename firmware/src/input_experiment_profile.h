@@ -5,6 +5,12 @@
 #error "The GPIO preemption probe requires the private GPIO RLE experiment"
 #endif
 
+#if defined(THINGDAQ_EXPERIMENT_ADC_ETC_PROBE) && \
+    (!defined(THINGDAQ_EXPERIMENT_GPIO_RLE) || \
+     defined(THINGDAQ_EXPERIMENT_GPIO_PREEMPT_PROBE))
+#error "ADC ETC probe requires GPIO RLE and excludes the preemption probe"
+#endif
+
 #include <cstdint>
 
 // Closed, build-time research variants, not additions to the public v2 contract.

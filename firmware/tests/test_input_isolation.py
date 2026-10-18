@@ -176,7 +176,14 @@ def test_service_success_does_not_mean_firmware_passed():
     assert summary["evidence"] == [{"result": "PASS"}]
 
 
-def test_preemption_probe_requires_phase_readback_and_private_rle():
+@pytest.mark.parametrize(
+    "flag,setting",
+    [
+        ("gpio_preempt_probe", "AUX_INPUT_GPIO_PREEMPT_PROBE"),
+        ("adc_etc_probe", "AUX_INPUT_ADC_ETC_PROBE"),
+    ],
+)
+def test_dma_probes_require_phase_readback_and_private_rle(flag, setting):
     manifest = {
         "input_experiment": {
             "gpio_rle": True,
@@ -184,7 +191,7 @@ def test_preemption_probe_requires_phase_readback_and_private_rle():
             "release_fixed_1mhz": True,
             "cpu_mhz": 600,
             "gpio_rle_wire_version": 130,
-            "gpio_preempt_probe": True,
+            flag: True,
         }
     }
     with pytest.raises(ValueError, match="--adc-phase"):
@@ -194,10 +201,15 @@ def test_preemption_probe_requires_phase_readback_and_private_rle():
     ) == {
         "AUX_INPUT_GPIO_RLE": "1",
         "AUX_INPUT_ADC_PHASE": "1",
-        "AUX_INPUT_GPIO_PREEMPT_PROBE": "1",
+        setting: "1",
     }
     with pytest.raises(ValueError):
         isolation.gpio_rle_settings({}, enabled=False, host_api=False, adc_phase=True)
+    manifest["input_experiment"].update(gpio_preempt_probe=True, adc_etc_probe=True)
+    with pytest.raises(ValueError):
+        isolation.gpio_rle_settings(
+            manifest, enabled=True, host_api=False, adc_phase=True
+        )
 
 
 def test_long_sequences_must_fit_below_container_limit():
