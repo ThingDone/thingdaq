@@ -6,6 +6,7 @@ import subprocess
 import sys
 import zlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -51,6 +52,49 @@ def rig_module(monkeypatch, enabled=True):
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.mark.parametrize("fault", [False, True])
+@pytest.mark.parametrize("bad", [None, "page", "reason", "run_id", "state"])
+def test_diagnostic_read_preserves_partial_words_and_restores_request_id(
+    monkeypatch, fault, bad
+):
+    rig = rig_module(monkeypatch)
+
+    class Link:
+        next_request_id = 123
+
+        def exchange(self, kind, *, on_data):
+            assert kind == rig.GET_STATUS_REQUEST
+            page = self.next_request_id - 0xFADC0000
+            values = {
+                "adc_fault_page": page,
+                "adc_fault_reason": int(fault),
+                "adc_fault_word0": 2 * page - 1,
+                "adc_fault_word1": 2 * page,
+                "device_state": rig.STATE_IDLE,
+            }
+            run_id = 7
+            if page == 3 and bad:
+                if bad == "run_id":
+                    run_id = 8
+                elif bad == "state":
+                    values["device_state"] = rig.STATE_RUNNING
+                else:
+                    values["adc_fault_" + bad] += 1
+            return SimpleNamespace(run_id=run_id, values=values), 0.001
+
+    monkeypatch.setattr(rig, "decode_status", lambda frame: frame)
+    link = Link()
+    words = []
+    if bad:
+        with pytest.raises(rig.ProtocolFailure, match="ADC diagnostic"):
+            rig.read_adc_diagnostic_pages(link, words, run_id=7, reason=int(fault))
+        assert words == [1, 2, 3, 4]
+    else:
+        rig.read_adc_diagnostic_pages(link, words, run_id=7, reason=int(fault))
+        assert words == list(range(1, 97))
+    assert link.next_request_id == 123
 
 
 @pytest.fixture(scope="module")

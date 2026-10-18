@@ -2364,6 +2364,28 @@ def decode_status(frame: Frame) -> StatusSnapshot:
     return StatusSnapshot(values)
 
 
+def read_adc_diagnostic_pages(
+    link: SerialLink, words: list[int], *, run_id: int, reason: int
+) -> None:
+    """Retain partial evidence on a read failure and restore ordinary request IDs."""
+    saved_request_id = link.next_request_id
+    try:
+        for page in range(1, 49):
+            link.next_request_id = 0xFADC0000 + page
+            frame, _ = link.exchange(GET_STATUS_REQUEST, on_data=lambda _frame: None)
+            values = decode_status(frame).values
+            if (
+                frame.run_id != run_id
+                or values["device_state"] != STATE_IDLE
+                or values["adc_fault_page"] != page
+                or values["adc_fault_reason"] != reason
+            ):
+                raise ProtocolFailure("ADC diagnostic page/reason/run/state mismatch")
+            words.extend((values["adc_fault_word0"], values["adc_fault_word1"]))
+    finally:
+        link.next_request_id = saved_request_id
+
+
 ZERO_ERROR_FIELDS = (("adc_fault_reason",) if EXPERIMENT_GPIO_RLE else ()) + (
     "parser_errors",
     "transport_errors",
@@ -3680,6 +3702,23 @@ def run_acceptance(
             paired_samples_joined=final_status.paired_gpio_samples_joined,
             primary_bank_samples_captured=final_status.primary_gpio_samples_captured,
         )
+        if os.environ.get("AUX_INPUT_ADC_PHASE", "0") == "1":
+            metrics["adc_stopped_detail"] = []
+            read_adc_diagnostic_pages(
+                link, metrics["adc_stopped_detail"], run_id=validator.run_id, reason=0
+            )
+            if os.environ.get("AUX_INPUT_GPIO_PREEMPT_PROBE", "0") == "1":
+                expected_priorities = 0xC0C18283 if validator.run_id & 1 else 0x80818283
+                evidence.equal(
+                    "adc_phase.dma_priorities",
+                    expected_priorities,
+                    metrics["adc_stopped_detail"][0],
+                )
+            emit_event(
+                "adc_stopped_detail",
+                run_id=validator.run_id,
+                words=metrics["adc_stopped_detail"],
+            )
         completed = not evidence.failures
     except Exception as error:  # noqa: BLE001 - remote evidence must retain diagnosis
         evidence.failures.append(f"{type(error).__name__}: {error}")
@@ -3706,6 +3745,7 @@ def run_acceptance(
                 GET_STATUS_REQUEST, on_data=lambda _frame: None
             )
             metrics["failure_status"] = decode_status(failure_frame).values
+            metrics["failure_run_id"] = failure_frame.run_id
             emit_event("failure_status", values=metrics["failure_status"])
         except Exception as status_error:  # noqa: BLE001 - cleanup must still run
             emit_event("failure_status_unavailable", error=str(status_error))
@@ -3739,25 +3779,17 @@ def run_acceptance(
             if EXPERIMENT_GPIO_RLE and metrics.get("failure_status", {}).get(
                 "adc_fault_reason", 0
             ):
-                saved_request_id = link.next_request_id
                 metrics["adc_fault_detail"] = []
                 try:
-                    for page in range(1, 49):
-                        link.next_request_id = 0xFADC0000 + page
-                        frame, _ = link.exchange(
-                            GET_STATUS_REQUEST, on_data=lambda _frame: None
-                        )
-                        values = decode_status(frame).values
-                        if values["adc_fault_page"] != page:
-                            raise ProtocolFailure("DMA fault detail page mismatch")
-                        metrics["adc_fault_detail"].extend(
-                            (values["adc_fault_word0"], values["adc_fault_word1"])
-                        )
+                    read_adc_diagnostic_pages(
+                        link,
+                        metrics["adc_fault_detail"],
+                        run_id=metrics["failure_run_id"],
+                        reason=metrics["failure_status"]["adc_fault_reason"],
+                    )
                     emit_event("adc_fault_detail", words=metrics["adc_fault_detail"])
                 except Exception as detail_error:  # noqa: BLE001 - retain original failure
                     emit_event("adc_fault_detail_unavailable", error=str(detail_error))
-                finally:
-                    link.next_request_id = saved_request_id
     return AcceptanceResult(evidence, metrics, stimulus_grade)
 
 

@@ -176,6 +176,30 @@ def test_service_success_does_not_mean_firmware_passed():
     assert summary["evidence"] == [{"result": "PASS"}]
 
 
+def test_preemption_probe_requires_phase_readback_and_private_rle():
+    manifest = {
+        "input_experiment": {
+            "gpio_rle": True,
+            "large_adc_frame": True,
+            "release_fixed_1mhz": True,
+            "cpu_mhz": 600,
+            "gpio_rle_wire_version": 130,
+            "gpio_preempt_probe": True,
+        }
+    }
+    with pytest.raises(ValueError, match="--adc-phase"):
+        isolation.gpio_rle_settings(manifest, enabled=True, host_api=False)
+    assert isolation.gpio_rle_settings(
+        manifest, enabled=True, host_api=False, adc_phase=True
+    ) == {
+        "AUX_INPUT_GPIO_RLE": "1",
+        "AUX_INPUT_ADC_PHASE": "1",
+        "AUX_INPUT_GPIO_PREEMPT_PROBE": "1",
+    }
+    with pytest.raises(ValueError):
+        isolation.gpio_rle_settings({}, enabled=False, host_api=False, adc_phase=True)
+
+
 def test_long_sequences_must_fit_below_container_limit():
     assert isolation.validate_program_budget(600, 1) == 635
     assert isolation.validate_program_budget(10, 20) == 330

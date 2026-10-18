@@ -176,7 +176,9 @@ def frame_experiment_settings(manifest: dict, *, enabled: bool, host_api: bool) 
     return {"AUX_INPUT_LARGE_ADC_FRAME": "1" if selected else "0"}
 
 
-def gpio_rle_settings(manifest: dict, *, enabled: bool, host_api: bool) -> dict:
+def gpio_rle_settings(
+    manifest: dict, *, enabled: bool, host_api: bool, adc_phase: bool = False
+) -> dict:
     experiment = manifest.get("input_experiment", {})
     selected = experiment.get("gpio_rle", False)
     if not isinstance(selected, bool) or selected != enabled:
@@ -191,7 +193,19 @@ def gpio_rle_settings(manifest: dict, *, enabled: bool, host_api: bool) -> dict:
         raise ValueError(
             "GPIO RLE requires its private wire validator and qualified baseline"
         )
-    return {"AUX_INPUT_GPIO_RLE": "1" if selected else "0"}
+    probe = experiment.get("gpio_preempt_probe", False)
+    if not isinstance(probe, bool) or (probe and not selected):
+        raise ValueError("invalid GPIO preemption probe manifest flag")
+    if adc_phase and not selected:
+        raise ValueError("--adc-phase requires --gpio-rle")
+    if probe and not adc_phase:
+        raise ValueError("GPIO preemption probe requires --adc-phase readback")
+    settings = {"AUX_INPUT_GPIO_RLE": "1" if selected else "0"}
+    if adc_phase:
+        settings["AUX_INPUT_ADC_PHASE"] = "1"
+    if probe:
+        settings["AUX_INPUT_GPIO_PREEMPT_PROBE"] = "1"
+    return settings
 
 
 def classify_result(result: dict, *, expected_cells: int | None = None) -> dict:
@@ -311,6 +325,11 @@ def main() -> int:
     parser.add_argument("--frame-experiment", action="store_true")
     parser.add_argument("--gpio-rle", action="store_true")
     parser.add_argument(
+        "--adc-phase",
+        action="store_true",
+        help="retrieve private ADC phase history after each STOP",
+    )
+    parser.add_argument(
         "--lifecycle-checks",
         action="store_true",
         help="also grade idempotent STOP and final conservation",
@@ -406,7 +425,12 @@ def main() -> int:
             )
         )
         settings.update(
-            gpio_rle_settings(manifest, enabled=args.gpio_rle, host_api=args.host_api)
+            gpio_rle_settings(
+                manifest,
+                enabled=args.gpio_rle,
+                host_api=args.host_api,
+                adc_phase=args.adc_phase,
+            )
         )
     except ValueError as error:
         parser.error(str(error))

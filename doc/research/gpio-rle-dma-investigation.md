@@ -58,9 +58,11 @@ qualification on this board.
 Raw evidence: `doc/results/raw/gpio-rle600-renewed-diagnosis-20261018`.
 The first job, `f4f75b34-6e05-4be5-aab3-ef9e441d3ee3`, passed sixty five-second
 captures and STOP/restart cycles without reflashing: 8,760 checks, peak
-62.457 degrees C. The following ten-minute capture is running. Frozen
-orchestration, runner, validator and image hashes reconcile. No failure has
-yet supplied the current image's early-phase checkpoints.
+62.457 degrees C. The following ten-minute capture also passed: 146 checks,
+66.141 degrees C peak. The [completed baseline](../results/experiments/gpio-rle600-renewed-diagnosis-20261018.md)
+contains all 61 captures and 8,906 checks. Frozen orchestration, runner,
+validator and image hashes reconciled before host changes. No failure
+supplied the current image's early-phase checkpoints.
 
 ## Diagnostic change
 
@@ -80,7 +82,12 @@ wait/service code, protocol round-trip, healthy/fault publication, reset,
 ordinary-host rejection and documentation. The 600 MHz large-ADC/RLE target
 build passes unchanged resource gates: 33,760 bytes RAM1 stack/local headroom
 and 4,096 bytes RAM2 heap headroom. Host retrieval and physical comparison
-follow after the frozen running campaign completes.
+are now supported by `run_input_isolation.py --adc-phase`. The host retains
+all 96 words, checks page/reason/run/IDLE consistency, restores ordinary
+request IDs on errors, and preserves partial evidence. The preemption probe
+requires this opt-in and grades actual priority-register readback against
+the acquisition epoch. Fault retrieval reuses the same reader and preserves
+the original acquisition failure if retrieval fails.
 
 ## Controlled preemption probe
 
