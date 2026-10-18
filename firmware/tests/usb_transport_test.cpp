@@ -656,6 +656,28 @@ void testAuxiliaryVariableLengthFrames() {
          "USB preserves short ADC and full GPIO frames across zero/partial writes");
 }
 
+void testCapacityChangePreservesActiveFrameWithoutTimeout() {
+  const auto adc = dataFrame(constants::FrameKind::kAdcData, 7U, 0U, 0U, true);
+  FakeLowerPrioritySource lower{};
+  lower.frames = {adc};
+  FakeCdcStream stream{};
+  stream.write_plan = {1024, 1024, usb::kWriteWouldBlock};
+  stats::Statistics statistics{};
+  usb::CdcTransport transport(stream, statistics, &lower);
+  const auto stalled = transport.serviceTransmit();
+  expect(stalled.stalled && stalled.bytes_written == 2048U &&
+             transport.snapshot().active_frame_bytes_sent == 2048U,
+         "capacity recheck defers the 24-byte tail without releasing its frame");
+  expect(transport.snapshot().short_capacity_deferrals == 1U &&
+             transport.snapshot().zero_length_write_events == 0U &&
+             statistics.snapshot().timeouts == 0U &&
+             statistics.snapshot().transport_errors == 0U,
+         "a write not attempted is a capacity deferral, not a backend timeout");
+  drainTransmit(transport);
+  expect(stream.output == adc && lower.frames.empty(),
+         "deferred tail resumes exactly once and completes the original frame");
+}
+
 }  // namespace
 
 int main() {
@@ -668,6 +690,7 @@ int main() {
   testResponsePriorityAndActiveFrameOwnership();
   testTransmitBudgets();
   testAuxiliaryVariableLengthFrames();
+  testCapacityChangePreservesActiveFrameWithoutTimeout();
 
   if (failures == 0) {
     std::cout << "usb transport tests passed\n";

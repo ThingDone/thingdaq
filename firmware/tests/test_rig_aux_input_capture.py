@@ -106,6 +106,26 @@ class EqualRateValidatorTests(unittest.TestCase):
 
 
 class FragmentedFrameParserTests(unittest.TestCase):
+    def test_retained_usb_corruption_is_rejected_at_every_read_boundary(self):
+        # Job 91ba765b-d70a-4523-b8dd-258f1e6888d3 retained two overlapping
+        # rejection windows. They reconstruct 2,048 bytes of ADC 138621,
+        # 72 stale bytes starting with ADC 138619, then 2,000 bytes of 138622.
+        # The last frame is deliberately incomplete; do not invent its tail.
+        wire = (
+            ROOT / "firmware/tests/fixtures/usb-autoflush-corruption.bin"
+        ).read_bytes()
+        self.assertEqual(4120, len(wire))
+        with patch.object(rig, "emit_event"):
+            for split in range(len(wire) + 1):
+                parser = rig.FrameParser()
+                frames = parser.feed(wire[:split]) + parser.feed(wire[split:])
+                self.assertEqual([], frames)
+                self.assertEqual(2, parser.checksum_errors)
+                self.assertEqual(0, parser.header_errors + parser.payload_errors)
+                self.assertEqual(2120, parser.bytes_discarded)
+                self.assertEqual(wire[2120:], parser.buffer)
+                self.assertEqual(138622, rig.HEADER.unpack_from(parser.buffer)[10])
+
     def test_data_and_control_frames_at_every_byte_split(self):
         wires = [
             (FIXTURES / name).read_bytes()

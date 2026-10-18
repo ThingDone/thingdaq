@@ -70,6 +70,38 @@ struct usb_string_descriptor_struct usb_string_product_name = {
 
 namespace thingdaq::usb {
 
+namespace {
+
+// The pinned core's compiled usb_serial_write reads tx_head/tx_available
+// before setting tx_noautoflush. Its timer ISR can flush/advance the ring in
+// that window, losing a write and sending stale bytes while returning success.
+// Mask only USB1: a global PRIMASK guard would delay acquisition and the core's
+// schedule_transfer() unconditionally enables global interrupts anyway.
+class UsbTransmitGuard final {
+ public:
+  UsbTransmitGuard() : was_enabled_(NVIC_IS_ENABLED(IRQ_USB1) != 0U) {
+    NVIC_DISABLE_IRQ(IRQ_USB1);
+#if defined(THINGDAQ_HOST_REGISTER_TEST)
+    __asm__ volatile("" : : : "memory");
+#else
+    __asm__ volatile("dsb\n\tisb" : : : "memory");
+#endif
+  }
+  ~UsbTransmitGuard() {
+    __asm__ volatile("" : : : "memory");
+    if (was_enabled_) {
+      NVIC_ENABLE_IRQ(IRQ_USB1);
+    }
+  }
+  UsbTransmitGuard(const UsbTransmitGuard &) = delete;
+  UsbTransmitGuard &operator=(const UsbTransmitGuard &) = delete;
+
+ private:
+  const bool was_enabled_;
+};
+
+}  // namespace
+
 bool TeensyCdcByteStream::sessionOpen() const {
   return (usb_cdc_line_rtsdtr & USB_SERIAL_DTR) != 0U;
 }
@@ -98,6 +130,7 @@ IoCount TeensyCdcByteStream::availableForWrite() {
   if (!sessionOpen()) {
     return 0;
   }
+  UsbTransmitGuard guard;
   return static_cast<IoCount>(usb_serial_write_buffer_free());
 }
 
@@ -107,8 +140,15 @@ IoCount TeensyCdcByteStream::write(const std::uint8_t *source,
     return 0;
   }
   if (source == nullptr || size == 0U ||
-      size > std::numeric_limits<std::uint32_t>::max()) {
+      size > board::kUsbTxMaxWriteBytes) {
     return -1;
+  }
+  UsbTransmitGuard guard;
+  // Recheck after masking: autoflush may have run since availableForWrite().
+  // The core excludes its current head from this capacity, so a bounded write
+  // with this much free ring space does not enter its cooperative timeout wait.
+  if (usb_serial_write_buffer_free() < static_cast<int>(size)) {
+    return kWriteWouldBlock;
   }
   return static_cast<IoCount>(
       usb_serial_write(source, static_cast<std::uint32_t>(size)));

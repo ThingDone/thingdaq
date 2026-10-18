@@ -14,6 +14,10 @@ namespace thingdaq::usb {
 // operation from an actual backend error without exceptions or allocation.
 using IoCount = std::int32_t;
 
+// write() only: capacity changed after availableForWrite(). No bytes were
+// offered to the backend; retry later without counting a backend timeout.
+inline constexpr IoCount kWriteWouldBlock = -2;
+
 class CdcByteStream {
  public:
   virtual ~CdcByteStream() = default;

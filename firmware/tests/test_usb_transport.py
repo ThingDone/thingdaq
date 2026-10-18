@@ -19,6 +19,37 @@ PORTABLE_SOURCES = (
 
 
 class FirmwareUsbTransportTests(unittest.TestCase):
+    def test_target_adapter_defers_usb_autoflush_without_masking_dma(self) -> None:
+        with tempfile.TemporaryDirectory(dir=FIRMWARE_DIRECTORY / "build") as directory:
+            executable = Path(directory) / "teensy-usb-test"
+            subprocess.run(
+                [
+                    "g++",
+                    "-std=c++17",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-Wconversion",
+                    "-Wsign-conversion",
+                    "-pedantic",
+                    "-O2",
+                    "-DARDUINO_TEENSY40",
+                    "-D__IMXRT1062__",
+                    "-DTHINGDAQ_HOST_REGISTER_TEST",
+                    f"-I{FIRMWARE_DIRECTORY / 'tests/fakes/usb'}",
+                    f"-I{FIRMWARE_DIRECTORY / 'tests/fakes/teensy40'}",
+                    f"-I{FIRMWARE_SOURCE}",
+                    str(FIRMWARE_DIRECTORY / "tests/teensy_usb_test.cpp"),
+                    str(FIRMWARE_SOURCE / "teensy_usb.cpp"),
+                    "-o",
+                    str(executable),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run([str(executable)], check=True, timeout=5)
+
     def test_transport_is_bounded_and_preserves_frame_ownership(self) -> None:
         compiler = shutil.which("g++")
         if compiler is None:

@@ -300,6 +300,7 @@ inline constexpr IRQ_NUMBER_t IRQ_DMA_CH0 = 0U;
 inline constexpr IRQ_NUMBER_t IRQ_DMA_CH1 = 1U;
 inline constexpr IRQ_NUMBER_t IRQ_DMA_CH2 = 2U;
 inline constexpr IRQ_NUMBER_t IRQ_DMA_CH3 = 3U;
+inline constexpr IRQ_NUMBER_t IRQ_USB1 = 113U;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC0 = 118U;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC1 = 119U;
 inline constexpr IRQ_NUMBER_t IRQ_ADC_ETC_ERR = 121U;
@@ -329,3 +330,4 @@ inline void fakeNvicDisable(IRQ_NUMBER_t irq) {
 #define NVIC_CLEAR_PENDING(irq) fakeNvicClearPending((irq))
 #define NVIC_ENABLE_IRQ(irq) fakeNvicEnable((irq))
 #define NVIC_DISABLE_IRQ(irq) fakeNvicDisable((irq))
+#define NVIC_IS_ENABLED(irq) (fake_imxrt::interrupt_enabled[(irq)])

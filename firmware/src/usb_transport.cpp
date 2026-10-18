@@ -302,6 +302,11 @@ ServiceReport CdcTransport::serviceTransmit() {
     ++report.io_calls;
     const IoCount written =
         stream_.write(selection.bytes.data + tx_offset_, requested);
+    if (written == kWriteWouldBlock) {
+      saturatingIncrement(counters_.short_capacity_deferrals);
+      stalled = true;
+      break;
+    }
     if (written < 0) {
       recordIoError();
       stalled = true;
