@@ -64,7 +64,10 @@ and three ten-minute RLE captures passed (584 checks, 66.755 °C peak), but the
 [restart gate failed](../results/experiments/gpio-rle600-dma-failure-20261018.md)
 with ADC DMA pipeline errors. A reproduced interrupt-accounting race is fixed;
 the original fault's exact ordering remains unproven. Fresh qualification of
-the new firmware is required, and physical RLE qualification remains pending.
+the new firmware failed again in the fourth restart cell after seven passing
+cells (1,022 checks). The [recurrence report](../results/experiments/gpio-rle600-dma-recurrence-20261018.md)
+preserves all five jobs. A private first-fault diagnostic suffix now supports
+short reproduction before further qualification; physical RLE remains pending.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when

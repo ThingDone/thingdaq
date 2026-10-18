@@ -25,7 +25,7 @@ def rig_module(monkeypatch, enabled=True):
 
 
 @pytest.fixture(scope="module")
-def wire(tmp_path_factory):
+def wire_bundle(tmp_path_factory):
     directory = tmp_path_factory.mktemp("gpio-rle")
     executable = directory / "oracle"
     command = [
@@ -61,11 +61,15 @@ def wire(tmp_path_factory):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     output = directory / "wire.bin"
+    status = directory / "status.bin"
     result = subprocess.run(
-        [str(executable), str(output)], capture_output=True, text=True, check=False
+        [str(executable), str(output), str(status)],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    return output.read_bytes()
+    return output.read_bytes(), status.read_bytes()
 
 
 def test_real_firmware_mixed_frames_decode_exactly(monkeypatch, wire):
@@ -215,3 +219,28 @@ def test_start_burst_uses_selected_wire_size_and_bounds_decoded_memory(
 def test_ordinary_start_frame_count_bound_is_unchanged(monkeypatch):
     rig = rig_module(monkeypatch, False)
     assert rig.StartFrameBuffer().frame_limit == 17
+
+
+@pytest.fixture(scope="module")
+def wire(wire_bundle):
+    return wire_bundle[0]
+
+
+def test_private_fault_status_roundtrip_and_reset(monkeypatch, wire_bundle):
+    rig = rig_module(monkeypatch)
+    parser = rig.FrameParser()
+    frames = parser.feed(wire_bundle[1])
+    assert len(frames) == 3 and parser.errors == parser.bytes_discarded == 0
+    statuses = [rig.decode_status(frame).values for frame in frames]
+    for index in (0, 2):
+        assert all(
+            statuses[index]["adc_fault_" + name] == 0 for name in rig.DMA_FAULT_FIELDS
+        )
+    assert statuses[1]["adc_fault_reason"] == 1
+    for name, expected in zip(rig.DMA_FAULT_FIELDS, (1, 2, 3, 4, 17, 34)):
+        assert statuses[1]["adc_fault_" + name] == expected
+    assert "adc_fault_reason" in rig.ZERO_ERROR_FIELDS
+    ordinary = rig_module(monkeypatch, False)
+    parser = ordinary.FrameParser()
+    assert parser.feed(wire_bundle[1]) == []
+    assert parser.header_errors > 0

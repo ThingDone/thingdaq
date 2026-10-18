@@ -37,6 +37,8 @@ struct Clock {
   operator std::uint32_t() { return ticks++; }
 } ARM_DWT_CYCCNT;
 void barrier() {}
+void recordFaultTrace(std::uint32_t, std::uint32_t = 0, std::uint32_t = 0,
+                      std::uint32_t = 0, std::uint32_t = 0) {}
 void saturatingIncrement(unsigned &value) { ++value; }
 std::uint32_t channelMask(std::size_t converter) { return 1U << converter; }
 std::size_t hardwarePipelineIndex(std::size_t converter) {

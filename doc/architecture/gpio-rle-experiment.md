@@ -18,7 +18,11 @@ After that host fix, smoke and three ten-minute captures passed, but the
 A deterministic test reproduces an already-accounted interrupt race in the
 ADC service; a firmware fix now accepts aligned index zero without weakening
 hardware-error, skew, window or ring checks. The historical fault's exact
-ordering remains unproven, and the new image requires fresh qualification.
+ordering remains unproven. The [next campaign reproduced the ADC fault](../results/experiments/gpio-rle600-dma-recurrence-20261018.md)
+in its fourth restart cell after seven passing cells. A private 12-byte STATUS
+suffix now preserves first-fault DMA error status and alignment state through
+cleanup; ordinary STATUS framing is unchanged. Short reproduction and fresh
+qualification remain required.
 ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.
 

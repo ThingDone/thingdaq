@@ -1,3 +1,4 @@
+#include "adc_dma_fault.h"
 #include "input_experiment_profile.h"
 
 #include "protocol.h"
@@ -350,7 +351,8 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
       return true;
     case protocol_v1::FrameKind::kGetStatusResponse:
       size = version == protocol_v2::kProtocolVersion
-                 ? protocol_v2::kStatusResponsePayloadSize
+                 ? protocol_v2::kStatusResponsePayloadSize +
+                       adc_capture::fault_trace::kBytes
                  : protocol_v1::kStatusResponsePayloadSize;
       return true;
     case protocol_v1::FrameKind::kStopResponse:
@@ -1956,7 +1958,8 @@ Result validateInfoV2(ByteView payload) {
 
 THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.payload_validation")
 Result validateStatusV2(ByteView payload) {
-  if (payload.size != protocol_v2::kStatusResponsePayloadSize ||
+  if (payload.size != protocol_v2::kStatusResponsePayloadSize +
+                          adc_capture::fault_trace::kBytes ||
       payload.data[protocol_v2::kStatusResponseProtocolVersionOffset] !=
           protocol_v2::kProtocolVersion ||
       payload.data[protocol_v2::kStatusResponseAuxBankModeOffset] > 1U ||
@@ -3341,7 +3344,8 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
   if (version2 && timing == nullptr) {
     return badPayload();
   }
-  std::array<std::uint8_t, protocol_v2::kStatusResponsePayloadSize> payload{};
+  std::array<std::uint8_t, protocol_v2::kStatusResponsePayloadSize +
+                               adc_capture::fault_trace::kBytes> payload{};
   MutableByteView bytes = mutableView(payload);
   writeSuccessPrefix(bytes);
   payload[protocol_v1::kStatusResponseDeviceStateOffset] =
@@ -3769,10 +3773,17 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
 #undef STORE_AUX_STATUS_U32
 #undef STORE_AUX_STATUS_U64
   }
+  if (version2) {
+    const auto fault = adc_capture::fault_trace::snapshot();
+    for (std::size_t i = 0; i < fault.size(); ++i) {
+      storeU32(bytes, protocol_v2::kStatusResponsePayloadSize + i * 4U, fault[i]);
+    }
+  }
   return encodeFrame(responseFields(protocol_v1::FrameKind::kGetStatusResponse,
                                     request, run_id),
                      {payload.data(), version2
-                                          ? protocol_v2::kStatusResponsePayloadSize
+                                          ? protocol_v2::kStatusResponsePayloadSize +
+                       adc_capture::fault_trace::kBytes
                                           : protocol_v1::kStatusResponsePayloadSize},
                      output);
 }

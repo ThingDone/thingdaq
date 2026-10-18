@@ -181,7 +181,7 @@ SUCCESS_PAYLOAD_SIZE = {
     INFO_RESPONSE: 680,
     CONFIGURE_RESPONSE: 20,
     START_RESPONSE: 20,
-    GET_STATUS_RESPONSE: 1476,
+    GET_STATUS_RESPONSE: 1476 + (12 if EXPERIMENT_GPIO_RLE else 0),
     GET_TEMPERATURE_RESPONSE: 12,
     STOP_RESPONSE: 8,
     RESET_STATS_RESPONSE: 8,
@@ -2264,8 +2264,19 @@ STATUS_FIELDS = {
     "aux_gpio_stale_completions": ("I", 1472),
 }
 
+# Private RLE image suffix: first-fault record survives automatic STOP cleanup.
+DMA_FAULT_FIELDS = (
+    "reason",
+    "adc0_index",
+    "adc1_index",
+    "polls",
+    "elapsed_cycles",
+    "dma_es",
+)
+
 CURRENT_STATUS_FIELDS = frozenset(
     {
+        *("adc_fault_" + name for name in DMA_FAULT_FIELDS),
         "device_state",
         "stream_mask",
         "source",
@@ -2325,15 +2336,29 @@ class StatusSnapshot:
 
 def decode_status(frame: Frame) -> StatusSnapshot:
     response_success(frame, GET_STATUS_RESPONSE)
-    return StatusSnapshot(
-        {
-            name: int(struct.unpack_from("<" + code, frame.payload, offset)[0])
-            for name, (code, offset) in STATUS_FIELDS.items()
-        }
-    )
+    values = {
+        name: int(struct.unpack_from("<" + code, frame.payload, offset)[0])
+        for name, (code, offset) in STATUS_FIELDS.items()
+    }
+    if EXPERIMENT_GPIO_RLE:
+        packed, elapsed, dma_es = struct.unpack_from("<III", frame.payload, 1476)
+        values.update(
+            zip(
+                ("adc_fault_" + name for name in DMA_FAULT_FIELDS),
+                (
+                    packed & 255,
+                    (packed >> 8) & 15,
+                    (packed >> 12) & 15,
+                    packed >> 16,
+                    elapsed,
+                    dma_es,
+                ),
+            )
+        )
+    return StatusSnapshot(values)
 
 
-ZERO_ERROR_FIELDS = (
+ZERO_ERROR_FIELDS = (("adc_fault_reason",) if EXPERIMENT_GPIO_RLE else ()) + (
     "parser_errors",
     "transport_errors",
     "gpio_packer_samples_dropped",

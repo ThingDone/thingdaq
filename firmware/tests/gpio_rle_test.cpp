@@ -5,6 +5,7 @@
 #include <limits>
 #include <vector>
 #include "packet_buffer_pipeline.h"
+#include "adc_dma_fault.h"
 #include "rle_encoder.h"
 #include "usb_transport.h"
 using namespace thingdaq;
@@ -98,7 +99,28 @@ void start(packet::PacketBufferPipeline &p, std::uint32_t id) {
       packet::kGpioStreamMask, layout.layout) == packet::OperationStatus::kOk);
 }
 int main(int argc, char **argv) {
-  assert(argc == 2);
+  assert(argc == 2 || argc == 3);
+  if (argc == 3) {
+    std::ofstream status_out(argv[2], std::ios::binary);
+    protocol::Request request{};
+    request.kind = protocol_v1::CommandKind::kGetStatus;
+    request.protocol_version = 2;
+    request.request_id = 1;
+    protocol::StatusResponse response{};
+    response.configuration.rate_profile = protocol_v2::RateProfile::kAdc1mhzGpio1mhz;
+    for (unsigned state = 0; state < 3; ++state) {
+      adc_capture::fault_trace::reset();
+      if (state != 2) {
+        for (std::size_t i = 1; i < adc_capture::fault_trace::kWords; ++i)
+          adc_capture::fault_trace::words[i] = static_cast<std::uint32_t>(i * 17);
+        if (state == 1) adc_capture::fault_trace::words[0] = 1U | (2U << 8U) | (3U << 12U) | (4U << 16U);
+      }
+      protocol::ControlFrame status;
+      assert(protocol::encodeStatusResponse(request, 0, response, status).ok());
+      status_out.write(reinterpret_cast<const char *>(status.view().data),
+                       static_cast<std::streamsize>(status.size()));
+    }
+  }
   codec();
   packet::OwnedPacketBufferStorage storage;
   packet::PacketBufferPipeline pipeline(storage);

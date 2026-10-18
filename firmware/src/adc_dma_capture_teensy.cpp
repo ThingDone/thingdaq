@@ -1,6 +1,7 @@
 #include "input_experiment_profile.h"
 
 #include "adc_dma_capture_teensy.h"
+#include "adc_dma_fault.h"
 
 #if defined(ARDUINO_TEENSY40) && defined(__IMXRT1062__)
 
@@ -494,15 +495,34 @@ bool processInferredPairCompletion() {
   return appendFutureGeneration();
 }
 
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.fault_trace")
+void recordFaultTrace(std::uint32_t reason, std::uint32_t adc0 = 0U,
+                      std::uint32_t adc1 = 0U, std::uint32_t elapsed = 0U,
+                      std::uint32_t polls = 0U) {
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+  if (fault_trace::words[0] != 0U) return;
+  fault_trace::words[1] = elapsed;
+  fault_trace::words[2] = DMA_ES;
+  barrier();
+  fault_trace::words[0] = reason | ((adc0 & 0xFU) << 8U) |
+                          ((adc1 & 0xFU) << 12U) |
+                          ((polls & 0xFFFFU) << 16U);
+#else
+  (void)reason; (void)adc0; (void)adc1; (void)elapsed; (void)polls;
+#endif
+}
+
 THINGDAQ_ADC_DMA_TARGET_COLD_CODE(
     ".flashmem.adc_dma.pipeline_wait")
 std::size_t waitForAlignedPipeline() {
   const std::uint32_t started = ARM_DWT_CYCCNT;
   std::uint32_t polls = 0U;
+  std::size_t adc0 = 0U;
+  std::size_t adc1 = 0U;
   do {
     ++polls;
-    const std::size_t adc0 = hardwarePipelineIndex(0U);
-    const std::size_t adc1 = hardwarePipelineIndex(1U);
+    adc0 = hardwarePipelineIndex(0U);
+    adc1 = hardwarePipelineIndex(1U);
     // A completion arriving after CINT but before the preceding progress
     // observation may already have been consumed. Its latched interrupt is
     // only a wakeup: matching index zero means no unaccounted generation.
@@ -511,6 +531,9 @@ std::size_t waitForAlignedPipeline() {
     }
   } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles &&
            polls < kDmaAlignmentWaitCycles);
+  recordFaultTrace(1U, static_cast<std::uint32_t>(adc0),
+                   static_cast<std::uint32_t>(adc1),
+                   ARM_DWT_CYCCNT - started, polls);
   return kInvalidPipelineIndex;
 }
 
@@ -536,6 +559,7 @@ bool servicePendingDmaPair() {
     const std::size_t completed_generations = waitForAlignedPipeline();
     if (completed_generations == kInvalidPipelineIndex ||
         (DMA_ERR & kAdcDmaChannelMask) != 0U) {
+      recordFaultTrace(2U);
       g_ring.recordDmaError(g_epoch, 0U);
       g_ring.recordDmaError(g_epoch, 1U);
       g_faulted = true;
@@ -544,11 +568,13 @@ bool servicePendingDmaPair() {
     for (std::size_t completed = 0U;
          completed < completed_generations; ++completed) {
       if (!processInferredPairCompletion()) {
+        recordFaultTrace(3U);
         g_faulted = true;
         return false;
       }
     }
   }
+  recordFaultTrace(4U);
   g_ring.recordDmaError(g_epoch, 0U);
   g_ring.recordDmaError(g_epoch, 1U);
   g_faulted = true;
@@ -777,6 +803,7 @@ StartStatus prepareHardware(std::uint32_t epoch,
   g_adc_etc_error_flags = 0U;
   g_adc_etc_error_interrupts = 0U;
   g_stale_interrupts = 0U;
+  fault_trace::reset();
   g_faulted = false;
   g_hardware_prepared = true;
   ARM_DEMCR |= ARM_DEMCR_TRCENA;
