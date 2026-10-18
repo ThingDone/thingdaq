@@ -17,6 +17,11 @@ clock/compression/output integration proposal for current work.
    after STOP, and peak die temperatures for every run; verify parser integrity,
    loss/conservation, START/STOP, and final IDLE. Preserve failed campaigns.
    The rig resets between jobs; separately exercise START/STOP without reset.
+   After endurance, qualify STOP/restart timing on the same image before
+   performance changes: command response, drain, final IDLE, idempotent STOP,
+   and repeated reconfiguration/START without reflashing. Preserve exact
+   conservation and the existing command deadlines. This priority was added
+   by the overnight instruction on 2026-10-18.
 2. Qualify the existing opt-in larger ADC layout at 600 MHz: 1,012 pairs in
    4,096-byte frames instead of 506 pairs in 2,072-byte frames. Compare measured
    overhead and retention, run sustained captures and repeated START/STOP.

@@ -292,6 +292,11 @@ def main() -> int:
     parser.add_argument("--diagnostic", action="store_true")
     parser.add_argument("--frame-experiment", action="store_true")
     parser.add_argument(
+        "--lifecycle-checks",
+        action="store_true",
+        help="also grade idempotent STOP and final conservation",
+    )
+    parser.add_argument(
         "--temperature",
         action="store_true",
         help="require die temperature before, during and after each run",
@@ -367,6 +372,10 @@ def main() -> int:
         "EXPECTED_HARDWARE_SERIAL": str(args.serial),
         "EXPECTED_BUILD_ID": build_id,
     }
+    if args.lifecycle_checks:
+        if args.host_api:
+            parser.error("--lifecycle-checks requires the independent wire validator")
+        settings["AUX_INPUT_LIFECYCLE_CHECKS"] = "1"
     if args.sdk_cases:
         settings["AUX_INPUT_SDK_CASES"] = ",".join(args.sdk_cases)
     experiment = manifest.get("input_experiment")

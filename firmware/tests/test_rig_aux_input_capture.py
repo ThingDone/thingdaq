@@ -597,6 +597,61 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
                         result.evidence.failures[0],
                     )
 
+    def test_lifecycle_timing_and_idempotent_stop_preserve_conservation(self) -> None:
+        with patch.dict(os.environ, {"AUX_INPUT_LIFECYCLE_CHECKS": "1"}):
+            result = self._run(
+                rig.RUN_CASES["INPUT_COMBINED"],
+                rig.PROFILES[-1],
+                run_diagnostic=False,
+            )
+        self.assertEqual([], result.evidence.failures)
+        timing = result.metrics["lifecycle_timing"]
+        self.assertGreater(timing["run_id"], 0)
+        for key in (
+            "configure_response_seconds",
+            "start_response_seconds",
+            "stop_response_seconds",
+            "idempotent_stop_response_seconds",
+            "start_to_first_validated_adc_seconds",
+            "start_to_first_validated_gpio_seconds",
+        ):
+            self.assertGreaterEqual(timing[key], 0)
+        self.assertGreaterEqual(
+            timing["stop_to_drained_seconds"], timing["stop_response_seconds"]
+        )
+        self.assertGreaterEqual(
+            timing["stop_to_final_idle_status_seconds"],
+            timing["stop_to_drained_seconds"],
+        )
+        names = [c["name"] for c in result.evidence.checks]
+        self.assertIn("idempotent_stop.state", names)
+        self.assertEqual(2, names.count("final.gpio_framed_bytes"))
+
+    def test_slow_idempotent_stop_fails_existing_command_deadline(self) -> None:
+        original = rig.SerialLink.exchange
+        stops = []
+
+        def exchange(link, kind, *args, **kwargs):
+            frame, latency = original(link, kind, *args, **kwargs)
+            if kind == rig.STOP_REQUEST:
+                stops.append(kind)
+                if len(stops) == 2:
+                    latency = rig.STATUS_MAXIMUM_LIMIT_SECONDS + 0.01
+            return frame, latency
+
+        with (
+            patch.dict(os.environ, {"AUX_INPUT_LIFECYCLE_CHECKS": "1"}),
+            patch.object(rig.SerialLink, "exchange", exchange),
+        ):
+            result = self._run(
+                rig.RUN_CASES["INPUT_COMBINED"],
+                rig.PROFILES[-1],
+                run_diagnostic=False,
+            )
+        self.assertTrue(
+            any("latency.command_max_seconds" in f for f in result.evidence.failures)
+        )
+
     def _run(self, case, profile, *, fault: str | None = None, run_diagnostic=True):  # type: ignore[no-untyped-def]
         port = PacedAuxSerial(fault=fault)
         with (

@@ -2749,6 +2749,8 @@ class AcquisitionValidator:
         self.aux_transitions = 0
         self._last_gpio: int | None = None
         self._last_receive: float | None = None
+        self.first_adc_received_at: float | None = None
+        self.first_gpio_received_at: float | None = None
 
     def accept(self, frame: Frame) -> None:
         now = time.monotonic()
@@ -2769,8 +2771,12 @@ class AcquisitionValidator:
             if not self.case.stream_mask & STREAM_ADC:
                 raise ProtocolFailure("GPIO-only run received ADC data")
             self._accept_adc(frame)
+            if self.first_adc_received_at is None:
+                self.first_adc_received_at = now
         elif frame.kind == GPIO_DATA:
             self._accept_gpio(frame)
+            if self.first_gpio_received_at is None:
+                self.first_gpio_received_at = now
         else:
             raise ProtocolFailure(f"unexpected data kind 0x{frame.kind:02x}")
         if self.case.stream_mask == STREAM_BOTH:
@@ -3242,6 +3248,7 @@ def run_acceptance(
                 raise ProtocolFailure("START boundary data exceeds bounded deferral")
             deferred.append(frame)
 
+        start_requested_at = time.monotonic()
         start_frame, start_latency = link.exchange(START_REQUEST, on_data=collect_start)
         evidence.equal(
             "start.echo",
@@ -3364,15 +3371,18 @@ def run_acceptance(
             status_count += 1
             memory.sample()
 
+        stop_requested_at = time.monotonic()
         stop_frame, stop_latency = link.exchange(STOP_REQUEST, on_data=validator.accept)
         response_success(stop_frame, STOP_RESPONSE)
         evidence.equal("stop.state", STATE_IDLE, stop_frame.payload[4])
         evidence.equal("stop.run_id", validator.run_id, stop_frame.run_id)
         link.drain_until_quiet(validator.accept)
+        drained_at = time.monotonic()
         sample_temperature("after")
         final_frame, final_latency = link.exchange(
             GET_STATUS_REQUEST, on_data=validator.accept
         )
+        final_status_at = time.monotonic()
         final_status = decode_status(final_frame)
         evidence.equal("final.status_run_id", validator.run_id, final_frame.run_id)
         validate_status(
@@ -3394,6 +3404,62 @@ def run_acceptance(
                 )
         _final_reconciliation(evidence, final_status, validator, case, fixture)
 
+        lifecycle = {
+            "start_requested_monotonic_seconds": start_requested_at,
+            "stop_requested_monotonic_seconds": stop_requested_at,
+            "final_idle_status_monotonic_seconds": final_status_at,
+            "configure_response_seconds": configure_latency,
+            "start_response_seconds": start_latency,
+            "stop_response_seconds": stop_latency,
+            "stop_to_drained_seconds": drained_at - stop_requested_at,
+            "stop_to_final_idle_status_seconds": final_status_at - stop_requested_at,
+            "drain_quiet_requirement_seconds": STOP_DRAIN_QUIET_SECONDS,
+            "start_to_first_validated_adc_seconds": (
+                None
+                if validator.first_adc_received_at is None
+                else validator.first_adc_received_at - start_requested_at
+            ),
+            "start_to_first_validated_gpio_seconds": (
+                None
+                if validator.first_gpio_received_at is None
+                else validator.first_gpio_received_at - start_requested_at
+            ),
+            "run_id": validator.run_id,
+        }
+        if os.environ.get("AUX_INPUT_LIFECYCLE_CHECKS", "0") == "1":
+            repeated_stop, repeated_latency = link.exchange(
+                STOP_REQUEST, on_data=validator.accept
+            )
+            response_success(repeated_stop, STOP_RESPONSE)
+            evidence.equal(
+                "idempotent_stop.state", STATE_IDLE, repeated_stop.payload[4]
+            )
+            evidence.equal(
+                "idempotent_stop.run_id", validator.run_id, repeated_stop.run_id
+            )
+            repeated_status_frame, repeated_status_latency = link.exchange(
+                GET_STATUS_REQUEST, on_data=validator.accept
+            )
+            repeated_status = decode_status(repeated_status_frame)
+            evidence.equal(
+                "idempotent_stop.status_run_id",
+                validator.run_id,
+                repeated_status_frame.run_id,
+            )
+            validate_status(
+                repeated_status,
+                case,
+                profile,
+                expected_checksum=checksum_algorithm,
+                expected_state=STATE_IDLE,
+                expected_generation=expected_generation,
+                final=True,
+            )
+            _check_stop_tails(repeated_status, case, final=True)
+            _final_reconciliation(evidence, repeated_status, validator, case, fixture)
+            lifecycle["idempotent_stop_response_seconds"] = repeated_latency
+            all_latencies.extend((repeated_latency, repeated_status_latency))
+        emit_event("lifecycle_timing", **lifecycle)
         all_latencies.extend((stop_latency, final_latency))
         evidence.check(
             "latency.status_samples", ">= 2", status_count, status_count >= 2
@@ -3445,6 +3511,7 @@ def run_acceptance(
         evidence.equal("host.stale_responses", 0, link.stale_responses)
         evidence.equal("host.discarded_run_data", 0, link.discarded_data_frames)
         metrics = {
+            "lifecycle_timing": lifecycle,
             "temperature_samples": temperature_samples,
             "adc_frames": validator.adc.frames,
             "adc_rate_hz": adc_rate,
