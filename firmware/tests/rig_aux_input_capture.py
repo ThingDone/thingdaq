@@ -56,6 +56,8 @@ SERIAL_READ_TIMEOUT_SECONDS = 0.02
 SERIAL_WRITE_TIMEOUT_SECONDS = 0.5
 SERIAL_READ_BYTES = 64 * 1024
 STARTUP_DRAIN_SECONDS = 0.25
+TEMPERATURE_READY_TIMEOUT_SECONDS = 1.0
+TEMPERATURE_MAX_ATTEMPTS = 64
 SYNC_ATTEMPTS = 4
 SYNC_DEADLINE_SECONDS = 0.75
 COMMAND_DEADLINE_SECONDS = 0.5
@@ -3075,7 +3077,8 @@ def run_acceptance(
     def sample_temperature(phase: str) -> None:
         if not temperature_enabled:
             return
-        for attempt in range(5):
+        ready_deadline = time.monotonic() + TEMPERATURE_READY_TIMEOUT_SECONDS
+        for attempt in range(TEMPERATURE_MAX_ATTEMPTS):
             frame, latency = link.exchange(
                 GET_TEMPERATURE_REQUEST,
                 on_data=validator.accept if validator is not None else None,
@@ -3094,10 +3097,19 @@ def run_acceptance(
             }
             temperature_samples.append(sample)
             emit_event("temperature", **sample)
-            if sensor == 2 and attempt < 4:
-                # FINISHED can clear while the periodic monitor converts. Retry
-                # on the host, continuing to drain acquisition data meanwhile.
-                retry_at = time.monotonic() + 0.007
+            if (
+                sensor == 2
+                and attempt + 1 < TEMPERATURE_MAX_ATTEMPTS
+                and time.monotonic() < ready_deadline
+            ):
+                # NOT_READY is a valid transient sensor state. The old five
+                # requests exhausted their budget in 86 ms in the endurance
+                # capture. Bound elapsed time, vary the spacing to avoid
+                # repeatedly sampling the same monitor phase, and keep draining.
+                retry_at = min(
+                    ready_deadline,
+                    time.monotonic() + (0.007, 0.013, 0.023, 0.037)[attempt % 4],
+                )
                 while time.monotonic() < retry_at:
                     link.pump_once(
                         validator.accept

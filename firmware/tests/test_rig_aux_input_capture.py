@@ -525,7 +525,13 @@ class PacedAuxSerial:
 class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
     def test_temperature_retries_are_bounded_and_failed_samples_retained(self) -> None:
         original = rig.SerialLink.exchange
-        for scenario in ("transient", "persistent", "hot"):
+        for scenario in (
+            "transient",
+            "five_not_ready",
+            "persistent",
+            "hot",
+            "unavailable",
+        ):
             calls = []
 
             def exchange(link, kind, *args, calls=calls, scenario=scenario, **kwargs):
@@ -536,7 +542,8 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
                     2
                     if scenario == "persistent"
                     or (scenario == "transient" and len(calls) == 1)
-                    else 0
+                    or (scenario == "five_not_ready" and len(calls) <= 5)
+                    else (1 if scenario == "unavailable" else 0)
                 )
                 value = 0 if sensor else (80000 if scenario == "hot" else 42000)
                 wire = encode_v2_frame(
@@ -551,11 +558,13 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
                 patch.dict(os.environ, {"AUX_INPUT_TEMPERATURE": "1"}),
                 patch.object(rig.SerialLink, "exchange", exchange),
             ):
+                started = time.monotonic()
                 result = self._run(
                     rig.RUN_CASES["INPUT_COMBINED"],
                     rig.PROFILES[-1],
                     run_diagnostic=False,
                 )
+                elapsed = time.monotonic() - started
                 samples = result.metrics["temperature_samples"]
                 self.assertEqual(len(calls), len(samples))
                 if scenario == "transient":
@@ -567,11 +576,24 @@ class AuxiliaryRigFakeDeviceTests(unittest.TestCase):
                         ["before", "before", "after"],
                         [sample["phase"] for sample in samples],
                     )
+                elif scenario == "five_not_ready":
+                    self.assertEqual([], result.evidence.failures)
+                    self.assertEqual([2] * 5 + [0, 0], [s["status"] for s in samples])
                 else:
                     self.assertTrue(result.evidence.failures)
-                    self.assertEqual(5 if scenario == "persistent" else 1, len(calls))
+                    if scenario == "persistent":
+                        self.assertGreater(len(calls), 5)
+                        self.assertLessEqual(len(calls), rig.TEMPERATURE_MAX_ATTEMPTS)
+                        self.assertGreaterEqual(
+                            elapsed, rig.TEMPERATURE_READY_TIMEOUT_SECONDS
+                        )
+                        self.assertLess(
+                            elapsed, rig.TEMPERATURE_READY_TIMEOUT_SECONDS + 1.0
+                        )
+                    else:
+                        self.assertEqual(1, len(calls))
                     self.assertIn(
-                        "unavailable" if scenario == "persistent" else "safety ceiling",
+                        "safety ceiling" if scenario == "hot" else "unavailable",
                         result.evidence.failures[0],
                     )
 
