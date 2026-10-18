@@ -134,6 +134,15 @@ offset, gradual drift and a later step. It uses a fresh bounded forty-cycle
 restart and ten-minute campaign, with unchanged capture gates. Full RLE
 qualification and its final report remain pending.
 
+The [early-phase diagnostic passed](../results/experiments/gpio-rle600-phase-diagnostic-20261018.md)
+forty restart cells and one ten-minute capture: 5,986 checks, 67.369 °C peak,
+zero parser errors/discards. No failure record was triggered; the added
+instrumentation does not establish a correction. The next bounded campaign
+uses the same immutable image for three ten-minute captures followed by forty
+restart cells, stopping on first failure. Decode the 96-word phase history if
+triggered. All ten failed physical campaigns and both failed builds remain
+preserved; full RLE qualification and its comparison report are pending.
+
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when
 this finite plan completes. The detailed local continuation record is
