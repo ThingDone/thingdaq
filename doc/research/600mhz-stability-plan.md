@@ -92,6 +92,12 @@ confirm indices 3/1, while CPU-visible descriptor links/destinations match
 expectations. The cause remains unresolved. The next diagnostic retains the
 last two accepted progress observations to narrow when divergence begins;
 full qualification and the final RLE report remain pending.
+The [progress-history diagnostic](../results/experiments/gpio-rle600-history-diagnostic-20261018.md)
+passed forty restart cells and one ten-minute capture: 5,986 checks,
+67.983 °C peak, zero parser errors/discards. No fault history was triggered;
+the instrumentation does not establish a correction. A bounded repeat on the
+same immutable image will attempt to reproduce the unresolved divergence,
+preserving all seven previous failed physical campaigns and two failed builds.
 
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
