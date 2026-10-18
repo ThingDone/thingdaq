@@ -19,6 +19,11 @@ VARIANTS = (
     "single_Os",
     "single_itcm_O2",
     "single_itcm_O3",
+    "span_O2",
+    "span_O3",
+    "span_Os",
+    "hybrid_Os",
+    "hybrid_O3",
 )
 PATTERNS = (
     "constant",

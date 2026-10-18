@@ -16,12 +16,13 @@ collector = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(collector)
 
 
-@pytest.fixture(scope="module")
-def kernel(tmp_path_factory):
+@pytest.fixture(scope="module", params=[False, True])
+def kernel(tmp_path_factory, request):
     directory = tmp_path_factory.mktemp("rle-kernel")
     source = directory / "candidate.cpp"
     source.write_text(
-        '#define RLE_SINGLE_ATTRIBUTES __attribute__((optimize("O3")))\n#include "single_pass.h"\n'
+        ("#define RLE_SPAN_SCAN 1\n" if request.param else "")
+        + '#define RLE_SINGLE_ATTRIBUTES __attribute__((optimize("O3")))\n#include "single_pass.h"\n'
     )
     library = directory / "candidate.so"
     subprocess.run(
@@ -106,7 +107,10 @@ def transcript():
 
 
 def test_complete_transcript():
-    assert len(collector.parse_transcript(transcript(), "O2")) == 224
+    assert (
+        len(collector.parse_transcript(transcript(), "O2"))
+        == len(collector.VARIANTS) * len(collector.PATTERNS) * 2
+    )
     assert collector.expected("constant")["encoded_bytes"] == 4
     assert collector.expected("runs2")["encoded_bytes"] == 0
 
@@ -141,7 +145,10 @@ def test_frozen_upload_composes_collectors(monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "rig_m7_benchmark", None)
     namespace = {"__name__": "input_isolation_rig"}
     exec(compile(runner.benchmark_source("rle"), "upload", "exec"), namespace)  # noqa: S102 - execute our frozen upload in a test
-    assert len(namespace["parse_transcript"](transcript(), "O2")) == 224
+    assert (
+        len(namespace["parse_transcript"](transcript(), "O2"))
+        == len(collector.VARIANTS) * len(collector.PATTERNS) * 2
+    )
     collector_module = __import__("sys").modules["rig_m7_benchmark"]
     seen = {}
 

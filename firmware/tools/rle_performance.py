@@ -22,7 +22,15 @@ VARIANTS = (
         "relaxed_O3",
     ]
     + [f"single_{opt}" for opt in ("O0", "O1", "O2", "O3", "Os")]
-    + ["single_itcm_O2", "single_itcm_O3"]
+    + [
+        "single_itcm_O2",
+        "single_itcm_O3",
+        "span_O2",
+        "span_O3",
+        "span_Os",
+        "hybrid_Os",
+        "hybrid_O3",
+    ]
 )
 
 
@@ -46,18 +54,28 @@ def build(cli: str, lto: bool) -> Path:
     (sketch / "protocol_support.cpp").write_text(
         '#include "production/protocol_body.h"\n'
     )
+    # LTO retains used protocol helpers together; supply their real dependency.
+    shutil.copy2(
+        base.SKETCH_DIRECTORY / "src/checksum.cpp", production / "checksum_body.h"
+    )
+    (sketch / "checksum_support.cpp").write_text(
+        '#include "production/checksum_body.h"\n'
+    )
     original = (base.SKETCH_DIRECTORY / "src/rle_encoder.cpp").read_text()
     declarations = []
     for name in VARIANTS:
         declarations.append(
             f'extern "C" rle_bench::Result {name}(const std::uint8_t *, std::uint8_t *);'
         )
-        if name.startswith("single"):
+        if name.startswith(("single", "span")):
             placement = ".fastrun" if "itcm" in name else f".flashmem.{name}"
-            text = f'''#define RLE_SINGLE_NAME {name}
+            text = (
+                ("#define RLE_SPAN_SCAN 1\n" if name.startswith("span") else "")
+                + f'''#define RLE_SINGLE_NAME {name}
 #define RLE_SINGLE_ATTRIBUTES __attribute__((section("{placement}"), noinline, noipa, used, optimize("{name.split("_")[-1]}")))
 #include "single_pass.h"
 '''
+            )
         else:
             source = original
             if name.startswith("encode_"):
@@ -91,6 +109,27 @@ rle_bench::Result {name}(const std::uint8_t *input, std::uint8_t *output) {{
   return {{static_cast<std::uint32_t>(result.bytes_written), result.ok() ? 0U : 2U}};
 }}
 '''
+        if name.startswith("hybrid"):
+            helper = "span_" + name.split("_")[-1]
+            marker = 'extern "C" __attribute__((section'
+            text = text.replace(
+                marker,
+                f'extern "C" rle_bench::Result {helper}(const std::uint8_t *, std::uint8_t *);\n'
+                + marker,
+            )
+            begin = text.index("  const auto result = codec::encode")
+            text = (
+                text[:begin]
+                + f"""  if (selected.plan.run_count == 1) {{
+    output[0] = static_cast<std::uint8_t>(rle_bench::kItems);
+    output[1] = static_cast<std::uint8_t>(rle_bench::kItems >> 8);
+    output[2] = input[0]; output[3] = input[1];
+    return {{4, 0}};
+  }}
+  return {helper}(input, output);
+}}
+"""
+            )
         (sketch / f"{name}.cpp").write_text(text)
     (sketch / "variants.h").write_text(
         "\n".join(

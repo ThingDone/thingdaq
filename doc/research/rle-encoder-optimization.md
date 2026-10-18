@@ -14,9 +14,11 @@ acquisition firmware or implement accumulated output framing.
 
 `firmware/tools/rle_performance.py` builds a separate 600 MHz sketch from the
 actual production encoder plus an experimental fixed-shape single-pass encoder.
-Fourteen variants cover the O2 baseline; encode-function-only O0/O1/O3/Os;
+Nineteen variants cover the O2 baseline; encode-function-only O0/O1/O3/Os;
 the whole encoder at O3; O3 with interprocedural restrictions removed;
-single-pass O0/O1/O2/O3/Os in flash; and single-pass O2/O3 in ITCM. Two images
+single-pass O0/O1/O2/O3/Os in flash; and single-pass O2/O3 in ITCM; a transition-index loop at O2/O3/Os; and hybrids
+that retain production sizing/RAW rejection, skip the redundant constant-input
+rescan, and use the transition-index encoder for other selected blocks. Two images
 compare the default O2 toolchain with O2 plus LTO. Generated sources, compiler,
 ELF, disassembly, symbol sizes and placements are retained in the manifest/build.
 
@@ -42,12 +44,21 @@ board oracle; input hashes and output canaries are checked outside timing.
 The host independently reconstructs canonical output and verifies the digest,
 RAW decision, complete case matrix, clock, cycle ordering and completion marker.
 The existing M7 serial collector and upload/provenance client are reused.
-Local validation passed 54 tests, including 240 seeded run distributions,
+Local validation passed 87 tests, including 240 seeded run distributions for
+each of the two single-pass loops,
 unaligned buffers, output guards and malformed/incomplete evidence rejection.
 
-Physical measurements are pending. Two initial harness build failures (Arduino
-not copying an `.inc` file, then missing the production `storeU16` dependency)
-are retained under `doc/results/raw/rle-encoder-20261018`; no image from either
+Two fourteen-variant pilot images each passed five complete physical sweeps.
+The initial no-LTO results show mixed-run selection/encoding near 47–77 cycles
+per input sample with the generic codec, versus roughly 8–11 with the first
+single-pass Os candidate. Early RAW fallback favors the original sizing pass.
+LTO changed the optimization ranking; it is not assumed to improve every case.
+The final nineteen-variant matched-source comparison is pending.
+
+Three harness build failures (Arduino
+not copying an `.inc` file, then missing the production `storeU16` dependency, and the LTO build retaining
+protocol helpers that also require the production checksum dependency)
+are retained under `doc/results/raw/rle-encoder-20261018`; no image from any
 failed build was flashed. The corrected standalone target build passes.
 
 ## Deferred encoding
