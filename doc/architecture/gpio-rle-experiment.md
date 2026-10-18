@@ -11,7 +11,8 @@ related: []
 This implements the final authorized stage of the
 [600 MHz qualification plan](../research/600mhz-stability-plan.md), after the
 [larger ADC qualification](../results/experiments/large-adc600-20261018.md).
-Hardware qualification is pending. ADC remains uncompressed at 1,012 pairs
+Hardware qualification is pending; the [first smoke failure](../results/experiments/gpio-rle600-start-boundary-failure-20261018.md)
+identified a host START buffering assumption and remains classified FAIL. ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.
 
 The experiment builder requires `--cpu-mhz 600 --release-fixed-1mhz

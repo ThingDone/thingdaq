@@ -934,6 +934,35 @@ class FrameParser:
             self._scan_start = 0
 
 
+class StartFrameBuffer:
+    """Bound one response read's data using the smallest selected wire frame.
+
+    RLE may expand to 4,048 logical bytes per 52-byte wire frame. The finite
+    frame count also bounds that transient decoded memory (under 5 MiB), while
+    wire_bytes prevents many larger frames from consuming the RLE count limit.
+    """
+
+    def __init__(self) -> None:
+        minimum = (
+            52
+            if EXPERIMENT_GPIO_RLE
+            else min(layout.adc_total_frame_bytes for layout in LAYOUTS.values())
+        )
+        self.frame_limit = math.ceil(SERIAL_READ_BYTES / minimum) + 1
+        self.frames: list[Frame] = []
+        self.wire_bytes = 0
+
+    def append(self, frame: Frame) -> None:
+        wire_bytes = frame.wire_bytes or HEADER_SIZE + len(frame.payload) + TRAILER_SIZE
+        if (
+            len(self.frames) >= self.frame_limit
+            or self.wire_bytes + wire_bytes > SERIAL_READ_BYTES + MAX_FRAME_BYTES
+        ):
+            raise ProtocolFailure("START boundary data exceeds bounded deferral")
+        self.frames.append(frame)
+        self.wire_bytes += wire_bytes
+
+
 class SerialLink:
     """One-request-at-a-time link that services both streams while waiting."""
 
@@ -3315,22 +3344,12 @@ def run_acceptance(
         if evidence.failures:
             raise ProtocolFailure("configured echo/metadata grading failed")
 
-        deferred: list[Frame] = []
-        deferred_limit = (
-            math.ceil(
-                SERIAL_READ_BYTES
-                / min(layout.adc_total_frame_bytes for layout in LAYOUTS.values())
-            )
-            + 1
-        )
-
-        def collect_start(frame: Frame) -> None:
-            if len(deferred) >= deferred_limit:
-                raise ProtocolFailure("START boundary data exceeds bounded deferral")
-            deferred.append(frame)
+        deferred = StartFrameBuffer()
 
         start_requested_at = time.monotonic()
-        start_frame, start_latency = link.exchange(START_REQUEST, on_data=collect_start)
+        start_frame, start_latency = link.exchange(
+            START_REQUEST, on_data=deferred.append
+        )
         evidence.equal(
             "start.echo",
             CONFIGURATION.unpack(requested),
@@ -3346,9 +3365,9 @@ def run_acceptance(
         validator = AcquisitionValidator(
             start_frame.run_id, checksum_algorithm, case, profile, fixture
         )
-        for frame in deferred:
+        for frame in deferred.frames:
             validator.accept(frame)
-        deferred.clear()
+        deferred.frames.clear()
 
         memory = MemoryTracker()
         status_latencies: list[float] = []

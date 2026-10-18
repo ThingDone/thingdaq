@@ -185,3 +185,33 @@ def test_rle_build_identity_and_manifest_opt_in(monkeypatch):
     for enabled, host_api in ((False, False), (True, True)):
         with pytest.raises(ValueError):
             run.gpio_rle_settings(manifest, enabled=enabled, host_api=host_api)
+
+
+def test_start_burst_uses_selected_wire_size_and_bounds_decoded_memory(
+    monkeypatch, wire
+):
+    rig = rig_module(monkeypatch)
+    short = rig.FrameParser().feed(wire[:52])[0]
+    buffer = rig.StartFrameBuffer()
+    # A normal 64 KiB read can exceed the old 17-frame larger-ADC limit.
+    for _ in range(40):
+        buffer.append(short)
+    assert buffer.wire_bytes == 40 * 52
+    assert len(buffer.frames) == 40
+    assert buffer.frame_limit * 4048 < 5 * 1024 * 1024
+    for _ in range(buffer.frame_limit - 40):
+        buffer.append(short)
+    with pytest.raises(rig.ProtocolFailure, match="bounded deferral"):
+        buffer.append(short)
+    # The larger frame-count allowance must not allow unbounded RAW buffering.
+    raw = next(frame for frame in rig.FrameParser().feed(wire) if not frame.gpio_rle)
+    buffer = rig.StartFrameBuffer()
+    for _ in range((rig.SERIAL_READ_BYTES + rig.MAX_FRAME_BYTES) // raw.wire_bytes):
+        buffer.append(raw)
+    with pytest.raises(rig.ProtocolFailure, match="bounded deferral"):
+        buffer.append(raw)
+
+
+def test_ordinary_start_frame_count_bound_is_unchanged(monkeypatch):
+    rig = rig_module(monkeypatch, False)
+    assert rig.StartFrameBuffer().frame_limit == 17
