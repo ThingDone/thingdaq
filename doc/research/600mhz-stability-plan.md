@@ -125,6 +125,14 @@ channel preemption for ADC1 only in the private combined-input RLE image,
 retaining all priorities, sample rates, deadlines and acceptance limits.
 Fresh bounded restart and ten-minute tests will assess this hypothesis before
 any full qualification. The ninth failed campaign remains preserved.
+The [ADC1-preemption candidate failed in its third restart cell](../results/experiments/gpio-rle600-preemption-failure-20261018.md)
+after two PASS cells (292 checks, 45.264 °C peak), with the same indices 3/1
+and apparent sample lead. This tenth failure is preserved and the ineffective
+ECP change is removed. The next diagnostic records eight earlier phase
+checkpoints, alongside the last-two observations, to distinguish initial
+offset, gradual drift and a later step. It uses a fresh bounded forty-cycle
+restart and ten-minute campaign, with unchanged capture gates. Full RLE
+qualification and its final report remain pending.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when

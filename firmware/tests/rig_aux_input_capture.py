@@ -3742,7 +3742,7 @@ def run_acceptance(
                 saved_request_id = link.next_request_id
                 metrics["adc_fault_detail"] = []
                 try:
-                    for page in range(1, 25):
+                    for page in range(1, 49):
                         link.next_request_id = 0xFADC0000 + page
                         frame, _ = link.exchange(
                             GET_STATUS_REQUEST, on_data=lambda _frame: None

@@ -49,19 +49,23 @@ packed CITER values (ADC0 low 16 bits), and start DWT. Detail words 36–47
 contain the two six-word records; words 28–35 hold fault-entry DWT, DMA_HRS,
 ADC0 NBYTES/BITER, ADC1 NBYTES/BITER, and ADC1/ADC2 GS. Sequential reads are
 not atomic; the observation timestamps bound their read interval. NBYTES is
-a live hardware value, not a saved initial transfer size. Retrieval uses 24
-private pages without enlarging any response.
+a live hardware value, not a saved initial transfer size. Retrieval now uses
+48 private pages without enlarging any response (including the sparse phase
+checkpoints below).
 This adds bounded service-path work and is diagnostic instrumentation, not
 a demonstrated fix. Acceptance limits and ordinary builds are unchanged.
 
 The [counter diagnostic failure](../results/experiments/gpio-rle600-counter-failure-20261018.md)
 shows apparent sample-progress divergence despite sub-microsecond register
-read spans. A controlled candidate clears ADC1 channel ECP only for the
-private RLE combined-input mode, preventing higher-priority DMA from suspending
-that channel. Channel priorities and all capture guards remain unchanged;
-stopped setup verifies the selected ECP bit. Other builds and non-auxiliary
-setup retain the prior ECP configuration. Preemption-related request delay is
-a hypothesis, not an established historical cause or qualified correction.
+read spans. A controlled ADC1 channel ECP change also
+[failed with the same discrepancy](../results/experiments/gpio-rle600-preemption-failure-20261018.md)
+and was removed. All channel preemption settings retain their prior values.
+The next diagnostic records the first observation at or after base generations
+0, 1, 2, 4, 16, 256, 1024 and 2048 in detail words 48–95. Each uses the same
+six-word format as the last-two history. Unreached records remain zero;
+reached records are immutable until prepare. These bounded checkpoints narrow
+whether the discrepancy begins at startup, grows gradually or appears later.
+Cause and correction remain unresolved; no acceptance gate is relaxed.
 
 ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.

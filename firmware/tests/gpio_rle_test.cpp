@@ -115,7 +115,31 @@ int main(int argc, char **argv) {
   assert(adc_capture::fault_trace::detail[42] == 3);
   adc_capture::fault_trace::reset();
   adc_capture::fault_trace::retainProgress();
-  for (std::size_t i = 36; i < 48; ++i)
+  for (std::size_t i = 36; i < 96; ++i)
+    assert(adc_capture::fault_trace::detail[i] == 0);
+  // Thresholds crossed between observations share the first later snapshot.
+  // Later snapshots never overwrite reached checkpoints, including DWT wrap.
+  for (std::uint32_t generation : {0U, 3U, 16U, 2048U, 4096U})
+    adc_capture::fault_trace::rememberProgress(
+        generation, 0x11U, 2U, 3U, 0x03F403F3U, 0xFFFFFFFEU);
+  adc_capture::fault_trace::retainProgress();
+  constexpr std::array<std::uint32_t, 8> expected_phases{
+      0U, 3U, 3U, 16U, 16U, 2048U, 2048U, 2048U};
+  for (std::size_t i = 0; i < expected_phases.size(); ++i) {
+    const std::size_t offset = 48 + i * 6;
+    assert(adc_capture::fault_trace::detail[offset] == expected_phases[i]);
+    assert(adc_capture::fault_trace::detail[offset + 4] == 0x03F403F3U);
+    assert(adc_capture::fault_trace::detail[offset + 2] -
+           adc_capture::fault_trace::detail[offset + 5] == 4U);
+  }
+  adc_capture::fault_trace::words[0] = 1U;
+  adc_capture::fault_trace::rememberProgress(9999, 99, 99, 99, 99, 99);
+  adc_capture::fault_trace::retainProgress();
+  assert(adc_capture::fault_trace::detail[42] == 4096U);
+  assert(adc_capture::fault_trace::detail[90] == 2048U);
+  adc_capture::fault_trace::reset();
+  adc_capture::fault_trace::retainProgress();
+  for (std::size_t i = 36; i < 96; ++i)
     assert(adc_capture::fault_trace::detail[i] == 0);
   if (argc == 3) {
     std::ofstream status_out(argv[2], std::ios::binary);
@@ -141,7 +165,7 @@ int main(int argc, char **argv) {
       assert(protocol::encodeStatusResponse(request, 0, response, status).ok());
       status_out.write(reinterpret_cast<const char *>(status.view().data),
                        static_cast<std::streamsize>(status.size()));
-      for (std::uint32_t page = 1; page <= 24; ++page) {
+      for (std::uint32_t page = 1; page <= 48; ++page) {
         request.request_id = adc_capture::fault_trace::kDetailRequestBase + page;
         assert(protocol::encodeStatusResponse(request, 0, response, status).ok());
         status_out.write(reinterpret_cast<const char *>(status.view().data),
@@ -149,7 +173,7 @@ int main(int argc, char **argv) {
       }
       assert(adc_capture::fault_trace::snapshot(0xFADC0000U) ==
              adc_capture::fault_trace::snapshot());
-      assert(adc_capture::fault_trace::snapshot(0xFADC0019U) ==
+      assert(adc_capture::fault_trace::snapshot(0xFADC0031U) ==
              adc_capture::fault_trace::snapshot());
     }
   }

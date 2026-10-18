@@ -234,17 +234,17 @@ def test_private_fault_status_roundtrip_and_reset(monkeypatch, wire_bundle):
         for offset in range(0, len(wire_bundle[1]), 4096)
         for frame in parser.feed(wire_bundle[1][offset : offset + 4096])
     ]
-    assert len(frames) == 75 and parser.errors == parser.bytes_discarded == 0
+    assert len(frames) == 147 and parser.errors == parser.bytes_discarded == 0
     statuses = [rig.decode_status(frame).values for frame in frames]
-    for index in (*range(25), *range(50, 75)):
+    for index in (*range(49), *range(98, 147)):
         assert all(
             statuses[index]["adc_fault_" + name] == 0 for name in rig.DMA_FAULT_FIELDS
         )
-    assert statuses[25]["adc_fault_reason"] == 1
+    assert statuses[49]["adc_fault_reason"] == 1
     for name, expected in zip(rig.DMA_FAULT_FIELDS, (1, 2, 3, 4, 17, 34)):
-        assert statuses[25]["adc_fault_" + name] == expected
-    for page in range(1, 25):
-        values = statuses[25 + page]
+        assert statuses[49]["adc_fault_" + name] == expected
+    for page in range(1, 49):
+        values = statuses[49 + page]
         assert values["adc_fault_reason"] == 1
         assert values["adc_fault_page"] == page
         assert values["adc_fault_word0"] == (2 * page - 1) * 23

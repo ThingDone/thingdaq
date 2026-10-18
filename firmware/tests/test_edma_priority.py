@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.parametrize("rle", [False, True])
-def test_adc1_preemption_candidate_is_scoped_and_reversible(tmp_path, rle):
+def test_reserved_priorities_and_preemption_match_ordinary_setup(tmp_path, rle):
     executable = tmp_path / "priority"
     subprocess.run(
         [

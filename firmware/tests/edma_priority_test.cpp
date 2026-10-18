@@ -9,12 +9,8 @@ int main() {
     const unsigned adc1 = auxiliary ? 2U : 1U;
     const unsigned gpio0 = auxiliary ? 1U : 0U;
     const unsigned gpio1 = auxiliary ? 0U : 3U;
-    unsigned adc1_ecp = 0x80U;
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
-    if (auxiliary) adc1_ecp = 0U;
-#endif
     assert(DMA_DCHPRI0 == (0x80U | adc0));
-    assert(DMA_DCHPRI1 == (adc1_ecp | adc1));
+    assert(DMA_DCHPRI1 == (0x80U | adc1));
     assert(DMA_DCHPRI2 == (0x80U | gpio0));
     assert(DMA_DCHPRI3 == (0x80U | gpio1));
   }
