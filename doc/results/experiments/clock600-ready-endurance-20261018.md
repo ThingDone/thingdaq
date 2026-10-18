@@ -1,0 +1,28 @@
+---
+type: result
+title: 600 MHz Three-Hour Capture With Bounded Temperature Retries
+created: 2026-10-18
+tags: [firmware, reliability, temperature]
+related: ['[[Clock600-Thermal-20261016]]', '[[Parser600-Investigation-20261017]]']
+---
+
+# 600 MHz three-hour repeated capture with bounded temperature retries
+
+Status: **RUNNING**. Attempted 0 of 18 requested ten-minute captures; 0 passed.
+
+This campaign restarts the eighteen-run request after correcting the host temperature-readiness retry policy. Both previous failed campaigns remain separate. Firmware is unchanged from USB autoflush fix `9e7fb90`. The exact archived `thingdaq-75ac69ba3e2bb588` image captures both 12-bit ADCs and all sixteen GPIO inputs at 1 MS/s, with normal ADC frames, standard Adler-32, 600 MHz CPU / 150 MHz IPG / 37.5 MHz ADC / 24 MHz PIT. Watchdog remains disabled.
+
+Each job verifies START, active acquisition, STOP to IDLE, drain, final counters, parser integrity, and sample conservation using the independent validator with a one-second readiness retry budget and varied retry spacing. Acquisition, checksum, loss, conservation, and thermal-limit checks are unchanged. Die temperature is sampled before, approximately every ten seconds during capture, and after STOP. The existing 80 °C abort is retained. The campaign stops on the first failed or ambiguous job; no automatic submission retry.
+
+The rig reflashes/resets between jobs. There is no intentional cooldown, but programming gaps mean this is three hours of requested acquisition across eighteen sessions, not an uninterrupted three-hour stream or proof of restart without reset. The USB-fixed image separately passed two START/STOP cycles without reflashing; see usb600-autoflush-20261018.
+
+| Run | Before (°C) | After STOP (°C) | Peak sampled (°C) | Result |
+| ---: | ---: | ---: | ---: | --- |
+
+## Scope and next work
+
+Ambient temperature and heatsink configuration are not independently measured. These captures do not grade externally stimulated analog accuracy or GPIO edge fidelity, establish a worst-case temperature, or resolve the historical parser rejection. Final and peak readings are distinct.
+
+Agreed order: establish reliability with this campaign; next evaluate and qualify larger ADC frames at 600 MHz; only then evaluate RLE with the successful larger-frame configuration. GPIO output is deferred. No frame-layout, compression, output, or SDK-default change is part of this campaign.
+
+Full graded metrics, temperatures, provenance, job IDs, and artifact hashes are in [the machine-readable report](clock600-ready-endurance-20261018.json). Raw jobs and the campaign script are retained under `doc/results/raw/clock600-ready-endurance-20261018/`.
