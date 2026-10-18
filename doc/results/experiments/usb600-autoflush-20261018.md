@@ -135,6 +135,8 @@ two-cycle job, all full metrics and temperature samples, artifact hashes,
 original rejection samples, machine-code replay, and healthy idle postflight.
 The separate eighteen-run endurance campaign is restarted only after these
 fix validations; it does not replace or regrade the failed original campaign.
+Its live results are recorded in the
+[fixed-image endurance report](clock600-fixed-endurance-20261018.md).
 
 ## Reproduction and evidence
 
