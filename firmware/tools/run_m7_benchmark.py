@@ -12,8 +12,26 @@ import m7_performance
 import run_input_isolation as rig
 
 
+def benchmark_source(kind: str) -> str:
+    source = (build.REPOSITORY_ROOT / "firmware/tests/rig_m7_benchmark.py").read_text()
+    if kind == "m7":
+        return source
+    rle_source = (
+        build.REPOSITORY_ROOT / "firmware/tests/rig_rle_benchmark.py"
+    ).read_text()
+    # Compile the modules separately to preserve their future-import semantics.
+    return (
+        "import sys, types\n"
+        "collector = types.ModuleType('rig_m7_benchmark')\n"
+        f"exec({source!r}, collector.__dict__)\n"
+        "sys.modules['rig_m7_benchmark'] = collector\n"
+        f"exec({rle_source!r}, globals())\n"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--kind", choices=("m7", "rle"), default="m7")
     parser.add_argument("--build-dir", required=True, type=Path)
     parser.add_argument("--evidence-dir", required=True, type=Path)
     parser.add_argument("--service", required=True)
@@ -26,7 +44,9 @@ def main() -> int:
         parser.error("credential file must be private")
     manifest_bytes = (args.build_dir / "benchmark-manifest.json").read_bytes()
     manifest = json.loads(manifest_bytes)
-    elf = args.build_dir / "m7_performance.ino.elf"
+    if manifest.get("kind", "m7") != args.kind:
+        parser.error("benchmark kind does not match manifest")
+    elf = args.build_dir / f"{args.kind}_performance.ino.elf"
     if build.sha256(elf) != manifest["elf_sha256"]:
         parser.error("ELF does not match benchmark manifest")
     # Derive HEX directly from the verified ELF: the original microbenchmark
@@ -41,7 +61,7 @@ def main() -> int:
         [str(objcopy), "-O", "ihex", "-R", ".eeprom", str(elf), str(hex_path)]
     )
     firmware = hex_path.read_bytes()
-    source = (build.REPOSITORY_ROOT / "firmware/tests/rig_m7_benchmark.py").read_text()
+    source = benchmark_source(args.kind)
     program = rig.make_program(
         source,
         {
@@ -74,7 +94,7 @@ def main() -> int:
         firmware,
         program,
         args.evidence_dir,
-        180,
+        300 if args.kind == "rle" else 180,
     )
     summary = rig.classify_result(result, expected_cells=1)
     (args.evidence_dir / "summary.json").write_text(

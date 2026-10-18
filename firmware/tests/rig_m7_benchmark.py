@@ -64,14 +64,20 @@ def parse_transcript(lines: list[str], optimization: str) -> list[dict]:
     return rows
 
 
-def main() -> int:
+def main(
+    *,
+    parse=parse_transcript,
+    optimization_env="M7_OPTIMIZATION",
+    validator="m7-dwt",
+    pass_timeout=15,
+) -> int:
     import serial
     from serial.tools import list_ports
 
-    evidence = {"result": "FAIL", "passes": [], "validator": "m7-dwt"}
+    evidence = {"result": "FAIL", "passes": [], "validator": validator}
     try:
         port = os.environ["SERIAL_PORT"]
-        optimization = os.environ["M7_OPTIMIZATION"]
+        optimization = os.environ[optimization_env]
         evidence["optimization"] = optimization
         observed = next((p for p in list_ports.comports() if p.device == port), None)
         evidence["usb_serial"] = observed.serial_number if observed else None
@@ -86,7 +92,7 @@ def main() -> int:
             for trial in range(5):
                 link.write(b"b")
                 lines = []
-                deadline = time.monotonic() + 15
+                deadline = time.monotonic() + pass_timeout
                 while time.monotonic() < deadline:
                     raw = link.readline()
                     if not raw:
@@ -98,7 +104,7 @@ def main() -> int:
                         raise ValueError(line)
                     if line == "done":
                         break
-                evidence["passes"].append(parse_transcript(lines, optimization))
+                evidence["passes"].append(parse(lines, optimization))
                 time.sleep(0.1)
         evidence["result"] = "PASS"
     except Exception as error:  # noqa: BLE001 - preserve hardware failures
