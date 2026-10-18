@@ -50,12 +50,13 @@ host-observed STOP response was 21.528 ms, drain completion 123.380 ms,
 and final-IDLE observation 247.440 ms. These include host/harness overhead;
 injected stalls, disconnects, and fault-state recovery remain ungraded.
 
-The larger-frame candidate `thingdaq-358337de6b642106` is built at 600 MHz;
-normal resource gates and 22 focused local tests pass. Its immutable image is
-archived under `doc/results/raw/large-adc600-20261018/image/`. Hardware
-qualification can now proceed through a 60-second smoke, three 600-second
-captures, and four START/STOP cycles without reflash. Evidence is retained
-under the same raw directory; RLE remains gated on all these checks passing.
+[Larger ADC frame qualification](../results/experiments/large-adc600-20261018.md)
+passed on immutable `thingdaq-358337de6b642106`: five jobs / eight cells,
+including three ten-minute captures and four START/STOP cycles without reflash.
+All 1,168 checks passed, with zero parser errors/discards and a 69.825 °C peak.
+The report compares wire overhead, GPIO-processing CPU and queue high-water
+against baseline without claiming total CPU improvement. GPIO-only RLE is now
+the next authorized stage, using this larger-frame configuration as baseline.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when
