@@ -48,18 +48,31 @@ Local validation passed 87 tests, including 240 seeded run distributions for
 each of the two single-pass loops,
 unaligned buffers, output guards and malformed/incomplete evidence rejection.
 
-Two fourteen-variant pilot images each passed five complete physical sweeps.
-The initial no-LTO results show mixed-run selection/encoding near 47–77 cycles
-per input sample with the generic codec, versus roughly 8–11 with the first
-single-pass Os candidate. Early RAW fallback favors the original sizing pass.
-LTO changed the optimization ranking; it is not assumed to improve every case.
-The final nineteen-variant matched-source comparison is pending.
+**Completed:** two fourteen-variant pilots and the final nineteen-variant
+matched-source pair all passed: 5,280 validated timing rows, 163,680 timed
+invocations. The [full result](../results/experiments/rle-encoder-optimization-20261018.md)
+contains all optimization/pattern/RAM matrices, code sizes, repeat variation
+and immutable provenance. The final images use clean source `1992d83`.
+
+The hybrid Os candidate is the conservative next integration choice. Without
+LTO, DTCM constant input improves from 8.305 to 4.112 cycles/sample; runs of
+32 samples improve from 50.047 to 9.751, and runs of three samples from
+76.613 to 15.802. Alternating/random RAW fallback remains near 3.09 cycles/sample.
+The one-pass span Os loop is faster on compressible changing data, but roughly
+doubles the early RAW-rejection cost. Function-only O3 offers much smaller
+improvements, and LTO provides no broad win. No production codec or scheduling
+change was made. The qualified acquisition image was restored and passed a
+five-second combined capture with 149 checks, including STOP/drain/IDLE.
 
 Three harness build failures (Arduino
 not copying an `.inc` file, then missing the production `storeU16` dependency, and the LTO build retaining
 protocol helpers that also require the production checksum dependency)
 are retained under `doc/results/raw/rle-encoder-20261018`; no image from any
-failed build was flashed. The corrected standalone target build passes.
+failed build was flashed. The corrected standalone target builds pass. The first restore preflight
+returned HTTP 503 before submission; health recovered and the subsequent
+restore succeeded. A generated-sketch cleanup now prevents stale unused files
+from persisting between future builds. The original measured snapshots remain
+immutable, including seven unused .inc files excluded from compilation.
 
 ## Deferred encoding
 
@@ -73,5 +86,7 @@ at 4,096 bytes per pool page), plus ownership for active/output work. Those
 pages must come from the existing pool; the qualified image has only 4,096
 bytes of free RAM2, already its required headroom floor. Average encoder
 throughput must exceed arrival rate, and backlog deadlines must prevent
-indefinite starvation. Measurements will inform the cycle budget; integrated
-stress testing is still needed before changing scheduling.
+indefinite starvation. The hybrid Os maximum observed block time was 53.447 microseconds, versus
+a 2,024-microsecond arrival interval, in the no-LTO isolated experiment. This
+supports a bounded deferred stage but does not measure system idle capacity.
+Integrated stress testing is still needed before changing scheduling.

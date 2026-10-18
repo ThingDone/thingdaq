@@ -38,7 +38,11 @@ def build(cli: str, lto: bool) -> Path:
     image = "O2-lto" if lto else "O2"
     directory = base.REPOSITORY_ROOT / "firmware/build/rle-performance" / image
     sketch = directory / "rle_performance"
-    sketch.mkdir(parents=True, exist_ok=True)
+    # This directory contains only generated benchmark copies. Recreate it so
+    # stale headers or wrappers cannot enter a later build or source manifest.
+    if sketch.exists():
+        shutil.rmtree(sketch)
+    sketch.mkdir(parents=True)
     for p in EXPERIMENT.iterdir():
         if p.is_file():
             shutil.copy2(p, sketch / p.name)

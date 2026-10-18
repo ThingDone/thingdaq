@@ -34,6 +34,12 @@ a correction. It remains historical evidence. Current RLE target resource gates
 retain 33,760 bytes RAM1 stack/local and 4,096 bytes RAM2 heap headroom.
 No GPIO outputs or public SDK promotion are included.
 
+Subsequent [isolated encoder experiments](../results/experiments/rle-encoder-optimization-20261018.md)
+compare nineteen variants with and without LTO. A hybrid specialized Os
+candidate improves constant and mixed-run costs while retaining fast RAW
+rejection. These are standalone measurements; the acquisition encoder and
+synchronous scheduling described here remain unchanged.
+
 The following preserves the implementation and diagnostic history; pending/next
 statements describe their respective historical checkpoints. The [first smoke failure](../results/experiments/gpio-rle600-start-boundary-failure-20261018.md)
 identified a host START buffering assumption and remains classified FAIL.
