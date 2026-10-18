@@ -12,7 +12,14 @@ This implements the final authorized stage of the
 [600 MHz qualification plan](../research/600mhz-stability-plan.md), after the
 [larger ADC qualification](../results/experiments/large-adc600-20261018.md).
 Hardware qualification is pending; the [first smoke failure](../results/experiments/gpio-rle600-start-boundary-failure-20261018.md)
-identified a host START buffering assumption and remains classified FAIL. ADC remains uncompressed at 1,012 pairs
+identified a host START buffering assumption and remains classified FAIL.
+After that host fix, smoke and three ten-minute captures passed, but the
+[restart job failed with ADC DMA pipeline counters](../results/experiments/gpio-rle600-dma-failure-20261018.md).
+A deterministic test reproduces an already-accounted interrupt race in the
+ADC service; a firmware fix now accepts aligned index zero without weakening
+hardware-error, skew, window or ring checks. The historical fault's exact
+ordering remains unproven, and the new image requires fresh qualification.
+ADC remains uncompressed at 1,012 pairs
 per frame; GPIO remains sixteen inputs at 1 MHz. No GPIO outputs are driven.
 
 The experiment builder requires `--cpu-mhz 600 --release-fixed-1mhz

@@ -503,8 +503,10 @@ std::size_t waitForAlignedPipeline() {
     ++polls;
     const std::size_t adc0 = hardwarePipelineIndex(0U);
     const std::size_t adc1 = hardwarePipelineIndex(1U);
-    if (adc0 == adc1 && adc0 != 0U &&
-        adc0 < kDmaPipelineDepth - 1U) {
+    // A completion arriving after CINT but before the preceding progress
+    // observation may already have been consumed. Its latched interrupt is
+    // only a wakeup: matching index zero means no unaccounted generation.
+    if (adc0 == adc1 && adc0 < kDmaPipelineDepth - 1U) {
       return adc0;
     }
   } while (ARM_DWT_CYCCNT - started < kDmaAlignmentWaitCycles &&
@@ -532,7 +534,8 @@ bool servicePendingDmaPair() {
     DMA_CINT = board::kAdcConverterConfigurations[0].edma_channel;
     barrier();
     const std::size_t completed_generations = waitForAlignedPipeline();
-    if (completed_generations == kInvalidPipelineIndex) {
+    if (completed_generations == kInvalidPipelineIndex ||
+        (DMA_ERR & kAdcDmaChannelMask) != 0U) {
       g_ring.recordDmaError(g_epoch, 0U);
       g_ring.recordDmaError(g_epoch, 1U);
       g_faulted = true;

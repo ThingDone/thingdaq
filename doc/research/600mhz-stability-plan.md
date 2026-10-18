@@ -59,7 +59,12 @@ against baseline without claiming total CPU improvement. GPIO-only RLE is now
 the next authorized stage, using this larger-frame configuration as baseline.
 The [opt-in implementation](../architecture/gpio-rle-experiment.md) passes local
 codec/ownership/validator tests and target resource gates. Two failed RAM1
-builds are preserved; physical RLE qualification is still pending.
+builds and the host START failure are preserved. After the host fix, smoke
+and three ten-minute RLE captures passed (584 checks, 66.755 °C peak), but the
+[restart gate failed](../results/experiments/gpio-rle600-dma-failure-20261018.md)
+with ADC DMA pipeline errors. A reproduced interrupt-accounting race is fixed;
+the original fault's exact ordering remains unproven. Fresh qualification of
+the new firmware is required, and physical RLE qualification remains pending.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when
