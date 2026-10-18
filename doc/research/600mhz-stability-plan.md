@@ -81,6 +81,13 @@ Failure-only TCD/descriptor detail is now retained and retrieved after STOP
 through explicit private STATUS pages; acceptance limits remain unchanged.
 Fresh diagnostic reproduction and qualification are required.
 
+The first [descriptor diagnostic campaign](../results/experiments/gpio-rle600-detail-diagnostic-20261018.md)
+passed eight restart cells and one ten-minute capture (1,314 checks,
+64.299 °C peak, zero parser errors/discards). It did not reproduce the failure
+and does not establish a fix. A bounded repeat increases restart coverage to
+forty cells, followed by another ten-minute capture on the same image; full
+qualification and the final RLE report remain pending.
+
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when

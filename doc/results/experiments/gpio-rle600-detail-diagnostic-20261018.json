@@ -1,0 +1,1946 @@
+{
+  "campaign": {
+    "active_job": "diagnostic-600",
+    "finished_utc": "2026-10-18T14:37:11.465418+00:00",
+    "firmware_sha256": "24dd53a2a2e2f3c54daa5ef130ecccf0061b9d55636aafc2c352a6ba2ac64549",
+    "gates": {
+      "clock600-ready-endurance-20261018": {
+        "commit": "46fb05a0d9c957aa1e6b8a35f748217685190fdf",
+        "runs": 18,
+        "status": "PASS"
+      },
+      "large-adc600-20261018": {
+        "cells": 8,
+        "commit": "57ea067c57a09c7fabcd3ab5b13465215265cd35",
+        "jobs": 5,
+        "status": "PASS"
+      },
+      "stop-recovery600-20261018": {
+        "commit": "d8162b390e9482eb69286f6148bf194a4e4d4df6",
+        "status": "PASS"
+      }
+    },
+    "jobs": [
+      {
+        "artifact_sha256": {
+          "build-manifest.json": "cf178d85f4781d60da196ed7a5161f12982d148a3c3bede4f7652596da01d4bb",
+          "firmware.ino.hex": "24dd53a2a2e2f3c54daa5ef130ecccf0061b9d55636aafc2c352a6ba2ac64549",
+          "provenance.json": "a323ebefec3e836e8ecd72e10c43891fb1419291692076d6adb9299dc564eee5",
+          "results.json": "00f598708a1325fcb87849fc73bffbea1237e3515d59ce45c8d65ed7d9482371",
+          "rig-program.py": "8ba29c0350a2e2d8ce4c785058c9f882a85b0000c85f9c7e91752172c4d22d72",
+          "summary.json": "d719fb3de228d1feec308773d27843b2fe9af39558203669fbdcf471fbc345a4"
+        },
+        "name": "regression-8x10",
+        "provenance": {
+          "build_id": "thingdaq-0f462a06fef8cf6f",
+          "case_sequence": [
+            "INPUT_COMBINED",
+            "INPUT_COMBINED",
+            "INPUT_COMBINED",
+            "INPUT_COMBINED",
+            "INPUT_COMBINED",
+            "INPUT_COMBINED",
+            "INPUT_COMBINED",
+            "INPUT_COMBINED"
+          ],
+          "health": {
+            "checks": {
+              "coordinator_mode": "normal",
+              "docker_reachable": true,
+              "hub_reachable": true,
+              "hubs": {
+                "0x00000000": true
+              },
+              "queue_depth": 0,
+              "worker_thread_alive": true
+            },
+            "status": "healthy"
+          },
+          "hex_sha256": "24dd53a2a2e2f3c54daa5ef130ecccf0061b9d55636aafc2c352a6ba2ac64549",
+          "input_experiment": {
+            "adc_clock_hz": 37500000,
+            "base_source_id": "0f9182ce1e40ecf7e6a6140ee0c41e126b952372903219fd12b54dde11dbcb61",
+            "builder_sha256": "c0b5e30ffbf0cb4cffea3fc728f37303b2a39d8d5acaa73bd8be398954db97e8",
+            "cpu_mhz": 600,
+            "data_checksum": "standard-adler32",
+            "equal_rates": false,
+            "gpio_rle": true,
+            "gpio_rle_wire_version": 130,
+            "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag][:gpio-rle16=v1])",
+            "ipg_hz": 150000000,
+            "large_adc_frame": true,
+            "pit_hz": 24000000,
+            "public_protocol_compatible": false,
+            "release_fixed_1mhz": true
+          },
+          "manifest_sha256": "cf178d85f4781d60da196ed7a5161f12982d148a3c3bede4f7652596da01d4bb",
+          "planned_program_seconds": 150.0,
+          "profile_sequence": [
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4,
+            4
+          ],
+          "program_sha256": "8ba29c0350a2e2d8ce4c785058c9f882a85b0000c85f9c7e91752172c4d22d72",
+          "runner_sha256": "a7d9032b6472438d0883f3f6a4bb20e9cada182f9e8942007bff9ece6db3b612",
+          "service": "http://192.168.150.14:5000",
+          "settings": {
+            "AUX_INPUT_CAPTURE_SECONDS": "10.0",
+            "AUX_INPUT_CASE": "INPUT_COMBINED",
+            "AUX_INPUT_CPU_MHZ": "600",
+            "AUX_INPUT_EQUAL_RATES": "0",
+            "AUX_INPUT_GPIO_RLE": "1",
+            "AUX_INPUT_LARGE_ADC_FRAME": "1",
+            "AUX_INPUT_LIFECYCLE_CHECKS": "1",
+            "AUX_INPUT_RATE_PROFILE": "4",
+            "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+            "AUX_INPUT_RUNTIME_HEALTH": "0",
+            "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+            "AUX_INPUT_TEMPERATURE": "1",
+            "EXPECTED_BUILD_ID": "thingdaq-0f462a06fef8cf6f",
+            "EXPECTED_HARDWARE_SERIAL": "20428100"
+          },
+          "source": {
+            "build_id": "thingdaq-0f462a06fef8cf6f",
+            "firmware_input_changes": [],
+            "firmware_inputs_clean": true,
+            "git_commit": "2edfa63299676de59edb44956c02d818b16a1a97",
+            "inputs": [
+              "firmware/firmware.ino",
+              "firmware/src/acquisition_controller.cpp",
+              "firmware/src/acquisition_controller.h",
+              "firmware/src/adc_dma_capture.cpp",
+              "firmware/src/adc_dma_capture.h",
+              "firmware/src/adc_dma_capture_teensy.cpp",
+              "firmware/src/adc_dma_capture_teensy.h",
+              "firmware/src/adc_dma_fault.h",
+              "firmware/src/adc_frame_packer.cpp",
+              "firmware/src/adc_frame_packer.h",
+              "firmware/src/adc_initializer.cpp",
+              "firmware/src/adc_initializer.h",
+              "firmware/src/adc_initializer_teensy.cpp",
+              "firmware/src/adc_initializer_teensy.h",
+              "firmware/src/adc_trigger.cpp",
+              "firmware/src/adc_trigger.h",
+              "firmware/src/adc_trigger_teensy.cpp",
+              "firmware/src/adc_trigger_teensy.h",
+              "firmware/src/board_config.h",
+              "firmware/src/checksum.cpp",
+              "firmware/src/checksum.h",
+              "firmware/src/checksum_benchmark.cpp",
+              "firmware/src/checksum_benchmark.h",
+              "firmware/src/checksum_benchmark_teensy.cpp",
+              "firmware/src/checksum_benchmark_teensy.h",
+              "firmware/src/control_state.cpp",
+              "firmware/src/control_state.h",
+              "firmware/src/dma_buffer_ownership.h",
+              "firmware/src/edma_priority_teensy.h",
+              "firmware/src/firmware_capabilities.h",
+              "firmware/src/firmware_identity.h",
+              "firmware/src/firmware_runtime.cpp",
+              "firmware/src/firmware_runtime.h",
+              "firmware/src/generated/protocol_constants.h",
+              "firmware/src/generated/protocol_v2_constants.h",
+              "firmware/src/gpio_batch_packer.cpp",
+              "firmware/src/gpio_batch_packer.h",
+              "firmware/src/gpio_batch_packer_teensy.cpp",
+              "firmware/src/gpio_batch_packer_teensy.h",
+              "firmware/src/gpio_capture_diagnostic.cpp",
+              "firmware/src/gpio_capture_diagnostic.h",
+              "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+              "firmware/src/gpio_capture_diagnostic_teensy.h",
+              "firmware/src/gpio_clock_diagnostic.cpp",
+              "firmware/src/gpio_clock_diagnostic.h",
+              "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+              "firmware/src/gpio_clock_diagnostic_teensy.h",
+              "firmware/src/gpio_dma_route_teensy.h",
+              "firmware/src/gpio_dual_bank_capture.cpp",
+              "firmware/src/gpio_dual_bank_capture.h",
+              "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+              "firmware/src/gpio_dual_bank_capture_teensy.h",
+              "firmware/src/gpio_dual_bank_packer.cpp",
+              "firmware/src/gpio_dual_bank_packer.h",
+              "firmware/src/gpio_pack_c.c",
+              "firmware/src/gpio_pack_c.h",
+              "firmware/src/gpio_raw_capture.cpp",
+              "firmware/src/gpio_raw_capture.h",
+              "firmware/src/gpio_raw_capture_teensy.cpp",
+              "firmware/src/gpio_raw_capture_teensy.h",
+              "firmware/src/gpio_raw_storage_teensy.h",
+              "firmware/src/input_experiment_profile.h",
+              "firmware/src/interrupt_guard_teensy.h",
+              "firmware/src/interrupt_vectors_teensy.h",
+              "firmware/src/packet_buffer_pipeline.cpp",
+              "firmware/src/packet_buffer_pipeline.h",
+              "firmware/src/protocol.cpp",
+              "firmware/src/protocol.h",
+              "firmware/src/rate_profile_table.h",
+              "firmware/src/rle_encoder.cpp",
+              "firmware/src/rle_encoder.h",
+              "firmware/src/runtime_health.h",
+              "firmware/src/runtime_health_teensy.cpp",
+              "firmware/src/statistics.cpp",
+              "firmware/src/statistics.h",
+              "firmware/src/stream_layout.h",
+              "firmware/src/synthetic_source.cpp",
+              "firmware/src/synthetic_source.h",
+              "firmware/src/teensy_clock.cpp",
+              "firmware/src/teensy_clock.h",
+              "firmware/src/teensy_usb.cpp",
+              "firmware/src/teensy_usb.h",
+              "firmware/src/temperature.h",
+              "firmware/src/temperature_teensy.cpp",
+              "firmware/src/usb_transport.cpp",
+              "firmware/src/usb_transport.h",
+              "firmware/src/variable_rate_scheduler.cpp",
+              "firmware/src/variable_rate_scheduler.h",
+              "firmware/src/variable_rate_scheduler_teensy.cpp",
+              "firmware/src/variable_rate_scheduler_teensy.h",
+              "firmware/src/watchdog_teensy.cpp",
+              "firmware/src/watchdog_teensy.h",
+              "protocol/protocol-v1.json",
+              "protocol/protocol-v2.json"
+            ],
+            "source_id": "0f462a06fef8cf6fa9938d2197e240c11ad8fb1f090aaa424928d8d182e0edb1",
+            "timestamp_epoch": 1792333467,
+            "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+            "timestamp_utc": "2026-10-18T14:24:27Z"
+          },
+          "version": {
+            "api": "v1",
+            "service": "remote-firmware-testing",
+            "version": "1.2.0"
+          }
+        },
+        "summary": {
+          "evidence": [
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 10.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 41594880,
+                "adc_frames": 10155,
+                "adc_rate_hz": 1000025.4696439682,
+                "aux_bank_samples_captured": 10275848,
+                "capture_seconds": 10.000329295173287,
+                "firmware_processing_cpu_basis_points": 1783,
+                "gpio_actual_wire_bytes": 264444,
+                "gpio_frames": 5077,
+                "gpio_logical_payload_bytes": 20551696,
+                "gpio_rate_hz": 1000025.4696439682,
+                "gpio_raw_equivalent_wire_bytes": 20795392,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 5077,
+                "host_peak_rss_growth_bytes": 12288,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.020808682776987553,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5163847.410340954,
+                  "idempotent_stop_response_seconds": 0.020781876519322395,
+                  "run_id": 1,
+                  "start_requested_monotonic_seconds": 5163836.967777626,
+                  "start_response_seconds": 0.019304858520627022,
+                  "start_to_first_validated_adc_seconds": 0.019571038894355297,
+                  "start_to_first_validated_gpio_seconds": 0.019731590524315834,
+                  "stop_requested_monotonic_seconds": 5163847.24555601,
+                  "stop_response_seconds": 0.021349942311644554,
+                  "stop_to_drained_seconds": 0.12314709275960922,
+                  "stop_to_final_idle_status_seconds": 0.16478494368493557
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.020906202495098114,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 3,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 10275848,
+                "paired_samples_transmitted": 10275848,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 41898856,
+                  "checksum_errors": 0,
+                  "frames_decoded": 15267,
+                  "header_errors": 0,
+                  "high_water_bytes": 69620,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 10275848,
+                "rejected_frames": [],
+                "status_count": 21,
+                "status_p99_seconds": 0.01627719309180975,
+                "stop_tail_adc_items": 200,
+                "stop_tail_gpio_items": 1212,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163836.882844085,
+                    "latency_seconds": 0.020837207324802876,
+                    "millidegrees_c": 39737,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163847.021188564,
+                    "latency_seconds": 0.016265162266790867,
+                    "millidegrees_c": 43422,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163847.389533404,
+                    "latency_seconds": 0.0207624863833189,
+                    "millidegrees_c": 43422,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            },
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 10.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 41594880,
+                "adc_frames": 10155,
+                "adc_rate_hz": 1000002.4741272915,
+                "aux_bank_samples_captured": 10275848,
+                "capture_seconds": 10.000559257343411,
+                "firmware_processing_cpu_basis_points": 1780,
+                "gpio_actual_wire_bytes": 264004,
+                "gpio_frames": 5077,
+                "gpio_logical_payload_bytes": 20551696,
+                "gpio_rate_hz": 1000002.4741272915,
+                "gpio_raw_equivalent_wire_bytes": 20795392,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 5077,
+                "host_peak_rss_growth_bytes": 0,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.020831908099353313,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5163858.312415514,
+                  "idempotent_stop_response_seconds": 0.02073291502892971,
+                  "run_id": 2,
+                  "start_requested_monotonic_seconds": 5163847.870099975,
+                  "start_response_seconds": 0.01883653923869133,
+                  "start_to_first_validated_adc_seconds": 0.019108472391963005,
+                  "start_to_first_validated_gpio_seconds": 0.019258984364569187,
+                  "stop_requested_monotonic_seconds": 5163858.147816453,
+                  "stop_response_seconds": 0.021406693384051323,
+                  "stop_to_drained_seconds": 0.12292534112930298,
+                  "stop_to_final_idle_status_seconds": 0.16459906101226807
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.020922900177538395,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 2,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 10275848,
+                "paired_samples_transmitted": 10275848,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 41898416,
+                  "checksum_errors": 0,
+                  "frames_decoded": 15267,
+                  "header_errors": 0,
+                  "high_water_bytes": 69624,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 10275848,
+                "rejected_frames": [],
+                "status_count": 21,
+                "status_p99_seconds": 0.016715303994715214,
+                "stop_tail_adc_items": 352,
+                "stop_tail_gpio_items": 1364,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163847.785687927,
+                    "latency_seconds": 0.020742889493703842,
+                    "millidegrees_c": 43422,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163857.923036593,
+                    "latency_seconds": 0.015984809026122093,
+                    "millidegrees_c": 44650,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163858.291468056,
+                    "latency_seconds": 0.02065211348235607,
+                    "millidegrees_c": 44650,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            },
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 10.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 41594880,
+                "adc_frames": 10155,
+                "adc_rate_hz": 999996.6716795455,
+                "aux_bank_samples_captured": 10275848,
+                "capture_seconds": 10.000617285259068,
+                "firmware_processing_cpu_basis_points": 1784,
+                "gpio_actual_wire_bytes": 264004,
+                "gpio_frames": 5077,
+                "gpio_logical_payload_bytes": 20551696,
+                "gpio_rate_hz": 999996.6716795455,
+                "gpio_raw_equivalent_wire_bytes": 20795392,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 5077,
+                "host_peak_rss_growth_bytes": 0,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.020831397734582424,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5163869.214884641,
+                  "idempotent_stop_response_seconds": 0.020657268352806568,
+                  "run_id": 3,
+                  "start_requested_monotonic_seconds": 5163858.772365913,
+                  "start_response_seconds": 0.018988601863384247,
+                  "start_to_first_validated_adc_seconds": 0.019218195229768753,
+                  "start_to_first_validated_gpio_seconds": 0.01936627458781004,
+                  "stop_requested_monotonic_seconds": 5163869.050148723,
+                  "stop_response_seconds": 0.021143256686627865,
+                  "stop_to_drained_seconds": 0.12304249498993158,
+                  "stop_to_final_idle_status_seconds": 0.16473591793328524
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.020684175193309784,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 2,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 10275848,
+                "paired_samples_transmitted": 10275848,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 41898416,
+                  "checksum_errors": 0,
+                  "frames_decoded": 15267,
+                  "header_errors": 0,
+                  "high_water_bytes": 69624,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 10275848,
+                "rejected_frames": [],
+                "status_count": 21,
+                "status_p99_seconds": 0.01631739642471075,
+                "stop_tail_adc_items": 318,
+                "stop_tail_gpio_items": 1330,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163858.687664905,
+                    "latency_seconds": 0.020778346806764603,
+                    "millidegrees_c": 45264,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163868.825582853,
+                    "latency_seconds": 0.016220353543758392,
+                    "millidegrees_c": 46492,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163869.193969634,
+                    "latency_seconds": 0.020708640106022358,
+                    "millidegrees_c": 46492,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            },
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 10.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 41594880,
+                "adc_frames": 10155,
+                "adc_rate_hz": 1000016.8666898706,
+                "aux_bank_samples_captured": 10275848,
+                "capture_seconds": 10.000415326096117,
+                "firmware_processing_cpu_basis_points": 1782,
+                "gpio_actual_wire_bytes": 264004,
+                "gpio_frames": 5077,
+                "gpio_logical_payload_bytes": 20551696,
+                "gpio_rate_hz": 1000016.8666898706,
+                "gpio_raw_equivalent_wire_bytes": 20795392,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 5077,
+                "host_peak_rss_growth_bytes": 0,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.02082270197570324,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5163880.159163585,
+                  "idempotent_stop_response_seconds": 0.020803176797926426,
+                  "run_id": 4,
+                  "start_requested_monotonic_seconds": 5163869.675035049,
+                  "start_response_seconds": 0.019373778253793716,
+                  "start_to_first_validated_adc_seconds": 0.01958873774856329,
+                  "start_to_first_validated_gpio_seconds": 0.019715704023838043,
+                  "stop_requested_monotonic_seconds": 5163879.952784573,
+                  "stop_response_seconds": 0.021464317105710506,
+                  "stop_to_drained_seconds": 0.12302781082689762,
+                  "stop_to_final_idle_status_seconds": 0.20637901220470667
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.020922919735312462,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 2,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 10275848,
+                "paired_samples_transmitted": 10275848,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 41898476,
+                  "checksum_errors": 0,
+                  "frames_decoded": 15268,
+                  "header_errors": 0,
+                  "high_water_bytes": 69624,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 10275848,
+                "rejected_frames": [],
+                "status_count": 21,
+                "status_p99_seconds": 0.016275877133011818,
+                "stop_tail_adc_items": 353,
+                "stop_tail_gpio_items": 1365,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163869.590172972,
+                    "latency_seconds": 0.020817129872739315,
+                    "millidegrees_c": 47106,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163879.728141657,
+                    "latency_seconds": 0.01618139911442995,
+                    "millidegrees_c": 48948,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163880.096691011,
+                    "latency_seconds": 0.02080825250595808,
+                    "millidegrees_c": null,
+                    "phase": "after",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5163880.13818042,
+                    "latency_seconds": 0.020842043682932854,
+                    "millidegrees_c": 48334,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            },
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 10.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 41594880,
+                "adc_frames": 10155,
+                "adc_rate_hz": 1000011.4695584063,
+                "aux_bank_samples_captured": 10275848,
+                "capture_seconds": 10.000469299033284,
+                "firmware_processing_cpu_basis_points": 1780,
+                "gpio_actual_wire_bytes": 264004,
+                "gpio_frames": 5077,
+                "gpio_logical_payload_bytes": 20551696,
+                "gpio_rate_hz": 1000011.4695584063,
+                "gpio_raw_equivalent_wire_bytes": 20795392,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 5077,
+                "host_peak_rss_growth_bytes": 0,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.020720346830785275,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5163891.101365092,
+                  "idempotent_stop_response_seconds": 0.020686295814812183,
+                  "run_id": 5,
+                  "start_requested_monotonic_seconds": 5163880.659237715,
+                  "start_response_seconds": 0.018939911387860775,
+                  "start_to_first_validated_adc_seconds": 0.019167260266840458,
+                  "start_to_first_validated_gpio_seconds": 0.019316669553518295,
+                  "stop_requested_monotonic_seconds": 5163890.936872322,
+                  "stop_response_seconds": 0.02130843885242939,
+                  "stop_to_drained_seconds": 0.12305971700698137,
+                  "stop_to_final_idle_status_seconds": 0.16449277009814978
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.020787647925317287,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 2,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 10275848,
+                "paired_samples_transmitted": 10275848,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 41898476,
+                  "checksum_errors": 0,
+                  "frames_decoded": 15268,
+                  "header_errors": 0,
+                  "high_water_bytes": 69624,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 10275848,
+                "rejected_frames": [],
+                "status_count": 21,
+                "status_p99_seconds": 0.016352053731679916,
+                "stop_tail_adc_items": 345,
+                "stop_tail_gpio_items": 1357,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163880.533265812,
+                    "latency_seconds": 0.020642275922000408,
+                    "millidegrees_c": null,
+                    "phase": "before",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5163880.574644756,
+                    "latency_seconds": 0.020784531719982624,
+                    "millidegrees_c": 48334,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163890.712180187,
+                    "latency_seconds": 0.016175451688468456,
+                    "millidegrees_c": 49562,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163891.080630909,
+                    "latency_seconds": 0.020631452091038227,
+                    "millidegrees_c": 49562,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            },
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 10.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 41594880,
+                "adc_frames": 10155,
+                "adc_rate_hz": 1000000.8207483018,
+                "aux_bank_samples_captured": 10275848,
+                "capture_seconds": 10.000575792044401,
+                "firmware_processing_cpu_basis_points": 1781,
+                "gpio_actual_wire_bytes": 264004,
+                "gpio_frames": 5077,
+                "gpio_logical_payload_bytes": 20551696,
+                "gpio_rate_hz": 1000000.8207483018,
+                "gpio_raw_equivalent_wire_bytes": 20795392,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 5077,
+                "host_peak_rss_growth_bytes": 0,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.020864572376012802,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5163902.00331289,
+                  "idempotent_stop_response_seconds": 0.020821668207645416,
+                  "run_id": 6,
+                  "start_requested_monotonic_seconds": 5163891.560891917,
+                  "start_response_seconds": 0.018587390892207623,
+                  "start_to_first_validated_adc_seconds": 0.01879161037504673,
+                  "start_to_first_validated_gpio_seconds": 0.0189146576449275,
+                  "stop_requested_monotonic_seconds": 5163901.838521193,
+                  "stop_response_seconds": 0.021342627704143524,
+                  "stop_to_drained_seconds": 0.12287833262234926,
+                  "stop_to_final_idle_status_seconds": 0.16479169763624668
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.02089922782033682,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 2,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 10275848,
+                "paired_samples_transmitted": 10275848,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 41898416,
+                  "checksum_errors": 0,
+                  "frames_decoded": 15267,
+                  "header_errors": 0,
+                  "high_water_bytes": 69624,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 10275848,
+                "rejected_frames": [],
+                "status_count": 21,
+                "status_p99_seconds": 0.016532544046640396,
+                "stop_tail_adc_items": 206,
+                "stop_tail_gpio_items": 1218,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163891.476369516,
+                    "latency_seconds": 0.020914826542139053,
+                    "millidegrees_c": 49562,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163901.59730589,
+                    "latency_seconds": 0.015669270418584347,
+                    "millidegrees_c": 50790,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163901.982305408,
+                    "latency_seconds": 0.020835675299167633,
+                    "millidegrees_c": 51404,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            },
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 10.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 41594880,
+                "adc_frames": 10155,
+                "adc_rate_hz": 999991.4327995438,
+                "aux_bank_samples_captured": 10275848,
+                "capture_seconds": 10.000669677741826,
+                "firmware_processing_cpu_basis_points": 1782,
+                "gpio_actual_wire_bytes": 264004,
+                "gpio_frames": 5077,
+                "gpio_logical_payload_bytes": 20551696,
+                "gpio_rate_hz": 999991.4327995438,
+                "gpio_raw_equivalent_wire_bytes": 20795392,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 5077,
+                "host_peak_rss_growth_bytes": 0,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.020748617127537727,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5163912.945950309,
+                  "idempotent_stop_response_seconds": 0.02077216561883688,
+                  "run_id": 7,
+                  "start_requested_monotonic_seconds": 5163902.503351478,
+                  "start_response_seconds": 0.018971625715494156,
+                  "start_to_first_validated_adc_seconds": 0.019197151996195316,
+                  "start_to_first_validated_gpio_seconds": 0.01934483554214239,
+                  "stop_requested_monotonic_seconds": 5163912.781062049,
+                  "stop_response_seconds": 0.02138353232294321,
+                  "stop_to_drained_seconds": 0.12307675741612911,
+                  "stop_to_final_idle_status_seconds": 0.16488825995475054
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.02089802920818329,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 2,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 10275848,
+                "paired_samples_transmitted": 10275848,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 41898596,
+                  "checksum_errors": 0,
+                  "frames_decoded": 15270,
+                  "header_errors": 0,
+                  "high_water_bytes": 69624,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 10275848,
+                "rejected_frames": [],
+                "status_count": 21,
+                "status_p99_seconds": 0.016352470964193344,
+                "stop_tail_adc_items": 323,
+                "stop_tail_gpio_items": 1335,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163902.377287977,
+                    "latency_seconds": 0.020929657854139805,
+                    "millidegrees_c": null,
+                    "phase": "before",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5163902.418770897,
+                    "latency_seconds": 0.020912885665893555,
+                    "millidegrees_c": 50790,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163912.554780761,
+                    "latency_seconds": 0.016164889559149742,
+                    "millidegrees_c": null,
+                    "phase": "running",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5163912.587267595,
+                    "latency_seconds": 0.016258067451417446,
+                    "millidegrees_c": null,
+                    "phase": "running",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 3,
+                    "host_monotonic_seconds": 5163912.620675271,
+                    "latency_seconds": 0.017268402501940727,
+                    "millidegrees_c": 52018,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163912.925059817,
+                    "latency_seconds": 0.02083723060786724,
+                    "millidegrees_c": 52018,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            },
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 10.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 41652224,
+                "adc_frames": 10169,
+                "adc_rate_hz": 1000149.5480092501,
+                "aux_bank_samples_captured": 10290016,
+                "capture_seconds": 10.015278235077858,
+                "firmware_processing_cpu_basis_points": 1779,
+                "gpio_actual_wire_bytes": 264368,
+                "gpio_frames": 5084,
+                "gpio_logical_payload_bytes": 20580032,
+                "gpio_rate_hz": 1000149.5480092501,
+                "gpio_raw_equivalent_wire_bytes": 20824064,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 5084,
+                "host_peak_rss_growth_bytes": 0,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.02056278381496668,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5163923.942176637,
+                  "idempotent_stop_response_seconds": 0.020839904434978962,
+                  "run_id": 8,
+                  "start_requested_monotonic_seconds": 5163913.48741062,
+                  "start_response_seconds": 0.018993787467479706,
+                  "start_to_first_validated_adc_seconds": 0.019219561479985714,
+                  "start_to_first_validated_gpio_seconds": 0.0193658834323287,
+                  "stop_requested_monotonic_seconds": 5163923.779642852,
+                  "stop_response_seconds": 0.0202442379668355,
+                  "stop_to_drained_seconds": 0.12103910744190216,
+                  "stop_to_final_idle_status_seconds": 0.1625337852165103
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.020192519761621952,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 2,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 10290016,
+                "paired_samples_transmitted": 10290016,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 41956244,
+                  "checksum_errors": 0,
+                  "frames_decoded": 15290,
+                  "header_errors": 0,
+                  "high_water_bytes": 69624,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 10290016,
+                "rejected_frames": [],
+                "status_count": 21,
+                "status_p99_seconds": 0.01621029432862997,
+                "stop_tail_adc_items": 579,
+                "stop_tail_gpio_items": 1591,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163913.320374567,
+                    "latency_seconds": 0.02062292955815792,
+                    "millidegrees_c": null,
+                    "phase": "before",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5163913.361867816,
+                    "latency_seconds": 0.02091256808489561,
+                    "millidegrees_c": null,
+                    "phase": "before",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 3,
+                    "host_monotonic_seconds": 5163913.403209809,
+                    "latency_seconds": 0.020717350766062737,
+                    "millidegrees_c": 52018,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163923.538767932,
+                    "latency_seconds": 0.016181688755750656,
+                    "millidegrees_c": 52632,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163923.921289691,
+                    "latency_seconds": 0.020563901402056217,
+                    "millidegrees_c": 52632,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            }
+          ],
+          "exit_code": 0,
+          "message": "Container ran successfully for test_id 177e8189-da1c-45c5-ab0f-468953229d2f",
+          "outcome": "PASS",
+          "test_id": "177e8189-da1c-45c5-ab0f-468953229d2f"
+        }
+      },
+      {
+        "artifact_sha256": {
+          "build-manifest.json": "cf178d85f4781d60da196ed7a5161f12982d148a3c3bede4f7652596da01d4bb",
+          "firmware.ino.hex": "24dd53a2a2e2f3c54daa5ef130ecccf0061b9d55636aafc2c352a6ba2ac64549",
+          "provenance.json": "177676c2ae26049f360e2877ed61b3b7bc78ff4f4da52b747389b09897bdcef2",
+          "results.json": "88625fe7968061f40a2ec1635f2362393e50e4124960b765f49b061c8efd793c",
+          "rig-program.py": "7f4999f6d82e788ed857f661111f8f3a5fe8891e2c86d20e0ab727295a88775f",
+          "summary.json": "d14d1b6afbbb318d7af6a3b555a551196d35c9c1cdcd0f0853049a30d2fa5897"
+        },
+        "name": "diagnostic-600",
+        "provenance": {
+          "build_id": "thingdaq-0f462a06fef8cf6f",
+          "case_sequence": [
+            "INPUT_COMBINED"
+          ],
+          "health": {
+            "checks": {
+              "coordinator_mode": "normal",
+              "docker_reachable": true,
+              "hub_reachable": true,
+              "hubs": {
+                "0x00000000": true
+              },
+              "queue_depth": 0,
+              "worker_thread_alive": true
+            },
+            "status": "healthy"
+          },
+          "hex_sha256": "24dd53a2a2e2f3c54daa5ef130ecccf0061b9d55636aafc2c352a6ba2ac64549",
+          "input_experiment": {
+            "adc_clock_hz": 37500000,
+            "base_source_id": "0f9182ce1e40ecf7e6a6140ee0c41e126b952372903219fd12b54dde11dbcb61",
+            "builder_sha256": "c0b5e30ffbf0cb4cffea3fc728f37303b2a39d8d5acaa73bd8be398954db97e8",
+            "cpu_mhz": 600,
+            "data_checksum": "standard-adler32",
+            "equal_rates": false,
+            "gpio_rle": true,
+            "gpio_rle_wire_version": 130,
+            "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag][:gpio-rle16=v1])",
+            "ipg_hz": 150000000,
+            "large_adc_frame": true,
+            "pit_hz": 24000000,
+            "public_protocol_compatible": false,
+            "release_fixed_1mhz": true
+          },
+          "manifest_sha256": "cf178d85f4781d60da196ed7a5161f12982d148a3c3bede4f7652596da01d4bb",
+          "planned_program_seconds": 635.0,
+          "profile_sequence": [
+            4
+          ],
+          "program_sha256": "7f4999f6d82e788ed857f661111f8f3a5fe8891e2c86d20e0ab727295a88775f",
+          "runner_sha256": "a7d9032b6472438d0883f3f6a4bb20e9cada182f9e8942007bff9ece6db3b612",
+          "service": "http://192.168.150.14:5000",
+          "settings": {
+            "AUX_INPUT_CAPTURE_SECONDS": "600.0",
+            "AUX_INPUT_CASE": "INPUT_COMBINED",
+            "AUX_INPUT_CPU_MHZ": "600",
+            "AUX_INPUT_EQUAL_RATES": "0",
+            "AUX_INPUT_GPIO_RLE": "1",
+            "AUX_INPUT_LARGE_ADC_FRAME": "1",
+            "AUX_INPUT_LIFECYCLE_CHECKS": "1",
+            "AUX_INPUT_RATE_PROFILE": "4",
+            "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+            "AUX_INPUT_RUNTIME_HEALTH": "0",
+            "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+            "AUX_INPUT_TEMPERATURE": "1",
+            "EXPECTED_BUILD_ID": "thingdaq-0f462a06fef8cf6f",
+            "EXPECTED_HARDWARE_SERIAL": "20428100"
+          },
+          "source": {
+            "build_id": "thingdaq-0f462a06fef8cf6f",
+            "firmware_input_changes": [],
+            "firmware_inputs_clean": true,
+            "git_commit": "2edfa63299676de59edb44956c02d818b16a1a97",
+            "inputs": [
+              "firmware/firmware.ino",
+              "firmware/src/acquisition_controller.cpp",
+              "firmware/src/acquisition_controller.h",
+              "firmware/src/adc_dma_capture.cpp",
+              "firmware/src/adc_dma_capture.h",
+              "firmware/src/adc_dma_capture_teensy.cpp",
+              "firmware/src/adc_dma_capture_teensy.h",
+              "firmware/src/adc_dma_fault.h",
+              "firmware/src/adc_frame_packer.cpp",
+              "firmware/src/adc_frame_packer.h",
+              "firmware/src/adc_initializer.cpp",
+              "firmware/src/adc_initializer.h",
+              "firmware/src/adc_initializer_teensy.cpp",
+              "firmware/src/adc_initializer_teensy.h",
+              "firmware/src/adc_trigger.cpp",
+              "firmware/src/adc_trigger.h",
+              "firmware/src/adc_trigger_teensy.cpp",
+              "firmware/src/adc_trigger_teensy.h",
+              "firmware/src/board_config.h",
+              "firmware/src/checksum.cpp",
+              "firmware/src/checksum.h",
+              "firmware/src/checksum_benchmark.cpp",
+              "firmware/src/checksum_benchmark.h",
+              "firmware/src/checksum_benchmark_teensy.cpp",
+              "firmware/src/checksum_benchmark_teensy.h",
+              "firmware/src/control_state.cpp",
+              "firmware/src/control_state.h",
+              "firmware/src/dma_buffer_ownership.h",
+              "firmware/src/edma_priority_teensy.h",
+              "firmware/src/firmware_capabilities.h",
+              "firmware/src/firmware_identity.h",
+              "firmware/src/firmware_runtime.cpp",
+              "firmware/src/firmware_runtime.h",
+              "firmware/src/generated/protocol_constants.h",
+              "firmware/src/generated/protocol_v2_constants.h",
+              "firmware/src/gpio_batch_packer.cpp",
+              "firmware/src/gpio_batch_packer.h",
+              "firmware/src/gpio_batch_packer_teensy.cpp",
+              "firmware/src/gpio_batch_packer_teensy.h",
+              "firmware/src/gpio_capture_diagnostic.cpp",
+              "firmware/src/gpio_capture_diagnostic.h",
+              "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+              "firmware/src/gpio_capture_diagnostic_teensy.h",
+              "firmware/src/gpio_clock_diagnostic.cpp",
+              "firmware/src/gpio_clock_diagnostic.h",
+              "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+              "firmware/src/gpio_clock_diagnostic_teensy.h",
+              "firmware/src/gpio_dma_route_teensy.h",
+              "firmware/src/gpio_dual_bank_capture.cpp",
+              "firmware/src/gpio_dual_bank_capture.h",
+              "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+              "firmware/src/gpio_dual_bank_capture_teensy.h",
+              "firmware/src/gpio_dual_bank_packer.cpp",
+              "firmware/src/gpio_dual_bank_packer.h",
+              "firmware/src/gpio_pack_c.c",
+              "firmware/src/gpio_pack_c.h",
+              "firmware/src/gpio_raw_capture.cpp",
+              "firmware/src/gpio_raw_capture.h",
+              "firmware/src/gpio_raw_capture_teensy.cpp",
+              "firmware/src/gpio_raw_capture_teensy.h",
+              "firmware/src/gpio_raw_storage_teensy.h",
+              "firmware/src/input_experiment_profile.h",
+              "firmware/src/interrupt_guard_teensy.h",
+              "firmware/src/interrupt_vectors_teensy.h",
+              "firmware/src/packet_buffer_pipeline.cpp",
+              "firmware/src/packet_buffer_pipeline.h",
+              "firmware/src/protocol.cpp",
+              "firmware/src/protocol.h",
+              "firmware/src/rate_profile_table.h",
+              "firmware/src/rle_encoder.cpp",
+              "firmware/src/rle_encoder.h",
+              "firmware/src/runtime_health.h",
+              "firmware/src/runtime_health_teensy.cpp",
+              "firmware/src/statistics.cpp",
+              "firmware/src/statistics.h",
+              "firmware/src/stream_layout.h",
+              "firmware/src/synthetic_source.cpp",
+              "firmware/src/synthetic_source.h",
+              "firmware/src/teensy_clock.cpp",
+              "firmware/src/teensy_clock.h",
+              "firmware/src/teensy_usb.cpp",
+              "firmware/src/teensy_usb.h",
+              "firmware/src/temperature.h",
+              "firmware/src/temperature_teensy.cpp",
+              "firmware/src/usb_transport.cpp",
+              "firmware/src/usb_transport.h",
+              "firmware/src/variable_rate_scheduler.cpp",
+              "firmware/src/variable_rate_scheduler.h",
+              "firmware/src/variable_rate_scheduler_teensy.cpp",
+              "firmware/src/variable_rate_scheduler_teensy.h",
+              "firmware/src/watchdog_teensy.cpp",
+              "firmware/src/watchdog_teensy.h",
+              "protocol/protocol-v1.json",
+              "protocol/protocol-v2.json"
+            ],
+            "source_id": "0f462a06fef8cf6fa9938d2197e240c11ad8fb1f090aaa424928d8d182e0edb1",
+            "timestamp_epoch": 1792333467,
+            "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+            "timestamp_utc": "2026-10-18T14:24:27Z"
+          },
+          "version": {
+            "api": "v1",
+            "service": "remote-firmware-testing",
+            "version": "1.2.0"
+          }
+        },
+        "summary": {
+          "evidence": [
+            {
+              "aux_bank_mode": "INPUT",
+              "case": "INPUT_COMBINED",
+              "checks": 146,
+              "configured_rates_hz": {
+                "adc_pairs": 1000000,
+                "gpio_samples": 1000000
+              },
+              "duration_seconds": 600.0,
+              "failed_checks": [],
+              "failures": [],
+              "fixture": {
+                "authorized": false,
+                "classification": "ELECTRICALLY_UNSTIMULATED",
+                "external_transition_checks": "NOT_RUN"
+              },
+              "kind": "aux_input_capture",
+              "metrics": {
+                "adc_actual_wire_bytes": 2429595648,
+                "adc_frames": 593163,
+                "adc_rate_hz": 999998.5203326716,
+                "aux_bank_samples_captured": 600279944,
+                "capture_seconds": 600.0055678086355,
+                "firmware_processing_cpu_basis_points": 1781,
+                "gpio_actual_wire_bytes": 15422528,
+                "gpio_frames": 296581,
+                "gpio_logical_payload_bytes": 1200559888,
+                "gpio_rate_hz": 999998.5203326716,
+                "gpio_raw_equivalent_wire_bytes": 1214795776,
+                "gpio_raw_frames": 0,
+                "gpio_rle_frames": 296581,
+                "host_peak_rss_growth_bytes": 65536,
+                "lifecycle_timing": {
+                  "configure_response_seconds": 0.020803687162697315,
+                  "drain_quiet_requirement_seconds": 0.1,
+                  "final_idle_status_monotonic_seconds": 5164557.252520052,
+                  "idempotent_stop_response_seconds": 0.020334123633801937,
+                  "run_id": 1,
+                  "start_requested_monotonic_seconds": 5163956.806073563,
+                  "start_response_seconds": 0.01926579512655735,
+                  "start_to_first_validated_adc_seconds": 0.019376197829842567,
+                  "start_to_first_validated_gpio_seconds": 0.019550391472876072,
+                  "stop_requested_monotonic_seconds": 5164557.088939205,
+                  "stop_response_seconds": 0.02130890265107155,
+                  "stop_to_drained_seconds": 0.12266865745186806,
+                  "stop_to_final_idle_status_seconds": 0.16358084697276354
+                },
+                "maximum_frame_skew": 1.0,
+                "maximum_receive_gap_seconds": 0.031360773369669914,
+                "packet_ready_high_water": 2,
+                "packet_transmit_high_water": 20,
+                "paired_generation_skew_events": 0,
+                "paired_samples_joined": 600279944,
+                "paired_samples_transmitted": 600279944,
+                "parser": {
+                  "bytes_discarded": 0,
+                  "bytes_received": 2446874028,
+                  "checksum_errors": 0,
+                  "frames_decoded": 891023,
+                  "header_errors": 0,
+                  "high_water_bytes": 69628,
+                  "payload_errors": 0
+                },
+                "primary_bank_samples_captured": 600279944,
+                "rejected_frames": [],
+                "status_count": 1201,
+                "status_p99_seconds": 0.016603125259280205,
+                "stop_tail_adc_items": 399,
+                "stop_tail_gpio_items": 1411,
+                "temperature_samples": [
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163956.721317734,
+                    "latency_seconds": 0.02081687655299902,
+                    "millidegrees_c": 49562,
+                    "phase": "before",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163966.857622188,
+                    "latency_seconds": 0.01618160493671894,
+                    "millidegrees_c": 52018,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163976.874865705,
+                    "latency_seconds": 0.01552058570086956,
+                    "millidegrees_c": 53246,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163986.891763008,
+                    "latency_seconds": 0.016294200904667377,
+                    "millidegrees_c": 53860,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5163996.907525254,
+                    "latency_seconds": 0.015222813934087753,
+                    "millidegrees_c": 55088,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164006.923779199,
+                    "latency_seconds": 0.015631765127182007,
+                    "millidegrees_c": 55702,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164016.941233952,
+                    "latency_seconds": 0.016172132454812527,
+                    "millidegrees_c": 55702,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164026.971649156,
+                    "latency_seconds": 0.016594452783465385,
+                    "millidegrees_c": null,
+                    "phase": "running",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5164027.005532835,
+                    "latency_seconds": 0.017429652623832226,
+                    "millidegrees_c": 56316,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164037.021996979,
+                    "latency_seconds": 0.016226201318204403,
+                    "millidegrees_c": 57544,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164047.038010205,
+                    "latency_seconds": 0.015409542247653008,
+                    "millidegrees_c": 57544,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164057.054818183,
+                    "latency_seconds": 0.016184940934181213,
+                    "millidegrees_c": 58158,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164067.071576348,
+                    "latency_seconds": 0.01633733417838812,
+                    "millidegrees_c": null,
+                    "phase": "running",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5164067.103879204,
+                    "latency_seconds": 0.01619364507496357,
+                    "millidegrees_c": 58772,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164077.135750502,
+                    "latency_seconds": 0.016339104622602463,
+                    "millidegrees_c": 58772,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164087.166907051,
+                    "latency_seconds": 0.016107934527099133,
+                    "millidegrees_c": 58772,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164097.184794641,
+                    "latency_seconds": 0.016239097341895103,
+                    "millidegrees_c": 59386,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164107.201541376,
+                    "latency_seconds": 0.016238375566899776,
+                    "millidegrees_c": 59386,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164117.21830593,
+                    "latency_seconds": 0.01631712820380926,
+                    "millidegrees_c": 60000,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164127.250136319,
+                    "latency_seconds": 0.016124931164085865,
+                    "millidegrees_c": 60000,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164137.281242152,
+                    "latency_seconds": 0.016192729584872723,
+                    "millidegrees_c": 60615,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164147.299057505,
+                    "latency_seconds": 0.015338758006691933,
+                    "millidegrees_c": 60615,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164157.315771583,
+                    "latency_seconds": 0.0161912702023983,
+                    "millidegrees_c": 61229,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164167.332404441,
+                    "latency_seconds": 0.01617805752903223,
+                    "millidegrees_c": 61229,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164177.3480844,
+                    "latency_seconds": 0.015135555528104305,
+                    "millidegrees_c": 61229,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164187.364804635,
+                    "latency_seconds": 0.015340803191065788,
+                    "millidegrees_c": 61843,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164197.397196389,
+                    "latency_seconds": 0.016224395483732224,
+                    "millidegrees_c": 61843,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164207.428364649,
+                    "latency_seconds": 0.016191055066883564,
+                    "millidegrees_c": 61843,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164217.44581216,
+                    "latency_seconds": 0.015129491686820984,
+                    "millidegrees_c": 61229,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164227.46244045,
+                    "latency_seconds": 0.01615489087998867,
+                    "millidegrees_c": 61843,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164237.4792247,
+                    "latency_seconds": 0.016212498769164085,
+                    "millidegrees_c": null,
+                    "phase": "running",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5164237.511546385,
+                    "latency_seconds": 0.016168009489774704,
+                    "millidegrees_c": 62457,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164247.54391772,
+                    "latency_seconds": 0.016382362693548203,
+                    "millidegrees_c": 61843,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164257.560674587,
+                    "latency_seconds": 0.016222943551838398,
+                    "millidegrees_c": 62457,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164267.576054752,
+                    "latency_seconds": 0.01496858149766922,
+                    "millidegrees_c": 62457,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164277.593059614,
+                    "latency_seconds": 0.016142304986715317,
+                    "millidegrees_c": 62457,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164287.609780557,
+                    "latency_seconds": 0.016121535561978817,
+                    "millidegrees_c": 62457,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164297.64022692,
+                    "latency_seconds": 0.016115883365273476,
+                    "millidegrees_c": 63071,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164307.658669859,
+                    "latency_seconds": 0.016164873726665974,
+                    "millidegrees_c": 63071,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164317.675309142,
+                    "latency_seconds": 0.016163552179932594,
+                    "millidegrees_c": null,
+                    "phase": "running",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5164317.706599065,
+                    "latency_seconds": 0.0150035684928298,
+                    "millidegrees_c": 63071,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164327.723447221,
+                    "latency_seconds": 0.016027321107685566,
+                    "millidegrees_c": 63071,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164337.740216625,
+                    "latency_seconds": 0.01615519169718027,
+                    "millidegrees_c": 63071,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164347.772545809,
+                    "latency_seconds": 0.01658316422253847,
+                    "millidegrees_c": 63071,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164357.789313577,
+                    "latency_seconds": 0.01613197010010481,
+                    "millidegrees_c": 63071,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164367.805887452,
+                    "latency_seconds": 0.01620222721248865,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164377.837816484,
+                    "latency_seconds": 0.01617300510406494,
+                    "millidegrees_c": 63071,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164387.854535377,
+                    "latency_seconds": 0.016155967488884926,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164397.870792784,
+                    "latency_seconds": 0.015800615772604942,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164407.88730842,
+                    "latency_seconds": 0.016139130108058453,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164417.919212998,
+                    "latency_seconds": 0.01721621211618185,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164427.9359205,
+                    "latency_seconds": 0.01628359593451023,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164437.952609254,
+                    "latency_seconds": 0.01617040764540434,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164447.984896931,
+                    "latency_seconds": 0.01613896619528532,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164458.001684065,
+                    "latency_seconds": 0.016158116050064564,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164468.01719537,
+                    "latency_seconds": 0.014808413572609425,
+                    "millidegrees_c": null,
+                    "phase": "running",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5164468.049787938,
+                    "latency_seconds": 0.01614401675760746,
+                    "millidegrees_c": 64299,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164478.066604081,
+                    "latency_seconds": 0.016360039822757244,
+                    "millidegrees_c": 64299,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164488.083320437,
+                    "latency_seconds": 0.016201644204556942,
+                    "millidegrees_c": null,
+                    "phase": "running",
+                    "status": 2
+                  },
+                  {
+                    "attempt": 2,
+                    "host_monotonic_seconds": 5164488.115084555,
+                    "latency_seconds": 0.01638168003410101,
+                    "millidegrees_c": 64299,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164498.13172457,
+                    "latency_seconds": 0.016218014061450958,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164508.148320896,
+                    "latency_seconds": 0.01612931117415428,
+                    "millidegrees_c": 64299,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164518.180278117,
+                    "latency_seconds": 0.01619723252952099,
+                    "millidegrees_c": 64299,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164528.197114595,
+                    "latency_seconds": 0.01626215036958456,
+                    "millidegrees_c": 63685,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164538.213679047,
+                    "latency_seconds": 0.016118655912578106,
+                    "millidegrees_c": 64299,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164548.245927606,
+                    "latency_seconds": 0.01618775725364685,
+                    "millidegrees_c": 64299,
+                    "phase": "running",
+                    "status": 0
+                  },
+                  {
+                    "attempt": 1,
+                    "host_monotonic_seconds": 5164557.232144663,
+                    "latency_seconds": 0.02048171777278185,
+                    "millidegrees_c": 64299,
+                    "phase": "after",
+                    "status": 0
+                  }
+                ]
+              },
+              "paired_diagnostic": "NOT_RUN",
+              "protocol_version": 2,
+              "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+              "result": "PASS",
+              "schema": "thingdaq.experiment-evidence/v1"
+            }
+          ],
+          "exit_code": 0,
+          "message": "Container ran successfully for test_id edbedc02-734c-4520-a404-7e59b7080358",
+          "outcome": "PASS",
+          "test_id": "edbedc02-734c-4520-a404-7e59b7080358"
+        }
+      }
+    ],
+    "orchestration_sha256": "319b6a37443fad270c4757297564400599929935795c9d53f86eec46d2c6c45e",
+    "postflight_health": {
+      "checks": {
+        "coordinator_mode": "normal",
+        "docker_reachable": true,
+        "hub_reachable": true,
+        "hubs": {
+          "0x00000000": true
+        },
+        "queue_depth": 0,
+        "worker_thread_alive": true
+      },
+      "status": "healthy"
+    },
+    "preflight_health": {
+      "checks": {
+        "coordinator_mode": "normal",
+        "docker_reachable": true,
+        "hub_reachable": true,
+        "hubs": {
+          "0x00000000": true
+        },
+        "queue_depth": 0,
+        "worker_thread_alive": true
+      },
+      "status": "healthy"
+    },
+    "runner_sha256": "b091b411228c48cd4933ea43b14b751200b86896c3099850dae91c78353ed7c2",
+    "started_utc": "2026-10-18T14:24:58.006035+00:00",
+    "status": "PASS",
+    "updated_utc": "2026-10-18T14:37:11.465424+00:00",
+    "validator_sha256": "a7d9032b6472438d0883f3f6a4bb20e9cada182f9e8942007bff9ece6db3b612"
+  },
+  "cells": 9,
+  "checks": 1314,
+  "peak_millidegrees_c": 64299,
+  "preceding_failure": "doc/results/experiments/gpio-rle600-window-failure-20261018.json",
+  "raw_directory": "doc/results/raw/gpio-rle600-detail-20261018",
+  "rle_qualification": "PENDING_UNRESOLVED_PIPELINE_WINDOW_FAILURE",
+  "scope": "BOUNDED_DIAGNOSTIC_ONLY",
+  "status": "PASS"
+}
