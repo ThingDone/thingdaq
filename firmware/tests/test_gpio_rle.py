@@ -12,6 +12,35 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.mark.parametrize("probe", [False, True])
+def test_dma_preempt_probe_only_changes_gpio_ability_in_odd_input_epochs(
+    tmp_path, probe
+):
+    executable = tmp_path / "preempt-policy"
+    subprocess.run(
+        [
+            "g++",
+            "-std=c++17",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-DTHINGDAQ_EXPERIMENT_GPIO_RLE=1",
+            "-DTHINGDAQ_EXPERIMENT_LARGE_ADC_FRAME=1",
+            "-DTHINGDAQ_RELEASE_FIXED_1MHZ=1",
+            "-DTHINGDAQ_EXPERIMENT_CPU_HZ=600000000U",
+            *(["-DTHINGDAQ_EXPERIMENT_GPIO_PREEMPT_PROBE=1"] if probe else []),
+            f"-I{ROOT / 'firmware/src'}",
+            str(ROOT / "firmware/tests/edma_priority_probe_test.cpp"),
+            "-o",
+            str(executable),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run([str(executable)], check=True, capture_output=True)
+
+
 def rig_module(monkeypatch, enabled=True):
     monkeypatch.setenv("AUX_INPUT_LARGE_ADC_FRAME", "1")
     monkeypatch.setenv("AUX_INPUT_GPIO_RLE", str(int(enabled)))

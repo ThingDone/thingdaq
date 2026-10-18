@@ -26,6 +26,7 @@ def experiment_identity(
     release_fixed_1mhz: bool = False,
     large_adc_frame: bool = False,
     gpio_rle: bool = False,
+    gpio_preempt_probe: bool = False,
 ) -> base.BuildIdentity:
     selection = f"input-rate-clock-v1:{cpu_mhz}:{int(equal_rates)}"
     if release_fixed_1mhz or large_adc_frame:
@@ -34,6 +35,8 @@ def experiment_identity(
         )
     if gpio_rle:
         selection += ":gpio-rle16=v1"
+    if gpio_preempt_probe:
+        selection += ":gpio-preempt-probe=v1"
     source_id = hashlib.sha256(f"{identity.source_id}:{selection}".encode()).hexdigest()
     return dataclasses.replace(
         identity, source_id=source_id, build_id=f"thingdaq-{source_id[:16]}"
@@ -60,8 +63,11 @@ def main() -> int:
     parser.add_argument("--release-fixed-1mhz", action="store_true")
     parser.add_argument("--large-adc-frame", action="store_true")
     parser.add_argument("--gpio-rle", action="store_true")
+    parser.add_argument("--gpio-preempt-probe", action="store_true")
     parser.add_argument("--arduino-cli", default="arduino-cli")
     args = parser.parse_args()
+    if args.gpio_preempt_probe and not args.gpio_rle:
+        parser.error("--gpio-preempt-probe requires --gpio-rle")
     if args.release_fixed_1mhz and args.equal_rates:
         parser.error("--release-fixed-1mhz cannot be combined with --equal-rates")
     if args.large_adc_frame and not args.release_fixed_1mhz:
@@ -83,6 +89,8 @@ def main() -> int:
         mode = "release-large-adc" if args.large_adc_frame else "release"
     if args.gpio_rle:
         mode += "-gpio-rle"
+    if args.gpio_preempt_probe:
+        mode += "-preempt-probe"
     base.OUTPUT_DIRECTORY = (
         base.SKETCH_DIRECTORY / "build" / (f"input-experiment-{mode}-{args.cpu_mhz}")
     )
@@ -95,6 +103,7 @@ def main() -> int:
         release_fixed_1mhz=args.release_fixed_1mhz,
         large_adc_frame=args.large_adc_frame,
         gpio_rle=args.gpio_rle,
+        gpio_preempt_probe=args.gpio_preempt_probe,
     )
     base.identity_definitions = lambda definitions, identity: (
         original_definitions(definitions, identity)
@@ -106,6 +115,11 @@ def main() -> int:
     base.identity_definitions = lambda definitions, identity: (
         original_flags(definitions, identity)
         + (" -DTHINGDAQ_EXPERIMENT_GPIO_RLE=1" if args.gpio_rle else "")
+        + (
+            " -DTHINGDAQ_EXPERIMENT_GPIO_PREEMPT_PROBE=1"
+            if args.gpio_preempt_probe
+            else ""
+        )
     )
     manifest_path = base.build(args.arduino_cli)
     manifest = json.loads(manifest_path.read_text())
@@ -124,6 +138,7 @@ def main() -> int:
         "large_adc_frame": args.large_adc_frame,
         "gpio_rle": args.gpio_rle,
         "gpio_rle_wire_version": 130 if args.gpio_rle else None,
+        "gpio_preempt_probe": args.gpio_preempt_probe,
         "data_checksum": "standard-adler32",
         "public_protocol_compatible": (
             not args.large_adc_frame
@@ -136,7 +151,7 @@ def main() -> int:
                 )
             )
         ),
-        "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag][:gpio-rle16=v1])",
+        "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag][:gpio-rle16=v1][:gpio-preempt-probe=v1])",
         "base_source_id": original_identity().source_id,
         "builder_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     }

@@ -854,6 +854,7 @@ StartStatus prepareHardware(std::uint32_t epoch,
     clearChannelState(converter);
   }
   configureDescriptors();
+  edma_priority::selectCaptureEpoch(epoch);
   configurePriorities();
 
   g_epoch = epoch;
@@ -921,7 +922,13 @@ StopReport stopHardwareAfterTriggers() {
   if ((DMA_INT & channelMask(kPairDispatchConverter)) != 0U) {
     (void)servicePendingDmaPair();
   }
-  fault_trace::retainStoppedProgress();
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+  fault_trace::retainStoppedProgress(
+      static_cast<std::uint32_t>(DMA_DCHPRI0) |
+      (static_cast<std::uint32_t>(DMA_DCHPRI1) << 8U) |
+      (static_cast<std::uint32_t>(DMA_DCHPRI2) << 16U) |
+      (static_cast<std::uint32_t>(DMA_DCHPRI3) << 24U));
+#endif
 
   std::array<ChannelStopState, kConverterCount> stopped{};
   for (std::size_t converter = 0U; converter < kConverterCount;

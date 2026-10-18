@@ -1,5 +1,10 @@
 #pragma once
 
+#if defined(THINGDAQ_EXPERIMENT_GPIO_PREEMPT_PROBE) && \
+    !defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+#error "The GPIO preemption probe requires the private GPIO RLE experiment"
+#endif
+
 #include <cstdint>
 
 // Closed, build-time research variants, not additions to the public v2 contract.

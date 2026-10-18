@@ -68,7 +68,8 @@ yet supplied the current image's early-phase checkpoints.
 STOP as well as after a fault. `stopHardwareAfterTriggers()` seals it after
 disabling requests/IRQs and servicing the last pending completion. Normal
 STATUS still reports zero fault; explicit private pages have reason zero.
-On healthy captures only words 36–95 contain progress history; words 0–35
+On healthy captures words 36–95 contain progress history; the follow-up
+preemption probe records DCHPRI0–3 in word 0, low byte first. Words 1–35
 remain zero and are not a hardware fault snapshot. Failed records retain
 priority, idempotent STOP does not overwrite them, and prepare clears the
 record. Acquisition ISR recording is unchanged. This is instrumentation,
@@ -80,3 +81,23 @@ ordinary-host rejection and documentation. The 600 MHz large-ADC/RLE target
 build passes unchanged resource gates: 33,760 bytes RAM1 stack/local headroom
 and 4,096 bytes RAM2 heap headroom. Host retrieval and physical comparison
 follow after the frozen running campaign completes.
+
+## Controlled preemption probe
+
+RT1060 RM section 6.3.4 explicitly disallows nested DMA preemption and
+describes DPA as a way to keep low-priority channels from occupying the
+preempt slot. Our GPIO channels currently permit preemption of each other.
+A GPIO major-loop descriptor fetch occurs every 2,024 samples. A GPIO
+transfer occupying the preempt slot while ADC1's request pulses is a second,
+more specific hypothesis; the previous experiment cleared ADC1 ECP, which
+does not prevent a GPIO channel from occupying that slot.
+
+The opt-in `--gpio-preempt-probe` build alternates policies within one binary:
+odd acquisition epochs set DPA on both GPIO channels, even epochs retain the
+existing policy. Numeric priorities and ADC ECP remain unchanged; both GPIO
+channels remain preemptible by an ADC channel. Selection occurs in stopped
+ADC prepare before either capture engine starts; GPIO setup reuses it. Other
+builds retain the original policy. The build identity and manifest explicitly
+mark the probe. Healthy STOP captures the four priority registers for host
+verification. This is a controlled diagnostic, not a production fix, and a
+PASS without a reproduced control failure cannot establish causality.

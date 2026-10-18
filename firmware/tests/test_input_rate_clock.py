@@ -76,6 +76,24 @@ def test_build_identity_distinguishes_clock_and_ratio(monkeypatch):
         original, 450, False, release_fixed_1mhz=True, large_adc_frame=True
     )
     assert len({small.build_id, large.build_id, *(i.build_id for i in identities)}) == 8
+    rle = builder.experiment_identity(
+        original,
+        600,
+        False,
+        release_fixed_1mhz=True,
+        large_adc_frame=True,
+        gpio_rle=True,
+    )
+    probe = builder.experiment_identity(
+        original,
+        600,
+        False,
+        release_fixed_1mhz=True,
+        large_adc_frame=True,
+        gpio_rle=True,
+        gpio_preempt_probe=True,
+    )
+    assert probe.build_id != rle.build_id
 
 
 def test_large_frame_manifest_retention_matches_fixed_release_layout(monkeypatch):

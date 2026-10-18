@@ -146,8 +146,9 @@ int main(int argc, char **argv) {
   adc_capture::fault_trace::rememberProgress(2048U, 0x11U, 123U, 0U,
                                             0x03F203F3U, 100U);
   assert(adc_capture::fault_trace::snapshot(0xFADC0016U)[0] == 0U);
-  adc_capture::fault_trace::retainStoppedProgress();
+  adc_capture::fault_trace::retainStoppedProgress(0xC0C18283U);
   assert(adc_capture::fault_trace::snapshot()[0] == 0U);
+  assert(adc_capture::fault_trace::snapshot(0xFADC0001U)[1] == 0xC0C18283U);
   assert(adc_capture::fault_trace::snapshot(0xFADC0016U)[0] == 0x1680U);
   assert(adc_capture::fault_trace::snapshot(0xFADC0016U)[1] == 2048U);
   adc_capture::fault_trace::progress_history.fill(999U);

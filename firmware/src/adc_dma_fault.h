@@ -60,8 +60,11 @@ inline void retainProgress() {
   for (std::size_t i = 0; i < phase_history.size(); ++i)
     detail[48 + i] = phase_history[i];
 }
-inline void retainStoppedProgress() {
+inline void retainStoppedProgress(std::uint32_t priorities = 0U) {
   if (words[0] != 0U || stopped_progress) return;
+  // Healthy record word 0 is DCHPRI0..3 (low byte first). Fault records keep
+  // their existing DADDR interpretation; the summary reason distinguishes them.
+  detail[0] = priorities;
   retainProgress();
   stopped_progress = true;
 }
@@ -92,7 +95,7 @@ inline std::array<std::uint32_t, kWords> snapshot(std::uint32_t request_id = 0) 
 #else
 inline constexpr std::size_t kWords = 0;
 inline void reset() {}
-inline void retainStoppedProgress() {}
+inline void retainStoppedProgress(std::uint32_t = 0U) {}
 inline std::array<std::uint32_t, 0> snapshot(std::uint32_t = 0) { return {}; }
 #endif
 inline constexpr std::size_t kBytes = kWords * sizeof(std::uint32_t);
