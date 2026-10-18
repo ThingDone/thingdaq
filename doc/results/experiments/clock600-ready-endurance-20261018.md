@@ -45,6 +45,6 @@ The rig reflashes/resets between jobs. There is no intentional cooldown, but pro
 
 Ambient temperature and heatsink configuration are not independently measured. These captures do not grade externally stimulated analog accuracy or GPIO edge fidelity, establish a worst-case temperature, or resolve the historical parser rejection. Final and peak readings are distinct.
 
-Agreed order: establish reliability with this campaign; next evaluate and qualify larger ADC frames at 600 MHz; only then evaluate RLE with the successful larger-frame configuration. GPIO output is deferred. No frame-layout, compression, output, or SDK-default change is part of this campaign.
+Agreed order: establish reliability with this campaign; qualify STOP/restart timing on the same image; then evaluate larger ADC frames at 600 MHz; only then evaluate GPIO-only RLE with the successful larger-frame configuration. The subsequent [STOP/restart qualification](stop-recovery600-20261018.md) passed 42 capture cells and 6,132 checks. GPIO output is deferred. No frame-layout, compression, output, or SDK-default change is part of this campaign.
 
 Full graded metrics, temperatures, provenance, job IDs, and artifact hashes are in [the machine-readable report](clock600-ready-endurance-20261018.json). Raw jobs and the campaign script are retained under `doc/results/raw/clock600-ready-endurance-20261018/`.

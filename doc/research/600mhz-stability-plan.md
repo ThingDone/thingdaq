@@ -34,20 +34,28 @@ clock/compression/output integration proposal for current work.
 4. GPIO output is deferred and excluded from this work. No output pin driving
    or auxiliary-output integration is planned.
 
-Current status: the USB-fixed campaign passed eight ten-minute captures,
-then run nine aborted on five temperature NOT_READY responses within 86 ms.
-The parser reported zero errors or discarded bytes. The corrected host retry
-policy passed local regressions and a 131-check, 60-second hardware smoke;
-see [the investigation](../results/experiments/temperature-retry-20261018.md).
-A fresh eighteen-run campaign began 2026-10-18 08:05:46 UTC; see
-[the live report](../results/experiments/clock600-ready-endurance-20261018.md).
-The 80 °C campaign abort and firmware thermal protection remain in force.
+Current status: all eighteen ten-minute endurance captures passed, with
+2,358 checks, 66,143,843,828 received bytes, zero parser errors or discarded
+bytes, and a maximum sampled die temperature of 69.211 °C. The
+[final endurance report](../results/experiments/clock600-ready-endurance-20261018.md)
+includes all eighteen before/after/peak temperatures and earlier failure
+classifications; committed and pushed as `46fb05a`. Earlier failures remain
+preserved. The 80 °C campaign abort and firmware thermal protection remain
+in force.
+
+[STOP/restart qualification](../results/experiments/stop-recovery600-20261018.md)
+also passed: 42 capture cells, 6,132 checks, and forty cycles without reflash
+in the sustained restart job, committed and pushed as `d8162b3`. Maximum
+host-observed STOP response was 21.528 ms, drain completion 123.380 ms,
+and final-IDLE observation 247.440 ms. These include host/harness overhead;
+injected stalls, disconnects, and fault-state recovery remain ungraded.
 
 The larger-frame candidate `thingdaq-358337de6b642106` is built at 600 MHz;
 normal resource gates and 22 focused local tests pass. Its immutable image is
 archived under `doc/results/raw/large-adc600-20261018/image/`. Hardware
-qualification is queued behind the full baseline campaign. RLE work has not
-started.
+qualification can now proceed through a 60-second smoke, three 600-second
+captures, and four START/STOP cycles without reflash. Evidence is retained
+under the same raw directory; RLE remains gated on all these checks passing.
 
 Same-agent Maestro Cue continuation `teensy-600mhz-qualification` checks every
 11 minutes, diagnoses failures, and advances these gates. It is removed when
