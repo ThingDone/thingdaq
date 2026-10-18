@@ -1,0 +1,3732 @@
+{
+  "artifact_hashes": {
+    "doc/results/raw/usb600-investigation-20261018/build-450.log": "8933625e519d81db485c248501e7cc6e9023439a78eb3ac4ecb2ba1baedbd302",
+    "doc/results/raw/usb600-investigation-20261018/build-final-600.log": "0b3ad51651f313b3c61c6f967e02d6f682a974bf78fb13776b31856819e48f12",
+    "doc/results/raw/usb600-investigation-20261018/core-race-replay.json": "3abf234e9b4aa2216ae288d1bf0416b57a8b3523bbdf31de5a7988b4e6c249e0",
+    "doc/results/raw/usb600-investigation-20261018/firmware-tests.log": "ba1c04af68727fc2dd3f0330c7b0d334f55f272faefa107dabd1864d47bb6274",
+    "doc/results/raw/usb600-investigation-20261018/original-write-disassembly.txt": "1290e182832544f6cbc1f7cab4d3bf20698ffd6d3c79b119649ca251288728b1",
+    "firmware/tools/replay_usb_autoflush.py": "fa3823179f0f7f14ca86ddafee6138c937a06b5a7b5c93fe0254880a30e1aa9a"
+  },
+  "classification": "firmware USB transmit race; real stream corruption; host parser correctly rejects",
+  "date": "2026-10-18",
+  "fix_commit": "9e7fb90",
+  "fixed_elf_sha256": "2088c653e7c9dad38d6507d05dafd404c4df214548a8e5831cb47d374158038f",
+  "fixed_jobs": {
+    "final-smoke": {
+      "hashes": {
+        "build-manifest.json": "54253ed1dc2c8572d3d81d1e65180b37373809bad5db0a748b6ebfcc8d73f29d",
+        "firmware.ino.hex": "6f78064713994762d6cf1443f5f76d79273ea569fbbf98b386a1df9fbe9906d4",
+        "results.json": "6686b2cd4573e0e7b88aba3f12f7c06e8768443bf80389f8567481ff9096280f",
+        "rig-program.py": "4a7c75fa7f1ee640c67385361f938931865f4e01e7ebbb53569d02ea46e2e3e8",
+        "summary.json": "bda22de7b06091bfc5b3fbc3881e4a20673db74f1513a233dd4e490a91d54dd7"
+      },
+      "provenance": {
+        "build_id": "thingdaq-75ac69ba3e2bb588",
+        "case_sequence": [
+          "INPUT_COMBINED"
+        ],
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "6f78064713994762d6cf1443f5f76d79273ea569fbbf98b386a1df9fbe9906d4",
+        "input_experiment": {
+          "adc_clock_hz": 37500000,
+          "base_source_id": "968605b4779ec82fedc7ad0f2ecd4335f95e806c1e55c2fa34d481c297a73155",
+          "builder_sha256": "090d25b955c4b4322302610b3ffc2932a8311e7a92eb3ed19975f123ed038a34",
+          "cpu_mhz": 600,
+          "data_checksum": "standard-adler32",
+          "equal_rates": false,
+          "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag])",
+          "ipg_hz": 150000000,
+          "large_adc_frame": false,
+          "pit_hz": 24000000,
+          "public_protocol_compatible": false,
+          "release_fixed_1mhz": true
+        },
+        "manifest_sha256": "54253ed1dc2c8572d3d81d1e65180b37373809bad5db0a748b6ebfcc8d73f29d",
+        "planned_program_seconds": 95.0,
+        "profile_sequence": [
+          4
+        ],
+        "program_sha256": "4a7c75fa7f1ee640c67385361f938931865f4e01e7ebbb53569d02ea46e2e3e8",
+        "runner_sha256": "5c625f4b5f31772d215537c9bc3ac2ff089a1a9be1760f1bdba9a25aef49b259",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "60.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "600",
+          "AUX_INPUT_EQUAL_RATES": "0",
+          "AUX_INPUT_LARGE_ADC_FRAME": "0",
+          "AUX_INPUT_RATE_PROFILE": "4",
+          "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+          "AUX_INPUT_RUNTIME_HEALTH": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-75ac69ba3e2bb588",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-75ac69ba3e2bb588",
+          "firmware_input_changes": [
+            " M firmware/src/teensy_usb.cpp",
+            " M firmware/src/usb_transport.cpp",
+            " M firmware/src/usb_transport.h"
+          ],
+          "firmware_inputs_clean": false,
+          "git_commit": "bf85b86be12ad66822bc23cfe44d6296ed93557b",
+          "inputs": [
+            "firmware/firmware.ino",
+            "firmware/src/acquisition_controller.cpp",
+            "firmware/src/acquisition_controller.h",
+            "firmware/src/adc_dma_capture.cpp",
+            "firmware/src/adc_dma_capture.h",
+            "firmware/src/adc_dma_capture_teensy.cpp",
+            "firmware/src/adc_dma_capture_teensy.h",
+            "firmware/src/adc_frame_packer.cpp",
+            "firmware/src/adc_frame_packer.h",
+            "firmware/src/adc_initializer.cpp",
+            "firmware/src/adc_initializer.h",
+            "firmware/src/adc_initializer_teensy.cpp",
+            "firmware/src/adc_initializer_teensy.h",
+            "firmware/src/adc_trigger.cpp",
+            "firmware/src/adc_trigger.h",
+            "firmware/src/adc_trigger_teensy.cpp",
+            "firmware/src/adc_trigger_teensy.h",
+            "firmware/src/board_config.h",
+            "firmware/src/checksum.cpp",
+            "firmware/src/checksum.h",
+            "firmware/src/checksum_benchmark.cpp",
+            "firmware/src/checksum_benchmark.h",
+            "firmware/src/checksum_benchmark_teensy.cpp",
+            "firmware/src/checksum_benchmark_teensy.h",
+            "firmware/src/control_state.cpp",
+            "firmware/src/control_state.h",
+            "firmware/src/dma_buffer_ownership.h",
+            "firmware/src/edma_priority_teensy.h",
+            "firmware/src/firmware_capabilities.h",
+            "firmware/src/firmware_identity.h",
+            "firmware/src/firmware_runtime.cpp",
+            "firmware/src/firmware_runtime.h",
+            "firmware/src/generated/protocol_constants.h",
+            "firmware/src/generated/protocol_v2_constants.h",
+            "firmware/src/gpio_batch_packer.cpp",
+            "firmware/src/gpio_batch_packer.h",
+            "firmware/src/gpio_batch_packer_teensy.cpp",
+            "firmware/src/gpio_batch_packer_teensy.h",
+            "firmware/src/gpio_capture_diagnostic.cpp",
+            "firmware/src/gpio_capture_diagnostic.h",
+            "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+            "firmware/src/gpio_capture_diagnostic_teensy.h",
+            "firmware/src/gpio_clock_diagnostic.cpp",
+            "firmware/src/gpio_clock_diagnostic.h",
+            "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+            "firmware/src/gpio_clock_diagnostic_teensy.h",
+            "firmware/src/gpio_dma_route_teensy.h",
+            "firmware/src/gpio_dual_bank_capture.cpp",
+            "firmware/src/gpio_dual_bank_capture.h",
+            "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+            "firmware/src/gpio_dual_bank_capture_teensy.h",
+            "firmware/src/gpio_dual_bank_packer.cpp",
+            "firmware/src/gpio_dual_bank_packer.h",
+            "firmware/src/gpio_pack_c.c",
+            "firmware/src/gpio_pack_c.h",
+            "firmware/src/gpio_raw_capture.cpp",
+            "firmware/src/gpio_raw_capture.h",
+            "firmware/src/gpio_raw_capture_teensy.cpp",
+            "firmware/src/gpio_raw_capture_teensy.h",
+            "firmware/src/gpio_raw_storage_teensy.h",
+            "firmware/src/input_experiment_profile.h",
+            "firmware/src/interrupt_guard_teensy.h",
+            "firmware/src/interrupt_vectors_teensy.h",
+            "firmware/src/packet_buffer_pipeline.cpp",
+            "firmware/src/packet_buffer_pipeline.h",
+            "firmware/src/protocol.cpp",
+            "firmware/src/protocol.h",
+            "firmware/src/rate_profile_table.h",
+            "firmware/src/runtime_health.h",
+            "firmware/src/runtime_health_teensy.cpp",
+            "firmware/src/statistics.cpp",
+            "firmware/src/statistics.h",
+            "firmware/src/stream_layout.h",
+            "firmware/src/synthetic_source.cpp",
+            "firmware/src/synthetic_source.h",
+            "firmware/src/teensy_clock.cpp",
+            "firmware/src/teensy_clock.h",
+            "firmware/src/teensy_usb.cpp",
+            "firmware/src/teensy_usb.h",
+            "firmware/src/temperature.h",
+            "firmware/src/temperature_teensy.cpp",
+            "firmware/src/usb_transport.cpp",
+            "firmware/src/usb_transport.h",
+            "firmware/src/variable_rate_scheduler.cpp",
+            "firmware/src/variable_rate_scheduler.h",
+            "firmware/src/variable_rate_scheduler_teensy.cpp",
+            "firmware/src/variable_rate_scheduler_teensy.h",
+            "firmware/src/watchdog_teensy.cpp",
+            "firmware/src/watchdog_teensy.h",
+            "protocol/protocol-v1.json",
+            "protocol/protocol-v2.json"
+          ],
+          "source_id": "75ac69ba3e2bb588312481dece059b09532ab7123e7964129c8286fec25a5e9d",
+          "timestamp_epoch": 1792189498,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-10-16T22:24:58Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 131,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 60.0,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 119119,
+              "adc_rate_hz": 1000005.5320540224,
+              "aux_bank_samples_captured": 60272696,
+              "capture_seconds": 60.003678056411445,
+              "firmware_processing_cpu_basis_points": 1488,
+              "gpio_frames": 29779,
+              "gpio_rate_hz": 999997.0992376287,
+              "host_peak_rss_growth_bytes": 16384,
+              "maximum_frame_skew": 3.0,
+              "maximum_receive_gap_seconds": 0.03322169743478298,
+              "packet_ready_high_water": 3,
+              "packet_transmit_high_water": 56,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 60272696,
+              "paired_samples_transmitted": 60272696,
+              "parser": {
+                "bytes_discarded": 0,
+                "bytes_received": 368979716,
+                "checksum_errors": 0,
+                "frames_decoded": 149036,
+                "header_errors": 0,
+                "high_water_bytes": 69628,
+                "payload_errors": 0
+              },
+              "primary_bank_samples_captured": 60272696,
+              "rejected_frames": [],
+              "status_count": 121,
+              "status_p99_seconds": 0.011017455719411373,
+              "stop_tail_adc_items": 252,
+              "stop_tail_gpio_items": 1770,
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131347.687773651,
+                  "latency_seconds": 0.02070878352969885,
+                  "millidegrees_c": 38509,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131357.80655728,
+                  "latency_seconds": 0.010405676439404488,
+                  "millidegrees_c": 42193,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131367.827137026,
+                  "latency_seconds": 0.010291565209627151,
+                  "millidegrees_c": 44036,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131377.847758627,
+                  "latency_seconds": 0.010892164893448353,
+                  "millidegrees_c": 46492,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131387.868633658,
+                  "latency_seconds": 0.01135118305683136,
+                  "millidegrees_c": 47720,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131397.88876449,
+                  "latency_seconds": 0.011145134456455708,
+                  "millidegrees_c": 48948,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131407.908054128,
+                  "latency_seconds": 0.010993044823408127,
+                  "millidegrees_c": 50176,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131408.190513224,
+                  "latency_seconds": 0.020687023177742958,
+                  "millidegrees_c": 50176,
+                  "phase": "after",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 8b4240b2-6721-4b5f-87a5-de72e8b950ac",
+        "outcome": "PASS",
+        "test_id": "8b4240b2-6721-4b5f-87a5-de72e8b950ac"
+      }
+    },
+    "restart-2x10": {
+      "hashes": {
+        "build-manifest.json": "54253ed1dc2c8572d3d81d1e65180b37373809bad5db0a748b6ebfcc8d73f29d",
+        "firmware.ino.hex": "6f78064713994762d6cf1443f5f76d79273ea569fbbf98b386a1df9fbe9906d4",
+        "results.json": "be2d5235c3fd3ddcb7ab933efa0e0c68ed77c4b87311ac58f7ea9e27f8dcbe78",
+        "rig-program.py": "ff818196eb569340422328e9146264cad2ad0cfa39f70c225f77ca6b9288c03d",
+        "summary.json": "0af3ee5bdaf2adc049eac917fbe2a65879dfe0bc645dea0786b9e53f4dad00d1"
+      },
+      "provenance": {
+        "build_id": "thingdaq-75ac69ba3e2bb588",
+        "case_sequence": [
+          "INPUT_COMBINED",
+          "INPUT_COMBINED"
+        ],
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "6f78064713994762d6cf1443f5f76d79273ea569fbbf98b386a1df9fbe9906d4",
+        "input_experiment": {
+          "adc_clock_hz": 37500000,
+          "base_source_id": "968605b4779ec82fedc7ad0f2ecd4335f95e806c1e55c2fa34d481c297a73155",
+          "builder_sha256": "090d25b955c4b4322302610b3ffc2932a8311e7a92eb3ed19975f123ed038a34",
+          "cpu_mhz": 600,
+          "data_checksum": "standard-adler32",
+          "equal_rates": false,
+          "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag])",
+          "ipg_hz": 150000000,
+          "large_adc_frame": false,
+          "pit_hz": 24000000,
+          "public_protocol_compatible": false,
+          "release_fixed_1mhz": true
+        },
+        "manifest_sha256": "54253ed1dc2c8572d3d81d1e65180b37373809bad5db0a748b6ebfcc8d73f29d",
+        "planned_program_seconds": 60.0,
+        "profile_sequence": [
+          4,
+          4
+        ],
+        "program_sha256": "ff818196eb569340422328e9146264cad2ad0cfa39f70c225f77ca6b9288c03d",
+        "runner_sha256": "5c625f4b5f31772d215537c9bc3ac2ff089a1a9be1760f1bdba9a25aef49b259",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "10.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "600",
+          "AUX_INPUT_EQUAL_RATES": "0",
+          "AUX_INPUT_LARGE_ADC_FRAME": "0",
+          "AUX_INPUT_RATE_PROFILE": "4",
+          "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+          "AUX_INPUT_RUNTIME_HEALTH": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-75ac69ba3e2bb588",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-75ac69ba3e2bb588",
+          "firmware_input_changes": [
+            " M firmware/src/teensy_usb.cpp",
+            " M firmware/src/usb_transport.cpp",
+            " M firmware/src/usb_transport.h"
+          ],
+          "firmware_inputs_clean": false,
+          "git_commit": "bf85b86be12ad66822bc23cfe44d6296ed93557b",
+          "inputs": [
+            "firmware/firmware.ino",
+            "firmware/src/acquisition_controller.cpp",
+            "firmware/src/acquisition_controller.h",
+            "firmware/src/adc_dma_capture.cpp",
+            "firmware/src/adc_dma_capture.h",
+            "firmware/src/adc_dma_capture_teensy.cpp",
+            "firmware/src/adc_dma_capture_teensy.h",
+            "firmware/src/adc_frame_packer.cpp",
+            "firmware/src/adc_frame_packer.h",
+            "firmware/src/adc_initializer.cpp",
+            "firmware/src/adc_initializer.h",
+            "firmware/src/adc_initializer_teensy.cpp",
+            "firmware/src/adc_initializer_teensy.h",
+            "firmware/src/adc_trigger.cpp",
+            "firmware/src/adc_trigger.h",
+            "firmware/src/adc_trigger_teensy.cpp",
+            "firmware/src/adc_trigger_teensy.h",
+            "firmware/src/board_config.h",
+            "firmware/src/checksum.cpp",
+            "firmware/src/checksum.h",
+            "firmware/src/checksum_benchmark.cpp",
+            "firmware/src/checksum_benchmark.h",
+            "firmware/src/checksum_benchmark_teensy.cpp",
+            "firmware/src/checksum_benchmark_teensy.h",
+            "firmware/src/control_state.cpp",
+            "firmware/src/control_state.h",
+            "firmware/src/dma_buffer_ownership.h",
+            "firmware/src/edma_priority_teensy.h",
+            "firmware/src/firmware_capabilities.h",
+            "firmware/src/firmware_identity.h",
+            "firmware/src/firmware_runtime.cpp",
+            "firmware/src/firmware_runtime.h",
+            "firmware/src/generated/protocol_constants.h",
+            "firmware/src/generated/protocol_v2_constants.h",
+            "firmware/src/gpio_batch_packer.cpp",
+            "firmware/src/gpio_batch_packer.h",
+            "firmware/src/gpio_batch_packer_teensy.cpp",
+            "firmware/src/gpio_batch_packer_teensy.h",
+            "firmware/src/gpio_capture_diagnostic.cpp",
+            "firmware/src/gpio_capture_diagnostic.h",
+            "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+            "firmware/src/gpio_capture_diagnostic_teensy.h",
+            "firmware/src/gpio_clock_diagnostic.cpp",
+            "firmware/src/gpio_clock_diagnostic.h",
+            "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+            "firmware/src/gpio_clock_diagnostic_teensy.h",
+            "firmware/src/gpio_dma_route_teensy.h",
+            "firmware/src/gpio_dual_bank_capture.cpp",
+            "firmware/src/gpio_dual_bank_capture.h",
+            "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+            "firmware/src/gpio_dual_bank_capture_teensy.h",
+            "firmware/src/gpio_dual_bank_packer.cpp",
+            "firmware/src/gpio_dual_bank_packer.h",
+            "firmware/src/gpio_pack_c.c",
+            "firmware/src/gpio_pack_c.h",
+            "firmware/src/gpio_raw_capture.cpp",
+            "firmware/src/gpio_raw_capture.h",
+            "firmware/src/gpio_raw_capture_teensy.cpp",
+            "firmware/src/gpio_raw_capture_teensy.h",
+            "firmware/src/gpio_raw_storage_teensy.h",
+            "firmware/src/input_experiment_profile.h",
+            "firmware/src/interrupt_guard_teensy.h",
+            "firmware/src/interrupt_vectors_teensy.h",
+            "firmware/src/packet_buffer_pipeline.cpp",
+            "firmware/src/packet_buffer_pipeline.h",
+            "firmware/src/protocol.cpp",
+            "firmware/src/protocol.h",
+            "firmware/src/rate_profile_table.h",
+            "firmware/src/runtime_health.h",
+            "firmware/src/runtime_health_teensy.cpp",
+            "firmware/src/statistics.cpp",
+            "firmware/src/statistics.h",
+            "firmware/src/stream_layout.h",
+            "firmware/src/synthetic_source.cpp",
+            "firmware/src/synthetic_source.h",
+            "firmware/src/teensy_clock.cpp",
+            "firmware/src/teensy_clock.h",
+            "firmware/src/teensy_usb.cpp",
+            "firmware/src/teensy_usb.h",
+            "firmware/src/temperature.h",
+            "firmware/src/temperature_teensy.cpp",
+            "firmware/src/usb_transport.cpp",
+            "firmware/src/usb_transport.h",
+            "firmware/src/variable_rate_scheduler.cpp",
+            "firmware/src/variable_rate_scheduler.h",
+            "firmware/src/variable_rate_scheduler_teensy.cpp",
+            "firmware/src/variable_rate_scheduler_teensy.h",
+            "firmware/src/watchdog_teensy.cpp",
+            "firmware/src/watchdog_teensy.h",
+            "protocol/protocol-v1.json",
+            "protocol/protocol-v2.json"
+          ],
+          "source_id": "75ac69ba3e2bb588312481dece059b09532ab7123e7964129c8286fec25a5e9d",
+          "timestamp_epoch": 1792189498,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-10-16T22:24:58Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 131,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 10.0,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 20316,
+              "adc_rate_hz": 999951.9672634762,
+              "aux_bank_samples_captured": 10279896,
+              "capture_seconds": 10.010172815993428,
+              "firmware_processing_cpu_basis_points": 1488,
+              "gpio_frames": 5079,
+              "gpio_rate_hz": 999850.8701077525,
+              "host_peak_rss_growth_bytes": 12288,
+              "maximum_frame_skew": 3.0,
+              "maximum_receive_gap_seconds": 0.02088912855833769,
+              "packet_ready_high_water": 3,
+              "packet_transmit_high_water": 7,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 10279896,
+              "paired_samples_transmitted": 10279896,
+              "parser": {
+                "bytes_discarded": 0,
+                "bytes_received": 62936060,
+                "checksum_errors": 0,
+                "frames_decoded": 25429,
+                "header_errors": 0,
+                "high_water_bytes": 69624,
+                "payload_errors": 0
+              },
+              "primary_bank_samples_captured": 10279896,
+              "rejected_frames": [],
+              "status_count": 21,
+              "status_p99_seconds": 0.010959780775010586,
+              "stop_tail_adc_items": 441,
+              "stop_tail_gpio_items": 441,
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132073.484477553,
+                  "latency_seconds": 0.02058825083076954,
+                  "millidegrees_c": null,
+                  "phase": "before",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5132073.525954867,
+                  "latency_seconds": 0.020816197618842125,
+                  "millidegrees_c": 60000,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132083.644429253,
+                  "latency_seconds": 0.010729478672146797,
+                  "millidegrees_c": 61229,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132084.035477551,
+                  "latency_seconds": 0.02067603822797537,
+                  "millidegrees_c": 61229,
+                  "phase": "after",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          },
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 131,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 10.0,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 20316,
+              "adc_rate_hz": 999967.4104455415,
+              "aux_bank_samples_captured": 10279896,
+              "capture_seconds": 10.010018222033978,
+              "firmware_processing_cpu_basis_points": 1488,
+              "gpio_frames": 5079,
+              "gpio_rate_hz": 999866.311728481,
+              "host_peak_rss_growth_bytes": 0,
+              "maximum_frame_skew": 3.0,
+              "maximum_receive_gap_seconds": 0.02092406339943409,
+              "packet_ready_high_water": 3,
+              "packet_transmit_high_water": 11,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 10279896,
+              "paired_samples_transmitted": 10279896,
+              "parser": {
+                "bytes_discarded": 0,
+                "bytes_received": 62936060,
+                "checksum_errors": 0,
+                "frames_decoded": 25429,
+                "header_errors": 0,
+                "high_water_bytes": 69624,
+                "payload_errors": 0
+              },
+              "primary_bank_samples_captured": 10279896,
+              "rejected_frames": [],
+              "status_count": 21,
+              "status_p99_seconds": 0.01088045910000801,
+              "stop_tail_adc_items": 483,
+              "stop_tail_gpio_items": 483,
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132084.388228802,
+                  "latency_seconds": 0.020861820317804813,
+                  "millidegrees_c": 61229,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132094.507456995,
+                  "latency_seconds": 0.010755258612334728,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5132094.529170152,
+                  "latency_seconds": 0.010704844258725643,
+                  "millidegrees_c": 61843,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132094.897667194,
+                  "latency_seconds": 0.020739443600177765,
+                  "millidegrees_c": 61843,
+                  "phase": "after",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 42e5f92d-1d1a-4802-bf56-03eca2be3ba5",
+        "outcome": "PASS",
+        "test_id": "42e5f92d-1d1a-4802-bf56-03eca2be3ba5"
+      }
+    },
+    "smoke": {
+      "hashes": {
+        "build-manifest.json": "91fb11118cc8ee2573e58c798a0e72f07eeb654548f3bbc1547d5b9b792287fb",
+        "firmware.ino.hex": "b63b945bb663392fc0fbbb896182965a73845cc6bbd49f2c2530b70f91b2b73c",
+        "results.json": "ebe2185a6c96c58450f17e28c93c780653d2c90f15dd580bf2d8040449549acd",
+        "rig-program.py": "66d40210071e527392bd86ac0fcf35b6c911795d6fb7c21b811059cff1ab0aa8",
+        "summary.json": "705de9ba7dc789933dfab439758b4f16e913f138f07da29dd2773c527358690e"
+      },
+      "provenance": {
+        "build_id": "thingdaq-dfef9705a9148552",
+        "case_sequence": [
+          "INPUT_COMBINED"
+        ],
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "b63b945bb663392fc0fbbb896182965a73845cc6bbd49f2c2530b70f91b2b73c",
+        "input_experiment": {
+          "adc_clock_hz": 37500000,
+          "base_source_id": "c2fd386cb818d661f4a6aebc70f1bec073e37e44eda831708fe099d209ce64e5",
+          "builder_sha256": "090d25b955c4b4322302610b3ffc2932a8311e7a92eb3ed19975f123ed038a34",
+          "cpu_mhz": 600,
+          "data_checksum": "standard-adler32",
+          "equal_rates": false,
+          "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag])",
+          "ipg_hz": 150000000,
+          "large_adc_frame": false,
+          "pit_hz": 24000000,
+          "public_protocol_compatible": false,
+          "release_fixed_1mhz": true
+        },
+        "manifest_sha256": "91fb11118cc8ee2573e58c798a0e72f07eeb654548f3bbc1547d5b9b792287fb",
+        "planned_program_seconds": 95.0,
+        "profile_sequence": [
+          4
+        ],
+        "program_sha256": "66d40210071e527392bd86ac0fcf35b6c911795d6fb7c21b811059cff1ab0aa8",
+        "runner_sha256": "5c625f4b5f31772d215537c9bc3ac2ff089a1a9be1760f1bdba9a25aef49b259",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "60.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "600",
+          "AUX_INPUT_EQUAL_RATES": "0",
+          "AUX_INPUT_LARGE_ADC_FRAME": "0",
+          "AUX_INPUT_RATE_PROFILE": "4",
+          "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+          "AUX_INPUT_RUNTIME_HEALTH": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-dfef9705a9148552",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-dfef9705a9148552",
+          "firmware_input_changes": [
+            " M firmware/src/teensy_usb.cpp"
+          ],
+          "firmware_inputs_clean": false,
+          "git_commit": "bf85b86be12ad66822bc23cfe44d6296ed93557b",
+          "inputs": [
+            "firmware/firmware.ino",
+            "firmware/src/acquisition_controller.cpp",
+            "firmware/src/acquisition_controller.h",
+            "firmware/src/adc_dma_capture.cpp",
+            "firmware/src/adc_dma_capture.h",
+            "firmware/src/adc_dma_capture_teensy.cpp",
+            "firmware/src/adc_dma_capture_teensy.h",
+            "firmware/src/adc_frame_packer.cpp",
+            "firmware/src/adc_frame_packer.h",
+            "firmware/src/adc_initializer.cpp",
+            "firmware/src/adc_initializer.h",
+            "firmware/src/adc_initializer_teensy.cpp",
+            "firmware/src/adc_initializer_teensy.h",
+            "firmware/src/adc_trigger.cpp",
+            "firmware/src/adc_trigger.h",
+            "firmware/src/adc_trigger_teensy.cpp",
+            "firmware/src/adc_trigger_teensy.h",
+            "firmware/src/board_config.h",
+            "firmware/src/checksum.cpp",
+            "firmware/src/checksum.h",
+            "firmware/src/checksum_benchmark.cpp",
+            "firmware/src/checksum_benchmark.h",
+            "firmware/src/checksum_benchmark_teensy.cpp",
+            "firmware/src/checksum_benchmark_teensy.h",
+            "firmware/src/control_state.cpp",
+            "firmware/src/control_state.h",
+            "firmware/src/dma_buffer_ownership.h",
+            "firmware/src/edma_priority_teensy.h",
+            "firmware/src/firmware_capabilities.h",
+            "firmware/src/firmware_identity.h",
+            "firmware/src/firmware_runtime.cpp",
+            "firmware/src/firmware_runtime.h",
+            "firmware/src/generated/protocol_constants.h",
+            "firmware/src/generated/protocol_v2_constants.h",
+            "firmware/src/gpio_batch_packer.cpp",
+            "firmware/src/gpio_batch_packer.h",
+            "firmware/src/gpio_batch_packer_teensy.cpp",
+            "firmware/src/gpio_batch_packer_teensy.h",
+            "firmware/src/gpio_capture_diagnostic.cpp",
+            "firmware/src/gpio_capture_diagnostic.h",
+            "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+            "firmware/src/gpio_capture_diagnostic_teensy.h",
+            "firmware/src/gpio_clock_diagnostic.cpp",
+            "firmware/src/gpio_clock_diagnostic.h",
+            "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+            "firmware/src/gpio_clock_diagnostic_teensy.h",
+            "firmware/src/gpio_dma_route_teensy.h",
+            "firmware/src/gpio_dual_bank_capture.cpp",
+            "firmware/src/gpio_dual_bank_capture.h",
+            "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+            "firmware/src/gpio_dual_bank_capture_teensy.h",
+            "firmware/src/gpio_dual_bank_packer.cpp",
+            "firmware/src/gpio_dual_bank_packer.h",
+            "firmware/src/gpio_pack_c.c",
+            "firmware/src/gpio_pack_c.h",
+            "firmware/src/gpio_raw_capture.cpp",
+            "firmware/src/gpio_raw_capture.h",
+            "firmware/src/gpio_raw_capture_teensy.cpp",
+            "firmware/src/gpio_raw_capture_teensy.h",
+            "firmware/src/gpio_raw_storage_teensy.h",
+            "firmware/src/input_experiment_profile.h",
+            "firmware/src/interrupt_guard_teensy.h",
+            "firmware/src/interrupt_vectors_teensy.h",
+            "firmware/src/packet_buffer_pipeline.cpp",
+            "firmware/src/packet_buffer_pipeline.h",
+            "firmware/src/protocol.cpp",
+            "firmware/src/protocol.h",
+            "firmware/src/rate_profile_table.h",
+            "firmware/src/runtime_health.h",
+            "firmware/src/runtime_health_teensy.cpp",
+            "firmware/src/statistics.cpp",
+            "firmware/src/statistics.h",
+            "firmware/src/stream_layout.h",
+            "firmware/src/synthetic_source.cpp",
+            "firmware/src/synthetic_source.h",
+            "firmware/src/teensy_clock.cpp",
+            "firmware/src/teensy_clock.h",
+            "firmware/src/teensy_usb.cpp",
+            "firmware/src/teensy_usb.h",
+            "firmware/src/temperature.h",
+            "firmware/src/temperature_teensy.cpp",
+            "firmware/src/usb_transport.cpp",
+            "firmware/src/usb_transport.h",
+            "firmware/src/variable_rate_scheduler.cpp",
+            "firmware/src/variable_rate_scheduler.h",
+            "firmware/src/variable_rate_scheduler_teensy.cpp",
+            "firmware/src/variable_rate_scheduler_teensy.h",
+            "firmware/src/watchdog_teensy.cpp",
+            "firmware/src/watchdog_teensy.h",
+            "protocol/protocol-v1.json",
+            "protocol/protocol-v2.json"
+          ],
+          "source_id": "dfef9705a9148552d120372eb715b8ec6f3877fa286870099b98cbd651465aa5",
+          "timestamp_epoch": 1792189498,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-10-16T22:24:58Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 106,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 60.0,
+            "failed_checks": [],
+            "failures": [
+              "ProtocolFailure: STATUS reports loss/error counters: {\"timeouts\": 2, \"transport_errors\": 2}"
+            ],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "failure_adc": {
+                "expected_sequence": 19849,
+                "expected_ticks": 80348752,
+                "framed_bytes": 41127128,
+                "frames": 19849,
+                "items": 10043594,
+                "payload_bytes": 40174376
+              },
+              "failure_gpio": {
+                "expected_sequence": 4962,
+                "expected_ticks": 80344704,
+                "framed_bytes": 20324352,
+                "frames": 4962,
+                "items": 10043088,
+                "payload_bytes": 20086176
+              },
+              "failure_parser": {
+                "bytes_discarded": 0,
+                "bytes_received": 61487591,
+                "checksum_errors": 0,
+                "frames_decoded": 24841,
+                "header_errors": 0,
+                "high_water_bytes": 69624,
+                "payload_errors": 0
+              },
+              "failure_status": {
+                "adc0_calibration_cycles": 4710,
+                "adc0_calibration_state": 1,
+                "adc0_channel": 7,
+                "adc0_completion_count": 1,
+                "adc0_dma_major_loops": 19852,
+                "adc0_dma_results": 10045112,
+                "adc0_etc_chain_configured": 8215,
+                "adc0_etc_trigger_counter_configured": 0,
+                "adc0_etc_trigger_ctrl_configured": 0,
+                "adc0_etc_trigger_queue": 0,
+                "adc0_peripheral": 1,
+                "adc0_pin": 14,
+                "adc0_trigger_effective_delay": 1,
+                "adc0_trigger_initial_delay": 0,
+                "adc0_trigger_xbar_input": 57,
+                "adc0_trigger_xbar_output": 103,
+                "adc0_trigger_xbar_sel_configured": 14592,
+                "adc1_calibration_cycles": 22140,
+                "adc1_calibration_state": 1,
+                "adc1_channel": 8,
+                "adc1_completion_count": 1,
+                "adc1_dma_major_loops": 19852,
+                "adc1_dma_results": 10045112,
+                "adc1_etc_chain_configured": 16408,
+                "adc1_etc_trigger_counter_configured": 75,
+                "adc1_etc_trigger_ctrl_configured": 0,
+                "adc1_etc_trigger_queue": 4,
+                "adc1_peripheral": 2,
+                "adc1_pin": 15,
+                "adc1_trigger_effective_delay": 76,
+                "adc1_trigger_initial_delay": 75,
+                "adc1_trigger_xbar_input": 57,
+                "adc1_trigger_xbar_output": 107,
+                "adc1_trigger_xbar_sel_configured": 14592,
+                "adc_buffers_acquired": 19852,
+                "adc_buffers_completed": 19852,
+                "adc_buffers_released": 19852,
+                "adc_cache_cpu_invalidations": 19852,
+                "adc_cache_dma_discards": 19861,
+                "adc_calibration_deadline_us": 10000,
+                "adc_clock_divider": 4,
+                "adc_clock_hz": 37500000,
+                "adc_clock_source": 1,
+                "adc_code_max": 4095,
+                "adc_code_min": 0,
+                "adc_completion_delta_cycles": 296,
+                "adc_completion_diagnostic_elapsed_cycles": 16373,
+                "adc_completion_expected_delta_cycles": 300,
+                "adc_completion_mismatches": 0,
+                "adc_completion_tolerance_cycles": 120,
+                "adc_configuration_flags": 255,
+                "adc_container_bytes": 2,
+                "adc_conversion_mode": 2,
+                "adc_destination_mismatches": 0,
+                "adc_dma_error_events": 0,
+                "adc_etc_ctrl_configured": 0,
+                "adc_etc_done0_1_irq_final": 1048577,
+                "adc_etc_done2_err_irq_final": 0,
+                "adc_etc_error_events": 0,
+                "adc_etc_error_flags": 0,
+                "adc_framed_bytes_emitted": 41133344,
+                "adc_framed_bytes_framed": 41133344,
+                "adc_framed_bytes_transmitted": 41131272,
+                "adc_frames_consumed": 19852,
+                "adc_frames_dropped": 0,
+                "adc_frames_dropped_after_framing": 0,
+                "adc_frames_dropped_after_promotion": 0,
+                "adc_frames_emitted": 19852,
+                "adc_frames_evicted": 0,
+                "adc_frames_evicted_after_promotion": 0,
+                "adc_frames_framed_pipeline": 19852,
+                "adc_frames_generated": 19852,
+                "adc_frames_transmitted": 19851,
+                "adc_hardware_average_count": 0,
+                "adc_incomplete_buffers": 0,
+                "adc_incomplete_conversions": 0,
+                "adc_initialization_error_flags": 0,
+                "adc_input_max_mv_nominal": 3300,
+                "adc_input_min_mv_nominal": 0,
+                "adc_ipg_clock_hz": 150000000,
+                "adc_items_dropped": 0,
+                "adc_items_emitted": 10045112,
+                "adc_items_framed_pipeline": 10045112,
+                "adc_items_generated": 10045112,
+                "adc_items_transmitted_pipeline": 10044606,
+                "adc_overwritten_conversions": 0,
+                "adc_packer_chronology_errors": 0,
+                "adc_packer_pipeline_errors": 0,
+                "adc_packer_source_errors": 0,
+                "adc_packet_filling_depth": 0,
+                "adc_packet_ready_depth": 0,
+                "adc_packet_ready_high_water": 2,
+                "adc_packet_transmit_depth": 1,
+                "adc_packet_transmit_high_water": 103,
+                "adc_pair_rate_hz": 1000000,
+                "adc_paired_major_loops": 19852,
+                "adc_pairs_captured": 10045112,
+                "adc_pairs_consumed": 10045112,
+                "adc_pairs_delivered": 10045112,
+                "adc_pairs_framed": 10045112,
+                "adc_pairs_transmitted": 10044606,
+                "adc_payload_bytes_dropped": 0,
+                "adc_payload_bytes_emitted": 40180448,
+                "adc_payload_bytes_framed": 40180448,
+                "adc_payload_bytes_produced": 40180448,
+                "adc_payload_bytes_transmitted": 40178424,
+                "adc_raw_drop_pairs_projected": 0,
+                "adc_raw_gap_pairs": 0,
+                "adc_raw_invariant_errors": 0,
+                "adc_raw_pairs_lost": 0,
+                "adc_raw_ready_depth": 0,
+                "adc_raw_ready_high_water": 2,
+                "adc_raw_ring_overruns": 0,
+                "adc_reference": 1,
+                "adc_reference_mv_nominal": 3300,
+                "adc_resolution_bits": 12,
+                "adc_resource_conflicts": 0,
+                "adc_sample_time_adck": 3,
+                "adc_schedule_exhaustions": 0,
+                "adc_stale_completions": 0,
+                "adc_stale_interrupts": 0,
+                "adc_start_errors": 0,
+                "adc_stop_errors": 0,
+                "adc_stop_pairs_discarded": 0,
+                "adc_trigger_ccm_ccgr1_configured": 4244632320,
+                "adc_trigger_ccm_ccgr2_configured": 218099763,
+                "adc_trigger_ccm_cscmr1_configured": 1729298496,
+                "adc_trigger_chain_length": 1,
+                "adc_trigger_configuration_flags": 255,
+                "adc_trigger_dwt_clock_hz": 600000000,
+                "adc_trigger_error_count": 0,
+                "adc_trigger_error_flags": 0,
+                "adc_trigger_gpio_master_pit_channel": 0,
+                "adc_trigger_gpio_master_pit_load": 5,
+                "adc_trigger_gpio_master_rate_hz": 4000000,
+                "adc_trigger_gpio_master_tctrl_configured": 0,
+                "adc_trigger_ipg_clock_hz": 150000000,
+                "adc_trigger_pair_pit_channel": 1,
+                "adc_trigger_pair_pit_load": 3,
+                "adc_trigger_pair_rate_hz": 1000000,
+                "adc_trigger_pair_tctrl_configured": 4,
+                "adc_trigger_phase_ipg_cycles": 75,
+                "adc_trigger_pit_clock_hz": 24000000,
+                "adc_trigger_pit_mcr_configured": 0,
+                "adc_trigger_predivider": 0,
+                "aux_bank_mode": 1,
+                "aux_gpio_dma_major_loops": 4963,
+                "aux_gpio_raw_ready_depth": 0,
+                "aux_gpio_raw_ready_high_water": 1,
+                "aux_gpio_raw_ring_overruns": 0,
+                "aux_gpio_samples_captured": 10045112,
+                "aux_gpio_stale_completions": 0,
+                "bad_checksums": 0,
+                "bad_flags": 0,
+                "bad_lengths": 0,
+                "bad_payloads": 0,
+                "bad_request_ids": 0,
+                "bad_types": 0,
+                "bad_versions": 0,
+                "commands_accepted": 23,
+                "commands_rejected": 0,
+                "data_checksum_algorithm": 1,
+                "data_frame_bytes": 4096,
+                "data_framed_bytes_transmitted": 61459720,
+                "data_payload_bytes_transmitted": 60268648,
+                "device_state": 3,
+                "frame_coverage_ticks": 4048,
+                "gpio_buffers_acquired": 4963,
+                "gpio_buffers_completed": 4963,
+                "gpio_buffers_released": 4963,
+                "gpio_cache_cpu_invalidations": 9926,
+                "gpio_cache_dma_discards": 9936,
+                "gpio_dma_major_loops": 4963,
+                "gpio_duplicate_samples_ignored": 0,
+                "gpio_framed_bytes_emitted": 20328448,
+                "gpio_framed_bytes_framed": 20328448,
+                "gpio_framed_bytes_transmitted": 20328448,
+                "gpio_frames_dropped": 0,
+                "gpio_frames_dropped_after_framing": 0,
+                "gpio_frames_dropped_after_promotion": 0,
+                "gpio_frames_emitted": 4963,
+                "gpio_frames_evicted": 0,
+                "gpio_frames_evicted_after_promotion": 0,
+                "gpio_frames_framed_pipeline": 4963,
+                "gpio_frames_generated": 4963,
+                "gpio_frames_packed": 4963,
+                "gpio_frames_produced": 4963,
+                "gpio_frames_transmitted": 4963,
+                "gpio_hardware_errors": 0,
+                "gpio_item_bytes": 2,
+                "gpio_items_dropped": 0,
+                "gpio_items_emitted": 10045112,
+                "gpio_items_framed_pipeline": 10045112,
+                "gpio_items_generated": 10045112,
+                "gpio_items_transmitted_pipeline": 10045112,
+                "gpio_packed_ready_depth": 0,
+                "gpio_packed_ready_high_water": 0,
+                "gpio_packer_chronology_errors": 0,
+                "gpio_packer_drop_samples_projected": 0,
+                "gpio_packer_pipeline_errors": 0,
+                "gpio_packer_samples_dropped": 0,
+                "gpio_packer_source_errors": 0,
+                "gpio_packet_filling_depth": 0,
+                "gpio_packet_ready_depth": 0,
+                "gpio_packet_ready_high_water": 1,
+                "gpio_packet_transmit_depth": 0,
+                "gpio_packet_transmit_high_water": 26,
+                "gpio_payload_bytes_dropped": 0,
+                "gpio_payload_bytes_emitted": 20090224,
+                "gpio_payload_bytes_framed": 20090224,
+                "gpio_payload_bytes_produced": 20090224,
+                "gpio_payload_bytes_transmitted": 20090224,
+                "gpio_processing_cpu_basis_points": 1466,
+                "gpio_raw_drop_samples_projected": 0,
+                "gpio_raw_invariant_errors": 0,
+                "gpio_raw_ready_depth": 0,
+                "gpio_raw_ready_high_water": 1,
+                "gpio_raw_ring_overruns": 0,
+                "gpio_raw_samples_lost": 0,
+                "gpio_resource_conflicts": 0,
+                "gpio_sample_rate_hz": 1000000,
+                "gpio_samples_captured": 10045112,
+                "gpio_samples_delivered": 10045112,
+                "gpio_samples_framed": 10045112,
+                "gpio_samples_packed": 10045112,
+                "gpio_samples_produced": 10045112,
+                "gpio_samples_transmitted": 10045112,
+                "gpio_stale_dma_completions": 0,
+                "gpio_start_errors": 0,
+                "gpio_stop_errors": 0,
+                "gpio_stop_samples_discarded": 0,
+                "packet_accounted_frame_skew": 0,
+                "packet_capacity_drops_without_evictable_frame": 0,
+                "packet_encoding_rejections": 0,
+                "packet_fairness_deferrals": 0,
+                "packet_frames_promoted": 24815,
+                "packet_invalid_operations": 0,
+                "packet_owned_depth": 1,
+                "packet_owned_high_water": 129,
+                "packet_pool_exhaustions": 0,
+                "packet_pressure_evictions": 0,
+                "packet_ready_depth": 0,
+                "packet_ready_high_water": 3,
+                "packet_ready_queue_rejections": 0,
+                "packet_retention_us_combined": 50600,
+                "packet_retention_us_single_stream": 101200,
+                "packet_transmit_depth": 1,
+                "packet_transmit_high_water": 129,
+                "packet_transmit_queue_rejections": 0,
+                "paired_gpio_buffers_acquired": 4963,
+                "paired_gpio_buffers_completed": 4963,
+                "paired_gpio_buffers_released": 4963,
+                "paired_gpio_cache_cpu_invalidations": 9926,
+                "paired_gpio_cache_dma_discards": 9936,
+                "paired_gpio_canceled_generations": 0,
+                "paired_gpio_cancellation_samples": 0,
+                "paired_gpio_count_mismatches": 0,
+                "paired_gpio_destination_mismatches": 0,
+                "paired_gpio_dma_major_loops": 4963,
+                "paired_gpio_generation_skew_events": 0,
+                "paired_gpio_generation_skew_samples": 0,
+                "paired_gpio_hardware_errors": 0,
+                "paired_gpio_invariant_errors": 0,
+                "paired_gpio_raw_ring_overruns": 0,
+                "paired_gpio_resource_conflicts": 0,
+                "paired_gpio_samples_captured": 10045112,
+                "paired_gpio_samples_delivered": 10045112,
+                "paired_gpio_samples_joined": 10045112,
+                "paired_gpio_samples_lost": 0,
+                "paired_gpio_schedule_exhaustions": 0,
+                "paired_gpio_stale_completions": 0,
+                "paired_gpio_stale_dma_completions": 0,
+                "paired_gpio_start_errors": 0,
+                "paired_gpio_stop_errors": 0,
+                "paired_gpio_stop_tail_samples": 0,
+                "paired_gpio_timestamp_mismatches": 0,
+                "parser_errors": 0,
+                "partial_usb_writes": 0,
+                "primary_gpio_dma_major_loops": 4963,
+                "primary_gpio_raw_ready_depth": 0,
+                "primary_gpio_raw_ready_high_water": 1,
+                "primary_gpio_raw_ring_overruns": 0,
+                "primary_gpio_samples_captured": 10045112,
+                "primary_gpio_stale_completions": 0,
+                "protocol_version": 2,
+                "rate_profile": 4,
+                "response_queue_rejections": 0,
+                "response_reservations_abandoned": 0,
+                "responses_completed": 23,
+                "responses_queued": 23,
+                "source": 0,
+                "state_errors": 0,
+                "stats_generation": 3,
+                "stream_mask": 3,
+                "timeouts": 2,
+                "transport_errors": 2,
+                "usb_active_frame_bytes_sent": 2048,
+                "usb_active_frame_size": 2072,
+                "usb_command_queue_depth": 0,
+                "usb_command_queue_high_water": 1,
+                "usb_io_errors": 0,
+                "usb_lower_priority_queue_depth": 1,
+                "usb_response_queue_depth": 0,
+                "usb_response_queue_high_water": 1,
+                "usb_rx_stall_events": 0,
+                "usb_short_capacity_deferrals": 0,
+                "usb_tx_stall_events": 31868
+              },
+              "parser": {
+                "bytes_discarded": 0,
+                "bytes_received": 61553127,
+                "checksum_errors": 0,
+                "frames_decoded": 24868,
+                "header_errors": 0,
+                "high_water_bytes": 69624,
+                "payload_errors": 0
+              },
+              "rejected_frames": [],
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131211.972945548,
+                  "latency_seconds": 0.02063914481550455,
+                  "millidegrees_c": 36667,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131222.09279206,
+                  "latency_seconds": 0.010449792258441448,
+                  "millidegrees_c": 40351,
+                  "phase": "running",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+            "result": "FAIL",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 1,
+        "message": "Container ran successfully for test_id cc6d6423-c123-4296-a0ad-0e44d9dce8ba",
+        "outcome": "TEST_FAIL",
+        "test_id": "cc6d6423-c123-4296-a0ad-0e44d9dce8ba"
+      }
+    },
+    "soak": {
+      "hashes": {
+        "build-manifest.json": "54253ed1dc2c8572d3d81d1e65180b37373809bad5db0a748b6ebfcc8d73f29d",
+        "firmware.ino.hex": "6f78064713994762d6cf1443f5f76d79273ea569fbbf98b386a1df9fbe9906d4",
+        "results.json": "17f0770e1bb35dd8b2c4f888e08b92f7c28e557b88e2ec085ed5e9f41eb39262",
+        "rig-program.py": "20e625ee64e4078832a2215728e39aa9341dd2da2d469bb84b5efcd4f3d66aeb",
+        "summary.json": "746f277aca8a2b102e4cf23a7b61bc33e0594c728d2e7dc6a266472882f0d086"
+      },
+      "provenance": {
+        "build_id": "thingdaq-75ac69ba3e2bb588",
+        "case_sequence": [
+          "INPUT_COMBINED"
+        ],
+        "health": {
+          "checks": {
+            "coordinator_mode": "normal",
+            "docker_reachable": true,
+            "hub_reachable": true,
+            "hubs": {
+              "0x00000000": true
+            },
+            "queue_depth": 0,
+            "worker_thread_alive": true
+          },
+          "status": "healthy"
+        },
+        "hex_sha256": "6f78064713994762d6cf1443f5f76d79273ea569fbbf98b386a1df9fbe9906d4",
+        "input_experiment": {
+          "adc_clock_hz": 37500000,
+          "base_source_id": "968605b4779ec82fedc7ad0f2ecd4335f95e806c1e55c2fa34d481c297a73155",
+          "builder_sha256": "090d25b955c4b4322302610b3ffc2932a8311e7a92eb3ed19975f123ed038a34",
+          "cpu_mhz": 600,
+          "data_checksum": "standard-adler32",
+          "equal_rates": false,
+          "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag])",
+          "ipg_hz": 150000000,
+          "large_adc_frame": false,
+          "pit_hz": 24000000,
+          "public_protocol_compatible": false,
+          "release_fixed_1mhz": true
+        },
+        "manifest_sha256": "54253ed1dc2c8572d3d81d1e65180b37373809bad5db0a748b6ebfcc8d73f29d",
+        "planned_program_seconds": 635.0,
+        "profile_sequence": [
+          4
+        ],
+        "program_sha256": "20e625ee64e4078832a2215728e39aa9341dd2da2d469bb84b5efcd4f3d66aeb",
+        "runner_sha256": "5c625f4b5f31772d215537c9bc3ac2ff089a1a9be1760f1bdba9a25aef49b259",
+        "service": "http://192.168.150.14:5000",
+        "settings": {
+          "AUX_INPUT_CAPTURE_SECONDS": "600.0",
+          "AUX_INPUT_CASE": "INPUT_COMBINED",
+          "AUX_INPUT_CPU_MHZ": "600",
+          "AUX_INPUT_EQUAL_RATES": "0",
+          "AUX_INPUT_LARGE_ADC_FRAME": "0",
+          "AUX_INPUT_RATE_PROFILE": "4",
+          "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+          "AUX_INPUT_RUNTIME_HEALTH": "0",
+          "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+          "AUX_INPUT_TEMPERATURE": "1",
+          "EXPECTED_BUILD_ID": "thingdaq-75ac69ba3e2bb588",
+          "EXPECTED_HARDWARE_SERIAL": "20428100"
+        },
+        "source": {
+          "build_id": "thingdaq-75ac69ba3e2bb588",
+          "firmware_input_changes": [
+            " M firmware/src/teensy_usb.cpp",
+            " M firmware/src/usb_transport.cpp",
+            " M firmware/src/usb_transport.h"
+          ],
+          "firmware_inputs_clean": false,
+          "git_commit": "bf85b86be12ad66822bc23cfe44d6296ed93557b",
+          "inputs": [
+            "firmware/firmware.ino",
+            "firmware/src/acquisition_controller.cpp",
+            "firmware/src/acquisition_controller.h",
+            "firmware/src/adc_dma_capture.cpp",
+            "firmware/src/adc_dma_capture.h",
+            "firmware/src/adc_dma_capture_teensy.cpp",
+            "firmware/src/adc_dma_capture_teensy.h",
+            "firmware/src/adc_frame_packer.cpp",
+            "firmware/src/adc_frame_packer.h",
+            "firmware/src/adc_initializer.cpp",
+            "firmware/src/adc_initializer.h",
+            "firmware/src/adc_initializer_teensy.cpp",
+            "firmware/src/adc_initializer_teensy.h",
+            "firmware/src/adc_trigger.cpp",
+            "firmware/src/adc_trigger.h",
+            "firmware/src/adc_trigger_teensy.cpp",
+            "firmware/src/adc_trigger_teensy.h",
+            "firmware/src/board_config.h",
+            "firmware/src/checksum.cpp",
+            "firmware/src/checksum.h",
+            "firmware/src/checksum_benchmark.cpp",
+            "firmware/src/checksum_benchmark.h",
+            "firmware/src/checksum_benchmark_teensy.cpp",
+            "firmware/src/checksum_benchmark_teensy.h",
+            "firmware/src/control_state.cpp",
+            "firmware/src/control_state.h",
+            "firmware/src/dma_buffer_ownership.h",
+            "firmware/src/edma_priority_teensy.h",
+            "firmware/src/firmware_capabilities.h",
+            "firmware/src/firmware_identity.h",
+            "firmware/src/firmware_runtime.cpp",
+            "firmware/src/firmware_runtime.h",
+            "firmware/src/generated/protocol_constants.h",
+            "firmware/src/generated/protocol_v2_constants.h",
+            "firmware/src/gpio_batch_packer.cpp",
+            "firmware/src/gpio_batch_packer.h",
+            "firmware/src/gpio_batch_packer_teensy.cpp",
+            "firmware/src/gpio_batch_packer_teensy.h",
+            "firmware/src/gpio_capture_diagnostic.cpp",
+            "firmware/src/gpio_capture_diagnostic.h",
+            "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+            "firmware/src/gpio_capture_diagnostic_teensy.h",
+            "firmware/src/gpio_clock_diagnostic.cpp",
+            "firmware/src/gpio_clock_diagnostic.h",
+            "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+            "firmware/src/gpio_clock_diagnostic_teensy.h",
+            "firmware/src/gpio_dma_route_teensy.h",
+            "firmware/src/gpio_dual_bank_capture.cpp",
+            "firmware/src/gpio_dual_bank_capture.h",
+            "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+            "firmware/src/gpio_dual_bank_capture_teensy.h",
+            "firmware/src/gpio_dual_bank_packer.cpp",
+            "firmware/src/gpio_dual_bank_packer.h",
+            "firmware/src/gpio_pack_c.c",
+            "firmware/src/gpio_pack_c.h",
+            "firmware/src/gpio_raw_capture.cpp",
+            "firmware/src/gpio_raw_capture.h",
+            "firmware/src/gpio_raw_capture_teensy.cpp",
+            "firmware/src/gpio_raw_capture_teensy.h",
+            "firmware/src/gpio_raw_storage_teensy.h",
+            "firmware/src/input_experiment_profile.h",
+            "firmware/src/interrupt_guard_teensy.h",
+            "firmware/src/interrupt_vectors_teensy.h",
+            "firmware/src/packet_buffer_pipeline.cpp",
+            "firmware/src/packet_buffer_pipeline.h",
+            "firmware/src/protocol.cpp",
+            "firmware/src/protocol.h",
+            "firmware/src/rate_profile_table.h",
+            "firmware/src/runtime_health.h",
+            "firmware/src/runtime_health_teensy.cpp",
+            "firmware/src/statistics.cpp",
+            "firmware/src/statistics.h",
+            "firmware/src/stream_layout.h",
+            "firmware/src/synthetic_source.cpp",
+            "firmware/src/synthetic_source.h",
+            "firmware/src/teensy_clock.cpp",
+            "firmware/src/teensy_clock.h",
+            "firmware/src/teensy_usb.cpp",
+            "firmware/src/teensy_usb.h",
+            "firmware/src/temperature.h",
+            "firmware/src/temperature_teensy.cpp",
+            "firmware/src/usb_transport.cpp",
+            "firmware/src/usb_transport.h",
+            "firmware/src/variable_rate_scheduler.cpp",
+            "firmware/src/variable_rate_scheduler.h",
+            "firmware/src/variable_rate_scheduler_teensy.cpp",
+            "firmware/src/variable_rate_scheduler_teensy.h",
+            "firmware/src/watchdog_teensy.cpp",
+            "firmware/src/watchdog_teensy.h",
+            "protocol/protocol-v1.json",
+            "protocol/protocol-v2.json"
+          ],
+          "source_id": "75ac69ba3e2bb588312481dece059b09532ab7123e7964129c8286fec25a5e9d",
+          "timestamp_epoch": 1792189498,
+          "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+          "timestamp_utc": "2026-10-16T22:24:58Z"
+        },
+        "version": {
+          "api": "v1",
+          "service": "remote-firmware-testing",
+          "version": "1.2.0"
+        }
+      },
+      "summary": {
+        "evidence": [
+          {
+            "aux_bank_mode": "INPUT",
+            "case": "INPUT_COMBINED",
+            "checks": 131,
+            "configured_rates_hz": {
+              "adc_pairs": 1000000,
+              "gpio_samples": 1000000
+            },
+            "duration_seconds": 600.0,
+            "failed_checks": [],
+            "failures": [],
+            "fixture": {
+              "authorized": false,
+              "classification": "ELECTRICALLY_UNSTIMULATED",
+              "external_transition_checks": "NOT_RUN"
+            },
+            "kind": "aux_input_capture",
+            "metrics": {
+              "adc_frames": 1186325,
+              "adc_rate_hz": 999998.352996909,
+              "aux_bank_samples_captured": 600279944,
+              "capture_seconds": 600.010728219524,
+              "firmware_processing_cpu_basis_points": 1511,
+              "gpio_frames": 296581,
+              "gpio_rate_hz": 999996.6663604,
+              "host_peak_rss_growth_bytes": 69632,
+              "maximum_frame_skew": 3.0,
+              "maximum_receive_gap_seconds": 0.033067346550524235,
+              "packet_ready_high_water": 3,
+              "packet_transmit_high_water": 68,
+              "paired_generation_skew_events": 0,
+              "paired_samples_joined": 600279944,
+              "paired_samples_transmitted": 600279944,
+              "parser": {
+                "bytes_discarded": 0,
+                "bytes_received": 3674701180,
+                "checksum_errors": 0,
+                "frames_decoded": 1484186,
+                "header_errors": 0,
+                "high_water_bytes": 69631,
+                "payload_errors": 0
+              },
+              "primary_bank_samples_captured": 600279944,
+              "rejected_frames": [],
+              "status_count": 1201,
+              "status_p99_seconds": 0.011231150478124619,
+              "stop_tail_adc_items": 290,
+              "stop_tail_gpio_items": 796,
+              "temperature_samples": [
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131439.391583325,
+                  "latency_seconds": 0.02084747515618801,
+                  "millidegrees_c": 47106,
+                  "phase": "before",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131449.51088964,
+                  "latency_seconds": 0.010427635163068771,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5131449.532774108,
+                  "latency_seconds": 0.010496593080461025,
+                  "millidegrees_c": 49562,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131459.545727479,
+                  "latency_seconds": 0.010581514798104763,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5131459.56673958,
+                  "latency_seconds": 0.010999233461916447,
+                  "millidegrees_c": 51404,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131469.587242934,
+                  "latency_seconds": 0.010470971465110779,
+                  "millidegrees_c": 52632,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131479.606496491,
+                  "latency_seconds": 0.010272501967847347,
+                  "millidegrees_c": 53246,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131489.628493656,
+                  "latency_seconds": 0.010759621858596802,
+                  "millidegrees_c": 53860,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131499.649212034,
+                  "latency_seconds": 0.011346624232828617,
+                  "millidegrees_c": 55088,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131509.668876449,
+                  "latency_seconds": 0.01138256210833788,
+                  "millidegrees_c": 55702,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131519.689768888,
+                  "latency_seconds": 0.010694043710827827,
+                  "millidegrees_c": 56316,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131529.710071831,
+                  "latency_seconds": 0.010139522142708302,
+                  "millidegrees_c": 57544,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131539.730583392,
+                  "latency_seconds": 0.009865089319646358,
+                  "millidegrees_c": 57544,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131549.74341069,
+                  "latency_seconds": 0.009987805970013142,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5131549.765763324,
+                  "latency_seconds": 0.01131496112793684,
+                  "millidegrees_c": 58158,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131559.778740118,
+                  "latency_seconds": 0.010354265570640564,
+                  "millidegrees_c": 58772,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131569.793822722,
+                  "latency_seconds": 0.010165872052311897,
+                  "millidegrees_c": 59386,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131579.804928456,
+                  "latency_seconds": 0.010980776511132717,
+                  "millidegrees_c": 59386,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131589.825524268,
+                  "latency_seconds": 0.010919098742306232,
+                  "millidegrees_c": 60000,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131599.845642377,
+                  "latency_seconds": 0.010333380661904812,
+                  "millidegrees_c": 60000,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131609.866353987,
+                  "latency_seconds": 0.00988110713660717,
+                  "millidegrees_c": 60615,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131619.885819873,
+                  "latency_seconds": 0.01076635904610157,
+                  "millidegrees_c": 61229,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131629.903835425,
+                  "latency_seconds": 0.011299914680421352,
+                  "millidegrees_c": 61229,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131639.923995219,
+                  "latency_seconds": 0.011056514456868172,
+                  "millidegrees_c": 61229,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131649.944544712,
+                  "latency_seconds": 0.011025005020201206,
+                  "millidegrees_c": 61843,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131659.964643084,
+                  "latency_seconds": 0.010557714849710464,
+                  "millidegrees_c": 61843,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131669.985170589,
+                  "latency_seconds": 0.010185744613409042,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5131670.007487625,
+                  "latency_seconds": 0.011408726684749126,
+                  "millidegrees_c": 62457,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131680.027036659,
+                  "latency_seconds": 0.010893520899116993,
+                  "millidegrees_c": 62457,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131690.047298804,
+                  "latency_seconds": 0.010165792889893055,
+                  "millidegrees_c": 62457,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131700.067970212,
+                  "latency_seconds": 0.01017092913389206,
+                  "millidegrees_c": 62457,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131710.087611416,
+                  "latency_seconds": 0.010770139284431934,
+                  "millidegrees_c": 62457,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131720.109681162,
+                  "latency_seconds": 0.011204971000552177,
+                  "millidegrees_c": 62457,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131730.129951394,
+                  "latency_seconds": 0.011057532392442226,
+                  "millidegrees_c": 63071,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131740.150357597,
+                  "latency_seconds": 0.010918362997472286,
+                  "millidegrees_c": 63071,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131750.170464963,
+                  "latency_seconds": 0.010566157288849354,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5131750.192438978,
+                  "latency_seconds": 0.010631942190229893,
+                  "millidegrees_c": 63071,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131760.21121546,
+                  "latency_seconds": 0.010838234797120094,
+                  "millidegrees_c": 63685,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131770.232106591,
+                  "latency_seconds": 0.011294132098555565,
+                  "millidegrees_c": 63685,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131780.252376471,
+                  "latency_seconds": 0.011042023077607155,
+                  "millidegrees_c": 63685,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131790.272754427,
+                  "latency_seconds": 0.011061769910156727,
+                  "millidegrees_c": 63685,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131800.293062408,
+                  "latency_seconds": 0.01070321910083294,
+                  "millidegrees_c": 64299,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131810.313497693,
+                  "latency_seconds": 0.009894859977066517,
+                  "millidegrees_c": 64299,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131820.334176194,
+                  "latency_seconds": 0.010570671409368515,
+                  "millidegrees_c": 64299,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131830.350949111,
+                  "latency_seconds": 0.011377121321856976,
+                  "millidegrees_c": 64299,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131840.363290181,
+                  "latency_seconds": 0.011047081090509892,
+                  "millidegrees_c": 64299,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131850.383749626,
+                  "latency_seconds": 0.011078414507210255,
+                  "millidegrees_c": 64299,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131860.404010963,
+                  "latency_seconds": 0.010313490405678749,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5131860.425860921,
+                  "latency_seconds": 0.010482557117938995,
+                  "millidegrees_c": 64913,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131870.444766951,
+                  "latency_seconds": 0.010670267976820469,
+                  "millidegrees_c": 64299,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131880.45574911,
+                  "latency_seconds": 0.010437930934131145,
+                  "millidegrees_c": 64913,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131890.476422306,
+                  "latency_seconds": 0.010257753543555737,
+                  "millidegrees_c": 64913,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131900.495787734,
+                  "latency_seconds": 0.010723346844315529,
+                  "millidegrees_c": 64913,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131910.511679953,
+                  "latency_seconds": 0.010769643820822239,
+                  "millidegrees_c": 64913,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131920.5321798,
+                  "latency_seconds": 0.011452727019786835,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131930.552303219,
+                  "latency_seconds": 0.01105855405330658,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5131930.573651042,
+                  "latency_seconds": 0.010039789602160454,
+                  "millidegrees_c": 64913,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131940.593331374,
+                  "latency_seconds": 0.010836833156645298,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131950.615233685,
+                  "latency_seconds": 0.011017420329153538,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131960.635508993,
+                  "latency_seconds": 0.011063162237405777,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131970.655078183,
+                  "latency_seconds": 0.011308595538139343,
+                  "millidegrees_c": 64913,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131980.67547019,
+                  "latency_seconds": 0.010997467674314976,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5131990.689673434,
+                  "latency_seconds": 0.011107691563665867,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132000.704400364,
+                  "latency_seconds": 0.011056733317673206,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132010.723390798,
+                  "latency_seconds": 0.010458273813128471,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5132010.745279442,
+                  "latency_seconds": 0.011228716932237148,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132020.766832586,
+                  "latency_seconds": 0.011310449801385403,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132030.787095693,
+                  "latency_seconds": 0.010851350612938404,
+                  "millidegrees_c": null,
+                  "phase": "running",
+                  "status": 2
+                },
+                {
+                  "attempt": 2,
+                  "host_monotonic_seconds": 5132030.808411557,
+                  "latency_seconds": 0.010160939767956734,
+                  "millidegrees_c": 65527,
+                  "phase": "running",
+                  "status": 0
+                },
+                {
+                  "attempt": 1,
+                  "host_monotonic_seconds": 5132039.901983054,
+                  "latency_seconds": 0.020253773778676987,
+                  "millidegrees_c": 65527,
+                  "phase": "after",
+                  "status": 0
+                }
+              ]
+            },
+            "paired_diagnostic": "NOT_RUN",
+            "protocol_version": 2,
+            "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+            "result": "PASS",
+            "schema": "thingdaq.experiment-evidence/v1"
+          }
+        ],
+        "exit_code": 0,
+        "message": "Container ran successfully for test_id 89cadb75-5904-460a-b8ae-a730a8864abf",
+        "outcome": "PASS",
+        "test_id": "89cadb75-5904-460a-b8ae-a730a8864abf"
+      }
+    }
+  },
+  "local_checks": {
+    "firmware_skipped": 3,
+    "firmware_subtests": 836,
+    "firmware_tests": 249
+  },
+  "machine_code_replay": [
+    {
+      "accepted": 24,
+      "correct": true,
+      "deferred": false,
+      "expected_bytes": 72,
+      "guarded": false,
+      "interrupt": false,
+      "irq_enabled_after": true,
+      "observed_bytes": 72,
+      "observed_regions": [
+        {
+          "count": 48,
+          "value": "A"
+        },
+        {
+          "count": 0,
+          "value": "B"
+        },
+        {
+          "count": 24,
+          "value": "C"
+        }
+      ],
+      "requested": 24,
+      "transfer_lengths": [
+        72
+      ],
+      "used": 48
+    },
+    {
+      "accepted": 24,
+      "correct": false,
+      "deferred": false,
+      "expected_bytes": 72,
+      "guarded": false,
+      "interrupt": true,
+      "irq_enabled_after": true,
+      "observed_bytes": 120,
+      "observed_regions": [
+        {
+          "count": 48,
+          "value": "A"
+        },
+        {
+          "count": 72,
+          "value": "B"
+        },
+        {
+          "count": 0,
+          "value": "C"
+        }
+      ],
+      "requested": 24,
+      "transfer_lengths": [
+        48,
+        72
+      ],
+      "used": 48
+    },
+    {
+      "accepted": 24,
+      "correct": true,
+      "deferred": true,
+      "expected_bytes": 72,
+      "guarded": true,
+      "interrupt": false,
+      "irq_enabled_after": true,
+      "observed_bytes": 72,
+      "observed_regions": [
+        {
+          "count": 48,
+          "value": "A"
+        },
+        {
+          "count": 0,
+          "value": "B"
+        },
+        {
+          "count": 24,
+          "value": "C"
+        }
+      ],
+      "requested": 24,
+      "transfer_lengths": [
+        72
+      ],
+      "used": 48
+    }
+  ],
+  "original_elf_sha256": "f1c40b1f52e0181ee15d1d748c2732f3c112bd69d429ea015989b34e5fd5225c",
+  "original_hex_matches_elf_manifest": true,
+  "original_job": {
+    "hashes": {
+      "build-manifest.json": "d16848516d953eeaa9458a8b2a44520880e2c43a002c293758b925fa082a2f66",
+      "firmware.ino.hex": "f22d53f3df1c364e46da425b33e6c42cfec71dd133c38dc1a84a5b1ec6ebc6e9",
+      "results.json": "570efe9d8d2bb17fcb8f069f9ee2adc8e480f62dbaf321c8a95e822cbadbd8ac",
+      "rig-program.py": "7bb4080b575f9ca55b53bd6a3d5acc73e16ff4f5ec2b68fc294fd5df2219e553",
+      "summary.json": "3b373f4b76231cfe8355333d6dc47da95ffe87a1951073944cf290c11caa6e8d"
+    },
+    "provenance": {
+      "build_id": "thingdaq-6c8a85596662e413",
+      "case_sequence": [
+        "INPUT_COMBINED"
+      ],
+      "health": {
+        "checks": {
+          "coordinator_mode": "normal",
+          "docker_reachable": true,
+          "hub_reachable": true,
+          "hubs": {
+            "0x00000000": true
+          },
+          "queue_depth": 0,
+          "worker_thread_alive": true
+        },
+        "status": "healthy"
+      },
+      "hex_sha256": "f22d53f3df1c364e46da425b33e6c42cfec71dd133c38dc1a84a5b1ec6ebc6e9",
+      "input_experiment": {
+        "adc_clock_hz": 37500000,
+        "base_source_id": "c3214f143592dbc858cf5fc4ae7d20417e789c3564f177915ed96f04a5ec45bc",
+        "builder_sha256": "090d25b955c4b4322302610b3ffc2932a8311e7a92eb3ed19975f123ed038a34",
+        "cpu_mhz": 600,
+        "data_checksum": "standard-adler32",
+        "equal_rates": false,
+        "identity_policy": "sha256(source_sha256:input-rate-clock-v1:cpu_mhz:equal_flag[:release=flag:large-adc=flag])",
+        "ipg_hz": 150000000,
+        "large_adc_frame": false,
+        "pit_hz": 24000000,
+        "public_protocol_compatible": false,
+        "release_fixed_1mhz": true
+      },
+      "manifest_sha256": "d16848516d953eeaa9458a8b2a44520880e2c43a002c293758b925fa082a2f66",
+      "planned_program_seconds": 635.0,
+      "profile_sequence": [
+        4
+      ],
+      "program_sha256": "7bb4080b575f9ca55b53bd6a3d5acc73e16ff4f5ec2b68fc294fd5df2219e553",
+      "runner_sha256": "5c625f4b5f31772d215537c9bc3ac2ff089a1a9be1760f1bdba9a25aef49b259",
+      "service": "http://192.168.150.14:5000",
+      "settings": {
+        "AUX_INPUT_CAPTURE_SECONDS": "600.0",
+        "AUX_INPUT_CASE": "INPUT_COMBINED",
+        "AUX_INPUT_CPU_MHZ": "600",
+        "AUX_INPUT_EQUAL_RATES": "0",
+        "AUX_INPUT_LARGE_ADC_FRAME": "0",
+        "AUX_INPUT_RATE_PROFILE": "4",
+        "AUX_INPUT_RELEASE_FIXED_1MHZ": "1",
+        "AUX_INPUT_RUNTIME_HEALTH": "0",
+        "AUX_INPUT_RUN_DIAGNOSTIC": "0",
+        "AUX_INPUT_TEMPERATURE": "1",
+        "EXPECTED_BUILD_ID": "thingdaq-6c8a85596662e413",
+        "EXPECTED_HARDWARE_SERIAL": "20428100"
+      },
+      "source": {
+        "build_id": "thingdaq-6c8a85596662e413",
+        "firmware_input_changes": [
+          " M firmware/src/input_experiment_profile.h"
+        ],
+        "firmware_inputs_clean": false,
+        "git_commit": "bfff1aaaf9457b2f5bd204b847ac0659c809b513",
+        "inputs": [
+          "firmware/firmware.ino",
+          "firmware/src/acquisition_controller.cpp",
+          "firmware/src/acquisition_controller.h",
+          "firmware/src/adc_dma_capture.cpp",
+          "firmware/src/adc_dma_capture.h",
+          "firmware/src/adc_dma_capture_teensy.cpp",
+          "firmware/src/adc_dma_capture_teensy.h",
+          "firmware/src/adc_frame_packer.cpp",
+          "firmware/src/adc_frame_packer.h",
+          "firmware/src/adc_initializer.cpp",
+          "firmware/src/adc_initializer.h",
+          "firmware/src/adc_initializer_teensy.cpp",
+          "firmware/src/adc_initializer_teensy.h",
+          "firmware/src/adc_trigger.cpp",
+          "firmware/src/adc_trigger.h",
+          "firmware/src/adc_trigger_teensy.cpp",
+          "firmware/src/adc_trigger_teensy.h",
+          "firmware/src/board_config.h",
+          "firmware/src/checksum.cpp",
+          "firmware/src/checksum.h",
+          "firmware/src/checksum_benchmark.cpp",
+          "firmware/src/checksum_benchmark.h",
+          "firmware/src/checksum_benchmark_teensy.cpp",
+          "firmware/src/checksum_benchmark_teensy.h",
+          "firmware/src/control_state.cpp",
+          "firmware/src/control_state.h",
+          "firmware/src/dma_buffer_ownership.h",
+          "firmware/src/edma_priority_teensy.h",
+          "firmware/src/firmware_capabilities.h",
+          "firmware/src/firmware_identity.h",
+          "firmware/src/firmware_runtime.cpp",
+          "firmware/src/firmware_runtime.h",
+          "firmware/src/generated/protocol_constants.h",
+          "firmware/src/generated/protocol_v2_constants.h",
+          "firmware/src/gpio_batch_packer.cpp",
+          "firmware/src/gpio_batch_packer.h",
+          "firmware/src/gpio_batch_packer_teensy.cpp",
+          "firmware/src/gpio_batch_packer_teensy.h",
+          "firmware/src/gpio_capture_diagnostic.cpp",
+          "firmware/src/gpio_capture_diagnostic.h",
+          "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+          "firmware/src/gpio_capture_diagnostic_teensy.h",
+          "firmware/src/gpio_clock_diagnostic.cpp",
+          "firmware/src/gpio_clock_diagnostic.h",
+          "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+          "firmware/src/gpio_clock_diagnostic_teensy.h",
+          "firmware/src/gpio_dma_route_teensy.h",
+          "firmware/src/gpio_dual_bank_capture.cpp",
+          "firmware/src/gpio_dual_bank_capture.h",
+          "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+          "firmware/src/gpio_dual_bank_capture_teensy.h",
+          "firmware/src/gpio_dual_bank_packer.cpp",
+          "firmware/src/gpio_dual_bank_packer.h",
+          "firmware/src/gpio_pack_c.c",
+          "firmware/src/gpio_pack_c.h",
+          "firmware/src/gpio_raw_capture.cpp",
+          "firmware/src/gpio_raw_capture.h",
+          "firmware/src/gpio_raw_capture_teensy.cpp",
+          "firmware/src/gpio_raw_capture_teensy.h",
+          "firmware/src/gpio_raw_storage_teensy.h",
+          "firmware/src/input_experiment_profile.h",
+          "firmware/src/interrupt_guard_teensy.h",
+          "firmware/src/interrupt_vectors_teensy.h",
+          "firmware/src/packet_buffer_pipeline.cpp",
+          "firmware/src/packet_buffer_pipeline.h",
+          "firmware/src/protocol.cpp",
+          "firmware/src/protocol.h",
+          "firmware/src/rate_profile_table.h",
+          "firmware/src/runtime_health.h",
+          "firmware/src/runtime_health_teensy.cpp",
+          "firmware/src/statistics.cpp",
+          "firmware/src/statistics.h",
+          "firmware/src/stream_layout.h",
+          "firmware/src/synthetic_source.cpp",
+          "firmware/src/synthetic_source.h",
+          "firmware/src/teensy_clock.cpp",
+          "firmware/src/teensy_clock.h",
+          "firmware/src/teensy_usb.cpp",
+          "firmware/src/teensy_usb.h",
+          "firmware/src/temperature.h",
+          "firmware/src/temperature_teensy.cpp",
+          "firmware/src/usb_transport.cpp",
+          "firmware/src/usb_transport.h",
+          "firmware/src/variable_rate_scheduler.cpp",
+          "firmware/src/variable_rate_scheduler.h",
+          "firmware/src/variable_rate_scheduler_teensy.cpp",
+          "firmware/src/variable_rate_scheduler_teensy.h",
+          "firmware/src/watchdog_teensy.cpp",
+          "firmware/src/watchdog_teensy.h",
+          "protocol/protocol-v1.json",
+          "protocol/protocol-v2.json"
+        ],
+        "source_id": "6c8a85596662e41386f156366cda58fac7b791f086ff79ad10adc31a2705b581",
+        "timestamp_epoch": 1791944920,
+        "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+        "timestamp_utc": "2026-10-14T02:28:40Z"
+      },
+      "version": {
+        "api": "v1",
+        "service": "remote-firmware-testing",
+        "version": "1.2.0"
+      }
+    },
+    "summary": {
+      "evidence": [
+        {
+          "aux_bank_mode": "INPUT",
+          "case": "INPUT_COMBINED",
+          "checks": 106,
+          "configured_rates_hz": {
+            "adc_pairs": 1000000,
+            "gpio_samples": 1000000
+          },
+          "duration_seconds": 600.0,
+          "failed_checks": [],
+          "failures": [
+            "ProtocolFailure: ADC continuity expected flags/seq/ticks 0/138621/561137808, got 0/138622/561141856"
+          ],
+          "fixture": {
+            "authorized": false,
+            "classification": "ELECTRICALLY_UNSTIMULATED",
+            "external_transition_checks": "NOT_RUN"
+          },
+          "kind": "aux_input_capture",
+          "metrics": {
+            "failure_adc": {
+              "expected_sequence": 138621,
+              "expected_ticks": 561137808,
+              "framed_bytes": 287222712,
+              "frames": 138621,
+              "items": 70142226,
+              "payload_bytes": 280568904
+            },
+            "failure_gpio": {
+              "expected_sequence": 34655,
+              "expected_ticks": 561133760,
+              "framed_bytes": 141946880,
+              "frames": 34655,
+              "items": 70141720,
+              "payload_bytes": 140283440
+            },
+            "failure_parser": {
+              "bytes_discarded": 2120,
+              "bytes_received": 429449795,
+              "checksum_errors": 2,
+              "frames_decoded": 173456,
+              "header_errors": 0,
+              "high_water_bytes": 69628,
+              "payload_errors": 0
+            },
+            "failure_status": {
+              "adc0_calibration_cycles": 4722,
+              "adc0_calibration_state": 1,
+              "adc0_channel": 7,
+              "adc0_completion_count": 1,
+              "adc0_dma_major_loops": 138647,
+              "adc0_dma_results": 70155382,
+              "adc0_etc_chain_configured": 8215,
+              "adc0_etc_trigger_counter_configured": 0,
+              "adc0_etc_trigger_ctrl_configured": 0,
+              "adc0_etc_trigger_queue": 0,
+              "adc0_peripheral": 1,
+              "adc0_pin": 14,
+              "adc0_trigger_effective_delay": 1,
+              "adc0_trigger_initial_delay": 0,
+              "adc0_trigger_xbar_input": 57,
+              "adc0_trigger_xbar_output": 103,
+              "adc0_trigger_xbar_sel_configured": 14592,
+              "adc1_calibration_cycles": 22148,
+              "adc1_calibration_state": 1,
+              "adc1_channel": 8,
+              "adc1_completion_count": 1,
+              "adc1_dma_major_loops": 138647,
+              "adc1_dma_results": 70155382,
+              "adc1_etc_chain_configured": 16408,
+              "adc1_etc_trigger_counter_configured": 75,
+              "adc1_etc_trigger_ctrl_configured": 0,
+              "adc1_etc_trigger_queue": 4,
+              "adc1_peripheral": 2,
+              "adc1_pin": 15,
+              "adc1_trigger_effective_delay": 76,
+              "adc1_trigger_initial_delay": 75,
+              "adc1_trigger_xbar_input": 57,
+              "adc1_trigger_xbar_output": 107,
+              "adc1_trigger_xbar_sel_configured": 14592,
+              "adc_buffers_acquired": 138646,
+              "adc_buffers_completed": 138647,
+              "adc_buffers_released": 138646,
+              "adc_cache_cpu_invalidations": 138646,
+              "adc_cache_dma_discards": 138655,
+              "adc_calibration_deadline_us": 10000,
+              "adc_clock_divider": 4,
+              "adc_clock_hz": 37500000,
+              "adc_clock_source": 1,
+              "adc_code_max": 4095,
+              "adc_code_min": 0,
+              "adc_completion_delta_cycles": 296,
+              "adc_completion_diagnostic_elapsed_cycles": 16397,
+              "adc_completion_expected_delta_cycles": 300,
+              "adc_completion_mismatches": 0,
+              "adc_completion_tolerance_cycles": 120,
+              "adc_configuration_flags": 255,
+              "adc_container_bytes": 2,
+              "adc_conversion_mode": 2,
+              "adc_destination_mismatches": 0,
+              "adc_dma_error_events": 0,
+              "adc_etc_ctrl_configured": 0,
+              "adc_etc_done0_1_irq_final": 1048577,
+              "adc_etc_done2_err_irq_final": 0,
+              "adc_etc_error_events": 0,
+              "adc_etc_error_flags": 0,
+              "adc_framed_bytes_emitted": 287274512,
+              "adc_framed_bytes_framed": 287274512,
+              "adc_framed_bytes_transmitted": 287274512,
+              "adc_frames_consumed": 138646,
+              "adc_frames_dropped": 0,
+              "adc_frames_dropped_after_framing": 0,
+              "adc_frames_dropped_after_promotion": 0,
+              "adc_frames_emitted": 138646,
+              "adc_frames_evicted": 0,
+              "adc_frames_evicted_after_promotion": 0,
+              "adc_frames_framed_pipeline": 138646,
+              "adc_frames_generated": 138646,
+              "adc_frames_transmitted": 138646,
+              "adc_hardware_average_count": 0,
+              "adc_incomplete_buffers": 0,
+              "adc_incomplete_conversions": 0,
+              "adc_initialization_error_flags": 0,
+              "adc_input_max_mv_nominal": 3300,
+              "adc_input_min_mv_nominal": 0,
+              "adc_ipg_clock_hz": 150000000,
+              "adc_items_dropped": 0,
+              "adc_items_emitted": 70154876,
+              "adc_items_framed_pipeline": 70154876,
+              "adc_items_generated": 70154876,
+              "adc_items_transmitted_pipeline": 70154876,
+              "adc_overwritten_conversions": 0,
+              "adc_packer_chronology_errors": 0,
+              "adc_packer_pipeline_errors": 0,
+              "adc_packer_source_errors": 0,
+              "adc_packet_filling_depth": 0,
+              "adc_packet_ready_depth": 0,
+              "adc_packet_ready_high_water": 2,
+              "adc_packet_transmit_depth": 0,
+              "adc_packet_transmit_high_water": 57,
+              "adc_pair_rate_hz": 1000000,
+              "adc_paired_major_loops": 138647,
+              "adc_pairs_captured": 70155382,
+              "adc_pairs_consumed": 70154876,
+              "adc_pairs_delivered": 70154876,
+              "adc_pairs_framed": 70154876,
+              "adc_pairs_transmitted": 70154876,
+              "adc_payload_bytes_dropped": 0,
+              "adc_payload_bytes_emitted": 280619504,
+              "adc_payload_bytes_framed": 280619504,
+              "adc_payload_bytes_produced": 280619504,
+              "adc_payload_bytes_transmitted": 280619504,
+              "adc_raw_drop_pairs_projected": 0,
+              "adc_raw_gap_pairs": 0,
+              "adc_raw_invariant_errors": 0,
+              "adc_raw_pairs_lost": 0,
+              "adc_raw_ready_depth": 1,
+              "adc_raw_ready_high_water": 2,
+              "adc_raw_ring_overruns": 0,
+              "adc_reference": 1,
+              "adc_reference_mv_nominal": 3300,
+              "adc_resolution_bits": 12,
+              "adc_resource_conflicts": 0,
+              "adc_sample_time_adck": 3,
+              "adc_schedule_exhaustions": 0,
+              "adc_stale_completions": 0,
+              "adc_stale_interrupts": 0,
+              "adc_start_errors": 0,
+              "adc_stop_errors": 0,
+              "adc_stop_pairs_discarded": 0,
+              "adc_trigger_ccm_ccgr1_configured": 4244632320,
+              "adc_trigger_ccm_ccgr2_configured": 218099763,
+              "adc_trigger_ccm_cscmr1_configured": 1729298496,
+              "adc_trigger_chain_length": 1,
+              "adc_trigger_configuration_flags": 255,
+              "adc_trigger_dwt_clock_hz": 600000000,
+              "adc_trigger_error_count": 0,
+              "adc_trigger_error_flags": 0,
+              "adc_trigger_gpio_master_pit_channel": 0,
+              "adc_trigger_gpio_master_pit_load": 5,
+              "adc_trigger_gpio_master_rate_hz": 4000000,
+              "adc_trigger_gpio_master_tctrl_configured": 0,
+              "adc_trigger_ipg_clock_hz": 150000000,
+              "adc_trigger_pair_pit_channel": 1,
+              "adc_trigger_pair_pit_load": 3,
+              "adc_trigger_pair_rate_hz": 1000000,
+              "adc_trigger_pair_tctrl_configured": 4,
+              "adc_trigger_phase_ipg_cycles": 75,
+              "adc_trigger_pit_clock_hz": 24000000,
+              "adc_trigger_pit_mcr_configured": 0,
+              "adc_trigger_predivider": 0,
+              "aux_bank_mode": 1,
+              "aux_gpio_dma_major_loops": 34661,
+              "aux_gpio_raw_ready_depth": 0,
+              "aux_gpio_raw_ready_high_water": 1,
+              "aux_gpio_raw_ring_overruns": 0,
+              "aux_gpio_samples_captured": 70153864,
+              "aux_gpio_stale_completions": 0,
+              "bad_checksums": 0,
+              "bad_flags": 0,
+              "bad_lengths": 0,
+              "bad_payloads": 0,
+              "bad_request_ids": 0,
+              "bad_types": 0,
+              "bad_versions": 0,
+              "commands_accepted": 149,
+              "commands_rejected": 0,
+              "data_checksum_algorithm": 1,
+              "data_frame_bytes": 4096,
+              "data_framed_bytes_transmitted": 429245968,
+              "data_payload_bytes_transmitted": 420927232,
+              "device_state": 3,
+              "frame_coverage_ticks": 4048,
+              "gpio_buffers_acquired": 34661,
+              "gpio_buffers_completed": 34661,
+              "gpio_buffers_released": 34661,
+              "gpio_cache_cpu_invalidations": 69322,
+              "gpio_cache_dma_discards": 69332,
+              "gpio_dma_major_loops": 34661,
+              "gpio_duplicate_samples_ignored": 0,
+              "gpio_framed_bytes_emitted": 141971456,
+              "gpio_framed_bytes_framed": 141971456,
+              "gpio_framed_bytes_transmitted": 141971456,
+              "gpio_frames_dropped": 0,
+              "gpio_frames_dropped_after_framing": 0,
+              "gpio_frames_dropped_after_promotion": 0,
+              "gpio_frames_emitted": 34661,
+              "gpio_frames_evicted": 0,
+              "gpio_frames_evicted_after_promotion": 0,
+              "gpio_frames_framed_pipeline": 34661,
+              "gpio_frames_generated": 34661,
+              "gpio_frames_packed": 34661,
+              "gpio_frames_produced": 34661,
+              "gpio_frames_transmitted": 34661,
+              "gpio_hardware_errors": 0,
+              "gpio_item_bytes": 2,
+              "gpio_items_dropped": 0,
+              "gpio_items_emitted": 70153864,
+              "gpio_items_framed_pipeline": 70153864,
+              "gpio_items_generated": 70153864,
+              "gpio_items_transmitted_pipeline": 70153864,
+              "gpio_packed_ready_depth": 0,
+              "gpio_packed_ready_high_water": 0,
+              "gpio_packer_chronology_errors": 0,
+              "gpio_packer_drop_samples_projected": 0,
+              "gpio_packer_pipeline_errors": 0,
+              "gpio_packer_samples_dropped": 0,
+              "gpio_packer_source_errors": 0,
+              "gpio_packet_filling_depth": 0,
+              "gpio_packet_ready_depth": 0,
+              "gpio_packet_ready_high_water": 1,
+              "gpio_packet_transmit_depth": 0,
+              "gpio_packet_transmit_high_water": 15,
+              "gpio_payload_bytes_dropped": 0,
+              "gpio_payload_bytes_emitted": 140307728,
+              "gpio_payload_bytes_framed": 140307728,
+              "gpio_payload_bytes_produced": 140307728,
+              "gpio_payload_bytes_transmitted": 140307728,
+              "gpio_processing_cpu_basis_points": 1467,
+              "gpio_raw_drop_samples_projected": 0,
+              "gpio_raw_invariant_errors": 0,
+              "gpio_raw_ready_depth": 0,
+              "gpio_raw_ready_high_water": 1,
+              "gpio_raw_ring_overruns": 0,
+              "gpio_raw_samples_lost": 0,
+              "gpio_resource_conflicts": 0,
+              "gpio_sample_rate_hz": 1000000,
+              "gpio_samples_captured": 70153864,
+              "gpio_samples_delivered": 70153864,
+              "gpio_samples_framed": 70153864,
+              "gpio_samples_packed": 70153864,
+              "gpio_samples_produced": 70153864,
+              "gpio_samples_transmitted": 70153864,
+              "gpio_stale_dma_completions": 0,
+              "gpio_start_errors": 0,
+              "gpio_stop_errors": 0,
+              "gpio_stop_samples_discarded": 0,
+              "packet_accounted_frame_skew": 0,
+              "packet_capacity_drops_without_evictable_frame": 0,
+              "packet_encoding_rejections": 0,
+              "packet_fairness_deferrals": 0,
+              "packet_frames_promoted": 173307,
+              "packet_invalid_operations": 0,
+              "packet_owned_depth": 0,
+              "packet_owned_high_water": 72,
+              "packet_pool_exhaustions": 0,
+              "packet_pressure_evictions": 0,
+              "packet_ready_depth": 0,
+              "packet_ready_high_water": 3,
+              "packet_ready_queue_rejections": 0,
+              "packet_retention_us_combined": 50600,
+              "packet_retention_us_single_stream": 101200,
+              "packet_transmit_depth": 0,
+              "packet_transmit_high_water": 72,
+              "packet_transmit_queue_rejections": 0,
+              "paired_gpio_buffers_acquired": 34661,
+              "paired_gpio_buffers_completed": 34661,
+              "paired_gpio_buffers_released": 34661,
+              "paired_gpio_cache_cpu_invalidations": 69322,
+              "paired_gpio_cache_dma_discards": 69332,
+              "paired_gpio_canceled_generations": 0,
+              "paired_gpio_cancellation_samples": 0,
+              "paired_gpio_count_mismatches": 0,
+              "paired_gpio_destination_mismatches": 0,
+              "paired_gpio_dma_major_loops": 34661,
+              "paired_gpio_generation_skew_events": 0,
+              "paired_gpio_generation_skew_samples": 0,
+              "paired_gpio_hardware_errors": 0,
+              "paired_gpio_invariant_errors": 0,
+              "paired_gpio_raw_ring_overruns": 0,
+              "paired_gpio_resource_conflicts": 0,
+              "paired_gpio_samples_captured": 70153864,
+              "paired_gpio_samples_delivered": 70153864,
+              "paired_gpio_samples_joined": 70153864,
+              "paired_gpio_samples_lost": 0,
+              "paired_gpio_schedule_exhaustions": 0,
+              "paired_gpio_stale_completions": 0,
+              "paired_gpio_stale_dma_completions": 0,
+              "paired_gpio_start_errors": 0,
+              "paired_gpio_stop_errors": 0,
+              "paired_gpio_stop_tail_samples": 0,
+              "paired_gpio_timestamp_mismatches": 0,
+              "parser_errors": 0,
+              "partial_usb_writes": 0,
+              "primary_gpio_dma_major_loops": 34661,
+              "primary_gpio_raw_ready_depth": 0,
+              "primary_gpio_raw_ready_high_water": 1,
+              "primary_gpio_raw_ring_overruns": 0,
+              "primary_gpio_samples_captured": 70153864,
+              "primary_gpio_stale_completions": 0,
+              "protocol_version": 2,
+              "rate_profile": 4,
+              "response_queue_rejections": 0,
+              "response_reservations_abandoned": 0,
+              "responses_completed": 149,
+              "responses_queued": 149,
+              "source": 0,
+              "state_errors": 0,
+              "stats_generation": 3,
+              "stream_mask": 3,
+              "timeouts": 0,
+              "transport_errors": 0,
+              "usb_active_frame_bytes_sent": 0,
+              "usb_active_frame_size": 0,
+              "usb_command_queue_depth": 0,
+              "usb_command_queue_high_water": 1,
+              "usb_io_errors": 0,
+              "usb_lower_priority_queue_depth": 0,
+              "usb_response_queue_depth": 0,
+              "usb_response_queue_high_water": 1,
+              "usb_rx_stall_events": 0,
+              "usb_short_capacity_deferrals": 0,
+              "usb_tx_stall_events": 172118
+            },
+            "parser": {
+              "bytes_discarded": 2120,
+              "bytes_received": 429515331,
+              "checksum_errors": 2,
+              "frames_decoded": 173483,
+              "header_errors": 0,
+              "high_water_bytes": 69628,
+              "payload_errors": 0
+            },
+            "rejected_frames": [
+              {
+                "bytes_received": 429449795,
+                "category": "checksum",
+                "frames_decoded": 173433,
+                "host_monotonic_seconds": 5105915.540090512,
+                "reason": "expected 0x7c32d1a8, received 0x1",
+                "wire_hex": "efbeadde020100002c00010018080000e8070000010000007d1d0200000000009048722100000000fa0100005e0680065d0686065d0682065d067e065b067d065e0681065f06830659067c065b067e065f0681065f0682065c0680065b0682065b067d065e0681065e067e065d0682065d067d065b067c06600680065e0683065b067d065a0680065e0680065e0682065b067e065c0680065d067e065d0680065e0681065f0683065d067e065c068606610681065f0683065b067d065b067d06600680065f0682065c067e065c067f065d067e065f0681065e067d065f0682065e067d065c067d0660067d06610680065e067e065d0681065d067c065d067e065e067d065d0681065d067e065b0681065d0681065d0682065c067d065a067c065e067e065f0682065c067b065a067c06610680065f0681065d067d065c067d065e067b065e0680065e067d065e0681065e067b0664067b0661067e065f0683065c067d065b067c0660067e06610681065e067d065c06800660067c065f068006600683065f0682065d067d065d067d0661068006620682065d067b065d067e0660067c06610681065d067c065d067d065d067b065f0680065c067d065e0681065e067c065d067d0660068006620683065d067b065c067d06600680065f0682065d0680065c067e065c067e065f0683065e0680065f0683065e067d065d067e0661068106630683065d067d065e068106610681065f0683065d067d06570680065e067d065e0682065e067e065e0682065e067b065c067c06600680065f0681065e067a065b067d0660067e065f0680065e067d065c0672065d067b065e0680065d067d065d0681065c067d065c067f065e067e065e0682065d067b065b067e0668067d065f0680065e067b065c067d065e067b0662067d0661067c065f06800660067a065d067b0662067d065f0682065d0678065d067c0660068106610681065c067d065b0680065d067d065e067e065e067e065e0680065e067e065b067d065f0680065f0683065b067b065b067d06600680065f0681065d067e065b067e065e067e065f0680065d067d065e0682065d067c065b067b0660067f065e0683065c067b065c067d0660067c065f0680065d067b065c067e065e067b065f0680065d067d065e0680065c067d065c067d065e068006610681065a067b065c067d0652067d065f0680065e067b065c067d065e067b065e067e065b067d065f0680065e067b065c067a0660067d065f0680065b0679065c067b06600680065f0680065d067b065c0680065e067d065f067e065d067d065f0681065f067b065c067c0661068006620682065b0680065c067e065d067f065f0680065d067e065c067f065e0680065f0682065d067f065e0681065e067c065e067b06610681065f068b065d067b065e068006610681065f0680065c067d065d067f065f067b065f067d065f067d06610682065e067e065d067d0660068106620682065b067d065c067d06600681065f0680065b067e065b067d065d067d065f0681065e067e065f0682065f067b065c067a0660067b065f0680065b067a065b067d065e067d065e0681065d067b065d067d065e067a065e0680065d067e065e0682065d067d065a067d0660068006570681065b067a065d067d0660067d06620681065e067d065c0680065e067c065e0681065e067f065e0682065c067d065b067a0660067d065e0683065b067b065b067d06600680065f0681065c067e065c067e065e067d065e06800660067d065e06800660067b065c067b0660067e065e0681065b067a065c067d065e067d065f067e065d0674065c067d065d067b065d067e065b067d065e067e065c067a065b06790660067b065f0680065c0678065b067b0661067d065e0680065d067c065b067d065d067d0654067b065e067d065e0682065e067f065b067d065f0680065e0682065a067b065a067e065e067f065f0682065b067e065b067e065d067d065c0681065b067e065d0682065e067d065a067e065e067e065e0683065b067b065b067e065e067e065f0682065c0680065b0680065b067d065d0680065c067d065d0681065c067c065a067b065d067d065f0683065a0679065a067b065d067c065d0680065c067b065a067c065c067b065e0680065d067d065d0682065d067d065a067d06600680065f0683065b067b065a067e0660067f066106800666067e065d0680065e067e06620682065f0680065f0682065d0681065d0680065e0681065f0683065c067b065e067e0660067e065f0681065e067d065b067d065e067b065f067e065b067a065e067e065d067a065c067a065e067b065d0681065b0678065b067d065e067d065e0680065b067c065b067b065d067b065f0681065d067b065d0680065d067a065a067b065e067e065f0681065b067b065b067e065e067d065f0680065d067b065b067e065e067c065e0681065c0680065f0682065c067e065b067e0668067e06610681065d067b0656067e0662067f065f06800660067e065d067d065e067d065f0680065e067d065e0682065f067b065a067c0660068b065f0682065b067b065c067a065e067d065f0681065e067d065b067e065e067b065e0680065d067d065e0681065e067e065c067b0660068006610682065c067b065c067e0660068006610681065d067c065c067e065e067a065f067d065f067c065f0680065e067b065c067a0660067e065f0681065b0679065b06790660067d065f0680065c067c065a067c065d067b065e067e065d067d065e0681065d067b065b067c06600680065f0682065a067b065e067e065f0680065f068306efbeadde020100002c00010018080000e807000001000000"
+              },
+              {
+                "bytes_received": 429449795,
+                "category": "checksum",
+                "frames_decoded": 173433,
+                "host_monotonic_seconds": 5105915.540243492,
+                "reason": "expected 0x293ecf9c, received 0x67e065f",
+                "wire_hex": "efbeadde020100002c00010018080000e8070000010000007b1d020000000000f028722100000000fa0100005f0680065b067e065b067e065d067d065e0681065e067e065e068206efbeadde020100002c00010018080000e8070000010000007e1d0200000000006058722100000000fa0100005e0680065f067d065b067e065f068006610683065b067d065c067e06610680065f0681065b067d065b067d065c067d065f0681065d0680065e0680065b067b065c067c06660680065f0682065b067b065b067e06600680065f0682065b067d065b067e065e066e065f0681065d067d065e0680065e067b065b067c06600680065f0682065b067b065c0680065e0680065f0681065b067d065b0680065e067d065e0681065d0680065e0682065b067f065c06800660067e065d0682065d067e065e0681065e067d065d0680065d067d065d0680065e067c065e067e065e067d065f0680065d067b065b067d065e0680065f0681065a067a065c067c06600680065f0682065b067d065b0680065e067c065f0680065d067e065c0681065d067d065b067e06610680065f0681065b067a065c0680065f0680065e0682065e067d065c067e065e0686065f0681065d067d065e0680065d067c065c067b06600680065f0682065b067b065d067e065f0680065f0680065d067b065c067e065e067c065f0680065e067d065f0680065e067b065c067b0660067d065f0682065b067b065c067e0660067e065f0680065e067d065c0680065e067c065e0680065e067d065e0681065e067b065a067b06600680065f0683065b067b065c0681065c0681065f0683065e067d065a067e0666067c065f0681065e067f065e0681065e067d065a067c0660068306610681065b067a065b067c06610680065f0680065d067b065c067d0660067d065f0680065f067d065e0682065d067b065c067d0660067e06610682065d067b065a067d06600680065f0680065d067c065c067d0666067b065e0680065d067f065c0681065e067d065d067b06600680065f0683065b067b065c067d0660067e065f0680065d067e065c0680065e067e065b0681065d0680065e0681065c067d065b067e0660067e065f0683065b067b065d0680065f0680065e0682065b067c065c067e065d067e065e0681065d067e065d0682065b067d065b067d065e0681065f06820659067b065d067e065d0681065e0687065b067d065b0680065e067d065f0680065d067e065f0681065e067b065b067d06610681065f0682065a067b065b067d065f067c065f0680065b067d065c067e065d067d065f0681065d067e065e0681065e067d065b067d06600681065f0683065b067b065b067e065f067e065f0680065d067d065b067d065e067d065c0680065e067e065d0681065d067c065a067b0660067e065f0682065a067a065b067d0660067e065e0680065b067b065b067e065e067d065f0680065d067d065d0680065c067c065b067e065e0680065f0683065d0683065c067d06610680065e0683065b067d065a067e065d067d065e0680065e067d065e0682065d067b065a067e06600680065f0683065a067c065b067b0661068006600682065c067e065d067e0660067d065f0680065e067e065e067f065e067d065b067b065d067e065f0682065e0674065c067d065e067d065f0680065e067b065c067d065e067b065e067e065f067c065e0680065d067d065a067b06600680065f0683065a067b065b067c0660067e06540682065e067b065c067f065f067c065f0680065b067d065e0682065e067c065b067b06600682065f067e065b067b065e067b0661067d06620672065d067b065c067b0660067b065f067e065f067b065e06800660067b065b067a0660067e065f06820661067a065b067d06610680065b0681065a067e065d067b0660067b065f0680065e067e065f0682065e067c065e06830660068006610681065b067b065e067d065f067f065f0680065d067e065d067c0660067d06610680065e067e065d067e0660067d065d067e06610680065f0683065c067b065b067e0660067e065d0681065e067e065c067e065f067c065f0680065e067e065e0682065e067d065b067a065e0681065f0683065b067e065b0680065f0680065f0682065c0680065c0680065d067d065e0680065e067d065e0681065d067b065a067d0661067e065f0683065d067b065d067d06600680065f0682065c067d065b067f065e067e065f0680065e067c065f0683065e067b065b067c065d0680065f0682065d067b065c067e0660068106620683065e067d065c067e0661067d06610680065e067c065f067e0660067d0652067d0661067e06610682065d067b065c067b0660067e06610682065f067d065b067e065e067d065e0682065f067d065e0681065d067d065c068006610680065e0681065d067b065d067c06610680065f0681065e067d065b067c0660067b065f067f0669067d066306800660067b065c067b0661067e065f0682065d067a065c067c0660067b065f0680065d067d065b067e065b067b065e0680065d0679065d0681065c067d065c067c065e0680065e0683065c067c065b067d065d0680065e0681065c067d065b067e065d067c065e067e0665067d065f0680065e067b065c067b0661067d065f0682065d067a065c067b0660067d065f0680065e067d065b067d065d067c065e0680065d0680065f0681065b067c065d067b0660068006640682065b067b065b067d0661068006620681065d067d065c067d065e067b065f067e065d067d065f0681065f067b0665067b0661067b065f0682065b067b065c067e065e067d065f0683065d067c065b067e065d067b065f067e06"
+              }
+            ],
+            "temperature_samples": [
+              {
+                "attempt": 1,
+                "host_monotonic_seconds": 5105845.259285329,
+                "latency_seconds": 0.020744014531373978,
+                "millidegrees_c": null,
+                "phase": "before",
+                "status": 2
+              },
+              {
+                "attempt": 2,
+                "host_monotonic_seconds": 5105845.300783243,
+                "latency_seconds": 0.020919502712786198,
+                "millidegrees_c": 36667,
+                "phase": "before",
+                "status": 0
+              },
+              {
+                "attempt": 1,
+                "host_monotonic_seconds": 5105855.419878918,
+                "latency_seconds": 0.010413506999611855,
+                "millidegrees_c": 40351,
+                "phase": "running",
+                "status": 0
+              },
+              {
+                "attempt": 1,
+                "host_monotonic_seconds": 5105865.440327056,
+                "latency_seconds": 0.010190282948315144,
+                "millidegrees_c": 42808,
+                "phase": "running",
+                "status": 0
+              },
+              {
+                "attempt": 1,
+                "host_monotonic_seconds": 5105875.461035664,
+                "latency_seconds": 0.010773560032248497,
+                "millidegrees_c": 44650,
+                "phase": "running",
+                "status": 0
+              },
+              {
+                "attempt": 1,
+                "host_monotonic_seconds": 5105885.481760845,
+                "latency_seconds": 0.011301993392407894,
+                "millidegrees_c": 46492,
+                "phase": "running",
+                "status": 0
+              },
+              {
+                "attempt": 1,
+                "host_monotonic_seconds": 5105895.501799323,
+                "latency_seconds": 0.011147216893732548,
+                "millidegrees_c": 47106,
+                "phase": "running",
+                "status": 0
+              },
+              {
+                "attempt": 1,
+                "host_monotonic_seconds": 5105905.523149216,
+                "latency_seconds": 0.00999151449650526,
+                "millidegrees_c": null,
+                "phase": "running",
+                "status": 2
+              },
+              {
+                "attempt": 2,
+                "host_monotonic_seconds": 5105905.544863587,
+                "latency_seconds": 0.011191082186996937,
+                "millidegrees_c": 48948,
+                "phase": "running",
+                "status": 0
+              }
+            ]
+          },
+          "paired_diagnostic": "NOT_RUN",
+          "protocol_version": 2,
+          "rate_profile": "ADC_1MHZ_GPIO_1MHZ",
+          "result": "FAIL",
+          "schema": "thingdaq.experiment-evidence/v1"
+        }
+      ],
+      "exit_code": 1,
+      "message": "Container ran successfully for test_id 91ba765b-d70a-4523-b8dd-258f1e6888d3",
+      "outcome": "TEST_FAIL",
+      "test_id": "91ba765b-d70a-4523-b8dd-258f1e6888d3"
+    }
+  },
+  "postflight_health": {
+    "checks": {
+      "coordinator_mode": "normal",
+      "docker_reachable": true,
+      "hub_reachable": true,
+      "hubs": {
+        "0x00000000": true
+      },
+      "queue_depth": 0,
+      "worker_thread_alive": true
+    },
+    "status": "healthy"
+  },
+  "reconstructed_wire": {
+    "bytes": 4120,
+    "discarded_bytes": 2120,
+    "failed_sequence": 138621,
+    "missing_frame_tail_bytes": 24,
+    "next_sequence": 138622,
+    "sha256": "11b6d515291ce43a76ae42fdd4ea088df8797994cb3566cdedc8291605335741",
+    "stale_fragment_bytes": 72,
+    "stale_sequence": 138619
+  },
+  "release_default_build_manifest": {
+    "arduino_cli": {
+      "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+      "path": "/usr/local/bin/arduino-cli"
+    },
+    "artifacts": [
+      {
+        "path": "firmware.ino.eep",
+        "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "size_bytes": 34
+      },
+      {
+        "path": "firmware.ino.elf",
+        "sha256": "b37bb278d50a5ca8c8ade12f0c2c1908395f5bc0ecb53f1c17c7342a3c450590",
+        "size_bytes": 2386864
+      },
+      {
+        "path": "firmware.ino.hex",
+        "sha256": "fac02ac7bfe1c3a63851536e80e98fb6842cad83a07256aa7c67de98685ae3de",
+        "size_bytes": 460924
+      },
+      {
+        "path": "firmware.ino.map",
+        "sha256": "f96f9d4f9253d16afc61e4be170c35900c5613f683bc36eff835faa2f364e459",
+        "size_bytes": 957374
+      }
+    ],
+    "binary_inspection": {
+      "adc_dma_buffers": {
+        "allocations": {
+          "DESCRIPTORS": {
+            "address": "0x2025f000",
+            "alignment_bytes": 32,
+            "bytes": 768,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_descriptors",
+            "symbol_type": "B"
+          },
+          "OVERFLOW_SINK": {
+            "address": "0x2025f300",
+            "alignment_bytes": 32,
+            "bytes": 32,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_overflow_sink",
+            "symbol_type": "B"
+          },
+          "RING": {
+            "address": "0x2025f320",
+            "alignment_bytes": 32,
+            "bytes": 32512,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_buffers",
+            "symbol_type": "B"
+          }
+        },
+        "total_bytes": 33312
+      },
+      "auxiliary_input_resources": {
+        "arbitration_scope": "fixed eDMA service order only; no pad-level simultaneity claim",
+        "auxiliary_dma_interrupt": {
+          "irq": 3,
+          "priority": 64,
+          "vector": 19
+        },
+        "auxiliary_dmamux_source": 31,
+        "auxiliary_edma_channel": 3,
+        "auxiliary_xbar_output": 1,
+        "edma_priorities": [
+          3,
+          2,
+          1,
+          0
+        ],
+        "edma_priority_order": [
+          "ADC0",
+          "ADC1",
+          "PRIMARY_GPIO",
+          "AUXILIARY_GPIO"
+        ],
+        "gpio1_bits_by_wire_bit": [
+          23,
+          22,
+          17,
+          16,
+          26,
+          27,
+          24,
+          25
+        ],
+        "gpio1_capture_mask": 264437760,
+        "gpio1_standard_port": 1,
+        "gpio6_fast_port": 6,
+        "gpio_dma_irq_priority": 64,
+        "gpr26_fast_select": 26,
+        "owner": "AUX_GPIO_CAPTURE",
+        "paired_join_required": true,
+        "pins": [
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23
+        ],
+        "pit_channel": 0,
+        "primary_dmamux_source": 30,
+        "primary_edma_channel": 2,
+        "primary_gpio2_bits_by_wire_bit": [
+          10,
+          17,
+          16,
+          11,
+          0,
+          2,
+          1,
+          3
+        ],
+        "primary_xbar_output": 0,
+        "raw_ring_depth_per_bank": 4,
+        "raw_word_bytes_per_bank": 4,
+        "shared_xbar_selector": {
+          "auxiliary_rmw_mask": "0xff00",
+          "combined_rmw_mask": "0xffff",
+          "primary_rmw_mask": "0x00ff",
+          "register_index": 0
+        },
+        "xbar_input": 56
+      },
+      "auxiliary_input_workspace": {
+        "active_bytes": 992,
+        "lease": "INPUT acquisition only; mutually exclusive with IDLE checksum benchmark",
+        "physical_storage": {
+          "address": "0x20267220",
+          "alignment_bytes": 32,
+          "bytes": 4096,
+          "range_end_exclusive": "0x20280000",
+          "range_start": "0x20200000",
+          "symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer",
+          "symbol_type": "B"
+        },
+        "unleased_bytes": 3104,
+        "views": {
+          "AUXILIARY_DESCRIPTORS": {
+            "address": "0x20267520",
+            "alignment_bytes": 32,
+            "bytes": 160,
+            "offset_bytes": 768,
+            "owner": "AUX_GPIO_CAPTURE",
+            "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+            "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+          },
+          "AUXILIARY_OVERFLOW_SINK": {
+            "address": "0x202675e0",
+            "alignment_bytes": 32,
+            "bytes": 32,
+            "offset_bytes": 960,
+            "owner": "AUX_GPIO_CAPTURE",
+            "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+            "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+          },
+          "PAIRED_JOIN_STATE": {
+            "address": "0x20267220",
+            "alignment_bytes": 32,
+            "bytes": 768,
+            "offset_bytes": 0,
+            "owner": "GPIO_JOIN",
+            "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+            "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+          },
+          "PRIMARY_INPUT_OVERFLOW_SINK": {
+            "address": "0x202675c0",
+            "alignment_bytes": 32,
+            "bytes": 32,
+            "offset_bytes": 928,
+            "owner": "GPIO_CAPTURE",
+            "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+            "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+          }
+        }
+      },
+      "checksum_benchmark_buffers": {
+        "regions": {
+          "DTCM_PACKET": {
+            "address": "0x20002420",
+            "alignment_bytes": 32,
+            "bytes": 4096,
+            "lease": "IDLE benchmark only; packet/acquisition path must be quiescent",
+            "physical_allocation": "DTCM_PRIMARY_PACKET_PAGE_0",
+            "range_end_exclusive": "0x20200000",
+            "range_start": "0x20000000",
+            "symbol": "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer",
+            "symbol_type": "B",
+            "view_offset_bytes": 0
+          },
+          "OCRAM_DMA": {
+            "address": "0x20267220",
+            "alignment_bytes": 32,
+            "bytes": 4096,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer",
+            "symbol_type": "B"
+          }
+        },
+        "working_ram_bytes": 8192
+      },
+      "checksum_resources": {
+        "algorithms": {
+          "ADLER32": {
+            "code_address": "0x0000134c",
+            "code_symbol": "thingdaq::checksum::adler32(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "arithmetic (no lookup table)",
+            "implementation_code_bytes": 260,
+            "table_flash_bytes": 0,
+            "table_ram_bytes": 0
+          },
+          "CRC32C": {
+            "address": "0x6001b080",
+            "code_address": "0x00001450",
+            "code_symbol": "thingdaq::checksum::crc32c(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "thingdaq::checksum::detail::kCrc32cTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          },
+          "CRC32_ISO_HDLC": {
+            "address": "0x60019080",
+            "code_address": "0x00001584",
+            "code_symbol": "thingdaq::checksum::crc32IsoHdlc(unsigned char const*, unsigned int)",
+            "code_symbol_type": "T",
+            "implementation": "eight-slice, 8 x 256-entry uint32 lookup table",
+            "implementation_code_bytes": 308,
+            "symbol": "thingdaq::checksum::detail::kCrc32IsoHdlcTable",
+            "symbol_type": "R",
+            "table_flash_bytes": 8192,
+            "table_ram_bytes": 0
+          }
+        },
+        "placement": "memory-mapped program flash (.progmem.checksum.*)",
+        "shared_dispatch": {
+          "address": "0x000016b8",
+          "code_bytes": 84,
+          "symbol": "thingdaq::checksum::compute(thingdaq::checksum::Algorithm, unsigned char const*, unsigned int, unsigned long&)",
+          "symbol_type": "T"
+        },
+        "total_implementation_code_bytes": 876,
+        "total_table_flash_bytes": 16384,
+        "total_table_ram_bytes": 0
+      },
+      "gpio_clock_diagnostic_buffer": {
+        "address": "0x2026c1a0",
+        "alignment_bytes": 32,
+        "bytes": 32,
+        "range_end_exclusive": "0x20280000",
+        "range_start": "0x20200000",
+        "symbol": "thingdaq::gpio_clock::g_gpio_clock_diagnostic_buffer",
+        "symbol_type": "B"
+      },
+      "gpio_packed_buffers": {
+        "address": "0x20268220",
+        "alignment_bytes": 32,
+        "buffers": 4,
+        "bytes": 16256,
+        "mode_layouts": {
+          "DISABLED": {
+            "gpio_item_bytes": 1,
+            "gpio_items_per_frame": 4048,
+            "payload_bytes": 4048,
+            "storage_bytes": 16256
+          },
+          "INPUT": {
+            "gpio_item_bytes": 2,
+            "gpio_items_per_frame": 2024,
+            "payload_bytes": 4048,
+            "storage_bytes": 16256
+          }
+        },
+        "payload_bytes_per_buffer": 4048,
+        "range_end_exclusive": "0x20280000",
+        "range_start": "0x20200000",
+        "storage_repartitioned": false,
+        "stride_bytes": 4064,
+        "symbol": "thingdaq::gpio_packer::g_gpio_packed_buffers",
+        "symbol_type": "B"
+      },
+      "gpio_paired_join_state": {
+        "address": "0x20267220",
+        "alignment_bytes": 32,
+        "bytes": 768,
+        "lease": "INPUT acquisition only; mutually exclusive with IDLE checksum benchmark",
+        "offset_bytes": 0,
+        "owner": "GPIO_JOIN",
+        "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+        "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+      },
+      "gpio_raw_dma_buffers": {
+        "allocations": {
+          "DESCRIPTORS": {
+            "address": "0x2026c1c0",
+            "alignment_bytes": 32,
+            "bytes": 160,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_descriptors",
+            "symbol_type": "B"
+          },
+          "OVERFLOW_SINK": {
+            "address": "0x2026c260",
+            "alignment_bytes": 32,
+            "bytes": 32,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_overflow_sink",
+            "symbol_type": "B"
+          },
+          "RING": {
+            "address": "0x2026c280",
+            "alignment_bytes": 32,
+            "bytes": 64768,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_buffers",
+            "symbol_type": "B"
+          }
+        },
+        "mode_views": {
+          "DISABLED": {
+            "PRIMARY": {
+              "DESCRIPTORS": {
+                "address": "0x2026c1c0",
+                "bytes": 160,
+                "offset_bytes": 0,
+                "physical_allocation": "DESCRIPTORS"
+              },
+              "OVERFLOW_SINK": {
+                "address": "0x2026c260",
+                "bytes": 32,
+                "offset_bytes": 0,
+                "physical_allocation": "OVERFLOW_SINK"
+              },
+              "RING": {
+                "address": "0x2026c280",
+                "bytes": 64768,
+                "offset_bytes": 0,
+                "physical_allocation": "RING"
+              }
+            }
+          },
+          "INPUT": {
+            "AUXILIARY": {
+              "DESCRIPTORS": {
+                "address": "0x20267520",
+                "alignment_bytes": 32,
+                "bytes": 160,
+                "offset_bytes": 768,
+                "owner": "AUX_GPIO_CAPTURE",
+                "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+                "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+              },
+              "OVERFLOW_SINK": {
+                "address": "0x202675e0",
+                "alignment_bytes": 32,
+                "bytes": 32,
+                "offset_bytes": 960,
+                "owner": "AUX_GPIO_CAPTURE",
+                "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+                "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+              },
+              "RING": {
+                "address": "0x20274100",
+                "bytes": 32384,
+                "offset_bytes": 32384,
+                "physical_allocation": "RING"
+              }
+            },
+            "PRIMARY": {
+              "DESCRIPTORS": {
+                "address": "0x2026c1c0",
+                "bytes": 160,
+                "offset_bytes": 0,
+                "physical_allocation": "DESCRIPTORS"
+              },
+              "OVERFLOW_SINK": {
+                "address": "0x202675c0",
+                "alignment_bytes": 32,
+                "bytes": 32,
+                "offset_bytes": 928,
+                "owner": "GPIO_CAPTURE",
+                "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+                "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+              },
+              "RING": {
+                "address": "0x2026c280",
+                "bytes": 32384,
+                "offset_bytes": 0,
+                "physical_allocation": "RING"
+              }
+            }
+          }
+        },
+        "packet_storage_repartitioned": false,
+        "shared_input_workspace": {
+          "active_bytes": 992,
+          "lease": "INPUT acquisition only; mutually exclusive with IDLE checksum benchmark",
+          "physical_storage": {
+            "address": "0x20267220",
+            "alignment_bytes": 32,
+            "bytes": 4096,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer",
+            "symbol_type": "B"
+          },
+          "unleased_bytes": 3104,
+          "views": {
+            "AUXILIARY_DESCRIPTORS": {
+              "address": "0x20267520",
+              "alignment_bytes": 32,
+              "bytes": 160,
+              "offset_bytes": 768,
+              "owner": "AUX_GPIO_CAPTURE",
+              "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+              "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+            },
+            "AUXILIARY_OVERFLOW_SINK": {
+              "address": "0x202675e0",
+              "alignment_bytes": 32,
+              "bytes": 32,
+              "offset_bytes": 960,
+              "owner": "AUX_GPIO_CAPTURE",
+              "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+              "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+            },
+            "PAIRED_JOIN_STATE": {
+              "address": "0x20267220",
+              "alignment_bytes": 32,
+              "bytes": 768,
+              "offset_bytes": 0,
+              "owner": "GPIO_JOIN",
+              "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+              "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+            },
+            "PRIMARY_INPUT_OVERFLOW_SINK": {
+              "address": "0x202675c0",
+              "alignment_bytes": 32,
+              "bytes": 32,
+              "offset_bytes": 928,
+              "owner": "GPIO_CAPTURE",
+              "physical_allocation": "CHECKSUM_BENCHMARK_OCRAM",
+              "physical_symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+            }
+          }
+        },
+        "total_bytes": 64960
+      },
+      "linker_memory": {
+        "ram1_actual_free_for_locals_stack_bytes": 34464,
+        "ram1_minimum_free_for_locals_stack_bytes": 32768,
+        "ram2_actual_free_for_heap_bytes": 4096,
+        "ram2_minimum_free_for_heap_bytes": 4096,
+        "regions": {
+          "DTCM": {
+            "bytes": 524288,
+            "end_exclusive": "0x20080000",
+            "start": "0x20000000"
+          },
+          "RAM": {
+            "bytes": 524288,
+            "end_exclusive": "0x20280000",
+            "start": "0x20200000"
+          }
+        },
+        "sections": {
+          ".bss": {
+            "bytes": 448160,
+            "end_exclusive": "0x2006f960",
+            "start": "0x200022c0"
+          },
+          ".bss.dma": {
+            "bytes": 520192,
+            "end_exclusive": "0x2027f000",
+            "start": "0x20200000"
+          }
+        }
+      },
+      "managed_memory": {
+        "allocation_count": 13,
+        "allocations": [
+          {
+            "address": "0x20002420",
+            "bytes": 430080,
+            "end_exclusive": "0x2006b420",
+            "owner": "packet_dtcm_primary",
+            "region": "DTCM",
+            "symbol": "thingdaq_packet_storage_primary"
+          },
+          {
+            "address": "0x20002420",
+            "bytes": 4096,
+            "end_exclusive": "0x20003420",
+            "lease": "IDLE benchmark only; packet/acquisition path must be quiescent",
+            "owner": "checksum_dtcm",
+            "physical_allocation": "packet_dtcm_primary",
+            "region": "DTCM",
+            "symbol": "thingdaq::benchmark::g_checksum_benchmark_dtcm_buffer"
+          },
+          {
+            "address": "0x20200000",
+            "bytes": 389120,
+            "end_exclusive": "0x2025f000",
+            "owner": "packet_ocram_reserve",
+            "region": "OCRAM",
+            "symbol": "(anonymous namespace)::packet_storage_reserve"
+          },
+          {
+            "address": "0x2025f000",
+            "bytes": 768,
+            "end_exclusive": "0x2025f300",
+            "owner": "adc_descriptors",
+            "region": "OCRAM",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_descriptors"
+          },
+          {
+            "address": "0x2025f300",
+            "bytes": 32,
+            "end_exclusive": "0x2025f320",
+            "owner": "adc_overflow_sink",
+            "region": "OCRAM",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_overflow_sink"
+          },
+          {
+            "address": "0x2025f320",
+            "bytes": 32512,
+            "end_exclusive": "0x20267220",
+            "owner": "adc_raw_storage",
+            "region": "OCRAM",
+            "symbol": "thingdaq::adc_capture::g_adc_dma_buffers"
+          },
+          {
+            "address": "0x20267220",
+            "bytes": 4096,
+            "end_exclusive": "0x20268220",
+            "owner": "checksum_ocram",
+            "region": "OCRAM",
+            "symbol": "thingdaq::benchmark::g_checksum_benchmark_ocram_buffer"
+          },
+          {
+            "address": "0x20268220",
+            "bytes": 16256,
+            "end_exclusive": "0x2026c1a0",
+            "owner": "gpio_packed_storage",
+            "region": "OCRAM",
+            "symbol": "thingdaq::gpio_packer::g_gpio_packed_buffers"
+          },
+          {
+            "address": "0x2026c1a0",
+            "bytes": 32,
+            "end_exclusive": "0x2026c1c0",
+            "owner": "gpio_clock_diagnostic",
+            "region": "OCRAM",
+            "symbol": "thingdaq::gpio_clock::g_gpio_clock_diagnostic_buffer"
+          },
+          {
+            "address": "0x2026c1c0",
+            "bytes": 160,
+            "end_exclusive": "0x2026c260",
+            "owner": "gpio_descriptors",
+            "region": "OCRAM",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_descriptors"
+          },
+          {
+            "address": "0x2026c260",
+            "bytes": 32,
+            "end_exclusive": "0x2026c280",
+            "owner": "gpio_overflow_sinks",
+            "region": "OCRAM",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_overflow_sink"
+          },
+          {
+            "address": "0x2026c280",
+            "bytes": 64768,
+            "end_exclusive": "0x2027bf80",
+            "owner": "gpio_raw_storage",
+            "region": "OCRAM",
+            "symbol": "thingdaq::gpio_capture::g_gpio_raw_dma_buffers"
+          },
+          {
+            "address": "0x2027d000",
+            "bytes": 8192,
+            "end_exclusive": "0x2027f000",
+            "owner": "pinned_usb_tx",
+            "region": "OCRAM",
+            "symbol": "txbuffer"
+          }
+        ],
+        "overlap_check": "passed"
+      },
+      "nm_path": "/home/bill/.arduino15/packages/teensy/tools/teensy-compile/15.2.1/arm/bin/arm-none-eabi-nm",
+      "packet_buffers": {
+        "banks": {
+          "DTCM_PRIMARY": {
+            "address": "0x20002420",
+            "alignment_bytes": 32,
+            "bytes": 430080,
+            "frames": 105,
+            "range_end_exclusive": "0x20200000",
+            "range_start": "0x20000000",
+            "symbol": "thingdaq_packet_storage_primary",
+            "symbol_type": "B"
+          },
+          "OCRAM_RESERVE": {
+            "address": "0x20200000",
+            "alignment_bytes": 32,
+            "bytes": 389120,
+            "frames": 95,
+            "range_end_exclusive": "0x20280000",
+            "range_start": "0x20200000",
+            "symbol": "(anonymous namespace)::packet_storage_reserve",
+            "symbol_type": "b"
+          }
+        },
+        "total_bytes": 819200,
+        "total_frames": 200
+      },
+      "packet_retention": {
+        "capacity": {
+          "baseline_frames": 200,
+          "change_note": null,
+          "current_frames": 200,
+          "delta_frames": 0
+        },
+        "combined_complete_intervals": 100,
+        "combined_frames_per_interval": 2,
+        "coverage_units": "ADC frames; conservative lower bounds for profile 4",
+        "profiles": [
+          {
+            "adc_pair_rate_hz": 1000000,
+            "gpio_sample_rate_hz": 4000000,
+            "modes": {
+              "DISABLED": {
+                "combined_retention_us": 101200,
+                "coverage_ticks": 8096,
+                "single_stream_retention_us": 202400
+              },
+              "INPUT": {
+                "combined_retention_us": 50600,
+                "coverage_ticks": 4048,
+                "single_stream_retention_us": 101200
+              }
+            },
+            "profile": "ADC_1MHZ_GPIO_4MHZ"
+          },
+          {
+            "adc_pair_rate_hz": 500000,
+            "gpio_sample_rate_hz": 2000000,
+            "modes": {
+              "DISABLED": {
+                "combined_retention_us": 202400,
+                "coverage_ticks": 16192,
+                "single_stream_retention_us": 404800
+              },
+              "INPUT": {
+                "combined_retention_us": 101200,
+                "coverage_ticks": 8096,
+                "single_stream_retention_us": 202400
+              }
+            },
+            "profile": "ADC_500KHZ_GPIO_2MHZ"
+          },
+          {
+            "adc_pair_rate_hz": 250000,
+            "gpio_sample_rate_hz": 1000000,
+            "modes": {
+              "DISABLED": {
+                "combined_retention_us": 404800,
+                "coverage_ticks": 32384,
+                "single_stream_retention_us": 809600
+              },
+              "INPUT": {
+                "combined_retention_us": 202400,
+                "coverage_ticks": 16192,
+                "single_stream_retention_us": 404800
+              }
+            },
+            "profile": "ADC_250KHZ_GPIO_1MHZ"
+          },
+          {
+            "adc_pair_rate_hz": 125000,
+            "gpio_sample_rate_hz": 500000,
+            "modes": {
+              "DISABLED": {
+                "combined_retention_us": 809600,
+                "coverage_ticks": 64768,
+                "single_stream_retention_us": 1619200
+              },
+              "INPUT": {
+                "combined_retention_us": 404800,
+                "coverage_ticks": 32384,
+                "single_stream_retention_us": 809600
+              }
+            },
+            "profile": "ADC_125KHZ_GPIO_500KHZ"
+          },
+          {
+            "adc_pair_rate_hz": 1000000,
+            "gpio_sample_rate_hz": 1000000,
+            "modes": {
+              "DISABLED": {
+                "combined_retention_us": 101200,
+                "coverage_ticks": 8096,
+                "single_stream_retention_us": 202400
+              },
+              "INPUT": {
+                "combined_retention_us": 50600,
+                "coverage_ticks": 4048,
+                "single_stream_retention_us": 101200
+              }
+            },
+            "profile": "ADC_1MHZ_GPIO_1MHZ"
+          }
+        ],
+        "raw_ring_overlay_preserves_packet_capacity": true,
+        "unused_frames_after_complete_intervals": 0
+      }
+    },
+    "command": [
+      "/usr/local/bin/arduino-cli",
+      "compile",
+      "--fqbn",
+      "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+      "--clean",
+      "--warnings",
+      "all",
+      "--build-property",
+      "build.flags.defs=-D__IMXRT1062__ -DTEENSYDUINO=160 -DTHINGDAQ_SOURCE_ID_WORD0=0x968605b4779ec82fULL -DTHINGDAQ_SOURCE_ID_WORD1=0xedc7ad0f2ecd4335ULL -DTHINGDAQ_SOURCE_ID_WORD2=0xf95e806c1e55c2faULL -DTHINGDAQ_SOURCE_ID_WORD3=0x34d481c297a73155ULL -DTHINGDAQ_BUILD_EPOCH=1792189498ULL -DTHINGDAQ_BUILD_YEAR=2026U -DTHINGDAQ_BUILD_MONTH=10U -DTHINGDAQ_BUILD_DAY=16U -DTHINGDAQ_BUILD_HOUR=22U -DTHINGDAQ_BUILD_MINUTE=24U -DTHINGDAQ_BUILD_SECOND=58U -DTHINGDAQ_OPTIMIZATION_O2STD=1 -DTHINGDAQ_RELEASE_FIXED_1MHZ=1",
+      "--build-property",
+      "build.flags.ld=-Wl,--gc-sections,--relax,--no-warn-rwx-segments \"-T/home/bill/.arduino15/packages/teensy/hardware/avr/1.62.0/cores/teensy4/imxrt1062.ld\" -Wl,-Map=/home/bill/agents/teensy_daq/firmware/build/teensy.avr.teensy40.usb_serial.speed_450.opt_o2std/firmware.ino.map,--cref",
+      "--export-binaries",
+      "--output-dir",
+      "/home/bill/agents/teensy_daq/firmware/build/teensy.avr.teensy40.usb_serial.speed_450.opt_o2std",
+      "/home/bill/agents/teensy_daq/firmware"
+    ],
+    "compiler": {
+      "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+      "path": "/home/bill/.arduino15/packages/teensy/tools/teensy-compile/15.2.1/arm/bin/arm-none-eabi-g++"
+    },
+    "memory_usage": {
+      "flash": {
+        "code_bytes": 129744,
+        "data_bytes": 25744,
+        "free_for_files_bytes": 1867780,
+        "headers_bytes": 8348
+      },
+      "ram1": {
+        "code_bytes": 32536,
+        "free_for_locals_bytes": 34464,
+        "padding_bytes": 232,
+        "variables_bytes": 457056
+      },
+      "ram2": {
+        "free_for_heap_bytes": 4096,
+        "variables_bytes": 520192
+      }
+    },
+    "output_directory": "firmware/build/teensy.avr.teensy40.usb_serial.speed_450.opt_o2std",
+    "release_policy": {
+      "adc_dma_active_lookahead_generations": 4,
+      "core_hz": 450000000,
+      "fixed_1mhz": true,
+      "legacy_gpio_capture_diagnostic_enabled": false,
+      "protocol_version": 2,
+      "supported_rate_profile_mask": 16
+    },
+    "schema_version": 11,
+    "sketch_directory": "firmware",
+    "source": {
+      "build_id": "thingdaq-968605b4779ec82f",
+      "firmware_input_changes": [
+        " M firmware/src/teensy_usb.cpp",
+        " M firmware/src/usb_transport.cpp",
+        " M firmware/src/usb_transport.h"
+      ],
+      "firmware_inputs_clean": false,
+      "git_commit": "bf85b86be12ad66822bc23cfe44d6296ed93557b",
+      "inputs": [
+        "firmware/firmware.ino",
+        "firmware/src/acquisition_controller.cpp",
+        "firmware/src/acquisition_controller.h",
+        "firmware/src/adc_dma_capture.cpp",
+        "firmware/src/adc_dma_capture.h",
+        "firmware/src/adc_dma_capture_teensy.cpp",
+        "firmware/src/adc_dma_capture_teensy.h",
+        "firmware/src/adc_frame_packer.cpp",
+        "firmware/src/adc_frame_packer.h",
+        "firmware/src/adc_initializer.cpp",
+        "firmware/src/adc_initializer.h",
+        "firmware/src/adc_initializer_teensy.cpp",
+        "firmware/src/adc_initializer_teensy.h",
+        "firmware/src/adc_trigger.cpp",
+        "firmware/src/adc_trigger.h",
+        "firmware/src/adc_trigger_teensy.cpp",
+        "firmware/src/adc_trigger_teensy.h",
+        "firmware/src/board_config.h",
+        "firmware/src/checksum.cpp",
+        "firmware/src/checksum.h",
+        "firmware/src/checksum_benchmark.cpp",
+        "firmware/src/checksum_benchmark.h",
+        "firmware/src/checksum_benchmark_teensy.cpp",
+        "firmware/src/checksum_benchmark_teensy.h",
+        "firmware/src/control_state.cpp",
+        "firmware/src/control_state.h",
+        "firmware/src/dma_buffer_ownership.h",
+        "firmware/src/edma_priority_teensy.h",
+        "firmware/src/firmware_capabilities.h",
+        "firmware/src/firmware_identity.h",
+        "firmware/src/firmware_runtime.cpp",
+        "firmware/src/firmware_runtime.h",
+        "firmware/src/generated/protocol_constants.h",
+        "firmware/src/generated/protocol_v2_constants.h",
+        "firmware/src/gpio_batch_packer.cpp",
+        "firmware/src/gpio_batch_packer.h",
+        "firmware/src/gpio_batch_packer_teensy.cpp",
+        "firmware/src/gpio_batch_packer_teensy.h",
+        "firmware/src/gpio_capture_diagnostic.cpp",
+        "firmware/src/gpio_capture_diagnostic.h",
+        "firmware/src/gpio_capture_diagnostic_teensy.cpp",
+        "firmware/src/gpio_capture_diagnostic_teensy.h",
+        "firmware/src/gpio_clock_diagnostic.cpp",
+        "firmware/src/gpio_clock_diagnostic.h",
+        "firmware/src/gpio_clock_diagnostic_teensy.cpp",
+        "firmware/src/gpio_clock_diagnostic_teensy.h",
+        "firmware/src/gpio_dma_route_teensy.h",
+        "firmware/src/gpio_dual_bank_capture.cpp",
+        "firmware/src/gpio_dual_bank_capture.h",
+        "firmware/src/gpio_dual_bank_capture_teensy.cpp",
+        "firmware/src/gpio_dual_bank_capture_teensy.h",
+        "firmware/src/gpio_dual_bank_packer.cpp",
+        "firmware/src/gpio_dual_bank_packer.h",
+        "firmware/src/gpio_pack_c.c",
+        "firmware/src/gpio_pack_c.h",
+        "firmware/src/gpio_raw_capture.cpp",
+        "firmware/src/gpio_raw_capture.h",
+        "firmware/src/gpio_raw_capture_teensy.cpp",
+        "firmware/src/gpio_raw_capture_teensy.h",
+        "firmware/src/gpio_raw_storage_teensy.h",
+        "firmware/src/input_experiment_profile.h",
+        "firmware/src/interrupt_guard_teensy.h",
+        "firmware/src/interrupt_vectors_teensy.h",
+        "firmware/src/packet_buffer_pipeline.cpp",
+        "firmware/src/packet_buffer_pipeline.h",
+        "firmware/src/protocol.cpp",
+        "firmware/src/protocol.h",
+        "firmware/src/rate_profile_table.h",
+        "firmware/src/runtime_health.h",
+        "firmware/src/runtime_health_teensy.cpp",
+        "firmware/src/statistics.cpp",
+        "firmware/src/statistics.h",
+        "firmware/src/stream_layout.h",
+        "firmware/src/synthetic_source.cpp",
+        "firmware/src/synthetic_source.h",
+        "firmware/src/teensy_clock.cpp",
+        "firmware/src/teensy_clock.h",
+        "firmware/src/teensy_usb.cpp",
+        "firmware/src/teensy_usb.h",
+        "firmware/src/temperature.h",
+        "firmware/src/temperature_teensy.cpp",
+        "firmware/src/usb_transport.cpp",
+        "firmware/src/usb_transport.h",
+        "firmware/src/variable_rate_scheduler.cpp",
+        "firmware/src/variable_rate_scheduler.h",
+        "firmware/src/variable_rate_scheduler_teensy.cpp",
+        "firmware/src/variable_rate_scheduler_teensy.h",
+        "firmware/src/watchdog_teensy.cpp",
+        "firmware/src/watchdog_teensy.h",
+        "protocol/protocol-v1.json",
+        "protocol/protocol-v2.json"
+      ],
+      "source_id": "968605b4779ec82fedc7ad0f2ecd4335f95e806c1e55c2fa34d481c297a73155",
+      "timestamp_epoch": 1792189498,
+      "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
+      "timestamp_utc": "2026-10-16T22:24:58Z"
+    },
+    "target": {
+      "core_id": "teensy:avr",
+      "core_version": "1.62.0",
+      "fqbn": "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+      "resolved_build_properties": {
+        "build.board": "TEENSY40",
+        "build.fcpu": "450000000",
+        "build.flags.optimize": "-O2",
+        "build.usbtype": "USB_SERIAL"
+      },
+      "warnings": "all"
+    }
+  },
+  "replay_model": "Exact Thumb instructions and real flush callback; modeled memcpy, USB completion and NVIC; not a full USB/cache simulator",
+  "schema": "thingdaq.usb-autoflush-investigation/v1"
+}
