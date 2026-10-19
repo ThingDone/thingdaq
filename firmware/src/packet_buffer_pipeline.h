@@ -16,7 +16,9 @@ struct PacketBufferPipelineTestAccess;
 #endif
 
 // These values describe ownership, not merely progress. Only FILLING exposes
-// mutable payload bytes. READY is owned by a bounded per-source ready queue,
+// mutable payload bytes. The private deferred path keeps complete raw pages
+// FILLING (frame_size != 0, producer lease invalidated) in the source FIFO
+// until a codec completes; they are invisible to promotion. READY is immutable,
 // and TRANSMITTING is immutable until CdcTransport releases the complete
 // frame after its final byte. Recycling always returns through FREE.
 enum class BufferState : std::uint8_t {
@@ -329,7 +331,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
       protocol_v1::ChecksumAlgorithm checksum_algorithm,
       std::uint8_t enabled_stream_mask,
       const stream_layout::RunLayout &layout);
-  // STOP cancels any producer-owned partial construction, then drains every
+  // STOP cancels producer-owned partial construction, then drains deferred
+  // complete pages and every
   // already complete READY/TRANSMITTING frame through normal USB ownership.
   StopReport stopProduction();
 
@@ -347,6 +350,12 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   FinishFillResult finishFill(const FillHandle &handle,
                               const FrameCompletion &completion);
   bool cancelFill(const FillHandle &handle);
+
+  // Low-priority cooperative worker. Clock is absolute 8 MHz, deadline 10 ms
+  // from admission. A zero budget still expires queued work under overload.
+  void setDeferredClock(std::uint64_t ticks) { deferred_now_ = static_cast<std::uint32_t>(ticks); }
+  void serviceDeferred(std::uint64_t ticks, std::size_t budget = 1U,
+                       std::uint64_t (*read_ticks)(void *) = nullptr, void *clock_context = nullptr);
 
   // Move a bounded number of complete READY frames into immutable transport
   // ownership. A combined active run admits at most one equal-duration frame
@@ -423,10 +432,12 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::uint64_t coverageFrames(std::size_t source_index) const;
   std::uint64_t accountedFrames(std::size_t source_index) const;
   BufferIndex takeFreeBuffer();
-  bool validFrameSize(const BufferRecord &record) const;
+  bool validFrameSize(BufferIndex index) const;
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
-  void compressGpio(BufferIndex index);
+  bool compressGpio(BufferIndex index);
+  bool packAdc12(BufferIndex index);
 #endif
+  void publishReady(BufferIndex index);
   BufferIndex oldestEvictableCompleteBuffer() const;
   bool evictCompleteBuffer(BufferIndex index);
   void dropBuffer(BufferIndex index, bool pressure_eviction);
@@ -468,6 +479,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::size_t transmit_queue_high_water_ = 0U;
   std::size_t buffers_owned_high_water_ = 0U;
   std::array<bool, kStreamCount> gap_before_next_frame_{};
+  std::uint32_t deferred_now_ = 0U;
+  std::size_t next_codec_source_ = 0U;
   bool accepting_frames_ = false;
 };
 

@@ -174,3 +174,11 @@ transport and compression on the observed inputs, not external-waveform fidelity
 GPIO processing CPU includes synchronous RLE finalization within the GPIO
 packer service, but is not total CPU usage. Queue maxima and thermal readings
 must be compared with their differing capture durations and initial conditions.
+
+
+The [deferred codec candidate](../research/deferred-codecs.md) adds an opt-in
+cooperative worker with default-on GPIO RLE, optional ADC12 packing, and explicit
+deadline drops. Its pressure qualification also fixes the compressed-frame
+validator to accept a checked buffer index instead of deriving one from a
+possibly copied record. See that candidate's evidence before treating it as
+qualified; historical captures above used their recorded immutable images.

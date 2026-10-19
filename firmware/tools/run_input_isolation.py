@@ -210,6 +210,17 @@ def gpio_rle_settings(
     if (probe or etc_probe) and not adc_phase:
         raise ValueError("DMA probe requires --adc-phase readback")
     settings = {"AUX_INPUT_GPIO_RLE": "1" if selected else "0"}
+    for key in ("deferred_codecs", "encode_gpio_rle", "adc_pack12"):
+        if key in experiment and not isinstance(experiment[key], bool):
+            raise ValueError(f"invalid codec manifest selection: {key}")
+    if experiment.get("deferred_codecs"):
+        if not selected or probe or etc_probe:
+            raise ValueError("deferred codecs require the qualified private baseline")
+        settings["AUX_INPUT_RLE_ENABLED"] = (
+            "1" if experiment.get("encode_gpio_rle", True) else "0"
+        )
+        settings["AUX_INPUT_DEFERRED_CODECS"] = "1"
+        settings["AUX_INPUT_ADC_PACK12"] = "1" if experiment.get("adc_pack12") else "0"
     if adc_phase:
         settings["AUX_INPUT_ADC_PHASE"] = "1"
     if probe:

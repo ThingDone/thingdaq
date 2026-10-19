@@ -2,6 +2,7 @@
 #include "input_experiment_profile.h"
 
 #include "protocol.h"
+#include "deferred_codec.h"
 
 #include <limits>
 
@@ -3775,7 +3776,12 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
 #undef STORE_AUX_STATUS_U64
   }
   if (version2) {
-    const auto fault = adc_capture::fault_trace::snapshot(request.request_id);
+    auto fault = adc_capture::fault_trace::snapshot(request.request_id);
+#if defined(THINGDAQ_DEFERRED_CODECS)
+    if (request.request_id > deferred_codec::kRequestBase &&
+        request.request_id <= deferred_codec::kRequestBase + 10U)
+      fault = deferred_codec::page(request.request_id);
+#endif
     for (std::size_t i = 0; i < fault.size(); ++i) {
       storeU32(bytes, protocol_v2::kStatusResponsePayloadSize + i * 4U, fault[i]);
     }

@@ -414,3 +414,42 @@ EncodeResult encode(protocol::ByteView decoded, const SizingPlan &plan,
 }
 
 }  // namespace thingdaq::rle
+
+namespace thingdaq::rle {
+THINGDAQ_RLE_CODE(".flashmem.rle.hybrid16")
+__attribute__((optimize("Os")))
+EncodeResult encodeHybrid16(protocol::ByteView input, const SizingPlan &plan,
+                            protocol::MutableByteView output) {
+  if (!plan.ok() || plan.shape.item_bytes != 2U || input.size != plan.item_count * 2U ||
+      !input.valid() || !output.valid() || output.size < plan.encoded_payload_bytes ||
+      rangesOverlap(input, output)) return {Status::kPlanMismatch, 0U, 0U};
+  if (plan.run_count == 1U) {
+    output.data[0] = static_cast<std::uint8_t>(plan.item_count);
+    output.data[1] = static_cast<std::uint8_t>(plan.item_count >> 8U);
+    output.data[2] = input.data[0]; output.data[3] = input.data[1];
+    return {Status::kOk, 1U, 4U};
+  }
+  std::size_t used = 0U, start = 0U, runs = 0U;
+  auto previous = loadUnalignedU16(input.data);
+  for (std::size_t item = 1U; item < plan.item_count; ++item) {
+    const auto current = loadUnalignedU16(input.data + 2U * item);
+    if (current == previous) continue;
+    if (used + 4U > output.size) return {Status::kOutputTooSmall, 0U, 0U};
+    const auto count = item - start;
+    output.data[used] = static_cast<std::uint8_t>(count);
+    output.data[used + 1U] = static_cast<std::uint8_t>(count >> 8U);
+    output.data[used + 2U] = static_cast<std::uint8_t>(previous);
+    output.data[used + 3U] = static_cast<std::uint8_t>(previous >> 8U);
+    used += 4U; ++runs; start = item; previous = current;
+  }
+  if (used + 4U > output.size) return {Status::kOutputTooSmall, 0U, 0U};
+  const auto count = plan.item_count - start;
+  output.data[used] = static_cast<std::uint8_t>(count);
+  output.data[used + 1U] = static_cast<std::uint8_t>(count >> 8U);
+  output.data[used + 2U] = static_cast<std::uint8_t>(previous);
+  output.data[used + 3U] = static_cast<std::uint8_t>(previous >> 8U);
+  used += 4U; ++runs;
+  return {runs == plan.run_count && used == plan.encoded_payload_bytes ? Status::kOk : Status::kPlanMismatch,
+          runs, used};
+}
+}

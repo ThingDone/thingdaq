@@ -1,3 +1,9 @@
+#if defined(THINGDAQ_DEFERRED_CODECS) && !defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+#error "Deferred codecs require the qualified GPIO-RLE private baseline"
+#endif
+#if (defined(THINGDAQ_ADC_PACK12) || defined(THINGDAQ_DISABLE_GPIO_RLE)) && !defined(THINGDAQ_DEFERRED_CODECS)
+#error "Codec selections require deferred codecs"
+#endif
 #pragma once
 
 #if defined(THINGDAQ_EXPERIMENT_GPIO_PREEMPT_PROBE) && \
@@ -62,6 +68,23 @@ inline constexpr std::uint8_t kAdc1DmamuxSource = kAdcEtcRequest ? 23U : 88U;
 // Private GPIO-RLE16 wire version; ordinary v2 decoders reject it. RAW fallback
 // and all ADC/control frames retain v2. No reserved header byte is repurposed.
 inline constexpr std::uint8_t kGpioRleVersion = 0x82U;
+inline constexpr std::uint8_t kAdcPackedVersion = 0x83U;
+#if defined(THINGDAQ_DEFERRED_CODECS)
+inline constexpr bool kDeferredCodecs = true;
+#else
+inline constexpr bool kDeferredCodecs = false;
+#endif
+#if defined(THINGDAQ_DISABLE_GPIO_RLE)
+inline constexpr bool kEncodeGpio = false;
+#else
+inline constexpr bool kEncodeGpio = kGpioRle;
+#endif
+#if defined(THINGDAQ_ADC_PACK12)
+inline constexpr bool kPackAdc = true;
+#else
+inline constexpr bool kPackAdc = false;
+#endif
+
 
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
 inline constexpr std::uint32_t kAdcFrameMultiplier = 2U;

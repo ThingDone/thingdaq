@@ -58,6 +58,11 @@ void codec() {
     std::vector<std::uint8_t> output(plan.encoded_payload_bytes + 1, 0xa5);
     assert(rle::encode(view, plan, {output.data(), output.size()}).ok());
     assert(output.back() == 0xa5);
+    if (width == 2U) {
+      std::vector<std::uint8_t> fast(output.size(), 0xa5);
+      assert(rle::encodeHybrid16(view, plan, {fast.data(), fast.size()}).ok());
+      assert(fast == output);
+    }
     std::vector<std::uint8_t> decoded;
     for (std::size_t off = 0; off < plan.encoded_payload_bytes; off += width + 2) {
       std::uint16_t count = 0;

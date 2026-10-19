@@ -28,6 +28,9 @@ def experiment_identity(
     gpio_rle: bool = False,
     gpio_preempt_probe: bool = False,
     adc_etc_probe: bool = False,
+    deferred_codecs: bool = False,
+    disable_gpio_rle: bool = False,
+    adc_pack12: bool = False,
 ) -> base.BuildIdentity:
     selection = f"input-rate-clock-v1:{cpu_mhz}:{int(equal_rates)}"
     if release_fixed_1mhz or large_adc_frame:
@@ -40,6 +43,10 @@ def experiment_identity(
         selection += ":gpio-preempt-probe=v1"
     if adc_etc_probe:
         selection += ":adc-etc-probe=v1"
+    if deferred_codecs:
+        selection += (
+            f":deferred-v1:rle={int(not disable_gpio_rle)}:adc12={int(adc_pack12)}"
+        )
     source_id = hashlib.sha256(f"{identity.source_id}:{selection}".encode()).hexdigest()
     return dataclasses.replace(
         identity, source_id=source_id, build_id=f"thingdaq-{source_id[:16]}"
@@ -66,10 +73,17 @@ def main() -> int:
     parser.add_argument("--release-fixed-1mhz", action="store_true")
     parser.add_argument("--large-adc-frame", action="store_true")
     parser.add_argument("--gpio-rle", action="store_true")
+    parser.add_argument("--deferred-codecs", action="store_true")
+    parser.add_argument("--no-rle", action="store_true", dest="disable_gpio_rle")
+    parser.add_argument("--adc-pack12", action="store_true")
     parser.add_argument("--gpio-preempt-probe", action="store_true")
     parser.add_argument("--adc-etc-probe", action="store_true")
     parser.add_argument("--arduino-cli", default="arduino-cli")
     args = parser.parse_args()
+    if args.deferred_codecs:
+        args.gpio_rle = True  # Private diagnostics/ETC route retained in all A/B cells.
+    if (args.disable_gpio_rle or args.adc_pack12) and not args.deferred_codecs:
+        parser.error("--no-rle/--adc-pack12 require --deferred-codecs")
     if args.gpio_preempt_probe and not args.gpio_rle:
         parser.error("--gpio-preempt-probe requires --gpio-rle")
     if args.adc_etc_probe and (not args.gpio_rle or args.gpio_preempt_probe):
@@ -95,6 +109,10 @@ def main() -> int:
         mode = "release-large-adc" if args.large_adc_frame else "release"
     if args.gpio_rle:
         mode += "-gpio-rle"
+    if args.deferred_codecs:
+        mode += (
+            f"-deferred-rle{int(not args.disable_gpio_rle)}-adc{int(args.adc_pack12)}"
+        )
     if args.gpio_preempt_probe:
         mode += "-preempt-probe"
     if args.adc_etc_probe:
@@ -113,6 +131,9 @@ def main() -> int:
         gpio_rle=args.gpio_rle,
         gpio_preempt_probe=args.gpio_preempt_probe,
         adc_etc_probe=args.adc_etc_probe,
+        deferred_codecs=args.deferred_codecs,
+        disable_gpio_rle=args.disable_gpio_rle,
+        adc_pack12=args.adc_pack12,
     )
     base.identity_definitions = lambda definitions, identity: (
         original_definitions(definitions, identity)
@@ -123,6 +144,9 @@ def main() -> int:
     original_flags = base.identity_definitions
     base.identity_definitions = lambda definitions, identity: (
         original_flags(definitions, identity)
+        + (" -DTHINGDAQ_DEFERRED_CODECS=1" if args.deferred_codecs else "")
+        + (" -DTHINGDAQ_DISABLE_GPIO_RLE=1" if args.disable_gpio_rle else "")
+        + (" -DTHINGDAQ_ADC_PACK12=1" if args.adc_pack12 else "")
         + (" -DTHINGDAQ_EXPERIMENT_GPIO_RLE=1" if args.gpio_rle else "")
         + (
             " -DTHINGDAQ_EXPERIMENT_GPIO_PREEMPT_PROBE=1"
@@ -147,6 +171,10 @@ def main() -> int:
         "release_fixed_1mhz": args.release_fixed_1mhz,
         "large_adc_frame": args.large_adc_frame,
         "gpio_rle": args.gpio_rle,
+        "deferred_codecs": args.deferred_codecs,
+        "encode_gpio_rle": args.gpio_rle and not args.disable_gpio_rle,
+        "adc_pack12": args.adc_pack12,
+        "codec_deadline_us": 10000 if args.deferred_codecs else None,
         "gpio_rle_wire_version": 130 if args.gpio_rle else None,
         "gpio_preempt_probe": args.gpio_preempt_probe,
         "adc_etc_probe": args.adc_etc_probe,

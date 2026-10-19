@@ -1,6 +1,7 @@
 #include "packet_buffer_pipeline.h"
 
 #include <limits>
+#include "deferred_codec.h"
 #include <cstring>
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
 #include "rle_encoder.h"
@@ -121,6 +122,10 @@ OperationStatus PacketBufferPipeline::startRun(
   }
   transmit_queue_.clear();
   source_counters_ = {};
+#if defined(THINGDAQ_DEFERRED_CODECS)
+  deferred_codec::counters = {};
+#endif
+  next_codec_source_ = 0U;
   transmit_depth_by_source_ = {};
   run_id_ = run_id;
   enabled_stream_mask_ = enabled_stream_mask;
@@ -153,7 +158,7 @@ StopReport PacketBufferPipeline::stopProduction() {
   accepting_frames_ = false;
   for (std::size_t index = 0U; index < records_.size(); ++index) {
     const BufferRecord &record = records_[index];
-    if (record.state != BufferState::kFilling) {
+    if (record.state != BufferState::kFilling || record.frame_size != 0U) {
       continue;
     }
     dropBuffer(static_cast<BufferIndex>(index), false);
@@ -333,9 +338,13 @@ FinishFillResult PacketBufferPipeline::finishFill(
   }
   record.gap_before_required = false;
   record.frame_size = layout.frame_bytes;
+  const bool deferred = input_experiment::kDeferredCodecs &&
+      layout_.protocol_version == 2U && layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput &&
+      ((record.stream == Stream::kGpio && input_experiment::kEncodeGpio) ||
+       (record.stream == Stream::kAdc && input_experiment::kPackAdc));
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
-  if (record.stream == Stream::kGpio && layout_.protocol_version == 2U &&
-      layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput) {
+  if (!deferred && input_experiment::kEncodeGpio && record.stream == Stream::kGpio &&
+      layout_.protocol_version == 2U && layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput) {
     compressGpio(handle.buffer_index);
   }
 #endif
@@ -348,6 +357,21 @@ FinishFillResult PacketBufferPipeline::finishFill(
     return result;
   }
 
+  if (deferred) {
+    // Complete raw page remains exclusively FILLING. Its invalidated lease
+    // stores enqueue time; the source FIFO reserves its chronological place.
+    record.lease = deferred_now_;
+  } else {
+    publishReady(handle.buffer_index);
+  }
+  result.status = OperationStatus::kOk;
+  return result;
+}
+
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.publish_ready")
+void PacketBufferPipeline::publishReady(BufferIndex index) {
+  auto &record = records_[index];
+  auto &ready = ready_queues_[streamIndex(record.stream)];
   record.state = BufferState::kReady;
   SourceCounters &source = source_counters_[streamIndex(record.stream)];
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
@@ -363,22 +387,31 @@ FinishFillResult PacketBufferPipeline::finishFill(
   if (total_ready > ready_queue_high_water_) {
     ready_queue_high_water_ = total_ready;
   }
-  result.status = OperationStatus::kOk;
-  return result;
 }
 
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.valid_size")
-bool PacketBufferPipeline::validFrameSize(const BufferRecord &record) const {
+bool PacketBufferPipeline::validFrameSize(BufferIndex index) const {
+  if (index >= records_.size()) return false;
+  const auto &record = records_[index];
   if (!validStream(record.stream)) return false;
   const auto &layout = streamLayout(record.stream);
   if (record.frame_size == layout.frame_bytes) return true;
+  if (input_experiment::kPackAdc && record.stream == Stream::kAdc &&
+      record.frame_size == 48U + record.item_count * 3U) {
+    const auto &frame = storage_.frame(index);
+    const protocol::ByteView bytes{frame.data(), record.frame_size};
+    std::uint32_t total = 0U, payload = 0U, items = 0U;
+    return frame[4] == input_experiment::kAdcPackedVersion && frame[5] == static_cast<std::uint8_t>(frameKind(Stream::kAdc)) &&
+        protocol::loadU32(bytes, 12U, total) && protocol::loadU32(bytes, 16U, payload) &&
+        protocol::loadU32(bytes, 40U, items) && total == record.frame_size &&
+        payload == record.item_count * 3U && items == record.item_count;
+  }
   if (!(input_experiment::kGpioRle && record.stream == Stream::kGpio &&
       layout_.protocol_version == 2U &&
       layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput &&
       record.item_count == layout.item_count &&
       record.frame_size >= 52U && record.frame_size < layout.frame_bytes &&
       (record.frame_size - 48U) % 4U == 0U)) return false;
-  const auto index = static_cast<std::size_t>(&record - records_.data());
   const auto &frame = storage_.frame(index);
   const protocol::ByteView bytes{frame.data(), record.frame_size};
   std::uint32_t total = 0U, payload = 0U, items = 0U;
@@ -397,7 +430,7 @@ bool PacketBufferPipeline::validFrameSize(const BufferRecord &record) const {
 // disjoint FREE pool page contains a complete checksummed result. This path
 // never invokes producer admission (which can evict) or allocates a RAM page.
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.compress_gpio")
-void PacketBufferPipeline::compressGpio(BufferIndex index) {
+bool PacketBufferPipeline::compressGpio(BufferIndex index) {
   auto &record = records_[index];
   auto &source = storage_.frame(index);
   const auto &layout = streamLayout(record.stream);
@@ -407,9 +440,9 @@ void PacketBufferPipeline::compressGpio(BufferIndex index) {
       decoded, {2U, layout.item_count}, layout.frame_bytes - 1U);
   if (!selection.ok()) {
     saturatingIncrement(encoding_rejections_);
-    return;
+    return false;
   }
-  if (!selection.select_rle) return;
+  if (!selection.select_rle) return true;
   BufferIndex scratch = kInvalidBufferIndex;
   for (std::size_t i = 0; i < records_.size(); ++i) {
     if (records_[i].state == BufferState::kFree) {
@@ -417,10 +450,10 @@ void PacketBufferPipeline::compressGpio(BufferIndex index) {
       break;
     }
   }
-  if (scratch == kInvalidBufferIndex) return;  // RAW under pool pressure.
+  if (scratch == kInvalidBufferIndex) return false;  // RAW under pool pressure.
   records_[scratch].state = BufferState::kFilling;
   auto &target = storage_.frame(scratch);
-  const auto encoded = rle::encode(decoded, selection.plan,
+  const auto encoded = rle::encodeHybrid16(decoded, selection.plan,
       {target.data() + protocol_v1::kHeaderSize, layout.payload_bytes});
   if (encoded.ok()) {
     const std::size_t bytes = selection.plan.encoded_frame_bytes;
@@ -443,6 +476,7 @@ void PacketBufferPipeline::compressGpio(BufferIndex index) {
     saturatingIncrement(encoding_rejections_);
   }
   recycle(scratch);
+  return record.frame_size != layout.frame_bytes;
 }
 #endif
 
@@ -485,7 +519,7 @@ PromotionReport PacketBufferPipeline::serviceReadyFrames(std::size_t limit) {
     BufferRecord &record = records_[buffer_index];
     if (record.state != BufferState::kReady ||
         streamIndex(record.stream) != selected_source ||
-        !validFrameSize(record)) {
+        !validFrameSize(buffer_index)) {
       saturatingIncrement(invalid_operations_);
       dropBuffer(buffer_index, false);
       report.invariant_error = true;
@@ -535,7 +569,7 @@ protocol::ByteView PacketBufferPipeline::frontFrame() const {
   }
   const BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
-      !validFrameSize(record)) {
+      !validFrameSize(*buffer_index)) {
     return {};
   }
   return {storage_.frame(*buffer_index).data(), record.frame_size};
@@ -551,7 +585,7 @@ bool PacketBufferPipeline::prepareFrontFrame() {
   const BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
       record.transmission_started ||
-      !validFrameSize(record)) {
+      !validFrameSize(*buffer_index)) {
     saturatingIncrement(invalid_operations_);
     return false;
   }
@@ -567,7 +601,7 @@ void PacketBufferPipeline::markFrontFrameStarted() {
   }
   BufferRecord &record = records_[*buffer_index];
   if (record.state != BufferState::kTransmitting ||
-      !validFrameSize(record)) {
+      !validFrameSize(*buffer_index)) {
     saturatingIncrement(invalid_operations_);
     return;
   }
@@ -610,7 +644,7 @@ void PacketBufferPipeline::releaseFrontFrame() {
 
   BufferRecord &record = records_[buffer_index];
   if (record.state != BufferState::kTransmitting ||
-      !validStream(record.stream) || !validFrameSize(record)) {
+      !validStream(record.stream) || !validFrameSize(buffer_index)) {
     saturatingIncrement(invalid_operations_);
     recycle(buffer_index);
     return;
@@ -640,8 +674,8 @@ std::size_t PacketBufferPipeline::queuedFrames() const {
 
 std::size_t PacketBufferPipeline::readyFrames() const {
   std::size_t total = 0U;
-  for (const ReadyQueue &queue : ready_queues_) {
-    total += queue.size();
+  for (const auto &record : records_) {
+    if (record.state == BufferState::kReady) ++total;
   }
   return total;
 }
@@ -688,7 +722,10 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
     }
   }
   for (std::size_t source = 0U; source < kStreamCount; ++source) {
-    result.ready_depth_by_source[source] = ready_queues_[source].size();
+    for (const auto &record : records_) {
+      if (record.state == BufferState::kReady && streamIndex(record.stream) == source)
+        ++result.ready_depth_by_source[source];
+    }
     result.transmit_depth_by_source[source] =
         transmit_depth_by_source_[source];
   }
@@ -729,7 +766,7 @@ bool PacketBufferPipeline::handleMatches(const FillHandle &handle) const {
     return false;
   }
   const BufferRecord &record = records_[handle.buffer_index];
-  return record.state == BufferState::kFilling &&
+  return record.state == BufferState::kFilling && record.frame_size == 0U &&
          record.stream == handle.stream &&
          record.sequence == handle.sequence && record.lease == handle.lease;
 }
@@ -744,7 +781,8 @@ std::size_t PacketBufferPipeline::selectReadySource(
         (next_ready_source_ + attempt) % kStreamCount;
     if (!streamEnabled(enabled_stream_mask_,
                        static_cast<Stream>(candidate)) ||
-        ready_queues_[candidate].empty()) {
+        ready_queues_[candidate].empty() ||
+        records_[*ready_queues_[candidate].front()].state != BufferState::kReady) {
       continue;
     }
     if (!equal_coverage_fairness) {
@@ -827,7 +865,7 @@ PacketBufferPipeline::oldestEvictableCompleteBuffer() const {
         (record.state == BufferState::kTransmitting &&
          !record.transmission_started);
     if (!complete_unsent || !validStream(record.stream) ||
-        !validFrameSize(record)) {
+        !validFrameSize(static_cast<BufferIndex>(index))) {
       continue;
     }
 
@@ -877,7 +915,7 @@ bool PacketBufferPipeline::evictCompleteBuffer(BufferIndex index) {
   if ((record.state != BufferState::kReady &&
        record.state != BufferState::kTransmitting) ||
       record.transmission_started || !validStream(record.stream) ||
-      !validFrameSize(record)) {
+      !validFrameSize(index)) {
     saturatingIncrement(invalid_operations_);
     return false;
   }
@@ -996,7 +1034,7 @@ bool PacketBufferPipeline::finalizeGapBefore(BufferIndex index) {
   if ((record.state != BufferState::kReady &&
        record.state != BufferState::kTransmitting) ||
       !validStream(record.stream) ||
-      !validFrameSize(record)) {
+      !validFrameSize(index)) {
     return false;
   }
 
@@ -1066,6 +1104,91 @@ std::size_t PacketBufferPipeline::ownedBuffers() const {
   return owned;
 }
 
-#undef THINGDAQ_PACKET_COLD_CODE
+
 
 }  // namespace thingdaq::packet
+
+namespace thingdaq::packet {
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.pack_adc12")
+__attribute__((optimize("Os")))
+bool PacketBufferPipeline::packAdc12(BufferIndex index) {
+  auto &record = records_[index];
+  auto &frame = storage_.frame(index);
+  auto *data = frame.data() + protocol_v1::kHeaderSize;
+  // Validate before modifying: 12-bit packing must never truncate bad data.
+  for (std::size_t i = 0; i < record.item_count * 4U; i += 2U)
+    if ((data[i + 1U] & 0xF0U) != 0U) { ++encoding_rejections_; return false; }
+  for (std::size_t i = 0; i < record.item_count; ++i) {
+    const auto a = static_cast<std::uint16_t>(data[4*i] | (data[4*i+1] << 8U));
+    const auto b = static_cast<std::uint16_t>(data[4*i+2] | (data[4*i+3] << 8U));
+    data[3*i] = static_cast<std::uint8_t>(a);
+    data[3*i+1] = static_cast<std::uint8_t>((a >> 8U) | (b << 4U));
+    data[3*i+2] = static_cast<std::uint8_t>(b >> 4U);
+  }
+  record.frame_size = 48U + record.item_count * 3U;
+  frame[protocol_v1::kHeaderVersionOffset] = input_experiment::kAdcPackedVersion;
+  const protocol::MutableByteView bytes{frame.data(), record.frame_size};
+  std::uint32_t checksum = 0U;
+  return protocol::storeU32(bytes, protocol_v1::kHeaderTotalLengthOffset, static_cast<std::uint32_t>(record.frame_size)) &&
+      protocol::storeU32(bytes, protocol_v1::kHeaderPayloadLengthOffset, record.item_count * 3U) &&
+      protocol::computeChecksum(checksum_algorithm_, {frame.data(), record.frame_size - 4U}, checksum).ok() &&
+      protocol::storeU32(bytes, record.frame_size - 4U, checksum);
+}
+#endif
+
+THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.deferred")
+void PacketBufferPipeline::serviceDeferred(std::uint64_t ticks, std::size_t budget, std::uint64_t (*read_ticks)(void *), void *clock_context) {
+#if defined(THINGDAQ_DEFERRED_CODECS)
+  setDeferredClock(ticks);
+  for (std::size_t attempt = 0; attempt < kStreamCount; ++attempt) {
+    const auto stream = (next_codec_source_ + attempt) % kStreamCount;
+    // READY predecessors may be blocked by USB/fairness. They must not hide
+    // the oldest pending block's deadline or prevent background progress.
+    BufferIndex index = kInvalidBufferIndex;
+    for (std::size_t offset = 0; offset < ready_queues_[stream].size(); ++offset) {
+      const auto candidate = *ready_queues_[stream].at(offset);
+      if (records_[candidate].state == BufferState::kFilling && records_[candidate].frame_size != 0U) {
+        index = candidate; break;
+      }
+    }
+    if (index == kInvalidBufferIndex) continue;
+    auto &record = records_[index];
+    auto &c = deferred_codec::counters[stream];
+    const auto age = deferred_now_ - record.lease;
+    if (age > c.max_age_ticks) c.max_age_ticks = age;
+    if (age >= 80000U) {
+      ready_queues_[stream].eraseFirst(index); ++c.deadline_drops;
+      dropBuffer(index, false);
+      continue;
+    }
+    if (budget == 0U) continue;
+    const auto started = read_ticks ? read_ticks(clock_context) : ticks;
+    const bool ok = record.stream == Stream::kGpio ? compressGpio(index) : packAdc12(index);
+    const auto ended = read_ticks ? read_ticks(clock_context) : ticks;
+    const auto work = static_cast<std::uint32_t>(ended - started);
+    c.work_ticks += work;
+    if (work > c.max_work_ticks) c.max_work_ticks = work;
+    // A late completion is still a deadline miss, never silently published.
+    const bool late = static_cast<std::uint32_t>(ended) - record.lease >= 80000U;
+    if (late) {
+      ready_queues_[stream].eraseFirst(index); ++c.deadline_drops;
+      dropBuffer(index, false);
+    } else if (!ok) {
+      ready_queues_[stream].eraseFirst(index); ++c.resource_drops;
+      dropBuffer(index, false);
+    } else {
+      ++c.completed;
+      if (record.frame_size == streamLayout(record.stream).frame_bytes) ++c.raw;
+      publishReady(index);
+    }
+    next_codec_source_ = (stream + 1U) % kStreamCount;
+    break;  // At most one block per idle opportunity, regardless of budget.
+  }
+#else
+  (void)ticks; (void)budget; (void)read_ticks; (void)clock_context;
+#endif
+}
+}
+
+#undef THINGDAQ_PACKET_COLD_CODE

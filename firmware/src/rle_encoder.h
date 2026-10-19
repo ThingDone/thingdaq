@@ -79,3 +79,10 @@ EncodeResult encode(protocol::ByteView decoded, const SizingPlan &plan,
                     protocol::MutableByteView output);
 
 }  // namespace thingdaq::rle
+
+namespace thingdaq::rle {
+// Validated two-byte GPIO input, disjoint output; sizing was computed from
+// this immutable input. Uses the measured hybrid constant/span strategy.
+EncodeResult encodeHybrid16(protocol::ByteView input, const SizingPlan &plan,
+                            protocol::MutableByteView output);
+}

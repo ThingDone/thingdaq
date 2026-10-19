@@ -1,4 +1,5 @@
 #include "firmware_runtime.h"
+#include "deferred_codec.h"
 
 #if defined(__IMXRT1062__)
 #define THINGDAQ_RUNTIME_COLD_CODE(section_name) \
@@ -202,6 +203,7 @@ LoopReport FirmwareRuntime::service() {
   // stay in this bounded cooperative path. Newly due work is promoted and
   // offered to CDC during the same visit. The production clock is polled; no
   // pacing ISR is installed.
+  packet_pipeline_.setDeferredClock(clock_.nowTicks());
   report.synthetic = synthetic_source_.service(now_ticks, packet_pipeline_);
   acquisition_controller_.service(report);
   if (report.physical_fault_detected &&
@@ -222,6 +224,15 @@ LoopReport FirmwareRuntime::service() {
   }
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
+#if defined(THINGDAQ_DEFERRED_CODECS)
+  // One codec block only after bounded high-priority work has caught up.
+  // Keep interrupts enabled. Expire deadlines even when no CPU slack exists.
+  const bool slack = !report.adc_packer.work_limit_reached &&
+      !report.aux_gpio_packer.work_limit_reached && !report.gpio_packer.raw_work_limit_reached &&
+      !report.command_dispatched && !report.physical_fault_detected;
+  packet_pipeline_.serviceDeferred(clock_.nowTicks(), slack ? 1U : 0U,
+      [](void *context) { return static_cast<FirmwareRuntime *>(context)->clock_.nowTicks(); }, this);
+#endif
   return report;
 }
 

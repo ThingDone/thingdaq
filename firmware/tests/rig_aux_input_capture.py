@@ -107,6 +107,9 @@ RELEASE_FIXED_1MHZ = os.environ.get("AUX_INPUT_RELEASE_FIXED_1MHZ", "0") == "1"
 EXPERIMENT_CPU_HZ = int(os.environ.get("AUX_INPUT_CPU_MHZ", "600")) * 1_000_000
 EXPERIMENT_GPIO_RLE = os.environ.get("AUX_INPUT_GPIO_RLE", "0") == "1"
 EXPERIMENT_ADC_ETC_REQUEST = os.environ.get("AUX_INPUT_ADC_ETC_REQUEST", "0") == "1"
+EXPERIMENT_DEFERRED = os.environ.get("AUX_INPUT_DEFERRED_CODECS", "0") == "1"
+EXPERIMENT_ADC_PACK12 = os.environ.get("AUX_INPUT_ADC_PACK12", "0") == "1"
+ADC_PACK12_VERSION = 0x83
 GPIO_RLE_VERSION = 0x82
 EXPERIMENT_LARGE_ADC_FRAME = os.environ.get("AUX_INPUT_LARGE_ADC_FRAME", "0") == "1"
 if EXPERIMENT_CPU_HZ not in (600_000_000, 450_000_000, 528_000_000):
@@ -576,6 +579,30 @@ class Frame:
     checksum: int
     wire_bytes: int = 0
     gpio_rle: bool = False
+    adc_pack12: bool = False
+
+
+_LOW_NIBBLE = bytes(i & 15 for i in range(256))
+_HIGH_NIBBLE = bytes(i >> 4 for i in range(256))
+_LOW_NIBBLE_SHIFT = bytes((i & 15) << 4 for i in range(256))
+
+
+def decode_adc12(payload: bytes, item_count: int) -> bytes:
+    if item_count != 1012 or len(payload) != item_count * 3:
+        raise ProtocolFailure("invalid packed ADC shape")
+    result = bytearray(item_count * 4)
+    middle, high = payload[1::3], payload[2::3]
+    result[0::4] = payload[0::3]
+    result[1::4] = middle.translate(_LOW_NIBBLE)
+    # Bounded byte lanes: disjoint nibbles, OR cannot carry between samples.
+    # Bulk operations keep the independent Python decoder below acquisition
+    # throughput instead of introducing host-induced USB backpressure.
+    result[2::4] = (
+        int.from_bytes(middle.translate(_HIGH_NIBBLE), "little")
+        | int.from_bytes(high.translate(_LOW_NIBBLE_SHIFT), "little")
+    ).to_bytes(item_count, "little")
+    result[3::4] = high.translate(_HIGH_NIBBLE)
+    return bytes(result)
 
 
 def decode_gpio_rle(payload: bytes, item_count: int) -> bytes:
@@ -721,9 +748,12 @@ class FrameParser:
             finally:
                 payload_view.release()
             is_rle = fields[1] == GPIO_RLE_VERSION
-            if is_rle:
+            is_adc12 = fields[1] == ADC_PACK12_VERSION
+            if is_rle or is_adc12:
                 try:
-                    payload = decode_gpio_rle(payload, fields[13])
+                    payload = (decode_gpio_rle if is_rle else decode_adc12)(
+                        payload, fields[13]
+                    )
                 except ProtocolFailure as error:
                     self.payload_errors += 1
                     self.record_rejection("payload", str(error), total_length)
@@ -732,6 +762,7 @@ class FrameParser:
             frame = Frame(
                 wire_bytes=total_length,
                 gpio_rle=is_rle,
+                adc_pack12=is_adc12,
                 kind=fields[2],
                 flags=fields[3],
                 checksum_algorithm=fields[5],
@@ -789,8 +820,14 @@ class FrameParser:
         ) = fields
         legacy_rejection = version == 1 and kind == ERROR_RESPONSE
         rle = EXPERIMENT_GPIO_RLE and version == GPIO_RLE_VERSION and kind == GPIO_DATA
+        adc12 = (
+            EXPERIMENT_ADC_PACK12 and version == ADC_PACK12_VERSION and kind == ADC_DATA
+        )
         if magic != MAGIC or (
-            version != PROTOCOL_VERSION and not legacy_rejection and not rle
+            version != PROTOCOL_VERSION
+            and not legacy_rejection
+            and not rle
+            and not adc12
         ):
             raise ProtocolFailure("invalid magic or protocol version")
         if header_length != HEADER_SIZE or reserved:
@@ -808,6 +845,12 @@ class FrameParser:
                 and 4 <= payload_length < 4048
                 and payload_length % 4 == 0
                 if rle
+                else (
+                    item_count == 1012
+                    and payload_length == 3036
+                    and total_length == 3084
+                )
+                if adc12
                 else (total_length, payload_length, item_count)
                 in ALLOWED_DATA_SHAPES[kind]
             )
@@ -2752,7 +2795,11 @@ def validate_status(
                 else layout.gpio_total_frame_bytes
             ),
         }
-        if EXPERIMENT_GPIO_RLE and prefix == "gpio" and case.aux_mode == AUX_INPUT:
+        if case.aux_mode == AUX_INPUT and (
+            (EXPERIMENT_GPIO_RLE and prefix == "gpio")
+            or (EXPERIMENT_ADC_PACK12 and prefix == "adc")
+        ):
+            minimum = 52 if prefix == "gpio" else 3084
             # Logical payload remains exact above. Selected wire sizes vary, so
             # constrain each stage and each queued difference; final drain also
             # reconciles every actual byte against independently parsed frames.
@@ -2762,10 +2809,10 @@ def validate_status(
                 ("emitted", emitted),
                 ("transmitted", transmitted),
             ):
-                name = f"gpio_framed_bytes_{stage}"
+                name = f"{prefix}_framed_bytes_{stage}"
                 del exact[name]
                 wire = status.values[name]
-                if not frames * 52 <= wire <= frames * 4096:
+                if not frames * minimum <= wire <= frames * 4096:
                     raise ProtocolFailure(
                         "GPIO selected wire bytes outside frame bounds"
                     )
@@ -2775,7 +2822,7 @@ def validate_status(
                 right_bytes,
             ) in itertools.pairwise(stages):
                 queued = left_count - right_count
-                if not queued * 52 <= left_bytes - right_bytes <= queued * 4096:
+                if not queued * minimum <= left_bytes - right_bytes <= queued * 4096:
                     raise ProtocolFailure(
                         "GPIO selected wire stage conservation failed"
                     )
@@ -2990,7 +3037,9 @@ class AcquisitionValidator:
             raise ProtocolFailure("ADC frame shape differs from active layout")
         if max(frame.payload[1::2], default=0) > ((1 << ADC_RESOLUTION_BITS) - 1) >> 8:
             raise ProtocolFailure("ADC frame contains an out-of-range code")
-        self._advance(self.adc, frame, self.layout.adc_total_frame_bytes)
+        self._advance(
+            self.adc, frame, frame.wire_bytes or self.layout.adc_total_frame_bytes
+        )
 
     def _accept_gpio(self, frame: Frame) -> None:
         coverage = self.layout.gpio_items_per_frame * self.profile.gpio_period_ticks
@@ -3703,6 +3752,64 @@ def run_acceptance(
             paired_samples_joined=final_status.paired_gpio_samples_joined,
             primary_bank_samples_captured=final_status.primary_gpio_samples_captured,
         )
+        if EXPERIMENT_DEFERRED:
+            saved_request_id = link.next_request_id
+            words = []
+            try:
+                for page in range(1, 7):
+                    link.next_request_id = 0xFDEC0000 + page
+                    frame, _ = link.exchange(
+                        GET_STATUS_REQUEST, on_data=lambda _frame: None
+                    )
+                    response_success(frame, GET_STATUS_RESPONSE)
+                    if frame.run_id != validator.run_id:
+                        raise ProtocolFailure("codec diagnostic run mismatch")
+                    words.extend(struct.unpack_from("<III", frame.payload, 1476))
+            finally:
+                link.next_request_id = saved_request_id
+            metrics["deferred_codecs"] = {}
+            for source, offset in (("adc", 0), ("gpio", 9)):
+                row = dict(
+                    zip(
+                        (
+                            "completed",
+                            "raw",
+                            "deadline_drops",
+                            "resource_drops",
+                            "work_ticks_low",
+                            "work_ticks_high",
+                            "max_work_ticks",
+                            "max_age_ticks",
+                            "deadline_ticks",
+                        ),
+                        words[offset : offset + 9],
+                    )
+                )
+                row["work_ticks"] = row.pop("work_ticks_low") + (
+                    row.pop("work_ticks_high") << 32
+                )
+                metrics["deferred_codecs"][source] = row
+                enabled = (
+                    EXPERIMENT_ADC_PACK12
+                    if source == "adc"
+                    else os.environ.get("AUX_INPUT_RLE_ENABLED", "1") == "1"
+                )
+                evidence.equal(
+                    f"codec.{source}.completed",
+                    final_status.values[f"{source}_frames_framed_pipeline"]
+                    if enabled
+                    else 0,
+                    row["completed"],
+                )
+                evidence.equal(
+                    f"codec.{source}.deadline_ticks", 80000, row["deadline_ticks"]
+                )
+                evidence.equal(
+                    f"codec.{source}.deadline_drops", 0, row["deadline_drops"]
+                )
+                evidence.equal(
+                    f"codec.{source}.resource_drops", 0, row["resource_drops"]
+                )
         if os.environ.get("AUX_INPUT_ADC_PHASE", "0") == "1":
             metrics["adc_stopped_detail"] = []
             read_adc_diagnostic_pages(
@@ -3973,6 +4080,41 @@ def main() -> int:
         )
     finally:
         port.close()
+    if EXPERIMENT_DEFERRED and result.evidence.failures:
+        # Keep the rig powered through the core's eight-second fault reboot.
+        # Preserve the rejected run; this is readback only, never a retry PASS.
+        time.sleep(10)
+        try:
+            from serial.tools import list_ports
+
+            matches = [
+                p
+                for p in list_ports.comports()
+                if p.serial_number == str(expected_serial)
+            ]
+            if len(matches) != 1:
+                raise ProtocolFailure("fault readback serial identity unavailable")
+            with serial.Serial(
+                matches[0].device,
+                BAUD_RATE,
+                timeout=SERIAL_READ_TIMEOUT_SECONDS,
+                write_timeout=SERIAL_WRITE_TIMEOUT_SECONDS,
+            ) as recovered:
+                recovery = SerialLink(recovered)
+                recovery.exchange(STOP_REQUEST, on_data=lambda _frame: None)
+                words = []
+                for page in range(7, 11):
+                    recovery.next_request_id = 0xFDEC0000 + page
+                    frame, _ = recovery.exchange(
+                        GET_STATUS_REQUEST, on_data=lambda _frame: None
+                    )
+                    response_success(frame, GET_STATUS_RESPONSE)
+                    words.extend(struct.unpack_from("<III", frame.payload, 1476))
+                result.metrics["arm_fault_readback"] = words[:11]
+                emit_event("arm_fault_readback", words=words[:11])
+        except Exception as error:  # noqa: BLE001 - preserve failed-run evidence
+            result.metrics["arm_fault_readback_error"] = str(error)
+            emit_event("arm_fault_readback_failed", error=str(error))
     artifact = {
         "schema": "thingdaq.experiment-evidence/v1",
         "kind": "aux_input_capture",

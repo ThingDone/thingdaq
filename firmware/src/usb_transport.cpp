@@ -40,6 +40,15 @@ bool validDataView(protocol::ByteView bytes) {
   const bool fixed_size = bytes.size == protocol_v1::kDataFrameBytes ||
       bytes.size == protocol_v2::kMinDataFrameBytes;
   if constexpr (!input_experiment::kGpioRle) return fixed_size;
+  if (input_experiment::kPackAdc && bytes.size == 3084U &&
+      bytes.data[protocol_v1::kHeaderVersionOffset] == input_experiment::kAdcPackedVersion &&
+      bytes.data[protocol_v1::kHeaderKindOffset] == static_cast<std::uint8_t>(protocol_v1::FrameKind::kAdcData)) {
+    std::uint32_t total = 0U, payload = 0U, items = 0U;
+    return protocol::loadU32(bytes, protocol_v1::kHeaderTotalLengthOffset, total) &&
+        protocol::loadU32(bytes, protocol_v1::kHeaderPayloadLengthOffset, payload) &&
+        protocol::loadU32(bytes, protocol_v1::kHeaderItemCountOffset, items) &&
+        total == 3084U && payload == 3036U && items == 1012U;
+  }
   if (bytes.size <= protocol_v1::kHeaderVersionOffset ||
       bytes.data[protocol_v1::kHeaderVersionOffset] != input_experiment::kGpioRleVersion)
     return fixed_size;

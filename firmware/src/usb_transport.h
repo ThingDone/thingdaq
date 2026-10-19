@@ -159,6 +159,11 @@ class FixedQueue {
     return empty() ? nullptr : &storage_[head_];
   }
 
+  // Read-only bounded inspection preserves FIFO ownership/order.
+  const Item *at(std::size_t offset) const {
+    return offset < size_ ? &storage_[(head_ + offset) % Capacity] : nullptr;
+  }
+
   bool popFront() {
     if (empty()) {
       return false;
