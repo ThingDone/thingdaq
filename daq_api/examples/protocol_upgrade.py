@@ -1,4 +1,4 @@
-"""Demonstrate public v3 discovery, lossless capture and configuration offline.
+"""Demonstrate automatic v1/v2/v3 discovery and lossless capture offline.
 
 Run from the checkout with:
     .venv/bin/python daq_api/examples/protocol_upgrade.py
@@ -11,7 +11,9 @@ from dataclasses import fields, replace
 
 from thingdone_daq import (
     ADCBlock,
+    DAQConfiguration,
     DeviceCommandError,
+    DeviceState,
     GPIOBlock,
     ThingDAQ,
     V3AppliedSettings,
@@ -21,6 +23,7 @@ from thingdone_daq import (
 from thingdone_daq._generated import protocol_v3_constants as c
 from thingdone_daq.synthetic import (
     SyntheticGPIOPattern,
+    synthetic_adc_payload,
     synthetic_gpio_payload,
     synthetic_v3_adc_payload,
 )
@@ -157,6 +160,57 @@ def capture(daq: ThingDAQ, applied: V3AppliedSettings, rejected: V3Settings) -> 
     print(f"run={run_id} state=STOPPED pending_frames=0 readback=exact loss=none")
 
 
+def legacy_compatibility(version: int) -> None:
+    """Negotiate an explicit legacy persona and verify its historical rates."""
+    with ThingDAQ.simulated(protocol_version=version, strict=True) as daq:
+        info = daq.device_info
+        expected_gpio_rate = 4_000_000 if version == 1 else 1_000_000
+        if info is None or info.protocol_version != version:
+            raise AssertionError("automatic legacy negotiation selected wrong version")
+        applied = daq.configure()
+        if not isinstance(applied, DAQConfiguration) or (
+            applied.adc_pair_rate_hz != 1_000_000
+            or applied.gpio_sample_rate_hz != expected_gpio_rate
+        ):
+            raise AssertionError("legacy defaults changed")
+        run_id = daq.start()
+        counts = {"adc": 0, "gpio": 0}
+        for block in daq.blocks(4):
+            if not isinstance(block, (ADCBlock, GPIOBlock)):
+                raise TypeError("unexpected legacy stream event")
+            name = "adc" if isinstance(block, ADCBlock) else "gpio"
+            first = counts[name] * block.item_count
+            expected = (
+                synthetic_adc_payload(first, block.item_count)
+                if isinstance(block, ADCBlock)
+                else synthetic_gpio_payload(first, block.item_count)
+            )
+            if (
+                block.protocol_version != version
+                or block.run_id != run_id
+                or block.sequence != counts[name]
+                or block.payload != expected
+            ):
+                raise AssertionError("legacy capture differs from source")
+            counts[name] += 1
+        if counts != {"adc": 2, "gpio": 2}:
+            raise AssertionError("legacy capture missing a stream")
+        daq.validate_stream_health()
+        if daq.stop() != DeviceState.IDLE or daq.loss_counters().has_loss:
+            raise AssertionError("legacy capture did not stop cleanly")
+        if daq.info().protocol_version != version:
+            raise AssertionError("STOP changed legacy wire version")
+        transport, reader = daq.transport, daq.reader
+    if transport.is_open or reader.is_running:
+        raise AssertionError("legacy transport/reader did not close")
+    print(
+        f"compatibility persona=v{version} negotiated=v{version} "
+        f"adc_pair_rate_hz=1000000 gpio_sample_rate_hz={expected_gpio_rate} "
+        "equality=exact loss=none final_state=IDLE "
+        "transport_closed=true reader_stopped=true PASS"
+    )
+
+
 def main() -> int:
     print(
         "example=protocol_upgrade simulated=true physical_required=false "
@@ -210,6 +264,9 @@ def main() -> int:
         transport, reader = daq.transport, daq.reader
     if transport.is_open or reader.is_running:
         raise AssertionError("transport/reader did not close")
+    print("compatibility persona=v3 negotiated=v3 compressed_capture=exact PASS")
+    for version in (1, 2):
+        legacy_compatibility(version)
     print(
         "PASS runs=3 equality=exact final_state=STOPPED transport_closed=true reader_stopped=true"
     )

@@ -364,7 +364,7 @@ available.
 
 ## CLI and examples
 
-The `thingdone_daq` console script provides metadata-only `list`, INFO (`info` or
+The `thingdone-daq` console script provides metadata-only `list`, INFO (`info` or
 `probe`), STATUS, reconciliation, configure/start/stop/reset, and bounded
 monitor/capture commands. `--json` emits one machine-readable document.
 Capture can select raw or explicitly calibrated ADC previews, selected GPIO
@@ -374,3 +374,51 @@ into cleanup-aware interruption so STOP is attempted before exit 130.
 All repository examples run against the simulator by default; the physical
 path requires `--real`. See [[Quickstart]] for the exact commands and hardware
 requirements.
+
+The v3 `probe`/`info` result includes `info`, `capabilities` (clock profiles,
+rate profiles, exact `configurations` tuples and bounds), `defaults`,
+`active_settings` (settings plus actual clocks), and `state`. Human output uses
+field paths such as `defaults.adc_policy` and
+`active_settings.clocks.cpu_clock_hz`; JSON preserves the typed model structure
+with enum names. Legacy JSON retains `info` and adds capabilities and active
+configuration; `defaults` is `null` because legacy INFO has no defaults table.
+Legacy human INFO output retains its existing field names.
+
+Configure and capture accept `--cpu-profile`, `--rate-profile`,
+`--adc-pair-rate-hz`, `--gpio-sample-rate-hz`, `--adc-resolution-bits`,
+`--gpio-policy`, and `--adc-policy`. Selector names are lowercase enum names
+from probe output. The API checks membership in the advertised exact tuples;
+unsupported combinations exit with code 7 before CONFIGURE. Omitting flags
+uses v3 advertised defaults, including source, streams, checksum and auxiliary
+bank mode. Legacy omissions retain the existing defaults and source selection;
+clock/encoding selectors require v3.
+
+V3 configure output reports the verified `settings` and `clocks` under
+`applied_configuration`, after CONFIGURE echo, GET_SETTINGS and INFO agree.
+Capture reports that same structure as `configuration`; sample previews report
+each frame's actual `encoding`. Payload byte counters measure decoded bytes,
+while `adc_wire_bytes`/`gpio_wire_bytes` and their rates include encoded frames.
+V3 firmware queue high-water telemetry is unavailable (`null` in JSON, `None`
+in human output). V3 ends in `STOPPED`; legacy ends in `IDLE`.
+
+Executable offline CLI examples (substitute a hardware target for simulation
+only when desired):
+
+```bash
+.venv/bin/python -m thingdone_daq.cli probe --simulate --simulator-version 3 --json
+.venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3
+.venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3 --cpu-profile cpu_450mhz --gpio-policy raw --adc-policy raw --json
+.venv/bin/python -m thingdone_daq.cli capture --simulate --simulator-version 3 --duration 0.1 --aux-bank-mode input --gpio-channel D16 --json
+.venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 2 --json
+.venv/bin/python daq_api/examples/protocol_upgrade.py
+```
+
+`--simulator-version` chooses the simulated peer, not a forced host wire
+version. All peers pass through automatic INFO negotiation. The omitted
+simulator version remains the historical v1/v2 persona; version 2 selects a
+v2-only release persona with 1 MHz ADC / 1 MHz GPIO defaults, while version 3
+advertises the compressed defaults. The same personas are available through
+`ThingDAQ.simulated(protocol_version=1|2|3)`.
+`protocol_upgrade.py` verifies automatic selection and exact legacy capture
+for v1/v2 alongside the three v3 compressed/RAW captures. Simulator clocks are
+metadata only; these checks make no physical throughput claim.

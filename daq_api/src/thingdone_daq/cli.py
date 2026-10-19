@@ -14,9 +14,10 @@ from math import isfinite
 from threading import current_thread, main_thread
 from time import monotonic
 from types import FrameType
-from typing import TextIO, cast
+from typing import TextIO
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v3_constants as v3
 from .calibration import CalibrationError, CalibrationRecord, load_calibration
 from .client import (
     BlockTimeoutError,
@@ -56,6 +57,13 @@ from .models import (
     Status,
     StreamAnomaly,
     StreamGap,
+)
+from .models_v3 import (
+    V3AppliedSettings,
+    V3Capabilities,
+    V3Info,
+    V3Settings,
+    V3Status,
 )
 from .protocol import ProtocolError
 from .reader import DeviceDisconnectedError, ReaderError, ReaderProtocolError
@@ -183,6 +191,12 @@ def _add_connection_arguments(parser: argparse.ArgumentParser) -> None:
         help="use the in-memory synthetic-stream simulator",
     )
     parser.add_argument(
+        "--simulator-version",
+        type=int,
+        choices=(1, 2, 3),
+        help="simulator persona; wire version is automatically negotiated (default: 1)",
+    )
+    parser.add_argument(
         "--gpio-pattern",
         choices=tuple(pattern.value for pattern in SyntheticGPIOPattern),
         default=SyntheticGPIOPattern.COUNTER.value,
@@ -194,8 +208,7 @@ def _add_acquisition_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--streams",
         choices=("adc", "gpio", "both", "none"),
-        default="both",
-        help="requested stream set (default: both)",
+        help="requested stream set (default: advertised v3 default; both on legacy)",
     )
     parser.add_argument(
         "--source",
@@ -205,35 +218,44 @@ def _add_acquisition_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--checksum",
         choices=("adler32", "crc32c", "crc32-iso-hdlc"),
-        default="adler32",
-        help="data-frame checksum (default: adler32)",
+        help="data-frame checksum (default: advertised v3 default; adler32 on legacy)",
     )
     parser.add_argument(
         "--adc-pair-rate-hz",
         type=int,
-        help="require this exact INFO-advertised ADC pair rate before CONFIGURE",
+        help="select this exact advertised ADC pair rate before CONFIGURE",
     )
     parser.add_argument(
         "--gpio-sample-rate-hz",
         type=int,
-        help="require this exact INFO-advertised GPIO rate before CONFIGURE",
+        help="select this exact advertised GPIO rate before CONFIGURE",
     )
     parser.add_argument(
         "--adc-resolution-bits",
         type=int,
-        help="require this exact INFO-advertised ADC resolution before CONFIGURE",
+        help="select this exact advertised ADC resolution before CONFIGURE",
     )
     parser.add_argument(
         "--aux-bank-mode",
         choices=("disabled", "input"),
-        default="disabled",
-        help="whole auxiliary GPIO bank mode (default: disabled)",
+        help="whole auxiliary GPIO bank mode (default: advertised v3 default; disabled on legacy)",
     )
     parser.add_argument(
         "--rate-profile",
         choices=tuple(profile.name.lower() for profile in RateProfile),
         help="generated exact ADC/GPIO rate profile",
     )
+
+    for flag, enum_type in (
+        ("cpu-profile", v3.CpuProfile),
+        ("gpio-policy", v3.GpioPolicy),
+        ("adc-policy", v3.AdcPolicy),
+    ):
+        parser.add_argument(
+            f"--{flag}",
+            choices=tuple(member.name.lower() for member in enum_type),
+            help="select an advertised v3 tuple value; omitted values use board defaults",
+        )
 
 
 def _add_capture_output_arguments(parser: argparse.ArgumentParser) -> None:
@@ -283,7 +305,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="thingdone-daq",
-        description="Inspect and control ThingDAQ protocol-v1/v2 devices.",
+        description="Inspect and control ThingDAQ protocol-v1/v2/v3 devices.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -294,7 +316,7 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser.set_defaults(action="list")
 
     command_help = {
-        "probe": "synchronize and print validated INFO",
+        "probe": "print identity, capabilities, defaults, supported tuples and active settings",
         "status": "print decoded GET_STATUS state and counters",
         "reconcile": "prove firmware counter conservation and print fault evidence",
         "configure": "atomically apply one advertised acquisition profile",
@@ -369,6 +391,9 @@ def _open_device(arguments: argparse.Namespace) -> ThingDAQ:
     ):
         raise ValueError("--gpio-pattern applies only with --simulate")
 
+    if arguments.simulator_version is not None and not arguments.simulate:
+        raise ValueError("--simulator-version requires --simulate")
+
     expected = ExpectedDeviceIdentity(
         hardware_serial=arguments.hardware_serial,
         firmware_version=arguments.expect_firmware,
@@ -377,12 +402,21 @@ def _open_device(arguments: argparse.Namespace) -> ThingDAQ:
     strict = bool(getattr(arguments, "strict_loss", False))
     if arguments.simulate:
         return ThingDAQ.simulated(
+            protocol_version=arguments.simulator_version or 1,
             control_only=False,
             strict=strict,
             command_timeout=arguments.timeout,
             block_timeout=arguments.timeout,
             shutdown_timeout=arguments.timeout,
-            expected_identity=expected,
+            expected_identity=expected
+            if any(
+                (
+                    arguments.hardware_serial,
+                    arguments.expect_firmware,
+                    arguments.expect_build_id,
+                )
+            )
+            else None,
             synchronization_attempts=arguments.sync_attempts,
             synchronization_retry_delay=arguments.sync_retry_delay,
             gpio_pattern=arguments.gpio_pattern,
@@ -429,7 +463,7 @@ def _source_names(mask: int) -> str:
 def _configuration_from_arguments(
     daq: ThingDAQ,
     arguments: argparse.Namespace,
-) -> DAQConfiguration:
+) -> DAQConfiguration | V3AppliedSettings:
     stream_masks = {
         "adc": constants.StreamMask.ADC,
         "gpio": constants.StreamMask.GPIO,
@@ -441,30 +475,44 @@ def _configuration_from_arguments(
         "crc32c": constants.ChecksumAlgorithm.CRC32C,
         "crc32-iso-hdlc": constants.ChecksumAlgorithm.CRC32_ISO_HDLC,
     }
-    stream_mask = stream_masks[arguments.streams]
-    checksum = checksum_algorithms[arguments.checksum]
+    stream_mask = stream_masks.get(arguments.streams)
+    checksum = checksum_algorithms.get(arguments.checksum)
     source = (
         None if arguments.source is None else constants.Source[arguments.source.upper()]
     )
-    aux_bank_mode = AuxBankMode.__members__[arguments.aux_bank_mode.upper()]
+    aux_bank_mode = (
+        None
+        if arguments.aux_bank_mode is None
+        else AuxBankMode.__members__[arguments.aux_bank_mode.upper()]
+    )
     rate_profile = (
         None
         if arguments.rate_profile is None
         else RateProfile.__members__[arguments.rate_profile.upper()]
     )
-    return cast(
-        DAQConfiguration,
-        daq.configure(
-            adc=bool(stream_mask & constants.StreamMask.ADC),
-            gpio=bool(stream_mask & constants.StreamMask.GPIO),
-            source=source,
-            checksum_algorithm=checksum,
-            adc_pair_rate_hz=arguments.adc_pair_rate_hz,
-            gpio_sample_rate_hz=arguments.gpio_sample_rate_hz,
-            adc_resolution_bits=arguments.adc_resolution_bits,
-            aux_bank_mode=aux_bank_mode,
-            rate_profile=rate_profile,
-        ),
+    return daq.configure(
+        adc=None
+        if stream_mask is None
+        else bool(stream_mask & constants.StreamMask.ADC),
+        gpio=None
+        if stream_mask is None
+        else bool(stream_mask & constants.StreamMask.GPIO),
+        source=source,
+        checksum_algorithm=checksum,
+        adc_pair_rate_hz=arguments.adc_pair_rate_hz,
+        gpio_sample_rate_hz=arguments.gpio_sample_rate_hz,
+        adc_resolution_bits=arguments.adc_resolution_bits,
+        aux_bank_mode=aux_bank_mode,
+        rate_profile=rate_profile,
+        cpu_profile=None
+        if arguments.cpu_profile is None
+        else v3.CpuProfile[arguments.cpu_profile.upper()],
+        gpio_policy=None
+        if arguments.gpio_policy is None
+        else v3.GpioPolicy[arguments.gpio_policy.upper()],
+        adc_policy=None
+        if arguments.adc_policy is None
+        else v3.AdcPolicy[arguments.adc_policy.upper()],
     )
 
 
@@ -550,14 +598,17 @@ def _capture_calibration(
         if any(value is not None for value in calibration_options):
             raise ValueError("calibration options require --adc-output calibrated")
         return None, None
-    if arguments.streams not in {"adc", "both"}:
+    if arguments.streams not in {None, "adc", "both"}:
         raise ValueError("calibrated ADC output requires an enabled ADC stream")
     if arguments.calibration is None:
         raise ValueError("--adc-output calibrated requires --calibration PATH")
-    info = cast(DeviceInfo | None, daq.device_info)
+    info = daq.device_info
     if info is None:
         raise DeviceSynchronizationError("open completed without INFO")
-    hardware_serial = arguments.calibration_hardware_serial or info.hardware_serial
+    serial = info.hardware_serial
+    if isinstance(serial, str):
+        serial = int(serial) if serial.isdecimal() else 0
+    hardware_serial = arguments.calibration_hardware_serial or serial
     if hardware_serial == 0:
         raise ValueError(
             "INFO has no calibration identity; pass "
@@ -568,8 +619,12 @@ def _capture_calibration(
         hardware_serial,
         arguments.analog_front_end_profile,
         adc_resolution_bits=info.adc_resolution_bits,
-        adc_code_range=(info.adc_code_min, info.adc_code_max),
-        adc_input_range_volts=(
+        adc_code_range=(0, (1 << info.adc_resolution_bits) - 1)
+        if isinstance(info, V3Info)
+        else (info.adc_code_min, info.adc_code_max),
+        adc_input_range_volts=(0.0, 3.3)
+        if isinstance(info, V3Info)
+        else (
             info.adc_input_min_mv_nominal / 1000.0,
             info.adc_input_max_mv_nominal / 1000.0,
         ),
@@ -604,6 +659,7 @@ def _adc_preview(
             {
                 "stream": "adc",
                 "sequence": block.sequence,
+                "encoding": block.encoding,
                 "pair_index": index,
                 "adc0_timestamp_ticks": adc0_tick,
                 "adc1_timestamp_ticks": adc1_tick,
@@ -627,6 +683,7 @@ def _gpio_preview(
         {
             "stream": "gpio",
             "sequence": block.sequence,
+            "encoding": block.encoding,
             "sample_index": index,
             "timestamp_ticks": block.sample_ticks(index),
             "packed": block.sample(index),
@@ -651,6 +708,7 @@ def _print_preview(rows: list[dict[str, object]], output: TextIO) -> None:
                 )
             print(
                 f"adc sequence={row['sequence']} pair={row['pair_index']} "
+                f"encoding={_format_value(row['encoding'])} "
                 f"adc0_ticks={row['adc0_timestamp_ticks']} "
                 f"adc1_ticks={row['adc1_timestamp_ticks']} "
                 f"adc0_raw={adc0['raw_code']} adc1_raw={adc1['raw_code']}"
@@ -669,6 +727,7 @@ def _print_preview(rows: list[dict[str, object]], output: TextIO) -> None:
         )
         print(
             f"gpio sequence={row['sequence']} sample={row['sample_index']} "
+            f"encoding={_format_value(row['encoding'])} "
             f"ticks={row['timestamp_ticks']} "
             f"packed=0x{packed:0{packed_width_bits // 4}x}"
             + (f" {selected_channels}" if selected_channels else ""),
@@ -696,6 +755,19 @@ def _print_loss_counters(losses: LossCounters, output: TextIO) -> None:
         f"observed_stream_anomalies={losses.observed_stream_anomalies}",
         file=output,
     )
+
+
+def _print_metadata(value: object, output: TextIO, prefix: str = "") -> None:
+    """Print the same nested metadata as JSON, using addressable field paths."""
+    converted = _json_value(value)
+    if isinstance(converted, dict):
+        for key, item in converted.items():
+            _print_metadata(item, output, f"{prefix}.{key}" if prefix else key)
+    elif isinstance(converted, list):
+        for index, item in enumerate(converted):
+            _print_metadata(item, output, f"{prefix}[{index}]")
+    else:
+        print(f"{prefix}={converted}", file=output)
 
 
 def _print_info(info: DeviceInfo, output: TextIO) -> None:
@@ -818,9 +890,11 @@ def _print_info(info: DeviceInfo, output: TextIO) -> None:
             )
 
 
-def _print_status(status: Status, run_id: int, output: TextIO) -> None:
+def _print_status(status: Status | V3Status, run_id: int, output: TextIO) -> None:
     print(f"run_id={run_id}", file=output)
     for status_field in fields(status):
+        if status_field.name == "run_id":
+            continue
         value = getattr(status, status_field.name)
         print(f"{status_field.name}={_format_value(value)}", file=output)
 
@@ -864,13 +938,18 @@ def _print_reconciliation(
 
 
 def _print_configuration(
-    configuration: DAQConfiguration,
+    configuration: DAQConfiguration | V3AppliedSettings,
     output: TextIO,
     *,
-    state: constants.DeviceState = constants.DeviceState.CONFIGURED,
-    capabilities: DeviceCapabilities | None = None,
+    state: constants.DeviceState
+    | v3.DeviceState
+    | None = constants.DeviceState.CONFIGURED,
+    capabilities: DeviceCapabilities | V3Capabilities | None = None,
 ) -> None:
-    print(f"state={state.name}", file=output)
+    print(f"state={state.name if state is not None else None}", file=output)
+    if isinstance(configuration, V3AppliedSettings):
+        _print_metadata(_configuration_details(configuration, capabilities), output)
+        return
     print(f"protocol_version={configuration.protocol_version}", file=output)
     print(f"profile={configuration.profile.name}", file=output)
     print(
@@ -889,7 +968,7 @@ def _print_configuration(
             file=output,
         )
     if (
-        capabilities is not None
+        isinstance(capabilities, DeviceCapabilities)
         and configuration.stream_mask & constants.StreamMask.ADC
     ):
         print(f"adc_resolution_bits={capabilities.adc_resolution_bits}", file=output)
@@ -906,10 +985,17 @@ def _print_configuration(
 
 
 def _configuration_details(
-    configuration: DAQConfiguration,
-    capabilities: DeviceCapabilities | None,
+    configuration: DAQConfiguration | V3AppliedSettings,
+    capabilities: DeviceCapabilities | V3Capabilities | None,
 ) -> dict[str, object]:
-    """Return the echoed wire body plus active fixed-rate INFO metadata."""
+    """Return verified applied settings; keep actual clocks separate from policy."""
+
+    if isinstance(configuration, V3AppliedSettings):
+        return {
+            "protocol_version": 3,
+            "settings": configuration.settings,
+            "clocks": configuration.clocks,
+        }
 
     details: dict[str, object] = {
         "protocol_version": configuration.protocol_version,
@@ -925,7 +1011,7 @@ def _configuration_details(
         details["adc_pair_rate_hz"] = configuration.adc_pair_rate_hz
         details["adc_pairs_per_frame"] = configuration.gpio_layout.adc_items_per_frame
     if (
-        capabilities is not None
+        isinstance(capabilities, DeviceCapabilities)
         and configuration.stream_mask & constants.StreamMask.ADC
     ):
         details["adc_resolution_bits"] = capabilities.adc_resolution_bits
@@ -946,7 +1032,7 @@ def _run_monitor(
     preview_rows: list[dict[str, object]] = []
     adc_preview_count = 0
     gpio_preview_count = 0
-    stopped: constants.DeviceState | None = None
+    stopped: constants.DeviceState | v3.DeviceState | None = None
     active_error = False
     try:
         for name in ("duration", "status_interval", "block_timeout"):
@@ -968,14 +1054,20 @@ def _run_monitor(
         configuration = _configuration_from_arguments(daq, arguments)
         command_latencies_ms.append((monotonic() - command_started) * 1_000)
         if any(pin >= 16 for pin in gpio_pins) and (
-            configuration.aux_bank_mode is not AuxBankMode.INPUT
+            (
+                configuration.settings
+                if isinstance(configuration, V3AppliedSettings)
+                else configuration
+            ).aux_bank_mode
+            != AuxBankMode.INPUT
         ):
             raise ValueError("D16-D23 require --aux-bank-mode input")
         if not json_output:
             _print_configuration(
                 configuration,
                 output,
-                capabilities=cast(DeviceCapabilities | None, daq.capabilities),
+                capabilities=daq.capabilities,
+                state=daq.state,
             )
 
         command_started = monotonic()
@@ -993,19 +1085,21 @@ def _run_monitor(
         previous_gpio_bytes = 0
         adc_bytes = 0
         gpio_bytes = 0
+        adc_wire_bytes = 0
+        gpio_wire_bytes = 0
         gaps = 0
         host_queue_losses = 0
         stream_anomalies = 0
         adc_blocks = 0
         gpio_blocks = 0
         status_samples = 0
-        last_status: Status | None = None
+        last_status: Status | V3Status | None = None
 
         while monotonic() < deadline:
             now = monotonic()
             if now >= next_status:
                 command_started = monotonic()
-                last_status = cast(Status, daq.status())
+                last_status = daq.status()
                 latency_ms = (monotonic() - command_started) * 1_000
                 command_latencies_ms.append(latency_ms)
                 status_samples += 1
@@ -1021,9 +1115,9 @@ def _run_monitor(
                         f"gpio_payload_Bps={gpio_rate:.0f} gaps={gaps} "
                         f"host_queue_losses={host_queue_losses} "
                         f"stream_anomalies={stream_anomalies} "
-                        f"packet_ready_hwm={last_status.packet_ready_high_water} "
+                        f"packet_ready_hwm={getattr(last_status, 'packet_ready_high_water', None)} "
                         "packet_transmit_hwm="
-                        f"{last_status.packet_transmit_high_water} "
+                        f"{getattr(last_status, 'packet_transmit_high_water', None)} "
                         f"host_block_queue_hwm={reader.block_queue_high_water} "
                         f"command_latency_ms={latency_ms:.3f}",
                         file=output,
@@ -1053,7 +1147,8 @@ def _run_monitor(
             elif isinstance(item, StreamAnomaly):
                 stream_anomalies += item.occurrences
             elif isinstance(item, ADCBlock):
-                adc_bytes += len(item.payload_view)
+                adc_bytes += item.decoded_bytes
+                adc_wire_bytes += item.wire_bytes
                 adc_blocks += 1
                 if arguments.adc_output != "none":
                     rows = _adc_preview(
@@ -1068,7 +1163,8 @@ def _run_monitor(
                     if not json_output:
                         _print_preview(rows, output)
             elif isinstance(item, GPIOBlock):
-                gpio_bytes += len(item.payload_view)
+                gpio_bytes += item.decoded_bytes
+                gpio_wire_bytes += item.wire_bytes
                 gpio_blocks += 1
                 rows = _gpio_preview(
                     item,
@@ -1081,7 +1177,7 @@ def _run_monitor(
                     _print_preview(rows, output)
 
         command_started = monotonic()
-        last_status = cast(Status, daq.status())
+        last_status = daq.status()
         final_latency_ms = (monotonic() - command_started) * 1_000
         command_latencies_ms.append(final_latency_ms)
         elapsed = max(monotonic() - started_at, 1e-9)
@@ -1092,14 +1188,22 @@ def _run_monitor(
             "gpio_blocks": gpio_blocks,
             "adc_payload_bytes": adc_bytes,
             "gpio_payload_bytes": gpio_bytes,
+            "adc_wire_bytes": adc_wire_bytes,
+            "gpio_wire_bytes": gpio_wire_bytes,
+            "adc_wire_bytes_per_second": adc_wire_bytes / elapsed,
+            "gpio_wire_bytes_per_second": gpio_wire_bytes / elapsed,
             "adc_payload_bytes_per_second": adc_bytes / elapsed,
             "gpio_payload_bytes_per_second": gpio_bytes / elapsed,
             "gaps": gaps,
             "host_queue_losses": host_queue_losses,
             "stream_anomalies": stream_anomalies,
             "status_samples": status_samples,
-            "packet_ready_high_water": last_status.packet_ready_high_water,
-            "packet_transmit_high_water": last_status.packet_transmit_high_water,
+            "packet_ready_high_water": getattr(
+                last_status, "packet_ready_high_water", None
+            ),
+            "packet_transmit_high_water": getattr(
+                last_status, "packet_transmit_high_water", None
+            ),
             "host_block_queue_high_water": reader.block_queue_high_water,
             "host_block_queue_drops": reader.host_block_queue_drops,
             "command_latency_max_ms": max(command_latencies_ms),
@@ -1109,13 +1213,15 @@ def _run_monitor(
         if not json_output:
             print(
                 f"summary elapsed_s={elapsed:.3f} "
+                f"adc_wire_Bps={adc_wire_bytes / elapsed:.0f} "
+                f"gpio_wire_Bps={gpio_wire_bytes / elapsed:.0f} "
                 f"adc_payload_Bps={adc_bytes / elapsed:.0f} "
                 f"gpio_payload_Bps={gpio_bytes / elapsed:.0f} gaps={gaps} "
                 f"host_queue_losses={host_queue_losses} "
                 f"stream_anomalies={stream_anomalies} "
-                f"packet_ready_hwm={last_status.packet_ready_high_water} "
+                f"packet_ready_hwm={getattr(last_status, 'packet_ready_high_water', None)} "
                 "packet_transmit_hwm="
-                f"{last_status.packet_transmit_high_water} "
+                f"{getattr(last_status, 'packet_transmit_high_water', None)} "
                 f"host_block_queue_hwm={reader.block_queue_high_water} "
                 f"host_block_queue_drops={reader.host_block_queue_drops} "
                 f"command_latency_max_ms={max(command_latencies_ms):.3f}",
@@ -1131,7 +1237,7 @@ def _run_monitor(
             constants.DeviceState.RUNNING,
         }:
             try:
-                stopped = cast(constants.DeviceState, daq.stop())
+                stopped = daq.stop()
                 if not json_output:
                     print(f"final_state={stopped.name}", file=output)
             except Exception:
@@ -1139,7 +1245,7 @@ def _run_monitor(
                     raise
 
     command_started = monotonic()
-    final_status = cast(Status, daq.status())
+    final_status = daq.status()
     command_latencies_ms.append((monotonic() - command_started) * 1_000)
     losses = daq.loss_counters(refresh=False)
     if arguments.strict_loss:
@@ -1157,9 +1263,7 @@ def _run_monitor(
         }
     return {
         "command": arguments.command,
-        "configuration": _configuration_details(
-            configuration, cast(DeviceCapabilities | None, daq.capabilities)
-        ),
+        "configuration": _configuration_details(configuration, daq.capabilities),
         "run_id": run_id,
         "adc_output": arguments.adc_output,
         "gpio_channels": [f"D{pin}" for pin in gpio_pins],
@@ -1204,15 +1308,29 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
     active_error = False
     try:
         if arguments.action == "probe":
-            info = cast(DeviceInfo | None, daq.device_info)
+            info = daq.device_info
             if info is None:
                 raise DeviceSynchronizationError("open completed without INFO")
+            metadata = {
+                "command": arguments.command,
+                "info": info,
+                "capabilities": daq.capabilities,
+                "defaults": daq.capabilities.defaults
+                if isinstance(daq.capabilities, V3Capabilities)
+                else None,
+                "active_settings": daq.get_settings()
+                if isinstance(info, V3Info)
+                else daq.configuration,
+                "state": daq.state,
+            }
             if json_output:
-                _print_json({"command": arguments.command, "info": info}, output)
+                _print_json(metadata, output)
+            elif isinstance(info, V3Info):
+                _print_metadata(metadata, output)
             else:
                 _print_info(info, output)
         elif arguments.action == "status":
-            status = cast(Status, daq.status())
+            status = daq.status()
             if json_output:
                 _print_json(
                     {"command": "status", "run_id": daq.run_id, "status": status},
@@ -1221,9 +1339,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
             else:
                 _print_status(status, daq.run_id, output)
         elif arguments.action == "reconcile":
-            reconciliation = reconcile_run_counters(
-                cast(Status, daq.status()), run_id=daq.run_id
-            )
+            reconciliation = reconcile_run_counters(daq.status(), run_id=daq.run_id)
             if json_output:
                 _print_json(
                     {
@@ -1246,7 +1362,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                         "state": daq.state,
                         "applied_configuration": _configuration_details(
                             applied_configuration,
-                            cast(DeviceCapabilities | None, daq.capabilities),
+                            daq.capabilities,
                         ),
                     },
                     output,
@@ -1255,7 +1371,8 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                 _print_configuration(
                     applied_configuration,
                     output,
-                    capabilities=cast(DeviceCapabilities | None, daq.capabilities),
+                    capabilities=daq.capabilities,
+                    state=daq.state,
                 )
         elif arguments.action == "monitor":
             with _capture_signal_handlers():
@@ -1264,7 +1381,11 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                 _print_json(capture_report, output)
         elif arguments.action == "start":
             run_id = daq.start()
-            started_configuration = cast(DAQConfiguration | None, daq.configuration)
+            started_configuration = (
+                daq.get_settings()
+                if isinstance(daq.configuration, V3Settings)
+                else daq.configuration
+            )
             if started_configuration is None:
                 raise DeviceSynchronizationError(
                     "START completed without an applied configuration"
@@ -1277,7 +1398,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                         "run_id": run_id,
                         "applied_configuration": _configuration_details(
                             started_configuration,
-                            cast(DeviceCapabilities | None, daq.capabilities),
+                            daq.capabilities,
                         ),
                     },
                     output,
@@ -1287,11 +1408,11 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                     started_configuration,
                     output,
                     state=constants.DeviceState.RUNNING,
-                    capabilities=cast(DeviceCapabilities | None, daq.capabilities),
+                    capabilities=daq.capabilities,
                 )
                 print(f"run_id={run_id}", file=output)
         elif arguments.action == "stop":
-            state = cast(constants.DeviceState, daq.stop())
+            state = daq.stop()
             if json_output:
                 _print_json({"command": "stop", "state": state}, output)
             else:

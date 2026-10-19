@@ -105,6 +105,18 @@ runpy.run_path(script, run_name="__main__")
         self.assertIn("hardware_throughput=not_measured", lines[0])
         self.assertIn("board=TEENSY_40", lines[1])
         self.assertIn("protocol=3", lines[1])
+        self.assertIn(
+            "compatibility persona=v3 negotiated=v3 compressed_capture=exact PASS",
+            lines,
+        )
+        for version, gpio_rate in ((1, 4_000_000), (2, 1_000_000)):
+            self.assertIn(
+                f"compatibility persona=v{version} negotiated=v{version} "
+                f"adc_pair_rate_hz=1000000 gpio_sample_rate_hz={gpio_rate} "
+                "equality=exact loss=none final_state=IDLE "
+                "transport_closed=true reader_stopped=true PASS",
+                lines,
+            )
         self.assertIn("supported_tuples=60", lines)
         self.assertEqual(60, sum(line.startswith("tuple[") for line in lines))
         self.assertIn(

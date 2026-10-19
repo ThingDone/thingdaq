@@ -618,11 +618,15 @@ class ThingDAQ:
         """Open the historical simulator or explicitly select public v3.
 
         ``protocol_version=3`` uses advertised board defaults and v3 control
-        models. The default persona retains historical v1/v2 behavior.
+        models. ``protocol_version=2`` selects the v2-only release persona.
+        The default persona retains historical v1/v2 behavior; all personas
+        use automatic wire-version negotiation through ``open()``.
         """
 
-        if isinstance(protocol_version, bool) or protocol_version not in (1, 3):
-            raise ValueError("simulator protocol_version must be 1 (legacy v1/v2) or 3")
+        if isinstance(protocol_version, bool) or protocol_version not in (1, 2, 3):
+            raise ValueError(
+                "simulator protocol_version must be 1 (legacy v1/v2), 2 (v2-only), or 3"
+            )
         if protocol_version == 3 and (
             control_only
             or expected_identity is not None
@@ -635,6 +639,10 @@ class ThingDAQ:
             device=SimulatedV3Device()
             if protocol_version == 3
             else SimulatedDevice(
+                protocol_version=protocol_version,
+                build_id="thingdaq-simulator-v2-release"
+                if protocol_version == 2
+                else "thingdaq-simulator-v1",
                 control_only=control_only,
                 gpio_pattern=gpio_pattern,
             ),

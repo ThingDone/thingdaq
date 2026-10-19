@@ -267,6 +267,18 @@ It prints all advertised tuples, verifies exact ADC/GPIO samples and timestamps,
 reports compression byte counts and RAW fallback, and exercises stopped
 600/450/600 MHz configuration transitions plus rejected running reconfiguration.
 Clock changes are simulated metadata; this does not measure hardware throughput.
+The CLI exposes v3 metadata and exact configuration tuples through `probe`:
+
+```bash
+.venv/bin/python -m thingdone_daq.cli probe --simulate --simulator-version 3 --json
+.venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3 --cpu-profile cpu_450mhz --gpio-policy raw --adc-policy raw --json
+```
+
+Omitted v3 selectors use advertised defaults. The offline upgrade demo also
+checks automatic negotiation and exact capture against historical v1 and
+v2-only release personas. See the [CLI reference](doc/reference/api-reference.md#cli-and-examples)
+for selectors, output fields and legacy behavior.
+
 See the [v3 upgrade architecture](doc/architecture/protocol-v3-upgrade.md) and
 [offline validation results](doc/results/protocol-v3-prototype.md) for the
 component boundaries, reproducible gates and capture byte counts.

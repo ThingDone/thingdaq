@@ -51,13 +51,16 @@ class SimulatedDevice:
     """A bounded, deterministic ThingDAQ protocol peer.
 
     The simulator consumes the same encoded request frames that future firmware
-    will consume and produces ordinary encoded response/data frames.  It starts
+    will consume and produces ordinary encoded response/data frames.
+    ``protocol_version=2`` selects a v2-only persona with 1 MHz ADC/GPIO
+    release defaults; the default retains historical v1/v2 behavior.  It starts
     in ``BOOT`` and completes its bounded boot synchronously by default.
     """
 
     def __init__(
         self,
         *,
+        protocol_version: int = 1,
         auto_boot: bool = True,
         control_only: bool = False,
         build_id: str = "thingdaq-simulator-v1",
@@ -65,6 +68,11 @@ class SimulatedDevice:
         max_requests_per_receive: int = 8,
         gpio_pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
     ) -> None:
+        if isinstance(protocol_version, bool) or protocol_version not in (1, 2):
+            raise ValueError("legacy simulator protocol_version must be 1 or 2")
+        if protocol_version == 2 and control_only:
+            raise ValueError("v2 release persona requires acquisition capabilities")
+        self._persona_version = protocol_version
         if max_receive_bytes < constants.MIN_FRAME_BYTES:
             raise ValueError("max_receive_bytes must hold at least one frame")
         if max_requests_per_receive <= 0:
@@ -165,7 +173,9 @@ class SimulatedDevice:
         responses: list[bytes] = []
         for index, request in enumerate(requests):
             response: bytes | None
-            if isinstance(request, V3Frame):
+            if isinstance(request, V3Frame) or (
+                self._persona_version == 2 and request.header.version != 2
+            ):
                 response = encode_frame(
                     constants.FrameKind.ERROR_RESPONSE,
                     _ERROR_RESPONSE.pack(
@@ -173,7 +183,7 @@ class SimulatedDevice:
                         0,
                         constants.ErrorCode.UNSUPPORTED_VERSION,
                         int(request.header.kind),
-                        3,
+                        request.header.version,
                         0,
                     ),
                     request_id=request.header.request_id,
@@ -401,7 +411,7 @@ class SimulatedDevice:
                 | constants.Capability.RESET_STATS
                 | constants.Capability.PING
             )
-            firmware_version = (0, 1, 0)
+            firmware_version = (1, 1, 0) if self._persona_version == 2 else (0, 1, 0)
             supported_configuration_mask = (
                 constants.ConfigurationProfile.SYNTHETIC_ADC
                 | constants.ConfigurationProfile.SYNTHETIC_GPIO
@@ -413,7 +423,11 @@ class SimulatedDevice:
             profile = configuration.rate_profile
         else:
             mode = v2_constants.DEFAULT_AUX_BANK_MODE
-            profile = v2_constants.DEFAULT_RATE_PROFILE
+            profile = (
+                v2_constants.RateProfile.ADC_1MHZ_GPIO_1MHZ
+                if self._persona_version == 2
+                else v2_constants.DEFAULT_RATE_PROFILE
+            )
         timing = RateProfileTiming.from_profile(profile)
         layout = GPIOLayout.from_mode(mode)
         auxiliary = None
