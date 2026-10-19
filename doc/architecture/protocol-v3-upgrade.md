@@ -17,11 +17,37 @@ related:
 
 # Public protocol v3 offline upgrade architecture
 
+## Current scope: fixed 600 MHz (2026-10-19)
+
+The user explicitly requires a fixed 600 MHz CPU; runtime frequency switching
+was not requested. The normal build now selects 600 MHz in its FQBN, timing
+definitions and output directory. `FixedBuildApplication` continues to advertise
+only the build's CPU profile and rejects requests for another speed. Stopped
+acquisition/codec configuration remains supported; no PLL transition adapter,
+core patch or watchdog-policy change is needed.
+
+The Phase 04 transition blocker is superseded, and remaining Phase 04–06 work
+covers fixed-clock configuration, documentation and qualification. Earlier
+two-clock simulator coverage and 450 MHz build results below are historical
+checkpoints, not requirements to switch CPU speed. Aligning the ordinary v3
+simulator/examples with the single-profile board remains a Phase 04 task.
+Generic wire IDs and legacy build records remain compatible. Physical public-v3
+qualification is still pending; this change does not program a device.
+
+Validation of this scope/build correction: 136 focused tests passed with five
+expected skips (build configuration, input timing, public control, runtime
+layouts and documentation). Generator, Ruff format/lint and SDK mypy passed.
+The normal pinned 600 MHz target build passed unchanged memory/placement gates:
+33,024 bytes free for RAM1 locals/stack and 4,096 bytes for RAM2 heap.
+The control regression rejects another otherwise-valid CPU profile and verifies
+unchanged settings; no runtime clock switch is performed. Full release
+qualification remains in the revised playbook.
+
 Phase 03 now integrates public v3 control, per-run codecs, acquisition layouts
 and USB framing in firmware. Portable C++ execution and the public Python SDK
 agree on emitted bytes, repeated v2/v3 sessions and loss accounting. Production
-clock selection remains fixed at build time; physical public-v3 capture and
-runtime clock switching remain unqualified. [[protocol-v3-firmware-portable]]
+clock selection remains fixed at build time; physical public-v3 capture
+remains unqualified. [[protocol-v3-firmware-portable]]
 records the consolidated gate and [[protocol-v3-python]] the earlier host gate.
 
 Phase 01 established the hardware-free vertical slice: discover an explicitly
@@ -222,7 +248,7 @@ by public run mode independently of private codec flags; legacy v2 retains ADC2.
 This checkpoint tested packet bytes directly with the public Python decoder.
 Public-v3 START, production ADC/GPIO block counts, the USB v3 data guard and public
 codec diagnostics were completed in the following layout/transport checkpoint.
-Physical qualification and runtime clock changes remain outstanding. The storage
+Physical qualification remains outstanding. The storage
 ceilings above are enforced by the packet layout factory, and the public v3
 checksum remains Adler-32 only.
 
@@ -245,7 +271,7 @@ storage are unchanged. A bounded raw-tail drain precedes the v3 STOP response.
 
 Both 450/600 MHz linked images pass the original memory gates after moving
 immutable discovery tables and initialization-only code to program flash.
-Runtime clock application and physical capture/throughput qualification remain
+Physical capture/throughput qualification remains
 outstanding; portable adapters and synthetic streaming do not establish them.
 
 ## Firmware portable validation checkpoint (2026-10-19)
@@ -269,6 +295,6 @@ layouts. The current gate reruns those suites; their physical limitations remain
 sequence and maps active timing, cached schedules, legacy projections and fixed
 storage. It identifies unbounded core handshake waits and mixed-frequency
 `micros()` conversion as constraints for the runtime adapter. The current
-watchdog remains disabled; runtime switching and physical qualification are
-still pending. The audit passed 41 baseline tests (3 intentional skips) and
-6 subtests without changing firmware.
+watchdog remains disabled; runtime switching is out of scope and physical
+qualification is still pending. The audit passed 41 baseline tests
+(3 intentional skips) and 6 subtests without changing firmware.

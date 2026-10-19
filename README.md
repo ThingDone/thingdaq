@@ -1,5 +1,11 @@
 # ThingDAQ
 
+The current development build runs at a **fixed 600 MHz** CPU clock, with
+1 MHz ADC/GPIO sampling. Runtime CPU-clock switching is out of scope;
+CONFIGURE can select supported acquisition/codec settings while stopped.
+This supersedes the runtime-switching plan, not the historical release evidence.
+Physical qualification of the public-v3 candidate remains pending.
+
 Release **1.1.0** uses **protocol v2**, a **450 MHz** core and fixed **1 MHz**
 rates on both ADCs and GPIO. Select 8 or 16 GPIO inputs; other acquisition
 rates are rejected. See the [current wire contract](doc/protocol/protocol-v2.md).
@@ -306,6 +312,12 @@ Common local gates:
 .venv/bin/python -m pytest
 python3 firmware/tools/build_firmware.py
 ```
+
+The firmware builder targets `speed=600`, pins acquisition timing to the same
+600 MHz clock, and exports to
+`firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/`.
+It does not flash the device. Historical 450 MHz builds remain available through
+the explicit experiment builder and the recorded release revision.
 
 ## Distribution and trademark boundary
 

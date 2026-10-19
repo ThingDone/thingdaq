@@ -137,7 +137,6 @@ def main() -> int:
     )
     base.identity_definitions = lambda definitions, identity: (
         original_definitions(definitions, identity)
-        + f" -DTHINGDAQ_EXPERIMENT_CPU_HZ={args.cpu_mhz * 1_000_000}U"
         + f" -DTHINGDAQ_EXPERIMENT_EQUAL_RATES={int(args.equal_rates)}"
         + (" -DTHINGDAQ_EXPERIMENT_LARGE_ADC_FRAME=1" if args.large_adc_frame else "")
     )

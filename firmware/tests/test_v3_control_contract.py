@@ -153,6 +153,26 @@ def test_discovery_and_settings_echo(executable: Path) -> None:
         )
 
 
+def test_fixed_build_rejects_other_cpu_without_changing_settings(
+    executable: Path,
+) -> None:
+    initial = exchange(executable, command(29))[0].value
+    assert isinstance(initial, V3AppliedSettings)
+    candidate = next(
+        settings
+        for settings in V3Capabilities.canonical().configurations
+        if settings.cpu_profile != initial.settings.cpu_profile
+        and settings.gpio_policy == c.GpioPolicy.RAW
+        and settings.adc_policy == c.AdcPolicy.RAW
+    )
+    before, rejected, after = exchange(
+        executable,
+        command(29) + command(17, candidate.to_bytes(), 2) + command(29, request_id=3),
+    )
+    assert rejected.error_code == c.ErrorCode.UNSUPPORTED_CONFIGURATION
+    assert before.value == after.value == initial
+
+
 def test_fake_adapter_does_not_change_production_advertisement(
     executable: Path,
 ) -> None:

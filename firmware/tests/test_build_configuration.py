@@ -38,7 +38,7 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
         self.assertEqual(11, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
-            "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std",
+            "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
         )
         self.assertEqual("/tools/arduino-cli", command[0])
@@ -65,6 +65,10 @@ class BuildConfigurationTests(unittest.TestCase):
         self.assertIn("-DTHINGDAQ_BUILD_YEAR=2023U", definitions)
         self.assertIn("-DTHINGDAQ_BUILD_SECOND=20U", definitions)
         self.assertIn("-DTHINGDAQ_OPTIMIZATION_O2STD=1", definitions)
+        self.assertEqual(
+            "600000000", build_firmware.EXPECTED_BUILD_PROPERTIES["build.fcpu"]
+        )
+        self.assertIn("-DTHINGDAQ_EXPERIMENT_CPU_HZ=600000000U", definitions)
         linker_flags = next(
             value for value in build_properties if value.startswith("build.flags.ld=")
         )

@@ -21,19 +21,19 @@ from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SKETCH_DIRECTORY = REPOSITORY_ROOT / "firmware"
-FQBN = "teensy:avr:teensy40:usb=serial,speed=450,opt=o2std"
+FQBN = "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std"
 RELEASE_BUILD = True
 CORE_ID = "teensy:avr"
 CORE_VERSION = "1.62.0"
 COMPILER_VERSION = "15.2.1"
 EXPECTED_BUILD_PROPERTIES = {
     "build.board": "TEENSY40",
-    "build.fcpu": "450000000",
+    "build.fcpu": "600000000",
     "build.flags.optimize": "-O2",
     "build.usbtype": "USB_SERIAL",
 }
 OUTPUT_DIRECTORY = (
-    SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_450.opt_o2std")
+    SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
 )
 MANIFEST_NAME = "build-manifest.json"
 MANIFEST_SCHEMA_VERSION = 11
@@ -385,6 +385,7 @@ def identity_definitions(base_definitions: str, identity: BuildIdentity) -> str:
         f"-DTHINGDAQ_BUILD_SECOND={timestamp.second}U",
         "-DTHINGDAQ_OPTIMIZATION_O2STD=1",
         f"-DTHINGDAQ_RELEASE_FIXED_1MHZ={int(RELEASE_BUILD)}",
+        f"-DTHINGDAQ_EXPERIMENT_CPU_HZ={EXPECTED_BUILD_PROPERTIES['build.fcpu']}U",
     )
     return " ".join((base_definitions, *identity_macros))
 

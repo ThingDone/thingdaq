@@ -16,6 +16,16 @@ related:
 
 # Runtime clock dependency audit
 
+## Scope correction (2026-10-19)
+
+The user requires a fixed 600 MHz CPU and did not request runtime frequency
+switching. The transition adapter and task 3 blocker below are superseded,
+not outstanding work. The Phase 04 halt marker has been removed and Phases
+04–06 now cover fixed-clock configuration and qualification. Do not patch
+the core or enable a reset watchdog to implement the removed requirement.
+The audit below is retained as historical analysis; its startup sequence and
+600 MHz timing data remain useful. [[protocol-v3-upgrade]] records current scope.
+
 Phase 04 task 1, audited against repository commit `24df6fd` and the locally
 installed `teensy:avr@1.62.0`. This is an implementation reference, not a runtime
 adapter or physical qualification. The worktree was clean before the audit.
@@ -295,7 +305,7 @@ and 47 subtests**, with two intentional 450 MHz compression skips. Generator
 drift (142 files), repository Ruff formatting/lint and SDK mypy checks passed.
 No task images were supplied or analyzed.
 
-## Task 3: blocked on bounded core transition semantics
+## Historical task 3 blocker (superseded by fixed 600 MHz scope)
 
 Rechecked 2026-10-19 before implementing the hardware adapter. The installed
 1.62.0 `clockspeed.c` still matches the SHA-256 below. Its hardware waits at
