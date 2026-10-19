@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass
+from functools import partial
 
 from ._generated import protocol_constants as v1_constants
 from ._generated import protocol_v2_constants as constants
+from ._generated import protocol_v3_constants as v3_constants
 from ._incremental import BoundedIncrementalParser, BytesLike, ParserCounters
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS, compute_checksum_value
 from .protocol import (
@@ -41,6 +43,14 @@ from .protocol import (
 )
 from .protocol import (
     encode_frame as encode_v1_frame,
+)
+from .protocol_v3 import (
+    V3ChecksumMismatchError,
+    V3Frame,
+    V3FrameHeader,
+    V3FrameValidationError,
+    _decode_buffered_v3_frame,
+    _decode_v3_header,
 )
 
 _HEADER = struct.Struct(constants.HEADER_STRUCT_FORMAT)
@@ -213,8 +223,8 @@ class V2Frame:
         return memoryview(self.payload)
 
 
-CompatibleFrame = V1Frame | V2Frame
-CompatibleFrameHeader = V1FrameHeader | V2FrameHeader
+CompatibleFrame = V1Frame | V2Frame | V3Frame
+CompatibleFrameHeader = V1FrameHeader | V2FrameHeader | V3FrameHeader
 
 
 def _v1_checksum_algorithm(
@@ -1300,6 +1310,8 @@ class IncrementalV2FrameParser(BoundedIncrementalParser[V2FrameHeader, V2Frame])
 def _decode_compatible_header(
     data: bytearray,
     offset: int = 0,
+    *,
+    include_v3: bool = False,
 ) -> CompatibleFrameHeader:
     """Decode a v1 or v2 header while presenting one validation type."""
 
@@ -1310,6 +1322,11 @@ def _decode_compatible_header(
             error_code=constants.ErrorCode.INVALID_LENGTH,
         )
     version = data[offset + constants.HEADER_VERSION_OFFSET]
+    if include_v3 and version == v3_constants.PROTOCOL_VERSION:
+        try:
+            return _decode_v3_header(data, offset)
+        except V3FrameValidationError as exc:
+            raise V2FrameValidationError(str(exc), reason="invalid_v3_frame") from exc
     if version == constants.PROTOCOL_VERSION:
         return _decode_v2_header(data, offset)
     if version == v1_constants.PROTOCOL_VERSION:
@@ -1333,6 +1350,13 @@ def _decode_buffered_compatible_frame(
     offset: int,
     header: CompatibleFrameHeader,
 ) -> CompatibleFrame:
+    if isinstance(header, V3FrameHeader):
+        try:
+            return _decode_buffered_v3_frame(buffer, offset, header)
+        except V3ChecksumMismatchError as exc:
+            raise V2ChecksumMismatchError(exc.expected, exc.observed) from exc
+        except V3FrameValidationError as exc:
+            raise V2FrameValidationError(str(exc), reason="invalid_v3_frame") from exc
     if isinstance(header, V2FrameHeader):
         return _decode_buffered_v2_frame(buffer, offset, header)
     try:
@@ -1354,12 +1378,14 @@ class IncrementalCompatibleFrameParser(
 
     max_buffered_bytes = MAX_V2_BUFFERED_BYTES
 
-    def __init__(self) -> None:
+    def __init__(self, *, include_v3: bool = False) -> None:
         super().__init__(
             magic_bytes=constants.MAGIC_BYTES,
             header_size=constants.HEADER_SIZE,
-            max_frame_bytes=_MAX_FRAME_BYTES,
-            decode_header=_decode_compatible_header,
+            max_frame_bytes=max(_MAX_FRAME_BYTES, v3_constants.MAX_DATA_FRAME_BYTES)
+            if include_v3
+            else _MAX_FRAME_BYTES,
+            decode_header=partial(_decode_compatible_header, include_v3=include_v3),
             decode_frame=_decode_buffered_compatible_frame,
             validation_error=V2FrameValidationError,
             checksum_error=V2ChecksumMismatchError,

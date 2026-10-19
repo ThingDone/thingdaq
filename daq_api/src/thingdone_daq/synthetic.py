@@ -349,6 +349,28 @@ def validate_synthetic_block(
         raise TypeError("synthetic validation requires an ADCBlock or GPIOBlock")
     if not block.flags & constants.FrameFlag.SYNTHETIC:
         raise SyntheticPatternError("synthetic block is missing the SYNTHETIC flag")
+    if block.protocol_version == 3:
+        if isinstance(block, ADCBlock):
+            expected = synthetic_v3_adc_payload(
+                block.first_pair_index, block.item_count
+            )
+        else:
+            pattern = (
+                SyntheticGPIOPattern.ALL_ZERO
+                if block.sequence % 2 == 0
+                else SyntheticGPIOPattern.HIGH_TRANSITION
+            )
+            expected = synthetic_gpio_payload(
+                block.first_sample_index,
+                block.item_count,
+                aux_bank_mode=block.aux_bank_mode,
+                pattern=pattern,
+            )
+        if block.payload != expected:
+            raise SyntheticPatternError(
+                "v3 synthetic samples differ from deterministic source"
+            )
+        return
     if isinstance(block, ADCBlock):
         if block.first_sample_ticks % block.pair_period_ticks:
             raise SyntheticPatternError("ADC timestamp is not pair-period aligned")

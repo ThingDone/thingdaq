@@ -31,6 +31,21 @@ from ._generated.protocol_constants import (
     StreamMask,
 )
 from ._generated.protocol_v2_constants import TemperatureStatus
+from ._generated.protocol_v3_constants import (
+    AdcPolicy as V3AdcPolicy,
+)
+from ._generated.protocol_v3_constants import (
+    CpuProfile as V3CpuProfile,
+)
+from ._generated.protocol_v3_constants import (
+    DeviceState as V3DeviceState,
+)
+from ._generated.protocol_v3_constants import (
+    Encoding as V3Encoding,
+)
+from ._generated.protocol_v3_constants import (
+    GpioPolicy as V3GpioPolicy,
+)
 from ._version import __version__ as __version__
 from .alignment import (
     AlignedInterval,
@@ -180,6 +195,7 @@ from .models import (
     extract_gpio_channel,
     interleave_adc,
 )
+from .models_v3 import V3AppliedSettings, V3Capabilities, V3Info, V3Settings, V3Status
 from .protocol import (
     ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
@@ -443,6 +459,16 @@ __all__ = [
     "UnexpectedStreamGapError",
     "UnexpectedStreamValidationError",
     "UnsupportedChecksumError",
+    "V3AdcPolicy",
+    "V3AppliedSettings",
+    "V3Capabilities",
+    "V3CpuProfile",
+    "V3DeviceState",
+    "V3Encoding",
+    "V3GpioPolicy",
+    "V3Info",
+    "V3Settings",
+    "V3Status",
     "__version__",
     "align_by_timestamp",
     "analyze_stream_continuity",

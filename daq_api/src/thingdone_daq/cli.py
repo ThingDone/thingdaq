@@ -14,7 +14,7 @@ from math import isfinite
 from threading import current_thread, main_thread
 from time import monotonic
 from types import FrameType
-from typing import TextIO
+from typing import TextIO, cast
 
 from ._generated import protocol_constants as constants
 from .calibration import CalibrationError, CalibrationRecord, load_calibration
@@ -452,16 +452,19 @@ def _configuration_from_arguments(
         if arguments.rate_profile is None
         else RateProfile.__members__[arguments.rate_profile.upper()]
     )
-    return daq.configure(
-        adc=bool(stream_mask & constants.StreamMask.ADC),
-        gpio=bool(stream_mask & constants.StreamMask.GPIO),
-        source=source,
-        checksum_algorithm=checksum,
-        adc_pair_rate_hz=arguments.adc_pair_rate_hz,
-        gpio_sample_rate_hz=arguments.gpio_sample_rate_hz,
-        adc_resolution_bits=arguments.adc_resolution_bits,
-        aux_bank_mode=aux_bank_mode,
-        rate_profile=rate_profile,
+    return cast(
+        DAQConfiguration,
+        daq.configure(
+            adc=bool(stream_mask & constants.StreamMask.ADC),
+            gpio=bool(stream_mask & constants.StreamMask.GPIO),
+            source=source,
+            checksum_algorithm=checksum,
+            adc_pair_rate_hz=arguments.adc_pair_rate_hz,
+            gpio_sample_rate_hz=arguments.gpio_sample_rate_hz,
+            adc_resolution_bits=arguments.adc_resolution_bits,
+            aux_bank_mode=aux_bank_mode,
+            rate_profile=rate_profile,
+        ),
     )
 
 
@@ -551,7 +554,7 @@ def _capture_calibration(
         raise ValueError("calibrated ADC output requires an enabled ADC stream")
     if arguments.calibration is None:
         raise ValueError("--adc-output calibrated requires --calibration PATH")
-    info = daq.device_info
+    info = cast(DeviceInfo | None, daq.device_info)
     if info is None:
         raise DeviceSynchronizationError("open completed without INFO")
     hardware_serial = arguments.calibration_hardware_serial or info.hardware_serial
@@ -972,7 +975,7 @@ def _run_monitor(
             _print_configuration(
                 configuration,
                 output,
-                capabilities=daq.capabilities,
+                capabilities=cast(DeviceCapabilities | None, daq.capabilities),
             )
 
         command_started = monotonic()
@@ -1002,7 +1005,7 @@ def _run_monitor(
             now = monotonic()
             if now >= next_status:
                 command_started = monotonic()
-                last_status = daq.status()
+                last_status = cast(Status, daq.status())
                 latency_ms = (monotonic() - command_started) * 1_000
                 command_latencies_ms.append(latency_ms)
                 status_samples += 1
@@ -1078,7 +1081,7 @@ def _run_monitor(
                     _print_preview(rows, output)
 
         command_started = monotonic()
-        last_status = daq.status()
+        last_status = cast(Status, daq.status())
         final_latency_ms = (monotonic() - command_started) * 1_000
         command_latencies_ms.append(final_latency_ms)
         elapsed = max(monotonic() - started_at, 1e-9)
@@ -1128,7 +1131,7 @@ def _run_monitor(
             constants.DeviceState.RUNNING,
         }:
             try:
-                stopped = daq.stop()
+                stopped = cast(constants.DeviceState, daq.stop())
                 if not json_output:
                     print(f"final_state={stopped.name}", file=output)
             except Exception:
@@ -1136,7 +1139,7 @@ def _run_monitor(
                     raise
 
     command_started = monotonic()
-    final_status = daq.status()
+    final_status = cast(Status, daq.status())
     command_latencies_ms.append((monotonic() - command_started) * 1_000)
     losses = daq.loss_counters(refresh=False)
     if arguments.strict_loss:
@@ -1154,7 +1157,9 @@ def _run_monitor(
         }
     return {
         "command": arguments.command,
-        "configuration": _configuration_details(configuration, daq.capabilities),
+        "configuration": _configuration_details(
+            configuration, cast(DeviceCapabilities | None, daq.capabilities)
+        ),
         "run_id": run_id,
         "adc_output": arguments.adc_output,
         "gpio_channels": [f"D{pin}" for pin in gpio_pins],
@@ -1199,7 +1204,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
     active_error = False
     try:
         if arguments.action == "probe":
-            info = daq.device_info
+            info = cast(DeviceInfo | None, daq.device_info)
             if info is None:
                 raise DeviceSynchronizationError("open completed without INFO")
             if json_output:
@@ -1207,7 +1212,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
             else:
                 _print_info(info, output)
         elif arguments.action == "status":
-            status = daq.status()
+            status = cast(Status, daq.status())
             if json_output:
                 _print_json(
                     {"command": "status", "run_id": daq.run_id, "status": status},
@@ -1216,7 +1221,9 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
             else:
                 _print_status(status, daq.run_id, output)
         elif arguments.action == "reconcile":
-            reconciliation = reconcile_run_counters(daq.status(), run_id=daq.run_id)
+            reconciliation = reconcile_run_counters(
+                cast(Status, daq.status()), run_id=daq.run_id
+            )
             if json_output:
                 _print_json(
                     {
@@ -1239,7 +1246,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                         "state": daq.state,
                         "applied_configuration": _configuration_details(
                             applied_configuration,
-                            daq.capabilities,
+                            cast(DeviceCapabilities | None, daq.capabilities),
                         ),
                     },
                     output,
@@ -1248,7 +1255,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                 _print_configuration(
                     applied_configuration,
                     output,
-                    capabilities=daq.capabilities,
+                    capabilities=cast(DeviceCapabilities | None, daq.capabilities),
                 )
         elif arguments.action == "monitor":
             with _capture_signal_handlers():
@@ -1257,7 +1264,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                 _print_json(capture_report, output)
         elif arguments.action == "start":
             run_id = daq.start()
-            started_configuration = daq.configuration
+            started_configuration = cast(DAQConfiguration | None, daq.configuration)
             if started_configuration is None:
                 raise DeviceSynchronizationError(
                     "START completed without an applied configuration"
@@ -1270,7 +1277,7 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                         "run_id": run_id,
                         "applied_configuration": _configuration_details(
                             started_configuration,
-                            daq.capabilities,
+                            cast(DeviceCapabilities | None, daq.capabilities),
                         ),
                     },
                     output,
@@ -1280,11 +1287,11 @@ def _execute(arguments: argparse.Namespace, output: TextIO) -> CliExitCode:
                     started_configuration,
                     output,
                     state=constants.DeviceState.RUNNING,
-                    capabilities=daq.capabilities,
+                    capabilities=cast(DeviceCapabilities | None, daq.capabilities),
                 )
                 print(f"run_id={run_id}", file=output)
         elif arguments.action == "stop":
-            state = daq.stop()
+            state = cast(constants.DeviceState, daq.stop())
             if json_output:
                 _print_json({"command": "stop", "state": state}, output)
             else:

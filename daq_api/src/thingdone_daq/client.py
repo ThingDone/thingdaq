@@ -13,6 +13,7 @@ from typing import Literal, TypeAlias
 
 from ._generated import protocol_constants as constants
 from ._generated import protocol_v2_constants as v2_constants
+from ._generated import protocol_v3_constants as v3_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .discovery import (
     DEFAULT_DISCOVERY_TIMEOUT,
@@ -58,8 +59,13 @@ from .models import (
     StreamGap,
     analyze_stream_continuity,
 )
+from .models_v3 import V3AppliedSettings, V3Capabilities, V3Info, V3Settings, V3Status
 from .protocol import ParserCounters
-from .protocol_v2 import RuntimeHealth, TemperatureReading
+from .protocol_v2 import (
+    IncrementalCompatibleFrameParser,
+    RuntimeHealth,
+    TemperatureReading,
+)
 from .reader import (
     DEFAULT_MAX_QUEUED_BLOCKS,
     BackgroundReader,
@@ -71,7 +77,9 @@ from .reader import (
     RequestTimeoutError,
     StreamStoppedError,
 )
+from .session_v3 import V3Session
 from .simulator import SimulatedDevice
+from .simulator_v3 import SimulatedV3Device
 from .synthetic import (
     SyntheticGPIOPattern,
     SyntheticPatternError,
@@ -175,8 +183,8 @@ class DeviceCommandError(ThingDAQError):
 
     def __init__(
         self,
-        command: constants.FrameKind | v2_constants.FrameKind,
-        error_code: constants.ErrorCode,
+        command: constants.FrameKind | v2_constants.FrameKind | v3_constants.FrameKind,
+        error_code: constants.ErrorCode | v3_constants.ErrorCode,
         request_id: int,
     ) -> None:
         super().__init__(
@@ -337,6 +345,7 @@ class ThingDAQ:
         synthetic_gpio_pattern: SyntheticGPIOPattern | str = (
             SyntheticGPIOPattern.COUNTER
         ),
+        _v3_simulator: bool = False,
     ) -> None:
         if not isinstance(strict, bool):
             raise TypeError("strict must be a boolean")
@@ -363,6 +372,7 @@ class ThingDAQ:
         except (TypeError, ValueError) as error:
             raise ValueError("unknown synthetic GPIO pattern") from error
 
+        self._v3: V3Session | None = None
         self._transport = transport
         self._strict = strict
         self._max_buffered_blocks = max_buffered_blocks
@@ -385,7 +395,10 @@ class ThingDAQ:
             queue_timeout=block_timeout,
             shutdown_timeout=shutdown_timeout,
             idle_sleep=idle_sleep,
+            parser=IncrementalCompatibleFrameParser(include_v3=_v3_simulator),
         )
+        if _v3_simulator:
+            self._v3 = V3Session(self._reader, self._command_timeout)
         self._lock = RLock()
         self._pending_items: deque[StreamItem] = deque()
         self._state: constants.DeviceState | None = None
@@ -566,6 +579,7 @@ class ThingDAQ:
     def simulated(
         cls,
         *,
+        protocol_version: int = 1,
         control_only: bool = False,
         read_chunk_size: int | None = None,
         write_chunk_size: int | None = None,
@@ -585,10 +599,26 @@ class ThingDAQ:
         synchronization_retry_delay: float = 0.05,
         gpio_pattern: SyntheticGPIOPattern | str = SyntheticGPIOPattern.COUNTER,
     ) -> ThingDAQ:
-        """Open the public API over the deterministic protocol simulator."""
+        """Open the historical simulator or explicitly select public v3.
 
+        ``protocol_version=3`` uses advertised board defaults and v3 control
+        models. The default persona retains historical v1/v2 behavior.
+        """
+
+        if isinstance(protocol_version, bool) or protocol_version not in (1, 3):
+            raise ValueError("simulator protocol_version must be 1 (legacy v1/v2) or 3")
+        if protocol_version == 3 and (
+            control_only
+            or expected_identity is not None
+            or SyntheticGPIOPattern(gpio_pattern) != SyntheticGPIOPattern.COUNTER
+        ):
+            raise ValueError(
+                "v3 simulator uses its advertised streams, identity and patterns"
+            )
         transport = InMemoryTransport(
-            device=SimulatedDevice(
+            device=SimulatedV3Device()
+            if protocol_version == 3
+            else SimulatedDevice(
                 control_only=control_only,
                 gpio_pattern=gpio_pattern,
             ),
@@ -596,6 +626,33 @@ class ThingDAQ:
             write_chunk_size=write_chunk_size,
             stream_interval=stream_interval,
         )
+        if protocol_version == 3:
+            daq = cls(
+                transport,
+                strict=strict,
+                read_size=read_size,
+                max_buffered_blocks=max_buffered_blocks,
+                max_buffered_events=max_buffered_events,
+                max_pending_requests=max_pending_requests,
+                command_timeout=command_timeout,
+                block_timeout=block_timeout,
+                shutdown_timeout=shutdown_timeout,
+                idle_sleep=idle_sleep,
+                session_policy=session_policy,
+                _v3_simulator=True,
+            )
+            try:
+                assert daq._v3 is not None
+                daq._v3.info()
+                daq._v3.info()
+                daq._v3.get_capabilities()
+                daq._v3.get_settings()
+                daq._v3.status()
+                daq._state = constants.DeviceState.CONFIGURED
+                return daq
+            except BaseException:
+                daq.close(stop=False)
+                raise
         return cls.open(
             transport,
             strict=strict,
@@ -635,16 +692,18 @@ class ThingDAQ:
         return self._session_policy
 
     @property
-    def state(self) -> constants.DeviceState | None:
-        return self._state
+    def state(self) -> constants.DeviceState | v3_constants.DeviceState | None:
+        return self._v3.state if self._v3 is not None else self._state
 
     @property
-    def configuration(self) -> DAQConfiguration | None:
+    def configuration(self) -> DAQConfiguration | V3Settings | None:
+        if self._v3 is not None:
+            return None if self._v3.applied is None else self._v3.applied.settings
         return self._configuration
 
     @property
-    def device_info(self) -> DeviceInfo | None:
-        return self._device_info
+    def device_info(self) -> DeviceInfo | V3Info | None:
+        return self._v3.identity if self._v3 is not None else self._device_info
 
     @property
     def verified_identity(self) -> DeviceIdentitySnapshot | None:
@@ -653,7 +712,9 @@ class ThingDAQ:
         return self._verified_identity
 
     @property
-    def capabilities(self) -> DeviceCapabilities | None:
+    def capabilities(self) -> DeviceCapabilities | V3Capabilities | None:
+        if self._v3 is not None:
+            return self._v3.capabilities
         info = self._device_info
         return None if info is None else info.capabilities
 
@@ -811,6 +872,7 @@ class ThingDAQ:
 
         if info.device_state is constants.DeviceState.RUNNING:
             status = self.status()
+            assert isinstance(status, Status)
             if status.device_state is constants.DeviceState.RUNNING:
                 configuration = self._configuration
                 if configuration is None or self._run_id == 0:
@@ -832,16 +894,35 @@ class ThingDAQ:
         self._session_policy_applied = True
         return info
 
-    def info(self) -> DeviceInfo:
+    def info(self) -> DeviceInfo | V3Info:
         """Return validated identity/capabilities in every post-boot state."""
 
         with self._lock:
+            self._ensure_open()
+            if self._v3 is not None:
+                return self._v3.info()
             info, _ = self._read_info()
             return info
 
+    def get_capabilities(self) -> V3Capabilities:
+        """Query the opt-in v3 device's exact selectable tuples over the wire."""
+        with self._lock:
+            self._ensure_open()
+            if self._v3 is None:
+                raise ThingDAQError("GET_CAPABILITIES requires a v3 simulator session")
+            return self._v3.get_capabilities()
+
+    def get_settings(self) -> V3AppliedSettings:
+        """Read exact v3 applied settings and clocks over the wire."""
+        with self._lock:
+            self._ensure_open()
+            if self._v3 is None:
+                raise ThingDAQError("GET_SETTINGS requires a v3 simulator session")
+            return self._v3.get_settings()
+
     def configure(
         self,
-        configuration: DAQConfiguration | None = None,
+        configuration: DAQConfiguration | V3Settings | None = None,
         *,
         adc: bool = True,
         gpio: bool = True,
@@ -853,7 +934,7 @@ class ThingDAQ:
         adc_resolution_bits: int | None = None,
         aux_bank_mode: AuxBankMode | int | None = None,
         rate_profile: RateProfile | int | None = None,
-    ) -> DAQConfiguration:
+    ) -> DAQConfiguration | V3AppliedSettings:
         """Apply an advertised configuration without starting acquisition.
 
         Protocol v1 has fixed acquisition rates and ADC resolution rather than
@@ -865,6 +946,86 @@ class ThingDAQ:
         """
 
         with self._lock:
+            self._ensure_open()
+            if self._v3 is not None:
+                assert self._v3.capabilities is not None
+                if configuration is not None and not isinstance(
+                    configuration, V3Settings
+                ):
+                    raise TypeError("v3 configuration must be V3Settings")
+                if not isinstance(adc, bool) or not isinstance(gpio, bool):
+                    raise TypeError("adc and gpio selectors must be booleans")
+                if any(
+                    isinstance(value, bool)
+                    for value in (
+                        source,
+                        checksum_algorithm,
+                        aux_bank_mode,
+                        rate_profile,
+                    )
+                ):
+                    raise TypeError("configuration enum options cannot be booleans")
+                if configuration is not None and (
+                    adc is not True
+                    or gpio is not True
+                    or source is not None
+                    or checksum_algorithm != constants.DEFAULT_CHECKSUM_ALGORITHM
+                    or any(
+                        value is not None
+                        for value in (
+                            adc_pair_rate_hz,
+                            gpio_sample_rate_hz,
+                            adc_resolution_bits,
+                            aux_bank_mode,
+                            rate_profile,
+                        )
+                    )
+                ):
+                    raise ValueError(
+                        "do not combine V3Settings with configuration options"
+                    )
+                settings = configuration
+                if settings is None:
+                    defaults = self._v3.capabilities.defaults
+                    mode = (
+                        defaults.aux_bank_mode
+                        if aux_bank_mode is None
+                        else v3_constants.AuxBankMode(aux_bank_mode)
+                    )
+                    settings = replace(
+                        defaults,
+                        stream_mask=v3_constants.StreamMask(
+                            int(adc) | (int(gpio) << 1)
+                        ),
+                        source=defaults.source
+                        if source is None
+                        else v3_constants.Source(source),
+                        checksum_algorithm=v3_constants.ChecksumAlgorithm(
+                            checksum_algorithm
+                        ),
+                        aux_bank_mode=mode,
+                        gpio_width_bits=16
+                        if mode == v3_constants.AuxBankMode.INPUT
+                        else 8,
+                        rate_profile=defaults.rate_profile
+                        if rate_profile is None
+                        else v3_constants.RateProfile(rate_profile),
+                        adc_pair_rate_hz=defaults.adc_pair_rate_hz
+                        if adc_pair_rate_hz is None
+                        else adc_pair_rate_hz,
+                        gpio_sample_rate_hz=defaults.gpio_sample_rate_hz
+                        if gpio_sample_rate_hz is None
+                        else gpio_sample_rate_hz,
+                        adc_resolution_bits=defaults.adc_resolution_bits
+                        if adc_resolution_bits is None
+                        else adc_resolution_bits,
+                    )
+                applied = self._v3.configure(settings)
+                self._state = constants.DeviceState.CONFIGURED
+                self._run_id = self._v3.run_id
+                return applied
+            if isinstance(configuration, V3Settings):
+                raise TypeError("V3Settings requires a v3 simulator session")
             self._require_verified_identity()
             self._require_state(
                 "configure",
@@ -872,7 +1033,11 @@ class ThingDAQ:
                 constants.DeviceState.CONFIGURED,
             )
             if configuration is None:
-                capabilities = self.capabilities
+                capabilities = (
+                    None
+                    if self._device_info is None
+                    else self._device_info.capabilities
+                )
                 auxiliary = capabilities.auxiliary if capabilities is not None else None
                 if not isinstance(adc, bool) or not isinstance(gpio, bool):
                     raise TypeError("adc and gpio selectors must be booleans")
@@ -946,7 +1111,11 @@ class ThingDAQ:
                 )
                 if requires_v2:
                     self._read_info(protocol_version=v2_constants.PROTOCOL_VERSION)
-                capabilities = self.capabilities
+                capabilities = (
+                    None
+                    if self._device_info is None
+                    else self._device_info.capabilities
+                )
                 selected_checksum = constants.ChecksumAlgorithm(checksum_algorithm)
                 if source is None:
                     if stream_mask is constants.StreamMask.NONE:
@@ -1028,12 +1197,45 @@ class ThingDAQ:
     def configure_control_only(self) -> DAQConfiguration:
         """Apply the exact zero-stream profile advertised by Phase 03 firmware."""
 
-        return self.configure(DAQConfiguration.control_only())
+        result = self.configure(DAQConfiguration.control_only())
+        assert isinstance(result, DAQConfiguration)
+        return result
 
     def start(self) -> int:
         """Start a configured acquisition and return its nonzero run ID."""
 
         with self._lock:
+            self._ensure_open()
+            if self._v3 is not None:
+                baseline = self.host_counters
+                parser_baseline = self.parser_counters.corruption_events
+                try:
+                    self._run_id = self._v3.start()
+                finally:
+                    if self._v3.state == v3_constants.DeviceState.RUNNING:
+                        self._state = constants.DeviceState.RUNNING
+                assert self._v3.applied is not None
+                settings = self._v3.applied.settings
+                # Shared continuity code needs only source, stream mask and timing.
+                self._configuration = DAQConfiguration(
+                    constants.StreamMask(settings.stream_mask),
+                    constants.Source(settings.source),
+                    aux_bank_mode=AuxBankMode(settings.aux_bank_mode)
+                    if settings.stream_mask & v3_constants.StreamMask.GPIO
+                    else AuxBankMode.DISABLED,
+                    rate_profile=RateProfile(settings.rate_profile),
+                )
+                self._pending_items.clear()
+                self._initialize_stream_expectations(self._configuration)
+                self._reset_loss_observations()
+                self._loss_stats_generation = None
+                self._host_loss_baseline = baseline
+                self._stream_host_drop_baseline = baseline.host_block_queue_drops
+                self._stream_loss_report_drop_baseline = (
+                    baseline.loss_report_queue_drops
+                )
+                self._stream_parser_error_baseline = parser_baseline
+                return self._run_id
             self._require_verified_identity()
             self._require_state("start", constants.DeviceState.CONFIGURED)
             requested_configuration = self._configuration
@@ -1119,10 +1321,20 @@ class ThingDAQ:
                 )
             return response.value
 
-    def status(self) -> Status:
+    def status(self) -> Status | V3Status:
         """Return current state, active configuration, and firmware counters."""
 
         with self._lock:
+            self._ensure_open()
+            if self._v3 is not None:
+                snapshot = self._v3.status()
+                self._run_id = snapshot.run_id
+                self._state = (
+                    constants.DeviceState.RUNNING
+                    if snapshot.state == v3_constants.DeviceState.RUNNING
+                    else constants.DeviceState.CONFIGURED
+                )
+                return snapshot
             response = self._command(constants.FrameKind.GET_STATUS_REQUEST)
             if not isinstance(response.value, Status):
                 raise UnexpectedMessageError("STATUS response has no Status value")
@@ -1157,7 +1369,9 @@ class ThingDAQ:
                 constants.DeviceState.IDLE,
                 constants.DeviceState.CONFIGURED,
             )
-            capabilities = self.capabilities
+            capabilities = (
+                None if self._device_info is None else self._device_info.capabilities
+            )
             if capabilities is not None and not capabilities.supports(
                 constants.Capability.RESET_STATS
             ):
@@ -1198,7 +1412,9 @@ class ThingDAQ:
         with self._lock:
             self._require_verified_identity()
             self._require_state("gpio_clock_diagnostic", constants.DeviceState.IDLE)
-            capabilities = self.capabilities
+            capabilities = (
+                None if self._device_info is None else self._device_info.capabilities
+            )
             if capabilities is not None and not capabilities.supports(
                 constants.Capability.GPIO_CLOCK_DIAGNOSTIC
             ):
@@ -1226,7 +1442,9 @@ class ThingDAQ:
         with self._lock:
             self._require_verified_identity()
             self._require_state("gpio_capture_diagnostic", constants.DeviceState.IDLE)
-            capabilities = self.capabilities
+            capabilities = (
+                None if self._device_info is None else self._device_info.capabilities
+            )
             if capabilities is not None and not capabilities.supports(
                 constants.Capability.GPIO_CAPTURE_DIAGNOSTIC
             ):
@@ -1243,10 +1461,17 @@ class ThingDAQ:
                 )
             return response.value
 
-    def stop(self) -> constants.DeviceState:
-        """Idempotently stop acquisition/configuration and enter IDLE."""
+    def stop(self) -> constants.DeviceState | v3_constants.DeviceState:
+        """Stop to legacy IDLE or v3 STOPPED after bounded drain."""
 
         with self._lock:
+            self._ensure_open()
+            if self._v3 is not None:
+                result = self._v3.stop()
+                self._state = constants.DeviceState.CONFIGURED
+                self._clear_stream_expectations(preserve_inferred=True)
+                self._pending_items.clear()
+                return result
             self._require_verified_identity()
             self._require_state(
                 "stop",
@@ -1331,11 +1556,35 @@ class ThingDAQ:
             if isinstance(item, (ADCBlock, GPIOBlock)):
                 emitted_blocks += 1
 
+    def _v3_counters(self, status: V3Status) -> FirmwareCounters:
+        assert self._v3 is not None and self._v3.applied is not None
+        # STOP/CONFIGURE preserve the previous run's counters, even if the
+        # next configuration selects a different GPIO width.
+        width = (
+            self._configuration.gpio_layout.item_bytes
+            if self._configuration is not None
+            else self._v3.applied.settings.gpio_width_bits // 8
+        )
+        return FirmwareCounters(
+            stats_generation=status.run_id or 1,
+            adc_frames_dropped=status.adc_frames_dropped,
+            adc_items_dropped=status.adc_items_dropped,
+            adc_payload_bytes_dropped=status.adc_items_dropped * 4,
+            gpio_frames_dropped=status.gpio_frames_dropped,
+            gpio_items_dropped=status.gpio_items_dropped,
+            gpio_payload_bytes_dropped=status.gpio_items_dropped * width,
+        )
+
     def loss_counters(self, *, refresh: bool = True) -> LossCounters:
         """Return loss domains separately, optionally refreshing GET_STATUS."""
 
         if refresh:
-            firmware = self.status().counters
+            snapshot = self.status()
+            firmware = (
+                self._v3_counters(snapshot)
+                if isinstance(snapshot, V3Status)
+                else snapshot.counters
+            )
             firmware_observed = True
         else:
             status = self._last_status
@@ -1367,7 +1616,9 @@ class ThingDAQ:
             telemetry_errors=tuple(sorted(self._telemetry_error_messages)),
         )
 
-    def validate_stream_health(self, status: Status | None = None) -> Status:
+    def validate_stream_health(
+        self, status: Status | V3Status | None = None
+    ) -> Status | V3Status:
         """Strictly reject parser, host-queue, and firmware health failures.
 
         Passing an already retrieved status avoids another command round trip.
@@ -1379,6 +1630,43 @@ class ThingDAQ:
         with self._lock:
             self._ensure_open()
             snapshot = self.status() if status is None else status
+            if isinstance(snapshot, V3Status):
+                if self._v3 is None:
+                    raise TypeError("V3Status requires a v3 session")
+                errors = self._counter_reconciliation_errors(
+                    self._v3_counters(snapshot)
+                )
+                if errors:
+                    raise UnexpectedStreamValidationError(
+                        "protocol_telemetry", "; ".join(errors)
+                    )
+                for category, count in (
+                    (
+                        "parser_errors",
+                        self.parser_counters.corruption_events
+                        - self._stream_parser_error_baseline,
+                    ),
+                    (
+                        "host_queue_drops",
+                        self.reader_counters.host_block_queue_drops
+                        - self._stream_host_drop_baseline,
+                    ),
+                    (
+                        "loss_report_queue_drops",
+                        self.reader_counters.loss_report_queue_drops
+                        - self._stream_loss_report_drop_baseline,
+                    ),
+                    ("protocol_telemetry", self._protocol_telemetry_errors),
+                    (
+                        "firmware_drops",
+                        snapshot.adc_items_dropped + snapshot.gpio_items_dropped,
+                    ),
+                ):
+                    if count:
+                        raise UnexpectedStreamValidationError(
+                            category, f"observed {count} {category}"
+                        )
+                return snapshot
             if not isinstance(snapshot, Status):
                 raise TypeError("status must be a Status snapshot")
             counter_errors = self._counter_reconciliation_errors(snapshot.counters)
@@ -1541,6 +1829,10 @@ class ThingDAQ:
         protocol_version: int | None = None,
     ) -> CommandResponse[ResponseValue]:
         self._ensure_open()
+        if self._v3 is not None:
+            raise ThingDAQError(
+                "this legacy command is unavailable in v3 simulator sessions"
+            )
         selected_version = (
             self._wire_protocol_version
             if protocol_version is None
@@ -1560,6 +1852,7 @@ class ThingDAQ:
         except (DeviceDisconnectedError, ReaderProtocolError) as error:
             error.evidence = self._recovery_evidence()
             raise
+        assert isinstance(response, CommandResponse)
         if not response.ok:
             raise DeviceCommandError(kind, response.error_code, response.request_id)
         expected_kind = (
@@ -1578,6 +1871,10 @@ class ThingDAQ:
         *,
         protocol_version: int | None = None,
     ) -> tuple[DeviceInfo, DeviceIdentitySnapshot]:
+        if self._v3 is not None:
+            raise ThingDAQError(
+                "this legacy command is unavailable in v3 simulator sessions"
+            )
         selected_version = (
             self._wire_protocol_version
             if protocol_version is None
@@ -1698,7 +1995,9 @@ class ThingDAQ:
                 f"{configuration.data_checksum_algorithm.name}",
                 error_code=constants.ErrorCode.UNSUPPORTED_CHECKSUM,
             )
-        capabilities = self.capabilities
+        capabilities = (
+            None if self._device_info is None else self._device_info.capabilities
+        )
         if capabilities is None:
             raise DeviceSynchronizationError(
                 "CONFIGURE capability validation requires a synchronized INFO"
@@ -1833,7 +2132,7 @@ class ThingDAQ:
                 f"{kind.name} source flag disagrees with the active configuration"
             )
 
-        if isinstance(block, ADCBlock):
+        if isinstance(block, ADCBlock) and self._v3 is None:
             info = self._device_info
             if info is None:
                 raise UnexpectedMessageError(
@@ -2015,19 +2314,24 @@ class ThingDAQ:
         ) as error:
             errors.append(f"firmware loss counters unavailable: {error}")
         else:
-            stats_generation = status.stats_generation
+            counters = (
+                self._v3_counters(status)
+                if isinstance(status, V3Status)
+                else status.counters
+            )
+            stats_generation = counters.stats_generation
             generation_error = self._observe_loss_stats_generation(stats_generation)
             if generation_error is not None:
                 errors.append(generation_error)
             if kind is constants.FrameKind.ADC_DATA:
-                dropped_frames = status.adc_frames_dropped
-                dropped_items = status.adc_items_dropped
-                dropped_bytes = status.adc_payload_bytes_dropped
+                dropped_frames = counters.adc_frames_dropped
+                dropped_items = counters.adc_items_dropped
+                dropped_bytes = counters.adc_payload_bytes_dropped
                 expected_bytes = inferred_items * constants.ADC_BYTES_PER_PAIR
             else:
-                dropped_frames = status.gpio_frames_dropped
-                dropped_items = status.gpio_items_dropped
-                dropped_bytes = status.gpio_payload_bytes_dropped
+                dropped_frames = counters.gpio_frames_dropped
+                dropped_items = counters.gpio_items_dropped
+                dropped_bytes = counters.gpio_payload_bytes_dropped
                 gpio_item_bytes = (
                     self._configuration.gpio_layout.item_bytes
                     if self._configuration is not None
@@ -2058,9 +2362,9 @@ class ThingDAQ:
                 else (1 if layout is None else layout.item_bytes)
             )
             counter_units_match = (
-                dropped_items == dropped_frames * items_per_frame
-                and dropped_bytes == dropped_items * bytes_per_item
-            )
+                self._v3 is not None
+                or dropped_items == dropped_frames * items_per_frame
+            ) and dropped_bytes == dropped_items * bytes_per_item
             if (
                 dropped_frames == inferred_frames
                 and dropped_items == inferred_items

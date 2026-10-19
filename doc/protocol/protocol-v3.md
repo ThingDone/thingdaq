@@ -16,9 +16,10 @@ related:
 
 `protocol/protocol-v3.json` is the canonical v3 wire contract. This checkpoint
 provides validated schemas, separate Python/C++ constants, golden frames and
-opt-in Python codecs and a simulated v3 device. Production firmware and serial
-negotiation are not enabled. The current product still uses [[protocol-v2]]. Physical results
-in [[deferred-codecs-20261018]] concern private research versions, not v3.
+opt-in Python codecs, a simulated v3 device and public ThingDAQ simulator
+sessions. Production firmware and serial negotiation are not enabled.
+The current product still uses [[protocol-v2]]. Physical results in
+[[deferred-codecs-20261018]] concern private research versions, not v3.
 
 Generate with `.venv/bin/python tools/generate_protocol.py`; verify with
 `--check`. `--protocol v3` selects only the new outputs. V1/v2 sources and all
@@ -160,7 +161,8 @@ v3 blocks; v1/v2 retain their fixed layouts and existing behavior.
 Construct `SimulatedV3Device` from `thingdone_daq.simulator_v3` and pass it to
 `InMemoryTransport`. Send `V3Command.to_bytes()` through transport writes and
 parse reads with `V3FrameParser`; partial writes/reads follow the same transport
-contract as v1/v2. `ThingDAQ.simulated` v3 selection is not wired yet.
+contract as v1/v2. The public session below wires these through the shared
+background reader and compatible parser.
 The historical `SimulatedDevice` and default transport persona remain unchanged.
 
 The v3 peer starts STOPPED with the advertised board defaults already applied.
@@ -184,3 +186,47 @@ retain their original state snapshots: query GET_STATUS again after draining to
 observe STOPPED. Closing a transport discards any pending tail and records its
 frame/items as dropped; reconnect preserves settings/run and clears request replay
 history. `device.reboot()` while detached restores defaults and all initial state.
+
+## Public simulator session
+
+`ThingDAQ.simulated(protocol_version=3)` explicitly selects the v3 persona.
+Opening performs two stable-identity INFO queries, GET_CAPABILITIES,
+GET_SETTINGS and GET_STATUS over the wire. The default selector remains `1`
+(the historical v1/v2 simulator). Production serial discovery/negotiation,
+CLI and legacy capture tooling remain unchanged. Facade return annotations now
+include the v3 model variants; default v1/v2 sessions still return their original
+models. Consumers accepting either session type should narrow the returned type.
+
+- `info()` / `device_info`: `V3Info`, including simulated identity and clocks.
+- `get_capabilities()` / `capabilities`: `V3Capabilities` with exact selectable tuples.
+- `get_settings()`: `V3AppliedSettings` containing settings and applied clocks.
+- `configure(V3Settings)` checks the advertised subset, verifies the exact echo,
+  and performs GET_SETTINGS readback before accepting it. `configure()` starts
+  from advertised defaults; existing stream/source/rate/auxiliary keyword options
+  select a matching tuple. Do not combine a settings object with those options.
+- `configuration` is the current `V3Settings`. Choose 450 MHz with both encoding
+  policies RAW, then call `configure()` while stopped to restore compressed
+  600 MHz defaults. Running changes receive a correlated INVALID_STATE error.
+- `start()` may use board defaults without a preceding CONFIGURE; it checks
+  settings readback and the START echo and returns a new nonzero run ID.
+- `blocks()` / `read_block()` retain ordinary ADCBlock/GPIOBlock channel views,
+  8 MHz timestamps, per-stream sequences and bounded queue-loss reports.
+- `stop()` waits through DRAINING to `V3DeviceState.STOPPED` within the command
+  deadline. It preserves settings. Context-manager exit stops and closes the
+  shared reader/transport deterministically.
+
+V3 `status()` returns the contract's `V3Status`, not legacy hardware-health
+telemetry. `validate_stream_health()` checks available v3 drop counters and
+shared host/parser/continuity evidence. `loss_counters()` maps run-relative
+frame/item drops and derived decoded byte losses into the common loss view;
+legacy-only firmware telemetry is unavailable. It does not measure hardware
+throughput or analog accuracy.
+
+Variable-length v3 frames use sequence deltas for missing **frames** and timestamp
+deltas for missing logical **items**. Their StreamGap has
+`variable_frame_items=True` and `sequence_inferred_items=None`; sequence alone
+cannot determine missing item counts. HostQueueLoss sums the actual evicted
+counts and retains exact timestamp intervals. For variable frames,
+`frame_item_count` describes the reference frame, not a fixed count for every
+lost frame; use `missing_items` / `dropped_items` for loss accounting. Fixed
+v1/v2 count validation remains intact.

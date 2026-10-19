@@ -8,7 +8,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from time import monotonic, sleep
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from ._generated import protocol_constants as constants
 from .client import (
@@ -17,7 +17,15 @@ from .client import (
     ThingDAQ,
     UnexpectedStreamValidationError,
 )
-from .models import ADCBlock, GPIOBlock, HostQueueLoss, Status, StreamAnomaly, StreamGap
+from .models import (
+    ADCBlock,
+    DAQConfiguration,
+    GPIOBlock,
+    HostQueueLoss,
+    Status,
+    StreamAnomaly,
+    StreamGap,
+)
 from .protocol import ParserCounters
 from .reader import ReaderCounters
 from .synthetic import SyntheticPatternError, validate_synthetic_block
@@ -677,7 +685,9 @@ def _wait_for_final_status(
     latest: Status | None = None
 
     while True:
-        latest = _timed(recorder, "STATUS", daq.status, clock=clock)
+        latest = _timed(
+            recorder, "STATUS", lambda: cast(Status, daq.status()), clock=clock
+        )
         reader = daq.reader_counters
         adc_wire = _reader_delta(
             "ADC received counter",
@@ -815,19 +825,22 @@ def run_synthetic_soak(
             applied = _timed(
                 latency,
                 "CONFIGURE",
-                lambda: daq.configure(
-                    adc=adc,
-                    gpio=gpio,
-                    source=constants.Source.SYNTHETIC,
-                    adc_pair_rate_hz=adc_pair_rate_hz,
-                    gpio_sample_rate_hz=gpio_sample_rate_hz,
-                    adc_resolution_bits=adc_resolution_bits,
+                lambda: cast(
+                    DAQConfiguration,
+                    daq.configure(
+                        adc=adc,
+                        gpio=gpio,
+                        source=constants.Source.SYNTHETIC,
+                        adc_pair_rate_hz=adc_pair_rate_hz,
+                        gpio_sample_rate_hz=gpio_sample_rate_hz,
+                        adc_resolution_bits=adc_resolution_bits,
+                    ),
                 ),
                 clock=clock,
             )
             configured_here = True
         else:
-            existing_configuration = daq.configuration
+            existing_configuration = cast(DAQConfiguration | None, daq.configuration)
             if existing_configuration is None:
                 raise ValueError("CONFIGURED facade has no applied configuration")
             applied = existing_configuration
@@ -864,7 +877,9 @@ def run_synthetic_soak(
                 break
             if next_status is not None and now >= next_status:
                 assert selected_status_interval is not None
-                status = _timed(latency, "STATUS", daq.status, clock=clock)
+                status = _timed(
+                    latency, "STATUS", lambda: cast(Status, daq.status()), clock=clock
+                )
                 validator.validate_status(status, response_run_id=daq.run_id)
                 validator.validate_host_health(
                     daq.reader_counters,
@@ -892,7 +907,9 @@ def run_synthetic_soak(
                 status_frame_interval is not None
                 and total_frames % status_frame_interval == 0
             ):
-                status = _timed(latency, "STATUS", daq.status, clock=clock)
+                status = _timed(
+                    latency, "STATUS", lambda: cast(Status, daq.status()), clock=clock
+                )
                 validator.validate_status(status, response_run_id=daq.run_id)
                 validator.validate_host_health(
                     daq.reader_counters,
@@ -935,7 +952,7 @@ def run_synthetic_soak(
                 final_status = _timed(
                     latency,
                     "STATUS",
-                    daq.status,
+                    lambda: cast(Status, daq.status()),
                     clock=clock,
                 )
         except BaseException as error:  # noqa: BLE001 - preserve primary failure

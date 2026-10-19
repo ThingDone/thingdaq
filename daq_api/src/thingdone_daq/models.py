@@ -6927,6 +6927,7 @@ class StreamGap:
     firmware_evidence: FirmwareLossEvidence | None = None
     period_ticks: int | None = None
     frame_item_count: int | None = None
+    variable_frame_items: bool = False
 
     def __post_init__(self) -> None:
         if isinstance(self.kind, bool):
@@ -6992,11 +6993,19 @@ class StreamGap:
         object.__setattr__(self, "period_ticks", period_ticks)
         object.__setattr__(self, "frame_item_count", frame_item_count)
         sequence_items = self.sequence_inferred_items
-        if sequence_items is None:
+        if not isinstance(self.variable_frame_items, bool):
+            raise TypeError("variable_frame_items must be a boolean")
+        if self.variable_frame_items and (
+            bool(self.missing_frames) != bool(self.missing_items)
+            or self.missing_items < self.missing_frames
+        ):
+            raise ValueError("variable-frame gap requires items for each missing frame")
+        if sequence_items is None and not self.variable_frame_items:
             sequence_items = self.missing_frames * self.items_per_frame
             object.__setattr__(self, "sequence_inferred_items", sequence_items)
-        _nonnegative("sequence_inferred_items", sequence_items)
-        if sequence_items != self.missing_items:
+        if sequence_items is not None:
+            _nonnegative("sequence_inferred_items", sequence_items)
+        if sequence_items is not None and sequence_items != self.missing_items:
             raise ValueError(
                 "sequence and timestamp imply different missing item counts"
             )
@@ -7105,8 +7114,15 @@ class StreamGap:
         if tick_delta % period:
             raise ValueError("stream timestamp gap is not sample-period aligned")
         missing_items = tick_delta // period
-        sequence_inferred_items = missing_frames * current.item_count
-        if sequence_inferred_items != missing_items:
+        sequence_inferred_items = (
+            None
+            if current.protocol_version == 3
+            else missing_frames * current.item_count
+        )
+        if (
+            sequence_inferred_items is not None
+            and sequence_inferred_items != missing_items
+        ):
             raise ValueError(
                 "sequence and timestamp imply different missing item counts"
             )
@@ -7145,6 +7161,7 @@ class StreamGap:
             firmware_evidence=evidence,
             period_ticks=period,
             frame_item_count=current.item_count,
+            variable_frame_items=current.protocol_version == 3,
         )
 
     @classmethod
@@ -7171,7 +7188,10 @@ class StreamGap:
         )
         if (
             previous_period != current_period
-            or previous.item_count != current.item_count
+            or (
+                current.protocol_version != 3
+                and previous.item_count != current.item_count
+            )
             or previous.protocol_version != current.protocol_version
         ):
             raise ValueError("stream profile changed inside one run")
@@ -7324,6 +7344,7 @@ class HostQueueLoss:
     contiguous: bool = True
     period_ticks: int | None = None
     frame_item_count: int | None = None
+    variable_frame_items: bool = False
 
     def __post_init__(self) -> None:
         if any(
@@ -7385,7 +7406,16 @@ class HostQueueLoss:
             _nonnegative(name, getattr(self, name))
         if self.run_id == 0 or self.dropped_blocks == 0 or self.dropped_items == 0:
             raise ValueError("host queue loss requires a nonempty active run range")
-        if self.dropped_items != self.dropped_blocks * self.items_per_block:
+        if not isinstance(self.variable_frame_items, bool):
+            raise TypeError("variable_frame_items must be a boolean")
+        if self.variable_frame_items and self.dropped_items < self.dropped_blocks:
+            raise ValueError(
+                "variable-frame loss requires items for each dropped block"
+            )
+        if (
+            not self.variable_frame_items
+            and self.dropped_items != self.dropped_blocks * self.items_per_block
+        ):
             raise ValueError("host queue block and item counts disagree")
         if self.firmware_gap_blocks > self.dropped_blocks:
             raise ValueError("host queue gap evidence exceeds dropped blocks")
@@ -7468,6 +7498,7 @@ class HostQueueLoss:
                 else block.sample_period_ticks
             ),
             frame_item_count=block.item_count,
+            variable_frame_items=block.protocol_version == 3,
         )
 
     def can_merge(self, other: HostQueueLoss) -> bool:
@@ -7476,7 +7507,11 @@ class HostQueueLoss:
             and self.source is other.source
             and self.run_id == other.run_id
             and self.item_period_ticks == other.item_period_ticks
-            and self.items_per_block == other.items_per_block
+            and self.variable_frame_items == other.variable_frame_items
+            and (
+                self.variable_frame_items
+                or self.items_per_block == other.items_per_block
+            )
             and other.first_sequence
             == ((self.last_sequence + 1) & constants.UINT32_MAX)
             and other.first_sample_ticks == self.end_sample_ticks
@@ -7504,6 +7539,7 @@ class HostQueueLoss:
             ),
             period_ticks=self.item_period_ticks,
             frame_item_count=self.items_per_block,
+            variable_frame_items=self.variable_frame_items,
         )
 
     def aggregated_with(self, other: HostQueueLoss) -> HostQueueLoss:
@@ -7514,7 +7550,11 @@ class HostQueueLoss:
             or self.source is not other.source
             or self.run_id != other.run_id
             or self.item_period_ticks != other.item_period_ticks
-            or self.items_per_block != other.items_per_block
+            or self.variable_frame_items != other.variable_frame_items
+            or (
+                not self.variable_frame_items
+                and self.items_per_block != other.items_per_block
+            )
         ):
             raise ValueError("cannot aggregate unrelated host queue losses")
         if self.can_merge(other) and self.contiguous and other.contiguous:
@@ -7537,6 +7577,7 @@ class HostQueueLoss:
             contiguous=False,
             period_ticks=self.item_period_ticks,
             frame_item_count=self.items_per_block,
+            variable_frame_items=self.variable_frame_items,
         )
 
 
@@ -7609,11 +7650,25 @@ def analyze_stream_continuity(
             firmware_evidence=evidence,
         )
 
-    sequence_items = sequence_delta * current.item_count
+    sequence_items = (
+        None if current.protocol_version == 3 else sequence_delta * current.item_count
+    )
     timestamp_items: int | None = None
     if tick_delta <= constants.UINT64_MAX // 2 and tick_delta % period == 0:
         timestamp_items = tick_delta // period
-    if timestamp_items is None or timestamp_items != sequence_items:
+    if current.protocol_version == 3:
+        max_items = (
+            v3_constants.MAX_ADC_PAIRS
+            if isinstance(current, ADCBlock)
+            else v3_constants.MAX_LOGICAL_PAYLOAD_BYTES // current.layout.item_bytes
+        )
+        counts_consistent = (
+            timestamp_items is not None
+            and sequence_delta <= timestamp_items <= sequence_delta * max_items
+        )
+    else:
+        counts_consistent = timestamp_items == sequence_items
+    if timestamp_items is None or not counts_consistent:
         sequence_implies_gap = sequence_delta > 0
         if evidence.gap_before != sequence_implies_gap:
             evidence = dataclass_replace(

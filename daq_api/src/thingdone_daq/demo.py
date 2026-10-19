@@ -6,13 +6,15 @@ import argparse
 import sys
 from collections import deque
 from collections.abc import Callable, Sequence
-from typing import TextIO
+from typing import TextIO, cast
 
 from ._generated import protocol_constants as constants
 from .client import ThingDAQ, ThingDAQError
 from .models import (
     AdcBlock,
     AdcConverter,
+    DAQConfiguration,
+    DeviceInfo,
     GpioBlock,
     Info,
     Status,
@@ -271,7 +273,7 @@ def run_demo(
         read_chunk_size=parser_chunk_size,
         read_size=parser_chunk_size,
     ) as daq:
-        info = daq.info()
+        info = cast(DeviceInfo, daq.info())
         _validate_capabilities(info)
         print(
             f"DISCOVER  {info.build_id} | protocol v{info.protocol_version} | "
@@ -291,7 +293,7 @@ def run_demo(
             file=output,
         )
 
-        configuration = daq.configure(adc=True, gpio=True)
+        configuration = cast(DAQConfiguration, daq.configure(adc=True, gpio=True))
         _require_equal(
             "configured streams",
             configuration.stream_mask,
@@ -389,7 +391,7 @@ def run_demo(
                 file=output,
             )
 
-        running_status = daq.status()
+        running_status = cast(Status, daq.status())
         _validate_status(
             running_status,
             state=constants.DeviceState.RUNNING,
@@ -404,8 +406,12 @@ def run_demo(
             file=output,
         )
 
-        _require_equal("STOP result", daq.stop(), constants.DeviceState.IDLE)
-        final_status = daq.status()
+        _require_equal(
+            "STOP result",
+            cast(constants.DeviceState, daq.stop()),
+            constants.DeviceState.IDLE,
+        )
+        final_status = cast(Status, daq.status())
         _validate_status(
             final_status,
             state=constants.DeviceState.IDLE,

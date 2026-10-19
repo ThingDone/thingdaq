@@ -7,20 +7,23 @@ from dataclasses import dataclass, field
 from threading import Condition, Event, Lock, RLock, Thread, current_thread
 from time import monotonic
 from types import TracebackType
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, overload
 
 from ._generated import protocol_constants as constants
 from ._generated import protocol_v2_constants as v2_constants
+from ._generated import protocol_v3_constants as v3_constants
 from .models import (
     AdcBlock,
     CommandResponse,
     DAQConfiguration,
+    DecodedMessage,
     GpioBlock,
     HostQueueLoss,
     ResponseValue,
     StreamAnomaly,
     decode_message,
 )
+from .models_v3 import V3AppliedSettings, V3Response, V3Settings, decode_v3_response
 from .protocol import (
     IncrementalFrameParser,
     ParserCounters,
@@ -31,6 +34,7 @@ from .protocol_v2 import (
     IncrementalCompatibleFrameParser,
     encode_v2_frame,
 )
+from .protocol_v3 import V3Frame, decode_v3_block, encode_v3_frame
 from .transport import (
     ByteTransport,
     TransportClosedError,
@@ -72,7 +76,7 @@ class RequestTimeoutError(ReaderError):
 
     def __init__(
         self,
-        kind: constants.FrameKind | v2_constants.FrameKind,
+        kind: constants.FrameKind | v2_constants.FrameKind | v3_constants.FrameKind,
         request_id: int,
         timeout: float,
     ) -> None:
@@ -165,13 +169,14 @@ class ReaderCounters:
 
 @dataclass(slots=True)
 class _PendingRequest:
-    kind: constants.FrameKind | v2_constants.FrameKind
-    expected_kind: constants.FrameKind | v2_constants.FrameKind
+    kind: constants.FrameKind | v2_constants.FrameKind | v3_constants.FrameKind
+    expected_kind: constants.FrameKind | v2_constants.FrameKind | v3_constants.FrameKind
     request_id: int
     deadline: float
     timeout: float
     completed: Event = field(default_factory=Event)
-    response: CommandResponse[ResponseValue] | None = None
+    response: CommandResponse[ResponseValue] | V3Response | None = None
+    protocol_version: int = constants.PROTOCOL_VERSION
     error: ReaderError | None = None
 
 
@@ -251,6 +256,7 @@ class BackgroundReader:
         self._active_run_id = 0
         self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
         self._active_configuration: DAQConfiguration | None = None
+        self._active_v3_settings: V3Settings | None = None
         self._stream_active = False
         self._thread: Thread | None = None
         self._started = False
@@ -403,6 +409,36 @@ class BackgroundReader:
             self._thread.start()
         return self
 
+    @overload
+    def request(
+        self,
+        kind: int,
+        payload: bytes | bytearray | memoryview = b"",
+        *,
+        timeout: float | None = None,
+        protocol_version: Literal[3],
+    ) -> V3Response: ...
+
+    @overload
+    def request(
+        self,
+        kind: int,
+        payload: bytes | bytearray | memoryview = b"",
+        *,
+        timeout: float | None = None,
+        protocol_version: Literal[1, 2] = 1,
+    ) -> CommandResponse[ResponseValue]: ...
+
+    @overload
+    def request(
+        self,
+        kind: int,
+        payload: bytes | bytearray | memoryview = b"",
+        *,
+        timeout: float | None = None,
+        protocol_version: int,
+    ) -> CommandResponse[ResponseValue] | V3Response: ...
+
     def request(
         self,
         kind: constants.FrameKind | int,
@@ -410,15 +446,17 @@ class BackgroundReader:
         *,
         timeout: float | None = None,
         protocol_version: int = constants.PROTOCOL_VERSION,
-    ) -> CommandResponse[ResponseValue]:
+    ) -> CommandResponse[ResponseValue] | V3Response:
         """Send one command and wait for its request-ID-correlated response."""
 
-        request_kinds: dict[int, constants.FrameKind | v2_constants.FrameKind] = {
-            int(key): value for key, value in constants.REQUEST_RESPONSE_KIND.items()
-        }
+        request_kinds: dict[
+            int, constants.FrameKind | v2_constants.FrameKind | v3_constants.FrameKind
+        ] = {int(key): value for key, value in constants.REQUEST_RESPONSE_KIND.items()}
         try:
             selected_kind = (
-                v2_constants.FrameKind(kind)
+                v3_constants.FrameKind(kind)
+                if protocol_version == 3
+                else v2_constants.FrameKind(kind)
                 if protocol_version == v2_constants.PROTOCOL_VERSION
                 and int(kind) not in constants.REQUEST_RESPONSE_KIND
                 else constants.FrameKind(kind)
@@ -430,13 +468,19 @@ class BackgroundReader:
                 int(key): value
                 for key, value in v2_constants.REQUEST_RESPONSE_KIND.items()
             }
+        if protocol_version == 3:
+            request_kinds = {
+                int(key): value
+                for key, value in v3_constants.COMMAND_RESPONSE_KINDS.items()
+            }
         if selected_kind not in request_kinds:
             raise ValueError(f"{selected_kind.name} is not a request frame kind")
         if protocol_version not in {
             constants.PROTOCOL_VERSION,
             v2_constants.PROTOCOL_VERSION,
+            v3_constants.PROTOCOL_VERSION,
         } or isinstance(protocol_version, bool):
-            raise ValueError("protocol_version must be 1 or 2")
+            raise ValueError("protocol_version must be 1, 2, or 3")
         selected_timeout = self._resolve_timeout(timeout, self._request_timeout)
 
         with self._condition:
@@ -448,13 +492,20 @@ class BackgroundReader:
             request_id = self._allocate_request_id_locked()
             pending = _PendingRequest(
                 kind=selected_kind,
+                protocol_version=protocol_version,
                 expected_kind=request_kinds[selected_kind],
                 request_id=request_id,
                 deadline=monotonic() + selected_timeout,
                 timeout=selected_timeout,
             )
             wire = (
-                encode_frame(
+                encode_v3_frame(
+                    v3_constants.FrameKind(int(selected_kind)),
+                    payload,
+                    request_id=request_id,
+                )
+                if protocol_version == 3
+                else encode_frame(
                     selected_kind,
                     payload,
                     request_id=request_id,
@@ -783,13 +834,37 @@ class BackgroundReader:
                 if self._stop_event.is_set():
                     return
                 try:
-                    message = decode_message(
-                        frame,
-                        configuration=self._active_configuration,
-                    )
+                    message: DecodedMessage | V3Response
+                    if isinstance(frame, V3Frame):
+                        if frame.header.kind in (
+                            v3_constants.FrameKind.ADC_DATA,
+                            v3_constants.FrameKind.GPIO_DATA,
+                        ):
+                            if self._active_v3_settings is None:
+                                raise ReaderProtocolError(
+                                    "v3 data arrived before START settings"
+                                )
+                            message = decode_v3_block(frame, self._active_v3_settings)
+                        else:
+                            message = decode_v3_response(frame)
+                    else:
+                        if (
+                            self._active_v3_settings is not None
+                            and frame.header.kind
+                            in (
+                                constants.FrameKind.ADC_DATA,
+                                constants.FrameKind.GPIO_DATA,
+                            )
+                        ):
+                            raise ReaderProtocolError(
+                                "wire version changed during v3 run"
+                            )
+                        message = decode_message(
+                            frame, configuration=self._active_configuration
+                        )
                     with self._condition:
                         self._frames_received += 1
-                    if isinstance(message, CommandResponse):
+                    if isinstance(message, (CommandResponse, V3Response)):
                         self._dispatch_response(message)
                     elif isinstance(message, (AdcBlock, GpioBlock)):
                         self._dispatch_block(message)
@@ -807,7 +882,7 @@ class BackgroundReader:
 
     def _dispatch_response(
         self,
-        response: CommandResponse[ResponseValue],
+        response: CommandResponse[ResponseValue] | V3Response,
     ) -> None:
         protocol_error: ReaderProtocolError | None = None
         with self._condition:
@@ -816,13 +891,18 @@ class BackgroundReader:
                 self._late_responses += 1
                 if (
                     response.ok
-                    and response.kind is constants.FrameKind.STOP_RESPONSE
+                    and response.kind == constants.FrameKind.STOP_RESPONSE
                     and response.run_id == self._active_run_id
                 ):
                     self._deactivate_stream_locked()
                 return
 
-            if response.kind not in {
+            if isinstance(response, V3Response) != (pending.protocol_version == 3):
+                protocol_error = ReaderProtocolError(
+                    "response protocol version differs from request"
+                )
+                pending.error = protocol_error
+            elif response.kind not in {
                 pending.expected_kind,
                 constants.FrameKind.ERROR_RESPONSE,
             }:
@@ -834,8 +914,13 @@ class BackgroundReader:
             else:
                 pending.response = response
                 self._responses_matched += 1
-                if response.ok and response.kind is constants.FrameKind.START_RESPONSE:
-                    if not isinstance(response.value, DAQConfiguration):
+                if response.ok and response.kind == constants.FrameKind.START_RESPONSE:
+                    if isinstance(response.value, V3AppliedSettings):
+                        self._active_v3_settings = response.value.settings
+                        self._activate_run_locked(
+                            response.run_id, constants.ChecksumAlgorithm.ADLER32
+                        )
+                    elif not isinstance(response.value, DAQConfiguration):
                         protocol_error = ReaderProtocolError(
                             "successful START response omitted its configuration"
                         )
@@ -846,7 +931,7 @@ class BackgroundReader:
                             response.value.data_checksum_algorithm,
                             response.value,
                         )
-                elif response.ok and response.kind is constants.FrameKind.STOP_RESPONSE:
+                elif response.ok and response.kind == constants.FrameKind.STOP_RESPONSE:
                     self._deactivate_stream_locked()
             pending.completed.set()
             self._condition.notify_all()

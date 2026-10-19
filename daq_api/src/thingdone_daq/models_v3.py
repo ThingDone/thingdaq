@@ -595,6 +595,10 @@ class V3Response:
     value: V3ResponseValue | None = None
     rejected_kind: int | None = None
 
+    @property
+    def ok(self) -> bool:
+        return self.status == c.ResponseStatus.OK
+
     def to_bytes(self) -> bytes:
         _require(
             self.status in tuple(c.ResponseStatus)

@@ -63,7 +63,7 @@ class PublicNamespaceTests(unittest.TestCase):
             self.assertTrue(daq.is_open)
         self.assertFalse(daq.is_open)
 
-    def test_phase10_exports_and_return_annotations_are_stable(self) -> None:
+    def test_exports_and_versioned_return_annotations_are_stable(self) -> None:
         required_exports = {
             "__version__",
             "ThingDAQ",
@@ -88,6 +88,16 @@ class PublicNamespaceTests(unittest.TestCase):
             "DAQStateError",
             "UnexpectedMessageError",
             "low_level",
+            "V3Info",
+            "V3Settings",
+            "V3AppliedSettings",
+            "V3Capabilities",
+            "V3Status",
+            "V3CpuProfile",
+            "V3GpioPolicy",
+            "V3AdcPolicy",
+            "V3DeviceState",
+            "V3Encoding",
         }
         exported = thingdone_daq.__all__
 
@@ -101,15 +111,18 @@ class PublicNamespaceTests(unittest.TestCase):
             ThingDAQ.__enter__: ThingDAQ,
             ThingDAQ.open: ThingDAQ,
             ThingDAQ.simulated: ThingDAQ,
-            ThingDAQ.info: thingdone_daq.DeviceInfo,
-            ThingDAQ.configure: thingdone_daq.DAQConfiguration,
+            ThingDAQ.info: thingdone_daq.DeviceInfo | thingdone_daq.V3Info,
+            ThingDAQ.configure: thingdone_daq.DAQConfiguration
+            | thingdone_daq.V3AppliedSettings,
             ThingDAQ.start: int,
-            ThingDAQ.status: thingdone_daq.Status,
-            ThingDAQ.stop: DeviceState,
+            ThingDAQ.status: thingdone_daq.Status | thingdone_daq.V3Status,
+            ThingDAQ.stop: DeviceState | thingdone_daq.V3DeviceState,
+            ThingDAQ.get_capabilities: thingdone_daq.V3Capabilities,
+            ThingDAQ.get_settings: thingdone_daq.V3AppliedSettings,
         }
         for method, expected in method_returns.items():
             with self.subTest(method=method.__name__):
-                self.assertIs(expected, get_type_hints(method)["return"])
+                self.assertEqual(expected, get_type_hints(method)["return"])
         self.assertIs(
             thingdone_daq.ConverterCalibration,
             get_type_hints(thingdone_daq.estimate_offset_gain)["return"],

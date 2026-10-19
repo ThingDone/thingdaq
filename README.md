@@ -236,8 +236,26 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 
 The additive [public v3 contract](doc/protocol/protocol-v3.md) defines bounded
 capability/settings queries and explicit RAW/RLE/PACK12 framing. Its generated
-constants and fixtures are available for offline implementation; the current
-firmware and SDK runtime remain on v1/v2.
+constants, codecs and opt-in Python simulator sessions are available offline.
+Production firmware, serial negotiation and the CLI remain on v1/v2.
+
+```python
+from thingdone_daq import ThingDAQ
+
+with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
+    capabilities = daq.get_capabilities()
+    applied = daq.configure()  # Advertised 600 MHz, 1 MHz/1 MHz, RLE_AUTO/PACK12
+    assert daq.get_settings() == applied
+    daq.start()
+    blocks = list(daq.blocks(4))  # Ordinary ADCBlock/GPIOBlock decoded samples
+    daq.validate_stream_health()
+    daq.stop()  # Waits for STOPPED; preserves settings
+```
+
+Pass an exact `V3Settings` tuple from `capabilities.configurations` to
+`configure()` for other advertised settings, including 450 MHz RAW. Clock values
+are simulated metadata. Omitting `protocol_version` retains the historical
+simulator defaults. See the [v3 session API](doc/protocol/protocol-v3.md#public-simulator-session).
 
 ## Repository layout and checks
 

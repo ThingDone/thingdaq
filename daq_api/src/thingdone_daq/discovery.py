@@ -10,7 +10,6 @@ from serial.tools import list_ports
 from serial.tools.list_ports_common import ListPortInfo
 
 from ._generated import protocol_constants as constants
-from ._generated import protocol_v2_constants as v2_constants
 from .identity import IdentityValidationError, validate_device_identity
 from .models import Info
 from .reader import BackgroundReader
@@ -345,7 +344,7 @@ def probe_candidate(
             response = reader.request(
                 constants.FrameKind.INFO_REQUEST,
                 timeout=selected_timeout,
-                protocol_version=v2_constants.PROTOCOL_VERSION,
+                protocol_version=2,
             )
         if (
             not response.ok
