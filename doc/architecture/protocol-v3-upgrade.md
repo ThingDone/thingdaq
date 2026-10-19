@@ -262,3 +262,13 @@ and pressure, ownership, resource/deadline and STOP-tail regressions.
 decoded through public Python frames and ADCBlock/GPIOBlock APIs, including
 irregular chunks, both GPIO widths, mixed RAW/RLE frames and exact legacy v2
 layouts. The current gate reruns those suites; their physical limitations remain.
+
+## Runtime clock dependency audit (2026-10-19)
+
+[[runtime-clock-dependency-audit]] pins the installed Teensy core 1.62.0 clock
+sequence and maps active timing, cached schedules, legacy projections and fixed
+storage. It identifies unbounded core handshake waits and mixed-frequency
+`micros()` conversion as constraints for the runtime adapter. The current
+watchdog remains disabled; runtime switching and physical qualification are
+still pending. The audit passed 41 baseline tests (3 intentional skips) and
+6 subtests without changing firmware.
