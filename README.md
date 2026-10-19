@@ -234,6 +234,11 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 - [System overview](doc/architecture/system-overview.md)
 - [Phase 10 package workflow evidence](doc/results/phase-10-package-workflows.md)
 
+The additive [public v3 contract](doc/protocol/protocol-v3.md) defines bounded
+capability/settings queries and explicit RAW/RLE/PACK12 framing. Its generated
+constants and fixtures are available for offline implementation; the current
+firmware and SDK runtime remain on v1/v2.
+
 ## Repository layout and checks
 
 - `firmware/`: Teensy 4.0 sketch, portable C++ components, build tooling, and

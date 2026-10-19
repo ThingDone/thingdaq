@@ -1,0 +1,4046 @@
+{
+  "byte_order": "little",
+  "magic": 3735928559,
+  "scalar_types": {
+    "u8": {
+      "width": 1,
+      "signed": false
+    },
+    "u16": {
+      "width": 2,
+      "signed": false
+    },
+    "u32": {
+      "width": 4,
+      "signed": false
+    },
+    "u64": {
+      "width": 8,
+      "signed": false
+    }
+  },
+  "header": {
+    "size": 44,
+    "encoding": "fixed-width unsigned integers in little-endian byte order",
+    "fields": [
+      {
+        "name": "magic",
+        "offset": 0,
+        "type": "u32"
+      },
+      {
+        "name": "version",
+        "offset": 4,
+        "type": "u8"
+      },
+      {
+        "name": "kind",
+        "offset": 5,
+        "type": "u8"
+      },
+      {
+        "name": "flags",
+        "offset": 6,
+        "type": "u16"
+      },
+      {
+        "name": "header_length",
+        "offset": 8,
+        "type": "u16"
+      },
+      {
+        "name": "checksum_algorithm",
+        "offset": 10,
+        "type": "u8"
+      },
+      {
+        "name": "reserved",
+        "offset": 11,
+        "type": "u8",
+        "required": 0
+      },
+      {
+        "name": "total_length",
+        "offset": 12,
+        "type": "u32"
+      },
+      {
+        "name": "payload_length",
+        "offset": 16,
+        "type": "u32"
+      },
+      {
+        "name": "run_id",
+        "offset": 20,
+        "type": "u32"
+      },
+      {
+        "name": "sequence",
+        "offset": 24,
+        "type": "u32"
+      },
+      {
+        "name": "request_id",
+        "offset": 28,
+        "type": "u32"
+      },
+      {
+        "name": "first_sample_ticks",
+        "offset": 32,
+        "type": "u64"
+      },
+      {
+        "name": "item_count",
+        "offset": 40,
+        "type": "u32"
+      }
+    ]
+  },
+  "trailer": {
+    "size": 4,
+    "type": "u32",
+    "byte_order": "little",
+    "coverage": "all 44 header bytes followed by every payload byte, starting at magic offset 0 and excluding all 4 trailer bytes"
+  },
+  "flags": [
+    {
+      "name": "SYNTHETIC",
+      "value": 1,
+      "description": "Data payload was produced by the deterministic test source."
+    },
+    {
+      "name": "GAP_BEFORE",
+      "value": 2,
+      "description": "At least one item or frame was dropped before this data frame."
+    },
+    {
+      "name": "EPOCH_START",
+      "value": 4,
+      "description": "This is the first frame for this stream in a new run."
+    },
+    {
+      "name": "OVERRUN_BEFORE",
+      "value": 8,
+      "description": "Firmware lost one or more logical items before this frame; GAP_BEFORE is also required."
+    },
+    {
+      "name": "RESPONSE_ERROR",
+      "value": 32768,
+      "description": "The response prefix reports a nonzero error code."
+    }
+  ],
+  "name": "ThingDAQ public protocol v3",
+  "protocol_version": 3,
+  "status": "offline contract; firmware qualification pending",
+  "compatibility": {
+    "v1_source_sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+    "v2_source_sha256": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+    "rule": "V1/v2 bytes and behaviors remain unchanged. V3 is explicitly selected before a session; no automatic production serial negotiation is added. All frames in a v3 session have version 3. Private versions 0x82/0x83 are never public encodings.",
+    "reserved_command_ids": [
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ],
+    "reserved_response_ids": [
+      149,
+      150,
+      151,
+      152,
+      153,
+      154,
+      155
+    ]
+  },
+  "generated_outputs": {
+    "python_constants": "daq_api/src/thingdone_daq/_generated/protocol_v3_constants.py",
+    "cpp_constants": "firmware/src/generated/protocol_v3_constants.h",
+    "fixture_directory": "protocol/fixtures-v3",
+    "fixture_manifest": "protocol/fixtures-v3/manifest.json"
+  },
+  "limits": {
+    "min_frame_bytes": 48,
+    "max_command_payload_bytes": 20,
+    "max_command_frame_bytes": 68,
+    "max_control_frame_bytes": 2048,
+    "data_prefix_bytes": 12,
+    "max_logical_payload_bytes": 4048,
+    "max_encoded_sample_bytes": 4048,
+    "max_data_frame_bytes": 4108,
+    "max_adc_pairs": 1012,
+    "max_gpio8_samples": 4048,
+    "max_gpio16_samples": 2024,
+    "max_cpu_profiles": 2,
+    "max_rate_profiles": 1,
+    "max_configuration_tuples": 64
+  },
+  "timing": {
+    "timestamp_hz": 8000000,
+    "adc_pair_rate_hz": 1000000,
+    "gpio_sample_rate_hz": 1000000,
+    "adc_pair_period_ticks": 8,
+    "gpio_sample_period_ticks": 8,
+    "adc1_phase_ticks": 4
+  },
+  "bootstrap_checksum_algorithm": "ADLER32",
+  "default_checksum_algorithm": "ADLER32",
+  "checksum_algorithms": [
+    {
+      "name": "ADLER32",
+      "value": 1,
+      "enabled_in_v3": true,
+      "description": "Adler-32, initial value 1, modulus 65521; mandatory for control and data; covers the transmitted header, encoding prefix and encoded sample bytes, excluding trailer."
+    }
+  ],
+  "enums": {
+    "response_status": [
+      {
+        "name": "OK",
+        "value": 0
+      },
+      {
+        "name": "ERROR",
+        "value": 1
+      }
+    ],
+    "error_code": [
+      {
+        "name": "OK",
+        "value": 0
+      },
+      {
+        "name": "UNSUPPORTED_VERSION",
+        "value": 1
+      },
+      {
+        "name": "UNKNOWN_FRAME_KIND",
+        "value": 2
+      },
+      {
+        "name": "INVALID_FLAGS",
+        "value": 3
+      },
+      {
+        "name": "INVALID_LENGTH",
+        "value": 4
+      },
+      {
+        "name": "INVALID_PAYLOAD",
+        "value": 5
+      },
+      {
+        "name": "UNSUPPORTED_CHECKSUM",
+        "value": 6
+      },
+      {
+        "name": "INVALID_STATE",
+        "value": 7
+      },
+      {
+        "name": "UNSUPPORTED_CONFIGURATION",
+        "value": 8
+      },
+      {
+        "name": "INVALID_REQUEST_ID",
+        "value": 9
+      },
+      {
+        "name": "BUSY",
+        "value": 10
+      },
+      {
+        "name": "INTERNAL_ERROR",
+        "value": 11
+      },
+      {
+        "name": "CHECKSUM_MISMATCH",
+        "value": 12
+      }
+    ],
+    "stream_mask": [
+      {
+        "name": "ADC",
+        "value": 1
+      },
+      {
+        "name": "GPIO",
+        "value": 2
+      }
+    ],
+    "source": [
+      {
+        "name": "HARDWARE",
+        "value": 0
+      },
+      {
+        "name": "SYNTHETIC",
+        "value": 1
+      }
+    ],
+    "aux_bank_mode": [
+      {
+        "name": "DISABLED",
+        "value": 0,
+        "description": "Retain the protocol-v1 D6-through-D13 one-byte input bank and all default behavior."
+      },
+      {
+        "name": "INPUT",
+        "value": 1,
+        "description": "Configure all of D16 through D23 as a second non-driving input bank and publish one little-endian 16-bit GPIO item."
+      }
+    ],
+    "device_state": [
+      {
+        "name": "STOPPED",
+        "value": 1
+      },
+      {
+        "name": "RUNNING",
+        "value": 3
+      },
+      {
+        "name": "DRAINING",
+        "value": 4
+      }
+    ],
+    "board_id": [
+      {
+        "name": "TEENSY_40",
+        "value": 1
+      }
+    ],
+    "mcu_id": [
+      {
+        "name": "IMXRT1062",
+        "value": 1
+      }
+    ],
+    "cpu_profile": [
+      {
+        "name": "CPU_600MHZ",
+        "value": 1
+      },
+      {
+        "name": "CPU_450MHZ",
+        "value": 2
+      }
+    ],
+    "rate_profile": [
+      {
+        "name": "ADC_1MHZ_GPIO_1MHZ",
+        "value": 4
+      }
+    ],
+    "gpio_policy": [
+      {
+        "name": "RAW",
+        "value": 0
+      },
+      {
+        "name": "RLE_AUTO",
+        "value": 1
+      }
+    ],
+    "adc_policy": [
+      {
+        "name": "RAW",
+        "value": 0
+      },
+      {
+        "name": "PACK12",
+        "value": 1
+      }
+    ],
+    "encoding": [
+      {
+        "name": "RAW",
+        "value": 0
+      },
+      {
+        "name": "GPIO_RLE",
+        "value": 1
+      },
+      {
+        "name": "ADC_PACK12",
+        "value": 2
+      }
+    ]
+  },
+  "payload_schemas": {
+    "empty": {
+      "size": 0,
+      "fields": []
+    },
+    "response_prefix": {
+      "size": 4,
+      "fields": [
+        {
+          "name": "response_status",
+          "type": "u8",
+          "enum": "response_status",
+          "offset": 0
+        },
+        {
+          "name": "reserved",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "error_code",
+          "type": "u16",
+          "enum": "error_code",
+          "offset": 2
+        }
+      ]
+    },
+    "settings": {
+      "size": 20,
+      "fields": [
+        {
+          "name": "stream_mask",
+          "type": "u8",
+          "allowed": [
+            1,
+            2,
+            3
+          ],
+          "offset": 0
+        },
+        {
+          "name": "source",
+          "type": "u8",
+          "enum": "source",
+          "offset": 1
+        },
+        {
+          "name": "checksum_algorithm",
+          "type": "u8",
+          "allowed": [
+            1
+          ],
+          "offset": 2
+        },
+        {
+          "name": "wire_version",
+          "type": "u8",
+          "allowed": [
+            3
+          ],
+          "offset": 3
+        },
+        {
+          "name": "cpu_profile",
+          "type": "u8",
+          "enum": "cpu_profile",
+          "offset": 4
+        },
+        {
+          "name": "rate_profile",
+          "type": "u8",
+          "enum": "rate_profile",
+          "offset": 5
+        },
+        {
+          "name": "aux_bank_mode",
+          "type": "u8",
+          "enum": "aux_bank_mode",
+          "offset": 6
+        },
+        {
+          "name": "gpio_width_bits",
+          "type": "u8",
+          "allowed": [
+            8,
+            16
+          ],
+          "offset": 7
+        },
+        {
+          "name": "gpio_policy",
+          "type": "u8",
+          "enum": "gpio_policy",
+          "offset": 8
+        },
+        {
+          "name": "adc_policy",
+          "type": "u8",
+          "enum": "adc_policy",
+          "offset": 9
+        },
+        {
+          "name": "adc_resolution_bits",
+          "type": "u8",
+          "allowed": [
+            12
+          ],
+          "offset": 10
+        },
+        {
+          "name": "reserved",
+          "type": "u8",
+          "required": 0,
+          "offset": 11
+        },
+        {
+          "name": "adc_pair_rate_hz",
+          "type": "u32",
+          "allowed": [
+            1000000
+          ],
+          "offset": 12
+        },
+        {
+          "name": "gpio_sample_rate_hz",
+          "type": "u32",
+          "allowed": [
+            1000000
+          ],
+          "offset": 16
+        }
+      ]
+    },
+    "cpu_profile_info": {
+      "size": 24,
+      "fields": [
+        {
+          "name": "cpu_profile",
+          "type": "u8",
+          "enum": "cpu_profile",
+          "offset": 0
+        },
+        {
+          "name": "reserved0",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "reserved1",
+          "type": "u16",
+          "required": 0,
+          "offset": 2
+        },
+        {
+          "name": "cpu_clock_hz",
+          "type": "u32",
+          "offset": 4
+        },
+        {
+          "name": "ipg_clock_hz",
+          "type": "u32",
+          "offset": 8
+        },
+        {
+          "name": "adc_clock_hz",
+          "type": "u32",
+          "offset": 12
+        },
+        {
+          "name": "pit_clock_hz",
+          "type": "u32",
+          "offset": 16
+        },
+        {
+          "name": "timestamp_hz",
+          "type": "u32",
+          "offset": 20
+        }
+      ]
+    },
+    "rate_profile_info": {
+      "size": 20,
+      "fields": [
+        {
+          "name": "rate_profile",
+          "type": "u8",
+          "enum": "rate_profile",
+          "offset": 0
+        },
+        {
+          "name": "reserved0",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "reserved1",
+          "type": "u16",
+          "required": 0,
+          "offset": 2
+        },
+        {
+          "name": "adc_pair_rate_hz",
+          "type": "u32",
+          "offset": 4
+        },
+        {
+          "name": "gpio_sample_rate_hz",
+          "type": "u32",
+          "offset": 8
+        },
+        {
+          "name": "adc_pair_period_ticks",
+          "type": "u16",
+          "offset": 12
+        },
+        {
+          "name": "gpio_sample_period_ticks",
+          "type": "u16",
+          "offset": 14
+        },
+        {
+          "name": "adc1_phase_ticks",
+          "type": "u16",
+          "offset": 16
+        },
+        {
+          "name": "reserved2",
+          "type": "u16",
+          "required": 0,
+          "offset": 18
+        }
+      ]
+    },
+    "configure_request": {
+      "size": 20,
+      "fields": [
+        {
+          "name": "settings",
+          "type": "repeated_schema",
+          "schema": "settings",
+          "count": 1,
+          "offset": 0
+        }
+      ]
+    },
+    "settings_response": {
+      "size": 48,
+      "fields": [
+        {
+          "name": "response_status",
+          "type": "u8",
+          "enum": "response_status",
+          "offset": 0
+        },
+        {
+          "name": "reserved",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "error_code",
+          "type": "u16",
+          "enum": "error_code",
+          "offset": 2
+        },
+        {
+          "name": "settings",
+          "type": "repeated_schema",
+          "schema": "settings",
+          "count": 1,
+          "offset": 4
+        },
+        {
+          "name": "clocks",
+          "type": "repeated_schema",
+          "schema": "cpu_profile_info",
+          "count": 1,
+          "offset": 24
+        }
+      ]
+    },
+    "info_response": {
+      "size": 132,
+      "fields": [
+        {
+          "name": "response_status",
+          "type": "u8",
+          "enum": "response_status",
+          "offset": 0
+        },
+        {
+          "name": "reserved",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "error_code",
+          "type": "u16",
+          "enum": "error_code",
+          "offset": 2
+        },
+        {
+          "name": "board_id",
+          "type": "u16",
+          "enum": "board_id",
+          "offset": 4
+        },
+        {
+          "name": "mcu_id",
+          "type": "u16",
+          "enum": "mcu_id",
+          "offset": 6
+        },
+        {
+          "name": "simulated",
+          "type": "u8",
+          "allowed": [
+            0,
+            1
+          ],
+          "offset": 8
+        },
+        {
+          "name": "protocol_version",
+          "type": "u8",
+          "allowed": [
+            3
+          ],
+          "offset": 9
+        },
+        {
+          "name": "adc_resolution_bits",
+          "type": "u8",
+          "allowed": [
+            12
+          ],
+          "offset": 10
+        },
+        {
+          "name": "reserved1",
+          "type": "u8",
+          "required": 0,
+          "offset": 11
+        },
+        {
+          "name": "hardware_serial",
+          "type": "nul_ascii",
+          "count": 32,
+          "offset": 12
+        },
+        {
+          "name": "firmware_version",
+          "type": "nul_ascii",
+          "count": 16,
+          "offset": 44
+        },
+        {
+          "name": "build_id",
+          "type": "nul_ascii",
+          "count": 48,
+          "offset": 60
+        },
+        {
+          "name": "clocks",
+          "type": "repeated_schema",
+          "schema": "cpu_profile_info",
+          "count": 1,
+          "offset": 108
+        }
+      ]
+    },
+    "capabilities_response": {
+      "size": 1404,
+      "fields": [
+        {
+          "name": "response_status",
+          "type": "u8",
+          "enum": "response_status",
+          "offset": 0
+        },
+        {
+          "name": "reserved",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "error_code",
+          "type": "u16",
+          "enum": "error_code",
+          "offset": 2
+        },
+        {
+          "name": "cpu_profile_count",
+          "type": "u8",
+          "offset": 4
+        },
+        {
+          "name": "rate_profile_count",
+          "type": "u8",
+          "offset": 5
+        },
+        {
+          "name": "configuration_count",
+          "type": "u8",
+          "offset": 6
+        },
+        {
+          "name": "reserved1",
+          "type": "u8",
+          "required": 0,
+          "offset": 7
+        },
+        {
+          "name": "max_data_frame_bytes",
+          "type": "u32",
+          "offset": 8
+        },
+        {
+          "name": "max_control_frame_bytes",
+          "type": "u32",
+          "offset": 12
+        },
+        {
+          "name": "max_logical_payload_bytes",
+          "type": "u32",
+          "offset": 16
+        },
+        {
+          "name": "max_encoded_sample_bytes",
+          "type": "u32",
+          "offset": 20
+        },
+        {
+          "name": "max_adc_pairs",
+          "type": "u32",
+          "offset": 24
+        },
+        {
+          "name": "max_gpio8_samples",
+          "type": "u32",
+          "offset": 28
+        },
+        {
+          "name": "max_gpio16_samples",
+          "type": "u32",
+          "offset": 32
+        },
+        {
+          "name": "defaults",
+          "type": "repeated_schema",
+          "schema": "settings",
+          "count": 1,
+          "offset": 36
+        },
+        {
+          "name": "cpu_profiles",
+          "type": "repeated_schema",
+          "schema": "cpu_profile_info",
+          "count": 2,
+          "offset": 56
+        },
+        {
+          "name": "rate_profiles",
+          "type": "repeated_schema",
+          "schema": "rate_profile_info",
+          "count": 1,
+          "offset": 104
+        },
+        {
+          "name": "configurations",
+          "type": "repeated_schema",
+          "schema": "settings",
+          "count": 64,
+          "offset": 124
+        }
+      ]
+    },
+    "status_response": {
+      "size": 80,
+      "fields": [
+        {
+          "name": "response_status",
+          "type": "u8",
+          "enum": "response_status",
+          "offset": 0
+        },
+        {
+          "name": "reserved",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "error_code",
+          "type": "u16",
+          "enum": "error_code",
+          "offset": 2
+        },
+        {
+          "name": "state",
+          "type": "u8",
+          "enum": "device_state",
+          "offset": 4
+        },
+        {
+          "name": "reserved1",
+          "type": "u8",
+          "required": 0,
+          "offset": 5
+        },
+        {
+          "name": "reserved2",
+          "type": "u16",
+          "required": 0,
+          "offset": 6
+        },
+        {
+          "name": "run_id",
+          "type": "u32",
+          "offset": 8
+        },
+        {
+          "name": "pending_frames",
+          "type": "u32",
+          "offset": 12
+        },
+        {
+          "name": "adc_frames_produced",
+          "type": "u64",
+          "offset": 16
+        },
+        {
+          "name": "adc_frames_dropped",
+          "type": "u64",
+          "offset": 24
+        },
+        {
+          "name": "adc_items_produced",
+          "type": "u64",
+          "offset": 32
+        },
+        {
+          "name": "adc_items_dropped",
+          "type": "u64",
+          "offset": 40
+        },
+        {
+          "name": "gpio_frames_produced",
+          "type": "u64",
+          "offset": 48
+        },
+        {
+          "name": "gpio_frames_dropped",
+          "type": "u64",
+          "offset": 56
+        },
+        {
+          "name": "gpio_items_produced",
+          "type": "u64",
+          "offset": 64
+        },
+        {
+          "name": "gpio_items_dropped",
+          "type": "u64",
+          "offset": 72
+        }
+      ]
+    },
+    "stop_response": {
+      "size": 16,
+      "fields": [
+        {
+          "name": "response_status",
+          "type": "u8",
+          "enum": "response_status",
+          "offset": 0
+        },
+        {
+          "name": "reserved",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "error_code",
+          "type": "u16",
+          "enum": "error_code",
+          "offset": 2
+        },
+        {
+          "name": "state",
+          "type": "u8",
+          "enum": "device_state",
+          "offset": 4
+        },
+        {
+          "name": "reserved1",
+          "type": "u8",
+          "required": 0,
+          "offset": 5
+        },
+        {
+          "name": "reserved2",
+          "type": "u16",
+          "required": 0,
+          "offset": 6
+        },
+        {
+          "name": "run_id",
+          "type": "u32",
+          "offset": 8
+        },
+        {
+          "name": "pending_frames",
+          "type": "u32",
+          "offset": 12
+        }
+      ]
+    },
+    "error_response": {
+      "size": 8,
+      "fields": [
+        {
+          "name": "response_status",
+          "type": "u8",
+          "enum": "response_status",
+          "offset": 0
+        },
+        {
+          "name": "reserved",
+          "type": "u8",
+          "required": 0,
+          "offset": 1
+        },
+        {
+          "name": "error_code",
+          "type": "u16",
+          "enum": "error_code",
+          "offset": 2
+        },
+        {
+          "name": "rejected_kind",
+          "type": "u8",
+          "offset": 4
+        },
+        {
+          "name": "reserved1",
+          "type": "u8",
+          "required": 0,
+          "offset": 5
+        },
+        {
+          "name": "reserved2",
+          "type": "u16",
+          "required": 0,
+          "offset": 6
+        }
+      ]
+    },
+    "data_prefix": {
+      "size": 12,
+      "fields": [
+        {
+          "name": "encoding",
+          "type": "u8",
+          "enum": "encoding",
+          "offset": 0
+        },
+        {
+          "name": "item_bytes",
+          "type": "u8",
+          "allowed": [
+            1,
+            2,
+            4
+          ],
+          "offset": 1
+        },
+        {
+          "name": "reserved",
+          "type": "u16",
+          "required": 0,
+          "offset": 2
+        },
+        {
+          "name": "decoded_bytes",
+          "type": "u32",
+          "offset": 4
+        },
+        {
+          "name": "run_count",
+          "type": "u32",
+          "offset": 8
+        }
+      ]
+    },
+    "adc_raw_pair": {
+      "size": 4,
+      "fields": [
+        {
+          "name": "adc0",
+          "type": "u16",
+          "offset": 0,
+          "maximum": 4095
+        },
+        {
+          "name": "adc1",
+          "type": "u16",
+          "offset": 2,
+          "maximum": 4095
+        }
+      ]
+    },
+    "adc_pack12_pair": {
+      "size": 3,
+      "fields": [
+        {
+          "name": "adc0_low8",
+          "type": "u8",
+          "offset": 0
+        },
+        {
+          "name": "adc1_low4_adc0_high4",
+          "type": "u8",
+          "offset": 1
+        },
+        {
+          "name": "adc1_high8",
+          "type": "u8",
+          "offset": 2
+        }
+      ]
+    },
+    "gpio8_rle_record": {
+      "size": 3,
+      "fields": [
+        {
+          "name": "run_length",
+          "type": "u16",
+          "offset": 0,
+          "minimum": 1
+        },
+        {
+          "name": "value",
+          "type": "u8",
+          "offset": 2
+        }
+      ]
+    },
+    "gpio16_rle_record": {
+      "size": 4,
+      "fields": [
+        {
+          "name": "run_length",
+          "type": "u16",
+          "offset": 0,
+          "minimum": 1
+        },
+        {
+          "name": "value",
+          "type": "u16",
+          "offset": 2
+        }
+      ]
+    }
+  },
+  "cpu_profiles": [
+    {
+      "cpu_profile": 1,
+      "cpu_clock_hz": 600000000,
+      "ipg_clock_hz": 150000000,
+      "adc_clock_hz": 37500000,
+      "pit_clock_hz": 24000000,
+      "timestamp_hz": 8000000
+    },
+    {
+      "cpu_profile": 2,
+      "cpu_clock_hz": 450000000,
+      "ipg_clock_hz": 150000000,
+      "adc_clock_hz": 37500000,
+      "pit_clock_hz": 24000000,
+      "timestamp_hz": 8000000
+    }
+  ],
+  "rate_profiles": [
+    {
+      "rate_profile": 4,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000,
+      "adc_pair_period_ticks": 8,
+      "gpio_sample_period_ticks": 8,
+      "adc1_phase_ticks": 4
+    }
+  ],
+  "defaults": {
+    "stream_mask": 3,
+    "source": 0,
+    "checksum_algorithm": 1,
+    "wire_version": 3,
+    "cpu_profile": 1,
+    "rate_profile": 4,
+    "aux_bank_mode": 0,
+    "gpio_width_bits": 8,
+    "gpio_policy": 1,
+    "adc_policy": 1,
+    "adc_resolution_bits": 12,
+    "adc_pair_rate_hz": 1000000,
+    "gpio_sample_rate_hz": 1000000
+  },
+  "selectable_configurations": [
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 1,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 1,
+      "adc_policy": 1,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 0,
+      "gpio_width_bits": 8,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 1,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 2,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 0,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    },
+    {
+      "stream_mask": 3,
+      "source": 1,
+      "checksum_algorithm": 1,
+      "wire_version": 3,
+      "cpu_profile": 2,
+      "rate_profile": 4,
+      "aux_bank_mode": 1,
+      "gpio_width_bits": 16,
+      "gpio_policy": 0,
+      "adc_policy": 0,
+      "adc_resolution_bits": 12,
+      "adc_pair_rate_hz": 1000000,
+      "gpio_sample_rate_hz": 1000000
+    }
+  ],
+  "capability_semantics": {
+    "profiles": "CPU and rate records define known IDs and clocks, not permission to select their Cartesian product. Only a byte-exact settings record in configurations is selectable. Devices may advertise a nonempty subset of the canonical selectable_configurations, including defaults; every nonreserved setting participates even when its stream is disabled.",
+    "tables": "Fixed capacity: 2 CPU records, 1 rate record, 64 complete settings records. Counts select leading valid records; all bytes of unused records MUST be zero (including normally nonzero fields). Reject zero counts, counts above capacity, duplicate IDs/tuples, unknown IDs, inconsistent clock/rate/width/policy fields or defaults absent from configurations. CPU/rate definitions can be known without appearing in a selectable tuple. No trailing extension bytes in v3.",
+    "identity": "Only Teensy 4.0/IMXRT1062 is defined. simulated=1 identifies emulated board metadata; hardware_serial must start SIM- in that case. nul_ascii fields require printable ASCII, one terminator and all-zero trailing padding; hardware_serial, firmware_version and build_id are nonempty. INFO clocks report active settings; GET_SETTINGS also returns these clocks.",
+    "limits": "Advertised limits equal the canonical v3 bounds; smaller hardware queues are internal. All bounds apply before allocation/decompression. Capability response itself is bounded by max_control_frame_bytes."
+  },
+  "frame_kinds": [
+    {
+      "name": "ADC_DATA",
+      "value": 1,
+      "class": "data",
+      "payload_schema": "data_prefix",
+      "allowed_flags": [
+        "SYNTHETIC",
+        "GAP_BEFORE",
+        "EPOCH_START",
+        "OVERRUN_BEFORE"
+      ]
+    },
+    {
+      "name": "GPIO_DATA",
+      "value": 2,
+      "class": "data",
+      "payload_schema": "data_prefix",
+      "allowed_flags": [
+        "SYNTHETIC",
+        "GAP_BEFORE",
+        "EPOCH_START",
+        "OVERRUN_BEFORE"
+      ]
+    },
+    {
+      "name": "INFO_REQUEST",
+      "value": 16,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "INFO_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "INFO_RESPONSE",
+      "value": 144,
+      "class": "response",
+      "payload_schema": "info_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "CONFIGURE_REQUEST",
+      "value": 17,
+      "class": "request",
+      "payload_schema": "configure_request",
+      "response_kind": "CONFIGURE_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "CONFIGURE_RESPONSE",
+      "value": 145,
+      "class": "response",
+      "payload_schema": "settings_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "START_REQUEST",
+      "value": 18,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "START_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "START_RESPONSE",
+      "value": 146,
+      "class": "response",
+      "payload_schema": "settings_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "GET_STATUS_REQUEST",
+      "value": 19,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "GET_STATUS_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "GET_STATUS_RESPONSE",
+      "value": 147,
+      "class": "response",
+      "payload_schema": "status_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "STOP_REQUEST",
+      "value": 20,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "STOP_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "STOP_RESPONSE",
+      "value": 148,
+      "class": "response",
+      "payload_schema": "stop_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "GET_CAPABILITIES_REQUEST",
+      "value": 28,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "GET_CAPABILITIES_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "GET_CAPABILITIES_RESPONSE",
+      "value": 156,
+      "class": "response",
+      "payload_schema": "capabilities_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "GET_SETTINGS_REQUEST",
+      "value": 29,
+      "class": "request",
+      "payload_schema": "empty",
+      "response_kind": "GET_SETTINGS_RESPONSE",
+      "allowed_flags": []
+    },
+    {
+      "name": "GET_SETTINGS_RESPONSE",
+      "value": 157,
+      "class": "response",
+      "payload_schema": "settings_response",
+      "error_payload_schema": "response_prefix",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "ERROR_RESPONSE",
+      "value": 159,
+      "class": "error_response",
+      "payload_schema": "error_response",
+      "allowed_flags": [
+        "RESPONSE_ERROR"
+      ]
+    }
+  ],
+  "command_kinds": [
+    {
+      "name": "INFO",
+      "value": 16,
+      "request_kind": "INFO_REQUEST",
+      "response_kind": "INFO_RESPONSE"
+    },
+    {
+      "name": "CONFIGURE",
+      "value": 17,
+      "request_kind": "CONFIGURE_REQUEST",
+      "response_kind": "CONFIGURE_RESPONSE"
+    },
+    {
+      "name": "START",
+      "value": 18,
+      "request_kind": "START_REQUEST",
+      "response_kind": "START_RESPONSE"
+    },
+    {
+      "name": "GET_STATUS",
+      "value": 19,
+      "request_kind": "GET_STATUS_REQUEST",
+      "response_kind": "GET_STATUS_RESPONSE"
+    },
+    {
+      "name": "STOP",
+      "value": 20,
+      "request_kind": "STOP_REQUEST",
+      "response_kind": "STOP_RESPONSE"
+    },
+    {
+      "name": "GET_CAPABILITIES",
+      "value": 28,
+      "request_kind": "GET_CAPABILITIES_REQUEST",
+      "response_kind": "GET_CAPABILITIES_RESPONSE"
+    },
+    {
+      "name": "GET_SETTINGS",
+      "value": 29,
+      "request_kind": "GET_SETTINGS_REQUEST",
+      "response_kind": "GET_SETTINGS_RESPONSE"
+    }
+  ],
+  "framing_rules": {
+    "validation": "Require magic 0xDEADBEEF, version 3, header_length 44, reserved zero, known kind/flags/checksum, total_length=44+payload_length+4 and exact fixed schema length for controls. No padding except explicit reserved fields. Every reserved scalar/bit and unused table byte is zero; receivers reject violations.",
+    "correlation": "Requests use nonzero u32 request_id, zero run_id/sequence/first_sample_ticks/item_count and flags=0. Responses echo request_id and the paired kind; generic ERROR_RESPONSE echoes an unknown rejected kind. Response run_id is current/most recent run (0 before first START); other data-only fields are zero. START response carries the newly assigned run_id. Host must not reuse request IDs during a connection; no automatic retransmission. Device rejects duplicate IDs still in its bounded last-16 accepted-request window with INVALID_REQUEST_ID; older IDs have no replay guarantee. The replay window contains request IDs after dispatch (including command errors), excluding zero and duplicate IDs; it is cleared on a new transport connection. A response with request_id=0 is only valid for INVALID_REQUEST_ID on a zero-ID request.",
+    "errors": "OK prefix means response_status=0,error_code=0,RESPONSE_ERROR clear and full success payload. Error means response_status=1, nonzero defined error_code, RESPONSE_ERROR set and exactly response_prefix (4 bytes); generic ERROR_RESPONSE alone adds rejected_kind (8 bytes total). Errors never mutate settings, run ID or acquisition state.",
+    "malformed": "Discard untrusted framing/oversize lengths/checksum failures and resynchronize to magic without allocating from untrusted length. A checksummed bounded request gets a correlated error for invalid payload/flags/request ID or unknown kind. Unsupported protocol versions are outside the v3 session and are discarded, never interpreted as an encoding.",
+    "validation_order": [
+      "bounded framing and checksum",
+      "known request kind (else generic UNKNOWN_FRAME_KIND)",
+      "request ID and replay",
+      "flags and fixed payload length",
+      "reserved fields, data-only request header fields and enum/scalar validity",
+      "command state",
+      "tuple membership and cross-field consistency",
+      "atomic application"
+    ]
+  },
+  "command_semantics": {
+    "INFO": "Allowed in all states; identity and active clock snapshot; no mutation.",
+    "GET_CAPABILITIES": "Allowed in all states; fixed capacity definitions, exact selectable settings and board defaults; no mutation.",
+    "GET_SETTINGS": "Allowed in all states; active complete settings and clocks, retained across STOP; no mutation.",
+    "CONFIGURE": "STOPPED only, pending_frames=0 and no transport data tail. Validate the entire candidate before any clock/pin/settings changes; on application failure roll back all changes and return INTERNAL_ERROR. Success atomically replaces settings and returns exact requested settings plus corresponding clocks. RUNNING returns INVALID_STATE; DRAINING returns BUSY. Unsupported tuple returns UNSUPPORTED_CONFIGURATION; valid but contradictory rate/width/policy fields return UNSUPPORTED_CONFIGURATION; unknown enums/nonzero reserved bytes return INVALID_PAYLOAD. No partial mutation.",
+    "START": "STOPPED only with drain complete; reboot defaults are already configured, so explicit CONFIGURE is optional. RUNNING returns INVALID_STATE, DRAINING returns BUSY. Increment u32 run_id modulo 2^32 skipping zero; reset per-stream sequence, relative timestamps and counters. Return exact active settings and clocks before any new-run data. Settings/wire mode are immutable throughout the run.",
+    "STOP": "RUNNING stops production and enters DRAINING if complete queued frames or a partial transport tail remain, otherwise STOPPED. Repeated STOP in DRAINING/STOPPED is idempotent. Response reports state/pending complete-or-partial frames and current run_id. Preserve settings and final counters. Continue sending queued complete old-run frames without truncation; automatically enter STOPPED only after every data byte is transmitted. Host drains through ordered GET_STATUS response reporting STOPPED,pending_frames=0 before restarting/reconfiguring.",
+    "GET_STATUS": "STATUS uses existing GET_STATUS ID. Allowed in all states; snapshot of state, run_id, pending frames and per-stream run counters. Produced includes dropped; items are logical ADC pairs/GPIO samples regardless of encoding. Counters are u64 saturating, reset only on successful START or reboot; dropped <= produced. Queued/draining frames count as produced. STOPPED requires pending_frames=0; DRAINING requires pending_frames>0.",
+    "reboot": "Reset to STOPPED, run_id=0, empty queues/counters/replay history and board defaults. Settings are session-only, never persisted. CDC reconnect preserves settings/state; a host must query and STOP/drain as necessary. Wire version changes require a separate stopped, drained session; CONFIGURE wire_version is always 3.",
+    "unsupported_commands": "IDs reserved from v1/v2 are not implemented in v3; return generic ERROR_RESPONSE with UNKNOWN_FRAME_KIND. No auxiliary OUTPUT, 528 MHz profile, higher sampling rates or additional boards are selectable."
+  },
+  "data_semantics": {
+    "prefix": "Every data payload begins with the 12-byte data_prefix, followed by encoded samples. item_count counts logical ADC pairs or GPIO samples, never runs or encoded bytes. decoded_bytes=item_count*item_bytes; require 1<=item_count<=kind/width maximum before multiplication or allocation. ADC item_bytes=4; GPIO item_bytes=active gpio_width_bits/8. run_count=0 for RAW/PACK12.",
+    "raw": "encoding=RAW: exactly decoded_bytes sample bytes. ADC pairs are ADC0 u16 LE followed by ADC1 u16 LE; reject either value above 4095. GPIO is one byte or u16 LE; primary D6..D13 bits 0..7, auxiliary D16..D23 bits 8..15. GPIO width must match settings.",
+    "rle": "encoding=GPIO_RLE only for GPIO with RLE_AUTO policy. Each record is nonzero u16 LE run length followed by one 8-bit or one u16 LE value. 1<=run_count<=item_count; sample byte length exactly run_count*(2+item_bytes). Sum lengths with checked arithmetic, reject prefix sum exceeding item_count and final sum not equal to item_count. Adjacent records must have different values (maximal runs; max logical count is below 65536). No terminator or padding. Require encoded sample bytes < decoded_bytes; tie/expansion falls back to RAW. RAW policy never emits RLE; RLE_AUTO accepts RAW fallback.",
+    "pack12": "encoding=ADC_PACK12 only for ADC with PACK12 policy. ADC0=a, ADC1=b, each 0..4095; exactly 3*item_count bytes. b0=a&255; b1=(a>>8)|((b&15)<<4); b2=b>>4. Decode a=b0|((b1&15)<<8), b=(b1>>4)|(b2<<4). Reject out-of-range input before packing; never mask invalid codes. PACK12 policy always emits PACK12; RAW ADC policy always emits RAW.",
+    "bounds": "Wire payload length includes prefix; checksum covers transmitted bytes, never expanded bytes. Max decoded and encoded sample bytes 4048; max wire frame 4108. Lengths and encoding-kind-policy combinations are validated before expansion. No zero-item data frames, truncated records, excess bytes or unknown encodings.",
+    "time_and_loss": "Data request_id=0; run_id nonzero and equal to START. Each stream has independent u32 sequence starting 0 and incremented for every produced frame including dropped frames, modulo 2^32. EPOCH_START marks its first transmitted frame; GAP_BEFORE marks any logical gap, OVERRUN_BEFORE implies GAP_BEFORE. SYNTHETIC iff source=SYNTHETIC. first_sample_ticks is u64 START-relative in the 8 MHz domain, aligned to 8 ticks, unaffected by encoding. ADC0[i]=first+8*i, ADC1[i]=first+8*i+4; GPIO[i]=first+8*i. Contiguous frames advance by prior item_count*8; any omitted logical samples advance timestamps and set loss flags. No timestamp wrap within a run; stop before u64 overflow. Frames need not cover equal durations across streams."
+  },
+  "golden_fixtures": [
+    {
+      "name": "info-request",
+      "kind": "INFO_REQUEST",
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      },
+      "request_id": 1
+    },
+    {
+      "name": "info-response",
+      "kind": "INFO_RESPONSE",
+      "payload": {
+        "schema": "info_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "board_id": 1,
+          "mcu_id": 1,
+          "simulated": 1,
+          "protocol_version": 3,
+          "adc_resolution_bits": 12,
+          "hardware_serial": "SIM-V3-0001",
+          "firmware_version": "v3-offline",
+          "build_id": "protocol-v3-golden",
+          "clocks": [
+            {
+              "cpu_profile": 1,
+              "cpu_clock_hz": 600000000,
+              "ipg_clock_hz": 150000000,
+              "adc_clock_hz": 37500000,
+              "pit_clock_hz": 24000000,
+              "timestamp_hz": 8000000
+            }
+          ]
+        }
+      },
+      "request_id": 1,
+      "run_id": 0
+    },
+    {
+      "name": "info-error",
+      "kind": "INFO_RESPONSE",
+      "payload": {
+        "schema": "response_prefix",
+        "values": {
+          "response_status": 1,
+          "error_code": 11
+        }
+      },
+      "request_id": 1,
+      "flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "configure-request",
+      "kind": "CONFIGURE_REQUEST",
+      "payload": {
+        "schema": "configure_request",
+        "values": {
+          "settings": [
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            }
+          ]
+        }
+      },
+      "request_id": 2
+    },
+    {
+      "name": "configure-response",
+      "kind": "CONFIGURE_RESPONSE",
+      "payload": {
+        "schema": "settings_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "settings": [
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            }
+          ],
+          "clocks": [
+            {
+              "cpu_profile": 1,
+              "cpu_clock_hz": 600000000,
+              "ipg_clock_hz": 150000000,
+              "adc_clock_hz": 37500000,
+              "pit_clock_hz": 24000000,
+              "timestamp_hz": 8000000
+            }
+          ]
+        }
+      },
+      "request_id": 2,
+      "run_id": 0
+    },
+    {
+      "name": "configure-error",
+      "kind": "CONFIGURE_RESPONSE",
+      "payload": {
+        "schema": "response_prefix",
+        "values": {
+          "response_status": 1,
+          "error_code": 7
+        }
+      },
+      "request_id": 2,
+      "flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "start-request",
+      "kind": "START_REQUEST",
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      },
+      "request_id": 3
+    },
+    {
+      "name": "start-response",
+      "kind": "START_RESPONSE",
+      "payload": {
+        "schema": "settings_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "settings": [
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            }
+          ],
+          "clocks": [
+            {
+              "cpu_profile": 1,
+              "cpu_clock_hz": 600000000,
+              "ipg_clock_hz": 150000000,
+              "adc_clock_hz": 37500000,
+              "pit_clock_hz": 24000000,
+              "timestamp_hz": 8000000
+            }
+          ]
+        }
+      },
+      "request_id": 3,
+      "run_id": 1
+    },
+    {
+      "name": "start-error",
+      "kind": "START_RESPONSE",
+      "payload": {
+        "schema": "response_prefix",
+        "values": {
+          "response_status": 1,
+          "error_code": 7
+        }
+      },
+      "request_id": 3,
+      "flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "get_status-request",
+      "kind": "GET_STATUS_REQUEST",
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      },
+      "request_id": 4
+    },
+    {
+      "name": "get_status-response",
+      "kind": "GET_STATUS_RESPONSE",
+      "payload": {
+        "schema": "status_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "state": 1,
+          "run_id": 1,
+          "pending_frames": 0,
+          "adc_frames_produced": 0,
+          "adc_frames_dropped": 0,
+          "adc_items_produced": 0,
+          "adc_items_dropped": 0,
+          "gpio_frames_produced": 0,
+          "gpio_frames_dropped": 0,
+          "gpio_items_produced": 0,
+          "gpio_items_dropped": 0
+        }
+      },
+      "request_id": 4,
+      "run_id": 1
+    },
+    {
+      "name": "get_status-error",
+      "kind": "GET_STATUS_RESPONSE",
+      "payload": {
+        "schema": "response_prefix",
+        "values": {
+          "response_status": 1,
+          "error_code": 11
+        }
+      },
+      "request_id": 4,
+      "flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "stop-request",
+      "kind": "STOP_REQUEST",
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      },
+      "request_id": 5
+    },
+    {
+      "name": "stop-response",
+      "kind": "STOP_RESPONSE",
+      "payload": {
+        "schema": "stop_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "state": 1,
+          "run_id": 1,
+          "pending_frames": 0
+        }
+      },
+      "request_id": 5,
+      "run_id": 1
+    },
+    {
+      "name": "stop-error",
+      "kind": "STOP_RESPONSE",
+      "payload": {
+        "schema": "response_prefix",
+        "values": {
+          "response_status": 1,
+          "error_code": 11
+        }
+      },
+      "request_id": 5,
+      "flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "get_capabilities-request",
+      "kind": "GET_CAPABILITIES_REQUEST",
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      },
+      "request_id": 6
+    },
+    {
+      "name": "get_capabilities-response",
+      "kind": "GET_CAPABILITIES_RESPONSE",
+      "payload": {
+        "schema": "capabilities_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "cpu_profile_count": 2,
+          "rate_profile_count": 1,
+          "configuration_count": 60,
+          "defaults": [
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            }
+          ],
+          "cpu_profiles": [
+            {
+              "cpu_profile": 1,
+              "cpu_clock_hz": 600000000,
+              "ipg_clock_hz": 150000000,
+              "adc_clock_hz": 37500000,
+              "pit_clock_hz": 24000000,
+              "timestamp_hz": 8000000
+            },
+            {
+              "cpu_profile": 2,
+              "cpu_clock_hz": 450000000,
+              "ipg_clock_hz": 150000000,
+              "adc_clock_hz": 37500000,
+              "pit_clock_hz": 24000000,
+              "timestamp_hz": 8000000
+            }
+          ],
+          "rate_profiles": [
+            {
+              "rate_profile": 4,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000,
+              "adc_pair_period_ticks": 8,
+              "gpio_sample_period_ticks": 8,
+              "adc1_phase_ticks": 4
+            }
+          ],
+          "configurations": [
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 1,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 2,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 3,
+              "source": 1,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 2,
+              "rate_profile": 4,
+              "aux_bank_mode": 1,
+              "gpio_width_bits": 16,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            },
+            {
+              "stream_mask": 0,
+              "source": 0,
+              "checksum_algorithm": 0,
+              "wire_version": 0,
+              "cpu_profile": 0,
+              "rate_profile": 0,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 0,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 0,
+              "adc_pair_rate_hz": 0,
+              "gpio_sample_rate_hz": 0
+            },
+            {
+              "stream_mask": 0,
+              "source": 0,
+              "checksum_algorithm": 0,
+              "wire_version": 0,
+              "cpu_profile": 0,
+              "rate_profile": 0,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 0,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 0,
+              "adc_pair_rate_hz": 0,
+              "gpio_sample_rate_hz": 0
+            },
+            {
+              "stream_mask": 0,
+              "source": 0,
+              "checksum_algorithm": 0,
+              "wire_version": 0,
+              "cpu_profile": 0,
+              "rate_profile": 0,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 0,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 0,
+              "adc_pair_rate_hz": 0,
+              "gpio_sample_rate_hz": 0
+            },
+            {
+              "stream_mask": 0,
+              "source": 0,
+              "checksum_algorithm": 0,
+              "wire_version": 0,
+              "cpu_profile": 0,
+              "rate_profile": 0,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 0,
+              "gpio_policy": 0,
+              "adc_policy": 0,
+              "adc_resolution_bits": 0,
+              "adc_pair_rate_hz": 0,
+              "gpio_sample_rate_hz": 0
+            }
+          ],
+          "max_data_frame_bytes": 4108,
+          "max_control_frame_bytes": 2048,
+          "max_logical_payload_bytes": 4048,
+          "max_encoded_sample_bytes": 4048,
+          "max_adc_pairs": 1012,
+          "max_gpio8_samples": 4048,
+          "max_gpio16_samples": 2024
+        }
+      },
+      "request_id": 6,
+      "run_id": 0
+    },
+    {
+      "name": "get_capabilities-error",
+      "kind": "GET_CAPABILITIES_RESPONSE",
+      "payload": {
+        "schema": "response_prefix",
+        "values": {
+          "response_status": 1,
+          "error_code": 11
+        }
+      },
+      "request_id": 6,
+      "flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "get_settings-request",
+      "kind": "GET_SETTINGS_REQUEST",
+      "payload": {
+        "schema": "empty",
+        "values": {}
+      },
+      "request_id": 7
+    },
+    {
+      "name": "get_settings-response",
+      "kind": "GET_SETTINGS_RESPONSE",
+      "payload": {
+        "schema": "settings_response",
+        "values": {
+          "response_status": 0,
+          "error_code": 0,
+          "settings": [
+            {
+              "stream_mask": 3,
+              "source": 0,
+              "checksum_algorithm": 1,
+              "wire_version": 3,
+              "cpu_profile": 1,
+              "rate_profile": 4,
+              "aux_bank_mode": 0,
+              "gpio_width_bits": 8,
+              "gpio_policy": 1,
+              "adc_policy": 1,
+              "adc_resolution_bits": 12,
+              "adc_pair_rate_hz": 1000000,
+              "gpio_sample_rate_hz": 1000000
+            }
+          ],
+          "clocks": [
+            {
+              "cpu_profile": 1,
+              "cpu_clock_hz": 600000000,
+              "ipg_clock_hz": 150000000,
+              "adc_clock_hz": 37500000,
+              "pit_clock_hz": 24000000,
+              "timestamp_hz": 8000000
+            }
+          ]
+        }
+      },
+      "request_id": 7,
+      "run_id": 0
+    },
+    {
+      "name": "get_settings-error",
+      "kind": "GET_SETTINGS_RESPONSE",
+      "payload": {
+        "schema": "response_prefix",
+        "values": {
+          "response_status": 1,
+          "error_code": 11
+        }
+      },
+      "request_id": 7,
+      "flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "unknown-command-error",
+      "kind": "ERROR_RESPONSE",
+      "payload": {
+        "schema": "error_response",
+        "values": {
+          "response_status": 1,
+          "error_code": 2,
+          "rejected_kind": 21
+        }
+      },
+      "request_id": 8,
+      "flags": [
+        "RESPONSE_ERROR"
+      ]
+    },
+    {
+      "name": "adc-raw",
+      "kind": "ADC_DATA",
+      "payload": {
+        "prefix": {
+          "encoding": 0,
+          "item_bytes": 4,
+          "decoded_bytes": 8,
+          "run_count": 0
+        },
+        "sample_hex": "0000ff0fbc0a2301",
+        "decoded_hex": "0000ff0fbc0a2301"
+      },
+      "run_id": 1,
+      "sequence": 0,
+      "item_count": 2,
+      "first_sample_ticks": 0,
+      "flags": [
+        "EPOCH_START"
+      ],
+      "settings": {
+        "stream_mask": 3,
+        "source": 0,
+        "checksum_algorithm": 1,
+        "wire_version": 3,
+        "cpu_profile": 1,
+        "rate_profile": 4,
+        "aux_bank_mode": 0,
+        "gpio_width_bits": 8,
+        "gpio_policy": 1,
+        "adc_policy": 0,
+        "adc_resolution_bits": 12,
+        "adc_pair_rate_hz": 1000000,
+        "gpio_sample_rate_hz": 1000000
+      }
+    },
+    {
+      "name": "adc-pack12",
+      "kind": "ADC_DATA",
+      "payload": {
+        "prefix": {
+          "encoding": 2,
+          "item_bytes": 4,
+          "decoded_bytes": 8,
+          "run_count": 0
+        },
+        "sample_hex": "00f0ffbc3a12",
+        "decoded_hex": "0000ff0fbc0a2301"
+      },
+      "run_id": 1,
+      "sequence": 0,
+      "item_count": 2,
+      "first_sample_ticks": 0,
+      "flags": [
+        "EPOCH_START"
+      ],
+      "settings": {
+        "stream_mask": 3,
+        "source": 0,
+        "checksum_algorithm": 1,
+        "wire_version": 3,
+        "cpu_profile": 1,
+        "rate_profile": 4,
+        "aux_bank_mode": 0,
+        "gpio_width_bits": 8,
+        "gpio_policy": 1,
+        "adc_policy": 1,
+        "adc_resolution_bits": 12,
+        "adc_pair_rate_hz": 1000000,
+        "gpio_sample_rate_hz": 1000000
+      }
+    },
+    {
+      "name": "gpio8-raw",
+      "kind": "GPIO_DATA",
+      "payload": {
+        "prefix": {
+          "encoding": 0,
+          "item_bytes": 1,
+          "decoded_bytes": 4,
+          "run_count": 0
+        },
+        "sample_hex": "00ff00ff",
+        "decoded_hex": "00ff00ff"
+      },
+      "run_id": 1,
+      "sequence": 0,
+      "item_count": 4,
+      "first_sample_ticks": 0,
+      "flags": [
+        "EPOCH_START"
+      ],
+      "settings": {
+        "stream_mask": 3,
+        "source": 0,
+        "checksum_algorithm": 1,
+        "wire_version": 3,
+        "cpu_profile": 1,
+        "rate_profile": 4,
+        "aux_bank_mode": 0,
+        "gpio_width_bits": 8,
+        "gpio_policy": 0,
+        "adc_policy": 1,
+        "adc_resolution_bits": 12,
+        "adc_pair_rate_hz": 1000000,
+        "gpio_sample_rate_hz": 1000000
+      }
+    },
+    {
+      "name": "gpio16-raw",
+      "kind": "GPIO_DATA",
+      "payload": {
+        "prefix": {
+          "encoding": 0,
+          "item_bytes": 2,
+          "decoded_bytes": 8,
+          "run_count": 0
+        },
+        "sample_hex": "0000ffff0000ffff",
+        "decoded_hex": "0000ffff0000ffff"
+      },
+      "run_id": 1,
+      "sequence": 0,
+      "item_count": 4,
+      "first_sample_ticks": 0,
+      "flags": [
+        "EPOCH_START"
+      ],
+      "settings": {
+        "stream_mask": 3,
+        "source": 0,
+        "checksum_algorithm": 1,
+        "wire_version": 3,
+        "cpu_profile": 1,
+        "rate_profile": 4,
+        "aux_bank_mode": 1,
+        "gpio_width_bits": 16,
+        "gpio_policy": 0,
+        "adc_policy": 1,
+        "adc_resolution_bits": 12,
+        "adc_pair_rate_hz": 1000000,
+        "gpio_sample_rate_hz": 1000000
+      }
+    },
+    {
+      "name": "gpio8-rle",
+      "kind": "GPIO_DATA",
+      "payload": {
+        "prefix": {
+          "encoding": 1,
+          "item_bytes": 1,
+          "decoded_bytes": 8,
+          "run_count": 2
+        },
+        "sample_hex": "040012040034",
+        "decoded_hex": "1212121234343434"
+      },
+      "run_id": 1,
+      "sequence": 0,
+      "item_count": 8,
+      "first_sample_ticks": 0,
+      "flags": [
+        "EPOCH_START"
+      ],
+      "settings": {
+        "stream_mask": 3,
+        "source": 0,
+        "checksum_algorithm": 1,
+        "wire_version": 3,
+        "cpu_profile": 1,
+        "rate_profile": 4,
+        "aux_bank_mode": 0,
+        "gpio_width_bits": 8,
+        "gpio_policy": 1,
+        "adc_policy": 1,
+        "adc_resolution_bits": 12,
+        "adc_pair_rate_hz": 1000000,
+        "gpio_sample_rate_hz": 1000000
+      }
+    },
+    {
+      "name": "gpio16-rle",
+      "kind": "GPIO_DATA",
+      "payload": {
+        "prefix": {
+          "encoding": 1,
+          "item_bytes": 2,
+          "decoded_bytes": 16,
+          "run_count": 2
+        },
+        "sample_hex": "040034120400cdab",
+        "decoded_hex": "3412341234123412cdabcdabcdabcdab"
+      },
+      "run_id": 1,
+      "sequence": 0,
+      "item_count": 8,
+      "first_sample_ticks": 0,
+      "flags": [
+        "EPOCH_START"
+      ],
+      "settings": {
+        "stream_mask": 3,
+        "source": 0,
+        "checksum_algorithm": 1,
+        "wire_version": 3,
+        "cpu_profile": 1,
+        "rate_profile": 4,
+        "aux_bank_mode": 1,
+        "gpio_width_bits": 16,
+        "gpio_policy": 1,
+        "adc_policy": 1,
+        "adc_resolution_bits": 12,
+        "adc_pair_rate_hz": 1000000,
+        "gpio_sample_rate_hz": 1000000
+      }
+    }
+  ],
+  "data_layouts": {
+    "adc": {
+      "channel_order": [
+        "ADC0",
+        "ADC1"
+      ],
+      "teensy_pins": [
+        14,
+        15
+      ],
+      "resolution_bits": 12,
+      "item_bytes": 4,
+      "max_items": 1012,
+      "raw_schema": "adc_raw_pair",
+      "packed_schema": "adc_pack12_pair"
+    },
+    "gpio8": {
+      "pins_by_bit": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "item_bytes": 1,
+      "max_items": 4048,
+      "rle_schema": "gpio8_rle_record"
+    },
+    "gpio16": {
+      "pins_by_bit": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "item_bytes": 2,
+      "max_items": 2024,
+      "rle_schema": "gpio16_rle_record"
+    }
+  },
+  "error_semantics": {
+    "OK": "Success only; never set RESPONSE_ERROR.",
+    "UNSUPPORTED_VERSION": "Reserved legacy meaning; mismatched version is discarded before v3 command dispatch.",
+    "UNKNOWN_FRAME_KIND": "Checksummed request with unsupported kind, including reserved legacy commands; generic ERROR_RESPONSE carries rejected_kind.",
+    "INVALID_FLAGS": "Checksummed request has nonzero flags.",
+    "INVALID_LENGTH": "Bounded checksummed request has wrong schema payload length. Unbounded/untrusted framing is discarded.",
+    "INVALID_PAYLOAD": "Nonzero reserved fields, unknown enum values, zero stream mask, out-of-domain scalar or nonzero data-only request header fields.",
+    "UNSUPPORTED_CHECKSUM": "Reserved legacy meaning; only Adler-32 frames are admitted in v3, so unknown algorithms are discarded.",
+    "INVALID_STATE": "CONFIGURE or START while RUNNING.",
+    "UNSUPPORTED_CONFIGURATION": "Well-formed settings absent from advertised exact tuples, including contradictory width/auxiliary mode or 450 MHz compression.",
+    "INVALID_REQUEST_ID": "Request ID is zero or duplicated in the last-16 accepted-request window. A zero ID response echoes zero as the sole correlation exception.",
+    "BUSY": "CONFIGURE or START during DRAINING or incomplete transport drain.",
+    "INTERNAL_ERROR": "Device cannot execute an otherwise valid command; any attempted CONFIGURE application is fully rolled back.",
+    "CHECKSUM_MISMATCH": "Reserved legacy meaning; corrupt checksums are discarded without response."
+  }
+}

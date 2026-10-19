@@ -17,6 +17,7 @@ from typing import Any
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v1.json"
 V2_SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v2.json"
+V3_SOURCE_PATH = REPOSITORY_ROOT / "protocol/protocol-v3.json"
 PYTHON_OUTPUT_PATH = (
     REPOSITORY_ROOT / "daq_api/src/thingdone_daq/_generated/protocol_constants.py"
 )
@@ -961,6 +962,714 @@ def validate_v2_contract(
     }
     if not required_cases <= set(malformed_names):
         raise ContractError("protocol v2 malformed fixture coverage is incomplete")
+
+
+def validate_v3_contract(
+    contract: Mapping[str, Any],
+    v1_contract: Mapping[str, Any],
+    v1_source_bytes: bytes,
+    v2_contract: Mapping[str, Any],
+    v2_source_bytes: bytes,
+) -> None:
+    """Validate the public v3 boundary before emitting either language or bytes."""
+
+    def require(condition: bool, message: str) -> None:
+        if not condition:
+            raise ContractError(f"protocol-v3: {message}")
+
+    require(contract["protocol_version"] == 3, "version must be 3")
+    for key in ("byte_order", "magic", "scalar_types", "header", "trailer", "flags"):
+        require(contract[key] == v2_contract[key], f"{key} must preserve v2 framing")
+    for version, source in ((1, v1_source_bytes), (2, v2_source_bytes)):
+        require(
+            contract["compatibility"][f"v{version}_source_sha256"]
+            == hashlib.sha256(source).hexdigest(),
+            f"frozen v{version} source hash mismatch",
+        )
+    generated = contract["generated_outputs"]
+    require(
+        generated
+        == {
+            "python_constants": "daq_api/src/thingdone_daq/_generated/protocol_v3_constants.py",
+            "cpp_constants": "firmware/src/generated/protocol_v3_constants.h",
+            "fixture_directory": "protocol/fixtures-v3",
+            "fixture_manifest": "protocol/fixtures-v3/manifest.json",
+        },
+        "outputs must use disjoint v3 paths",
+    )
+    limits = contract["limits"]
+    expected_limits = {
+        "min_frame_bytes": 48,
+        "max_command_payload_bytes": 20,
+        "max_command_frame_bytes": 68,
+        "max_control_frame_bytes": 2048,
+        "data_prefix_bytes": 12,
+        "max_logical_payload_bytes": 4048,
+        "max_encoded_sample_bytes": 4048,
+        "max_data_frame_bytes": 4108,
+        "max_adc_pairs": 1012,
+        "max_gpio8_samples": 4048,
+        "max_gpio16_samples": 2024,
+        "max_cpu_profiles": 2,
+        "max_rate_profiles": 1,
+        "max_configuration_tuples": 64,
+    }
+    require(limits == expected_limits, "wire/logical/table bounds changed")
+    timing = contract["timing"]
+    require(
+        timing
+        == {
+            "timestamp_hz": 8_000_000,
+            "adc_pair_rate_hz": 1_000_000,
+            "gpio_sample_rate_hz": 1_000_000,
+            "adc_pair_period_ticks": 8,
+            "gpio_sample_period_ticks": 8,
+            "adc1_phase_ticks": 4,
+        },
+        "only 1 MHz/1 MHz in the 8 MHz domain is defined",
+    )
+    enums = contract["enums"]
+    for name, entries in enums.items():
+        enum_map(entries)
+        validate_enum_width(
+            name, entries, 16 if name in {"error_code", "board_id", "mcu_id"} else 8
+        )
+    expected_enums = {
+        "cpu_profile": {"CPU_600MHZ": 1, "CPU_450MHZ": 2},
+        "rate_profile": {"ADC_1MHZ_GPIO_1MHZ": 4},
+        "gpio_policy": {"RAW": 0, "RLE_AUTO": 1},
+        "adc_policy": {"RAW": 0, "PACK12": 1},
+        "encoding": {"RAW": 0, "GPIO_RLE": 1, "ADC_PACK12": 2},
+        "device_state": {"STOPPED": 1, "RUNNING": 3, "DRAINING": 4},
+        "board_id": {"TEENSY_40": 1},
+        "mcu_id": {"IMXRT1062": 1},
+    }
+    for name in (
+        "response_status",
+        "error_code",
+        "stream_mask",
+        "source",
+        "aux_bank_mode",
+    ):
+        expected_enums[name] = enum_map(v2_contract["enums"][name])
+    require(set(enums) == set(expected_enums), "unexpected enum table")
+    for name, expected in expected_enums.items():
+        require(enum_map(enums[name]) == expected, f"invalid {name} IDs")
+    require(
+        enum_map(contract["checksum_algorithms"]) == {"ADLER32": 1}, "Adler-32 required"
+    )
+    require(
+        contract["bootstrap_checksum_algorithm"]
+        == contract["default_checksum_algorithm"]
+        == "ADLER32"
+        and checksum_enabled(contract, contract["checksum_algorithms"][0]),
+        "control and data checksums must be enabled",
+    )
+
+    schemas = contract["payload_schemas"]
+    expected_sizes = {
+        "empty": 0,
+        "response_prefix": 4,
+        "settings": 20,
+        "cpu_profile_info": 24,
+        "rate_profile_info": 20,
+        "configure_request": 20,
+        "settings_response": 48,
+        "info_response": 132,
+        "capabilities_response": 1404,
+        "status_response": 80,
+        "stop_response": 16,
+        "error_response": 8,
+        "data_prefix": 12,
+        "adc_raw_pair": 4,
+        "adc_pack12_pair": 3,
+        "gpio8_rle_record": 3,
+        "gpio16_rle_record": 4,
+    }
+    require(set(schemas) == set(expected_sizes), "unexpected payload schema")
+    for name, schema in schemas.items():
+        size = int(schema["size"])
+        require(size == expected_sizes[name], f"{name} length changed")
+        validate_fields(name, size, schema["fields"], schemas)
+        for field in schema["fields"]:
+            if field["name"].startswith("reserved"):
+                require(
+                    field.get("required") == 0, f"{name} reserved field must be zero"
+                )
+            if "enum" in field:
+                require(field["enum"] in enums, f"unknown enum in {name}")
+                validate_enum_width(name, enums[field["enum"]], 8 * field_width(field))
+            if field["type"] == "repeated_schema":
+                require(
+                    field["schema"]
+                    in {"settings", "cpu_profile_info", "rate_profile_info"},
+                    "nested schema must be a leaf record",
+                )
+    settings_fields = schemas["settings"]["fields"]
+    require(
+        [(f["name"], f["type"], f["offset"]) for f in settings_fields]
+        == [
+            (name, "u8", i)
+            for i, name in enumerate(
+                (
+                    "stream_mask",
+                    "source",
+                    "checksum_algorithm",
+                    "wire_version",
+                    "cpu_profile",
+                    "rate_profile",
+                    "aux_bank_mode",
+                    "gpio_width_bits",
+                    "gpio_policy",
+                    "adc_policy",
+                    "adc_resolution_bits",
+                    "reserved",
+                )
+            )
+        ]
+        + [("adc_pair_rate_hz", "u32", 12), ("gpio_sample_rate_hz", "u32", 16)],
+        "settings wire layout changed",
+    )
+    for name, count in (
+        ("cpu_profiles", 2),
+        ("rate_profiles", 1),
+        ("configurations", 64),
+    ):
+        field = next(
+            f for f in schemas["capabilities_response"]["fields"] if f["name"] == name
+        )
+        require(field["count"] == count, f"{name} capacity mismatch")
+    expected_cpus = [
+        {
+            "cpu_profile": i,
+            "cpu_clock_hz": hz,
+            "ipg_clock_hz": 150_000_000,
+            "adc_clock_hz": 37_500_000,
+            "pit_clock_hz": 24_000_000,
+            "timestamp_hz": 8_000_000,
+        }
+        for i, hz in ((1, 600_000_000), (2, 450_000_000))
+    ]
+    require(contract["cpu_profiles"] == expected_cpus, "invalid CPU clock definitions")
+    require(
+        contract["rate_profiles"]
+        == [
+            dict(
+                rate_profile=4,
+                **{k: v for k, v in timing.items() if k != "timestamp_hz"},
+            )
+        ],
+        "invalid rate definitions",
+    )
+    configurations = contract["selectable_configurations"]
+    require(
+        0 < len(configurations) <= limits["max_configuration_tuples"],
+        "configuration count out of bounds",
+    )
+    encoded_configurations = set()
+    for settings in configurations:
+        for field in settings_fields:
+            if "required" in field:
+                continue
+            value = settings[field["name"]]
+            allowed = field.get("allowed")
+            if "enum" in field:
+                allowed = list(enum_map(enums[field["enum"]]).values())
+            require(
+                allowed is not None and value in allowed,
+                f"invalid setting {field['name']}",
+            )
+        require(
+            settings["gpio_width_bits"]
+            == (8 if settings["aux_bank_mode"] == 0 else 16),
+            "GPIO width/mode contradiction",
+        )
+        require(
+            settings["cpu_profile"] == 1
+            or (settings["gpio_policy"] == settings["adc_policy"] == 0),
+            "compression requires 600 MHz",
+        )
+        encoded = encode_schema_payload(contract, "settings", settings)
+        require(
+            encoded not in encoded_configurations, "duplicate selectable configuration"
+        )
+        encoded_configurations.add(encoded)
+    defaults = contract["defaults"]
+    require(
+        defaults
+        == {
+            "stream_mask": 3,
+            "source": 0,
+            "checksum_algorithm": 1,
+            "wire_version": 3,
+            "cpu_profile": 1,
+            "rate_profile": 4,
+            "aux_bank_mode": 0,
+            "gpio_width_bits": 8,
+            "gpio_policy": 1,
+            "adc_policy": 1,
+            "adc_resolution_bits": 12,
+            "adc_pair_rate_hz": 1_000_000,
+            "gpio_sample_rate_hz": 1_000_000,
+        },
+        "board defaults changed",
+    )
+    require(
+        encode_schema_payload(contract, "settings", defaults) in encoded_configurations,
+        "defaults not selectable",
+    )
+    for cpu in (1, 2):
+        require(
+            any(
+                s["cpu_profile"] == cpu and s["gpio_policy"] == s["adc_policy"] == 0
+                for s in configurations
+            ),
+            "RAW settings required at both clocks",
+        )
+
+    commands = enum_map(contract["command_kinds"])
+    require(
+        commands
+        == {
+            "INFO": 16,
+            "CONFIGURE": 17,
+            "START": 18,
+            "GET_STATUS": 19,
+            "STOP": 20,
+            "GET_CAPABILITIES": 28,
+            "GET_SETTINGS": 29,
+        },
+        "command IDs changed",
+    )
+    old_ids = {
+        entry["value"]
+        for old in (v1_contract, v2_contract)
+        for entry in old["frame_kinds"]
+    }
+    require(
+        not (old_ids & {28, 29, 156, 157}),
+        "new command IDs collide with legacy definitions",
+    )
+    kinds = enum_map(contract["frame_kinds"])
+    require(
+        kinds
+        == {
+            "ADC_DATA": 1,
+            "GPIO_DATA": 2,
+            "ERROR_RESPONSE": 159,
+            **{n + "_REQUEST": v for n, v in commands.items()},
+            **{n + "_RESPONSE": v + 128 for n, v in commands.items()},
+        },
+        "frame IDs changed",
+    )
+    by_name = {k["name"]: k for k in contract["frame_kinds"]}
+    response_schemas = {
+        "INFO": "info_response",
+        "CONFIGURE": "settings_response",
+        "START": "settings_response",
+        "GET_STATUS": "status_response",
+        "STOP": "stop_response",
+        "GET_CAPABILITIES": "capabilities_response",
+        "GET_SETTINGS": "settings_response",
+    }
+    for cmd in contract["command_kinds"]:
+        name = cmd["name"]
+        require(
+            cmd["request_kind"] == name + "_REQUEST"
+            and cmd["response_kind"] == name + "_RESPONSE",
+            "command correlation mismatch",
+        )
+        request = by_name[cmd["request_kind"]]
+        response = by_name[cmd["response_kind"]]
+        require(
+            request["class"] == "request"
+            and request["response_kind"] == cmd["response_kind"]
+            and request["allowed_flags"] == [],
+            "request semantics changed",
+        )
+        require(
+            request["payload_schema"]
+            == ("configure_request" if name == "CONFIGURE" else "empty"),
+            "request payload changed",
+        )
+        require(
+            response["class"] == "response"
+            and response["payload_schema"] == response_schemas[name]
+            and response["error_payload_schema"] == "response_prefix"
+            and response["allowed_flags"] == ["RESPONSE_ERROR"],
+            "response semantics changed",
+        )
+        require(
+            schemas[response["payload_schema"]]["size"] + 48
+            <= limits["max_control_frame_bytes"],
+            "response exceeds bound",
+        )
+    fixtures = contract["golden_fixtures"]
+    names = [f["name"] for f in fixtures]
+    require(len(names) == len(set(names)), "duplicate fixture name")
+    require(
+        all(Path(n).name == n and n not in {"", ".", ".."} for n in names),
+        "invalid fixture path",
+    )
+    require(
+        {f["kind"] for f in fixtures} == set(kinds),
+        "fixtures must cover every frame kind",
+    )
+    require(
+        set(contract["error_semantics"]) == set(enum_map(enums["error_code"])),
+        "every error must have semantics",
+    )
+    for fixture in fixtures:
+        if by_name[fixture["kind"]]["class"] != "data":
+            validate_v3_control_fixture(contract, fixture)
+    build_golden_frames(contract)
+
+
+def validate_v3_control_fixture(
+    contract: Mapping[str, Any], fixture: Mapping[str, Any]
+) -> None:
+    """Check semantic golden metadata, including zero-filled unused table slots."""
+    schemas = contract["payload_schemas"]
+    payload_spec = fixture["payload"]
+    schema_name = payload_spec["schema"]
+    values = payload_spec["values"]
+
+    def check_record(name: str, record: Mapping[str, Any]) -> None:
+        for field in schemas[name]["fields"]:
+            if "required" in field:
+                continue
+            value = record[field["name"]]
+            allowed = field.get("allowed")
+            if "enum" in field:
+                allowed = list(enum_map(contract["enums"][field["enum"]]).values())
+            if allowed is not None and value not in allowed:
+                raise ContractError(f"v3 fixture invalid {name}.{field['name']}")
+            if field["type"] == "nul_ascii" and (
+                not value or any(not 32 <= ord(c) < 127 for c in value)
+            ):
+                raise ContractError("v3 fixture invalid identity text")
+            if field["type"] == "repeated_schema":
+                table = field["name"]
+                count_name = {
+                    "cpu_profiles": "cpu_profile_count",
+                    "rate_profiles": "rate_profile_count",
+                    "configurations": "configuration_count",
+                }.get(table)
+                count = int(record[count_name]) if count_name else int(field["count"])
+                if not 1 <= count <= int(field["count"]):
+                    raise ContractError("v3 fixture table count exceeds bound")
+                for index, item in enumerate(value):
+                    if index < count:
+                        check_record(field["schema"], item)
+                    elif any(encode_schema_payload(contract, field["schema"], item)):
+                        raise ContractError(
+                            "v3 fixture unused table slots must be zero"
+                        )
+        if name == "settings" and record not in contract["selectable_configurations"]:
+            raise ContractError("v3 fixture settings are not selectable")
+        if name == "cpu_profile_info" and record not in contract["cpu_profiles"]:
+            raise ContractError("v3 fixture unknown clock definition")
+        if name == "rate_profile_info" and record not in contract["rate_profiles"]:
+            raise ContractError("v3 fixture unknown rate definition")
+
+    check_record(schema_name, values)
+    if "response_status" in values:
+        error = "RESPONSE_ERROR" in fixture.get("flags", [])
+        if (values["response_status"] == 1) != error or (
+            values["error_code"] != 0
+        ) != error:
+            raise ContractError("v3 fixture response prefix/flag mismatch")
+    if schema_name == "settings_response" and (
+        values["settings"][0]["cpu_profile"] != values["clocks"][0]["cpu_profile"]
+    ):
+        raise ContractError("v3 fixture active clock mismatch")
+    if (
+        schema_name == "info_response"
+        and values["simulated"]
+        and not values["hardware_serial"].startswith("SIM-")
+    ):
+        raise ContractError("v3 fixture simulator identity mismatch")
+    if schema_name == "capabilities_response":
+        for field, source, count_field in (
+            ("cpu_profiles", "cpu_profiles", "cpu_profile_count"),
+            ("rate_profiles", "rate_profiles", "rate_profile_count"),
+            ("configurations", "selectable_configurations", "configuration_count"),
+        ):
+            if values[field][: values[count_field]] != contract[source]:
+                raise ContractError(
+                    "v3 fixture capability table differs from canonical definitions"
+                )
+        if values["defaults"] != [contract["defaults"]]:
+            raise ContractError("v3 fixture defaults mismatch")
+        for field in schemas[schema_name]["fields"]:
+            if (
+                field["name"].startswith("max_")
+                and values[field["name"]] != contract["limits"][field["name"]]
+            ):
+                raise ContractError("v3 fixture advertised limit mismatch")
+    if schema_name in {"stop_response", "status_response"}:
+        state, pending = values["state"], values["pending_frames"]
+        if (state == 1 and pending != 0) or (state == 4 and pending == 0):
+            raise ContractError("v3 fixture state/drain mismatch")
+        if values["run_id"] != fixture.get("run_id", 0):
+            raise ContractError("v3 fixture run ID mismatch")
+        if schema_name == "status_response":
+            for stream in ("adc", "gpio"):
+                for unit in ("items", "frames"):
+                    if (
+                        values[f"{stream}_{unit}_dropped"]
+                        > values[f"{stream}_{unit}_produced"]
+                    ):
+                        raise ContractError("v3 fixture dropped exceeds produced")
+
+
+def v3_scalar_constants(contract: Mapping[str, Any]) -> dict[str, int]:
+    """Share sizes/offsets/bounds between the two v3 language renderers."""
+    result = {
+        "MAGIC": int(contract["magic"]),
+        "PROTOCOL_VERSION": 3,
+        "HEADER_SIZE": 44,
+        "TRAILER_SIZE": 4,
+    }
+    result.update(
+        {
+            k.upper(): int(v)
+            for group in ("limits", "timing")
+            for k, v in contract[group].items()
+        }
+    )
+    for field in contract["header"]["fields"]:
+        result[f"HEADER_{field['name'].upper()}_OFFSET"] = int(field["offset"])
+    for name, schema in contract["payload_schemas"].items():
+        result[f"{name.upper()}_PAYLOAD_SIZE"] = int(schema["size"])
+        for field in schema["fields"]:
+            prefix = f"{name.upper()}_{field['name'].upper()}"
+            result[prefix + "_OFFSET"] = int(field["offset"])
+            if "count" in field:
+                result[prefix + "_COUNT"] = int(field["count"])
+    return result
+
+
+def v3_enum_specs(
+    contract: Mapping[str, Any],
+) -> list[tuple[str, Sequence[Mapping[str, Any]]]]:
+    return [
+        ("FrameKind", contract["frame_kinds"]),
+        ("CommandKind", contract["command_kinds"]),
+        ("FrameFlag", contract["flags"]),
+        ("ChecksumAlgorithm", contract["checksum_algorithms"]),
+    ] + [(snake_to_pascal(k), v) for k, v in contract["enums"].items()]
+
+
+def v3_record_tables(contract: Mapping[str, Any]) -> dict[str, list[bytes]]:
+    return {
+        name: [encode_schema_payload(contract, schema, record) for record in records]
+        for name, schema, records in (
+            ("DEFAULT_SETTINGS", "settings", [contract["defaults"]]),
+            ("CPU_PROFILES", "cpu_profile_info", contract["cpu_profiles"]),
+            ("RATE_PROFILES", "rate_profile_info", contract["rate_profiles"]),
+            (
+                "SELECTABLE_CONFIGURATIONS",
+                "settings",
+                contract["selectable_configurations"],
+            ),
+        )
+    }
+
+
+def render_python_v3(contract: Mapping[str, Any], source_sha256: str) -> bytes:
+    lines = [
+        '"""Generated public protocol-v3 constants. Do not edit by hand.',
+        "",
+        "Source: protocol/protocol-v3.json",
+        f"Source SHA-256: {source_sha256}",
+        '"""',
+        "",
+        "from enum import IntEnum, IntFlag",
+        "",
+        f'SOURCE_SHA256 = "{source_sha256}"',
+        'BYTE_ORDER = "little"',
+        "",
+    ]
+    lines.extend(f"{k} = {v}" for k, v in v3_scalar_constants(contract).items())
+    lines.extend(["", ""])
+    for name, entries in v3_enum_specs(contract):
+        lines.extend(
+            python_enum(
+                name,
+                entries,
+                base="IntFlag" if name in {"FrameFlag", "StreamMask"} else "IntEnum",
+            )
+        )
+    for name, schema in {
+        "header": contract["header"],
+        **contract["payload_schemas"],
+    }.items():
+        fmt = "<" + "".join(
+            INTEGER_FORMATS[f["type"]]
+            if f["type"] in INTEGER_FORMATS
+            else f"{field_width(f, contract['payload_schemas'])}s"
+            for f in schema["fields"]
+        )
+        lines.append(f'{name.upper()}_STRUCT_FORMAT = "{fmt}"')
+    lines.extend(["", "# Wire records; decode using the schema formats/offsets above."])
+    for name, records in v3_record_tables(contract).items():
+        if len(records) == 1:
+            lines.append(f'{name} = (bytes.fromhex("{records[0].hex()}"),)')
+            continue
+        lines.append(f"{name} = (")
+        lines.extend(f'    bytes.fromhex("{record.hex()}"),' for record in records)
+        lines.append(")")
+    lines.extend(["", "COMMAND_RESPONSE_KINDS = {"])
+    lines.extend(
+        f"    CommandKind.{c['name']}: FrameKind.{c['response_kind']},"
+        for c in contract["command_kinds"]
+    )
+    lines.extend(["}", ""])
+    return "\n".join(lines).encode()
+
+
+def render_cpp_v3(contract: Mapping[str, Any], source_sha256: str) -> bytes:
+    lines = [
+        "// Generated public protocol-v3 constants. Do not edit by hand.",
+        "// Source: protocol/protocol-v3.json",
+        f"// Source SHA-256: {source_sha256}",
+        "#pragma once",
+        "",
+        "#include <cstdint>",
+        "",
+        "namespace thingdaq::protocol_v3 {",
+        "",
+        f'inline constexpr char kSourceSha256[] = "{source_sha256}";',
+        "inline constexpr bool kWireIsLittleEndian = true;",
+    ]
+    lines.extend(
+        f"inline constexpr std::uint32_t k{snake_to_pascal(k)} = {v}U;"
+        for k, v in v3_scalar_constants(contract).items()
+    )
+    lines.append("")
+    for name, entries in v3_enum_specs(contract):
+        bits = 16 if name in {"FrameFlag", "ErrorCode", "BoardId", "McuId"} else 8
+        lines.extend(cpp_enum(name, f"std::uint{bits}_t", entries))
+    for name, records in v3_record_tables(contract).items():
+        lines.append(
+            f"inline constexpr std::uint8_t k{snake_to_pascal(name)}[][{len(records[0])}] = {{"
+        )
+        lines.extend(
+            "  {" + ", ".join(f"{b}U" for b in record) + "}," for record in records
+        )
+        lines.extend(["};", ""])
+    lines.extend(["}  // namespace thingdaq::protocol_v3", ""])
+    return "\n".join(lines).encode()
+
+
+def validate_v3_data_fixture(
+    contract: Mapping[str, Any], fixture: Mapping[str, Any], payload: bytes
+) -> None:
+    """Validate hand-authored sample bytes independently of runtime codecs."""
+    prefix = fixture["payload"]["prefix"]
+    count, width, runs, encoding = (
+        int(fixture["item_count"]),
+        int(prefix["item_bytes"]),
+        int(prefix["run_count"]),
+        int(prefix["encoding"]),
+    )
+    adc = fixture["kind"] == "ADC_DATA"
+    settings = fixture["settings"]
+    if settings not in contract["selectable_configurations"]:
+        raise ContractError("v3 data fixture settings are not selectable")
+    if not settings["stream_mask"] & (1 if adc else 2):
+        raise ContractError("v3 data fixture uses a disabled stream")
+    if ("SYNTHETIC" in fixture.get("flags", [])) != (settings["source"] == 1):
+        raise ContractError("v3 data fixture source flag mismatch")
+    if adc and encoding != (2 if settings["adc_policy"] == 1 else 0):
+        raise ContractError("v3 data fixture ADC policy mismatch")
+    if not adc and (
+        width * 8 != settings["gpio_width_bits"]
+        or (encoding == 1 and settings["gpio_policy"] != 1)
+    ):
+        raise ContractError("v3 data fixture GPIO width/policy mismatch")
+    if (adc and width != 4) or (not adc and width not in (1, 2)):
+        raise ContractError("v3 fixture invalid logical width")
+    if not 1 <= count <= 4048 // width or prefix["decoded_bytes"] != count * width:
+        raise ContractError("v3 fixture logical count exceeds bound or disagrees")
+    samples = payload[12:]
+    if encoding == 0:
+        if runs != 0 or len(samples) != count * width:
+            raise ContractError("v3 RAW fixture length/run count mismatch")
+        decoded = samples
+        if adc and any(value[0] > 4095 for value in struct.iter_unpack("<H", samples)):
+            raise ContractError("v3 RAW ADC fixture exceeds 12 bits")
+    elif encoding == 2 and adc:
+        if runs != 0 or len(samples) != count * 3:
+            raise ContractError("v3 PACK12 fixture length/run count mismatch")
+        decoded = b"".join(
+            struct.pack("<HH", a | ((b & 15) << 8), (b >> 4) | (c << 4))
+            for a, b, c in struct.iter_unpack("BBB", samples)
+        )
+    elif encoding == 1 and not adc:
+        if (
+            not 1 <= runs <= count
+            or len(samples) != runs * (2 + width)
+            or len(samples) >= count * width
+        ):
+            raise ContractError("v3 RLE fixture length/run count/profit mismatch")
+        output = bytearray()
+        previous = None
+        for offset in range(0, len(samples), 2 + width):
+            length = int.from_bytes(samples[offset : offset + 2], "little")
+            value = samples[offset + 2 : offset + 2 + width]
+            if (
+                length == 0
+                or len(output) + length * width > count * width
+                or value == previous
+            ):
+                raise ContractError("v3 RLE fixture invalid run")
+            output.extend(value * length)
+            previous = value
+        decoded = bytes(output)
+    else:
+        raise ContractError("v3 fixture encoding-kind mismatch")
+    if (
+        len(decoded) != count * width
+        or decoded.hex() != fixture["payload"]["decoded_hex"]
+    ):
+        raise ContractError("v3 fixture decoded samples mismatch")
+
+
+def expected_v3_outputs(
+    contract: Mapping[str, Any], source_bytes: bytes
+) -> dict[Path, bytes]:
+    """Emit separate v3 constants and source-hashed wire vectors."""
+    source_hash = hashlib.sha256(source_bytes).hexdigest()
+    fixture_outputs, entries = build_golden_frames(contract)
+    generated = contract["generated_outputs"]
+    manifest = {
+        "byte_order": "little",
+        "protocol_version": 3,
+        "generator": "tools/generate_protocol.py",
+        "source": "protocol/protocol-v3.json",
+        "source_sha256": source_hash,
+        "fixtures": entries,
+    }
+    outputs = {
+        REPOSITORY_ROOT / generated["python_constants"]: render_python_v3(
+            contract, source_hash
+        ),
+        REPOSITORY_ROOT / generated["cpp_constants"]: render_cpp_v3(
+            contract, source_hash
+        ),
+        REPOSITORY_ROOT / generated["fixture_manifest"]: (
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+        ).encode(),
+    }
+    outputs.update(
+        {
+            REPOSITORY_ROOT / generated["fixture_directory"] / name: data
+            for name, data in fixture_outputs.items()
+        }
+    )
+    return outputs
 
 
 def snake_to_pascal(name: str) -> str:
@@ -2478,6 +3187,10 @@ def encode_fixture_payload(
     """Build a golden payload from a schema or deterministic data pattern."""
 
     payload_spec = fixture["payload"]
+    if int(contract["protocol_version"]) == 3 and "prefix" in payload_spec:
+        return encode_schema_payload(
+            contract, "data_prefix", payload_spec["prefix"]
+        ) + bytes.fromhex(payload_spec["sample_hex"])
     pattern = payload_spec.get("pattern")
     if pattern == "adc_interleaved_ramp":
         layout_name = (
@@ -2918,6 +3631,15 @@ def build_golden_frames(
                         else "gpio_sample_period_ticks"
                     ]
                 )
+            elif int(contract["protocol_version"]) == 3:
+                validate_v3_data_fixture(contract, fixture, payload)
+                expected_total_length = total_length
+                expected_item_count = item_count
+                period_ticks = int(contract["timing"]["adc_pair_period_ticks"])
+                if total_length > int(limits["max_data_frame_bytes"]) or run_id == 0:
+                    raise ContractError(
+                        "v3 data fixture exceeds wire bound or has zero run ID"
+                    )
             else:
                 mode_name = str(fixture.get("aux_bank_mode", ""))
                 profile_name = str(fixture.get("rate_profile", ""))
@@ -3027,6 +3749,10 @@ def build_golden_frames(
         }
         if len(frame) <= 256:
             manifest_entry["frame_hex"] = frame.hex()
+        if int(contract["protocol_version"]) == 3 and kind_spec["class"] == "data":
+            manifest_entry.update(fixture["payload"]["prefix"])
+            manifest_entry["decoded_hex"] = fixture["payload"]["decoded_hex"]
+            manifest_entry["settings"] = fixture["settings"]
         if int(contract["protocol_version"]) == 2:
             manifest_entry["expectation"] = str(fixture.get("expectation", "accept"))
             for key in (
@@ -3211,7 +3937,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--protocol",
-        choices=("all", "v1", "v2"),
+        choices=("all", "v1", "v2", "v3"),
         default="all",
         help="select generated protocol outputs (default: all)",
     )
@@ -3237,7 +3963,23 @@ def main() -> int:
                     v2_contract,
                     v2_source_bytes,
                 )
-    except (ContractError, KeyError, TypeError, json.JSONDecodeError) as error:
+            if args.protocol in {"all", "v3"}:
+                v3_contract, v3_source_bytes = load_contract(V3_SOURCE_PATH)
+                validate_v3_contract(
+                    v3_contract,
+                    v1_contract,
+                    v1_source_bytes,
+                    v2_contract,
+                    v2_source_bytes,
+                )
+                v3_outputs = expected_v3_outputs(v3_contract, v3_source_bytes)
+                overlap = set(outputs) & set(v3_outputs)
+                if overlap:
+                    raise ContractError("v3 output paths overlap legacy outputs")
+                outputs = (
+                    v3_outputs if args.protocol == "v3" else {**outputs, **v3_outputs}
+                )
+    except (ValueError, KeyError, TypeError, struct.error) as error:
         print(f"Invalid protocol contract: {error}", file=sys.stderr)
         return 2
     if args.check:
