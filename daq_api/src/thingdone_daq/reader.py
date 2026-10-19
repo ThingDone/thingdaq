@@ -171,6 +171,14 @@ class ReaderCounters:
     gpio_item_queue_drops: int = 0
     queued_loss_reports: int = 0
     loss_report_queue_drops: int = 0
+    # Validated data frames, including later stale/boundary/queue discards.
+    # Wire bytes include the header, encoding prefix, and checksum trailer.
+    adc_items_received: int = 0
+    gpio_items_received: int = 0
+    adc_decoded_bytes_received: int = 0
+    gpio_decoded_bytes_received: int = 0
+    adc_wire_bytes_received: int = 0
+    gpio_wire_bytes_received: int = 0
 
 
 @dataclass(slots=True)
@@ -267,12 +275,19 @@ class BackgroundReader:
         self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
         self._active_configuration: DAQConfiguration | None = None
         self._active_v3_settings: V3Settings | None = None
+        self._selected_wire_version: int | None = None
         self._stream_active = False
         self._thread: Thread | None = None
         self._started = False
         self._closed = False
         self._terminal_error: ReaderError | None = None
 
+        self._adc_items_received = 0
+        self._adc_decoded_bytes_received = 0
+        self._adc_wire_bytes_received = 0
+        self._gpio_items_received = 0
+        self._gpio_decoded_bytes_received = 0
+        self._gpio_wire_bytes_received = 0
         self._bytes_read = 0
         self._read_calls = 0
         self._frames_received = 0
@@ -363,6 +378,12 @@ class BackgroundReader:
     def counters(self) -> ReaderCounters:
         with self._condition:
             return ReaderCounters(
+                adc_items_received=self._adc_items_received,
+                adc_decoded_bytes_received=self._adc_decoded_bytes_received,
+                adc_wire_bytes_received=self._adc_wire_bytes_received,
+                gpio_items_received=self._gpio_items_received,
+                gpio_decoded_bytes_received=self._gpio_decoded_bytes_received,
+                gpio_wire_bytes_received=self._gpio_wire_bytes_received,
                 bytes_read=self._bytes_read,
                 read_calls=self._read_calls,
                 frames_received=self._frames_received,
@@ -688,6 +709,8 @@ class BackgroundReader:
             constants.DEFAULT_CHECKSUM_ALGORITHM
         ),
         configuration: DAQConfiguration | None = None,
+        *,
+        protocol_version: int | None = None,
     ) -> None:
         """Establish an externally learned run identity and clear old blocks."""
 
@@ -707,6 +730,15 @@ class BackgroundReader:
             raise TypeError("configuration must be DAQConfiguration or None")
         with self._condition:
             self._require_live_locked()
+            selected_version = (
+                (configuration.protocol_version if configuration is not None else 1)
+                if protocol_version is None
+                else protocol_version
+            )
+            if isinstance(selected_version, bool) or selected_version not in (1, 2):
+                raise ValueError("legacy run protocol_version must be 1 or 2")
+            self._selected_wire_version = selected_version
+            self._active_v3_settings = None
             self._activate_run_locked(run_id, selected_checksum, configuration)
 
     def activate_v3_run(self, run_id: int, settings: V3Settings) -> None:
@@ -714,6 +746,7 @@ class BackgroundReader:
         with self._condition:
             self._require_live_locked()
             self._active_v3_settings = settings
+            self._selected_wire_version = 3
             self._activate_run_locked(
                 run_id, constants.ChecksumAlgorithm(settings.checksum_algorithm)
             )
@@ -859,6 +892,16 @@ class BackgroundReader:
                     return
                 try:
                     message: DecodedMessage | V3Response
+                    if (
+                        frame.header.kind
+                        in (
+                            constants.FrameKind.ADC_DATA,
+                            constants.FrameKind.GPIO_DATA,
+                        )
+                        and self._selected_wire_version is not None
+                        and frame.header.version != self._selected_wire_version
+                    ):
+                        raise ReaderProtocolError("unnegotiated data wire version")
                     if isinstance(frame, V3Frame):
                         if frame.header.kind in (
                             v3_constants.FrameKind.ADC_DATA,
@@ -872,17 +915,6 @@ class BackgroundReader:
                         else:
                             message = decode_v3_response(frame)
                     else:
-                        if (
-                            self._active_v3_settings is not None
-                            and frame.header.kind
-                            in (
-                                constants.FrameKind.ADC_DATA,
-                                constants.FrameKind.GPIO_DATA,
-                            )
-                        ):
-                            raise ReaderProtocolError(
-                                "wire version changed during v3 run"
-                            )
                         message = decode_message(
                             frame, configuration=self._active_configuration
                         )
@@ -918,6 +950,7 @@ class BackgroundReader:
                     response.ok
                     and response.kind == constants.FrameKind.STOP_RESPONSE
                     and response.run_id == self._active_run_id
+                    and wire_version == self._selected_wire_version
                 ):
                     self._deactivate_stream_locked()
                 return
@@ -968,6 +1001,11 @@ class BackgroundReader:
             else:
                 pending.response = response
                 self._responses_matched += 1
+                if response.ok and response.kind in (
+                    constants.FrameKind.CONFIGURE_RESPONSE,
+                    constants.FrameKind.START_RESPONSE,
+                ):
+                    self._selected_wire_version = wire_version
                 if response.ok and response.kind == constants.FrameKind.START_RESPONSE:
                     if isinstance(response.value, V3AppliedSettings):
                         self._active_v3_settings = response.value.settings
@@ -980,6 +1018,7 @@ class BackgroundReader:
                         )
                         pending.error = protocol_error
                     else:
+                        self._active_v3_settings = None
                         self._activate_run_locked(
                             response.run_id,
                             response.value.data_checksum_algorithm,
@@ -1000,8 +1039,14 @@ class BackgroundReader:
         with self._condition:
             if isinstance(block, AdcBlock):
                 self._adc_frames_received += 1
+                self._adc_items_received += block.item_count
+                self._adc_decoded_bytes_received += block.decoded_bytes
+                self._adc_wire_bytes_received += block.wire_bytes
             else:
                 self._gpio_frames_received += 1
+                self._gpio_items_received += block.item_count
+                self._gpio_decoded_bytes_received += block.decoded_bytes
+                self._gpio_wire_bytes_received += block.wire_bytes
             if not self._stream_active or block.run_id != self._active_run_id:
                 self._stale_blocks_discarded += 1
                 if isinstance(block, AdcBlock):

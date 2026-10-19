@@ -6031,8 +6031,12 @@ def _validate_v3_block_payload(
     item_bytes: int,
     profile: RateProfile,
     first_sample_ticks: int,
+    checksum_algorithm: constants.ChecksumAlgorithm,
 ) -> None:
     from .protocol_v3 import decode_data_payload
+
+    if checksum_algorithm != constants.ChecksumAlgorithm.ADLER32:
+        raise ValueError("protocol-v3 blocks require Adler-32")
 
     if profile != RateProfile(v3_constants.RateProfile.ADC_1MHZ_GPIO_1MHZ):
         raise ValueError("protocol-v3 blocks require the 1 MHz rate profile")
@@ -6127,6 +6131,7 @@ class ADCBlock:
                 4,
                 profile,
                 self.first_sample_ticks,
+                checksum,
             )
         elif self.encoded_payload is not None:
             raise ValueError("encoded_payload is only valid for protocol-v3 blocks")
@@ -6241,6 +6246,16 @@ class ADCBlock:
             aux_bank_mode=configuration.aux_bank_mode,
             rate_profile=configuration.rate_profile,
             protocol_version=v2_constants.PROTOCOL_VERSION,
+        )
+
+    @property
+    def encoding(self) -> v3_constants.Encoding:
+        """Actual encoding of this frame, distinct from the selected policy."""
+
+        return (
+            v3_constants.Encoding.RAW
+            if self.encoded_payload is None
+            else v3_constants.Encoding(self.encoded_payload[0])
         )
 
     @property
@@ -6586,6 +6601,7 @@ class GPIOBlock:
                 layout.item_bytes,
                 profile,
                 self.first_sample_ticks,
+                checksum,
             )
         elif self.encoded_payload is not None:
             raise ValueError("encoded_payload is only valid for protocol-v3 blocks")
@@ -6643,6 +6659,16 @@ class GPIOBlock:
             aux_bank_mode=configuration.aux_bank_mode,
             rate_profile=configuration.rate_profile,
             protocol_version=v2_constants.PROTOCOL_VERSION,
+        )
+
+    @property
+    def encoding(self) -> v3_constants.Encoding:
+        """Actual encoding of this frame, distinct from the selected policy."""
+
+        return (
+            v3_constants.Encoding.RAW
+            if self.encoded_payload is None
+            else v3_constants.Encoding(self.encoded_payload[0])
         )
 
     @property

@@ -219,7 +219,7 @@ Important properties and methods:
 | Member | Meaning |
 | --- | --- |
 | `run_id`, `sequence`, `first_sample_ticks`, `flags` | Wire identity and continuity |
-| `item_count` | 1,012 converter pairs |
+| `item_count` | Logical converter-pair count; v3 permits short frames |
 | `adc0`, `adc1` | Lazy unchanged raw-code views for A0/A1 |
 | `pair(i)` / `pairs()` | One or all `(ADC0, ADC1)` pairs |
 | `pair_ticks(i)` / `pair_seconds(i)` | Nominal ADC0/ADC1 times |
@@ -242,15 +242,36 @@ Important properties and methods:
 | Member | Meaning |
 | --- | --- |
 | `run_id`, `sequence`, `first_sample_ticks`, `flags` | Wire identity and continuity |
-| `item_count` | 4,048 packed snapshots |
+| `item_count` | Logical simultaneous-sample count; independent of compression |
 | `samples` / `payload_view` | Read-only packed-byte view |
-| `sample(i)` | One packed D6-D13 byte |
-| `sample_ticks(i)` / `sample_seconds(i)` | Nominal time at `t0 + 2i` ticks |
-| `channel(pin)` | Lazy Boolean view for exactly one D6-D13 pin |
+| `sample(i)` | One packed primary byte or primary+auxiliary 16-bit word |
+| `sample_ticks(i)` / `sample_seconds(i)` | Nominal time at `t0 + i * sample_period_ticks` |
+| `channel(pin)` | Lazy Boolean view for one enabled pin |
 | `as_numpy()` | Optional zero-copy packed array and selected-channel operations |
 
 The bit map is fixed: D6 through D13 occupy bits 0 through 7. There is no eager
-eight-channel expansion.
+eight-channel expansion. With auxiliary INPUT enabled, D16-D23 occupy bits 8-15.
+V3 GPIO uses an 8-tick period; ADC pairs retain an 8-tick period and 4-tick ADC1
+phase. Tick zero is the START epoch, independent of payload compression.
+
+Both block types expose `encoding` (actual `V3Encoding`), `decoded_bytes`,
+`encoded_sample_bytes` (excluding the v3 prefix), and `wire_bytes` (complete
+header/prefix/samples/checksum). `payload` and optional NumPy views always use
+immutable decoded storage. RLE_AUTO permits interleaved RAW and RLE frames;
+ADC PACK12 requires PACK12 frames. V3 supports Adler-32; v1/v2 retain all their
+supported data checksums. Unexpected versions or policies terminate the reader.
+
+`daq.reader_counters` exposes per-stream `adc_*_received` / `gpio_*_received`
+totals for `frames`, `items`, `decoded_bytes`, and `wire_bytes`. These count
+validated received data, including subsequent queue, boundary, and stale-run
+discards. Subtract snapshots and divide wire bytes by elapsed seconds for data
+bandwidth; `bytes_read` also includes control traffic and rejected bytes. STOP
+tails remain decoded/accounted and discarded; a new START resets the sample
+epoch. Reader counters are lifetime totals.
+
+The current `TimestampAligner` still rejects the equal-rate profile, including
+v3. ADC/GPIO sequence numbers do not identify matching time coverage; consume
+blocks using their per-sample timestamps.
 
 ## Calibration
 
@@ -288,7 +309,7 @@ convenience form.
 
 ## STATUS, loss, and reconciliation
 
-`daq.status()` returns the full immutable firmware `Status`. Its nested
+For v1/v2, `daq.status()` returns the full immutable firmware `Status`. Its nested
 `counters`/ADC evidence expose per-source acquisition, framing, transmission,
 drop, queue, parser, transport, lifecycle, and diagnostic values.
 
@@ -304,6 +325,23 @@ drop, queue, parser, transport, lifecycle, and diagnostic values.
 returns a detailed `RunCounterReconciliation` with conservation equations and
 fault snapshot. Applications should inspect both live events and cumulative
 counters.
+
+V3 returns `V3Status`, with produced/dropped frame and logical-item counts plus
+pending drain frames. `reconcile_run_counters()` and `snapshot_firmware_faults()`
+accept it directly and use its run ID; `stats_generation` is `None` because v3
+has no such field. Reconciliation checks dropped counts against produced counts
+and pending frames against undropped production. It cannot prove transmission
+or DMA conservation from telemetry v3 does not advertise, and never infers wire
+bytes from logical items. `loss_counters(refresh=False)` retains the latest v3
+status evidence until the next START; a fresh START clears that cache.
+
+`run_synthetic_soak()` also accepts v3 sessions, preserving the selected clock,
+width, and encoding policies while selecting synthetic input and requested
+streams. `StreamRateMetrics.item_count` and `decoded_bytes` sum validated block
+contents; `payload_bytes` includes the v3 encoding prefix, and `framed_bytes`
+counts full wire frames. Final v3 reconciliation compares drained, undropped
+production against received frames and host discards. Unadvertised firmware
+emitted-frame/parser/transport counters in the result are `None`.
 
 ## Exceptions
 

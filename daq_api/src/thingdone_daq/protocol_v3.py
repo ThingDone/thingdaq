@@ -1,7 +1,7 @@
 """Bounded public-v3 framing and lossless sample codecs.
 
-This module is opt-in; production serial negotiation remains unchanged. Payloads
-retain transmitted bytes, while ``decode_v3_block`` supplies ordinary block views.
+Payloads retain transmitted bytes, while ``decode_v3_block`` supplies ordinary
+block views after the session negotiates v3.
 """
 
 from __future__ import annotations
@@ -23,6 +23,9 @@ if TYPE_CHECKING:
 
 _HEADER = struct.Struct(c.HEADER_STRUCT_FORMAT)
 _PREFIX = struct.Struct(c.DATA_PREFIX_STRUCT_FORMAT)
+_LOW_NIBBLE = bytes(i & 15 for i in range(256))
+_HIGH_NIBBLE = bytes(i >> 4 for i in range(256))
+_LOW_NIBBLE_SHIFT = bytes((i & 15) << 4 for i in range(256))
 _DATA_KINDS = {c.FrameKind.ADC_DATA, c.FrameKind.GPIO_DATA}
 _REQUEST_KINDS = {c.FrameKind(int(kind)) for kind in c.CommandKind}
 _RESPONSE_SIZES = {
@@ -270,16 +273,16 @@ def decode_data_payload(
         )
         _require(len(samples) == 3 * item_count, "truncated or excess PACK12 samples")
         expanded = bytearray(decoded)
-        for i, (a, middle, b) in enumerate(
-            struct.iter_unpack(c.ADC_PACK12_PAIR_STRUCT_FORMAT, samples)
-        ):
-            struct.pack_into(
-                c.ADC_RAW_PAIR_STRUCT_FORMAT,
-                expanded,
-                i * 4,
-                a | ((middle & 15) << 8),
-                (middle >> 4) | (b << 4),
-            )
+        # Reuse the rig decoder's bounded byte lanes. Disjoint nibbles cannot
+        # carry between samples; bulk operations avoid a Python loop per pair.
+        middle, high = samples[1::3], samples[2::3]
+        expanded[0::4] = samples[0::3]
+        expanded[1::4] = middle.translate(_LOW_NIBBLE)
+        expanded[2::4] = (
+            int.from_bytes(middle.translate(_HIGH_NIBBLE), "little")
+            | int.from_bytes(high.translate(_LOW_NIBBLE_SHIFT), "little")
+        ).to_bytes(item_count, "little")
+        expanded[3::4] = high.translate(_HIGH_NIBBLE)
         raw = bytes(expanded)
     elif encoding == c.Encoding.GPIO_RLE:
         _require(kind == c.FrameKind.GPIO_DATA, "RLE requires GPIO")

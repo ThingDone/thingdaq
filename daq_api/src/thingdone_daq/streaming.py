@@ -6,11 +6,12 @@ import math
 import tracemalloc
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import monotonic, sleep
 from typing import TypeVar, cast
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v3_constants as v3_constants
 from .client import (
     BlockTimeoutError,
     StreamItem,
@@ -26,6 +27,7 @@ from .models import (
     StreamAnomaly,
     StreamGap,
 )
+from .models_v3 import V3AppliedSettings, V3Settings, V3Status
 from .protocol import ParserCounters
 from .reader import ReaderCounters
 from .synthetic import SyntheticPatternError, validate_synthetic_block
@@ -35,13 +37,18 @@ _Result = TypeVar("_Result")
 
 @dataclass(frozen=True, slots=True)
 class StreamRateMetrics:
-    """Frame, logical-item, byte, and rate totals for one stream."""
+    """Totals over validated blocks, independent of their encoded size.
+
+    ``payload_bytes`` includes the v3 encoding prefix; ``framed_bytes`` includes
+    the entire wire frame. ``decoded_bytes`` is expanded sample storage.
+    """
 
     frame_count: int
     item_count: int
     payload_bytes: int
     framed_bytes: int
     elapsed_seconds: float
+    decoded_bytes: int = 0
 
     @property
     def payload_bytes_per_second(self) -> float:
@@ -101,10 +108,14 @@ class MemoryHighWaterMetrics:
 
 @dataclass(frozen=True, slots=True)
 class CounterReconciliation:
-    """Firmware, wire-parser, and validated-consumer conservation snapshot."""
+    """Firmware, wire-parser, and validated-consumer conservation snapshot.
 
-    adc_firmware_frames_emitted: int
-    gpio_firmware_frames_emitted: int
+    V3 compares drained undropped production with received frames. Its absent
+    emitted/parser/transport telemetry is ``None``, never a fabricated zero.
+    """
+
+    adc_firmware_frames_emitted: int | None
+    gpio_firmware_frames_emitted: int | None
     adc_wire_frames_received: int
     gpio_wire_frames_received: int
     adc_validated_frames: int
@@ -117,8 +128,8 @@ class CounterReconciliation:
     gpio_stale_discards: int
     firmware_adc_items_dropped: int
     firmware_gpio_items_dropped: int
-    firmware_parser_errors: int
-    firmware_transport_errors: int
+    firmware_parser_errors: int | None
+    firmware_transport_errors: int | None
     host_parser_errors: int
     host_event_queue_drops: int
     issues: tuple[str, ...]
@@ -148,7 +159,7 @@ class SoakMetrics:
     command_latency: CommandLatencyDistribution
     queues: QueueDepthMetrics
     memory: MemoryHighWaterMetrics
-    final_status: Status
+    final_status: Status | V3Status
     reader_counters: ReaderCounters
     parser_counters: ParserCounters
     reconciliation: CounterReconciliation
@@ -339,7 +350,7 @@ class SyntheticStreamValidator:
 
     def validate_status(
         self,
-        status: Status,
+        status: Status | V3Status,
         *,
         response_run_id: int,
         final: bool = False,
@@ -351,6 +362,25 @@ class SyntheticStreamValidator:
                 "status_run_id",
                 f"STATUS carries run {response_run_id}; expected {self.run_id}",
             )
+        if isinstance(status, V3Status):
+            expected_v3_state = (
+                v3_constants.DeviceState.STOPPED
+                if final
+                else v3_constants.DeviceState.RUNNING
+            )
+            if status.run_id != self.run_id or status.state != expected_v3_state:
+                self._fail("status_state", "v3 STATUS disagrees with run/state")
+            if status.adc_items_dropped or status.gpio_items_dropped:
+                self._fail("firmware_drops", "v3 STATUS reports dropped logical items")
+            if final and status.pending_frames:
+                self._fail("status_state", "v3 STOP still has pending frames")
+            adc_frames, gpio_frames = _available_frames(status)
+            if (
+                adc_frames < self.adc_frames_validated
+                or gpio_frames < self.gpio_frames_validated
+            ):
+                self._fail("frame_counter", "v3 produced count trails validated frames")
+            return
         expected_state = (
             constants.DeviceState.IDLE if final else constants.DeviceState.RUNNING
         )
@@ -544,9 +574,19 @@ def _positive_seconds(name: str, value: float) -> float:
     return selected
 
 
+def _available_frames(status: Status | V3Status) -> tuple[int, int]:
+    """V3 undropped production is only a delivery expectation after drain."""
+    if isinstance(status, V3Status):
+        return (
+            status.adc_frames_produced - status.adc_frames_dropped,
+            status.gpio_frames_produced - status.gpio_frames_dropped,
+        )
+    return status.adc_frames_emitted, status.gpio_frames_emitted
+
+
 def _reconcile(
     *,
-    status: Status,
+    status: Status | V3Status,
     baseline_reader: ReaderCounters,
     final_reader: ReaderCounters,
     baseline_parser: ParserCounters,
@@ -605,16 +645,23 @@ def _reconcile(
     )
 
     issues: list[str] = []
-    if status.adc_frames_emitted != adc_wire:
+    adc_expected, gpio_expected = _available_frames(status)
+    firmware_parser_errors = (
+        status.parser_errors if isinstance(status, Status) else None
+    )
+    firmware_transport_errors = (
+        status.transport_errors if isinstance(status, Status) else None
+    )
+    if adc_expected != adc_wire:
         issues.append(
-            "firmware emitted "
-            f"{status.adc_frames_emitted} ADC frame(s), but the host parser "
+            "firmware delivery expectation is "
+            f"{adc_expected} ADC frame(s), but the host parser "
             f"received {adc_wire}"
         )
-    if status.gpio_frames_emitted != gpio_wire:
+    if gpio_expected != gpio_wire:
         issues.append(
-            "firmware emitted "
-            f"{status.gpio_frames_emitted} GPIO frame(s), but the host parser "
+            "firmware delivery expectation is "
+            f"{gpio_expected} GPIO frame(s), but the host parser "
             f"received {gpio_wire}"
         )
     adc_accounted = (
@@ -635,9 +682,9 @@ def _reconcile(
         )
     if status.adc_items_dropped or status.gpio_items_dropped:
         issues.append("firmware reported dropped logical items")
-    if status.parser_errors:
+    if firmware_parser_errors:
         issues.append("firmware reported parser errors")
-    if status.transport_errors:
+    if firmware_transport_errors:
         issues.append("firmware reported transport errors")
     if parser_errors:
         issues.append("host parser rejected frame candidates")
@@ -647,8 +694,12 @@ def _reconcile(
         issues.append("host event queue dropped frames")
 
     return CounterReconciliation(
-        adc_firmware_frames_emitted=status.adc_frames_emitted,
-        gpio_firmware_frames_emitted=status.gpio_frames_emitted,
+        adc_firmware_frames_emitted=(
+            adc_expected if isinstance(status, Status) else None
+        ),
+        gpio_firmware_frames_emitted=(
+            gpio_expected if isinstance(status, Status) else None
+        ),
         adc_wire_frames_received=adc_wire,
         gpio_wire_frames_received=gpio_wire,
         adc_validated_frames=validator.adc_frames_validated,
@@ -661,8 +712,8 @@ def _reconcile(
         gpio_stale_discards=gpio_stale,
         firmware_adc_items_dropped=status.adc_items_dropped,
         firmware_gpio_items_dropped=status.gpio_items_dropped,
-        firmware_parser_errors=status.parser_errors,
-        firmware_transport_errors=status.transport_errors,
+        firmware_parser_errors=firmware_parser_errors,
+        firmware_transport_errors=firmware_transport_errors,
         host_parser_errors=parser_errors,
         host_event_queue_drops=event_drops,
         issues=tuple(issues),
@@ -678,16 +729,14 @@ def _wait_for_final_status(
     quiet_period: float,
     clock: Callable[[], float] = monotonic,
     sleeper: Callable[[float], None] = sleep,
-) -> Status:
+) -> Status | V3Status:
     deadline = clock() + timeout
     stable_since: float | None = None
     previous: tuple[int, int, int, int] | None = None
-    latest: Status | None = None
+    latest: Status | V3Status | None = None
 
     while True:
-        latest = _timed(
-            recorder, "STATUS", lambda: cast(Status, daq.status()), clock=clock
-        )
+        latest = _timed(recorder, "STATUS", daq.status, clock=clock)
         reader = daq.reader_counters
         adc_wire = _reader_delta(
             "ADC received counter",
@@ -700,8 +749,7 @@ def _wait_for_final_status(
             baseline.gpio_frames_received,
         )
         current = (
-            latest.adc_frames_emitted,
-            latest.gpio_frames_emitted,
+            *_available_frames(latest),
             adc_wire,
             gpio_wire,
         )
@@ -810,18 +858,47 @@ def run_synthetic_soak(
     started = False
     primary_error: BaseException | None = None
     cleanup_error: BaseException | None = None
-    final_status: Status | None = None
+    final_status: Status | V3Status | None = None
     validator: SyntheticStreamValidator | None = None
     baseline_reader: ReaderCounters | None = None
     baseline_parser: ParserCounters | None = None
     run_id = 0
     adc_frames = 0
     gpio_frames = 0
+    adc_items = gpio_items = 0
+    adc_decoded = gpio_decoded = 0
+    adc_payload = gpio_payload = 0
+    adc_wire = gpio_wire = 0
     capture_started = clock()
     capture_finished = capture_started
 
     try:
-        if daq.state is constants.DeviceState.IDLE:
+        applied: DAQConfiguration | V3Settings
+        if isinstance(daq.configuration, V3Settings):
+            existing = daq.configuration
+            for name, requested in (
+                ("adc_pair_rate_hz", adc_pair_rate_hz),
+                ("gpio_sample_rate_hz", gpio_sample_rate_hz),
+                ("adc_resolution_bits", adc_resolution_bits),
+            ):
+                if requested is not None and requested != getattr(existing, name):
+                    raise ValueError(f"{name} differs from applied v3 settings")
+            result = _timed(
+                latency,
+                "CONFIGURE",
+                lambda: daq.configure(
+                    replace(
+                        existing,
+                        source=v3_constants.Source.SYNTHETIC,
+                        stream_mask=v3_constants.StreamMask(requested_mask),
+                    )
+                ),
+                clock=clock,
+            )
+            assert isinstance(result, V3AppliedSettings)
+            applied = result.settings
+            configured_here = True
+        elif daq.state is constants.DeviceState.IDLE:
             applied = _timed(
                 latency,
                 "CONFIGURE",
@@ -846,7 +923,7 @@ def run_synthetic_soak(
             applied = existing_configuration
         if (
             applied.stream_mask != requested_mask
-            or applied.source is not constants.Source.SYNTHETIC
+            or applied.source != constants.Source.SYNTHETIC
         ):
             raise ValueError("applied configuration does not match the requested soak")
 
@@ -877,9 +954,7 @@ def run_synthetic_soak(
                 break
             if next_status is not None and now >= next_status:
                 assert selected_status_interval is not None
-                status = _timed(
-                    latency, "STATUS", lambda: cast(Status, daq.status()), clock=clock
-                )
+                status = _timed(latency, "STATUS", daq.status, clock=clock)
                 validator.validate_status(status, response_run_id=daq.run_id)
                 validator.validate_host_health(
                     daq.reader_counters,
@@ -900,16 +975,22 @@ def run_synthetic_soak(
             block = validator.validate(item)
             if isinstance(block, ADCBlock):
                 adc_frames += 1
+                adc_items += block.item_count
+                adc_decoded += block.decoded_bytes
+                adc_payload += block.wire_bytes - constants.MIN_FRAME_BYTES
+                adc_wire += block.wire_bytes
             else:
                 gpio_frames += 1
+                gpio_items += block.item_count
+                gpio_decoded += block.decoded_bytes
+                gpio_payload += block.wire_bytes - constants.MIN_FRAME_BYTES
+                gpio_wire += block.wire_bytes
             total_frames += 1
             if (
                 status_frame_interval is not None
                 and total_frames % status_frame_interval == 0
             ):
-                status = _timed(
-                    latency, "STATUS", lambda: cast(Status, daq.status()), clock=clock
-                )
+                status = _timed(latency, "STATUS", daq.status, clock=clock)
                 validator.validate_status(status, response_run_id=daq.run_id)
                 validator.validate_host_health(
                     daq.reader_counters,
@@ -952,7 +1033,7 @@ def run_synthetic_soak(
                 final_status = _timed(
                     latency,
                     "STATUS",
-                    lambda: cast(Status, daq.status()),
+                    daq.status,
                     clock=clock,
                 )
         except BaseException as error:  # noqa: BLE001 - preserve primary failure
@@ -995,16 +1076,18 @@ def run_synthetic_soak(
     elapsed = max(capture_finished - capture_started, 1e-12)
     adc_metrics = StreamRateMetrics(
         frame_count=adc_frames,
-        item_count=adc_frames * constants.ADC_PAIRS_PER_FRAME,
-        payload_bytes=adc_frames * constants.ADC_DATA_PAYLOAD_SIZE,
-        framed_bytes=adc_frames * constants.DATA_FRAME_BYTES,
+        item_count=adc_items,
+        payload_bytes=adc_payload,
+        framed_bytes=adc_wire,
+        decoded_bytes=adc_decoded,
         elapsed_seconds=elapsed,
     )
     gpio_metrics = StreamRateMetrics(
         frame_count=gpio_frames,
-        item_count=gpio_frames * constants.GPIO_SAMPLES_PER_FRAME,
-        payload_bytes=gpio_frames * constants.GPIO_DATA_PAYLOAD_SIZE,
-        framed_bytes=gpio_frames * constants.DATA_FRAME_BYTES,
+        item_count=gpio_items,
+        payload_bytes=gpio_payload,
+        framed_bytes=gpio_wire,
+        decoded_bytes=gpio_decoded,
         elapsed_seconds=elapsed,
     )
     queues = QueueDepthMetrics(

@@ -898,6 +898,7 @@ class ThingDAQ:
                     self._run_id,
                     configuration.data_checksum_algorithm,
                     configuration,
+                    protocol_version=self._wire_protocol_version,
                 )
                 self._initialize_stream_expectations(
                     configuration,
@@ -1605,6 +1606,12 @@ class ThingDAQ:
                 else snapshot.counters
             )
             firmware_observed = True
+        elif self._v3 is not None:
+            cached = self._v3.last_status
+            firmware = (
+                self._v3_counters(cached) if cached is not None else FirmwareCounters()
+            )
+            firmware_observed = cached is not None
         else:
             status = self._last_status
             firmware = status.counters if status is not None else FirmwareCounters()

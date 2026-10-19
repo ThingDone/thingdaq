@@ -7,6 +7,7 @@ from enum import Enum
 
 from ._generated import protocol_constants as constants
 from .models import Status
+from .models_v3 import V3Status
 
 
 class EquationState(Enum):
@@ -57,7 +58,7 @@ class FirmwareFaultSnapshot:
     """Typed nonzero diagnostic evidence retained for one statistics epoch."""
 
     run_id: int
-    stats_generation: int
+    stats_generation: int | None
     faults: tuple[FirmwareFault, ...]
 
     @property
@@ -86,7 +87,7 @@ class RunCounterReconciliation:
     """Ordered conservation equations and fault evidence for one run snapshot."""
 
     run_id: int
-    stats_generation: int
+    stats_generation: int | None
     equations: tuple[CounterEquation, ...]
     fault_snapshot: FirmwareFaultSnapshot
 
@@ -221,10 +222,12 @@ _U32_FIELDS = frozenset(
 )
 
 
-def _saturated(status: Status, fields: tuple[str, ...]) -> bool:
+def _saturated(status: Status | V3Status, fields: tuple[str, ...]) -> bool:
     for name in fields:
         value = int(getattr(status, name))
-        if name in _U64_FIELDS and value == constants.UINT64_MAX:
+        if (
+            isinstance(status, V3Status) or name in _U64_FIELDS
+        ) and value == constants.UINT64_MAX:
             return True
         if name in _U32_FIELDS and value == constants.UINT32_MAX:
             return True
@@ -232,7 +235,7 @@ def _saturated(status: Status, fields: tuple[str, ...]) -> bool:
 
 
 def _equation(
-    status: Status,
+    status: Status | V3Status,
     *,
     counter: str,
     expression: str,
@@ -582,18 +585,32 @@ _FAULT_FIELDS: tuple[tuple[str, str, str], ...] = (
 
 
 def snapshot_firmware_faults(
-    status: Status,
+    status: Status | V3Status,
     *,
     run_id: int = 0,
 ) -> FirmwareFaultSnapshot:
     """Return every nonzero loss/fault field without collapsing its unit."""
 
-    if not isinstance(status, Status):
-        raise TypeError("status must be a Status snapshot")
+    if not isinstance(status, (Status, V3Status)):
+        raise TypeError("status must be a Status or V3Status snapshot")
     if not isinstance(run_id, int) or isinstance(run_id, bool):
         raise TypeError("run_id must be a uint32 integer")
     if not 0 <= run_id <= constants.UINT32_MAX:
         raise ValueError("run_id must fit uint32")
+    if isinstance(status, V3Status):
+        if run_id not in (0, status.run_id):
+            raise ValueError("run_id differs from V3Status")
+        # V3 exposes only logical loss counters, with no stats-generation field
+        # or raw DMA/USB fault telemetry. Never synthesize those legacy fields.
+        return FirmwareFaultSnapshot(
+            status.run_id,
+            None,
+            tuple(
+                FirmwareFault(counter, int(getattr(status, counter)), unit, category)
+                for counter, unit, category in _FAULT_FIELDS[:4]
+                if getattr(status, counter)
+            ),
+        )
     faults: list[FirmwareFault] = []
     for counter, unit, category in _FAULT_FIELDS:
         value = int(getattr(status, counter))
@@ -615,7 +632,7 @@ def snapshot_firmware_faults(
 
 
 def reconcile_run_counters(
-    status: Status,
+    status: Status | V3Status,
     *,
     run_id: int = 0,
 ) -> RunCounterReconciliation:
@@ -625,14 +642,67 @@ def reconcile_run_counters(
     counter. Saturated operands are reported as indeterminate rather than
     being mistaken for a mismatch. Live snapshots include current queue depth;
     stopped snapshots reduce naturally to produced = transmitted + dropped.
+
+    V3 checks only advertised logical produced/dropped counters and pending
+    frames. It has no transmitted-byte or DMA counters, so this report cannot
+    prove end-to-end delivery or bandwidth; ``stats_generation`` is ``None``.
+    Variable frame counts and compression never imply fixed items/bytes per frame.
     """
 
-    if not isinstance(status, Status):
-        raise TypeError("status must be a Status snapshot")
+    if not isinstance(status, (Status, V3Status)):
+        raise TypeError("status must be a Status or V3Status snapshot")
     if not isinstance(run_id, int) or isinstance(run_id, bool):
         raise TypeError("run_id must be a uint32 integer")
     if not 0 <= run_id <= constants.UINT32_MAX:
         raise ValueError("run_id must fit uint32")
+
+    if isinstance(status, V3Status):
+        faults = snapshot_firmware_faults(status, run_id=run_id)
+        v3_equations = []
+        for stream, item_unit in (
+            ("adc", "ADC pairs"),
+            ("gpio", "GPIO sample instants"),
+        ):
+            for quantity, unit in (("frames", "frames"), ("items", item_unit)):
+                dropped = f"{stream}_{quantity}_dropped"
+                produced = f"{stream}_{quantity}_produced"
+                v3_equations.append(
+                    _equation(
+                        status,
+                        counter=dropped,
+                        expression=f"{dropped} <= {produced}",
+                        actual=getattr(status, dropped),
+                        expected=getattr(status, produced),
+                        unit=unit,
+                        relation="<=",
+                        fields=(dropped, produced),
+                    )
+                )
+        v3_equations.append(
+            _equation(
+                status,
+                counter="pending_frames",
+                expression="pending_frames <= produced frames - dropped frames",
+                actual=status.pending_frames,
+                expected=(
+                    status.adc_frames_produced
+                    + status.gpio_frames_produced
+                    - status.adc_frames_dropped
+                    - status.gpio_frames_dropped
+                ),
+                unit="frames",
+                relation="<=",
+                fields=(
+                    "adc_frames_produced",
+                    "gpio_frames_produced",
+                    "adc_frames_dropped",
+                    "gpio_frames_dropped",
+                ),
+            )
+        )
+        return RunCounterReconciliation(
+            status.run_id, None, tuple(v3_equations), faults
+        )
 
     inferred_streams = status.stream_mask
     layout = status.configuration.gpio_layout if status.configuration else None

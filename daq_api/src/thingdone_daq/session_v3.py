@@ -28,6 +28,7 @@ class V3Session:
         self.identity: V3Info | None = None
         self.state = c.DeviceState.STOPPED
         self.run_id = 0
+        self.last_status: V3Status | None = None
 
     def command(
         self, kind: c.CommandKind, payload: bytes = b"", *, timeout: float | None = None
@@ -145,6 +146,7 @@ class V3Session:
         # Record RUNNING even for a contradictory echo so close still sends STOP.
         self.state = c.DeviceState.RUNNING
         self.run_id = response.run_id
+        self.last_status = None
         if not response.run_id or response.value != requested:
             raise UnexpectedMessageError("START run ID/settings differ from request")
         return response.run_id
@@ -154,6 +156,7 @@ class V3Session:
         assert isinstance(value, V3Status)
         self.state = value.state
         self.run_id = value.run_id
+        self.last_status = value
         return value
 
     def stop(self) -> c.DeviceState:
