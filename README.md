@@ -267,6 +267,9 @@ It prints all advertised tuples, verifies exact ADC/GPIO samples and timestamps,
 reports compression byte counts and RAW fallback, and exercises stopped
 600/450/600 MHz configuration transitions plus rejected running reconfiguration.
 Clock changes are simulated metadata; this does not measure hardware throughput.
+See the [v3 upgrade architecture](doc/architecture/protocol-v3-upgrade.md) and
+[offline validation results](doc/results/protocol-v3-prototype.md) for the
+component boundaries, reproducible gates and capture byte counts.
 
 ## Repository layout and checks
 

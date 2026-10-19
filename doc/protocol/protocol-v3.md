@@ -131,7 +131,10 @@ exact golden-byte round trips, malformed metadata, count/expansion bounds,
 RLE tie fallback, PACK12 bit positions and bounded parser recovery.
 `daq_api/tests/test_simulator_v3.py` covers all 60 advertised tuples, encoded
 commands, atomic configuration, replay, chunking, corruption and transport drain.
-Public session integration remains a subsequent Phase 01 task.
+`daq_api/tests/test_public_api_v3.py` covers the completed public-session path;
+`daq_api/tests/test_examples.py` asserts the executable demo's results and cleanup.
+See [[protocol-v3-upgrade]] for architecture and [[protocol-v3-prototype]] for
+reproducible offline validation results.
 
 ## Opt-in Python codecs
 
