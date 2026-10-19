@@ -237,7 +237,9 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 The additive [public v3 contract](doc/protocol/protocol-v3.md) defines bounded
 capability/settings queries and explicit RAW/RLE/PACK12 framing. Its generated
 constants, codecs and opt-in Python simulator sessions are available offline.
-Production firmware, serial negotiation and the CLI remain on v1/v2.
+The Python API, serial negotiation and CLI support v3 plus historical v1 and
+release v2 peers. Production firmware remains v2; v3 validation is currently
+offline. See the [Python compatibility gate](doc/results/protocol-v3-python.md).
 
 ```python
 from thingdone_daq import ThingDAQ

@@ -14,6 +14,7 @@ related:
   - '[[Calibration]]'
   - '[[NumPy-Integration]]'
   - '[[Hardware-Safety]]'
+  - '[[protocol-v3-python]]'
 ---
 
 # Python API reference
@@ -105,16 +106,19 @@ streams and checksum, rather than the last active settings. An explicit rate
 or rate profile must select one advertised rate record.
 
 ```python
-from thingdone_daq import V3AdcPolicy, V3CpuProfile, V3GpioPolicy
+from thingdone_daq import ThingDAQ, V3AdcPolicy, V3CpuProfile, V3GpioPolicy
 
-# On an open, stopped v3 session:
-applied = daq.configure(
-    cpu_profile=V3CpuProfile.CPU_450MHZ,
-    gpio_policy=V3GpioPolicy.RAW,
-    adc_policy=V3AdcPolicy.RAW,
-)
-assert daq.get_settings() == applied
-assert daq.info().clocks == applied.clocks
+with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
+    capabilities = daq.get_capabilities()
+    selected = capabilities.select_settings(
+        cpu_profile=V3CpuProfile.CPU_450MHZ,
+        gpio_policy=V3GpioPolicy.RAW,
+        adc_policy=V3AdcPolicy.RAW,
+    )
+    assert selected in capabilities.configurations
+    applied = daq.configure(selected)
+    assert daq.get_settings() == applied
+    assert daq.info().clocks == applied.clocks
 ```
 
 All selectors must match one advertised tuple, including disabled streams.
@@ -179,17 +183,54 @@ applied = daq.configure(
 )
 ```
 
-The three numeric keywords are exact INFO preconditions, not CONFIGURE body
-fields. A requirement for a disabled stream is invalid. Unsupported
+For legacy v1/v2, the three numeric keywords are exact INFO preconditions, not
+CONFIGURE body fields. A requirement for a disabled stream is invalid. Unsupported
 stream/source/profile/checksum/rate/resolution selections raise
 `DeviceCapabilityError` before CONFIGURE is written. The returned
 `DAQConfiguration` is the exact device echo. A changed echo raises
 `UnexpectedMessageError` while retaining the observed state for cleanup.
 
-`daq.start()` requires CONFIGURED, verifies the echoed applied configuration,
-activates a new nonzero run ID, and returns it. `daq.stop()` is idempotent in
-IDLE/CONFIGURED/RUNNING and returns `DeviceState.IDLE`. `daq.configuration`,
+For legacy v1/v2, `daq.start()` requires CONFIGURED, verifies the echoed applied
+configuration, activates a new nonzero run ID, and returns it. `daq.stop()` is
+idempotent in IDLE/CONFIGURED/RUNNING and returns `DeviceState.IDLE`. `daq.configuration`,
 `daq.state`, and `daq.run_id` expose the facade's latest authoritative state.
+
+V3 configures and starts from STOPPED. `stop()` waits for the bounded drain to
+finish, returns `V3DeviceState.STOPPED`, and preserves the applied settings for
+restart. Numeric v3 selectors select an advertised complete configuration tuple.
+This complete offline example exercises defaults, decoded blocks, readback and
+restart through the public API:
+
+```python
+from thingdone_daq import ADCBlock, GPIOBlock, ThingDAQ, V3DeviceState
+
+with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
+    capabilities = daq.get_capabilities()
+    applied = daq.configure()
+    assert applied.settings == capabilities.defaults
+    assert daq.get_settings() == applied
+    run_id = daq.start()
+    blocks = list(daq.blocks(4))
+    assert all(isinstance(block, (ADCBlock, GPIOBlock)) for block in blocks)
+    assert all(block.run_id == run_id for block in blocks)
+    for block in blocks:
+        print(block.encoding.name, block.item_count, block.decoded_bytes, block.wire_bytes)
+        if isinstance(block, ADCBlock):
+            assert block.pair_ticks(0)[1] - block.pair_ticks(0)[0] == 4
+        else:
+            assert block.sample_ticks(1) - block.sample_ticks(0) == 8
+    daq.validate_stream_health()
+    assert daq.stop() == V3DeviceState.STOPPED
+    assert daq.get_settings() == applied
+    assert daq.start() != run_id
+    first = daq.read_block()
+    assert first.first_sample_ticks == 0
+    assert daq.stop() == V3DeviceState.STOPPED
+```
+
+The simulator's clocks and timestamps are deterministic metadata, not measured
+physical timing. See [[protocol-v3-python]] for the validated compatibility
+matrix, exact commands and current limitations.
 
 `configure_control_only()` exists for older zero-stream Phase 03 firmware; it
 is not a way to request disabled acquisition from production firmware.
