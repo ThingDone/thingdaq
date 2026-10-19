@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
+from math import isfinite
+from secrets import randbelow
 from threading import Condition, Event, Lock, RLock, Thread, current_thread
 from time import monotonic
 from types import TracebackType
@@ -61,6 +63,10 @@ class ReaderError(RuntimeError):
         # The public ThingDAQ facade fills this with its last firmware and
         # loss snapshot before re-raising a terminal reader error.
         self.evidence: object | None = None
+
+
+class ProtocolVersionRejected(ReaderError):
+    """A correlated INFO explicitly rejected the probed wire version."""
 
 
 class ReaderNotStartedError(ReaderError):
@@ -178,6 +184,7 @@ class _PendingRequest:
     response: CommandResponse[ResponseValue] | V3Response | None = None
     protocol_version: int = constants.PROTOCOL_VERSION
     error: ReaderError | None = None
+    negotiating: bool = False
 
 
 class BackgroundReader:
@@ -205,6 +212,7 @@ class BackgroundReader:
         queue_timeout: float = 1.0,
         shutdown_timeout: float = 1.0,
         idle_sleep: float = 0.001,
+        randomize_request_ids: bool = False,
         parser: IncrementalFrameParser | IncrementalCompatibleFrameParser | None = None,
     ) -> None:
         integer_limits = {
@@ -225,7 +233,7 @@ class BackgroundReader:
             "idle_sleep": idle_sleep,
         }
         if any(
-            not isinstance(value, (int, float)) or value <= 0
+            not isinstance(value, (int, float)) or not isfinite(value) or value <= 0
             for value in deadlines.values()
         ):
             raise ValueError("reader timeouts must be positive")
@@ -252,7 +260,9 @@ class BackgroundReader:
         self._blocks: deque[DataBlock] = deque()
         self._stream_reports: deque[ReaderStreamReport] = deque()
         self._events: deque[ReaderEvent] = deque()
-        self._next_request_id = 1
+        self._next_request_id = (
+            randbelow(constants.UINT32_MAX) + 1 if randomize_request_ids else 1
+        )
         self._active_run_id = 0
         self._active_checksum_algorithm = constants.DEFAULT_CHECKSUM_ALGORITHM
         self._active_configuration: DAQConfiguration | None = None
@@ -417,6 +427,7 @@ class BackgroundReader:
         *,
         timeout: float | None = None,
         protocol_version: Literal[3],
+        _negotiating: bool = False,
     ) -> V3Response: ...
 
     @overload
@@ -427,6 +438,7 @@ class BackgroundReader:
         *,
         timeout: float | None = None,
         protocol_version: Literal[1, 2] = 1,
+        _negotiating: bool = False,
     ) -> CommandResponse[ResponseValue]: ...
 
     @overload
@@ -437,6 +449,7 @@ class BackgroundReader:
         *,
         timeout: float | None = None,
         protocol_version: int,
+        _negotiating: bool = False,
     ) -> CommandResponse[ResponseValue] | V3Response: ...
 
     def request(
@@ -446,6 +459,7 @@ class BackgroundReader:
         *,
         timeout: float | None = None,
         protocol_version: int = constants.PROTOCOL_VERSION,
+        _negotiating: bool = False,
     ) -> CommandResponse[ResponseValue] | V3Response:
         """Send one command and wait for its request-ID-correlated response."""
 
@@ -492,6 +506,7 @@ class BackgroundReader:
             request_id = self._allocate_request_id_locked()
             pending = _PendingRequest(
                 kind=selected_kind,
+                negotiating=_negotiating,
                 protocol_version=protocol_version,
                 expected_kind=request_kinds[selected_kind],
                 request_id=request_id,
@@ -694,6 +709,15 @@ class BackgroundReader:
             self._require_live_locked()
             self._activate_run_locked(run_id, selected_checksum, configuration)
 
+    def activate_v3_run(self, run_id: int, settings: V3Settings) -> None:
+        """Adopt settings freshly read from an already running v3 device."""
+        with self._condition:
+            self._require_live_locked()
+            self._active_v3_settings = settings
+            self._activate_run_locked(
+                run_id, constants.ChecksumAlgorithm(settings.checksum_algorithm)
+            )
+
     def deactivate_stream(self) -> None:
         """Cancel block waiters and discard blocks at a deliberate boundary."""
 
@@ -841,9 +865,9 @@ class BackgroundReader:
                             v3_constants.FrameKind.GPIO_DATA,
                         ):
                             if self._active_v3_settings is None:
-                                raise ReaderProtocolError(
-                                    "v3 data arrived before START settings"
-                                )
+                                with self._condition:
+                                    self._stale_blocks_discarded += 1
+                                continue
                             message = decode_v3_block(frame, self._active_v3_settings)
                         else:
                             message = decode_v3_response(frame)
@@ -865,7 +889,7 @@ class BackgroundReader:
                     with self._condition:
                         self._frames_received += 1
                     if isinstance(message, (CommandResponse, V3Response)):
-                        self._dispatch_response(message)
+                        self._dispatch_response(message, frame.header.version)
                     elif isinstance(message, (AdcBlock, GpioBlock)):
                         self._dispatch_block(message)
                     else:
@@ -883,6 +907,7 @@ class BackgroundReader:
     def _dispatch_response(
         self,
         response: CommandResponse[ResponseValue] | V3Response,
+        wire_version: int,
     ) -> None:
         protocol_error: ReaderProtocolError | None = None
         with self._condition:
@@ -897,7 +922,36 @@ class BackgroundReader:
                     self._deactivate_stream_locked()
                 return
 
-            if isinstance(response, V3Response) != (pending.protocol_version == 3):
+            rejection = (
+                pending.negotiating
+                and pending.kind == constants.FrameKind.INFO_REQUEST
+                and not response.ok
+                and response.error_code == constants.ErrorCode.UNSUPPORTED_VERSION
+                and (
+                    (
+                        response.kind == pending.expected_kind
+                        and wire_version == pending.protocol_version
+                    )
+                    or (
+                        isinstance(response, CommandResponse)
+                        and response.kind == constants.FrameKind.ERROR_RESPONSE
+                        and response.rejected_kind == int(pending.kind)
+                        and response.rejected_version == pending.protocol_version
+                    )
+                    or (
+                        isinstance(response, V3Response)
+                        and wire_version == pending.protocol_version
+                        and response.kind == v3_constants.FrameKind.ERROR_RESPONSE
+                        and response.rejected_kind == int(pending.kind)
+                    )
+                )
+            )
+            if rejection:
+                pending.error = ProtocolVersionRejected(
+                    f"INFO explicitly rejected wire version {pending.protocol_version}"
+                )
+                self._responses_matched += 1
+            elif wire_version != pending.protocol_version:
                 protocol_error = ReaderProtocolError(
                     "response protocol version differs from request"
                 )
@@ -1214,7 +1268,11 @@ class BackgroundReader:
     @staticmethod
     def _resolve_timeout(value: float | None, default: float) -> float:
         selected = default if value is None else value
-        if not isinstance(selected, (int, float)) or selected <= 0:
+        if (
+            not isinstance(selected, (int, float))
+            or not isfinite(selected)
+            or selected <= 0
+        ):
             raise ValueError("timeout must be positive")
         return float(selected)
 

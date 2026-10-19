@@ -22,6 +22,7 @@ from .protocol_v2 import (
     IncrementalCompatibleFrameParser,
     encode_v2_frame,
 )
+from .protocol_v3 import V3Frame
 from .synthetic import (
     SyntheticGPIOPattern,
     synthetic_adc_payload,
@@ -81,7 +82,7 @@ class SimulatedDevice:
         self._control_only = control_only
         self._max_receive_bytes = max_receive_bytes
         self._max_requests_per_receive = max_requests_per_receive
-        self._request_parser = IncrementalCompatibleFrameParser()
+        self._request_parser = IncrementalCompatibleFrameParser(include_v3=True)
         self._gpio_pattern = selected_gpio_pattern
         self._state = constants.DeviceState.BOOT
         self._configuration: Configuration | None = None
@@ -163,7 +164,22 @@ class SimulatedDevice:
         requests = self._request_parser.feed(incoming)
         responses: list[bytes] = []
         for index, request in enumerate(requests):
-            if index >= self._max_requests_per_receive:
+            response: bytes | None
+            if isinstance(request, V3Frame):
+                response = encode_frame(
+                    constants.FrameKind.ERROR_RESPONSE,
+                    _ERROR_RESPONSE.pack(
+                        constants.ResponseStatus.ERROR,
+                        0,
+                        constants.ErrorCode.UNSUPPORTED_VERSION,
+                        int(request.header.kind),
+                        3,
+                        0,
+                    ),
+                    request_id=request.header.request_id,
+                    flags=constants.FrameFlag.RESPONSE_ERROR,
+                )
+            elif index >= self._max_requests_per_receive:
                 response = self._busy_response(request)
             else:
                 response = self._handle_frame(request)
@@ -543,7 +559,10 @@ class SimulatedDevice:
     def _handle_status(self, request: CompatibleFrame) -> bytes:
         return self._success_response(
             request,
-            self.status().to_payload(protocol_version=request.header.version),
+            self.status().to_payload(
+                protocol_version=request.header.version,
+                counter_configuration=self._counter_configuration,
+            ),
         )
 
     def _handle_stop(self, request: CompatibleFrame) -> bytes:

@@ -32,9 +32,9 @@ from thingdone_daq import (
     ThingDAQ,
     TransportDisconnectedError,
     TransportTimeoutError,
-    decode_frame,
 )
 from thingdone_daq.cli import CliExitCode, _execute, build_parser, main
+from thingdone_daq.protocol_v2 import IncrementalCompatibleFrameParser
 
 
 class ResetNoiseTransport(InMemoryTransport):
@@ -46,8 +46,8 @@ class ResetNoiseTransport(InMemoryTransport):
 
     def write(self, data: bytes | bytearray | memoryview) -> int:
         wire = bytes(data)
-        request = decode_frame(wire)
-        if request.header.kind is FrameKind.INFO_REQUEST:
+        request = IncrementalCompatibleFrameParser(include_v3=True).feed(wire)[0]
+        if request.header.kind == FrameKind.INFO_REQUEST:
             self.info_writes += 1
             if self.info_writes == 1:
                 with self._lock:
@@ -77,7 +77,7 @@ class DropStatusTransport(InMemoryTransport):
 
     def write(self, data: bytes | bytearray | memoryview) -> int:
         wire = bytes(data)
-        request = decode_frame(wire)
+        request = IncrementalCompatibleFrameParser(include_v3=True).feed(wire)[0]
         if self.drop_status and request.header.kind is FrameKind.GET_STATUS_REQUEST:
             with self._lock:
                 self._require_open()
@@ -241,7 +241,7 @@ class SynchronizationAndIdentityTests(unittest.TestCase):
             synchronization_retry_delay=0,
         ) as daq:
             self.assertIsNotNone(daq.verified_identity)
-            self.assertEqual(3, transport.info_writes)
+            self.assertEqual(4, transport.info_writes)
             self.assertEqual(1, daq.reader_counters.request_timeouts)
             self.assertEqual(1, daq.parser_counters.resynchronizations)
             self.assertGreater(daq.parser_counters.bytes_discarded, 0)

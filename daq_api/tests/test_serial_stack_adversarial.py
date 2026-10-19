@@ -7,6 +7,7 @@ import time
 import unittest
 from collections.abc import Callable
 from dataclasses import dataclass
+from unittest.mock import patch
 
 import serial
 from thingdone_daq import (
@@ -36,6 +37,7 @@ from thingdone_daq import (
 )
 from thingdone_daq._generated import protocol_constants as constants
 from thingdone_daq.models import ResponseValue
+from thingdone_daq.protocol_v2 import IncrementalCompatibleFrameParser
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 1.0) -> None:
@@ -120,7 +122,7 @@ class ScriptedSerialPeer:
         self._one_shot_stream = one_shot_stream
         self._empty_read_wait = empty_read_wait
         self._condition = threading.Condition()
-        self._request_parser = IncrementalFrameParser()
+        self._request_parser = IncrementalCompatibleFrameParser(include_v3=True)
         self._request_frames: list[Frame] = []
         self._pending = bytearray(initial_input)
         self._held_responses: list[bytes] = []
@@ -491,9 +493,9 @@ class Phase03ControlSerialIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(1, first_peer.responses_dropped)
         self.assertEqual(
-            3,
+            4,
             sum(
-                frame.header.kind is FrameKind.INFO_REQUEST
+                frame.header.kind == FrameKind.INFO_REQUEST
                 for frame in first_peer.request_frames
             ),
         )
@@ -567,7 +569,7 @@ class Phase03ControlSerialIntegrationTests(unittest.TestCase):
         self.assertEqual(3, len(peer.request_frames))
         self.assertTrue(
             all(
-                frame.header.kind is FrameKind.INFO_REQUEST
+                frame.header.kind == FrameKind.INFO_REQUEST
                 for frame in peer.request_frames
             )
         )
@@ -627,7 +629,8 @@ class PublicSerialSimulatorParityTests(unittest.TestCase):
             read_chunk_size=19,
             write_chunk_size=4,
         )
-        memory_result = _exercise_public_api(memory_transport)
+        with patch("thingdone_daq.reader.randbelow", return_value=0):
+            memory_result = _exercise_public_api(memory_transport)
 
         serial_device = RecordingSimulatedDevice()
         serial_peer = ScriptedSerialPeer(
@@ -636,18 +639,20 @@ class PublicSerialSimulatorParityTests(unittest.TestCase):
             write_pattern=(1, 0, 3, 7, 2, 11),
             one_shot_stream=True,
         )
-        serial_result = _exercise_public_api(_serial_transport(serial_peer))
+        with patch("thingdone_daq.reader.randbelow", return_value=0):
+            serial_result = _exercise_public_api(_serial_transport(serial_peer))
 
         self.assertEqual(memory_result, serial_result)
         self.assertEqual(memory_device.host_bytes, serial_device.host_bytes)
         self.assertEqual(memory_device.response_frames, serial_device.response_frames)
         self.assertEqual(memory_device.data_frames, serial_device.data_frames)
 
-        request_parser = IncrementalFrameParser()
+        request_parser = IncrementalCompatibleFrameParser(include_v3=True)
         requests = request_parser.feed(serial_device.host_bytes)
         self.assertEqual(0, request_parser.buffered_bytes)
         self.assertEqual(
             [
+                FrameKind.INFO_REQUEST,  # v3 rejected by the legacy persona
                 FrameKind.INFO_REQUEST,
                 FrameKind.INFO_REQUEST,
                 FrameKind.INFO_REQUEST,

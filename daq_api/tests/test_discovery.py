@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import struct
 import threading
 import unittest
 from dataclasses import dataclass
@@ -12,6 +13,8 @@ from thingdone_daq import (
     DeviceNotFoundError,
     DeviceState,
     DiscoveryProbeError,
+    ErrorCode,
+    FrameFlag,
     FrameKind,
     Info,
     McuId,
@@ -19,13 +22,13 @@ from thingdone_daq import (
     TransportClosedError,
     TransportDisconnectedError,
     TransportOpenError,
-    decode_frame,
     discover,
     encode_frame,
     enumerate_candidates,
     probe_candidate,
     select_device,
 )
+from thingdone_daq.protocol_v2 import IncrementalCompatibleFrameParser
 
 TEENSY_VID = 0x16C0
 TEENSY_PID = 0x0483
@@ -67,10 +70,27 @@ class InfoProbeTransport:
             if not self._is_open:
                 raise TransportClosedError("probe transport is closed")
             self.writes.append(wire)
-            request = decode_frame(wire)
-            if request.header.kind is not FrameKind.INFO_REQUEST:
+            request = IncrementalCompatibleFrameParser(include_v3=True).feed(wire)[0]
+            if request.header.kind != FrameKind.INFO_REQUEST:
                 raise AssertionError("discovery sent a non-INFO command")
-            if self.info is not None:
+            if self.info is not None and request.header.version != 1:
+                self._pending.extend(
+                    encode_frame(
+                        FrameKind.ERROR_RESPONSE,
+                        struct.pack(
+                            "<BBHBBH",
+                            1,
+                            0,
+                            ErrorCode.UNSUPPORTED_VERSION,
+                            int(request.header.kind),
+                            request.header.version,
+                            0,
+                        ),
+                        request_id=request.header.request_id,
+                        flags=FrameFlag.RESPONSE_ERROR,
+                    )
+                )
+            elif self.info is not None:
                 self._pending.extend(
                     encode_frame(
                         FrameKind.INFO_RESPONSE,
@@ -206,7 +226,7 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual("PJRC", devices[0].manufacturer)
         self.assertEqual("USB Serial", devices[1].product)
         self.assertTrue(all(transport.closed.is_set() for transport in transports))
-        self.assertTrue(all(len(transport.writes) == 1 for transport in transports))
+        self.assertTrue(all(len(transport.writes) == 2 for transport in transports))
 
     def test_timeout_or_stale_metadata_does_not_abort_other_candidates(self) -> None:
         ports = [
@@ -294,7 +314,7 @@ class DiscoveryTests(unittest.TestCase):
         )
         self.assertEqual(1, len(transports["COM3"].writes))
         self.assertTrue(
-            all(len(transport.writes) <= 1 for transport in transports.values())
+            all(len(transport.writes) <= 2 for transport in transports.values())
         )
         self.assertTrue(
             all(transport.closed.is_set() for transport in transports.values())

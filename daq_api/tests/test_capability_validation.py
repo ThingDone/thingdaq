@@ -15,8 +15,8 @@ from thingdone_daq import (
     StreamMask,
     ThingDAQ,
     UnexpectedMessageError,
-    decode_frame,
 )
+from thingdone_daq.protocol_v2 import IncrementalCompatibleFrameParser
 
 
 class CountingTransport(InMemoryTransport):
@@ -27,7 +27,7 @@ class CountingTransport(InMemoryTransport):
         self.configure_requests = 0
 
     def write(self, data: bytes | bytearray | memoryview) -> int:
-        frame = decode_frame(bytes(data))
+        frame = IncrementalCompatibleFrameParser(include_v3=True).feed(bytes(data))[0]
         if frame.header.kind is FrameKind.CONFIGURE_REQUEST:
             self.configure_requests += 1
         return super().write(data)

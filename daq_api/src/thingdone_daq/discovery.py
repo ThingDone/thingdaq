@@ -4,14 +4,22 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from math import isfinite
 from typing import Protocol, TypeAlias
 
 from serial.tools import list_ports
 from serial.tools.list_ports_common import ListPortInfo
 
 from ._generated import protocol_constants as constants
-from .identity import IdentityValidationError, validate_device_identity
+from .identity import (
+    DeviceIdentitySnapshot,
+    IdentityValidationError,
+    validate_device_identity,
+)
 from .models import Info
+from .models_v3 import V3Info
+from .negotiation import InfoNegotiation
+from .protocol_v2 import IncrementalCompatibleFrameParser
 from .reader import BackgroundReader
 from .transport import ByteTransport, SerialTransport
 
@@ -102,9 +110,13 @@ class SerialPortCandidate:
 class DeviceIdentity:
     """Stable identity learned from INFO rather than a transient port path."""
 
-    hardware_serial: int
+    hardware_serial: int | str
 
     def __post_init__(self) -> None:
+        if isinstance(self.hardware_serial, str):
+            if not self.hardware_serial:
+                raise ValueError("hardware_serial must be nonempty")
+            return
         if (
             not isinstance(self.hardware_serial, int)
             or isinstance(self.hardware_serial, bool)
@@ -118,13 +130,13 @@ class DiscoveredDevice:
     """A metadata candidate that answered a compatible, physical-device INFO."""
 
     candidate: SerialPortCandidate
-    info: Info
+    info: Info | V3Info
 
     @property
     def identity(self) -> DeviceIdentity:
         """Return the stable identity used across port renames and rescans."""
 
-        return DeviceIdentity(self.info.hardware_serial)
+        return DeviceIdentity(self.hardware_serial)
 
     @property
     def port(self) -> str:
@@ -165,10 +177,10 @@ class DiscoveredDevice:
         return self.candidate.description
 
     @property
-    def hardware_serial(self) -> int:
+    def hardware_serial(self) -> int | str:
         """Return the protocol INFO hardware serial number."""
 
-        return self.info.hardware_serial
+        return DeviceIdentitySnapshot.from_info(self.info).hardware_serial
 
 
 def _default_port_enumerator() -> Iterable[ListPortInfo]:
@@ -242,6 +254,7 @@ def _validate_timeout(timeout: float) -> float:
     if (
         not isinstance(timeout, (int, float))
         or isinstance(timeout, bool)
+        or not isfinite(timeout)
         or timeout <= 0
     ):
         raise ValueError("discovery timeout must be positive")
@@ -272,9 +285,11 @@ def _usb_serial_as_int(serial_number: str | None) -> int | None:
     return int(serial_number, 10)
 
 
-def _validate_physical_info(candidate: SerialPortCandidate, info: Info) -> None:
+def _validate_physical_info(
+    candidate: SerialPortCandidate, info: Info | V3Info
+) -> None:
     try:
-        validate_device_identity(info)
+        identity = validate_device_identity(info)
     except IdentityValidationError as error:
         raise DiscoveryProbeError(
             candidate,
@@ -282,15 +297,21 @@ def _validate_physical_info(candidate: SerialPortCandidate, info: Info) -> None:
             error,
         ) from error
     if (
-        info.board_id is not constants.BoardId.TEENSY_40
-        or info.mcu_id is not constants.McuId.IMXRT1062
+        identity.board_id is not constants.BoardId.TEENSY_40
+        or identity.mcu_id is not constants.McuId.IMXRT1062
     ):
         raise DiscoveryProbeError(
             candidate, "INFO did not identify a Teensy 4.0 / i.MX RT1062 device"
         )
 
+    if (
+        isinstance(info, V3Info)
+        and candidate.serial_number is not None
+        and candidate.serial_number != info.hardware_serial
+    ):
+        raise DiscoveryProbeError(candidate, "USB serial metadata differs from v3 INFO")
     enumerated_serial = _usb_serial_as_int(candidate.serial_number)
-    if enumerated_serial is not None and enumerated_serial != info.hardware_serial:
+    if enumerated_serial is not None and enumerated_serial != identity.hardware_serial:
         raise DiscoveryProbeError(
             candidate,
             "USB serial metadata changed before the INFO probe completed",
@@ -325,6 +346,8 @@ def probe_candidate(
             transport = transport_factory(candidate)
         reader = BackgroundReader(
             transport,
+            randomize_request_ids=True,
+            parser=IncrementalCompatibleFrameParser(include_v3=True),
             max_pending_requests=1,
             max_queued_blocks=1,
             max_queued_events=1,
@@ -333,23 +356,11 @@ def probe_candidate(
             shutdown_timeout=selected_timeout,
         )
         reader.start()
-        response = reader.request(
-            constants.FrameKind.INFO_REQUEST,
-            timeout=selected_timeout,
-        )
+        response = InfoNegotiation().probe(reader, selected_timeout)
         if (
             not response.ok
-            and response.error_code is constants.ErrorCode.UNSUPPORTED_VERSION
-        ):
-            response = reader.request(
-                constants.FrameKind.INFO_REQUEST,
-                timeout=selected_timeout,
-                protocol_version=2,
-            )
-        if (
-            not response.ok
-            or response.kind is not constants.FrameKind.INFO_RESPONSE
-            or not isinstance(response.value, Info)
+            or response.kind != constants.FrameKind.INFO_RESPONSE
+            or not isinstance(response.value, (Info, V3Info))
         ):
             raise DiscoveryProbeError(candidate, "device rejected or malformed INFO")
         _validate_physical_info(candidate, response.value)
@@ -406,6 +417,8 @@ def _matches_hardware_serial(
     if isinstance(hardware_serial, int) and not isinstance(hardware_serial, bool):
         return device.hardware_serial == hardware_serial
     if isinstance(hardware_serial, str):
+        if device.hardware_serial == hardware_serial:
+            return True
         if device.serial_number == hardware_serial:
             return True
         serial_as_int = _usb_serial_as_int(hardware_serial)

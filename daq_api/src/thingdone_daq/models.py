@@ -5134,9 +5134,12 @@ class Status:
         return self.data_checksum_algorithm
 
     def to_payload(
-        self, *, protocol_version: int = constants.PROTOCOL_VERSION
+        self,
+        *,
+        protocol_version: int = constants.PROTOCOL_VERSION,
+        counter_configuration: DAQConfiguration | None = None,
     ) -> bytes:
-        """Encode a successful STATUS response with ADC initialization state."""
+        """Encode STATUS, retaining the stopped run's counter layout if supplied."""
 
         use_v2 = protocol_version == v2_constants.PROTOCOL_VERSION
         payload = bytearray(
@@ -5244,10 +5247,16 @@ class Status:
                 getattr(self, name),
             )
         if use_v2:
-            configuration = self.configuration or DAQConfiguration(
-                stream_mask=self.stream_mask,
-                source=self.source,
-                data_checksum_algorithm=self.data_checksum_algorithm,
+            configuration = (
+                self.configuration
+                or counter_configuration
+                or DAQConfiguration(
+                    stream_mask=self.stream_mask,
+                    source=self.source
+                    if self.stream_mask
+                    else constants.Source.HARDWARE,
+                    data_checksum_algorithm=self.data_checksum_algorithm,
+                )
             )
             timing = configuration.rate_timing
             layout = configuration.gpio_layout
@@ -5421,25 +5430,29 @@ class Status:
         configuration = None
         auxiliary_gpio = None
         if len(payload_bytes) == v2_constants.STATUS_RESPONSE_PAYLOAD_SIZE:
-            configuration = DAQConfiguration(
-                stream_mask=constants.StreamMask(
-                    payload_bytes[constants.STATUS_RESPONSE_STREAM_MASK_OFFSET]
-                ),
-                source=constants.Source(
-                    payload_bytes[constants.STATUS_RESPONSE_SOURCE_OFFSET]
-                ),
-                data_checksum_algorithm=constants.ChecksumAlgorithm(
-                    payload_bytes[
-                        constants.STATUS_RESPONSE_DATA_CHECKSUM_ALGORITHM_OFFSET
-                    ]
-                ),
-                aux_bank_mode=AuxBankMode(
-                    payload_bytes[v2_constants.STATUS_RESPONSE_AUX_BANK_MODE_OFFSET]
-                ),
-                rate_profile=RateProfile(
-                    payload_bytes[v2_constants.STATUS_RESPONSE_RATE_PROFILE_OFFSET]
-                ),
-            )
+            if (
+                payload_bytes[constants.STATUS_RESPONSE_DEVICE_STATE_OFFSET]
+                != constants.DeviceState.IDLE
+            ):
+                configuration = DAQConfiguration(
+                    stream_mask=constants.StreamMask(
+                        payload_bytes[constants.STATUS_RESPONSE_STREAM_MASK_OFFSET]
+                    ),
+                    source=constants.Source(
+                        payload_bytes[constants.STATUS_RESPONSE_SOURCE_OFFSET]
+                    ),
+                    data_checksum_algorithm=constants.ChecksumAlgorithm(
+                        payload_bytes[
+                            constants.STATUS_RESPONSE_DATA_CHECKSUM_ALGORITHM_OFFSET
+                        ]
+                    ),
+                    aux_bank_mode=AuxBankMode(
+                        payload_bytes[v2_constants.STATUS_RESPONSE_AUX_BANK_MODE_OFFSET]
+                    ),
+                    rate_profile=RateProfile(
+                        payload_bytes[v2_constants.STATUS_RESPONSE_RATE_PROFILE_OFFSET]
+                    ),
+                )
             c = v2_constants
             values64 = struct.unpack_from(
                 "<" + "Q" * 18,

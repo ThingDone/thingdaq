@@ -25,6 +25,7 @@ from thingdone_daq import (
     synthetic_adc_payload,
 )
 from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.protocol_v2 import IncrementalCompatibleFrameParser
 
 
 def _adc(
@@ -140,7 +141,7 @@ class _StaleAfterStartTransport(InMemoryTransport):
         self._injected = False
 
     def write(self, data: bytes | bytearray | memoryview) -> int:
-        request = decode_frame(bytes(data))
+        request = IncrementalCompatibleFrameParser(include_v3=True).feed(bytes(data))[0]
         written = super().write(data)
         if request.header.kind is FrameKind.START_REQUEST and not self._injected:
             self._injected = True
@@ -426,7 +427,9 @@ class PublicLossRecoveryTests(unittest.TestCase):
     def test_host_queue_loss_reports_exact_policy_units(self) -> None:
         class _BurstTransport(InMemoryTransport):
             def write(self, data: bytes | bytearray | memoryview) -> int:
-                request = decode_frame(bytes(data))
+                request = IncrementalCompatibleFrameParser(include_v3=True).feed(
+                    bytes(data)
+                )[0]
                 written = super().write(data)
                 if request.header.kind is FrameKind.START_REQUEST:
                     with self._lock:

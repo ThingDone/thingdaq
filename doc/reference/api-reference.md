@@ -70,8 +70,19 @@ Both constructors return a typed context manager. `close()` normally attempts
 STOP before deterministic shutdown. `close(stop=False)` deliberately preserves
 device state and should be limited to tools that explicitly need it.
 
+`ThingDAQ.open()` and discovery share bounded, read-only INFO negotiation:
+v3 first, then historical v1, then v2-only release firmware. A fallback requires
+an explicit, correlated `UNSUPPORTED_VERSION` response; timeouts, bad checksums
+and malformed metadata never permit downgrade. Open requires two matching
+identities before applying the session policy. The configured wire version
+persists through STOP and subsequent operations. Reconnect by closing and
+opening a fresh session, which rereads metadata and settings; no settings cache
+is transferred. See [[protocol-v3-negotiation]] for bounds and compatibility tests.
+
 ## Identity and capabilities
 
+V3 sessions return `V3Info`, with advertised metadata available through
+`get_capabilities()` and active readback through `get_settings()`. Legacy
 `daq.info()` returns `DeviceInfo`; the last synchronized value is also
 `daq.device_info`. Key fields include:
 

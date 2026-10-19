@@ -41,6 +41,7 @@ from thingdone_daq import (
     encode_frame,
 )
 from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.protocol_v2 import IncrementalCompatibleFrameParser
 
 
 class PhysicalInfoDevice(SimulatedDevice):
@@ -116,7 +117,7 @@ class StartBurstTransport(InMemoryTransport):
         self._burst_added = False
 
     def write(self, data: bytes | bytearray | memoryview) -> int:
-        request = decode_frame(bytes(data))
+        request = IncrementalCompatibleFrameParser(include_v3=True).feed(bytes(data))[0]
         written = super().write(data)
         if request.header.kind is FrameKind.START_REQUEST and not self._burst_added:
             self._burst_added = True

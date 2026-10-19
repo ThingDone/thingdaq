@@ -45,6 +45,7 @@ from thingdone_daq import (
     synthetic_adc_payload,
 )
 from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq.protocol_v2 import IncrementalCompatibleFrameParser
 
 _Fault = Literal["missing", "duplicate", "reordered", "cross_run"]
 
@@ -165,7 +166,7 @@ class _StartBurstTransport(InMemoryTransport):
         self._burst_injected = False
 
     def write(self, data: bytes | bytearray | memoryview) -> int:
-        request = decode_frame(bytes(data))
+        request = IncrementalCompatibleFrameParser(include_v3=True).feed(bytes(data))[0]
         written = super().write(data)
         if request.header.kind is FrameKind.START_REQUEST and not self._burst_injected:
             self._burst_injected = True

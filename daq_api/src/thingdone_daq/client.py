@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, replace
 from enum import Enum
+from math import isfinite
 from threading import RLock
 from time import sleep
 from types import TracebackType
@@ -60,6 +61,7 @@ from .models import (
     analyze_stream_continuity,
 )
 from .models_v3 import V3AppliedSettings, V3Capabilities, V3Info, V3Settings, V3Status
+from .negotiation import InfoNegotiation
 from .protocol import ParserCounters
 from .protocol_v2 import (
     IncrementalCompatibleFrameParser,
@@ -341,11 +343,11 @@ class ThingDAQ:
         operation_byte_budget: int | None = None,
         expected_identity: ExpectedDeviceIdentity | None = None,
         reopened_identity: DeviceIdentitySnapshot | None = None,
+        _expected_usb_serial: str | None = None,
         session_policy: SessionRecoveryPolicy | str = SessionRecoveryPolicy.ADOPT,
         synthetic_gpio_pattern: SyntheticGPIOPattern | str = (
             SyntheticGPIOPattern.COUNTER
         ),
-        _v3_simulator: bool = False,
     ) -> None:
         if not isinstance(strict, bool):
             raise TypeError("strict must be a boolean")
@@ -380,9 +382,11 @@ class ThingDAQ:
         self._block_timeout = float(block_timeout)
         self._expected_identity = expected_identity
         self._reopened_identity = reopened_identity
+        self._expected_usb_serial = _expected_usb_serial
         self._session_policy = selected_session_policy
         self._session_policy_applied = False
         self._synthetic_gpio_pattern = selected_gpio_pattern
+        self._negotiation = InfoNegotiation()
         self._wire_protocol_version = constants.PROTOCOL_VERSION
         self._verified_identity: DeviceIdentitySnapshot | None = None
         self._reader = BackgroundReader(
@@ -395,10 +399,9 @@ class ThingDAQ:
             queue_timeout=block_timeout,
             shutdown_timeout=shutdown_timeout,
             idle_sleep=idle_sleep,
-            parser=IncrementalCompatibleFrameParser(include_v3=_v3_simulator),
+            parser=IncrementalCompatibleFrameParser(include_v3=True),
+            randomize_request_ids=True,
         )
-        if _v3_simulator:
-            self._v3 = V3Session(self._reader, self._command_timeout)
         self._lock = RLock()
         self._pending_items: deque[StreamItem] = deque()
         self._state: constants.DeviceState | None = None
@@ -475,7 +478,7 @@ class ThingDAQ:
             raise ValueError("pass either device or hardware_serial, not both")
 
         selected: DiscoveredDevice | SerialPortCandidate | str | None = None
-        expected_serial: int | None = None
+        expected_serial: int | str | None = None
         reopened_identity: DeviceIdentitySnapshot | None = None
         if device is None:
             devices = discover_devices(timeout=discovery_timeout)
@@ -489,7 +492,9 @@ class ThingDAQ:
             elif len(devices) > 1:
                 available_serials = ", ".join(
                     str(item.hardware_serial)
-                    for item in sorted(devices, key=lambda item: item.hardware_serial)
+                    for item in sorted(
+                        devices, key=lambda item: str(item.hardware_serial)
+                    )
                 )
                 raise MultipleDevicesFoundError(
                     "multiple ThingDAQs were discovered; pass "
@@ -517,20 +522,6 @@ class ThingDAQ:
                 "port path, or None"
             )
 
-        if selected is not None:
-            port = selected.port if not isinstance(selected, str) else selected
-            if serial_transport_factory is None:
-                transport = SerialTransport(
-                    port,
-                    open_timeout=serial_open_timeout,
-                    read_timeout=serial_read_timeout,
-                    write_timeout=serial_write_timeout,
-                    flush_timeout=serial_flush_timeout,
-                    close_timeout=serial_close_timeout,
-                )
-            else:
-                transport = serial_transport_factory(port)
-
         if expected_serial is not None:
             if (
                 expected_identity is not None
@@ -545,23 +536,47 @@ class ThingDAQ:
                 hardware_serial=expected_serial,
             )
 
-        daq = cls(
-            transport,
-            strict=strict,
-            read_size=read_size,
-            max_buffered_blocks=max_buffered_blocks,
-            max_buffered_events=max_buffered_events,
-            max_pending_requests=max_pending_requests,
-            command_timeout=command_timeout,
-            block_timeout=block_timeout,
-            shutdown_timeout=shutdown_timeout,
-            idle_sleep=idle_sleep,
-            operation_byte_budget=operation_byte_budget,
-            expected_identity=expected_identity,
-            reopened_identity=reopened_identity,
-            session_policy=session_policy,
-            synthetic_gpio_pattern=synthetic_gpio_pattern,
-        )
+        if selected is not None:
+            port = selected.port if not isinstance(selected, str) else selected
+            if serial_transport_factory is None:
+                transport = SerialTransport(
+                    port,
+                    open_timeout=serial_open_timeout,
+                    read_timeout=serial_read_timeout,
+                    write_timeout=serial_write_timeout,
+                    flush_timeout=serial_flush_timeout,
+                    close_timeout=serial_close_timeout,
+                )
+            else:
+                transport = serial_transport_factory(port)
+
+        try:
+            daq = cls(
+                transport,
+                strict=strict,
+                read_size=read_size,
+                max_buffered_blocks=max_buffered_blocks,
+                max_buffered_events=max_buffered_events,
+                max_pending_requests=max_pending_requests,
+                command_timeout=command_timeout,
+                block_timeout=block_timeout,
+                shutdown_timeout=shutdown_timeout,
+                idle_sleep=idle_sleep,
+                operation_byte_budget=operation_byte_budget,
+                expected_identity=expected_identity,
+                reopened_identity=reopened_identity,
+                _expected_usb_serial=selected.serial_number
+                if isinstance(selected, (DiscoveredDevice, SerialPortCandidate))
+                else None,
+                session_policy=session_policy,
+                synthetic_gpio_pattern=synthetic_gpio_pattern,
+            )
+        except BaseException:
+            try:
+                transport.close()
+            except Exception:  # noqa: BLE001, S110 - preserve construction failure
+                pass
+            raise
         try:
             daq.synchronize(
                 attempts=synchronization_attempts,
@@ -626,33 +641,6 @@ class ThingDAQ:
             write_chunk_size=write_chunk_size,
             stream_interval=stream_interval,
         )
-        if protocol_version == 3:
-            daq = cls(
-                transport,
-                strict=strict,
-                read_size=read_size,
-                max_buffered_blocks=max_buffered_blocks,
-                max_buffered_events=max_buffered_events,
-                max_pending_requests=max_pending_requests,
-                command_timeout=command_timeout,
-                block_timeout=block_timeout,
-                shutdown_timeout=shutdown_timeout,
-                idle_sleep=idle_sleep,
-                session_policy=session_policy,
-                _v3_simulator=True,
-            )
-            try:
-                assert daq._v3 is not None
-                daq._v3.info()
-                daq._v3.info()
-                daq._v3.get_capabilities()
-                daq._v3.get_settings()
-                daq._v3.status()
-                daq._state = constants.DeviceState.CONFIGURED
-                return daq
-            except BaseException:
-                daq.close(stop=False)
-                raise
         return cls.open(
             transport,
             strict=strict,
@@ -800,7 +788,7 @@ class ThingDAQ:
         *,
         attempts: int = 4,
         retry_delay: float = 0.05,
-    ) -> DeviceInfo:
+    ) -> DeviceInfo | V3Info:
         """Discard one valid INFO, then require a stable authoritative INFO.
 
         Reset/startup noise is handled by the incremental parser. A timeout,
@@ -814,6 +802,7 @@ class ThingDAQ:
         if (
             not isinstance(retry_delay, (int, float))
             or isinstance(retry_delay, bool)
+            or not isfinite(retry_delay)
             or retry_delay < 0
         ):
             raise ValueError("synchronization retry delay must be nonnegative")
@@ -823,7 +812,7 @@ class ThingDAQ:
             last_retryable: ThingDAQError | None = None
             for attempt in range(attempts):
                 try:
-                    info, identity = self._read_info()
+                    info, identity = self._probe_info()
                 except CommandTimeoutError as error:
                     last_retryable = error
                 except DeviceCommandError as error:
@@ -843,6 +832,31 @@ class ThingDAQ:
                         )
                     else:
                         self._verified_identity = identity
+                        if isinstance(info, V3Info):
+                            assert self._v3 is not None
+                            self._v3.get_capabilities()
+                            self._v3.get_settings()
+                            snapshot = self._v3.status()
+                            self._run_id = snapshot.run_id
+                            self._state = constants.DeviceState.CONFIGURED
+                            if snapshot.state != v3_constants.DeviceState.STOPPED:
+                                if self._session_policy is SessionRecoveryPolicy.STOP:
+                                    self.stop()
+                                elif snapshot.state == v3_constants.DeviceState.RUNNING:
+                                    assert self._v3.applied is not None
+                                    self._reader.activate_v3_run(
+                                        snapshot.run_id, self._v3.applied.settings
+                                    )
+                                    self._configuration = self._v3_stream_configuration(
+                                        self._v3.applied.settings
+                                    )
+                                    self._initialize_stream_expectations(
+                                        self._configuration, epoch_start=False
+                                    )
+                                    self._reset_loss_observations()
+                                    self._state = constants.DeviceState.RUNNING
+                            self._session_policy_applied = True
+                            return info
                         return self._apply_session_policy(info)
 
                 if attempt + 1 < attempts and retry_delay:
@@ -900,7 +914,9 @@ class ThingDAQ:
         with self._lock:
             self._ensure_open()
             if self._v3 is not None:
-                return self._v3.info()
+                value = self._v3.info()
+                self._validate_info_identity(value)
+                return value
             info, _ = self._read_info()
             return info
 
@@ -1171,12 +1187,13 @@ class ThingDAQ:
                 adc_resolution_bits=adc_resolution_bits,
             )
 
+            selected_version = max(
+                self._wire_protocol_version, configuration.protocol_version
+            )
             response = self._command(
                 constants.FrameKind.CONFIGURE_REQUEST,
-                configuration.to_payload(
-                    protocol_version=configuration.protocol_version
-                ),
-                protocol_version=configuration.protocol_version,
+                configuration.to_payload(protocol_version=selected_version),
+                protocol_version=selected_version,
             )
             if not isinstance(response.value, DAQConfiguration):
                 raise UnexpectedMessageError(
@@ -1184,7 +1201,7 @@ class ThingDAQ:
                 )
             self._state = constants.DeviceState.CONFIGURED
             self._configuration = response.value
-            self._wire_protocol_version = configuration.protocol_version
+            self._wire_protocol_version = selected_version
             self._run_id = response.run_id
             self._last_status = None
             if response.value != configuration:
@@ -1200,6 +1217,18 @@ class ThingDAQ:
         result = self.configure(DAQConfiguration.control_only())
         assert isinstance(result, DAQConfiguration)
         return result
+
+    @staticmethod
+    def _v3_stream_configuration(settings: V3Settings) -> DAQConfiguration:
+        """Project selected streams/rates into the existing continuity tracker."""
+        return DAQConfiguration(
+            constants.StreamMask(settings.stream_mask),
+            constants.Source(settings.source),
+            aux_bank_mode=AuxBankMode(settings.aux_bank_mode)
+            if settings.stream_mask & v3_constants.StreamMask.GPIO
+            else AuxBankMode.DISABLED,
+            rate_profile=RateProfile(settings.rate_profile),
+        )
 
     def start(self) -> int:
         """Start a configured acquisition and return its nonzero run ID."""
@@ -1217,14 +1246,7 @@ class ThingDAQ:
                 assert self._v3.applied is not None
                 settings = self._v3.applied.settings
                 # Shared continuity code needs only source, stream mask and timing.
-                self._configuration = DAQConfiguration(
-                    constants.StreamMask(settings.stream_mask),
-                    constants.Source(settings.source),
-                    aux_bank_mode=AuxBankMode(settings.aux_bank_mode)
-                    if settings.stream_mask & v3_constants.StreamMask.GPIO
-                    else AuxBankMode.DISABLED,
-                    rate_profile=RateProfile(settings.rate_profile),
-                )
+                self._configuration = self._v3_stream_configuration(settings)
                 self._pending_items.clear()
                 self._initialize_stream_expectations(self._configuration)
                 self._reset_loss_observations()
@@ -1485,7 +1507,6 @@ class ThingDAQ:
             self._state = constants.DeviceState.IDLE
             self._configuration = None
             assert self._verified_identity is not None
-            self._wire_protocol_version = self._verified_identity.protocol_version
             self._run_id = response.run_id
             self._clear_stream_expectations(preserve_inferred=True)
             self._pending_items.clear()
@@ -1830,9 +1851,7 @@ class ThingDAQ:
     ) -> CommandResponse[ResponseValue]:
         self._ensure_open()
         if self._v3 is not None:
-            raise ThingDAQError(
-                "this legacy command is unavailable in v3 simulator sessions"
-            )
+            raise ThingDAQError("this legacy command is unavailable in v3 sessions")
         selected_version = (
             self._wire_protocol_version
             if protocol_version is None
@@ -1872,29 +1891,70 @@ class ThingDAQ:
         protocol_version: int | None = None,
     ) -> tuple[DeviceInfo, DeviceIdentitySnapshot]:
         if self._v3 is not None:
-            raise ThingDAQError(
-                "this legacy command is unavailable in v3 simulator sessions"
-            )
+            raise ThingDAQError("this legacy command is unavailable in v3 sessions")
         selected_version = (
             self._wire_protocol_version
             if protocol_version is None
             else protocol_version
         )
+        response = self._command(
+            constants.FrameKind.INFO_REQUEST, protocol_version=selected_version
+        )
+        return self._accept_legacy_info(response, selected_version)
+
+    def _probe_info(self) -> tuple[DeviceInfo | V3Info, DeviceIdentitySnapshot]:
+        if self._v3 is not None:
+            info = self._v3.info()
+            return info, self._validate_info_identity(info)
+        if self._verified_identity is not None:
+            return self._read_info()
         try:
-            response = self._command(
-                constants.FrameKind.INFO_REQUEST,
-                protocol_version=selected_version,
+            response = self._negotiation.probe(self._reader, self._command_timeout)
+        except RequestTimeoutError as error:
+            raise CommandTimeoutError(error, self._recovery_evidence()) from error
+        if not response.ok:
+            raise DeviceCommandError(
+                response.kind, response.error_code, response.request_id
             )
-        except DeviceCommandError as error:
-            if (
-                selected_version != constants.PROTOCOL_VERSION
-                or error.error_code != constants.ErrorCode.UNSUPPORTED_VERSION
-            ):
-                raise
-            selected_version = v2_constants.PROTOCOL_VERSION
-            response = self._command(
-                constants.FrameKind.INFO_REQUEST, protocol_version=selected_version
+        if isinstance(response.value, V3Info):
+            identity = self._validate_info_identity(response.value)
+            self._v3 = V3Session(self._reader, self._command_timeout)
+            self._v3.identity = response.value
+            self._wire_protocol_version = 3
+            return response.value, identity
+        if not isinstance(response, CommandResponse):
+            raise UnexpectedMessageError("INFO response has no identity")
+        self._wire_protocol_version = self._negotiation.version
+        return self._accept_legacy_info(response, self._negotiation.version)
+
+    def _validate_info_identity(
+        self, info: DeviceInfo | V3Info
+    ) -> DeviceIdentitySnapshot:
+        if (
+            isinstance(info, V3Info)
+            and self._expected_usb_serial is not None
+            and info.hardware_serial != self._expected_usb_serial
+        ):
+            raise DeviceIdentityMismatchError(
+                "USB serial metadata differs from v3 INFO"
             )
+        try:
+            identity = validate_device_identity(info, self._expected_identity)
+        except IdentityValidationError as error:
+            raise DeviceIdentityMismatchError(str(error)) from error
+        if self._reopened_identity is not None and identity != self._reopened_identity:
+            raise DeviceIdentityMismatchError(
+                "reopened firmware identity differs from the discovery probe"
+            )
+        if self._verified_identity is not None and identity != self._verified_identity:
+            raise DeviceIdentityMismatchError(
+                "firmware identity changed during the open session"
+            )
+        return identity
+
+    def _accept_legacy_info(
+        self, response: CommandResponse[ResponseValue], selected_version: int
+    ) -> tuple[DeviceInfo, DeviceIdentitySnapshot]:
         if not isinstance(response.value, DeviceInfo):
             raise UnexpectedMessageError("INFO response has no DeviceInfo value")
         info = response.value
@@ -1927,7 +1987,6 @@ class ThingDAQ:
 
         previous_run_id = self._run_id
         self._device_info = info
-        self._wire_protocol_version = selected_version
         self._state = info.device_state
         self._run_id = response.run_id
         if previous_run_id != response.run_id:
