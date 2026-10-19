@@ -257,6 +257,17 @@ Pass an exact `V3Settings` tuple from `capabilities.configurations` to
 are simulated metadata. Omitting `protocol_version` retains the historical
 simulator defaults. See the [v3 session API](doc/protocol/protocol-v3.md#public-simulator-session).
 
+Run the deterministic public-v3 demonstration without hardware:
+
+```bash
+.venv/bin/python daq_api/examples/protocol_upgrade.py
+```
+
+It prints all advertised tuples, verifies exact ADC/GPIO samples and timestamps,
+reports compression byte counts and RAW fallback, and exercises stopped
+600/450/600 MHz configuration transitions plus rejected running reconfiguration.
+Clock changes are simulated metadata; this does not measure hardware throughput.
+
 ## Repository layout and checks
 
 - `firmware/`: Teensy 4.0 sketch, portable C++ components, build tooling, and

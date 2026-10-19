@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import io
 import os
+import runpy
 import subprocess
 import sys
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
+
+from thingdone_daq import ThingDAQ
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = PACKAGE_ROOT.parent
@@ -17,8 +23,33 @@ EXAMPLE_SCRIPTS = tuple(
 
 
 class SimulatorExampleTests(unittest.TestCase):
+    def test_protocol_upgrade_sample_mismatch_closes_transport(self) -> None:
+        demo = runpy.run_path(str(EXAMPLES_ROOT / "protocol_upgrade.py"))
+        main = demo["main"]
+        sessions = []
+        simulated = ThingDAQ.simulated
+
+        def open_session(**options):
+            session = simulated(**options)
+            sessions.append(session)
+            return session
+
+        with (
+            patch.object(ThingDAQ, "simulated", side_effect=open_session),
+            patch.dict(
+                main.__globals__,
+                {"synthetic_v3_adc_payload": lambda first, count: bytes(count * 4)},
+            ),
+            redirect_stdout(io.StringIO()),
+            self.assertRaisesRegex(AssertionError, "ADC channel values differ"),
+        ):
+            main()
+        self.assertEqual(1, len(sessions))
+        self.assertFalse(sessions[0].transport.is_open)
+        self.assertFalse(sessions[0].reader.is_running)
+
     def test_every_public_example_runs_offline_and_identifies_itself(self) -> None:
-        self.assertEqual(10, len(EXAMPLE_SCRIPTS))
+        self.assertEqual(11, len(EXAMPLE_SCRIPTS))
         environment = os.environ.copy()
         source_path = str(PACKAGE_ROOT / "src")
         environment["PYTHONPATH"] = os.pathsep.join(
