@@ -16,8 +16,8 @@ related:
 
 `protocol/protocol-v3.json` is the canonical v3 wire contract. This checkpoint
 provides validated schemas, separate Python/C++ constants, golden frames and
-opt-in Python codecs. Production firmware, serial negotiation and the v3
-simulator are not enabled. The current product still uses [[protocol-v2]]. Physical results
+opt-in Python codecs and a simulated v3 device. Production firmware and serial
+negotiation are not enabled. The current product still uses [[protocol-v2]]. Physical results
 in [[deferred-codecs-20261018]] concern private research versions, not v3.
 
 Generate with `.venv/bin/python tools/generate_protocol.py`; verify with
@@ -127,8 +127,10 @@ contract mutations, all version-selecting generator paths, and the frozen
 legacy artifact digest recorded in [[protocol-v3-foundation]].
 `daq_api/tests/test_protocol_v3_codecs.py` exercises runtime controls and samples,
 exact golden-byte round trips, malformed metadata, count/expansion bounds,
-RLE tie fallback, PACK12 bit positions and bounded parser recovery. Simulator
-and session lifecycle tests remain subsequent Phase 01 tasks.
+RLE tie fallback, PACK12 bit positions and bounded parser recovery.
+`daq_api/tests/test_simulator_v3.py` covers all 60 advertised tuples, encoded
+commands, atomic configuration, replay, chunking, corruption and transport drain.
+Public session integration remains a subsequent Phase 01 task.
 
 ## Opt-in Python codecs
 
@@ -144,7 +146,7 @@ capabilities, applied settings, status, STOP state and command/response records.
 Use `V3Capabilities.require_supported(settings)` to check a device's exact
 advertised subset and `V3Response.validate_for(command)` to check correlation
 and the CONFIGURE echo. State transitions, replay tracking and atomic application
-belong to the later session/device integration; these codecs do not mutate state.
+belong to the device/session integration; these codecs do not mutate state.
 
 `decode_v3_block(frame, settings)` validates selected stream/source/width/policy
 and returns the existing `ADCBlock` or `GPIOBlock`. Channel views and timestamps
@@ -152,3 +154,33 @@ use decoded samples. `encoded_payload` retains the transmitted prefix and sample
 bytes; `encoded_sample_bytes`, `decoded_bytes` and `wire_bytes` distinguish sample
 compression from complete frame overhead. Variable logical counts apply only to
 v3 blocks; v1/v2 retain their fixed layouts and existing behavior.
+
+## Opt-in simulated device
+
+Construct `SimulatedV3Device` from `thingdone_daq.simulator_v3` and pass it to
+`InMemoryTransport`. Send `V3Command.to_bytes()` through transport writes and
+parse reads with `V3FrameParser`; partial writes/reads follow the same transport
+contract as v1/v2. `ThingDAQ.simulated` v3 selection is not wired yet.
+The historical `SimulatedDevice` and default transport persona remain unchanged.
+
+The v3 peer starts STOPPED with the advertised board defaults already applied.
+INFO always sets `simulated=True`, uses a `SIM-` serial and identifies its build
+as `thingdaq-simulator-v3`. HARDWARE source represents emulated board input;
+SYNTHETIC source sets the wire flag. Both use deterministic samples. Selecting
+450 MHz changes metadata only; no simulator rate measures hardware throughput.
+
+GPIO frames alternate all-zero input and high-transition input using existing
+synthetic formulas: primary bytes alternate AA/55, auxiliary bytes 0F/F0.
+RLE_AUTO therefore emits RLE followed by RAW at either GPIO width. ADC uses
+`synthetic_v3_adc_payload`: the existing 12-bit ramp, with each 2048-pair cycle's
+first four pairs replaced by `(0,0)`, `(4095,4095)`, `(0xABC,0x123)` and
+`(0x555,0xAAA)`. This exercises edge values and every packed bit position.
+
+START resets per-stream sequences, timestamps and logical counters; its response
+precedes data. The transport produces one frame per requested credit. STOP
+preserves settings and enters DRAINING while a partially read data frame remains;
+START/CONFIGURE return BUSY until that tail is consumed. Already queued responses
+retain their original state snapshots: query GET_STATUS again after draining to
+observe STOPPED. Closing a transport discards any pending tail and records its
+frame/items as dropped; reconnect preserves settings/run and clears request replay
+history. `device.reboot()` while detached restores defaults and all initial state.

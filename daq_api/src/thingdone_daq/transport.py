@@ -13,7 +13,9 @@ from typing import Literal, Protocol, cast, runtime_checkable
 import serial
 
 from ._generated import protocol_constants as constants
+from ._generated import protocol_v3_constants as v3_constants
 from .simulator import SimulatedDevice
+from .simulator_v3 import SimulatedV3Device
 
 BytesLike = bytes | bytearray | memoryview
 
@@ -521,7 +523,7 @@ class InMemoryTransport:
 
     def __init__(
         self,
-        device: SimulatedDevice | None = None,
+        device: SimulatedDevice | SimulatedV3Device | None = None,
         *,
         read_chunk_size: int | None = None,
         write_chunk_size: int | None = None,
@@ -533,7 +535,17 @@ class InMemoryTransport:
             raise ValueError("read_chunk_size must be positive")
         if write_chunk_size is not None and write_chunk_size <= 0:
             raise ValueError("write_chunk_size must be positive")
-        minimum_pending = constants.DATA_FRAME_BYTES + constants.MAX_CONTROL_FRAME_BYTES
+        self._max_control_frame_bytes = (
+            v3_constants.MAX_CONTROL_FRAME_BYTES
+            if isinstance(device, SimulatedV3Device)
+            else constants.MAX_CONTROL_FRAME_BYTES
+        )
+        maximum_data = (
+            v3_constants.MAX_DATA_FRAME_BYTES
+            if isinstance(device, SimulatedV3Device)
+            else constants.DATA_FRAME_BYTES
+        )
+        minimum_pending = maximum_data + self._max_control_frame_bytes
         if max_pending_bytes < minimum_pending:
             raise ValueError(f"max_pending_bytes must be at least {minimum_pending}")
         if stream_interval is not None and (
@@ -557,6 +569,7 @@ class InMemoryTransport:
         self._stream_credits = 0
         self._next_stream_at = monotonic()
         self._pending = bytearray()
+        self._pending_data_bytes = 0
         self._is_open = True
         self._lock = RLock()
 
@@ -586,7 +599,7 @@ class InMemoryTransport:
                 # most N minimum-frame lengths can complete at most N requests,
                 # including when the first byte finishes a buffered partial one.
                 response_capacity = self._max_pending_bytes - len(self._pending)
-                response_slots = response_capacity // constants.MAX_CONTROL_FRAME_BYTES
+                response_slots = response_capacity // self._max_control_frame_bytes
                 if response_slots == 0:
                     return 0
                 accepted = min(len(view), self.device.max_receive_bytes)
@@ -625,6 +638,7 @@ class InMemoryTransport:
             returned = self._bounded_read_size_locked(size)
             chunk = bytes(self._pending[:returned])
             del self._pending[:returned]
+            self._data_bytes_read_locked(returned)
             return chunk
 
     def readinto(self, buffer: bytearray | memoryview) -> int:
@@ -646,6 +660,7 @@ class InMemoryTransport:
                 finally:
                     pending_view.release()
                 del self._pending[:returned]
+                self._data_bytes_read_locked(returned)
                 return returned
         finally:
             view.release()
@@ -677,6 +692,9 @@ class InMemoryTransport:
             if self._is_open:
                 self._is_open = False
                 self._pending.clear()
+                self._pending_data_bytes = 0
+                if isinstance(self.device, SimulatedV3Device):
+                    self.device.discard_transport_data()
                 self._stream_credits = 0
 
     def _require_open(self) -> None:
@@ -695,10 +713,23 @@ class InMemoryTransport:
         if data_frame is None:
             return
         self._pending.extend(data_frame)
+        if isinstance(self.device, SimulatedV3Device):
+            self._pending_data_bytes = len(data_frame)
+            self.device.set_transport_pending_data(True)
         if self._demand_driven:
             self._stream_credits -= 1
         if self._stream_interval is not None:
             self._next_stream_at = now + self._stream_interval
+
+    def _data_bytes_read_locked(self, returned: int) -> None:
+        # A data frame is produced only into an empty queue, so its tail always
+        # precedes queued responses. Reading controls must not delay drain.
+        if self._pending_data_bytes:
+            self._pending_data_bytes = max(0, self._pending_data_bytes - returned)
+            if not self._pending_data_bytes and isinstance(
+                self.device, SimulatedV3Device
+            ):
+                self.device.set_transport_pending_data(False)
 
     def _bounded_read_size_locked(self, requested: int) -> int:
         returned = min(requested, len(self._pending))

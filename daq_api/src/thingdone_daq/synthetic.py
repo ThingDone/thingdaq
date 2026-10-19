@@ -53,6 +53,21 @@ def synthetic_adc1_code(sample_index: int) -> int:
     return synthetic_adc_code(AdcConverter.ADC1, sample_index)
 
 
+def synthetic_v3_adc_payload(first_pair_index: int, pair_count: int) -> bytes:
+    """Legacy ramp with four edge/bit-pattern pairs per 2048-pair v3 cycle.
+
+    Pairs 0..3 are (0, 0), (4095, 4095), (0xABC, 0x123), (0x555, 0xAAA).
+    Remaining pairs use the existing ADC0=2*n, ADC1=2*n+1 12-bit ramp.
+    """
+    payload = bytearray(synthetic_adc_payload(first_pair_index, pair_count))
+    edges = ((0, 0), (4095, 4095), (0xABC, 0x123), (0x555, 0xAAA))
+    for offset in range(pair_count):
+        phase = (first_pair_index + offset) % 2048
+        if phase < len(edges):
+            struct.pack_into("<HH", payload, offset * 4, *edges[phase])
+    return bytes(payload)
+
+
 def synthetic_gpio_byte(sample_index: int) -> int:
     """Return the packed D6-through-D13 sample ``m modulo 256``."""
 
@@ -365,6 +380,7 @@ __all__ = [
     "synthetic_gpio_byte",
     "synthetic_gpio_payload",
     "synthetic_gpio_value",
+    "synthetic_v3_adc_payload",
     "validate_synthetic_adc_payload",
     "validate_synthetic_block",
     "validate_synthetic_gpio_payload",
