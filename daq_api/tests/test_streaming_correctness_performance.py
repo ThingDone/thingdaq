@@ -8,10 +8,12 @@ import math
 import os
 import platform
 import random
+import struct
 import time
 import tracemalloc
 import unittest
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from itertools import islice
 from statistics import median
@@ -41,7 +43,17 @@ from thingdone_daq import (
     synthetic_gpio_payload,
 )
 from thingdone_daq._generated import protocol_constants as constants
+from thingdone_daq._generated import protocol_v3_constants as v3
+from thingdone_daq.models_v3 import V3Settings
 from thingdone_daq.protocol import ParserCounters
+from thingdone_daq.protocol_v2 import IncrementalCompatibleFrameParser
+from thingdone_daq.protocol_v3 import (
+    V3Frame,
+    decode_v3_block,
+    encode_adc_payload,
+    encode_gpio_payload,
+    encode_v3_frame,
+)
 
 TARGET_FRAMED_BYTES_PER_SECOND = (
     2
@@ -709,6 +721,314 @@ class StreamingPerformanceGuardTests(unittest.TestCase):
             REQUIRED_BENCHMARK_HEADROOM,
             serialized_report,
         )
+
+
+# Keep codec measurements separate from the historical sustained-rate gate.
+# Fixture construction, warmup, and tracemalloc never enter timed measurements.
+V3_CAPTURE_FULL_FRAMES = 64
+V3_RETAINED_BLOCKS = 8
+V3_BENCHMARK_SEED = 0xDA03_B001
+V3_TIMED_REPETITIONS = 8
+
+
+@dataclass(frozen=True, slots=True)
+class _V3CodecCorpus:
+    name: str
+    baseline: str
+    settings: V3Settings
+    encoding: v3.Encoding
+    wire: bytes
+    payloads: tuple[bytes, ...]
+    item_bytes: int
+
+    @property
+    def decoded_bytes(self) -> int:
+        return sum(map(len, self.payloads))
+
+    @property
+    def logical_items(self) -> int:
+        return self.decoded_bytes // self.item_bytes
+
+
+@lru_cache(maxsize=1)
+def _v3_codec_corpora() -> tuple[_V3CodecCorpus, ...]:
+    corpora = []
+    # Each compressed case has an identical-sample RAW baseline. Alternating
+    # GPIO changes every sample: RLE_AUTO must transmit RAW at both widths.
+    profiles = [("adc", 0, False, policy) for policy in (0, 1)] + [
+        ("gpio", width, alternating, policy)
+        for width in (8, 16)
+        for alternating in (False, True)
+        for policy in (0, 1)
+    ]
+    for stream, width, alternating, policy in profiles:
+        is_adc = stream == "adc"
+        item_bytes = 4 if is_adc else width // 8
+        count = v3.MAX_LOGICAL_PAYLOAD_BYTES // item_bytes
+        base = (
+            "adc"
+            if is_adc
+            else f"gpio{width}-{'alternating' if alternating else 'runs'}"
+        )
+        mode = "raw" if not policy else "pack12" if is_adc else "rle-auto"
+        settings = replace(
+            V3Settings.defaults(),
+            source=v3.Source.SYNTHETIC,
+            aux_bank_mode=v3.AuxBankMode.INPUT
+            if width == 16
+            else v3.AuxBankMode.DISABLED,
+            gpio_width_bits=width or 8,
+            adc_policy=v3.AdcPolicy(policy) if is_adc else v3.AdcPolicy.RAW,
+            gpio_policy=v3.GpioPolicy(policy) if not is_adc else v3.GpioPolicy.RAW,
+        )
+        encoding = (
+            v3.Encoding.RAW
+            if not policy or alternating
+            else v3.Encoding.ADC_PACK12
+            if is_adc
+            else v3.Encoding.GPIO_RLE
+        )
+        wire = bytearray()
+        payloads = []
+        for sequence, items in enumerate([count] * V3_CAPTURE_FULL_FRAMES + [17]):
+            first = sequence * count
+            if is_adc:
+                pairs = [
+                    (synthetic_adc0_code(i), synthetic_adc1_code(i))
+                    for i in range(first, first + items)
+                ]
+                raw = b"".join(struct.pack("<HH", *pair) for pair in pairs)
+                payload = encode_adc_payload(pairs, policy=settings.adc_policy)
+            else:
+                values = [
+                    (0xA581 if width == 16 else 0x81)
+                    if (i if alternating else i // 64) % 2
+                    else (0x5A42 if width == 16 else 0x42)
+                    for i in range(first, first + items)
+                ]
+                raw = b"".join(value.to_bytes(item_bytes, "little") for value in values)
+                payload = encode_gpio_payload(
+                    values, width_bits=width, policy=settings.gpio_policy
+                )
+            payloads.append(raw)
+            wire.extend(
+                encode_v3_frame(
+                    v3.FrameKind.ADC_DATA if is_adc else v3.FrameKind.GPIO_DATA,
+                    payload,
+                    flags=v3.FrameFlag.SYNTHETIC
+                    | (v3.FrameFlag.EPOCH_START if sequence == 0 else v3.FrameFlag(0)),
+                    run_id=1,
+                    sequence=sequence,
+                    first_sample_ticks=first * v3.ADC_PAIR_PERIOD_TICKS,
+                    item_count=items,
+                )
+            )
+        corpora.append(
+            _V3CodecCorpus(
+                f"{base}-{mode}",
+                f"{base}-raw",
+                settings,
+                encoding,
+                bytes(wire),
+                tuple(payloads),
+                item_bytes,
+            )
+        )
+    return tuple(corpora)
+
+
+def _consume_v3_codec_corpus(
+    corpus: _V3CodecCorpus,
+    ranges: tuple[tuple[int, int], ...],
+    *,
+    repetitions: int = 1,
+) -> dict[str, int]:
+    """Replay through the reader's parser/block path with a bounded sink."""
+    parser = IncrementalCompatibleFrameParser(include_v3=True)
+    retained: deque[ADCBlock | GPIOBlock] = deque(maxlen=V3_RETAINED_BLOCKS)
+    frames = items = decoded = wire_bytes = retained_bytes = peak_retained = 0
+    with memoryview(corpus.wire) as wire:
+        for _ in range(repetitions):
+            for start, end in ranges:
+                with wire[start:end] as chunk:
+                    parsed = parser.feed(chunk)
+                for frame in parsed:
+                    assert isinstance(frame, V3Frame)
+                    block = decode_v3_block(frame, corpus.settings)
+                    index = frames % len(corpus.payloads)
+                    assert block.sequence == index
+                    assert block.payload == corpus.payloads[index]
+                    assert block.encoding == corpus.encoding
+                    assert (
+                        block.item_count
+                        == len(corpus.payloads[index]) // corpus.item_bytes
+                    )
+                    assert block.first_sample_ticks == (
+                        index
+                        * (v3.MAX_LOGICAL_PAYLOAD_BYTES // corpus.item_bytes)
+                        * v3.ADC_PAIR_PERIOD_TICKS
+                    )
+                    if len(retained) == V3_RETAINED_BLOCKS:
+                        oldest = retained.popleft()
+                        retained_bytes -= oldest.decoded_bytes + len(
+                            oldest.encoded_payload
+                        )
+                    retained.append(block)
+                    retained_bytes += block.decoded_bytes + len(block.encoded_payload)
+                    peak_retained = max(peak_retained, retained_bytes)
+                    frames += 1
+                    items += block.item_count
+                    decoded += block.decoded_bytes
+                    wire_bytes += block.wire_bytes
+    counters = parser.counters
+    assert (
+        counters.corruption_events
+        == counters.buffered_bytes
+        == counters.bytes_discarded
+        == 0
+    )
+    assert counters.high_water_mark <= parser.max_buffered_bytes
+    assert frames == counters.frames_decoded == len(corpus.payloads) * repetitions
+    assert items == corpus.logical_items * repetitions
+    assert decoded == corpus.decoded_bytes * repetitions
+    assert wire_bytes == counters.bytes_received == len(corpus.wire) * repetitions
+    assert len(retained) == V3_RETAINED_BLOCKS
+    assert peak_retained <= V3_RETAINED_BLOCKS * (
+        2 * v3.MAX_LOGICAL_PAYLOAD_BYTES + v3.DATA_PREFIX_BYTES
+    )
+    return {
+        "frames": frames,
+        "logical_items": items,
+        "decoded_bytes": decoded,
+        "wire_bytes": wire_bytes,
+        "parser_high_water_bytes": counters.high_water_mark,
+        "peak_retained_payload_bytes": peak_retained,
+    }
+
+
+class V3CodecPerformanceTests(unittest.TestCase):
+    def test_count_and_memory_bounds_over_repeated_captures(self) -> None:
+        corpora = _v3_codec_corpora()
+        baselines = {corpus.name: corpus for corpus in corpora}
+        memory_report = []
+        for corpus in corpora:
+            with self.subTest(profile=corpus.name):
+                baseline = baselines[corpus.baseline]
+                self.assertEqual(baseline.payloads, corpus.payloads)
+                self.assertEqual(65, len(corpus.payloads))
+                self.assertEqual(17 * corpus.item_bytes, len(corpus.payloads[-1]))
+                if corpus.encoding == v3.Encoding.RAW:
+                    self.assertEqual(baseline.wire, corpus.wire)
+                    self.assertEqual(
+                        len(corpus.wire),
+                        corpus.decoded_bytes
+                        + 65 * (v3.MIN_FRAME_BYTES + v3.DATA_PREFIX_BYTES),
+                    )
+                else:
+                    self.assertLess(len(corpus.wire), len(baseline.wire))
+                if corpus.encoding == v3.Encoding.ADC_PACK12:
+                    self.assertEqual(
+                        len(baseline.wire) - len(corpus.wire), corpus.logical_items
+                    )
+                ranges = _chunk_ranges(
+                    len(corpus.wire), seed=V3_BENCHMARK_SEED, maximum_chunk=4093
+                )
+                _consume_v3_codec_corpus(corpus, ranges)  # Warm caches before tracing.
+                tracing_was_active = tracemalloc.is_tracing()
+                if not tracing_was_active:
+                    tracemalloc.start()
+                gc.collect()
+                memory_baseline, _ = tracemalloc.get_traced_memory()
+                tracemalloc.reset_peak()
+                try:
+                    result = _consume_v3_codec_corpus(corpus, ranges, repetitions=8)
+                    _, peak = tracemalloc.get_traced_memory()
+                    gc.collect()
+                    current, _ = tracemalloc.get_traced_memory()
+                finally:
+                    if not tracing_was_active:
+                        tracemalloc.stop()
+                # Generous fixed allocation ceilings; no rate/timing assertion.
+                self.assertLessEqual(peak - memory_baseline, 2 * 1024 * 1024)
+                self.assertLessEqual(current - memory_baseline, 128 * 1024)
+                memory_report.append(
+                    {
+                        "profile": corpus.name,
+                        "repetitions": 8,
+                        **result,
+                        "traced_peak_bytes": peak - memory_baseline,
+                        "traced_retained_after_return_bytes": current - memory_baseline,
+                    }
+                )
+        print("PHASE02_V3_MEMORY " + json.dumps(memory_report, sort_keys=True))
+
+    def test_informational_decode_throughput_relative_to_matching_raw(self) -> None:
+        corpora = _v3_codec_corpora()
+        reports = []
+        for maximum_chunk in (1024, 16384):
+            ranges = {
+                corpus.name: _chunk_ranges(
+                    len(corpus.wire),
+                    seed=V3_BENCHMARK_SEED,
+                    maximum_chunk=maximum_chunk,
+                )
+                for corpus in corpora
+            }
+            for corpus in corpora:
+                _consume_v3_codec_corpus(corpus, ranges[corpus.name])
+            walls = {corpus.name: [] for corpus in corpora}
+            cpus = {corpus.name: [] for corpus in corpora}
+            # Rotate order across batches to reduce fixed-order thermal/cache bias.
+            for batch in range(3):
+                for corpus in corpora[batch:] + corpora[:batch]:
+                    wall_started = time.perf_counter()
+                    cpu_started = time.process_time()
+                    _consume_v3_codec_corpus(
+                        corpus, ranges[corpus.name], repetitions=V3_TIMED_REPETITIONS
+                    )
+                    cpus[corpus.name].append(time.process_time() - cpu_started)
+                    walls[corpus.name].append(time.perf_counter() - wall_started)
+            for corpus in corpora:
+                elapsed = median(walls[corpus.name])
+                reports.append(
+                    {
+                        "profile": corpus.name,
+                        "baseline": corpus.baseline,
+                        "actual_encoding": corpus.encoding.name,
+                        "maximum_chunk_bytes": maximum_chunk,
+                        "repetitions": V3_TIMED_REPETITIONS,
+                        "frames": len(corpus.payloads) * V3_TIMED_REPETITIONS,
+                        "logical_items": corpus.logical_items * V3_TIMED_REPETITIONS,
+                        "logical_item_unit": "adc_pair"
+                        if corpus.item_bytes == 4
+                        else "gpio_sample",
+                        "logical_samples_per_second": corpus.logical_items
+                        * V3_TIMED_REPETITIONS
+                        / elapsed,
+                        "wire_bytes": len(corpus.wire) * V3_TIMED_REPETITIONS,
+                        "decoded_bytes": corpus.decoded_bytes * V3_TIMED_REPETITIONS,
+                        "elapsed_seconds": walls[corpus.name],
+                        "process_seconds": cpus[corpus.name],
+                        "median_elapsed_seconds": elapsed,
+                        "baseline_relative_wall_cost": elapsed
+                        / median(walls[corpus.baseline]),
+                        "baseline_relative_cpu_cost": median(cpus[corpus.name])
+                        / median(cpus[corpus.baseline]),
+                    }
+                )
+        report = {
+            "schema": "thingdaq-python-v3-codec-benchmark-v1",
+            "python_implementation": platform.python_implementation(),
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "processor": platform.processor() or "unknown",
+            "cpu_count": os.cpu_count(),
+            "seed": V3_BENCHMARK_SEED,
+            "timing_is_informational": True,
+            "samples": reports,
+        }
+        print("PHASE02_V3_BENCHMARK " + json.dumps(report, sort_keys=True))
 
 
 if __name__ == "__main__":

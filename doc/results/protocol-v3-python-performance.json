@@ -1,0 +1,661 @@
+{
+  "command": ".venv/bin/python -m pytest -q -s daq_api/tests/test_streaming_correctness_performance.py",
+  "created": "2026-10-19",
+  "memory": [
+    {
+      "decoded_bytes": 2073120,
+      "frames": 520,
+      "logical_items": 518280,
+      "parser_high_water_bytes": 4111,
+      "peak_retained_payload_bytes": 64864,
+      "profile": "adc-raw",
+      "repetitions": 8,
+      "traced_peak_bytes": 115052,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 2104320
+    },
+    {
+      "decoded_bytes": 2073120,
+      "frames": 520,
+      "logical_items": 518280,
+      "parser_high_water_bytes": 4111,
+      "peak_retained_payload_bytes": 56768,
+      "profile": "adc-pack12",
+      "repetitions": 8,
+      "traced_peak_bytes": 109452,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 1586040
+    },
+    {
+      "decoded_bytes": 2072712,
+      "frames": 520,
+      "logical_items": 2072712,
+      "parser_high_water_bytes": 4111,
+      "peak_retained_payload_bytes": 64864,
+      "profile": "gpio8-runs-raw",
+      "repetitions": 8,
+      "traced_peak_bytes": 110590,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 2103912
+    },
+    {
+      "decoded_bytes": 2072712,
+      "frames": 520,
+      "logical_items": 2072712,
+      "parser_high_water_bytes": 3318,
+      "peak_retained_payload_bytes": 34016,
+      "profile": "gpio8-runs-rle-auto",
+      "repetitions": 8,
+      "traced_peak_bytes": 79266,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 129528
+    },
+    {
+      "decoded_bytes": 2072712,
+      "frames": 520,
+      "logical_items": 2072712,
+      "parser_high_water_bytes": 4111,
+      "peak_retained_payload_bytes": 64864,
+      "profile": "gpio8-alternating-raw",
+      "repetitions": 8,
+      "traced_peak_bytes": 110590,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 2103912
+    },
+    {
+      "decoded_bytes": 2072712,
+      "frames": 520,
+      "logical_items": 2072712,
+      "parser_high_water_bytes": 4111,
+      "peak_retained_payload_bytes": 64864,
+      "profile": "gpio8-alternating-rle-auto",
+      "repetitions": 8,
+      "traced_peak_bytes": 110590,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 2103912
+    },
+    {
+      "decoded_bytes": 2072848,
+      "frames": 520,
+      "logical_items": 1036424,
+      "parser_high_water_bytes": 4111,
+      "peak_retained_payload_bytes": 64864,
+      "profile": "gpio16-runs-raw",
+      "repetitions": 8,
+      "traced_peak_bytes": 110590,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 2104048
+    },
+    {
+      "decoded_bytes": 2072848,
+      "frames": 520,
+      "logical_items": 1036424,
+      "parser_high_water_bytes": 3154,
+      "peak_retained_payload_bytes": 33520,
+      "profile": "gpio16-runs-rle-auto",
+      "repetitions": 8,
+      "traced_peak_bytes": 80179,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 97792
+    },
+    {
+      "decoded_bytes": 2072848,
+      "frames": 520,
+      "logical_items": 1036424,
+      "parser_high_water_bytes": 4111,
+      "peak_retained_payload_bytes": 64864,
+      "profile": "gpio16-alternating-raw",
+      "repetitions": 8,
+      "traced_peak_bytes": 110582,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 2104048
+    },
+    {
+      "decoded_bytes": 2072848,
+      "frames": 520,
+      "logical_items": 1036424,
+      "parser_high_water_bytes": 4111,
+      "peak_retained_payload_bytes": 64864,
+      "profile": "gpio16-alternating-rle-auto",
+      "repetitions": 8,
+      "traced_peak_bytes": 110582,
+      "traced_retained_after_return_bytes": 528,
+      "wire_bytes": 2104048
+    }
+  ],
+  "schema": "thingdaq-python-v3-performance-evidence-v1",
+  "test_sha256": "b7a56b4db09304b9cf1d26259f9cc85944734f489842b7518e2ca9f18c00b2f9",
+  "throughput": {
+    "cpu_count": 12,
+    "machine": "x86_64",
+    "platform": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "python_implementation": "CPython",
+    "python_version": "3.12.3",
+    "samples": [
+      {
+        "actual_encoding": "RAW",
+        "baseline": "adc-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2073120,
+        "elapsed_seconds": [
+          0.040416269010165706,
+          0.040315068006748334,
+          0.04105262798839249
+        ],
+        "frames": 520,
+        "logical_item_unit": "adc_pair",
+        "logical_items": 518280,
+        "logical_samples_per_second": 12823548.850331523,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.040416269010165706,
+        "process_seconds": [
+          0.04039788099999875,
+          0.04031330099999941,
+          0.0410416110000007
+        ],
+        "profile": "adc-raw",
+        "repetitions": 8,
+        "wire_bytes": 2104320
+      },
+      {
+        "actual_encoding": "ADC_PACK12",
+        "baseline": "adc-raw",
+        "baseline_relative_cpu_cost": 1.2609981696812396,
+        "baseline_relative_wall_cost": 1.2604835940961265,
+        "decoded_bytes": 2073120,
+        "elapsed_seconds": [
+          0.05094404402188957,
+          0.050682550005149096,
+          0.05145600999821909
+        ],
+        "frames": 520,
+        "logical_item_unit": "adc_pair",
+        "logical_items": 518280,
+        "logical_samples_per_second": 10173515.078176875,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.05094404402188957,
+        "process_seconds": [
+          0.05094165399999895,
+          0.050680574000001144,
+          0.05145409399999856
+        ],
+        "profile": "adc-pack12",
+        "repetitions": 8,
+        "wire_bytes": 1586040
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio8-runs-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2072712,
+        "elapsed_seconds": [
+          0.03376828698674217,
+          0.03359230500063859,
+          0.03356839399202727
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 2072712,
+        "logical_samples_per_second": 61701987.998757385,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.03359230500063859,
+        "process_seconds": [
+          0.03376653900000015,
+          0.033590579000000176,
+          0.03356666899999894
+        ],
+        "profile": "gpio8-runs-raw",
+        "repetitions": 8,
+        "wire_bytes": 2103912
+      },
+      {
+        "actual_encoding": "GPIO_RLE",
+        "baseline": "gpio8-runs-raw",
+        "baseline_relative_cpu_cost": 1.786927429860595,
+        "baseline_relative_wall_cost": 1.7868958379128759,
+        "decoded_bytes": 2072712,
+        "elapsed_seconds": [
+          0.060142722009913996,
+          0.05986168701201677,
+          0.06002594999154098
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 2072712,
+        "logical_samples_per_second": 34530265.6649681,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.06002594999154098,
+        "process_seconds": [
+          0.06014069700000135,
+          0.05985162600000038,
+          0.06002392699999959
+        ],
+        "profile": "gpio8-runs-rle-auto",
+        "repetitions": 8,
+        "wire_bytes": 129528
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio8-alternating-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2072712,
+        "elapsed_seconds": [
+          0.0336857259972021,
+          0.033278320013778284,
+          0.03396500900271349
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 2072712,
+        "logical_samples_per_second": 61530869.192849144,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.0336857259972021,
+        "process_seconds": [
+          0.033683998999999076,
+          0.033269789000000216,
+          0.033963328999998765
+        ],
+        "profile": "gpio8-alternating-raw",
+        "repetitions": 8,
+        "wire_bytes": 2103912
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio8-alternating-raw",
+        "baseline_relative_cpu_cost": 0.9982267544896174,
+        "baseline_relative_wall_cost": 0.9992830494791985,
+        "decoded_bytes": 2072712,
+        "elapsed_seconds": [
+          0.03366157499840483,
+          0.03337081099743955,
+          0.03400228000828065
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 2072712,
+        "logical_samples_per_second": 61575015.432231635,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.03366157499840483,
+        "process_seconds": [
+          0.033624269000000595,
+          0.03336913899999949,
+          0.03399181900000059
+        ],
+        "profile": "gpio8-alternating-rle-auto",
+        "repetitions": 8,
+        "wire_bytes": 2103912
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio16-runs-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2072848,
+        "elapsed_seconds": [
+          0.03363004498532973,
+          0.03366638600709848,
+          0.03399249000358395
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 1036424,
+        "logical_samples_per_second": 30785127.924971584,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.03366638600709848,
+        "process_seconds": [
+          0.0336284090000003,
+          0.0336646389999995,
+          0.03399083899999944
+        ],
+        "profile": "gpio16-runs-raw",
+        "repetitions": 8,
+        "wire_bytes": 2104048
+      },
+      {
+        "actual_encoding": "GPIO_RLE",
+        "baseline": "gpio16-runs-raw",
+        "baseline_relative_cpu_cost": 1.4240403112595665,
+        "baseline_relative_wall_cost": 1.4243127548244399,
+        "decoded_bytes": 2072848,
+        "elapsed_seconds": [
+          0.047951462998753414,
+          0.04784932199981995,
+          0.04846307000843808
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 1036424,
+        "logical_samples_per_second": 21614022.496601276,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.047951462998753414,
+        "process_seconds": [
+          0.047939803000000225,
+          0.04784715299999931,
+          0.048460742999999695
+        ],
+        "profile": "gpio16-runs-rle-auto",
+        "repetitions": 8,
+        "wire_bytes": 97792
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio16-alternating-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2072848,
+        "elapsed_seconds": [
+          0.03388265799731016,
+          0.033632003993261606,
+          0.03434007501346059
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 1036424,
+        "logical_samples_per_second": 30588627.376349237,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.03388265799731016,
+        "process_seconds": [
+          0.03387060799999908,
+          0.03363033900000012,
+          0.03432755000000043
+        ],
+        "profile": "gpio16-alternating-raw",
+        "repetitions": 8,
+        "wire_bytes": 2104048
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio16-alternating-raw",
+        "baseline_relative_cpu_cost": 0.9947565452619329,
+        "baseline_relative_wall_cost": 0.9944510847929895,
+        "decoded_bytes": 2072848,
+        "elapsed_seconds": [
+          0.03352265400462784,
+          0.03369464600109495,
+          0.03407682100078091
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 1036424,
+        "logical_samples_per_second": 30759308.169206467,
+        "maximum_chunk_bytes": 1024,
+        "median_elapsed_seconds": 0.03369464600109495,
+        "process_seconds": [
+          0.03352095899999874,
+          0.033693009000000274,
+          0.03407523899999987
+        ],
+        "profile": "gpio16-alternating-rle-auto",
+        "repetitions": 8,
+        "wire_bytes": 2104048
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "adc-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2073120,
+        "elapsed_seconds": [
+          0.033446312008891255,
+          0.032720051996875554,
+          0.0325966399977915
+        ],
+        "frames": 520,
+        "logical_item_unit": "adc_pair",
+        "logical_items": 518280,
+        "logical_samples_per_second": 15839828.12892506,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.032720051996875554,
+        "process_seconds": [
+          0.033437219000001406,
+          0.03271842799999902,
+          0.03258714900000115
+        ],
+        "profile": "adc-raw",
+        "repetitions": 8,
+        "wire_bytes": 2104320
+      },
+      {
+        "actual_encoding": "ADC_PACK12",
+        "baseline": "adc-raw",
+        "baseline_relative_cpu_cost": 1.3930746611665223,
+        "baseline_relative_wall_cost": 1.3930610508640344,
+        "decoded_bytes": 2073120,
+        "elapsed_seconds": [
+          0.04565550101688132,
+          0.045581030019093305,
+          0.04519143400830217
+        ],
+        "frames": 520,
+        "logical_item_unit": "adc_pair",
+        "logical_items": 518280,
+        "logical_samples_per_second": 11370519.704861851,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.045581030019093305,
+        "process_seconds": [
+          0.04564310199999966,
+          0.045579212999999896,
+          0.04518963200000137
+        ],
+        "profile": "adc-pack12",
+        "repetitions": 8,
+        "wire_bytes": 1586040
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio8-runs-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2072712,
+        "elapsed_seconds": [
+          0.026398553978651762,
+          0.02624172199284658,
+          0.026057729992317036
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 2072712,
+        "logical_samples_per_second": 78985365.38741687,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.02624172199284658,
+        "process_seconds": [
+          0.026397006999999917,
+          0.02623220699999962,
+          0.0259969679999994
+        ],
+        "profile": "gpio8-runs-raw",
+        "repetitions": 8,
+        "wire_bytes": 2103912
+      },
+      {
+        "actual_encoding": "GPIO_RLE",
+        "baseline": "gpio8-runs-raw",
+        "baseline_relative_cpu_cost": 2.1846230856595437,
+        "baseline_relative_wall_cost": 2.1840842988947275,
+        "decoded_bytes": 2072712,
+        "elapsed_seconds": [
+          0.05822699499549344,
+          0.05731413298053667,
+          0.05722640102612786
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 2072712,
+        "logical_samples_per_second": 36164064.46737794,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.05731413298053667,
+        "process_seconds": [
+          0.058220435999999154,
+          0.05730748499999905,
+          0.057224435000000184
+        ],
+        "profile": "gpio8-runs-rle-auto",
+        "repetitions": 8,
+        "wire_bytes": 129528
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio8-alternating-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2072712,
+        "elapsed_seconds": [
+          0.026387815014459193,
+          0.026373704022262245,
+          0.02622977300779894
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 2072712,
+        "logical_samples_per_second": 78590098.61680438,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.026373704022262245,
+        "process_seconds": [
+          0.02638629700000017,
+          0.026372237000000354,
+          0.026228266999998695
+        ],
+        "profile": "gpio8-alternating-raw",
+        "repetitions": 8,
+        "wire_bytes": 2103912
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio8-alternating-raw",
+        "baseline_relative_cpu_cost": 0.996219888362115,
+        "baseline_relative_wall_cost": 0.9962204388627476,
+        "decoded_bytes": 2072712,
+        "elapsed_seconds": [
+          0.0263479040004313,
+          0.026274022995494306,
+          0.026227002002997324
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 2072712,
+        "logical_samples_per_second": 78888261.6246262,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.026274022995494306,
+        "process_seconds": [
+          0.0263341170000011,
+          0.02627254699999959,
+          0.026225557000000066
+        ],
+        "profile": "gpio8-alternating-rle-auto",
+        "repetitions": 8,
+        "wire_bytes": 2103912
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio16-runs-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2072848,
+        "elapsed_seconds": [
+          0.026156612002523616,
+          0.0265135369845666,
+          0.026277913013473153
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 1036424,
+        "logical_samples_per_second": 39440879.47427967,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.026277913013473153,
+        "process_seconds": [
+          0.02615501800000075,
+          0.026511967999999442,
+          0.02625834699999885
+        ],
+        "profile": "gpio16-runs-raw",
+        "repetitions": 8,
+        "wire_bytes": 2104048
+      },
+      {
+        "actual_encoding": "GPIO_RLE",
+        "baseline": "gpio16-runs-raw",
+        "baseline_relative_cpu_cost": 1.7600663514729884,
+        "baseline_relative_wall_cost": 1.7588238060100188,
+        "decoded_bytes": 2072848,
+        "elapsed_seconds": [
+          0.04621777799911797,
+          0.04640682099852711,
+          0.04621821898035705
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 1036424,
+        "logical_samples_per_second": 22424576.776540976,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.04621821898035705,
+        "process_seconds": [
+          0.04621589200000109,
+          0.04640497199999949,
+          0.04621643299999967
+        ],
+        "profile": "gpio16-runs-rle-auto",
+        "repetitions": 8,
+        "wire_bytes": 97792
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio16-alternating-raw",
+        "baseline_relative_cpu_cost": 1.0,
+        "baseline_relative_wall_cost": 1.0,
+        "decoded_bytes": 2072848,
+        "elapsed_seconds": [
+          0.026406094984849915,
+          0.026718248991528526,
+          0.026380883995443583
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 1036424,
+        "logical_samples_per_second": 39249423.309074365,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.026406094984849915,
+        "process_seconds": [
+          0.026404547000000278,
+          0.026716876999998362,
+          0.026379397000001248
+        ],
+        "profile": "gpio16-alternating-raw",
+        "repetitions": 8,
+        "wire_bytes": 2104048
+      },
+      {
+        "actual_encoding": "RAW",
+        "baseline": "gpio16-alternating-raw",
+        "baseline_relative_cpu_cost": 0.9988070236539031,
+        "baseline_relative_wall_cost": 0.9990748352556468,
+        "decoded_bytes": 2072848,
+        "elapsed_seconds": [
+          0.02638166499673389,
+          0.0265660869772546,
+          0.026081691001309082
+        ],
+        "frames": 520,
+        "logical_item_unit": "gpio_sample",
+        "logical_items": 1036424,
+        "logical_samples_per_second": 39285769.11761679,
+        "maximum_chunk_bytes": 16384,
+        "median_elapsed_seconds": 0.02638166499673389,
+        "process_seconds": [
+          0.026373046999999872,
+          0.026564507999999876,
+          0.026080136999999226
+        ],
+        "profile": "gpio16-alternating-rle-auto",
+        "repetitions": 8,
+        "wire_bytes": 2104048
+      }
+    ],
+    "schema": "thingdaq-python-v3-codec-benchmark-v1",
+    "seed": 3657674753,
+    "timing_is_informational": true
+  }
+}
