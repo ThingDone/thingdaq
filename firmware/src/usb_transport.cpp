@@ -36,7 +36,9 @@ std::uint32_t counterDelta(std::uint32_t current, std::uint32_t previous) {
 // responses still pass through queueResponse's full ordinary protocol decoder.
 THINGDAQ_USB_COLD_CODE(".flashmem.usb.data_view")
 bool validDataView(protocol::ByteView bytes) {
-  if (!bytes.valid()) return false;
+  if (!bytes.valid() || bytes.size <= protocol_v1::kHeaderVersionOffset) return false;
+  if (bytes.data[protocol_v1::kHeaderVersionOffset] == protocol_v3::kProtocolVersion)
+    return protocol::validV3DataView(bytes);
   const bool fixed_size = bytes.size == protocol_v1::kDataFrameBytes ||
       bytes.size == protocol_v2::kMinDataFrameBytes;
   if constexpr (!input_experiment::kGpioRle) return fixed_size;

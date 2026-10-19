@@ -24,6 +24,9 @@ constexpr std::uint16_t flag(protocol_v1::FrameFlag value) {
 
 }  // namespace
 
+#if defined(__IMXRT1062__)
+__attribute__((section(".flashmem.synthetic.start"), noinline, noipa, used))
+#endif
 OperationStatus SyntheticSource::startRun(
     std::uint32_t run_id, const protocol::Configuration &configuration,
     std::uint64_t start_clock_ticks,
@@ -40,7 +43,8 @@ OperationStatus SyntheticSource::startRun(
       configuration.source != protocol_v1::Source::kSynthetic ||
       !protocol::isSupportedChecksum(
           configuration.data_checksum_algorithm) ||
-      configuration.data_frame_bytes != protocol_v1::kDataFrameBytes) {
+      configuration.data_frame_bytes != (configuration.protocol_version == protocol_v3::kProtocolVersion
+          ? settings::kRawFrameBytes : protocol_v1::kDataFrameBytes)) {
     return OperationStatus::kInvalidConfiguration;
   }
   if (!pipeline.acceptingFrames() || pipeline.runId() != run_id ||

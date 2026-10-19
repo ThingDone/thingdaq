@@ -323,10 +323,8 @@ class HardwareCapture : public PairSource {
   virtual void setLegacyV2Mode(bool) {}
   // Public v3 uses the qualified ACK-cleared ADC_ETC request route.
   virtual void setPublicV3Mode(bool) {}
-#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
   // Frame length no longer distinguishes eight- and sixteen-input modes.
   virtual void setAuxInputMode(bool) {}
-#endif
   virtual StartStatus inspectStart(std::uint32_t epoch) = 0;
   virtual StartStatus inspectStart(std::uint32_t epoch,
                                    std::uint32_t pairs_per_buffer) {

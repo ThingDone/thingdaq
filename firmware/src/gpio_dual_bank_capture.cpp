@@ -54,7 +54,8 @@ bool validPeriod(std::uint32_t period) {
 THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.prime")
 PrimeResult DualBankCaptureRing::prime(
     std::uint32_t epoch, std::uint32_t sample_period_ticks,
-    std::uint32_t initial_generation, std::uint64_t first_sample_ticks) {
+    std::uint32_t initial_generation, std::uint64_t first_sample_ticks,
+    std::uint32_t samples_per_block) {
   PrimeResult result{};
   result.epoch = epoch;
   result.active_generation = initial_generation;
@@ -63,13 +64,14 @@ PrimeResult DualBankCaptureRing::prime(
     result.status = OperationStatus::kInvalidEpoch;
     return result;
   }
-  if (!validPeriod(sample_period_ticks) ||
+  if (samples_per_block == 0U || samples_per_block > kSamplesPerBlock ||
+      !validPeriod(sample_period_ticks) ||
       first_sample_ticks % sample_period_ticks != 0U) {
     result.status = OperationStatus::kInvalidPeriod;
     return result;
   }
   const std::uint64_t coverage =
-      static_cast<std::uint64_t>(kSamplesPerBlock) * sample_period_ticks;
+      static_cast<std::uint64_t>(samples_per_block) * sample_period_ticks;
   if (coverage > std::numeric_limits<std::uint64_t>::max() -
                      first_sample_ticks ||
       coverage > std::numeric_limits<std::uint64_t>::max() -
@@ -96,6 +98,7 @@ PrimeResult DualBankCaptureRing::prime(
   next_first_sample_ticks_ = first_sample_ticks;
   next_schedule_generation_ = initial_generation;
   sample_period_ticks_ = sample_period_ticks;
+  samples_per_block_ = samples_per_block;
   epoch_ = epoch;
   next_free_search_ = 0U;
   running_ = true;
@@ -241,7 +244,7 @@ CompletionResult DualBankCaptureRing::onMajorLoopComplete(
     completion_valid = false;
     saturatingIncrement(progress_.destination_mismatches);
   }
-  if (sample_count != kSamplesPerBlock) {
+  if (sample_count != samples_per_block_) {
     completed->invalid_data = true;
     completion_valid = false;
     saturatingIncrement(progress_.count_mismatches);
@@ -254,8 +257,8 @@ CompletionResult DualBankCaptureRing::onMajorLoopComplete(
 
   completed->observed_first_ticks[bank_index] = first_sample_ticks;
   const std::uint32_t bounded_sample_count =
-      sample_count > kSamplesPerBlock
-          ? static_cast<std::uint32_t>(kSamplesPerBlock)
+      sample_count > samples_per_block_
+          ? static_cast<std::uint32_t>(samples_per_block_)
           : sample_count;
   completed->observed_counts[bank_index] = bounded_sample_count;
   completed->completion_mask = static_cast<std::uint8_t>(
@@ -322,14 +325,14 @@ AcquireResult DualBankCaptureRing::acquireReady() {
       storage_.auxiliary[selected].words.data();
   result.handle.first_sample_ticks = record.first_sample_ticks;
   result.handle.sample_period_ticks = sample_period_ticks_;
-  result.handle.sample_count = static_cast<std::uint32_t>(kSamplesPerBlock);
+  result.handle.sample_count = static_cast<std::uint32_t>(samples_per_block_);
   result.handle.epoch = record.epoch;
   result.handle.generation = record.generation;
   result.handle.lease = record.lease;
   result.handle.buffer_index = selected;
   saturatingIncrement(progress_.buffers_acquired);
   saturatingAdd(progress_.sample_instants_delivered,
-                static_cast<std::uint64_t>(kSamplesPerBlock));
+                static_cast<std::uint64_t>(samples_per_block_));
   critical_.exit(token);
 
   cache_.invalidateBeforeCpuRead(storage_.primary[selected].words.data(),
@@ -413,7 +416,7 @@ StopReport DualBankCaptureRing::stop(
   bool valid_progress = true;
   for (std::size_t bank = 0U; bank < kBankCount; ++bank) {
     if (banks[bank].generation != next_completion_generations_[bank] ||
-        banks[bank].sample_count > kSamplesPerBlock ||
+        banks[bank].sample_count > samples_per_block_ ||
         (banks[bank].sample_count != 0U &&
          !isDmaDestination(banks[bank].destination))) {
       valid_progress = false;
@@ -428,7 +431,7 @@ StopReport DualBankCaptureRing::stop(
   running_ = false;
 
   for (const BankStopState &bank : banks) {
-    if (bank.sample_count > kSamplesPerBlock) {
+    if (bank.sample_count > samples_per_block_) {
       saturatingIncrement(progress_.count_mismatches);
     }
   }
@@ -446,8 +449,8 @@ StopReport DualBankCaptureRing::stop(
         first_ticks[bank] = slot.observed_first_ticks[bank];
       } else if (banks[bank].generation == slot.generation) {
         contributed[bank] =
-            banks[bank].sample_count > kSamplesPerBlock
-                ? static_cast<std::uint32_t>(kSamplesPerBlock)
+            banks[bank].sample_count > samples_per_block_
+                ? static_cast<std::uint32_t>(samples_per_block_)
                 : banks[bank].sample_count;
         first_ticks[bank] = banks[bank].first_sample_ticks;
         if (banks[bank].sample_count != 0U &&
@@ -634,7 +637,7 @@ DualBankCaptureRing::GenerationSlot *DualBankCaptureRing::scheduleGeneration(
     return nullptr;
   }
   const std::uint64_t coverage =
-      static_cast<std::uint64_t>(kSamplesPerBlock) * sample_period_ticks_;
+      static_cast<std::uint64_t>(samples_per_block_) * sample_period_ticks_;
   if (coverage > std::numeric_limits<std::uint64_t>::max() -
                      next_first_sample_ticks_) {
     return nullptr;
@@ -700,9 +703,9 @@ void DualBankCaptureRing::finalizeGeneration(
   saturatingIncrement(progress_.paired_major_loops);
   saturatingAdd(progress_.sample_instants_captured,
                 static_cast<std::uint64_t>(logical_samples));
-  const bool complete = logical_samples == kSamplesPerBlock &&
-                        slot.observed_counts[0] == kSamplesPerBlock &&
-                        slot.observed_counts[1] == kSamplesPerBlock;
+  const bool complete = logical_samples == samples_per_block_ &&
+                        slot.observed_counts[0] == samples_per_block_ &&
+                        slot.observed_counts[1] == samples_per_block_;
   result.pair_lost = slot.invalid_data || !complete ||
                      slot.destination == kOverflowDestination;
 
@@ -733,7 +736,7 @@ void DualBankCaptureRing::finalizeGeneration(
       record.state = BufferState::kReady;
       saturatingIncrement(progress_.buffers_completed);
       saturatingAdd(progress_.sample_instants_joined,
-                    static_cast<std::uint64_t>(kSamplesPerBlock));
+                    static_cast<std::uint64_t>(samples_per_block_));
       const std::size_t ready = countState(BufferState::kReady);
       if (ready > progress_.ready_high_water) {
         progress_.ready_high_water = ready;
@@ -799,7 +802,7 @@ bool DualBankCaptureRing::allBuffersFree() const {
 THINGDAQ_GPIO_DUAL_COLD_CODE(".flashmem.gpio_dual.handle_matches")
 bool DualBankCaptureRing::handleMatches(const BufferHandle &handle,
                                         BufferState state) const {
-  if (!handle.valid()) {
+  if (!handle.valid() || handle.sample_count != samples_per_block_) {
     return false;
   }
   const BufferRecord &record = records_[handle.buffer_index];

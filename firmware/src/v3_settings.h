@@ -10,6 +10,12 @@
 namespace thingdaq::settings {
 
 // Wire-sized values avoid padding, heap storage and a second metadata table.
+// Public decoded payload is cache-line aligned and leaves room for the prefix
+// in every existing 4096-byte packet page. Shared by metadata and acquisition.
+inline constexpr std::uint32_t kDecodedPayloadBytes = 4032U;
+inline constexpr std::uint32_t kRawFrameBytes = kDecodedPayloadBytes +
+    protocol_v3::kHeaderSize + protocol_v3::kDataPrefixBytes + protocol_v3::kTrailerSize;
+
 using Record = std::array<std::uint8_t, protocol_v3::kSettingsPayloadSize>;
 using Clocks =
     std::array<std::uint8_t, protocol_v3::kCpuProfileInfoPayloadSize>;

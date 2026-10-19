@@ -169,6 +169,9 @@ static_assert(protocol_v3::kCapabilitiesResponsePayloadSize +
                   protocol_v3::kMinFrameBytes <= ControlFrame::capacity());
 
 Result decodeFrame(ByteView input, DecodedFrame &frame);
+// O(1) envelope/prefix guard for immutable, already checksummed packet pages.
+// Does not decode samples or recompute the checksum on each USB short write.
+bool validV3DataView(ByteView bytes);
 Result encodeFrameTo(FrameFields fields, ByteView payload,
                      MutableByteView output, std::size_t &written);
 
@@ -215,7 +218,22 @@ struct Configuration {
       ? protocol_v2::kProtocolVersion : protocol_v1::kProtocolVersion;
   // Set by public v2 control admission; direct experiment harnesses opt out.
   bool legacy_v2 = false;
+  settings::Record public_settings{};
 };
+
+inline Configuration publicConfiguration(const settings::Record &record) {
+  Configuration result{};
+  result.stream_mask = record[protocol_v3::kSettingsStreamMaskOffset];
+  result.source = static_cast<protocol_v1::Source>(record[protocol_v3::kSettingsSourceOffset]);
+  result.data_checksum_algorithm = protocol_v1::ChecksumAlgorithm::kAdler32;
+  // The selected RAW maximum includes the public prefix (4032 + 60).
+  result.data_frame_bytes = settings::kRawFrameBytes;
+  result.aux_bank_mode = static_cast<protocol_v2::AuxBankMode>(record[protocol_v3::kSettingsAuxBankModeOffset]);
+  result.rate_profile = protocol_v2::RateProfile::kAdc1mhzGpio1mhz;
+  result.protocol_version = protocol_v3::kProtocolVersion;
+  result.public_settings = record;
+  return result;
+}
 
 struct ChecksumBenchmarkRequest {
   protocol_v1::ChecksumAlgorithm checksum_algorithm =
@@ -288,6 +306,7 @@ struct V3Status {
   std::uint32_t pending_frames = 0U;
   // ADC frames produced/dropped, items produced/dropped; then GPIO.
   std::array<std::uint64_t, 8U> counters{};
+  std::array<std::uint64_t, 22U> diagnostics{};
 };
 Result encodeV3StatusResponse(const Request& request, std::uint32_t run_id,
                               const V3Status& status, ControlFrame& output);

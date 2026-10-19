@@ -1077,7 +1077,7 @@ def validate_v3_contract(
         "settings_response": 48,
         "info_response": 132,
         "capabilities_response": 1404,
-        "status_response": 80,
+        "status_response": 256,
         "stop_response": 16,
         "error_response": 8,
         "data_prefix": 12,
@@ -1538,6 +1538,13 @@ def render_cpp_v3(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         "",
         "#include <cstdint>",
         "",
+        "// Keep discovery-only tables out of the bounded DTCM packet/stack budget.",
+        "#if defined(__IMXRT1062__)",
+        '#define THINGDAQ_V3_TABLE_DATA __attribute__((section(".progmem.protocol_v3.tables")))',
+        "#else",
+        "#define THINGDAQ_V3_TABLE_DATA",
+        "#endif",
+        "",
         "namespace thingdaq::protocol_v3 {",
         "",
         f'inline constexpr char kSourceSha256[] = "{source_sha256}";',
@@ -1553,13 +1560,20 @@ def render_cpp_v3(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         lines.extend(cpp_enum(name, f"std::uint{bits}_t", entries))
     for name, records in v3_record_tables(contract).items():
         lines.append(
-            f"inline constexpr std::uint8_t k{snake_to_pascal(name)}[][{len(records[0])}] = {{"
+            f"inline constexpr std::uint8_t k{snake_to_pascal(name)}[][{len(records[0])}] THINGDAQ_V3_TABLE_DATA = {{"
         )
         lines.extend(
             "  {" + ", ".join(f"{b}U" for b in record) + "}," for record in records
         )
         lines.extend(["};", ""])
-    lines.extend(["}  // namespace thingdaq::protocol_v3", ""])
+    lines.extend(
+        [
+            "}  // namespace thingdaq::protocol_v3",
+            "",
+            "#undef THINGDAQ_V3_TABLE_DATA",
+            "",
+        ]
+    )
     return "\n".join(lines).encode()
 
 

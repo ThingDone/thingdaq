@@ -629,6 +629,28 @@ class V3Status(V3Stop):
     gpio_frames_dropped: int = 0
     gpio_items_produced: int = 0
     gpio_items_dropped: int = 0
+    adc_codec_completed: int = 0
+    adc_codec_raw: int = 0
+    adc_codec_deadline_drops: int = 0
+    adc_codec_resource_drops: int = 0
+    adc_codec_work_ticks: int = 0
+    adc_codec_max_work_ticks: int = 0
+    adc_codec_max_age_ticks: int = 0
+    gpio_codec_completed: int = 0
+    gpio_codec_raw: int = 0
+    gpio_codec_deadline_drops: int = 0
+    gpio_codec_resource_drops: int = 0
+    gpio_codec_work_ticks: int = 0
+    gpio_codec_max_work_ticks: int = 0
+    gpio_codec_max_age_ticks: int = 0
+    adc_wire_bytes_transmitted: int = 0
+    adc_items_per_frame: int = 0
+    adc_max_frame_bytes: int = 0
+    adc_retention_ticks: int = 0
+    gpio_wire_bytes_transmitted: int = 0
+    gpio_items_per_frame: int = 0
+    gpio_max_frame_bytes: int = 0
+    gpio_retention_ticks: int = 0
 
     def to_payload(self) -> bytes:
         prefix = V3Stop.to_payload(self)
@@ -649,7 +671,31 @@ class V3Status(V3Stop):
             ),
             "dropped count exceeds produced",
         )
-        return prefix + _pack("<8Q", *counts)
+        diagnostics = (
+            self.adc_codec_completed,
+            self.adc_codec_raw,
+            self.adc_codec_deadline_drops,
+            self.adc_codec_resource_drops,
+            self.adc_codec_work_ticks,
+            self.adc_codec_max_work_ticks,
+            self.adc_codec_max_age_ticks,
+            self.gpio_codec_completed,
+            self.gpio_codec_raw,
+            self.gpio_codec_deadline_drops,
+            self.gpio_codec_resource_drops,
+            self.gpio_codec_work_ticks,
+            self.gpio_codec_max_work_ticks,
+            self.gpio_codec_max_age_ticks,
+            self.adc_wire_bytes_transmitted,
+            self.adc_items_per_frame,
+            self.adc_max_frame_bytes,
+            self.adc_retention_ticks,
+            self.gpio_wire_bytes_transmitted,
+            self.gpio_items_per_frame,
+            self.gpio_max_frame_bytes,
+            self.gpio_retention_ticks,
+        )
+        return prefix + _pack("<30Q", *counts, *diagnostics)
 
     @classmethod
     def from_payload(cls, payload: BytesLike) -> V3Status:
@@ -659,7 +705,7 @@ class V3Status(V3Stop):
             stop.state,
             stop.run_id,
             stop.pending_frames,
-            *struct.unpack_from("<8Q", data, c.STOP_RESPONSE_PAYLOAD_SIZE),
+            *struct.unpack_from("<30Q", data, c.STOP_RESPONSE_PAYLOAD_SIZE),
         )
         result.to_payload()
         return result

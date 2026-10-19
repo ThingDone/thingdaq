@@ -113,6 +113,7 @@ struct DispatchReadiness {
   temperature::Reading temperature{};
   health::Reading runtime_health{};
   std::uint32_t pending_frames = 0U;
+  std::array<std::uint64_t, 22U> v3_diagnostics{};
 };
 
 class ControlState {
@@ -123,6 +124,11 @@ class ControlState {
         active_settings_{application.defaults(), {}} {
     active_settings_.clocks = settings::clocksFor(
         active_settings_.settings[protocol_v3::kSettingsCpuProfileOffset]);
+  }
+
+  protocol::Configuration startConfiguration(std::uint8_t version) const {
+    return version == protocol_v3::kProtocolVersion
+        ? protocol::publicConfiguration(active_settings_.settings) : appliedConfiguration();
   }
 
   // Constant-time, idempotent BOOT completion. The future sketch supplies the
@@ -202,7 +208,7 @@ class ControlState {
   bool settings_known_ = true;
   settings::Application& settings_application_;
   settings::Applied active_settings_{};
-  // Only successful CONFIGURE selects a mode; queries never switch it.
+  // Successful CONFIGURE or a v3 START from boot selects a mode; queries never do.
   std::uint8_t negotiated_version_ = 0U;
   bool transitionTo(protocol_v1::DeviceState next);
   DispatchResult reject(const protocol::Request &request,

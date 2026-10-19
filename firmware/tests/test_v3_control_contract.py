@@ -291,10 +291,7 @@ def test_lengths_corruption_resync_and_duplicate(executable: Path) -> None:
     assert len(replies) == 1 and replies[0].request_id == 99
     replies = exchange(executable, command(28) + command(28))
     assert replies[1].error_code == c.ErrorCode.INVALID_REQUEST_ID
-    assert (
-        exchange(executable, command(18))[0].error_code
-        == c.ErrorCode.UNSUPPORTED_CONFIGURATION
-    )
+    assert exchange(executable, command(18))[0].error_code == c.ErrorCode.OK
 
 
 def test_generated_control_frames_and_reserved_response_bytes(executable: Path) -> None:

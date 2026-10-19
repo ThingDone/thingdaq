@@ -40,7 +40,6 @@ SourceByteCounters byteCounters(const stream_layout::FrameLayout &layout,
                                 const SourceCounters &source) {
   SourceByteCounters result{};
   const std::uint64_t payload_bytes_per_item = layout.item_bytes;
-  const std::uint64_t frame_bytes = layout.frame_bytes;
   result.payload_bytes_produced = saturatingMultiply(
       source.items_produced, payload_bytes_per_item);
   result.payload_bytes_framed = saturatingMultiply(
@@ -53,18 +52,10 @@ SourceByteCounters byteCounters(const stream_layout::FrameLayout &layout,
       source.items_dropped, payload_bytes_per_item);
   result.payload_bytes_evicted = saturatingMultiply(
       source.items_evicted, payload_bytes_per_item);
-  result.framed_bytes_framed =
-      saturatingMultiply(source.frames_framed, frame_bytes);
-  result.framed_bytes_emitted =
-      saturatingMultiply(source.frames_emitted, frame_bytes);
-  result.framed_bytes_transmitted =
-      saturatingMultiply(source.frames_transmitted, frame_bytes);
-  result.framed_bytes_evicted =
-      saturatingMultiply(source.frames_evicted, frame_bytes);
-    result.framed_bytes_framed = source.wire_bytes_framed;
-    result.framed_bytes_emitted = source.wire_bytes_emitted;
-    result.framed_bytes_transmitted = source.wire_bytes_transmitted;
-    result.framed_bytes_evicted = source.wire_bytes_evicted;
+  result.framed_bytes_framed = source.wire_bytes_framed;
+  result.framed_bytes_emitted = source.wire_bytes_emitted;
+  result.framed_bytes_transmitted = source.wire_bytes_transmitted;
+  result.framed_bytes_evicted = source.wire_bytes_evicted;
   return result;
 }
 
@@ -393,25 +384,17 @@ bool PacketBufferPipeline::validFrameSize(BufferIndex index) const {
     if (record.frame_size < protocol_v3::kMinFrameBytes + protocol_v3::kDataPrefixBytes ||
         record.frame_size > frame.size() || record.item_count != layout.item_count) return false;
     const protocol::ByteView bytes{frame.data(), record.frame_size};
-    const std::size_t prefix = protocol_v3::kHeaderSize;
-    std::uint32_t total = 0U, payload = 0U, items = 0U, decoded = 0U, runs = 0U;
-    if (frame[4] != protocol_v3::kProtocolVersion || frame[5] != static_cast<std::uint8_t>(frameKind(record.stream)) ||
-        frame[prefix + 1U] != layout.item_bytes || frame[prefix + 2U] != 0U || frame[prefix + 3U] != 0U ||
-        !protocol::loadU32(bytes, 12U, total) || !protocol::loadU32(bytes, 16U, payload) ||
-        !protocol::loadU32(bytes, 40U, items) || !protocol::loadU32(bytes, prefix + 4U, decoded) ||
-        !protocol::loadU32(bytes, prefix + 8U, runs) || total != record.frame_size ||
-        payload != total - protocol_v3::kMinFrameBytes || items != record.item_count ||
-        decoded != layout.payload_bytes) return false;
-    const auto encoding = static_cast<protocol_v3::Encoding>(frame[prefix]);
-    const auto encoded_bytes = payload - protocol_v3::kDataPrefixBytes;
-    if (encoding == protocol_v3::Encoding::kRaw)
-      return runs == 0U && encoded_bytes == decoded;
-    if (encoding == protocol_v3::Encoding::kAdcPack12)
-      return record.stream == Stream::kAdc && layout_.adc_policy == protocol_v3::AdcPolicy::kPack12 &&
-          runs == 0U && encoded_bytes == items * 3U;
-    return encoding == protocol_v3::Encoding::kGpioRle && record.stream == Stream::kGpio &&
-        layout_.gpio_policy == protocol_v3::GpioPolicy::kRleAuto && runs > 0U && runs <= items &&
-        encoded_bytes == runs * (2U + layout.item_bytes) && encoded_bytes < decoded;
+    if (!protocol::validV3DataView(bytes) ||
+        frame[protocol_v3::kHeaderKindOffset] != static_cast<std::uint8_t>(frameKind(record.stream)) ||
+        frame[protocol_v3::kHeaderSize + protocol_v3::kDataPrefixItemBytesOffset] != layout.item_bytes)
+      return false;
+    std::uint32_t items = 0U;
+    protocol::loadU32(bytes, protocol_v3::kHeaderItemCountOffset, items);
+    if (items != record.item_count) return false;
+    const auto encoding = static_cast<protocol_v3::Encoding>(frame[protocol_v3::kHeaderSize]);
+    return encoding == protocol_v3::Encoding::kRaw ||
+        (encoding == protocol_v3::Encoding::kAdcPack12 && layout_.adc_policy == protocol_v3::AdcPolicy::kPack12) ||
+        (encoding == protocol_v3::Encoding::kGpioRle && layout_.gpio_policy == protocol_v3::GpioPolicy::kRleAuto);
   }
   if (record.frame_size == layout.frame_bytes) return true;
   if (!layout_.legacy_v2 && input_experiment::kPackAdc && record.stream == Stream::kAdc &&
@@ -842,6 +825,14 @@ std::uint64_t PacketBufferPipeline::accountedFrames(
 }
 
 std::uint64_t PacketBufferPipeline::coverageFrames(std::size_t index) const {
+  if (index >= layout_.streams.size()) return 0U;
+  if (layout_.protocol_version == protocol_v3::kProtocolVersion) {
+    const auto &streams = layout_.streams;
+    const auto unit = streams[0].coverage_ticks > streams[1].coverage_ticks
+        ? streams[0].coverage_ticks : streams[1].coverage_ticks;
+    return saturatingMultiply(accountedFrames(index),
+        static_cast<std::uint64_t>(streams[index].coverage_ticks)) / unit;
+  }
   // Compare equal time coverage, including the experiment's doubled ADC
   // frame. Use shifts by constant divisors rather than 64-bit tick products.
   const bool weighted = (input_experiment::kEqualRates ||
@@ -1190,7 +1181,7 @@ void PacketBufferPipeline::serviceDeferred(std::uint64_t ticks, std::size_t budg
     const auto age = deferred_now_ - record.lease;
     if (age > c.max_age_ticks) c.max_age_ticks = age;
     if (age >= 80000U) {
-      ready_queues_[stream].eraseFirst(index); ++c.deadline_drops;
+      ready_queues_[stream].eraseFirst(index); saturatingIncrement(c.deadline_drops);
       dropBuffer(index, false);
       continue;
     }
@@ -1199,19 +1190,19 @@ void PacketBufferPipeline::serviceDeferred(std::uint64_t ticks, std::size_t budg
     const bool ok = record.stream == Stream::kGpio ? compressGpio(index) : packAdc12(index);
     const auto ended = read_ticks ? read_ticks(clock_context) : ticks;
     const auto work = static_cast<std::uint32_t>(ended - started);
-    c.work_ticks += work;
+    saturatingAdd(c.work_ticks, static_cast<std::uint64_t>(work));
     if (work > c.max_work_ticks) c.max_work_ticks = work;
     // A late completion is still a deadline miss, never silently published.
     const bool late = static_cast<std::uint32_t>(ended) - record.lease >= 80000U;
     if (late) {
-      ready_queues_[stream].eraseFirst(index); ++c.deadline_drops;
+      ready_queues_[stream].eraseFirst(index); saturatingIncrement(c.deadline_drops);
       dropBuffer(index, false);
     } else if (!ok) {
-      ready_queues_[stream].eraseFirst(index); ++c.resource_drops;
+      ready_queues_[stream].eraseFirst(index); saturatingIncrement(c.resource_drops);
       dropBuffer(index, false);
     } else {
-      ++c.completed;
-      if (record.frame_size == streamLayout(record.stream).frame_bytes + layout_.prefixBytes()) ++c.raw;
+      saturatingIncrement(c.completed);
+      if (record.frame_size == streamLayout(record.stream).frame_bytes + layout_.prefixBytes()) saturatingIncrement(c.raw);
       publishReady(index);
     }
     next_codec_source_ = (stream + 1U) % kStreamCount;

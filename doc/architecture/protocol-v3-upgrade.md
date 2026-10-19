@@ -203,3 +203,25 @@ the USB v3 data guard or expose public codec diagnostics. Those remain the next
 layout/transport task; physical qualification and runtime clock changes also
 remain outstanding. The storage ceilings above are enforced by the packet layout
 factory, and the public v3 checksum remains Adler-32 only.
+
+
+## Firmware layout/transport checkpoint (2026-10-19)
+
+[[protocol-v3-firmware-layouts]] completes acquisition/USB integration and enables
+public v3 START/STOP. One shared decoded-payload size selects 1008 ADC pairs,
+4032 GPIO8 samples or 2016 GPIO16 samples; each RAW frame occupies 4092 bytes in
+an existing 4096-byte page. GPIO16 DMA count, pair-join leases and STOP accounting
+now follow the run layout. ADC priority mode is independent of frame size.
+Legacy v2 layouts and private experiment adapters remain explicit.
+
+The packet and USB paths share a bounded v3 shape guard. Queue fairness compares
+logical coverage, wire throughput accumulates actual transmitted frame lengths,
+and STATUS retention is an explicitly shared-pool upper bound. The generated
+256-byte public STATUS schema exposes layout, wire totals and codec counters;
+Python models and golden vectors match it. The fixed control buffers and packet
+storage are unchanged. A bounded raw-tail drain precedes the v3 STOP response.
+
+Both 450/600 MHz linked images pass the original memory gates after moving
+immutable discovery tables and initialization-only code to program flash.
+Runtime clock application and physical capture/throughput qualification remain
+outstanding; portable adapters and synthetic streaming do not establish them.

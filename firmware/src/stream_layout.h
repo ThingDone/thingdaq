@@ -256,6 +256,19 @@ inline Result publicV3(const settings::Record &settings,
   return result;
 }
 
+// Cache-line-sized decoded payloads fit the existing 4096-byte packet pages.
+// ADC uses the larger block class for both GPIO widths, independent of codecs.
+inline constexpr std::uint32_t kV3AdcPairs = settings::kDecodedPayloadBytes / 4U;
+inline constexpr std::uint32_t kV3Gpio8Samples = settings::kDecodedPayloadBytes;
+inline constexpr std::uint32_t kV3Gpio16Samples = settings::kDecodedPayloadBytes / 2U;
+inline Result publicV3(const settings::Record &settings) {
+  return publicV3(settings, kV3AdcPairs,
+      settings[protocol_v3::kSettingsGpioWidthBitsOffset] == 16U
+          ? kV3Gpio16Samples : kV3Gpio8Samples);
+}
+static_assert(kV3AdcPairs * 4U + 60U <= protocol_v1::kDataFrameBytes);
+static_assert(kV3Gpio16Samples * 2U + 60U <= protocol_v1::kDataFrameBytes);
+
 constexpr RunLayout legacy() {
   RunLayout result{};
   result.streams[0] = makeFrameLayout(

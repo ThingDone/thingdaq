@@ -49,8 +49,14 @@ class TeensyDualBankCapture final : public HardwareCapture {
                            protocol_v2::RateProfile profile) override;
   StartStatus prepare(std::uint32_t epoch,
                       protocol_v2::RateProfile profile) override;
+  StartStatus inspectStart(std::uint32_t epoch, protocol_v2::RateProfile profile,
+                           std::uint32_t samples) override;
+  StartStatus prepare(std::uint32_t epoch, protocol_v2::RateProfile profile,
+                      std::uint32_t samples) override;
   StartStatus start(std::uint32_t epoch,
                     protocol_v2::RateProfile profile) override;
+  StartStatus start(std::uint32_t epoch, protocol_v2::RateProfile profile,
+                    std::uint32_t samples) override;
   StopReport stopAfterTriggers(
       StopReason reason = StopReason::kStop) override;
   StopReport stop(StopReason reason = StopReason::kStop) override;

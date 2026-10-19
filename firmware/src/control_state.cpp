@@ -91,6 +91,14 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
   if (request.protocol_version == protocol_v3::kProtocolVersion)
     return dispatchV3(request, response, readiness);
 
+  // Legacy telemetry cannot describe public encoding/layouts. A probe must
+  // not produce an invalid legacy reply or trigger response-path recovery.
+  if (state_ == protocol_v1::DeviceState::kRunning &&
+      negotiated_version_ == protocol_v3::kProtocolVersion &&
+      (request.kind == protocol_v1::CommandKind::kInfo ||
+       request.kind == protocol_v1::CommandKind::kGetStatus))
+    return reject(request, protocol_v1::ErrorCode::kUnsupportedConfiguration, response);
+
   if (request.kind == protocol::kGetRuntimeHealth) {
     return encoded(request, protocol_v1::ErrorCode::kOk,
                    protocol::encodeRuntimeHealthResponse(request, run_id_, readiness.runtime_health, response),
@@ -442,18 +450,45 @@ DispatchResult ControlState::dispatchV3(const protocol::Request& request,
       }
       break;
     }
-    case CommandKind::kStart:
+    case CommandKind::kStart: {
       if (state_ == protocol_v1::DeviceState::kRunning)
         return reject(request, ErrorCode::kInvalidState, response);
-      if (!readiness.start_ready || readiness.pending_frames != 0U)
+      if (negotiated_version_ != 0U && negotiated_version_ != protocol_v3::kProtocolVersion)
+        return reject(request, ErrorCode::kUnsupportedConfiguration, response);
+      if (!readiness.start_ready || readiness.pending_frames != 0U || pending_event_mask_ != 0U)
         return reject(request, ErrorCode::kBusy, response);
-      // Control discovery/settings are usable before public data integration.
-      // Never acknowledge START while the acquisition path emits legacy frames.
-      return reject(request, ErrorCode::kUnsupportedConfiguration, response);
+      const auto candidate = protocol::publicConfiguration(active_settings_.settings);
+      if (!stream_layout::publicV3(candidate.public_settings).ok())
+        return reject(request, ErrorCode::kUnsupportedConfiguration, response);
+      const auto next_run = nextRunId(run_id_);
+      result = protocol::encodeV3SettingsResponse(request, next_run, active_settings_, response);
+      if (!result.ok()) break;
+      configuration_ = candidate;
+      has_configuration_ = true;
+      transitionTo(protocol_v1::DeviceState::kConfigured);
+      transitionTo(protocol_v1::DeviceState::kRunning);
+      negotiated_version_ = protocol_v3::kProtocolVersion;
+      run_id_ = next_run;
+      statistics_.resetForNewGeneration();
+      pending_event_mask_ |= eventBit(Event::kStartEpoch);
+      break;
+    }
     case CommandKind::kStop:
     case CommandKind::kGetStatus: {
+      if (kind == CommandKind::kStop) {
+        if (negotiated_version_ != 0U && negotiated_version_ != protocol_v3::kProtocolVersion)
+          return reject(request, ErrorCode::kInvalidState, response);
+        if (state_ == protocol_v1::DeviceState::kRunning) {
+          transitionTo(protocol_v1::DeviceState::kIdle);
+          configuration_ = kIdleConfiguration;
+          has_configuration_ = false;
+          pending_event_mask_ &= static_cast<std::uint8_t>(~eventBit(Event::kStartEpoch));
+          pending_event_mask_ |= eventBit(Event::kStop);
+        }
+      }
       protocol::V3Status status{};
       status.pending_frames = readiness.pending_frames;
+      status.diagnostics = readiness.v3_diagnostics;
       status.state = state_ == protocol_v1::DeviceState::kRunning
                          ? protocol_v3::DeviceState::kRunning
                      : readiness.pending_frames != 0U

@@ -18,8 +18,8 @@ related:
 provides validated schemas, separate Python/C++ constants, golden frames and
 opt-in Python codecs, a simulated v3 device and public ThingDAQ simulator
 sessions. Firmware control discovery/settings are implemented in
-[[protocol-v3-firmware-control]]; firmware acquisition remains gated pending
-public data-path integration.
+[[protocol-v3-firmware-control]]; [[protocol-v3-firmware-layouts]] enables public
+v3 acquisition/USB framing with portable and linked-image validation.
 The current product still uses [[protocol-v2]]. Physical results in
 [[deferred-codecs-20261018]] concern private research versions, not v3.
 
@@ -42,7 +42,7 @@ Private versions `0x82/0x83` are not v3 encodings.
 | INFO | `0x10 / 0x90` | 0 | 132 |
 | CONFIGURE | `0x11 / 0x91` | 20 | 48 |
 | START | `0x12 / 0x92` | 0 | 48 |
-| GET_STATUS (STATUS) | `0x13 / 0x93` | 0 | 80 |
+| GET_STATUS (STATUS) | `0x13 / 0x93` | 0 | 256 |
 | STOP | `0x14 / 0x94` | 0 | 16 |
 | GET_CAPABILITIES | `0x1C / 0x9C` | 0 | 1404 |
 | GET_SETTINGS | `0x1D / 0x9D` | 0 | 48 |
@@ -238,3 +238,32 @@ counts and retains exact timestamp intervals. For variable frames,
 `frame_item_count` describes the reference frame, not a fixed count for every
 lost frame; use `missing_items` / `dropped_items` for loss accounting. Fixed
 v1/v2 count validation remains intact.
+
+
+## Firmware layout and diagnostic status
+
+[[protocol-v3-firmware-layouts]] records production v3 framing: 1008 ADC pairs,
+4032 GPIO8 samples or 2016 GPIO16 samples per frame, with a 4092-byte RAW envelope
+inside each existing 4096-byte packet page. PACK12 ADC frames contain 3084 wire
+bytes. Device-specific limits can be smaller than the protocol maxima above.
+
+GET_STATUS retains the original 80-byte state/logical-counter prefix and appends
+22 little-endian u64 fields (256-byte payload total). Offsets are generated from
+`protocol/protocol-v3.json`:
+
+| Payload offsets | Fields |
+| --- | --- |
+| 80–128 | ADC codec completed, RAW fallback, deadline drops, resource drops, work ticks, maximum work ticks, maximum age ticks |
+| 136–184 | GPIO codec counters in the same order |
+| 192–216 | ADC completed wire bytes, logical items/frame, maximum RAW wire bytes/frame, retention ticks |
+| 224–248 | GPIO layout/transport fields in the same order |
+
+Codec times use the 8 MHz domain. Counts/maxima saturate at the firmware source's
+u32 width and accumulated work at u64. RAW policies bypass codec work, so their
+codec counters remain zero. Completed wire bytes include envelope, prefix and
+checksum; an incomplete USB write does not count as a transmitted frame.
+Retention is a per-stream upper bound if every shared packet page holds that
+stream, calculated from logical time coverage. Zero layout/retention fields mean
+unavailable, including before the first run. Settings changes preserve the prior
+run's diagnostics until START resets them. Legacy layouts and diagnostics do not
+change. This pre-release v3 schema extension requires matching generated clients.

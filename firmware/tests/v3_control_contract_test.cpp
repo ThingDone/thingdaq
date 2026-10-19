@@ -240,16 +240,34 @@ int main(int argc, char** argv) {
       const auto mode_before = control.negotiatedVersion();
       const auto calls_before = fake.calls;
       assert(control.dispatch(command.request, response, ready).responseReady());
-      if (command.request.kind != v1::CommandKind::kConfigure) {
+      if (command.request.kind != v1::CommandKind::kConfigure &&
+          command.request.kind != v1::CommandKind::kStart) {
         assert(control.negotiatedVersion() == mode_before);
         assert(fake.calls == calls_before);
       }
+      if (command.request.kind == v1::CommandKind::kStart && control.runId() != initial_run) {
+        assert(control.state() == v1::DeviceState::kRunning);
+        assert(control.runId() == initial_run + 1U);
+        assert(control.statistics().generation() == generation + 1U);
+        assert(control.takePendingEvents().has(thingdaq::control::Event::kStartEpoch));
+        wire::Request probe{};
+        probe.protocol_version = 2U;
+        probe.request_id = 0xABC000U;
+        probe.kind = v1::CommandKind::kInfo;
+        wire::ControlFrame legacy_reply{};
+        assert(control.dispatch(probe, legacy_reply).command_error == v1::ErrorCode::kUnsupportedConfiguration);
+        wire::DecodedFrame decoded{};
+        assert(wire::decodeFrame(legacy_reply.view(), decoded).ok());
+        assert(control.state() == v1::DeviceState::kRunning && control.negotiatedVersion() == 3U);
+        assert(control.takePendingEvents().mask == 0U);
+      } else {
       assert(control.state() == initial_state);
       assert(control.runId() == initial_run);
       assert(control.statistics().generation() == generation);
       assert(control.statistics().snapshot().data_path.adc.items_generated ==
              1012U);
       assert(control.takePendingEvents().mask == 0U);
+      }
     }
     std::cout.write(reinterpret_cast<const char*>(response.data()),
                     static_cast<std::streamsize>(response.size()));

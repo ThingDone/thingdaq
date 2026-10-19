@@ -102,6 +102,7 @@ std::uint32_t g_gpio2_gdir_unrelated = 0U;
 std::uint32_t g_gpr27_unrelated = 0U;
 protocol_v2::RateProfile g_profile = protocol_v2::kDefaultRateProfile;
 bool g_workspace_claimed = false;
+std::uint32_t g_samples_per_block = static_cast<std::uint32_t>(kSamplesPerBlock);
 bool g_hardware_prepared = false;
 volatile bool g_hardware_running = false;
 // Read by main while completion/error ISRs can change it. Multi-field
@@ -288,10 +289,10 @@ void configureDescriptor(IMXRT_DMA_TCD_t &descriptor, Bank bank,
   descriptor.DOFF = destination == kOverflowDestination
                         ? 0
                         : static_cast<std::int16_t>(sizeof(std::uint32_t));
-  descriptor.CITER_ELINKNO = static_cast<std::uint16_t>(kSamplesPerBlock);
+  descriptor.CITER_ELINKNO = static_cast<std::uint16_t>(g_samples_per_block);
   descriptor.DLASTSGA = descriptorAddress(bank, kOverflowDestination);
   descriptor.CSR = kTcdControl;
-  descriptor.BITER_ELINKNO = static_cast<std::uint16_t>(kSamplesPerBlock);
+  descriptor.BITER_ELINKNO = static_cast<std::uint16_t>(g_samples_per_block);
 }
 
 void copyDescriptorToHardware(Bank bank,
@@ -380,8 +381,8 @@ bool routeValid(const variable_rate::Schedule &schedule) {
         tcd.SADDR != psrAddress(bank) || tcd.ATTR != kTcdAttributes ||
         tcd.NBYTES_MLNO != sizeof(std::uint32_t) ||
         tcd.DOFF != static_cast<std::int16_t>(sizeof(std::uint32_t)) ||
-        tcd.CITER_ELINKNO != kSamplesPerBlock ||
-        tcd.BITER_ELINKNO != kSamplesPerBlock ||
+        tcd.CITER_ELINKNO != g_samples_per_block ||
+        tcd.BITER_ELINKNO != g_samples_per_block ||
         tcd.CSR != kTcdControl ||
         (priorityRegister(bank) & 0x0FU) != expected_priority ||
         !hardwareDestinationMatches(
@@ -437,7 +438,7 @@ void clearInterrupts() {
 }
 
 std::uint64_t blockCoverageTicks() {
-  return static_cast<std::uint64_t>(kSamplesPerBlock) *
+  return static_cast<std::uint64_t>(g_samples_per_block) *
          g_sample_period_ticks;
 }
 
@@ -463,7 +464,7 @@ bool publishCompletion(Bank bank) {
   const CompletionResult completed = g_ring->onMajorLoopComplete(
       bank, g_epoch, g_current_generations[index],
       g_current_destinations[index], g_current_first_ticks[index],
-      static_cast<std::uint32_t>(kSamplesPerBlock));
+      static_cast<std::uint32_t>(g_samples_per_block));
   if (!completed.consumed || !completed.ok() ||
       completed.future_generation != g_current_generations[index] + 2U) {
     if (!completed.consumed) {
@@ -519,7 +520,7 @@ void auxiliaryDmaIsr() {
 
 std::uint32_t activeSamples(Bank bank) {
   const IMXRT_DMA_TCD_t &tcd = hardwareTcd(bank);
-  if (tcd.BITER_ELINKNO != kSamplesPerBlock ||
+  if (tcd.BITER_ELINKNO != g_samples_per_block ||
       tcd.CITER_ELINKNO > tcd.BITER_ELINKNO) {
     if (g_ring != nullptr) {
       g_ring->recordHardwareError(g_epoch);
@@ -641,7 +642,9 @@ void rollbackPreparation() {
 
 THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(".flashmem.gpio_dual.inspect")
 StartStatus inspectHardwareStart(std::uint32_t epoch,
-                                 protocol_v2::RateProfile profile) {
+                                 protocol_v2::RateProfile profile,
+                                 std::uint32_t samples = static_cast<std::uint32_t>(kSamplesPerBlock)) {
+  if (samples == 0U || samples > kSamplesPerBlock) return StartStatus::kUnsupportedProfile;
   if (epoch == 0U) {
     return StartStatus::kInvalidEpoch;
   }
@@ -665,8 +668,9 @@ StartStatus inspectHardwareStart(std::uint32_t epoch,
 
 THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(".flashmem.gpio_dual.prepare")
 StartStatus prepareHardware(std::uint32_t epoch,
-                            protocol_v2::RateProfile profile) {
-  const StartStatus readiness = inspectHardwareStart(epoch, profile);
+                            protocol_v2::RateProfile profile,
+                            std::uint32_t samples = static_cast<std::uint32_t>(kSamplesPerBlock)) {
+  const StartStatus readiness = inspectHardwareStart(epoch, profile, samples);
   if (readiness != StartStatus::kOk) {
     if (readiness == StartStatus::kResourceBusy) {
       saturatingIncrement(g_resource_conflicts);
@@ -696,6 +700,7 @@ StartStatus prepareHardware(std::uint32_t epoch,
     return StartStatus::kResourceBusy;
   }
 
+  g_samples_per_block = samples;
   g_epoch = epoch;
   g_sample_period_ticks = derived.schedule.gpio_sample_period_ticks;
   g_profile = profile;
@@ -713,7 +718,7 @@ StartStatus prepareHardware(std::uint32_t epoch,
   g_stale_dma_completions = 0U;
 
   const PrimeResult prime =
-      g_ring->prime(epoch, g_sample_period_ticks);
+      g_ring->prime(epoch, g_sample_period_ticks, 0U, 0U, samples);
   if (!prime.ok()) {
     saturatingIncrement(g_start_errors);
     rollbackPreparation();
@@ -770,8 +775,9 @@ StartStatus prepareHardware(std::uint32_t epoch,
 
 THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(".flashmem.gpio_dual.start")
 StartStatus startHardware(std::uint32_t epoch,
-                          protocol_v2::RateProfile profile) {
-  const StartStatus prepared = prepareHardware(epoch, profile);
+                          protocol_v2::RateProfile profile,
+                          std::uint32_t samples = static_cast<std::uint32_t>(kSamplesPerBlock)) {
+  const StartStatus prepared = prepareHardware(epoch, profile, samples);
   if (prepared != StartStatus::kOk) {
     return prepared;
   }
@@ -922,7 +928,24 @@ StartStatus TeensyDualBankCapture::prepare(
 }
 
 THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(
-    ".flashmem.gpio_dual.facade_start")
+    ".flashmem.gpio_dual.facade_inspect_samples")
+StartStatus TeensyDualBankCapture::inspectStart(
+    std::uint32_t epoch, protocol_v2::RateProfile profile, std::uint32_t samples) {
+  return inspectHardwareStart(epoch, profile, samples);
+}
+THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(".flashmem.gpio_dual.facade_prepare_samples")
+StartStatus TeensyDualBankCapture::prepare(
+    std::uint32_t epoch, protocol_v2::RateProfile profile, std::uint32_t samples) {
+  return prepareHardware(epoch, profile, samples);
+}
+
+THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(".flashmem.gpio_dual.facade_start_samples")
+StartStatus TeensyDualBankCapture::start(
+    std::uint32_t epoch, protocol_v2::RateProfile profile, std::uint32_t samples) {
+  return startHardware(epoch, profile, samples);
+}
+
+THINGDAQ_DUAL_GPIO_TARGET_COLD_CODE(".flashmem.gpio_dual.facade_start")
 StartStatus TeensyDualBankCapture::start(
     std::uint32_t epoch, protocol_v2::RateProfile profile) {
   return startHardware(epoch, profile);

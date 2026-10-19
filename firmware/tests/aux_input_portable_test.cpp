@@ -581,6 +581,65 @@ void testAuxiliaryPackerUsesDynamicPacketShapesAndCounters() {
 
 }  // namespace
 
+void testPublicLayoutCountsAndPairedStopTail() {
+  JoinFixture fixture{};
+  constexpr std::uint32_t count = 2016U;
+  auto settings = thingdaq::settings::kBoardDefaults;
+  settings[thingdaq::protocol_v3::kSettingsGpioPolicyOffset] = 0U;
+  settings[thingdaq::protocol_v3::kSettingsAdcPolicyOffset] = 0U;
+  settings[thingdaq::protocol_v3::kSettingsAuxBankModeOffset] = 1U;
+  settings[thingdaq::protocol_v3::kSettingsGpioWidthBitsOffset] = 16U;
+  const auto selected = layout::publicV3(settings);
+  expect(selected.ok() && selected.layout.streams[0].item_count == 1008U &&
+         selected.layout.streams[1].item_count == count, "public production counts fit packet pages");
+  expect(!fixture.ring.prime(71U, 8U, 0U, 0U, 2025U).ok(), "oversized raw block is rejected");
+  const auto primed = fixture.ring.prime(71U, 8U, 0U, 0U, count);
+  expect(primed.ok(), "public DMA count primes existing storage");
+  for (auto bank : {join::Bank::kPrimary, join::Bank::kAuxiliary}) {
+    const auto done = fixture.ring.onMajorLoopComplete(bank, 71U, 0U,
+        primed.active_destination, 0U, count);
+    expect(done.ok(), "both banks complete exactly the selected count");
+  }
+  const auto lease = fixture.ring.acquireReady();
+  expect(lease.ok() && lease.handle.sample_count == count, "lease carries actual logical count");
+  auto bad = lease.handle;
+  bad.sample_count = 2024U;
+  expect(fixture.ring.release(bad) == join::OperationStatus::kInvalidHandle,
+         "legacy-sized forged lease cannot release public DMA ownership");
+  expect(fixture.ring.release(lease.handle) == join::OperationStatus::kOk, "exact lease releases");
+  for (auto bank : {join::Bank::kPrimary, join::Bank::kAuxiliary})
+    expect(fixture.ring.onMajorLoopComplete(bank, 71U, 1U, primed.queued_destination,
+        count * 8U, count).ok(), "second block uses logical coverage");
+  static packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  expect(pipeline.startRun(71U, protocol_v1::ChecksumAlgorithm::kAdler32,
+      packet::kGpioStreamMask, selected.layout) == packet::OperationStatus::kOk, "public packet layout starts");
+  packer::AuxiliaryBatchPacker gpio{fixture.ring};
+  expect(gpio.startRun(71U, protocol_v1::ChecksumAlgorithm::kAdler32,
+      protocol_v2::RateProfile::kAdc1mhzGpio1mhz, pipeline) == packer::OperationStatus::kOk,
+      "public auxiliary packer accepts selected layout");
+  const auto packed = gpio.service(pipeline, 1U);
+  expect(!packed.source_error && !packed.pipeline_error && packed.frames_framed == 1U,
+      "paired public frame is published without sample loss");
+  pipeline.serviceReadyFrames();
+  const auto bytes = pipeline.frontFrame();
+  expect(bytes.size == 4092U && protocol::validV3DataView(bytes), "RAW envelope uses actual wire length");
+  std::uint64_t ticks = 0U;
+  protocol::loadU64(bytes, 32U, ticks);
+  expect(ticks == count * 8U, "frame timestamp follows logical DMA count");
+  pipeline.releaseFrontFrame();
+  const auto next = fixture.ring.reserveGeneration(71U, 2U);
+  std::array<join::BankStopState, 2U> stop{};
+  for (auto &bank : stop) bank = {2U, next.destination, count * 16U, 7U};
+  expect(fixture.ring.stop(stop).ok(), "public partial STOP tail accepted");
+  fixture.ring.serviceDiscarded();
+  const auto snapshot = fixture.ring.snapshot();
+  expect(snapshot.progress.conserved() && snapshot.progress.stop_tail_samples == 7U,
+      "partial STOP tail counts logical samples, not bytes");
+  expect(fixture.ring.prime(72U, 8U).ok(), "legacy count restored in next epoch");
+  fixture.ring.cancel(72U);
+}
+
 void testV2ConfigureThroughIncrementalParser() {
   for (const auto &timing : protocol_v2::kRateProfiles) {
     for (std::uint8_t mode = 0U; mode < 2U; ++mode) {
@@ -650,6 +709,7 @@ void testV2InfoPublishesActiveLayoutAndPriorities() {
 }
 
 int main() {
+  testPublicLayoutCountsAndPairedStopTail();
   testV2InfoPublishesActiveLayoutAndPriorities();
   testV2ConfigureThroughIncrementalParser();
   testExactSchedulesAndTransactionalRollback();

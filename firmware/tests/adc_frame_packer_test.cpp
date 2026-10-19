@@ -92,6 +92,35 @@ wire::DecodedFrame promoteAndDecode(packet::PacketBufferPipeline &pipeline) {
   return decoded;
 }
 
+void testPublicLargerAdcLayout() {
+  FakePairSource source{};
+  packet::OwnedPacketBufferStorage storage{};
+  packet::PacketBufferPipeline pipeline{storage};
+  packer::AdcFramePacker adc{source};
+  auto settings = thingdaq::settings::kBoardDefaults;
+  settings[thingdaq::protocol_v3::kSettingsGpioPolicyOffset] = 0U;
+  settings[thingdaq::protocol_v3::kSettingsAdcPolicyOffset] = 0U;
+  const auto selected = layout::publicV3(settings);
+  expect(pipeline.startRun(99U, v1::ChecksumAlgorithm::kAdler32,
+      packet::kAdcStreamMask, selected.layout) == packet::OperationStatus::kOk,
+      "public ADC layout starts");
+  expect(adc.startRun(99U, v1::ChecksumAlgorithm::kAdler32, pipeline) == packer::OperationStatus::kOk,
+      "physical ADC packer accepts 1008-pair layout");
+  source.push(0U, 99U, 0U, 1008U);
+  source.push(1008U, 99U, 0U, 1008U);
+  const auto result = adc.service(pipeline, 2U);
+  expect(result.frames_framed == 2U && source.releases == 2U, "exact public DMA leases framed");
+  pipeline.serviceReadyFrames();
+  for (std::uint64_t i = 0U; i < 2U; ++i) {
+    const auto bytes = pipeline.frontFrame();
+    expect(bytes.size == 4092U && wire::validV3DataView(bytes), "public RAW shape validates");
+    std::uint64_t ticks = 0U;
+    wire::loadU64(bytes, 32U, ticks);
+    expect(ticks == i * 8064U, "ADC duration follows 1008 logical pairs");
+    pipeline.releaseFrontFrame();
+  }
+}
+
 void testPhysicalPairFramingTimestampsAndGapProjection() {
   FakePairSource source{};
   packet::OwnedPacketBufferStorage storage{};
@@ -388,6 +417,7 @@ void testExperimentalInputLayoutUsesShortFramesAndSelectedPeriod() {
 }  // namespace
 
 int main() {
+  testPublicLargerAdcLayout();
   testPhysicalPairFramingTimestampsAndGapProjection();
   testStaleEpochCannotCrossRuns();
   testAlignedFrameBoundaryAtLargestSafeTimestamp();

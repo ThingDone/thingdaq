@@ -567,7 +567,7 @@ Result validateV3Payload(const FrameHeader& h, ByteView p) {
            state == DeviceState::kRunning))
         return badPayload();
       if (h.kind == protocol_v1::FrameKind::kGetStatusResponse) {
-        for (std::size_t i = kStatusResponseAdcFramesProducedOffset; i < p.size;
+        for (std::size_t i = kStatusResponseAdcFramesProducedOffset; i < kStatusResponseAdcCodecCompletedOffset;
              i += 16U) {
           std::uint64_t produced = 0U, dropped = 0U;
           loadU64(p, i, produced);
@@ -3108,6 +3108,49 @@ Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
   return Result::success();
 }
 
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.v3_data_shape")
+bool validV3DataView(ByteView b) {
+  using namespace protocol_v3;
+  if (!b.valid() || b.size < kMinFrameBytes + kDataPrefixBytes ||
+      b.size > protocol_v1::kDataFrameBytes) return false;
+  std::uint32_t magic = 0U, total = 0U, payload = 0U, run = 0U, request = 0U;
+  std::uint32_t items = 0U, decoded = 0U, records = 0U;
+  std::uint16_t header = 0U, flags = 0U;
+  std::uint64_t ticks = 0U;
+  loadU32(b, kHeaderMagicOffset, magic);
+  loadU16(b, kHeaderHeaderLengthOffset, header);
+  loadU16(b, kHeaderFlagsOffset, flags);
+  loadU32(b, kHeaderTotalLengthOffset, total);
+  loadU32(b, kHeaderPayloadLengthOffset, payload);
+  loadU32(b, kHeaderRunIdOffset, run);
+  loadU32(b, kHeaderRequestIdOffset, request);
+  loadU32(b, kHeaderItemCountOffset, items);
+  loadU64(b, kHeaderFirstSampleTicksOffset, ticks);
+  loadU32(b, kHeaderSize + kDataPrefixDecodedBytesOffset, decoded);
+  loadU32(b, kHeaderSize + kDataPrefixRunCountOffset, records);
+  const bool adc = b.data[kHeaderKindOffset] == static_cast<std::uint8_t>(FrameKind::kAdcData);
+  const bool gpio = b.data[kHeaderKindOffset] == static_cast<std::uint8_t>(FrameKind::kGpioData);
+  const auto width = b.data[kHeaderSize + kDataPrefixItemBytesOffset];
+  const auto encoding = static_cast<Encoding>(b.data[kHeaderSize + kDataPrefixEncodingOffset]);
+  if (magic != kMagic || b.data[kHeaderVersionOffset] != kProtocolVersion ||
+      header != kHeaderSize || b.data[kHeaderReservedOffset] != 0U ||
+      b.data[kHeaderChecksumAlgorithmOffset] != 1U || (!adc && !gpio) ||
+      (flags & ~std::uint16_t{15U}) != 0U || ((flags & 8U) != 0U && (flags & 2U) == 0U) ||
+      total != b.size || payload != total - kMinFrameBytes || run == 0U || request != 0U ||
+      items == 0U || ticks % 8U != 0U ||
+      (adc ? width != 4U : (width != 1U && width != 2U)) ||
+      !zeroBytes(b, kHeaderSize + 2U, 2U) ||
+      static_cast<std::uint64_t>(items) * width != decoded ||
+      decoded > protocol_v1::kDataFrameBytes - kMinFrameBytes - kDataPrefixBytes ||
+      ticks > std::numeric_limits<std::uint64_t>::max() - static_cast<std::uint64_t>(items) * 8U)
+    return false;
+  const auto encoded = payload - kDataPrefixBytes;
+  if (encoding == Encoding::kRaw) return records == 0U && encoded == decoded;
+  if (encoding == Encoding::kAdcPack12) return adc && records == 0U && encoded == items * 3U;
+  return encoding == Encoding::kGpioRle && gpio && records > 0U && records <= items &&
+      encoded == records * (width + 2U) && encoded < decoded;
+}
+
 bool isV3Command(std::uint8_t kind) {
   return v3Request(static_cast<protocol_v1::FrameKind>(kind));
 }
@@ -3290,6 +3333,8 @@ Result encodeV3StatusResponse(const Request& request, std::uint32_t run_id,
   for (std::size_t i = 0U; i < status.counters.size(); ++i)
     storeU64(bytes, kStatusResponseAdcFramesProducedOffset + i * 8U,
              status.counters[i]);
+  for (std::size_t i = 0U; i < status.diagnostics.size(); ++i)
+    storeU64(bytes, kStatusResponseAdcCodecCompletedOffset + i * 8U, status.diagnostics[i]);
   const bool stop = request.kind == protocol_v1::CommandKind::kStop;
   return encodeFrame(
       responseFields(stop ? protocol_v1::FrameKind::kStopResponse

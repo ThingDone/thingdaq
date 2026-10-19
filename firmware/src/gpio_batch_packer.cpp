@@ -39,7 +39,7 @@ constexpr std::uint16_t flag(protocol_v1::FrameFlag value) {
   return static_cast<std::uint16_t>(value);
 }
 
-constexpr std::uint64_t kFrameSamples = protocol_v1::kGpioSamplesPerFrame;
+
 
 }  // namespace
 
@@ -88,9 +88,9 @@ OperationStatus GpioBatchPacker::startRun(
   if (!selected_layout.valid() ||
       selected_layout.aux_bank_mode !=
           protocol_v2::AuxBankMode::kDisabled ||
-      gpio_layout.item_count != kFrameSamples ||
+      gpio_layout.item_count > protocol_v1::kGpioSamplesPerFrame ||
       gpio_layout.item_bytes != kPackedWireBytesPerSample ||
-      gpio_layout.payload_bytes != storage_.buffers[0].bytes.size()) {
+      gpio_layout.payload_bytes > storage_.buffers[0].bytes.size()) {
     return OperationStatus::kPipelineNotReady;
   }
 
@@ -376,9 +376,9 @@ void GpioBatchPacker::accountRawGap(std::uint64_t sample_count,
   input_gap_pending_ = true;
 
   while (sample_count != 0U) {
-    if (current_frame_samples_ == 0U && sample_count >= kFrameSamples) {
-      const std::uint64_t full_frames = sample_count / kFrameSamples;
-      const std::uint64_t full_samples = full_frames * kFrameSamples;
+    if (current_frame_samples_ == 0U && sample_count >= static_cast<std::uint64_t>(layout_.streams[1].item_count)) {
+      const std::uint64_t full_frames = sample_count / static_cast<std::uint64_t>(layout_.streams[1].item_count);
+      const std::uint64_t full_samples = full_frames * static_cast<std::uint64_t>(layout_.streams[1].item_count);
       saturatingAdd(progress_.frames_produced, full_frames);
       saturatingAdd(prepacket_frames_dropped_, full_frames);
       saturatingAdd(pending_dropped_frames_, full_frames);
@@ -394,14 +394,14 @@ void GpioBatchPacker::accountRawGap(std::uint64_t sample_count,
 
     invalidateCurrentFrame();
     const std::uint64_t remaining_in_frame =
-        kFrameSamples - current_frame_samples_;
+        static_cast<std::uint64_t>(layout_.streams[1].item_count) - current_frame_samples_;
     const std::uint64_t chunk =
         sample_count < remaining_in_frame ? sample_count : remaining_in_frame;
     saturatingAdd(current_raw_drop_samples_, chunk);
     current_frame_samples_ += static_cast<std::uint32_t>(chunk);
     saturatingAdd(next_source_sample_, chunk);
     sample_count -= chunk;
-    if (current_frame_samples_ == kFrameSamples) {
+    if (current_frame_samples_ == static_cast<std::uint64_t>(layout_.streams[1].item_count)) {
       finishInvalidFrame(report);
     }
   }
@@ -413,7 +413,7 @@ void GpioBatchPacker::consumeAvailable(const std::uint32_t *source,
   std::size_t offset = 0U;
   while (offset < sample_count) {
     const std::size_t remaining_in_frame =
-        static_cast<std::size_t>(kFrameSamples - current_frame_samples_);
+        static_cast<std::size_t>(static_cast<std::uint64_t>(layout_.streams[1].item_count) - current_frame_samples_);
     const std::size_t remaining = sample_count - offset;
     const std::size_t chunk =
         remaining < remaining_in_frame ? remaining : remaining_in_frame;
@@ -451,7 +451,7 @@ void GpioBatchPacker::consumeAvailable(const std::uint32_t *source,
     offset += chunk;
     current_frame_samples_ += static_cast<std::uint32_t>(chunk);
     saturatingAdd(next_source_sample_, static_cast<std::uint64_t>(chunk));
-    if (current_frame_samples_ == kFrameSamples) {
+    if (current_frame_samples_ == static_cast<std::uint64_t>(layout_.streams[1].item_count)) {
       if (current_frame_invalid_) {
         finishInvalidFrame(report);
       } else {
@@ -513,7 +513,7 @@ void GpioBatchPacker::finishPackedFrame(ServiceReport &report) {
 
   BufferRecord &record = records_[filling_buffer_];
   record.state = BufferState::kReady;
-  record.first_sample = next_source_sample_ - kFrameSamples;
+  record.first_sample = next_source_sample_ - static_cast<std::uint64_t>(layout_.streams[1].item_count);
   record.dropped_frames_before = pending_dropped_frames_;
   record.raw_drop_samples_before = pending_raw_drop_samples_;
   record.packer_drop_samples_before = pending_packer_drop_samples_;
@@ -524,11 +524,11 @@ void GpioBatchPacker::finishPackedFrame(ServiceReport &report) {
     saturatingIncrement(source_errors_);
     report.source_error = true;
     recycle(filling_buffer_);
-    saturatingAdd(progress_.packer_drop_samples, kFrameSamples);
+    saturatingAdd(progress_.packer_drop_samples, static_cast<std::uint64_t>(layout_.streams[1].item_count));
     saturatingIncrement(progress_.frames_produced);
     saturatingIncrement(prepacket_frames_dropped_);
     saturatingIncrement(pending_dropped_frames_);
-    saturatingAdd(pending_packer_drop_samples_, kFrameSamples);
+    saturatingAdd(pending_packer_drop_samples_, static_cast<std::uint64_t>(layout_.streams[1].item_count));
     ++report.frames_dropped;
   } else {
     pending_dropped_frames_ = 0U;

@@ -1,13 +1,20 @@
 // Generated public protocol-v3 constants. Do not edit by hand.
 // Source: protocol/protocol-v3.json
-// Source SHA-256: 6bcb5abe84b2d39f5febc6fbb2f10cfc241b31830ea105ff5661c09fb027f55e
+// Source SHA-256: 41b4a7a4e644888e97ae7cd61686650703ee0638b4be6a793411bdfdb9a52c6c
 #pragma once
 
 #include <cstdint>
 
+// Keep discovery-only tables out of the bounded DTCM packet/stack budget.
+#if defined(__IMXRT1062__)
+#define THINGDAQ_V3_TABLE_DATA __attribute__((section(".progmem.protocol_v3.tables")))
+#else
+#define THINGDAQ_V3_TABLE_DATA
+#endif
+
 namespace thingdaq::protocol_v3 {
 
-inline constexpr char kSourceSha256[] = "6bcb5abe84b2d39f5febc6fbb2f10cfc241b31830ea105ff5661c09fb027f55e";
+inline constexpr char kSourceSha256[] = "41b4a7a4e644888e97ae7cd61686650703ee0638b4be6a793411bdfdb9a52c6c";
 inline constexpr bool kWireIsLittleEndian = true;
 inline constexpr std::uint32_t kMagic = 3735928559U;
 inline constexpr std::uint32_t kProtocolVersion = 3U;
@@ -138,7 +145,7 @@ inline constexpr std::uint32_t kCapabilitiesResponseRateProfilesOffset = 104U;
 inline constexpr std::uint32_t kCapabilitiesResponseRateProfilesCount = 1U;
 inline constexpr std::uint32_t kCapabilitiesResponseConfigurationsOffset = 124U;
 inline constexpr std::uint32_t kCapabilitiesResponseConfigurationsCount = 64U;
-inline constexpr std::uint32_t kStatusResponsePayloadSize = 80U;
+inline constexpr std::uint32_t kStatusResponsePayloadSize = 256U;
 inline constexpr std::uint32_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::uint32_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::uint32_t kStatusResponseErrorCodeOffset = 2U;
@@ -155,6 +162,28 @@ inline constexpr std::uint32_t kStatusResponseGpioFramesProducedOffset = 48U;
 inline constexpr std::uint32_t kStatusResponseGpioFramesDroppedOffset = 56U;
 inline constexpr std::uint32_t kStatusResponseGpioItemsProducedOffset = 64U;
 inline constexpr std::uint32_t kStatusResponseGpioItemsDroppedOffset = 72U;
+inline constexpr std::uint32_t kStatusResponseAdcCodecCompletedOffset = 80U;
+inline constexpr std::uint32_t kStatusResponseAdcCodecRawOffset = 88U;
+inline constexpr std::uint32_t kStatusResponseAdcCodecDeadlineDropsOffset = 96U;
+inline constexpr std::uint32_t kStatusResponseAdcCodecResourceDropsOffset = 104U;
+inline constexpr std::uint32_t kStatusResponseAdcCodecWorkTicksOffset = 112U;
+inline constexpr std::uint32_t kStatusResponseAdcCodecMaxWorkTicksOffset = 120U;
+inline constexpr std::uint32_t kStatusResponseAdcCodecMaxAgeTicksOffset = 128U;
+inline constexpr std::uint32_t kStatusResponseGpioCodecCompletedOffset = 136U;
+inline constexpr std::uint32_t kStatusResponseGpioCodecRawOffset = 144U;
+inline constexpr std::uint32_t kStatusResponseGpioCodecDeadlineDropsOffset = 152U;
+inline constexpr std::uint32_t kStatusResponseGpioCodecResourceDropsOffset = 160U;
+inline constexpr std::uint32_t kStatusResponseGpioCodecWorkTicksOffset = 168U;
+inline constexpr std::uint32_t kStatusResponseGpioCodecMaxWorkTicksOffset = 176U;
+inline constexpr std::uint32_t kStatusResponseGpioCodecMaxAgeTicksOffset = 184U;
+inline constexpr std::uint32_t kStatusResponseAdcWireBytesTransmittedOffset = 192U;
+inline constexpr std::uint32_t kStatusResponseAdcItemsPerFrameOffset = 200U;
+inline constexpr std::uint32_t kStatusResponseAdcMaxFrameBytesOffset = 208U;
+inline constexpr std::uint32_t kStatusResponseAdcRetentionTicksOffset = 216U;
+inline constexpr std::uint32_t kStatusResponseGpioWireBytesTransmittedOffset = 224U;
+inline constexpr std::uint32_t kStatusResponseGpioItemsPerFrameOffset = 232U;
+inline constexpr std::uint32_t kStatusResponseGpioMaxFrameBytesOffset = 240U;
+inline constexpr std::uint32_t kStatusResponseGpioRetentionTicksOffset = 248U;
 inline constexpr std::uint32_t kStopResponsePayloadSize = 16U;
 inline constexpr std::uint32_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::uint32_t kStopResponseReservedOffset = 1U;
@@ -308,20 +337,20 @@ enum class Encoding : std::uint8_t {
   kAdcPack12 = 2U,
 };
 
-inline constexpr std::uint8_t kDefaultSettings[][20] = {
+inline constexpr std::uint8_t kDefaultSettings[][20] THINGDAQ_V3_TABLE_DATA = {
   {3U, 0U, 1U, 3U, 1U, 4U, 0U, 8U, 1U, 1U, 12U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U},
 };
 
-inline constexpr std::uint8_t kCpuProfiles[][24] = {
+inline constexpr std::uint8_t kCpuProfiles[][24] THINGDAQ_V3_TABLE_DATA = {
   {1U, 0U, 0U, 0U, 0U, 70U, 195U, 35U, 128U, 209U, 240U, 8U, 96U, 52U, 60U, 2U, 0U, 54U, 110U, 1U, 0U, 18U, 122U, 0U},
   {2U, 0U, 0U, 0U, 128U, 116U, 210U, 26U, 128U, 209U, 240U, 8U, 96U, 52U, 60U, 2U, 0U, 54U, 110U, 1U, 0U, 18U, 122U, 0U},
 };
 
-inline constexpr std::uint8_t kRateProfiles[][20] = {
+inline constexpr std::uint8_t kRateProfiles[][20] THINGDAQ_V3_TABLE_DATA = {
   {4U, 0U, 0U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U, 8U, 0U, 8U, 0U, 4U, 0U, 0U, 0U},
 };
 
-inline constexpr std::uint8_t kSelectableConfigurations[][20] = {
+inline constexpr std::uint8_t kSelectableConfigurations[][20] THINGDAQ_V3_TABLE_DATA = {
   {1U, 0U, 1U, 3U, 1U, 4U, 0U, 8U, 0U, 0U, 12U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U},
   {1U, 1U, 1U, 3U, 1U, 4U, 0U, 8U, 0U, 0U, 12U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U},
   {2U, 0U, 1U, 3U, 1U, 4U, 0U, 8U, 0U, 0U, 12U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U},
@@ -385,3 +414,5 @@ inline constexpr std::uint8_t kSelectableConfigurations[][20] = {
 };
 
 }  // namespace thingdaq::protocol_v3
+
+#undef THINGDAQ_V3_TABLE_DATA

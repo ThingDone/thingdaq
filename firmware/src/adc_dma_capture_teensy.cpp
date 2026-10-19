@@ -344,11 +344,10 @@ void configureDescriptors() {
   }
 }
 
-#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
 bool g_aux_input_mode = false;
-#endif
 
 bool auxiliaryPriorities() {
+  if (g_public_v3) return g_aux_input_mode;
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
   return g_aux_input_mode;
 #else
@@ -1046,11 +1045,9 @@ void TeensyAdcDmaCapture::setLegacyV2Mode(bool enabled) {
   if (!g_hardware_prepared) g_legacy_v2 = enabled;
 }
 
-#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
 void TeensyAdcDmaCapture::setAuxInputMode(bool enabled) {
-  g_aux_input_mode = enabled;
+  if (!g_hardware_prepared) g_aux_input_mode = enabled;
 }
-#endif
 
 StartStatus TeensyAdcDmaCapture::inspectStart(std::uint32_t epoch) {
   return inspectHardwareStart(

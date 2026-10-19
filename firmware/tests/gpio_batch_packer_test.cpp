@@ -263,6 +263,38 @@ void testDisabledExperimentalProfileRetainsOneBankPacker() {
   }
 }
 
+void testPublicGpio8ReframesExistingRawBlocks() {
+  FakeRawSource source{};
+  expect(source.add(0U, 4048U) && source.add(4048U, 4048U), "existing raw DMA block sizes");
+  PipelineFixture fixture{};
+  auto settings = thingdaq::settings::kBoardDefaults;
+  settings[thingdaq::protocol_v3::kSettingsAuxBankModeOffset] = 0U;
+  settings[thingdaq::protocol_v3::kSettingsGpioWidthBitsOffset] = 8U;
+  settings[thingdaq::protocol_v3::kSettingsGpioPolicyOffset] = 0U;
+  settings[thingdaq::protocol_v3::kSettingsAdcPolicyOffset] = 0U;
+  const auto selected = thingdaq::stream_layout::publicV3(settings);
+  expect(fixture.pipeline.startRun(99U, constants::ChecksumAlgorithm::kAdler32,
+      packet::kGpioStreamMask, selected.layout) == packet::OperationStatus::kOk, "public GPIO8 layout starts");
+  packer::GpioBatchPacker gpio{source, fixture.packed_storage};
+  expect(gpio.startRun(99U, constants::ChecksumAlgorithm::kAdler32, fixture.pipeline) == packer::OperationStatus::kOk,
+      "one-bank packer accepts 4032 samples");
+  const auto packed = gpio.service(fixture.pipeline, 8U, 8U);
+  expect(packed.frames_framed == 2U && !packed.pipeline_error && !packed.source_error,
+      "two existing raw blocks become two public frames plus tail");
+  expect(gpio.stopProduction().partial_samples_discarded == 32U, "only actual incomplete tail is dropped");
+  fixture.pipeline.serviceReadyFrames();
+  for (std::uint64_t i = 0U; i < 2U; ++i) {
+    const auto bytes = fixture.pipeline.frontFrame();
+    expect(bytes.size == 4092U && wire::validV3DataView(bytes), "GPIO8 public RAW envelope");
+    std::uint64_t ticks = 0U;
+    wire::loadU64(bytes, 32U, ticks);
+    expect(ticks == i * 32256U, "GPIO8 logical coverage is independent of raw DMA blocks");
+    for (std::size_t n = 0U; n < 4032U; ++n)
+      expect(bytes.data[56U + n] == static_cast<std::uint8_t>((i * 4032U + n) & 255U), "continuous packed values");
+    fixture.pipeline.releaseFrontFrame();
+  }
+}
+
 void testRawBoundariesBecomeExactChecksummedFrames() {
   FakeRawSource source{};
   expect(source.add(0U, 17U) && source.add(17U, 2000U) &&
@@ -582,6 +614,7 @@ void testTargetProcessingProfileHandlesCounterWrap() {
 }  // namespace
 
 int main() {
+  testPublicGpio8ReframesExistingRawBlocks();
   testExactMappingAndBatchPrimitive();
   testDisabledExperimentalProfileRetainsOneBankPacker();
   testRawBoundariesBecomeExactChecksummedFrames();

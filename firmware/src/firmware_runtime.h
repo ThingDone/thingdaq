@@ -61,20 +61,7 @@ class FirmwareRuntime {
                   gpio_aux_packer::AuxiliaryBatchPacker *aux_gpio_packer =
                       nullptr,
                   temperature::Reader temperature_reader = nullptr,
-                  health::Reader health_reader = nullptr)
-      : control_{},
-        packet_pipeline_{packet_storage},
-        synthetic_source_{source_mode},
-        clock_(clock),
-        transport_{stream, control_.statistics(), &packet_pipeline_},
-        acquisition_controller_{
-            control_.statistics(), packet_pipeline_, gpio_capture, gpio_packer,
-            adc_initializer, adc_trigger_scheduler, adc_capture, adc_packer,
-            rate_scheduler, aux_gpio_capture, aux_gpio_packer},
-        checksum_benchmark_(checksum_benchmark),
-        gpio_clock_diagnostic_(gpio_clock_diagnostic),
-        gpio_capture_diagnostic_(gpio_capture_diagnostic),
-        temperature_reader_(temperature_reader), health_reader_(health_reader) {}
+                  health::Reader health_reader = nullptr);
 
   bool begin(std::uint32_t hardware_serial);
   LoopReport service();

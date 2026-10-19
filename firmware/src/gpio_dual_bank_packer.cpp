@@ -83,8 +83,12 @@ OperationStatus AuxiliaryBatchPacker::startRun(
   if (!quiescent()) {
     return OperationStatus::kNotQuiescent;
   }
-  const stream_layout::Result selected = stream_layout::experimental(
-      protocol_v2::AuxBankMode::kInput, profile);
+  const auto &actual = pipeline.layout();
+  stream_layout::Result selected = stream_layout::experimental(
+      protocol_v2::AuxBankMode::kInput, profile, actual.legacy_v2);
+  if (actual.protocol_version == protocol_v3::kProtocolVersion && actual.valid() &&
+      actual.aux_bank_mode == protocol_v2::AuxBankMode::kInput && actual.rate_profile == profile)
+    selected = {stream_layout::Status::kOk, actual};
   if (!selected.ok()) {
     return OperationStatus::kUnsupportedProfile;
   }

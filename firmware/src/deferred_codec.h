@@ -2,7 +2,8 @@
 #include <array>
 #include <cstdint>
 namespace thingdaq::deferred_codec {
-// Private diagnostic pages; ordinary STATUS remains byte-for-byte unchanged.
+// Public v3 STATUS exposes these counters. Private diagnostic pages remain
+// available to legacy experiment clients without changing v1/v2 STATUS.
 inline constexpr std::uint32_t kRequestBase = 0xFDEC0000U;
 struct Counters {
   std::uint32_t completed = 0, raw = 0, deadline_drops = 0, resource_drops = 0;

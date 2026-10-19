@@ -17,6 +17,39 @@ std::uint32_t counterDelta(std::uint32_t current, std::uint32_t baseline) {
 
 }  // namespace
 
+THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.construct")
+FirmwareRuntime::FirmwareRuntime(usb::CdcByteStream &stream,
+                  packet::PacketBufferStorage &packet_storage,
+                  synthetic::TickClock &clock,
+                  synthetic::Mode source_mode,
+                  benchmark::Runner *checksum_benchmark,
+                  gpio_clock::Runner *gpio_clock_diagnostic,
+                  gpio_capture::HardwareCapture *gpio_capture,
+                  gpio_packer::GpioBatchPacker *gpio_packer,
+                  gpio_diagnostic::Runner *gpio_capture_diagnostic,
+                  adc::Initializer *adc_initializer,
+                  adc_trigger::Scheduler *adc_trigger_scheduler,
+                  adc_capture::HardwareCapture *adc_capture,
+                  adc_packer::AdcFramePacker *adc_packer,
+                  variable_rate::Scheduler *rate_scheduler,
+                  gpio_join::HardwareCapture *aux_gpio_capture,
+                  gpio_aux_packer::AuxiliaryBatchPacker *aux_gpio_packer,
+                  temperature::Reader temperature_reader,
+                  health::Reader health_reader)
+    : control_{},
+        packet_pipeline_{packet_storage},
+        synthetic_source_{source_mode},
+        clock_(clock),
+        transport_{stream, control_.statistics(), &packet_pipeline_},
+        acquisition_controller_{
+            control_.statistics(), packet_pipeline_, gpio_capture, gpio_packer,
+            adc_initializer, adc_trigger_scheduler, adc_capture, adc_packer,
+            rate_scheduler, aux_gpio_capture, aux_gpio_packer},
+        checksum_benchmark_(checksum_benchmark),
+        gpio_clock_diagnostic_(gpio_clock_diagnostic),
+        gpio_capture_diagnostic_(gpio_capture_diagnostic),
+        temperature_reader_(temperature_reader), health_reader_(health_reader) {}
+
 THINGDAQ_RUNTIME_COLD_CODE(".flashmem.runtime.begin")
 bool FirmwareRuntime::begin(std::uint32_t hardware_serial) {
   return control_.completeBoot(hardware_serial,
@@ -63,6 +96,23 @@ LoopReport FirmwareRuntime::service() {
         publishPacketStatistics();
       }
       control::DispatchReadiness readiness{};
+      if (packet_stats_generation_ != 0U &&
+          command.request.protocol_version == protocol_v3::kProtocolVersion &&
+          command.request.kind == protocol_v1::CommandKind::kGetStatus) {
+        const auto packet = packet_pipeline_.snapshot();
+        for (std::size_t i = 0U; i < 2U; ++i) {
+          const auto &codec = deferred_codec::counters[i];
+          const std::uint64_t counters[] = {codec.completed, codec.raw, codec.deadline_drops,
+              codec.resource_drops, codec.work_ticks, codec.max_work_ticks, codec.max_age_ticks};
+          for (std::size_t j = 0U; j < 7U; ++j) readiness.v3_diagnostics[i * 7U + j] = counters[j];
+          const auto &layout = packet_pipeline_.layout().streams[i];
+          readiness.v3_diagnostics[14U + i * 4U] = packet.source_bytes[i].framed_bytes_transmitted;
+          readiness.v3_diagnostics[15U + i * 4U] = layout.item_count;
+          readiness.v3_diagnostics[16U + i * 4U] = layout.frame_bytes + packet_pipeline_.layout().prefixBytes();
+          readiness.v3_diagnostics[17U + i * 4U] =
+              static_cast<std::uint64_t>(board::kPacketBufferCount) * layout.coverage_ticks;
+        }
+      }
       if (command.request.protocol_version == protocol_v3::kProtocolVersion) {
         const auto packets = packet_pipeline_.snapshot();
         readiness.pending_frames = static_cast<std::uint32_t>(
@@ -98,9 +148,9 @@ LoopReport FirmwareRuntime::service() {
         readiness.start_ready = dataPathQuiescent();
         if (readiness.start_ready &&
             acquisition::Controller::isExecutableConfiguration(
-                control_.appliedConfiguration())) {
+                control_.startConfiguration(command.request.protocol_version))) {
           readiness.start_ready = acquisition_controller_.readyForStart(
-              control_.appliedConfiguration(),
+              control_.startConfiguration(command.request.protocol_version),
               control::ControlState::nextRunId(control_.runId()));
         }
       } else if (command.request.kind ==
@@ -193,6 +243,23 @@ LoopReport FirmwareRuntime::service() {
   if (report.internal_error && response_ready) {
     recoverResponsePath(command.request, response, false, report);
     response_ready = false;
+  }
+  if (response_ready && command.request.protocol_version == protocol_v3::kProtocolVersion &&
+      command.request.kind == protocol_v1::CommandKind::kStop &&
+      (response.view().data[protocol_v3::kHeaderFlagsOffset + 1U] & 0x80U) == 0U) {
+    // STOP may expose complete raw DMA blocks. Finish the existing bounded
+    // drain visit before reporting pending packet frames to the host.
+    packet_pipeline_.setDeferredClock(now_ticks);
+    acquisition_controller_.service(report);
+    protocol::V3Status stopped{};
+    stopped.pending_frames = static_cast<std::uint32_t>(packet_pipeline_.snapshot().pending_frames);
+    stopped.state = stopped.pending_frames != 0U ? protocol_v3::DeviceState::kDraining
+                                                : protocol_v3::DeviceState::kStopped;
+    if (report.internal_error ||
+        !protocol::encodeV3StatusResponse(command.request, control_.runId(), stopped, response).ok()) {
+      recoverResponsePath(command.request, response, false, report);
+      response_ready = false;
+    }
   }
   if (response_ready) {
     report.response_queued = transport_.queueResponse(response);

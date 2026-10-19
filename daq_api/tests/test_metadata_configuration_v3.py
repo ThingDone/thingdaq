@@ -1,5 +1,6 @@
 """Advertised tuple selection, atomic application and clock readback contracts."""
 
+import struct
 from dataclasses import replace
 
 import pytest
@@ -19,7 +20,7 @@ from thingdone_daq import (
     low_level,
 )
 from thingdone_daq._generated import protocol_v3_constants as c
-from thingdone_daq.models_v3 import V3Info
+from thingdone_daq.models_v3 import V3Info, V3Status
 from thingdone_daq.simulator_v3 import SimulatedV3Device
 
 
@@ -261,3 +262,19 @@ def test_legacy_configuration_never_silently_ignores_v3_selectors(options):
         applied = daq.configure()
         assert applied.adc_pair_rate_hz == 1_000_000
         assert applied.gpio_sample_rate_hz == 4_000_000
+
+
+def test_public_status_diagnostics_have_independent_fixed_offsets():
+    # 16-byte state prefix, 8 logical counters, then 22 diagnostic u64s.
+    prefix = struct.pack("<BBHBBHII", 0, 0, 0, 1, 0, 0, 7, 0)
+    counts = (8, 1, 8064, 1008, 2, 0, 8064, 0)
+    diagnostics = tuple((1 << 32) + i for i in range(22))
+    payload = prefix + struct.pack("<30Q", *counts, *diagnostics)
+    assert len(payload) == 256
+    status = V3Status.from_payload(payload)
+    assert status.adc_codec_completed == 1 << 32
+    assert status.adc_codec_max_age_ticks == (1 << 32) + 6
+    assert status.gpio_codec_completed == (1 << 32) + 7
+    assert status.adc_wire_bytes_transmitted == (1 << 32) + 14
+    assert status.gpio_retention_ticks == (1 << 32) + 21
+    assert status.to_payload() == payload

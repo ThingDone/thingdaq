@@ -239,8 +239,8 @@ struct SourceCounters {
 };
 
 // Payload bytes describe uncompressed logical items. Framed bytes include the
-// selected wire envelope and payload: fixed layout ordinarily, accumulated
-// per record in the opt-in GPIO RLE experiment.
+// actual selected wire envelope and encoded payload, accumulated per record.
+// Never derive time coverage or retention from these wire byte totals.
 struct SourceByteCounters {
   std::uint64_t payload_bytes_produced = 0U;
   std::uint64_t payload_bytes_framed = 0U;

@@ -177,7 +177,7 @@ struct BufferHandle {
 
   constexpr bool valid() const {
     return primary_words != nullptr && auxiliary_words != nullptr &&
-           buffer_index < kRingDepth && sample_count == kSamplesPerBlock &&
+           buffer_index < kRingDepth && sample_count > 0U && sample_count <= kSamplesPerBlock &&
            sample_period_ticks != 0U && epoch != 0U && lease != 0U;
   }
 };
@@ -239,12 +239,24 @@ class HardwareCapture : public PairedRawSource {
  public:
   virtual StartStatus inspectStart(
       std::uint32_t epoch, protocol_v2::RateProfile profile) = 0;
+  virtual StartStatus inspectStart(std::uint32_t epoch, protocol_v2::RateProfile profile,
+                                   std::uint32_t samples) {
+    return samples == kSamplesPerBlock ? inspectStart(epoch, profile) : StartStatus::kUnsupportedProfile;
+  }
+  virtual StartStatus prepare(std::uint32_t epoch, protocol_v2::RateProfile profile,
+                              std::uint32_t samples) {
+    return samples == kSamplesPerBlock ? prepare(epoch, profile) : StartStatus::kUnsupportedProfile;
+  }
   // Prepare both GPIO DMA paths against one epoch while PIT0 remains stopped.
   virtual StartStatus prepare(
       std::uint32_t epoch, protocol_v2::RateProfile profile) = 0;
   // Standalone GPIO convenience path: prepare both banks, then enable PIT0.
   virtual StartStatus start(
       std::uint32_t epoch, protocol_v2::RateProfile profile) = 0;
+  virtual StartStatus start(std::uint32_t epoch, protocol_v2::RateProfile profile,
+                            std::uint32_t samples) {
+    return samples == kSamplesPerBlock ? start(epoch, profile) : StartStatus::kUnsupportedProfile;
+  }
   // Combined-mode callers stop the common trigger before invoking this path.
   virtual StopReport stopAfterTriggers(
       StopReason reason = StopReason::kStop) = 0;
@@ -282,7 +294,8 @@ class DualBankCaptureRing final : public PairedRawSource {
 
   PrimeResult prime(std::uint32_t epoch, std::uint32_t sample_period_ticks,
                     std::uint32_t initial_generation = 0U,
-                    std::uint64_t first_sample_ticks = 0U);
+                    std::uint64_t first_sample_ticks = 0U,
+                    std::uint32_t samples_per_block = static_cast<std::uint32_t>(kSamplesPerBlock));
   ReservationResult reserveGeneration(std::uint32_t epoch,
                                       std::uint32_t generation);
   CompletionResult onMajorLoopComplete(
@@ -350,6 +363,7 @@ class DualBankCaptureRing final : public PairedRawSource {
   std::uint64_t next_first_sample_ticks_ = 0U;
   std::uint32_t next_schedule_generation_ = 0U;
   std::uint32_t sample_period_ticks_ = 0U;
+  std::uint32_t samples_per_block_ = static_cast<std::uint32_t>(kSamplesPerBlock);
   std::uint32_t epoch_ = 0U;
   std::uint32_t next_lease_ = 1U;
   std::size_t next_free_search_ = 0U;

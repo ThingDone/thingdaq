@@ -128,10 +128,17 @@ class SyntheticPipelineTests(unittest.TestCase):
         self.assertIn("pipeline.beginFill", combined)
         self.assertIn("pipeline.finishFill", combined)
         self.assertIn("encodeDataFrameInPlace", combined)
-        self.assertEqual(2, runtime.count("acquisition_controller_.service(report)"))
+        # V3 STOP performs one bounded raw-tail drain before serializing its
+        # pending-frame response; the steady-state acquisition/USB loop stays unchanged.
+        self.assertEqual(3, runtime.count("acquisition_controller_.service(report)"))
         self.assertEqual(2, runtime.count("transport_.serviceTransmit()"))
         producer = runtime.index("synthetic_source_.service(")
-        first_acquisition = runtime.index("acquisition_controller_.service(report)")
+        self.assertEqual(
+            2, runtime[producer:].count("acquisition_controller_.service(report)")
+        )
+        first_acquisition = runtime.index(
+            "acquisition_controller_.service(report)", producer
+        )
         first_promotion = runtime.index(
             "report.packet_promotion_before_second_acquisition ="
         )

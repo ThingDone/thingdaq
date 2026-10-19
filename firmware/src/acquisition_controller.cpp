@@ -39,6 +39,8 @@ constexpr bool usesLegacySchedule(
 
 constexpr std::uint32_t adcPairsPerBuffer(
     const protocol::Configuration &configuration) {
+  if (configuration.protocol_version == protocol_v3::kProtocolVersion)
+    return stream_layout::kV3AdcPairs;
   return static_cast<std::uint32_t>(
       usesAuxInput(configuration)
           ? (configuration.legacy_v2 ? protocol_v2::kInputAdcPairsPerFrame
@@ -55,6 +57,8 @@ void addConflict(Audit &audit, Conflict conflict) {
 THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.layout")
 stream_layout::Result Controller::runLayout(
     const protocol::Configuration &configuration) {
+  if (configuration.protocol_version == protocol_v3::kProtocolVersion)
+    return stream_layout::publicV3(configuration.public_settings);
   if (usesLegacySchedule(configuration)) {
     stream_layout::Result result{};
     result.layout = stream_layout::legacy();
@@ -114,6 +118,14 @@ THINGDAQ_ACQUISITION_COLD_CODE(
     ".flashmem.acquisition.configuration_validation")
 bool Controller::completeConfigurationValid(
     const protocol::Configuration &configuration) {
+  if (configuration.protocol_version == protocol_v3::kProtocolVersion) {
+    const auto expected = protocol::publicConfiguration(configuration.public_settings);
+    if (configuration.legacy_v2 || configuration.stream_mask != expected.stream_mask ||
+        configuration.source != expected.source || configuration.aux_bank_mode != expected.aux_bank_mode ||
+        configuration.rate_profile != expected.rate_profile ||
+        configuration.data_checksum_algorithm != expected.data_checksum_algorithm)
+      return false;
+  }
   const Profile profile = profileFor(configuration);
   const stream_layout::Result layout = runLayout(configuration);
   const std::uint32_t maximum_frame_bytes =
@@ -124,7 +136,7 @@ bool Controller::completeConfigurationValid(
   return (profile == Profile::kAdc || profile == Profile::kGpio ||
           profile == Profile::kCombined) &&
          layout.ok() &&
-         configuration.data_frame_bytes == maximum_frame_bytes &&
+         configuration.data_frame_bytes == maximum_frame_bytes + layout.layout.prefixBytes() &&
          protocol::isSupportedChecksum(
              configuration.data_checksum_algorithm);
 }
@@ -195,7 +207,7 @@ Audit Controller::inspect(const protocol::Configuration &configuration,
         }
         audit.aux_gpio_capture_status =
             aux_gpio_capture_->inspectStart(epoch,
-                                            configuration.rate_profile);
+                                            configuration.rate_profile, runLayout(configuration).layout.streams[1].item_count);
         audit.aux_gpio_inspected = true;
         if (audit.aux_gpio_capture_status !=
             gpio_join::StartStatus::kOk) {
@@ -363,9 +375,7 @@ bool Controller::start(const protocol::Configuration &configuration,
     adc_capture_->setLegacyV2Mode(configuration.legacy_v2);
     adc_capture_->setPublicV3Mode(
         configuration.protocol_version == protocol_v3::kProtocolVersion);
-#if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
     adc_capture_->setAuxInputMode(usesAuxInput(configuration));
-#endif
     report.adc_capture_start_status = adc_capture_->prepare(
         run_id, adcPairsPerBuffer(configuration));
     report.adc_capture_prepared =
@@ -387,9 +397,9 @@ bool Controller::start(const protocol::Configuration &configuration,
       report.aux_gpio_capture_start_status =
           profile == Profile::kCombined
               ? aux_gpio_capture_->prepare(run_id,
-                                           configuration.rate_profile)
+                                           configuration.rate_profile, runLayout(configuration).layout.streams[1].item_count)
               : aux_gpio_capture_->start(run_id,
-                                         configuration.rate_profile);
+                                         configuration.rate_profile, runLayout(configuration).layout.streams[1].item_count);
       report.aux_gpio_capture_prepared =
           report.aux_gpio_capture_start_status ==
           gpio_join::StartStatus::kOk;
