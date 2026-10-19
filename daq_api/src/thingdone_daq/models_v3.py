@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 from ._generated import protocol_v3_constants as c
 from ._incremental import BytesLike
@@ -451,6 +451,108 @@ class V3Capabilities:
                 "settings not advertised by device",
                 error_code=c.ErrorCode.UNSUPPORTED_CONFIGURATION,
             )
+
+    def select_settings(
+        self,
+        *,
+        adc: bool | None = None,
+        gpio: bool | None = None,
+        source: c.Source | int | None = None,
+        checksum_algorithm: c.ChecksumAlgorithm | int | None = None,
+        cpu_profile: c.CpuProfile | int | None = None,
+        rate_profile: c.RateProfile | int | None = None,
+        aux_bank_mode: c.AuxBankMode | int | None = None,
+        gpio_policy: c.GpioPolicy | int | None = None,
+        adc_policy: c.AdcPolicy | int | None = None,
+        adc_resolution_bits: int | None = None,
+        adc_pair_rate_hz: int | None = None,
+        gpio_sample_rate_hz: int | None = None,
+    ) -> V3Settings:
+        """Select one advertised tuple, filling omitted options from defaults.
+
+        Explicit rates select an advertised rate record; a profile selects its
+        complete rate pair. Clock selection never silently changes encoding.
+        This method is read-only and can be used before CONFIGURE.
+        """
+        self.to_payload()
+        for name, enabled in (("adc", adc), ("gpio", gpio)):
+            if enabled is not None and not isinstance(enabled, bool):
+                raise TypeError(f"{name} selector must be a boolean or None")
+        options = {
+            "source": source,
+            "checksum_algorithm": checksum_algorithm,
+            "cpu_profile": cpu_profile,
+            "rate_profile": rate_profile,
+            "aux_bank_mode": aux_bank_mode,
+            "gpio_policy": gpio_policy,
+            "adc_policy": adc_policy,
+            "adc_resolution_bits": adc_resolution_bits,
+            "adc_pair_rate_hz": adc_pair_rate_hz,
+            "gpio_sample_rate_hz": gpio_sample_rate_hz,
+        }
+        for name, value in options.items():
+            if value is not None and (
+                not isinstance(value, int) or isinstance(value, bool)
+            ):
+                raise TypeError(f"{name} must be an integer or enum, not {value!r}")
+        requested = {
+            field.name: getattr(self.defaults, field.name)
+            for field in fields(V3Settings)
+        }
+        requested.update(
+            {key: value for key, value in options.items() if value is not None}
+        )
+        mask = int(self.defaults.stream_mask)
+        for enabled, bit in ((adc, c.StreamMask.ADC), (gpio, c.StreamMask.GPIO)):
+            if enabled is not None:
+                mask = mask | int(bit) if enabled else mask & ~int(bit)
+        requested["stream_mask"] = mask
+        if aux_bank_mode is not None:
+            widths = {
+                record.gpio_width_bits
+                for record in self.configurations
+                if record.aux_bank_mode == aux_bank_mode
+            }
+            if len(widths) == 1:
+                requested["gpio_width_bits"] = widths.pop()
+        if any(
+            value is not None
+            for value in (rate_profile, adc_pair_rate_hz, gpio_sample_rate_hz)
+        ):
+            rates = tuple(
+                rate
+                for rate in self.rate_profiles
+                if (rate_profile is None or rate.rate_profile == rate_profile)
+                and (
+                    adc_pair_rate_hz is None
+                    or rate.adc_pair_rate_hz == adc_pair_rate_hz
+                )
+                and (
+                    gpio_sample_rate_hz is None
+                    or rate.gpio_sample_rate_hz == gpio_sample_rate_hz
+                )
+            )
+            if len(rates) != 1:
+                raise V3FrameValidationError(
+                    "rates/profile do not select one advertised rate record; "
+                    "inspect get_capabilities().rate_profiles",
+                    error_code=c.ErrorCode.UNSUPPORTED_CONFIGURATION,
+                )
+            rate = rates[0]
+            requested.update(
+                rate_profile=rate.rate_profile,
+                adc_pair_rate_hz=rate.adc_pair_rate_hz,
+                gpio_sample_rate_hz=rate.gpio_sample_rate_hz,
+            )
+        for record in self.configurations:
+            if all(getattr(record, key) == value for key, value in requested.items()):
+                return record
+        raise V3FrameValidationError(
+            f"settings tuple not advertised: {requested}; "
+            "inspect get_capabilities().configurations and select a complete tuple "
+            "(450 MHz requires RAW GPIO and ADC policies)",
+            error_code=c.ErrorCode.UNSUPPORTED_CONFIGURATION,
+        )
 
 
 @dataclass(frozen=True, slots=True)

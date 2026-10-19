@@ -68,6 +68,7 @@ from .protocol_v2 import (
     RuntimeHealth,
     TemperatureReading,
 )
+from .protocol_v3 import V3FrameValidationError
 from .reader import (
     DEFAULT_MAX_QUEUED_BLOCKS,
     BackgroundReader,
@@ -921,11 +922,13 @@ class ThingDAQ:
             return info
 
     def get_capabilities(self) -> V3Capabilities:
-        """Query the opt-in v3 device's exact selectable tuples over the wire."""
+        """Read v3 defaults, clocks, rates, and exact encoding/configuration tuples."""
         with self._lock:
             self._ensure_open()
             if self._v3 is None:
-                raise ThingDAQError("GET_CAPABILITIES requires a v3 simulator session")
+                raise ThingDAQError(
+                    "GET_CAPABILITIES requires protocol v3; use info().capabilities on legacy devices"
+                )
             return self._v3.get_capabilities()
 
     def get_settings(self) -> V3AppliedSettings:
@@ -933,25 +936,34 @@ class ThingDAQ:
         with self._lock:
             self._ensure_open()
             if self._v3 is None:
-                raise ThingDAQError("GET_SETTINGS requires a v3 simulator session")
+                raise ThingDAQError(
+                    "GET_SETTINGS requires protocol v3; use status() on legacy devices"
+                )
             return self._v3.get_settings()
 
     def configure(
         self,
         configuration: DAQConfiguration | V3Settings | None = None,
         *,
-        adc: bool = True,
-        gpio: bool = True,
+        adc: bool | None = None,
+        gpio: bool | None = None,
         source: constants.Source | int | None = None,
-        checksum_algorithm: constants.ChecksumAlgorithm
-        | int = constants.DEFAULT_CHECKSUM_ALGORITHM,
+        checksum_algorithm: constants.ChecksumAlgorithm | int | None = None,
         adc_pair_rate_hz: int | None = None,
         gpio_sample_rate_hz: int | None = None,
         adc_resolution_bits: int | None = None,
         aux_bank_mode: AuxBankMode | int | None = None,
-        rate_profile: RateProfile | int | None = None,
+        rate_profile: RateProfile | v3_constants.RateProfile | int | None = None,
+        cpu_profile: v3_constants.CpuProfile | int | None = None,
+        gpio_policy: v3_constants.GpioPolicy | int | None = None,
+        adc_policy: v3_constants.AdcPolicy | int | None = None,
     ) -> DAQConfiguration | V3AppliedSettings:
         """Apply an advertised configuration without starting acquisition.
+
+        V3 omissions use advertised defaults. ``cpu_profile``, ``gpio_policy``
+        and ``adc_policy`` select an exact advertised tuple; a clock change
+        does not substitute another encoding. CONFIGURE, GET_SETTINGS and INFO
+        must agree on settings and active clocks before this returns.
 
         Protocol v1 has fixed acquisition rates and ADC resolution rather than
         carrying those fields in the eight-byte CONFIGURE body.  The optional
@@ -969,79 +981,65 @@ class ThingDAQ:
                     configuration, V3Settings
                 ):
                     raise TypeError("v3 configuration must be V3Settings")
-                if not isinstance(adc, bool) or not isinstance(gpio, bool):
-                    raise TypeError("adc and gpio selectors must be booleans")
-                if any(
-                    isinstance(value, bool)
-                    for value in (
-                        source,
-                        checksum_algorithm,
-                        aux_bank_mode,
-                        rate_profile,
-                    )
-                ):
-                    raise TypeError("configuration enum options cannot be booleans")
-                if configuration is not None and (
-                    adc is not True
-                    or gpio is not True
-                    or source is not None
-                    or checksum_algorithm != constants.DEFAULT_CHECKSUM_ALGORITHM
-                    or any(
-                        value is not None
-                        for value in (
-                            adc_pair_rate_hz,
-                            gpio_sample_rate_hz,
-                            adc_resolution_bits,
-                            aux_bank_mode,
-                            rate_profile,
-                        )
-                    )
+                options = (
+                    adc,
+                    gpio,
+                    source,
+                    checksum_algorithm,
+                    adc_pair_rate_hz,
+                    gpio_sample_rate_hz,
+                    adc_resolution_bits,
+                    aux_bank_mode,
+                    rate_profile,
+                    cpu_profile,
+                    gpio_policy,
+                    adc_policy,
+                )
+                if configuration is not None and any(
+                    value is not None for value in options
                 ):
                     raise ValueError(
                         "do not combine V3Settings with configuration options"
                     )
                 settings = configuration
                 if settings is None:
-                    defaults = self._v3.capabilities.defaults
-                    mode = (
-                        defaults.aux_bank_mode
-                        if aux_bank_mode is None
-                        else v3_constants.AuxBankMode(aux_bank_mode)
-                    )
-                    settings = replace(
-                        defaults,
-                        stream_mask=v3_constants.StreamMask(
-                            int(adc) | (int(gpio) << 1)
-                        ),
-                        source=defaults.source
-                        if source is None
-                        else v3_constants.Source(source),
-                        checksum_algorithm=v3_constants.ChecksumAlgorithm(
-                            checksum_algorithm
-                        ),
-                        aux_bank_mode=mode,
-                        gpio_width_bits=16
-                        if mode == v3_constants.AuxBankMode.INPUT
-                        else 8,
-                        rate_profile=defaults.rate_profile
-                        if rate_profile is None
-                        else v3_constants.RateProfile(rate_profile),
-                        adc_pair_rate_hz=defaults.adc_pair_rate_hz
-                        if adc_pair_rate_hz is None
-                        else adc_pair_rate_hz,
-                        gpio_sample_rate_hz=defaults.gpio_sample_rate_hz
-                        if gpio_sample_rate_hz is None
-                        else gpio_sample_rate_hz,
-                        adc_resolution_bits=defaults.adc_resolution_bits
-                        if adc_resolution_bits is None
-                        else adc_resolution_bits,
-                    )
+                    try:
+                        settings = self._v3.capabilities.select_settings(
+                            adc=adc,
+                            gpio=gpio,
+                            source=source,
+                            checksum_algorithm=checksum_algorithm,
+                            adc_pair_rate_hz=adc_pair_rate_hz,
+                            gpio_sample_rate_hz=gpio_sample_rate_hz,
+                            adc_resolution_bits=adc_resolution_bits,
+                            aux_bank_mode=aux_bank_mode,
+                            rate_profile=rate_profile,
+                            cpu_profile=cpu_profile,
+                            gpio_policy=gpio_policy,
+                            adc_policy=adc_policy,
+                        )
+                    except V3FrameValidationError as error:
+                        raise DeviceCapabilityError(str(error)) from error
                 applied = self._v3.configure(settings)
                 self._state = constants.DeviceState.CONFIGURED
                 self._run_id = self._v3.run_id
                 return applied
             if isinstance(configuration, V3Settings):
-                raise TypeError("V3Settings requires a v3 simulator session")
+                raise TypeError("V3Settings requires a protocol v3 session")
+            if any(
+                value is not None for value in (cpu_profile, gpio_policy, adc_policy)
+            ):
+                raise DeviceCapabilityError(
+                    "cpu_profile, gpio_policy, and adc_policy selection requires "
+                    "protocol v3; legacy firmware uses fixed clocks and RAW samples"
+                )
+            adc = True if adc is None else adc
+            gpio = True if gpio is None else gpio
+            checksum_algorithm = (
+                constants.DEFAULT_CHECKSUM_ALGORITHM
+                if checksum_algorithm is None
+                else checksum_algorithm
+            )
             self._require_verified_identity()
             self._require_state(
                 "configure",

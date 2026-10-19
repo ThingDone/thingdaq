@@ -6,7 +6,8 @@ byte-transport access available for protocol tooling without making callers
 construct frames for ordinary discovery, configuration, or capture workflows.
 """
 
-from ._generated import protocol_constants, protocol_v2_constants
+from ._generated import protocol_constants, protocol_v2_constants, protocol_v3_constants
+from .models_v3 import V3Command, V3Response, decode_v3_response
 from .protocol import (
     ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
@@ -44,6 +45,16 @@ from .protocol_v2 import (
     encode_v2_frame,
     select_protocol_version,
     validate_v2_configuration_echo,
+)
+from .protocol_v3 import (
+    V3ChecksumMismatchError,
+    V3Frame,
+    V3FrameHeader,
+    V3FrameParser,
+    V3FrameValidationError,
+    compute_v3_checksum,
+    decode_v3_frame,
+    encode_v3_frame,
 )
 from .reader import (
     DEFAULT_MAX_QUEUED_BLOCKS,
@@ -126,17 +137,29 @@ __all__ = [
     "V2FrameValidationError",
     "V2ProtocolError",
     "V2UnsupportedChecksumError",
+    "V3ChecksumMismatchError",
+    "V3Command",
+    "V3Frame",
+    "V3FrameHeader",
+    "V3FrameParser",
+    "V3FrameValidationError",
+    "V3Response",
     "checksum_backend",
     "compute_checksum",
     "compute_v2_checksum",
+    "compute_v3_checksum",
     "decode_compatible_frame",
     "decode_frame",
     "decode_v2_configuration",
     "decode_v2_frame",
+    "decode_v3_frame",
+    "decode_v3_response",
     "encode_frame",
     "encode_v2_frame",
+    "encode_v3_frame",
     "protocol_constants",
     "protocol_v2_constants",
+    "protocol_v3_constants",
     "select_protocol_version",
     "validate_v2_configuration_echo",
 ]

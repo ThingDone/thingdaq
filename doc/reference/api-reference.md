@@ -94,6 +94,46 @@ V3 sessions return `V3Info`, with advertised metadata available through
   trigger, DMA, and resource metadata; and
 - GPIO rate, D6-D13 bit order, ring/resource metadata, and diagnostic policy.
 
+For v3, `get_capabilities()` returns the existing `V3Capabilities` model:
+`defaults` is a `V3Settings` tuple, `cpu_profiles` contains `V3Clocks` records,
+`rate_profiles` contains `V3Rate` records, and `configurations` contains every
+selectable complete tuple. These types and `V3CpuProfile`, `V3RateProfile`,
+`V3GpioPolicy`, and `V3AdcPolicy` are exported from `thingdone_daq`.
+`capabilities.select_settings(...)` previews the same selection as `configure()`
+without sending commands. Omitted v3 options use advertised defaults, including
+streams and checksum, rather than the last active settings. An explicit rate
+or rate profile must select one advertised rate record.
+
+```python
+from thingdone_daq import V3AdcPolicy, V3CpuProfile, V3GpioPolicy
+
+# On an open, stopped v3 session:
+applied = daq.configure(
+    cpu_profile=V3CpuProfile.CPU_450MHZ,
+    gpio_policy=V3GpioPolicy.RAW,
+    adc_policy=V3AdcPolicy.RAW,
+)
+assert daq.get_settings() == applied
+assert daq.info().clocks == applied.clocks
+```
+
+All selectors must match one advertised tuple, including disabled streams.
+450 MHz requires explicit RAW policies because the advertised defaults use
+compression. Unsupported keyword selections raise `DeviceCapabilityError`
+before CONFIGURE; no clock, rate, resolution, or encoding is silently replaced.
+Alternatively, pass a complete advertised `V3Settings` object without keyword
+overrides. CONFIGURE applies it atomically while stopped, then the API validates
+the echo, GET_SETTINGS, advertised clock profile, and fresh INFO clock metadata.
+
+`configuration` is the last validated active tuple; `get_settings()` rereads the
+device and returns `V3AppliedSettings(settings, clocks)`. Neither replaces the
+advertised `defaults`. GPIO policy `RLE_AUTO` permits each data frame to select
+RAW or RLE; `V3Encoding` describes actual frame encoding, not a CONFIGURE policy.
+Legacy keyword usage and defaults are preserved; clock/encoding selectors require
+v3. Legacy metadata remains available through `info().capabilities`, with active
+state through `status()`. Expert v3 frame/command codecs are also exported from
+`thingdone_daq.low_level` alongside the existing v1/v2 tools.
+
 `info.capabilities` returns `DeviceCapabilities` with:
 
 ```python

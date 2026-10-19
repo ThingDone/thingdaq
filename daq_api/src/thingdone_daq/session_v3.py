@@ -88,12 +88,33 @@ class V3Session:
 
         value = self.command(c.CommandKind.GET_SETTINGS).value
         assert isinstance(value, V3AppliedSettings)
-        assert self.capabilities is not None
-        self.capabilities.require_supported(value.settings)
+        # Initial synchronization has just read two INFO records. Reuse that
+        # snapshot to keep the bounded open exchange unchanged.
+        self._validate_applied(value, refresh_info=self.applied is not None)
         if self.state != c.DeviceState.STOPPED and self.applied != value:
             raise UnexpectedMessageError("v3 settings changed during run/drain")
         self.applied = value
         return value
+
+    def _validate_applied(
+        self, value: V3AppliedSettings, *, refresh_info: bool = True
+    ) -> None:
+        from .client import UnexpectedMessageError
+
+        assert self.capabilities is not None
+        self.capabilities.require_supported(value.settings)
+        clocks = next(
+            record
+            for record in self.capabilities.cpu_profiles
+            if record.cpu_profile == value.settings.cpu_profile
+        )
+        if value.clocks != clocks:
+            raise UnexpectedMessageError(
+                "applied clocks differ from advertised profile"
+            )
+        info = self.info() if refresh_info else self.identity
+        if info is None or info.clocks != value.clocks:
+            raise UnexpectedMessageError("INFO clocks differ from applied settings")
 
     def configure(self, settings: V3Settings) -> V3AppliedSettings:
         from .client import UnexpectedMessageError
@@ -109,6 +130,7 @@ class V3Session:
         readback = self.command(c.CommandKind.GET_SETTINGS).value
         if value != readback:
             raise UnexpectedMessageError("GET_SETTINGS differs from CONFIGURE echo")
+        self._validate_applied(value)
         self.applied = value
         self.run_id = response.run_id
         return value

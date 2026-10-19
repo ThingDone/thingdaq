@@ -46,6 +46,9 @@ from ._generated.protocol_v3_constants import (
 from ._generated.protocol_v3_constants import (
     GpioPolicy as V3GpioPolicy,
 )
+from ._generated.protocol_v3_constants import (
+    RateProfile as V3RateProfile,
+)
 from ._version import __version__ as __version__
 from .alignment import (
     AlignedInterval,
@@ -195,7 +198,15 @@ from .models import (
     extract_gpio_channel,
     interleave_adc,
 )
-from .models_v3 import V3AppliedSettings, V3Capabilities, V3Info, V3Settings, V3Status
+from .models_v3 import (
+    V3AppliedSettings,
+    V3Capabilities,
+    V3Clocks,
+    V3Info,
+    V3Rate,
+    V3Settings,
+    V3Status,
+)
 from .protocol import (
     ChecksumAlgorithmMismatchError,
     ChecksumMismatchError,
@@ -462,11 +473,14 @@ __all__ = [
     "V3AdcPolicy",
     "V3AppliedSettings",
     "V3Capabilities",
+    "V3Clocks",
     "V3CpuProfile",
     "V3DeviceState",
     "V3Encoding",
     "V3GpioPolicy",
     "V3Info",
+    "V3Rate",
+    "V3RateProfile",
     "V3Settings",
     "V3Status",
     "__version__",

@@ -157,7 +157,7 @@ def test_legacy_defaults_and_parser_remain_opt_in():
     with ThingDAQ.simulated() as daq:
         assert daq.info().protocol_version == 1
         assert daq.configure().gpio_sample_rate_hz == 4_000_000
-        with pytest.raises(TypeError, match="v3 simulator"):
+        with pytest.raises(TypeError, match="protocol v3"):
             daq.configure(V3Settings.defaults())
     from thingdone_daq.models_v3 import V3Command
 
