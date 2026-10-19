@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "generated/protocol_v3_constants.h"
+#include "board_profile.h"
 #include "input_experiment_profile.h"
 
 namespace thingdaq::settings {
@@ -29,33 +29,43 @@ constexpr std::array<std::uint8_t, N> record(const std::uint8_t (&bytes)[N]) {
 
 inline constexpr auto kBoardDefaults = record(protocol_v3::kDefaultSettings[0]);
 inline constexpr std::uint8_t kBuildCpuProfile =
-    input_experiment::kCpuHz == 600000000U   ? 1U
-    : input_experiment::kCpuHz == 450000000U ? 2U
-                                             : 0U;
+    board_profile::cpuIdForHz(input_experiment::kCpuHz);
+
+constexpr bool boardSupports(const Record& value) {
+  for (const auto& bytes : protocol_v3::kSelectableConfigurations) {
+    bool equal = true;
+    for (std::size_t i = 0U; i < value.size(); ++i)
+      if (bytes[i] != value[i]) equal = false;
+    if (equal) return true;
+  }
+  return false;
+}
+
+constexpr Record defaultsFor(protocol_v3::CpuProfile profile) {
+  auto value = kBoardDefaults;
+  value[protocol_v3::kSettingsCpuProfileOffset] =
+      static_cast<std::uint8_t>(profile);
+  if (boardSupports(value)) return value;
+  // Preserve the board's default stream/source/width/rates when this CPU
+  // supports only RAW. Exact membership still decides whether it is usable.
+  value[protocol_v3::kSettingsGpioPolicyOffset] =
+      static_cast<std::uint8_t>(protocol_v3::GpioPolicy::kRaw);
+  value[protocol_v3::kSettingsAdcPolicyOffset] =
+      static_cast<std::uint8_t>(protocol_v3::AdcPolicy::kRaw);
+  return boardSupports(value) ? value : Record{};
+}
 
 constexpr Record buildDefaults() {
-  auto value = kBoardDefaults;
-  value[protocol_v3::kSettingsCpuProfileOffset] = kBuildCpuProfile;
-  // Compression is the public 600 MHz default. The board table excludes
-  // codecs at 450 MHz; build-fixed clocks remain enforced by the adapter.
-  value[protocol_v3::kSettingsGpioPolicyOffset] = kBuildCpuProfile == 1U ? 1U : 0U;
-  value[protocol_v3::kSettingsAdcPolicyOffset] = kBuildCpuProfile == 1U ? 1U : 0U;
-  return value;
+  return defaultsFor(static_cast<protocol_v3::CpuProfile>(kBuildCpuProfile));
 }
 inline constexpr auto kBuildDefaults = buildDefaults();
 
-inline Clocks clocksFor(std::uint8_t profile) {
+constexpr Clocks clocksFor(std::uint8_t profile) {
   for (const auto& bytes : protocol_v3::kCpuProfiles) {
-    if (bytes[0] == profile) return record(bytes);
+    if (bytes[protocol_v3::kCpuProfileInfoCpuProfileOffset] == profile)
+      return record(bytes);
   }
   return {};
-}
-
-inline bool boardSupports(const Record& value) {
-  for (const auto& bytes : protocol_v3::kSelectableConfigurations) {
-    if (record(bytes) == value) return true;
-  }
-  return false;
 }
 
 struct Applied {

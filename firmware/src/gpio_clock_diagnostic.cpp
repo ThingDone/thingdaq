@@ -19,29 +19,44 @@ constexpr std::uint32_t absoluteDifference(std::uint32_t left,
   return left >= right ? left - right : right - left;
 }
 
-}  // namespace
-
-THINGDAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.plan")
-Plan makePlan(const protocol::GpioClockDiagnosticRequest &request) {
+THINGDAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.plan_clocks")
+Plan makePlanForClocks(const protocol::GpioClockDiagnosticRequest &request,
+                       std::uint32_t cpu_hz, std::uint32_t pit_hz) {
   Plan plan{};
-  if (!protocol::validGpioClockDiagnosticRequest(request)) {
+  if (!protocol::validGpioClockDiagnosticRequest(request) ||
+      cpu_hz == 0U || pit_hz == 0U || pit_hz % request.rate_hz != 0U) {
     return plan;
   }
   plan.rate_hz = request.rate_hz;
-  plan.pit_divisor = protocol_v1::kGpioClockPitHz / request.rate_hz;
+  plan.pit_divisor = pit_hz / request.rate_hz;
   plan.pit_load_value = plan.pit_divisor - 1U;
   // Reuse the rational event/cycle conversion from experiment/clock-450mhz:
   // 450 MHz / 4 MHz is 112.5 cycles, not an integer cycles-per-event.
-  plan.cycles_per_event = (input_experiment::kCpuHz + request.rate_hz - 1U) /
+  plan.cycles_per_event = (cpu_hz + request.rate_hz - 1U) /
       request.rate_hz;
   plan.measurement_cycles =
       static_cast<std::uint32_t>((static_cast<std::uint64_t>(request.event_count) *
-          input_experiment::kCpuHz + request.rate_hz - 1U) / request.rate_hz);
+          cpu_hz + request.rate_hz - 1U) / request.rate_hz);
   plan.requested_event_count = request.event_count;
   plan.tcd_major_count = static_cast<std::uint16_t>(
       2U * static_cast<std::uint32_t>(request.event_count) +
       protocol_v1::kGpioClockDuplicateGuardEvents);
   return plan;
+}
+
+}  // namespace
+
+THINGDAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.plan")
+Plan makePlan(const protocol::GpioClockDiagnosticRequest &request) {
+  return makePlanForClocks(request, input_experiment::kCpuHz,
+                          protocol_v1::kGpioClockPitHz);
+}
+
+THINGDAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.plan_profile")
+Plan makePlan(const protocol::GpioClockDiagnosticRequest &request,
+              protocol_v3::CpuProfile profile) {
+  const auto cpu = board_profile::cpuFor(profile);
+  return makePlanForClocks(request, cpu.cpu_hz, cpu.pit_hz);
 }
 
 THINGDAQ_GPIO_CLOCK_COLD_CODE(".flashmem.gpio_clock.runner")

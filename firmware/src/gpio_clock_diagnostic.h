@@ -20,10 +20,11 @@ struct Plan {
   std::uint16_t tcd_major_count = 0U;
 };
 
-// All integer arithmetic is exact because accepted rates divide both the
-// 24 MHz PIT clock and the 600 MHz DWT clock. The request validator also
-// proves every intermediate and the 15-bit eDMA ELINKNO count are bounded.
+// PIT divisors are exact. DWT windows round up rational cycle/event ratios
+// (450 MHz / 4 MHz is 112.5); request validation bounds the eDMA count.
 Plan makePlan(const protocol::GpioClockDiagnosticRequest &request);
+Plan makePlan(const protocol::GpioClockDiagnosticRequest &request,
+              protocol_v3::CpuProfile profile);
 
 class Platform {
  public:

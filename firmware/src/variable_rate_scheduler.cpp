@@ -29,14 +29,14 @@ bool fitsU32(std::uint64_t value) {
 
 THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.derive_known")
 DeriveResult deriveKnown(const protocol_v2::RateProfileTiming &timing,
-                         ClockDomains clocks) {
+                         ClockDomains clocks, bool legacy = true) {
   DeriveResult result{};
   result.schedule.profile = timing.profile;
   result.schedule.clocks = clocks;
   result.schedule.adc_pair_rate_hz = timing.adc_pair_rate_hz;
   result.schedule.gpio_sample_rate_hz = timing.gpio_sample_rate_hz;
 
-  if (clocks != kContractClocks) {
+  if (legacy && clocks != kContractClocks) {
     result.status = Status::kClockMismatch;
     return result;
   }
@@ -121,7 +121,7 @@ DeriveResult deriveKnown(const protocol_v2::RateProfileTiming &timing,
   schedule.completion_expected_dwt_cycles =
       static_cast<std::uint32_t>(expected_dwt);
 
-  if (schedule.adc_pair_period_ticks != timing.adc_pair_period_ticks ||
+  if (legacy && (schedule.adc_pair_period_ticks != timing.adc_pair_period_ticks ||
       schedule.adc1_phase_ticks != timing.adc1_phase_ticks ||
       schedule.gpio_sample_period_ticks !=
           timing.gpio_sample_period_ticks ||
@@ -133,7 +133,7 @@ DeriveResult deriveKnown(const protocol_v2::RateProfileTiming &timing,
       schedule.adc1_phase_ipg_cycles !=
           timing.adc1_phase_ipg_cycles ||
       schedule.completion_expected_dwt_cycles !=
-          timing.completion_expected_dwt_cycles) {
+          timing.completion_expected_dwt_cycles)) {
     result.status = Status::kGeneratedContractMismatch;
     return result;
   }
@@ -187,6 +187,34 @@ DeriveResult deriveForRates(std::uint32_t adc_pair_rate_hz,
   }
   DeriveResult result{};
   result.status = Status::kUnsupportedRatePair;
+  return result;
+}
+
+THINGDAQ_VARIABLE_RATE_COLD_CODE(".flashmem.variable_rate.derive_v3")
+DeriveResult derive(const settings::Record &selected) {
+  using namespace protocol_v3;
+  if (!settings::boardSupports(selected)) {
+    DeriveResult result{};
+    result.status = Status::kUnsupportedRatePair;
+    return result;
+  }
+  const auto cpu = board_profile::cpuFor(
+      static_cast<CpuProfile>(selected[kSettingsCpuProfileOffset]));
+  const auto rate = board_profile::rateFor(
+      static_cast<RateProfile>(selected[kSettingsRateProfileOffset]));
+  if (!cpu.valid() || !rate.valid()) return {};
+  protocol_v2::RateProfileTiming timing{};
+  timing.profile = static_cast<protocol_v2::RateProfile>(rate.id);
+  timing.adc_pair_rate_hz = rate.adc_pair_hz;
+  timing.gpio_sample_rate_hz = rate.gpio_hz;
+  auto result = deriveKnown(timing,
+      {cpu.timestamp_hz, cpu.pit_hz, cpu.ipg_hz, cpu.cpu_hz}, false);
+  if (result.ok() &&
+      (result.schedule.adc_pair_period_ticks != rate.adc_period_ticks ||
+       result.schedule.gpio_sample_period_ticks != rate.gpio_period_ticks ||
+       result.schedule.adc1_phase_ticks != rate.adc1_phase_ticks)) {
+    result.status = Status::kGeneratedContractMismatch;
+  }
   return result;
 }
 

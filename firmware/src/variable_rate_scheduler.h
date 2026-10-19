@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "generated/protocol_v2_constants.h"
+#include "v3_settings.h"
 
 namespace thingdaq::variable_rate {
 
@@ -113,14 +114,16 @@ struct DeriveResult {
   constexpr bool ok() const { return status == Status::kOk; }
 };
 
-// The public derivation boundary is intentionally closed over the generated
-// four-profile table. It never rounds a requested rate or chooses a nearest
-// divider.
+// Legacy derivation remains closed over the generated v2 table and build
+// clocks. It never rounds a requested rate or chooses a nearest divider.
 DeriveResult derive(protocol_v2::RateProfile profile,
                     ClockDomains clocks = kContractClocks);
 DeriveResult deriveForRates(std::uint32_t adc_pair_rate_hz,
                             std::uint32_t gpio_sample_rate_hz,
                             ClockDomains clocks = kContractClocks);
+// Public v3 projection requires an exact complete board tuple. This computes
+// target timing only; it neither applies clocks nor advertises adapter support.
+DeriveResult derive(const settings::Record &selected);
 bool readbackMatches(const Schedule &expected, const Schedule &observed);
 
 // A target adapter owns the opaque register snapshot behind this transaction.

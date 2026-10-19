@@ -249,6 +249,52 @@ No production code changed and no new production test is needed for this audit.
 The profile calculations, document front matter, local file references and core
 fingerprints were also checked, along with `git diff --check`.
 
+## Task 2: typed profile and timing projection
+
+Implemented 2026-10-19. `firmware/src/board_profile.h` provides typed CPU and
+rate views over the generated v3 Flash tables. There is no second persisted
+table and no change to `protocol-v3.json`. `settings::defaultsFor` derives the
+600 MHz compressed default or the 450 MHz RAW default using exact tuple
+membership; an unknown CPU has no usable default.
+
+`variable_rate::derive(settings::Record)` validates the entire tuple before
+reusing the existing exact-divider arithmetic. `runtime_timing::project` in
+`firmware/src/runtime_timing.h` packages the schedule, ADC settings, unready
+trigger snapshot, completion tolerance, calibration/diagnostic/stop/alignment
+cycle budgets and expected v3 clock metadata. Its values match the clock table
+above. `gpio_clock::makePlan(request, CpuProfile)` projects diagnostic windows
+with rational rounding, including 113 cycles per event and 11,363 cycles for
+101 events at 4 MHz with a 450 MHz CPU.
+
+The public projection accepts exactly 48 configurations at 600 MHz and 12 at
+450 MHz, all at 1 MHz with 8 MHz timestamps. The 450 MHz tuples are RAW-only;
+600 MHz permits the generated RAW/PACK12 and RAW/RLE_AUTO combinations. Research
+528 MHz builds and historical rate experiments cannot extend this set.
+
+Compatibility remains explicit: the legacy `derive(RateProfile, ClockDomains)`
+and `deriveForRates` overloads retain build-clock checks and generated v2
+validation. `legacyTimingFor`, v1/v2 validators, layouts and serializers are
+unchanged; v3 timing snapshots do not replace their metadata contracts.
+Portable control tests still exercise v2/v3 sessions and read-only queries.
+
+These APIs calculate **expected** settings, not hardware readback. Production
+still uses `FixedBuildApplication`, advertising only its build clock. The next
+adapter task must apply/read back clocks before publishing this projection;
+the later acquisition task must pass it to hardware owners and rebase counters.
+No clock transition, target candidate build or physical qualification is claimed
+by this task. See [[protocol-v3-upgrade]] for the remaining integration work.
+
+Validation: `test_input_rate_clock.py` passed 11 cases with three intentional
+fixed-release/equal-rate skips. Its C++ harness now checks all 60 tuples under
+all nine supported research/release build combinations, rejects corrupted
+settings and 450 MHz compression, checks timing/defaults/wire clocks, and keeps
+legacy build-clock rejection intact. The auxiliary-input, v3 control/layout/
+portable-regression, protocol, control-state, ADC initializer/trigger/register,
+GPIO clock, firmware-runtime and build-configuration suites passed **138 tests
+and 47 subtests**, with two intentional 450 MHz compression skips. Generator
+drift (142 files), repository Ruff formatting/lint and SDK mypy checks passed.
+No task images were supplied or analyzed.
+
 ## Installed source fingerprints
 
 SHA-256 of the inspected local core files (relative to `cores/teensy4/`).
