@@ -11,11 +11,20 @@ related:
   - '[[protocol-v3]]'
   - '[[protocol-v3-foundation]]'
   - '[[python-api]]'
+  - '[[protocol-v3-python]]'
+  - '[[protocol-v3-firmware-portable]]'
 ---
 
 # Public protocol v3 offline upgrade architecture
 
-Phase 01 implements a hardware-free vertical slice: discover an explicitly
+Phase 03 now integrates public v3 control, per-run codecs, acquisition layouts
+and USB framing in firmware. Portable C++ execution and the public Python SDK
+agree on emitted bytes, repeated v2/v3 sessions and loss accounting. Production
+clock selection remains fixed at build time; physical public-v3 capture and
+runtime clock switching remain unqualified. [[protocol-v3-firmware-portable]]
+records the consolidated gate and [[protocol-v3-python]] the earlier host gate.
+
+Phase 01 established the hardware-free vertical slice: discover an explicitly
 simulated Teensy 4.0, select an advertised configuration, capture compressed
 ADC/GPIO frames through the public Python transport/parser stack, and read back
 the applied settings. [[protocol-v3-prototype]] records commands and measured
@@ -33,6 +42,11 @@ offline results. [[protocol-v3]] describes the complete wire contract.
 | `daq_api/src/thingdone_daq/session_v3.py` | Public v3 command lifecycle, capability selection, applied echo/readback, run identity, status and bounded STOP. |
 | Existing `client.py`, `transport.py`, `reader.py`, `protocol_v2.py`, `models.py` | ThingDAQ facade, in-memory byte transport, shared background reader, opt-in compatible parser, ADCBlock/GPIOBlock access and loss accounting. |
 | `daq_api/examples/protocol_upgrade.py` | Executable discovery/configuration/capture/readback demonstration with exact source comparisons and deterministic cleanup. |
+| Firmware `protocol.cpp`, `control_state.cpp`, `v3_settings.h` | Bounded generated controls, capability-derived tuples, transactional application/readback, replay protection and negotiated mode. |
+| Firmware `firmware_runtime.cpp`, `acquisition_controller.cpp`, `stream_layout.h` | Run lifecycle, selected logical counts, acquisition routing and public status snapshots. |
+| Firmware `packet_buffer_pipeline.cpp`, `deferred_codec.h`, `rle_encoder.cpp`, ADC/GPIO packers | Existing page ownership, cooperative RAW/RLE/PACK12 publication, loss and STOP-tail accounting. |
+| Firmware `usb_transport.cpp` | Shared frame-shape validation, immutable partial-write ownership, logical-coverage fairness and actual wire-byte totals. |
+| `firmware/tests/test_v3_cross_language.py` and its C++ harness | Python command bytes through the real C++ control/runtime/USB path, decoded by public Python parser and block APIs. |
 
 The data path is public facade → session → shared reader/transport → simulated
 device, then encoded bytes → compatible parser → validated decoded blocks.
@@ -40,14 +54,14 @@ Opening `ThingDAQ.simulated(protocol_version=3, strict=True)` performs two
 stable-identity INFO queries, GET_CAPABILITIES, GET_SETTINGS and GET_STATUS over
 the wire. Public API capture does not bypass framing with direct device calls.
 
-## Configuration and lifecycle
+## Simulator configuration and lifecycle
 
-Board defaults are both streams, HARDWARE source (emulated), CPU 600 MHz,
+Simulator board defaults are both streams, HARDWARE source (emulated), CPU 600 MHz,
 1 MHz ADC-pair and GPIO rates, 12-bit ADC, auxiliary bank DISABLED (8 GPIO bits),
 GPIO RLE_AUTO and ADC PACK12. Both HARDWARE and SYNTHETIC selections produce
 deterministic simulated input; identity explicitly reports simulation.
 
-Capabilities advertise 60 complete settings tuples: 48 at 600 MHz across
+Simulator capabilities advertise 60 complete settings tuples: 48 at 600 MHz across
 RAW/compressed policies and 12 RAW-only tuples at 450 MHz. Each combines one of
 ADC/GPIO/both, hardware/synthetic source and 8/16-bit GPIO. Even disabled-stream
 fields must match an advertised record. Known CPU/rate definitions do not
@@ -103,29 +117,36 @@ Fixed-count v1/v2 behavior remains intact.
 
 V1/v2 canonical sources and all 111 generated legacy artifacts are frozen by
 independent hash tests. V3 adds 31 generated outputs, including 28 golden frames.
-Default simulator selection, production serial negotiation, CLI and firmware
-remain on their existing v1/v2 paths. Private `0x82/0x83` research frames are
-not public v3 and are not accepted as v3 encoding discriminators.
+Default simulator selection remains historical v1/v2; the Python serial facade
+and CLI now negotiate public v3 with bounded explicit fallback to legacy peers.
+Current firmware accepts v3 and explicit v2 RAW configuration; it preserves the
+release rejection of v1 acquisition. Private `0x82/0x83` research frames are not
+public v3 and are not accepted as v3 encoding discriminators.
 
 Facade annotations include v3 model variants, so callers accepting either
 session type must narrow returned metadata/settings types. V3 status provides
 its own contract counters, not legacy hardware-health telemetry. Strict loss
 checks remain enabled; optional equal-frame alignment is not established here.
 
-This phase establishes byte correctness, bounded parsing, API behavior and
-simulated lifecycle only. It does not establish firmware integration, physical
-clock switching, sustained USB/host throughput, analog accuracy, external pin
-timing or thermal reliability. Those require subsequent implementation and
-qualification; private-codec hardware evidence does not qualify public v3.
+Phases 01–03 establish byte correctness, bounded parsing, API behavior and
+firmware integration through portable runtime execution and linked target
+images. They do not establish physical clock switching, sustained USB/host
+throughput, analog accuracy, external pin timing or thermal reliability.
+Those require subsequent implementation and qualification; private-codec
+hardware evidence does not qualify public v3.
+
+The following checkpoints retain the implementation sequence. START gating and
+unfinished integration described in the control/codec checkpoints were resolved
+by the layout/transport checkpoint below.
 
 ## Firmware control contract checkpoint (2026-10-19)
 
 The existing C++ incremental parser, dispatcher and USB response queue now
 understand all seven v3 control IDs and their request/response schemas. This
-checkpoint implements discovery, capability/settings selection and serializers;
-it does **not** enable public-v3 acquisition. START returns
-UNSUPPORTED_CONFIGURATION until the following lifecycle/data-path tasks wire
-public framing into acquisition. A successful fake application is portable
+checkpoint initially implemented discovery, capability/settings selection and
+serializers with public-v3 acquisition gated. START returned
+UNSUPPORTED_CONFIGURATION until the later layout/transport integration.
+A successful fake application is portable
 control evidence only. [[protocol-v3-firmware-control]] records validation.
 
 `firmware/src/v3_settings.h` separates canonical board definitions, build defaults,
@@ -141,8 +162,8 @@ unchanged. CONFIGURE publishes settings only after successful exact adapter
 readback. ControlState now reapplies and verifies the previous complete settings
 on application failure or mismatched readback. A failed rollback inhibits START
 and settings/clock reports until a successful CONFIGURE. The fixed-build adapter
-still applies software selections only; public-v3 START remains gated pending
-public data-path integration.
+still applies software selections only; public-v3 START was gated at this
+checkpoint pending public data-path integration.
 
 [[protocol-v3-firmware-transactions]] records the transactional/legacy checkpoint.
 Successful v2 CONFIGURE explicitly selects historical RAW layouts, compiled-clock
@@ -152,7 +173,8 @@ known capability bits and standard payload sizes, including in a private-codec
 build. The synthetic source follows selected per-stream counts and coverage.
 Only CONFIGURE changes mode: INFO probes never switch it, pending STOP/DMA/packet/
 USB work blocks reconfiguration, and duplicate IDs retain the contract's bounded
-16-entry replay protection. Public-v3 START/STOP acquisition remains owned by the following layout task.
+16-entry replay protection. The later layout task completed public-v3 START/STOP
+acquisition.
 
 The capability contract now permits positive device limits bounded by canonical
 maxima and build defaults belonging to the advertised subset. Previously the
@@ -166,8 +188,8 @@ records or defaults absent from the tuple set.
 The control response buffer remains 1,536 bytes (the capability frame is 1,452),
 and packet pages remain 4,096 bytes. The advertised sample capacity reserves the
 12-byte v3 encoding prefix: 4,036 bytes, up to 1,009 ADC pairs, 4,036 GPIO8 samples
-or 2,018 GPIO16 samples. These are storage ceilings, not a claim that v3 frames
-are already emitted. The command buffer is 68 bytes and parser retention is
+or 2,018 GPIO16 samples. These storage ceilings exceed the selected aligned run
+counts documented below. The command buffer is 68 bytes and parser retention is
 71 bytes, accounted as 72 aligned bytes. The resource registry also corrects its
 old v1-sized accounting for existing v2 response buffers; no pool was enlarged.
 
@@ -197,12 +219,12 @@ the build defaults are compressed. Private experiment layouts retain their
 explicit adapter and wire versions. ADC_ETC request routing can now be selected
 by public run mode independently of private codec flags; legacy v2 retains ADC2.
 
-This checkpoint tests packet bytes directly with the public Python decoder. It
-does not enable public-v3 START, choose production ADC/GPIO block counts, complete
-the USB v3 data guard or expose public codec diagnostics. Those remain the next
-layout/transport task; physical qualification and runtime clock changes also
-remain outstanding. The storage ceilings above are enforced by the packet layout
-factory, and the public v3 checksum remains Adler-32 only.
+This checkpoint tested packet bytes directly with the public Python decoder.
+Public-v3 START, production ADC/GPIO block counts, the USB v3 data guard and public
+codec diagnostics were completed in the following layout/transport checkpoint.
+Physical qualification and runtime clock changes remain outstanding. The storage
+ceilings above are enforced by the packet layout factory, and the public v3
+checksum remains Adler-32 only.
 
 
 ## Firmware layout/transport checkpoint (2026-10-19)
@@ -225,3 +247,18 @@ Both 450/600 MHz linked images pass the original memory gates after moving
 immutable discovery tables and initialization-only code to program flash.
 Runtime clock application and physical capture/throughput qualification remain
 outstanding; portable adapters and synthetic streaming do not establish them.
+
+## Firmware portable validation checkpoint (2026-10-19)
+
+[[protocol-v3-firmware-portable]] consolidates the full firmware/Python regression,
+generator, formatting, lint, typing and linked-image memory gates. No production
+code, state-size bound, page count or required gate was changed for this check.
+The default build remains 450 MHz RAW; the isolated 600 MHz verification build
+selects RLE_AUTO/PACK12 and is not a published release image.
+
+[[protocol-v3-firmware-adversarial]] supplies independent wire/checksum oracles
+and pressure, ownership, resource/deadline and STOP-tail regressions.
+[[protocol-v3-firmware-cross-language]] supplies command-driven C++ sessions
+decoded through public Python frames and ADCBlock/GPIOBlock APIs, including
+irregular chunks, both GPIO widths, mixed RAW/RLE frames and exact legacy v2
+layouts. The current gate reruns those suites; their physical limitations remain.
