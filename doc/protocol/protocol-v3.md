@@ -15,9 +15,9 @@ related:
 # Public protocol v3 contract
 
 `protocol/protocol-v3.json` is the canonical v3 wire contract. This checkpoint
-provides validated schemas, separate Python/C++ constants and golden frames;
-it does not enable production firmware, serial negotiation, runtime codecs or
-the simulator. The current product still uses [[protocol-v2]]. Physical results
+provides validated schemas, separate Python/C++ constants, golden frames and
+opt-in Python codecs. Production firmware, serial negotiation and the v3
+simulator are not enabled. The current product still uses [[protocol-v2]]. Physical results
 in [[deferred-codecs-20261018]] concern private research versions, not v3.
 
 Generate with `.venv/bin/python tools/generate_protocol.py`; verify with
@@ -124,5 +124,31 @@ streams need not cover equal durations.
 `daq_api/tests/test_protocol_v3_generation.py` independently checks framing,
 checksums, hand-derived packed/RLE bytes, exact capability records, rejected
 contract mutations, all version-selecting generator paths, and the frozen
-legacy artifact digest recorded in [[protocol-v3-foundation]]. Runtime parser,
-codec and simulator behavior will be exercised in subsequent Phase 01 tasks.
+legacy artifact digest recorded in [[protocol-v3-foundation]].
+`daq_api/tests/test_protocol_v3_codecs.py` exercises runtime controls and samples,
+exact golden-byte round trips, malformed metadata, count/expansion bounds,
+RLE tie fallback, PACK12 bit positions and bounded parser recovery. Simulator
+and session lifecycle tests remain subsequent Phase 01 tasks.
+
+## Opt-in Python codecs
+
+`thingdone_daq.protocol_v3` supplies `encode_v3_frame`, `decode_v3_frame`,
+`V3FrameParser`, `encode_adc_payload`, `encode_gpio_payload` and
+`decode_data_payload`. The parser reuses the existing bounded scanner and
+checksum backend; it accepts only explicitly selected public-v3 frames.
+A truncated stream stays buffered within its fixed bound until completed or
+reset; the single-frame decoder rejects truncation and trailing bytes.
+
+`thingdone_daq.models_v3` supplies typed settings, clocks, rates, identity,
+capabilities, applied settings, status, STOP state and command/response records.
+Use `V3Capabilities.require_supported(settings)` to check a device's exact
+advertised subset and `V3Response.validate_for(command)` to check correlation
+and the CONFIGURE echo. State transitions, replay tracking and atomic application
+belong to the later session/device integration; these codecs do not mutate state.
+
+`decode_v3_block(frame, settings)` validates selected stream/source/width/policy
+and returns the existing `ADCBlock` or `GPIOBlock`. Channel views and timestamps
+use decoded samples. `encoded_payload` retains the transmitted prefix and sample
+bytes; `encoded_sample_bytes`, `decoded_bytes` and `wire_bytes` distinguish sample
+compression from complete frame overhead. Variable logical counts apply only to
+v3 blocks; v1/v2 retain their fixed layouts and existing behavior.

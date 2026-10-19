@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypeVar, overload
 
 from ._generated import protocol_constants as constants
 from ._generated import protocol_v2_constants as v2_constants
+from ._generated import protocol_v3_constants as v3_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
 from .protocol import Frame, FrameValidationError, adc_payload_codes_valid
 from .protocol_v2 import (
@@ -6010,6 +6011,36 @@ class AdcChannelView(Sequence[int]):
         return struct.unpack_from("<H", self._block.payload, offset)[0]
 
 
+def _validate_v3_block_payload(
+    payload: bytes,
+    encoded_payload: bytes | None,
+    kind: v3_constants.FrameKind,
+    item_bytes: int,
+    profile: RateProfile,
+    first_sample_ticks: int,
+) -> None:
+    from .protocol_v3 import decode_data_payload
+
+    if profile != RateProfile(v3_constants.RateProfile.ADC_1MHZ_GPIO_1MHZ):
+        raise ValueError("protocol-v3 blocks require the 1 MHz rate profile")
+    if not isinstance(encoded_payload, bytes):
+        raise TypeError("protocol-v3 blocks require immutable encoded_payload bytes")
+    if (
+        not 0 < len(payload) <= v3_constants.MAX_LOGICAL_PAYLOAD_BYTES
+        or len(payload) % item_bytes
+    ):
+        raise ValueError("protocol-v3 decoded sample length is invalid")
+    count = len(payload) // item_bytes
+    if first_sample_ticks % v3_constants.ADC_PAIR_PERIOD_TICKS or (
+        first_sample_ticks + count * v3_constants.ADC_PAIR_PERIOD_TICKS
+        > constants.UINT64_MAX
+    ):
+        raise ValueError("protocol-v3 block timestamp is unaligned or would wrap")
+    decoded = decode_data_payload(kind, encoded_payload, count)
+    if decoded.item_bytes != item_bytes or decoded.payload != payload:
+        raise ValueError("protocol-v3 encoded samples disagree with decoded payload")
+
+
 @dataclass(frozen=True, slots=True)
 class ADCBlock:
     """One ADC frame; each logical item is an ADC0/ADC1 sample pair."""
@@ -6027,6 +6058,7 @@ class ADCBlock:
     rate_profile: RateProfile = v2_constants.DEFAULT_RATE_PROFILE
     protocol_version: int = constants.PROTOCOL_VERSION
     gap: StreamGap | None = None
+    encoded_payload: bytes | None = None
 
     def __post_init__(self) -> None:
         _unsigned("run_id", self.run_id, 32)
@@ -6063,8 +6095,9 @@ class ADCBlock:
         if self.protocol_version not in {
             constants.PROTOCOL_VERSION,
             v2_constants.PROTOCOL_VERSION,
+            v3_constants.PROTOCOL_VERSION,
         } or isinstance(self.protocol_version, bool):
-            raise ValueError("ADC block protocol version must be 1 or 2")
+            raise ValueError("ADC block protocol version must be 1, 2 or 3")
         if self.protocol_version == constants.PROTOCOL_VERSION and (
             mode is not AuxBankMode.DISABLED
             or profile is not v2_constants.DEFAULT_RATE_PROFILE
@@ -6073,7 +6106,18 @@ class ADCBlock:
         object.__setattr__(self, "aux_bank_mode", mode)
         object.__setattr__(self, "rate_profile", profile)
         layout = GPIOLayout.from_mode(mode)
-        if len(payload) != layout.adc_payload_bytes:
+        if self.protocol_version == v3_constants.PROTOCOL_VERSION:
+            _validate_v3_block_payload(
+                payload,
+                self.encoded_payload,
+                v3_constants.FrameKind.ADC_DATA,
+                4,
+                profile,
+                self.first_sample_ticks,
+            )
+        elif self.encoded_payload is not None:
+            raise ValueError("encoded_payload is only valid for protocol-v3 blocks")
+        elif len(payload) != layout.adc_payload_bytes:
             if mode is AuxBankMode.DISABLED:
                 raise ValueError("ADC blocks require exactly 1012 sample pairs")
             raise ValueError(
@@ -6185,6 +6229,27 @@ class ADCBlock:
             rate_profile=configuration.rate_profile,
             protocol_version=v2_constants.PROTOCOL_VERSION,
         )
+
+    @property
+    def decoded_bytes(self) -> int:
+        """Sample storage used by channel views after lossless decoding."""
+
+        return len(self.payload)
+
+    @property
+    def encoded_sample_bytes(self) -> int:
+        """Transmitted sample storage, excluding the v3 encoding prefix."""
+
+        if self.encoded_payload is None:
+            return len(self.payload)
+        return len(self.encoded_payload) - v3_constants.DATA_PREFIX_BYTES
+
+    @property
+    def wire_bytes(self) -> int:
+        """Complete transmitted frame size, including header/prefix/checksum."""
+
+        payload = self.payload if self.encoded_payload is None else self.encoded_payload
+        return constants.HEADER_SIZE + len(payload) + constants.TRAILER_SIZE
 
     @property
     def data_checksum_algorithm(self) -> constants.ChecksumAlgorithm:
@@ -6452,6 +6517,7 @@ class GPIOBlock:
     aux_bank_mode: AuxBankMode = AuxBankMode.DISABLED
     rate_profile: RateProfile = v2_constants.DEFAULT_RATE_PROFILE
     protocol_version: int = constants.PROTOCOL_VERSION
+    encoded_payload: bytes | None = None
 
     def __post_init__(self) -> None:
         _unsigned("run_id", self.run_id, 32)
@@ -6488,8 +6554,9 @@ class GPIOBlock:
         if self.protocol_version not in {
             constants.PROTOCOL_VERSION,
             v2_constants.PROTOCOL_VERSION,
+            v3_constants.PROTOCOL_VERSION,
         } or isinstance(self.protocol_version, bool):
-            raise ValueError("GPIO block protocol version must be 1 or 2")
+            raise ValueError("GPIO block protocol version must be 1, 2 or 3")
         if self.protocol_version == constants.PROTOCOL_VERSION and (
             mode is not AuxBankMode.DISABLED
             or profile is not v2_constants.DEFAULT_RATE_PROFILE
@@ -6498,7 +6565,18 @@ class GPIOBlock:
         object.__setattr__(self, "aux_bank_mode", mode)
         object.__setattr__(self, "rate_profile", profile)
         layout = GPIOLayout.from_mode(mode)
-        if len(payload) != layout.payload_bytes:
+        if self.protocol_version == v3_constants.PROTOCOL_VERSION:
+            _validate_v3_block_payload(
+                payload,
+                self.encoded_payload,
+                v3_constants.FrameKind.GPIO_DATA,
+                layout.item_bytes,
+                profile,
+                self.first_sample_ticks,
+            )
+        elif self.encoded_payload is not None:
+            raise ValueError("encoded_payload is only valid for protocol-v3 blocks")
+        elif len(payload) != layout.payload_bytes:
             if mode is AuxBankMode.DISABLED:
                 raise ValueError("GPIO blocks require exactly 4048 packed samples")
             raise ValueError(
@@ -6555,6 +6633,27 @@ class GPIOBlock:
         )
 
     @property
+    def decoded_bytes(self) -> int:
+        """Sample storage used by channel views after lossless decoding."""
+
+        return len(self.payload)
+
+    @property
+    def encoded_sample_bytes(self) -> int:
+        """Transmitted sample storage, excluding the v3 encoding prefix."""
+
+        if self.encoded_payload is None:
+            return len(self.payload)
+        return len(self.encoded_payload) - v3_constants.DATA_PREFIX_BYTES
+
+    @property
+    def wire_bytes(self) -> int:
+        """Complete transmitted frame size, including header/prefix/checksum."""
+
+        payload = self.payload if self.encoded_payload is None else self.encoded_payload
+        return constants.HEADER_SIZE + len(payload) + constants.TRAILER_SIZE
+
+    @property
     def data_checksum_algorithm(self) -> constants.ChecksumAlgorithm:
         """The exact algorithm that validated this frame's trailer."""
 
@@ -6574,7 +6673,7 @@ class GPIOBlock:
     def item_count(self) -> int:
         """Count of simultaneous packed samples in the payload."""
 
-        return self.layout.items_per_frame
+        return len(self.payload) // self.item_bytes
 
     @property
     def layout(self) -> GPIOLayout:
