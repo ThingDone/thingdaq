@@ -125,15 +125,23 @@ def test_discovery_and_settings_echo(executable: Path) -> None:
     assert info.hardware_serial == "12345678"
     assert not info.simulated
     assert len(caps.cpu_profiles) == 1
-    assert len(caps.configurations) == 12
+    compressed = info.clocks.cpu_profile == c.CpuProfile.CPU_600MHZ
+    assert len(caps.configurations) == (48 if compressed else 12)
     assert caps.max_control_frame_bytes == 1536
     assert caps.max_data_frame_bytes == 4096
+    assert caps.defaults.gpio_policy == (
+        c.GpioPolicy.RLE_AUTO if compressed else c.GpioPolicy.RAW
+    )
+    assert caps.defaults.adc_policy == (
+        c.AdcPolicy.PACK12 if compressed else c.AdcPolicy.RAW
+    )
     assert caps.defaults == applied.settings
     assert info.clocks == applied.clocks
     for settings in caps.configurations:
         assert settings.cpu_profile == info.clocks.cpu_profile
-        assert settings.gpio_policy == c.GpioPolicy.RAW
-        assert settings.adc_policy == c.AdcPolicy.RAW
+        if not compressed:
+            assert settings.gpio_policy == c.GpioPolicy.RAW
+            assert settings.adc_policy == c.AdcPolicy.RAW
     for settings in caps.configurations:
         responses = exchange(
             executable, command(17, settings.to_bytes()) + command(29, request_id=2)

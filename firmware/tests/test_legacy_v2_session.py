@@ -43,7 +43,6 @@ def runtime_binary(request, tmp_path_factory) -> Path:
             f"-I{FIRMWARE_SOURCE}",
             str(REPOSITORY_ROOT / "firmware/tests/legacy_v2_session_test.cpp"),
             *(str(path) for path in COMPILE_SOURCES),
-            str(FIRMWARE_SOURCE / "rle_encoder.cpp"),
             "-o",
             str(output),
         ],

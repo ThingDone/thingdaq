@@ -14,6 +14,7 @@ CPP_TEST = REPOSITORY_ROOT / "firmware/tests/packet_buffer_pipeline_test.cpp"
 PRODUCTION_SOURCES = (
     FIRMWARE_SOURCE / "packet_buffer_pipeline.h",
     FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp",
+    FIRMWARE_SOURCE / "rle_encoder.cpp",
 )
 
 
@@ -40,6 +41,7 @@ class PacketBufferPipelineTests(unittest.TestCase):
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
                     str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
+                    str(FIRMWARE_SOURCE / "rle_encoder.cpp"),
                     str(FIRMWARE_SOURCE / "usb_transport.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),

@@ -231,7 +231,6 @@ LoopReport FirmwareRuntime::service() {
   }
   report.packet_promotion = packet_pipeline_.serviceReadyFrames();
   report.transmit = transport_.serviceTransmit();
-#if defined(THINGDAQ_DEFERRED_CODECS)
   // One codec block only after bounded high-priority work has caught up.
   // Keep interrupts enabled. Expire deadlines even when no CPU slack exists.
   const bool slack = !report.adc_packer.work_limit_reached &&
@@ -239,7 +238,6 @@ LoopReport FirmwareRuntime::service() {
       !report.command_dispatched && !report.physical_fault_detected;
   packet_pipeline_.serviceDeferred(clock_.nowTicks(), slack ? 1U : 0U,
       [](void *context) { return static_cast<FirmwareRuntime *>(context)->clock_.nowTicks(); }, this);
-#endif
   return report;
 }
 

@@ -35,6 +35,7 @@ def test_input_rate_clock(cpu, equal, release, tmp_path):
                 for name in (
                     "variable_rate_scheduler.cpp",
                     "packet_buffer_pipeline.cpp",
+                    "rle_encoder.cpp",
                     "protocol.cpp",
                     "checksum.cpp",
                     "gpio_clock_diagnostic.cpp",

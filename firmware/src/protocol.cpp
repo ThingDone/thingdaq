@@ -2550,6 +2550,13 @@ bool dataFrameShapeMatchesContract(protocol_v1::FrameKind kind,
       static_cast<std::uint64_t>(shape.item_count) * shape.item_bytes;
   const std::uint64_t total =
       payload + protocol_v1::kHeaderSize + protocol_v1::kTrailerSize;
+  if (shape.protocol_version == protocol_v3::kProtocolVersion) {
+    return payload + protocol_v3::kDataPrefixBytes == shape.payload_bytes &&
+        total + protocol_v3::kDataPrefixBytes == shape.frame_bytes &&
+        shape.frame_bytes <= protocol_v1::kDataFrameBytes && shape.item_period_ticks == 8U &&
+        (kind == protocol_v1::FrameKind::kAdcData ? shape.item_bytes == 4U
+             : (shape.item_bytes == 1U || shape.item_bytes == 2U));
+  }
   if (payload != shape.payload_bytes || total != shape.frame_bytes) {
     return false;
   }
@@ -3013,7 +3020,8 @@ Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
                               std::size_t payload_bytes_written,
                               const DataFrameShape &shape) {
   if (shape.protocol_version != protocol_v1::kProtocolVersion &&
-      shape.protocol_version != protocol_v2::kProtocolVersion) {
+      shape.protocol_version != protocol_v2::kProtocolVersion &&
+      shape.protocol_version != protocol_v3::kProtocolVersion) {
     return badVersion();
   }
   if (!frame.valid() || frame.size != shape.frame_bytes ||
@@ -3022,7 +3030,9 @@ Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
       !dataFrameShapeMatchesContract(fields.kind, shape)) {
     return badLength();
   }
-  if (!isSupportedChecksum(fields.checksum_algorithm)) {
+  if (!isSupportedChecksum(fields.checksum_algorithm) ||
+      (shape.protocol_version == protocol_v3::kProtocolVersion &&
+       fields.checksum_algorithm != protocol_v1::ChecksumAlgorithm::kAdler32)) {
     return unsupportedChecksum();
   }
   const std::uint16_t allowed = protocol_v1::allowedFlags(fields.kind);
@@ -3060,9 +3070,24 @@ Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
   header.request_id = fields.request_id;
   header.first_sample_ticks = fields.first_sample_ticks;
   header.item_count = fields.item_count;
-  Result result = validatePayload(
-      header,
-      {frame.data + protocol_v1::kHeaderSize, shape.payload_bytes});
+  Result result = Result::success();
+  if (shape.protocol_version == protocol_v3::kProtocolVersion) {
+    const auto offset = protocol_v3::kHeaderSize;
+    for (std::size_t i = 0; i < protocol_v3::kDataPrefixBytes; ++i) frame.data[offset + i] = 0U;
+    frame.data[offset + protocol_v3::kDataPrefixItemBytesOffset] = static_cast<std::uint8_t>(shape.item_bytes);
+    storeU32(frame, offset + protocol_v3::kDataPrefixDecodedBytesOffset,
+             shape.item_count * shape.item_bytes);
+    if (fields.kind == protocol_v1::FrameKind::kAdcData) {
+      // RAW and PACK12 have the same 12-bit input contract. Validate before
+      // publication, including explicit RAW configurations.
+      for (std::size_t i = offset + protocol_v3::kDataPrefixBytes + 1U;
+           i < offset + shape.payload_bytes; i += 2U)
+        if ((frame.data[i] & 0xF0U) != 0U) return badPayload();
+    }
+  } else {
+    result = validatePayload(header,
+        {frame.data + protocol_v1::kHeaderSize, shape.payload_bytes});
+  }
   if (!result.ok()) {
     return result;
   }

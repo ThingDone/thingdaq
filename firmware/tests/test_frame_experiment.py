@@ -98,6 +98,7 @@ int main() {
             str(source),
             str(ROOT / "firmware/src/protocol.cpp"),
             str(ROOT / "firmware/src/packet_buffer_pipeline.cpp"),
+            str(ROOT / "firmware/src/rle_encoder.cpp"),
             str(ROOT / "firmware/src/checksum.cpp"),
             "-o",
             str(executable),

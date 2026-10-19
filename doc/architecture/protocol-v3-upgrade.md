@@ -130,11 +130,12 @@ control evidence only. [[protocol-v3-firmware-control]] records validation.
 
 `firmware/src/v3_settings.h` separates canonical board definitions, build defaults,
 active settings/readback and an injectable application interface. Production
-exposes twelve RAW tuples at its single build-fixed 450 or 600 MHz clock. It
+exposes 48 RAW/compressed tuples at its build-fixed 600 MHz clock, or twelve
+RAW-only tuples at 450 MHz. It
 performs no clock register writes; 528 MHz research builds cannot describe a
 public-v3 settings tuple. The portable fake exposes all sixty board tuples to
-exercise the same capability serializer and membership checks. Codec promotion
-will replace the temporary RAW build defaults with compressed 600 MHz defaults.
+exercise the same capability serializer and membership checks. The 600 MHz
+build defaults now select RLE_AUTO and PACK12; 450 MHz defaults remain RAW.
 Queries leave acquisition, negotiated mode, run identity and statistics generation
 unchanged. CONFIGURE publishes settings only after successful exact adapter
 readback. ControlState now reapplies and verifies the previous complete settings
@@ -151,8 +152,7 @@ known capability bits and standard payload sizes, including in a private-codec
 build. The synthetic source follows selected per-stream counts and coverage.
 Only CONFIGURE changes mode: INFO probes never switch it, pending STOP/DMA/packet/
 USB work blocks reconfiguration, and duplicate IDs retain the contract's bounded
-16-entry replay protection. Public-v3 framing and START/STOP acquisition remain
-owned by the following codec/layout tasks.
+16-entry replay protection. Public-v3 START/STOP acquisition remains owned by the following layout task.
 
 The capability contract now permits positive device limits bounded by canonical
 maxima and build defaults belonging to the advertised subset. Previously the
@@ -175,4 +175,31 @@ The parser verifies bounded framing/checksum before reflecting malformed v3
 requests, emits typed or generic errors with the current run ID, and retains
 legacy malformed-frame handling. Pending-frame metadata includes complete
 pages awaiting deferred codecs and partial USB frames, excluding unfinished
-producer leases. Existing DMA/USB/deferred codec algorithms remain unchanged.
+producer leases. DMA/USB ownership and cooperative codec deadlines remain unchanged.
+
+
+## Firmware codec checkpoint (2026-10-19)
+
+[[protocol-v3-firmware-codecs]] records public policy-driven packet encoding.
+`stream_layout::publicV3` snapshots validated settings and explicit logical block
+counts into a run layout. Producers receive decoded sample storage after the
+12-byte prefix. The packet pipeline emits version 3 with RAW, GPIO_RLE or
+ADC_PACK12 identifiers, decoded byte counts, and RLE run counts. GPIO8 reuses the
+generic encoder; GPIO16 retains the qualified hybrid encoder. Strict whole-frame
+profitability selects RAW for ties and incompressible samples. ADC input is
+validated as 12-bit before RAW publication or lossless in-place PACK12 packing.
+
+The same deferred FIFO ownership, 80,000-tick deadline, one-block idle service,
+resource drops, gap propagation and STOP-tail drain apply without experimental
+build defines. RLE borrows a FREE page from the existing pool; no frame buffer was
+added. Explicit v2 configurations still force historical RAW settings even when
+the build defaults are compressed. Private experiment layouts retain their
+explicit adapter and wire versions. ADC_ETC request routing can now be selected
+by public run mode independently of private codec flags; legacy v2 retains ADC2.
+
+This checkpoint tests packet bytes directly with the public Python decoder. It
+does not enable public-v3 START, choose production ADC/GPIO block counts, complete
+the USB v3 data guard or expose public codec diagnostics. Those remain the next
+layout/transport task; physical qualification and runtime clock changes also
+remain outstanding. The storage ceilings above are enforced by the packet layout
+factory, and the public v3 checksum remains Adler-32 only.

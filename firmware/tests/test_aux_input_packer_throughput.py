@@ -45,6 +45,7 @@ class AuxiliaryInputPackerThroughputTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "gpio_dual_bank_capture.cpp"),
                     str(FIRMWARE_SOURCE / "gpio_raw_capture.cpp"),
                     str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
+                    str(FIRMWARE_SOURCE / "rle_encoder.cpp"),
                     str(FIRMWARE_SOURCE / "usb_transport.cpp"),
                     str(FIRMWARE_SOURCE / "statistics.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),

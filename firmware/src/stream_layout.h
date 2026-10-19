@@ -8,6 +8,7 @@
 #include "generated/protocol_constants.h"
 #include "generated/protocol_v2_constants.h"
 #include "rate_profile_table.h"
+#include "v3_settings.h"
 
 #if defined(__IMXRT1062__)
 #define THINGDAQ_STREAM_LAYOUT_COLD_CODE(section_name) \
@@ -82,6 +83,13 @@ struct RunLayout {
       protocol_v2::RateProfile::kAdc1mhzGpio4mhz;
   std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
   bool legacy_v2 = false;
+  protocol_v3::GpioPolicy gpio_policy = protocol_v3::GpioPolicy::kRaw;
+  protocol_v3::AdcPolicy adc_policy = protocol_v3::AdcPolicy::kRaw;
+
+  constexpr std::uint32_t prefixBytes() const {
+    return protocol_version == protocol_v3::kProtocolVersion
+               ? protocol_v3::kDataPrefixBytes : 0U;
+  }
 
   constexpr const FrameLayout &forStream(Stream stream) const {
     const std::size_t index = static_cast<std::size_t>(stream);
@@ -90,6 +98,25 @@ struct RunLayout {
 
   THINGDAQ_STREAM_LAYOUT_COLD_CODE(".flashmem.stream_layout.run_valid")
   constexpr bool valid() const {
+    if (protocol_version == protocol_v3::kProtocolVersion) {
+      // FrameLayout describes decoded samples. The public wire envelope also
+      // carries a prefix; keep it inside the existing packet page.
+      const bool input = aux_bank_mode == protocol_v2::AuxBankMode::kInput;
+      return !legacy_v2 &&
+          (input || aux_bank_mode == protocol_v2::AuxBankMode::kDisabled) &&
+          rate_profile == protocol_v2::RateProfile::kAdc1mhzGpio1mhz &&
+          (gpio_policy == protocol_v3::GpioPolicy::kRaw ||
+           gpio_policy == protocol_v3::GpioPolicy::kRleAuto) &&
+          (adc_policy == protocol_v3::AdcPolicy::kRaw ||
+           adc_policy == protocol_v3::AdcPolicy::kPack12) &&
+          streams[0].valid() && streams[1].valid() &&
+          streams[0].item_bytes == 4U && streams[1].item_bytes == (input ? 2U : 1U) &&
+          streams[0].item_period_ticks == 8U && streams[1].item_period_ticks == 8U &&
+          streams[0].frame_bytes <= protocol_v1::kDataFrameBytes - prefixBytes() &&
+          streams[1].frame_bytes <= protocol_v1::kDataFrameBytes - prefixBytes();
+    }
+    if (gpio_policy != protocol_v3::GpioPolicy::kRaw ||
+        adc_policy != protocol_v3::AdcPolicy::kRaw) return false;
     const std::uint32_t gpio_coverage_multiplier =
         ((!legacy_v2 && input_experiment::kEqualRates) || rate_profile == protocol_v2::RateProfile::kAdc1mhzGpio1mhz) &&
                 protocol_version == protocol_v2::kProtocolVersion ? 4U : 1U;
@@ -168,7 +195,8 @@ constexpr bool operator==(const RunLayout &left, const RunLayout &right) {
          left.aux_bank_mode == right.aux_bank_mode &&
          left.rate_profile == right.rate_profile &&
          left.protocol_version == right.protocol_version &&
-         left.legacy_v2 == right.legacy_v2;
+         left.legacy_v2 == right.legacy_v2 &&
+         left.gpio_policy == right.gpio_policy && left.adc_policy == right.adc_policy;
 }
 
 constexpr bool operator!=(const RunLayout &left, const RunLayout &right) {
@@ -203,6 +231,28 @@ constexpr FrameLayout makeFrameLayout(std::uint32_t item_count,
   result.payload_bytes = static_cast<std::uint32_t>(payload);
   result.coverage_ticks = static_cast<std::uint32_t>(coverage);
   result.frame_bytes = static_cast<std::uint32_t>(total);
+  return result;
+}
+
+// The acquisition layout owner supplies logical block counts. No codec may
+// infer sample counts or time coverage from its encoded length.
+inline Result publicV3(const settings::Record &settings,
+                       std::uint32_t adc_pairs, std::uint32_t gpio_samples) {
+  Result result{};
+  if (!settings::boardSupports(settings)) return result;
+  auto &layout = result.layout;
+  layout.protocol_version = protocol_v3::kProtocolVersion;
+  layout.aux_bank_mode = static_cast<protocol_v2::AuxBankMode>(
+      settings[protocol_v3::kSettingsAuxBankModeOffset]);
+  layout.rate_profile = protocol_v2::RateProfile::kAdc1mhzGpio1mhz;
+  layout.gpio_policy = static_cast<protocol_v3::GpioPolicy>(
+      settings[protocol_v3::kSettingsGpioPolicyOffset]);
+  layout.adc_policy = static_cast<protocol_v3::AdcPolicy>(
+      settings[protocol_v3::kSettingsAdcPolicyOffset]);
+  layout.streams[0] = makeFrameLayout(adc_pairs, 4U, 8U);
+  layout.streams[1] = makeFrameLayout(gpio_samples,
+      settings[protocol_v3::kSettingsGpioWidthBitsOffset] / 8U, 8U);
+  result.status = layout.valid() ? Status::kOk : Status::kInvalidGeneratedContract;
   return result;
 }
 

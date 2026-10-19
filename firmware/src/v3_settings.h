@@ -30,10 +30,10 @@ inline constexpr std::uint8_t kBuildCpuProfile =
 constexpr Record buildDefaults() {
   auto value = kBoardDefaults;
   value[protocol_v3::kSettingsCpuProfileOffset] = kBuildCpuProfile;
-  // Public codec integration is a separate checkpoint. Do not advertise the
-  // private experimental codecs as public-v3 support.
-  value[protocol_v3::kSettingsGpioPolicyOffset] = 0U;
-  value[protocol_v3::kSettingsAdcPolicyOffset] = 0U;
+  // Compression is the public 600 MHz default. The board table excludes
+  // codecs at 450 MHz; build-fixed clocks remain enforced by the adapter.
+  value[protocol_v3::kSettingsGpioPolicyOffset] = kBuildCpuProfile == 1U ? 1U : 0U;
+  value[protocol_v3::kSettingsAdcPolicyOffset] = kBuildCpuProfile == 1U ? 1U : 0U;
   return value;
 }
 inline constexpr auto kBuildDefaults = buildDefaults();
@@ -78,9 +78,7 @@ class FixedBuildApplication final : public Application {
   bool supports(const Record& candidate) const override {
     return kBuildCpuProfile != 0U && boardSupports(candidate) &&
            candidate[protocol_v3::kSettingsCpuProfileOffset] ==
-               kBuildCpuProfile &&
-           candidate[protocol_v3::kSettingsGpioPolicyOffset] == 0U &&
-           candidate[protocol_v3::kSettingsAdcPolicyOffset] == 0U;
+               kBuildCpuProfile;
   }
   bool apply(const Record& candidate, Applied& readback) override {
     if (!supports(candidate)) return false;

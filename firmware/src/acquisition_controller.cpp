@@ -361,6 +361,8 @@ bool Controller::start(const protocol::Configuration &configuration,
 
   if (includesAdc(profile)) {
     adc_capture_->setLegacyV2Mode(configuration.legacy_v2);
+    adc_capture_->setPublicV3Mode(
+        configuration.protocol_version == protocol_v3::kProtocolVersion);
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
     adc_capture_->setAuxInputMode(usesAuxInput(configuration));
 #endif

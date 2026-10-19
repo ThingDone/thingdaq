@@ -41,6 +41,7 @@ class AuxiliaryInputPortableTests(unittest.TestCase):
                     str(FIRMWARE_SOURCE / "gpio_dual_bank_capture.cpp"),
                     str(FIRMWARE_SOURCE / "gpio_dual_bank_packer.cpp"),
                     str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
+                    str(FIRMWARE_SOURCE / "rle_encoder.cpp"),
                     str(FIRMWARE_SOURCE / "protocol.cpp"),
                     str(FIRMWARE_SOURCE / "checksum.cpp"),
                     "-o",

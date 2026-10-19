@@ -9,8 +9,8 @@ struct Counters {
   std::uint64_t work_ticks = 0;
   std::uint32_t max_work_ticks = 0, max_age_ticks = 0;
 };
-#if defined(THINGDAQ_DEFERRED_CODECS)
 inline std::array<Counters, 2> counters{};
+#if defined(THINGDAQ_DEFERRED_CODECS)
 inline std::array<std::uint32_t, 3> page(std::uint32_t request) {
   const auto p = request - kRequestBase;
   if (p >= 7U && p <= 10U) {

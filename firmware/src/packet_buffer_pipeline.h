@@ -16,7 +16,7 @@ struct PacketBufferPipelineTestAccess;
 #endif
 
 // These values describe ownership, not merely progress. Only FILLING exposes
-// mutable payload bytes. The private deferred path keeps complete raw pages
+// mutable payload bytes. The deferred codec path keeps complete raw pages
 // FILLING (frame_size != 0, producer lease invalidated) in the source FIFO
 // until a codec completes; they are invisible to promotion. READY is immutable,
 // and TRANSMITTING is immutable until CdcTransport releases the complete
@@ -208,13 +208,11 @@ struct FinishFillResult {
 };
 
 struct SourceCounters {
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   // Selected wire bytes; logical item/payload counters remain uncompressed.
   std::uint64_t wire_bytes_framed = 0U;
   std::uint64_t wire_bytes_emitted = 0U;
   std::uint64_t wire_bytes_transmitted = 0U;
   std::uint64_t wire_bytes_evicted = 0U;
-#endif
   std::uint64_t frames_produced = 0U;
   std::uint64_t items_produced = 0U;
   std::uint64_t frames_framed = 0U;
@@ -435,10 +433,8 @@ class PacketBufferPipeline final : public usb::LowerPriorityFrameSource {
   std::uint64_t accountedFrames(std::size_t source_index) const;
   BufferIndex takeFreeBuffer();
   bool validFrameSize(BufferIndex index) const;
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   bool compressGpio(BufferIndex index);
   bool packAdc12(BufferIndex index);
-#endif
   void publishReady(BufferIndex index);
   BufferIndex oldestEvictableCompleteBuffer() const;
   bool evictCompleteBuffer(BufferIndex index);

@@ -149,6 +149,7 @@ std::uint32_t g_stop_errors = 0U;
 std::uint32_t g_stale_interrupts = 0U;
 bool g_hardware_prepared = false;
 bool g_legacy_v2 = false;
+bool g_public_v3 = false;
 // Read by main while completion/error ISRs can change it. Multi-field
 // snapshots additionally hold interrupts::Guard for a coherent record.
 volatile bool g_faulted = false;
@@ -156,13 +157,11 @@ volatile bool g_faulted = false;
 // Same-image request-source A/B: odd epochs use ADC_ETC trigger 4's ACK-cleared
 // request for ADC1; even epochs retain the original ADC2 COCO request.
 bool g_adc_etc_request = false;
-#elif defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+#else
 constexpr bool g_adc_etc_request = input_experiment::kAdcEtcRequest;
 #endif
 
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
-bool adcEtcRequest() { return g_adc_etc_request && !g_legacy_v2; }
-#endif
+bool adcEtcRequest() { return (g_public_v3 || g_adc_etc_request) && !g_legacy_v2; }
 
 std::uint32_t address32(const volatile void *address) {
   return static_cast<std::uint32_t>(
@@ -182,10 +181,9 @@ volatile std::uint32_t *dmamuxRegister(std::size_t converter) {
 std::uint32_t dmamuxConfiguration(std::size_t converter) {
   if (converter == 1U && g_legacy_v2)
     return DMAMUX_CHCFG_ENBL | DMAMUX_SOURCE_ADC2;
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if (converter == 1U && adcEtcRequest())
     return DMAMUX_CHCFG_ENBL | DMAMUX_SOURCE_ADC_ETC;
-#endif
+
   return DMAMUX_CHCFG_ENBL |
          board::kAdcConverterConfigurations[converter].dmamux_source;
 }
@@ -236,9 +234,8 @@ bool triggersStopped() {
 }
 
 bool resourcesBusy() {
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if ((ADC_ETC_DMA_CTRL & 0xFFU) != 0U) return true;
-#endif
+
   if ((DMA_ERQ & kAdcDmaChannelMask) != 0U ||
       (ADC1_GC & ADC_GC_DMAEN) != 0U ||
       (ADC2_GC & ADC_GC_DMAEN) != 0U) {
@@ -267,10 +264,9 @@ void clearChannelState(std::size_t converter) {
 void disableRequests() {
   ADC1_GC &= ~ADC_GC_DMAEN;
   ADC2_GC &= ~ADC_GC_DMAEN;
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   ADC_ETC_DMA_CTRL = ADC_ETC_DMA_CTRL_TRIQ_REQ(4U);
   ADC_ETC_CTRL &= ~ADC_ETC_CTRL_DMA_MODE_SEL;
-#endif
+
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
     DMA_CERQ = board::kAdcConverterConfigurations[converter].edma_channel;
@@ -453,10 +449,9 @@ bool appendFutureGeneration() {
 }
 
 bool configuredHardwareValid() {
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if ((ADC_ETC_DMA_CTRL & 0xFFU) !=
       (adcEtcRequest() ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U)) return false;
-#endif
+
   if ((DMA_ERQ & kAdcDmaChannelMask) != kAdcDmaChannelMask ||
       (ADC1_GC & ADC_GC_DMAEN) == 0U ||
       (ADC2_GC & ADC_GC_DMAEN) == 0U ||
@@ -902,12 +897,11 @@ StartStatus prepareHardware(std::uint32_t epoch,
 
   ADC1_GC |= ADC_GC_DMAEN;
   ADC2_GC |= ADC_GC_DMAEN;
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   // Clear stale trigger-4 requests before enabling its aggregate DMA source.
   // ADC2's result register and TCD remain identical in both probe conditions.
   ADC_ETC_DMA_CTRL = ADC_ETC_DMA_CTRL_TRIQ_REQ(4U) |
       (adcEtcRequest() ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U);
-#endif
+
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
     *dmamuxRegister(converter) = dmamuxConfiguration(converter);
@@ -1043,6 +1037,10 @@ HardwareSnapshot hardwareSnapshot() {
 }
 
 }  // namespace
+
+void TeensyAdcDmaCapture::setPublicV3Mode(bool enabled) {
+  if (!g_hardware_prepared) g_public_v3 = enabled;
+}
 
 void TeensyAdcDmaCapture::setLegacyV2Mode(bool enabled) {
   if (!g_hardware_prepared) g_legacy_v2 = enabled;

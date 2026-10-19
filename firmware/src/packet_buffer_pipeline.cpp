@@ -3,9 +3,7 @@
 #include <limits>
 #include "deferred_codec.h"
 #include <cstring>
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
 #include "rle_encoder.h"
-#endif
 
 #if defined(__IMXRT1062__)
 #define THINGDAQ_PACKET_COLD_CODE(section_name) \
@@ -63,12 +61,10 @@ SourceByteCounters byteCounters(const stream_layout::FrameLayout &layout,
       saturatingMultiply(source.frames_transmitted, frame_bytes);
   result.framed_bytes_evicted =
       saturatingMultiply(source.frames_evicted, frame_bytes);
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
     result.framed_bytes_framed = source.wire_bytes_framed;
     result.framed_bytes_emitted = source.wire_bytes_emitted;
     result.framed_bytes_transmitted = source.wire_bytes_transmitted;
     result.framed_bytes_evicted = source.wire_bytes_evicted;
-#endif
   return result;
 }
 
@@ -101,7 +97,9 @@ OperationStatus PacketBufferPipeline::startRun(
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kRunActive;
   }
-  if (!protocol::isSupportedChecksum(checksum_algorithm)) {
+  if (!protocol::isSupportedChecksum(checksum_algorithm) ||
+      (layout.protocol_version == protocol_v3::kProtocolVersion &&
+       checksum_algorithm != protocol_v1::ChecksumAlgorithm::kAdler32)) {
     saturatingIncrement(run_start_rejections_);
     return OperationStatus::kUnsupportedChecksum;
   }
@@ -122,9 +120,7 @@ OperationStatus PacketBufferPipeline::startRun(
   }
   transmit_queue_.clear();
   source_counters_ = {};
-#if defined(THINGDAQ_DEFERRED_CODECS)
   deferred_codec::counters = {};
-#endif
   next_codec_source_ = 0U;
   transmit_depth_by_source_ = {};
   run_id_ = run_id;
@@ -261,15 +257,13 @@ protocol::MutableByteView PacketBufferPipeline::writablePayload(
     return {};
   }
   return {storage_.frame(handle.buffer_index).data() +
-              protocol_v1::kHeaderSize,
+              protocol_v1::kHeaderSize + layout_.prefixBytes(),
           streamLayout(handle.stream).payload_bytes};
 }
 
 // Keep the larger experimental finalizer in flash to preserve the 32 KiB
 // instruction-memory bank and the unchanged 32 KiB stack/headroom gate.
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.finish_fill")
-#endif
 FinishFillResult PacketBufferPipeline::finishFill(
     const FillHandle &handle, const FrameCompletion &completion) {
   FinishFillResult result{};
@@ -320,16 +314,16 @@ FinishFillResult PacketBufferPipeline::finishFill(
       layout.item_count,
       layout.item_bytes,
       layout.item_period_ticks,
-      layout.payload_bytes,
-      layout.frame_bytes};
+      layout.payload_bytes + layout_.prefixBytes(),
+      layout.frame_bytes + layout_.prefixBytes()};
   const protocol::MutableByteView frame{
-      storage_.frame(handle.buffer_index).data(), layout.frame_bytes};
+      storage_.frame(handle.buffer_index).data(), shape.frame_bytes};
   result.encoding =
       layout_.protocol_version == protocol_v1::kProtocolVersion
           ? protocol::encodeDataFrameInPlace(
                 fields, frame, completion.payload_bytes_written)
           : protocol::encodeDataFrameInPlace(
-                fields, frame, completion.payload_bytes_written, shape);
+                fields, frame, shape.payload_bytes, shape);
   if (!result.encoding.ok()) {
     saturatingIncrement(encoding_rejections_);
     dropBuffer(handle.buffer_index, false);
@@ -337,17 +331,18 @@ FinishFillResult PacketBufferPipeline::finishFill(
     return result;
   }
   record.gap_before_required = false;
-  record.frame_size = layout.frame_bytes;
-  const bool deferred = !layout_.legacy_v2 && input_experiment::kDeferredCodecs &&
+  record.frame_size = shape.frame_bytes;
+  const bool public_codec = layout_.protocol_version == protocol_v3::kProtocolVersion &&
+      ((record.stream == Stream::kGpio && layout_.gpio_policy == protocol_v3::GpioPolicy::kRleAuto) ||
+       (record.stream == Stream::kAdc && layout_.adc_policy == protocol_v3::AdcPolicy::kPack12));
+  const bool deferred = public_codec || (!layout_.legacy_v2 && input_experiment::kDeferredCodecs &&
       layout_.protocol_version == 2U && layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput &&
       ((record.stream == Stream::kGpio && input_experiment::kEncodeGpio) ||
-       (record.stream == Stream::kAdc && input_experiment::kPackAdc));
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+       (record.stream == Stream::kAdc && input_experiment::kPackAdc)));
   if (!layout_.legacy_v2 && !deferred && input_experiment::kEncodeGpio && record.stream == Stream::kGpio &&
       layout_.protocol_version == 2U && layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput) {
     compressGpio(handle.buffer_index);
   }
-#endif
 
   ReadyQueue &ready = ready_queues_[streamIndex(record.stream)];
   if (!ready.push(handle.buffer_index)) {
@@ -374,9 +369,7 @@ void PacketBufferPipeline::publishReady(BufferIndex index) {
   auto &ready = ready_queues_[streamIndex(record.stream)];
   record.state = BufferState::kReady;
   SourceCounters &source = source_counters_[streamIndex(record.stream)];
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   saturatingAdd(source.wire_bytes_framed, static_cast<std::uint64_t>(record.frame_size));
-#endif
   saturatingIncrement(source.frames_framed);
   saturatingAdd(source.items_framed,
                 static_cast<std::uint64_t>(record.item_count));
@@ -395,6 +388,31 @@ bool PacketBufferPipeline::validFrameSize(BufferIndex index) const {
   const auto &record = records_[index];
   if (!validStream(record.stream)) return false;
   const auto &layout = streamLayout(record.stream);
+  if (layout_.protocol_version == protocol_v3::kProtocolVersion) {
+    const auto &frame = storage_.frame(index);
+    if (record.frame_size < protocol_v3::kMinFrameBytes + protocol_v3::kDataPrefixBytes ||
+        record.frame_size > frame.size() || record.item_count != layout.item_count) return false;
+    const protocol::ByteView bytes{frame.data(), record.frame_size};
+    const std::size_t prefix = protocol_v3::kHeaderSize;
+    std::uint32_t total = 0U, payload = 0U, items = 0U, decoded = 0U, runs = 0U;
+    if (frame[4] != protocol_v3::kProtocolVersion || frame[5] != static_cast<std::uint8_t>(frameKind(record.stream)) ||
+        frame[prefix + 1U] != layout.item_bytes || frame[prefix + 2U] != 0U || frame[prefix + 3U] != 0U ||
+        !protocol::loadU32(bytes, 12U, total) || !protocol::loadU32(bytes, 16U, payload) ||
+        !protocol::loadU32(bytes, 40U, items) || !protocol::loadU32(bytes, prefix + 4U, decoded) ||
+        !protocol::loadU32(bytes, prefix + 8U, runs) || total != record.frame_size ||
+        payload != total - protocol_v3::kMinFrameBytes || items != record.item_count ||
+        decoded != layout.payload_bytes) return false;
+    const auto encoding = static_cast<protocol_v3::Encoding>(frame[prefix]);
+    const auto encoded_bytes = payload - protocol_v3::kDataPrefixBytes;
+    if (encoding == protocol_v3::Encoding::kRaw)
+      return runs == 0U && encoded_bytes == decoded;
+    if (encoding == protocol_v3::Encoding::kAdcPack12)
+      return record.stream == Stream::kAdc && layout_.adc_policy == protocol_v3::AdcPolicy::kPack12 &&
+          runs == 0U && encoded_bytes == items * 3U;
+    return encoding == protocol_v3::Encoding::kGpioRle && record.stream == Stream::kGpio &&
+        layout_.gpio_policy == protocol_v3::GpioPolicy::kRleAuto && runs > 0U && runs <= items &&
+        encoded_bytes == runs * (2U + layout.item_bytes) && encoded_bytes < decoded;
+  }
   if (record.frame_size == layout.frame_bytes) return true;
   if (!layout_.legacy_v2 && input_experiment::kPackAdc && record.stream == Stream::kAdc &&
       record.frame_size == 48U + record.item_count * 3U) {
@@ -425,7 +443,6 @@ bool PacketBufferPipeline::validFrameSize(BufferIndex index) const {
       items == record.item_count;
 }
 
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
 // Synchronous main-loop transform: source remains FILLING and intact until a
 // disjoint FREE pool page contains a complete checksummed result. This path
 // never invokes producer admission (which can evict) or allocates a RAM page.
@@ -434,10 +451,12 @@ bool PacketBufferPipeline::compressGpio(BufferIndex index) {
   auto &record = records_[index];
   auto &source = storage_.frame(index);
   const auto &layout = streamLayout(record.stream);
-  const protocol::ByteView decoded{source.data() + protocol_v1::kHeaderSize,
+  const protocol::ByteView decoded{source.data() + protocol_v1::kHeaderSize + layout_.prefixBytes(),
                                     layout.payload_bytes};
+  // The shared sizer excludes the v3 prefix. Both candidate envelopes add
+  // the same prefix, so comparing these lengths preserves strict profitability.
   const auto selection = rle::sizeForAdaptiveSelection(
-      decoded, {2U, layout.item_count}, layout.frame_bytes - 1U);
+      decoded, {layout.item_bytes, layout.item_count}, layout.frame_bytes - 1U);
   if (!selection.ok()) {
     saturatingIncrement(encoding_rejections_);
     return false;
@@ -450,20 +469,30 @@ bool PacketBufferPipeline::compressGpio(BufferIndex index) {
       break;
     }
   }
-  if (scratch == kInvalidBufferIndex) return false;  // RAW under pool pressure.
+  if (scratch == kInvalidBufferIndex) return false;  // Deferred caller accounts a resource drop.
   records_[scratch].state = BufferState::kFilling;
   auto &target = storage_.frame(scratch);
-  const auto encoded = rle::encodeHybrid16(decoded, selection.plan,
-      {target.data() + protocol_v1::kHeaderSize, layout.payload_bytes});
+  const protocol::MutableByteView output_samples{
+      target.data() + protocol_v1::kHeaderSize + layout_.prefixBytes(), layout.payload_bytes};
+  const auto encoded = layout.item_bytes == 2U
+      ? rle::encodeHybrid16(decoded, selection.plan, output_samples)
+      : rle::encode(decoded, selection.plan, output_samples);
   if (encoded.ok()) {
-    const std::size_t bytes = selection.plan.encoded_frame_bytes;
-    std::memcpy(target.data(), source.data(), protocol_v1::kHeaderSize);
-    target[protocol_v1::kHeaderVersionOffset] = input_experiment::kGpioRleVersion;
+    const std::size_t bytes = selection.plan.encoded_frame_bytes + layout_.prefixBytes();
+    std::memcpy(target.data(), source.data(), protocol_v1::kHeaderSize + layout_.prefixBytes());
+    if (layout_.protocol_version == protocol_v3::kProtocolVersion) {
+      target[protocol_v3::kHeaderSize] = static_cast<std::uint8_t>(protocol_v3::Encoding::kGpioRle);
+      protocol::storeU32({target.data(), bytes}, protocol_v3::kHeaderSize + protocol_v3::kDataPrefixRunCountOffset,
+                         static_cast<std::uint32_t>(selection.plan.run_count));
+    } else {
+      // Explicit experiment adapter only; negotiated v2 never reaches here.
+      target[protocol_v1::kHeaderVersionOffset] = input_experiment::kGpioRleVersion;
+    }
     const protocol::MutableByteView output{target.data(), bytes};
     std::uint32_t checksum = 0U;
     if (protocol::storeU32(output, protocol_v1::kHeaderTotalLengthOffset, static_cast<std::uint32_t>(bytes)) &&
         protocol::storeU32(output, protocol_v1::kHeaderPayloadLengthOffset,
-                           static_cast<std::uint32_t>(encoded.bytes_written)) &&
+                           static_cast<std::uint32_t>(encoded.bytes_written + layout_.prefixBytes())) &&
         protocol::computeChecksum(checksum_algorithm_,
             {target.data(), bytes - protocol_v1::kTrailerSize}, checksum).ok() &&
         protocol::storeU32(output, bytes - protocol_v1::kTrailerSize, checksum)) {
@@ -476,9 +505,8 @@ bool PacketBufferPipeline::compressGpio(BufferIndex index) {
     saturatingIncrement(encoding_rejections_);
   }
   recycle(scratch);
-  return record.frame_size != layout.frame_bytes;
+  return record.frame_size != layout.frame_bytes + layout_.prefixBytes();
 }
-#endif
 
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.cancel")
 bool PacketBufferPipeline::cancelFill(const FillHandle &handle) {
@@ -541,9 +569,7 @@ PromotionReport PacketBufferPipeline::serviceReadyFrames(std::size_t limit) {
     record.state = BufferState::kTransmitting;
     ++transmit_depth_by_source_[selected_source];
     SourceCounters &source = source_counters_[selected_source];
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
     saturatingAdd(source.wire_bytes_emitted, static_cast<std::uint64_t>(record.frame_size));
-#endif
     saturatingIncrement(source.frames_emitted);
     saturatingAdd(source.items_emitted,
                   static_cast<std::uint64_t>(record.item_count));
@@ -654,9 +680,7 @@ void PacketBufferPipeline::releaseFrontFrame() {
   record.transmission_started = true;
   const std::size_t source_index = streamIndex(record.stream);
   SourceCounters &source = source_counters_[source_index];
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   saturatingAdd(source.wire_bytes_transmitted, static_cast<std::uint64_t>(record.frame_size));
-#endif
   saturatingIncrement(source.frames_transmitted);
   saturatingAdd(source.items_transmitted,
                 static_cast<std::uint64_t>(record.item_count));
@@ -964,9 +988,7 @@ void PacketBufferPipeline::dropBuffer(BufferIndex index,
     saturatingIncrement(source.frames_dropped_after_promotion);
   }
   if (pressure_eviction) {
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
     saturatingAdd(source.wire_bytes_evicted, static_cast<std::uint64_t>(dropped.frame_size));
-#endif
     saturatingIncrement(source.frames_evicted);
     saturatingAdd(source.items_evicted,
                   static_cast<std::uint64_t>(dropped.item_count));
@@ -1111,13 +1133,12 @@ std::size_t PacketBufferPipeline::ownedBuffers() const {
 }  // namespace thingdaq::packet
 
 namespace thingdaq::packet {
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.pack_adc12")
 __attribute__((optimize("Os")))
 bool PacketBufferPipeline::packAdc12(BufferIndex index) {
   auto &record = records_[index];
   auto &frame = storage_.frame(index);
-  auto *data = frame.data() + protocol_v1::kHeaderSize;
+  auto *data = frame.data() + protocol_v1::kHeaderSize + layout_.prefixBytes();
   // Validate before modifying: 12-bit packing must never truncate bad data.
   for (std::size_t i = 0; i < record.item_count * 4U; i += 2U)
     if ((data[i + 1U] & 0xF0U) != 0U) { ++encoding_rejections_; return false; }
@@ -1128,20 +1149,29 @@ bool PacketBufferPipeline::packAdc12(BufferIndex index) {
     data[3*i+1] = static_cast<std::uint8_t>((a >> 8U) | (b << 4U));
     data[3*i+2] = static_cast<std::uint8_t>(b >> 4U);
   }
-  record.frame_size = 48U + record.item_count * 3U;
-  frame[protocol_v1::kHeaderVersionOffset] = input_experiment::kAdcPackedVersion;
+  record.frame_size = 48U + layout_.prefixBytes() + record.item_count * 3U;
+  if (layout_.protocol_version == protocol_v3::kProtocolVersion) {
+    frame[protocol_v3::kHeaderSize] = static_cast<std::uint8_t>(protocol_v3::Encoding::kAdcPack12);
+  } else {
+    frame[protocol_v1::kHeaderVersionOffset] = input_experiment::kAdcPackedVersion;
+  }
   const protocol::MutableByteView bytes{frame.data(), record.frame_size};
   std::uint32_t checksum = 0U;
   return protocol::storeU32(bytes, protocol_v1::kHeaderTotalLengthOffset, static_cast<std::uint32_t>(record.frame_size)) &&
-      protocol::storeU32(bytes, protocol_v1::kHeaderPayloadLengthOffset, record.item_count * 3U) &&
+      protocol::storeU32(bytes, protocol_v1::kHeaderPayloadLengthOffset, layout_.prefixBytes() + record.item_count * 3U) &&
       protocol::computeChecksum(checksum_algorithm_, {frame.data(), record.frame_size - 4U}, checksum).ok() &&
       protocol::storeU32(bytes, record.frame_size - 4U, checksum);
 }
-#endif
 
 THINGDAQ_PACKET_COLD_CODE(".flashmem.packet.deferred")
 void PacketBufferPipeline::serviceDeferred(std::uint64_t ticks, std::size_t budget, std::uint64_t (*read_ticks)(void *), void *clock_context) {
-#if defined(THINGDAQ_DEFERRED_CODECS)
+  // Legacy RAW runs need no FIFO traversal now that service is compiled in.
+  if (layout_.protocol_version == protocol_v3::kProtocolVersion) {
+    if (layout_.gpio_policy == protocol_v3::GpioPolicy::kRaw &&
+        layout_.adc_policy == protocol_v3::AdcPolicy::kRaw) return;
+  } else if (layout_.legacy_v2 || !input_experiment::kDeferredCodecs) {
+    return;
+  }
   setDeferredClock(ticks);
   for (std::size_t attempt = 0; attempt < kStreamCount; ++attempt) {
     const auto stream = (next_codec_source_ + attempt) % kStreamCount;
@@ -1150,7 +1180,7 @@ void PacketBufferPipeline::serviceDeferred(std::uint64_t ticks, std::size_t budg
     BufferIndex index = kInvalidBufferIndex;
     for (std::size_t offset = 0; offset < ready_queues_[stream].size(); ++offset) {
       const auto candidate = *ready_queues_[stream].at(offset);
-      if (records_[candidate].state == BufferState::kFilling && records_[candidate].frame_size != 0U) {
+      if (candidate < records_.size() && records_[candidate].state == BufferState::kFilling && records_[candidate].frame_size != 0U) {
         index = candidate; break;
       }
     }
@@ -1181,15 +1211,12 @@ void PacketBufferPipeline::serviceDeferred(std::uint64_t ticks, std::size_t budg
       dropBuffer(index, false);
     } else {
       ++c.completed;
-      if (record.frame_size == streamLayout(record.stream).frame_bytes) ++c.raw;
+      if (record.frame_size == streamLayout(record.stream).frame_bytes + layout_.prefixBytes()) ++c.raw;
       publishReady(index);
     }
     next_codec_source_ = (stream + 1U) % kStreamCount;
     break;  // At most one block per idle opportunity, regardless of budget.
   }
-#else
-  (void)ticks; (void)budget; (void)read_ticks; (void)clock_context;
-#endif
 }
 }
 

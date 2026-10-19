@@ -73,6 +73,7 @@ class M7PerformanceTests(unittest.TestCase):
                 "gpio_dual_bank_capture.cpp",
                 "gpio_dual_bank_packer.cpp",
                 "packet_buffer_pipeline.cpp",
+                "rle_encoder.cpp",
                 "protocol.cpp",
                 "checksum.cpp",
             ]

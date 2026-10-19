@@ -140,6 +140,8 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
       // Non-release historical rate profiles continue to use their v2 scheduler.
       if (candidate.legacy_v2 && settings::kBuildCpuProfile != 0U) {
         auto legacy_settings = settings::kBuildDefaults;
+        legacy_settings[protocol_v3::kSettingsGpioPolicyOffset] = 0U;
+        legacy_settings[protocol_v3::kSettingsAdcPolicyOffset] = 0U;
         legacy_settings[protocol_v3::kSettingsStreamMaskOffset] = candidate.stream_mask;
         legacy_settings[protocol_v3::kSettingsSourceOffset] = static_cast<std::uint8_t>(candidate.source);
         legacy_settings[protocol_v3::kSettingsAuxBankModeOffset] = static_cast<std::uint8_t>(candidate.aux_bank_mode);

@@ -118,8 +118,9 @@ struct FrameFields {
 };
 
 // Exact wire shape for a data frame. Protocol v1 callers keep using the
-// three-argument encoder below; the experimental portable path supplies one
-// of the generated v2 mode/profile shapes explicitly.
+// three-argument encoder below; v2 supplies a generated mode/profile shape.
+// For v3, payload/frame bytes include the prefix, while item bytes/count
+// describe decoded samples already written after that prefix.
 struct DataFrameShape {
   std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
   std::uint32_t item_count = 0U;

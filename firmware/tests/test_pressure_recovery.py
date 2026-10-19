@@ -19,6 +19,7 @@ PRODUCTION_SOURCES = (
     "adc_trigger.cpp",
     "adc_frame_packer.cpp",
     "packet_buffer_pipeline.cpp",
+    "rle_encoder.cpp",
     "synthetic_source.cpp",
     "control_state.cpp",
     "usb_transport.cpp",
