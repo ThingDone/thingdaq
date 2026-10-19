@@ -1,3 +1,15 @@
+---
+type: report
+title: Deferred GPIO RLE and ADC12 qualification
+created: 2026-10-18
+tags:
+  - compression
+  - firmware
+  - qualification
+related:
+  - '[[deferred-codecs]]'
+---
+
 # Deferred GPIO RLE and ADC12 qualification — 2026-10-18
 
 **For Bill:** 28/28 clean-source captures passed (4,396 checks), including 30 minutes with both codecs, 10 minutes with default GPIO RLE, and twenty same-boot START/STOP cells. No codec deadline/resource drops or parser discards; peak die temperature 65.527 °C. GPIO hybrid `-Os` RLE defaults on; ADC12 packing is optional and defaults off. No hardware changes were needed.

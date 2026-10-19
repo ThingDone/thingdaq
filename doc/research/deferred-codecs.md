@@ -1,3 +1,15 @@
+---
+type: research
+title: Deferred input codecs
+created: 2026-10-18
+tags:
+  - compression
+  - firmware
+  - private-protocol
+related:
+  - '[[deferred-codecs-20261018]]'
+---
+
 # Deferred input codecs
 
 This private 600 MHz candidate adds cooperative low-priority processing for
