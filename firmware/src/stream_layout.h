@@ -81,6 +81,7 @@ struct RunLayout {
   protocol_v2::RateProfile rate_profile =
       protocol_v2::RateProfile::kAdc1mhzGpio4mhz;
   std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
+  bool legacy_v2 = false;
 
   constexpr const FrameLayout &forStream(Stream stream) const {
     const std::size_t index = static_cast<std::size_t>(stream);
@@ -90,10 +91,10 @@ struct RunLayout {
   THINGDAQ_STREAM_LAYOUT_COLD_CODE(".flashmem.stream_layout.run_valid")
   constexpr bool valid() const {
     const std::uint32_t gpio_coverage_multiplier =
-        (input_experiment::kEqualRates || rate_profile == protocol_v2::RateProfile::kAdc1mhzGpio1mhz) &&
+        ((!legacy_v2 && input_experiment::kEqualRates) || rate_profile == protocol_v2::RateProfile::kAdc1mhzGpio1mhz) &&
                 protocol_version == protocol_v2::kProtocolVersion ? 4U : 1U;
     const std::uint32_t adc_multiplier =
-        protocol_version == protocol_v2::kProtocolVersion &&
+        !legacy_v2 && protocol_version == protocol_v2::kProtocolVersion &&
                 aux_bank_mode == protocol_v2::AuxBankMode::kInput
             ? input_experiment::kAdcFrameMultiplier : 1U;
     if (!streams[0].valid() || !streams[1].valid() ||
@@ -123,7 +124,8 @@ struct RunLayout {
     }
 
     const protocol_v2::RateProfileTiming *timing = nullptr;
-    timing = rate_profile::timingFor(rate_profile);
+    timing = legacy_v2 ? rate_profile::legacyTimingFor(rate_profile)
+                       : rate_profile::timingFor(rate_profile);
     if (timing == nullptr) {
       return false;
     }
@@ -136,7 +138,8 @@ struct RunLayout {
     }
     const std::uint32_t adc_items = static_cast<std::uint32_t>(
         disabled ? protocol_v2::kDisabledAdcPairsPerFrame
-                 : rate_profile::kInputAdcPairsPerFrame);
+                 : (legacy_v2 ? protocol_v2::kInputAdcPairsPerFrame
+                              : rate_profile::kInputAdcPairsPerFrame));
     const std::uint32_t gpio_items = static_cast<std::uint32_t>(
         disabled ? protocol_v2::kDisabledGpioSamplesPerFrame
                  : protocol_v2::kInputGpioSamplesPerFrame);
@@ -164,7 +167,8 @@ constexpr bool operator==(const RunLayout &left, const RunLayout &right) {
          left.streams[1] == right.streams[1] &&
          left.aux_bank_mode == right.aux_bank_mode &&
          left.rate_profile == right.rate_profile &&
-         left.protocol_version == right.protocol_version;
+         left.protocol_version == right.protocol_version &&
+         left.legacy_v2 == right.legacy_v2;
 }
 
 constexpr bool operator!=(const RunLayout &left, const RunLayout &right) {
@@ -223,14 +227,16 @@ constexpr const protocol_v2::RateProfileTiming *timingFor(
 }
 
 constexpr Result experimental(protocol_v2::AuxBankMode mode,
-                              protocol_v2::RateProfile profile) {
+                              protocol_v2::RateProfile profile,
+                              bool legacy_v2 = false) {
   Result result{};
   if (mode != protocol_v2::AuxBankMode::kDisabled &&
       mode != protocol_v2::AuxBankMode::kInput) {
     result.status = Status::kInvalidAuxBankMode;
     return result;
   }
-  const protocol_v2::RateProfileTiming *timing = timingFor(profile);
+  const protocol_v2::RateProfileTiming *timing = legacy_v2
+      ? rate_profile::legacyTimingFor(profile) : timingFor(profile);
   if (timing == nullptr) {
     result.status = Status::kUnsupportedRateProfile;
     return result;
@@ -238,7 +244,8 @@ constexpr Result experimental(protocol_v2::AuxBankMode mode,
 
   const bool input = mode == protocol_v2::AuxBankMode::kInput;
   const std::uint32_t adc_items = static_cast<std::uint32_t>(
-      input ? rate_profile::kInputAdcPairsPerFrame
+      input ? (legacy_v2 ? protocol_v2::kInputAdcPairsPerFrame
+                        : rate_profile::kInputAdcPairsPerFrame)
             : protocol_v2::kDisabledAdcPairsPerFrame);
   const std::uint32_t gpio_items = static_cast<std::uint32_t>(
       input ? protocol_v2::kInputGpioSamplesPerFrame
@@ -251,6 +258,7 @@ constexpr Result experimental(protocol_v2::AuxBankMode mode,
   result.layout.aux_bank_mode = mode;
   result.layout.rate_profile = profile;
   result.layout.protocol_version = protocol_v2::kProtocolVersion;
+  result.layout.legacy_v2 = legacy_v2;
   result.status = result.layout.valid() ? Status::kOk
                                         : Status::kInvalidGeneratedContract;
   return result;

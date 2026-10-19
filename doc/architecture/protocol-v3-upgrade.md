@@ -137,9 +137,22 @@ exercise the same capability serializer and membership checks. Codec promotion
 will replace the temporary RAW build defaults with compressed 600 MHz defaults.
 Queries leave acquisition, negotiated mode, run identity and statistics generation
 unchanged. CONFIGURE publishes settings only after successful exact adapter
-readback. Application implementations own hardware atomicity; the subsequent
-transactional task owns rollback orchestration and complete v2/v3 lifecycle
-integration. The fixed-build adapter applies software selections only.
+readback. ControlState now reapplies and verifies the previous complete settings
+on application failure or mismatched readback. A failed rollback inhibits START
+and settings/clock reports until a successful CONFIGURE. The fixed-build adapter
+still applies software selections only; public-v3 START remains gated pending
+public data-path integration.
+
+[[protocol-v3-firmware-transactions]] records the transactional/legacy checkpoint.
+Successful v2 CONFIGURE explicitly selects historical RAW layouts, compiled-clock
+settings and the ADC2 request route. The qualified ADC_ETC route remains intact
+for the experimental path. V2 INFO/STATUS use historical counts, timing tables,
+known capability bits and standard payload sizes, including in a private-codec
+build. The synthetic source follows selected per-stream counts and coverage.
+Only CONFIGURE changes mode: INFO probes never switch it, pending STOP/DMA/packet/
+USB work blocks reconfiguration, and duplicate IDs retain the contract's bounded
+16-entry replay protection. Public-v3 framing and START/STOP acquisition remain
+owned by the following codec/layout tasks.
 
 The capability contract now permits positive device limits bounded by canonical
 maxima and build defaults belonging to the advertised subset. Previously the

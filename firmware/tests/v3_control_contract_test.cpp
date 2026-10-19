@@ -22,19 +22,141 @@ class FakeApplication final : public settings::Application {
   bool apply(const settings::Record& value,
              settings::Applied& readback) override {
     ++calls;
-    if (fail) return false;
+    hardware = {value, settings::clocksFor(value[v3::kSettingsCpuProfileOffset])};
+    if (fail_rollback) return false;
+    if (fail) { fail = false; return false; }
     readback = {value,
                 settings::clocksFor(value[v3::kSettingsCpuProfileOffset])};
-    if (mismatch) readback.clocks[4] ^= 1U;
+    if (mismatch) { mismatch = false; readback.clocks[4] ^= 1U; }
     return true;
   }
+  settings::Applied hardware{settings::kBoardDefaults, settings::clocksFor(1U)};
+  bool fail_rollback = false;
   unsigned calls = 0U;
   bool fail = false;
   bool mismatch = false;
 };
 
+void transactions() {
+  using namespace thingdaq;
+  FakeApplication app;
+  control::ControlState state(app);
+  assert(state.completeBoot(12345678U));
+  wire::ControlFrame response;
+  wire::Request request{};
+  request.protocol_version = 3U;
+  request.kind = v1::CommandKind::kConfigure;
+  request.settings = settings::record(v3::kSelectableConfigurations[59]);
+  request.request_id = 1U;
+  auto dispatch = [&](control::DispatchReadiness ready = {}) {
+    return state.dispatch(request, response, ready);
+  };
+  for (unsigned blocked = 0; blocked < 2; ++blocked) {
+    control::DispatchReadiness ready{};
+    ready.configuration_ready = blocked != 0U;
+    ready.pending_frames = blocked == 1U ? 1U : 0U;
+    assert(dispatch(ready).command_error == v1::ErrorCode::kBusy);
+    assert(app.calls == 0U && state.negotiatedVersion() == 0U);
+    ++request.request_id;
+  }
+  assert(dispatch().commandAccepted());
+  const auto saved = state.activeSettings();
+  const auto calls = app.calls;
+  assert(dispatch().command_error == v1::ErrorCode::kInvalidRequestId);
+  assert(app.calls == calls);
+  request.settings = settings::kBoardDefaults;
+  for (unsigned failure = 0; failure < 2; ++failure) {
+    ++request.request_id;
+    app.fail = failure == 0U;
+    app.mismatch = failure == 1U;
+    const auto before = app.calls;
+    assert(dispatch().command_error == v1::ErrorCode::kInternalError);
+    assert(app.calls == before + 2U);
+    assert(app.hardware.settings == saved.settings && app.hardware.clocks == saved.clocks);
+    assert(state.activeSettings().settings == saved.settings);
+    assert(state.negotiatedVersion() == 3U && state.runId() == 0U);
+  }
+  // Neither version of discovery selects a session or touches hardware.
+  for (auto version : {2U, 3U}) {
+    request.protocol_version = static_cast<std::uint8_t>(version);
+    request.kind = v1::CommandKind::kInfo;
+    ++request.request_id;
+    assert(dispatch().commandAccepted());
+    assert(state.negotiatedVersion() == 3U);
+  }
+  request.protocol_version = 2U;
+  request.kind = v1::CommandKind::kStart;
+  ++request.request_id;
+  assert(dispatch().command_error == v1::ErrorCode::kUnsupportedConfiguration);
+  request.kind = v1::CommandKind::kConfigure;
+  request.configuration = control::kSyntheticConfiguration;
+  request.configuration.protocol_version = 2U;
+  request.configuration.aux_bank_mode = protocol_v2::AuxBankMode::kInput;
+  request.configuration.rate_profile = protocol_v2::RateProfile::kAdc1mhzGpio1mhz;
+  ++request.request_id;
+  assert(dispatch().commandAccepted());
+  assert(state.negotiatedVersion() == 2U && state.appliedConfiguration().legacy_v2);
+  assert(state.activeSettings().settings[v3::kSettingsGpioPolicyOffset] == 0U);
+  assert(state.activeSettings().settings[v3::kSettingsAdcPolicyOffset] == 0U);
+  assert(state.activeSettings().settings[v3::kSettingsCpuProfileOffset] == settings::kBuildCpuProfile);
+  request.kind = v1::CommandKind::kStart;
+  ++request.request_id;
+  assert(dispatch().commandAccepted());
+  const auto start_id = request.request_id;
+  assert(state.runId() == 1U);
+  assert(dispatch().command_error == v1::ErrorCode::kInvalidRequestId);
+  state.takePendingEvents();
+  request.protocol_version = 3U;
+  request.kind = v1::CommandKind::kConfigure;
+  ++request.request_id;
+  assert(dispatch().command_error == v1::ErrorCode::kInvalidState);
+  request.kind = v1::CommandKind::kStop;
+  ++request.request_id;
+  assert(dispatch().command_error == v1::ErrorCode::kInvalidState);
+  request.kind = v1::CommandKind::kInfo;
+  ++request.request_id;
+  assert(dispatch().commandAccepted());
+  assert(state.state() == v1::DeviceState::kRunning && state.runId() == 1U);
+  request.protocol_version = 2U;
+  request.kind = v1::CommandKind::kStop;
+  ++request.request_id;
+  assert(dispatch().commandAccepted());
+  request.protocol_version = 3U;
+  request.kind = v1::CommandKind::kConfigure;
+  ++request.request_id;
+  assert(dispatch().command_error == v1::ErrorCode::kBusy); // unconsumed STOP
+  state.takePendingEvents();
+  ++request.request_id;
+  control::DispatchReadiness drain{};
+  drain.pending_frames = 1U;
+  assert(dispatch(drain).command_error == v1::ErrorCode::kBusy);
+  ++request.request_id;
+  assert(dispatch().commandAccepted());
+  request.protocol_version = 2U;
+  request.kind = v1::CommandKind::kStart;
+  request.request_id = start_id;
+  assert(dispatch().command_error == v1::ErrorCode::kInvalidRequestId);
+  assert(state.runId() == 1U && state.negotiatedVersion() == 3U);
+  // Failed rollback latches unknown hardware; successful CONFIGURE repairs it.
+  state.beginHostSession();
+  request.protocol_version = 3U;
+  request.kind = v1::CommandKind::kConfigure;
+  request.request_id = 1U;
+  app.fail_rollback = true;
+  assert(dispatch().command_error == v1::ErrorCode::kInternalError);
+  request.kind = static_cast<v1::CommandKind>(v3::CommandKind::kGetSettings);
+  ++request.request_id;
+  assert(dispatch().command_error == v1::ErrorCode::kInternalError);
+  app.fail_rollback = false;
+  request.kind = v1::CommandKind::kConfigure;
+  ++request.request_id;
+  assert(dispatch().commandAccepted());
+  assert(state.takePendingEvents().mask == 0U);
+}
+
 int main(int argc, char** argv) {
   const std::string mode = argc > 1 ? argv[1] : "fixed";
+  if (mode == "transactions") { transactions(); return 0; }
   if (mode == "validate") {
     const std::vector<std::uint8_t> bytes(
         std::istreambuf_iterator<char>(std::cin), {});

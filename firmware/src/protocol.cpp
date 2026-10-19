@@ -696,7 +696,10 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
     std::size_t expected_payload = 0U;
     if (!expectedPayloadSize(header.kind, response_error, header.version,
                              expected_payload) ||
-        header.payload_length != expected_payload) {
+        (header.payload_length != expected_payload &&
+         !(header.version == protocol_v2::kProtocolVersion && !response_error &&
+           header.kind == protocol_v1::FrameKind::kGetStatusResponse &&
+           header.payload_length == protocol_v2::kStatusResponsePayloadSize))) {
       return badLength();
     }
   }
@@ -719,14 +722,19 @@ Result validateHeader(const FrameHeader &header, bool commands_only) {
           header.item_count ==
               (adc ? protocol_v2::kDisabledAdcPairsPerFrame
                    : protocol_v2::kDisabledGpioSamplesPerFrame);
-      const bool input =
+      const bool legacy_input =
+          header.payload_length == (adc ? protocol_v2::kInputAdcPairsPerFrame * 4U
+                                       : protocol_v2::kDataPayloadBytes) &&
+          header.item_count == (adc ? protocol_v2::kInputAdcPairsPerFrame
+                                   : protocol_v2::kInputGpioSamplesPerFrame);
+      const bool input = legacy_input || (
           header.payload_length ==
               (adc ? rate_profile::kInputAdcPairsPerFrame *
                          protocol_v2::kAdcBytesPerPair
                    : protocol_v2::kInputGpioSamplesPerFrame * 2U) &&
           header.item_count ==
               (adc ? rate_profile::kInputAdcPairsPerFrame
-                   : protocol_v2::kInputGpioSamplesPerFrame);
+                   : protocol_v2::kInputGpioSamplesPerFrame));
       const std::uint32_t item_bytes = adc ? 4U : (input ? 2U : 1U);
       if ((!disabled && !input) ||
           header.total_length != protocol_v1::kHeaderSize +
@@ -2241,8 +2249,9 @@ Result validateInfoV2(ByteView payload) {
 
 THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.payload_validation")
 Result validateStatusV2(ByteView payload) {
-  if (payload.size != protocol_v2::kStatusResponsePayloadSize +
-                          adc_capture::fault_trace::kBytes ||
+  if ((payload.size != protocol_v2::kStatusResponsePayloadSize &&
+       payload.size != protocol_v2::kStatusResponsePayloadSize +
+                          adc_capture::fault_trace::kBytes) ||
       payload.data[protocol_v2::kStatusResponseProtocolVersionOffset] !=
           protocol_v2::kProtocolVersion ||
       payload.data[protocol_v2::kStatusResponseAuxBankModeOffset] > 1U ||
@@ -2560,6 +2569,18 @@ bool dataFrameShapeMatchesContract(protocol_v1::FrameKind kind,
   }
   if (shape.protocol_version != protocol_v2::kProtocolVersion) {
     return false;
+  }
+
+  for (const auto &timing : protocol_v2::kRateProfiles) {
+    const bool adc = kind == protocol_v1::FrameKind::kAdcData;
+    if (shape.item_period_ticks == (adc ? timing.adc_pair_period_ticks
+                                      : timing.gpio_sample_period_ticks) &&
+        ((shape.item_count == (adc ? protocol_v2::kInputAdcPairsPerFrame
+                                  : protocol_v2::kInputGpioSamplesPerFrame) &&
+          shape.item_bytes == (adc ? 4U : 2U)) ||
+         (shape.item_count == (adc ? protocol_v2::kDisabledAdcPairsPerFrame
+                                  : protocol_v2::kDisabledGpioSamplesPerFrame) &&
+          shape.item_bytes == (adc ? 4U : 1U)))) return true;
   }
 
   for (const protocol_v2::RateProfileTiming &timing :
@@ -3298,6 +3319,7 @@ Result decodeRequest(ByteView input, Request &request) {
       return badPayload();
     }
     decoded.configuration.protocol_version = frame.header.version;
+    decoded.configuration.legacy_v2 = frame.header.version == protocol_v2::kProtocolVersion;
     if (frame.header.version == protocol_v2::kProtocolVersion) {
       decoded.configuration.aux_bank_mode =
           static_cast<protocol_v2::AuxBankMode>(frame.payload.data[
@@ -3370,10 +3392,14 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
       version2 && response.applied_configuration.aux_bank_mode ==
                       protocol_v2::AuxBankMode::kInput;
   const protocol_v2::RateProfileTiming *timing =
-      rate_profile::timingFor(response.applied_configuration.rate_profile);
+      (response.applied_configuration.legacy_v2
+           ? rate_profile::legacyTimingFor(response.applied_configuration.rate_profile)
+           : rate_profile::timingFor(response.applied_configuration.rate_profile));
   if (version2 && timing == nullptr) {
     return badPayload();
   }
+  const auto input_adc_pairs = response.applied_configuration.legacy_v2
+      ? protocol_v2::kInputAdcPairsPerFrame : rate_profile::kInputAdcPairsPerFrame;
   std::array<std::uint8_t, protocol_v2::kInfoResponsePayloadSize> payload{};
   MutableByteView bytes = mutableView(payload);
   writeSuccessPrefix(bytes);
@@ -3388,7 +3414,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
   storeU32(bytes, protocol_v1::kInfoResponseSupportedChecksumMaskOffset,
            response.supported_checksum_mask);
   storeU32(bytes, protocol_v1::kInfoResponseCapabilityBitsOffset,
-           version2 ? response.capability_bits |
+           version2 ? (response.capability_bits & protocol_v2::kKnownCapabilityMask) |
                           static_cast<std::uint32_t>(
                               protocol_v2::Capability::kAuxiliaryInputBank) |
                           static_cast<std::uint32_t>(
@@ -3555,7 +3581,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
            response.supported_configuration_mask);
   storeU16(bytes, protocol_v1::kInfoResponseDataPayloadBytesOffset,
            auxiliary_input
-               ? static_cast<std::uint16_t>(rate_profile::kInputAdcPairsPerFrame *
+               ? static_cast<std::uint16_t>(input_adc_pairs *
                                             protocol_v1::kAdcPairBytes)
                : response.data_payload_bytes);
   storeU16(bytes, protocol_v1::kInfoResponseAdcPairsPerFrameOffset,
@@ -3563,7 +3589,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                ? static_cast<std::uint16_t>(
                      response.applied_configuration.aux_bank_mode ==
                              protocol_v2::AuxBankMode::kInput
-                         ? rate_profile::kInputAdcPairsPerFrame
+                         ? input_adc_pairs
                          : protocol_v2::kDisabledAdcPairsPerFrame)
                : response.adc_pairs_per_frame);
   storeU16(bytes, protocol_v1::kInfoResponseGpioSamplesPerFrameOffset,
@@ -3603,7 +3629,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                ? static_cast<std::uint16_t>(
                      response.applied_configuration.aux_bank_mode ==
                              protocol_v2::AuxBankMode::kInput
-                         ? rate_profile::kInputAdcPairsPerFrame
+                         ? input_adc_pairs
                          : protocol_v2::kDisabledAdcPairsPerFrame)
                : response.adc_pairs_per_buffer);
   storeU32(bytes, protocol_v1::kInfoResponseAdcDmaRingBytesOffset,
@@ -3611,7 +3637,7 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
                ? static_cast<std::uint32_t>(
                      ((response.applied_configuration.aux_bank_mode ==
                                protocol_v2::AuxBankMode::kInput
-                           ? rate_profile::kInputAdcPairsPerFrame
+                           ? input_adc_pairs
                            : protocol_v2::kDisabledAdcPairsPerFrame) *
                               protocol_v1::kAdcPairBytes +
                           31U) /
@@ -3706,12 +3732,14 @@ Result encodeInfoResponse(const Request &request, std::uint32_t run_id,
              protocol_v2::kInfoResponseDisabledGpioSamplesPerFrameOffset,
              protocol_v2::kDisabledGpioSamplesPerFrame);
     storeU16(bytes, protocol_v2::kInfoResponseInputAdcPairsPerFrameOffset,
-             rate_profile::kInputAdcPairsPerFrame);
+             static_cast<std::uint16_t>(input_adc_pairs));
     storeU16(bytes, protocol_v2::kInfoResponseInputGpioSamplesPerFrameOffset,
              protocol_v2::kInputGpioSamplesPerFrame);
     for (std::size_t index = 0U; index < rate_profile::kCount; ++index) {
-      const protocol_v2::RateProfileTiming &entry =
-          rate_profile::kTimings[index];
+      const protocol_v2::RateProfileTiming entry =
+          response.applied_configuration.legacy_v2
+              ? rate_profile::legacyTiming(protocol_v2::kRateProfiles[index])
+              : rate_profile::kTimings[index];
       const std::size_t base = protocol_v2::kInfoResponseRateProfilesOffset +
                                index * protocol_v2::kRateProfileInfoPayloadSize;
       payload[base + protocol_v2::kRateProfileInfoRateProfileOffset] =
@@ -3828,7 +3856,9 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
   const bool version2 =
       request.protocol_version == protocol_v2::kProtocolVersion;
   const protocol_v2::RateProfileTiming *timing =
-      rate_profile::timingFor(response.configuration.rate_profile);
+      response.configuration.legacy_v2
+          ? rate_profile::legacyTimingFor(response.configuration.rate_profile)
+          : rate_profile::timingFor(response.configuration.rate_profile);
   if (version2 && timing == nullptr) {
     return badPayload();
   }
@@ -4261,7 +4291,7 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
 #undef STORE_AUX_STATUS_U32
 #undef STORE_AUX_STATUS_U64
   }
-  if (version2) {
+  if (version2 && !response.configuration.legacy_v2) {
     auto fault = adc_capture::fault_trace::snapshot(request.request_id);
 #if defined(THINGDAQ_DEFERRED_CODECS)
     if (request.request_id > deferred_codec::kRequestBase &&
@@ -4276,7 +4306,7 @@ Result encodeStatusResponse(const Request &request, std::uint32_t run_id,
                                     request, run_id),
                      {payload.data(), version2
                                           ? protocol_v2::kStatusResponsePayloadSize +
-                       adc_capture::fault_trace::kBytes
+                       (response.configuration.legacy_v2 ? 0U : adc_capture::fault_trace::kBytes)
                                           : protocol_v1::kStatusResponsePayloadSize},
                      output);
 }

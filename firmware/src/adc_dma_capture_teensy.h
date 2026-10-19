@@ -45,6 +45,7 @@ struct HardwareSnapshot {
 
 class TeensyAdcDmaCapture final : public HardwareCapture {
  public:
+  void setLegacyV2Mode(bool enabled) override;
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
   void setAuxInputMode(bool enabled) override;
 #endif

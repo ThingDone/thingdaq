@@ -338,12 +338,12 @@ FinishFillResult PacketBufferPipeline::finishFill(
   }
   record.gap_before_required = false;
   record.frame_size = layout.frame_bytes;
-  const bool deferred = input_experiment::kDeferredCodecs &&
+  const bool deferred = !layout_.legacy_v2 && input_experiment::kDeferredCodecs &&
       layout_.protocol_version == 2U && layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput &&
       ((record.stream == Stream::kGpio && input_experiment::kEncodeGpio) ||
        (record.stream == Stream::kAdc && input_experiment::kPackAdc));
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
-  if (!deferred && input_experiment::kEncodeGpio && record.stream == Stream::kGpio &&
+  if (!layout_.legacy_v2 && !deferred && input_experiment::kEncodeGpio && record.stream == Stream::kGpio &&
       layout_.protocol_version == 2U && layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput) {
     compressGpio(handle.buffer_index);
   }
@@ -396,7 +396,7 @@ bool PacketBufferPipeline::validFrameSize(BufferIndex index) const {
   if (!validStream(record.stream)) return false;
   const auto &layout = streamLayout(record.stream);
   if (record.frame_size == layout.frame_bytes) return true;
-  if (input_experiment::kPackAdc && record.stream == Stream::kAdc &&
+  if (!layout_.legacy_v2 && input_experiment::kPackAdc && record.stream == Stream::kAdc &&
       record.frame_size == 48U + record.item_count * 3U) {
     const auto &frame = storage_.frame(index);
     const protocol::ByteView bytes{frame.data(), record.frame_size};
@@ -406,7 +406,7 @@ bool PacketBufferPipeline::validFrameSize(BufferIndex index) const {
         protocol::loadU32(bytes, 40U, items) && total == record.frame_size &&
         payload == record.item_count * 3U && items == record.item_count;
   }
-  if (!(input_experiment::kGpioRle && record.stream == Stream::kGpio &&
+  if (!(!layout_.legacy_v2 && input_experiment::kGpioRle && record.stream == Stream::kGpio &&
       layout_.protocol_version == 2U &&
       layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput &&
       record.item_count == layout.item_count &&
@@ -823,7 +823,7 @@ std::uint64_t PacketBufferPipeline::coverageFrames(std::size_t index) const {
   const bool weighted = (input_experiment::kEqualRates ||
       layout_.rate_profile == protocol_v2::RateProfile::kAdc1mhzGpio1mhz) &&
       layout_.protocol_version == protocol_v2::kProtocolVersion;
-  if (input_experiment::kAdcFrameMultiplier == 2U &&
+  if (!layout_.legacy_v2 && input_experiment::kAdcFrameMultiplier == 2U &&
       layout_.protocol_version == protocol_v2::kProtocolVersion &&
       layout_.aux_bank_mode == protocol_v2::AuxBankMode::kInput) {
     return weighted == (index == 0U) ? accountedFrames(index) / 2U

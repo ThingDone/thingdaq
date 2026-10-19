@@ -101,6 +101,10 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
                    protocol::encodeTemperatureResponse(request, run_id_, readiness.temperature, response),
                    response);
   }
+  if (!settings_known_ &&
+      (request.kind == protocol_v1::CommandKind::kInfo ||
+       request.kind == protocol_v1::CommandKind::kGetStatus))
+    return reject(request, protocol_v1::ErrorCode::kInternalError, response);
   switch (request.kind) {
     case protocol_v1::CommandKind::kInfo:
       return encoded(request, protocol_v1::ErrorCode::kOk,
@@ -114,11 +118,15 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
         return reject(request, protocol_v1::ErrorCode::kInvalidState,
                       response);
       }
-      if (!readiness.configuration_ready) {
+      if (!readiness.configuration_ready || readiness.pending_frames != 0U ||
+          pending_event_mask_ != 0U) {
         return reject(request, protocol_v1::ErrorCode::kBusy, response);
       }
-      const protocol_v1::ErrorCode validation =
-          validateConfiguration(request.configuration);
+      auto candidate = request.configuration;
+      candidate.legacy_v2 = request.protocol_version == protocol_v2::kProtocolVersion;
+      if (request.protocol_version != candidate.protocol_version)
+        return reject(request, protocol_v1::ErrorCode::kInvalidPayload, response);
+      const protocol_v1::ErrorCode validation = validateConfiguration(candidate);
       if (validation != protocol_v1::ErrorCode::kOk) {
         return reject(request, validation, response);
       }
@@ -128,6 +136,22 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
         return encoded(request, protocol_v1::ErrorCode::kInternalError,
                        encoding, response);
       }
+      // Returning from v3 restores the compiled legacy clock and RAW policies.
+      // Non-release historical rate profiles continue to use their v2 scheduler.
+      if (candidate.legacy_v2 && settings::kBuildCpuProfile != 0U) {
+        auto legacy_settings = settings::kBuildDefaults;
+        legacy_settings[protocol_v3::kSettingsStreamMaskOffset] = candidate.stream_mask;
+        legacy_settings[protocol_v3::kSettingsSourceOffset] = static_cast<std::uint8_t>(candidate.source);
+        legacy_settings[protocol_v3::kSettingsAuxBankModeOffset] = static_cast<std::uint8_t>(candidate.aux_bank_mode);
+        legacy_settings[protocol_v3::kSettingsGpioWidthBitsOffset] =
+            candidate.aux_bank_mode == protocol_v2::AuxBankMode::kInput ? 16U : 8U;
+        legacy_settings[protocol_v3::kSettingsChecksumAlgorithmOffset] =
+            static_cast<std::uint8_t>(candidate.data_checksum_algorithm);
+        if (!settings_application_.supports(legacy_settings))
+          return reject(request, protocol_v1::ErrorCode::kUnsupportedConfiguration, response);
+        if (!applySettings(legacy_settings))
+          return reject(request, protocol_v1::ErrorCode::kInternalError, response);
+      }
       if (!transitionTo(protocol_v1::DeviceState::kConfigured)) {
         response.clear();
         return encoded(
@@ -136,7 +160,7 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
                                       protocol::ValidationIssue::kBadPayload),
             response);
       }
-      configuration_ = request.configuration;
+      configuration_ = candidate;
       negotiated_version_ = request.protocol_version;
       has_configuration_ = true;
       statistics_.recordCommandAccepted();
@@ -145,7 +169,9 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
     }
 
     case protocol_v1::CommandKind::kStart: {
-      if (negotiated_version_ == protocol_v3::kProtocolVersion)
+      if (!settings_known_)
+        return reject(request, protocol_v1::ErrorCode::kInternalError, response);
+      if (negotiated_version_ != 0U && negotiated_version_ != request.protocol_version)
         return reject(request,
                       protocol_v1::ErrorCode::kUnsupportedConfiguration,
                       response);
@@ -154,7 +180,8 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
         return reject(request, protocol_v1::ErrorCode::kInvalidState,
                       response);
       }
-      if (!readiness.start_ready) {
+      if (!readiness.start_ready || readiness.pending_frames != 0U ||
+          pending_event_mask_ != 0U) {
         return reject(request, protocol_v1::ErrorCode::kBusy, response);
       }
       const std::uint32_t next_run = nextRunId(run_id_);
@@ -192,6 +219,8 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
     }
 
     case protocol_v1::CommandKind::kStop: {
+      if (negotiated_version_ != 0U && negotiated_version_ != request.protocol_version)
+        return reject(request, protocol_v1::ErrorCode::kInvalidState, response);
       const protocol::Result encoding =
           protocol::encodeStopResponse(request, run_id_, response);
       if (!encoding.ok()) {
@@ -210,6 +239,7 @@ DispatchResult ControlState::dispatch(const protocol::Request &request,
       }
       configuration_ = kIdleConfiguration;
       has_configuration_ = false;
+      pending_event_mask_ &= static_cast<std::uint8_t>(~eventBit(Event::kStartEpoch));
       if (needs_stop_signal) {
         pending_event_mask_ = static_cast<std::uint8_t>(
             pending_event_mask_ | eventBit(Event::kStop));
@@ -357,6 +387,10 @@ DispatchResult ControlState::dispatchV3(const protocol::Request& request,
   using protocol_v3::CommandKind;
   if (!protocol::isV3Command(static_cast<std::uint8_t>(request.kind)))
     return reject(request, ErrorCode::kUnknownFrameKind, response);
+  if (!settings_known_ &&
+      request.kind != protocol_v1::CommandKind::kConfigure &&
+      request.kind != static_cast<protocol_v1::CommandKind>(CommandKind::kGetCapabilities))
+    return reject(request, ErrorCode::kInternalError, response);
   if (!settings::boardSupports(active_settings_.settings))
     return reject(request, ErrorCode::kUnsupportedConfiguration, response);
   const auto kind = static_cast<CommandKind>(request.kind);
@@ -372,6 +406,10 @@ DispatchResult ControlState::dispatchV3(const protocol::Request& request,
           request, run_id_, settings_application_, response);
       break;
     case CommandKind::kGetSettings:
+      // Historical non-release v2 rates have no public-v3 settings record.
+      if (negotiated_version_ == protocol_v2::kProtocolVersion && has_configuration_ &&
+          configuration_.rate_profile != protocol_v2::RateProfile::kAdc1mhzGpio1mhz)
+        return reject(request, ErrorCode::kUnsupportedConfiguration, response);
       result = protocol::encodeV3SettingsResponse(request, run_id_,
                                                   active_settings_, response);
       break;
@@ -381,22 +419,23 @@ DispatchResult ControlState::dispatchV3(const protocol::Request& request,
       if (!valid.ok()) return reject(request, valid.error, response);
       if (state_ == protocol_v1::DeviceState::kRunning)
         return reject(request, ErrorCode::kInvalidState, response);
-      if (!readiness.configuration_ready || readiness.pending_frames != 0U)
+      if (!readiness.configuration_ready || readiness.pending_frames != 0U ||
+          pending_event_mask_ != 0U)
         return reject(request, ErrorCode::kBusy, response);
       if (!settings::boardSupports(request.settings) ||
           !settings_application_.supports(request.settings))
         return reject(request, ErrorCode::kUnsupportedConfiguration, response);
-      settings::Applied readback{};
-      if (!settings_application_.apply(request.settings, readback) ||
-          readback.settings != request.settings ||
-          readback.clocks !=
-              settings::clocksFor(
-                  request.settings[protocol_v3::kSettingsCpuProfileOffset]))
-        return reject(request, ErrorCode::kInternalError, response);
-      result = protocol::encodeV3SettingsResponse(request, run_id_, readback,
-                                                  response);
+      // Serialize the expected echo before touching hardware. Commit only after
+      // exact readback; failed application/readback restores the previous state.
+      const settings::Applied expected{request.settings, settings::clocksFor(
+          request.settings[protocol_v3::kSettingsCpuProfileOffset])};
+      result = protocol::encodeV3SettingsResponse(request, run_id_, expected, response);
       if (result.ok()) {
-        active_settings_ = readback;
+        if (!applySettings(request.settings))
+          return reject(request, ErrorCode::kInternalError, response);
+        configuration_ = kIdleConfiguration;
+        has_configuration_ = false;
+        transitionTo(protocol_v1::DeviceState::kIdle);
         negotiated_version_ = protocol_v3::kProtocolVersion;
       }
       break;
@@ -419,7 +458,7 @@ DispatchResult ControlState::dispatchV3(const protocol::Request& request,
                          ? protocol_v3::DeviceState::kDraining
                          : protocol_v3::DeviceState::kStopped;
       if (kind == CommandKind::kStop &&
-          state_ == protocol_v1::DeviceState::kRunning)
+          negotiated_version_ != 0U && negotiated_version_ != protocol_v3::kProtocolVersion)
         return reject(request, ErrorCode::kInvalidState, response);
       const auto snapshot = statistics_.snapshot();
       const auto& adc = snapshot.data_path.adc;
@@ -434,6 +473,24 @@ DispatchResult ControlState::dispatchV3(const protocol::Request& request,
     }
   }
   return encoded(request, ErrorCode::kOk, result, response);
+}
+
+THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.apply_settings")
+bool ControlState::applySettings(const settings::Record& candidate) {
+  settings::Applied readback{};
+  if (settings_application_.apply(candidate, readback) &&
+      readback.settings == candidate &&
+      readback.clocks == settings::clocksFor(candidate[protocol_v3::kSettingsCpuProfileOffset])) {
+    active_settings_ = readback;
+    settings_known_ = true;
+    return true;
+  }
+  settings::Applied restored{};
+  settings_known_ = settings_application_.apply(active_settings_.settings, restored) &&
+      restored.settings == active_settings_.settings && restored.clocks == active_settings_.clocks;
+  // An unverified rollback inhibits START and settings/clock reports until a
+  // later successful CONFIGURE. Never report the candidate as applied.
+  return false;
 }
 
 THINGDAQ_CONTROL_COLD_CODE(".flashmem.control.configuration_validation")
@@ -460,8 +517,13 @@ protocol_v1::ErrorCode ControlState::validateConfiguration(
 
   if (configuration.protocol_version == protocol_v2::kProtocolVersion) {
     const stream_layout::Result layout = stream_layout::experimental(
-        configuration.aux_bank_mode, configuration.rate_profile);
-    if (!layout.ok()) {
+        configuration.aux_bank_mode, configuration.rate_profile,
+        configuration.legacy_v2);
+    const auto* actual = rate_profile::timingFor(configuration.rate_profile);
+    const auto* legacy = rate_profile::legacyTimingFor(configuration.rate_profile);
+    if (!layout.ok() || (configuration.legacy_v2 && actual != nullptr && legacy != nullptr &&
+        (actual->adc_pair_period_ticks != legacy->adc_pair_period_ticks ||
+         actual->gpio_sample_period_ticks != legacy->gpio_sample_period_ticks))) {
       return protocol_v1::ErrorCode::kUnsupportedConfiguration;
     }
   }
@@ -558,6 +620,8 @@ protocol::InfoResponse ControlState::infoResponse() const {
   response.data_checksum_algorithm =
       appliedConfiguration().data_checksum_algorithm;
   response.applied_configuration = appliedConfiguration();
+  // V2 selects the historical ADC2 request route at acquisition preparation.
+  response.adc_dmamux_sources[1] = protocol_v1::kAdcDmamuxSources[1];
   for (std::size_t index = 0U; index < response.gpio_pin_map.size(); ++index) {
     response.gpio_pin_map[index] =
         capabilities::kMetadata.gpio_pins_by_bit[index];

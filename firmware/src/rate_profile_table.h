@@ -19,13 +19,19 @@ inline constexpr std::size_t kCount = 5U;
 inline constexpr std::size_t kInputAdcPairsPerFrame =
     protocol_v2::kInputAdcPairsPerFrame * input_experiment::kAdcFrameMultiplier;
 
-constexpr protocol_v2::RateProfileTiming experimentTiming(
+constexpr protocol_v2::RateProfileTiming legacyTiming(
     protocol_v2::RateProfileTiming timing) {
   timing.adc1_phase_ipg_cycles =
       input_experiment::scaleIpg(timing.adc1_phase_ipg_cycles);
-  timing.input_frame_coverage_ticks *= input_experiment::kAdcFrameMultiplier;
   timing.completion_expected_dwt_cycles =
       input_experiment::scaleDwt(timing.completion_expected_dwt_cycles);
+  return timing;
+}
+
+constexpr protocol_v2::RateProfileTiming experimentTiming(
+    protocol_v2::RateProfileTiming timing) {
+  timing = legacyTiming(timing);
+  timing.input_frame_coverage_ticks *= input_experiment::kAdcFrameMultiplier;
   if (input_experiment::kEqualRates && timing.gpio_sample_rate_hz != timing.adc_pair_rate_hz) {
     timing.gpio_sample_rate_hz = timing.adc_pair_rate_hz;
     timing.gpio_sample_period_ticks = timing.adc_pair_period_ticks;
@@ -49,6 +55,14 @@ inline constexpr std::array<protocol_v2::RateProfileTiming, kCount> kTimings
         experimentTiming(protocol_v2::kRateProfiles[3]),
         experimentTiming(protocol_v2::kRateProfiles[4]),
     }};
+
+constexpr const protocol_v2::RateProfileTiming *legacyTimingFor(
+    protocol_v2::RateProfile profile) {
+  for (const auto &timing : protocol_v2::kRateProfiles) {
+    if (timing.profile == profile) return &timing;
+  }
+  return nullptr;
+}
 
 constexpr const protocol_v2::RateProfileTiming *timingFor(
     protocol_v2::RateProfile profile) {

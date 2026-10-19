@@ -109,6 +109,8 @@ class SyntheticSource {
           (1U << protocol_v1::kAdcResolutionBits) - 1U);
 
   struct StreamState {
+    std::uint32_t item_count = 0U;
+    std::uint32_t coverage_ticks = 0U;
     std::uint64_t logical_frames = 0U;
     std::uint64_t frames_generated = 0U;
     std::uint64_t items_generated = 0U;
@@ -126,7 +128,7 @@ class SyntheticSource {
   static void fillAdc(protocol::MutableByteView payload,
                       std::uint64_t first_pair_index);
   static void fillGpio(protocol::MutableByteView payload,
-                       std::uint64_t first_sample_index);
+                       std::uint64_t first_sample_index, std::uint32_t item_bytes);
 
   std::array<StreamState, packet::kStreamCount> streams_{};
   protocol::Configuration configuration_{};

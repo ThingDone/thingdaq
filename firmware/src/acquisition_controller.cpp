@@ -41,7 +41,8 @@ constexpr std::uint32_t adcPairsPerBuffer(
     const protocol::Configuration &configuration) {
   return static_cast<std::uint32_t>(
       usesAuxInput(configuration)
-          ? rate_profile::kInputAdcPairsPerFrame
+          ? (configuration.legacy_v2 ? protocol_v2::kInputAdcPairsPerFrame
+                                     : rate_profile::kInputAdcPairsPerFrame)
           : protocol_v2::kDisabledAdcPairsPerFrame);
 }
 
@@ -61,7 +62,8 @@ stream_layout::Result Controller::runLayout(
     return result;
   }
   return stream_layout::experimental(configuration.aux_bank_mode,
-                                     configuration.rate_profile);
+                                     configuration.rate_profile,
+                                     configuration.legacy_v2);
 }
 
 THINGDAQ_ACQUISITION_COLD_CODE(".flashmem.acquisition.initialize")
@@ -358,6 +360,7 @@ bool Controller::start(const protocol::Configuration &configuration,
   }
 
   if (includesAdc(profile)) {
+    adc_capture_->setLegacyV2Mode(configuration.legacy_v2);
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
     adc_capture_->setAuxInputMode(usesAuxInput(configuration));
 #endif

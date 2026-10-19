@@ -157,7 +157,10 @@ class ControlState {
   }
   constexpr bool hasConfiguration() const { return has_configuration_; }
   constexpr protocol::Configuration appliedConfiguration() const {
-    return has_configuration_ ? configuration_ : kIdleConfiguration;
+    if (has_configuration_) return configuration_;
+    auto result = kIdleConfiguration;
+    result.legacy_v2 = true;
+    return result;
   }
 
   constexpr const stats::Statistics &statistics() const { return statistics_; }
@@ -195,9 +198,11 @@ class ControlState {
   DispatchResult dispatchV3(const protocol::Request& request,
                             protocol::ControlFrame& response,
                             const DispatchReadiness& readiness);
+  bool applySettings(const settings::Record& candidate);
+  bool settings_known_ = true;
   settings::Application& settings_application_;
   settings::Applied active_settings_{};
-  // Queries never select a wire mode. Lifecycle integration follows separately.
+  // Only successful CONFIGURE selects a mode; queries never switch it.
   std::uint8_t negotiated_version_ = 0U;
   bool transitionTo(protocol_v1::DeviceState next);
   DispatchResult reject(const protocol::Request &request,

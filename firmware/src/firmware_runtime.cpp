@@ -86,6 +86,7 @@ LoopReport FirmwareRuntime::service() {
       if (command.request.kind == protocol_v1::CommandKind::kConfigure) {
         readiness.configuration_ready = dataPathQuiescent();
         if (readiness.configuration_ready &&
+            command.request.protocol_version != protocol_v3::kProtocolVersion &&
             acquisition::Controller::isExecutableConfiguration(
                 command.request.configuration)) {
           readiness.configuration_ready =

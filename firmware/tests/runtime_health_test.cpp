@@ -67,6 +67,7 @@ int main() {
   configure.kind = protocol_v1::CommandKind::kConfigure;
   configure.request_id = 100;
   configure.configuration = control::kSyntheticConfiguration;
+  configure.protocol_version = configure.configuration.protocol_version;
   assert(state.dispatch(configure, response).commandAccepted());
   request.request_id = 101;
   assert(state.dispatch(request, response, readiness).commandAccepted());

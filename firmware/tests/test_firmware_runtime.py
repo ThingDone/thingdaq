@@ -41,6 +41,33 @@ PORTABLE_SOURCES = (
 )
 
 
+COMPILE_SOURCES = tuple(
+    FIRMWARE_SOURCE / name
+    for name in (
+        "acquisition_controller.cpp",
+        "firmware_runtime.cpp",
+        "adc_initializer.cpp",
+        "adc_trigger.cpp",
+        "adc_frame_packer.cpp",
+        "packet_buffer_pipeline.cpp",
+        "synthetic_source.cpp",
+        "control_state.cpp",
+        "usb_transport.cpp",
+        "statistics.cpp",
+        "protocol.cpp",
+        "checksum.cpp",
+        "checksum_benchmark.cpp",
+        "gpio_clock_diagnostic.cpp",
+        "gpio_raw_capture.cpp",
+        "gpio_batch_packer.cpp",
+        "gpio_dual_bank_capture.cpp",
+        "gpio_dual_bank_packer.cpp",
+        "variable_rate_scheduler.cpp",
+        "gpio_capture_diagnostic.cpp",
+    )
+)
+
+
 class FirmwareRuntimeTests(unittest.TestCase):
     def test_runtime_integrates_the_complete_control_plane(self) -> None:
         compiler = shutil.which("g++")
@@ -63,26 +90,7 @@ class FirmwareRuntimeTests(unittest.TestCase):
                     "-fno-rtti",
                     f"-I{FIRMWARE_SOURCE}",
                     str(CPP_TEST),
-                    str(FIRMWARE_SOURCE / "acquisition_controller.cpp"),
-                    str(FIRMWARE_SOURCE / "firmware_runtime.cpp"),
-                    str(FIRMWARE_SOURCE / "adc_initializer.cpp"),
-                    str(FIRMWARE_SOURCE / "adc_trigger.cpp"),
-                    str(FIRMWARE_SOURCE / "adc_frame_packer.cpp"),
-                    str(FIRMWARE_SOURCE / "packet_buffer_pipeline.cpp"),
-                    str(FIRMWARE_SOURCE / "synthetic_source.cpp"),
-                    str(FIRMWARE_SOURCE / "control_state.cpp"),
-                    str(FIRMWARE_SOURCE / "usb_transport.cpp"),
-                    str(FIRMWARE_SOURCE / "statistics.cpp"),
-                    str(FIRMWARE_SOURCE / "protocol.cpp"),
-                    str(FIRMWARE_SOURCE / "checksum.cpp"),
-                    str(FIRMWARE_SOURCE / "checksum_benchmark.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_clock_diagnostic.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_raw_capture.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_batch_packer.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_dual_bank_capture.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_dual_bank_packer.cpp"),
-                    str(FIRMWARE_SOURCE / "variable_rate_scheduler.cpp"),
-                    str(FIRMWARE_SOURCE / "gpio_capture_diagnostic.cpp"),
+                    *(str(path) for path in COMPILE_SOURCES),
                     "-o",
                     str(executable),
                 ],

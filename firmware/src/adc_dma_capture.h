@@ -319,6 +319,8 @@ class PairCaptureRing final : public PairSource {
 
 class HardwareCapture : public PairSource {
  public:
+  // Select the historical request route before preparing a stopped legacy run.
+  virtual void setLegacyV2Mode(bool) {}
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
   // Frame length no longer distinguishes eight- and sixteen-input modes.
   virtual void setAuxInputMode(bool) {}

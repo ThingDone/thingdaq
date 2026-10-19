@@ -212,6 +212,8 @@ struct Configuration {
           : protocol_v2::kDefaultRateProfile;
   std::uint8_t protocol_version = input_experiment::kReleaseFixed1MHz
       ? protocol_v2::kProtocolVersion : protocol_v1::kProtocolVersion;
+  // Set by public v2 control admission; direct experiment harnesses opt out.
+  bool legacy_v2 = false;
 };
 
 struct ChecksumBenchmarkRequest {

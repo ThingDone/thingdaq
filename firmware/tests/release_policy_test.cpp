@@ -29,6 +29,7 @@ int main() {
       request.kind = protocol_v1::CommandKind::kStop;
       ++request.request_id;
       assert(state.dispatch(request, response).commandAccepted());
+      state.takePendingEvents();
       request.kind = protocol_v1::CommandKind::kConfigure;
     }
   }

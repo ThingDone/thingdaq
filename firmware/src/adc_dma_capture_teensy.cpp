@@ -148,6 +148,7 @@ std::uint32_t g_start_errors = 0U;
 std::uint32_t g_stop_errors = 0U;
 std::uint32_t g_stale_interrupts = 0U;
 bool g_hardware_prepared = false;
+bool g_legacy_v2 = false;
 // Read by main while completion/error ISRs can change it. Multi-field
 // snapshots additionally hold interrupts::Guard for a coherent record.
 volatile bool g_faulted = false;
@@ -157,6 +158,10 @@ volatile bool g_faulted = false;
 bool g_adc_etc_request = false;
 #elif defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
 constexpr bool g_adc_etc_request = input_experiment::kAdcEtcRequest;
+#endif
+
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+bool adcEtcRequest() { return g_adc_etc_request && !g_legacy_v2; }
 #endif
 
 std::uint32_t address32(const volatile void *address) {
@@ -175,8 +180,10 @@ volatile std::uint32_t *dmamuxRegister(std::size_t converter) {
 }
 
 std::uint32_t dmamuxConfiguration(std::size_t converter) {
+  if (converter == 1U && g_legacy_v2)
+    return DMAMUX_CHCFG_ENBL | DMAMUX_SOURCE_ADC2;
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
-  if (converter == 1U && g_adc_etc_request)
+  if (converter == 1U && adcEtcRequest())
     return DMAMUX_CHCFG_ENBL | DMAMUX_SOURCE_ADC_ETC;
 #endif
   return DMAMUX_CHCFG_ENBL |
@@ -448,7 +455,7 @@ bool appendFutureGeneration() {
 bool configuredHardwareValid() {
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   if ((ADC_ETC_DMA_CTRL & 0xFFU) !=
-      (g_adc_etc_request ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U)) return false;
+      (adcEtcRequest() ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U)) return false;
 #endif
   if ((DMA_ERQ & kAdcDmaChannelMask) != kAdcDmaChannelMask ||
       (ADC1_GC & ADC_GC_DMAEN) == 0U ||
@@ -899,7 +906,7 @@ StartStatus prepareHardware(std::uint32_t epoch,
   // Clear stale trigger-4 requests before enabling its aggregate DMA source.
   // ADC2's result register and TCD remain identical in both probe conditions.
   ADC_ETC_DMA_CTRL = ADC_ETC_DMA_CTRL_TRIQ_REQ(4U) |
-      (g_adc_etc_request ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U);
+      (adcEtcRequest() ? ADC_ETC_DMA_CTRL_TRIQ_ENABLE(4U) : 0U);
 #endif
   for (std::size_t converter = 0U; converter < kConverterCount;
        ++converter) {
@@ -1036,6 +1043,10 @@ HardwareSnapshot hardwareSnapshot() {
 }
 
 }  // namespace
+
+void TeensyAdcDmaCapture::setLegacyV2Mode(bool enabled) {
+  if (!g_hardware_prepared) g_legacy_v2 = enabled;
+}
 
 #if defined(THINGDAQ_EXPERIMENT_LARGE_ADC_FRAME)
 void TeensyAdcDmaCapture::setAuxInputMode(bool enabled) {

@@ -51,8 +51,10 @@ OperationStatus SyntheticSource::startRun(
   }
 
   streams_ = {};
-  for (StreamState &stream : streams_) {
-    stream.epoch_frame_pending = true;
+  for (std::size_t index = 0U; index < streams_.size(); ++index) {
+    const auto &layout = pipeline.streamLayout(static_cast<packet::Stream>(index));
+    streams_[index].item_count = layout.item_count;
+    streams_[index].coverage_ticks = layout.coverage_ticks;
   }
   configuration_ = configuration;
   run_id_ = run_id;
@@ -114,13 +116,12 @@ Snapshot SyntheticSource::snapshot() const {
   for (std::size_t index = 0U; index < streams_.size(); ++index) {
     const StreamState &source = streams_[index];
     StreamSnapshot &destination = result.streams[index];
-    const packet::Stream stream = static_cast<packet::Stream>(index);
     destination.frames_generated = source.frames_generated;
     destination.items_generated = source.items_generated;
     destination.next_item_index =
-        source.logical_frames * packet::itemsPerFrame(stream);
+        source.logical_frames * source.item_count;
     destination.next_frame_first_ticks =
-        source.logical_frames * kFrameCoverageTicks;
+        source.logical_frames * source.coverage_ticks;
     destination.epoch_frame_pending = source.epoch_frame_pending;
     destination.gap_before_pending = source.gap_before_pending;
   }
@@ -150,7 +151,7 @@ bool SyntheticSource::frameDue(packet::Stream stream,
     return true;
   }
   const StreamState &source = streams_[packet::streamIndex(stream)];
-  const std::uint64_t completed_frames = elapsed_ticks / kFrameCoverageTicks;
+  const std::uint64_t completed_frames = elapsed_ticks / source.coverage_ticks;
   return source.logical_frames < completed_frames;
 }
 
@@ -173,13 +174,13 @@ bool SyntheticSource::generateFrame(
     ServiceReport &report) {
   StreamState &source = streams_[packet::streamIndex(stream)];
   const std::uint64_t first_item_index =
-      source.logical_frames * packet::itemsPerFrame(stream);
+      source.logical_frames * source.item_count;
   const std::uint64_t first_sample_ticks =
-      source.logical_frames * kFrameCoverageTicks;
+      source.logical_frames * source.coverage_ticks;
   ++source.logical_frames;
   saturatingIncrement(source.frames_generated);
   saturatingAdd(source.items_generated,
-                static_cast<std::uint64_t>(packet::itemsPerFrame(stream)));
+                static_cast<std::uint64_t>(source.item_count));
   ++report.frames_generated;
 
   const packet::BeginFillResult begun = pipeline.beginFill(stream);
@@ -193,7 +194,7 @@ bool SyntheticSource::generateFrame(
   }
 
   protocol::MutableByteView payload = pipeline.writablePayload(begun.handle);
-  if (!payload.valid() || payload.size != protocol_v1::kDataPayloadBytes) {
+  if (!payload.valid() || payload.size != pipeline.streamLayout(stream).payload_bytes) {
     (void)pipeline.cancelFill(begun.handle);
     source.gap_before_pending = true;
     saturatingIncrement(frames_dropped_);
@@ -204,7 +205,7 @@ bool SyntheticSource::generateFrame(
   if (stream == packet::Stream::kAdc) {
     fillAdc(payload, first_item_index);
   } else {
-    fillGpio(payload, first_item_index);
+    fillGpio(payload, first_item_index, pipeline.streamLayout(stream).item_bytes);
   }
 
   packet::FrameCompletion completion{};
@@ -240,7 +241,7 @@ bool SyntheticSource::generateFrame(
 
 void SyntheticSource::fillAdc(protocol::MutableByteView payload,
                               std::uint64_t first_pair_index) {
-  for (std::size_t pair = 0U; pair < protocol_v1::kAdcPairsPerFrame;
+  for (std::size_t pair = 0U; pair < payload.size / 4U;
        ++pair) {
     const std::uint64_t index = first_pair_index + pair;
     const std::uint16_t adc0 = adc0Code(index);
@@ -256,10 +257,13 @@ void SyntheticSource::fillAdc(protocol::MutableByteView payload,
 }
 
 void SyntheticSource::fillGpio(protocol::MutableByteView payload,
-                               std::uint64_t first_sample_index) {
+                               std::uint64_t first_sample_index, std::uint32_t item_bytes) {
   for (std::size_t sample = 0U;
-       sample < protocol_v1::kGpioSamplesPerFrame; ++sample) {
-    payload.data[sample] = gpioByte(first_sample_index + sample);
+       sample < payload.size / item_bytes; ++sample) {
+    const auto value = first_sample_index + sample;
+    payload.data[sample * item_bytes] = gpioByte(value);
+    if (item_bytes == 2U)
+      payload.data[sample * item_bytes + 1U] = gpioByte(value >> 8U);
   }
 }
 

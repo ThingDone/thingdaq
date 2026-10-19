@@ -57,9 +57,10 @@ struct Applied {
   Clocks clocks = clocksFor(kBuildCpuProfile);
 };
 
-// An adapter must apply atomically and return exact readback, restoring the
-// previous hardware state on failure. The control layer checks the readback
-// before publishing it. This seam does not establish physical qualification.
+// Apply synchronously while acquisition is quiescent and return actual readback.
+// On failure or mismatch, ControlState reapplies the previous complete record
+// and verifies restoration before allowing START or settings/clock reports.
+// This seam does not establish physical qualification.
 class Application {
  public:
   virtual ~Application() = default;

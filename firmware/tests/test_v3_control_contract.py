@@ -331,3 +331,7 @@ def test_start_serializer_matches_golden_without_starting_acquisition(
     assert (
         result.stdout == (ROOT / "protocol/fixtures-v3/start-response.bin").read_bytes()
     )
+
+
+def test_transactions_rollback_modes_and_replay(executable: Path) -> None:
+    subprocess.run([str(executable), "transactions"], check=True, capture_output=True)
