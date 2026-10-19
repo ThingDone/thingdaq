@@ -75,10 +75,15 @@ continuity/checksum/conservation, temperature, STOP/IDLE and retained failures.
 The inputs are electrically unstimulated; known-data portable tests establish
 codec fidelity, while physical captures establish acquisition/transport behavior.
 
-The corrected combined smoke passed 157 checks across 15 seconds, with zero
-codec drops, 62 us maximum ADC work and 58 us maximum GPIO work. Qualification
-continues with clean-source comparative and sustained runs; this smoke is not
-an endurance PASS.
+Clean-source qualification passed 28 captures and 4,396 checks: all four
+60-second mode comparisons, three ten-minute combined-codec captures, twenty
+same-boot START/STOP cells, and a ten-minute default RLE-only capture. No codec
+deadline/resource drops or parser discards were observed; peak die temperature
+was 65.527 degrees C. Both codecs reduced wire traffic from 6.071 to 3.073 MB/s
+on these unstimulated inputs. The ten-minute jobs reflash separately; only the
+twenty restart cells share one boot. Full counters, per-capture temperatures,
+retained failures and provenance are in the
+[qualification report](../results/experiments/deferred-codecs-20261018.md).
 
 The initial pilot exposed a missing USB view guard for packed ADC frames; that
 guard and a real-transport regression test were added. Two later pilots timed
