@@ -28,6 +28,7 @@ class FakeApplication final : public settings::Application {
     readback = {value,
                 settings::clocksFor(value[v3::kSettingsCpuProfileOffset])};
     if (mismatch) { mismatch = false; readback.clocks[4] ^= 1U; }
+    if (mismatch_settings) { mismatch_settings = false; readback.settings[8] ^= 1U; }
     return true;
   }
   settings::Applied hardware{settings::kBoardDefaults, settings::clocksFor(1U)};
@@ -35,6 +36,7 @@ class FakeApplication final : public settings::Application {
   unsigned calls = 0U;
   bool fail = false;
   bool mismatch = false;
+  bool mismatch_settings = false;
 };
 
 void transactions() {
@@ -64,17 +66,34 @@ void transactions() {
   const auto calls = app.calls;
   assert(dispatch().command_error == v1::ErrorCode::kInvalidRequestId);
   assert(app.calls == calls);
+  const auto generation = state.statistics().generation();
+  // Literal invalid tuples, independent of the generated accepted table.
+  for (unsigned defect = 0U; defect < 4U; ++defect) {
+    request.settings = settings::kBoardDefaults;
+    if (defect == 0U) request.settings[4] = 2U; // 450 MHz + compression
+    if (defect == 1U) assert(wire::storeU32({request.settings.data(), request.settings.size()}, 12U, 1234567U));
+    if (defect == 2U) request.settings[11] = 1U; // reserved byte
+    if (defect == 3U) request.settings[9] = 2U; // unknown ADC policy
+    ++request.request_id;
+    assert(dispatch().command_error == (defect < 2U ? v1::ErrorCode::kUnsupportedConfiguration : v1::ErrorCode::kInvalidPayload));
+    assert(app.calls == calls && state.activeSettings().settings == saved.settings);
+    assert(state.activeSettings().clocks == saved.clocks && state.runId() == 0U);
+    assert(state.statistics().generation() == generation && state.takePendingEvents().mask == 0U);
+  }
   request.settings = settings::kBoardDefaults;
-  for (unsigned failure = 0; failure < 2; ++failure) {
+  for (unsigned failure = 0; failure < 3; ++failure) {
     ++request.request_id;
     app.fail = failure == 0U;
     app.mismatch = failure == 1U;
+    app.mismatch_settings = failure == 2U;
     const auto before = app.calls;
     assert(dispatch().command_error == v1::ErrorCode::kInternalError);
     assert(app.calls == before + 2U);
     assert(app.hardware.settings == saved.settings && app.hardware.clocks == saved.clocks);
     assert(state.activeSettings().settings == saved.settings);
     assert(state.negotiatedVersion() == 3U && state.runId() == 0U);
+    assert(dispatch().command_error == v1::ErrorCode::kInvalidRequestId);
+    assert(app.calls == before + 2U); // failed requests cannot reapply on replay
   }
   // Neither version of discovery selects a session or touches hardware.
   for (auto version : {2U, 3U}) {
@@ -144,6 +163,11 @@ void transactions() {
   request.request_id = 1U;
   app.fail_rollback = true;
   assert(dispatch().command_error == v1::ErrorCode::kInternalError);
+  request.kind = v1::CommandKind::kStart;
+  ++request.request_id;
+  const auto failed_calls = app.calls;
+  assert(dispatch().command_error == v1::ErrorCode::kInternalError);
+  assert(app.calls == failed_calls && state.runId() == 1U);
   request.kind = static_cast<v1::CommandKind>(v3::CommandKind::kGetSettings);
   ++request.request_id;
   assert(dispatch().command_error == v1::ErrorCode::kInternalError);
@@ -154,9 +178,75 @@ void transactions() {
   assert(state.takePendingEvents().mask == 0U);
 }
 
+void repeatedSessions() {
+  using namespace thingdaq;
+  FakeApplication app;
+  control::ControlState state(app);
+  assert(state.completeBoot(12345678U));
+  wire::ControlFrame reply;
+  wire::Request request{};
+  std::uint32_t id = 0U;
+  for (unsigned session = 0U; session < 8U; ++session) {
+    const auto version = static_cast<std::uint8_t>(session % 2U == 0U ? 3U : 2U);
+    request.protocol_version = version;
+    request.kind = v1::CommandKind::kConfigure;
+    request.settings = settings::kBoardDefaults;
+    request.settings[7] = session % 4U < 2U ? 8U : 16U;
+    request.settings[6] = request.settings[7] == 16U ? 1U : 0U;
+    request.configuration = control::kSyntheticConfiguration;
+    request.configuration.protocol_version = 2U;
+    request.configuration.aux_bank_mode = static_cast<protocol_v2::AuxBankMode>(request.settings[6]);
+    request.configuration.rate_profile = protocol_v2::RateProfile::kAdc1mhzGpio1mhz;
+    request.request_id = ++id;
+    const auto generation = state.statistics().generation();
+    assert(state.dispatch(request, reply).commandAccepted());
+    assert(state.negotiatedVersion() == version && state.runId() == session);
+    const auto applied = state.activeSettings();
+    const auto calls = app.calls;
+    assert(state.dispatch(request, reply).command_error == v1::ErrorCode::kInvalidRequestId);
+    assert(app.calls == calls);
+    // Discovery before START, in either wire version, cannot select the mode.
+    for (auto probe_version : {2U, 3U}) {
+      auto probe = request;
+      probe.protocol_version = static_cast<std::uint8_t>(probe_version);
+      probe.kind = v1::CommandKind::kInfo; probe.request_id = ++id;
+      assert(state.dispatch(probe, reply).commandAccepted());
+      assert(state.negotiatedVersion() == version && app.calls == calls);
+      assert(state.statistics().generation() == generation);
+    }
+    request.kind = v1::CommandKind::kStart;
+    for (unsigned block = 0U; block < 2U; ++block) {
+      control::DispatchReadiness readiness{};
+      readiness.start_ready = block != 0U;
+      readiness.pending_frames = block == 1U ? 1U : 0U;
+      request.request_id = ++id;
+      assert(state.dispatch(request, reply, readiness).command_error == v1::ErrorCode::kBusy);
+      assert(state.runId() == session && state.statistics().generation() == generation);
+    }
+    request.request_id = ++id;
+    assert(state.dispatch(request, reply).commandAccepted());
+    assert(state.dispatch(request, reply).command_error == v1::ErrorCode::kInvalidRequestId);
+    assert(state.runId() == session + 1U && state.statistics().generation() == generation + 1U);
+    assert(state.takePendingEvents().has(control::Event::kStartEpoch));
+    assert(state.takePendingEvents().mask == 0U);
+    request.kind = v1::CommandKind::kConfigure; request.request_id = ++id;
+    assert(state.dispatch(request, reply).command_error == v1::ErrorCode::kInvalidState);
+    assert(app.calls == calls && state.activeSettings().settings == applied.settings);
+    request.kind = v1::CommandKind::kStop; request.request_id = ++id;
+    assert(state.dispatch(request, reply).commandAccepted());
+    assert(state.dispatch(request, reply).command_error == v1::ErrorCode::kInvalidRequestId);
+    assert(state.takePendingEvents().has(control::Event::kStop));
+    request.request_id = ++id;
+    assert(state.dispatch(request, reply).commandAccepted());
+    assert(state.takePendingEvents().mask == 0U);
+    assert(state.activeSettings().settings == applied.settings && app.calls == calls);
+  }
+}
+
 int main(int argc, char** argv) {
   const std::string mode = argc > 1 ? argv[1] : "fixed";
   if (mode == "transactions") { transactions(); return 0; }
+  if (mode == "sessions") { repeatedSessions(); return 0; }
   if (mode == "validate") {
     const std::vector<std::uint8_t> bytes(
         std::istreambuf_iterator<char>(std::cin), {});

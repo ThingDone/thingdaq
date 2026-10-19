@@ -340,3 +340,10 @@ def test_start_serializer_matches_golden_without_starting_acquisition(
 
 def test_transactions_rollback_modes_and_replay(executable: Path) -> None:
     subprocess.run([str(executable), "transactions"], check=True, capture_output=True)
+
+
+def test_repeated_v2_v3_sessions(executable: Path) -> None:
+    result = subprocess.run(
+        [str(executable), "sessions"], check=False, capture_output=True
+    )
+    assert result.returncode == 0, result.stderr.decode()
