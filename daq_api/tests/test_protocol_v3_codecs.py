@@ -126,6 +126,96 @@ def test_hand_derived_adc_and_all_bit_positions() -> None:
         )
 
 
+# Literal wire bytes keep each decoder assertion independent of the encoder.
+# ADC0 occupies bits 0..11; ADC1 occupies bits 12..23 of the LE packed word.
+@pytest.mark.parametrize(
+    ("channel", "packed_words"),
+    [
+        (
+            0,
+            (
+                "010000 020000 040000 080000 100000 200000 400000 800000 "
+                "000100 000200 000400 000800"
+            ),
+        ),
+        (
+            1,
+            (
+                "001000 002000 004000 008000 000001 000002 000004 000008 "
+                "000010 000020 000040 000080"
+            ),
+        ),
+    ],
+)
+def test_pack12_walking_bits_against_literal_bytes(channel, packed_words):
+    prefix = bytes.fromhex("020400000400000000000000")
+    for bit, packed in enumerate(packed_words.split()):
+        pair = (1 << bit, 0) if channel == 0 else (0, 1 << bit)
+        expected = prefix + bytes.fromhex(packed)
+        assert encode_adc_payload([pair]) == expected
+        decoded = decode_data_payload(1, expected, 1)
+        assert struct.unpack("<HH", decoded.payload) == pair
+
+
+@pytest.mark.parametrize(
+    ("pair", "packed"),
+    [
+        ((0, 0), "000000"),
+        ((4095, 4095), "ffffff"),
+        ((4095, 0), "ff0f00"),
+        ((0, 4095), "00f0ff"),
+        ((0xABC, 0x123), "bc3a12"),
+        ((0x123, 0xABC), "23c1ab"),
+        ((0x555, 0xAAA), "55a5aa"),
+    ],
+)
+def test_pack12_boundaries_and_channel_order_from_literal_bytes(pair, packed):
+    payload = bytes.fromhex("020400000400000000000000" + packed)
+    assert encode_adc_payload([pair]) == payload
+    assert struct.unpack("<HH", decode_data_payload(1, payload, 1).payload) == pair
+
+
+@pytest.mark.parametrize(
+    ("width", "values", "literal"),
+    [
+        # Two records cost six/eight bytes. Ties MUST select RAW; adding one
+        # repeated item makes RLE profitable, including the 16-bit value lane.
+        (8, [0x12] * 3 + [0x34] * 3, "000100000600000000000000121212343434"),
+        (8, [0x12] * 3 + [0x34] * 4, "010100000700000002000000030012040034"),
+        (16, [0x1234] * 2 + [0xABCD] * 2, "00020000080000000000000034123412cdabcdab"),
+        (16, [0x1234] * 2 + [0xABCD] * 3, "010200000a00000002000000020034120300cdab"),
+    ],
+)
+def test_multirun_profitability_boundary_from_literal_bytes(width, values, literal):
+    payload = bytes.fromhex(literal)
+    assert encode_gpio_payload(values, width_bits=width) == payload
+    decoded = decode_data_payload(2, payload, len(values))
+    assert decoded.payload == b"".join(
+        value.to_bytes(width // 8, "little") for value in values
+    )
+
+
+@pytest.mark.parametrize("path", sorted(FIXTURES.glob("*.bin")), ids=lambda p: p.stem)
+def test_every_golden_frame_at_every_transport_split(path):
+    wire = path.read_bytes()
+    for split in range(1, len(wire)):
+        parser = V3FrameParser()
+        assert parser.feed(wire[:split]) == [], (path.name, split)
+        frames = parser.feed(wire[split:])
+        assert len(frames) == 1, (path.name, split)
+        assert frames[0].to_bytes() == wire
+        assert parser.buffered_bytes == 0
+
+
+@pytest.mark.parametrize("offset", range(8, 36, 4))
+@pytest.mark.parametrize("value", [0, 0xFFFFFFFF])
+def test_each_capability_limit_rejects_zero_and_unbounded_values(offset, value):
+    payload = bytearray(fixture("get_capabilities-response")[44:-4])
+    struct.pack_into("<I", payload, offset, value)
+    with pytest.raises(V3FrameValidationError):
+        V3Capabilities.from_payload(payload)
+
+
 @pytest.mark.parametrize("value", [-1, 4096, 65535, 1 << 100, True, 1.5])
 @pytest.mark.parametrize("policy", list(c.AdcPolicy))
 def test_adc_never_masks_invalid_codes(value: int, policy: c.AdcPolicy) -> None:

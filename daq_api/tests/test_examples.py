@@ -96,6 +96,66 @@ runpy.run_path(script, run_name="__main__")
                     completed.stdout,
                 )
                 self.assertEqual("", completed.stderr)
+                if script.name == "protocol_upgrade.py":
+                    self.assert_protocol_upgrade_results(completed.stdout)
+
+    def assert_protocol_upgrade_results(self, output: str) -> None:
+        lines = output.splitlines()
+        self.assertIn("simulated=true physical_required=false", lines[0])
+        self.assertIn("hardware_throughput=not_measured", lines[0])
+        self.assertIn("board=TEENSY_40", lines[1])
+        self.assertIn("protocol=3", lines[1])
+        self.assertIn("supported_tuples=60", lines)
+        self.assertEqual(60, sum(line.startswith("tuple[") for line in lines))
+        self.assertIn(
+            "defaults: ADC|GPIO HARDWARE ADLER32 3 CPU_600MHZ "
+            "ADC_1MHZ_GPIO_1MHZ DISABLED 8 RLE_AUTO PACK12 12 1000000 1000000",
+            lines,
+        )
+        clocks = [line for line in lines if line.startswith("applied_cpu_hz=")]
+        self.assertEqual(
+            [
+                f"applied_cpu_hz={cpu} ipg_hz=150000000 adc_hz=37500000 "
+                "pit_hz=24000000 timestamp_hz=8000000 readback=exact"
+                for cpu in (600000000, 450000000, 600000000)
+            ],
+            clocks,
+        )
+        for run in (1, 2, 3):
+            compressed = run != 2
+            adc_bytes = 6072 if compressed else 8096
+            gpio_bytes = 4051 if compressed else 8096
+            expected = [
+                f"run={run} running_reconfiguration=INVALID_STATE settings_unchanged=true",
+                (
+                    f"run={run} stream=adc frames=2 items=2024 equality=exact "
+                    f"raw_sample_bytes=8096 transmitted_sample_bytes={adc_bytes} "
+                    f"transmitted_frame_bytes={adc_bytes + 120}"
+                ),
+                (
+                    f"run={run} adc_packing_saved_bytes={2024 if compressed else 0} "
+                    f"adc_packing_savings_percent={25.0 if compressed else 0.0}"
+                ),
+                (
+                    f"run={run} stream=gpio frames=2 items=8096 equality=exact "
+                    f"raw_sample_bytes=8096 transmitted_sample_bytes={gpio_bytes} "
+                    f"transmitted_frame_bytes={gpio_bytes + 120}"
+                ),
+                (
+                    f"run={run} gpio_rle_frames={1 if compressed else 0} "
+                    f"gpio_raw_frames={1 if compressed else 2} "
+                    f"gpio_fallback_frames={1 if compressed else 0}"
+                ),
+                f"run={run} state=STOPPED pending_frames=0 readback=exact loss=none",
+            ]
+            self.assertEqual(
+                expected, [line for line in lines if line.startswith(f"run={run} ")]
+            )
+        self.assertEqual(
+            "PASS runs=3 equality=exact final_state=STOPPED "
+            "transport_closed=true reader_stopped=true",
+            lines[-1],
+        )
 
 
 if __name__ == "__main__":

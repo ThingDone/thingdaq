@@ -1,6 +1,7 @@
 """Public-v3 device tests through real command bytes and the existing transport."""
 
 import struct
+import zlib
 from dataclasses import replace
 
 import pytest
@@ -57,6 +58,80 @@ def raw_request(kind=c.CommandKind.CONFIGURE, request_id=1, payload=None, **fiel
     header.update(fields)
     wire = struct.pack(c.HEADER_STRUCT_FORMAT, *header.values()) + payload
     return wire + struct.pack("<I", compute_v3_checksum(wire))
+
+
+@pytest.mark.parametrize(
+    ("settings_hex", "cpu_hz"),
+    [
+        ("030001030104000801010c0040420f0040420f00", 600_000_000),
+        ("030001030104011001010c0040420f0040420f00", 600_000_000),
+        ("030001030204000800000c0040420f0040420f00", 450_000_000),
+    ],
+)
+def test_wire_lifecycle_with_literal_settings_and_independent_response_checks(
+    settings_hex, cpu_hz
+):
+    device = SimulatedV3Device()
+    request_id = 0
+
+    def exchange(kind, payload=b"", *, run=0, error=0):
+        nonlocal request_id
+        request_id += 1
+        request = raw_request(kind=kind, request_id=request_id, payload=payload)
+        # Cross-check the shared request checksum with an independent backend.
+        assert int.from_bytes(request[-4:], "little") == zlib.adler32(request[:-4])
+        responses = device.receive(request)
+        assert len(responses) == 1
+        response = responses[0]
+        assert response[:6] == bytes.fromhex("efbeadde03") + bytes([kind + 0x80])
+        assert struct.unpack_from("<H", response, 6)[0] == (0x8000 if error else 0)
+        assert response[8:12] == bytes.fromhex("2c000100")
+        assert struct.unpack_from("<IIIIIQI", response, 12) == (
+            len(response),
+            len(response) - 48,
+            run,
+            0,
+            request_id,
+            0,
+            0,
+        )
+        assert int.from_bytes(response[-4:], "little") == zlib.adler32(response[:-4])
+        assert response[44:48] == struct.pack("<BBH", bool(error), 0, error)
+        if error:
+            assert len(response) == 52
+        return response[48:-4]
+
+    defaults = bytes.fromhex("030001030104000801010c0040420f0040420f00")
+    assert exchange(0x1D)[:20] == defaults
+    settings = bytes.fromhex(settings_hex)
+    applied = exchange(0x11, settings)
+    expected_clocks = struct.pack(
+        "<B3xIIIII", settings[4], cpu_hz, 150_000_000, 37_500_000, 24_000_000, 8_000_000
+    )
+    assert applied == settings + expected_clocks
+    assert exchange(0x1D) == applied
+
+    # Malformed/unsupported stopped requests must leave the complete applied
+    # settings and clocks untouched, even if an early field could be applied.
+    for offset, value, error in ((4, 2, 8), (3, 2, 8), (11, 1, 5)):
+        bad = bytearray(defaults)
+        bad[offset] = value
+        exchange(0x11, bad, error=error)
+        assert exchange(0x1D) == applied
+
+    assert exchange(0x12, run=1) == applied
+    exchange(0x11, defaults, run=1, error=7)
+    exchange(0x12, run=1, error=7)
+    assert exchange(0x1D, run=1) == applied
+    # No streaming request means no pending tail; STOP is immediately stopped.
+    stopped = bytes.fromhex("010000000100000000000000")
+    assert exchange(0x14, run=1) == stopped
+    assert exchange(0x14, run=1) == stopped
+    assert exchange(0x1D, run=1) == applied
+    assert exchange(0x12, run=2) == applied
+    exchange(0x14, run=2)
+    device.reboot()
+    assert exchange(0x1D)[:20] == defaults
 
 
 def test_default_identity_and_settings_are_explicitly_simulated():

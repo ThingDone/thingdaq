@@ -10,6 +10,7 @@ import struct
 import subprocess
 import sys
 import zlib
+from itertools import product
 from pathlib import Path
 from typing import Any
 
@@ -125,6 +126,45 @@ def test_capabilities_are_exact_tuples_with_bounded_zero_padding() -> None:
         assert struct.unpack_from("<II", record, 12) == (1_000_000, 1_000_000)
         if record[4] == 2:
             assert record[8:10] == b"\0\0"
+
+
+def test_advertised_table_matches_independent_allowed_configuration_matrix() -> None:
+    # Freeze the release policy without reading its generated constants:
+    # CPU 600 accepts both codecs, CPU 450 accepts RAW only; aux width is tied
+    # to bank mode. No 528 MHz or higher-rate profile enters this matrix.
+    expected = set()
+    for cpu, policies in ((1, (0, 1)), (2, (0,))):
+        for stream, source, aux, gpio_policy, adc_policy in product(
+            (1, 2, 3), (0, 1), (0, 1), policies, policies
+        ):
+            expected.add(
+                bytes(
+                    [
+                        stream,
+                        source,
+                        1,
+                        3,
+                        cpu,
+                        4,
+                        aux,
+                        16 if aux else 8,
+                        gpio_policy,
+                        adc_policy,
+                        12,
+                        0,
+                    ]
+                )
+                + bytes.fromhex("40420f0040420f00")
+            )
+    assert len(expected) == 60
+    assert set(v3.SELECTABLE_CONFIGURATIONS) == expected
+    payload = (
+        ROOT / "protocol/fixtures-v3/get_capabilities-response.bin"
+    ).read_bytes()[44:-4]
+    assert payload[6] == len(expected)
+    assert {
+        payload[offset : offset + 20] for offset in range(124, 1324, 20)
+    } == expected
 
 
 @pytest.mark.parametrize(
