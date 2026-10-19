@@ -2304,9 +2304,49 @@ void testHealthTraversesParserRuntimeAndUsbQueue() {
   }
 }
 
+void testV3ControlsTraverseRuntimeAndUsbQueue() {
+  namespace v3 = thingdaq::protocol_v3;
+  FakeCdcStream stream{};
+  stream.max_write_size = 7U;
+  packet::OwnedPacketBufferStorage storage{};
+  FakeTickClock clock{};
+  app::FirmwareRuntime firmware{stream, storage, clock};
+  expect(firmware.begin(12345678U), "v3 runtime boots");
+  const std::uint8_t kinds[] = {16U, 28U, 29U, 17U, 19U, 20U, 18U};
+  std::uint32_t id = 1U;
+  for (const auto kind : kinds) {
+    wire::FrameFields fields{};
+    fields.version = 3U;
+    fields.kind = static_cast<constants::FrameKind>(kind);
+    fields.request_id = id++;
+    wire::CommandFrame request{};
+    const auto &defaults = thingdaq::settings::kBuildDefaults;
+    const wire::ByteView payload = kind == 17U
+        ? wire::ByteView{defaults.data(), defaults.size()} : wire::ByteView{};
+    expect(wire::encodeFrame(fields, payload, request).ok(), "encode v3 runtime command");
+    stream.appendInput(request);
+  }
+  expect(drain(firmware, stream).quiescent, "v3 controls drain fragmented USB");
+  const auto frames = decodeOutput(stream.output);
+  expect(frames.size() == 7U, "all v3 response kinds admitted to USB queue");
+  for (std::size_t i = 0U; i < frames.size() && i < 7U; ++i) {
+    expect(frames[i].header.version == 3U && frames[i].header.request_id == i + 1U &&
+           static_cast<std::uint8_t>(frames[i].header.kind) == (kinds[i] | 0x80U),
+           "v3 control correlation survives partial writes");
+    expect(frames[i].payload.data[0] == (kinds[i] == 18U ? 1U : 0U),
+           "only public acquisition remains gated");
+  }
+  if (frames.size() == 7U)
+    expect(frames[1].header.payload_length == v3::kCapabilitiesResponsePayloadSize,
+           "complete 1404-byte capabilities payload reaches USB");
+  expect(firmware.state() == constants::DeviceState::kIdle && firmware.runId() == 0U,
+         "v3 controls never start legacy acquisition");
+}
+
 }  // namespace
 
 int main() {
+  testV3ControlsTraverseRuntimeAndUsbQueue();
   testHealthTraversesParserRuntimeAndUsbQueue();
   testTemperatureTraversesParserRuntimeAndUsbQueue();
   testCompleteControlPlane();

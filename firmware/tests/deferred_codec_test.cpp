@@ -51,6 +51,7 @@ static void drain(std::ofstream *out = nullptr) {
 
   }
   assert(pipeline.quiescent());
+  assert(pipeline.snapshot().pending_frames == 0U);
   if (out) out->write(reinterpret_cast<const char *>(sink.bytes.data()), static_cast<std::streamsize>(sink.bytes.size()));
   sink.bytes.clear();
 }
@@ -60,6 +61,7 @@ int main(int argc, char **argv) {
   fill(packet::Stream::kAdc); fill(packet::Stream::kGpio);
   // No transform or selected-wire publication in acquisition context.
   const auto before = pipeline.snapshot();
+  assert(before.pending_frames == 2U);
   assert(before.sources[0].frames_framed == (input_experiment::kPackAdc ? 0U : 1U));
   assert(before.sources[1].frames_framed == (input_experiment::kEncodeGpio ? 0U : 1U));
   pipeline.stopProduction(); // complete deferred pages must drain, not cancel

@@ -712,6 +712,8 @@ PipelineSnapshot PacketBufferPipeline::snapshot() const {
                   result.source_bytes[source].framed_bytes_transmitted);
   }
   for (const BufferRecord &record : records_) {
+    if (record.state != BufferState::kFree && record.frame_size != 0U)
+      ++result.pending_frames;
     const std::size_t state = static_cast<std::size_t>(record.state);
     if (state < result.buffers_by_state.size()) {
       ++result.buffers_by_state[state];

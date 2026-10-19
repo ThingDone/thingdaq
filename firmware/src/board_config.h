@@ -413,7 +413,8 @@ inline constexpr EdmaAllocation kEdmaAllocations[] = {
      ResourceOwner::kAuxGpioCapture},
 };
 
-inline constexpr std::size_t kCommandParserCapacityBytes = 68U;
+inline constexpr std::size_t kCommandParserCapacityBytes =
+    (protocol::kCommandParserStorageBytes + 3U) & ~std::size_t{3U};
 inline constexpr std::size_t kUsbRxScratchBytes = 128U;
 inline constexpr std::size_t kCommandQueueDepth = 4U;
 inline constexpr std::size_t kResponseQueueDepth = 4U;
@@ -587,10 +588,10 @@ inline constexpr MemoryAllocation kMemoryAllocations[] = {
     {MemoryUse::kUsbRxScratch, MemoryRegion::kDtcmRam1,
      kUsbRxScratchBytes, 4U, ResourceOwner::kUsbTransport},
     {MemoryUse::kCommandQueue, MemoryRegion::kDtcmRam1,
-     kCommandQueueDepth * protocol_v1::kMaxCommandFrameBytes, 4U,
+     kCommandQueueDepth * protocol::CommandFrame::capacity(), 4U,
      ResourceOwner::kControlPlane},
     {MemoryUse::kResponseQueue, MemoryRegion::kDtcmRam1,
-     kResponseQueueDepth * protocol_v1::kMaxControlFrameBytes, 4U,
+     kResponseQueueDepth * protocol::ControlFrame::capacity(), 4U,
      ResourceOwner::kUsbTransport},
     {MemoryUse::kPacketBufferStorage, MemoryRegion::kDtcmRam1,
      kPacketBufferPrimaryStorageBytes, kCacheLineBytes,

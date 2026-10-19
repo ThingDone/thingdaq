@@ -330,7 +330,6 @@ def test_checksumming_does_not_legitimize_bad_fields(
         (124, bytes(20)),
         (124 + 20, c.SELECTABLE_CONFIGURATIONS[0]),  # duplicate tuple
         (124 + 60 * 20, b"\x01"),  # unused slot
-        (36, c.SELECTABLE_CONFIGURATIONS[0]),  # not board defaults
     ],
 )
 def test_capability_table_bounds_and_consistency(offset: int, data: bytes) -> None:
@@ -545,3 +544,35 @@ def test_state_and_info_models_reject_contradictions() -> None:
     ):
         with pytest.raises(V3FrameValidationError):
             state.to_payload()
+
+
+def test_build_specific_capabilities_preserve_limits_and_defaults() -> None:
+    canonical = V3Capabilities.canonical()
+    defaults = replace(
+        canonical.defaults,
+        cpu_profile=c.CpuProfile.CPU_450MHZ,
+        gpio_policy=c.GpioPolicy.RAW,
+        adc_policy=c.AdcPolicy.RAW,
+    )
+    caps = replace(
+        canonical,
+        defaults=defaults,
+        cpu_profiles=(canonical.cpu_profiles[1],),
+        configurations=(defaults,),
+        max_data_frame_bytes=4096,
+        max_control_frame_bytes=1536,
+        max_logical_payload_bytes=4036,
+        max_encoded_sample_bytes=4036,
+        max_adc_pairs=1009,
+        max_gpio8_samples=4036,
+        max_gpio16_samples=2018,
+    )
+    assert V3Capabilities.from_payload(caps.to_payload()) == caps
+    caps.require_supported(defaults)
+    for field, value in (
+        ("max_data_frame_bytes", 4095),
+        ("max_control_frame_bytes", 1451),
+        ("max_logical_payload_bytes", 4035),
+    ):
+        with pytest.raises(V3FrameValidationError):
+            replace(caps, **{field: value}).to_payload()

@@ -17,7 +17,9 @@ related:
 `protocol/protocol-v3.json` is the canonical v3 wire contract. This checkpoint
 provides validated schemas, separate Python/C++ constants, golden frames and
 opt-in Python codecs, a simulated v3 device and public ThingDAQ simulator
-sessions. Production firmware and serial negotiation are not enabled.
+sessions. Firmware control discovery/settings are implemented in
+[[protocol-v3-firmware-control]]; firmware acquisition remains gated pending
+public data-path integration.
 The current product still uses [[protocol-v2]]. Physical results in
 [[deferred-codecs-20261018]] concern private research versions, not v3.
 
@@ -72,9 +74,12 @@ advertised tuple, including settings for disabled streams.
 
 The canonical table contains 60 tuples: ADC/GPIO/both, hardware/synthetic,
 8/16 GPIO bits, four RAW/compressed policy combinations at 600 MHz, and RAW
-only at 450 MHz. Devices may advertise a subset containing board defaults.
+only at 450 MHz. Devices may advertise a subset with build defaults drawn from that subset.
+Advertised device limits may be smaller than the canonical maxima; they must
+remain positive, fit the capability response and respect framing and logical
+item capacity relationships.
 Widths follow auxiliary mode DISABLED/INPUT; OUTPUT, 528 MHz and historical
-higher-rate profiles are absent. Defaults are both streams, hardware source,
+higher-rate profiles are absent. Reference defaults are both streams, hardware source,
 600 MHz, 1 MHz/1 MHz, 12-bit ADC, auxiliary DISABLED, GPIO RLE_AUTO, ADC PACK12.
 
 CONFIGURE validates and applies all settings atomically while STOPPED with

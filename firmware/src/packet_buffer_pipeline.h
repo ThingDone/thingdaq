@@ -284,6 +284,8 @@ struct PipelineSnapshot {
   std::uint64_t data_framed_bytes_transmitted = 0U;
   std::size_t ready_queue_depth = 0U;
   std::size_t transmit_queue_depth = 0U;
+  // Complete pages, including deferred codecs and a partial USB tail.
+  std::size_t pending_frames = 0U;
   std::size_t buffers_owned = 0U;
   std::size_t ready_queue_high_water = 0U;
   std::size_t transmit_queue_high_water = 0U;

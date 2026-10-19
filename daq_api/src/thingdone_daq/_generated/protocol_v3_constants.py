@@ -1,12 +1,12 @@
 """Generated public protocol-v3 constants. Do not edit by hand.
 
 Source: protocol/protocol-v3.json
-Source SHA-256: 39b43beb44cfa0a704ec94a30301562fecbd04d815813b53722200dc0f4a1b7f
+Source SHA-256: 6bcb5abe84b2d39f5febc6fbb2f10cfc241b31830ea105ff5661c09fb027f55e
 """
 
 from enum import IntEnum, IntFlag
 
-SOURCE_SHA256 = "39b43beb44cfa0a704ec94a30301562fecbd04d815813b53722200dc0f4a1b7f"
+SOURCE_SHA256 = "6bcb5abe84b2d39f5febc6fbb2f10cfc241b31830ea105ff5661c09fb027f55e"
 BYTE_ORDER = "little"
 
 MAGIC = 3735928559

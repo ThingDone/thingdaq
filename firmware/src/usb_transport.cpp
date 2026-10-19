@@ -66,6 +66,11 @@ bool validDataView(protocol::ByteView bytes) {
 }
 
 bool responseKind(protocol_v1::FrameKind kind) {
+  if (kind == static_cast<protocol_v1::FrameKind>(
+                  protocol_v3::FrameKind::kGetCapabilitiesResponse) ||
+      kind == static_cast<protocol_v1::FrameKind>(
+                  protocol_v3::FrameKind::kGetSettingsResponse))
+    return true;
   if (kind == protocol::kTemperatureResponse ||
       kind == protocol::kRuntimeHealthResponse) return true;
   switch (kind) {

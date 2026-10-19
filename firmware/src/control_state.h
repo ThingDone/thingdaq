@@ -112,11 +112,18 @@ struct DispatchReadiness {
       protocol_v1::ErrorCode::kUnsupportedConfiguration;
   temperature::Reading temperature{};
   health::Reading runtime_health{};
+  std::uint32_t pending_frames = 0U;
 };
 
 class ControlState {
  public:
-  constexpr ControlState() = default;
+  explicit ControlState(
+      settings::Application& application = settings::kFixedBuildApplication)
+      : settings_application_(application),
+        active_settings_{application.defaults(), {}} {
+    active_settings_.clocks = settings::clocksFor(
+        active_settings_.settings[protocol_v3::kSettingsCpuProfileOffset]);
+  }
 
   // Constant-time, idempotent BOOT completion. The future sketch supplies the
   // chip-derived USB serial before command polling begins.
@@ -142,6 +149,12 @@ class ControlState {
   constexpr protocol_v1::DeviceState state() const { return state_; }
   constexpr std::uint32_t runId() const { return run_id_; }
   constexpr std::uint32_t hardwareSerial() const { return hardware_serial_; }
+  constexpr std::uint8_t negotiatedVersion() const {
+    return negotiated_version_;
+  }
+  constexpr const settings::Applied& activeSettings() const {
+    return active_settings_;
+  }
   constexpr bool hasConfiguration() const { return has_configuration_; }
   constexpr protocol::Configuration appliedConfiguration() const {
     return has_configuration_ ? configuration_ : kIdleConfiguration;
@@ -179,6 +192,13 @@ class ControlState {
       const protocol::Configuration &configuration);
 
  private:
+  DispatchResult dispatchV3(const protocol::Request& request,
+                            protocol::ControlFrame& response,
+                            const DispatchReadiness& readiness);
+  settings::Application& settings_application_;
+  settings::Applied active_settings_{};
+  // Queries never select a wire mode. Lifecycle integration follows separately.
+  std::uint8_t negotiated_version_ = 0U;
   bool transitionTo(protocol_v1::DeviceState next);
   DispatchResult reject(const protocol::Request &request,
                         protocol_v1::ErrorCode error,

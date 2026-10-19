@@ -1,13 +1,13 @@
-#include "adc_dma_fault.h"
-#include "input_experiment_profile.h"
-
 #include "protocol.h"
-#include "deferred_codec.h"
 
 #include <limits>
 
+#include "adc_dma_fault.h"
 #include "checksum.h"
+#include "deferred_codec.h"
+#include "firmware_identity.h"
 #include "generated/protocol_v2_constants.h"
+#include "input_experiment_profile.h"
 #include "rate_profile_table.h"
 
 #if defined(__IMXRT1062__)
@@ -383,10 +383,284 @@ bool expectedPayloadSize(protocol_v1::FrameKind kind, bool response_error,
   return false;
 }
 
+// V3 controls have independent schemas; legacy enum values remain frozen.
+constexpr bool v3Request(protocol_v1::FrameKind kind) {
+  switch (static_cast<protocol_v3::CommandKind>(kind)) {
+    case protocol_v3::CommandKind::kInfo:
+    case protocol_v3::CommandKind::kConfigure:
+    case protocol_v3::CommandKind::kStart:
+    case protocol_v3::CommandKind::kGetStatus:
+    case protocol_v3::CommandKind::kStop:
+    case protocol_v3::CommandKind::kGetCapabilities:
+    case protocol_v3::CommandKind::kGetSettings:
+      return true;
+  }
+  return false;
+}
+constexpr bool v3Response(protocol_v1::FrameKind kind) {
+  return v3Request(static_cast<protocol_v1::FrameKind>(
+             static_cast<std::uint8_t>(kind) & 0x7FU)) &&
+         static_cast<std::uint8_t>(kind) >= 0x80U;
+}
+std::size_t v3PayloadSize(protocol_v1::FrameKind kind, bool error) {
+  using namespace protocol_v3;
+  if (kind == protocol_v1::FrameKind::kErrorResponse)
+    return kErrorResponsePayloadSize;
+  if (error) return kResponsePrefixPayloadSize;
+  if (v3Request(kind))
+    return kind == protocol_v1::FrameKind::kConfigureRequest
+               ? kConfigureRequestPayloadSize
+               : 0U;
+  switch (static_cast<FrameKind>(kind)) {
+    case FrameKind::kInfoResponse:
+      return kInfoResponsePayloadSize;
+    case FrameKind::kConfigureResponse:
+    case FrameKind::kStartResponse:
+    case FrameKind::kGetSettingsResponse:
+      return kSettingsResponsePayloadSize;
+    case FrameKind::kGetStatusResponse:
+      return kStatusResponsePayloadSize;
+    case FrameKind::kStopResponse:
+      return kStopResponsePayloadSize;
+    case FrameKind::kGetCapabilitiesResponse:
+      return kCapabilitiesResponsePayloadSize;
+    default:
+      return 0U;
+  }
+}
+Result validateV3Header(const FrameHeader& h, bool commands_only) {
+  const bool request = v3Request(h.kind);
+  const bool generic = h.kind == protocol_v1::FrameKind::kErrorResponse;
+  if ((!request && !v3Response(h.kind) && !generic) ||
+      (commands_only && !request))
+    return badKind();
+  const bool error = (h.flags & kResponseErrorFlag) != 0U;
+  if (h.request_id == 0U && (request || !error)) return badRequestId();
+  if ((h.flags & static_cast<std::uint16_t>(
+                     ~(request ? 0U : kResponseErrorFlag))) != 0U ||
+      (generic && !error))
+    return badFlags();
+  if (h.header_length != protocol_v3::kHeaderSize ||
+      h.payload_length != v3PayloadSize(h.kind, error) ||
+      h.total_length != protocol_v3::kMinFrameBytes + h.payload_length ||
+      h.total_length > (request ? protocol_v3::kMaxCommandFrameBytes
+                                : protocol_v3::kMaxControlFrameBytes))
+    return badLength();
+  if (h.checksum_algorithm != protocol_v1::ChecksumAlgorithm::kAdler32)
+    return unsupportedChecksum();
+  if (h.sequence != 0U || h.first_sample_ticks != 0U || h.item_count != 0U ||
+      (request && h.run_id != 0U) ||
+      (h.kind == protocol_v1::FrameKind::kStartResponse && !error &&
+       h.run_id == 0U))
+    return badPayload();
+  return Result::success();
+}
+bool zeroBytes(ByteView bytes, std::size_t offset, std::size_t count) {
+  if (!bytes.valid() || !hasRange(bytes.size, offset, count)) return false;
+  for (std::size_t i = offset; i < offset + count; ++i)
+    if (bytes.data[i] != 0U) return false;
+  return true;
+}
+template <std::size_t N>
+bool sameBytes(ByteView bytes, std::size_t offset,
+               const std::uint8_t (&record)[N]) {
+  if (!hasRange(bytes.size, offset, N)) return false;
+  for (std::size_t i = 0U; i < N; ++i)
+    if (bytes.data[offset + i] != record[i]) return false;
+  return true;
+}
+bool v3ClocksValid(ByteView bytes, std::size_t offset) {
+  for (const auto& record : protocol_v3::kCpuProfiles)
+    if (sameBytes(bytes, offset, record)) return true;
+  return false;
+}
+bool v3TupleValid(ByteView bytes, std::size_t offset) {
+  for (const auto& record : protocol_v3::kSelectableConfigurations)
+    if (sameBytes(bytes, offset, record)) return true;
+  return false;
+}
+bool fixedStringValid(ByteView bytes, std::size_t offset, std::size_t count) {
+  bool terminated = false;
+  for (std::size_t i = offset; i < offset + count; ++i) {
+    const auto c = bytes.data[i];
+    if (c == 0U)
+      terminated = true;
+    else if (terminated || c < 32U || c > 126U)
+      return false;
+  }
+  return terminated && bytes.data[offset] != 0U;
+}
+Result validateV3Payload(const FrameHeader& h, ByteView p) {
+  using namespace protocol_v3;
+  if (v3Request(h.kind)) {
+    return h.kind == protocol_v1::FrameKind::kConfigureRequest
+               ? validateV3Settings(p)
+               : Result::success();
+  }
+  std::uint16_t error = 0U;
+  if (!loadU16(p, kResponsePrefixErrorCodeOffset, error) || p.data[1] != 0U ||
+      error > static_cast<std::uint16_t>(ErrorCode::kChecksumMismatch))
+    return badPayload();
+  const bool failed = (h.flags & kResponseErrorFlag) != 0U;
+  if (p.data[0] != (failed ? 1U : 0U) || failed != (error != 0U) ||
+      (h.request_id == 0U &&
+       error != static_cast<std::uint16_t>(ErrorCode::kInvalidRequestId)))
+    return badPayload();
+  if (failed) {
+    return h.kind != protocol_v1::FrameKind::kErrorResponse ||
+                   zeroBytes(p, 5U, 3U)
+               ? Result::success()
+               : badPayload();
+  }
+  switch (static_cast<FrameKind>(h.kind)) {
+    case FrameKind::kConfigureResponse:
+    case FrameKind::kStartResponse:
+    case FrameKind::kGetSettingsResponse:
+      return v3TupleValid(p, kSettingsResponseSettingsOffset) &&
+                     v3ClocksValid(p, kSettingsResponseClocksOffset) &&
+                     p.data[kSettingsResponseSettingsOffset +
+                            kSettingsCpuProfileOffset] ==
+                         p.data[kSettingsResponseClocksOffset]
+                 ? Result::success()
+                 : badPayload();
+    case FrameKind::kInfoResponse: {
+      std::uint16_t board = 0U, mcu = 0U;
+      loadU16(p, kInfoResponseBoardIdOffset, board);
+      loadU16(p, kInfoResponseMcuIdOffset, mcu);
+      return board == static_cast<std::uint16_t>(BoardId::kTeensy40) &&
+                     mcu == static_cast<std::uint16_t>(McuId::kImxrt1062) &&
+                     p.data[kInfoResponseSimulatedOffset] <= 1U &&
+                     p.data[kInfoResponseProtocolVersionOffset] ==
+                         kProtocolVersion &&
+                     p.data[kInfoResponseAdcResolutionBitsOffset] == 12U &&
+                     p.data[11] == 0U &&
+                     (p.data[kInfoResponseSimulatedOffset] == 0U ||
+                      (p.data[kInfoResponseHardwareSerialOffset] == 'S' &&
+                       p.data[kInfoResponseHardwareSerialOffset + 1U] == 'I' &&
+                       p.data[kInfoResponseHardwareSerialOffset + 2U] == 'M' &&
+                       p.data[kInfoResponseHardwareSerialOffset + 3U] ==
+                           '-')) &&
+                     fixedStringValid(p, kInfoResponseHardwareSerialOffset,
+                                      kInfoResponseHardwareSerialCount) &&
+                     fixedStringValid(p, kInfoResponseFirmwareVersionOffset,
+                                      kInfoResponseFirmwareVersionCount) &&
+                     fixedStringValid(p, kInfoResponseBuildIdOffset,
+                                      kInfoResponseBuildIdCount) &&
+                     v3ClocksValid(p, kInfoResponseClocksOffset)
+                 ? Result::success()
+                 : badPayload();
+    }
+    case FrameKind::kGetStatusResponse:
+    case FrameKind::kStopResponse: {
+      std::uint32_t run = 0U, pending = 0U;
+      loadU32(p, kStatusResponseRunIdOffset, run);
+      loadU32(p, kStatusResponsePendingFramesOffset, pending);
+      const auto state =
+          static_cast<DeviceState>(p.data[kStatusResponseStateOffset]);
+      if (!zeroBytes(p, 5U, 3U) || run != h.run_id ||
+          (state != DeviceState::kStopped && state != DeviceState::kRunning &&
+           state != DeviceState::kDraining) ||
+          (state == DeviceState::kStopped && pending != 0U) ||
+          (state == DeviceState::kDraining && pending == 0U) ||
+          (state != DeviceState::kStopped && run == 0U) ||
+          (h.kind == protocol_v1::FrameKind::kStopResponse &&
+           state == DeviceState::kRunning))
+        return badPayload();
+      if (h.kind == protocol_v1::FrameKind::kGetStatusResponse) {
+        for (std::size_t i = kStatusResponseAdcFramesProducedOffset; i < p.size;
+             i += 16U) {
+          std::uint64_t produced = 0U, dropped = 0U;
+          loadU64(p, i, produced);
+          loadU64(p, i + 8U, dropped);
+          if (dropped > produced) return badPayload();
+        }
+      }
+      return Result::success();
+    }
+    case FrameKind::kGetCapabilitiesResponse: {
+      const auto cpus = p.data[kCapabilitiesResponseCpuProfileCountOffset];
+      const auto rates = p.data[kCapabilitiesResponseRateProfileCountOffset];
+      const auto tuples = p.data[kCapabilitiesResponseConfigurationCountOffset];
+      if (cpus == 0U || cpus > kMaxCpuProfiles || rates != 1U || tuples == 0U ||
+          tuples > kMaxConfigurationTuples || p.data[7] != 0U ||
+          !v3TupleValid(p, kCapabilitiesResponseDefaultsOffset))
+        return badPayload();
+      for (std::size_t i = 0U; i < kMaxCpuProfiles; ++i) {
+        const auto offset = kCapabilitiesResponseCpuProfilesOffset +
+                            i * kCpuProfileInfoPayloadSize;
+        if (i < cpus ? !v3ClocksValid(p, offset)
+                     : !zeroBytes(p, offset, kCpuProfileInfoPayloadSize))
+          return badPayload();
+        if (i > 0U && i < cpus &&
+            p.data[offset] == p.data[kCapabilitiesResponseCpuProfilesOffset])
+          return badPayload();
+      }
+      if (!sameBytes(p, kCapabilitiesResponseRateProfilesOffset,
+                     kRateProfiles[0]))
+        return badPayload();
+      bool defaults_found = false;
+      for (std::size_t i = 0U; i < kMaxConfigurationTuples; ++i) {
+        const auto offset = kCapabilitiesResponseConfigurationsOffset +
+                            i * kSettingsPayloadSize;
+        if (i >= tuples) {
+          if (!zeroBytes(p, offset, kSettingsPayloadSize)) return badPayload();
+          continue;
+        }
+        if (!v3TupleValid(p, offset)) return badPayload();
+        bool cpu_found = false, equals_defaults = true;
+        for (std::size_t j = 0U; j < cpus; ++j)
+          cpu_found =
+              cpu_found || p.data[offset + kSettingsCpuProfileOffset] ==
+                               p.data[kCapabilitiesResponseCpuProfilesOffset +
+                                      j * kCpuProfileInfoPayloadSize];
+        if (!cpu_found) return badPayload();
+        for (std::size_t j = 0U; j < kSettingsPayloadSize; ++j)
+          equals_defaults = equals_defaults &&
+                            p.data[offset + j] ==
+                                p.data[kCapabilitiesResponseDefaultsOffset + j];
+        defaults_found = defaults_found || equals_defaults;
+        for (std::size_t j = 0U; j < i; ++j) {
+          bool equal = true;
+          for (std::size_t k = 0U; k < kSettingsPayloadSize; ++k)
+            equal =
+                equal && p.data[offset + k] ==
+                             p.data[kCapabilitiesResponseConfigurationsOffset +
+                                    j * kSettingsPayloadSize + k];
+          if (equal) return badPayload();
+        }
+      }
+      const std::uint32_t maxima[] = {kMaxDataFrameBytes,
+                                      kMaxControlFrameBytes,
+                                      kMaxLogicalPayloadBytes,
+                                      kMaxEncodedSampleBytes,
+                                      kMaxAdcPairs,
+                                      kMaxGpio8Samples,
+                                      kMaxGpio16Samples};
+      std::array<std::uint32_t, 7U> limits{};
+      for (std::size_t i = 0U; i < limits.size(); ++i) {
+        loadU32(p, kCapabilitiesResponseMaxDataFrameBytesOffset + i * 4U,
+                limits[i]);
+        if (limits[i] == 0U || limits[i] > maxima[i]) return badPayload();
+      }
+      if (limits[1] < kMinFrameBytes + kCapabilitiesResponsePayloadSize ||
+          limits[0] < kMinFrameBytes + kDataPrefixBytes + limits[3] ||
+          limits[4] * 4U > limits[2] || limits[5] > limits[2] ||
+          limits[6] * 2U > limits[2])
+        return badPayload();
+      return defaults_found ? Result::success() : badPayload();
+    }
+    default:
+      return badKind();
+  }
+}
+
 THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.header_validation")
 Result validateHeader(const FrameHeader &header, bool commands_only) {
+  if (header.version == protocol_v3::kProtocolVersion)
+    return validateV3Header(header, commands_only);
   if (header.version != protocol_v1::kProtocolVersion &&
-      header.version != protocol_v2::kProtocolVersion) {
+      header.version != protocol_v2::kProtocolVersion &&
+      header.version != protocol_v3::kProtocolVersion) {
     return badVersion();
   }
   if (!isKnownKind(header.kind) ||
@@ -548,12 +822,15 @@ Result decodeHeader(ByteView input, FrameHeader &header, bool commands_only) {
   }
   const std::uint8_t version = input.data[protocol_v1::kHeaderVersionOffset];
   if (version != protocol_v1::kProtocolVersion &&
-      version != protocol_v2::kProtocolVersion) {
+      version != protocol_v2::kProtocolVersion &&
+      version != protocol_v3::kProtocolVersion) {
     return badVersion();
   }
-  protocol_v1::FrameKind kind{};
-  if (!decodeKind(input.data[protocol_v1::kHeaderKindOffset], kind) ||
-      (commands_only && !isRequestKind(kind))) {
+  protocol_v1::FrameKind kind = static_cast<protocol_v1::FrameKind>(
+      input.data[protocol_v1::kHeaderKindOffset]);
+  if (version != protocol_v3::kProtocolVersion &&
+      (!decodeKind(input.data[protocol_v1::kHeaderKindOffset], kind) ||
+       (commands_only && !isRequestKind(kind)))) {
     return badKind();
   }
   const std::uint8_t raw_checksum =
@@ -564,7 +841,8 @@ Result decodeHeader(ByteView input, FrameHeader &header, bool commands_only) {
       !checksumAllowedForKind(kind, checksum_algorithm)) {
     return unsupportedChecksum();
   }
-  if (input.data[protocol_v1::kHeaderReservedOffset] != 0U) {
+  if (version != protocol_v3::kProtocolVersion &&
+      input.data[protocol_v1::kHeaderReservedOffset] != 0U) {
     return badPayload();
   }
 
@@ -591,6 +869,9 @@ Result decodeHeader(ByteView input, FrameHeader &header, bool commands_only) {
     return badLength();
   }
   const Result result = validateHeader(candidate, commands_only);
+  if (result.ok() && version == protocol_v3::kProtocolVersion &&
+      input.data[protocol_v3::kHeaderReservedOffset] != 0U)
+    return badPayload();
   if (result.ok()) {
     header = candidate;
   }
@@ -2016,6 +2297,8 @@ Result validatePayload(const FrameHeader &header, ByteView payload) {
   if (!payload.valid() || payload.size != header.payload_length) {
     return badLength();
   }
+  if (header.version == protocol_v3::kProtocolVersion)
+    return validateV3Payload(header, payload);
   if (header.kind == protocol_v1::FrameKind::kAdcData) {
     for (std::size_t offset = 0U; offset < payload.size; offset += 2U) {
       std::uint16_t sample = 0U;
@@ -2779,12 +3062,215 @@ Result encodeDataFrameInPlace(FrameFields fields, MutableByteView frame,
   return Result::success();
 }
 
+bool isV3Command(std::uint8_t kind) {
+  return v3Request(static_cast<protocol_v1::FrameKind>(kind));
+}
+
+Result validateV3Settings(ByteView p) {
+  using namespace protocol_v3;
+  if (!p.valid() || p.size != kSettingsPayloadSize) return badLength();
+  if (p.data[kSettingsStreamMaskOffset] == 0U ||
+      p.data[kSettingsStreamMaskOffset] > 3U ||
+      p.data[kSettingsSourceOffset] > 1U ||
+      p.data[kSettingsChecksumAlgorithmOffset] != 1U ||
+      p.data[kSettingsWireVersionOffset] != kProtocolVersion ||
+      (p.data[kSettingsCpuProfileOffset] != 1U &&
+       p.data[kSettingsCpuProfileOffset] != 2U) ||
+      p.data[kSettingsRateProfileOffset] !=
+          static_cast<std::uint8_t>(RateProfile::kAdc1mhzGpio1mhz) ||
+      p.data[kSettingsAuxBankModeOffset] > 1U ||
+      (p.data[kSettingsGpioWidthBitsOffset] != 8U &&
+       p.data[kSettingsGpioWidthBitsOffset] != 16U) ||
+      p.data[kSettingsGpioPolicyOffset] > 1U ||
+      p.data[kSettingsAdcPolicyOffset] > 1U ||
+      p.data[kSettingsAdcResolutionBitsOffset] != 12U ||
+      p.data[kSettingsReservedOffset] != 0U)
+    return badPayload();
+  std::uint32_t adc = 0U, gpio = 0U;
+  loadU32(p, kSettingsAdcPairRateHzOffset, adc);
+  loadU32(p, kSettingsGpioSampleRateHzOffset, gpio);
+  return adc != 0U && gpio != 0U ? Result::success() : badPayload();
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.encodeV3SettingsResponse")
+Result encodeV3SettingsResponse(const Request& request, std::uint32_t run_id,
+                                const settings::Applied& applied,
+                                ControlFrame& output) {
+  using namespace protocol_v3;
+  if (request.protocol_version != kProtocolVersion ||
+      (request.kind != protocol_v1::CommandKind::kConfigure &&
+       request.kind != protocol_v1::CommandKind::kStart &&
+       static_cast<std::uint8_t>(request.kind) !=
+           static_cast<std::uint8_t>(CommandKind::kGetSettings)))
+    return badKind();
+  std::array<std::uint8_t, kSettingsResponsePayloadSize> payload{};
+  for (std::size_t i = 0U; i < applied.settings.size(); ++i)
+    payload[kSettingsResponseSettingsOffset + i] = applied.settings[i];
+  for (std::size_t i = 0U; i < applied.clocks.size(); ++i)
+    payload[kSettingsResponseClocksOffset + i] = applied.clocks[i];
+  return encodeFrame(
+      responseFields(static_cast<protocol_v1::FrameKind>(
+                         static_cast<std::uint8_t>(request.kind) | 0x80U),
+                     request, run_id),
+      view(payload), output);
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.encodeV3CapabilitiesResponse")
+Result encodeV3CapabilitiesResponse(const Request& request,
+                                    std::uint32_t run_id,
+                                    const settings::Application& application,
+                                    ControlFrame& output) {
+  using namespace protocol_v3;
+  if (request.protocol_version != kProtocolVersion ||
+      static_cast<std::uint8_t>(request.kind) !=
+          static_cast<std::uint8_t>(CommandKind::kGetCapabilities))
+    return badKind();
+  std::array<std::uint8_t, kCapabilitiesResponsePayloadSize> payload{};
+  const auto bytes = mutableView(payload);
+  const auto defaults = application.defaults();
+  if (!settings::boardSupports(defaults) || !application.supports(defaults))
+    return badPayload();
+  for (std::size_t i = 0U; i < defaults.size(); ++i)
+    payload[kCapabilitiesResponseDefaultsOffset + i] = defaults[i];
+  std::uint8_t count = 0U;
+  std::array<bool, kMaxCpuProfiles> used_cpus{};
+  for (const auto& tuple : kSelectableConfigurations) {
+    if (!application.supports(settings::record(tuple))) continue;
+    if (count == kMaxConfigurationTuples) return badLength();
+    for (std::size_t i = 0U; i < kSettingsPayloadSize; ++i)
+      payload[kCapabilitiesResponseConfigurationsOffset +
+              count * kSettingsPayloadSize + i] = tuple[i];
+    used_cpus[tuple[kSettingsCpuProfileOffset] - 1U] = true;
+    ++count;
+  }
+  payload[kCapabilitiesResponseConfigurationCountOffset] = count;
+  count = 0U;
+  for (std::size_t cpu = 0U; cpu < used_cpus.size(); ++cpu) {
+    if (!used_cpus[cpu]) continue;
+    for (std::size_t i = 0U; i < kCpuProfileInfoPayloadSize; ++i)
+      payload[kCapabilitiesResponseCpuProfilesOffset +
+              count * kCpuProfileInfoPayloadSize + i] = kCpuProfiles[cpu][i];
+    ++count;
+  }
+  payload[kCapabilitiesResponseCpuProfileCountOffset] = count;
+  payload[kCapabilitiesResponseRateProfileCountOffset] = 1U;
+  for (std::size_t i = 0U; i < kRateProfileInfoPayloadSize; ++i)
+    payload[kCapabilitiesResponseRateProfilesOffset + i] = kRateProfiles[0][i];
+  // Existing packet pages remain 4096 bytes. Reserve the public encoding
+  // prefix; do not copy the reference contract's larger frame maximum.
+  constexpr std::uint32_t samples =
+      protocol_v1::kMaxDataFrameBytes - kMinFrameBytes - kDataPrefixBytes;
+  const std::uint32_t limits[] = {
+      protocol_v1::kMaxDataFrameBytes,
+      static_cast<std::uint32_t>(ControlFrame::capacity()),
+      samples,
+      samples,
+      samples / 4U,
+      samples,
+      samples / 2U};
+  for (std::size_t i = 0U; i < 7U; ++i)
+    storeU32(bytes, kCapabilitiesResponseMaxDataFrameBytesOffset + i * 4U,
+             limits[i]);
+  return encodeFrame(responseFields(static_cast<protocol_v1::FrameKind>(
+                                        FrameKind::kGetCapabilitiesResponse),
+                                    request, run_id),
+                     view(payload), output);
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.encodeV3InfoResponse")
+Result encodeV3InfoResponse(const Request& request, std::uint32_t run_id,
+                            std::uint32_t serial,
+                            const settings::Clocks& clocks,
+                            ControlFrame& output) {
+  using namespace protocol_v3;
+  if (request.protocol_version != kProtocolVersion ||
+      request.kind != protocol_v1::CommandKind::kInfo)
+    return badKind();
+  std::array<std::uint8_t, kInfoResponsePayloadSize> payload{};
+  const auto bytes = mutableView(payload);
+  storeU16(bytes, kInfoResponseBoardIdOffset,
+           static_cast<std::uint16_t>(BoardId::kTeensy40));
+  storeU16(bytes, kInfoResponseMcuIdOffset,
+           static_cast<std::uint16_t>(McuId::kImxrt1062));
+  payload[kInfoResponseProtocolVersionOffset] = kProtocolVersion;
+  payload[kInfoResponseAdcResolutionBitsOffset] = 12U;
+  // Match the decimal hardware serial used by the USB/legacy identity.
+  std::array<std::uint8_t, 10U> digits{};
+  std::size_t count = 0U;
+  do {
+    digits[count++] = static_cast<std::uint8_t>('0' + serial % 10U);
+    serial /= 10U;
+  } while (serial != 0U);
+  for (std::size_t i = 0U; i < count; ++i)
+    payload[kInfoResponseHardwareSerialOffset + i] = digits[count - i - 1U];
+  const std::uint8_t versions[] = {identity::kFirmwareVersion.major,
+                                   identity::kFirmwareVersion.minor,
+                                   identity::kFirmwareVersion.patch};
+  std::size_t at = kInfoResponseFirmwareVersionOffset;
+  for (std::size_t component = 0U; component < 3U; ++component) {
+    std::uint32_t value = versions[component];
+    count = 0U;
+    do {
+      digits[count++] = static_cast<std::uint8_t>('0' + value % 10U);
+      value /= 10U;
+    } while (value != 0U);
+    for (std::size_t i = 0U; i < count; ++i)
+      payload[at++] = digits[count - i - 1U];
+    if (component < 2U) payload[at++] = '.';
+  }
+  for (std::size_t i = 0U; i < identity::kBuildId.size(); ++i)
+    payload[kInfoResponseBuildIdOffset + i] =
+        static_cast<std::uint8_t>(identity::kBuildId[i]);
+  for (std::size_t i = 0U; i < clocks.size(); ++i)
+    payload[kInfoResponseClocksOffset + i] = clocks[i];
+  return encodeFrame(
+      responseFields(protocol_v1::FrameKind::kInfoResponse, request, run_id),
+      view(payload), output);
+}
+
+THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.encodeV3StatusResponse")
+Result encodeV3StatusResponse(const Request& request, std::uint32_t run_id,
+                              const V3Status& status, ControlFrame& output) {
+  using namespace protocol_v3;
+  if (request.protocol_version != kProtocolVersion ||
+      (request.kind != protocol_v1::CommandKind::kStop &&
+       request.kind != protocol_v1::CommandKind::kGetStatus))
+    return badKind();
+  std::array<std::uint8_t, kStatusResponsePayloadSize> payload{};
+  const auto bytes = mutableView(payload);
+  payload[kStatusResponseStateOffset] = static_cast<std::uint8_t>(status.state);
+  storeU32(bytes, kStatusResponseRunIdOffset, run_id);
+  storeU32(bytes, kStatusResponsePendingFramesOffset, status.pending_frames);
+  for (std::size_t i = 0U; i < status.counters.size(); ++i)
+    storeU64(bytes, kStatusResponseAdcFramesProducedOffset + i * 8U,
+             status.counters[i]);
+  const bool stop = request.kind == protocol_v1::CommandKind::kStop;
+  return encodeFrame(
+      responseFields(stop ? protocol_v1::FrameKind::kStopResponse
+                          : protocol_v1::FrameKind::kGetStatusResponse,
+                     request, run_id),
+      {payload.data(), stop ? kStopResponsePayloadSize : payload.size()},
+      output);
+}
+
 THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.request_decode")
 Result decodeRequest(ByteView input, Request &request) {
   DecodedFrame frame{};
   Result result = decodeFrame(input, frame);
   if (!result.ok()) {
     return result;
+  }
+  if (frame.header.version == protocol_v3::kProtocolVersion) {
+    if (!v3Request(frame.header.kind)) return badKind();
+    Request decoded{};
+    decoded.kind = static_cast<protocol_v1::CommandKind>(frame.header.kind);
+    decoded.request_id = frame.header.request_id;
+    decoded.protocol_version = protocol_v3::kProtocolVersion;
+    if (decoded.kind == protocol_v1::CommandKind::kConfigure)
+      for (std::size_t i = 0U; i < decoded.settings.size(); ++i)
+        decoded.settings[i] = frame.payload.data[i];
+    request = decoded;
+    return Result::success();
   }
   if (input_experiment::kReleaseFixed1MHz &&
       frame.header.version != protocol_v2::kProtocolVersion) {
@@ -4233,6 +4719,26 @@ THINGDAQ_PROTOCOL_COLD_CODE(".flashmem.protocol.typed_error_response")
 Result encodeTypedErrorResponse(const Request &request, std::uint32_t run_id,
                                 protocol_v1::ErrorCode error,
                                 ControlFrame &output) {
+  if (request.protocol_version == protocol_v3::kProtocolVersion) {
+    std::array<std::uint8_t, protocol_v3::kErrorResponsePayloadSize> payload{};
+    writeErrorPrefix(mutableView(payload), error);
+    FrameFields fields{};
+    fields.version = protocol_v3::kProtocolVersion;
+    fields.request_id = request.request_id;
+    fields.run_id = run_id;
+    fields.flags = kResponseErrorFlag;
+    const auto kind = static_cast<std::uint8_t>(request.kind);
+    const bool known = isV3Command(kind);
+    fields.kind = known ? static_cast<protocol_v1::FrameKind>(kind | 0x80U)
+                        : protocol_v1::FrameKind::kErrorResponse;
+    if (!known) payload[protocol_v3::kErrorResponseRejectedKindOffset] = kind;
+    return encodeFrame(
+        fields,
+        {payload.data(),
+         known ? protocol_v3::kResponsePrefixPayloadSize : payload.size()},
+        output);
+  }
+
   if (request.request_id == 0U) {
     return badRequestId();
   }
@@ -4286,7 +4792,14 @@ Result encodeRejectedFrameResponse(std::uint32_t request_id,
                                    std::uint8_t rejected_kind,
                                    std::uint8_t rejected_version,
                                    protocol_v1::ErrorCode error,
-                                   ControlFrame &output) {
+                                   ControlFrame &output, std::uint32_t run_id) {
+  if (rejected_version == protocol_v3::kProtocolVersion) {
+    Request request{};
+    request.protocol_version = protocol_v3::kProtocolVersion;
+    request.kind = static_cast<protocol_v1::CommandKind>(rejected_kind);
+    request.request_id = request_id;
+    return encodeTypedErrorResponse(request, run_id, error, output);
+  }
   if (request_id == 0U) {
     return badRequestId();
   }
@@ -4365,6 +4878,53 @@ IncrementalCommandParser::DrainResult IncrementalCommandParser::drain(
     if (buffered_ < protocol_v1::kHeaderSize) {
       return DrainResult::kNone;
     }
+    // V3 rejects only complete, bounded, checksummed requests. In particular,
+    // never reflect untrusted IDs from a damaged or truncated header.
+    if (buffer_[protocol_v3::kHeaderVersionOffset] ==
+        protocol_v3::kProtocolVersion) {
+      const ByteView bytes{buffer_.data(), buffered_};
+      std::uint32_t total = 0U, payload = 0U, checksum = 0U;
+      std::uint16_t header_size = 0U;
+      loadU32(bytes, protocol_v3::kHeaderTotalLengthOffset, total);
+      loadU32(bytes, protocol_v3::kHeaderPayloadLengthOffset, payload);
+      loadU16(bytes, protocol_v3::kHeaderHeaderLengthOffset, header_size);
+      if (header_size != protocol_v3::kHeaderSize ||
+          total < protocol_v3::kMinFrameBytes ||
+          total > protocol_v3::kMaxCommandFrameBytes ||
+          payload != total - protocol_v3::kMinFrameBytes) {
+        recordFailure(badLength());
+        discard(1U);
+        continue;
+      }
+      if (buffered_ < total) return DrainResult::kNone;
+      loadU32(bytes, total - protocol_v3::kTrailerSize, checksum);
+      if (adler32({buffer_.data(), total - protocol_v3::kTrailerSize}) !=
+          checksum) {
+        recordFailure(badChecksum());
+        discard(1U);
+        continue;
+      }
+      Request request{};
+      const Result result = decodeRequest({buffer_.data(), total}, request);
+      if (!result.ok()) {
+        recordFailure(result);
+        const bool rejection = describeRejection(result, command);
+        discard(total);
+        if (rejection) return DrainResult::kRejection;
+        continue;
+      }
+      command = {};
+      command.frame.setSize(total);
+      for (std::size_t i = 0U; i < total; ++i)
+        command.frame.mutableData()[i] = buffer_[i];
+      command.request = request;
+      for (std::size_t i = total; i < buffered_; ++i)
+        buffer_[i - total] = buffer_[i];
+      buffered_ -= total;
+      saturatingIncrement(counters_.commands_accepted);
+      resynchronizing_ = false;
+      return DrainResult::kCommand;
+    }
     FrameHeader header{};
     Result result = decodeHeader({buffer_.data(), buffered_}, header, true);
     if (!result.ok()) {
@@ -4416,14 +4976,17 @@ bool IncrementalCommandParser::describeRejection(
     return false;
   }
   std::uint32_t request_id = 0U;
-  if (!loadU32({buffer_.data(), buffered_},
-               protocol_v1::kHeaderRequestIdOffset, request_id) ||
-      request_id == 0U) {
+  if (!loadU32({buffer_.data(), buffered_}, protocol_v1::kHeaderRequestIdOffset,
+               request_id) ||
+      (request_id == 0U && buffer_[protocol_v1::kHeaderVersionOffset] !=
+                               protocol_v3::kProtocolVersion)) {
     return false;
   }
 
   ParsedCommand rejected{};
-  rejected.rejection_error = failure.error;
+  rejected.rejection_error = request_id == 0U &&
+      buffer_[protocol_v1::kHeaderVersionOffset] == protocol_v3::kProtocolVersion
+      ? protocol_v1::ErrorCode::kInvalidRequestId : failure.error;
   rejected.rejected_request_id = request_id;
   rejected.rejected_kind =
       buffer_[protocol_v1::kHeaderKindOffset];

@@ -623,7 +623,7 @@ void testGoldenEncode(const std::string &fixture_directory,
 
 void testFixedCapacityBoundaries() {
   static_assert(wire::CommandFrame::capacity() ==
-                experimental_constants::kMaxCommandFrameBytes);
+                thingdaq::protocol_v3::kMaxCommandFrameBytes);
   static_assert(wire::ControlFrame::capacity() ==
                 experimental_constants::kMaxControlFrameBytes);
   static_assert(constants::kMaxCommandFrameBytes <=
@@ -806,7 +806,7 @@ void expectDecodeError(const std::vector<std::uint8_t> &bytes,
 void testValidation(const std::string &fixture_directory) {
   const std::vector<std::uint8_t> info =
       readFixture(fixture_directory, "info-request.bin");
-  expectDecodeError(mutated(info, constants::kHeaderVersionOffset, 3U),
+  expectDecodeError(mutated(info, constants::kHeaderVersionOffset, 4U),
                     constants::ErrorCode::kUnsupportedVersion,
                     "reject bad version");
   expectDecodeError(mutated(info, constants::kHeaderKindOffset, 0xFEU),
@@ -904,7 +904,7 @@ void testParser(const std::string &fixture_directory) {
   const std::vector<std::uint8_t> response =
       readFixture(fixture_directory, "stop-response.bin");
   std::vector<std::vector<std::uint8_t>> corruptions{
-      mutated(info, constants::kHeaderVersionOffset, 3U),
+      mutated(info, constants::kHeaderVersionOffset, 4U),
       mutated(info, constants::kHeaderKindOffset, 0xFEU),
       mutated(info, constants::kHeaderFlagsOffset, 1U),
       mutated(info, constants::kHeaderHeaderLengthOffset, 43U),

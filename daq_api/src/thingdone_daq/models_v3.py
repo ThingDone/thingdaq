@@ -30,6 +30,25 @@ _LIMITS = (
 )
 
 
+def _validate_limits(limits: tuple[int, ...]) -> None:
+    for value, maximum in zip(limits, _LIMITS, strict=True):
+        _require(
+            isinstance(value, int)
+            and not isinstance(value, bool)
+            and 0 < value <= maximum,
+            "advertised limit outside canonical bounds",
+        )
+    frame, control, logical, encoded, adc, gpio8, gpio16 = limits
+    _require(
+        control >= c.MIN_FRAME_BYTES + c.CAPABILITIES_RESPONSE_PAYLOAD_SIZE
+        and frame >= c.MIN_FRAME_BYTES + c.DATA_PREFIX_BYTES + encoded
+        and adc * 4 <= logical
+        and gpio8 <= logical
+        and gpio16 * 2 <= logical,
+        "inconsistent device limits",
+    )
+
+
 def _pack(fmt: str, *values: int | bytes) -> bytes:
     try:
         return struct.pack(fmt, *values)
@@ -359,7 +378,7 @@ class V3Capabilities:
             self.max_gpio8_samples,
             self.max_gpio16_samples,
         )
-        _require(limits == _LIMITS, "advertised limits differ from canonical bounds")
+        _validate_limits(limits)
         counts = (
             len(self.cpu_profiles),
             len(self.rate_profiles),
@@ -379,10 +398,7 @@ class V3Capabilities:
             and len(set(settings)) == counts[2],
             "duplicate table records",
         )
-        _require(
-            self.defaults.to_bytes() == c.DEFAULT_SETTINGS[0],
-            "incorrect board defaults",
-        )
+        self.defaults.to_bytes()
         _require(
             self.defaults in self.configurations, "defaults absent from configurations"
         )
@@ -418,7 +434,7 @@ class V3Capabilities:
         _, _, _, nc, nr, ns, reserved, *tail = fields
         _require(reserved == 0, "nonzero capability reserved field")
         limits = tuple(tail[:7])
-        _require(limits == _LIMITS, "advertised limits differ from canonical bounds")
+        _validate_limits(limits)
         default, cpus, rates, settings = tail[7:]
         cpu_records = _table(cpus, nc, c.MAX_CPU_PROFILES, _CLOCKS.size)
         rate_records = _table(rates, nr, c.MAX_RATE_PROFILES, _RATE.size)
@@ -430,6 +446,7 @@ class V3Capabilities:
             tuple(V3Clocks.from_bytes(record) for record in cpu_records),
             tuple(V3Rate.from_bytes(record) for record in rate_records),
             tuple(V3Settings.from_bytes(record) for record in settings_records),
+            *limits,
         )
         result.to_payload()
         return result

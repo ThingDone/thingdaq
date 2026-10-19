@@ -117,3 +117,49 @@ simulated lifecycle only. It does not establish firmware integration, physical
 clock switching, sustained USB/host throughput, analog accuracy, external pin
 timing or thermal reliability. Those require subsequent implementation and
 qualification; private-codec hardware evidence does not qualify public v3.
+
+## Firmware control contract checkpoint (2026-10-19)
+
+The existing C++ incremental parser, dispatcher and USB response queue now
+understand all seven v3 control IDs and their request/response schemas. This
+checkpoint implements discovery, capability/settings selection and serializers;
+it does **not** enable public-v3 acquisition. START returns
+UNSUPPORTED_CONFIGURATION until the following lifecycle/data-path tasks wire
+public framing into acquisition. A successful fake application is portable
+control evidence only. [[protocol-v3-firmware-control]] records validation.
+
+`firmware/src/v3_settings.h` separates canonical board definitions, build defaults,
+active settings/readback and an injectable application interface. Production
+exposes twelve RAW tuples at its single build-fixed 450 or 600 MHz clock. It
+performs no clock register writes; 528 MHz research builds cannot describe a
+public-v3 settings tuple. The portable fake exposes all sixty board tuples to
+exercise the same capability serializer and membership checks. Codec promotion
+will replace the temporary RAW build defaults with compressed 600 MHz defaults.
+Queries leave acquisition, negotiated mode, run identity and statistics generation
+unchanged. CONFIGURE publishes settings only after successful exact adapter
+readback. Application implementations own hardware atomicity; the subsequent
+transactional task owns rollback orchestration and complete v2/v3 lifecycle
+integration. The fixed-build adapter applies software selections only.
+
+The capability contract now permits positive device limits bounded by canonical
+maxima and build defaults belonging to the advertised subset. Previously the
+schema and Python reader required reference limits/defaults, which would force
+this fixed-clock checkpoint to misreport its capabilities. Generated schemas,
+wire layouts and golden frame bytes remain unchanged; source hashes were
+regenerated. The public Python reader preserves and validates these device
+limits, checks capacity relationships and still rejects duplicate/unknown
+records or defaults absent from the tuple set.
+
+The control response buffer remains 1,536 bytes (the capability frame is 1,452),
+and packet pages remain 4,096 bytes. The advertised sample capacity reserves the
+12-byte v3 encoding prefix: 4,036 bytes, up to 1,009 ADC pairs, 4,036 GPIO8 samples
+or 2,018 GPIO16 samples. These are storage ceilings, not a claim that v3 frames
+are already emitted. The command buffer is 68 bytes and parser retention is
+71 bytes, accounted as 72 aligned bytes. The resource registry also corrects its
+old v1-sized accounting for existing v2 response buffers; no pool was enlarged.
+
+The parser verifies bounded framing/checksum before reflecting malformed v3
+requests, emits typed or generic errors with the current run ID, and retains
+legacy malformed-frame handling. Pending-frame metadata includes complete
+pages awaiting deferred codecs and partial USB frames, excluding unfinished
+producer leases. Existing DMA/USB/deferred codec algorithms remain unchanged.

@@ -2087,10 +2087,10 @@
     }
   ],
   "capability_semantics": {
-    "profiles": "CPU and rate records define known IDs and clocks, not permission to select their Cartesian product. Only a byte-exact settings record in configurations is selectable. Devices may advertise a nonempty subset of the canonical selectable_configurations, including defaults; every nonreserved setting participates even when its stream is disabled.",
+    "profiles": "CPU and rate records define known IDs and clocks, not permission to select their Cartesian product. Only a byte-exact settings record in configurations is selectable. Devices may advertise a nonempty subset of the canonical selectable_configurations, with build-specific defaults selected from that subset; every nonreserved setting participates even when its stream is disabled.",
     "tables": "Fixed capacity: 2 CPU records, 1 rate record, 64 complete settings records. Counts select leading valid records; all bytes of unused records MUST be zero (including normally nonzero fields). Reject zero counts, counts above capacity, duplicate IDs/tuples, unknown IDs, inconsistent clock/rate/width/policy fields or defaults absent from configurations. CPU/rate definitions can be known without appearing in a selectable tuple. No trailing extension bytes in v3.",
     "identity": "Only Teensy 4.0/IMXRT1062 is defined. simulated=1 identifies emulated board metadata; hardware_serial must start SIM- in that case. nul_ascii fields require printable ASCII, one terminator and all-zero trailing padding; hardware_serial, firmware_version and build_id are nonempty. INFO clocks report active settings; GET_SETTINGS also returns these clocks.",
-    "limits": "Advertised limits equal the canonical v3 bounds; smaller hardware queues are internal. All bounds apply before allocation/decompression. Capability response itself is bounded by max_control_frame_bytes."
+    "limits": "Advertised device limits are positive and no greater than the canonical v3 bounds. max_control_frame_bytes must fit the capability response; max_data_frame_bytes must fit the advertised encoded sample bound plus framing and encoding prefix. Logical item maxima must fit max_logical_payload_bytes. All bounds apply before allocation/decompression. Hardware queues remain internal."
   },
   "frame_kinds": [
     {

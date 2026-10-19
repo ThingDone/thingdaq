@@ -45,7 +45,8 @@ LoopReport FirmwareRuntime::service() {
       report.rejected_command_dispatched = true;
       const protocol::Result encoded = protocol::encodeRejectedFrameResponse(
           command.rejected_request_id, command.rejected_kind,
-          command.rejected_version, command.rejection_error, response);
+          command.rejected_version, command.rejection_error, response,
+          control_.runId());
       if (encoded.ok()) {
         response_ready = true;
       } else {
@@ -62,6 +63,11 @@ LoopReport FirmwareRuntime::service() {
         publishPacketStatistics();
       }
       control::DispatchReadiness readiness{};
+      if (command.request.protocol_version == protocol_v3::kProtocolVersion) {
+        const auto packets = packet_pipeline_.snapshot();
+        readiness.pending_frames = static_cast<std::uint32_t>(
+            packets.pending_frames);
+      }
       if (command.request.kind == protocol::kGetRuntimeHealth && health_reader_ != nullptr) {
         readiness.runtime_health = health_reader_();
       }

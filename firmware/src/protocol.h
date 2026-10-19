@@ -1,15 +1,15 @@
 #pragma once
 
-#include "input_experiment_profile.h"
-
 #include <array>
 #include <cstddef>
 #include <cstdint>
 
 #include "generated/protocol_constants.h"
 #include "generated/protocol_v2_constants.h"
-#include "temperature.h"
+#include "input_experiment_profile.h"
 #include "runtime_health.h"
+#include "temperature.h"
+#include "v3_settings.h"
 
 namespace thingdaq::protocol {
 
@@ -161,9 +161,11 @@ class FixedFrame {
   std::size_t size_ = 0U;
 };
 
-using CommandFrame = FixedFrame<protocol_v2::kMaxCommandFrameBytes>;
+using CommandFrame = FixedFrame<protocol_v3::kMaxCommandFrameBytes>;
 using ControlFrame = FixedFrame<protocol_v2::kMaxControlFrameBytes>;
 using DataFrame = FixedFrame<protocol_v1::kMaxDataFrameBytes>;
+static_assert(protocol_v3::kCapabilitiesResponsePayloadSize +
+                  protocol_v3::kMinFrameBytes <= ControlFrame::capacity());
 
 Result decodeFrame(ByteView input, DecodedFrame &frame);
 Result encodeFrameTo(FrameFields fields, ByteView payload,
@@ -257,11 +259,35 @@ struct Request {
   protocol_v1::CommandKind kind = protocol_v1::CommandKind::kInfo;
   std::uint32_t request_id = 0U;
   Configuration configuration{};
+  settings::Record settings = settings::kBuildDefaults;
   ChecksumBenchmarkRequest checksum_benchmark{};
   GpioClockDiagnosticRequest gpio_clock_diagnostic{};
   std::uint64_t nonce = 0U;
   std::uint8_t protocol_version = protocol_v1::kProtocolVersion;
 };
+
+// V3 controls retain the legacy envelope and bounded response storage.
+bool isV3Command(std::uint8_t kind);
+Result validateV3Settings(ByteView bytes);
+Result encodeV3SettingsResponse(const Request& request, std::uint32_t run_id,
+                                const settings::Applied& applied,
+                                ControlFrame& output);
+Result encodeV3CapabilitiesResponse(const Request& request,
+                                    std::uint32_t run_id,
+                                    const settings::Application& application,
+                                    ControlFrame& output);
+Result encodeV3InfoResponse(const Request& request, std::uint32_t run_id,
+                            std::uint32_t serial,
+                            const settings::Clocks& clocks,
+                            ControlFrame& output);
+struct V3Status {
+  protocol_v3::DeviceState state = protocol_v3::DeviceState::kStopped;
+  std::uint32_t pending_frames = 0U;
+  // ADC frames produced/dropped, items produced/dropped; then GPIO.
+  std::array<std::uint64_t, 8U> counters{};
+};
+Result encodeV3StatusResponse(const Request& request, std::uint32_t run_id,
+                              const V3Status& status, ControlFrame& output);
 
 struct ParsedCommand {
   CommandFrame frame{};
@@ -934,11 +960,12 @@ Result encodeRejectedFrameResponse(std::uint32_t request_id,
                                    std::uint8_t rejected_kind,
                                    std::uint8_t rejected_version,
                                    protocol_v1::ErrorCode error,
-                                   ControlFrame &output);
+                                   ControlFrame &output,
+                                   std::uint32_t run_id = 0U);
 
 inline constexpr std::size_t kMagicBytes = sizeof(std::uint32_t);
 inline constexpr std::size_t kCommandParserStorageBytes =
-    protocol_v2::kMaxCommandFrameBytes + kMagicBytes - 1U;
+    protocol_v3::kMaxCommandFrameBytes + kMagicBytes - 1U;
 
 struct ParserCounters {
   std::uint64_t bytes_received = 0U;
@@ -999,6 +1026,6 @@ class IncrementalCommandParser {
 static_assert(protocol_v1::kMaxCommandFrameBytes <=
               protocol_v1::kMaxControlFrameBytes);
 static_assert(kCommandParserStorageBytes ==
-              protocol_v2::kMaxCommandFrameBytes + 3U);
+              protocol_v3::kMaxCommandFrameBytes + 3U);
 
 }  // namespace thingdaq::protocol
