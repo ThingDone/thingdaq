@@ -295,6 +295,50 @@ and 47 subtests**, with two intentional 450 MHz compression skips. Generator
 drift (142 files), repository Ruff formatting/lint and SDK mypy checks passed.
 No task images were supplied or analyzed.
 
+## Task 3: blocked on bounded core transition semantics
+
+Rechecked 2026-10-19 before implementing the hardware adapter. The installed
+1.62.0 `clockspeed.c` still matches the SHA-256 below. Its hardware waits at
+lines 99, 127, 132, 171, 179, 186, 201 and 215 have no timeout, cancellation
+hook or failure return. Both supported profiles require an ARM PLL change;
+the PLL-lock wait at line 171 is therefore on the runtime transition path.
+The only return is the calculated frequency at line 218.
+
+This conflicts with task 3's combined requirements to use that core routine,
+bound command handling, preserve USB responsiveness and return an explicit
+application failure. `settings::Application::apply` is synchronous, and
+`ControlState::applySettings` cannot attempt rollback or encode an error until
+it returns. A deadline checked after `set_arm_clock` returns cannot contain a
+stuck wait. Prevalidation and register readback also cannot make the call
+return when a hardware handshake fails. Leaving interrupts enabled does not
+ensure command dispatch resumes.
+
+The sketch still disables `watchdog::begin()` at `firmware/firmware.ino:57`.
+Enabling a reset watchdog could bound a hang, but would terminate the USB
+session and lose the in-flight request instead of returning its required
+error response. It would require an explicit reset/reconnect failure contract.
+The current builder pins core 1.62.0; no bounded replacement is provided by
+the inspected routine. Interrupt-driven escape from a partially executed
+clock sequence has no supported recovery contract in that implementation.
+
+**Resume prerequisite:** revise the transition contract to select either a
+reviewed, versioned core modification with bounded waits and defined recovery,
+or reset/reconnect containment for nonreturning core failures (including the
+watchdog-policy exception and host-visible failure behavior). Neither is an
+implementation-equivalent substitution for the task as written. A bounded
+core modification still needs to define what happens if rollback itself hangs.
+
+Task 3 remains unchecked and the local Phase 04 playbook has a halt marker,
+because subsequent integration and qualification depend on this decision.
+No adapter, firmware behavior, toolchain installation or watchdog policy was
+changed; no target build, flashing or physical testing was performed. No task
+images were supplied or analyzed. This records a blocker, not completion of
+the hardware adapter.
+
+Documentation validation: `test_documentation_integrity.py` passed all four
+tests and 1,075 subtests; `git diff --check` passed. The playbook lives under
+the repository's ignored `.maestro/` directory; its halt marker remains local.
+
 ## Installed source fingerprints
 
 SHA-256 of the inspected local core files (relative to `cores/teensy4/`).
