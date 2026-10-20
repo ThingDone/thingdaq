@@ -12,7 +12,12 @@ related:
   - '[[Hardware-Safety]]'
 ---
 
-# Protocol v2 — firmware 1.1.0
+# Protocol v2 — historical compatibility guide for firmware 1.1.0
+
+This page preserves the 1.1.0 wire specification and measurements. Current
+development defaults are in [[protocol-v3]]; mixed-version operation is in
+[[protocol-v3-migration]]. New firmware retains explicit v2 RAW acquisition at
+its actual fixed build clock. The 450 MHz policy below belongs to 1.1.0 only.
 
 Firmware and Python API **1.1.0 use wire protocol 2**, not 3. This is the first
 stable v2 release. Firmware 1.0.0 used v1. Experimental v2 snapshots were not a

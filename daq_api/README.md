@@ -1,36 +1,44 @@
 # thingdone-daq: ThingDAQ Python API
 
-Release 1.1.0 uses [Protocol-V2](https://github.com/ThingDone/thingdaq/blob/main/doc/protocol/protocol-v2.md): fixed 1 MHz ADC/GPIO and a 450 MHz core.
-Default hardware configuration selects 8 GPIO inputs; pass
-`aux_bank_mode=AuxBankMode.INPUT` for 16. `daq.get_temperature()` returns a
-`TemperatureReading` with sensor `status`, signed `millidegrees_c` and
-`celsius`; non-valid readings have `None` values. This is die, not ambient,
-temperature. Reading it does not change the acquisition state.
+The **1.2.0 development candidate** negotiates public **v3** with fixed
+**600 MHz**, **1 MHz ADC pairs/GPIO**, **12-bit ADC PACK12**, **GPIO RLE_AUTO**,
+and auxiliary **DISABLED** (8 inputs). INPUT selects 16 inputs. Firmware,
+Python and wire versions are independent. Physical qualification is **NOT_RUN**;
+historical 1.1.0/v2 evidence does not qualify this candidate.
 
-With the firmware hardening build, `daq.get_runtime_health()` reports the
-boot-lifetime stack watermark, watchdog status and reset cause. It can be read
-through the same client during acquisition; see the
-[runtime health guide](../doc/results/firmware-runtime-hardening.md).
+Install the candidate from a repository checkout with
+`python -m pip install ./daq_api` (repository root), or install its locally
+built wheel. The PyPI commands below select the published package, which need
+not include this development candidate. Once installed, no checkout is needed:
 
-The legacy `gpio_capture_diagnostic()` is unavailable in this release: its
-fixed 4 MHz path is disabled and its INFO capability bit is clear. The separate
-`gpio_clock_diagnostic()` remains available at 1 MHz only.
+```bash
+python -m thingdone_daq.protocol_upgrade
+thingdone-daq probe --simulate --simulator-version 3 --json
+thingdone-daq configure --simulate --simulator-version 3 --json
+thingdone-daq capture --simulate --simulator-version 3 --duration 0.1 --strict-loss --json
+```
 
-The optional `TimestampAligner` rejects the new equal-rate profile because
-one GPIO frame spans four ADC frames. Use `read_block()` / `blocks()` and
-per-sample timestamps. Historical simulator profiles remain available offline
-and do not imply release hardware support.
+`probe` reports identity, capabilities, defaults and active settings/clocks.
+Stopped `configure` verifies its echo and GET_SETTINGS readback. Each simulated
+CLI invocation creates a fresh peer; the upgrade demo retains a session across
+compressed/RAW/default changes and verifies v1/v2 compatibility. The omitted
+simulator version remains historical v1.
 
-Physical SDK validation passes ADC-only, GPIO-only (8/16 inputs), and combined
-8-input capture on the remote test server. Combined16 reproduces firmware USB
-queue loss under its 0.5-core CPU quota. Two allocated cores pass short captures,
-width transitions and a 600-second SDK repeat, but another SDK attempt timed out
-after 50.08 seconds with two firmware ADC DMA error events and zero CPU throttling. Sustained
-combined16 SDK operation therefore remains unqualified. The independent wire
-validator passes 600 seconds with two cores on the same firmware.
-Historical parser rejections were not reproduced; their cause remains unresolved.
-See the [current baseline and CPU comparison](../doc/results/watchdog-sdk-20260927.md).
-Keep strict loss checking enabled and validate the intended host.
+After checking the [hardware safety guide](https://github.com/ThingDone/thingdaq/blob/main/doc/reference/hardware-safety.md),
+substitute the attached device's serial for these physical commands:
+
+```bash
+thingdone-daq probe --hardware-serial 20512460 --json
+thingdone-daq configure --hardware-serial 20512460 --json
+thingdone-daq capture --hardware-serial 20512460 --duration 10 --strict-loss
+```
+
+Read the [v3 contract](https://github.com/ThingDone/thingdaq/blob/main/doc/protocol/protocol-v3.md)
+and [migration guide](https://github.com/ThingDone/thingdaq/blob/main/doc/guides/protocol-v3-migration.md)
+for exact tuples, stopped readback, reset/reconnect and explicit older-client
+v2 RAW operation. Selecting RAW in a v3 session does not select v2 framing.
+V3 STATUS exposes validity-marked measurements; unavailable diagnostics are
+`None`/JSON `null`. Temperature/runtime-health commands remain legacy-only.
 
 Install **thingdone-daq** and import **thingdone_daq** (Python 3.10–3.14):
 
@@ -43,8 +51,10 @@ python -m pip install 'thingdone-daq[numpy]'
 ```python
 from thingdone_daq import ThingDAQ
 
-with ThingDAQ.simulated() as daq:
-    print(daq.info())
+with ThingDAQ.simulated(protocol_version=3) as daq:
+    print(daq.info(), daq.get_capabilities())
+    applied = daq.configure()
+    assert applied == daq.get_settings()
 ```
 
 The CLI commands are `thingdone-daq`, `thingdone-daq-demo`, and
@@ -70,7 +80,7 @@ python3 -m pip install --editable '.[dev,numpy]'
 See [System-Overview](https://github.com/ThingDone/thingdaq/blob/main/doc/architecture/system-overview.md) for the package boundary and
 [Foundation-Reuse-Inventory](https://github.com/ThingDone/thingdaq/blob/main/doc/reference/Foundation-Reuse-Inventory.md) for the implementation-pattern audit.
 
-## Public v3 development simulator
+## Public v3 configuration and offline simulator
 
 The development firmware and explicit v3 simulator use a **fixed 600 MHz** CPU,
 1 MHz ADC/GPIO sampling and an 8 MHz timestamp domain. The simulator advertises
@@ -103,7 +113,7 @@ with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
     assert daq.configure().settings == daq.capabilities.defaults  # RLE_AUTO/PACK12
 ```
 
-Run `.venv/bin/python daq_api/examples/protocol_upgrade.py` from the checkout for
+Run `python -m thingdone_daq.protocol_upgrade` from the installed package for
 stopped compressed/RAW/default changes and lossless captures at fixed 600 MHz.
 Simulator clocks are metadata; physical public-v3 qualification remains pending.
 See the [v3 protocol guide](https://github.com/ThingDone/thingdaq/blob/main/doc/protocol/protocol-v3.md)
@@ -112,7 +122,8 @@ and [API reference](https://github.com/ThingDone/thingdaq/blob/main/doc/referenc
 ## Distribution and publication boundary
 
 The host API and firmware are versioned independently from the wire protocol;
-release 1.1.0 assigns semantic version `1.1.0` to both and uses wire protocol v2. The
+this candidate assigns semantic version `1.2.0` to both and uses wire protocol v3.
+Historical release 1.1.0 used wire protocol v2. The
 host value is single-sourced in `thingdone_daq._version`, exposed as
 `thingdone_daq.__version__`, and consumed by the build metadata declared in
 `pyproject.toml`. Firmware single-sources its value in
@@ -156,7 +167,7 @@ state, and `SOURCE_DATE_EPOCH`.
 
 The synchronous `ThingDAQ` facade operates on a small `ByteTransport`
 interface. `InMemoryTransport` connects that facade to `SimulatedDevice`
-through encoded protocol-v1 or negotiated protocol-v2 bytes,
+through encoded protocol-v1/v2 bytes; `SimulatedV3Device` supplies public v3,
 including arbitrary partial read/write
 boundaries. `SerialTransport` implements the same interface over PySerial, so
 command and streaming code does not depend on the concrete byte source. The
@@ -166,13 +177,13 @@ a second command decoder or direct-read shortcut:
 ```python
 from thingdone_daq import ADCBlock, HostQueueLoss, StreamAnomaly, StreamGap, ThingDAQ
 
-with ThingDAQ.simulated(read_chunk_size=47) as daq:
+with ThingDAQ.simulated(protocol_version=3, read_chunk_size=47) as daq:
     info = daq.info()
     applied = daq.configure(
         adc=True,
         gpio=True,
         adc_pair_rate_hz=1_000_000,
-        gpio_sample_rate_hz=4_000_000,
+        gpio_sample_rate_hz=1_000_000,
         adc_resolution_bits=12,
     )
     run_id = daq.start()
@@ -189,7 +200,7 @@ with ThingDAQ.simulated(read_chunk_size=47) as daq:
 
     final = daq.status()
     daq.stop()
-    generation = daq.reset_stats()  # valid after STOP, or while CONFIGURED
+    assert daq.get_settings() == applied  # STOP preserves v3 settings
 ```
 
 `ThingDAQ.open(...)` and `ThingDAQ.simulated(...)` return the same typed
@@ -203,7 +214,10 @@ compatibility.
 
 CONFIGURE is capability-driven. The facade rejects unsupported stream, source,
 checksum, exact source/stream profile, rate profile, and resolution
-requirements before writing CONFIGURE. Release 1.1.0 negotiates v2 and defaults
+requirements before writing CONFIGURE. V3 selects an exact advertised tuple,
+returns `V3AppliedSettings`, and verifies GET_SETTINGS plus INFO clocks.
+Omitted fields use advertised board defaults, not the prior configuration.
+Historical release 1.1.0 negotiates v2 and defaults
 to 1 MHz ADC pairs and 1 MHz GPIO, using the extended 16-byte body. Legacy
 v1 devices retain their eight-byte CONFIGURE body; the simulator retains its
 historical defaults. Unsupported release rate requests fail before CONFIGURE. The CONFIGURE echo must equal the request; before START, the
@@ -287,10 +301,12 @@ acceptance.
 
 ## Runnable workflows
 
-The ten scripts in `examples/` cover discovery/serial selection, raw ADC
+The eleven checkout scripts in `examples/` cover discovery/serial selection, raw ADC
 channels, explicit interleaving, optional calibration, packed/selected GPIO,
 combined timestamp alignment, live STATUS/loss handling, standalone simulator
-use, the auxiliary-input workload matrix, and explicit clean shutdown. Every
+use, the v3 protocol upgrade demo, the auxiliary-input workload matrix, and
+explicit clean shutdown. Only the protocol upgrade module is also installed;
+the other examples require the checkout. Every
 script's no-argument path uses the simulator. Physical access is opt-in via
 `--real`; calibration additionally requires an explicit user-owned path:
 
@@ -302,6 +318,13 @@ python examples/raw_adc_channels.py --real --hardware-serial 20512460
 ```
 
 The complete roster and physical prerequisites are in [Quickstart](https://github.com/ThingDone/thingdaq/blob/main/doc/guides/quickstart.md).
+
+### Legacy v1/v2 models and diagnostics
+
+The state names, command availability and fixed-layout details in this subsection
+apply to legacy sessions. V3 uses STOPPED/RUNNING/DRAINING, optional CONFIGURE
+before START, and no RESET_STATS or legacy diagnostic commands. V3 counters
+reset on successful START or reboot. See the v3 contract for current layouts.
 
 `DeviceInfo`, `DeviceCapabilities`, `AuxiliaryInputMetadata`, `GPIOLayout`,
 `RateProfileTiming`, `AdcCalibrationMetadata`,
@@ -417,7 +440,9 @@ is discarded by the incremental parser. Physical targets must be Teensy
 `thingdaq-` source build ID. `ExpectedDeviceIdentity` adds exact firmware, build,
 and serial pins when a particular artifact is required.
 
-### Reopen policy and recovery evidence
+### Legacy reopen policy and recovery evidence
+
+For v3 reset/reconnect and STOPPED drain semantics, use the migration guide.
 
 Every synchronized open resolves device state explicitly. The default
 `SessionRecoveryPolicy.ADOPT` preserves CONFIGURED state and, for an existing
@@ -471,7 +496,9 @@ with ThingDAQ.open(hardware_serial=12345670, expected_identity=expected) as daq:
 CONFIGURE/START/STATUS/STOP/RESET_STATS schemas without serial hardware. The
 default simulator retains its synthetic ADC/GPIO behavior.
 
-The installed `thingdone-daq` command exposes bounded one-shot hardware controls:
+The installed `thingdone-daq` command exposes bounded one-shot hardware controls.
+The following legacy command roster includes RESET_STATS, which is unsupported
+in v3; reconciliation in v3 checks only the advertised counters; use the opening v3 commands for the candidate:
 
 ```bash
 thingdone-daq list
@@ -550,6 +577,11 @@ parser, decoder, and reader path.
 
 ## Stream data and loss policy
 
+In v3, blocks expose decoded channel data plus `encoding`, `encoded_payload`,
+`encoded_sample_bytes`, `decoded_bytes` and `wire_bytes`. Logical item counts
+can vary by frame. Sequence deltas count missing frames; timestamp deltas count
+missing logical items. Never multiply a gap by a presumed fixed frame size.
+
 ADC blocks always retain separate `adc0`/A0 and `adc1`/A1 lazy channel views.
 Each view exposes the shared zero-copy `payload_view` plus its byte offset and
 four-byte stride, so optional array consumers can use the native pair buffer
@@ -592,7 +624,7 @@ payload or timestamps; schema-v1 timing skew is provenance-only and is not
 applied. The formulas, safe-store contract, workflow, and limitations are in
 [Calibration](https://github.com/ThingDone/thingdaq/blob/main/doc/architecture/calibration.md).
 
-`Status.adc_acquisition` exposes the complete physical dual-DMA, pair,
+For legacy v1/v2, `Status.adc_acquisition` exposes the complete physical dual-DMA, pair,
 framing, loss, ADC_ETC/eDMA conversion-error, lifecycle, and packer snapshot.
 `Status.has_adc_errors` includes initialization and trigger errors as well as
 those live counters. If a RUNNING STATUS has been polled, subsequently
@@ -624,6 +656,9 @@ modular uint32 sequence wrap reset or advance the appropriate baselines without
 joining epochs.
 
 ## Optional bounded ADC/GPIO alignment
+
+This historical equal-duration helper does not accept v3 or the v2 equal-rate
+layouts. Use individual block sample timestamps for current acquisition.
 
 Raw delivery remains the primary path: `read_block()` and `blocks()` expose
 each typed block or loss/anomaly report as soon as the application consumes it.
@@ -829,7 +864,7 @@ synchronization and requires the complete firmware identity to remain equal to
 the discovery result, catching an image change or hot re-enumeration before a
 state-changing command can be issued.
 
-## Executable offline demo
+## Historical v1 executable offline demo
 
 Both entry points below run the same bounded synthetic acquisition. They print
 the discovered capabilities, ADC and GPIO ramps (including frame joins), final
@@ -840,3 +875,40 @@ returns a nonzero exit status:
 python -m thingdone_daq.demo --frame-count 2 --parser-chunk-size 17
 thingdone-daq-demo --frame-count 2 --parser-chunk-size 17
 ```
+
+## Historical 1.1.0 diagnostics and physical evidence
+
+The following results and command availability describe their recorded legacy
+builds; they make no qualification claim for public v3.
+
+Release 1.1.0 uses [Protocol-V2](https://github.com/ThingDone/thingdaq/blob/main/doc/protocol/protocol-v2.md): fixed 1 MHz ADC/GPIO and a 450 MHz core.
+Default hardware configuration selects 8 GPIO inputs; pass
+`aux_bank_mode=AuxBankMode.INPUT` for 16. `daq.get_temperature()` returns a
+`TemperatureReading` with sensor `status`, signed `millidegrees_c` and
+`celsius`; non-valid readings have `None` values. This is die, not ambient,
+temperature. Reading it does not change the acquisition state.
+
+With the firmware hardening build, `daq.get_runtime_health()` reports the
+boot-lifetime stack watermark, watchdog status and reset cause. It can be read
+through the same client during acquisition; see the
+[runtime health guide](../doc/results/firmware-runtime-hardening.md).
+
+The legacy `gpio_capture_diagnostic()` is unavailable in this release: its
+fixed 4 MHz path is disabled and its INFO capability bit is clear. The separate
+`gpio_clock_diagnostic()` remains available at 1 MHz only.
+
+The optional `TimestampAligner` rejects the new equal-rate profile because
+one GPIO frame spans four ADC frames. Use `read_block()` / `blocks()` and
+per-sample timestamps. Historical simulator profiles remain available offline
+and do not imply release hardware support.
+
+Physical SDK validation passes ADC-only, GPIO-only (8/16 inputs), and combined
+8-input capture on the remote test server. Combined16 reproduces firmware USB
+queue loss under its 0.5-core CPU quota. Two allocated cores pass short captures,
+width transitions and a 600-second SDK repeat, but another SDK attempt timed out
+after 50.08 seconds with two firmware ADC DMA error events and zero CPU throttling. Sustained
+combined16 SDK operation therefore remains unqualified. The independent wire
+validator passes 600 seconds with two cores on the same firmware.
+Historical parser rejections were not reproduced; their cause remains unresolved.
+See the [historical baseline and CPU comparison](../doc/results/watchdog-sdk-20260927.md).
+Keep strict loss checking enabled and validate the intended host.

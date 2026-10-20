@@ -9,6 +9,9 @@ tags:
   - simulator
   - hardware
 related:
+  - '[[protocol-v3-upgrade]]'
+  - '[[protocol-v3]]'
+  - '[[protocol-v3-migration]]'
   - '[[Python-API]]'
   - '[[API-Reference]]'
   - '[[Hardware-Safety]]'
@@ -20,11 +23,13 @@ related:
 # ThingDAQ quickstart
 
 > [!IMPORTANT]
-> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
-> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
-> examples below are historical; their 600 MHz / 4 MHz claims are not current
-> release settings. Use live INFO metadata. `TimestampAligner` does not support
-> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+> The 1.2.0 development candidate uses [[protocol-v3]]: fixed 600 MHz CPU,
+> 1 MHz ADC pairs and GPIO, 12-bit ADC PACK12, GPIO RLE_AUTO, and auxiliary
+> DISABLED (8 inputs). Select INPUT for 16 GPIO inputs. Query metadata before
+> configuring an exact advertised tuple while STOPPED. Physical qualification
+> is NOT_RUN; historical 1.1.0/v2 results do not qualify this candidate.
+> Use block sample timestamps; `TimestampAligner` does not support these layouts.
+> See [[protocol-v3-migration]] and [[protocol-v3-upgrade]].
 
 Start with the simulator. It uses the real protocol encoder, parser,
 background reader, immutable block models, checksums, timestamps, loss policy,
@@ -58,18 +63,26 @@ and pure-Python parity.
 Run the complete offline flight and a short strict-loss CLI capture:
 
 ```bash
-.venv/bin/thingdone-daq-demo --frames 2
-.venv/bin/thingdone-daq capture --simulate --duration 1 --strict-loss \
+.venv/bin/python -m thingdone_daq.protocol_upgrade
+.venv/bin/thingdone-daq probe --simulate --simulator-version 3 --json
+.venv/bin/thingdone-daq configure --simulate --simulator-version 3 --json
+.venv/bin/thingdone-daq capture --simulate --simulator-version 3 --duration 1 --strict-loss \
   --gpio-channel D6 --gpio-channel D13
 ```
 
-`--simulate` never enumerates or opens USB hardware. INFO advertises synthetic
-ADC/GPIO profiles, and CONFIGURE, START, STATUS, stream decoding, STOP, and
-shutdown travel through ordinary protocol-v1 frames.
+`--simulate` never enumerates or opens USB hardware. `--simulator-version 3`
+selects public v3 with board defaults and emulated HARDWARE/SYNTHETIC sources.
+Each CLI invocation creates a new simulated device. The installed
+`python -m thingdone_daq.protocol_upgrade` demo keeps one session for stopped
+compressed/RAW/default changes, verifies exact samples, RLE fallback, byte counts,
+and v1/v2 compatibility. No checkout-only helper is needed after installation.
+Omitting the version retains the historical v1 persona; `thingdone-daq-demo`
+remains its separate legacy offline demo.
 
 ## Executable examples
 
-Every script below runs with no arguments against the simulator. The `--real`
+Every script below runs with no arguments against the simulator. These checkout
+scripts retain historical personas unless explicitly marked v3. The `--real`
 path is opt-in and clearly represents a physical-device operation.
 
 | Example | Simulator command | Physical requirement with `--real` |
@@ -126,18 +139,12 @@ USB acceptance, target timing, pad behavior, or electrical performance.
 ## Minimal Python lifecycle
 
 ```python
-from thingdone_daq import ADCBlock, GPIOBlock, Source, ThingDAQ
+from thingdone_daq import ADCBlock, GPIOBlock, ThingDAQ
 
-with ThingDAQ.simulated(strict=True) as daq:
-    info = daq.info()
-    applied = daq.configure(
-        adc=True,
-        gpio=True,
-        source=Source.SYNTHETIC,
-        adc_pair_rate_hz=1_000_000,
-        gpio_sample_rate_hz=4_000_000,
-        adc_resolution_bits=12,
-    )
+with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
+    print(daq.info(), daq.get_capabilities())
+    applied = daq.configure()
+    assert applied == daq.get_settings()
     print(applied)
 
     run_id = daq.start()
@@ -151,38 +158,29 @@ with ThingDAQ.simulated(strict=True) as daq:
     daq.stop()
 ```
 
-The context manager attempts bounded STOP if the body exits while CONFIGURED
-or RUNNING, then closes the background reader and transport deterministically.
+The context manager attempts bounded STOP if the body exits with an active run,
+then closes the background reader and transport deterministically.
 Calling `stop()` explicitly still makes the lifecycle visible at the normal
 success boundary.
 
 ## Capability-driven configuration
 
-INFO is authoritative. Before writing CONFIGURE, the client rejects:
-
-- stream bits absent from `supported_stream_mask`;
-- a source absent from `supported_source_mask`;
-- a source/stream pair absent from `supported_configuration_mask`;
-- a checksum absent from the device mask or host implementation set;
-- an exact ADC/GPIO rate requirement that differs from INFO; and
-- an exact ADC resolution requirement that differs from INFO.
-
-Protocol v1 carries stream, source, checksum, and 4,096-byte frame size in the
-eight-byte CONFIGURE body. Rates and resolution are fixed INFO capabilities,
-so `adc_pair_rate_hz`, `gpio_sample_rate_hz`, and `adc_resolution_bits` are
-host-side preconditions and are never smuggled into reserved wire bytes.
-CONFIGURE returns the device's exact applied body. The facade rejects a changed
-CONFIGURE echo, and START must echo that same applied configuration again.
-
-The CLI exposes the same preflight and then prints the applied body plus active
-fixed-rate metadata:
+For v3, `get_capabilities()` advertises complete supported settings tuples and
+board defaults; `get_settings()` returns active settings and clocks. Omitted
+`configure()` options select defaults, not prior values. The SDK rejects a
+nonadvertised tuple before sending it, then verifies the CONFIGURE echo,
+GET_SETTINGS readback and INFO clocks. Running changes fail with INVALID_STATE;
+wait for STOP/drain before configuring. STOP preserves settings; reset restores
+defaults. CPU speed cannot change at runtime.
 
 ```bash
-.venv/bin/thingdone-daq configure --simulate --streams both \
-  --source synthetic --checksum adler32 \
-  --adc-pair-rate-hz 1000000 --gpio-sample-rate-hz 4000000 \
-  --adc-resolution-bits 12
+thingdone-daq configure --simulate --simulator-version 3 \
+  --gpio-policy raw --adc-policy raw --aux-bank-mode input --json
 ```
+
+This remains **v3 RAW**, not v2 framing. See [[protocol-v3-migration]] for older
+v2 clients. Legacy v1/v2 use their own INFO masks and CONFIGURE models; 4 MHz
+GPIO belongs to historical v1 examples, not the current board defaults.
 
 ## Discover and select physical hardware
 
@@ -191,6 +189,9 @@ opening them:
 
 ```bash
 .venv/bin/thingdone-daq list
+.venv/bin/thingdone-daq probe --hardware-serial 20512460 --json
+.venv/bin/thingdone-daq configure --hardware-serial 20512460 --json
+.venv/bin/thingdone-daq capture --hardware-serial 20512460 --duration 10 --strict-loss
 ```
 
 `discover()` then opens only matching candidates for a short read-only INFO
@@ -280,8 +281,8 @@ This project targets Teensy 4.0 / i.MX RT1062 only. A0/A1 and D6-D13 are
 protection, and anti-alias filtering belong to the external front end; consult
 [[Hardware-Safety]] before connecting anything.
 
-The accepted campaigns demonstrated full-rate digital acquisition, framing,
-checksums, timestamps, command responsiveness, exact loss accounting,
+The historical accepted campaigns demonstrated full-rate digital acquisition,
+framing, checksums, timestamps, command responsiveness, exact loss accounting,
 recovery, and clean STOP on one recorded Teensy 4.0. Inputs were not externally
 stimulated for analog-quality or GPIO-edge grading. Analog accuracy, analog
 bandwidth, true aperture timing, customer front ends, and external digital pad

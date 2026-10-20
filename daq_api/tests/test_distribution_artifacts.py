@@ -276,6 +276,13 @@ class DistributionArtifactTests(unittest.TestCase):
         cases = (
             (
                 (
+                    "import runpy; "
+                    "runpy.run_module('thingdone_daq.protocol_upgrade', run_name='__main__')"
+                ),
+                "PASS runs=3 equality=exact final_state=STOPPED",
+            ),
+            (
+                (
                     "from thingdone_daq.cli import main; "
                     "raise SystemExit(main(['info', '--simulate', '--json']))"
                 ),

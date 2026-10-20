@@ -7,6 +7,9 @@ tags:
   - thingdaq
   - documentation
 related:
+  - '[[protocol-v3-upgrade]]'
+  - '[[protocol-v3]]'
+  - '[[protocol-v3-migration]]'
   - '[[Evidence-Index]]'
   - '[[Clock-Compression-IO-Report]]'
   - '[[Phase-11-Soak-Evidence]]'
@@ -53,13 +56,33 @@ related:
 # ThingDAQ documentation
 
 > [!IMPORTANT]
-> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
-> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
-> examples below are historical; their 600 MHz / 4 MHz claims are not current
-> release settings. Use live INFO metadata. `TimestampAligner` does not support
-> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+> The 1.2.0 development candidate uses [[protocol-v3]]: fixed 600 MHz CPU,
+> 1 MHz ADC pairs and GPIO, 12-bit ADC PACK12, GPIO RLE_AUTO, and auxiliary
+> DISABLED (8 inputs). Select INPUT for 16 GPIO inputs. Query metadata before
+> configuring an exact advertised tuple while STOPPED. Physical qualification
+> is NOT_RUN; historical 1.1.0/v2 results do not qualify this candidate.
+> Use block sample timestamps; `TimestampAligner` does not support these layouts.
+> See [[protocol-v3-migration]] and [[protocol-v3-upgrade]].
 
-The current release's artifact and validation record is [[Release-1.1.0]].
+The historical 1.1.0 artifact and validation record is [[Release-1.1.0]].
+Start the current candidate with [[Quickstart]], build it with [[firmware-builds]],
+and use [[protocol-v3-migration]] for client/firmware compatibility.
+
+After installing this checkout (`python -m pip install ./daq_api`), run:
+
+```bash
+python -m thingdone_daq.protocol_upgrade
+thingdone-daq probe --simulate --simulator-version 3 --json
+thingdone-daq configure --simulate --simulator-version 3 --json
+thingdone-daq capture --simulate --simulator-version 3 --duration 0.1 --strict-loss
+# Physical device: substitute its serial after checking Hardware-Safety.
+thingdone-daq probe --hardware-serial 20512460 --json
+thingdone-daq capture --hardware-serial 20512460 --duration 10 --strict-loss
+```
+
+The probe reports defaults/active settings; configure performs stopped readback.
+Separate simulator commands start fresh devices. The installed upgrade demo
+keeps a session through configuration changes and verifies decoded samples.
 The subsequent reliability investigation and runtime stack command are described
 in [[Firmware-Runtime-Hardening]].
 
@@ -95,7 +118,7 @@ physical acceptance.
   and the allocation, ownership, and pure-Python parity contract for optional
   arrays in [[NumPy-Integration]].
 - `protocol/` contains versioned wire-contract specifications, beginning with
-  [[Protocol-V1]].
+  [[protocol-v3]]; [[Protocol-V1]] and [[Protocol-V2]] are historical contracts.
 - `decisions/` contains architecture decision records, including
   [[ADR-001-Wire-Protocol]], [[ADR-002-Checksum-Selection]], and
   [[ADR-003-GPIO-Clock-DMA]], followed by the permanent converter, trigger,

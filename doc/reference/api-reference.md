@@ -8,6 +8,9 @@ tags:
   - api
   - reference
 related:
+  - '[[protocol-v3-upgrade]]'
+  - '[[protocol-v3]]'
+  - '[[protocol-v3-migration]]'
   - '[[Quickstart]]'
   - '[[Python-API]]'
   - '[[Protocol-V1]]'
@@ -19,34 +22,22 @@ related:
 
 # Python API reference
 
-Release 1.1.0 disables the legacy 4 MHz `gpio_capture_diagnostic()` command;
-its capability bit is clear. `gpio_clock_diagnostic()` accepts only 1 MHz.
-
-`ThingDAQ.get_temperature()` returns `TemperatureReading(status,
-millidegrees_c)`, with a `celsius` property. It works in IDLE, CONFIGURED and
-RUNNING on firmware 1.1.0, does not change acquisition, and returns `None`
-for a non-valid sensor reading. `TemperatureStatus` is exported from `thingdone_daq`.
-See [[Protocol-V2]] for wire details and the fixed-rate release policy.
-
-`ThingDAQ.get_runtime_health()` returns an immutable `RuntimeHealth` with
-`stack_available`, `watchdog_enabled`, `stack_total_bytes`,
-`stack_min_free_bytes`, `stack_max_used_bytes`, `reset_cause` and
-`watchdog_timeout_ms`. It requires the firmware hardening build and works during
-acquisition. The watermark persists until reboot; RESET_STATS does not clear it.
-Use the acquisition's existing `ThingDAQ` instance to query it. See
-[[Firmware-Runtime-Hardening]] for measurement limits and long-test guidance.
-
 > [!IMPORTANT]
-> Release 1.1.0 uses [[Protocol-V2]]: 450 MHz core, both ADCs and GPIO at
-> 1 MHz, with 8 or 16 GPIO inputs. Phase-numbered results and legacy v1
-> examples below are historical; their 600 MHz / 4 MHz claims are not current
-> release settings. Use live INFO metadata. `TimestampAligner` does not support
-> the new unequal-duration ADC/GPIO frames; use block sample timestamps.
+> The 1.2.0 development candidate uses [[protocol-v3]]: fixed 600 MHz CPU,
+> 1 MHz ADC pairs and GPIO, 12-bit ADC PACK12, GPIO RLE_AUTO, and auxiliary
+> DISABLED (8 inputs). Select INPUT for 16 GPIO inputs. Query metadata before
+> configuring an exact advertised tuple while STOPPED. Physical qualification
+> is NOT_RUN; historical 1.1.0/v2 results do not qualify this candidate.
+> Use block sample timestamps; `TimestampAligner` does not support these layouts.
+> See [[protocol-v3-migration]] and [[protocol-v3-upgrade]].
 
 This page describes the stable synchronous user surface. Import normal
 operations and immutable models from `thingdone_daq`; use
 `thingdone_daq.low_level` only for protocol tooling that intentionally owns raw
 frames, parsers, readers, or byte transports.
+
+Installed offline check: `python -m thingdone_daq.protocol_upgrade`. See the
+CLI section below for metadata, stopped configuration/readback and capture.
 
 ## Entry points
 
@@ -65,7 +56,7 @@ from thingdone_daq import ThingDAQ, discover, enumerate_candidates, select_devic
 `ThingDAQ.open(hardware_serial=N)` is the recommended physical selection.
 `expected_identity=ExpectedDeviceIdentity(...)` can additionally pin exact
 firmware/build/board/MCU/protocol identity. `session_policy="adopt"` is the
-default; use `"stop"` to force an existing CONFIGURED/RUNNING device to IDLE.
+default; use `"stop"` to drain to STOPPED (v3) or IDLE (legacy).
 
 Both constructors return a typed context manager. `close()` normally attempts
 STOP before deterministic shutdown. `close(stop=False)` deliberately preserves
@@ -176,12 +167,12 @@ applied = daq.configure(
     source=Source.HARDWARE,
     checksum_algorithm=ChecksumAlgorithm.ADLER32,
     adc_pair_rate_hz=1_000_000,
-    gpio_sample_rate_hz=4_000_000,
+    gpio_sample_rate_hz=1_000_000,
     adc_resolution_bits=12,
 )
 ```
 
-Or pass an explicit wire model:
+For historical v1 regression only, pass an explicit legacy wire model:
 
 ```python
 request = DAQConfiguration(
@@ -453,11 +444,11 @@ V3 configure output reports the verified `settings` and `clocks` under
 Capture reports that same structure as `configuration`; sample previews report
 each frame's actual `encoding`. Payload byte counters measure decoded bytes,
 while `adc_wire_bytes`/`gpio_wire_bytes` and their rates include encoded frames.
-V3 firmware queue high-water telemetry is unavailable (`null` in JSON, `None`
-in human output). V3 ends in `STOPPED`; legacy ends in `IDLE`.
+V3 STATUS exposes packet READY/transmit high-water values when their validity
+bits are set; unsupported measurements are `null` in JSON (`None` in Python). V3 ends in `STOPPED`; legacy ends in `IDLE`.
 
-Executable offline CLI examples (substitute a hardware target for simulation
-only when desired):
+Executable installed-package commands (physical commands require a safely
+connected device; substitute its hardware serial):
 
 ```bash
 .venv/bin/python -m thingdone_daq.cli probe --simulate --simulator-version 3 --json
@@ -465,7 +456,10 @@ only when desired):
 .venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3 --cpu-profile cpu_600mhz --gpio-policy raw --adc-policy raw --json
 .venv/bin/python -m thingdone_daq.cli capture --simulate --simulator-version 3 --duration 0.1 --aux-bank-mode input --gpio-channel D16 --json
 .venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 2 --json
-.venv/bin/python daq_api/examples/protocol_upgrade.py
+python -m thingdone_daq.protocol_upgrade
+thingdone-daq probe --hardware-serial 20512460 --json
+thingdone-daq configure --hardware-serial 20512460 --json
+thingdone-daq capture --hardware-serial 20512460 --duration 10 --strict-loss
 ```
 
 `--simulator-version` chooses the simulated peer, not a forced host wire
@@ -474,6 +468,29 @@ simulator version remains the historical v1/v2 persona; version 2 selects a
 v2-only release persona with 1 MHz ADC / 1 MHz GPIO defaults, while version 3
 advertises the compressed defaults. The same personas are available through
 `ThingDAQ.simulated(protocol_version=1|2|3)`.
-`protocol_upgrade.py` verifies automatic selection and exact legacy capture
+The installed `thingdone_daq.protocol_upgrade` demo verifies automatic selection and exact legacy capture
 for v1/v2 alongside the three v3 compressed/RAW captures. Simulator clocks are
 metadata only; these checks make no physical throughput claim.
+
+## Legacy v2 diagnostic availability
+
+Release 1.1.0 disables the legacy 4 MHz `gpio_capture_diagnostic()` command;
+its capability bit is clear. `gpio_clock_diagnostic()` accepts only 1 MHz.
+
+`ThingDAQ.get_temperature()` returns `TemperatureReading(status,
+millidegrees_c)`, with a `celsius` property. It works in IDLE, CONFIGURED and
+RUNNING on firmware 1.1.0, does not change acquisition, and returns `None`
+for a non-valid sensor reading. `TemperatureStatus` is exported from `thingdone_daq`.
+See [[Protocol-V2]] for wire details and the fixed-rate release policy.
+
+`ThingDAQ.get_runtime_health()` returns an immutable `RuntimeHealth` with
+`stack_available`, `watchdog_enabled`, `stack_total_bytes`,
+`stack_min_free_bytes`, `stack_max_used_bytes`, `reset_cause` and
+`watchdog_timeout_ms`. It requires the firmware hardening build and works during
+acquisition. The watermark persists until reboot; RESET_STATS does not clear it.
+Use the acquisition's existing `ThingDAQ` instance to query it. See
+[[Firmware-Runtime-Hardening]] for measurement limits and long-test guidance.
+
+These commands are not v3 commands. V3 STATUS exposes only its validity-marked
+diagnostics; temperature/runtime-health commands and full DMA-conservation
+evidence are unavailable. SDK/CLI reconciliation checks the advertised subset.

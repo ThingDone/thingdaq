@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 from urllib.parse import unquote
+
+from thingdone_daq._generated import protocol_v3_constants as v3
+from thingdone_daq.cli import build_parser
+from thingdone_daq.protocol_v3 import encode_adc_payload, encode_gpio_payload
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_SOURCE = REPOSITORY_ROOT / "daq_api/src"
@@ -86,7 +92,7 @@ class DocumentationIntegrityTests(unittest.TestCase):
                 if "ThingDAQ.simulated" in code:
                     runnable.append((document, line, code))
 
-        self.assertEqual(10, len(runnable))
+        self.assertEqual(11, len(runnable))
         environment = {
             key: value
             for key in ("LANG", "LC_ALL", "PATH", "SYSTEMROOT", "TMPDIR")
@@ -142,6 +148,93 @@ serial.serial_for_url = forbidden
         }
 
         self.assertEqual(public_examples, documented)
+
+    def test_v3_contract_tables_match_canonical_schema(self) -> None:
+        schema = json.loads((REPOSITORY_ROOT / "protocol/protocol-v3.json").read_text())
+        document = (DOC_ROOT / "protocol/protocol-v3.md").read_text()
+        for fields in (
+            schema["header"]["fields"],
+            schema["payload_schemas"]["settings"]["fields"],
+        ):
+            for field in fields:
+                self.assertIn(
+                    f"| {field['offset']} | {field['type']} | `{field['name']}` |",
+                    document,
+                )
+        kinds = {kind["name"]: kind for kind in schema["frame_kinds"]}
+        for kind in kinds.values():
+            if kind["class"] != "request":
+                continue
+            response = kinds[kind["response_kind"]]
+            name = kind["name"].removesuffix("_REQUEST")
+            if name == "GET_STATUS":
+                name += " (STATUS)"
+            request_size = schema["payload_schemas"][kind["payload_schema"]]["size"]
+            response_size = schema["payload_schemas"][response["payload_schema"]][
+                "size"
+            ]
+            self.assertIn(
+                f"| {name} | `0x{kind['value']:02X} / 0x{response['value']:02X}` "
+                f"| {request_size} | {response_size} |",
+                document,
+            )
+        for error in schema["enums"]["error_code"]:
+            self.assertIn(f"| {error['name']} | {error['value']} |", document)
+
+    def test_current_guide_cli_commands_parse_without_hardware(self) -> None:
+        parser = build_parser()
+        documents = (
+            REPOSITORY_ROOT / "README.md",
+            REPOSITORY_ROOT / "daq_api/README.md",
+            DOC_ROOT / "README.md",
+            DOC_ROOT / "guides/quickstart.md",
+            DOC_ROOT / "guides/protocol-v3-migration.md",
+            DOC_ROOT / "reference/api-reference.md",
+        )
+        for document in documents:
+            text = document.read_text().replace("\\\n", "")
+            commands = re.findall(
+                r"^```bash\n(.*?)^```", text, re.MULTILINE | re.DOTALL
+            )
+            parsed = 0
+            for fence in commands:
+                for line in fence.splitlines():
+                    args = shlex.split(line, comments=True)
+                    if not args:
+                        continue
+                    if Path(args[0]).name == "thingdone-daq":
+                        args = args[1:]
+                    elif args[1:3] == ["-m", "thingdone_daq.cli"]:
+                        args = args[3:]
+                    else:
+                        continue
+                    with self.subTest(document=document, command=line):
+                        parser.parse_args(args)
+                    parsed += 1
+            self.assertGreater(parsed, 0, str(document))
+
+    def test_v3_documented_packing_examples_match_runtime(self) -> None:
+        document = (DOC_ROOT / "protocol/protocol-v3.md").read_text()
+        cases = (
+            (
+                encode_adc_payload([(0xABC, 0x123)], policy=v3.AdcPolicy.RAW),
+                "BC 0A 23 01",
+            ),
+            (encode_adc_payload([(0xABC, 0x123)]), "BC 3A 12"),
+            (encode_adc_payload([(0, 0), (4095, 4095)]), "00 00 00 FF FF FF"),
+            (
+                encode_gpio_payload([0xAA] * 6 + [0x55] * 4, width_bits=8),
+                "06 00 AA 04 00 55",
+            ),
+            (encode_gpio_payload([0x1234] * 3, width_bits=16), "03 00 34 12"),
+            (encode_gpio_payload([0xAA] * 3, width_bits=8), "AA AA AA"),
+        )
+        for payload, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertIn(f"`{expected}`", document)
+                self.assertEqual(bytes.fromhex(expected), payload[12:])
+        for payload in (cases[1][0], cases[3][0]):
+            self.assertIn(f"`{payload[:12].hex(' ').upper()}`", document)
 
 
 if __name__ == "__main__":

@@ -1,14 +1,33 @@
 # ThingDAQ
 
-The current development build runs at a **fixed 600 MHz** CPU clock, with
-1 MHz ADC/GPIO sampling. Runtime CPU-clock switching is out of scope;
-CONFIGURE can select supported acquisition/codec settings while stopped.
-This supersedes the runtime-switching plan, not the historical release evidence.
-Physical qualification of the public-v3 candidate remains pending.
+The **1.2.0 development candidate** uses [public protocol v3](doc/protocol/protocol-v3.md):
+**fixed 600 MHz**, **1 MHz ADC pairs/GPIO**, **12-bit ADC PACK12**, **GPIO RLE_AUTO**,
+and **auxiliary DISABLED** (8 inputs; INPUT selects 16). Query capabilities and
+configure an exact advertised tuple while STOPPED. Runtime CPU switching is
+unavailable. Physical qualification is **NOT_RUN**; this is not a published or
+approved release. See the [migration guide](doc/guides/protocol-v3-migration.md).
+
+Install this candidate from the checkout with `python -m pip install ./daq_api`.
+The installed package provides these hardware-free checks:
+
+```bash
+python -m thingdone_daq.protocol_upgrade
+thingdone-daq probe --simulate --simulator-version 3 --json
+thingdone-daq configure --simulate --simulator-version 3 --json
+thingdone-daq capture --simulate --simulator-version 3 --duration 0.1 --strict-loss --json
+```
+
+`probe` includes identity, capabilities, defaults and active settings/clocks.
+`configure` verifies the echo and GET_SETTINGS readback. Each simulated CLI
+invocation creates a fresh device; the upgrade demo retains one session across
+compressed/RAW/default changes and checks v1/v2 compatibility too.
+
+## Historical releases and physical evidence
 
 Release **1.1.0** uses **protocol v2**, a **450 MHz** core and fixed **1 MHz**
 rates on both ADCs and GPIO. Select 8 or 16 GPIO inputs; other acquisition
-rates are rejected. See the [current wire contract](doc/protocol/protocol-v2.md).
+rates are rejected. See the
+[historical v2 compatibility contract](doc/protocol/protocol-v2.md).
 Build identity, validation and limits are in the
 [v1.1.0 release report](doc/results/release-1.1.0.md).
 The optional equal-frame `TimestampAligner` is not supported for this new
@@ -20,14 +39,14 @@ Two allocated cores pass short captures, width transitions and a 600-second
 SDK repeat, but another SDK attempt timed out after 50.08 seconds with firmware
 ADC DMA error counters and zero host throttling. The independent wire validator
 also passed a 600-second watchdog-enabled firmware baseline with two cores. See the
-[current watchdog baseline and SDK CPU comparison](doc/results/watchdog-sdk-20260927.md).
+[historical watchdog baseline and SDK CPU comparison](doc/results/watchdog-sdk-20260927.md).
 Strict loss detection remains enabled; historical parser rejections remain unexplained.
 
 Watchdog initialization is temporarily disabled in current firmware while the
 intermittent ADC fault remains unresolved. A disabled-watchdog build passed a
-600-second SDK capture, but watchdog causation is unproven. Runtime health
-reports watchdog disabled and timeout zero; reset cause is not captured while
-initialization is skipped. See the [decision and test evidence](doc/results/watchdog-disabled-20260927.md).
+600-second SDK capture, but watchdog causation is unproven. The legacy
+runtime-health command reports watchdog disabled and timeout zero; v3 does not
+expose that command. Reset cause is not captured while initialization is skipped. See the [decision and test evidence](doc/results/watchdog-disabled-20260927.md).
 
 Current source uses an optimized, wire-compatible Adler-32 implementation.
 Checksummed larger ADC frames are available as an opt-in research build, using
@@ -66,8 +85,8 @@ pins, source, or front end.
 
 ## Start without hardware
 
-For application integration, install `thingdone-daq` from PyPI and import
-`thingdone_daq`:
+Published packages remain separately versioned. The following installs the
+published package, which need not contain this development candidate:
 
 ```bash
 python -m pip install thingdone-daq
@@ -83,8 +102,8 @@ python3 -m venv .venv
 Run the complete deterministic demo or a bounded CLI capture:
 
 ```bash
-.venv/bin/thingdone-daq-demo --frames 2
-.venv/bin/thingdone-daq capture --simulate --duration 1 --strict-loss \
+.venv/bin/python -m thingdone_daq.protocol_upgrade
+.venv/bin/thingdone-daq capture --simulate --simulator-version 3 --duration 1 --strict-loss \
   --gpio-channel D6 --gpio-channel D13
 ```
 
@@ -133,17 +152,12 @@ physical discovery by hardware serial, and lifecycle guidance.
 ## Minimal API
 
 ```python
-from thingdone_daq import ADCBlock, GPIOBlock, Source, ThingDAQ
+from thingdone_daq import ADCBlock, GPIOBlock, ThingDAQ
 
-with ThingDAQ.simulated(strict=True) as daq:
-    applied = daq.configure(
-        adc=True,
-        gpio=True,
-        source=Source.SYNTHETIC,
-        adc_pair_rate_hz=1_000_000,
-        gpio_sample_rate_hz=4_000_000,
-        adc_resolution_bits=12,
-    )
+with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
+    print(daq.info(), daq.get_capabilities())
+    applied = daq.configure()
+    assert applied == daq.get_settings()
     run_id = daq.start()
 
     for item in daq.blocks(2):
@@ -156,10 +170,10 @@ with ThingDAQ.simulated(strict=True) as daq:
     daq.stop()
 ```
 
-`configure()` checks the exact stream/source profile, checksum, and optional
-rate/resolution requirements against synchronized INFO capabilities before it
-sends CONFIGURE. The returned `DAQConfiguration` is the device's exact applied
-echo; a changed CONFIGURE or START echo is rejected.
+V3 `configure()` selects an exact advertised tuple and returns
+`V3AppliedSettings(settings, clocks)`. The SDK verifies CONFIGURE/START echoes,
+GET_SETTINGS and INFO clocks. Omitted options use board defaults, not the prior
+configuration. `stop()` drains and preserves settings; reboot restores defaults.
 
 ## Hardware use
 
@@ -167,7 +181,8 @@ Metadata-only enumeration never opens candidate ports:
 
 ```bash
 .venv/bin/thingdone-daq list
-.venv/bin/thingdone-daq info --hardware-serial 20512460
+.venv/bin/thingdone-daq probe --hardware-serial 20512460 --json
+.venv/bin/thingdone-daq configure --hardware-serial 20512460 --json
 .venv/bin/thingdone-daq monitor --hardware-serial 20512460 \
   --streams both --source hardware --duration 10 --strict-loss
 ```
@@ -204,7 +219,7 @@ generated validators, and passing local software/build gates. Because the USB
 identity, firmware build ID, host namespace, and packaging identity changed,
 the earlier physical results are engineering history rather than release
 acceptance for the renamed binary. Physical acceptance was pending at that
-historical freeze; use the v1.1.0 release report for current qualification.
+historical freeze; the v1.1.0 report qualifies only its recorded artifact.
 The identity-pinned standalone and installed `thingdone-daq-soak` entry paths are
 documented in the [soak harness guide](doc/guides/soak-harness.md). Both embed
 the deterministic `firmware/soak/validation-manifest.json` contract; a
@@ -213,7 +228,8 @@ used, and override reports are always non-release.
 The superseded artifacts, exact hashes, local packaging results, diagnostic
 fixture smoke, and report interpretation for the earlier candidate remain in
 the [Phase 12 Windows handoff](doc/results/phase-12-windows-handoff.md). Use
-the current soak harness guide—not those historical hashes—for a new run.
+the soak harness guide only for its named legacy campaigns. Public-v3 physical
+qualification requires its own candidate-bound runner and evidence.
 
 Those runs used unstimulated A0/A1 and no declared external digital stimulus.
 They do not establish analog accuracy, analog bandwidth, true aperture timing,
@@ -270,7 +286,7 @@ simulator defaults. See the [v3 session API](doc/protocol/protocol-v3.md#public-
 Run the deterministic public-v3 demonstration without hardware:
 
 ```bash
-.venv/bin/python daq_api/examples/protocol_upgrade.py
+.venv/bin/python -m thingdone_daq.protocol_upgrade
 ```
 
 It prints all advertised tuples, verifies exact ADC/GPIO samples and timestamps,

@@ -7,6 +7,7 @@ tags:
   - build
   - protocol-v3
 related:
+  - '[[protocol-v3-migration]]'
   - '[[protocol-v3-upgrade]]'
   - '[[protocol-v3]]'
   - '[[release-1.1.0]]'
