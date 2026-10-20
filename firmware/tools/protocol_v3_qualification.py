@@ -435,7 +435,7 @@ def validate_evidence(candidate, records):
         else "NOT_RUN"
         if not records
         else "INCONCLUSIVE"
-        if missing
+        if missing or any(r["outcome"] == "INCONCLUSIVE" for r in outcomes)
         else "PASS"
     )
     return {

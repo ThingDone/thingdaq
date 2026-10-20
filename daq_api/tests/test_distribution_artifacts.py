@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import configparser
+import json
 import os
 import re
 import shutil
@@ -17,6 +18,7 @@ from email.parser import Parser
 from pathlib import Path, PurePosixPath
 from typing import ClassVar
 
+from test_documentation_integrity import CURRENT_GUIDES, guide_cli_commands
 from thingdone_daq import __version__
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -331,6 +333,86 @@ class DistributionArtifactTests(unittest.TestCase):
                 )
                 self.assertIn(expected, rendered)
                 self.assertEqual("", completed.stderr)
+
+    def test_current_v3_guide_commands_execute_from_wheel_without_device_access(
+        self,
+    ) -> None:
+        commands = sorted(
+            {
+                args
+                for document in CURRENT_GUIDES
+                for args in guide_cli_commands(document)
+                if "--simulate" in args
+                and "--simulator-version" in args
+                and args[args.index("--simulator-version") + 1] == "3"
+            }
+        )
+        self.assertGreaterEqual(len(commands), 9)
+        guard = """
+import socket, serial, sys
+def forbidden(*args, **kwargs):
+    raise AssertionError("offline guide accessed hardware/network")
+socket.socket = socket.create_connection = forbidden
+serial.Serial = serial.serial_for_url = forbidden
+sys.path.insert(0, sys.argv[1])
+import thingdone_daq
+assert '.whl/' in thingdone_daq.__file__.replace('\\\\', '/')
+from thingdone_daq.cli import main
+raise SystemExit(main(sys.argv[2:]))
+"""
+        for args in commands:
+            with self.subTest(command=args):
+                completed = subprocess.run(
+                    [sys.executable, "-I", "-c", guard, str(self.wheel_path), *args],
+                    cwd=self.wheel_path.parent,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                self.assertEqual(
+                    0, completed.returncode, completed.stdout + completed.stderr
+                )
+                self.assertEqual("", completed.stderr)
+                if "--json" not in args:
+                    self.assertIn("STOPPED", completed.stdout)
+                    continue
+                report = json.loads(completed.stdout)
+                if args[0] == "probe":
+                    self.assertEqual(3, report["info"]["protocol_version"])
+                    self.assertEqual(
+                        report["defaults"], report["capabilities"]["defaults"]
+                    )
+                    self.assertEqual(
+                        report["defaults"], report["active_settings"]["settings"]
+                    )
+                    self.assertEqual(48, len(report["capabilities"]["configurations"]))
+                    applied = report["active_settings"]
+                elif args[0] == "configure":
+                    applied = report["applied_configuration"]
+                    self.assertEqual("STOPPED", report["state"])
+                else:
+                    self.assertEqual("capture", args[0])
+                    self.assertEqual("STOPPED", report["final_state"])
+                    self.assertGreater(report["summary"]["adc_blocks"], 0)
+                    self.assertGreater(report["summary"]["gpio_blocks"], 0)
+                    applied = report["configuration"]
+                settings = applied["settings"]
+                self.assertEqual(600_000_000, applied["clocks"]["cpu_clock_hz"])
+                self.assertEqual(1_000_000, settings["adc_pair_rate_hz"])
+                self.assertEqual(1_000_000, settings["gpio_sample_rate_hz"])
+                self.assertEqual(
+                    args[args.index("--gpio-policy") + 1].upper()
+                    if "--gpio-policy" in args
+                    else "RLE_AUTO",
+                    settings["gpio_policy"],
+                )
+                self.assertEqual(
+                    args[args.index("--adc-policy") + 1].upper()
+                    if "--adc-policy" in args
+                    else "PACK12",
+                    settings["adc_policy"],
+                )
 
     def test_no_private_or_publication_material_is_packaged(self) -> None:
         for archive_name, members in (

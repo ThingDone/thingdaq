@@ -31,6 +31,30 @@ PYTHON_FENCE = re.compile(
     re.MULTILINE | re.DOTALL,
 )
 URI_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+CURRENT_GUIDES = (
+    REPOSITORY_ROOT / "README.md",
+    REPOSITORY_ROOT / "daq_api/README.md",
+    DOC_ROOT / "README.md",
+    DOC_ROOT / "guides/quickstart.md",
+    DOC_ROOT / "guides/protocol-v3-migration.md",
+    DOC_ROOT / "reference/api-reference.md",
+)
+
+
+def guide_cli_commands(document: Path) -> tuple[tuple[str, ...], ...]:
+    """Share exact documented arguments with parser and built-wheel checks."""
+    commands = []
+    text = document.read_text().replace("\\\n", "")
+    for fence in re.findall(r"^```bash\n(.*?)^```", text, re.MULTILINE | re.DOTALL):
+        for line in fence.splitlines():
+            args = shlex.split(line, comments=True)
+            if not args:
+                continue
+            if Path(args[0]).name == "thingdone-daq":
+                commands.append(tuple(args[1:]))
+            elif args[1:3] == ["-m", "thingdone_daq.cli"]:
+                commands.append(tuple(args[3:]))
+    return tuple(commands)
 
 
 def _python_fences(path: Path) -> tuple[tuple[int, str], ...]:
@@ -183,35 +207,12 @@ serial.serial_for_url = forbidden
 
     def test_current_guide_cli_commands_parse_without_hardware(self) -> None:
         parser = build_parser()
-        documents = (
-            REPOSITORY_ROOT / "README.md",
-            REPOSITORY_ROOT / "daq_api/README.md",
-            DOC_ROOT / "README.md",
-            DOC_ROOT / "guides/quickstart.md",
-            DOC_ROOT / "guides/protocol-v3-migration.md",
-            DOC_ROOT / "reference/api-reference.md",
-        )
-        for document in documents:
-            text = document.read_text().replace("\\\n", "")
-            commands = re.findall(
-                r"^```bash\n(.*?)^```", text, re.MULTILINE | re.DOTALL
-            )
-            parsed = 0
-            for fence in commands:
-                for line in fence.splitlines():
-                    args = shlex.split(line, comments=True)
-                    if not args:
-                        continue
-                    if Path(args[0]).name == "thingdone-daq":
-                        args = args[1:]
-                    elif args[1:3] == ["-m", "thingdone_daq.cli"]:
-                        args = args[3:]
-                    else:
-                        continue
-                    with self.subTest(document=document, command=line):
-                        parser.parse_args(args)
-                    parsed += 1
-            self.assertGreater(parsed, 0, str(document))
+        for document in CURRENT_GUIDES:
+            commands = guide_cli_commands(document)
+            self.assertTrue(commands, str(document))
+            for args in commands:
+                with self.subTest(document=document, command=args):
+                    parser.parse_args(args)
 
     def test_v3_documented_packing_examples_match_runtime(self) -> None:
         document = (DOC_ROOT / "protocol/protocol-v3.md").read_text()

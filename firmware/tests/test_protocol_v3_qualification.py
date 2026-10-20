@@ -13,6 +13,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import requests
+from test_rig_http_retry import Clock, reply
 from test_v3_cross_language import (
     capabilities,
     command,
@@ -539,8 +541,8 @@ def test_legacy_wire_accounting_uses_pipeline_generation_counters(cpp):  # noqa:
             assert wire["gap_items"] == 0
 
 
-def test_complete_transcript_gate_and_failed_retry_lineage():
-    frozen = candidate()
+def complete_records(frozen):
+    """Synthetic complete matrix, used only for offline rejection tests."""
     records = []
     for index, cell in enumerate(frozen["matrix"]):
         row = {
@@ -577,6 +579,12 @@ def test_complete_transcript_gate_and_failed_retry_lineage():
                     selected["settings_hex"] = cell["alternate_hex"]
                 row["captures"].append(measured_fixture(selected, cycle + 1))
         records.append(row)
+    return records
+
+
+def test_complete_transcript_gate_and_failed_retry_lineage():
+    frozen = candidate()
+    records = complete_records(frozen)
     assert policy.validate_evidence(frozen, records)["outcome"] == "PASS"
     assert policy.validate_evidence(frozen, records[:-1])["outcome"] == "INCONCLUSIVE"
     failed = copy.deepcopy(records[0])
@@ -584,3 +592,380 @@ def test_complete_transcript_gate_and_failed_retry_lineage():
     result = policy.validate_evidence(frozen, [failed, *records])
     assert result["outcome"] == "FAIL"
     assert len(result["attempts"]) == len(records) + 1
+
+
+@pytest.mark.parametrize(
+    "path,value,reason",
+    [
+        (("candidate_sha256",), "0" * 64, "candidate identity mismatch"),
+        (("physical",), False, "physical evidence missing"),
+        (("info", "hardware_serial"), "other-board", "observed hardware_serial"),
+        (("info", "build_id"), "other-build", "observed build_id"),
+        (("info", "firmware_version"), "1.1.0", "observed firmware_version"),
+        (("info", "protocol_version"), 0x83, "nonphysical/nonpublic INFO"),
+        (("cell", "seconds"), 1, "matrix cell changed"),
+        (("captures", 0, "readback_hex"), "", "stale settings readback"),
+        (
+            ("captures", 0, "clocks_after", "cpu_clock_hz"),
+            450_000_000,
+            "stale final clocks",
+        ),
+        (
+            ("captures", 0, "clock_measurements", 1, "dma_sample_count"),
+            8000,
+            "physical DWT/PIT/eDMA clock measurement failed",
+        ),
+        (
+            ("captures", 0, "temperatures", 1, "celsius"),
+            80,
+            "thermal abort",
+        ),
+        (("captures", 0, "parser_errors"), 1, "SDK parser corruption"),
+        (("captures", 0, "oracle", "adc", "versions"), [0x82], "private/wrong version"),
+        (("captures", 0, "oracle", "adc", "versions"), [0x83], "private/wrong version"),
+        (("captures", 0, "oracle", "adc", "gap_items"), 1, "unexplained sample gap"),
+        (
+            ("captures", 0, "status", "adc_items_produced"),
+            60_480_001,
+            "item conservation",
+        ),
+        (("captures", 0, "status", "transport_errors"), None, "unavailable/nonzero"),
+        (("captures",), [], "missing captures/lifecycle cycles"),
+    ],
+)
+def test_complete_evidence_rejects_single_fault_despite_pass_label(path, value, reason):
+    frozen = candidate()
+    records = complete_records(frozen)
+    assert policy.validate_evidence(frozen, records)["outcome"] == "PASS"
+    # Choose a combined cell so both streams must be checked.
+    record = next(
+        r
+        for r in records
+        if r["cell"]["kind"] == "smoke"
+        and V3Settings.from_bytes(bytes.fromhex(r["cell"]["settings_hex"])).stream_mask
+        == 3
+    )
+    # Do not mutate the candidate through a shared cell reference.
+    index = records.index(record)
+    records[index] = copy.deepcopy(record)
+    target = records[index]
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    result = policy.validate_evidence(frozen, records)
+    assert result["outcome"] == "FAIL"
+    assert any(reason in problem for problem in result["problems"])
+    assert not result["checks"]["all_attempts_valid"]
+
+
+def test_complete_matrix_cannot_hide_an_unresolved_earlier_attempt():
+    frozen = candidate()
+    records = complete_records(frozen)
+    pending = {
+        "cell_id": records[0]["cell_id"],
+        "outcome": "INCONCLUSIVE",
+        "retention_error": "results.json unavailable after interrupted retrieval",
+    }
+    result = policy.validate_evidence(frozen, [pending, *records])
+    assert result["missing_cells"] == []
+    assert not result["checks"]["all_attempts_valid"]
+    assert result["outcome"] == result["physical_qualification"] == "INCONCLUSIVE"
+
+
+@pytest.mark.parametrize(
+    "kind", ["smoke", "lifecycle", "soak", "stall", "fallback", "legacy", "negative"]
+)
+def test_missing_required_matrix_cell_is_never_pass(kind):
+    frozen = candidate()
+    records = complete_records(frozen)
+    missing = next(r for r in records if r["cell"]["kind"] == kind)
+    records.remove(missing)
+    result = policy.validate_evidence(frozen, records)
+    assert result["outcome"] == "INCONCLUSIVE"
+    assert result["missing_cells"] == [missing["cell_id"]]
+    assert not result["checks"]["matrix_complete"]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "firmware",
+        "manifest",
+        "source_revision",
+        "dirty_build",
+        "build_id",
+        "cpu",
+        "protocol",
+        "experiment",
+        "dirty_worktree",
+        "changed_inputs",
+    ],
+)
+def test_artifact_verification_rejects_stale_or_nonstandard_builds(
+    monkeypatch, tmp_path, fault
+):
+    frozen = candidate()
+    firmware_path = tmp_path / "firmware.ino.hex"
+    manifest_path = tmp_path / "build-manifest.json"
+    firmware_path.write_bytes(b"firmware")
+    manifest = {
+        "source": {
+            "git_commit": frozen["source_revision"],
+            "firmware_inputs_clean": True,
+            "build_id": frozen["identity"]["build_id"],
+        },
+        "release_policy": {"core_hz": 600_000_000, "protocol_version": 3},
+        "artifacts": [
+            {
+                "path": "firmware.ino.hex",
+                "sha256": frozen["firmware_sha256"],
+                "size_bytes": 8,
+            }
+        ],
+    }
+    # Isolate the git boundary; hashes and build-policy verification remain real.
+    monkeypatch.setattr(runner.subprocess, "check_output", lambda *a, **k: "")
+    monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: None)
+    runner.save(manifest_path, manifest)
+    frozen["build_manifest_sha256"] = runner.rig.digest(manifest_path.read_bytes())
+    assert runner.verify_artifacts(frozen, firmware_path, manifest_path) == b"firmware"
+    if fault == "firmware":
+        firmware_path.write_bytes(b"another-image")
+    elif fault == "manifest":
+        manifest_path.write_text(manifest_path.read_text() + "\n")
+    elif fault == "dirty_worktree":
+        monkeypatch.setattr(
+            runner.subprocess, "check_output", lambda *a, **k: "?? protocol/new.json\n"
+        )
+    elif fault == "changed_inputs":
+
+        def changed(*args, **kwargs):
+            raise runner.subprocess.CalledProcessError(1, args[0])
+
+        monkeypatch.setattr(runner.subprocess, "run", changed)
+    else:
+        if fault == "source_revision":
+            manifest["source"]["git_commit"] = "c" * 40
+        elif fault == "dirty_build":
+            manifest["source"]["firmware_inputs_clean"] = False
+        elif fault == "build_id":
+            manifest["source"]["build_id"] = "other-build"
+        elif fault == "cpu":
+            manifest["release_policy"]["core_hz"] = 450_000_000
+        elif fault == "protocol":
+            manifest["release_policy"]["protocol_version"] = 2
+        else:
+            manifest["input_experiment"] = {"enabled": True}
+        runner.save(manifest_path, manifest)
+        frozen["build_manifest_sha256"] = runner.rig.digest(manifest_path.read_bytes())
+    expected = {
+        "firmware": "firmware differs",
+        "manifest": "build manifest differs",
+        "dirty_worktree": "inputs are dirty",
+    }.get(fault, "provenance/defaults mismatch")
+    if fault == "changed_inputs":
+        with pytest.raises(runner.subprocess.CalledProcessError):
+            runner.verify_artifacts(frozen, firmware_path, manifest_path)
+    else:
+        with pytest.raises(ValueError, match=expected):
+            runner.verify_artifacts(frozen, firmware_path, manifest_path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("sdk_version",),
+        ("sdk_archive_sha256",),
+        *(("runner_sha256", name) for name in runner.RUNNER_INPUTS),
+        *(("schema_sha256", f"protocol-v{version}.json") for version in (1, 2, 3)),
+    ],
+)
+def test_candidate_binds_every_sdk_schema_and_runner_input(path):
+    frozen = candidate()
+    target = frozen["inputs"]
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = "stale"
+    with pytest.raises(ValueError, match="inputs differ"):
+        runner.check_candidate(frozen)
+
+
+@pytest.fixture
+def retained_attempt(tmp_path):
+    frozen = candidate()
+    record = complete_records(frozen)[0]
+    directory = tmp_path / record["cell_id"] / "attempt-001"
+    directory.mkdir(parents=True)
+    program = runner.make_program(frozen, record["cell"])
+    (directory / "rig-program.py").write_text(program)
+    (directory / "firmware.ino.hex").write_bytes(b"firmware")
+    runner.save(
+        directory / "provenance.json",
+        {
+            "candidate_sha256": policy.json_hash(frozen),
+            "service": "http://fake.invalid",
+        },
+    )
+    runner.save(
+        directory / "submission.json",
+        {
+            "program_sha256": runner.rig.digest(program.encode()),
+            "firmware_sha256": frozen["firmware_sha256"],
+            "service": "http://fake.invalid",
+        },
+    )
+    runner.save(directory / "start.json", {"test_id": record["job_id"]})
+    runner.save(
+        directory / "results.json",
+        {
+            "results": {
+                "test_id": record["job_id"],
+                "completed": True,
+                "program_success": True,
+                "exit_code": 0,
+                "stdout": "QUALIFICATION " + json.dumps(record),
+            }
+        },
+    )
+    return frozen, tmp_path, directory
+
+
+@pytest.mark.parametrize(
+    "filename,key,value,reason",
+    [
+        ("provenance.json", "candidate_sha256", "stale", "saved candidate mismatch"),
+        ("submission.json", "program_sha256", "stale", "submission input identity"),
+        ("submission.json", "firmware_sha256", "stale", "submission input identity"),
+        (
+            "submission.json",
+            "service",
+            "http://other.invalid",
+            "submission input identity",
+        ),
+        ("start.json", "test_id", "other-job", "service result job ID mismatch"),
+        (
+            "rig-program.py",
+            None,
+            "# changed program",
+            "saved program/firmware identity",
+        ),
+        (
+            "firmware.ino.hex",
+            None,
+            "changed firmware",
+            "saved program/firmware identity",
+        ),
+    ],
+)
+def test_retained_evidence_rejects_artifact_identity_tampering(
+    retained_attempt, filename, key, value, reason
+):
+    frozen, output, directory = retained_attempt
+    assert runner.retained_records(frozen, output)[0]["outcome"] == "PASS"
+    path = directory / filename
+    if key is None:
+        path.write_text(value)
+    else:
+        data = json.loads(path.read_text())
+        data[key] = value
+        runner.save(path, data)
+    # A cached PASS summary is never authoritative.
+    runner.save(directory / "summary.json", {"outcome": "PASS"})
+    result = runner.evaluate(frozen, output)
+    assert result["outcome"] == "FAIL"
+    assert reason in result["retention_errors"][0]["retention_error"]
+
+
+@pytest.mark.parametrize(
+    "key,value", [("completed", False), ("program_success", False), ("exit_code", 1)]
+)
+def test_service_failure_overrides_worker_pass(retained_attempt, key, value):
+    frozen, output, directory = retained_attempt
+    path = directory / "results.json"
+    data = json.loads(path.read_text())
+    data["results"][key] = value
+    runner.save(path, data)
+    assert runner.evaluate(frozen, output)["outcome"] == "FAIL"
+
+
+def test_campaign_recovers_accepted_5xx_and_interrupted_results_without_resubmission(
+    monkeypatch, tmp_path
+):
+    frozen = candidate()
+    record = complete_records(frozen)[0]
+    cell = record["cell"]
+    output = tmp_path / "campaign"
+    directory = output / cell["id"] / "attempt-001"
+    clock = Clock()
+    monkeypatch.setattr(runner.rig.time, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(runner.rig.time, "sleep", clock.sleep)
+    monkeypatch.setenv("FW_RIG_AUTH", "offline-secret")
+    monkeypatch.setattr(runner, "verify_artifacts", lambda *_: b"firmware")
+    monkeypatch.setattr(runner.rig, "service_preflight", lambda _: {})
+    events = []
+    statuses = iter([{"status": "queued"}] * 1000 + [{"status": "success"}] * 2)
+    results_requested = 0
+
+    def post(url, **kwargs):
+        nonlocal results_requested
+        endpoint = url.rsplit("/", 1)[1]
+        events.append(endpoint)
+        if endpoint == "start":
+            saved = json.loads((directory / "submission.json").read_text())
+            assert kwargs["json"]["agent_name"] == saved["agent_name"]
+            return reply(503)
+        assert kwargs["json"]["test_id"] == record["job_id"]
+        if endpoint == "status":
+            return reply(body=next(statuses))
+        assert endpoint == "results"
+        results_requested += 1
+        if results_requested == 1:
+            raise OSError("interrupted result retrieval")
+        return reply(
+            body={
+                "results": {
+                    "test_id": record["job_id"],
+                    "completed": True,
+                    "program_success": True,
+                    "exit_code": 0,
+                    "stdout": "QUALIFICATION " + json.dumps(record),
+                }
+            }
+        )
+
+    def recover(service, submission, evidence_dir):
+        events.append("journal")
+        assert evidence_dir == directory
+        assert submission == json.loads((directory / "submission.json").read_text())
+        started = {"test_id": record["job_id"]}
+        runner.save(directory / "start.json", started)
+        return started
+
+    monkeypatch.setattr(requests, "post", post)
+    monkeypatch.setattr(runner.rig, "recover_submission", recover)
+    args = SimpleNamespace(
+        output=output,
+        resume=False,
+        firmware=None,
+        build_manifest=None,
+        cell=cell["id"],
+        service="http://fake.invalid",
+    )
+    with pytest.raises(OSError, match="interrupted"):
+        runner.run_campaign(args, frozen, [cell])
+    assert events[:2] == ["start", "journal"]
+    assert clock.now >= 1000  # Queue time exceeds this cell's execution budget.
+    assert (
+        json.loads((output / "qualification.json").read_text())["outcome"]
+        == "INCONCLUSIVE"
+    )
+    args.resume = True
+    result = runner.run_campaign(args, frozen, [cell])
+    assert result["outcome"] == "INCONCLUSIVE"  # Other matrix cells remain unrun.
+    assert result["attempts"][0]["outcome"] == "PASS"
+    assert result["retention_errors"] == []
+    assert (directory / "client-error.json").exists()
+    assert events.count("start") == events.count("journal") == 1
+    previous_events = events[:]
+    assert runner.run_campaign(args, frozen, [cell]) == result
+    assert events == previous_events  # Completed jobs are never submitted again.
