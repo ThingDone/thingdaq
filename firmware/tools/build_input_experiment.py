@@ -98,6 +98,7 @@ def main() -> int:
         parser.error(
             "--gpio-rle requires 600 MHz, --release-fixed-1mhz and --large-adc-frame"
         )
+    base.PUBLIC_V3_BUILD = False
     base.RELEASE_BUILD = args.release_fixed_1mhz
     base.FQBN = f"teensy:avr:teensy40:usb=serial,speed={args.cpu_mhz},opt=o2std"
     base.EXPECTED_BUILD_PROPERTIES = {

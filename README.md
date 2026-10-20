@@ -319,8 +319,10 @@ python3 firmware/tools/build_firmware.py
 The firmware builder targets `speed=600`, pins acquisition timing to the same
 600 MHz clock, and exports to
 `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/`.
-It does not flash the device. Historical 450 MHz builds remain available through
-the explicit experiment builder and the recorded release revision.
+It does not flash the device. Public-v3 defaults use RLE_AUTO and PACK12 without
+private codec flags. See the [build and compatibility guide](doc/guides/firmware-builds.md)
+for manifest provenance, explicit v2 RAW operation, and reproduction of the
+historical 450 MHz release from its recorded revision.
 
 ## Distribution and trademark boundary
 

@@ -15,6 +15,7 @@ from thingdone_daq.models_v3 import (
     V3Capabilities,
     V3Info,
     V3Response,
+    V3Settings,
     V3Status,
     V3Stop,
     decode_v3_response,
@@ -54,7 +55,7 @@ def patch(wire: bytes, offset: int, value: bytes) -> bytes:
     return bytes(data)
 
 
-@pytest.fixture(scope="module", params=[600000000, 450000000])
+@pytest.fixture(scope="module", params=[None, 600000000, 450000000])
 def executable(request, tmp_path_factory) -> Path:
     compiler = shutil.which("g++")
     if compiler is None:
@@ -74,7 +75,11 @@ def executable(request, tmp_path_factory) -> Path:
             "-fno-exceptions",
             "-fno-rtti",
             "-DTHINGDAQ_RELEASE_FIXED_1MHZ=1",
-            f"-DTHINGDAQ_EXPERIMENT_CPU_HZ={request.param}U",
+            *(
+                [f"-DTHINGDAQ_EXPERIMENT_CPU_HZ={request.param}U"]
+                if request.param is not None
+                else []
+            ),
             f"-I{SOURCE}",
             str(ROOT / "firmware/tests/v3_control_contract_test.cpp"),
             *(
@@ -93,6 +98,9 @@ def executable(request, tmp_path_factory) -> Path:
         text=True,
     )
     assert result.returncode == 0, result.stderr
+    applied = exchange(output, command(29))[0].value
+    assert isinstance(applied, V3AppliedSettings)
+    assert applied.clocks.cpu_clock_hz == (request.param or 600000000)
     return output
 
 
@@ -135,6 +143,8 @@ def test_discovery_and_settings_echo(executable: Path) -> None:
     assert caps.defaults.adc_policy == (
         c.AdcPolicy.PACK12 if compressed else c.AdcPolicy.RAW
     )
+    if compressed:
+        assert caps.defaults == V3Settings.defaults()
     assert caps.defaults == applied.settings
     assert info.clocks == applied.clocks
     for settings in caps.configurations:

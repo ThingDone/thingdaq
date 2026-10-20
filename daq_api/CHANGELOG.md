@@ -1,5 +1,14 @@
 # Python SDK changelog
 
+## 1.2.0 — development candidate (not published)
+
+- Add public protocol-v3 negotiation, metadata, configuration, streaming and
+  decoding, with advertised 600 MHz / 1 MHz / RLE_AUTO / PACK12 defaults.
+- Retain v1/v2 decoding and explicit legacy simulator personas. Older v2 SDKs
+  can use the new firmware's v2 RAW compatibility path.
+- Firmware 1.2.0, wire protocol 3 and SDK 1.2.0 are independent version axes.
+  Physical qualification remains pending; no package publication is implied.
+
 ## 1.1.0 — first public package
 
 - Publish the Python SDK as `thingdone-daq`, imported as `thingdone_daq`.

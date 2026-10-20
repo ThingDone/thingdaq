@@ -21,22 +21,34 @@ from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SKETCH_DIRECTORY = REPOSITORY_ROOT / "firmware"
-FQBN = "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std"
+V3_CONTRACT_PATH = REPOSITORY_ROOT / "protocol/protocol-v3.json"
+V3_CONTRACT = json.loads(V3_CONTRACT_PATH.read_text(encoding="utf-8"))
+BOARD_DEFAULTS = V3_CONTRACT["defaults"]
+BOARD_CLOCKS = next(
+    profile
+    for profile in V3_CONTRACT["cpu_profiles"]
+    if profile["cpu_profile"] == BOARD_DEFAULTS["cpu_profile"]
+)
+DEFAULT_CPU_HZ = BOARD_CLOCKS["cpu_clock_hz"]
+FQBN = f"teensy:avr:teensy40:usb=serial,speed={DEFAULT_CPU_HZ // 1_000_000},opt=o2std"
+PUBLIC_V3_BUILD = True
 RELEASE_BUILD = True
 CORE_ID = "teensy:avr"
 CORE_VERSION = "1.62.0"
 COMPILER_VERSION = "15.2.1"
 EXPECTED_BUILD_PROPERTIES = {
     "build.board": "TEENSY40",
-    "build.fcpu": "600000000",
+    "build.fcpu": str(DEFAULT_CPU_HZ),
     "build.flags.optimize": "-O2",
     "build.usbtype": "USB_SERIAL",
 }
 OUTPUT_DIRECTORY = (
-    SKETCH_DIRECTORY / "build" / ("teensy.avr.teensy40.usb_serial.speed_600.opt_o2std")
+    SKETCH_DIRECTORY
+    / "build"
+    / FQBN.replace(":", ".").replace("=", "_").replace(",", ".")
 )
 MANIFEST_NAME = "build-manifest.json"
-MANIFEST_SCHEMA_VERSION = 11
+MANIFEST_SCHEMA_VERSION = 12
 LINKER_MAP_NAME = "firmware.ino.map"
 ARTIFACT_SUFFIXES = {".bin", ".eep", ".elf", ".hex", ".map"}
 SOURCE_INPUTS = (
@@ -44,6 +56,9 @@ SOURCE_INPUTS = (
     SKETCH_DIRECTORY / "src",
     REPOSITORY_ROOT / "protocol/protocol-v1.json",
     REPOSITORY_ROOT / "protocol/protocol-v2.json",
+    V3_CONTRACT_PATH,
+    Path(__file__).resolve(),
+    REPOSITORY_ROOT / "firmware/tools/build_input_experiment.py",
 )
 SOURCE_DATE_EPOCH_MAX = 253_402_300_799  # 9999-12-31T23:59:59Z
 PROGRAM_FLASH_START = 0x60000000
@@ -1398,6 +1413,51 @@ def managed_memory_usage(nm_output: str) -> dict[str, Any]:
     }
 
 
+def public_build_policy() -> dict[str, Any]:
+    """Project the canonical board policy used by FixedBuildApplication."""
+
+    if not PUBLIC_V3_BUILD:
+        return {"enabled": False, "selection": "explicit input experiment"}
+    if (
+        not RELEASE_BUILD
+        or int(EXPECTED_BUILD_PROPERTIES["build.fcpu"]) != DEFAULT_CPU_HZ
+        or DEFAULT_CPU_HZ != 600_000_000
+        or BOARD_DEFAULTS not in V3_CONTRACT["selectable_configurations"]
+    ):
+        raise BuildError("standard build disagrees with the fixed 600 MHz board policy")
+    identity_header = (SKETCH_DIRECTORY / "src/firmware_identity.h").read_text()
+    version = re.search(r"kFirmwareVersion\{(\d+)U, (\d+)U, (\d+)U\}", identity_header)
+    if version is None:
+        raise BuildError("firmware semantic version is missing")
+    return {
+        "enabled": True,
+        "qualification": "NOT_RUN",
+        "protocol_version": V3_CONTRACT["protocol_version"],
+        "firmware_version": [int(part) for part in version.groups()],
+        "defaults": BOARD_DEFAULTS,
+        "clocks": BOARD_CLOCKS,
+        "runtime_cpu_switching": False,
+        "configurations": [
+            value
+            for value in V3_CONTRACT["selectable_configurations"]
+            if value["cpu_profile"] == BOARD_DEFAULTS["cpu_profile"]
+        ],
+        "codec_selection": "public CONFIGURE settings; no private codec flags",
+        "legacy_compatibility": {"protocol_version": 2, "encoding": "RAW"},
+        "input_sha256": {
+            str(path.relative_to(REPOSITORY_ROOT)): sha256(path)
+            for path in (
+                V3_CONTRACT_PATH,
+                SKETCH_DIRECTORY / "src/generated/protocol_v3_constants.h",
+                SKETCH_DIRECTORY / "src/board_profile.h",
+                SKETCH_DIRECTORY / "src/v3_settings.h",
+                SKETCH_DIRECTORY / "src/input_experiment_profile.h",
+                Path(__file__).resolve(),
+            )
+        },
+    }
+
+
 def git_source_state() -> dict[str, Any]:
     """Record the Git commit and dirtiness of the exact firmware inputs."""
 
@@ -1483,6 +1543,7 @@ def build(arduino_cli_name: str) -> Path:
             f"requires Arm GNU {COMPILER_VERSION}, but found {compiler_first_line}"
         )
 
+    public_policy = public_build_policy()
     identity = build_identity()
 
     OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
@@ -1541,11 +1602,20 @@ def build(arduino_cli_name: str) -> Path:
         "release_policy": {
             "fixed_1mhz": RELEASE_BUILD,
             "core_hz": int(properties["build.fcpu"]) if RELEASE_BUILD else None,
-            "protocol_version": 2 if RELEASE_BUILD else None,
-            "supported_rate_profile_mask": 16 if RELEASE_BUILD else None,
+            "protocol_version": (
+                V3_CONTRACT["protocol_version"]
+                if PUBLIC_V3_BUILD
+                else 2
+                if RELEASE_BUILD
+                else None
+            ),
+            "supported_rate_profile_mask": (1 << BOARD_DEFAULTS["rate_profile"])
+            if RELEASE_BUILD
+            else None,
             "adc_dma_active_lookahead_generations": 4 if RELEASE_BUILD else 6,
             "legacy_gpio_capture_diagnostic_enabled": not RELEASE_BUILD,
         },
+        "public_protocol": public_policy,
         "target": {
             "fqbn": FQBN,
             "core_id": CORE_ID,
@@ -1575,7 +1645,11 @@ def build(arduino_cli_name: str) -> Path:
             "gpio_paired_join_state": gpio_paired_join_state,
             "gpio_packed_buffers": gpio_packed_buffers,
             "auxiliary_input_resources": auxiliary_resources,
-            "packet_retention": packet_retention,
+            # This projection describes legacy layouts only. Public v3 uses
+            # shorter, prefix-bearing frames and must not inherit these times.
+            (
+                "legacy_v2_packet_retention" if PUBLIC_V3_BUILD else "packet_retention"
+            ): packet_retention,
             "linker_memory": linker_memory,
             "managed_memory": managed_memory,
         },

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import sys
 import tempfile
@@ -36,7 +37,7 @@ class BuildConfigurationTests(unittest.TestCase):
 
         self.assertEqual("teensy:avr", build_firmware.CORE_ID)
         self.assertEqual("1.62.0", build_firmware.CORE_VERSION)
-        self.assertEqual(11, build_firmware.MANIFEST_SCHEMA_VERSION)
+        self.assertEqual(12, build_firmware.MANIFEST_SCHEMA_VERSION)
         self.assertEqual(
             "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
             build_firmware.FQBN,
@@ -69,6 +70,8 @@ class BuildConfigurationTests(unittest.TestCase):
             "600000000", build_firmware.EXPECTED_BUILD_PROPERTIES["build.fcpu"]
         )
         self.assertIn("-DTHINGDAQ_EXPERIMENT_CPU_HZ=600000000U", definitions)
+        for private in ("GPIO_RLE", "ADC_PACK12", "DEFERRED_CODECS"):
+            self.assertNotIn(private, definitions)
         linker_flags = next(
             value for value in build_properties if value.startswith("build.flags.ld=")
         )
@@ -77,6 +80,63 @@ class BuildConfigurationTests(unittest.TestCase):
             f"-Wl,-Map={build_firmware.OUTPUT_DIRECTORY / build_firmware.LINKER_MAP_NAME},--cref",
             linker_flags,
         )
+
+    def test_public_policy_and_source_identity_cover_v3_inputs(self) -> None:
+        from dataclasses import asdict
+
+        from thingdone_daq import ThingDAQ, V3Settings
+
+        contract = json.loads(
+            (REPOSITORY_ROOT / "protocol/protocol-v3.json").read_text()
+        )
+        policy = build_firmware.public_build_policy()
+        self.assertEqual(contract["defaults"], policy["defaults"])
+        self.assertEqual(contract["defaults"], asdict(V3Settings.defaults()))
+        self.assertEqual(600_000_000, policy["clocks"]["cpu_clock_hz"])
+        self.assertEqual([1, 2, 0], policy["firmware_version"])
+        self.assertEqual(3, policy["protocol_version"])
+        self.assertEqual("NOT_RUN", policy["qualification"])
+        self.assertEqual(48, len(policy["configurations"]))
+        with ThingDAQ.simulated(protocol_version=3) as daq:
+            applied = daq.configure()
+            self.assertEqual(policy["defaults"], asdict(applied.settings))
+            self.assertEqual(policy["clocks"], asdict(applied.clocks))
+            self.assertEqual(applied, daq.get_settings())
+            self.assertEqual(
+                policy["configurations"],
+                [asdict(value) for value in daq.get_capabilities().configurations],
+            )
+        inputs = build_firmware.collect_source_files()
+        for name, digest in policy["input_sha256"].items():
+            path = REPOSITORY_ROOT / name
+            self.assertIn(path, inputs)
+            self.assertEqual(build_firmware.sha256(path), digest)
+        # Mutating each policy/recipe input must change the actual content hash.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            copies = []
+            for name in policy["input_sha256"]:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((REPOSITORY_ROOT / name).read_bytes())
+                copies.append(path)
+            original = build_firmware.source_fingerprint(copies, root=root)
+            for path in copies:
+                content = path.read_bytes()
+                path.write_bytes(content + b"\n")
+                self.assertNotEqual(
+                    original, build_firmware.source_fingerprint(copies, root=root)
+                )
+                path.write_bytes(content)
+        with (
+            patch.dict(
+                build_firmware.EXPECTED_BUILD_PROPERTIES, {"build.fcpu": "450000000"}
+            ),
+            self.assertRaisesRegex(build_firmware.BuildError, "board policy"),
+        ):
+            build_firmware.public_build_policy()
+        with patch.object(build_firmware, "PUBLIC_V3_BUILD", False):
+            self.assertFalse(build_firmware.public_build_policy()["enabled"])
 
     def test_memory_summary_is_recorded_exactly(self) -> None:
         summary = build_firmware.parse_memory_usage(

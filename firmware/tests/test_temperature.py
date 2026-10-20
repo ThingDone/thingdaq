@@ -23,7 +23,15 @@ def test_temperature_sensor_and_command(tmp_path, release):
             "-Wconversion",
             "-Wsign-conversion",
             f"-I{source}",
-            *(["-DTHINGDAQ_RELEASE_FIXED_1MHZ=1"] if release else []),
+            # Keep the historical 1.1.0 policy test at its explicit clock.
+            *(
+                [
+                    "-DTHINGDAQ_RELEASE_FIXED_1MHZ=1",
+                    "-DTHINGDAQ_EXPERIMENT_CPU_HZ=450000000U",
+                ]
+                if release
+                else []
+            ),
             str(
                 ROOT
                 / "firmware/tests"

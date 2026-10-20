@@ -344,7 +344,7 @@ static_assert(thingdaq::control::kSyntheticConfiguration.stream_mask ==
 static_assert(thingdaq::control::kSyntheticConfiguration.source ==
               thingdaq::protocol_v1::Source::kSynthetic);
 static_assert(thingdaq::identity::kFirmwareVersion.major == 1U);
-static_assert(thingdaq::identity::kFirmwareVersion.minor == 1U);
+static_assert(thingdaq::identity::kFirmwareVersion.minor == 2U);
 static_assert(thingdaq::identity::kFirmwareVersion.patch == 0U);
 static_assert(thingdaq::board::kAdc0Pin == 14U);
 static_assert(thingdaq::board::kAdc1Pin == 15U);
