@@ -328,9 +328,13 @@ Common local gates:
 .venv/bin/python -m ruff format --check daq_api firmware tools
 .venv/bin/python -m ruff check daq_api firmware tools
 .venv/bin/python -m mypy daq_api/src/thingdone_daq
-.venv/bin/python -m pytest firmware/tests daq_api/tests
+.venv/bin/python -m pytest
 python3 firmware/tools/build_firmware.py
 ```
+
+`pytest.ini` selects both repository suites (`firmware/tests` and `daq_api/tests`)
+by default, keeping ignored scratch checkouts and archived rig evidence out of
+test discovery. Explicit test paths still work for focused checks.
 
 The firmware builder targets `speed=600`, pins acquisition timing to the same
 600 MHz clock, and exports to
