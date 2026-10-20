@@ -1,0 +1,176 @@
+{
+  "artifact_identity": {
+    "candidate_sha256": "4781d273db15091039b841b51680a31143b02a6eec4d94ac23ec2898634540b4",
+    "matrix_jobs": 63,
+    "result": "PASS",
+    "retained_files": 15
+  },
+  "candidate_file_sha256": "d00e693a67cd58aa66c885fe7a7113ab6efb3a82e5d3953418ffc5b0a09cefcb",
+  "freeze": {
+    "artifact_sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
+    "build_id": "thingdaq-67539aafb5b130a5",
+    "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+    "protected_file_count": 498,
+    "protected_tree_sha256": "3abd0fc8fa5c69556b9d8a576bb2068097e60f3633a23f35e0b43a417fd52471",
+    "result": "PASS",
+    "source_id": "67539aafb5b130a5598aae353e16ec988593d71ad7dbb14dbfe240cf8caf15bc",
+    "staged_directory": ".maestro/playbooks/Working/phase05-freeze/frozen"
+  },
+  "freeze_file_sha256": "eecde36ccb890946fd4ea0d331505774487dfa22020bd86471c80da2257e67fd",
+  "local_gates": {
+    "documentation_and_layout_tests": {
+      "passed": 11,
+      "subtests_passed": 1379
+    },
+    "freeze_and_qualification_tests": {
+      "passed": 76,
+      "seconds": 22.35
+    },
+    "fresh_installed_wheel_demo": "PASS",
+    "historical_soak_generation_and_conformance": "PASS",
+    "prior_full_suite": {
+      "log_sha256": "d4127e98c6489788069a55b028de8fd18a19b8b3cf8260fe4f022c9c8102aa09",
+      "passed": 2648,
+      "report": "doc/results/protocol-v3-local-gates.md",
+      "skipped": 5
+    },
+    "protocol_generation": {
+      "outputs": 142,
+      "result": "PASS"
+    },
+    "report_artifact_verification_example": "PASS",
+    "ruff_format": {
+      "files": 203,
+      "result": "PASS"
+    },
+    "ruff_lint": "PASS",
+    "sdk_mypy": {
+      "result": "PASS",
+      "source_files": 34
+    },
+    "strict_twine": "PASS"
+  },
+  "physical_qualification": {
+    "attempts": [],
+    "checks": {
+      "all_attempts_valid": true,
+      "matrix_complete": false,
+      "physical_evidence_present": false
+    },
+    "endurance": "three separate reflashed 600-second jobs; lifecycle is same-boot only",
+    "missing_cells": [
+      "fallback-0",
+      "fallback-1",
+      "same-boot-20",
+      "smoke-010001030104000800000c0040420f0040420f00",
+      "smoke-010001030104000800010c0040420f0040420f00",
+      "smoke-010001030104000801000c0040420f0040420f00",
+      "smoke-010001030104000801010c0040420f0040420f00",
+      "smoke-010001030104011000000c0040420f0040420f00",
+      "smoke-010001030104011000010c0040420f0040420f00",
+      "smoke-010001030104011001000c0040420f0040420f00",
+      "smoke-010001030104011001010c0040420f0040420f00",
+      "smoke-010101030104000800000c0040420f0040420f00",
+      "smoke-010101030104000800010c0040420f0040420f00",
+      "smoke-010101030104000801000c0040420f0040420f00",
+      "smoke-010101030104000801010c0040420f0040420f00",
+      "smoke-010101030104011000000c0040420f0040420f00",
+      "smoke-010101030104011000010c0040420f0040420f00",
+      "smoke-010101030104011001000c0040420f0040420f00",
+      "smoke-010101030104011001010c0040420f0040420f00",
+      "smoke-020001030104000800000c0040420f0040420f00",
+      "smoke-020001030104000800010c0040420f0040420f00",
+      "smoke-020001030104000801000c0040420f0040420f00",
+      "smoke-020001030104000801010c0040420f0040420f00",
+      "smoke-020001030104011000000c0040420f0040420f00",
+      "smoke-020001030104011000010c0040420f0040420f00",
+      "smoke-020001030104011001000c0040420f0040420f00",
+      "smoke-020001030104011001010c0040420f0040420f00",
+      "smoke-020101030104000800000c0040420f0040420f00",
+      "smoke-020101030104000800010c0040420f0040420f00",
+      "smoke-020101030104000801000c0040420f0040420f00",
+      "smoke-020101030104000801010c0040420f0040420f00",
+      "smoke-020101030104011000000c0040420f0040420f00",
+      "smoke-020101030104011000010c0040420f0040420f00",
+      "smoke-020101030104011001000c0040420f0040420f00",
+      "smoke-020101030104011001010c0040420f0040420f00",
+      "smoke-030001030104000800000c0040420f0040420f00",
+      "smoke-030001030104000800010c0040420f0040420f00",
+      "smoke-030001030104000801000c0040420f0040420f00",
+      "smoke-030001030104000801010c0040420f0040420f00",
+      "smoke-030001030104011000000c0040420f0040420f00",
+      "smoke-030001030104011000010c0040420f0040420f00",
+      "smoke-030001030104011001000c0040420f0040420f00",
+      "smoke-030001030104011001010c0040420f0040420f00",
+      "smoke-030101030104000800000c0040420f0040420f00",
+      "smoke-030101030104000800010c0040420f0040420f00",
+      "smoke-030101030104000801000c0040420f0040420f00",
+      "smoke-030101030104000801010c0040420f0040420f00",
+      "smoke-030101030104011000000c0040420f0040420f00",
+      "smoke-030101030104011000010c0040420f0040420f00",
+      "smoke-030101030104011001000c0040420f0040420f00",
+      "smoke-030101030104011001010c0040420f0040420f00",
+      "soak-1",
+      "soak-2",
+      "soak-3",
+      "stall-0",
+      "stall-1",
+      "unsupported",
+      "v2-0-1",
+      "v2-0-2",
+      "v2-0-3",
+      "v2-1-1",
+      "v2-1-2",
+      "v2-1-3"
+    ],
+    "outcome": "NOT_RUN",
+    "physical_qualification": "NOT_RUN",
+    "policy": "public-v3-qualification-1",
+    "problems": [],
+    "retention_errors": []
+  },
+  "source_dirty": false,
+  "source_revision": "eb8a890da5646ff18074a9103678b8e6acc0c900",
+  "validation_logs": [
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/build-first.log",
+      "sha256": "509d8e5f533e76207a954946ef31af0b1d0226752e275c344f9ba12690def138",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/build-second.log",
+      "sha256": "509d8e5f533e76207a954946ef31af0b1d0226752e275c344f9ba12690def138",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/regressions.log",
+      "sha256": "6c4b9a11d53e8060b6aa8b89e9c033bdef882d6f0b6d84d2e83401defa439ee5",
+      "size_bytes": 180
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/distributions.log",
+      "sha256": "25947fe1ded034aaa22fd71b5fb4d7904c866751e103046cd258dd2639a1d276",
+      "size_bytes": 17086
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/twine.log",
+      "sha256": "645ef637823eac97a14c2afe548b718734951c39cf30d64ad3cadc0f4f4106b1",
+      "size_bytes": 232
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/install.log",
+      "sha256": "6b4f48a8bce1ba1d5065826934af753e9c5a9e6f9977b417f16266ddcc15d115",
+      "size_bytes": 548
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/offline-demo.log",
+      "sha256": "53f9de65c963d6093c0f52f548250dfd2ea7211345c67fb2a43cef5f348b83b0",
+      "size_bytes": 8401
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase05-freeze/documentation.log",
+      "sha256": "242c1829696103656cfc73fecf58b1bff3bd5974cbab0769e7596c0506162805",
+      "size_bytes": 110
+    }
+  ]
+}

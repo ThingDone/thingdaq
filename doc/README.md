@@ -69,7 +69,8 @@ The historical 1.1.0 artifact and validation record is [[Release-1.1.0]].
 Start the current candidate with [[Quickstart]], build it with [[firmware-builds]],
 and use [[protocol-v3-migration]] for client/firmware compatibility.
 The exact-candidate rig runner and evidence gate are documented in
-[[protocol-v3-qualification]]; their availability does not establish physical
+[[protocol-v3-qualification]]; the frozen candidate and Phase 06 setup are in
+[[protocol-v3-release-candidate]]. Their availability does not establish physical
 qualification.
 
 After installing this checkout (`python -m pip install ./daq_api`), run:
