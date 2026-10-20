@@ -13,6 +13,7 @@ related:
   - '[[python-api]]'
   - '[[protocol-v3-python]]'
   - '[[protocol-v3-firmware-portable]]'
+  - '[[protocol-v3-clock-control]]'
 ---
 
 # Public protocol v3 offline upgrade architecture
@@ -49,6 +50,30 @@ agree on emitted bytes, repeated v2/v3 sessions and loss accounting. Production
 clock selection remains fixed at build time; physical public-v3 capture
 remains unqualified. [[protocol-v3-firmware-portable]]
 records the consolidated gate and [[protocol-v3-python]] the earlier host gate.
+
+### Phase 04 fixed-clock evidence handoff (2026-10-20)
+
+[[protocol-v3-clock-control]] consolidates the completed Phase 04 local
+evidence: all 48 normal 600 MHz settings, state/error semantics, compatibility
+boundaries, exact validation commands and candidate artifact identity.
+Runtime CPU switching is out of scope. The existing fixed-build application
+changes acquisition/codec selections while stopped and advertises compiled
+clock metadata; it does not independently measure clocks.
+
+The normal public-codec candidate is `thingdaq-4c250bedb4d1bbc0`, built from
+`f16d463cb2b187dac4155c0301262dde16389b45` and recorded in validation commit
+`d1ad76a`. All 125 compile entries agree on 600 MHz. Target placement gates
+passed with 33,024 bytes of RAM1 locals/stack and 4,096 bytes of RAM2 heap;
+the required minima remain 32,768 and 4,096 bytes.
+
+All 2,499 unique maintained tests passed across the full run and focused
+recheck. The full invocation had two host-timing-sensitive fake-serial
+throughput failures; both affected modules passed unchanged in isolation.
+The evidence report preserves these failures and reruns, the five intentional
+skips, and generator, formatting, lint and type-check results.
+Phase 06 still owns flashing, physical capture, independent clock measurements
+and on-device qualification. No private-codec or historical 450 MHz evidence
+substitutes for that public-v3 qualification.
 
 ### Fixed-clock production control verification (2026-10-20)
 
