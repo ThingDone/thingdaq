@@ -600,15 +600,20 @@ def snapshot_firmware_faults(
     if isinstance(status, V3Status):
         if run_id not in (0, status.run_id):
             raise ValueError("run_id differs from V3Status")
-        # V3 exposes only logical loss counters, with no stats-generation field
-        # or raw DMA/USB fault telemetry. Never synthesize those legacy fields.
+        # Missing measurements remain None; only advertised nonzero evidence
+        # participates in health checks.
+        codec_faults = tuple(
+            (f"{stream}_codec_{kind}_drops", "frames", "codec")
+            for stream in ("adc", "gpio")
+            for kind in ("deadline", "resource")
+        )
         return FirmwareFaultSnapshot(
             status.run_id,
             None,
             tuple(
-                FirmwareFault(counter, int(getattr(status, counter)), unit, category)
-                for counter, unit, category in _FAULT_FIELDS[:4]
-                if getattr(status, counter)
+                FirmwareFault(counter, int(value), unit, category)
+                for counter, unit, category in (*_FAULT_FIELDS, *codec_faults)
+                if (value := getattr(status, counter, None))
             ),
         )
     faults: list[FirmwareFault] = []
@@ -643,8 +648,8 @@ def reconcile_run_counters(
     being mistaken for a mismatch. Live snapshots include current queue depth;
     stopped snapshots reduce naturally to produced = transmitted + dropped.
 
-    V3 checks only advertised logical produced/dropped counters and pending
-    frames. It has no transmitted-byte or DMA counters, so this report cannot
+    V3 checks logical produced/dropped counters and pending frames. Its selected
+    byte and health diagnostics do not provide full DMA conservation, so this report cannot
     prove end-to-end delivery or bandwidth; ``stats_generation`` is ``None``.
     Variable frame counts and compression never imply fixed items/bytes per frame.
     """

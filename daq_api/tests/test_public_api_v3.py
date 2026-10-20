@@ -389,3 +389,34 @@ def test_stop_waits_for_partial_frame_drain(monkeypatch):
         assert daq.configure().settings == daq.capabilities.defaults
         assert daq.start() == 2
         assert daq.read_block().sequence == 0
+
+
+@pytest.mark.parametrize(
+    "counter",
+    [
+        "adc_codec_deadline_drops",
+        "gpio_codec_resource_drops",
+        "parser_errors",
+        "transport_errors",
+        "adc_dma_error_events",
+        "adc_etc_error_events",
+        "gpio_hardware_errors",
+        "adc_raw_invariant_errors",
+        "gpio_raw_invariant_errors",
+        "packet_invalid_operations",
+        "packet_encoding_rejections",
+    ],
+)
+def test_strict_health_rejects_available_v3_diagnostics(counter):
+    from thingdone_daq import UnexpectedStreamValidationError, snapshot_firmware_faults
+
+    with ThingDAQ.simulated(protocol_version=3) as daq:
+        baseline = daq.status()
+        assert getattr(baseline, counter) is None
+        assert daq.validate_stream_health(baseline) == baseline
+        status = replace(baseline, **{counter: 7})
+        faults = snapshot_firmware_faults(status)
+        assert faults.first_fault.counter == counter
+        assert faults.first_fault.value == 7
+        with pytest.raises(UnexpectedStreamValidationError, match=counter):
+            daq.validate_stream_health(status)

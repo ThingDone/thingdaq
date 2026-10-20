@@ -388,3 +388,20 @@ def test_cli_does_not_report_success_when_readback_disagrees(capsys, monkeypatch
     )
     assert not daq.transport.is_open
     assert not daq.reader.is_running
+
+
+@pytest.mark.parametrize("json_output", [True, False])
+def test_status_diagnostics_preserve_unavailable_measurements(
+    capsys, sessions, json_output
+):
+    output = run_cli(capsys, "status", json_output=json_output)
+    if json_output:
+        status = output["status"]
+        assert status["adc_codec_completed"] is None
+        assert status["adc_encoded_bytes_transmitted"] is None
+        assert status["transport_errors"] is None
+        assert status["adc_frames_produced"] == 0
+    else:
+        assert "adc_codec_completed=None" in output
+        assert "adc_encoded_bytes_transmitted=None" in output
+        assert "transport_errors=None" in output

@@ -212,6 +212,7 @@ struct SourceCounters {
   std::uint64_t wire_bytes_framed = 0U;
   std::uint64_t wire_bytes_emitted = 0U;
   std::uint64_t wire_bytes_transmitted = 0U;
+  std::uint64_t encoded_bytes_transmitted = 0U;
   std::uint64_t wire_bytes_evicted = 0U;
   std::uint64_t frames_produced = 0U;
   std::uint64_t items_produced = 0U;

@@ -1077,7 +1077,7 @@ def validate_v3_contract(
         "settings_response": 48,
         "info_response": 132,
         "capabilities_response": 1404,
-        "status_response": 256,
+        "status_response": 384,
         "stop_response": 16,
         "error_response": 8,
         "data_prefix": 12,
@@ -1414,6 +1414,19 @@ def validate_v3_control_fixture(
         if values["run_id"] != fixture.get("run_id", 0):
             raise ContractError("v3 fixture run ID mismatch")
         if schema_name == "status_response":
+            diagnostics = [
+                field
+                for field in schemas[schema_name]["fields"]
+                if 80 <= field["offset"] < schemas[schema_name]["size"] - 8
+            ]
+            validity = values["diagnostic_validity"]
+            if not 0 <= validity < 1 << len(diagnostics):
+                raise ContractError("unknown diagnostic validity bits")
+            for index, field in enumerate(diagnostics):
+                if not validity & (1 << index) and values[field["name"]] != 0:
+                    raise ContractError(
+                        "unavailable diagnostic must have zero wire value"
+                    )
             for stream in ("adc", "gpio"):
                 for unit in ("items", "frames"):
                     if (
@@ -1430,6 +1443,10 @@ def v3_scalar_constants(contract: Mapping[str, Any]) -> dict[str, int]:
         "PROTOCOL_VERSION": 3,
         "HEADER_SIZE": 44,
         "TRAILER_SIZE": 4,
+        "STATUS_DIAGNOSTIC_COUNT": (
+            contract["payload_schemas"]["status_response"]["size"] - 88
+        )
+        // 8,
     }
     result.update(
         {
@@ -1511,7 +1528,11 @@ def render_python_v3(contract: Mapping[str, Any], source_sha256: str) -> bytes:
             else f"{field_width(f, contract['payload_schemas'])}s"
             for f in schema["fields"]
         )
-        lines.append(f'{name.upper()}_STRUCT_FORMAT = "{fmt}"')
+        assignment = f'{name.upper()}_STRUCT_FORMAT = "{fmt}"'
+        if len(assignment) > 88:
+            lines.extend([f"{name.upper()}_STRUCT_FORMAT = (", f'    "{fmt}"', ")"])
+        else:
+            lines.append(assignment)
     lines.extend(["", "# Wire records; decode using the schema formats/offsets above."])
     for name, records in v3_record_tables(contract).items():
         if len(records) == 1:

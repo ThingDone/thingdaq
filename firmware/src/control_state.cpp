@@ -489,6 +489,7 @@ DispatchResult ControlState::dispatchV3(const protocol::Request& request,
       protocol::V3Status status{};
       status.pending_frames = readiness.pending_frames;
       status.diagnostics = readiness.v3_diagnostics;
+      status.diagnostic_validity = readiness.v3_diagnostic_validity;
       status.state = state_ == protocol_v1::DeviceState::kRunning
                          ? protocol_v3::DeviceState::kRunning
                      : readiness.pending_frames != 0U

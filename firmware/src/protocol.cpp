@@ -3335,6 +3335,7 @@ Result encodeV3StatusResponse(const Request& request, std::uint32_t run_id,
              status.counters[i]);
   for (std::size_t i = 0U; i < status.diagnostics.size(); ++i)
     storeU64(bytes, kStatusResponseAdcCodecCompletedOffset + i * 8U, status.diagnostics[i]);
+  storeU64(bytes, kStatusResponseDiagnosticValidityOffset, status.diagnostic_validity);
   const bool stop = request.kind == protocol_v1::CommandKind::kStop;
   return encodeFrame(
       responseFields(stop ? protocol_v1::FrameKind::kStopResponse

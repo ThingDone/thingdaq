@@ -5,7 +5,7 @@ from __future__ import annotations
 import shlex
 import struct
 import subprocess
-from dataclasses import replace
+from dataclasses import asdict, replace
 from itertools import cycle, groupby
 
 import pytest
@@ -111,6 +111,81 @@ def capabilities(cpp):
         cpp, [request((FIXTURES / "get_capabilities-request.bin").read_bytes())]
     )
     return decode_v3_response(frames[0]).value
+
+
+def test_build_manifest_matches_actual_firmware_metadata(cpp):
+    if cpp[1] != 600:
+        return  # Historical clock is deliberately not the normal build policy.
+    caps = capabilities(cpp)
+    policy = build_firmware.public_build_policy()
+    assert policy["defaults"] == asdict(caps.defaults)
+    assert policy["clocks"] == asdict(caps.cpu_profiles[0])
+    assert policy["configurations"] == [asdict(s) for s in caps.configurations]
+    diagnostics = policy["status_diagnostics"]
+    assert diagnostics["payload_bytes"] == c.STATUS_RESPONSE_PAYLOAD_SIZE
+    for field in diagnostics["fields"]:
+        assert field["offset"] == getattr(
+            c, f"STATUS_RESPONSE_{field['name'].upper()}_OFFSET"
+        )
+
+
+def test_default_start_without_configure_through_controlled_producer(cpp):
+    settings = capabilities(cpp).defaults
+    frames, _ = exchange(
+        cpp,
+        [
+            request(command(18, request_id=1)),
+            "P 0",
+            request(command(29, request_id=2)),
+            request(command(20, request_id=3)),
+        ],
+        mode="codec",
+    )
+    responses = replies(frames)
+    assert responses[1].value == responses[2].value
+    assert responses[1].value.settings == settings
+    data = [f for f in frames if f.header.kind in (1, 2)]
+    assert len(data) == 2
+    for frame in data:
+        assert_samples(decode_v3_block(frame, settings), controlled=True)
+
+
+def test_status_availability_parser_errors_and_epoch_reset(cpp):
+    settings = replace(capabilities(cpp).defaults, source=1)
+    damaged = bytearray(command(16, request_id=90))
+    damaged[-1] ^= 1
+    frames, _ = exchange(
+        cpp,
+        [
+            request(command(19, request_id=1)),
+            request(damaged),
+            request(command(19, request_id=2)),
+            request(command(17, settings.to_bytes(), 3)),
+            request(command(18, request_id=4)),
+            "T 32256",
+            request(command(20, request_id=5)),
+            request(command(19, request_id=6)),
+        ],
+    )
+    responses = replies(frames)
+    before, bad, stopped = [responses[i].value for i in (1, 2, 6)]
+    assert before.adc_codec_completed is before.adc_logical_bytes_transmitted is None
+    assert before.parser_errors == 0
+    assert bad.parser_errors == 1
+    assert stopped.parser_errors == stopped.transport_errors == 0
+    assert stopped.packet_ready_high_water > 0
+    assert stopped.packet_transmit_high_water > 0
+    assert stopped.adc_logical_bytes_transmitted > 0
+    for name in (
+        "adc_dma_error_events",
+        "adc_etc_error_events",
+        "gpio_hardware_errors",
+        "adc_raw_invariant_errors",
+        "gpio_raw_invariant_errors",
+        "packet_invalid_operations",
+        "packet_encoding_rejections",
+    ):
+        assert getattr(stopped, name) == 0
 
 
 def test_fixed_clock_settings_lifecycle(cpp):
@@ -448,7 +523,20 @@ def test_all_advertised_synthetic_tuples_and_v2_sessions(cpp, chunks):
             assert getattr(status, f"{name}_items_dropped") == 0
             assert getattr(status, f"{name}_frames_dropped") == 0
             if version == 3:
+                item_bytes = 4 if kind == 1 else width // 8
+                assert getattr(status, f"{name}_items_per_frame") == count
+                assert (
+                    getattr(status, f"{name}_max_frame_bytes")
+                    == 60 + count * item_bytes
+                )
+                assert getattr(status, f"{name}_retention_ticks") > count * 8
                 assert getattr(status, f"{name}_wire_bytes_transmitted") == total
+                assert getattr(status, f"{name}_encoded_bytes_transmitted") == (
+                    total - 60 * len(data)
+                )
+                assert getattr(status, f"{name}_logical_bytes_transmitted") == (
+                    len(data) * count * item_bytes
+                )
                 assert getattr(status, f"{name}_items_produced") == len(data) * count
                 assert getattr(status, f"{name}_frames_produced") == len(data)
                 policy = settings.adc_policy if kind == 1 else settings.gpio_policy
@@ -466,7 +554,8 @@ def test_all_advertised_synthetic_tuples_and_v2_sessions(cpp, chunks):
 
 
 def test_controlled_mixed_codecs_through_control_and_usb(cpp):
-    configs = [s for s in capabilities(cpp).configurations if s.stream_mask == 3]
+    caps = capabilities(cpp)
+    configs = caps.configurations
     operations, records = [], []
     for run, settings in enumerate(configs, 1):
         base = run * 10
@@ -480,14 +569,23 @@ def test_controlled_mixed_codecs_through_control_and_usb(cpp):
                 request(command(29, request_id=base + 2 + pattern)),
             ]
         operations.append(request(command(20, request_id=base + 6)))
+        operations.append(request(command(16, request_id=base + 7)))
+        operations.append(request(command(19, request_id=base + 8)))
         records.append(settings)
     frames, _ = exchange(cpp, operations, mode="codec", chunks=(1, 17, 2, 61, 3))
     responses = replies(frames)
-    assert len(responses) == len(configs) * 7
+    assert len(responses) == len(configs) * 9
     assert all(r.error_code == 0 for r in responses.values()), responses
     for run, settings in enumerate(records, 1):
         data = [f for f in frames if f.header.run_id == run and f.header.kind in (1, 2)]
-        assert len(data) == 8
+        assert len(data) == 4 * int(settings.stream_mask).bit_count()
+        for offset in (0, 1, 2, 3, 4, 5):
+            applied = responses[run * 10 + offset].value
+            assert applied.settings == settings
+            assert applied.clocks == caps.cpu_profiles[0]
+        assert responses[run * 10 + 7].value.clocks == caps.cpu_profiles[0]
+        # This seam deliberately has no runtime telemetry publisher.
+        assert responses[run * 10 + 8].value.adc_codec_completed is None
         for frame in data:
             block = decode_v3_block(frame, settings)
             assert block.item_count == 12
@@ -510,7 +608,11 @@ def test_controlled_mixed_codecs_through_control_and_usb(cpp):
         gpio = [
             decode_v3_block(f, settings).encoding for f in data if f.header.kind == 2
         ]
-        assert gpio == ([1, 0, 0, 1] if settings.gpio_policy else [0] * 4)
+        assert gpio == (
+            ([1, 0, 0, 1] if settings.gpio_policy else [0] * 4)
+            if int(settings.stream_mask) & 2
+            else []
+        )
 
 
 def test_runtime_loss_counters_match_sequence_gaps_and_decoded_items(cpp):
@@ -552,3 +654,26 @@ def test_runtime_loss_counters_match_sequence_gaps_and_decoded_items(cpp):
             assert frame.header.first_sample_ticks == frame.header.sequence * count * 8
             assert_samples(block)
             previous = frame.header.sequence
+
+
+def test_legacy_run_cannot_inherit_v3_codec_diagnostics(cpp):
+    legacy = DAQConfiguration(3, 1, aux_bank_mode=0, rate_profile=4)
+    frames, _ = exchange(
+        cpp,
+        [
+            request(
+                encode_v2_frame(17, legacy.to_payload(protocol_version=2), request_id=1)
+            ),
+            request(encode_v2_frame(18, request_id=2)),
+            "T 32384",
+            request(encode_v2_frame(20, request_id=3)),
+            request(command(19, request_id=4)),
+        ],
+    )
+    status = replies(frames)[4].value
+    assert status.adc_codec_completed is None
+    assert status.gpio_codec_completed is None
+    assert status.adc_logical_bytes_transmitted is None
+    assert status.gpio_max_frame_bytes is None
+    assert status.transport_errors == 0
+    assert all(f.header.version == 2 for f in frames if f.header.kind in (1, 2))

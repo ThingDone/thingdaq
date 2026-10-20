@@ -96,7 +96,13 @@ LoopReport FirmwareRuntime::service() {
         publishPacketStatistics();
       }
       control::DispatchReadiness readiness{};
+      const auto diagnostic = [&readiness](std::size_t offset, std::uint64_t value) {
+        const auto index = (offset - protocol_v3::kStatusResponseAdcCodecCompletedOffset) / 8U;
+        readiness.v3_diagnostics[index] = value;
+        readiness.v3_diagnostic_validity |= std::uint64_t{1U} << index;
+      };
       if (packet_stats_generation_ != 0U &&
+          packet_pipeline_.layout().protocol_version == protocol_v3::kProtocolVersion &&
           command.request.protocol_version == protocol_v3::kProtocolVersion &&
           command.request.kind == protocol_v1::CommandKind::kGetStatus) {
         const auto packet = packet_pipeline_.snapshot();
@@ -112,6 +118,37 @@ LoopReport FirmwareRuntime::service() {
           readiness.v3_diagnostics[17U + i * 4U] =
               static_cast<std::uint64_t>(board::kPacketBufferCount) * layout.coverage_ticks;
         }
+        readiness.v3_diagnostic_validity = (std::uint64_t{1U} << 22U) - 1U;
+        diagnostic(protocol_v3::kStatusResponseAdcLogicalBytesTransmittedOffset,
+                   packet.source_bytes[0].payload_bytes_transmitted);
+        diagnostic(protocol_v3::kStatusResponseAdcEncodedBytesTransmittedOffset,
+                   packet.sources[0].encoded_bytes_transmitted);
+        diagnostic(protocol_v3::kStatusResponseGpioLogicalBytesTransmittedOffset,
+                   packet.source_bytes[1].payload_bytes_transmitted);
+        diagnostic(protocol_v3::kStatusResponseGpioEncodedBytesTransmittedOffset,
+                   packet.sources[1].encoded_bytes_transmitted);
+      }
+      if (command.request.protocol_version == protocol_v3::kProtocolVersion &&
+          command.request.kind == protocol_v1::CommandKind::kGetStatus) {
+        const auto health = control_.statistics().snapshot();
+#define V3_DIAGNOSTIC(Name, value) \
+        diagnostic(protocol_v3::kStatusResponse##Name##Offset, value)
+        V3_DIAGNOSTIC(ParserErrors, health.parser_errors);
+        V3_DIAGNOSTIC(TransportErrors, health.transport_errors);
+        V3_DIAGNOSTIC(PacketReadyHighWater, health.packet_queue.ready_high_water);
+        V3_DIAGNOSTIC(PacketTransmitHighWater, health.packet_queue.transmit_high_water);
+        V3_DIAGNOSTIC(AdcDmaErrorEvents, health.adc_capture.dma_error_events);
+        V3_DIAGNOSTIC(AdcEtcErrorEvents, health.adc_capture.adc_etc_error_events);
+        V3_DIAGNOSTIC(GpioHardwareErrors,
+            static_cast<std::uint64_t>(health.gpio_raw_capture.hardware_errors) +
+            health.auxiliary_gpio_capture.hardware_errors);
+        V3_DIAGNOSTIC(AdcRawInvariantErrors, health.adc_capture.invariant_errors);
+        V3_DIAGNOSTIC(GpioRawInvariantErrors,
+            static_cast<std::uint64_t>(health.gpio_raw_capture.invariant_errors) +
+            health.auxiliary_gpio_capture.invariant_errors);
+        V3_DIAGNOSTIC(PacketInvalidOperations, health.packet_queue.invalid_operations);
+        V3_DIAGNOSTIC(PacketEncodingRejections, health.packet_queue.encoding_rejections);
+#undef V3_DIAGNOSTIC
       }
       if (command.request.protocol_version == protocol_v3::kProtocolVersion) {
         const auto packets = packet_pipeline_.snapshot();

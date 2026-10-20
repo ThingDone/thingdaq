@@ -42,7 +42,7 @@ Private versions `0x82/0x83` are not v3 encodings.
 | INFO | `0x10 / 0x90` | 0 | 132 |
 | CONFIGURE | `0x11 / 0x91` | 20 | 48 |
 | START | `0x12 / 0x92` | 0 | 48 |
-| GET_STATUS (STATUS) | `0x13 / 0x93` | 0 | 256 |
+| GET_STATUS (STATUS) | `0x13 / 0x93` | 0 | 384 |
 | STOP | `0x14 / 0x94` | 0 | 16 |
 | GET_CAPABILITIES | `0x1C / 0x9C` | 0 | 1404 |
 | GET_SETTINGS | `0x1D / 0x9D` | 0 | 48 |
@@ -254,7 +254,8 @@ inside each existing 4096-byte packet page. PACK12 ADC frames contain 3084 wire
 bytes. Device-specific limits can be smaller than the protocol maxima above.
 
 GET_STATUS retains the original 80-byte state/logical-counter prefix and appends
-22 little-endian u64 fields (256-byte payload total). Offsets are generated from
+37 little-endian u64 diagnostic fields and a u64 validity bitmap (384-byte payload
+total). Offsets are generated from
 `protocol/protocol-v3.json`:
 
 | Payload offsets | Fields |
@@ -263,13 +264,35 @@ GET_STATUS retains the original 80-byte state/logical-counter prefix and appends
 | 136–184 | GPIO codec counters in the same order |
 | 192–216 | ADC completed wire bytes, logical items/frame, maximum RAW wire bytes/frame, retention ticks |
 | 224–248 | GPIO layout/transport fields in the same order |
+| 256–280 | ADC logical/encoded bytes transmitted, then GPIO logical/encoded bytes transmitted |
+| 288–312 | Parser errors, transport errors, packet READY high-water, packet transmit high-water |
+| 320–368 | ADC DMA errors, ADC_ETC errors, GPIO hardware errors, ADC raw invariant errors, GPIO raw invariant errors, packet invalid operations, packet encoding rejections |
+| 376 | Diagnostic validity bitmap; bit 0 corresponds to offset 80, bit 36 to offset 368 |
 
 Codec times use the 8 MHz domain. Counts/maxima saturate at the firmware source's
 u32 width and accumulated work at u64. RAW policies bypass codec work, so their
 codec counters remain zero. Completed wire bytes include envelope, prefix and
 checksum; an incomplete USB write does not count as a transmitted frame.
+Logical bytes count decoded ADC pairs at four bytes each and GPIO samples at
+one/two bytes each. Encoded bytes exclude header, data prefix and checksum;
+wire bytes include all three. All three totals count only fully transmitted
+frames, including during stalls and STOP drain. Codec completed counts include
+RAW fallbacks; subtract RAW from completed for compressed completions. A RAW
+policy bypasses the codec and contributes to neither count.
+
+Validity bits distinguish unavailable measurements from measured zero and
+saturation. An unset bit requires a zero wire value; the SDK exposes `None` and
+the CLI exposes JSON `null` (human output `None`). Reserved validity bits must be
+zero. The simulator and control-only harness do not claim runtime measurements.
+Temperature, watchdog/reset details and complete DMA-stage conservation remain
+unavailable through v3; these are not implied by the selected health counters.
+GPIO hardware/invariant errors include both primary and auxiliary capture
+owners. Health counters and queue high-water marks use the existing statistics
+epoch, reset by successful START; strict SDK health checks reject available
+nonzero faults, including codec deadline/resource drops.
+
 Retention is a per-stream upper bound if every shared packet page holds that
-stream, calculated from logical time coverage. Zero layout/retention fields mean
-unavailable, including before the first run. Settings changes preserve the prior
+stream, calculated from logical time coverage. Layout, codec and byte fields are
+unavailable before the first v3 run and after a legacy run. Settings changes preserve the prior
 run's diagnostics until START resets them. Legacy layouts and diagnostics do not
 change. This pre-release v3 schema extension requires matching generated clients.

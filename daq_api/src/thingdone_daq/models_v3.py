@@ -630,28 +630,43 @@ class V3Status(V3Stop):
     gpio_frames_dropped: int = 0
     gpio_items_produced: int = 0
     gpio_items_dropped: int = 0
-    adc_codec_completed: int = 0
-    adc_codec_raw: int = 0
-    adc_codec_deadline_drops: int = 0
-    adc_codec_resource_drops: int = 0
-    adc_codec_work_ticks: int = 0
-    adc_codec_max_work_ticks: int = 0
-    adc_codec_max_age_ticks: int = 0
-    gpio_codec_completed: int = 0
-    gpio_codec_raw: int = 0
-    gpio_codec_deadline_drops: int = 0
-    gpio_codec_resource_drops: int = 0
-    gpio_codec_work_ticks: int = 0
-    gpio_codec_max_work_ticks: int = 0
-    gpio_codec_max_age_ticks: int = 0
-    adc_wire_bytes_transmitted: int = 0
-    adc_items_per_frame: int = 0
-    adc_max_frame_bytes: int = 0
-    adc_retention_ticks: int = 0
-    gpio_wire_bytes_transmitted: int = 0
-    gpio_items_per_frame: int = 0
-    gpio_max_frame_bytes: int = 0
-    gpio_retention_ticks: int = 0
+    adc_codec_completed: int | None = None
+    adc_codec_raw: int | None = None
+    adc_codec_deadline_drops: int | None = None
+    adc_codec_resource_drops: int | None = None
+    adc_codec_work_ticks: int | None = None
+    adc_codec_max_work_ticks: int | None = None
+    adc_codec_max_age_ticks: int | None = None
+    gpio_codec_completed: int | None = None
+    gpio_codec_raw: int | None = None
+    gpio_codec_deadline_drops: int | None = None
+    gpio_codec_resource_drops: int | None = None
+    gpio_codec_work_ticks: int | None = None
+    gpio_codec_max_work_ticks: int | None = None
+    gpio_codec_max_age_ticks: int | None = None
+    adc_wire_bytes_transmitted: int | None = None
+    adc_items_per_frame: int | None = None
+    adc_max_frame_bytes: int | None = None
+    adc_retention_ticks: int | None = None
+    gpio_wire_bytes_transmitted: int | None = None
+    gpio_items_per_frame: int | None = None
+    gpio_max_frame_bytes: int | None = None
+    gpio_retention_ticks: int | None = None
+    adc_logical_bytes_transmitted: int | None = None
+    adc_encoded_bytes_transmitted: int | None = None
+    gpio_logical_bytes_transmitted: int | None = None
+    gpio_encoded_bytes_transmitted: int | None = None
+    parser_errors: int | None = None
+    transport_errors: int | None = None
+    packet_ready_high_water: int | None = None
+    packet_transmit_high_water: int | None = None
+    adc_dma_error_events: int | None = None
+    adc_etc_error_events: int | None = None
+    gpio_hardware_errors: int | None = None
+    adc_raw_invariant_errors: int | None = None
+    gpio_raw_invariant_errors: int | None = None
+    packet_invalid_operations: int | None = None
+    packet_encoding_rejections: int | None = None
 
     def to_payload(self) -> bytes:
         prefix = V3Stop.to_payload(self)
@@ -672,41 +687,43 @@ class V3Status(V3Stop):
             ),
             "dropped count exceeds produced",
         )
-        diagnostics = (
-            self.adc_codec_completed,
-            self.adc_codec_raw,
-            self.adc_codec_deadline_drops,
-            self.adc_codec_resource_drops,
-            self.adc_codec_work_ticks,
-            self.adc_codec_max_work_ticks,
-            self.adc_codec_max_age_ticks,
-            self.gpio_codec_completed,
-            self.gpio_codec_raw,
-            self.gpio_codec_deadline_drops,
-            self.gpio_codec_resource_drops,
-            self.gpio_codec_work_ticks,
-            self.gpio_codec_max_work_ticks,
-            self.gpio_codec_max_age_ticks,
-            self.adc_wire_bytes_transmitted,
-            self.adc_items_per_frame,
-            self.adc_max_frame_bytes,
-            self.adc_retention_ticks,
-            self.gpio_wire_bytes_transmitted,
-            self.gpio_items_per_frame,
-            self.gpio_max_frame_bytes,
-            self.gpio_retention_ticks,
+        # The generated field order defines validity bits as well as wire offsets.
+        diagnostics = tuple(getattr(self, field.name) for field in fields(self)[11:])
+        validity = sum(
+            1 << i for i, value in enumerate(diagnostics) if value is not None
         )
-        return prefix + _pack("<30Q", *counts, *diagnostics)
+        return prefix + _pack(
+            f"<{8 + c.STATUS_DIAGNOSTIC_COUNT + 1}Q",
+            *counts,
+            *(0 if value is None else value for value in diagnostics),
+            validity,
+        )
 
     @classmethod
     def from_payload(cls, payload: BytesLike) -> V3Status:
         data = _success(payload, c.STATUS_RESPONSE_PAYLOAD_SIZE)
         stop = V3Stop.from_payload(data[: c.STOP_RESPONSE_PAYLOAD_SIZE])
+        values = struct.unpack_from(
+            f"<{8 + c.STATUS_DIAGNOSTIC_COUNT + 1}Q", data, c.STOP_RESPONSE_PAYLOAD_SIZE
+        )
+        validity = values[-1]
+        _require(
+            validity < 1 << c.STATUS_DIAGNOSTIC_COUNT,
+            "unknown diagnostic validity bits",
+        )
+        diagnostics = tuple(
+            value if validity & (1 << i) else None
+            for i, value in enumerate(values[8:-1])
+        )
+        _require(
+            all(
+                value == 0 or validity & (1 << i)
+                for i, value in enumerate(values[8:-1])
+            ),
+            "unavailable diagnostic must have zero wire value",
+        )
         result = cls(
-            stop.state,
-            stop.run_id,
-            stop.pending_frames,
-            *struct.unpack_from("<30Q", data, c.STOP_RESPONSE_PAYLOAD_SIZE),
+            stop.state, stop.run_id, stop.pending_frames, *values[:8], *diagnostics
         )
         result.to_payload()
         return result

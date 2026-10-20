@@ -1,6 +1,6 @@
 // Generated public protocol-v3 constants. Do not edit by hand.
 // Source: protocol/protocol-v3.json
-// Source SHA-256: 41b4a7a4e644888e97ae7cd61686650703ee0638b4be6a793411bdfdb9a52c6c
+// Source SHA-256: ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c
 #pragma once
 
 #include <cstdint>
@@ -14,12 +14,13 @@
 
 namespace thingdaq::protocol_v3 {
 
-inline constexpr char kSourceSha256[] = "41b4a7a4e644888e97ae7cd61686650703ee0638b4be6a793411bdfdb9a52c6c";
+inline constexpr char kSourceSha256[] = "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c";
 inline constexpr bool kWireIsLittleEndian = true;
 inline constexpr std::uint32_t kMagic = 3735928559U;
 inline constexpr std::uint32_t kProtocolVersion = 3U;
 inline constexpr std::uint32_t kHeaderSize = 44U;
 inline constexpr std::uint32_t kTrailerSize = 4U;
+inline constexpr std::uint32_t kStatusDiagnosticCount = 37U;
 inline constexpr std::uint32_t kMinFrameBytes = 48U;
 inline constexpr std::uint32_t kMaxCommandPayloadBytes = 20U;
 inline constexpr std::uint32_t kMaxCommandFrameBytes = 68U;
@@ -145,7 +146,7 @@ inline constexpr std::uint32_t kCapabilitiesResponseRateProfilesOffset = 104U;
 inline constexpr std::uint32_t kCapabilitiesResponseRateProfilesCount = 1U;
 inline constexpr std::uint32_t kCapabilitiesResponseConfigurationsOffset = 124U;
 inline constexpr std::uint32_t kCapabilitiesResponseConfigurationsCount = 64U;
-inline constexpr std::uint32_t kStatusResponsePayloadSize = 256U;
+inline constexpr std::uint32_t kStatusResponsePayloadSize = 384U;
 inline constexpr std::uint32_t kStatusResponseResponseStatusOffset = 0U;
 inline constexpr std::uint32_t kStatusResponseReservedOffset = 1U;
 inline constexpr std::uint32_t kStatusResponseErrorCodeOffset = 2U;
@@ -184,6 +185,22 @@ inline constexpr std::uint32_t kStatusResponseGpioWireBytesTransmittedOffset = 2
 inline constexpr std::uint32_t kStatusResponseGpioItemsPerFrameOffset = 232U;
 inline constexpr std::uint32_t kStatusResponseGpioMaxFrameBytesOffset = 240U;
 inline constexpr std::uint32_t kStatusResponseGpioRetentionTicksOffset = 248U;
+inline constexpr std::uint32_t kStatusResponseAdcLogicalBytesTransmittedOffset = 256U;
+inline constexpr std::uint32_t kStatusResponseAdcEncodedBytesTransmittedOffset = 264U;
+inline constexpr std::uint32_t kStatusResponseGpioLogicalBytesTransmittedOffset = 272U;
+inline constexpr std::uint32_t kStatusResponseGpioEncodedBytesTransmittedOffset = 280U;
+inline constexpr std::uint32_t kStatusResponseParserErrorsOffset = 288U;
+inline constexpr std::uint32_t kStatusResponseTransportErrorsOffset = 296U;
+inline constexpr std::uint32_t kStatusResponsePacketReadyHighWaterOffset = 304U;
+inline constexpr std::uint32_t kStatusResponsePacketTransmitHighWaterOffset = 312U;
+inline constexpr std::uint32_t kStatusResponseAdcDmaErrorEventsOffset = 320U;
+inline constexpr std::uint32_t kStatusResponseAdcEtcErrorEventsOffset = 328U;
+inline constexpr std::uint32_t kStatusResponseGpioHardwareErrorsOffset = 336U;
+inline constexpr std::uint32_t kStatusResponseAdcRawInvariantErrorsOffset = 344U;
+inline constexpr std::uint32_t kStatusResponseGpioRawInvariantErrorsOffset = 352U;
+inline constexpr std::uint32_t kStatusResponsePacketInvalidOperationsOffset = 360U;
+inline constexpr std::uint32_t kStatusResponsePacketEncodingRejectionsOffset = 368U;
+inline constexpr std::uint32_t kStatusResponseDiagnosticValidityOffset = 376U;
 inline constexpr std::uint32_t kStopResponsePayloadSize = 16U;
 inline constexpr std::uint32_t kStopResponseResponseStatusOffset = 0U;
 inline constexpr std::uint32_t kStopResponseReservedOffset = 1U;

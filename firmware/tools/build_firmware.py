@@ -1443,6 +1443,15 @@ def public_build_policy() -> dict[str, Any]:
             if value["cpu_profile"] == BOARD_DEFAULTS["cpu_profile"]
         ],
         "codec_selection": "public CONFIGURE settings; no private codec flags",
+        "status_diagnostics": {
+            "payload_bytes": V3_CONTRACT["payload_schemas"]["status_response"]["size"],
+            "availability": "per-field diagnostic_validity bitmap; unavailable is not zero",
+            "fields": [
+                {"name": field["name"], "offset": field["offset"]}
+                for field in V3_CONTRACT["payload_schemas"]["status_response"]["fields"]
+                if field["offset"] >= 80
+            ],
+        },
         "legacy_compatibility": {"protocol_version": 2, "encoding": "RAW"},
         "input_sha256": {
             str(path.relative_to(REPOSITORY_ROOT)): sha256(path)

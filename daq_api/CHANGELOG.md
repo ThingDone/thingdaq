@@ -4,6 +4,10 @@
 
 - Add public protocol-v3 negotiation, metadata, configuration, streaming and
   decoding, with advertised 600 MHz / 1 MHz / RLE_AUTO / PACK12 defaults.
+- Extend pre-release v3 STATUS with logical/encoded byte totals and selected
+  health counters. Diagnostic availability decodes to `None`/JSON `null`;
+  strict health checks reject reported codec, DMA, parser and transport faults.
+  The 384-byte STATUS schema requires matching firmware and SDK candidates.
 - Retain v1/v2 decoding and explicit legacy simulator personas. Older v2 SDKs
   can use the new firmware's v2 RAW compatibility path.
 - Firmware 1.2.0, wire protocol 3 and SDK 1.2.0 are independent version axes.

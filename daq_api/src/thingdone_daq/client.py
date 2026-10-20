@@ -16,6 +16,7 @@ from ._generated import protocol_constants as constants
 from ._generated import protocol_v2_constants as v2_constants
 from ._generated import protocol_v3_constants as v3_constants
 from .checksum import HOST_SUPPORTED_CHECKSUM_ALGORITHMS
+from .diagnostics import snapshot_firmware_faults
 from .discovery import (
     DEFAULT_DISCOVERY_TIMEOUT,
     DeviceNotFoundError,
@@ -1700,6 +1701,10 @@ class ThingDAQ:
                         raise UnexpectedStreamValidationError(
                             category, f"observed {count} {category}"
                         )
+                for fault in snapshot_firmware_faults(snapshot).faults:
+                    raise UnexpectedStreamValidationError(
+                        fault.counter, f"observed {fault.value} {fault.unit}"
+                    )
                 return snapshot
             if not isinstance(snapshot, Status):
                 raise TypeError("status must be a Status snapshot")

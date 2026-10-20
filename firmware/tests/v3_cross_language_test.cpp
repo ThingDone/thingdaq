@@ -112,7 +112,7 @@ void codecSession() {
               state.activeSettings().settings, 12U, 12U);
           assert(layout.ok());
           assert(pipeline.startRun(state.runId(), constants::kDefaultChecksumAlgorithm,
-              packet::kAllStreamMask, layout.layout) == packet::OperationStatus::kOk);
+              state.activeSettings().settings[0], layout.layout) == packet::OperationStatus::kOk);
         }
         if (events.has(control::Event::kStop)) pipeline.stopProduction();
       }
@@ -121,6 +121,8 @@ void codecSession() {
       const unsigned pattern = static_cast<unsigned>(std::stoul(argument));
       assert(pattern < 4U);
       for (auto source : {packet::Stream::kAdc, packet::Stream::kGpio}) {
+        if ((state.activeSettings().settings[0] &
+             (source == packet::Stream::kAdc ? 1U : 2U)) == 0U) continue;
         const auto begun = pipeline.beginFill(source);
         assert(begun.ok());
         const auto view = pipeline.writablePayload(begun.handle);

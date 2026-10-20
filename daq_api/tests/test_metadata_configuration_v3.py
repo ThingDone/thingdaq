@@ -277,16 +277,53 @@ def test_legacy_configuration_never_silently_ignores_v3_selectors(options):
 
 
 def test_public_status_diagnostics_have_independent_fixed_offsets():
-    # 16-byte state prefix, 8 logical counters, then 22 diagnostic u64s.
+    # Independent offsets: 37 diagnostic u64s and a trailing validity bitmap.
     prefix = struct.pack("<BBHBBHII", 0, 0, 0, 1, 0, 0, 7, 0)
     counts = (8, 1, 8064, 1008, 2, 0, 8064, 0)
-    diagnostics = tuple((1 << 32) + i for i in range(22))
-    payload = prefix + struct.pack("<30Q", *counts, *diagnostics)
-    assert len(payload) == 256
+    diagnostics = tuple((1 << 32) + i for i in range(37))
+    payload = prefix + struct.pack("<46Q", *counts, *diagnostics, (1 << 37) - 1)
+    assert len(payload) == 384
     status = V3Status.from_payload(payload)
     assert status.adc_codec_completed == 1 << 32
     assert status.adc_codec_max_age_ticks == (1 << 32) + 6
     assert status.gpio_codec_completed == (1 << 32) + 7
     assert status.adc_wire_bytes_transmitted == (1 << 32) + 14
     assert status.gpio_retention_ticks == (1 << 32) + 21
+    assert status.adc_logical_bytes_transmitted == (1 << 32) + 22
+    assert status.packet_encoding_rejections == (1 << 32) + 36
     assert status.to_payload() == payload
+
+
+def test_status_unavailable_zero_and_saturated_measurements_are_distinct():
+    status = V3Status(
+        c.DeviceState.STOPPED,
+        1,
+        0,
+        adc_codec_completed=0,
+        gpio_wire_bytes_transmitted=(1 << 64) - 1,
+    )
+    decoded = V3Status.from_payload(status.to_payload())
+    assert decoded == status
+    assert decoded.adc_codec_completed == 0
+    assert decoded.gpio_codec_completed is None
+    assert decoded.gpio_wire_bytes_transmitted == (1 << 64) - 1
+    assert decoded.adc_codec_work_ticks is None
+    payload = bytearray(status.to_payload())
+    struct.pack_into("<Q", payload, 376, 1 << 37)
+    with pytest.raises(ValueError, match="validity"):
+        V3Status.from_payload(payload)
+    payload = bytearray(status.to_payload())
+    struct.pack_into("<Q", payload, 136, 1)
+    with pytest.raises(ValueError, match="unavailable"):
+        V3Status.from_payload(payload)
+
+
+def test_status_model_field_order_matches_every_generated_diagnostic_offset():
+    from dataclasses import fields
+
+    diagnostics = fields(V3Status)[11:]
+    assert len(diagnostics) == c.STATUS_DIAGNOSTIC_COUNT
+    for index, field in enumerate(diagnostics):
+        assert (
+            getattr(c, f"STATUS_RESPONSE_{field.name.upper()}_OFFSET") == 80 + 8 * index
+        )

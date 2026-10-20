@@ -853,7 +853,7 @@
       ]
     },
     "status_response": {
-      "size": 256,
+      "size": 384,
       "fields": [
         {
           "name": "response_status",
@@ -1050,6 +1050,86 @@
           "name": "gpio_retention_ticks",
           "type": "u64",
           "offset": 248
+        },
+        {
+          "name": "adc_logical_bytes_transmitted",
+          "type": "u64",
+          "offset": 256
+        },
+        {
+          "name": "adc_encoded_bytes_transmitted",
+          "type": "u64",
+          "offset": 264
+        },
+        {
+          "name": "gpio_logical_bytes_transmitted",
+          "type": "u64",
+          "offset": 272
+        },
+        {
+          "name": "gpio_encoded_bytes_transmitted",
+          "type": "u64",
+          "offset": 280
+        },
+        {
+          "name": "parser_errors",
+          "type": "u64",
+          "offset": 288
+        },
+        {
+          "name": "transport_errors",
+          "type": "u64",
+          "offset": 296
+        },
+        {
+          "name": "packet_ready_high_water",
+          "type": "u64",
+          "offset": 304
+        },
+        {
+          "name": "packet_transmit_high_water",
+          "type": "u64",
+          "offset": 312
+        },
+        {
+          "name": "adc_dma_error_events",
+          "type": "u64",
+          "offset": 320
+        },
+        {
+          "name": "adc_etc_error_events",
+          "type": "u64",
+          "offset": 328
+        },
+        {
+          "name": "gpio_hardware_errors",
+          "type": "u64",
+          "offset": 336
+        },
+        {
+          "name": "adc_raw_invariant_errors",
+          "type": "u64",
+          "offset": 344
+        },
+        {
+          "name": "gpio_raw_invariant_errors",
+          "type": "u64",
+          "offset": 352
+        },
+        {
+          "name": "packet_invalid_operations",
+          "type": "u64",
+          "offset": 360
+        },
+        {
+          "name": "packet_encoding_rejections",
+          "type": "u64",
+          "offset": 368
+        },
+        {
+          "name": "diagnostic_validity",
+          "type": "u64",
+          "offset": 376
         }
       ]
     },
@@ -2430,7 +2510,7 @@
     "CONFIGURE": "STOPPED only, pending_frames=0 and no transport data tail. Validate the entire candidate before any clock/pin/settings changes; on application failure roll back all changes and return INTERNAL_ERROR. Success atomically replaces settings and returns exact requested settings plus corresponding clocks. RUNNING returns INVALID_STATE; DRAINING returns BUSY. Unsupported tuple returns UNSUPPORTED_CONFIGURATION; valid but contradictory rate/width/policy fields return UNSUPPORTED_CONFIGURATION; unknown enums/nonzero reserved bytes return INVALID_PAYLOAD. No partial mutation.",
     "START": "STOPPED only with drain complete; reboot defaults are already configured, so explicit CONFIGURE is optional. RUNNING returns INVALID_STATE, DRAINING returns BUSY. Increment u32 run_id modulo 2^32 skipping zero; reset per-stream sequence, relative timestamps and counters. Return exact active settings and clocks before any new-run data. Settings/wire mode are immutable throughout the run.",
     "STOP": "RUNNING stops production and enters DRAINING if complete queued frames or a partial transport tail remain, otherwise STOPPED. Repeated STOP in DRAINING/STOPPED is idempotent. Response reports state/pending complete-or-partial frames and current run_id. Preserve settings and final counters. Continue sending queued complete old-run frames without truncation; automatically enter STOPPED only after every data byte is transmitted. Host drains through ordered GET_STATUS response reporting STOPPED,pending_frames=0 before restarting/reconfiguring.",
-    "GET_STATUS": "STATUS uses existing GET_STATUS ID. Allowed in all states; snapshot of state, run_id, pending frames and per-stream run counters. Produced includes dropped; items are logical ADC pairs/GPIO samples regardless of encoding. Counters are u64 saturating, reset only on successful START or reboot; dropped <= produced. Queued/draining frames count as produced. STOPPED requires pending_frames=0; DRAINING requires pending_frames>0. Diagnostics append per-stream codec completed/RAW/deadline/resource counters, accumulated/max work and maximum age in 8 MHz ticks, transmitted complete wire-frame bytes, selected logical items per frame, maximum RAW frame bytes including prefix, and retention_ticks. Retention is an upper bound if every shared packet page belongs to that stream: page count * logical items * period; it is not guaranteed simultaneous retention or a compression ratio. Layout fields describe the active/most recent run, zero when unavailable (including before the first run). Wire totals include the header, prefix and trailer and count only completed frames. Codec counters saturate at their source widths (u32 counts/maxima, u64 work), reset on START and remain queryable after STOP.",
+    "GET_STATUS": "STATUS uses existing GET_STATUS ID. Allowed in all states; snapshot of state, run_id, pending frames and per-stream run counters. Produced includes dropped; items are logical ADC pairs/GPIO samples regardless of encoding. Counters are u64 saturating, reset only on successful START or reboot; dropped <= produced. Queued/draining frames count as produced. STOPPED requires pending_frames=0; DRAINING requires pending_frames>0. Diagnostics append per-stream codec completed/RAW/deadline/resource counters, accumulated/max work and maximum age in 8 MHz ticks, transmitted complete wire-frame bytes, selected logical items per frame, maximum RAW frame bytes including prefix, and retention_ticks. Retention is an upper bound if every shared packet page belongs to that stream: page count * logical items * period; it is not guaranteed simultaneous retention or a compression ratio. Layout fields describe the active/most recent v3 run, unavailable before the first run and after legacy acquisition. Wire totals include the header, prefix and trailer and count only completed frames. Codec counters saturate at their source widths (u32 counts/maxima, u64 work), reset on START and remain queryable after STOP. STATUS payload is 384 bytes. Offsets 256/264 and 272/280 append ADC and GPIO logical/encoded byte totals for completed transmissions; logical bytes use 4 bytes per ADC pair and 1/2 bytes per GPIO sample, encoded bytes exclude all framing. Offsets 288 through 368 expose parser/transport errors, packet READY/transmit high-water, ADC DMA/ETC errors, GPIO hardware errors, ADC/GPIO raw invariant errors and packet invalid-operation/encoding errors. GPIO hardware/invariant totals include primary and auxiliary owners. Offset 376 holds diagnostic_validity: bit i marks availability of the diagnostic u64 at offset 80+8*i, for i=0..36. Reserved bits must be zero; unavailable fields must contain zero on wire and decode to None/null, never a measured zero. Availability is independent of saturation. Simulator/control-only peers leave unsupported diagnostics unavailable. Temperature, watchdog and full DMA conservation are not provided by this STATUS. Codec compressed completions equal completed minus RAW fallback; RAW policies bypass both counters.",
     "reboot": "Reset to STOPPED, run_id=0, empty queues/counters/replay history and board defaults. Settings are session-only, never persisted. CDC reconnect preserves settings/state; a host must query and STOP/drain as necessary. Wire version changes require a separate stopped, drained session; CONFIGURE wire_version is always 3.",
     "unsupported_commands": "IDs reserved from v1/v2 are not implemented in v3; return generic ERROR_RESPONSE with UNKNOWN_FRAME_KIND. No auxiliary OUTPUT, 528 MHz profile, higher sampling rates or additional boards are selectable."
   },
@@ -2693,7 +2773,23 @@
           "gpio_wire_bytes_transmitted": 0,
           "gpio_items_per_frame": 0,
           "gpio_max_frame_bytes": 0,
-          "gpio_retention_ticks": 0
+          "gpio_retention_ticks": 0,
+          "adc_logical_bytes_transmitted": 0,
+          "adc_encoded_bytes_transmitted": 0,
+          "gpio_logical_bytes_transmitted": 0,
+          "gpio_encoded_bytes_transmitted": 0,
+          "parser_errors": 0,
+          "transport_errors": 0,
+          "packet_ready_high_water": 0,
+          "packet_transmit_high_water": 0,
+          "adc_dma_error_events": 0,
+          "adc_etc_error_events": 0,
+          "gpio_hardware_errors": 0,
+          "adc_raw_invariant_errors": 0,
+          "gpio_raw_invariant_errors": 0,
+          "packet_invalid_operations": 0,
+          "packet_encoding_rejections": 0,
+          "diagnostic_validity": 0
         }
       },
       "request_id": 4,

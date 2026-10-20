@@ -664,6 +664,9 @@ void PacketBufferPipeline::releaseFrontFrame() {
   const std::size_t source_index = streamIndex(record.stream);
   SourceCounters &source = source_counters_[source_index];
   saturatingAdd(source.wire_bytes_transmitted, static_cast<std::uint64_t>(record.frame_size));
+  saturatingAdd(source.encoded_bytes_transmitted, static_cast<std::uint64_t>(
+      record.frame_size - protocol_v1::kHeaderSize - protocol_v1::kTrailerSize -
+      layout_.prefixBytes()));
   saturatingIncrement(source.frames_transmitted);
   saturatingAdd(source.items_transmitted,
                 static_cast<std::uint64_t>(record.item_count));

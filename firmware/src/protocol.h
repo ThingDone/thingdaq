@@ -306,7 +306,8 @@ struct V3Status {
   std::uint32_t pending_frames = 0U;
   // ADC frames produced/dropped, items produced/dropped; then GPIO.
   std::array<std::uint64_t, 8U> counters{};
-  std::array<std::uint64_t, 22U> diagnostics{};
+  std::array<std::uint64_t, protocol_v3::kStatusDiagnosticCount> diagnostics{};
+  std::uint64_t diagnostic_validity = 0U;
 };
 Result encodeV3StatusResponse(const Request& request, std::uint32_t run_id,
                               const V3Status& status, ControlFrame& output);

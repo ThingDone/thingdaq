@@ -54,6 +54,8 @@ static packet::FillHandle fill(packet::Stream stream, unsigned pattern = 0U) {
   return begun.handle;
 }
 static void drain(std::ofstream *output = nullptr) {
+  const auto before = pipeline.snapshot();
+  std::array<std::uint64_t, 2U> encoded{};
   for (unsigned pass = 0; pass < 100U && !pipeline.quiescent(); ++pass) {
     pipeline.serviceDeferred(100U);
     pipeline.serviceReadyFrames();
@@ -61,11 +63,18 @@ static void drain(std::ofstream *output = nullptr) {
       const auto bytes = pipeline.frontFrame();
       assert(pipeline.prepareFrontFrame());
       pipeline.markFrontFrameStarted();
+      const auto source = bytes.data[5] == 1U ? 0U : 1U;
+      encoded[source] += bytes.size - protocol_v3::kMinFrameBytes -
+                         protocol_v3::kDataPrefixBytes;
       if (output) output->write(reinterpret_cast<const char *>(bytes.data), static_cast<std::streamsize>(bytes.size));
       pipeline.releaseFrontFrame();
     }
   }
   assert(pipeline.quiescent());
+  const auto after = pipeline.snapshot();
+  for (std::size_t source = 0; source < encoded.size(); ++source)
+    assert(after.sources[source].encoded_bytes_transmitted ==
+           before.sources[source].encoded_bytes_transmitted + encoded[source]);
 }
 static std::uint64_t lateClock(void *) { return 80000U; }
 int main(int argc, char **argv) {

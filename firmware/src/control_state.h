@@ -113,7 +113,8 @@ struct DispatchReadiness {
   temperature::Reading temperature{};
   health::Reading runtime_health{};
   std::uint32_t pending_frames = 0U;
-  std::array<std::uint64_t, 22U> v3_diagnostics{};
+  std::array<std::uint64_t, protocol_v3::kStatusDiagnosticCount> v3_diagnostics{};
+  std::uint64_t v3_diagnostic_validity = 0U;
 };
 
 class ControlState {
