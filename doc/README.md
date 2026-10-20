@@ -2,7 +2,7 @@
 type: reference
 title: ThingDAQ Documentation Index
 created: 2026-08-27
-updated: 2026-09-04
+updated: 2026-10-20
 tags:
   - thingdaq
   - documentation
@@ -10,6 +10,7 @@ related:
   - '[[protocol-v3-upgrade]]'
   - '[[protocol-v3]]'
   - '[[protocol-v3-migration]]'
+  - '[[protocol-v3-qualification]]'
   - '[[Evidence-Index]]'
   - '[[Clock-Compression-IO-Report]]'
   - '[[Phase-11-Soak-Evidence]]'
@@ -67,6 +68,9 @@ related:
 The historical 1.1.0 artifact and validation record is [[Release-1.1.0]].
 Start the current candidate with [[Quickstart]], build it with [[firmware-builds]],
 and use [[protocol-v3-migration]] for client/firmware compatibility.
+The exact-candidate rig runner and evidence gate are documented in
+[[protocol-v3-qualification]]; their availability does not establish physical
+qualification.
 
 After installing this checkout (`python -m pip install ./daq_api`), run:
 
