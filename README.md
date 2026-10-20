@@ -244,8 +244,8 @@ The additive [public v3 contract](doc/protocol/protocol-v3.md) defines bounded
 capability/settings queries and explicit RAW/RLE/PACK12 framing. Its generated
 constants, codecs and opt-in Python simulator sessions are available offline.
 The Python API, serial negotiation and CLI support v3 plus historical v1 and
-release v2 peers. Production firmware remains v2; v3 validation is currently
-offline. See the [Python compatibility gate](doc/results/protocol-v3-python.md).
+release v2 peers. Development firmware integrates v3 at fixed 600 MHz; physical
+public-v3 qualification remains pending. See the [Python compatibility gate](doc/results/protocol-v3-python.md).
 
 ```python
 from thingdone_daq import ThingDAQ
@@ -261,8 +261,10 @@ with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
 ```
 
 Pass an exact `V3Settings` tuple from `capabilities.configurations` to
-`configure()` for other advertised settings, including 450 MHz RAW. Clock values
-are simulated metadata. Omitting `protocol_version` retains the historical
+`configure()` for other advertised settings, including RAW at fixed 600 MHz. The
+ordinary v3 simulator advertises 48 tuples and only the 600 MHz CPU profile;
+450 MHz requests are rejected without changing settings. Clock values are
+simulated metadata. Omitting `protocol_version` retains the historical
 simulator defaults. See the [v3 session API](doc/protocol/protocol-v3.md#public-simulator-session).
 
 Run the deterministic public-v3 demonstration without hardware:
@@ -273,13 +275,14 @@ Run the deterministic public-v3 demonstration without hardware:
 
 It prints all advertised tuples, verifies exact ADC/GPIO samples and timestamps,
 reports compression byte counts and RAW fallback, and exercises stopped
-600/450/600 MHz configuration transitions plus rejected running reconfiguration.
-Clock changes are simulated metadata; this does not measure hardware throughput.
+compressed/RAW/default configuration changes at fixed 600 MHz, rejection of a
+nonadvertised 450 MHz profile, and rejected running reconfiguration. This does
+not measure hardware throughput.
 The CLI exposes v3 metadata and exact configuration tuples through `probe`:
 
 ```bash
 .venv/bin/python -m thingdone_daq.cli probe --simulate --simulator-version 3 --json
-.venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3 --cpu-profile cpu_450mhz --gpio-policy raw --adc-policy raw --json
+.venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3 --cpu-profile cpu_600mhz --gpio-policy raw --adc-policy raw --json
 ```
 
 Omitted v3 selectors use advertised defaults. The offline upgrade demo also

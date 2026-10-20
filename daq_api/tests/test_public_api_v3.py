@@ -25,10 +25,10 @@ from thingdone_daq.protocol_v3 import V3FrameValidationError, decode_v3_frame
 from thingdone_daq.simulator_v3 import SimulatedV3Device
 
 
-def raw450(defaults):
+def raw600(defaults):
     return replace(
         defaults,
-        cpu_profile=c.CpuProfile.CPU_450MHZ,
+        cpu_profile=c.CpuProfile.CPU_600MHZ,
         gpio_policy=c.GpioPolicy.RAW,
         adc_policy=c.AdcPolicy.RAW,
     )
@@ -41,15 +41,15 @@ def test_defaults_discovery_transitions_and_atomic_running_rejection():
         capabilities = daq.get_capabilities()
         defaults = capabilities.defaults
         assert daq.configuration == defaults == V3Settings.defaults()
-        assert len(capabilities.configurations) == 60
-        for epoch, settings in enumerate((defaults, raw450(defaults), defaults), 1):
+        assert len(capabilities.configurations) == 48
+        for epoch, settings in enumerate((defaults, raw600(defaults), defaults), 1):
             applied = daq.configure(settings)
             assert applied == daq.get_settings()
             assert applied.settings == settings
             assert daq.info().clocks == applied.clocks
             assert daq.start() == epoch
             with pytest.raises(DeviceCommandError) as error:
-                daq.configure(raw450(defaults))
+                daq.configure(raw600(defaults))
             assert error.value.error_code == c.ErrorCode.INVALID_STATE
             assert daq.get_settings() == applied
             blocks = list(daq.blocks(4))
@@ -65,10 +65,18 @@ def test_defaults_discovery_transitions_and_atomic_running_rejection():
 
 
 @pytest.mark.parametrize("settings", V3Capabilities.canonical().configurations)
-def test_advertised_tuple_through_public_blocks(settings):
+def test_generic_tuple_through_public_blocks_or_host_rejection(settings):
     with ThingDAQ.simulated(
         protocol_version=3, strict=True, stream_interval=0.003
     ) as daq:
+        if settings.cpu_profile != c.CpuProfile.CPU_600MHZ:
+            before = daq.get_settings()
+            requests = daq.reader_counters.responses_matched
+            with pytest.raises(V3FrameValidationError, match="not advertised"):
+                daq.configure(settings)
+            assert daq.reader_counters.responses_matched == requests
+            assert daq.get_settings() == before
+            return
         assert daq.configure(settings).settings == settings
         daq.start()
         blocks = list(daq.blocks(4))
@@ -148,7 +156,7 @@ def test_capabilities_are_wire_discovered_and_gate_configuration(monkeypatch):
         assert daq.get_capabilities().configurations == (device.settings,)
         requests = daq.reader_counters.responses_matched
         with pytest.raises(V3FrameValidationError, match="not advertised"):
-            daq.configure(raw450(device.settings))
+            daq.configure(raw600(device.settings))
         assert daq.reader_counters.responses_matched == requests
         assert daq.configuration == device.settings
 
@@ -202,7 +210,7 @@ def test_contradictory_applied_echo_is_rejected_and_close_stops(
                 and kind == bad_command
                 and isinstance(value, V3AppliedSettings)
             ):
-                changed = raw450(value.settings)
+                changed = raw600(value.settings)
                 value = V3AppliedSettings(
                     changed, V3Clocks.for_profile(changed.cpu_profile)
                 )

@@ -74,7 +74,10 @@ advertised tuple, including settings for disabled streams.
 
 The canonical table contains 60 tuples: ADC/GPIO/both, hardware/synthetic,
 8/16 GPIO bits, four RAW/compressed policy combinations at 600 MHz, and RAW
-only at 450 MHz. Devices may advertise a subset with build defaults drawn from that subset.
+only at 450 MHz. The normal firmware and ordinary v3 simulator advertise only
+the 48 fixed-600 MHz tuples and one CPU record. The 450 MHz wire ID remains
+known for compatibility, but does not imply device support. Devices advertise
+a subset with build defaults drawn from that subset.
 Advertised device limits may be smaller than the canonical maxima; they must
 remain positive, fit the capability response and respect framing and logical
 item capacity relationships.
@@ -176,8 +179,10 @@ The historical `SimulatedDevice` and default transport persona remain unchanged.
 The v3 peer starts STOPPED with the advertised board defaults already applied.
 INFO always sets `simulated=True`, uses a `SIM-` serial and identifies its build
 as `thingdaq-simulator-v3`. HARDWARE source represents emulated board input;
-SYNTHETIC source sets the wire flag. Both use deterministic samples. Selecting
-450 MHz changes metadata only; no simulator rate measures hardware throughput.
+SYNTHETIC source sets the wire flag. Both use deterministic samples. CPU speed
+is fixed at 600 MHz; even an otherwise-valid 450 MHz RAW request receives
+UNSUPPORTED_CONFIGURATION while stopped and preserves settings. No simulator
+rate measures hardware throughput.
 
 GPIO frames alternate all-zero input and high-transition input using existing
 synthetic formulas: primary bytes alternate AA/55, auxiliary bytes 0F/F0.
@@ -212,9 +217,10 @@ models. Consumers accepting either session type should narrow the returned type.
   and performs GET_SETTINGS readback before accepting it. `configure()` starts
   from advertised defaults; existing stream/source/rate/auxiliary keyword options
   select a matching tuple. Do not combine a settings object with those options.
-- `configuration` is the current `V3Settings`. Choose 450 MHz with both encoding
-  policies RAW, then call `configure()` while stopped to restore compressed
-  600 MHz defaults. Running changes receive a correlated INVALID_STATE error.
+- `configuration` is the current `V3Settings`. Select both encoding policies RAW
+  at 600 MHz, then call `configure()` while stopped to restore compressed
+  defaults. Nonadvertised CPU selections fail host capability checks before
+  CONFIGURE. Valid running changes receive a correlated INVALID_STATE error.
 - `start()` may use board defaults without a preceding CONFIGURE; it checks
   settings readback and the START echo and returns a new nonzero run ID.
 - `blocks()` / `read_block()` retain ordinary ADCBlock/GPIOBlock channel views,

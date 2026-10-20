@@ -65,7 +65,7 @@ def raw_request(kind=c.CommandKind.CONFIGURE, request_id=1, payload=None, **fiel
     [
         ("030001030104000801010c0040420f0040420f00", 600_000_000),
         ("030001030104011001010c0040420f0040420f00", 600_000_000),
-        ("030001030204000800000c0040420f0040420f00", 450_000_000),
+        ("030001030104000800000c0040420f0040420f00", 600_000_000),
     ],
 )
 def test_wire_lifecycle_with_literal_settings_and_independent_response_checks(
@@ -142,7 +142,9 @@ def test_default_identity_and_settings_are_explicitly_simulated():
     assert info.clocks.cpu_clock_hz == 600_000_000
     caps = command(device, c.CommandKind.GET_CAPABILITIES, 2).value
     assert isinstance(caps, V3Capabilities)
-    assert len(caps.configurations) == 60
+    assert len(caps.configurations) == 48
+    assert caps.cpu_profiles == (info.clocks,)
+    assert all(s.cpu_profile == c.CpuProfile.CPU_600MHZ for s in caps.configurations)
     assert caps.defaults == device.settings == V3Settings.defaults()
     assert (
         caps.defaults.adc_pair_rate_hz == caps.defaults.gpio_sample_rate_hz == 1_000_000
@@ -157,9 +159,15 @@ def test_default_identity_and_settings_are_explicitly_simulated():
 
 
 @pytest.mark.parametrize("settings", V3Capabilities.canonical().configurations)
-def test_every_advertised_tuple_configures_and_streams(settings):
+def test_generic_tuples_stream_or_reject_unsupported_cpu(settings):
     device = SimulatedV3Device()
     configured = command(device, c.CommandKind.CONFIGURE, 1, settings)
+    if settings.cpu_profile != c.CpuProfile.CPU_600MHZ:
+        assert configured.error_code == c.ErrorCode.UNSUPPORTED_CONFIGURATION
+        assert device.settings == V3Settings.defaults()
+        assert device.info().clocks.cpu_clock_hz == 600_000_000
+        assert device.state == c.DeviceState.STOPPED and device.run_id == 0
+        return
     assert configured.value.settings == settings
     assert command(device, c.CommandKind.GET_SETTINGS, 2).value == configured.value
     assert (
@@ -255,12 +263,11 @@ def test_atomic_configuration_state_reboot_and_reconnect():
     defaults = device.settings
     raw = replace(
         defaults,
-        cpu_profile=c.CpuProfile.CPU_450MHZ,
         gpio_policy=c.GpioPolicy.RAW,
         adc_policy=c.AdcPolicy.RAW,
     )
     command(device, c.CommandKind.CONFIGURE, 1, raw)
-    assert device.info().clocks.cpu_clock_hz == 450_000_000
+    assert device.info().clocks.cpu_clock_hz == 600_000_000
     command(device, c.CommandKind.START, 2)
     assert (
         command(device, c.CommandKind.CONFIGURE, 3, defaults).error_code
@@ -280,6 +287,39 @@ def test_atomic_configuration_state_reboot_and_reconnect():
     device.reboot()
     assert device.settings == defaults and device.run_id == 0
     assert command(device, c.CommandKind.START, 1).run_id == 1
+
+
+@pytest.mark.parametrize(
+    ("state", "error"),
+    [
+        (c.DeviceState.STOPPED, c.ErrorCode.UNSUPPORTED_CONFIGURATION),
+        (c.DeviceState.RUNNING, c.ErrorCode.INVALID_STATE),
+        (c.DeviceState.DRAINING, c.ErrorCode.BUSY),
+    ],
+)
+def test_known_unadvertised_cpu_preserves_active_settings_and_error_precedence(
+    state, error
+):
+    device = SimulatedV3Device()
+    raw = replace(
+        device.settings, gpio_policy=c.GpioPolicy.RAW, adc_policy=c.AdcPolicy.RAW
+    )
+    applied = command(device, c.CommandKind.CONFIGURE, 1, raw).value
+    if state != c.DeviceState.STOPPED:
+        command(device, c.CommandKind.START, 2)
+    if state == c.DeviceState.DRAINING:
+        device.set_transport_pending_data(True)
+        command(device, c.CommandKind.STOP, 3)
+    unsupported = replace(raw, cpu_profile=c.CpuProfile.CPU_450MHZ)
+    # The generic codec still recognizes this profile; device membership rejects it.
+    assert V3Settings.from_bytes(unsupported.to_bytes()) == unsupported
+    before = device.status()
+    response = command(device, c.CommandKind.CONFIGURE, 4, unsupported)
+    assert response.error_code == error
+    assert response.run_id == before.run_id
+    assert command(device, c.CommandKind.GET_SETTINGS, 5).value == applied
+    assert device.info().clocks == applied.clocks
+    assert device.status() == before
 
 
 @pytest.mark.parametrize(

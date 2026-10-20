@@ -70,6 +70,41 @@ python3 -m pip install --editable '.[dev,numpy]'
 See [System-Overview](https://github.com/ThingDone/thingdaq/blob/main/doc/architecture/system-overview.md) for the package boundary and
 [Foundation-Reuse-Inventory](https://github.com/ThingDone/thingdaq/blob/main/doc/reference/Foundation-Reuse-Inventory.md) for the implementation-pattern audit.
 
+## Public v3 development simulator
+
+The development firmware and explicit v3 simulator use a **fixed 600 MHz** CPU,
+1 MHz ADC/GPIO sampling and an 8 MHz timestamp domain. The simulator advertises
+48 exact tuples covering RAW/compressed policies, stream/source selections and
+8/16-bit GPIO. Generic 450 MHz wire IDs remain compatible, but the ordinary v3
+peer does not advertise or accept them. Historical v1/v2 personas are unchanged.
+
+```python
+from thingdone_daq import (
+    DeviceCapabilityError, ThingDAQ, V3AdcPolicy, V3CpuProfile, V3GpioPolicy,
+)
+
+with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
+    raw = daq.configure(gpio_policy=V3GpioPolicy.RAW, adc_policy=V3AdcPolicy.RAW)
+    assert raw.clocks.cpu_clock_hz == 600_000_000
+    try:
+        daq.configure(
+            cpu_profile=V3CpuProfile.CPU_450MHZ,
+            gpio_policy=V3GpioPolicy.RAW,
+            adc_policy=V3AdcPolicy.RAW,
+        )
+    except DeviceCapabilityError:
+        assert daq.get_settings() == raw
+    else:
+        raise AssertionError("nonadvertised CPU profile accepted")
+    assert daq.configure().settings == daq.capabilities.defaults  # RLE_AUTO/PACK12
+```
+
+Run `.venv/bin/python daq_api/examples/protocol_upgrade.py` from the checkout for
+stopped compressed/RAW/default changes and lossless captures at fixed 600 MHz.
+Simulator clocks are metadata; physical public-v3 qualification remains pending.
+See the [v3 protocol guide](https://github.com/ThingDone/thingdaq/blob/main/doc/protocol/protocol-v3.md)
+and [API reference](https://github.com/ThingDone/thingdaq/blob/main/doc/reference/api-reference.md).
+
 ## Distribution and publication boundary
 
 The host API and firmware are versioned independently from the wire protocol;

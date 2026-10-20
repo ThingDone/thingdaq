@@ -103,6 +103,11 @@ runpy.run_path(script, run_name="__main__")
         lines = output.splitlines()
         self.assertIn("simulated=true physical_required=false", lines[0])
         self.assertIn("hardware_throughput=not_measured", lines[0])
+        self.assertIn("cpu_policy=fixed_600mhz", lines[0])
+        self.assertIn(
+            "cpu_450mhz=not_advertised rejected=true settings_unchanged=true", lines
+        )
+        self.assertIn("reset_to_defaults=true cpu_hz=600000000", lines)
         self.assertIn("board=TEENSY_40", lines[1])
         self.assertIn("protocol=3", lines[1])
         self.assertIn(
@@ -117,8 +122,8 @@ runpy.run_path(script, run_name="__main__")
                 "transport_closed=true reader_stopped=true PASS",
                 lines,
             )
-        self.assertIn("supported_tuples=60", lines)
-        self.assertEqual(60, sum(line.startswith("tuple[") for line in lines))
+        self.assertIn("supported_tuples=48", lines)
+        self.assertEqual(48, sum(line.startswith("tuple[") for line in lines))
         self.assertIn(
             "defaults: ADC|GPIO HARDWARE ADLER32 3 CPU_600MHZ "
             "ADC_1MHZ_GPIO_1MHZ DISABLED 8 RLE_AUTO PACK12 12 1000000 1000000",
@@ -129,7 +134,7 @@ runpy.run_path(script, run_name="__main__")
             [
                 f"applied_cpu_hz={cpu} ipg_hz=150000000 adc_hz=37500000 "
                 "pit_hz=24000000 timestamp_hz=8000000 readback=exact"
-                for cpu in (600000000, 450000000, 600000000)
+                for cpu in (600000000, 600000000, 600000000)
             ],
             clocks,
         )

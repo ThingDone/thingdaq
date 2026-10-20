@@ -82,7 +82,7 @@ path is opt-in and clearly represents a physical-device operation.
 | Combined timestamp alignment | `.venv/bin/python daq_api/examples/combined_alignment.py` | Safe A0/A1 and D6-D13 inputs |
 | Live STATUS and loss handling | `.venv/bin/python daq_api/examples/status_and_loss.py` | Safe inputs; performs a short physical combined capture |
 | Standalone simulator lifecycle | `.venv/bin/python daq_api/examples/simulator.py` | None; this example intentionally has no `--real` path |
-| Public v3 capabilities and lossless compression | `.venv/bin/python daq_api/examples/protocol_upgrade.py` | None; simulated 600/450 MHz settings, exact sample checks, and encoding byte counts |
+| Public v3 capabilities and lossless compression | `.venv/bin/python daq_api/examples/protocol_upgrade.py` | None; fixed 600 MHz RAW/compressed settings, unsupported-CPU rejection, exact samples, and byte counts |
 | Auxiliary-input workload matrix | `.venv/bin/python daq_api/examples/aux_input_matrix.py` | None; this example intentionally has no `--real` path |
 | Explicit clean shutdown | `.venv/bin/python daq_api/examples/clean_shutdown.py` | Safe A0/A1 input; demonstrates STOP in `finally` |
 

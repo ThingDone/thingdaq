@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import struct
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from ._generated import protocol_v3_constants as c
 from ._incremental import BoundedIncrementalParser, BytesLike
@@ -74,8 +74,9 @@ class SimulatedV3Device:
     """Explicit v3 persona for the existing :class:`InMemoryTransport`.
 
     Board defaults include HARDWARE source, meaning emulated board input here;
-    INFO always identifies this device as simulated. No physical clock changes
-    or timing claims are made. Direct ``next_data_frame`` calls transfer whole
+    INFO always identifies this device as simulated. Like the normal firmware,
+    it advertises only fixed 600 MHz configurations. No physical timing claims
+    are made. Direct ``next_data_frame`` calls transfer whole
     frames; the transport reports any partial data tail through
     ``set_transport_pending_data`` so STOP cannot prematurely report STOPPED.
     """
@@ -94,7 +95,17 @@ class SimulatedV3Device:
         self._build_id = build_id
         self._max_receive_bytes = max_receive_bytes
         self._max_requests_per_receive = max_requests_per_receive
-        self._capabilities = V3Capabilities.canonical()
+        canonical = V3Capabilities.canonical()
+        cpu = canonical.defaults.cpu_profile
+        self._capabilities = replace(
+            canonical,
+            cpu_profiles=tuple(
+                p for p in canonical.cpu_profiles if p.cpu_profile == cpu
+            ),
+            configurations=tuple(
+                s for s in canonical.configurations if s.cpu_profile == cpu
+            ),
+        )
         self._request_parser = BoundedIncrementalParser(
             magic_bytes=c.MAGIC.to_bytes(4, "little"),
             header_size=c.HEADER_SIZE,
@@ -262,6 +273,7 @@ class SimulatedV3Device:
         if kind == c.CommandKind.CONFIGURE:
             try:
                 candidate = V3Settings.from_bytes(wire[c.HEADER_SIZE : -4])
+                self._capabilities.require_supported(candidate)
             except V3FrameValidationError as exc:
                 if exc.error_code != c.ErrorCode.UNSUPPORTED_CONFIGURATION:
                     return self._reply(kind, request_id, error=exc.error_code)
@@ -292,7 +304,6 @@ class SimulatedV3Device:
         else:
             if kind == c.CommandKind.CONFIGURE:
                 assert candidate is not None
-                self._capabilities.require_supported(candidate)
                 self._settings = candidate
             elif kind == c.CommandKind.START:
                 self._run_id = (self._run_id + 1) & 0xFFFFFFFF or 1

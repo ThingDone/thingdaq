@@ -453,6 +453,7 @@ class V3Capabilities:
 
     @classmethod
     def canonical(cls) -> V3Capabilities:
+        """Return generic wire definitions, not a particular device's support."""
         return cls(
             V3Settings.defaults(),
             tuple(map(V3Clocks.from_bytes, c.CPU_PROFILES)),

@@ -29,8 +29,8 @@ core patch or watchdog-policy change is needed.
 The Phase 04 transition blocker is superseded, and remaining Phase 04–06 work
 covers fixed-clock configuration, documentation and qualification. Earlier
 two-clock simulator coverage and 450 MHz build results below are historical
-checkpoints, not requirements to switch CPU speed. Aligning the ordinary v3
-simulator/examples with the single-profile board remains a Phase 04 task.
+checkpoints, not requirements to switch CPU speed. The ordinary v3 simulator
+and examples now follow the single-profile board policy.
 Generic wire IDs and legacy build records remain compatible. Physical public-v3
 qualification is still pending; this change does not program a device.
 
@@ -87,8 +87,10 @@ Simulator board defaults are both streams, HARDWARE source (emulated), CPU 600 M
 GPIO RLE_AUTO and ADC PACK12. Both HARDWARE and SYNTHETIC selections produce
 deterministic simulated input; identity explicitly reports simulation.
 
-Simulator capabilities advertise 60 complete settings tuples: 48 at 600 MHz across
-RAW/compressed policies and 12 RAW-only tuples at 450 MHz. Each combines one of
+Simulator capabilities advertise 48 complete settings tuples at fixed 600 MHz
+across RAW/compressed policies. The generic canonical table retains twelve
+450 MHz RAW tuples for compatibility; the ordinary simulator rejects them.
+Each supported tuple combines one of
 ADC/GPIO/both, hardware/synthetic source and 8/16-bit GPIO. Even disabled-stream
 fields must match an advertised record. Known CPU/rate definitions do not
 authorize arbitrary combinations. Auxiliary OUTPUT, 528 MHz, other boards and
@@ -100,7 +102,22 @@ GET_SETTINGS readback. RUNNING rejects configuration with INVALID_STATE;
 DRAINING rejects it with BUSY. Neither failure mutates settings. START returns
 the applied settings and new nonzero run ID before data. STOP drains a partial
 frame and preserves settings; reboot restores board defaults. Wire mode cannot
-change during a run or drain. Clock selection changes simulator metadata only.
+change during a run or drain. CPU speed remains 600 MHz throughout. Known
+nonadvertised CPU profiles return UNSUPPORTED_CONFIGURATION when stopped,
+INVALID_STATE when running and BUSY during drain, without mutating settings.
+The public example exercises compressed/RAW/default changes, host rejection of
+a 450 MHz RAW selection and unchanged historical v1/v2 personas.
+
+Simulator alignment validated 2026-10-20: all 1,237 SDK tests passed across the
+focused simulator/API/CLI/example/documentation suite and remaining SDK suite.
+The documentation gate executes nine simulator snippets; its expected count
+was updated for the new SDK README example. Regression coverage retains all
+60 generic tuples: 48 stream at 600 MHz and twelve 450 MHz tuples are rejected
+without mutation. Wire tests preserve stopped/running/draining error precedence.
+Generator drift (142 outputs), changed-Python Ruff format/lint and SDK mypy
+(33 source files) passed. No firmware build, hardware access or task images
+were needed for this simulator/documentation task. Historical results remain
+unchanged; subsequent Phase 04 tasks own firmware validation.
 
 ## Wire and decoding decisions
 

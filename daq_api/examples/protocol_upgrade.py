@@ -12,6 +12,7 @@ from dataclasses import fields, replace
 from thingdone_daq import (
     ADCBlock,
     DAQConfiguration,
+    DeviceCapabilityError,
     DeviceCommandError,
     DeviceState,
     GPIOBlock,
@@ -214,7 +215,7 @@ def legacy_compatibility(version: int) -> None:
 def main() -> int:
     print(
         "example=protocol_upgrade simulated=true physical_required=false "
-        "clock_changes=metadata_only hardware_throughput=not_measured"
+        "cpu_policy=fixed_600mhz hardware_throughput=not_measured"
     )
     with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
         info = daq.info()
@@ -237,14 +238,26 @@ def main() -> int:
             f"max_logical_payload_bytes={capabilities.max_logical_payload_bytes} "
             "byte_counts=captured_data_only frame_bytes=header+prefix+samples+checksum"
         )
-        raw450 = replace(
+        raw = replace(
             defaults,
-            cpu_profile=c.CpuProfile.CPU_450MHZ,
             gpio_policy=c.GpioPolicy.RAW,
             adc_policy=c.AdcPolicy.RAW,
         )
-        capabilities.require_supported(raw450)
-        for settings in (None, raw450, None):
+        capabilities.require_supported(raw)
+        before = daq.get_settings()
+        try:
+            daq.configure(
+                cpu_profile=c.CpuProfile.CPU_450MHZ,
+                gpio_policy=c.GpioPolicy.RAW,
+                adc_policy=c.AdcPolicy.RAW,
+            )
+        except DeviceCapabilityError:
+            if daq.get_settings() != before or daq.info().clocks != before.clocks:
+                raise AssertionError("unsupported CPU request mutated settings")
+        else:
+            raise AssertionError("nonadvertised CPU profile unexpectedly accepted")
+        print("cpu_450mhz=not_advertised rejected=true settings_unchanged=true")
+        for settings in (None, raw, None):
             applied = daq.configure() if settings is None else daq.configure(settings)
             expected = defaults if settings is None else settings
             if (
@@ -252,6 +265,7 @@ def main() -> int:
                 or applied.settings != expected
                 or daq.get_settings() != applied
                 or daq.info().clocks != applied.clocks
+                or applied.clocks.cpu_clock_hz != 600_000_000
             ):
                 raise AssertionError("stopped configuration/readback mismatch")
             clocks = applied.clocks
@@ -260,7 +274,8 @@ def main() -> int:
                 f"adc_hz={clocks.adc_clock_hz} pit_hz={clocks.pit_clock_hz} "
                 f"timestamp_hz={clocks.timestamp_hz} readback=exact"
             )
-            capture(daq, applied, raw450 if settings is None else defaults)
+            capture(daq, applied, raw if settings is None else defaults)
+        print("reset_to_defaults=true cpu_hz=600000000")
         transport, reader = daq.transport, daq.reader
     if transport.is_open or reader.is_running:
         raise AssertionError("transport/reader did not close")

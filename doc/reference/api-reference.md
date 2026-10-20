@@ -106,12 +106,14 @@ streams and checksum, rather than the last active settings. An explicit rate
 or rate profile must select one advertised rate record.
 
 ```python
-from thingdone_daq import ThingDAQ, V3AdcPolicy, V3CpuProfile, V3GpioPolicy
+from thingdone_daq import (
+    DeviceCapabilityError, ThingDAQ, V3AdcPolicy, V3CpuProfile, V3GpioPolicy,
+)
 
 with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
     capabilities = daq.get_capabilities()
     selected = capabilities.select_settings(
-        cpu_profile=V3CpuProfile.CPU_450MHZ,
+        cpu_profile=V3CpuProfile.CPU_600MHZ,
         gpio_policy=V3GpioPolicy.RAW,
         adc_policy=V3AdcPolicy.RAW,
     )
@@ -119,11 +121,23 @@ with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:
     applied = daq.configure(selected)
     assert daq.get_settings() == applied
     assert daq.info().clocks == applied.clocks
+    try:
+        daq.configure(
+            cpu_profile=V3CpuProfile.CPU_450MHZ,
+            gpio_policy=V3GpioPolicy.RAW,
+            adc_policy=V3AdcPolicy.RAW,
+        )
+    except DeviceCapabilityError:
+        assert daq.get_settings() == applied
+    else:
+        raise AssertionError("nonadvertised CPU profile accepted")
+    assert daq.configure().settings == capabilities.defaults  # Compressed, 600 MHz
 ```
 
 All selectors must match one advertised tuple, including disabled streams.
-450 MHz requires explicit RAW policies because the advertised defaults use
-compression. Unsupported keyword selections raise `DeviceCapabilityError`
+The normal firmware and ordinary v3 simulator advertise only fixed 600 MHz
+tuples. The generic 450 MHz wire ID remains known, but is not device support.
+Unsupported keyword selections raise `DeviceCapabilityError`
 before CONFIGURE; no clock, rate, resolution, or encoding is silently replaced.
 Alternatively, pass a complete advertised `V3Settings` object without keyword
 overrides. CONFIGURE applies it atomically while stopped, then the API validates
@@ -448,7 +462,7 @@ only when desired):
 ```bash
 .venv/bin/python -m thingdone_daq.cli probe --simulate --simulator-version 3 --json
 .venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3
-.venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3 --cpu-profile cpu_450mhz --gpio-policy raw --adc-policy raw --json
+.venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 3 --cpu-profile cpu_600mhz --gpio-policy raw --adc-policy raw --json
 .venv/bin/python -m thingdone_daq.cli capture --simulate --simulator-version 3 --duration 0.1 --aux-bank-mode input --gpio-channel D16 --json
 .venv/bin/python -m thingdone_daq.cli configure --simulate --simulator-version 2 --json
 .venv/bin/python daq_api/examples/protocol_upgrade.py

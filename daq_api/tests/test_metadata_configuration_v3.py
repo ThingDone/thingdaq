@@ -44,12 +44,12 @@ def test_metadata_exports_and_read_only_selection():
         assert caps.defaults.rate_profile == V3RateProfile.ADC_1MHZ_GPIO_1MHZ
         before = list(device.commands)
         selected = caps.select_settings(
-            cpu_profile=V3CpuProfile.CPU_450MHZ,
+            cpu_profile=V3CpuProfile.CPU_600MHZ,
             gpio_policy=V3GpioPolicy.RAW,
             adc_policy=V3AdcPolicy.RAW,
         )
         assert selected in caps.configurations
-        assert selected.cpu_profile == V3CpuProfile.CPU_450MHZ
+        assert selected.cpu_profile == V3CpuProfile.CPU_600MHZ
         assert selected != caps.defaults == daq.configuration
         assert device.commands == before
         assert low_level.protocol_v3_constants is c
@@ -57,7 +57,14 @@ def test_metadata_exports_and_read_only_selection():
         assert low_level.decode_v3_frame(command.to_bytes()).header.request_id == 123
 
 
-@pytest.mark.parametrize("settings", V3Capabilities.canonical().configurations)
+@pytest.mark.parametrize(
+    "settings",
+    [
+        s
+        for s in V3Capabilities.canonical().configurations
+        if s.cpu_profile == c.CpuProfile.CPU_600MHZ
+    ],
+)
 def test_every_advertised_tuple_can_be_selected_by_keywords_atomically(settings):
     device = RecordingDevice()
     with ThingDAQ.open(InMemoryTransport(device)) as daq:
@@ -91,7 +98,7 @@ def test_omissions_reset_to_advertised_defaults_and_do_not_reuse_active_settings
         defaults = daq.get_capabilities().defaults
         changed = daq.configure(
             gpio=False,
-            cpu_profile=V3CpuProfile.CPU_450MHZ,
+            cpu_profile=V3CpuProfile.CPU_600MHZ,
             gpio_policy=V3GpioPolicy.RAW,
             adc_policy=V3AdcPolicy.RAW,
         )
@@ -113,6 +120,11 @@ def test_omissions_reset_to_advertised_defaults_and_do_not_reuse_active_settings
     [
         {"cpu_profile": 3},
         {"cpu_profile": V3CpuProfile.CPU_450MHZ},
+        {
+            "cpu_profile": V3CpuProfile.CPU_450MHZ,
+            "gpio_policy": V3GpioPolicy.RAW,
+            "adc_policy": V3AdcPolicy.RAW,
+        },
         {"rate_profile": 0},
         {"adc_pair_rate_hz": 2_000_000},
         {"gpio_sample_rate_hz": 4_000_000},

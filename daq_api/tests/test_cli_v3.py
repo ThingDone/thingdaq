@@ -80,8 +80,8 @@ def test_probe_json_has_exact_defaults_tables_and_readback(capsys, sessions):
     report = run_cli(capsys, "info")
     capabilities = report["capabilities"]
     assert report["info"]["protocol_version"] == 3
-    assert len(capabilities["configurations"]) == 60
-    assert len(capabilities["cpu_profiles"]) == 2
+    assert len(capabilities["configurations"]) == 48
+    assert len(capabilities["cpu_profiles"]) == 1
     assert len(capabilities["rate_profiles"]) == 1
     assert report["defaults"] == capabilities["defaults"]
     assert report["active_settings"]["settings"] == report["defaults"]
@@ -95,7 +95,7 @@ def test_probe_human_has_same_metadata_and_does_not_mutate_settings(
     device = SimulatedV3Device()
     with ThingDAQ.open(InMemoryTransport(device)) as setup:
         setup.configure(
-            cpu_profile=c.CpuProfile.CPU_450MHZ,
+            cpu_profile=c.CpuProfile.CPU_600MHZ,
             gpio_policy=c.GpioPolicy.RAW,
             adc_policy=c.AdcPolicy.RAW,
         )
@@ -107,16 +107,26 @@ def test_probe_human_has_same_metadata_and_does_not_mutate_settings(
     ):
         output = run_cli(capsys, "probe", json_output=False)
     assert "defaults.cpu_profile=CPU_600MHZ" in output
-    assert "active_settings.settings.cpu_profile=CPU_450MHZ" in output
-    assert "active_settings.clocks.cpu_clock_hz=450000000" in output
-    assert "capabilities.configurations[59]." in output
-    assert "capabilities.cpu_profiles[1].cpu_clock_hz=450000000" in output
+    assert "active_settings.settings.cpu_profile=CPU_600MHZ" in output
+    assert "active_settings.clocks.cpu_clock_hz=600000000" in output
+    assert "capabilities.configurations[47]." in output
+    assert "capabilities.cpu_profiles[0].cpu_clock_hz=600000000" in output
+    assert "capabilities.cpu_profiles[1]." not in output
+    assert "defaults.gpio_policy=RLE_AUTO" in output
+    assert "active_settings.settings.gpio_policy=RAW" in output
     with ThingDAQ.open(InMemoryTransport(device)) as check:
         assert check.get_settings() == before
     assert not daq.is_open
 
 
-@pytest.mark.parametrize("record", c.SELECTABLE_CONFIGURATIONS)
+@pytest.mark.parametrize(
+    "record",
+    [
+        r
+        for r in c.SELECTABLE_CONFIGURATIONS
+        if V3Settings.from_bytes(r).cpu_profile == c.CpuProfile.CPU_600MHZ
+    ],
+)
 def test_cli_can_select_every_advertised_tuple(capsys, sessions, record):
     settings = V3Settings.from_bytes(record)
     stream = {1: "adc", 2: "gpio", 3: "both"}[int(settings.stream_mask)]
@@ -150,9 +160,7 @@ def test_cli_can_select_every_advertised_tuple(capsys, sessions, record):
         == settings.cpu_profile.name
     )
     clocks = report["applied_configuration"]["clocks"]
-    assert clocks["cpu_clock_hz"] == (
-        600_000_000 if settings.cpu_profile == c.CpuProfile.CPU_600MHZ else 450_000_000
-    )
+    assert clocks["cpu_clock_hz"] == 600_000_000
     assert clocks["cpu_profile"] == settings.cpu_profile.name
 
 
@@ -160,6 +168,7 @@ def test_cli_can_select_every_advertised_tuple(capsys, sessions, record):
     "options",
     [
         ["--cpu-profile", "cpu_450mhz"],
+        ["--cpu-profile", "cpu_450mhz", "--gpio-policy", "raw", "--adc-policy", "raw"],
         ["--gpio-sample-rate-hz", "4000000"],
         ["--adc-pair-rate-hz", "500000"],
         ["--adc-resolution-bits", "10"],
