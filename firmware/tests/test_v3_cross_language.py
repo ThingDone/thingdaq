@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import shlex
 import struct
 import subprocess
 from dataclasses import replace
 from itertools import cycle, groupby
 
 import pytest
+from test_build_configuration import build_firmware
 from test_firmware_runtime import COMPILE_SOURCES, FIRMWARE_SOURCE, REPOSITORY_ROOT
 from test_v3_control_contract import command
 from thingdone_daq import ADCBlock, DAQConfiguration, GPIOBlock, reconcile_run_counters
@@ -26,6 +28,21 @@ FIXTURES = REPOSITORY_ROOT / "protocol/fixtures-v3"
 @pytest.fixture(scope="module", params=[450, 600], ids=["historical-450", "normal-600"])
 def cpp(request, tmp_path_factory):
     binary = tmp_path_factory.mktemp("v3-cross-language") / "session"
+    # Exercise the normal builder's definitions, so a recipe regression cannot
+    # hide behind this harness hardcoding a successful 600 MHz configuration.
+    if request.param == 600:
+        identity = build_firmware.BuildIdentity(
+            source_id="a" * 64,
+            build_id="thingdaq-aaaaaaaaaaaaaaaa",
+            timestamp_epoch=1_700_000_000,
+            timestamp_utc="2023-11-14T22:13:20Z",
+        )
+        flags = shlex.split(build_firmware.identity_definitions("", identity))
+    else:
+        flags = [
+            "-DTHINGDAQ_RELEASE_FIXED_1MHZ=1",
+            "-DTHINGDAQ_EXPERIMENT_CPU_HZ=450000000U",
+        ]
     subprocess.run(
         [
             "g++",
@@ -39,8 +56,7 @@ def cpp(request, tmp_path_factory):
             "-pedantic",
             "-fno-exceptions",
             "-fno-rtti",
-            "-DTHINGDAQ_RELEASE_FIXED_1MHZ=1",
-            f"-DTHINGDAQ_EXPERIMENT_CPU_HZ={request.param}000000U",
+            *flags,
             f"-I{FIRMWARE_SOURCE}",
             str(REPOSITORY_ROOT / "firmware/tests/v3_cross_language_test.cpp"),
             *(str(path) for path in COMPILE_SOURCES),

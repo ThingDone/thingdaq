@@ -4,11 +4,97 @@
 #undef main
 #include <cassert>
 #include "deferred_codec.h"
+#include "runtime_timing.h"
 
 namespace {
 namespace v3 = thingdaq::protocol_v3;
 namespace codec = thingdaq::deferred_codec;
 using Bytes = std::vector<std::uint8_t>;
+
+void fixedClockSettingsAndTiming() {
+  namespace td = thingdaq;
+  // This harness represents only the normal board. Historical build variants
+  // and generic application rollback remain in their existing separate suites.
+  static_assert(td::input_experiment::kCpuHz == 600000000U);
+  td::control::ControlState state;
+  assert(state.completeBoot(12345678U));
+  wire::Request request{};
+  request.protocol_version = 3U;
+  request.kind = constants::CommandKind::kConfigure;
+  wire::ControlFrame response;
+  const auto baseline = td::variable_rate::derive(
+      td::protocol_v2::RateProfile::kAdc1mhzGpio1mhz);
+  assert(baseline.ok());
+  unsigned accepted = 0U;
+  for (const auto& bytes : v3::kSelectableConfigurations) {
+    const auto selected = td::settings::record(bytes);
+    if (selected[v3::kSettingsCpuProfileOffset] !=
+        static_cast<unsigned>(v3::CpuProfile::kCpu600mhz)) continue;
+    ++accepted;
+    request.settings = selected;
+    ++request.request_id;
+    assert(state.dispatch(request, response).commandAccepted());
+    const auto applied = state.activeSettings();
+    assert(applied.settings == selected);
+    const auto timing = td::runtime_timing::project(applied.settings);
+    assert(timing.ok() && timing.schedule == baseline.schedule);
+    assert(timing.wire_clocks == applied.clocks);
+    assert(timing.cpu.cpu_hz == 600000000U && timing.cpu.ipg_hz == 150000000U);
+    assert(timing.cpu.timestamp_hz == 8000000U);
+    assert(timing.schedule.adc_pair_rate_hz == 1000000U);
+    assert(timing.schedule.gpio_sample_rate_hz == 1000000U);
+    assert(timing.schedule.adc_pair_period_ticks == 8U);
+    assert(timing.schedule.gpio_sample_period_ticks == 8U);
+    assert(timing.schedule.adc1_phase_ticks == 4U);
+    // Both diagnostic entry points must use the same compiled CPU/PIT clocks,
+    // regardless of stream mask, source, GPIO width, or either codec policy.
+    for (auto rate : {1000U, 1000000U, 4000000U}) {
+      wire::GpioClockDiagnosticRequest diagnostic{};
+      diagnostic.rate_hz = rate;
+      diagnostic.event_count = 32U;
+      const auto plan = td::gpio_clock::makePlan(diagnostic);
+      const auto projected = td::gpio_clock::makePlan(diagnostic, timing.cpu.id);
+      assert(plan.pit_divisor == 24000000U / rate);
+      assert(plan.pit_load_value == projected.pit_load_value);
+      assert(plan.cycles_per_event == 600000000U / rate);
+      assert(plan.measurement_cycles == 32U * (600000000U / rate));
+      assert(plan.cycles_per_event == projected.cycles_per_event);
+      assert(plan.measurement_cycles == projected.measurement_cycles);
+    }
+    const auto generation = state.statistics().generation();
+    const auto configuration = state.appliedConfiguration();
+    const auto device_state = state.state();
+    const auto has_configuration = state.hasConfiguration();
+    assert(state.takePendingEvents().mask == 0U);
+    // Known RAW-only historical tuples must still be rejected after EVERY
+    // valid selection, including compressed selections and either GPIO width.
+    for (const auto& unsupported : v3::kSelectableConfigurations) {
+      if (unsupported[v3::kSettingsCpuProfileOffset] !=
+          static_cast<unsigned>(v3::CpuProfile::kCpu450mhz)) continue;
+      request.settings = td::settings::record(unsupported);
+      ++request.request_id;
+      assert(state.dispatch(request, response).command_error ==
+             constants::ErrorCode::kUnsupportedConfiguration);
+      assert(state.activeSettings().settings == applied.settings);
+      assert(state.activeSettings().clocks == applied.clocks);
+      const auto after = state.appliedConfiguration();
+      assert(after.public_settings == configuration.public_settings);
+      assert(after.stream_mask == configuration.stream_mask);
+      assert(after.source == configuration.source);
+      assert(after.data_checksum_algorithm == configuration.data_checksum_algorithm);
+      assert(after.data_frame_bytes == configuration.data_frame_bytes);
+      assert(after.aux_bank_mode == configuration.aux_bank_mode);
+      assert(after.rate_profile == configuration.rate_profile);
+      assert(after.protocol_version == configuration.protocol_version);
+      assert(after.legacy_v2 == configuration.legacy_v2);
+      assert(state.hasConfiguration() == has_configuration);
+      assert(state.negotiatedVersion() == 3U && state.state() == device_state);
+      assert(state.runId() == 0U && state.statistics().generation() == generation);
+      assert(state.takePendingEvents().mask == 0U);
+    }
+  }
+  assert(accepted == 48U);
+}
 
 thingdaq::stream_layout::RunLayout publicLayout(unsigned width, bool compressed,
                                                unsigned count = 12U) {
@@ -384,6 +470,7 @@ int main(int argc, char **argv) {
   else if (test == "pressure") pressureAndTails();
   else if (test == "leases") invalidLeasesAndDeadlines();
   else if (test == "maximum") maximumCountsAndRejectedPayloads();
+  else if (test == "fixed-clock") fixedClockSettingsAndTiming();
   else assert(false);
   return failures == 0 ? 0 : 1;
 }

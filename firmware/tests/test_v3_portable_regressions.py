@@ -39,7 +39,7 @@ def portable_binary(tmp_path_factory):
 
 
 @pytest.mark.parametrize(
-    "scenario", ["bytes", "shapes", "pressure", "leases", "maximum"]
+    "scenario", ["bytes", "shapes", "pressure", "leases", "maximum", "fixed-clock"]
 )
 def test_public_contract_adversarial_cases(portable_binary, scenario):
     result = subprocess.run(

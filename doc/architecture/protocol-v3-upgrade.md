@@ -92,6 +92,51 @@ ADC/GPIO frames through the public Python transport/parser stack, and read back
 the applied settings. [[protocol-v3-prototype]] records commands and measured
 offline results. [[protocol-v3]] describes the complete wire contract.
 
+### Fixed-clock portable regression extension (2026-10-20)
+
+The existing portable pressure/regression harness now applies all 48 normal
+600 MHz configurations through production `ControlState`. After each selection,
+it rejects all twelve otherwise-valid historical 450 MHz RAW tuples (576
+rejections total), preserving settings, compiled clocks, acquisition
+configuration, control state, negotiated version, run ID, statistics generation
+and pending events.
+
+Every accepted setting projects to the same build-clock acquisition schedule:
+600 MHz CPU, 150 MHz IPG, 1 MHz ADC/GPIO sampling, 8 MHz timestamps and a
+four-tick ADC1 phase. Build-clock and profile-based GPIO diagnostic plans agree
+at 1 kHz, 1 MHz and 4 MHz regardless of codec, source, stream mask or GPIO width.
+[[runtime-clock-dependency-audit]] records the underlying timing projection.
+
+The cross-language runtime suite now obtains normal-build definitions from
+`build_firmware.identity_definitions` instead of duplicating the desired
+600 MHz flags. Its independent clock/capability assertions therefore detect
+recipe drift. Explicit `historical-450` cases retain their separate build
+override. Existing decoded RAW/PACK12/RLE samples, timestamps, epochs and v2
+compatibility checks remain active. Fake-application failure/readback/rollback
+tests are preserved; these simulate generic configuration failures and impose
+no PLL transition or runtime frequency-switch requirement.
+
+Validation: **168 unique tests and 1,117 subtests passed**, with five intentional
+historical fixed-rate/equal-rate and RAW-only compression skips. The new harness
+initially assumed a configuration equality operator and a configured state
+after v3 CONFIGURE; it now compares configuration fields and snapshots the
+actual idle state. All six portable scenarios passed after those test-only
+corrections. The remaining suites passed without changes:
+
+```bash
+TMPDIR="$PWD/.maestro/playbooks/Working/tmp" .venv/bin/python -m pytest firmware/tests/test_v3_cross_language.py -q
+TMPDIR="$PWD/.maestro/playbooks/Working/tmp" .venv/bin/python -m pytest firmware/tests/test_v3_portable_regressions.py firmware/tests/test_v3_control_contract.py firmware/tests/test_firmware_runtime.py firmware/tests/test_v3_layout_runtime.py firmware/tests/test_control_state.py firmware/tests/test_input_rate_clock.py firmware/tests/test_gpio_clock_diagnostic.py firmware/tests/test_adc_register_adapter.py firmware/tests/test_aux_input_portable.py -q
+TMPDIR="$PWD/.maestro/playbooks/Working/tmp" .venv/bin/python -m pytest firmware/tests/test_v3_portable_regressions.py -q
+TMPDIR="$PWD/.maestro/playbooks/Working/tmp" .venv/bin/python -m pytest firmware/tests/test_build_configuration.py daq_api/tests/test_documentation_integrity.py -q
+.venv/bin/ruff check firmware/tests/test_v3_cross_language.py firmware/tests/test_v3_portable_regressions.py
+.venv/bin/ruff format --check firmware/tests/test_v3_cross_language.py firmware/tests/test_v3_portable_regressions.py
+git diff --check
+```
+
+No production code changed. Target compilation, flashing, physical clock
+measurement and hardware acquisition were not run in this regression task.
+No task images were supplied or analyzed.
+
 ## Component ownership
 
 | Component | Responsibility |
