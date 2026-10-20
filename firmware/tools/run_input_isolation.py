@@ -14,10 +14,16 @@ import base64
 import hashlib
 import io
 import json
+import os
+import re
+import shlex
 import stat
+import subprocess
 import time
+import uuid
 import zipfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 BOARD = "teensy:avr:teensy40"
 CASES = ("CONTROL_GPIO", "CONTROL_COMBINED", "INPUT_GPIO", "INPUT_COMBINED")
@@ -27,16 +33,69 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def service_preflight(service: str) -> dict:
-    """Require the established rig's healthy, idle state before each job."""
+RETRY_SECONDS = 30
+SERVER_ERROR_SECONDS = 600
+
+
+def reconcile_start(recover, first_failure=None):
+    """Wait for readable acceptance evidence; never treat a failed read as absent."""
+    if first_failure is None:
+        first_failure = time.monotonic()
+    while True:
+        try:
+            return recover()
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            if time.monotonic() - first_failure >= SERVER_ERROR_SECONDS:
+                raise
+            print("/start: journal unavailable; holding submission", flush=True)
+            time.sleep(RETRY_SECONDS)
+
+
+def request_json(
+    service, endpoint, *, fields=None, recover_start=None, on_retry_recovered=None
+):
+    """Retry every HTTP 5xx for this request, including non-JSON edge replies.
+
+    A /start retry requires positive reconciliation with the rig journal.
+    Transport exceptions and 4xx keep their existing semantics.
+    """
     import requests
 
-    response = requests.get(f"{service}/health", timeout=10)
-    response.raise_for_status()
-    health = response.json()
+    endpoint = endpoint.strip("/")
+    if endpoint == "start" and recover_start is None:
+        raise ValueError("/start requires journal reconciliation")
+    first_failure = None
+    while True:
+        if fields is None:
+            response = requests.get(f"{service}/{endpoint}", timeout=10)
+        else:
+            response = requests.post(f"{service}/{endpoint}", json=fields, timeout=30)
+        if not 500 <= getattr(response, "status_code", 200) < 600:
+            response.raise_for_status()
+            if first_failure is not None and on_retry_recovered is not None:
+                on_retry_recovered(time.monotonic() - first_failure)
+            return response.json()
+        if first_failure is None:
+            first_failure = time.monotonic()
+        if time.monotonic() - first_failure >= SERVER_ERROR_SECONDS:
+            if recover_start is not None:
+                accepted = reconcile_start(recover_start, first_failure)
+                if accepted is not None:
+                    return accepted
+            response.raise_for_status()
+        print(f"/{endpoint}: HTTP {response.status_code}; retrying in 30 s", flush=True)
+        time.sleep(RETRY_SECONDS)
+        if endpoint == "start":
+            accepted = reconcile_start(recover_start, first_failure)
+            if accepted is not None:
+                return accepted
+
+
+def service_preflight(service: str) -> dict:
+    """Require a healthy rig; other agents' queued work is normal."""
+    health = request_json(service, "health")
     expected = {
         "coordinator_mode": "normal",
-        "queue_depth": 0,
         "worker_thread_alive": True,
         "docker_reachable": True,
         "hub_reachable": True,
@@ -44,8 +103,120 @@ def service_preflight(service: str) -> dict:
     if health.get("status") != "healthy" or any(
         health.get("checks", {}).get(key) != value for key, value in expected.items()
     ):
-        raise RuntimeError("service not idle/healthy; no submission made")
+        raise RuntimeError("service not healthy; no submission made")
     return health
+
+
+def recover_submission(service, submission, evidence_dir):
+    """Find this submission's unique agent tag in the rig's admission journal.
+
+    No credentials or other agents' journal entries are saved. A failed journal
+    read is not evidence of absence and must never permit a resubmission.
+    FW_RIG_SSH may override the default bill@<service hostname> SSH destination.
+    """
+    host = os.environ.get("FW_RIG_SSH", f"bill@{urlsplit(service).hostname}")
+    # Bound the journal scan using elapsed age, interpreted against the rig's
+    # clock. The margin covers SSH latency and modest local clock adjustment.
+    lookback_seconds = max(60, int(time.time() - submission["created_at"]) + 60)
+    journal = subprocess.run(
+        [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            host,
+            # Do not compare absolute timestamps from two different machines.
+            # Quote the remote shell command explicitly.
+            shlex.join(
+                [
+                    "journalctl",
+                    "-u",
+                    "remote_firmware_service",
+                    "--grep",
+                    submission["agent_name"],
+                    "--since",
+                    f"{lookback_seconds} seconds ago",
+                    "--no-pager",
+                    "-o",
+                    "json",
+                ]
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    # journalctl --grep exits 1 for no matches. SSH errors (255), partial
+    # output, and permission warnings are not proof that no job was accepted.
+    if (
+        journal.stderr.strip()
+        or journal.returncode not in (0, 1)
+        or (journal.returncode == 1 and journal.stdout.strip())
+    ):
+        raise RuntimeError("rig journal read was incomplete")
+    matches = set()
+    for line in journal.stdout.splitlines():
+        message = json.loads(line).get("MESSAGE", "")
+        if f"(agent {submission['agent_name']})" in message:
+            match = re.search(r"Starting new test ([0-9a-f-]{36}) for board", message)
+            if not match:
+                raise RuntimeError("unrecognized submission journal entry")
+            matches.add(match[1])
+    if len(matches) > 1:
+        raise RuntimeError("multiple accepted jobs for submission; inspect journal")
+    if not matches:
+        return None
+    accepted = {"test_id": matches.pop(), "recovered_from": "journal"}
+    (evidence_dir / "start.json").write_text(json.dumps(accepted, indent=2) + "\n")
+    return accepted
+
+
+def is_queued(status):
+    """Support explicit states plus the rig's legacy running/queued message."""
+    return (
+        status.get("status") in {"queued", "pending"}
+        or (status.get("queue_position") or 0) > 0
+        or "queued" in status.get("message", "").lower()
+    )
+
+
+def wait_for_result(service, auth, test_id, evidence_dir, timeout_seconds):
+    """Queue residence and HTTP retry waits do not consume execution time."""
+    active_seconds = 0.0
+    previous_queued = True
+    previous_poll = time.monotonic()
+    while True:
+        retry_seconds = []
+        status = request_json(
+            service,
+            "status",
+            fields={"auth": auth, "test_id": test_id},
+            on_retry_recovered=retry_seconds.append,
+        )
+        (evidence_dir / "status.json").write_text(json.dumps(status, indent=2) + "\n")
+        queued = is_queued(status)
+        # Successful HTTP latency is execution time; a 5xx outage has its own
+        # budget, and a queued interval has no deadline at all.
+        now = time.monotonic()
+        if not previous_queued and not queued:
+            active_seconds += now - previous_poll - sum(retry_seconds)
+        previous_poll = now
+        previous_queued = queued
+        if not queued and status.get("status") not in {"running", "busy"}:
+            result = request_json(
+                service, "results", fields={"auth": auth, "test_id": test_id}
+            )
+            (evidence_dir / "results.json").write_text(
+                json.dumps(result, indent=2) + "\n"
+            )
+            return result
+        if active_seconds >= timeout_seconds:
+            raise RuntimeError(
+                f"job {test_id} exceeded execution deadline; inspect before further submissions"
+            )
+        time.sleep(1)
 
 
 def submit_program(
@@ -56,52 +227,99 @@ def submit_program(
     evidence_dir: Path,
     timeout_seconds: float,
 ) -> dict:
-    """Submit once, retain raw replies, and wait for a terminal rig result.
-
-    A submission or polling timeout is ambiguous: callers must inspect the
-    saved job before submitting again. Never automatically retry /start.
-    """
-    import requests
+    """Submit or recover one job; persist its identity before network activity."""
 
     def save(name, value):
         (evidence_dir / name).write_text(
             json.dumps(value, indent=2, sort_keys=True) + "\n"
         )
 
-    def post(endpoint, fields):
-        response = requests.post(
-            f"{service}/{endpoint}", json={"auth": auth, **fields}, timeout=30
-        )
-        response.raise_for_status()
-        return response.json()
+    identity = {
+        "service": service,
+        "firmware_sha256": digest(firmware),
+        "program_sha256": digest(program.encode()),
+    }
+    submission_path = evidence_dir / "submission.json"
+    resumed = submission_path.exists()
+    if resumed:
+        submission = json.loads(submission_path.read_text())
+        if any(submission.get(key) != value for key, value in identity.items()):
+            raise ValueError("saved submission does not match this request")
+    else:
+        submission = {
+            **identity,
+            "agent_name": f"teensy_daq-{uuid.uuid4().hex}",
+            "created_at": time.time(),
+            "execution_timeout_seconds": timeout_seconds,
+        }
+        save("submission.json", submission)
 
-    save("preflight.json", service_preflight(service))
-    archive_bytes = io.BytesIO()
-    with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("firmware.ino.hex", firmware)
-    started = post(
-        "start",
-        {
-            "python": program,
-            "board": BOARD,
-            "binary": base64.b64encode(archive_bytes.getvalue()).decode(),
-        },
-    )
-    save("start.json", started)
+    def recover():
+        return recover_submission(service, submission, evidence_dir)
+
+    start_path = evidence_dir / "start.json"
+    if start_path.exists():
+        started = json.loads(start_path.read_text())
+    else:
+        started = reconcile_start(recover) if resumed else None
+        if started is None:
+            save("preflight.json", service_preflight(service))
+            archive_bytes = io.BytesIO()
+            with zipfile.ZipFile(archive_bytes, "w", zipfile.ZIP_DEFLATED) as archive:
+                # Stable bytes when recovering a process interrupted during /start.
+                entry = zipfile.ZipInfo("firmware.ino.hex")
+                entry.compress_type = zipfile.ZIP_DEFLATED
+                archive.writestr(entry, firmware)
+            started = request_json(
+                service,
+                "start",
+                recover_start=recover,
+                fields={
+                    "auth": auth,
+                    "python": program,
+                    "board": BOARD,
+                    "binary": base64.b64encode(archive_bytes.getvalue()).decode(),
+                    "agent_name": submission["agent_name"],
+                },
+            )
+            save("start.json", started)
     test_id = started["test_id"]
-    print(f"Started {test_id}: {evidence_dir.name}", flush=True)
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        status = post("status", {"test_id": test_id})
-        save("status.json", status)
-        if status.get("status") not in {"running", "busy", "queued", "pending"}:
-            result = post("results", {"test_id": test_id})
-            save("results.json", result)
-            return result
-        time.sleep(1)
-    raise RuntimeError(
-        f"job {test_id} exceeded deadline; inspect before further submissions"
+    print(f"Following {test_id}: {evidence_dir.name}", flush=True)
+    return wait_for_result(service, auth, test_id, evidence_dir, timeout_seconds)
+
+
+def resume_saved_program(service, auth, evidence_dir):
+    """Follow a retained job using its frozen inputs, without rebuilding."""
+    if not any(
+        (evidence_dir / name).exists() for name in ("start.json", "submission.json")
+    ):
+        raise ValueError(
+            "no saved submission identity; inspect the journal before submitting"
+        )
+    provenance = json.loads((evidence_dir / "provenance.json").read_text())
+    if provenance["service"] != service:
+        raise ValueError("saved service does not match resume request")
+    submission_path = evidence_dir / "submission.json"
+    submission = (
+        json.loads(submission_path.read_text()) if submission_path.exists() else {}
     )
+    result = submit_program(
+        service,
+        auth,
+        (evidence_dir / "firmware.ino.hex").read_bytes(),
+        (evidence_dir / "rig-program.py").read_text(),
+        evidence_dir,
+        submission.get(
+            "execution_timeout_seconds",
+            provenance.get("planned_program_seconds", 900) + 90,
+        ),
+    )
+    summary = classify_result(
+        result, expected_cells=len(provenance.get("profile_sequence", [0]))
+    )
+    (evidence_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    print(json.dumps(summary), flush=True)
+    return 0 if summary["outcome"] == "PASS" else 1
 
 
 def verify_hex(firmware: bytes, manifest: dict) -> None:
@@ -338,6 +556,11 @@ def main() -> int:
     )
     parser.add_argument("--evidence-dir", required=True, type=Path)
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="follow the saved job using frozen evidence inputs",
+    )
+    parser.add_argument(
         "--case",
         choices=CASES,
         required=True,
@@ -403,16 +626,15 @@ def main() -> int:
         parser.error("--sdk-cases requires --host-api")
     if args.runtime_health and not args.host_api:
         parser.error("--runtime-health requires --host-api")
-    # Only live submission needs the service client's optional HTTP dependency.
-    import requests
-
     if not 1 <= args.seconds <= 600:
         parser.error("--seconds must be 1..600")
-    if args.evidence_dir.exists():
+    if args.evidence_dir.exists() and not args.resume:
         parser.error("evidence directory already exists; choose a new immutable run")
     if stat.S_IMODE(args.auth_file.stat().st_mode) & 0o077:
         parser.error("credential file must be private")
     auth = args.auth_file.read_text().strip()
+    if args.resume:
+        return resume_saved_program(args.service, auth, args.evidence_dir)
     build = args.build_dir or (
         args.worktree
         / "firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std"
@@ -503,9 +725,7 @@ def main() -> int:
         ) + program
 
     def get(endpoint):
-        response = requests.get(f"{args.service}/{endpoint}", timeout=10)
-        response.raise_for_status()
-        return response.json()
+        return request_json(args.service, endpoint)
 
     health = service_preflight(args.service)
     args.evidence_dir.mkdir(parents=True)

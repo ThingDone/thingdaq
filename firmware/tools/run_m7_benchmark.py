@@ -34,14 +34,23 @@ def main() -> int:
     parser.add_argument("--kind", choices=("m7", "rle"), default="m7")
     parser.add_argument("--build-dir", required=True, type=Path)
     parser.add_argument("--evidence-dir", required=True, type=Path)
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="follow the saved job using frozen evidence inputs",
+    )
     parser.add_argument("--service", required=True)
     parser.add_argument("--serial", type=int, default=20428100)
     parser.add_argument("--auth-file", type=Path, default=Path.home() / ".fw_api_key")
     args = parser.parse_args()
-    if args.evidence_dir.exists():
+    if args.evidence_dir.exists() and not args.resume:
         parser.error("choose a new immutable evidence directory")
     if stat.S_IMODE(args.auth_file.stat().st_mode) & 0o077:
         parser.error("credential file must be private")
+    if args.resume:
+        return rig.resume_saved_program(
+            args.service, args.auth_file.read_text().strip(), args.evidence_dir
+        )
     manifest_bytes = (args.build_dir / "benchmark-manifest.json").read_bytes()
     manifest = json.loads(manifest_bytes)
     if manifest.get("kind", "m7") != args.kind:

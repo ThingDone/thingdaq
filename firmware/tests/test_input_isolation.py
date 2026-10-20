@@ -356,7 +356,7 @@ def test_ambiguous_submission_timeout_is_never_retried(monkeypatch, tmp_path):
     assert calls == ["http://unused.invalid/start"]
 
 
-def test_busy_preflight_prevents_submission(monkeypatch, tmp_path):
+def test_unhealthy_preflight_prevents_submission(monkeypatch, tmp_path):
     import requests
 
     monkeypatch.setattr(
@@ -370,7 +370,7 @@ def test_busy_preflight_prevents_submission(monkeypatch, tmp_path):
     monkeypatch.setattr(
         requests, "post", lambda *a, **k: pytest.fail("must not submit")
     )
-    with pytest.raises(RuntimeError, match="not idle/healthy"):
+    with pytest.raises(RuntimeError, match="not healthy"):
         isolation.submit_program(
             "http://unused.invalid", "test-key", b"hex", "pass", tmp_path, 1
         )

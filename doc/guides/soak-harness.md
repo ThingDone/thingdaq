@@ -201,6 +201,46 @@ stall can be separated from device-originated loss. Progress lines begin with `S
 Exactly one terminal line begins with `SOAK_RESULT ` followed by compact JSON;
 the process exits zero only when that result is `PASS`.
 
+## Rig HTTP retries and shared queue
+
+Campaigns use `firmware/tools/run_input_isolation.py` (`request_json`,
+`submit_program`, and `wait_for_result`); `run_m7_benchmark.py` shares this client.
+The programs in `firmware/tests/rig_*.py` run inside the rig and use serial I/O,
+not HTTP. Archived clients in ignored raw evidence are historical artifacts,
+not campaign entry points. The external rig service's `agent_kit` is maintained
+in its own repository.
+
+Every HTTP 500–599 from any endpoint, including health, status, results, and
+logs, is transient. Repeat the same request after 30 seconds; fail only after
+600 seconds of continuous 5xx for that request. Successful polls reset the
+outage budget. A single 5xx must not halt Auto Run or mark a task blocked.
+Transport exceptions and HTTP 4xx remain distinct errors.
+
+A nonempty shared queue is normal. Wait for queued/pending jobs, including
+legacy `running` replies with a queued message or positive `queue_position`.
+Queue residence and HTTP retry waits do not consume the execution deadline.
+An active job still has a bounded execution budget.
+
+Before `/start`, retain a unique submission tag and input hashes in
+`submission.json`. After an ambiguous 5xx, read the rig admission journal for
+that tag before any resubmission; follow an accepted job instead of queuing
+another. If journal access fails, hold the submission while retrying the read.
+The default SSH destination is `bill@<service hostname>`; set `FW_RIG_SSH` when
+the HTTP URL and SSH host differ. Journal access is read-only. Credentials are
+never written to submission evidence.
+
+To resume a saved input-isolation or M7 run, repeat its original command with
+`--resume` and the same evidence directory and service. This uses the frozen
+firmware/program and saved job identity, then polls status/results. Do not
+choose a fresh evidence directory to recover an ambiguous submission.
+
+Host regression gate (fake HTTP, journal, and clock; no rig access):
+
+```bash
+.venv/bin/python -m pytest -q firmware/tests/test_rig_http_retry.py \
+  firmware/tests/test_input_isolation.py
+```
+
 ## Saved job evidence
 
 Keep the service's exact `/results` response together with client-side metadata
