@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import struct
 import subprocess
 from dataclasses import replace
 from itertools import cycle, groupby
@@ -10,6 +11,7 @@ import pytest
 from test_firmware_runtime import COMPILE_SOURCES, FIRMWARE_SOURCE, REPOSITORY_ROOT
 from test_v3_control_contract import command
 from thingdone_daq import ADCBlock, DAQConfiguration, GPIOBlock, reconcile_run_counters
+from thingdone_daq._generated import protocol_v3_constants as c
 from thingdone_daq.models import decode_message, decode_response
 from thingdone_daq.models_v3 import V3Settings, decode_v3_response
 from thingdone_daq.protocol_v2 import (
@@ -21,7 +23,7 @@ from thingdone_daq.protocol_v3 import decode_v3_block
 FIXTURES = REPOSITORY_ROOT / "protocol/fixtures-v3"
 
 
-@pytest.fixture(scope="module", params=[450, 600])
+@pytest.fixture(scope="module", params=[450, 600], ids=["historical-450", "normal-600"])
 def cpp(request, tmp_path_factory):
     binary = tmp_path_factory.mktemp("v3-cross-language") / "session"
     subprocess.run(
@@ -93,6 +95,163 @@ def capabilities(cpp):
         cpp, [request((FIXTURES / "get_capabilities-request.bin").read_bytes())]
     )
     return decode_v3_response(frames[0]).value
+
+
+def test_fixed_clock_settings_lifecycle(cpp):
+    caps = capabilities(cpp)
+    clocks = caps.cpu_profiles[0]
+    assert len(caps.cpu_profiles) == 1
+    assert clocks.cpu_clock_hz == cpp[1] * 1_000_000
+    assert clocks.ipg_clock_hz == 150_000_000 and clocks.pit_clock_hz == 24_000_000
+    assert clocks.adc_clock_hz == 37_500_000 and clocks.timestamp_hz == 8_000_000
+    assert len(caps.configurations) == (48 if cpp[1] == 600 else 12)
+    assert all(s.cpu_profile == clocks.cpu_profile for s in caps.configurations)
+    raw = replace(caps.defaults, source=1, gpio_policy=0, adc_policy=0)
+    selected = [raw, replace(caps.defaults, source=1), raw]
+    operations = [
+        request(command(16, request_id=1)),
+        request(command(29, request_id=2)),
+    ]
+    for run, settings in enumerate(selected, 1):
+        base = run * 20
+        operations += [
+            request(command(17, settings.to_bytes(), base)),
+            request(command(17, settings.to_bytes(), base + 1)),  # idempotent
+            request(command(29, request_id=base + 2)),
+            request(command(18, request_id=base + 3)),
+            request(command(17, raw.to_bytes(), base + 4)),  # running
+            request(encode_v2_frame(16, request_id=base + 5)),  # legacy probe
+            request(command(29, request_id=base + 6)),
+            "T 32256",
+            request(command(20, request_id=base + 7)),
+            request(command(19, request_id=base + 8)),
+            request(command(16, request_id=base + 9)),
+            request(encode_v2_frame(16, request_id=base + 10)),
+            request(command(29, request_id=base + 11)),
+        ]
+    frames, _ = exchange(cpp, operations)
+    responses = replies(frames)
+    assert len(responses) == 2 + 12 * len(selected)
+    assert responses[1].value.clocks == responses[2].value.clocks == clocks
+    assert responses[2].value.settings == caps.defaults
+    for run, settings in enumerate(selected, 1):
+        base = run * 20
+        for offset in (0, 1, 2, 3, 6, 11):
+            response = responses[base + offset]
+            assert response.error_code == c.ErrorCode.OK
+            assert response.value.settings == settings
+            assert response.value.clocks == clocks
+            assert response.run_id == (run - 1 if offset < 3 else run)
+        assert responses[base + 4].error_code == c.ErrorCode.INVALID_STATE
+        assert responses[base + 5].error_code == c.ErrorCode.UNSUPPORTED_CONFIGURATION
+        for offset in (7, 8, 9, 10):
+            assert responses[base + offset].error_code == c.ErrorCode.OK
+        assert responses[base + 8].value.state == c.DeviceState.STOPPED
+        assert responses[base + 8].value.pending_frames == 0
+        assert responses[base + 9].value.clocks == clocks
+        data = [f for f in frames if f.header.run_id == run and f.header.kind in (1, 2)]
+        assert data
+        for frame in data:
+            assert_samples(decode_v3_block(frame, settings))
+        for kind in (1, 2):
+            first = next(f for f in data if f.header.kind == kind)
+            assert first.header.sequence == first.header.first_sample_ticks == 0
+
+    # A newly constructed runtime models boot, rather than a host reconnect.
+    frames, _ = exchange(
+        cpp, [request(command(k, request_id=i)) for i, k in enumerate((16, 28, 29), 1)]
+    )
+    boot = replies(frames)
+    assert all(r.run_id == 0 and r.error_code == 0 for r in boot.values())
+    assert boot[1].value.clocks == boot[3].value.clocks == clocks
+    assert boot[2].value.defaults == boot[3].value.settings == caps.defaults
+
+
+def test_unsupported_settings_preserve_fixed_clock_state(cpp):
+    caps = capabilities(cpp)
+    raw = replace(caps.defaults, source=1, gpio_policy=0, adc_policy=0)
+    other_cpu = c.CpuProfile.CPU_450MHZ if cpp[1] == 600 else c.CpuProfile.CPU_600MHZ
+    # Known enums with unsupported membership/rates, plus an unknown CPU ID.
+    candidates = [
+        (
+            replace(raw, cpu_profile=other_cpu).to_bytes(),
+            c.ErrorCode.UNSUPPORTED_CONFIGURATION,
+        ),
+        (
+            raw.to_bytes()[:16] + struct.pack("<I", 2_000_000),
+            c.ErrorCode.UNSUPPORTED_CONFIGURATION,
+        ),
+        (
+            raw.to_bytes()[:12] + struct.pack("<I", 2_000_000) + raw.to_bytes()[16:],
+            c.ErrorCode.UNSUPPORTED_CONFIGURATION,
+        ),
+        (
+            raw.to_bytes()[:4] + b"\x03" + raw.to_bytes()[5:],
+            c.ErrorCode.INVALID_PAYLOAD,
+        ),
+    ]
+    operations = [request(command(17, raw.to_bytes(), 1))]
+    for i, (payload, _) in enumerate(candidates):
+        base = 10 + i * 3
+        operations += [
+            request(command(17, payload, base)),
+            request(command(29, request_id=base + 1)),
+            request(command(16, request_id=base + 2)),
+        ]
+    frames, _ = exchange(cpp, operations)
+    responses = replies(frames)
+    assert len(responses) == 1 + 3 * len(candidates)
+    for i, (_, error) in enumerate(candidates):
+        base = 10 + i * 3
+        assert responses[base].error_code == error
+        assert responses[base + 1].value == responses[1].value
+        assert responses[base + 2].value.clocks == caps.cpu_profiles[0]
+    assert all(r.run_id == 0 for r in responses.values())
+
+
+def test_stop_drain_rejects_configuration_then_starts_new_epoch(cpp):
+    caps = capabilities(cpp)
+    original = replace(caps.defaults, source=1)
+    raw = replace(
+        original, gpio_policy=0, adc_policy=0, gpio_width_bits=16, aux_bank_mode=1
+    )
+    frames, _ = exchange(
+        cpp,
+        [
+            request(command(17, original.to_bytes(), 1)),
+            request(command(18, request_id=2)),
+            "A 32256",  # service until old DATA is partially sent
+            "Q " + command(20, request_id=3).hex(),
+            "Q " + command(17, raw.to_bytes(), 4).hex(),
+            "Q " + command(19, request_id=5).hex(),
+            "Q " + command(29, request_id=6).hex(),
+            "T 0",  # process queued requests, then finish draining USB
+            request(command(19, request_id=7)),
+            request(command(17, raw.to_bytes(), 8)),
+            request(command(18, request_id=9)),
+            "T 32256",
+            request(command(20, request_id=10)),
+        ],
+    )
+    responses = replies(frames)
+    assert len(responses) == 10
+    assert responses[4].error_code == c.ErrorCode.BUSY
+    assert all(r.error_code == 0 for key, r in responses.items() if key != 4)
+    assert responses[5].value.state == c.DeviceState.DRAINING
+    assert responses[5].value.pending_frames > 0
+    assert responses[6].value == responses[1].value
+    assert responses[7].value.state == c.DeviceState.STOPPED
+    assert responses[7].value.pending_frames == 0
+    assert responses[8].value == responses[9].value
+    assert responses[9].value.settings == raw
+    assert responses[9].value.clocks == caps.cpu_profiles[0]
+    assert responses[2].run_id == responses[6].run_id == 1
+    assert responses[9].run_id == 2
+    for run, settings in ((1, original), (2, raw)):
+        data = [f for f in frames if f.header.run_id == run and f.header.kind in (1, 2)]
+        assert data
+        for frame in data:
+            assert_samples(decode_v3_block(frame, settings))
 
 
 def assert_samples(block, *, controlled=False):

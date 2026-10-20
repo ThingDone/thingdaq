@@ -50,6 +50,42 @@ clock selection remains fixed at build time; physical public-v3 capture
 remains unqualified. [[protocol-v3-firmware-portable]]
 records the consolidated gate and [[protocol-v3-python]] the earlier host gate.
 
+### Fixed-clock production control verification (2026-10-20)
+
+Extended the existing cross-language runtime harness with queued commands and a
+bounded partial-DATA transmission step. Python wire requests pass through the
+production C++ parser, `FixedBuildApplication`, control state, acquisition
+controller and USB transport, then back through the public Python decoder.
+The normal 600 MHz recipe and historical 450 MHz compatibility variant have
+separately named test cases; neither changes frequency at runtime.
+
+Verified INFO/capabilities/GET_SETTINGS/CONFIGURE/START clock and settings
+agreement, stopped RAW/compressed/RAW changes, same-settings idempotence,
+rejection during acquisition and actual queued-frame drain, and successful
+reconfigure/START after drain with a new run epoch. Unsupported CPU/rate tuples
+and unknown CPU IDs preserve the last valid settings. A fresh runtime instance
+restores boot defaults and run ID zero. V2 probes preserve settings; existing
+mixed v2/v3 sessions retain historical RAW sizes, metadata and sample timing.
+CPU/IPG/ADC/PIT/timestamp metadata is 600/150/37.5/24/8 MHz for the normal build;
+samples remain 1 MHz. These are compiled metadata and portable execution
+results, not physical clock measurements or a device reboot test.
+
+Validation: **122 passed, 2 intentional skips, 24 subtests passed** across:
+
+```bash
+TMPDIR="$PWD/.maestro/playbooks/Working/tmp" .venv/bin/python -m pytest firmware/tests/test_v3_cross_language.py -q
+TMPDIR="$PWD/.maestro/playbooks/Working/tmp" .venv/bin/python -m pytest firmware/tests/test_v3_control_contract.py firmware/tests/test_firmware_runtime.py firmware/tests/test_v3_layout_runtime.py firmware/tests/test_control_state.py -q
+.venv/bin/ruff check firmware/tests/test_v3_cross_language.py
+.venv/bin/ruff format --check firmware/tests/test_v3_cross_language.py
+git diff --check
+```
+
+The skips are compressed layouts on the historical RAW-only 450 MHz variant.
+Strict-warning C++ compilation and changed-Python lint/format checks passed.
+No firmware behavior change was needed. Target build, hardware access, flashing
+and physical qualification were not run in this task; see
+[[runtime-clock-dependency-audit]] for the preceding timing audit.
+
 Phase 01 established the hardware-free vertical slice: discover an explicitly
 simulated Teensy 4.0, select an advertised configuration, capture compressed
 ADC/GPIO frames through the public Python transport/parser stack, and read back

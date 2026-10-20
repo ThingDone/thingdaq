@@ -37,6 +37,23 @@ void runtimeSession() {
   };
   std::string operation, argument;
   while (std::cin >> operation >> argument) {
+    // Queue a command or leave a frame partially transmitted so the next
+    // commands exercise production STOP/drain admission, before USB empties.
+    if (operation == "Q") {
+      stream.appendInput(inputCommand(argument));
+      continue;
+    }
+    if (operation == "A") {
+      clock.ticks += std::stoull(argument);
+      // Compressed frames need deferred codec visits before first USB write.
+      for (unsigned pass = 0; pass < 1000U; ++pass) {
+        assert(!firmware.service().internal_error);
+        if (firmware.transportSnapshot().active_frame_bytes_sent != 0U) break;
+      }
+      assert(firmware.packetSnapshot().pending_frames != 0U);
+      assert(firmware.transportSnapshot().active_frame_bytes_sent != 0U);
+      continue;
+    }
     if (operation == "C") stream.appendInput(inputCommand(argument));
     else if (operation == "T") clock.ticks += std::stoull(argument);
     else {
