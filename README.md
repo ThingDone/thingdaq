@@ -312,7 +312,7 @@ Common local gates:
 .venv/bin/python -m ruff format --check daq_api firmware tools
 .venv/bin/python -m ruff check daq_api firmware tools
 .venv/bin/python -m mypy daq_api/src/thingdone_daq
-.venv/bin/python -m pytest
+.venv/bin/python -m pytest firmware/tests daq_api/tests
 python3 firmware/tools/build_firmware.py
 ```
 

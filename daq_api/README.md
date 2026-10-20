@@ -80,7 +80,11 @@ peer does not advertise or accept them. Historical v1/v2 personas are unchanged.
 
 ```python
 from thingdone_daq import (
-    DeviceCapabilityError, ThingDAQ, V3AdcPolicy, V3CpuProfile, V3GpioPolicy,
+    DeviceCapabilityError,
+    ThingDAQ,
+    V3AdcPolicy,
+    V3CpuProfile,
+    V3GpioPolicy,
 )
 
 with ThingDAQ.simulated(protocol_version=3, strict=True) as daq:

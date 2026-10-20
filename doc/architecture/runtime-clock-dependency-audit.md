@@ -16,6 +16,111 @@ related:
 
 # Runtime clock dependency audit
 
+## Fixed 600 MHz candidate build (2026-10-20)
+
+The normal `firmware/tools/build_firmware.py` recipe compiled the public-codec
+candidate from commit `f16d463cb2b187dac4155c0301262dde16389b45`, with clean
+firmware inputs. CPU frequency is fixed; runtime switching remains out of scope.
+The subsequent changes only correct validation instructions and documentation.
+This is local compilation evidence for [[protocol-v3-upgrade]], not physical
+qualification.
+
+Build identity:
+
+- Build ID: `thingdaq-4c250bedb4d1bbc0`.
+- Source SHA-256:
+  `4c250bedb4d1bbc01bd5b302470501f6a5e53825b607bb2d9c4048983babbbb0`.
+- Source-derived timestamp: `2026-10-20T05:10:58Z`.
+- Arduino CLI 1.4.1, Teensy core 1.62.0, Arm GNU 15.2.1, `-O2`.
+- FQBN: `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std`.
+- Output: `firmware/build/teensy.avr.teensy40.usb_serial.speed_600.opt_o2std/`.
+
+All 125 compile database entries contain `F_CPU=600000000`,
+`THINGDAQ_EXPERIMENT_CPU_HZ=600000000U` and `THINGDAQ_RELEASE_FIXED_1MHZ=1`.
+The internal timing definition, resolved `build.fcpu`, FQBN, output directory
+and manifest `release_policy.core_hz` agree. No private GPIO-RLE, deferred-codec
+or ADC-PACK12 experiment flags were supplied; public codec dispatch remains
+available, and the linked ELF contains the RLE encoder and deferred-codec
+counters. Portable coverage checks public RAW/PACK12/RLE_AUTO behavior.
+Clock values are build evidence, not independent hardware register readback.
+The manifest's historical `release_policy.protocol_version=2` describes the
+legacy fixed-rate policy; it does not limit the public v3 control path.
+
+| Target gate | Result |
+| --- | --- |
+| RAM1 locals/stack | 33,024 bytes free; required minimum 32,768 bytes; margin 256 bytes |
+| RAM2 heap | 4,096 bytes free; required minimum 4,096 bytes; margin zero |
+| Linker/placement | All builder checks passed: checksum flash tables, packet pages, DMA alignment/ranges, shared workspace, managed-memory overlap and linker sections |
+| Packet retention | 200 pages retained (105 DTCM + 95 OCRAM) |
+| Artifact integrity | All four manifest artifact sizes and SHA-256 hashes rechecked against disk; current firmware source fingerprint matches |
+
+| Local artifact | Bytes | SHA-256 |
+| --- | --- | --- |
+| `firmware.ino.elf` | 2843348 | `7a4f5349b897ef7a1f220fb573963da42417bbd42a78c6dfbd1e787ae24064f8` |
+| `firmware.ino.hex` | 521404 | `0017f377307e315cffe800d67fcbd2c031f46ea02ef4c94252831fba3e460261` |
+| `firmware.ino.map` | 1392786 | `ac0fa82cb3dced3c13daa991dc0b565ea4578776ec473b6256298183c80ce045` |
+| `firmware.ino.eep` | 34 | `c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77` |
+
+Manifest SHA-256:
+`fc18a31ac15da45ca74643483be9a8c5a4f4dbff9d9bcc1dc85f609c82e88213`.
+The manifest and binaries remain ignored build artifacts. Local raw logs and
+the compile-database/hash inspection summary are retained under
+`.maestro/playbooks/Working/phase04-fixed600/`.
+
+Reproduction from the repository root:
+
+```bash
+mkdir -p .maestro/playbooks/Working/phase04-fixed600/tmp
+mkdir -p .maestro/playbooks/Working/phase04-fixed600/cache
+export TMPDIR="$PWD/.maestro/playbooks/Working/phase04-fixed600/tmp"
+export XDG_CACHE_HOME="$PWD/.maestro/playbooks/Working/phase04-fixed600/cache"
+export ARDUINO_BUILD_CACHE_PATH="$PWD/.maestro/playbooks/Working/phase04-fixed600/cache/arduino"
+.venv/bin/python tools/generate_protocol.py --check
+.venv/bin/python -m ruff format --check daq_api firmware tools
+.venv/bin/python -m ruff check daq_api firmware tools
+.venv/bin/python -m mypy daq_api/src/thingdone_daq
+.venv/bin/python -m pytest firmware/tests daq_api/tests -q -ra --tb=short
+python3 firmware/tools/build_firmware.py
+git diff --check
+```
+
+Generator drift passed for all 142 outputs; Ruff 0.16.5 formatting passed for
+198 files and lint passed; mypy 2.3.1 passed for all 33 SDK source files.
+The full maintained suite (pytest 9.1.1) completed in 266.31 seconds with
+**2,497 passed, 2 failed, 5 skipped and 16,820 subtests passed**. Both failures
+were existing real-time fake-serial throughput checks:
+`test_selected_campaign_benchmarks_and_streams_only_one_candidate` measured
+1,347,008 ADC payload bytes/s against a 2,000,000 lower bound, and
+`test_full_program_runs_diagnostics_streams_status_and_stops` measured
+2,664,815 GPIO samples/s against a 3,200,000 lower bound.
+Rerunning both complete affected modules in isolation, without code or
+threshold changes, passed **13 tests and 29 subtests in 1.28 seconds**:
+
+```bash
+.venv/bin/python -m pytest firmware/tests/test_rig_checksum_benchmark.py firmware/tests/test_rig_gpio_capture.py -q -ra --tb=short
+```
+
+Thus all 2,499 unique tests passed across the full run and focused recheck;
+the full invocation itself was not uniformly green. These short wall-clock
+fake-device checks remain host-timing-sensitive. The five intentional skips
+are three historical fixed-rate/equal-rate combinations and two historical
+450 MHz RAW-only compressed layouts. No tests were disabled or limits relaxed.
+After the documentation edits, `daq_api/tests/test_documentation_integrity.py`
+passed all four tests and 1,082 subtests; `git diff --check` passed.
+
+The initial unscoped README pytest command collected archived copies beneath
+ignored `benchmark-scratch/`, producing 832 collection/import errors. The
+documented command now explicitly selects the maintained firmware and SDK test
+directories. The first formatting gate also found a multiline import in the
+SDK README; formatting was corrected without changing the runnable example.
+No firmware code or memory gate changed.
+
+NOT_RUN: flashing, rig access, physical capture, independent clock measurements
+and on-device qualification (reserved for Phase 06). All requested local tools
+were available. The target tool emitted a missing `/etc/udev/rules.d/00-teensy.rules`
+warning; this did not prevent compilation, and no system configuration changed.
+No task images were supplied or analyzed.
+
 ## Fixed-clock acquisition verification (2026-10-20)
 
 The active Phase 04 acquisition task verifies fixed 600 MHz operation; the
