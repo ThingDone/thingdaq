@@ -88,6 +88,7 @@ class Application {
 // Current production adapter changes software acquisition selections only.
 // Clocks are build-fixed; no runtime clock selection or hardware writes occur.
 // The normal build uses 600 MHz throughout; CONFIGURE cannot change CPU speed.
+// Applied::clocks is compiled metadata, not independent clock-register readback.
 class FixedBuildApplication final : public Application {
  public:
   Record defaults() const override { return kBuildDefaults; }

@@ -19,6 +19,7 @@
 // register surface, including helpers kept in their anonymous namespaces.
 #include "../src/adc_initializer_teensy.cpp"
 #include "../src/adc_trigger_teensy.cpp"
+#include "../src/runtime_timing.h"
 
 namespace {
 
@@ -531,6 +532,74 @@ void testRateAdapterIgnoresLatchedStatusAndPreservesFullDelay() {
   }
 }
 
+void testFixed600MHzProjectionMatchesAcquisitionRegisters() {
+  namespace td = thingdaq;
+  namespace rate = td::variable_rate;
+  resetFakeRegisters();
+  const auto timing = td::runtime_timing::project(td::settings::kBuildDefaults);
+  expect(timing.ok() && timing.cpu.cpu_hz == 600000000U &&
+             timing.cpu.ipg_hz == 150000000U &&
+             timing.cpu.timestamp_hz == 8000000U,
+         "normal build projects fixed 600/150 MHz clocks and 8 MHz timestamps");
+
+  adc::TeensyPlatform converters;
+  const auto settings = timing.adcSettings();
+  expect(settings.adc_clock_hz == 37500000U &&
+             settings.clock_divider == 4U &&
+             timing.calibration_deadline_cycles == adc::kCalibrationDeadlineCycles &&
+             timing.diagnostic_deadline_cycles == trigger::kDiagnosticDeadlineCycles,
+         "ADC calibration and diagnostic budgets match the selected CPU");
+  for (const auto &route : board::kAdcConverterConfigurations) {
+    expect(converters.prepareConverter(route, settings) == adc::PrepareStatus::kOk,
+           "projected ADC settings prepare the fixed converter route");
+  }
+  expect((IMXRT_ADC1.CFG & (ADC_CFG_ADIV(3U) | ADC_CFG_ADICLK(3U))) ==
+             (ADC_CFG_ADIV(1U) | ADC_CFG_ADICLK(1U)) &&
+             IMXRT_ADC1.CFG == IMXRT_ADC2.CFG,
+         "both converters program IPG/2 divided by two");
+
+  rate::TeensyRatePlatform platform;
+  rate::Scheduler scheduler(platform);
+  // Controller::start uses this same legacy enum to apply the public 1 MHz
+  // rate. Compare the actual target path with the independent v3 projection.
+  const auto configured =
+      scheduler.configure(td::protocol_v2::RateProfile::kAdc1mhzGpio1mhz);
+  expect(configured.ok() && scheduler.selected() == timing.schedule &&
+             rate::teensySelectedSchedule() == timing.schedule &&
+             rate::registerReadbackMatches(timing.schedule),
+         "acquisition applies precisely the public timing projection");
+  expect(fake_imxrt::pit_channels[0].LDVAL == 23U &&
+             fake_imxrt::pit_channels[1].LDVAL == 0U &&
+             fake_imxrt::adc_etc.TRIG[0].COUNTER == 0U &&
+             fake_imxrt::adc_etc.TRIG[4].COUNTER == 75U,
+         "1 MHz PIT chain retains the 500 ns ADC1 phase");
+  const auto snapshot = timing.triggerSnapshot();
+  expect(snapshot.completion_expected_delta_cycles == 300U &&
+             snapshot.completion_tolerance_cycles == 120U &&
+             snapshot.gpio_master_rate_hz == 1000000U &&
+             snapshot.pair_rate_hz == 1000000U && !snapshot.ready(),
+         "projected diagnostic expectations never imply measured readiness");
+  trigger::TeensyPlatform triggers;
+  expect(triggers.armFromStopped(false) && triggers.stop() &&
+             rate::registerReadbackMatches(timing.schedule),
+         "trigger owner arms and stops the selected 1 MHz schedule");
+
+  fake_imxrt::f_cpu_actual = 450000000U;
+  expect(!rate::registerReadbackMatches(timing.schedule),
+         "core CPU bookkeeping mismatch rejects target timing");
+  fake_imxrt::f_cpu_actual = 600000000U;
+  fake_imxrt::f_bus_actual = 132000000U;
+  expect(!rate::registerReadbackMatches(timing.schedule) &&
+             converters.prepareConverter(board::kAdcConverterConfigurations[0],
+                                         settings) ==
+                 adc::PrepareStatus::kConfigurationInvalid,
+         "core IPG bookkeeping mismatch rejects trigger and ADC setup");
+  fake_imxrt::f_bus_actual = 150000000U;
+  fake_imxrt::pit_channels[0].LDVAL.reset(5U);
+  expect(!rate::registerReadbackMatches(timing.schedule),
+         "stale historical 4 MHz GPIO divider fails register readback");
+}
+
 int main() {
   testInterruptGuardPreservesCallerAndEarlyReturns();
   testFixedPinModuleRoutesAndLegalResolutionModes();
@@ -539,6 +608,7 @@ int main() {
   testCompletionDiagnosticPollsHardwareStatusWithInterruptsMasked();
   testCombinedRegisterResourcesCoexistWithPriorityIsolation();
   testRateAdapterIgnoresLatchedStatusAndPreservesFullDelay();
+  testFixed600MHzProjectionMatchesAcquisitionRegisters();
   if (failures != 0) {
     std::cerr << failures << " ADC register-adapter assertion(s) failed\n";
     return 1;

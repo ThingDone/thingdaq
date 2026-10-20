@@ -16,6 +16,70 @@ related:
 
 # Runtime clock dependency audit
 
+## Fixed-clock acquisition verification (2026-10-20)
+
+The active Phase 04 acquisition task verifies fixed 600 MHz operation; the
+transition proposals in the historical sections below do not apply.
+`board_profile.h` and `runtime_timing.h` agree with the existing hardware owners.
+No clock adapter, peripheral ownership change, watchdog change or USB change
+is required. Related control-path work remains in [[protocol-v3-upgrade]].
+
+| Consumer checked | Fixed-build result |
+| --- | --- |
+| ADC initialization | Both converters use IPG/2 followed by /2: 150 MHz IPG, 37.5 MHz ADC, 12-bit conversion. The initializer checks core bus bookkeeping and its programmed CFG/gates. |
+| Acquisition scheduler and PIT | `Controller::start` applies `kAdc1mhzGpio1mhz` through the existing scheduler. Its schedule equals the v3 projection: 24 MHz PIT, PIT0 load 23, chained PIT1 load 0; both sampling rates are 1 MHz. |
+| ADC_ETC and completion diagnostic | Queues 0/4 retain channels 7/8, initial delays 0/75 and effective delays 1/76 IPG cycles. The 500 ns phase is four 8 MHz ticks, or 300 DWT cycles with 120-cycle tolerance. |
+| ADC DMA requests | Public v3 explicitly selects ADC_ETC source 23 for ADC1; ADC0 retains source 24. Legacy v2 retains ADC2 source 88. Capture teardown owns disabling the ACK-cleared ETC request after trigger stop. |
+| GPIO capture | Single-bank preparation replaces its historical cached load with the derived schedule; dual-bank preparation also derives the load. Both therefore use load 23 for public acquisition. |
+| DWT budgets | Calibration and ADC/single-bank GPIO stop: 6,000,000 cycles (10 ms). Trigger diagnostic: 1,200,000 cycles (2 ms). ADC DMA alignment: 6,000 cycles (10 us). Existing poll caps and static assertions remain. |
+| GPIO clock diagnostic | Existing rational plan arithmetic uses the fixed build CPU and 24 MHz PIT; the target checks `F_CPU_ACTUAL`. Its legacy 4 MHz diagnostic contract is separate from the 1 MHz acquisition schedule. |
+| Timestamp and epochs | `TeensyTickClock` extends unsigned 32-bit `micros()` deltas and multiplies by eight. With no clock changes, no rebase is needed. Each successful START allocates a new run ID; packers reset source indices and share one epoch. |
+
+The boot ADC trigger snapshot records the legacy boot self-test schedule
+(4 MHz master / 1 MHz ADC). It is retained compatibility/initialization
+evidence, not a report of a later acquisition schedule. The target trigger
+owner uses `teensySelectedSchedule()` when arming production acquisition.
+The v3 projection does not set readiness flags or claim a measured completion.
+
+Clock evidence has distinct limits: `FixedBuildApplication::Applied::clocks`
+echoes compiled profile metadata. `F_CPU_ACTUAL` and `F_BUS_ACTUAL` are core
+bookkeeping, not independent PLL/IPG measurements. Peripheral PIT, ADC_ETC,
+XBAR, CFG and gate checks do read their registers. Nothing here claims
+physical clock or analog aperture qualification.
+
+Extended the existing `adc_register_adapter_test.cpp` fixture to compare the
+real scheduler/ADC/trigger adapters against the public projection, exercise
+1 MHz arm/stop, and reject CPU/IPG bookkeeping mismatches and a stale 4 MHz
+PIT load. Its strict compiler gate exposed two implicit 16-to-8-bit conversions
+in `Projection::triggerSnapshot`; explicit conversions now document the exact
+public loads 23/0. Existing all-tuple tests verify those load bounds.
+
+Validation uses the following local command:
+
+```bash
+TMPDIR="$PWD/.maestro/playbooks/Working" .venv/bin/python -m pytest -q \
+  firmware/tests/test_adc_register_adapter.py \
+  firmware/tests/test_input_rate_clock.py \
+  firmware/tests/test_adc_initializer.py \
+  firmware/tests/test_adc_trigger.py \
+  firmware/tests/test_gpio_register_configuration.py \
+  firmware/tests/test_gpio_clock_diagnostic.py \
+  firmware/tests/test_adc_dma_interrupt_order.py \
+  firmware/tests/test_firmware_runtime.py \
+  firmware/tests/test_v3_layout_runtime.py \
+  firmware/tests/test_runtime_health.py \
+  firmware/tests/test_watchdog_teensy.py \
+  firmware/tests/test_usb_transport.py \
+  --basetemp=.maestro/playbooks/Working/phase04-fixed-acquisition-final
+```
+
+Result: **72 passed, 5 skipped, 31 subtests passed**. The skips cover three
+unsupported fixed-release/equal-rate experiments and two historical 450 MHz
+compressed layouts. `git diff --check` also passed.
+
+Target compilation and physical capture are NOT_RUN for this task; they remain
+separate playbook tasks. No hardware access or task images.
+
 ## Scope correction (2026-10-19)
 
 The user requires a fixed 600 MHz CPU and did not request runtime frequency

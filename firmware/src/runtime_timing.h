@@ -35,8 +35,12 @@ struct Projection {
     value.ipg_clock_hz = cpu.ipg_hz;
     value.gpio_master_rate_hz = schedule.gpio_sample_rate_hz;
     value.pair_rate_hz = schedule.adc_pair_rate_hz;
-    value.gpio_master_pit_load = schedule.gpio_master_pit_load;
-    value.pair_pit_load = schedule.adc_pair_pit_load;
+    // Exact public tuples use loads 23/0, which fit the legacy diagnostic
+    // fields. The general scheduler retains 16-bit loads for historical rates.
+    value.gpio_master_pit_load =
+        static_cast<std::uint8_t>(schedule.gpio_master_pit_load);
+    value.pair_pit_load =
+        static_cast<std::uint8_t>(schedule.adc_pair_pit_load);
     value.predivider = schedule.adc_etc_predivider;
     value.chain_length = schedule.adc_etc_chain_length;
     value.initial_delays = {schedule.adc0_initial_delay, schedule.adc1_initial_delay};
