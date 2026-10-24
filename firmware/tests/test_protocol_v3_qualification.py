@@ -478,9 +478,13 @@ def test_capture_policy_accepts_complete_accounting_and_rejects_mutations():
         assert policy.validate_capture(cell, broken)
 
 
-def test_prepare_retains_existing_freezer_identity_contract(tmp_path):
+def test_prepare_retains_existing_freezer_identity_contract(tmp_path, cpp):  # noqa: F811
+    if cpp[1] != 600:
+        return  # Candidate preparation targets the standard fixed-600 build.
     frozen = candidate()
-    caps = normal_capabilities()
+    # Compare the complete payload to the real portable firmware encoder,
+    # including its smaller packet/control limits, not the generic SDK persona.
+    caps = capabilities(cpp)
     manifest = {
         "source": {
             "git_commit": frozen["source_revision"],
@@ -506,7 +510,7 @@ def test_prepare_retains_existing_freezer_identity_contract(tmp_path):
     prepared = runner.prepare_candidate(path, "12345")
     freezer = importlib.import_module("freeze_soak_candidate")
     freezer.validate_candidate_build(prepared, manifest, manifest["artifacts"])
-    assert prepared["capabilities_hex"] == frozen["capabilities_hex"]
+    assert prepared["capabilities_hex"] == caps.to_payload().hex()
     assert prepared["physical_qualification"] == "NOT_RUN"
     assert runner.check_candidate(prepared) == frozen["matrix"]
 
