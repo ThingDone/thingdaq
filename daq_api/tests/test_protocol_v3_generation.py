@@ -30,6 +30,63 @@ def load() -> dict[str, Any]:
     return json.loads((ROOT / "protocol/protocol-v3.json").read_bytes())
 
 
+def test_flash_tables_survive_partial_use_in_multiple_translation_units(tmp_path):
+    """A TU using only tuples must not discard another TU's clock tables."""
+    first = tmp_path / "tuples.cpp"
+    first.write_text(
+        '#include "generated/protocol_v3_constants.h"\n'
+        "const void* tuples() {\n"
+        "  return thingdaq::protocol_v3::kSelectableConfigurations;\n}\n"
+    )
+    second = tmp_path / "tables.cpp"
+    names = (
+        "DefaultSettings",
+        "CpuProfiles",
+        "RateProfiles",
+        "SelectableConfigurations",
+    )
+    second.write_text(
+        '#include "generated/protocol_v3_constants.h"\n'
+        "#include <cstdio>\nextern const void* tuples();\n"
+        "int main() {\nusing namespace thingdaq::protocol_v3;\n"
+        "if (tuples() != kSelectableConfigurations) return 1;\n"
+        + "".join(
+            f"std::fwrite(k{name}, 1, sizeof(k{name}), stdout);\n" for name in names
+        )
+        + "}\n"
+    )
+    binary = tmp_path / "tables"
+    subprocess.run(
+        [
+            "g++",
+            "-std=c++17",
+            "-O2",
+            "-D__IMXRT1062__",
+            "-ffunction-sections",
+            "-fdata-sections",
+            "-Wl,--gc-sections",
+            f"-I{ROOT / 'firmware/src'}",
+            str(first),
+            str(second),
+            "-o",
+            str(binary),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    result = subprocess.run([str(binary)], check=True, capture_output=True)
+    expected = b"".join(
+        b"".join(records)
+        for records in (
+            v3.DEFAULT_SETTINGS,
+            v3.CPU_PROFILES,
+            v3.RATE_PROFILES,
+            v3.SELECTABLE_CONFIGURATIONS,
+        )
+    )
+    assert result.stdout == expected
+
+
 def validate(contract: dict[str, Any]) -> None:
     old1, bytes1 = GEN.load_contract()
     old2, bytes2 = GEN.load_contract(GEN.V2_SOURCE_PATH)
