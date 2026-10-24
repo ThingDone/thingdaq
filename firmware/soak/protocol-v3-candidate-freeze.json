@@ -733,7 +733,7 @@
       "build_id": "thingdaq-5c7c7201f63665fd",
       "firmware_input_changes": [],
       "firmware_inputs_clean": true,
-      "git_commit": "e1a4988e3fbfb8f7732e42ca22f2c4e42381804a",
+      "git_commit": "8f0c5c2e6260471c9054cbd52086b647c7aeffec",
       "inputs": [
         "firmware/firmware.ino",
         "firmware/src/acquisition_controller.cpp",
@@ -850,12 +850,12 @@
     "build_id": "thingdaq-5c7c7201f63665fd",
     "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
     "path": "firmware/soak/protocol-v3-candidate.json",
-    "sha256": "ffce83593c3465bbb72d1a639e90fe66b9f01e4e65554b9014eccee1ffe2401e",
+    "sha256": "13b4060f6a90d7aecc4f8f93de319f389ed65a74c665f2bd72b6597e28054872",
     "source_id": "5c7c7201f63665fd6769e590f42b7228a13f05ff05e561e535ad042fac01e8e3"
   },
-  "created_utc": "2026-10-24T04:17:12+00:00",
+  "created_utc": "2026-10-24T04:21:32+00:00",
   "protected": {
-    "base_git_commit": "e1a4988e3fbfb8f7732e42ca22f2c4e42381804a",
+    "base_git_commit": "8f0c5c2e6260471c9054cbd52086b647c7aeffec",
     "file_count": 498,
     "files": [
       {
@@ -2400,8 +2400,8 @@
       },
       {
         "path": "firmware/tests/test_protocol_v3_qualification.py",
-        "sha256": "e1f47623d1fbadce5807a91841015052cdbe5156e66cc1764cb9bb52a52efea7",
-        "size_bytes": 36805
+        "sha256": "e1da7d0b5e31935ff3ec0d444539a62b5e77f0b7d5bd5ff0f4c46a94a2806f1e",
+        "size_bytes": 37071
       },
       {
         "path": "firmware/tests/test_rig_adc_capture.py",
@@ -2620,8 +2620,8 @@
       },
       {
         "path": "firmware/tools/qualify_protocol_v3.py",
-        "sha256": "5854e2c575090c11da4cd0f76c0480b8d30352f53c9276599ba34e9c1149c02d",
-        "size_bytes": 17416
+        "sha256": "cdafaae1cc8d46342539fd0789f3ecf4850277acaa989ab12ecdef7dc3f0e5fa",
+        "size_bytes": 18145
       },
       {
         "path": "firmware/tools/read_temperature.py",
@@ -3349,7 +3349,7 @@
         "size_bytes": 173030
       }
     ],
-    "tree_sha256": "da540a2cb687c2f43a6cd467c4646e73c9e369311d3468afdf85cb6c3f5218f6"
+    "tree_sha256": "c9b3b08a525abfd3897a9c397848d084b0b45be058c6f1d42a5682e720a7ad49"
   },
   "reproducibility": {
     "artifacts": [
@@ -3377,36 +3377,36 @@
     "build_count": 2,
     "byte_identical": true,
     "manifest_sha256": {
-      "first": "4ae37f79adda610266b911a0ddc83002ce4d5bce8e6368af97204c4f8de52c58",
-      "second": "4ae37f79adda610266b911a0ddc83002ce4d5bce8e6368af97204c4f8de52c58"
+      "first": "85cd32689b1fa4aaf1eef0dfe764c148607b902c77909c01314f74187bd655c4",
+      "second": "85cd32689b1fa4aaf1eef0dfe764c148607b902c77909c01314f74187bd655c4"
     }
   },
   "schema_version": 1,
   "staged": {
-    "directory": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen",
+    "directory": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen",
     "files": [
       {
-        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/build-manifest.json",
-        "sha256": "4ae37f79adda610266b911a0ddc83002ce4d5bce8e6368af97204c4f8de52c58",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/build-manifest.json",
+        "sha256": "85cd32689b1fa4aaf1eef0dfe764c148607b902c77909c01314f74187bd655c4",
         "size_bytes": 55667
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.elf",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/firmware.ino.elf",
         "sha256": "f7804fe18bd79e213a91e9b16a898614180e74e043c59a622559820740789fde",
         "size_bytes": 2844540
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.hex",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/firmware.ino.hex",
         "sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
         "size_bytes": 521404
       },
       {
-        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.map",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/firmware.ino.map",
         "sha256": "699afc94cddb5385842b6cefb31c1bdaee3219ef6ef1490791a52ff93debdbe5",
         "size_bytes": 1130316
       }

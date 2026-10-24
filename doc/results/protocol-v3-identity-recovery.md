@@ -57,6 +57,37 @@ The old header fails linking with missing default/CPU/rate tables; the corrected
 header links and emits every table byte exactly. All 66 generator tests pass.
 The corrected target ELF also places both CPU and rate tables in program flash.
 
+## Candidate capability projection correction
+
+The first corrected-firmware job `a2c51df7-2a57-4fac-95dd-dce71eba684e` returned
+the exact expected live identity, public v3, serial `20428100`, and 600 MHz.
+Its overall result remains **FAIL** because the full capabilities differed.
+All defaults, clocks, rates and 48 configurations matched; seven maximum-size
+fields in the candidate had incorrectly inherited generic SDK limits.
+
+| Limit | Actual firmware | Incorrect candidate |
+| --- | ---: | ---: |
+| Data frame bytes | 4096 | 4108 |
+| Control frame bytes | 1536 | 2048 |
+| Logical payload bytes | 4036 | 4048 |
+| Encoded sample bytes | 4036 | 4048 |
+| ADC pairs | 1009 | 1012 |
+| GPIO8 samples | 4036 | 4048 |
+| GPIO16 samples | 2018 | 2024 |
+
+`prepare_candidate` now derives those limits from the existing v1 packet and
+v2 control capacities, reserving the v3 envelope/prefix, as the firmware does.
+Its regression compares the **entire payload** with the portable C++ firmware
+encoder: FAIL before the correction, PASS after; all 74 qualification tests pass.
+The exact-capability acceptance gate was preserved. This is a candidate-runner
+correction, not an increase or reduction of firmware capabilities.
+
+The intermediate candidate/lock are archived as
+`firmware/soak/history/*-20261024-link-only.json`. Final provenance requires
+revision `8f0c5c2`, so two fresh standard builds were made there. Their exported
+firmware bytes match the intermediate corrected image exactly; their manifests
+bind the updated clean revision. No earlier PASS is transplanted into this freeze.
+
 ## Replacement freeze
 
 The active manifests remain `firmware/soak/protocol-v3-candidate.json` and
@@ -67,18 +98,18 @@ remain bound to their original candidate and are not replacement acceptance.
 
 | Field | Replacement |
 | --- | --- |
-| Source revision | `e1a4988` (full revision in candidate) |
+| Source revision | `8f0c5c2` (full revision in candidate) |
 | Build ID | `thingdaq-5c7c7201f63665fd` |
 | HEX SHA-256 | `33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a` |
-| Artifact root | `.maestro/playbooks/Working/phase06-candidate-20261024/` |
+| Artifact root | `.maestro/playbooks/Working/phase06-candidate-20261024-final/` |
 | Expected hardware serial | `20428100` |
 | Target | `teensy:avr:teensy40:usb=serial,speed=600,opt=o2std` |
 
 Two clean builds reproduced HEX/ELF/MAP/EEP and the manifest exactly. Both passed
 existing placement, allocation-ownership, RAM1 (33,024-byte locals headroom) and
 RAM2 (4,096-byte heap headroom) gates. The freeze protects 498 files and retains
-15 artifacts, with the unchanged 63-job matrix. SDK, schema, and runner hashes
-remain unchanged; the exact validated wheel/sdist bytes are reused because no
+15 artifacts, with the unchanged 63-job matrix. SDK and schema hashes remain unchanged; the candidate runner hash includes
+`0ce06c6` and its regression is `8f0c5c2`; the exact validated wheel/sdist bytes are reused because no
 package input changed. Toolchain remains Arduino CLI 1.4.1, Teensy core 1.62.0,
 and Arm GNU 15.2.1. Defaults remain fixed 600 MHz, 1 MHz ADC/GPIO, auxiliary
 DISABLED, GPIO RLE_AUTO, ADC PACK12.
@@ -87,7 +118,11 @@ Recovery evidence is retained under
 `.maestro/playbooks/Working/phase06-identity-recovery-20261024/`. Each accepted
 job has its own saved submission/job ID and result; HTTP uses the established
 runner with queue-aware timeouts and 30-second/ten-minute 5xx recovery.
-No acquisition or compatibility measurement has run.
+The full host suite passed **2,649 tests, five expected skips** in 304.37 seconds
+for the table correction. After the runner correction, all **74 affected tests**
+passed in 21.86 seconds. Generator drift, lint/format, whitespace, and 11
+documentation/layout tests passed. No acquisition or compatibility measurement
+has run.
 
 Use the active candidate's artifact paths, not the superseded Phase 05 paths:
 
