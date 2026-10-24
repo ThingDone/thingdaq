@@ -6,10 +6,12 @@
 #include <cstdint>
 
 // Keep discovery-only tables out of the bounded DTCM packet/stack budget.
+// Each inline object needs its own COMDAT section: partial use in another
+// translation unit must not discard unrelated tables during linking.
 #if defined(__IMXRT1062__)
-#define THINGDAQ_V3_TABLE_DATA __attribute__((section(".progmem.protocol_v3.tables")))
+#define THINGDAQ_V3_TABLE_DATA(name) __attribute__((section(".progmem.protocol_v3." name)))
 #else
-#define THINGDAQ_V3_TABLE_DATA
+#define THINGDAQ_V3_TABLE_DATA(name)
 #endif
 
 namespace thingdaq::protocol_v3 {
@@ -354,20 +356,20 @@ enum class Encoding : std::uint8_t {
   kAdcPack12 = 2U,
 };
 
-inline constexpr std::uint8_t kDefaultSettings[][20] THINGDAQ_V3_TABLE_DATA = {
+inline constexpr std::uint8_t kDefaultSettings[][20] THINGDAQ_V3_TABLE_DATA("DEFAULT_SETTINGS") = {
   {3U, 0U, 1U, 3U, 1U, 4U, 0U, 8U, 1U, 1U, 12U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U},
 };
 
-inline constexpr std::uint8_t kCpuProfiles[][24] THINGDAQ_V3_TABLE_DATA = {
+inline constexpr std::uint8_t kCpuProfiles[][24] THINGDAQ_V3_TABLE_DATA("CPU_PROFILES") = {
   {1U, 0U, 0U, 0U, 0U, 70U, 195U, 35U, 128U, 209U, 240U, 8U, 96U, 52U, 60U, 2U, 0U, 54U, 110U, 1U, 0U, 18U, 122U, 0U},
   {2U, 0U, 0U, 0U, 128U, 116U, 210U, 26U, 128U, 209U, 240U, 8U, 96U, 52U, 60U, 2U, 0U, 54U, 110U, 1U, 0U, 18U, 122U, 0U},
 };
 
-inline constexpr std::uint8_t kRateProfiles[][20] THINGDAQ_V3_TABLE_DATA = {
+inline constexpr std::uint8_t kRateProfiles[][20] THINGDAQ_V3_TABLE_DATA("RATE_PROFILES") = {
   {4U, 0U, 0U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U, 8U, 0U, 8U, 0U, 4U, 0U, 0U, 0U},
 };
 
-inline constexpr std::uint8_t kSelectableConfigurations[][20] THINGDAQ_V3_TABLE_DATA = {
+inline constexpr std::uint8_t kSelectableConfigurations[][20] THINGDAQ_V3_TABLE_DATA("SELECTABLE_CONFIGURATIONS") = {
   {1U, 0U, 1U, 3U, 1U, 4U, 0U, 8U, 0U, 0U, 12U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U},
   {1U, 1U, 1U, 3U, 1U, 4U, 0U, 8U, 0U, 0U, 12U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U},
   {2U, 0U, 1U, 3U, 1U, 4U, 0U, 8U, 0U, 0U, 12U, 0U, 64U, 66U, 15U, 0U, 64U, 66U, 15U, 0U},

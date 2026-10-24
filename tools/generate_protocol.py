@@ -1560,10 +1560,12 @@ def render_cpp_v3(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         "#include <cstdint>",
         "",
         "// Keep discovery-only tables out of the bounded DTCM packet/stack budget.",
+        "// Each inline object needs its own COMDAT section: partial use in another",
+        "// translation unit must not discard unrelated tables during linking.",
         "#if defined(__IMXRT1062__)",
-        '#define THINGDAQ_V3_TABLE_DATA __attribute__((section(".progmem.protocol_v3.tables")))',
+        '#define THINGDAQ_V3_TABLE_DATA(name) __attribute__((section(".progmem.protocol_v3." name)))',
         "#else",
-        "#define THINGDAQ_V3_TABLE_DATA",
+        "#define THINGDAQ_V3_TABLE_DATA(name)",
         "#endif",
         "",
         "namespace thingdaq::protocol_v3 {",
@@ -1581,7 +1583,7 @@ def render_cpp_v3(contract: Mapping[str, Any], source_sha256: str) -> bytes:
         lines.extend(cpp_enum(name, f"std::uint{bits}_t", entries))
     for name, records in v3_record_tables(contract).items():
         lines.append(
-            f"inline constexpr std::uint8_t k{snake_to_pascal(name)}[][{len(records[0])}] THINGDAQ_V3_TABLE_DATA = {{"
+            f'inline constexpr std::uint8_t k{snake_to_pascal(name)}[][{len(records[0])}] THINGDAQ_V3_TABLE_DATA("{name}") = {{'
         )
         lines.extend(
             "  {" + ", ".join(f"{b}U" for b in record) + "}," for record in records
