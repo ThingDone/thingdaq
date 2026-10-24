@@ -1,8 +1,9 @@
 {
   "artifact": {
     "name": "firmware.ino.hex",
-    "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.hex",
-    "sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7"
+    "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.hex",
+    "sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+    "size_bytes": 521404
   },
   "board": {
     "board_id": 1,
@@ -10,27 +11,22 @@
     "hardware_serial": "20428100",
     "mcu_id": 1
   },
-  "board_identity_reference": {
-    "path": "doc/results/experiments/clock600-fixed-endurance-20261018.json",
-    "status": "historical rig target; live public-v3 identity verification pending Phase 06"
-  },
-  "build_manifest_path": ".maestro/playbooks/Working/phase05-freeze/frozen/build-manifest.json",
-  "build_manifest_sha256": "e629c55af5bfd14517e2191e59a0ffabef66af0ded18eeb9322e9c96bce94b3f",
+  "build_manifest_path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/build-manifest.json",
+  "build_manifest_sha256": "4ae37f79adda610266b911a0ddc83002ce4d5bce8e6368af97204c4f8de52c58",
   "capabilities_hex": "00000000010130000c10000000080000d00f0000d00f0000f4030000d00f0000e8070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
   "firmware": {
-    "build_id": "thingdaq-67539aafb5b130a5",
-    "source_id": "67539aafb5b130a5598aae353e16ec988593d71ad7dbb14dbfe240cf8caf15bc",
+    "build_id": "thingdaq-5c7c7201f63665fd",
+    "source_id": "5c7c7201f63665fd6769e590f42b7228a13f05ff05e561e535ad042fac01e8e3",
     "version": [
       1,
       2,
       0
     ]
   },
-  "firmware_sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
-  "freeze_lock_path": "firmware/soak/protocol-v3-candidate-freeze.json",
+  "firmware_sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
   "identity": {
     "board_id": 1,
-    "build_id": "thingdaq-67539aafb5b130a5",
+    "build_id": "thingdaq-5c7c7201f63665fd",
     "firmware_version": "1.2.0",
     "hardware_serial": "20428100",
     "mcu_id": 1
@@ -545,8 +541,8 @@
   },
   "retained_artifacts": {
     "build_manifest": {
-      "path": ".maestro/playbooks/Working/phase05-freeze/frozen/build-manifest.json",
-      "sha256": "e629c55af5bfd14517e2191e59a0ffabef66af0ded18eeb9322e9c96bce94b3f",
+      "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/build-manifest.json",
+      "sha256": "4ae37f79adda610266b911a0ddc83002ce4d5bce8e6368af97204c4f8de52c58",
       "size_bytes": 55667
     },
     "distributions": [
@@ -563,64 +559,64 @@
     ],
     "firmware": [
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.elf",
-        "sha256": "8588c3e54a092b78c2afc9f175fe9f2002210ebc22f5d95540de0f0c6708c0c5",
-        "size_bytes": 2844392
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.elf",
+        "sha256": "f7804fe18bd79e213a91e9b16a898614180e74e043c59a622559820740789fde",
+        "size_bytes": 2844540
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.hex",
-        "sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.hex",
+        "sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
         "size_bytes": 521404
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.map",
-        "sha256": "22a877e2e24596a770415c341bc8b0decef044122d1222ed56f86075feb5277b",
-        "size_bytes": 1128290
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.map",
+        "sha256": "699afc94cddb5385842b6cefb31c1bdaee3219ef6ef1490791a52ff93debdbe5",
+        "size_bytes": 1130316
       }
     ],
     "inputs": [
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/inputs/firmware/tests/rig_protocol_v3_qualification.py",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/inputs/firmware/tests/rig_protocol_v3_qualification.py",
         "sha256": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
         "size_bytes": 21354
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/inputs/firmware/tools/protocol_v3_qualification.py",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/inputs/firmware/tools/protocol_v3_qualification.py",
         "sha256": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
         "size_bytes": 18620
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/inputs/firmware/tools/qualify_protocol_v3.py",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/inputs/firmware/tools/qualify_protocol_v3.py",
         "sha256": "5854e2c575090c11da4cd0f76c0480b8d30352f53c9276599ba34e9c1149c02d",
         "size_bytes": 17416
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/inputs/firmware/tools/run_input_isolation.py",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/inputs/firmware/tools/run_input_isolation.py",
         "sha256": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5",
         "size_bytes": 31370
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/inputs/protocol/protocol-v1.json",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/inputs/protocol/protocol-v1.json",
         "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
         "size_bytes": 104550
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/inputs/protocol/protocol-v2.json",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/inputs/protocol/protocol-v2.json",
         "sha256": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
         "size_bytes": 148848
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/inputs/protocol/protocol-v3.json",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/inputs/protocol/protocol-v3.json",
         "sha256": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c",
         "size_bytes": 119358
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/inputs/sdk.zip",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/inputs/sdk.zip",
         "sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
         "size_bytes": 294298
       }
@@ -628,5 +624,5 @@
   },
   "schema_version": 1,
   "source_dirty": false,
-  "source_revision": "eb8a890da5646ff18074a9103678b8e6acc0c900"
+  "source_revision": "e1a4988e3fbfb8f7732e42ca22f2c4e42381804a"
 }

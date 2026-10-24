@@ -19,6 +19,11 @@ related:
 
 # Frozen public protocol v3 release candidate
 
+**Historical Phase 05 freeze, superseded on 2026-10-24.** The active candidate
+and artifact paths are documented in [[protocol-v3-identity-recovery]]. The
+original manifests are retained under `firmware/soak/history/*-20261020.json`;
+the commands and identities below describe that historical candidate.
+
 **Physical qualification: NOT_RUN. Release approval: pending Phase 06.**
 No rig request, flash, physical capture or remote package publication occurred
 at this checkpoint.

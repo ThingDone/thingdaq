@@ -714,9 +714,9 @@
     "memory_usage": {
       "flash": {
         "code_bytes": 148964,
-        "data_bytes": 27968,
+        "data_bytes": 28036,
         "free_for_files_bytes": 1846276,
-        "headers_bytes": 8408
+        "headers_bytes": 8340
       },
       "ram1": {
         "code_bytes": 32664,
@@ -730,10 +730,10 @@
       }
     },
     "source": {
-      "build_id": "thingdaq-67539aafb5b130a5",
+      "build_id": "thingdaq-5c7c7201f63665fd",
       "firmware_input_changes": [],
       "firmware_inputs_clean": true,
-      "git_commit": "eb8a890da5646ff18074a9103678b8e6acc0c900",
+      "git_commit": "e1a4988e3fbfb8f7732e42ca22f2c4e42381804a",
       "inputs": [
         "firmware/firmware.ino",
         "firmware/src/acquisition_controller.cpp",
@@ -838,24 +838,24 @@
         "protocol/protocol-v2.json",
         "protocol/protocol-v3.json"
       ],
-      "source_id": "67539aafb5b130a5598aae353e16ec988593d71ad7dbb14dbfe240cf8caf15bc",
-      "timestamp_epoch": 1792475625,
+      "source_id": "5c7c7201f63665fd6769e590f42b7228a13f05ff05e561e535ad042fac01e8e3",
+      "timestamp_epoch": 1792815371,
       "timestamp_policy": "SOURCE_DATE_EPOCH when set; otherwise latest Git commit affecting firmware inputs",
-      "timestamp_utc": "2026-10-20T05:53:45Z"
+      "timestamp_utc": "2026-10-24T04:16:11Z"
     }
   },
   "candidate": {
     "artifact_name": "firmware.ino.hex",
-    "artifact_sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
-    "build_id": "thingdaq-67539aafb5b130a5",
+    "artifact_sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+    "build_id": "thingdaq-5c7c7201f63665fd",
     "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
     "path": "firmware/soak/protocol-v3-candidate.json",
-    "sha256": "4781d273db15091039b841b51680a31143b02a6eec4d94ac23ec2898634540b4",
-    "source_id": "67539aafb5b130a5598aae353e16ec988593d71ad7dbb14dbfe240cf8caf15bc"
+    "sha256": "ffce83593c3465bbb72d1a639e90fe66b9f01e4e65554b9014eccee1ffe2401e",
+    "source_id": "5c7c7201f63665fd6769e590f42b7228a13f05ff05e561e535ad042fac01e8e3"
   },
-  "created_utc": "2026-10-20T06:41:11+00:00",
+  "created_utc": "2026-10-24T04:17:12+00:00",
   "protected": {
-    "base_git_commit": "eb8a890da5646ff18074a9103678b8e6acc0c900",
+    "base_git_commit": "e1a4988e3fbfb8f7732e42ca22f2c4e42381804a",
     "file_count": 498,
     "files": [
       {
@@ -1280,8 +1280,8 @@
       },
       {
         "path": "daq_api/tests/test_protocol_v3_generation.py",
-        "sha256": "082ff54839ab6c5c8ae7d8aac6f2fb4965121ae8a437b1916b079fb542e0eaff",
-        "size_bytes": 12523
+        "sha256": "bba0e6001405ab76dc617237cd1e6c4899f48321e44117e99265d45ba6404537",
+        "size_bytes": 14284
       },
       {
         "path": "daq_api/tests/test_protocol_vectors_exhaustive.py",
@@ -1580,8 +1580,8 @@
       },
       {
         "path": "firmware/src/generated/protocol_v3_constants.h",
-        "sha256": "e70d63a68a50a2b846e5b577ffb22dd9c33fc224205ca2eb1440ff5c3c080b4c",
-        "size_bytes": 24371
+        "sha256": "c1b1011d6143a9a49a48d78fbd290e0146304c779651dacfb43dcb0a0142edc8",
+        "size_bytes": 24609
       },
       {
         "path": "firmware/src/gpio_batch_packer.cpp",
@@ -3345,11 +3345,11 @@
       },
       {
         "path": "tools/generate_protocol.py",
-        "sha256": "d2c524f6ec2b70f6895a2d4abee09f9924fb688138bc8817c014d94ef5535f6d",
-        "size_bytes": 172842
+        "sha256": "8f28742569b0d162b9c2e60bdbbc2da39ea36223a66768f77f1eede8c9036426",
+        "size_bytes": 173030
       }
     ],
-    "tree_sha256": "3abd0fc8fa5c69556b9d8a576bb2068097e60f3633a23f35e0b43a417fd52471"
+    "tree_sha256": "da540a2cb687c2f43a6cd467c4646e73c9e369311d3468afdf85cb6c3f5218f6"
   },
   "reproducibility": {
     "artifacts": [
@@ -3360,55 +3360,55 @@
       },
       {
         "path": "firmware.ino.elf",
-        "sha256": "8588c3e54a092b78c2afc9f175fe9f2002210ebc22f5d95540de0f0c6708c0c5",
-        "size_bytes": 2844392
+        "sha256": "f7804fe18bd79e213a91e9b16a898614180e74e043c59a622559820740789fde",
+        "size_bytes": 2844540
       },
       {
         "path": "firmware.ino.hex",
-        "sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
+        "sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
         "size_bytes": 521404
       },
       {
         "path": "firmware.ino.map",
-        "sha256": "22a877e2e24596a770415c341bc8b0decef044122d1222ed56f86075feb5277b",
-        "size_bytes": 1128290
+        "sha256": "699afc94cddb5385842b6cefb31c1bdaee3219ef6ef1490791a52ff93debdbe5",
+        "size_bytes": 1130316
       }
     ],
     "build_count": 2,
     "byte_identical": true,
     "manifest_sha256": {
-      "first": "e629c55af5bfd14517e2191e59a0ffabef66af0ded18eeb9322e9c96bce94b3f",
-      "second": "e629c55af5bfd14517e2191e59a0ffabef66af0ded18eeb9322e9c96bce94b3f"
+      "first": "4ae37f79adda610266b911a0ddc83002ce4d5bce8e6368af97204c4f8de52c58",
+      "second": "4ae37f79adda610266b911a0ddc83002ce4d5bce8e6368af97204c4f8de52c58"
     }
   },
   "schema_version": 1,
   "staged": {
-    "directory": ".maestro/playbooks/Working/phase05-freeze/frozen",
+    "directory": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen",
     "files": [
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/build-manifest.json",
-        "sha256": "e629c55af5bfd14517e2191e59a0ffabef66af0ded18eeb9322e9c96bce94b3f",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/build-manifest.json",
+        "sha256": "4ae37f79adda610266b911a0ddc83002ce4d5bce8e6368af97204c4f8de52c58",
         "size_bytes": 55667
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.eep",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.eep",
         "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
         "size_bytes": 34
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.elf",
-        "sha256": "8588c3e54a092b78c2afc9f175fe9f2002210ebc22f5d95540de0f0c6708c0c5",
-        "size_bytes": 2844392
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.elf",
+        "sha256": "f7804fe18bd79e213a91e9b16a898614180e74e043c59a622559820740789fde",
+        "size_bytes": 2844540
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.hex",
-        "sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.hex",
+        "sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
         "size_bytes": 521404
       },
       {
-        "path": ".maestro/playbooks/Working/phase05-freeze/frozen/firmware.ino.map",
-        "sha256": "22a877e2e24596a770415c341bc8b0decef044122d1222ed56f86075feb5277b",
-        "size_bytes": 1128290
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024/frozen/firmware.ino.map",
+        "sha256": "699afc94cddb5385842b6cefb31c1bdaee3219ef6ef1490791a52ff93debdbe5",
+        "size_bytes": 1130316
       }
     ]
   }
