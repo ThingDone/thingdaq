@@ -18,7 +18,35 @@ related:
 The original frozen candidate faults during global runtime construction because
 its clock-table reference resolves to address zero. The generator correction is
 pushed in `b5869d5`; independent regression coverage is in `e1a4988`.
-**Replacement live identity: pending. Physical measurements: NOT_RUN.**
+**PASS: replacement live identity and exact capabilities verified.**
+Physical measurements and supported-release promotion remain **NOT_RUN**.
+
+## Verified live prerequisite
+
+Final job `240ddb26-7a67-4218-9ba8-ce9e2d74a9e6` flashed the frozen image and
+passed the unchanged identity/capability worker with **zero capture cycles**.
+INFO reported physical Teensy 4.0 / i.MX RT1062 (board/MCU 1/1), serial
+`20428100`, firmware 1.2.0, public protocol 3, and build
+`thingdaq-5c7c7201f63665fd`. Its clock metadata reports CPU 600 MHz, IPG 150 MHz,
+PIT 24 MHz, ADC 37.5 MHz, and timestamp 8 MHz. The complete capability payload,
+including all 48 advertised configurations and all limits, matches the candidate.
+These are advertised clocks; independent register and acquisition checks remain
+in the following playbook tasks.
+
+Canonical final candidate SHA-256:
+`13b4060f6a90d7aecc4f8f93de319f389ed65a74c665f2bd72b6597e28054872`.
+The worker returned exit 0 and PASS; service health passed afterward.
+Machine-readable results, all diagnostic job IDs/results, original failures,
+artifact hashes, and retained-evidence hashes are in
+[protocol-v3-identity-recovery.json](protocol-v3-identity-recovery.json).
+
+To inspect the completed result without submitting another job:
+
+```bash
+.venv/bin/python \
+  .maestro/playbooks/Working/phase06-identity-recovery-20261024/verify_final_identity.py \
+  --resume
+```
 
 ## Diagnosis and retained failures
 

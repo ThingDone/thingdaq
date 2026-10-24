@@ -1,0 +1,1047 @@
+{
+  "availability": {
+    "after": {
+      "checks": {
+        "coordinator_mode": "normal",
+        "docker_reachable": true,
+        "hub_reachable": true,
+        "hubs": {
+          "0x00000000": true
+        },
+        "queue_depth": 0,
+        "worker_thread_alive": true
+      },
+      "status": "healthy"
+    },
+    "before": {
+      "checks": {
+        "coordinator_mode": "normal",
+        "docker_reachable": true,
+        "hub_reachable": true,
+        "hubs": {
+          "0x00000000": true
+        },
+        "queue_depth": 0,
+        "worker_thread_alive": true
+      },
+      "status": "healthy"
+    },
+    "version": {
+      "api": "v1",
+      "service": "remote-firmware-testing",
+      "version": "1.2.0"
+    }
+  },
+  "candidate": {
+    "firmware_sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+    "freeze": {
+      "artifact_sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+      "build_id": "thingdaq-5c7c7201f63665fd",
+      "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+      "protected_file_count": 498,
+      "protected_tree_sha256": "c9b3b08a525abfd3897a9c397848d084b0b45be058c6f1d42a5682e720a7ad49",
+      "result": "PASS",
+      "source_id": "5c7c7201f63665fd6769e590f42b7228a13f05ff05e561e535ad042fac01e8e3",
+      "staged_directory": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen"
+    },
+    "identity": {
+      "board_id": 1,
+      "build_id": "thingdaq-5c7c7201f63665fd",
+      "firmware_version": "1.2.0",
+      "hardware_serial": "20428100",
+      "mcu_id": 1
+    },
+    "inputs": {
+      "runner_sha256": {
+        "firmware/tests/rig_protocol_v3_qualification.py": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+        "firmware/tools/protocol_v3_qualification.py": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+        "firmware/tools/qualify_protocol_v3.py": "cdafaae1cc8d46342539fd0789f3ecf4850277acaa989ab12ecdef7dc3f0e5fa",
+        "firmware/tools/run_input_isolation.py": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5"
+      },
+      "schema_sha256": {
+        "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+        "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+      },
+      "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+      "sdk_version": "1.2.0"
+    },
+    "matrix_jobs": 63,
+    "path": "firmware/soak/protocol-v3-candidate.json",
+    "retained_artifacts_checked": [
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/firmware.ino.eep",
+        "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+        "size_bytes": 34
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/firmware.ino.elf",
+        "sha256": "f7804fe18bd79e213a91e9b16a898614180e74e043c59a622559820740789fde",
+        "size_bytes": 2844540
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/firmware.ino.hex",
+        "sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+        "size_bytes": 521404
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/firmware.ino.map",
+        "sha256": "699afc94cddb5385842b6cefb31c1bdaee3219ef6ef1490791a52ff93debdbe5",
+        "size_bytes": 1130316
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/frozen/build-manifest.json",
+        "sha256": "85cd32689b1fa4aaf1eef0dfe764c148607b902c77909c01314f74187bd655c4",
+        "size_bytes": 55667
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/inputs/firmware/tests/rig_protocol_v3_qualification.py",
+        "sha256": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+        "size_bytes": 21354
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/inputs/firmware/tools/protocol_v3_qualification.py",
+        "sha256": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+        "size_bytes": 18620
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/inputs/firmware/tools/qualify_protocol_v3.py",
+        "sha256": "cdafaae1cc8d46342539fd0789f3ecf4850277acaa989ab12ecdef7dc3f0e5fa",
+        "size_bytes": 18145
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/inputs/firmware/tools/run_input_isolation.py",
+        "sha256": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5",
+        "size_bytes": 31370
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/inputs/protocol/protocol-v1.json",
+        "sha256": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "size_bytes": 104550
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/inputs/protocol/protocol-v2.json",
+        "sha256": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+        "size_bytes": 148848
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/inputs/protocol/protocol-v3.json",
+        "sha256": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c",
+        "size_bytes": 119358
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/inputs/sdk.zip",
+        "sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+        "size_bytes": 294298
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase05-freeze/distributions/thingdone_daq-1.2.0-py3-none-any.whl",
+        "sha256": "8ba2f35029405407582ef699e4cad3b2d3a210c93d11ffc0b64cff3eb36ee51c",
+        "size_bytes": 315618
+      },
+      {
+        "path": ".maestro/playbooks/Working/phase05-freeze/distributions/thingdone_daq-1.2.0.tar.gz",
+        "sha256": "701d4559e426591683eae72773c78d88de80d38e24c30516d860767dbbd0f22f",
+        "size_bytes": 346157
+      }
+    ],
+    "sha256": "13b4060f6a90d7aecc4f8f93de319f389ed65a74c665f2bd72b6597e28054872",
+    "source_revision": "8f0c5c2e6260471c9054cbd52086b647c7aeffec"
+  },
+  "corrections": [
+    {
+      "cause": "shared COMDAT section discarded CPU/rate tables; startup constructor loads address zero",
+      "fault_pc": "0x60008abc",
+      "production_commit": "b5869d5",
+      "regression_after": "PASS",
+      "regression_before": "FAIL",
+      "regression_commit": "e1a4988"
+    },
+    {
+      "cause": "candidate capabilities inherited generic rather than physical frame limits",
+      "production_commit": "0ce06c6",
+      "regression_after": "PASS",
+      "regression_before": "FAIL",
+      "regression_commit": "8f0c5c2"
+    }
+  ],
+  "created_utc": "2026-10-24T04:23:57.367441+00:00",
+  "historical_failure": {
+    "job_id": "20005b76-64a0-43c3-88a8-347d7676d2c9",
+    "reconciled_status": {
+      "message": "Test completed",
+      "status": "success"
+    },
+    "report": "doc/results/protocol-v3-rig-verification.json",
+    "result": "FAIL"
+  },
+  "jobs": [
+    {
+      "board": "teensy:avr:teensy40",
+      "completed": true,
+      "directory": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job",
+      "exit_code": 1,
+      "hub_port": 15,
+      "program_success": true,
+      "provenance": {
+        "candidate_sha256": "4781d273db15091039b841b51680a31143b02a6eec4d94ac23ec2898634540b4",
+        "cell": {
+          "cycles": 0,
+          "id": "preflight-identity-only",
+          "kind": "smoke",
+          "seconds": 0,
+          "settings_hex": "010001030104000800000c0040420f0040420f00"
+        },
+        "firmware_sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
+        "inputs": {
+          "runner_sha256": {
+            "firmware/tests/rig_protocol_v3_qualification.py": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+            "firmware/tools/protocol_v3_qualification.py": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+            "firmware/tools/qualify_protocol_v3.py": "5854e2c575090c11da4cd0f76c0480b8d30352f53c9276599ba34e9c1149c02d",
+            "firmware/tools/run_input_isolation.py": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5"
+          },
+          "schema_sha256": {
+            "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+            "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+            "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+          },
+          "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+          "sdk_version": "1.2.0"
+        },
+        "planned_program_seconds": 36,
+        "program_sha256": "177de0cc0c6306ef265c1fe934544bb1b0d4175b26b8bcc87ceba866820be6dc",
+        "scope": "identity-only; not a qualification matrix cell",
+        "service": "http://192.168.150.14:5000"
+      },
+      "stdout": "Teensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/e0789e19-da36-4883-9698-9222ec3a1d9e/firmware.ino.hex\": 185344 bytes, 9.1% usage\nSoft reboot performed\nWaiting for Teensy device...\n (hint: press the reset button)\nFound HalfKay Bootloader\nRead \"/remote_firmware_testing/work_results/e0789e19-da36-4883-9698-9222ec3a1d9e/firmware.ino.hex\": 185344 bytes, 9.1% usage\nProgramming..................................................................................................................................................................................\nBooting\nQUALIFICATION {\"candidate_sha256\": \"4781d273db15091039b841b51680a31143b02a6eec4d94ac23ec2898634540b4\", \"captures\": [], \"cell\": {\"cycles\": 0, \"id\": \"preflight-identity-only\", \"kind\": \"smoke\", \"seconds\": 0, \"settings_hex\": \"010001030104000800000c0040420f0040420f00\"}, \"cell_id\": \"preflight-identity-only\", \"error\": \"CommandTimeoutError: INFO_REQUEST request 166788245 exceeded 0.999998 seconds\", \"failure_oracle\": {\"adc\": {\"encoded_bytes\": 0, \"encodings\": {}, \"end_item\": 0, \"first_host_seconds\": 0, \"first_ticks\": 0, \"frames\": 0, \"gap_items\": 0, \"items\": 0, \"last_host_seconds\": 0, \"last_ticks\": 0, \"logical_bytes\": 0, \"next_sequence\": 0, \"run_ids\": [], \"sample_checks\": 0, \"samples\": [], \"versions\": [], \"wire_bytes\": 0}, \"control_samples\": [], \"errors\": 0, \"gpio\": {\"encoded_bytes\": 0, \"encodings\": {}, \"end_item\": 0, \"first_host_seconds\": 0, \"first_ticks\": 0, \"frames\": 0, \"gap_items\": 0, \"items\": 0, \"last_host_seconds\": 0, \"last_ticks\": 0, \"logical_bytes\": 0, \"next_sequence\": 0, \"run_ids\": [], \"sample_checks\": 0, \"samples\": [], \"versions\": [], \"wire_bytes\": 0}, \"partial_bytes\": 0, \"raw_bytes\": 0, \"raw_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"}, \"outcome\": \"FAIL\", \"physical\": false, \"rejections\": []}\n",
+      "test_id": "e0789e19-da36-4883-9698-9222ec3a1d9e"
+    },
+    {
+      "board": "teensy:avr:teensy40",
+      "completed": true,
+      "directory": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job",
+      "exit_code": 1,
+      "hub_port": 15,
+      "program_success": true,
+      "provenance": {
+        "candidate_sha256": "4781d273db15091039b841b51680a31143b02a6eec4d94ac23ec2898634540b4",
+        "cell": {
+          "cycles": 0,
+          "id": "preflight-identity-only",
+          "kind": "smoke",
+          "seconds": 0,
+          "settings_hex": "010001030104000800000c0040420f0040420f00"
+        },
+        "firmware_sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
+        "inputs": {
+          "runner_sha256": {
+            "firmware/tests/rig_protocol_v3_qualification.py": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+            "firmware/tools/protocol_v3_qualification.py": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+            "firmware/tools/qualify_protocol_v3.py": "5854e2c575090c11da4cd0f76c0480b8d30352f53c9276599ba34e9c1149c02d",
+            "firmware/tools/run_input_isolation.py": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5"
+          },
+          "schema_sha256": {
+            "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+            "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+            "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+          },
+          "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+          "sdk_version": "1.2.0"
+        },
+        "planned_program_seconds": 36,
+        "program_sha256": "413ce9548d734fc2e5993c9506a176d74028991bfc14ef42911aec8f35753558",
+        "scope": "identity-only; not a qualification matrix cell",
+        "service": "http://192.168.150.14:5000"
+      },
+      "stdout": "error writing to Teensy\n\n\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/ff615b5a-70e6-4767-88cf-2de7bbb56983/firmware.ino.hex\": 185344 bytes, 9.1% usage\nSoft reboot performed\nWaiting for Teensy device...\n (hint: press the reset button)\nFound HalfKay Bootloader\nRead \"/remote_firmware_testing/work_results/ff615b5a-70e6-4767-88cf-2de7bbb56983/firmware.ino.hex\": 185344 bytes, 9.1% usage\nProgramming...\nUpload attempt 1 of 3 failed (exit 1); the board is in the HalfKay bootloader on usb 1-4.4.4.1.3, so it is being programmed again from there\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/ff615b5a-70e6-4767-88cf-2de7bbb56983/firmware.ino.hex\": 185344 bytes, 9.1% usage\nFound HalfKay Bootloader\nProgramming..................................................................................................................................................................................\nBooting\nPORTS [{\"device\": \"/dev/ttyACM0\", \"vid\": 5824, \"pid\": 1155, \"serial\": \"20428100\"}]\nRAW_INFO {\"cycle\": 0, \"attempt\": 0, \"version\": 3, \"sent\": 48, \"dtr\": true, \"tx\": \"efbeadde031000002c00010030000000000000000000000000000000640000000000000000000000000000000d04949e\", \"rx\": \"\"}\nRAW_INFO {\"cycle\": 0, \"attempt\": 1, \"version\": 3, \"sent\": 48, \"dtr\": true, \"tx\": \"efbeadde031000002c00010030000000000000000000000000000000650000000000000000000000000000000e04a49e\", \"rx\": \"\"}\nRAW_INFO {\"cycle\": 0, \"attempt\": 2, \"version\": 3, \"sent\": 48, \"dtr\": true, \"tx\": \"efbeadde031000002c00010030000000000000000000000000000000660000000000000000000000000000000f04b49e\", \"rx\": \"\"}\nRAW_INFO {\"cycle\": 0, \"attempt\": 3, \"version\": 2, \"sent\": 48, \"dtr\": true, \"tx\": \"efbeadde021000002c00010030000000000000000000000000000000670000000000000000000000000000000f049c9e\", \"rx\": \"\"}\nTraceback (most recent call last):\n  File \"/storage/child.py\", line 35, in <module>\n    raw.extend(port.read(4096))\n               ~~~~~~~~~^^^^^^\n  File \"/usr/local/lib/python3.13/site-packages/serial/serialposix.py\", line 595, in read\n    raise SerialException(\n        'device reports readiness to read but returned no data '\n        '(device disconnected or multiple access on port?)')\nserial.serialutil.SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)\n",
+      "test_id": "ff615b5a-70e6-4767-88cf-2de7bbb56983"
+    },
+    {
+      "board": "teensy:avr:teensy40",
+      "completed": true,
+      "directory": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job",
+      "exit_code": 0,
+      "hub_port": 15,
+      "program_success": true,
+      "provenance": {
+        "firmware_sha256": "a4288ca3fd04cbf4f6a9769e1a913bb84ef117c8b5435603b1a0e42ce67ae1b0",
+        "planned_program_seconds": 65,
+        "program_sha256": "cb2d1690b9c7d54918a9f33c90b92666d0a7fdf2577e432e958f89a8a10e2769",
+        "scope": "diagnostic startup fault record only; not candidate acceptance",
+        "service": "http://192.168.150.14:5000"
+      },
+      "stdout": "error writing to Teensy\n\n\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/5cb4237d-8af4-4724-a965-45ce48efb190/firmware.ino.hex\": 185344 bytes, 9.1% usage\nSoft reboot performed\nWaiting for Teensy device...\n (hint: press the reset button)\nFound HalfKay Bootloader\nRead \"/remote_firmware_testing/work_results/5cb4237d-8af4-4724-a965-45ce48efb190/firmware.ino.hex\": 185344 bytes, 9.1% usage\nProgramming...\nUpload attempt 1 of 3 failed (exit 1); the board is in the HalfKay bootloader on usb 1-4.4.4.1.3, so it is being programmed again from there\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/5cb4237d-8af4-4724-a965-45ce48efb190/firmware.ino.hex\": 185344 bytes, 9.1% usage\nFound HalfKay Bootloader\nProgramming..................................................................................................................................................................................\nBooting\nSERIAL_EVENT {\"elapsed\": 7.740721455775201, \"error\": \"device reports readiness to read but returned no data (device disconnected or multiple access on port?)\"}\nSERIAL_EVENT {\"elapsed\": 8.246690649539232, \"error\": \"[Errno 6] could not open port /dev/ttyACM0: [Errno 6] No such device or address: '/dev/ttyACM0'\"}\nSERIAL_EVENT {\"elapsed\": 16.444884477183223, \"error\": \"device reports readiness to read but returned no data (device disconnected or multiple access on port?)\"}\nSERIAL_EVENT {\"elapsed\": 16.95065701007843, \"error\": \"[Errno 6] could not open port /dev/ttyACM0: [Errno 6] No such device or address: '/dev/ttyACM0'\"}\nSERIAL_EVENT {\"elapsed\": 25.404671008698642, \"error\": \"device reports readiness to read but returned no data (device disconnected or multiple access on port?)\"}\nSERIAL_EVENT {\"elapsed\": 25.910582687705755, \"error\": \"[Errno 6] could not open port /dev/ttyACM0: [Errno 6] No such device or address: '/dev/ttyACM0'\"}\n",
+      "test_id": "5cb4237d-8af4-4724-a965-45ce48efb190"
+    },
+    {
+      "board": "teensy:avr:teensy40",
+      "completed": true,
+      "directory": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job",
+      "exit_code": 0,
+      "hub_port": 15,
+      "program_success": true,
+      "provenance": {
+        "firmware_sha256": "0c744a2e0c119497e84cd6803c7cd5175ad7f3ad9e3eb9faa4ae37a19e979197",
+        "planned_program_seconds": 65,
+        "program_sha256": "fcf09a7c9cff6595f31f318c7f361440124b521ed4e5b498d866eefd7a5b0971",
+        "scope": "diagnostic startup fault record only; not candidate acceptance",
+        "service": "http://192.168.150.14:5000"
+      },
+      "stdout": "error writing to Teensy\n\n\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/a995b69f-7742-470b-9558-be6e6cfb85d4/firmware.ino.hex\": 185344 bytes, 9.1% usage\nSoft reboot performed\nWaiting for Teensy device...\n (hint: press the reset button)\nFound HalfKay Bootloader\nRead \"/remote_firmware_testing/work_results/a995b69f-7742-470b-9558-be6e6cfb85d4/firmware.ino.hex\": 185344 bytes, 9.1% usage\nProgramming...\nUpload attempt 1 of 3 failed (exit 1); the board is in the HalfKay bootloader on usb 1-4.4.4.1.3, so it is being programmed again from there\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/a995b69f-7742-470b-9558-be6e6cfb85d4/firmware.ino.hex\": 185344 bytes, 9.1% usage\nFound HalfKay Bootloader\nProgramming..................................................................................................................................................................................\nBooting\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": null, \"product\": null}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": null, \"product\": null}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": null, \"product\": null}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\nUSB_DESCRIPTOR [{\"device\": \"/dev/ttyACM0\", \"serial\": \"20428100\", \"product\": \"60008abc\"}]\n",
+      "test_id": "a995b69f-7742-470b-9558-be6e6cfb85d4"
+    },
+    {
+      "board": "teensy:avr:teensy40",
+      "completed": true,
+      "directory": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job",
+      "exit_code": 1,
+      "hub_port": 15,
+      "program_success": true,
+      "provenance": {
+        "candidate_sha256": "ffce83593c3465bbb72d1a639e90fe66b9f01e4e65554b9014eccee1ffe2401e",
+        "cell": {
+          "cycles": 0,
+          "id": "preflight-identity-only",
+          "kind": "smoke",
+          "seconds": 0,
+          "settings_hex": "010001030104000800000c0040420f0040420f00"
+        },
+        "firmware_sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+        "inputs": {
+          "runner_sha256": {
+            "firmware/tests/rig_protocol_v3_qualification.py": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+            "firmware/tools/protocol_v3_qualification.py": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+            "firmware/tools/qualify_protocol_v3.py": "5854e2c575090c11da4cd0f76c0480b8d30352f53c9276599ba34e9c1149c02d",
+            "firmware/tools/run_input_isolation.py": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5"
+          },
+          "schema_sha256": {
+            "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+            "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+            "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+          },
+          "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+          "sdk_version": "1.2.0"
+        },
+        "planned_program_seconds": 36,
+        "program_sha256": "0975678ba93756a59c3295b788a20c396548798b7eba96d9507153d65a9db915",
+        "scope": "identity-only; not a qualification matrix cell",
+        "service": "http://192.168.150.14:5000"
+      },
+      "stdout": "error writing to Teensy\n\n\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/a2c51df7-2a57-4fac-95dd-dce71eba684e/firmware.ino.hex\": 185344 bytes, 9.1% usage\nSoft reboot performed\nWaiting for Teensy device...\n (hint: press the reset button)\nFound HalfKay Bootloader\nRead \"/remote_firmware_testing/work_results/a2c51df7-2a57-4fac-95dd-dce71eba684e/firmware.ino.hex\": 185344 bytes, 9.1% usage\nProgramming...\nUpload attempt 1 of 3 failed (exit 1); the board is in the HalfKay bootloader on usb 1-4.4.4.1.3, so it is being programmed again from there\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/a2c51df7-2a57-4fac-95dd-dce71eba684e/firmware.ino.hex\": 185344 bytes, 9.1% usage\nFound HalfKay Bootloader\nProgramming..................................................................................................................................................................................\nBooting\nQUALIFICATION {\"candidate_sha256\": \"ffce83593c3465bbb72d1a639e90fe66b9f01e4e65554b9014eccee1ffe2401e\", \"capabilities_hex\": \"00000000010130000010000000060000c40f0000c40f0000f1030000c40f0000e2070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"captures\": [], \"cell\": {\"cycles\": 0, \"id\": \"preflight-identity-only\", \"kind\": \"smoke\", \"seconds\": 0, \"settings_hex\": \"010001030104000800000c0040420f0040420f00\"}, \"cell_id\": \"preflight-identity-only\", \"error\": \"ValueError: advertised tuples differ\", \"failure_oracle\": {\"adc\": {\"encoded_bytes\": 0, \"encodings\": {}, \"end_item\": 0, \"first_host_seconds\": 0, \"first_ticks\": 0, \"frames\": 0, \"gap_items\": 0, \"items\": 0, \"last_host_seconds\": 0, \"last_ticks\": 0, \"logical_bytes\": 0, \"next_sequence\": 0, \"run_ids\": [], \"sample_checks\": 0, \"samples\": [], \"versions\": [], \"wire_bytes\": 0}, \"control_samples\": [\"efbeadde039000002c000100b4000000840000000000000000000000f8738afb000000000000000000000000000000000100010000030c003230343238313030000000000000000000000000000000000000000000000000312e322e3000000000000000000000007468696e676461712d356337633732303166363336363566640000000000000000000000000000000000000000000000010000000046c32380d1f00860343c0200366e0100127a00de178052\", \"efbeadde039000002c000100b4000000840000000000000000000000f9738afb000000000000000000000000000000000100010000030c003230343238313030000000000000000000000000000000000000000000000000312e322e3000000000000000000000007468696e676461712d356337633732303166363336363566640000000000000000000000000000000000000000000000010000000046c32380d1f00860343c0200366e0100127a00df171453\", \"efbeadde039c00002c000100ac0500007c0500000000000000000000fa738afb00000000000000000000000000000000010130000010000000060000c40f0000c40f0000f1030000c40f0000e2070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e5220f9\", \"efbeadde039d00002c00010060000000300000000000000000000000fb738afb00000000000000000000000000000000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a00460e42b9\", \"efbeadde039300002c000100b0010000800100000000000000000000fc738afb00000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fc1f0000003e09f22f\", \"efbeadde039000002c000100b4000000840000000000000000000000fd738afb000000000000000000000000000000000100010000030c003230343238313030000000000000000000000000000000000000000000000000312e322e3000000000000000000000007468696e676461712d356337633732303166363336363566640000000000000000000000000000000000000000000000010000000046c32380d1f00860343c0200366e0100127a00e3176455\", \"efbeadde039c00002c000100ac0500007c0500000000000000000000fe738afb00000000000000000000000000000000010130000010000000060000c40f0000c40f0000f1030000c40f0000e2070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000012525f0f\", \"efbeadde039400002c00010040000000100000000000000000000000ff738afb000000000000000000000000000000000100000000000000000000004507834f\"], \"errors\": 0, \"gpio\": {\"encoded_bytes\": 0, \"encodings\": {}, \"end_item\": 0, \"first_host_seconds\": 0, \"first_ticks\": 0, \"frames\": 0, \"gap_items\": 0, \"items\": 0, \"last_host_seconds\": 0, \"last_ticks\": 0, \"logical_bytes\": 0, \"next_sequence\": 0, \"run_ids\": [], \"sample_checks\": 0, \"samples\": [], \"versions\": [], \"wire_bytes\": 0}, \"partial_bytes\": 0, \"raw_bytes\": 4036, \"raw_sha256\": \"7eb38dc6c5b1cc536484943e667e89b4d99c3f32cd665519fe52653a45615615\"}, \"info\": {\"adc_resolution_bits\": 12, \"board_id\": 1, \"build_id\": \"thingdaq-5c7c7201f63665fd\", \"clocks\": {\"adc_clock_hz\": 37500000, \"cpu_clock_hz\": 600000000, \"cpu_profile\": 1, \"ipg_clock_hz\": 150000000, \"pit_clock_hz\": 24000000, \"timestamp_hz\": 8000000}, \"firmware_version\": \"1.2.0\", \"hardware_serial\": \"20428100\", \"mcu_id\": 1, \"protocol_version\": 3, \"simulated\": false}, \"outcome\": \"FAIL\", \"physical\": true, \"rejections\": []}\n",
+      "test_id": "a2c51df7-2a57-4fac-95dd-dce71eba684e"
+    },
+    {
+      "board": "teensy:avr:teensy40",
+      "completed": true,
+      "directory": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job",
+      "exit_code": 0,
+      "hub_port": 15,
+      "program_success": true,
+      "provenance": {
+        "candidate_sha256": "13b4060f6a90d7aecc4f8f93de319f389ed65a74c665f2bd72b6597e28054872",
+        "cell": {
+          "cycles": 0,
+          "id": "preflight-identity-only",
+          "kind": "smoke",
+          "seconds": 0,
+          "settings_hex": "010001030104000800000c0040420f0040420f00"
+        },
+        "firmware_sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+        "inputs": {
+          "runner_sha256": {
+            "firmware/tests/rig_protocol_v3_qualification.py": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+            "firmware/tools/protocol_v3_qualification.py": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+            "firmware/tools/qualify_protocol_v3.py": "cdafaae1cc8d46342539fd0789f3ecf4850277acaa989ab12ecdef7dc3f0e5fa",
+            "firmware/tools/run_input_isolation.py": "3890049641dbf67a784423c83ac1831abd7dae883b6bc176cc354770315013f5"
+          },
+          "schema_sha256": {
+            "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+            "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+            "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+          },
+          "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+          "sdk_version": "1.2.0"
+        },
+        "planned_program_seconds": 36,
+        "program_sha256": "a68374b30a47b8ba8b16b769290d7daf44e7a5d87b0249a034c24de16560dd35",
+        "scope": "identity-only; not a qualification matrix cell",
+        "service": "http://192.168.150.14:5000"
+      },
+      "stdout": "error writing to Teensy\n\n\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/240ddb26-7a67-4218-9ba8-ce9e2d74a9e6/firmware.ino.hex\": 185344 bytes, 9.1% usage\nSoft reboot performed\nWaiting for Teensy device...\n (hint: press the reset button)\nFound HalfKay Bootloader\nRead \"/remote_firmware_testing/work_results/240ddb26-7a67-4218-9ba8-ce9e2d74a9e6/firmware.ino.hex\": 185344 bytes, 9.1% usage\nProgramming...\nUpload attempt 1 of 3 failed (exit 1); the board is in the HalfKay bootloader on usb 1-4.4.4.1.3, so it is being programmed again from there\nTeensy Loader, Command Line, Version 2.2\nRead \"/remote_firmware_testing/work_results/240ddb26-7a67-4218-9ba8-ce9e2d74a9e6/firmware.ino.hex\": 185344 bytes, 9.1% usage\nFound HalfKay Bootloader\nProgramming..................................................................................................................................................................................\nBooting\nQUALIFICATION {\"candidate_sha256\": \"13b4060f6a90d7aecc4f8f93de319f389ed65a74c665f2bd72b6597e28054872\", \"capabilities_hex\": \"00000000010130000010000000060000c40f0000c40f0000f1030000c40f0000e2070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"captures\": [], \"cell\": {\"cycles\": 0, \"id\": \"preflight-identity-only\", \"kind\": \"smoke\", \"seconds\": 0, \"settings_hex\": \"010001030104000800000c0040420f0040420f00\"}, \"cell_id\": \"preflight-identity-only\", \"info\": {\"adc_resolution_bits\": 12, \"board_id\": 1, \"build_id\": \"thingdaq-5c7c7201f63665fd\", \"clocks\": {\"adc_clock_hz\": 37500000, \"cpu_clock_hz\": 600000000, \"cpu_profile\": 1, \"ipg_clock_hz\": 150000000, \"pit_clock_hz\": 24000000, \"timestamp_hz\": 8000000}, \"firmware_version\": \"1.2.0\", \"hardware_serial\": \"20428100\", \"mcu_id\": 1, \"protocol_version\": 3, \"simulated\": false}, \"outcome\": \"PASS\", \"physical\": true, \"rejections\": []}\n",
+      "test_id": "240ddb26-7a67-4218-9ba8-ce9e2d74a9e6"
+    }
+  ],
+  "live_validation": {
+    "job_id": "240ddb26-7a67-4218-9ba8-ce9e2d74a9e6",
+    "record": {
+      "candidate_sha256": "13b4060f6a90d7aecc4f8f93de319f389ed65a74c665f2bd72b6597e28054872",
+      "capabilities_hex": "00000000010130000010000000060000c40f0000c40f0000f1030000c40f0000e2070000030001030104000801010c0040420f0040420f00010000000046c32380d1f00860343c0200366e0100127a000000000000000000000000000000000000000000000000000400000040420f0040420f000800080004000000010001030104000800000c0040420f0040420f00010101030104000800000c0040420f0040420f00020001030104000800000c0040420f0040420f00020101030104000800000c0040420f0040420f00030001030104000800000c0040420f0040420f00030101030104000800000c0040420f0040420f00010001030104000800010c0040420f0040420f00010101030104000800010c0040420f0040420f00020001030104000800010c0040420f0040420f00020101030104000800010c0040420f0040420f00030001030104000800010c0040420f0040420f00030101030104000800010c0040420f0040420f00010001030104000801000c0040420f0040420f00010101030104000801000c0040420f0040420f00020001030104000801000c0040420f0040420f00020101030104000801000c0040420f0040420f00030001030104000801000c0040420f0040420f00030101030104000801000c0040420f0040420f00010001030104000801010c0040420f0040420f00010101030104000801010c0040420f0040420f00020001030104000801010c0040420f0040420f00020101030104000801010c0040420f0040420f00030001030104000801010c0040420f0040420f00030101030104000801010c0040420f0040420f00010001030104011000000c0040420f0040420f00010101030104011000000c0040420f0040420f00020001030104011000000c0040420f0040420f00020101030104011000000c0040420f0040420f00030001030104011000000c0040420f0040420f00030101030104011000000c0040420f0040420f00010001030104011000010c0040420f0040420f00010101030104011000010c0040420f0040420f00020001030104011000010c0040420f0040420f00020101030104011000010c0040420f0040420f00030001030104011000010c0040420f0040420f00030101030104011000010c0040420f0040420f00010001030104011001000c0040420f0040420f00010101030104011001000c0040420f0040420f00020001030104011001000c0040420f0040420f00020101030104011001000c0040420f0040420f00030001030104011001000c0040420f0040420f00030101030104011001000c0040420f0040420f00010001030104011001010c0040420f0040420f00010101030104011001010c0040420f0040420f00020001030104011001010c0040420f0040420f00020101030104011001010c0040420f0040420f00030001030104011001010c0040420f0040420f00030101030104011001010c0040420f0040420f000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "captures": [],
+      "cell": {
+        "cycles": 0,
+        "id": "preflight-identity-only",
+        "kind": "smoke",
+        "seconds": 0,
+        "settings_hex": "010001030104000800000c0040420f0040420f00"
+      },
+      "cell_id": "preflight-identity-only",
+      "info": {
+        "adc_resolution_bits": 12,
+        "board_id": 1,
+        "build_id": "thingdaq-5c7c7201f63665fd",
+        "clocks": {
+          "adc_clock_hz": 37500000,
+          "cpu_clock_hz": 600000000,
+          "cpu_profile": 1,
+          "ipg_clock_hz": 150000000,
+          "pit_clock_hz": 24000000,
+          "timestamp_hz": 8000000
+        },
+        "firmware_version": "1.2.0",
+        "hardware_serial": "20428100",
+        "mcu_id": 1,
+        "protocol_version": 3,
+        "simulated": false
+      },
+      "outcome": "PASS",
+      "physical": true,
+      "rejections": []
+    },
+    "result": "PASS",
+    "scope": "identity-only; not a qualification matrix cell"
+  },
+  "physical_measurements": "NOT_RUN",
+  "release_qualification": "NOT_RUN",
+  "result": "PASS",
+  "retained_evidence": [
+    {
+      "path": ".maestro/playbooks/Working/phase06-candidate-20261024/first-build.log",
+      "sha256": "7e757bb42656ee6cb7a2ce16770172006c20ab65001c76e1a79426bb0c32ae86",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-candidate-20261024/freeze-validation.json",
+      "sha256": "b5949fb623117d416a77e536d0cc4d26f888d96feba8ee804560afcbdecd1e1c",
+      "size_bytes": 514
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-candidate-20261024/second-build.log",
+      "sha256": "7e757bb42656ee6cb7a2ce16770172006c20ab65001c76e1a79426bb0c32ae86",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/first-build.log",
+      "sha256": "7e757bb42656ee6cb7a2ce16770172006c20ab65001c76e1a79426bb0c32ae86",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/freeze-validation.json",
+      "sha256": "13bd16bb9aa846475c35b22341a5099d26ae3a3c988dd31dbb5c7acc4de2ab69",
+      "size_bytes": 520
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-candidate-20261024-final/second-build.log",
+      "sha256": "7e757bb42656ee6cb7a2ce16770172006c20ab65001c76e1a79426bb0c32ae86",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/build_crash_descriptor.py",
+      "sha256": "499f65a228ae9a9427deb2854cf3f11db5a8c91283fb3772590f9c3e4663a6a8",
+      "size_bytes": 1573
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/build_crash_diagnostic.py",
+      "sha256": "16a2c476fa1c25e8a56c4f9b2718131083f6fc30963532bb03c250582c360085",
+      "size_bytes": 1511
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/build_final.py",
+      "sha256": "c3ec5b9d09be8aa0539957cc9bb9e80b620ea46433508e1ae85f82b0d40b72d8",
+      "size_bytes": 679
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/build_replacement.py",
+      "sha256": "244d479ce827522b4602562520b1105ecfdb62ff33a593d820aea4fc8b4eff22",
+      "size_bytes": 673
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/capabilities-after.log",
+      "sha256": "f0ce8ec1d1b62979c2a61e49f556ad55a39d77672c0d90ffda9d8dbb04be4926",
+      "size_bytes": 464
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/capabilities-before.log",
+      "sha256": "aa49e34445c9548a8100266b34e26daba6a3be716b6cc17c4117e99c19620546",
+      "size_bytes": 3305
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/corrected-constructor.txt",
+      "sha256": "41f44302faec62c4e36b77ce1fea4e21f5f7b8e7215d02b7b8febae1954801b7",
+      "size_bytes": 4388
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/corrected-table-symbols.txt",
+      "sha256": "fe1984b6a6ae785e02489995fe4c5fe84b99465886643a8c0375f756792bf076",
+      "size_bytes": 182
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-build/build-manifest.json",
+      "sha256": "6d6a75f97bdf094c363d60c407bc30ef03655ff90644d9674c626b7a0894259b",
+      "size_bytes": 55723
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-build/firmware.ino.eep",
+      "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+      "size_bytes": 34
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-build/firmware.ino.elf",
+      "sha256": "037081535f9afeda94ab1feb9d42d011e5f976d9f31aad1a2dda0084e51bcd6a",
+      "size_bytes": 2845204
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-build/firmware.ino.hex",
+      "sha256": "a4288ca3fd04cbf4f6a9769e1a913bb84ef117c8b5435603b1a0e42ce67ae1b0",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-build/firmware.ino.map",
+      "sha256": "c40a65cbcf0f6fe0390658bea714733ece8325c2329252e28c1e94c2c10dbdca",
+      "size_bytes": 1128904
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-build.log",
+      "sha256": "ab8dc5ef3c01af7b2927d108d5389b08adefbd3b71cced2b8f0b4565ba88432a",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-build/build-manifest.json",
+      "sha256": "c6d15a2cd7579ffe01cabc2b9ac2525ebcea25603d5f289aa35cf6db3b47c48e",
+      "size_bytes": 55723
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-build/firmware.ino.eep",
+      "sha256": "c4a8b44f3ab62332bf41f3a70722fa89e6b79ebcc2335152b8b0ff4e52650f77",
+      "size_bytes": 34
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-build/firmware.ino.elf",
+      "sha256": "6004b9c0fa962ceef3270e7203e2e4e855eee66523e57a73b4547a1cf031180e",
+      "size_bytes": 2844888
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-build/firmware.ino.hex",
+      "sha256": "0c744a2e0c119497e84cd6803c7cd5175ad7f3ad9e3eb9faa4ae37a19e979197",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-build/firmware.ino.map",
+      "sha256": "e7eb19994493d4a549226cea1e04adb298dc7d4e6777d78fd7a42465a0580d95",
+      "size_bytes": 1128422
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-build.log",
+      "sha256": "26b55fe018e8a6c7b0f818d015d88665dfb4f804e4dd3964d16591a9876ad0c2",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/firmware.ino.hex",
+      "sha256": "0c744a2e0c119497e84cd6803c7cd5175ad7f3ad9e3eb9faa4ae37a19e979197",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/journal.txt",
+      "sha256": "d468698fe89670a216a00b943d487d86fec946fa7127e596168240fcea057f00",
+      "size_bytes": 1517
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/provenance.json",
+      "sha256": "61c4b88809264b2c72f6cc43e7751f903d86be008b98484dfc545f447f7798fe",
+      "size_bytes": 333
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/results.json",
+      "sha256": "b81567edf819eacc323ba901d5253b380be030d7635de1c4c7e45a6aae2259c9",
+      "size_bytes": 4617
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/rig-program.py",
+      "sha256": "fcf09a7c9cff6595f31f318c7f361440124b521ed4e5b498d866eefd7a5b0971",
+      "size_bytes": 247
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/start.json",
+      "sha256": "2dd1cce4413d1d0c6da3d3fe63f5d74f53401bdadd090d9dde4385d6a3ffc672",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-job/submission.json",
+      "sha256": "0e33171846405298a5871c20fdc86246c1fc6960bac2b08cb81aae4de8b8a349",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-descriptor-run.log",
+      "sha256": "c924ee25ab1a2c84e53a54f4da78711f50ba4df3a9d2d8d8110ddf7459c51ecb",
+      "size_bytes": 3674
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/firmware.ino.hex",
+      "sha256": "a4288ca3fd04cbf4f6a9769e1a913bb84ef117c8b5435603b1a0e42ce67ae1b0",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/journal.txt",
+      "sha256": "c4b9a0b806af3800a0c023aec4372572d67b1ed851fca27f0e5dddd2fab7291a",
+      "size_bytes": 1517
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/provenance.json",
+      "sha256": "4b60b706a3be21de994fb5feb2089e0edd49a45d317468c9185da6b4bbfc8565",
+      "size_bytes": 333
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/results.json",
+      "sha256": "aabd5d3e54a46a2c5fb014ecebc93713d5bc1175858c3b472e32ea0628ee2d5f",
+      "size_bytes": 2586
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/rig-program.py",
+      "sha256": "cb2d1690b9c7d54918a9f33c90b92666d0a7fdf2577e432e958f89a8a10e2769",
+      "size_bytes": 617
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/start.json",
+      "sha256": "55d5a5216722d803555d555567bb0b84e0e37a55b26e853e9fb5cf2f69a5a25f",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-job/submission.json",
+      "sha256": "e673dbb06af572b8c5856b0bce54e8d8858818551aa0908e5babf244f6ba4422",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/crash-run.log",
+      "sha256": "92600ea0d310d4d732e2d3a0e8fee9a77cd288105cccf9e4a3a57244bc87de0b",
+      "size_bytes": 1968
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/diagnostic-constructor.txt",
+      "sha256": "2b617c4f48be511d241fda226f9d2e873e8f7b6779747f1ac0cb1deff84c8986",
+      "size_bytes": 4412
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/diagnostic-table-symbols.txt",
+      "sha256": "904cbcb181d94d46686f33ece7cdd6b6ad7fb6bd25a8483a0a3ca1bf8ebea99e",
+      "size_bytes": 69
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/documentation-final.log",
+      "sha256": "bb905396b057722ddd4cfc336f1d302b511679bf52b198882e4ab409fb1ebb92",
+      "size_bytes": 464
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/documentation.log",
+      "sha256": "296798ef77cf8a289fc9c67d5ef92cc4b730bfbdb27e78105626ac72e9c547c7",
+      "size_bytes": 464
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/firmware.ino.hex",
+      "sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/journal.txt",
+      "sha256": "48f8ba3143236b559a5560bc637d3daf68f2460dabfb13372bb60232fbc3ba9e",
+      "size_bytes": 1517
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/provenance.json",
+      "sha256": "761a7c41257c90dbcf860b2f4a2bbda0ee77c47a0b9b66d54021e0077ad4dbff",
+      "size_bytes": 1536
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/results.json",
+      "sha256": "9f5446957fe5c43b24ff8216f5184fe8c18673723b05ea8f8d4605c7e51b95fa",
+      "size_bytes": 5245
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/rig-program.py",
+      "sha256": "a68374b30a47b8ba8b16b769290d7daf44e7a5d87b0249a034c24de16560dd35",
+      "size_bytes": 453765
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/start.json",
+      "sha256": "b3c8f8efa10441c5e5666df40e422a985b322ac7e7b8a590b2f418f4d7d83ef8",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-job/submission.json",
+      "sha256": "36ca32fac1818a2cd6e2b56bbbb4d58c09da7ff8ae32fc3d41bdedd96f925be9",
+      "size_bytes": 357
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity-validation.json",
+      "sha256": "f689506f11e034a0db9eb2449b16de30cee263303764fd97e5e4bb713c10ebe4",
+      "size_bytes": 3888
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/final-identity.log",
+      "sha256": "dde371deb16cf5e7b788d9bbea0d2f71b14da880d116cabd9cf2a6f8cc006c8f",
+      "size_bytes": 506
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/fixed-build-validation.log",
+      "sha256": "e9661f14d4d225f49e3988b69df7bf64fdecf895124101dda1b45797109332ba",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/freeze_final.py",
+      "sha256": "902f9462ad21b5327033f4a74e2ccf87f9b4a0050d4e1d5a62912e4d92009f35",
+      "size_bytes": 2682
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/freeze_final_rebuilt.py",
+      "sha256": "ff8ee79d8b999783f60ca34bb9a3300b7d4a50274058e5f3992e404351cb00e1",
+      "size_bytes": 2574
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/freeze_replacement.py",
+      "sha256": "51fb7c0354c843794e4f0b56f6ceb12be7277908286279bde9b703b11ade412d",
+      "size_bytes": 2535
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/full-tests.log",
+      "sha256": "15477a6830ac27f95df03d51630ac18d1f36cd189b0086725eaf1e8cbe390134",
+      "size_bytes": 12107
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/generator-tests.log",
+      "sha256": "77c71c3bccc0a20bfd14717b9b882f802661800fbf8d4257967730eebecb5b7a",
+      "size_bytes": 464
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/health.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/firmware.ino.hex",
+      "sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/journal.txt",
+      "sha256": "ff8c7a58fd78e954d4dce12cebec791affdbb02a48f7230347df516577d57238",
+      "size_bytes": 1517
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/provenance.json",
+      "sha256": "7f5e07f98fc2fd08e40b33616a2beb25f22cabc30d6f066b958ba38848c0dbef",
+      "size_bytes": 1536
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/results.json",
+      "sha256": "4ee6d52f42971150e06b7d99e9ca256ee731f851b712b8b414d917cc0d43793a",
+      "size_bytes": 2592
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/rig-program.py",
+      "sha256": "177de0cc0c6306ef265c1fe934544bb1b0d4175b26b8bcc87ceba866820be6dc",
+      "size_bytes": 453738
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/start.json",
+      "sha256": "adf9942e80f03786e6e40524f1b2a19d67dc4d56cd264d7fc6bc97f22871b6ca",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-job/submission.json",
+      "sha256": "41195e3a71314cc2e5d7d38b8c3f4ff5dce8147f8a2b8729fc27fef104a0baa5",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/identity-run.log",
+      "sha256": "0b65be7f7ca8030054fe42e616e27dc29c37b1f6fba0ad45edcdbd2fe1dc04fe",
+      "size_bytes": 2783
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/link-regression-before.log",
+      "sha256": "ea588337e2bfc28da7c5d65b21e6b52e973672a15eb267451586e377183016d6",
+      "size_bytes": 6887
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/linker-before.stderr",
+      "sha256": "e1d981ad2eef36c131201267499b576b16be3f17643a94396440ad21d8d0bbfa",
+      "size_bytes": 421
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/offline-validation.json",
+      "sha256": "ab9fd648887391db603061e7cfbd770136c00f87b8315aea53c5d1b6e0461f69",
+      "size_bytes": 5640
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/original-constructor.txt",
+      "sha256": "41f16f17d9ef427b4c519ef158d82e8059ccee8399c8c53e464ca934afa438f3",
+      "size_bytes": 4376
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/original-table-symbols.txt",
+      "sha256": "90768d64e5b010ae3e773ae673082eb604f38f9e8b613b81f9355ef3b071a998",
+      "size_bytes": 69
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/platforms.json",
+      "sha256": "733017586428a4215dd034582579f897a9aea8206d7f34f8778f697aabb5a48c",
+      "size_bytes": 14982
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/postflight-health.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/firmware.ino.hex",
+      "sha256": "2a64e61f071b4ff9d981c3ea0217049dd40b64fad2ae448267a70c5b47fd25e7",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/journal.txt",
+      "sha256": "8707d289e35d59a7dfd9cfeae4cd8e40594cc367fa3fbfed576892dfd1013796",
+      "size_bytes": 1517
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/provenance.json",
+      "sha256": "6e7dee9095b2a9bb8388b4d54de3588dda92830189fd20aaaf2537ebe3af9cee",
+      "size_bytes": 1536
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/results.json",
+      "sha256": "00843d417ed76695b73fd6cfe89cc376982704fef0129a2729ef4ff39b0a67c5",
+      "size_bytes": 3083
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/rig-program.py",
+      "sha256": "413ce9548d734fc2e5993c9506a176d74028991bfc14ef42911aec8f35753558",
+      "size_bytes": 489718
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/start.json",
+      "sha256": "484d5910980c9af22d5b56ceacaa439de3825e7dfb831f9a2aec7dea1c151517",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe-job/submission.json",
+      "sha256": "6468faed5eb0054f13bd84c559d09e2aca44aaab0e329d7bb030f98334d5d358",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw-probe.log",
+      "sha256": "af02cbf7ee9cc6dd099100ca9625e0ddfefda7aaf7912e36a3e3c5700d3e106b",
+      "size_bytes": 3313
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/raw_probe.py",
+      "sha256": "fe1b82ead6819829216a6f51b13701f11a54ee3126c14f3f9f386d375cbaa973",
+      "size_bytes": 1119
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/read_crash.py",
+      "sha256": "cb2d1690b9c7d54918a9f33c90b92666d0a7fdf2577e432e958f89a8a10e2769",
+      "size_bytes": 617
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/read_descriptor.py",
+      "sha256": "fcf09a7c9cff6595f31f318c7f361440124b521ed4e5b498d866eefd7a5b0971",
+      "size_bytes": 247
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/firmware.ino.hex",
+      "sha256": "33ff95d8f37b6ebd51457eae66c323ca99b82efe692b1b4994d2d05700398b2a",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/journal.txt",
+      "sha256": "d0e6b12e29df03e749bebd2391460bd1804e7d0028c10fa6902b2fb8e8c24dd4",
+      "size_bytes": 1517
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/provenance.json",
+      "sha256": "7d378f273982bfc07520b06e5d299666bc70f422721fc7f7484064d4222dc2d7",
+      "size_bytes": 1536
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/results.json",
+      "sha256": "348482a77ccd65aaf5b14fcb4fa43d259dbfb31f573c57e8fe4b5ba058765387",
+      "size_bytes": 14298
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/rig-program.py",
+      "sha256": "0975678ba93756a59c3295b788a20c396548798b7eba96d9507153d65a9db915",
+      "size_bytes": 453675
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/start.json",
+      "sha256": "9b19da0db4850098b13adb77f3eb01cdd48c3d5a5beb10dd4364b42d158d5c5e",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity-job/submission.json",
+      "sha256": "df86caf34cd362fe0f6f9f856f6d80f539f1949b60dda681ae299e731fec0028",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/replacement-identity.log",
+      "sha256": "445b2bd594cf1cd7961438ffdb182264b9013fb80353629f82836ee8434278a2",
+      "size_bytes": 14453
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/retained-status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/run_crash_descriptor.py",
+      "sha256": "3318f125bd5fa6eebae0722f4258f29007a8ddbaaac78fafa6bfd2ae622f24d1",
+      "size_bytes": 1444
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/run_crash_diagnostic.py",
+      "sha256": "c553c319805a2eae300ee718571426587065e8f2083e419c6a6c6bf2aab0a9ca",
+      "size_bytes": 1406
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/run_raw_probe.py",
+      "sha256": "a04b71353c5b74f61202f7f35f54bbb528eedd6e03824e250ec30a130648fac7",
+      "size_bytes": 4206
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/runtime_health_teensy.diagnostic.cpp",
+      "sha256": "03e5d72665dd541ac702f3652dcdc43ff92dcddf89d87a440936f702a0cc6a55",
+      "size_bytes": 2724
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/tests.log",
+      "sha256": "206ba9c144b6671dadc718919d5ff44969f7762818e00e33d900665462e63e28",
+      "size_bytes": 1505
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/verify_final_identity.py",
+      "sha256": "8beb2914dac4e5990a8ac84e13ced24ebe66a79328d21dce8a10974464a7fe97",
+      "size_bytes": 3776
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/verify_identity.py",
+      "sha256": "9d317d5ee39f5a2f77f24a73338b262c53d49eab82cda4a22c50a5879a71ddc3",
+      "size_bytes": 3764
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/verify_replacement_identity.py",
+      "sha256": "e537b07cfce2b2930b03e87e41d1f9f0431ffec1ba460532c4f981b21d25437a",
+      "size_bytes": 3788
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/version.json",
+      "sha256": "744c2e3efd7f99a86329e870622ee8dc10e5b3e22e3e48a3191ffb6a38d3113b",
+      "size_bytes": 80
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-identity-recovery-20261024/write_evidence.py",
+      "sha256": "77381309c5d331885a411f066fe72a6d4989b976f12206ae0d1fe19284d0f8cd",
+      "size_bytes": 5368
+    }
+  ],
+  "scope": "live identity/capabilities prerequisite only; zero acquisition cycles",
+  "toolchain": {
+    "arduino_cli": {
+      "identity": "arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:13:12Z",
+      "path": "/usr/local/bin/arduino-cli"
+    },
+    "compiler": {
+      "identity": "arm-none-eabi-g++ (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+      "path": "/home/bill/.arduino15/packages/teensy/tools/teensy-compile/15.2.1/arm/bin/arm-none-eabi-g++"
+    }
+  },
+  "validation": {
+    "affected_qualification_suite": {
+      "passed": 74,
+      "scope": "final runner correction",
+      "seconds": 21.86
+    },
+    "documentation_and_layout": {
+      "passed": 11
+    },
+    "full_suite": {
+      "passed": 2649,
+      "scope": "table correction; before candidate-runner correction",
+      "seconds": 304.37,
+      "skipped": 5
+    },
+    "generator_drift": "PASS",
+    "generator_suite": {
+      "passed": 66
+    },
+    "lint_format": "PASS",
+    "retained_artifacts": 15,
+    "two_clean_builds": "byte-identical firmware artifacts and manifests"
+  }
+}

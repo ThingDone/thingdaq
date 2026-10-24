@@ -15,6 +15,10 @@ related:
 
 # Phase 06 rig and candidate verification
 
+Historical attempt; its **FAIL remains unchanged**. The 2026-10-24 diagnosis,
+corrections, and replacement identity PASS are in [[protocol-v3-identity-recovery]].
+The unchecked-task statement below describes the original attempt.
+
 **FAIL: live firmware identity could not be read after programming.**
 The first Phase 06 agent task remains unchecked. Measurements are **NOT_RUN**;
 the release remains an unqualified candidate.
