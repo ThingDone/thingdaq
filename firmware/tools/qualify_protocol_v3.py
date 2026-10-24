@@ -21,6 +21,9 @@ from pathlib import Path
 import run_input_isolation as rig
 from protocol_v3_qualification import POLICY, json_hash, matrix, validate_evidence
 from thingdone_daq import __version__
+from thingdone_daq._generated import protocol_constants as v1
+from thingdone_daq._generated import protocol_v2_constants as v2
+from thingdone_daq._generated import protocol_v3_constants as v3
 from thingdone_daq.models_v3 import V3Capabilities, V3Clocks, V3Settings
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -108,6 +111,9 @@ def prepare_candidate(manifest_path, serial):
     configurations = tuple(V3Settings(**row) for row in public["configurations"])
     rate_ids = {s.rate_profile for s in configurations}
     canonical = V3Capabilities.canonical()
+    # encodeV3CapabilitiesResponse uses the existing v1 packet pages and v2
+    # control-frame storage, not the larger generic v3 wire maxima.
+    samples = v1.MAX_DATA_FRAME_BYTES - v3.MIN_FRAME_BYTES - v3.DATA_PREFIX_BYTES
     caps = replace(
         canonical,
         defaults=V3Settings(**public["defaults"]),
@@ -116,6 +122,13 @@ def prepare_candidate(manifest_path, serial):
             p for p in canonical.rate_profiles if p.rate_profile in rate_ids
         ),
         configurations=configurations,
+        max_data_frame_bytes=v1.MAX_DATA_FRAME_BYTES,
+        max_control_frame_bytes=v2.MAX_CONTROL_FRAME_BYTES,
+        max_logical_payload_bytes=samples,
+        max_encoded_sample_bytes=samples,
+        max_adc_pairs=samples // 4,
+        max_gpio8_samples=samples,
+        max_gpio16_samples=samples // 2,
     )
     artifact = next(
         row for row in manifest["artifacts"] if row["path"] == "firmware.ino.hex"
