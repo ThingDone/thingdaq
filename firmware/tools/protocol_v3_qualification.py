@@ -256,6 +256,12 @@ def validate_capture(cell, capture):
         need(wire["versions"] == [expected_version], f"{name} private/wrong version")
         need(wire["run_ids"] == [capture["run_id"]], f"{name} run mismatch")
         need(wire["sample_checks"] > 0, f"{name} missing independent codec check")
+        if not legacy and settings.source == c.Source.SYNTHETIC:
+            need(
+                wire.get("synthetic_checks", 0) == len(wire["encodings"])
+                and wire.get("synthetic_checks", 0) > 0,
+                f"{name} missing independent synthetic source check",
+            )
         need(wire["logical_bytes"] == wire["items"] * width, f"{name} logical bytes")
         # The independent cursor accounts for leading and internal gaps; final
         # producer counters also bind the otherwise invisible STOP tail.

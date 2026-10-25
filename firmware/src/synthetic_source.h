@@ -125,10 +125,11 @@ class SyntheticSource {
   bool generateFrame(packet::Stream stream,
                      packet::PacketBufferPipeline &pipeline,
                      ServiceReport &report);
-  static void fillAdc(protocol::MutableByteView payload,
+  void fillAdc(protocol::MutableByteView payload,
                       std::uint64_t first_pair_index);
-  static void fillGpio(protocol::MutableByteView payload,
-                       std::uint64_t first_sample_index, std::uint32_t item_bytes);
+  void fillGpio(protocol::MutableByteView payload,
+                       std::uint64_t first_sample_index, std::uint32_t item_bytes,
+                       std::uint64_t logical_frame);
 
   std::array<StreamState, packet::kStreamCount> streams_{};
   protocol::Configuration configuration_{};

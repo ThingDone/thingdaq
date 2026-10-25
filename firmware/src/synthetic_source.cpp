@@ -209,7 +209,8 @@ bool SyntheticSource::generateFrame(
   if (stream == packet::Stream::kAdc) {
     fillAdc(payload, first_item_index);
   } else {
-    fillGpio(payload, first_item_index, pipeline.streamLayout(stream).item_bytes);
+    fillGpio(payload, first_item_index, pipeline.streamLayout(stream).item_bytes,
+             source.logical_frames - 1U);
   }
 
   packet::FrameCompletion completion{};
@@ -248,8 +249,17 @@ void SyntheticSource::fillAdc(protocol::MutableByteView payload,
   for (std::size_t pair = 0U; pair < payload.size / 4U;
        ++pair) {
     const std::uint64_t index = first_pair_index + pair;
-    const std::uint16_t adc0 = adc0Code(index);
-    const std::uint16_t adc1 = adc1Code(index);
+    std::uint16_t adc0 = adc0Code(index);
+    std::uint16_t adc1 = adc1Code(index);
+    // Match the public v3 SDK's edge pairs; legacy ramps are unchanged.
+    constexpr std::uint16_t edges[4][2] = {
+        {0U, 0U}, {4095U, 4095U}, {0xABCU, 0x123U}, {0x555U, 0xAAAU}};
+    const auto phase = index % 2048U;
+    if (configuration_.protocol_version == protocol_v3::kProtocolVersion &&
+        phase < 4U) {
+      adc0 = edges[phase][0];
+      adc1 = edges[phase][1];
+    }
     const std::size_t offset = pair * 4U;
     payload.data[offset] = static_cast<std::uint8_t>(adc0 & 0xFFU);
     payload.data[offset + 1U] =
@@ -261,10 +271,21 @@ void SyntheticSource::fillAdc(protocol::MutableByteView payload,
 }
 
 void SyntheticSource::fillGpio(protocol::MutableByteView payload,
-                               std::uint64_t first_sample_index, std::uint32_t item_bytes) {
+                               std::uint64_t first_sample_index, std::uint32_t item_bytes,
+                               std::uint64_t logical_frame) {
   for (std::size_t sample = 0U;
        sample < payload.size / item_bytes; ++sample) {
     const auto value = first_sample_index + sample;
+    // V3 alternates compressible and high-transition frames, as specified by
+    // its SDK validator/simulator. Logical frame parity survives counted loss.
+    if (configuration_.protocol_version == protocol_v3::kProtocolVersion) {
+      const bool held = (logical_frame & 1U) == 0U;
+      const bool even = (value & 1U) == 0U;
+      payload.data[sample * item_bytes] = held ? 0U : (even ? 0xAAU : 0x55U);
+      if (item_bytes == 2U)
+        payload.data[sample * item_bytes + 1U] = held ? 0U : (even ? 0x0FU : 0xF0U);
+      continue;
+    }
     payload.data[sample * item_bytes] = gpioByte(value);
     if (item_bytes == 2U)
       payload.data[sample * item_bytes + 1U] = gpioByte(value >> 8U);

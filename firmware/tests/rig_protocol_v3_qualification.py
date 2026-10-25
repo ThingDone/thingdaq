@@ -78,6 +78,7 @@ def empty_stream():
         "versions": [],
         "run_ids": [],
         "sample_checks": 0,
+        "synthetic_checks": 0,
         "encodings": {},
         "first_ticks": 0,
         "last_ticks": 0,
@@ -107,9 +108,10 @@ class WireTap:
     def is_open(self):
         return self.transport.is_open
 
-    def reset(self, width=1):
+    def reset(self, width=1, synthetic=False):
         require(not self.buffer, "partial frame at run boundary")
         self.width = width
+        self.synthetic = synthetic
         self.streams = {"adc": empty_stream(), "gpio": empty_stream()}
         self.errors = 0
         self.raw_hash = hashlib.sha256()
@@ -234,6 +236,38 @@ class WireTap:
                             expected == decode_data_payload(kind, body, count).payload,
                             "SDK/oracle codec disagreement",
                         )
+                    if self.synthetic:
+                        require(version == 3 and flags & 1, "synthetic source marker")
+                        first = ticks // 8
+                        if kind == 1:
+                            edges = (
+                                (0, 0),
+                                (4095, 4095),
+                                (0xABC, 0x123),
+                                (0x555, 0xAAA),
+                            )
+                            values = (
+                                edges[i % 2048]
+                                if i % 2048 < 4
+                                else ((2 * i) & 4095, (2 * i + 1) & 4095)
+                                for i in range(first, first + count)
+                            )
+                            source = b"".join(
+                                struct.pack("<HH", *pair) for pair in values
+                            )
+                        else:
+                            source = b"".join(
+                                (
+                                    0
+                                    if sequence % 2 == 0
+                                    else (0xAA if i % 2 == 0 else 0x55)
+                                    if width == 1
+                                    else (0x0FAA if i % 2 == 0 else 0xF055)
+                                ).to_bytes(width, "little")
+                                for i in range(first, first + count)
+                            )
+                        require(expected == source, "synthetic source samples disagree")
+                        row["synthetic_checks"] += 1
                     row["sample_checks"] += 1
                     row["samples"].append(frame.hex())
                 row["encodings"][key] = row["encodings"].get(key, 0) + 1
@@ -341,7 +375,10 @@ def capture(daq, tap, cell, settings, record):
     result["capabilities_hex"] = record["capabilities_hex"]
     temperature(daq, result["temperatures"], "before")
     result["clock_measurements"] = [clock_before or clock_measurement(daq)]
-    tap.reset(settings.gpio_width_bits // 8)
+    tap.reset(
+        settings.gpio_width_bits // 8,
+        synthetic=not legacy and int(settings.source) == 1,
+    )
     before_parser = daq.parser_counters.corruption_events
     before_host = daq.reader_counters.host_block_queue_drops
     before_reader = asdict(daq.reader_counters)
