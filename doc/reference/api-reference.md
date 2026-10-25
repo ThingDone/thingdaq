@@ -23,11 +23,12 @@ related:
 # Python API reference
 
 > [!IMPORTANT]
-> The 1.2.0 development candidate uses [[protocol-v3]]: fixed 600 MHz CPU,
+> The supported 1.2.0 release uses [[protocol-v3]]: fixed 600 MHz CPU,
 > 1 MHz ADC pairs and GPIO, 12-bit ADC PACK12, GPIO RLE_AUTO, and auxiliary
 > DISABLED (8 inputs). Select INPUT for 16 GPIO inputs. Query metadata before
-> configuring an exact advertised tuple while STOPPED. Physical qualification
-> is NOT_RUN; historical 1.1.0/v2 results do not qualify this candidate.
+> configuring an exact advertised tuple while STOPPED. Exact-artifact physical
+> qualification passed all 62 cells plus supplemental checks; see
+> [[release-1.2.0]] and [[protocol-v3-hardware]]. Package publication is separate.
 > Use block sample timestamps; `TimestampAligner` does not support these layouts.
 > See [[protocol-v3-migration]] and [[protocol-v3-upgrade]].
 

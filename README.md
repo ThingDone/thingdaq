@@ -1,13 +1,17 @@
 # ThingDAQ
 
-The **1.2.0 development candidate** uses [public protocol v3](doc/protocol/protocol-v3.md):
+The **supported 1.2.0 release** uses [public protocol v3](doc/protocol/protocol-v3.md):
 **fixed 600 MHz**, **1 MHz ADC pairs/GPIO**, **12-bit ADC PACK12**, **GPIO RLE_AUTO**,
 and **auxiliary DISABLED** (8 inputs; INPUT selects 16). Query capabilities and
 configure an exact advertised tuple while STOPPED. Runtime CPU switching is
-unavailable. Physical qualification is **NOT_RUN**; this is not a published or
-approved release. See the [migration guide](doc/guides/protocol-v3-migration.md).
+unavailable. Exact-artifact physical qualification is **PASS (62/62 cells)**,
+plus identity, metadata/reset, old-SDK and mixed-version checks. See the
+[release notes and artifact hashes](doc/results/release-1.2.0.md),
+[hardware evidence](doc/results/protocol-v3-hardware.md), and
+[migration guide](doc/guides/protocol-v3-migration.md). Remote package publication
+is separate; no 1.2.0 package was published by this qualification.
 
-Install this candidate from the checkout with `python -m pip install ./daq_api`.
+Install the SDK from the checkout with `python -m pip install ./daq_api`.
 The installed package provides these hardware-free checks:
 
 ```bash
@@ -33,18 +37,21 @@ Build identity, validation and limits are in the
 The optional equal-frame `TimestampAligner` is not supported for this new
 profile; acquisition blocks provide exact per-sample timestamps.
 
-The Python SDK's combined ADC + 16-GPIO path remains unqualified for sustained
-lossless capture. Its queue-loss failure reproduces under a 0.5-core host quota.
-Two allocated cores pass short captures, width transitions and a 600-second
+Historical SDK combined ADC + 16-GPIO captures were unqualified for sustained
+lossless capture. Their queue-loss failure reproduced under a 0.5-core host quota.
+Two allocated cores passed short captures, width transitions and a 600-second
 SDK repeat, but another SDK attempt timed out after 50.08 seconds with firmware
 ADC DMA error counters and zero host throttling. The independent wire validator
 also passed a 600-second watchdog-enabled firmware baseline with two cores. See the
 [historical watchdog baseline and SDK CPU comparison](doc/results/watchdog-sdk-20260927.md).
-Strict loss detection remains enabled; historical parser rejections remain unexplained.
+Those failures remain historical evidence. The supported v3 artifact passes its
+separate complete matrix with two host cores and strict loss detection enabled.
 
-Watchdog initialization is temporarily disabled in current firmware while the
-intermittent ADC fault remains unresolved. A disabled-watchdog build passed a
-600-second SDK capture, but watchdog causation is unproven. The legacy
+Watchdog initialization remains disabled in the supported firmware. The
+public-v3 STOP-boundary DMA fault was corrected and requalified; see the
+[DMA recovery evidence](doc/results/protocol-v3-dma-recovery.md). A historical
+disabled-watchdog build passed a 600-second SDK capture, but watchdog causation
+is unproven. The legacy
 runtime-health command reports watchdog disabled and timeout zero; v3 does not
 expose that command. Reset cause is not captured while initialization is skipped. See the [decision and test evidence](doc/results/watchdog-disabled-20260927.md).
 
@@ -86,7 +93,7 @@ pins, source, or front end.
 ## Start without hardware
 
 Published packages remain separately versioned. The following installs the
-published package, which need not contain this development candidate:
+published package, which need not contain the locally qualified 1.2.0 release:
 
 ```bash
 python -m pip install thingdone-daq
@@ -251,7 +258,8 @@ the [hardware-safety guide](doc/reference/hardware-safety.md).
 - [Hardware safety](doc/reference/hardware-safety.md)
 - [Calibration](doc/architecture/calibration.md)
 - [Optional NumPy integration](doc/architecture/numpy-integration.md)
-- [Current protocol v2](doc/protocol/protocol-v2.md)
+- [Current protocol v3](doc/protocol/protocol-v3.md)
+- [Legacy protocol v2](doc/protocol/protocol-v2.md)
 - [Historical protocol v1](doc/protocol/protocol-v1.md)
 - [System overview](doc/architecture/system-overview.md)
 - [Phase 10 package workflow evidence](doc/results/phase-10-package-workflows.md)
@@ -260,8 +268,9 @@ The additive [public v3 contract](doc/protocol/protocol-v3.md) defines bounded
 capability/settings queries and explicit RAW/RLE/PACK12 framing. Its generated
 constants, codecs and opt-in Python simulator sessions are available offline.
 The Python API, serial negotiation and CLI support v3 plus historical v1 and
-release v2 peers. Development firmware integrates v3 at fixed 600 MHz; physical
-public-v3 qualification remains pending. See the [Python compatibility gate](doc/results/protocol-v3-python.md).
+release v2 peers. Supported firmware runs v3 at fixed 600 MHz; see the
+[exact-artifact hardware qualification](doc/results/protocol-v3-hardware.md) and
+[host compatibility gate](doc/results/protocol-v3-python.md).
 
 ```python
 from thingdone_daq import ThingDAQ

@@ -19,23 +19,24 @@ related:
 
 # Public v3 SDK and firmware migration
 
-The 1.2.0 development candidate defaults to fixed 600 MHz CPU, both streams at
+The supported 1.2.0 release defaults to fixed 600 MHz CPU, both streams at
 1 MHz, 12-bit ADC PACK12, GPIO RLE_AUTO and auxiliary DISABLED (8 GPIO inputs).
 INPUT selects 16 bits. Firmware version 1.2.0, SDK version 1.2.0 and wire version
-3 are independent identities. Physical qualification is **NOT_RUN**. Historical
-v1/v2 measurements and private compression experiments do not qualify this
-candidate. Build/install from the checkout or its local wheel; these instructions
-do not imply that a candidate package has been published.
+3 are independent identities. Exact-artifact physical qualification is
+**PASS (62/62 cells)** plus supplemental identity, metadata/reset, isolated
+pre-upgrade SDK and mixed-version checks. See [[release-1.2.0]] for supported
+artifact hashes and [[protocol-v3-hardware]] for evidence and measurement limits.
+Install from the checkout or retained local wheel; remote publication is separate.
 
 ## Compatibility matrix
 
 | Python client | Firmware | Behavior |
 | --- | --- | --- |
-| New v3-aware SDK | Public v3 candidate | Negotiates v3; advertised compressed defaults, exact tuple selection and active settings/clocks readback |
+| New v3-aware SDK | Supported public v3 | Negotiates v3; advertised compressed defaults, exact tuple selection and active settings/clocks readback |
 | New v3-aware SDK | Historical v1 | Explicit version rejection permits fallback to v1; existing layouts, models, rate checks and commands retained |
 | New v3-aware SDK | Historical v2 / release 1.1.0 | Negotiates v2 after explicit rejections; legacy RAW layouts and 1 MHz policy retained |
-| Older v2 SDK (1.1.0) | Public v3 candidate | Explicit v2 CONFIGURE/START yields legacy RAW frames at the new firmware's actual fixed 600 MHz clock |
-| v1-only SDK | Public v3 candidate | No guarantee of acquisition; the new firmware need not acquire in v1 mode |
+| Older v2 SDK (1.1.0) | Supported public v3 | Explicit v2 CONFIGURE/START yields legacy RAW frames at the new firmware's actual fixed 600 MHz clock |
+| v1-only SDK | Supported public v3 | No guarantee of acquisition; the new firmware need not acquire in v1 mode |
 | Any ordinary public SDK | Private `0x82` / `0x83` experiment | No automatic support or decoding as public v3; use matching archived tooling only for offline evidence inspection |
 
 The new SDK probes INFO in order **3 → 1 → 2**. It advances only after an
@@ -144,7 +145,11 @@ with ThingDAQ.open(hardware_serial=20512460, strict=True) as daq:
 ```
 
 The v2 request selects the legacy wire path; private compression flags are not
-needed. Read live INFO for the actual 600 MHz clock. The historical 1.1.0 450 MHz
+needed. All five documented v2 stream/width configurations passed using unchanged
+pre-upgrade SDK revision `3a52ead02791019fcdb0b27a8be869effc955aa2`. ADC-only
+with auxiliary INPUT is invalid in v2; use DISABLED for ADC-only. Incomplete
+STOP tails are explicitly bounded and reconciled separately from complete packets.
+Read live INFO for the actual 600 MHz clock. The historical 1.1.0 450 MHz
 artifact remains separately reproducible; do not relabel its hashes or assume
 its qualification transfers. New Python's v3 RAW policies do not emulate v2.
 

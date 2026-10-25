@@ -1,6 +1,6 @@
 ---
 type: reference
-title: Public v3 candidate builds and legacy RAW compatibility
+title: Public v3 release builds and legacy RAW compatibility
 created: 2026-10-20
 tags:
   - firmware
@@ -13,12 +13,16 @@ related:
   - '[[release-1.1.0]]'
 ---
 
-# Public v3 candidate builds and legacy RAW compatibility
+# Public v3 release builds and legacy RAW compatibility
 
-## Standard candidate
+## Supported artifact and standard build
 
-From the repository root, with Arduino CLI, Teensy core 1.62.0 and Arm GNU
-15.2.1 installed:
+The supported artifact is the unchanged frozen HEX named in [[release-1.2.0]]
+and `firmware/soak/protocol-v3-release.json`; use its recorded hash when flashing.
+Promotion did not rebuild firmware. A new build is not automatically qualified.
+
+For source reproduction from the repository root, with Arduino CLI, Teensy
+core 1.62.0 and Arm GNU 15.2.1 installed:
 
 ```bash
 .venv/bin/python firmware/tools/build_firmware.py
@@ -61,11 +65,12 @@ headroom and allocation ownership checks remain required.
 `binary_inspection.legacy_v2_packet_retention` describes only legacy layouts.
 It is not a public-v3 retention estimate: public frames include a prefix and
 use different logical item counts. V3 STATUS exposes the selected layout's
-retention. Physical qualification is `NOT_RUN` for this candidate.
+retention. The exact frozen release passed all 62 required hardware cells and
+supplemental checks; see [[protocol-v3-hardware]].
 
 Firmware **1.2.0**, wire protocol **3**, and SDK **1.2.0** are independently
-versioned. These are development candidate sources, not a published package
-or a physical release approval.
+versioned. The supported release manifest binds their exact tested hashes;
+remote package publication is separate.
 
 ## Explicit v2 RAW operation
 

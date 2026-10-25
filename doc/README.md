@@ -57,21 +57,22 @@ related:
 # ThingDAQ documentation
 
 > [!IMPORTANT]
-> The 1.2.0 development candidate uses [[protocol-v3]]: fixed 600 MHz CPU,
+> The supported 1.2.0 release uses [[protocol-v3]]: fixed 600 MHz CPU,
 > 1 MHz ADC pairs and GPIO, 12-bit ADC PACK12, GPIO RLE_AUTO, and auxiliary
 > DISABLED (8 inputs). Select INPUT for 16 GPIO inputs. Query metadata before
-> configuring an exact advertised tuple while STOPPED. Physical qualification
-> is NOT_RUN; historical 1.1.0/v2 results do not qualify this candidate.
+> configuring an exact advertised tuple while STOPPED. Exact-artifact physical
+> qualification passed all 62 cells plus supplemental checks; see
+> [[release-1.2.0]] and [[protocol-v3-hardware]]. Package publication is separate.
 > Use block sample timestamps; `TimestampAligner` does not support these layouts.
 > See [[protocol-v3-migration]] and [[protocol-v3-upgrade]].
 
 The historical 1.1.0 artifact and validation record is [[Release-1.1.0]].
-Start the current candidate with [[Quickstart]], build it with [[firmware-builds]],
+Start the supported release with [[Quickstart]], build it with [[firmware-builds]],
 and use [[protocol-v3-migration]] for client/firmware compatibility.
 The exact-candidate rig runner and evidence gate are documented in
-[[protocol-v3-qualification]]; the frozen candidate and Phase 06 setup are in
-[[protocol-v3-release-candidate]]. Their availability does not establish physical
-qualification.
+[[protocol-v3-qualification]]. Current supported hashes and limits are in
+[[release-1.2.0]]; [[protocol-v3-release-candidate]] retains the historical Phase 05
+freeze and setup.
 
 After installing this checkout (`python -m pip install ./daq_api`), run:
 

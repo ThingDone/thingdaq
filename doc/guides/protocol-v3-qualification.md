@@ -18,10 +18,13 @@ related:
 # Exact-candidate protocol v3 qualification
 
 `firmware/tools/qualify_protocol_v3.py` plans, submits, resumes and validates
-one fixed-candidate campaign. The implementation is available for Phase 06;
-**physical qualification remains NOT_RUN** until the complete matrix has
-passing retained service evidence. The local simulator and portable C++ tests
-are implementation checks, not hardware qualification.
+one fixed-candidate campaign. The supported 1.2.0 artifact has **62/62 PASS**
+and five passing supplemental checks, recorded in [[protocol-v3-hardware]].
+`firmware/soak/protocol-v3-release.json` binds its supported status to the
+unchanged candidate, freeze, firmware and SDK hashes; see [[release-1.2.0]].
+The frozen candidate retains its preparation-time NOT_RUN field. New candidates
+still require their own complete physical evidence; local simulator and portable
+C++ tests are implementation checks.
 
 The worker uses public v3 negotiation and the production SDK's control,
 parser and block paths. Explicit v2 RAW cells use that SDK's low-level
@@ -198,7 +201,7 @@ from acceptance.
 ```bash
 .venv/bin/python firmware/tools/qualify_protocol_v3.py validate \
   --candidate firmware/soak/protocol-v3-candidate.json \
-  --output .maestro/playbooks/Working/protocol-v3-qualification
+  --output .maestro/playbooks/Working/protocol-v3-qualification-legacy-matrix-fixed-20261025
 ```
 
 Each cell's `attempt-001/` retains firmware bytes, exact generated program,
