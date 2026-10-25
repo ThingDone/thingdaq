@@ -1,0 +1,2631 @@
+{
+  "build_id": "thingdaq-92950ec5f7156586",
+  "candidate_sha256": "5d6df850bd97add629502c9126c42eb1483ee2bd05efb1c0b466c55e5a92c1c7",
+  "canonical_streaming_counts": {
+    "FAIL": 1,
+    "NOT_RUN": 19,
+    "PASS": 36
+  },
+  "created": "2026-10-25",
+  "diagnosis": "Host CPU quota limits USB drain; exhausted packet pool evicts complete unsent frames. Reproduced on the frozen candidate with zero raw-ring overruns and DMA faults.",
+  "firmware_sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+  "freeze_verification": {
+    "artifact_sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+    "build_id": "thingdaq-92950ec5f7156586",
+    "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+    "protected_file_count": 499,
+    "protected_tree_sha256": "3d9ac9a820b881936a1a247ca9eacb97bf40b9305805b85704fec55a659470d1",
+    "result": "PASS",
+    "source_id": "92950ec5f71565862251c63bd1d170a51045d43f383f89d93302681a228a41a2",
+    "staged_directory": ".maestro/playbooks/Working/phase06-dma-corrected-20261024/frozen"
+  },
+  "limits": [
+    "Original failure did not retain detailed raw-ring/pressure or host CPU telemetry; its exact scheduling history is not reconstructable. Same-image reproduction supplies that missing path evidence.",
+    "A single 60-second adequate-CPU diagnostic supports the scoped remedy; complete requalification and endurance remain required.",
+    "Legacy STATUS includes separately accounted incomplete STOP tails and boot layout metadata; public-v3 layout and complete-frame counters remain authoritative.",
+    "Full raw stream is hashed, with bounded sample/control frames retained; a full raw-byte file was not saved."
+  ],
+  "local_validation": {
+    "affected_tests": {
+      "passed": 31,
+      "subtests_passed": 16
+    },
+    "documentation_tests": {
+      "passed": 11,
+      "subtests_passed": 1442
+    },
+    "independent_capture_grading": "PASS",
+    "portable_pressure_reproduction": "PASS",
+    "production_inputs_changed": false
+  },
+  "original": {
+    "error": "ValueError: unexpected SDK event StreamGap(kind=<FrameKind.GPIO_DATA: 2>, run_id=1, expected_sequence=19423, observed_sequence=19424, missing_frames=1, missing_items=2016, expected_first_sample_ticks=313254144, observed_first_sample_ticks=313270272, firmware_reported=True, firmware_overrun=True, host_queue_drops=0, source=<Source.HARDWARE: 0>, sequence_inferred_items=None, firmware_evidence=FirmwareLossEvidence(source=<Source.HARDWARE: 0>, gap_before=True, overrun_before=True, stats_generation=1, cumulative_dropped_frames=1, cumulative_dropped_items=2016, cumulative_dropped_bytes=4032, expected_cumulative_frames=1, expected_cumulative_items=2016, flags_match=True, counters_match=True, errors=()), period_ticks=8, frame_item_count=2016, variable_frame_items=True)",
+    "final_status": {
+      "adc_codec_completed": 0,
+      "adc_codec_deadline_drops": 0,
+      "adc_codec_max_age_ticks": 0,
+      "adc_codec_max_work_ticks": 0,
+      "adc_codec_raw": 0,
+      "adc_codec_resource_drops": 0,
+      "adc_codec_work_ticks": 0,
+      "adc_dma_error_events": 0,
+      "adc_encoded_bytes_transmitted": 157235904,
+      "adc_etc_error_events": 0,
+      "adc_frames_dropped": 0,
+      "adc_frames_produced": 38997,
+      "adc_items_dropped": 0,
+      "adc_items_per_frame": 1008,
+      "adc_items_produced": 39308976,
+      "adc_logical_bytes_transmitted": 157235904,
+      "adc_max_frame_bytes": 4092,
+      "adc_raw_invariant_errors": 0,
+      "adc_retention_ticks": 1612800,
+      "adc_wire_bytes_transmitted": 159575724,
+      "gpio_codec_completed": 0,
+      "gpio_codec_deadline_drops": 0,
+      "gpio_codec_max_age_ticks": 0,
+      "gpio_codec_max_work_ticks": 0,
+      "gpio_codec_raw": 0,
+      "gpio_codec_resource_drops": 0,
+      "gpio_codec_work_ticks": 0,
+      "gpio_encoded_bytes_transmitted": 78611904,
+      "gpio_frames_dropped": 1,
+      "gpio_frames_produced": 19498,
+      "gpio_hardware_errors": 0,
+      "gpio_items_dropped": 2016,
+      "gpio_items_per_frame": 2016,
+      "gpio_items_produced": 39307968,
+      "gpio_logical_bytes_transmitted": 78611904,
+      "gpio_max_frame_bytes": 4092,
+      "gpio_raw_invariant_errors": 0,
+      "gpio_retention_ticks": 3225600,
+      "gpio_wire_bytes_transmitted": 79781724,
+      "packet_encoding_rejections": 0,
+      "packet_invalid_operations": 0,
+      "packet_ready_high_water": 2,
+      "packet_transmit_high_water": 200,
+      "parser_errors": 0,
+      "pending_frames": 0,
+      "run_id": 1,
+      "state": 1,
+      "transport_errors": 0
+    },
+    "first_status": {
+      "adc_codec_completed": 0,
+      "adc_codec_deadline_drops": 0,
+      "adc_codec_max_age_ticks": 0,
+      "adc_codec_max_work_ticks": 0,
+      "adc_codec_raw": 0,
+      "adc_codec_resource_drops": 0,
+      "adc_codec_work_ticks": 0,
+      "adc_dma_error_events": 0,
+      "adc_encoded_bytes_transmitted": 156679488,
+      "adc_etc_error_events": 0,
+      "adc_frames_dropped": 0,
+      "adc_frames_produced": 38989,
+      "adc_items_dropped": 0,
+      "adc_items_per_frame": 1008,
+      "adc_items_produced": 39300912,
+      "adc_logical_bytes_transmitted": 156679488,
+      "adc_max_frame_bytes": 4092,
+      "adc_raw_invariant_errors": 0,
+      "adc_retention_ticks": 1612800,
+      "adc_wire_bytes_transmitted": 159011028,
+      "gpio_codec_completed": 0,
+      "gpio_codec_deadline_drops": 0,
+      "gpio_codec_max_age_ticks": 0,
+      "gpio_codec_max_work_ticks": 0,
+      "gpio_codec_raw": 0,
+      "gpio_codec_resource_drops": 0,
+      "gpio_codec_work_ticks": 0,
+      "gpio_encoded_bytes_transmitted": 78337728,
+      "gpio_frames_dropped": 1,
+      "gpio_frames_produced": 19494,
+      "gpio_hardware_errors": 0,
+      "gpio_items_dropped": 2016,
+      "gpio_items_per_frame": 2016,
+      "gpio_items_produced": 39299904,
+      "gpio_logical_bytes_transmitted": 78337728,
+      "gpio_max_frame_bytes": 4092,
+      "gpio_raw_invariant_errors": 0,
+      "gpio_retention_ticks": 3225600,
+      "gpio_wire_bytes_transmitted": 79503468,
+      "packet_encoding_rejections": 0,
+      "packet_invalid_operations": 0,
+      "packet_ready_high_water": 2,
+      "packet_transmit_high_water": 200,
+      "parser_errors": 0,
+      "pending_frames": 194,
+      "run_id": 1,
+      "state": 3,
+      "transport_errors": 0
+    },
+    "job_id": "322b4ac0-309d-4d61-a625-d4ce41cbf104",
+    "outcome": "FAIL"
+  },
+  "portable_reproduction": {
+    "blocked_usb_gpio_frames_evicted": 1,
+    "conservation": true,
+    "draining_consumer_evictions": 0,
+    "gpio_bytes_dropped": 4032,
+    "gpio_items_dropped": 2016,
+    "independent_sdk_checksum_and_payload_validation": "PASS",
+    "outcome": "PASS",
+    "pinned_frame_unchanged": true
+  },
+  "qualification_credit": "NONE: diagnostic jobs do not replace canonical failures",
+  "retained_files": [
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/container-cleanup.json",
+      "sha256": "59e5203b5c1bdbca0ab59a0ab330f72306ad84e5973489108b5d186eaaa161df",
+      "size_bytes": 94
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/documentation-validation.log",
+      "sha256": "711619e7d5cd4502e623d546f3f61d39343937464abf9d05f8cd448b8bcecb01",
+      "size_bytes": 119
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/freeze-verification.json",
+      "sha256": "c14b93f4a31d4f7da0ad0a74d3dd65bd1fdd667f9a923b22e1ce0dea877fc69a",
+      "size_bytes": 518
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/diagnostic-candidate.json",
+      "sha256": "126f1acadb482396be9346ead43c74953a93d34b5eda8ee694a1d46534f5ca20",
+      "size_bytes": 23260
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/host-timing.json",
+      "sha256": "c8f4ed4d2df3b9c74f22584d14aeef80d3b904f98b4c2e846987dca08bbbda35",
+      "size_bytes": 3890
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/ownership-status.json",
+      "sha256": "e3d948aef2c077126b52813e143da5b23de754e6f0d3c766372293bc40279fcc",
+      "size_bytes": 9854
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/prior-status.json",
+      "sha256": "8e83788f45772e01fa3fdf13e4b25f4058c25ad9fc4f1525728c2c09d543d24e",
+      "size_bytes": 149
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/provenance.json",
+      "sha256": "8bbea1c3d09d6d6517fb915f95777a1bc587bd429cf592d05843ed665795ecb3",
+      "size_bytes": 5764
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/record.json",
+      "sha256": "cae7a1e57470671b0a2388df8c6d26670fcdbcb8180ea10182c9e49f8780860c",
+      "size_bytes": 43742
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/results.json",
+      "sha256": "65501123d77167af0638cbacd445293517644993427e69fbad4caa3e67f03412",
+      "size_bytes": 69066
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/rig-program.py",
+      "sha256": "ec3b88770a6fa74499a31a4ab214f89a0da134eb4537e0722935f2b2481622b3",
+      "size_bytes": 455376
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/start.json",
+      "sha256": "98f87f7c535c9ed3976e986f24b6050c88d126e7625d8eb367af5b5d3495104f",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01/submission.json",
+      "sha256": "1e67800a4ae2d5d79733cb99c7a091c1cca9ae946997cc571ff4678d589be154",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/diagnostic-candidate.json",
+      "sha256": "126f1acadb482396be9346ead43c74953a93d34b5eda8ee694a1d46534f5ca20",
+      "size_bytes": 23260
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/host-timing.json",
+      "sha256": "da569049925e08f6a9fda8857f367242d8556cd882f1531377f8c92ab40eba35",
+      "size_bytes": 3906
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/ownership-status.json",
+      "sha256": "2e40e385c5565aa5796afbeaa487816c5ee9634bb6fb4518f2bfdd5cca92ec79",
+      "size_bytes": 9859
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/prior-status.json",
+      "sha256": "adaa005dda02f36cf62be2074accf2681740ae6ac0f6ca396bb0cd8431fad3d3",
+      "size_bytes": 295
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/provenance.json",
+      "sha256": "a643040222fa5705762c00a1a54bdd26bd69843617a0ac50cf465694a97f7ab3",
+      "size_bytes": 5764
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/record.json",
+      "sha256": "d9d48dc274003befcb168b6fd0ff1b6b2ff24830b691cc54f6a03cbdc2ea1e36",
+      "size_bytes": 81045
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/resources-after.json",
+      "sha256": "238ff17fd1be811b5be597f60f92010589bd078b7ea738cd352d22503ea0a922",
+      "size_bytes": 518
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/resources-before.json",
+      "sha256": "a4ef6995afc365603e2cb93ff549dd8fc0d8ffea88373c861de7840e8979292c",
+      "size_bytes": 503
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/results.json",
+      "sha256": "0f7c17bff310c9d0001e3e6647c306978cf2baf73102f232950745ef9ae14a23",
+      "size_bytes": 108082
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/rig-program.py",
+      "sha256": "66c47bd4b9b362047d45c95c38bd4c6cc96c3442ecd293ecdf4979ce0fc85a25",
+      "size_bytes": 456079
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/start.json",
+      "sha256": "6c8eb936433b89a89c062a39382c4c1bce2787027a85f646f1d2e15e2f476878",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02/submission.json",
+      "sha256": "973396233e95a4b11c06db727a90a30d38987e70cb22e5c3507e9acf7e08f90d",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/cpu-allocation.json",
+      "sha256": "dcfb3e1ef9486e41174a875ea249035b0cf6ad3c3e5536f8dd31d6da7fdae0c2",
+      "size_bytes": 198
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/diagnostic-candidate.json",
+      "sha256": "126f1acadb482396be9346ead43c74953a93d34b5eda8ee694a1d46534f5ca20",
+      "size_bytes": 23260
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/host-timing.json",
+      "sha256": "2ae11ca2c1343d29f0f014f9bd50b60d7fe70eeb58105b42f15f9f6dc713dcbe",
+      "size_bytes": 3061
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/ownership-status.json",
+      "sha256": "cf9d3bd6c480f7b5ea1a4d5be493d6b8439843408f2080cd941578b6106b6685",
+      "size_bytes": 9845
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/prior-status.json",
+      "sha256": "ff26101a841505d5dd98573c68a3d819a292eb383551037a2d550088f5c20540",
+      "size_bytes": 441
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/provenance.json",
+      "sha256": "0141af256a732a4d36efb58a18e050362538f8e8184c48719bfbefb361f68268",
+      "size_bytes": 5764
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/record.json",
+      "sha256": "70867c260f4f12398603658cd5cbb8dcb42fea1fadd1d843269012ebf07a9296",
+      "size_bytes": 39580
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/resources-after.json",
+      "sha256": "ecc874c4ac79478b4d7db18e4153345879179dd931bd55338af5bc33f240f9ce",
+      "size_bytes": 510
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/resources-before.json",
+      "sha256": "e39246541207c45e0ec562a5097f1f8737bd7fedcfd9364c516eb09a56464331",
+      "size_bytes": 510
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/results.json",
+      "sha256": "23213b5f4244ea7cd031afbf3a9097d2b9b734ddcee625410f0845755c6baf1b",
+      "size_bytes": 64075
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/rig-program.py",
+      "sha256": "b2f3a4e56341de32d99920938fe8ed51e9e5c83dfb079479eed2267016096a06",
+      "size_bytes": 456234
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/start.json",
+      "sha256": "42408cfdfee77c5bef81a26e6bd9eef713e3a1b8ac13ccb7d5d1448410380326",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03/submission.json",
+      "sha256": "06632de0443ee27bfc63968448b68ca89e55d0efd3c672d7adeef44ce206026f",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/packet_pressure_repro.cpp",
+      "sha256": "1433a61113e7f0ee1de8e06733db426f34bbf89988acec1b70f06b440c979106",
+      "size_bytes": 7302
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/reproduction.json",
+      "sha256": "16bebddd73894ec8929dfa4a7f763ef274f0f9797caa8310c90c2b3ff8db8c24",
+      "size_bytes": 279
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/retained-gpio-successor.bin",
+      "sha256": "a8d27c79a6be683c18befc3b86e010e0a9dba8a5a65ae18777d4d11b8a2a1b6c",
+      "size_bytes": 4092
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/run_adequate_cpu.py",
+      "sha256": "c72b1d2ff39a4d37386cb2a3336608c6d3d6b7134f72b542acc2e66755acb5a1",
+      "size_bytes": 8485
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/run_diagnostic.py",
+      "sha256": "6f054c2ffda9ee9b34f706ae5282bd3342c6dd3f2fa0cd77030d0bcb1b538566",
+      "size_bytes": 5441
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/run_repro.py",
+      "sha256": "52382fa37cfa9197ee4246d5a23302c5e020009560a3403ec6996a49fc116f8a",
+      "size_bytes": 1611
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/run_resources.py",
+      "sha256": "260d11143fd5fe9b09621f76a2377e3f0688cdff07168834be4be452df5c5485",
+      "size_bytes": 6303
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/validation.log",
+      "sha256": "e286c3c3f216a0b44425d5bfed5a74b20b3b20f61706bc5c2ffa3e7fe12a2d20",
+      "size_bytes": 104
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-030001030104011000000c0040420f0040420f00/attempt-001/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-030001030104011000000c0040420f0040420f00/attempt-001/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-030001030104011000000c0040420f0040420f00/attempt-001/provenance.json",
+      "sha256": "0023c698563be4fab3f14d9ef2b1fb369a41b1836a2b7ab8081ba25eba1b3ca2",
+      "size_bytes": 1501
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-030001030104011000000c0040420f0040420f00/attempt-001/results.json",
+      "sha256": "32e9702288d4790fbecf62707db4a9222f8fc0854fb8d1ae436fdd63066af8bb",
+      "size_bytes": 72851
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-030001030104011000000c0040420f0040420f00/attempt-001/rig-program.py",
+      "sha256": "48f56027d4118cc6b8beab02d7ad778e0d09a4844d254c1ea3d85a86e4e9fce9",
+      "size_bytes": 453759
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-030001030104011000000c0040420f0040420f00/attempt-001/start.json",
+      "sha256": "8d8c5b1a72e4f44cc4c854a3f7208bcce8b1ebeb91138f09e8f16b85d1dd729d",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-030001030104011000000c0040420f0040420f00/attempt-001/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-030001030104011000000c0040420f0040420f00/attempt-001/submission.json",
+      "sha256": "11ebfabaea421b7a24943c27c4f38cb8164cae28b239ace3c2bc7acc380bc771",
+      "size_bytes": 358
+    }
+  ],
+  "runs": [
+    {
+      "directory": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-01",
+      "duration_seconds": 60.00091512128711,
+      "error": null,
+      "host_queue_drops": 0,
+      "host_timing": {
+        "max_between_reads": 0.08192574977874756,
+        "max_oracle_seconds": 0.0693320045247674,
+        "max_read_seconds": 0.0755773801356554,
+        "slow_reads": [
+          {
+            "at": 5738218.587149458,
+            "elapsed": 0.0262265857309103,
+            "gap": 0.0033379970118403435
+          },
+          {
+            "at": 5738218.715441013,
+            "elapsed": 0.0029010698199272156,
+            "gap": 0.023529795929789543
+          },
+          {
+            "at": 5738218.791978782,
+            "elapsed": 0.02249759528785944,
+            "gap": 0.0033524902537465096
+          },
+          {
+            "at": 5738218.916763404,
+            "elapsed": 0.00343354232609272,
+            "gap": 0.02051766123622656
+          },
+          {
+            "at": 5738218.985615383,
+            "elapsed": 0.02655753865838051,
+            "gap": 0.003355838358402252
+          },
+          {
+            "at": 5738219.11636589,
+            "elapsed": 0.0032686004415154457,
+            "gap": 0.026534151285886765
+          },
+          {
+            "at": 5738219.217600429,
+            "elapsed": 0.003348561003804207,
+            "gap": 0.031023679301142693
+          },
+          {
+            "at": 5738219.286710775,
+            "elapsed": 0.02619905862957239,
+            "gap": 0.0033030258491635323
+          },
+          {
+            "at": 5738219.394729756,
+            "elapsed": 0.020945880562067032,
+            "gap": 0.003374524414539337
+          },
+          {
+            "at": 5738219.491441163,
+            "elapsed": 0.02213343884795904,
+            "gap": 0.0033189095556735992
+          },
+          {
+            "at": 5738219.616228902,
+            "elapsed": 0.0033032968640327454,
+            "gap": 0.020455826073884964
+          },
+          {
+            "at": 5738219.714342805,
+            "elapsed": 0.0025931019335985184,
+            "gap": 0.02173704281449318
+          },
+          {
+            "at": 5738219.79282574,
+            "elapsed": 0.020205439068377018,
+            "gap": 0.003419135697185993
+          },
+          {
+            "at": 5738220.015078552,
+            "elapsed": 0.0027212779968976974,
+            "gap": 0.020943794399499893
+          },
+          {
+            "at": 5738220.094400874,
+            "elapsed": 0.0211850143969059,
+            "gap": 0.0034940754994750023
+          },
+          {
+            "at": 5738220.191601643,
+            "elapsed": 0.023970589973032475,
+            "gap": 0.003862171433866024
+          },
+          {
+            "at": 5738220.287789001,
+            "elapsed": 0.024842683225870132,
+            "gap": 0.0032906997948884964
+          },
+          {
+            "at": 5738220.414785699,
+            "elapsed": 0.0027060378342866898,
+            "gap": 0.022693640552461147
+          },
+          {
+            "at": 5738220.51698713,
+            "elapsed": 0.002456052228808403,
+            "gap": 0.06057513691484928
+          },
+          {
+            "at": 5738220.616128619,
+            "elapsed": 0.003736770711839199,
+            "gap": 0.08058592863380909
+          },
+          {
+            "at": 5738220.71624806,
+            "elapsed": 0.0035504596307873726,
+            "gap": 0.04531062766909599
+          },
+          {
+            "at": 5738220.771122899,
+            "elapsed": 0.042212726548314095,
+            "gap": 0.001864871010184288
+          },
+          {
+            "at": 5738220.860064357,
+            "elapsed": 0.0511743538081646,
+            "gap": 0.002172057516872883
+          },
+          {
+            "at": 5738220.917481164,
+            "elapsed": 0.050430345349013805,
+            "gap": 0.0062424540519714355
+          },
+          {
+            "at": 5738220.969056403,
+            "elapsed": 0.05046197213232517,
+            "gap": 0.0011448934674263
+          },
+          {
+            "at": 5738221.022353229,
+            "elapsed": 0.050436814315617085,
+            "gap": 0.0028348537161946297
+          },
+          {
+            "at": 5738221.073931787,
+            "elapsed": 0.05044773407280445,
+            "gap": 0.0011417437344789505
+          },
+          {
+            "at": 5738221.125235127,
+            "elapsed": 0.05027306638658047,
+            "gap": 0.0008556060492992401
+          },
+          {
+            "at": 5738221.176350814,
+            "elapsed": 0.05044273007661104,
+            "gap": 0.0008426206186413765
+          },
+          {
+            "at": 5738221.227630114,
+            "elapsed": 0.050464228726923466,
+            "gap": 0.0008365698158740997
+          },
+          {
+            "at": 5738221.278947213,
+            "elapsed": 0.0503213033080101,
+            "gap": 0.0008528698235750198
+          },
+          {
+            "at": 5738221.329768575,
+            "elapsed": 0.0501874927431345,
+            "gap": 0.0005000587552785873
+          }
+        ]
+      },
+      "identity": {
+        "adc_resolution_bits": 12,
+        "board_id": 1,
+        "build_id": "thingdaq-92950ec5f7156586",
+        "clocks": {
+          "adc_clock_hz": 37500000,
+          "cpu_clock_hz": 600000000,
+          "cpu_profile": 1,
+          "ipg_clock_hz": 150000000,
+          "pit_clock_hz": 24000000,
+          "timestamp_hz": 8000000
+        },
+        "firmware_version": "1.2.0",
+        "hardware_serial": "20428100",
+        "mcu_id": 1,
+        "protocol_version": 3,
+        "simulated": false
+      },
+      "job_id": "9bd2bd3d-a7b6-46e4-bf64-8d985fce9179",
+      "outcome": "PASS",
+      "ownership_status": {
+        "adc0_dma_major_loops": 59541,
+        "adc0_dma_results": 60017328,
+        "adc1_dma_major_loops": 59541,
+        "adc1_dma_results": 60017328,
+        "adc_buffers_acquired": 59541,
+        "adc_buffers_completed": 59541,
+        "adc_buffers_released": 59541,
+        "adc_cache_cpu_invalidations": 59541,
+        "adc_cache_dma_discards": 59554,
+        "adc_calibration_cycles": [
+          5935,
+          17675
+        ],
+        "adc_calibration_deadline_us": 10000,
+        "adc_calibration_states": [
+          1,
+          1
+        ],
+        "adc_channels": [
+          7,
+          8
+        ],
+        "adc_clock_divider": 4,
+        "adc_clock_hz": 37500000,
+        "adc_clock_source": 1,
+        "adc_code_max": 4095,
+        "adc_code_min": 0,
+        "adc_completion_mismatches": 0,
+        "adc_configuration_flags": 255,
+        "adc_container_bytes": 2,
+        "adc_conversion_mode": 2,
+        "adc_destination_mismatches": 0,
+        "adc_dma_error_events": 0,
+        "adc_etc_error_events": 0,
+        "adc_etc_error_flags": 0,
+        "adc_framed_bytes_emitted": 243641772,
+        "adc_framed_bytes_framed": 243641772,
+        "adc_framed_bytes_transmitted": 243641772,
+        "adc_frames_consumed": 59541,
+        "adc_frames_dropped": 0,
+        "adc_frames_dropped_after_framing": 0,
+        "adc_frames_dropped_after_promotion": 0,
+        "adc_frames_emitted": 59541,
+        "adc_frames_evicted": 0,
+        "adc_frames_evicted_after_promotion": 0,
+        "adc_frames_framed_pipeline": 59541,
+        "adc_frames_generated": 59541,
+        "adc_frames_transmitted": 59541,
+        "adc_hardware_average_count": 0,
+        "adc_incomplete_buffers": 1,
+        "adc_incomplete_conversions": 0,
+        "adc_initialization_error_flags": 0,
+        "adc_input_max_mv_nominal": 3300,
+        "adc_input_min_mv_nominal": 0,
+        "adc_ipg_clock_hz": 150000000,
+        "adc_items_dropped": 993,
+        "adc_items_emitted": 60017328,
+        "adc_items_framed_pipeline": 60017328,
+        "adc_items_generated": 60017328,
+        "adc_items_transmitted_pipeline": 60017328,
+        "adc_overwritten_conversions": 0,
+        "adc_packer_chronology_errors": 0,
+        "adc_packer_pipeline_errors": 0,
+        "adc_packer_source_errors": 0,
+        "adc_packet_filling_depth": 0,
+        "adc_packet_ready_depth": 0,
+        "adc_packet_ready_high_water": 1,
+        "adc_packet_transmit_depth": 0,
+        "adc_packet_transmit_high_water": 126,
+        "adc_paired_major_loops": 59541,
+        "adc_pairs_captured": 60018321,
+        "adc_pairs_consumed": 60017328,
+        "adc_pairs_delivered": 60017328,
+        "adc_pairs_framed": 60017328,
+        "adc_pairs_transmitted": 60017328,
+        "adc_payload_bytes_dropped": 0,
+        "adc_payload_bytes_emitted": 240069312,
+        "adc_payload_bytes_framed": 240069312,
+        "adc_payload_bytes_produced": 240069312,
+        "adc_payload_bytes_transmitted": 240069312,
+        "adc_peripherals": [
+          1,
+          2
+        ],
+        "adc_pins": [
+          14,
+          15
+        ],
+        "adc_raw_drop_pairs_projected": 0,
+        "adc_raw_gap_pairs": 0,
+        "adc_raw_invariant_errors": 0,
+        "adc_raw_pairs_lost": 993,
+        "adc_raw_ready_depth": 0,
+        "adc_raw_ready_high_water": 1,
+        "adc_raw_ring_overruns": 0,
+        "adc_reference": 1,
+        "adc_reference_mv_nominal": 3300,
+        "adc_resolution_bits": 12,
+        "adc_resource_conflicts": 0,
+        "adc_sample_time_adck": 3,
+        "adc_schedule_exhaustions": 0,
+        "adc_stale_completions": 0,
+        "adc_stale_interrupts": 0,
+        "adc_start_errors": 0,
+        "adc_stop_errors": 0,
+        "adc_stop_pairs_discarded": 993,
+        "adc_trigger": {
+          "adc_etc_ctrl_configured": 0,
+          "ccm_ccgr1_configured": 4244632320,
+          "ccm_ccgr2_configured": 218099763,
+          "ccm_cscmr1_configured": 1729298496,
+          "chain_configured": [
+            8215,
+            16408
+          ],
+          "chain_length": 1,
+          "completion_counts": [
+            1,
+            1
+          ],
+          "completion_delta_cycles": 296,
+          "completion_expected_delta_cycles": 300,
+          "completion_tolerance_cycles": 120,
+          "configuration_flags": 255,
+          "diagnostic_elapsed_cycles": 17736,
+          "done0_1_irq_final": 1048577,
+          "done2_err_irq_final": 0,
+          "dwt_clock_hz": 600000000,
+          "effective_delays": [
+            1,
+            76
+          ],
+          "error_flags": 0,
+          "gpio_master_pit_channel": 0,
+          "gpio_master_pit_load": 5,
+          "gpio_master_rate_hz": 4000000,
+          "gpio_master_tctrl_configured": 0,
+          "initial_delays": [
+            0,
+            75
+          ],
+          "ipg_clock_hz": 150000000,
+          "pair_pit_channel": 1,
+          "pair_pit_load": 3,
+          "pair_rate_hz": 1000000,
+          "pair_tctrl_configured": 4,
+          "phase_ipg_cycles": 75,
+          "pit_clock_hz": 24000000,
+          "pit_mcr_configured": 0,
+          "predivider": 0,
+          "trigger_counter_configured": [
+            0,
+            75
+          ],
+          "trigger_ctrl_configured": [
+            0,
+            0
+          ],
+          "trigger_error_count": 0,
+          "trigger_queues": [
+            0,
+            4
+          ],
+          "xbar_inputs": [
+            57,
+            57
+          ],
+          "xbar_outputs": [
+            103,
+            107
+          ],
+          "xbar_sel_configured": [
+            14592,
+            14592
+          ]
+        },
+        "auxiliary_gpio": {
+          "adc_pair_rate_hz": 1000000,
+          "bank_major_loops": [
+            29770,
+            29770
+          ],
+          "bank_ring_overruns": [
+            0,
+            0
+          ],
+          "bank_samples_captured": [
+            60016320,
+            60016320
+          ],
+          "bank_stale_completions": [
+            0,
+            0
+          ],
+          "buffers_acquired": 29770,
+          "buffers_completed": 29770,
+          "buffers_released": 29770,
+          "cache_cpu_invalidations": 59540,
+          "cache_dma_discards": 59554,
+          "canceled_generations": 2,
+          "cancellation_samples": 0,
+          "count_mismatches": 0,
+          "destination_mismatches": 0,
+          "frame_coverage_ticks": 8096,
+          "generation_skew_events": 0,
+          "generation_skew_samples": 0,
+          "gpio_item_bytes": 1,
+          "gpio_sample_rate_hz": 1000000,
+          "hardware_errors": 0,
+          "invariant_errors": 0,
+          "packet_retention_us_combined": 101200,
+          "packet_retention_us_single_stream": 202400,
+          "paired_major_loops": 29770,
+          "raw_ring_overruns": 0,
+          "ready_depth": [
+            0,
+            0
+          ],
+          "ready_high_water": [
+            1,
+            1
+          ],
+          "resource_conflicts": 0,
+          "samples_captured": 60018321,
+          "samples_delivered": 60016320,
+          "samples_joined": 60016320,
+          "samples_lost": 2001,
+          "schedule_exhaustions": 0,
+          "stale_completions": 0,
+          "stale_dma_completions": 0,
+          "start_errors": 0,
+          "stop_errors": 0,
+          "stop_tail_samples": 2001,
+          "timestamp_mismatches": 0
+        },
+        "bad_checksums": 0,
+        "bad_flags": 0,
+        "bad_lengths": 0,
+        "bad_payloads": 0,
+        "bad_request_ids": 0,
+        "bad_types": 0,
+        "bad_versions": 0,
+        "commands_accepted": 22,
+        "commands_rejected": 0,
+        "configuration": null,
+        "data_checksum_algorithm": 1,
+        "data_frame_bytes": 4096,
+        "data_framed_bytes_transmitted": 365460612,
+        "data_payload_bytes_transmitted": 360101952,
+        "device_state": 1,
+        "gpio_buffers_acquired": 29770,
+        "gpio_buffers_completed": 29770,
+        "gpio_buffers_released": 29770,
+        "gpio_cache_cpu_invalidations": 59540,
+        "gpio_cache_dma_discards": 59554,
+        "gpio_dma_major_loops": 29770,
+        "gpio_duplicate_samples_ignored": 0,
+        "gpio_framed_bytes_emitted": 121818840,
+        "gpio_framed_bytes_framed": 121818840,
+        "gpio_framed_bytes_transmitted": 121818840,
+        "gpio_frames_dropped": 0,
+        "gpio_frames_dropped_after_framing": 0,
+        "gpio_frames_dropped_after_promotion": 0,
+        "gpio_frames_emitted": 29770,
+        "gpio_frames_evicted": 0,
+        "gpio_frames_evicted_after_promotion": 0,
+        "gpio_frames_framed_pipeline": 29770,
+        "gpio_frames_generated": 29770,
+        "gpio_frames_packed": 29770,
+        "gpio_frames_produced": 29770,
+        "gpio_frames_transmitted": 29770,
+        "gpio_hardware_errors": 0,
+        "gpio_items_dropped": 2001,
+        "gpio_items_emitted": 60016320,
+        "gpio_items_framed_pipeline": 60016320,
+        "gpio_items_generated": 60016320,
+        "gpio_items_transmitted_pipeline": 60016320,
+        "gpio_packed_ready_depth": 0,
+        "gpio_packed_ready_high_water": 0,
+        "gpio_packer_chronology_errors": 0,
+        "gpio_packer_drop_samples_projected": 0,
+        "gpio_packer_pipeline_errors": 0,
+        "gpio_packer_samples_dropped": 0,
+        "gpio_packer_source_errors": 0,
+        "gpio_packet_filling_depth": 0,
+        "gpio_packet_ready_depth": 0,
+        "gpio_packet_ready_high_water": 1,
+        "gpio_packet_transmit_depth": 0,
+        "gpio_packet_transmit_high_water": 63,
+        "gpio_payload_bytes_dropped": 0,
+        "gpio_payload_bytes_emitted": 120032640,
+        "gpio_payload_bytes_framed": 120032640,
+        "gpio_payload_bytes_produced": 120032640,
+        "gpio_payload_bytes_transmitted": 120032640,
+        "gpio_processing_cpu_basis_points": 1345,
+        "gpio_raw_drop_samples_projected": 0,
+        "gpio_raw_invariant_errors": 0,
+        "gpio_raw_ready_depth": 0,
+        "gpio_raw_ready_high_water": 1,
+        "gpio_raw_ring_overruns": 0,
+        "gpio_raw_samples_lost": 2001,
+        "gpio_resource_conflicts": 0,
+        "gpio_samples_captured": 60018321,
+        "gpio_samples_delivered": 60016320,
+        "gpio_samples_framed": 60016320,
+        "gpio_samples_packed": 60016320,
+        "gpio_samples_produced": 60016320,
+        "gpio_samples_transmitted": 60016320,
+        "gpio_stale_dma_completions": 0,
+        "gpio_start_errors": 0,
+        "gpio_stop_errors": 0,
+        "gpio_stop_samples_discarded": 2001,
+        "packet_accounted_frame_skew": 0,
+        "packet_capacity_drops_without_evictable_frame": 0,
+        "packet_encoding_rejections": 0,
+        "packet_fairness_deferrals": 0,
+        "packet_frames_promoted": 89311,
+        "packet_invalid_operations": 0,
+        "packet_owned_depth": 0,
+        "packet_owned_high_water": 189,
+        "packet_pool_exhaustions": 0,
+        "packet_pressure_evictions": 0,
+        "packet_ready_depth": 0,
+        "packet_ready_high_water": 2,
+        "packet_ready_queue_rejections": 0,
+        "packet_transmit_depth": 0,
+        "packet_transmit_high_water": 189,
+        "packet_transmit_queue_rejections": 0,
+        "parser_errors": 0,
+        "partial_usb_writes": 0,
+        "response_queue_rejections": 0,
+        "response_reservations_abandoned": 0,
+        "responses_completed": 22,
+        "responses_queued": 22,
+        "source": 0,
+        "state_errors": 0,
+        "stats_generation": 2,
+        "stream_mask": 0,
+        "timeouts": 0,
+        "transport_errors": 0,
+        "usb_active_frame_bytes_sent": 0,
+        "usb_active_frame_size": 0,
+        "usb_command_queue_depth": 0,
+        "usb_command_queue_high_water": 1,
+        "usb_io_errors": 0,
+        "usb_lower_priority_queue_depth": 0,
+        "usb_response_queue_depth": 0,
+        "usb_response_queue_high_water": 1,
+        "usb_rx_stall_events": 0,
+        "usb_short_capacity_deferrals": 851,
+        "usb_tx_stall_events": 1361257
+      },
+      "parser_errors": 0,
+      "qualification_status": {
+        "adc_codec_completed": 0,
+        "adc_codec_deadline_drops": 0,
+        "adc_codec_max_age_ticks": 0,
+        "adc_codec_max_work_ticks": 0,
+        "adc_codec_raw": 0,
+        "adc_codec_resource_drops": 0,
+        "adc_codec_work_ticks": 0,
+        "adc_dma_error_events": 0,
+        "adc_encoded_bytes_transmitted": 240069312,
+        "adc_etc_error_events": 0,
+        "adc_frames_dropped": 0,
+        "adc_frames_produced": 59541,
+        "adc_items_dropped": 0,
+        "adc_items_per_frame": 1008,
+        "adc_items_produced": 60017328,
+        "adc_logical_bytes_transmitted": 240069312,
+        "adc_max_frame_bytes": 4092,
+        "adc_raw_invariant_errors": 0,
+        "adc_retention_ticks": 1612800,
+        "adc_wire_bytes_transmitted": 243641772,
+        "gpio_codec_completed": 0,
+        "gpio_codec_deadline_drops": 0,
+        "gpio_codec_max_age_ticks": 0,
+        "gpio_codec_max_work_ticks": 0,
+        "gpio_codec_raw": 0,
+        "gpio_codec_resource_drops": 0,
+        "gpio_codec_work_ticks": 0,
+        "gpio_encoded_bytes_transmitted": 120032640,
+        "gpio_frames_dropped": 0,
+        "gpio_frames_produced": 29770,
+        "gpio_hardware_errors": 0,
+        "gpio_items_dropped": 0,
+        "gpio_items_per_frame": 2016,
+        "gpio_items_produced": 60016320,
+        "gpio_logical_bytes_transmitted": 120032640,
+        "gpio_max_frame_bytes": 4092,
+        "gpio_raw_invariant_errors": 0,
+        "gpio_retention_ticks": 3225600,
+        "gpio_wire_bytes_transmitted": 121818840,
+        "packet_encoding_rejections": 0,
+        "packet_invalid_operations": 0,
+        "packet_ready_high_water": 2,
+        "packet_transmit_high_water": 189,
+        "parser_errors": 0,
+        "pending_frames": 0,
+        "run_id": 1,
+        "state": 1,
+        "transport_errors": 0
+      },
+      "settings_hex": "030001030104011000000c0040420f0040420f00",
+      "temperatures": [
+        {
+          "attempt": 1,
+          "celsius": 38.509,
+          "host_monotonic_seconds": 5738160.66838261,
+          "phase": "before",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 41.579,
+          "host_monotonic_seconds": 5738170.860628455,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": null,
+          "host_monotonic_seconds": 5738180.881525738,
+          "phase": "running",
+          "status": "NOT_READY"
+        },
+        {
+          "attempt": 2,
+          "celsius": 42.808,
+          "host_monotonic_seconds": 5738180.918321981,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 44.65,
+          "host_monotonic_seconds": 5738190.932809237,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": null,
+          "host_monotonic_seconds": 5738200.945758061,
+          "phase": "running",
+          "status": "NOT_READY"
+        },
+        {
+          "attempt": 2,
+          "celsius": 46.492,
+          "host_monotonic_seconds": 5738200.956934242,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 47.72,
+          "host_monotonic_seconds": 5738210.977965928,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 48.948,
+          "host_monotonic_seconds": 5738221.329911757,
+          "phase": "after",
+          "status": "VALID"
+        }
+      ],
+      "wire": {
+        "adc": {
+          "encoded_bytes": 240069312,
+          "encodings": {
+            "0": 59541
+          },
+          "end_item": 60017328,
+          "first_host_seconds": 5738160.835381451,
+          "first_ticks": 0,
+          "frames": 59541,
+          "gap_items": 0,
+          "items": 60017328,
+          "last_host_seconds": 5738220.911218933,
+          "last_ticks": 480130560,
+          "logical_bytes": 240069312,
+          "next_sequence": 59541,
+          "run_ids": [
+            1
+          ],
+          "sample_checks": 1,
+          "versions": [
+            3
+          ],
+          "wire_bytes": 243641772
+        },
+        "gpio": {
+          "encoded_bytes": 120032640,
+          "encodings": {
+            "0": 29770
+          },
+          "end_item": 60016320,
+          "first_host_seconds": 5738160.835493862,
+          "first_ticks": 0,
+          "frames": 29770,
+          "gap_items": 0,
+          "items": 60016320,
+          "last_host_seconds": 5738220.911132182,
+          "last_ticks": 480114432,
+          "logical_bytes": 120032640,
+          "next_sequence": 29770,
+          "run_ids": [
+            1
+          ],
+          "sample_checks": 1,
+          "versions": [
+            3
+          ],
+          "wire_bytes": 121818840
+        }
+      }
+    },
+    {
+      "directory": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-02",
+      "duration_seconds": null,
+      "error": "ValueError: unexpected SDK event StreamGap(kind=<FrameKind.ADC_DATA: 1>, run_id=1, expected_sequence=49281, observed_sequence=49285, missing_frames=4, missing_items=4032, expected_first_sample_ticks=397401984, observed_first_sample_ticks=397434240, firmware_reported=True, firmware_overrun=True, host_queue_drops=0, source=<Source.HARDWARE: 0>, sequence_inferred_items=None, firmware_evidence=FirmwareLossEvidence(source=<Source.HARDWARE: 0>, gap_before=True, overrun_before=True, stats_generation=1, cumulative_dropped_frames=4, cumulative_dropped_items=4032, cumulative_dropped_bytes=16128, expected_cumulative_frames=4, expected_cumulative_items=4032, flags_match=True, counters_match=True, errors=()), period_ticks=8, frame_item_count=1008, variable_frame_items=True)",
+      "host_queue_drops": 0,
+      "host_timing": {
+        "max_between_reads": 0.08038681373000145,
+        "max_oracle_seconds": 0.06921054795384407,
+        "max_read_seconds": 0.08059216849505901,
+        "slow_reads": [
+          {
+            "at": 5738314.911364972,
+            "elapsed": 0.0030008256435394287,
+            "gap": 0.03662326466292143
+          },
+          {
+            "at": 5738314.986015189,
+            "elapsed": 0.023818296380341053,
+            "gap": 0.0032350290566682816
+          },
+          {
+            "at": 5738315.112790231,
+            "elapsed": 0.003325801342725754,
+            "gap": 0.022351096384227276
+          },
+          {
+            "at": 5738315.212284574,
+            "elapsed": 0.00327340979129076,
+            "gap": 0.02507415972650051
+          },
+          {
+            "at": 5738315.287377507,
+            "elapsed": 0.022440007887780666,
+            "gap": 0.003429669886827469
+          },
+          {
+            "at": 5738315.383895394,
+            "elapsed": 0.0274878041818738,
+            "gap": 0.0031770365312695503
+          },
+          {
+            "at": 5738315.512584819,
+            "elapsed": 0.0031762458384037018,
+            "gap": 0.023835739120841026
+          },
+          {
+            "at": 5738315.611171941,
+            "elapsed": 0.0028414400294423103,
+            "gap": 0.02556881122291088
+          },
+          {
+            "at": 5738315.713657847,
+            "elapsed": 0.0026927832514047623,
+            "gap": 0.02043293323367834
+          },
+          {
+            "at": 5738315.812815535,
+            "elapsed": 0.003634301945567131,
+            "gap": 0.022878708317875862
+          },
+          {
+            "at": 5738315.890184842,
+            "elapsed": 0.020240102894604206,
+            "gap": 0.0034156953915953636
+          },
+          {
+            "at": 5738316.112388734,
+            "elapsed": 0.0031998921185731888,
+            "gap": 0.020908735692501068
+          },
+          {
+            "at": 5738316.413271461,
+            "elapsed": 0.003360981121659279,
+            "gap": 0.02059229090809822
+          },
+          {
+            "at": 5738316.511971466,
+            "elapsed": 0.0030074454843997955,
+            "gap": 0.022451842203736305
+          },
+          {
+            "at": 5738316.579072523,
+            "elapsed": 0.031768969260156155,
+            "gap": 0.003484327346086502
+          },
+          {
+            "at": 5738316.686359106,
+            "elapsed": 0.02363679651170969,
+            "gap": 0.0032827667891979218
+          },
+          {
+            "at": 5738316.783617371,
+            "elapsed": 0.029007076285779476,
+            "gap": 0.0037302663549780846
+          },
+          {
+            "at": 5738316.912274265,
+            "elapsed": 0.003118853084743023,
+            "gap": 0.02447915356606245
+          },
+          {
+            "at": 5738317.085208498,
+            "elapsed": 0.023989724926650524,
+            "gap": 0.0036693671718239784
+          },
+          {
+            "at": 5738317.211544571,
+            "elapsed": 0.0027259625494480133,
+            "gap": 0.022476596757769585
+          },
+          {
+            "at": 5738317.289244705,
+            "elapsed": 0.0222413782030344,
+            "gap": 0.003399956040084362
+          },
+          {
+            "at": 5738317.413962788,
+            "elapsed": 0.0031805504113435745,
+            "gap": 0.020136280916631222
+          },
+          {
+            "at": 5738317.510857338,
+            "elapsed": 0.00287018995732069,
+            "gap": 0.020189090631902218
+          },
+          {
+            "at": 5738317.591535954,
+            "elapsed": 0.020376740023493767,
+            "gap": 0.004136968404054642
+          },
+          {
+            "at": 5738317.687896789,
+            "elapsed": 0.022335833869874477,
+            "gap": 0.0036334842443466187
+          },
+          {
+            "at": 5738317.814174922,
+            "elapsed": 0.0036228494718670845,
+            "gap": 0.04357443656772375
+          },
+          {
+            "at": 5738317.914093075,
+            "elapsed": 0.002682572230696678,
+            "gap": 0.07790158689022064
+          },
+          {
+            "at": 5738317.962526235,
+            "elapsed": 0.048378124833106995,
+            "gap": 0.0049718525260686874
+          },
+          {
+            "at": 5738318.068781347,
+            "elapsed": 0.050276498310267925,
+            "gap": 0.0020852331072092056
+          },
+          {
+            "at": 5738318.121042913,
+            "elapsed": 0.05008841399103403,
+            "gap": 0.0019850675016641617
+          },
+          {
+            "at": 5738318.171399417,
+            "elapsed": 0.050100162625312805,
+            "gap": 0.00026809051632881165
+          },
+          {
+            "at": 5738318.222284431,
+            "elapsed": 0.05008697882294655,
+            "gap": 0.0007848506793379784
+          }
+        ]
+      },
+      "identity": {
+        "adc_resolution_bits": 12,
+        "board_id": 1,
+        "build_id": "thingdaq-92950ec5f7156586",
+        "clocks": {
+          "adc_clock_hz": 37500000,
+          "cpu_clock_hz": 600000000,
+          "cpu_profile": 1,
+          "ipg_clock_hz": 150000000,
+          "pit_clock_hz": 24000000,
+          "timestamp_hz": 8000000
+        },
+        "firmware_version": "1.2.0",
+        "hardware_serial": "20428100",
+        "mcu_id": 1,
+        "protocol_version": 3,
+        "simulated": false
+      },
+      "job_id": "d32cf7d4-3756-4834-8458-b9c5efccb1a2",
+      "outcome": "FAIL",
+      "ownership_status": {
+        "adc0_dma_major_loops": 49429,
+        "adc0_dma_results": 49824432,
+        "adc1_dma_major_loops": 49429,
+        "adc1_dma_results": 49824432,
+        "adc_buffers_acquired": 49429,
+        "adc_buffers_completed": 49429,
+        "adc_buffers_released": 49429,
+        "adc_cache_cpu_invalidations": 49429,
+        "adc_cache_dma_discards": 49442,
+        "adc_calibration_cycles": [
+          5931,
+          17679
+        ],
+        "adc_calibration_deadline_us": 10000,
+        "adc_calibration_states": [
+          1,
+          1
+        ],
+        "adc_channels": [
+          7,
+          8
+        ],
+        "adc_clock_divider": 4,
+        "adc_clock_hz": 37500000,
+        "adc_clock_source": 1,
+        "adc_code_max": 4095,
+        "adc_code_min": 0,
+        "adc_completion_mismatches": 0,
+        "adc_configuration_flags": 255,
+        "adc_container_bytes": 2,
+        "adc_conversion_mode": 2,
+        "adc_destination_mismatches": 0,
+        "adc_dma_error_events": 0,
+        "adc_etc_error_events": 0,
+        "adc_etc_error_flags": 0,
+        "adc_framed_bytes_emitted": 202263468,
+        "adc_framed_bytes_framed": 202263468,
+        "adc_framed_bytes_transmitted": 202247100,
+        "adc_frames_consumed": 49429,
+        "adc_frames_dropped": 4,
+        "adc_frames_dropped_after_framing": 4,
+        "adc_frames_dropped_after_promotion": 4,
+        "adc_frames_emitted": 49429,
+        "adc_frames_evicted": 4,
+        "adc_frames_evicted_after_promotion": 4,
+        "adc_frames_framed_pipeline": 49429,
+        "adc_frames_generated": 49429,
+        "adc_frames_transmitted": 49425,
+        "adc_hardware_average_count": 0,
+        "adc_incomplete_buffers": 1,
+        "adc_incomplete_conversions": 0,
+        "adc_initialization_error_flags": 0,
+        "adc_input_max_mv_nominal": 3300,
+        "adc_input_min_mv_nominal": 0,
+        "adc_ipg_clock_hz": 150000000,
+        "adc_items_dropped": 4560,
+        "adc_items_emitted": 49824432,
+        "adc_items_framed_pipeline": 49824432,
+        "adc_items_generated": 49824432,
+        "adc_items_transmitted_pipeline": 49820400,
+        "adc_overwritten_conversions": 0,
+        "adc_packer_chronology_errors": 0,
+        "adc_packer_pipeline_errors": 0,
+        "adc_packer_source_errors": 0,
+        "adc_packet_filling_depth": 0,
+        "adc_packet_ready_depth": 0,
+        "adc_packet_ready_high_water": 1,
+        "adc_packet_transmit_depth": 0,
+        "adc_packet_transmit_high_water": 134,
+        "adc_paired_major_loops": 49429,
+        "adc_pairs_captured": 49824960,
+        "adc_pairs_consumed": 49824432,
+        "adc_pairs_delivered": 49824432,
+        "adc_pairs_framed": 49824432,
+        "adc_pairs_transmitted": 49820400,
+        "adc_payload_bytes_dropped": 16128,
+        "adc_payload_bytes_emitted": 199297728,
+        "adc_payload_bytes_framed": 199297728,
+        "adc_payload_bytes_produced": 199297728,
+        "adc_payload_bytes_transmitted": 199281600,
+        "adc_peripherals": [
+          1,
+          2
+        ],
+        "adc_pins": [
+          14,
+          15
+        ],
+        "adc_raw_drop_pairs_projected": 0,
+        "adc_raw_gap_pairs": 0,
+        "adc_raw_invariant_errors": 0,
+        "adc_raw_pairs_lost": 528,
+        "adc_raw_ready_depth": 0,
+        "adc_raw_ready_high_water": 1,
+        "adc_raw_ring_overruns": 0,
+        "adc_reference": 1,
+        "adc_reference_mv_nominal": 3300,
+        "adc_resolution_bits": 12,
+        "adc_resource_conflicts": 0,
+        "adc_sample_time_adck": 3,
+        "adc_schedule_exhaustions": 0,
+        "adc_stale_completions": 0,
+        "adc_stale_interrupts": 0,
+        "adc_start_errors": 0,
+        "adc_stop_errors": 0,
+        "adc_stop_pairs_discarded": 528,
+        "adc_trigger": {
+          "adc_etc_ctrl_configured": 0,
+          "ccm_ccgr1_configured": 4244632320,
+          "ccm_ccgr2_configured": 218099763,
+          "ccm_cscmr1_configured": 1729298496,
+          "chain_configured": [
+            8215,
+            16408
+          ],
+          "chain_length": 1,
+          "completion_counts": [
+            1,
+            1
+          ],
+          "completion_delta_cycles": 296,
+          "completion_expected_delta_cycles": 300,
+          "completion_tolerance_cycles": 120,
+          "configuration_flags": 255,
+          "diagnostic_elapsed_cycles": 17740,
+          "done0_1_irq_final": 1048577,
+          "done2_err_irq_final": 0,
+          "dwt_clock_hz": 600000000,
+          "effective_delays": [
+            1,
+            76
+          ],
+          "error_flags": 0,
+          "gpio_master_pit_channel": 0,
+          "gpio_master_pit_load": 5,
+          "gpio_master_rate_hz": 4000000,
+          "gpio_master_tctrl_configured": 0,
+          "initial_delays": [
+            0,
+            75
+          ],
+          "ipg_clock_hz": 150000000,
+          "pair_pit_channel": 1,
+          "pair_pit_load": 3,
+          "pair_rate_hz": 1000000,
+          "pair_tctrl_configured": 4,
+          "phase_ipg_cycles": 75,
+          "pit_clock_hz": 24000000,
+          "pit_mcr_configured": 0,
+          "predivider": 0,
+          "trigger_counter_configured": [
+            0,
+            75
+          ],
+          "trigger_ctrl_configured": [
+            0,
+            0
+          ],
+          "trigger_error_count": 0,
+          "trigger_queues": [
+            0,
+            4
+          ],
+          "xbar_inputs": [
+            57,
+            57
+          ],
+          "xbar_outputs": [
+            103,
+            107
+          ],
+          "xbar_sel_configured": [
+            14592,
+            14592
+          ]
+        },
+        "auxiliary_gpio": {
+          "adc_pair_rate_hz": 1000000,
+          "bank_major_loops": [
+            24714,
+            24714
+          ],
+          "bank_ring_overruns": [
+            0,
+            0
+          ],
+          "bank_samples_captured": [
+            49823424,
+            49823424
+          ],
+          "bank_stale_completions": [
+            0,
+            0
+          ],
+          "buffers_acquired": 24714,
+          "buffers_completed": 24714,
+          "buffers_released": 24714,
+          "cache_cpu_invalidations": 49428,
+          "cache_dma_discards": 49442,
+          "canceled_generations": 2,
+          "cancellation_samples": 0,
+          "count_mismatches": 0,
+          "destination_mismatches": 0,
+          "frame_coverage_ticks": 8096,
+          "generation_skew_events": 0,
+          "generation_skew_samples": 0,
+          "gpio_item_bytes": 1,
+          "gpio_sample_rate_hz": 1000000,
+          "hardware_errors": 0,
+          "invariant_errors": 0,
+          "packet_retention_us_combined": 101200,
+          "packet_retention_us_single_stream": 202400,
+          "paired_major_loops": 24714,
+          "raw_ring_overruns": 0,
+          "ready_depth": [
+            0,
+            0
+          ],
+          "ready_high_water": [
+            1,
+            1
+          ],
+          "resource_conflicts": 0,
+          "samples_captured": 49824960,
+          "samples_delivered": 49823424,
+          "samples_joined": 49823424,
+          "samples_lost": 1536,
+          "schedule_exhaustions": 0,
+          "stale_completions": 0,
+          "stale_dma_completions": 0,
+          "start_errors": 0,
+          "stop_errors": 0,
+          "stop_tail_samples": 1536,
+          "timestamp_mismatches": 0
+        },
+        "bad_checksums": 0,
+        "bad_flags": 0,
+        "bad_lengths": 0,
+        "bad_payloads": 0,
+        "bad_request_ids": 0,
+        "bad_types": 0,
+        "bad_versions": 0,
+        "commands_accepted": 21,
+        "commands_rejected": 0,
+        "configuration": null,
+        "data_checksum_algorithm": 1,
+        "data_frame_bytes": 4096,
+        "data_framed_bytes_transmitted": 303364512,
+        "data_payload_bytes_transmitted": 298916352,
+        "device_state": 1,
+        "gpio_buffers_acquired": 24714,
+        "gpio_buffers_completed": 24714,
+        "gpio_buffers_released": 24714,
+        "gpio_cache_cpu_invalidations": 49428,
+        "gpio_cache_dma_discards": 49442,
+        "gpio_dma_major_loops": 24714,
+        "gpio_duplicate_samples_ignored": 0,
+        "gpio_framed_bytes_emitted": 101129688,
+        "gpio_framed_bytes_framed": 101129688,
+        "gpio_framed_bytes_transmitted": 101117412,
+        "gpio_frames_dropped": 3,
+        "gpio_frames_dropped_after_framing": 3,
+        "gpio_frames_dropped_after_promotion": 3,
+        "gpio_frames_emitted": 24714,
+        "gpio_frames_evicted": 3,
+        "gpio_frames_evicted_after_promotion": 3,
+        "gpio_frames_framed_pipeline": 24714,
+        "gpio_frames_generated": 24714,
+        "gpio_frames_packed": 24714,
+        "gpio_frames_produced": 24714,
+        "gpio_frames_transmitted": 24711,
+        "gpio_hardware_errors": 0,
+        "gpio_items_dropped": 7584,
+        "gpio_items_emitted": 49823424,
+        "gpio_items_framed_pipeline": 49823424,
+        "gpio_items_generated": 49823424,
+        "gpio_items_transmitted_pipeline": 49817376,
+        "gpio_packed_ready_depth": 0,
+        "gpio_packed_ready_high_water": 0,
+        "gpio_packer_chronology_errors": 0,
+        "gpio_packer_drop_samples_projected": 0,
+        "gpio_packer_pipeline_errors": 0,
+        "gpio_packer_samples_dropped": 0,
+        "gpio_packer_source_errors": 0,
+        "gpio_packet_filling_depth": 0,
+        "gpio_packet_ready_depth": 0,
+        "gpio_packet_ready_high_water": 1,
+        "gpio_packet_transmit_depth": 0,
+        "gpio_packet_transmit_high_water": 66,
+        "gpio_payload_bytes_dropped": 12096,
+        "gpio_payload_bytes_emitted": 99646848,
+        "gpio_payload_bytes_framed": 99646848,
+        "gpio_payload_bytes_produced": 99646848,
+        "gpio_payload_bytes_transmitted": 99634752,
+        "gpio_processing_cpu_basis_points": 1343,
+        "gpio_raw_drop_samples_projected": 0,
+        "gpio_raw_invariant_errors": 0,
+        "gpio_raw_ready_depth": 0,
+        "gpio_raw_ready_high_water": 1,
+        "gpio_raw_ring_overruns": 0,
+        "gpio_raw_samples_lost": 1536,
+        "gpio_resource_conflicts": 0,
+        "gpio_samples_captured": 49824960,
+        "gpio_samples_delivered": 49823424,
+        "gpio_samples_framed": 49823424,
+        "gpio_samples_packed": 49823424,
+        "gpio_samples_produced": 49823424,
+        "gpio_samples_transmitted": 49817376,
+        "gpio_stale_dma_completions": 0,
+        "gpio_start_errors": 0,
+        "gpio_stop_errors": 0,
+        "gpio_stop_samples_discarded": 1536,
+        "packet_accounted_frame_skew": 0,
+        "packet_capacity_drops_without_evictable_frame": 0,
+        "packet_encoding_rejections": 0,
+        "packet_fairness_deferrals": 0,
+        "packet_frames_promoted": 74143,
+        "packet_invalid_operations": 0,
+        "packet_owned_depth": 0,
+        "packet_owned_high_water": 200,
+        "packet_pool_exhaustions": 7,
+        "packet_pressure_evictions": 7,
+        "packet_ready_depth": 0,
+        "packet_ready_high_water": 2,
+        "packet_ready_queue_rejections": 0,
+        "packet_transmit_depth": 0,
+        "packet_transmit_high_water": 200,
+        "packet_transmit_queue_rejections": 0,
+        "parser_errors": 0,
+        "partial_usb_writes": 0,
+        "response_queue_rejections": 0,
+        "response_reservations_abandoned": 0,
+        "responses_completed": 21,
+        "responses_queued": 21,
+        "source": 0,
+        "state_errors": 0,
+        "stats_generation": 2,
+        "stream_mask": 0,
+        "timeouts": 0,
+        "transport_errors": 0,
+        "usb_active_frame_bytes_sent": 0,
+        "usb_active_frame_size": 0,
+        "usb_command_queue_depth": 0,
+        "usb_command_queue_high_water": 1,
+        "usb_io_errors": 0,
+        "usb_lower_priority_queue_depth": 0,
+        "usb_response_queue_depth": 0,
+        "usb_response_queue_high_water": 1,
+        "usb_rx_stall_events": 0,
+        "usb_short_capacity_deferrals": 735,
+        "usb_tx_stall_events": 1224927
+      },
+      "parser_errors": 0,
+      "qualification_status": null,
+      "resources": {
+        "after": {
+          "/proc/self/cgroup": "0::/\n",
+          "/sys/fs/cgroup/cpu.max": "50000 100000\n",
+          "/sys/fs/cgroup/cpu.stat": "usage_usec 24982783\nuser_usec 22380389\nsystem_usec 2602394\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 520\nnr_throttled 452\nthrottled_usec 10491320\nnr_bursts 0\nburst_usec 0\n",
+          "cpu": 24.57029475,
+          "usage": [
+            22.052095,
+            2.518201,
+            42624,
+            0,
+            0,
+            0,
+            10551,
+            0,
+            0,
+            0,
+            648,
+            0,
+            0,
+            0,
+            170509,
+            748
+          ],
+          "wall": 5738318.272684018
+        },
+        "before": {
+          "/proc/self/cgroup": "0::/\n",
+          "/sys/fs/cgroup/cpu.max": "50000 100000\n",
+          "/sys/fs/cgroup/cpu.stat": "usage_usec 565739\nuser_usec 535963\nsystem_usec 29775\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 12\nnr_throttled 11\nthrottled_usec 532124\nnr_bursts 0\nburst_usec 0\n",
+          "cpu": 0.563850462,
+          "usage": [
+            0.536119,
+            0.027798,
+            40936,
+            0,
+            0,
+            0,
+            10167,
+            0,
+            0,
+            0,
+            648,
+            0,
+            0,
+            0,
+            132,
+            31
+          ],
+          "wall": 5738267.358695378
+        },
+        "cgroup_delta": {
+          "burst_usec": 0,
+          "core_sched.force_idle_usec": 0,
+          "nice_usec": 0,
+          "nr_bursts": 0,
+          "nr_periods": 508,
+          "nr_throttled": 441,
+          "system_usec": 2572619,
+          "throttled_usec": 9959196,
+          "usage_usec": 24417044,
+          "user_usec": 21844426
+        },
+        "cpu_seconds": 24.006444287999997,
+        "wall_seconds": 50.9139886405319
+      },
+      "settings_hex": "030001030104011000000c0040420f0040420f00",
+      "temperatures": [
+        {
+          "attempt": 1,
+          "celsius": 46.492,
+          "host_monotonic_seconds": 5738268.039273246,
+          "phase": "before",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 47.72,
+          "host_monotonic_seconds": 5738278.221576636,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 49.562,
+          "host_monotonic_seconds": 5738288.231566553,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 50.79,
+          "host_monotonic_seconds": 5738298.240446387,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 51.404,
+          "host_monotonic_seconds": 5738308.259379774,
+          "phase": "running",
+          "status": "VALID"
+        }
+      ],
+      "wire": {
+        "adc": {
+          "encoded_bytes": 199281600,
+          "encodings": {
+            "0": 49425
+          },
+          "end_item": 49824432,
+          "first_host_seconds": 5738268.206358325,
+          "first_ticks": 0,
+          "frames": 49425,
+          "gap_items": 4032,
+          "items": 49820400,
+          "last_host_seconds": 5738318.119052987,
+          "last_ticks": 398587392,
+          "logical_bytes": 199281600,
+          "next_sequence": 49429,
+          "run_ids": [
+            1
+          ],
+          "sample_checks": 1,
+          "versions": [
+            3
+          ],
+          "wire_bytes": 202247100
+        },
+        "gpio": {
+          "encoded_bytes": 99634752,
+          "encodings": {
+            "0": 24711
+          },
+          "end_item": 49823424,
+          "first_host_seconds": 5738268.206544227,
+          "first_ticks": 0,
+          "frames": 24711,
+          "gap_items": 6048,
+          "items": 49817376,
+          "last_host_seconds": 5738318.119030212,
+          "last_ticks": 398571264,
+          "logical_bytes": 99634752,
+          "next_sequence": 24714,
+          "run_ids": [
+            1
+          ],
+          "sample_checks": 1,
+          "versions": [
+            3
+          ],
+          "wire_bytes": 101117412
+        }
+      }
+    },
+    {
+      "cpu_allocation": {
+        "after_quota": 200000,
+        "before_quota": 50000,
+        "id": "a9824a2be5df9e09f2c525f04585644ced44f6c319595ab1980c17cf9cce43eb",
+        "job": "4e475671-5925-4e12-908b-c93d8711053a",
+        "period": 100000
+      },
+      "directory": ".maestro/playbooks/Working/phase06-gpio-overrun-20261025/job-03",
+      "duration_seconds": 60.00783201120794,
+      "error": null,
+      "host_queue_drops": 0,
+      "host_timing": {
+        "max_between_reads": 0.006675654090940952,
+        "max_oracle_seconds": 0.0010845493525266647,
+        "max_read_seconds": 0.05082536395639181,
+        "slow_reads": [
+          {
+            "at": 5738444.729821525,
+            "elapsed": 0.0504686925560236,
+            "gap": 0
+          },
+          {
+            "at": 5738444.781413432,
+            "elapsed": 0.05042261444032192,
+            "gap": 0.0011232150718569756
+          },
+          {
+            "at": 5738444.83307988,
+            "elapsed": 0.050433444790542126,
+            "gap": 0.00124383345246315
+          },
+          {
+            "at": 5738444.884404551,
+            "elapsed": 0.050477223470807076,
+            "gap": 0.0008912263438105583
+          },
+          {
+            "at": 5738444.939882598,
+            "elapsed": 0.05032541789114475,
+            "gap": 0.005000823177397251
+          },
+          {
+            "at": 5738444.99107451,
+            "elapsed": 0.05036302097141743,
+            "gap": 0.0008664941415190697
+          },
+          {
+            "at": 5738445.042634279,
+            "elapsed": 0.050449956208467484,
+            "gap": 0.0011967476457357407
+          },
+          {
+            "at": 5738445.093851585,
+            "elapsed": 0.050505807623267174,
+            "gap": 0.0007673501968383789
+          },
+          {
+            "at": 5738445.149794362,
+            "elapsed": 0.05034609045833349,
+            "gap": 0.005436968989670277
+          },
+          {
+            "at": 5738445.20091497,
+            "elapsed": 0.05044538341462612,
+            "gap": 0.0007745176553726196
+          },
+          {
+            "at": 5738445.252170998,
+            "elapsed": 0.05035708472132683,
+            "gap": 0.0008106445893645287
+          },
+          {
+            "at": 5738445.303327726,
+            "elapsed": 0.05023097340017557,
+            "gap": 0.0007996438071131706
+          },
+          {
+            "at": 5738445.353984127,
+            "elapsed": 0.05044861230999231,
+            "gap": 0.00042542722076177597
+          },
+          {
+            "at": 5738445.405483351,
+            "elapsed": 0.050267345272004604,
+            "gap": 0.0010506119579076767
+          },
+          {
+            "at": 5738445.456542835,
+            "elapsed": 0.05042570736259222,
+            "gap": 0.0007921382784843445
+          },
+          {
+            "at": 5738505.536985892,
+            "elapsed": 0.05082536395639181,
+            "gap": 0.0035112081095576286
+          },
+          {
+            "at": 5738505.591479965,
+            "elapsed": 0.05043174885213375,
+            "gap": 0.0036687087267637253
+          },
+          {
+            "at": 5738505.643047687,
+            "elapsed": 0.05029675550758839,
+            "gap": 0.001135973259806633
+          },
+          {
+            "at": 5738505.6962108,
+            "elapsed": 0.05043997336179018,
+            "gap": 0.0028663575649261475
+          },
+          {
+            "at": 5738505.747798537,
+            "elapsed": 0.05044364370405674,
+            "gap": 0.001147763803601265
+          },
+          {
+            "at": 5738505.799075503,
+            "elapsed": 0.05044545605778694,
+            "gap": 0.0008333222940564156
+          },
+          {
+            "at": 5738505.850342862,
+            "elapsed": 0.05044587980955839,
+            "gap": 0.0008219033479690552
+          },
+          {
+            "at": 5738505.901593601,
+            "elapsed": 0.050272260792553425,
+            "gap": 0.0008048592135310173
+          },
+          {
+            "at": 5738505.952702877,
+            "elapsed": 0.05047622509300709,
+            "gap": 0.0008370149880647659
+          },
+          {
+            "at": 5738506.003647627,
+            "elapsed": 0.05047752056270838,
+            "gap": 0.00046852510422468185
+          }
+        ]
+      },
+      "identity": {
+        "adc_resolution_bits": 12,
+        "board_id": 1,
+        "build_id": "thingdaq-92950ec5f7156586",
+        "clocks": {
+          "adc_clock_hz": 37500000,
+          "cpu_clock_hz": 600000000,
+          "cpu_profile": 1,
+          "ipg_clock_hz": 150000000,
+          "pit_clock_hz": 24000000,
+          "timestamp_hz": 8000000
+        },
+        "firmware_version": "1.2.0",
+        "hardware_serial": "20428100",
+        "mcu_id": 1,
+        "protocol_version": 3,
+        "simulated": false
+      },
+      "job_id": "4e475671-5925-4e12-908b-c93d8711053a",
+      "outcome": "PASS",
+      "ownership_status": {
+        "adc0_dma_major_loops": 59551,
+        "adc0_dma_results": 60027408,
+        "adc1_dma_major_loops": 59551,
+        "adc1_dma_results": 60027408,
+        "adc_buffers_acquired": 59551,
+        "adc_buffers_completed": 59551,
+        "adc_buffers_released": 59551,
+        "adc_cache_cpu_invalidations": 59551,
+        "adc_cache_dma_discards": 59564,
+        "adc_calibration_cycles": [
+          5931,
+          17679
+        ],
+        "adc_calibration_deadline_us": 10000,
+        "adc_calibration_states": [
+          1,
+          1
+        ],
+        "adc_channels": [
+          7,
+          8
+        ],
+        "adc_clock_divider": 4,
+        "adc_clock_hz": 37500000,
+        "adc_clock_source": 1,
+        "adc_code_max": 4095,
+        "adc_code_min": 0,
+        "adc_completion_mismatches": 0,
+        "adc_configuration_flags": 255,
+        "adc_container_bytes": 2,
+        "adc_conversion_mode": 2,
+        "adc_destination_mismatches": 0,
+        "adc_dma_error_events": 0,
+        "adc_etc_error_events": 0,
+        "adc_etc_error_flags": 0,
+        "adc_framed_bytes_emitted": 243682692,
+        "adc_framed_bytes_framed": 243682692,
+        "adc_framed_bytes_transmitted": 243682692,
+        "adc_frames_consumed": 59551,
+        "adc_frames_dropped": 0,
+        "adc_frames_dropped_after_framing": 0,
+        "adc_frames_dropped_after_promotion": 0,
+        "adc_frames_emitted": 59551,
+        "adc_frames_evicted": 0,
+        "adc_frames_evicted_after_promotion": 0,
+        "adc_frames_framed_pipeline": 59551,
+        "adc_frames_generated": 59551,
+        "adc_frames_transmitted": 59551,
+        "adc_hardware_average_count": 0,
+        "adc_incomplete_buffers": 1,
+        "adc_incomplete_conversions": 0,
+        "adc_initialization_error_flags": 0,
+        "adc_input_max_mv_nominal": 3300,
+        "adc_input_min_mv_nominal": 0,
+        "adc_ipg_clock_hz": 150000000,
+        "adc_items_dropped": 718,
+        "adc_items_emitted": 60027408,
+        "adc_items_framed_pipeline": 60027408,
+        "adc_items_generated": 60027408,
+        "adc_items_transmitted_pipeline": 60027408,
+        "adc_overwritten_conversions": 0,
+        "adc_packer_chronology_errors": 0,
+        "adc_packer_pipeline_errors": 0,
+        "adc_packer_source_errors": 0,
+        "adc_packet_filling_depth": 0,
+        "adc_packet_ready_depth": 0,
+        "adc_packet_ready_high_water": 1,
+        "adc_packet_transmit_depth": 0,
+        "adc_packet_transmit_high_water": 5,
+        "adc_paired_major_loops": 59551,
+        "adc_pairs_captured": 60028126,
+        "adc_pairs_consumed": 60027408,
+        "adc_pairs_delivered": 60027408,
+        "adc_pairs_framed": 60027408,
+        "adc_pairs_transmitted": 60027408,
+        "adc_payload_bytes_dropped": 0,
+        "adc_payload_bytes_emitted": 240109632,
+        "adc_payload_bytes_framed": 240109632,
+        "adc_payload_bytes_produced": 240109632,
+        "adc_payload_bytes_transmitted": 240109632,
+        "adc_peripherals": [
+          1,
+          2
+        ],
+        "adc_pins": [
+          14,
+          15
+        ],
+        "adc_raw_drop_pairs_projected": 0,
+        "adc_raw_gap_pairs": 0,
+        "adc_raw_invariant_errors": 0,
+        "adc_raw_pairs_lost": 718,
+        "adc_raw_ready_depth": 0,
+        "adc_raw_ready_high_water": 1,
+        "adc_raw_ring_overruns": 0,
+        "adc_reference": 1,
+        "adc_reference_mv_nominal": 3300,
+        "adc_resolution_bits": 12,
+        "adc_resource_conflicts": 0,
+        "adc_sample_time_adck": 3,
+        "adc_schedule_exhaustions": 0,
+        "adc_stale_completions": 0,
+        "adc_stale_interrupts": 0,
+        "adc_start_errors": 0,
+        "adc_stop_errors": 0,
+        "adc_stop_pairs_discarded": 718,
+        "adc_trigger": {
+          "adc_etc_ctrl_configured": 0,
+          "ccm_ccgr1_configured": 4244632320,
+          "ccm_ccgr2_configured": 218099763,
+          "ccm_cscmr1_configured": 1729298496,
+          "chain_configured": [
+            8215,
+            16408
+          ],
+          "chain_length": 1,
+          "completion_counts": [
+            1,
+            1
+          ],
+          "completion_delta_cycles": 296,
+          "completion_expected_delta_cycles": 300,
+          "completion_tolerance_cycles": 120,
+          "configuration_flags": 255,
+          "diagnostic_elapsed_cycles": 17740,
+          "done0_1_irq_final": 1048577,
+          "done2_err_irq_final": 0,
+          "dwt_clock_hz": 600000000,
+          "effective_delays": [
+            1,
+            76
+          ],
+          "error_flags": 0,
+          "gpio_master_pit_channel": 0,
+          "gpio_master_pit_load": 5,
+          "gpio_master_rate_hz": 4000000,
+          "gpio_master_tctrl_configured": 0,
+          "initial_delays": [
+            0,
+            75
+          ],
+          "ipg_clock_hz": 150000000,
+          "pair_pit_channel": 1,
+          "pair_pit_load": 3,
+          "pair_rate_hz": 1000000,
+          "pair_tctrl_configured": 4,
+          "phase_ipg_cycles": 75,
+          "pit_clock_hz": 24000000,
+          "pit_mcr_configured": 0,
+          "predivider": 0,
+          "trigger_counter_configured": [
+            0,
+            75
+          ],
+          "trigger_ctrl_configured": [
+            0,
+            0
+          ],
+          "trigger_error_count": 0,
+          "trigger_queues": [
+            0,
+            4
+          ],
+          "xbar_inputs": [
+            57,
+            57
+          ],
+          "xbar_outputs": [
+            103,
+            107
+          ],
+          "xbar_sel_configured": [
+            14592,
+            14592
+          ]
+        },
+        "auxiliary_gpio": {
+          "adc_pair_rate_hz": 1000000,
+          "bank_major_loops": [
+            29775,
+            29775
+          ],
+          "bank_ring_overruns": [
+            0,
+            0
+          ],
+          "bank_samples_captured": [
+            60026400,
+            60026400
+          ],
+          "bank_stale_completions": [
+            0,
+            0
+          ],
+          "buffers_acquired": 29775,
+          "buffers_completed": 29775,
+          "buffers_released": 29775,
+          "cache_cpu_invalidations": 59550,
+          "cache_dma_discards": 59564,
+          "canceled_generations": 2,
+          "cancellation_samples": 0,
+          "count_mismatches": 0,
+          "destination_mismatches": 0,
+          "frame_coverage_ticks": 8096,
+          "generation_skew_events": 0,
+          "generation_skew_samples": 0,
+          "gpio_item_bytes": 1,
+          "gpio_sample_rate_hz": 1000000,
+          "hardware_errors": 0,
+          "invariant_errors": 0,
+          "packet_retention_us_combined": 101200,
+          "packet_retention_us_single_stream": 202400,
+          "paired_major_loops": 29775,
+          "raw_ring_overruns": 0,
+          "ready_depth": [
+            0,
+            0
+          ],
+          "ready_high_water": [
+            1,
+            1
+          ],
+          "resource_conflicts": 0,
+          "samples_captured": 60028126,
+          "samples_delivered": 60026400,
+          "samples_joined": 60026400,
+          "samples_lost": 1726,
+          "schedule_exhaustions": 0,
+          "stale_completions": 0,
+          "stale_dma_completions": 0,
+          "start_errors": 0,
+          "stop_errors": 0,
+          "stop_tail_samples": 1726,
+          "timestamp_mismatches": 0
+        },
+        "bad_checksums": 0,
+        "bad_flags": 0,
+        "bad_lengths": 0,
+        "bad_payloads": 0,
+        "bad_request_ids": 0,
+        "bad_types": 0,
+        "bad_versions": 0,
+        "commands_accepted": 16,
+        "commands_rejected": 0,
+        "configuration": null,
+        "data_checksum_algorithm": 1,
+        "data_frame_bytes": 4096,
+        "data_framed_bytes_transmitted": 365521992,
+        "data_payload_bytes_transmitted": 360162432,
+        "device_state": 1,
+        "gpio_buffers_acquired": 29775,
+        "gpio_buffers_completed": 29775,
+        "gpio_buffers_released": 29775,
+        "gpio_cache_cpu_invalidations": 59550,
+        "gpio_cache_dma_discards": 59564,
+        "gpio_dma_major_loops": 29775,
+        "gpio_duplicate_samples_ignored": 0,
+        "gpio_framed_bytes_emitted": 121839300,
+        "gpio_framed_bytes_framed": 121839300,
+        "gpio_framed_bytes_transmitted": 121839300,
+        "gpio_frames_dropped": 0,
+        "gpio_frames_dropped_after_framing": 0,
+        "gpio_frames_dropped_after_promotion": 0,
+        "gpio_frames_emitted": 29775,
+        "gpio_frames_evicted": 0,
+        "gpio_frames_evicted_after_promotion": 0,
+        "gpio_frames_framed_pipeline": 29775,
+        "gpio_frames_generated": 29775,
+        "gpio_frames_packed": 29775,
+        "gpio_frames_produced": 29775,
+        "gpio_frames_transmitted": 29775,
+        "gpio_hardware_errors": 0,
+        "gpio_items_dropped": 1726,
+        "gpio_items_emitted": 60026400,
+        "gpio_items_framed_pipeline": 60026400,
+        "gpio_items_generated": 60026400,
+        "gpio_items_transmitted_pipeline": 60026400,
+        "gpio_packed_ready_depth": 0,
+        "gpio_packed_ready_high_water": 0,
+        "gpio_packer_chronology_errors": 0,
+        "gpio_packer_drop_samples_projected": 0,
+        "gpio_packer_pipeline_errors": 0,
+        "gpio_packer_samples_dropped": 0,
+        "gpio_packer_source_errors": 0,
+        "gpio_packet_filling_depth": 0,
+        "gpio_packet_ready_depth": 0,
+        "gpio_packet_ready_high_water": 1,
+        "gpio_packet_transmit_depth": 0,
+        "gpio_packet_transmit_high_water": 2,
+        "gpio_payload_bytes_dropped": 0,
+        "gpio_payload_bytes_emitted": 120052800,
+        "gpio_payload_bytes_framed": 120052800,
+        "gpio_payload_bytes_produced": 120052800,
+        "gpio_payload_bytes_transmitted": 120052800,
+        "gpio_processing_cpu_basis_points": 1358,
+        "gpio_raw_drop_samples_projected": 0,
+        "gpio_raw_invariant_errors": 0,
+        "gpio_raw_ready_depth": 0,
+        "gpio_raw_ready_high_water": 1,
+        "gpio_raw_ring_overruns": 0,
+        "gpio_raw_samples_lost": 1726,
+        "gpio_resource_conflicts": 0,
+        "gpio_samples_captured": 60028126,
+        "gpio_samples_delivered": 60026400,
+        "gpio_samples_framed": 60026400,
+        "gpio_samples_packed": 60026400,
+        "gpio_samples_produced": 60026400,
+        "gpio_samples_transmitted": 60026400,
+        "gpio_stale_dma_completions": 0,
+        "gpio_start_errors": 0,
+        "gpio_stop_errors": 0,
+        "gpio_stop_samples_discarded": 1726,
+        "packet_accounted_frame_skew": 0,
+        "packet_capacity_drops_without_evictable_frame": 0,
+        "packet_encoding_rejections": 0,
+        "packet_fairness_deferrals": 0,
+        "packet_frames_promoted": 89326,
+        "packet_invalid_operations": 0,
+        "packet_owned_depth": 0,
+        "packet_owned_high_water": 7,
+        "packet_pool_exhaustions": 0,
+        "packet_pressure_evictions": 0,
+        "packet_ready_depth": 0,
+        "packet_ready_high_water": 2,
+        "packet_ready_queue_rejections": 0,
+        "packet_transmit_depth": 0,
+        "packet_transmit_high_water": 7,
+        "packet_transmit_queue_rejections": 0,
+        "parser_errors": 0,
+        "partial_usb_writes": 0,
+        "response_queue_rejections": 0,
+        "response_reservations_abandoned": 0,
+        "responses_completed": 16,
+        "responses_queued": 16,
+        "source": 0,
+        "state_errors": 0,
+        "stats_generation": 2,
+        "stream_mask": 0,
+        "timeouts": 0,
+        "transport_errors": 0,
+        "usb_active_frame_bytes_sent": 0,
+        "usb_active_frame_size": 0,
+        "usb_command_queue_depth": 0,
+        "usb_command_queue_high_water": 1,
+        "usb_io_errors": 0,
+        "usb_lower_priority_queue_depth": 0,
+        "usb_response_queue_depth": 0,
+        "usb_response_queue_high_water": 1,
+        "usb_rx_stall_events": 0,
+        "usb_short_capacity_deferrals": 61,
+        "usb_tx_stall_events": 226561
+      },
+      "parser_errors": 0,
+      "qualification_status": {
+        "adc_codec_completed": 0,
+        "adc_codec_deadline_drops": 0,
+        "adc_codec_max_age_ticks": 0,
+        "adc_codec_max_work_ticks": 0,
+        "adc_codec_raw": 0,
+        "adc_codec_resource_drops": 0,
+        "adc_codec_work_ticks": 0,
+        "adc_dma_error_events": 0,
+        "adc_encoded_bytes_transmitted": 240109632,
+        "adc_etc_error_events": 0,
+        "adc_frames_dropped": 0,
+        "adc_frames_produced": 59551,
+        "adc_items_dropped": 0,
+        "adc_items_per_frame": 1008,
+        "adc_items_produced": 60027408,
+        "adc_logical_bytes_transmitted": 240109632,
+        "adc_max_frame_bytes": 4092,
+        "adc_raw_invariant_errors": 0,
+        "adc_retention_ticks": 1612800,
+        "adc_wire_bytes_transmitted": 243682692,
+        "gpio_codec_completed": 0,
+        "gpio_codec_deadline_drops": 0,
+        "gpio_codec_max_age_ticks": 0,
+        "gpio_codec_max_work_ticks": 0,
+        "gpio_codec_raw": 0,
+        "gpio_codec_resource_drops": 0,
+        "gpio_codec_work_ticks": 0,
+        "gpio_encoded_bytes_transmitted": 120052800,
+        "gpio_frames_dropped": 0,
+        "gpio_frames_produced": 29775,
+        "gpio_hardware_errors": 0,
+        "gpio_items_dropped": 0,
+        "gpio_items_per_frame": 2016,
+        "gpio_items_produced": 60026400,
+        "gpio_logical_bytes_transmitted": 120052800,
+        "gpio_max_frame_bytes": 4092,
+        "gpio_raw_invariant_errors": 0,
+        "gpio_retention_ticks": 3225600,
+        "gpio_wire_bytes_transmitted": 121839300,
+        "packet_encoding_rejections": 0,
+        "packet_invalid_operations": 0,
+        "packet_ready_high_water": 2,
+        "packet_transmit_high_water": 7,
+        "parser_errors": 0,
+        "pending_frames": 0,
+        "run_id": 1,
+        "state": 1,
+        "transport_errors": 0
+      },
+      "resources": {
+        "after": {
+          "/proc/self/cgroup": "0::/\n",
+          "/sys/fs/cgroup/cpu.max": "200000 100000\n",
+          "/sys/fs/cgroup/cpu.stat": "usage_usec 31859784\nuser_usec 28519515\nsystem_usec 3340269\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 624\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0\n",
+          "cpu": 31.468758385,
+          "usage": [
+            28.197501,
+            3.271265,
+            42524,
+            0,
+            0,
+            0,
+            10409,
+            0,
+            0,
+            0,
+            648,
+            0,
+            0,
+            0,
+            200279,
+            228
+          ],
+          "wall": 5738506.05531531
+        },
+        "before": {
+          "/proc/self/cgroup": "0::/\n",
+          "/sys/fs/cgroup/cpu.max": "200000 100000\n",
+          "/sys/fs/cgroup/cpu.stat": "usage_usec 550762\nuser_usec 509780\nsystem_usec 40982\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 10\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0\n",
+          "cpu": 0.496639829,
+          "usage": [
+            0.467663,
+            0.028978999999999998,
+            40988,
+            0,
+            0,
+            0,
+            10003,
+            0,
+            0,
+            0,
+            648,
+            0,
+            0,
+            0,
+            177,
+            17
+          ],
+          "wall": 5738444.728022026
+        },
+        "cgroup_delta": {
+          "burst_usec": 0,
+          "core_sched.force_idle_usec": 0,
+          "nice_usec": 0,
+          "nr_bursts": 0,
+          "nr_periods": 614,
+          "nr_throttled": 0,
+          "system_usec": 3299287,
+          "throttled_usec": 0,
+          "usage_usec": 31309022,
+          "user_usec": 28009735
+        },
+        "cpu_seconds": 30.972118556,
+        "wall_seconds": 61.327293284237385
+      },
+      "settings_hex": "030001030104011000000c0040420f0040420f00",
+      "temperatures": [
+        {
+          "attempt": 1,
+          "celsius": 46.492,
+          "host_monotonic_seconds": 5738445.354097392,
+          "phase": "before",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 47.72,
+          "host_monotonic_seconds": 5738455.545610087,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 48.948,
+          "host_monotonic_seconds": 5738465.564989538,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 50.176,
+          "host_monotonic_seconds": 5738475.584275634,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 51.404,
+          "host_monotonic_seconds": 5738485.604474125,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 52.632,
+          "host_monotonic_seconds": 5738495.624472702,
+          "phase": "running",
+          "status": "VALID"
+        },
+        {
+          "attempt": 1,
+          "celsius": 53.86,
+          "host_monotonic_seconds": 5738506.003760165,
+          "phase": "after",
+          "status": "VALID"
+        }
+      ],
+      "wire": {
+        "adc": {
+          "encoded_bytes": 240109632,
+          "encodings": {
+            "0": 59551
+          },
+          "end_item": 60027408,
+          "first_host_seconds": 5738445.521389681,
+          "first_ticks": 0,
+          "frames": 59551,
+          "gap_items": 0,
+          "items": 60027408,
+          "last_host_seconds": 5738505.587775415,
+          "last_ticks": 480211200,
+          "logical_bytes": 240109632,
+          "next_sequence": 59551,
+          "run_ids": [
+            1
+          ],
+          "sample_checks": 1,
+          "versions": [
+            3
+          ],
+          "wire_bytes": 243682692
+        },
+        "gpio": {
+          "encoded_bytes": 120052800,
+          "encodings": {
+            "0": 29775
+          },
+          "end_item": 60026400,
+          "first_host_seconds": 5738445.521617952,
+          "first_ticks": 0,
+          "frames": 29775,
+          "gap_items": 0,
+          "items": 60026400,
+          "last_host_seconds": 5738505.587712213,
+          "last_ticks": 480195072,
+          "logical_bytes": 120052800,
+          "next_sequence": 29775,
+          "run_ids": [
+            1
+          ],
+          "sample_checks": 1,
+          "versions": [
+            3
+          ],
+          "wire_bytes": 121839300
+        }
+      }
+    }
+  ],
+  "schema_version": 1,
+  "scoped_remedy": "Establish and verify adequate job-specific host CPU allocation before capture; retain quota/throttling and ownership evidence. Do not change acquisition or drop policy.",
+  "source_revision": "71ab64c2603105c6340b73d149c0cad8d3035c24"
+}
