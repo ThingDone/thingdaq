@@ -244,6 +244,9 @@ bool SyntheticSource::generateFrame(
   return true;
 }
 
+#if defined(__IMXRT1062__)
+__attribute__((section(".flashmem.synthetic.fillAdc"), noinline, noipa, used))
+#endif
 void SyntheticSource::fillAdc(protocol::MutableByteView payload,
                               std::uint64_t first_pair_index) {
   for (std::size_t pair = 0U; pair < payload.size / 4U;
@@ -270,6 +273,9 @@ void SyntheticSource::fillAdc(protocol::MutableByteView payload,
   }
 }
 
+#if defined(__IMXRT1062__)
+__attribute__((section(".flashmem.synthetic.fillGpio"), noinline, noipa, used))
+#endif
 void SyntheticSource::fillGpio(protocol::MutableByteView payload,
                                std::uint64_t first_sample_index, std::uint32_t item_bytes,
                                std::uint64_t logical_frame) {
