@@ -14,9 +14,9 @@ related:
   - '[[protocol-v3-migration]]'
 ---
 
-# Legacy matrix recovery and streaming: INCONCLUSIVE
+# Legacy matrix recovery and streaming: PASS
 
-Fresh streaming campaign: **50/55 PASS, 0 FAIL, 5 NOT_RUN**. Isolated pre-upgrade SDK: **PASS**. Whole 62-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **55/55 PASS, 0 FAIL, 0 NOT_RUN**. Isolated pre-upgrade SDK: **PASS**. Whole 62-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -35,7 +35,7 @@ Two clean target builds reproduce the same firmware HEX as the failed candidate.
 - Full suite: 2716 passed, 11 skipped, 17118 subtests passed in 289.45s (0:04:49).
 - Focused runtime/qualification suite: 133 passed, 6 skipped in 23.27s.
 - Legacy grader: 21 passed in 0.19s.
-- Documentation/layout: 11 passed, 1499 subtests passed in 2.63s.
+- Documentation/layout: 11 passed, 1499 subtests passed in 2.67s.
 
 Historical candidate/freeze archived unchanged as `firmware/soak/history/protocol-v3-candidate*-20261025-legacy-matrix-failed.json`. All historical campaign/report hashes listed in the machine-readable report and 316 earlier evidence hashes verified. Historical passing cells are not imported.
 
@@ -91,6 +91,11 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 | `smoke-030101030104000800000c0040420f0040420f00` | PASS | `b42d46d3-cfe5-4271-b173-d9b59fbfc403` |
 | `smoke-030101030104000800010c0040420f0040420f00` | PASS | `9f9997ce-a2bf-4ec3-abed-7691c78c095a` |
 | `smoke-030101030104000801000c0040420f0040420f00` | PASS | `42bc5ff9-d507-4afe-baf2-0cf6b4f8b854` |
+| `smoke-030101030104000801010c0040420f0040420f00` | PASS | `4a3f385a-b759-4a2e-ba6b-0f36b0f8ffdb` |
+| `smoke-030101030104011000000c0040420f0040420f00` | PASS | `ccffafbf-4fc8-4160-8abf-de8e392d6307` |
+| `smoke-030101030104011000010c0040420f0040420f00` | PASS | `28a08531-a20c-41bf-8955-51d91beec411` |
+| `smoke-030101030104011001000c0040420f0040420f00` | PASS | `eb1d17fe-0766-44c6-919e-e0605fbd2265` |
+| `smoke-030101030104011001010c0040420f0040420f00` | PASS | `90394d4e-3d5a-4224-818a-aa8196b75c29` |
 | `v2-0-1` | PASS | `a70e9f3c-88da-40d4-abc3-7572fc7cd66d` |
 | `v2-0-2` | PASS | `338c2782-998e-4b63-a64a-f5e53007bc48` |
 | `v2-0-3` | PASS | `7966be1b-dae9-4941-8cef-2df5a4e9acdf` |
@@ -99,8 +104,14 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 
 ## Continuation and limits
 
-Controller stage at report: `STREAMING_MATRIX`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-legacy-matrix-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
+Controller stage at report: `STREAMING_COMPATIBILITY_COMPLETE`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-legacy-matrix-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
 
 Legacy SDK reference is unchanged revision `3a52ead02791019fcdb0b27a8be869effc955aa2`, archive SHA-256 `6f086090943069ed228b529871a7fe03bbccb2e69c611464a31fa80f340e4e20`. Its physical probe follows the five fresh v2 cells, before the remaining streaming matrix. New-SDK/old-v1/v2 results are local fixture/simulator evidence; no old firmware image is claimed physically tested. Programming reset is not power removal. Unstimulated acquisition does not measure analog accuracy, external edge fidelity, power or multi-hour continuous reliability.
 
 Exact counters, independent grades, job identities and hashed evidence references are in [the machine-readable report](protocol-v3-legacy-matrix-recovery.json).
+
+## Streaming task completion
+
+All 48 advertised v3 configurations, both full fallback captures and all five valid v2 RAW configurations passed on this exact candidate. The isolated unchanged pre-upgrade SDK independently passed its five 60-second cases in one boot. No historical passing cell was imported. Original failures remain retained.
+
+The streaming controller has completed and must not be restarted to advance the playbook. Lifecycle/backpressure/endurance are six separate unrun campaign cells; complete release qualification and promotion remain pending. Continue only with the next playbook task and the active frozen candidate.
