@@ -16,7 +16,7 @@ related:
 
 # Legacy matrix recovery and streaming: INCONCLUSIVE
 
-Fresh streaming campaign: **10/55 PASS, 0 FAIL, 45 NOT_RUN**. Isolated pre-upgrade SDK: **PASS**. Whole 62-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **20/55 PASS, 0 FAIL, 35 NOT_RUN**. Isolated pre-upgrade SDK: **PASS**. Whole 62-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -50,6 +50,16 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 | `fallback-1` | PASS | `c2b79b4f-41f5-4cbf-9b85-f0f29cd69627` |
 | `smoke-010001030104000800000c0040420f0040420f00` | PASS | `0c3f3c69-a751-4c43-9228-88e7ea08d1fc` |
 | `smoke-010001030104000800010c0040420f0040420f00` | PASS | `3d91f4e1-c6f6-42e7-98a4-bd4da4c575ed` |
+| `smoke-010001030104000801000c0040420f0040420f00` | PASS | `11bb30be-0471-4fc9-8d1a-cb0ea5b362ea` |
+| `smoke-010001030104000801010c0040420f0040420f00` | PASS | `c7ccd36f-3f09-4c22-9657-fe42e72d7466` |
+| `smoke-010001030104011000000c0040420f0040420f00` | PASS | `df334a57-9339-4270-9f2c-e71f2f9a61b5` |
+| `smoke-010001030104011000010c0040420f0040420f00` | PASS | `da804445-1c64-4609-a44f-36e7c9370fef` |
+| `smoke-010001030104011001000c0040420f0040420f00` | PASS | `4b5da522-35f3-4599-928b-395552b002e0` |
+| `smoke-010001030104011001010c0040420f0040420f00` | PASS | `016bcd46-f390-41c4-9f6d-aceadf286b8b` |
+| `smoke-010101030104000800000c0040420f0040420f00` | PASS | `f78635c8-5e3e-4925-9506-76cc404533a2` |
+| `smoke-010101030104000800010c0040420f0040420f00` | PASS | `a25a516d-9894-4a70-b383-f8740627c3a5` |
+| `smoke-010101030104000801000c0040420f0040420f00` | PASS | `425625fc-6f9c-433f-8672-9aa28b96b5c8` |
+| `smoke-010101030104000801010c0040420f0040420f00` | PASS | `23594d26-b662-4db2-a7f5-82494140cc3c` |
 | `smoke-030001030104011000000c0040420f0040420f00` | PASS | `d1093f61-3b29-48ea-a8f9-eafa3af55892` |
 | `v2-0-1` | PASS | `a70e9f3c-88da-40d4-abc3-7572fc7cd66d` |
 | `v2-0-2` | PASS | `338c2782-998e-4b63-a64a-f5e53007bc48` |
