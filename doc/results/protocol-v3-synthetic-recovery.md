@@ -16,7 +16,7 @@ related:
 
 # Synthetic recovery and streaming: INCONCLUSIVE
 
-Fresh streaming campaign: **30/56 PASS, 0 FAIL, 26 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **40/56 PASS, 0 FAIL, 16 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -75,7 +75,17 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 | `smoke-020101030104000800000c0040420f0040420f00` | PASS | `7972de50-4d37-4e51-8cf9-11093eb13896` |
 | `smoke-020101030104000800010c0040420f0040420f00` | PASS | `efd9c276-ef56-49a2-991d-e75beb9b048b` |
 | `smoke-020101030104000801000c0040420f0040420f00` | PASS | `7eb5af9b-161f-4430-bce6-da8e6a47a17f` |
+| `smoke-020101030104000801010c0040420f0040420f00` | PASS | `e78c613a-739a-409f-b8f6-e7aca55f6274` |
+| `smoke-020101030104011000000c0040420f0040420f00` | PASS | `7f6b454b-735e-439b-a57b-8a6bf4c6b826` |
+| `smoke-020101030104011000010c0040420f0040420f00` | PASS | `ea4dacef-8a75-41da-998c-42f752d4243c` |
+| `smoke-020101030104011001000c0040420f0040420f00` | PASS | `ec07a9d6-5f40-47c9-91db-d70de0a97064` |
+| `smoke-020101030104011001010c0040420f0040420f00` | PASS | `3d68e19c-9810-48e0-af5e-2e89dfd97abe` |
+| `smoke-030001030104000800000c0040420f0040420f00` | PASS | `c0198aff-fb64-4c59-8ee5-7f60b2f84fcc` |
+| `smoke-030001030104000800010c0040420f0040420f00` | PASS | `c51f6ee9-2da5-40c8-bace-3c22a8980b7e` |
+| `smoke-030001030104000801000c0040420f0040420f00` | PASS | `1836fbf1-69a8-4f93-a236-85c2b23d6b25` |
+| `smoke-030001030104000801010c0040420f0040420f00` | PASS | `4bd2db50-8254-4861-805d-3960613ac516` |
 | `smoke-030001030104011000000c0040420f0040420f00` | PASS | `c06338d5-4c0e-4e07-94b9-8f7f958fa796` |
+| `smoke-030001030104011000010c0040420f0040420f00` | PASS | `6f2af357-84b1-4cb7-8c7f-fe6121dbb45f` |
 
 ## Continuation and limits
 
