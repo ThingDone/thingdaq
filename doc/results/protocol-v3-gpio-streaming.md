@@ -17,8 +17,8 @@ related:
 
 # Streaming and compatibility: INCONCLUSIVE
 
-The exact corrected candidate has **3/56 streaming cells PASS**,
-**0 FAIL**, and **53 NOT_RUN**. Isolated pre-upgrade
+The exact corrected candidate has **10/56 streaming cells PASS**,
+**0 FAIL**, and **46 NOT_RUN**. Isolated pre-upgrade
 SDK physical compatibility: **NOT_RUN**. The unsupported-request cell
 is separate. Full release qualification remains **INCONCLUSIVE**;
 remaining lifecycle, backpressure, endurance, grading and promotion tasks have
@@ -36,7 +36,7 @@ not been credited here.
 
 ## Validation and compatibility scope
 
-Local checks: **1284 passed, 284 subtests passed in 47.64s**. These cover new-SDK/old-v1/old-v2 fixtures and
+Local checks: **1284 passed, 284 subtests passed in 47.64s**. Independent legacy evidence grader: **13 passed in 0.08s** (valid control plus 12 injected faults). These cover new-SDK/old-v1/old-v2 fixtures and
 simulator peers, codecs/public APIs, legacy firmware session unit tests and
 rig/qualification/resource/freeze checks. They do not constitute physical old
 firmware testing. The original pre-upgrade SDK archive is revision
@@ -60,6 +60,13 @@ hash-linked original result files.
 | --- | --- | --- | ---: | ---: | ---: |
 | `smoke-010001030104000800000c0040420f0040420f00` | PASS | `eb1cbc1f-6dea-4cdf-a84a-241c1f46ad86` | 60.00171210616827 | 60027408 | 0 |
 | `smoke-010001030104000800010c0040420f0040420f00` | PASS | `ca4aae0c-d0fa-4aa9-9afa-dfedac8fe2a8` | 60.00181107688695 | 60031440 | 0 |
+| `smoke-010001030104000801000c0040420f0040420f00` | PASS | `6ed0a5ba-b183-471d-ad58-757af2310e34` | 60.00972013361752 | 60030432 | 0 |
+| `smoke-010001030104000801010c0040420f0040420f00` | PASS | `b5ebfde7-fb76-4962-8497-7946226834c8` | 60.01581954583526 | 60051600 | 0 |
+| `smoke-010001030104011000000c0040420f0040420f00` | PASS | `0e8f556c-63b9-407d-9b72-6a300329f849` | 60.00139211118221 | 60027408 | 0 |
+| `smoke-010001030104011000010c0040420f0040420f00` | PASS | `4bb79d7f-ef44-4fb0-9012-aa0e8d185875` | 60.01135392207652 | 60047568 | 0 |
+| `smoke-010001030104011001000c0040420f0040420f00` | PASS | `f2ad7544-dd7c-4134-920a-124f811acf51` | 60.0030430033803 | 60030432 | 0 |
+| `smoke-010001030104011001010c0040420f0040420f00` | PASS | `e029fa9f-8f1e-4e19-9212-54c6ddc8dfe6` | 60.01783865503967 | 60051600 | 0 |
+| `smoke-010101030104000800000c0040420f0040420f00` | PASS | `8676f37b-0482-400a-9a4b-99862c728e8a` | 60.00373372063041 | 60028416 | 0 |
 | `smoke-030001030104011000000c0040420f0040420f00` | PASS | `b5b41941-6b73-419b-92af-88be8f08613d` | 60.00000737980008 | 60017328 | 60016320 |
 
 ## Retention and continuation
