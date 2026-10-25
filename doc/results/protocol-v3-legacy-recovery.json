@@ -1,0 +1,291 @@
+{
+  "campaign_validation": {
+    "attempts": [],
+    "checks": {
+      "all_attempts_valid": true,
+      "matrix_complete": false,
+      "physical_evidence_present": false
+    },
+    "endurance": "three separate reflashed 600-second jobs; lifecycle is same-boot only",
+    "missing_cells": [
+      "fallback-0",
+      "fallback-1",
+      "same-boot-20",
+      "smoke-010001030104000800000c0040420f0040420f00",
+      "smoke-010001030104000800010c0040420f0040420f00",
+      "smoke-010001030104000801000c0040420f0040420f00",
+      "smoke-010001030104000801010c0040420f0040420f00",
+      "smoke-010001030104011000000c0040420f0040420f00",
+      "smoke-010001030104011000010c0040420f0040420f00",
+      "smoke-010001030104011001000c0040420f0040420f00",
+      "smoke-010001030104011001010c0040420f0040420f00",
+      "smoke-010101030104000800000c0040420f0040420f00",
+      "smoke-010101030104000800010c0040420f0040420f00",
+      "smoke-010101030104000801000c0040420f0040420f00",
+      "smoke-010101030104000801010c0040420f0040420f00",
+      "smoke-010101030104011000000c0040420f0040420f00",
+      "smoke-010101030104011000010c0040420f0040420f00",
+      "smoke-010101030104011001000c0040420f0040420f00",
+      "smoke-010101030104011001010c0040420f0040420f00",
+      "smoke-020001030104000800000c0040420f0040420f00",
+      "smoke-020001030104000800010c0040420f0040420f00",
+      "smoke-020001030104000801000c0040420f0040420f00",
+      "smoke-020001030104000801010c0040420f0040420f00",
+      "smoke-020001030104011000000c0040420f0040420f00",
+      "smoke-020001030104011000010c0040420f0040420f00",
+      "smoke-020001030104011001000c0040420f0040420f00",
+      "smoke-020001030104011001010c0040420f0040420f00",
+      "smoke-020101030104000800000c0040420f0040420f00",
+      "smoke-020101030104000800010c0040420f0040420f00",
+      "smoke-020101030104000801000c0040420f0040420f00",
+      "smoke-020101030104000801010c0040420f0040420f00",
+      "smoke-020101030104011000000c0040420f0040420f00",
+      "smoke-020101030104011000010c0040420f0040420f00",
+      "smoke-020101030104011001000c0040420f0040420f00",
+      "smoke-020101030104011001010c0040420f0040420f00",
+      "smoke-030001030104000800000c0040420f0040420f00",
+      "smoke-030001030104000800010c0040420f0040420f00",
+      "smoke-030001030104000801000c0040420f0040420f00",
+      "smoke-030001030104000801010c0040420f0040420f00",
+      "smoke-030001030104011000000c0040420f0040420f00",
+      "smoke-030001030104011000010c0040420f0040420f00",
+      "smoke-030001030104011001000c0040420f0040420f00",
+      "smoke-030001030104011001010c0040420f0040420f00",
+      "smoke-030101030104000800000c0040420f0040420f00",
+      "smoke-030101030104000800010c0040420f0040420f00",
+      "smoke-030101030104000801000c0040420f0040420f00",
+      "smoke-030101030104000801010c0040420f0040420f00",
+      "smoke-030101030104011000000c0040420f0040420f00",
+      "smoke-030101030104011000010c0040420f0040420f00",
+      "smoke-030101030104011001000c0040420f0040420f00",
+      "smoke-030101030104011001010c0040420f0040420f00",
+      "soak-1",
+      "soak-2",
+      "soak-3",
+      "stall-0",
+      "stall-1",
+      "unsupported",
+      "v2-0-1",
+      "v2-0-2",
+      "v2-0-3",
+      "v2-1-1",
+      "v2-1-2",
+      "v2-1-3"
+    ],
+    "outcome": "NOT_RUN",
+    "physical_qualification": "NOT_RUN",
+    "policy": "public-v3-qualification-1",
+    "problems": []
+  },
+  "candidate_sha256": "3f075ccc6438b1e09d56663954700bd4ac39563ab023b7543713897916e00ef8",
+  "controller_state": {
+    "stage": "FROZEN"
+  },
+  "correction_commits": [
+    "ab115d1",
+    "6db6342"
+  ],
+  "created": "2026-10-25",
+  "firmware_sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+  "freeze_validation": {
+    "artifact_sha256": "827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d",
+    "build_id": "thingdaq-e0c750868be7c5c2",
+    "fqbn": "teensy:avr:teensy40:usb=serial,speed=600,opt=o2std",
+    "protected_file_count": 499,
+    "protected_tree_sha256": "a28f98df800b5d9839f9f339225c81139a6274f2c6478bab808d043c102ab332",
+    "result": "PASS",
+    "source_id": "e0c750868be7c5c29915dfd9a9e7ed614920e7ab614dbc9ca7a380bb0f488fe1",
+    "staged_directory": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/frozen"
+  },
+  "historical_files_verified": {
+    "failed_campaign_and_reports": 996,
+    "previous": 316
+  },
+  "identity": {
+    "board_id": 1,
+    "build_id": "thingdaq-e0c750868be7c5c2",
+    "firmware_version": "1.2.0",
+    "hardware_serial": "20428100",
+    "mcu_id": 1
+  },
+  "inputs": {
+    "runner_sha256": {
+      "firmware/soak/validator.py": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
+      "firmware/tests/rig_protocol_v3_qualification.py": "bd0473961e39413139da71edb4cc01eee0a127614e0484347bec706edd9c9ab4",
+      "firmware/tests/rig_release_sdk.py": "b432db0416f803c54c03c76ac4ba2f0dc0d8ae97903f0397a742a7905ee4b4ae",
+      "firmware/tools/protocol_v3_qualification.py": "dae99095e3f9ef432d1d76bac34e7c087668ef2d805d9c90544bb643c6621a1e",
+      "firmware/tools/qualify_protocol_v3.py": "8b22656564c6c40738c912e977310ba49a70e860da22a672e25f6b7e78cd9501",
+      "firmware/tools/run_input_isolation.py": "7a211f58a97fdd11d5202b5aed9cb4e210b61209237faacaf422613f78135eb1"
+    },
+    "schema_sha256": {
+      "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+      "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+      "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+    },
+    "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+    "sdk_version": "1.2.0"
+  },
+  "isolated_legacy_sdk": {
+    "outcome": "NOT_RUN"
+  },
+  "local_validation": {
+    "docs-pytest": "11 passed, 1485 subtests passed in 2.66s",
+    "focused": "104 passed, 6 skipped in 23.53s",
+    "full-pytest": "2687 passed, 11 skipped, 17104 subtests passed in 293.11s (0:04:53)",
+    "grader-pytest": "13 passed in 0.09s"
+  },
+  "outcome": "INCONCLUSIVE",
+  "prerequisites": {
+    "final-identity-validation": {
+      "outcome": "NOT_RUN"
+    },
+    "metadata-grade": {
+      "outcome": "NOT_RUN"
+    },
+    "reset_defaults-grade": {
+      "outcome": "NOT_RUN"
+    }
+  },
+  "regression_before": "Production firmware: v2 STOP/drain PASS; extra v3 STOP INVALID_STATE, matching rig transcript\n{\"kind\": \"legacy\", \"prototype_explicit_close\": false, \"injected_fault\": null, \"outcome\": \"FAIL\", \"error\": \"DAQShutdownError: STOP failed: STOP_REQUEST request 1559528437 failed with INVALID_STATE\", \"stops\": [[2, 20], [3, 20]]}\n{\"kind\": \"smoke\", \"prototype_explicit_close\": false, \"injected_fault\": null, \"outcome\": \"PASS\", \"error\": null, \"stops\": [[3, 20]]}\n{\"kind\": \"legacy\", \"prototype_explicit_close\": true, \"injected_fault\": null, \"outcome\": \"PASS\", \"error\": null, \"stops\": [[2, 20]]}\n{\"kind\": \"legacy\", \"prototype_explicit_close\": true, \"injected_fault\": \"drain\", \"outcome\": \"FAIL\", \"error\": \"ValueError: injected incomplete STOP drain\", \"stops\": [[2, 20], [3, 20]]}\n{\"kind\": \"legacy\", \"prototype_explicit_close\": true, \"injected_fault\": \"close\", \"outcome\": \"FAIL\", \"error\": \"OSError: injected reader close failure\", \"stops\": [[2, 20], [3, 20]]}\n",
+  "retained_evidence": [
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/before-regression.log",
+      "sha256": "26a48fda8cc4bf44e3c8d0691117fb3bb946631c6af20f837d5005ae3d133a08",
+      "size_bytes": 945
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/build.log",
+      "sha256": "bffbe9270ecee1bd98290cc8534d09bb2da30c6629e32832ed40cb0a397b8509",
+      "size_bytes": 35
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/build_candidate.py",
+      "sha256": "7de45023b9b810031359d880e58e191330a47e31031120bedcf7b937616975bf",
+      "size_bytes": 680
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/continue_qualification.py",
+      "sha256": "39e76c095feba7747cfd203cc38d09adf512aeea5e62e1a2135cac949223e895",
+      "size_bytes": 5030
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/docs-pytest.log",
+      "sha256": "2b7709e000f2e054340eb621a3d8743561f3c60ba5e7836d747dc9b28d4366c0",
+      "size_bytes": 76
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/first-build.log",
+      "sha256": "dc97d0600a31356b5e9f96a1627e5dce785752dd9853f962e1fff7c7ca56edc6",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/focused.log",
+      "sha256": "52b0b31822e438cf25186a0f2b75900fa0b447e0343f2419f6c2659edd33b321",
+      "size_bytes": 192
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/freeze.log",
+      "sha256": "6da10c2da588000777df6740cbbacf1d95d7792520bf4fe5a012c6d5dd850940",
+      "size_bytes": 579
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/freeze_candidate.py",
+      "sha256": "3b550ddd434d3e55256834ba93224c04cb304a623a992979d810196310037274",
+      "size_bytes": 3101
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/full-pytest.log",
+      "sha256": "bff784e001485676c37ba802aaa5ef18a24fd984c39b00d98370f3b0d4f9d4ba",
+      "size_bytes": 3062
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/grade_legacy.py",
+      "sha256": "3633d1262047545abe132df0e50c7d571828ce6e6c5a196b217226eaee639885",
+      "size_bytes": 5829
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/grade_metadata.py",
+      "sha256": "f49276f0b021ec0ee97e340635891781e72504f1325f12cfb2d2f389ca90c601",
+      "size_bytes": 4985
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/grader-pytest.log",
+      "sha256": "193e43a08c28b06fe698344404de37c7e0ac7d5485667c0323a6eacf17b1576b",
+      "size_bytes": 99
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/historical-evidence-hashes.json",
+      "sha256": "51ccf0f48d13895de0cda1c902998b8ff54974008bc5bf3d4e4a3b64127d5536",
+      "size_bytes": 214580
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/legacy_probe.py",
+      "sha256": "18fc20b7b44d1b446693c759cb57eb6d30c0c9f97519727a16fd815e9dedf5b0",
+      "size_bytes": 21216
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/metadata_probe_v2.py",
+      "sha256": "ed4dafb8e87ce8e656bdd69cf93e872bcca912f150d912ef622d83860703af55",
+      "size_bytes": 8494
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/regression.log",
+      "sha256": "e93a50e0f05fa4b444c17c98c1cbc70f239ea69f579991ee8c53ea179abdb9a6",
+      "size_bytes": 115
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/run_legacy_probe.py",
+      "sha256": "1ca3d7271ea4c2768d709d16b591c67d6370d23075597f79c1e5b00c65ba8718",
+      "size_bytes": 3684
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/run_metadata_v2.py",
+      "sha256": "b6ba82895e3b486ef9827ca7554223d7e370e9692a7bf9e092b6a4f9bef78340",
+      "size_bytes": 3675
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/second-build.log",
+      "sha256": "dc97d0600a31356b5e9f96a1627e5dce785752dd9853f962e1fff7c7ca56edc6",
+      "size_bytes": 878
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/status.py",
+      "sha256": "5464ff474af862ffc937ae20a3e7810e5baefa49a590496dd6b021f99c607e6a",
+      "size_bytes": 903
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/test_grade_legacy.py",
+      "sha256": "c3e7b1f1b3cd130b9866d71d21d26992ffbaa9ceffd5d63f021379f55696ba70",
+      "size_bytes": 5019
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/verify_identity.py",
+      "sha256": "1cf167cb108297c2eb362a0374575fb359df9428ac94b442521c16b8eb1554ca",
+      "size_bytes": 3844
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-legacy-corrected-20261025/write_report.py",
+      "sha256": "d8aed7f4f3f780558849284475235c9c30b267352883fa3b45320c1ae3b31a89",
+      "size_bytes": 9197
+    },
+    {
+      "path": "firmware/soak/protocol-v3-candidate-freeze.json",
+      "sha256": "ace0fd3c98066c083967daff4aeded8ef8b120a2a8572612377faa625ec67043",
+      "size_bytes": 129007
+    },
+    {
+      "path": "firmware/soak/protocol-v3-candidate.json",
+      "sha256": "9d33d7c16aae40c544286c91819703c9ae2170a9928632d3589a5b8ac6863144",
+      "size_bytes": 24018
+    }
+  ],
+  "schema_version": 1,
+  "scope": "legacy cleanup correction, prerequisites and streaming/compatibility; lifecycle/endurance/promotion separate",
+  "source_revision": "6db63422359ccc470977bf1b71a59214b667de5b",
+  "streaming_cells": [],
+  "streaming_matrix": {
+    "FAIL": 0,
+    "NOT_RUN": 56,
+    "PASS": 0
+  }
+}
