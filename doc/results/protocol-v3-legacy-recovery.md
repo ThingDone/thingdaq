@@ -14,9 +14,9 @@ related:
   - '[[protocol-v3-migration]]'
 ---
 
-# Legacy cleanup recovery and streaming: INCONCLUSIVE
+# Legacy cleanup recovery and streaming: FAIL
 
-Fresh streaming campaign: **0/56 PASS, 0 FAIL, 56 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **NOT_RUN**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **2/56 PASS, 1 FAIL, 53 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **FAIL**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -43,13 +43,22 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 
 | Cell | Grade | Job |
 | --- | --- | --- |
-| final-identity-validation | NOT_RUN |  |
-| metadata-grade | NOT_RUN |  |
-| reset_defaults-grade | NOT_RUN |  |
+| final-identity-validation | PASS | a6bdd7b3-767d-4dee-ad41-754b5c096da8 |
+| metadata-grade | PASS | 6263bfee-3b0a-4dad-bf16-ab83d9432645 |
+| reset_defaults-grade | PASS | 9f567ec4-adda-49f2-a4c7-34bb5e5feeea |
+| `v2-0-1` | PASS | `d54e5cb9-2efe-40b8-9ce9-1de2d3a1b87c` |
+| `v2-0-2` | PASS | `cbc4e874-0f03-430b-b17d-68896d94c85b` |
+| `v2-0-3` | FAIL | `aee893a8-75e7-447f-bc8b-291b2e94224f` |
+
+## Retained combined-stream failure
+
+Job `aee893a8-75e7-447f-bc8b-291b2e94224f` captured both streams for 60.000003 seconds, with zero frame drops, wire gaps, DMA/parser/host errors or CPU throttling, and final IDLE/zero ownership. The frozen policy rejected legacy item conservation: ADC reported 78 explicitly discarded STOP pairs; GPIO reported 3,114 explicitly discarded STOP samples. ADC captured 60,018,762 pairs and transmitted 60,018,684; GPIO transmitted 60,015,648 samples. Raw loss equals the explicit STOP tail in each stream.
+
+Legacy `items_generated` counts complete packets, while `items_dropped` also includes unframed physical STOP tails (`statistics.cpp::refreshDataProjection`). The existing soak validator reconciles bounded tails; the v3 qualification policy omitted that legacy distinction. This original result remains FAIL. A corrected policy requires independent regression, a new freeze and fresh captures; no historical passes are imported. The controller exited and released its lock. The isolated old SDK was never submitted.
 
 ## Continuation and limits
 
-Controller stage at report: `FROZEN`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-legacy-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-legacy-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
+Controller stage at report: `FAIL`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-legacy-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-legacy-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
 
 Legacy SDK reference is unchanged revision `3a52ead02791019fcdb0b27a8be869effc955aa2`, archive SHA-256 `6f086090943069ed228b529871a7fe03bbccb2e69c611464a31fa80f340e4e20`. Its physical probe follows the complete streaming matrix. New-SDK/old-v1/v2 results are local fixture/simulator evidence; no old firmware image is claimed physically tested. Programming reset is not power removal. Unstimulated acquisition does not measure analog accuracy, external edge fidelity, power or multi-hour continuous reliability.
 
