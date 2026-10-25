@@ -83,3 +83,19 @@ endurance checks, and promotion remain uncredited. Real unstimulated acquisition
 does not establish analog accuracy or external waveform fidelity. Machine-readable
 results and exact retained evidence hashes are in
 [protocol-v3-dma-recovery.json](protocol-v3-dma-recovery.json).
+
+## Resume checkpoint
+
+On 2026-10-24 the previous controller process had exited. Resuming with
+`--resume` followed saved job `1dbf164b-b283-498c-a7aa-69f0198806ca` through
+queue residence and execution to PASS, without submitting another copy.
+Independent replay now gives **3/56 streaming PASS, zero FAIL, 53 incomplete**.
+Job `558e5bbf-e5cd-4c74-bc3d-318ec7bdd767` is the next accepted cell; the
+controller continues as PID 8538 at this checkpoint. Inspect the live ledger
+and process before resuming; these counts are historical.
+
+The candidate freeze and every earlier retained evidence hash rechecked PASS.
+Documentation/layout validation passed 11 tests and 1,435 subtests. The JSON
+`continuations` entry retains the resumed job's evidence hashes. Earlier
+checkpoint counts and failures remain unchanged; complete streaming, later
+qualification, and promotion remain uncredited.

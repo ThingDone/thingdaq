@@ -628,6 +628,51 @@
     "source_revision": "c67872b3f854b192786a25e958a0c9ac2cf1bbc6"
   },
   "candidate_sha256": "5d6df850bd97add629502c9126c42eb1483ee2bd05efb1c0b466c55e5a92c1c7",
+  "continuations": [
+    {
+      "action": "Resume existing controller with --resume after its process exited; follow saved job without resubmission",
+      "controller_pid_at_checkpoint": 8538,
+      "documentation_validation": {
+        "subtests_passed": 1435,
+        "tests_passed": 11
+      },
+      "freeze_check": "PASS",
+      "matrix_snapshot": {
+        "fail": 0,
+        "not_complete": 53,
+        "pass": 3,
+        "required": 56
+      },
+      "next_accepted_job_id": "558e5bbf-e5cd-4c74-bc3d-318ec7bdd767",
+      "prior_retained_file_hashes": "PASS",
+      "recorded_at_utc": "2026-10-25T03:24:18.734319+00:00",
+      "resumed_cell_id": "smoke-010001030104000801000c0040420f0040420f00",
+      "resumed_cell_outcome": "PASS",
+      "resumed_job_id": "1dbf164b-b283-498c-a7aa-69f0198806ca",
+      "retained_files": [
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801000c0040420f0040420f00/attempt-001/provenance.json",
+          "sha256": "94401a8ba6fcdf2b2a95735feaf6f8a946abb244e7d66937bfd004db5c579210",
+          "size_bytes": 1501
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801000c0040420f0040420f00/attempt-001/submission.json",
+          "sha256": "ef6f4cef5dd52c02b7ef658beac100e5de04a435965c9e9f63e1a1d870d0ee7c",
+          "size_bytes": 358
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801000c0040420f0040420f00/attempt-001/start.json",
+          "sha256": "64915136f175424f69c26efadbd014b1a7afc68013847afc7f6fc0f7632c385e",
+          "size_bytes": 108
+        },
+        {
+          "path": ".maestro/playbooks/Working/protocol-v3-qualification-dma-fixed-20261024/smoke-010001030104000801000c0040420f0040420f00/attempt-001/results.json",
+          "sha256": "d4766e7ea5b7c82bd5dc41e55d60f29c426dd0e1ca6371ef612835f65cfa3f50",
+          "size_bytes": 29061
+        }
+      ]
+    }
+  ],
   "created": "2026-10-24",
   "freeze_commit": "811ab97",
   "full_qualification_outcome": "INCONCLUSIVE",
