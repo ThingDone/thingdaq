@@ -571,6 +571,7 @@ def measured_fixture(cell, run_id=1):
             versions=[2 if cell["kind"] == "legacy" else 3],
             run_ids=[run_id],
             sample_checks=1,
+            synthetic_checks=2 if settings.source == 1 else 0,
             logical_bytes=items * width,
             encoded_bytes=items * width,
             wire_bytes=items * width + frames * 60,
@@ -1143,3 +1144,68 @@ def test_campaign_recovers_accepted_5xx_and_interrupted_results_without_resubmis
     previous_events = events[:]
     assert runner.run_campaign(args, frozen, [cell]) == result
     assert events == previous_events  # Completed jobs are never submitted again.
+
+
+@pytest.mark.parametrize("width", [8, 16])
+@pytest.mark.parametrize("policies", [0, 1, 2, 3])
+def test_real_synthetic_generator_reaches_fallback_gate(cpp, width, policies):  # noqa: F811
+    # Drive the actual SyntheticSource through runtime/control/packet/USB, not
+    # the codec fixture's hand-filled pages or measured_fixture's counters.
+    from thingdone_daq.protocol_v3 import decode_v3_block
+    from thingdone_daq.synthetic import validate_synthetic_block
+
+    if cpp[1] != 600 and policies:
+        pytest.skip("historical 450 MHz advertises RAW only")
+    caps = capabilities(cpp)
+    settings = next(
+        s
+        for s in caps.configurations
+        if s.source == 1
+        and s.stream_mask == 3
+        and s.gpio_width_bits == width
+        and int(s.gpio_policy) == policies & 1
+        and int(s.adc_policy) == (policies >> 1) & 1
+    )
+    frames, _ = exchange(
+        cpp,
+        [
+            request(command(17, settings.to_bytes(), 1)),
+            request(command(18, request_id=2)),
+            *["T 32256"] * 6,
+            request(command(20, request_id=3)),
+            request(command(19, request_id=4)),
+        ],
+    )
+    data = [f for f in frames if f.header.kind in (1, 2)]
+    tap = worker.WireTap(None)
+    tap.reset(width // 8, synthetic=True)
+    for frame in data:
+        block = decode_v3_block(frame, settings=settings)
+        validate_synthetic_block(block)
+        tap.accept(frame.to_bytes())
+    oracle = tap.snapshot()
+    assert oracle["errors"] == oracle["partial_bytes"] == 0
+    for name in ("adc", "gpio"):
+        assert oracle[name]["gap_items"] == 0
+        assert oracle[name]["synthetic_checks"] == len(oracle[name]["encodings"])
+    assert set(oracle["gpio"]["encodings"]) == ({"0", "1"} if policies & 1 else {"0"})
+    if policies == 3:
+        cell = next(
+            r
+            for r in policy.matrix(caps.to_payload().hex())
+            if r["id"] == f"fallback-{int(width == 16)}"
+        )
+        measured = measured_fixture(cell)
+        # Only the encoding/source coverage comes from the portable generator;
+        # duration/health remain explicit unit fixtures, never hardware credit.
+        for name in ("adc", "gpio"):
+            for key in ("encodings", "synthetic_checks"):
+                measured["oracle"][name][key] = oracle[name][key]
+        assert policy.validate_capture(cell, measured) == []
+        measured["oracle"]["gpio"]["encodings"] = {"0": 1}
+        assert "RLE/RAW fallback unobserved" in policy.validate_capture(cell, measured)
+        measured["oracle"]["gpio"]["synthetic_checks"] = 0
+        assert (
+            "gpio missing independent synthetic source check"
+            in policy.validate_capture(cell, measured)
+        )

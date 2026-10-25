@@ -348,6 +348,11 @@ def test_stop_drain_rejects_configuration_then_starts_new_epoch(cpp):
 def assert_samples(block, *, controlled=False):
     first = block.first_sample_ticks // 8
     assert block.end_tick_exclusive == block.first_sample_ticks + block.item_count * 8
+    if block.protocol_version == 3 and not controlled:
+        from thingdone_daq.synthetic import validate_synthetic_block
+
+        validate_synthetic_block(block)
+        return
     if isinstance(block, ADCBlock):
         edges = [(0, 4095), (4095, 0), (0x123, 0xABC), (0x800, 0x7FF)]
         pairs = [
@@ -514,10 +519,22 @@ def test_all_advertised_synthetic_tuples_and_v2_sessions(cpp, chunks):
                 )
                 assert_samples(block)
                 compressed_adc = version == 3 and kind == 1 and settings.adc_policy == 1
-                assert block.encoding == (2 if compressed_adc else 0)
-                expected_wire = (60 if version == 3 else 48) + count * (
-                    3 if compressed_adc else 4 if kind == 1 else width // 8
+                compressed_gpio = (
+                    version == 3
+                    and kind == 2
+                    and settings.gpio_policy == 1
+                    and sequence % 2 == 0
                 )
+                assert block.encoding == (
+                    2 if compressed_adc else 1 if compressed_gpio else 0
+                )
+                encoded_bytes = (
+                    (2 + width // 8)
+                    if compressed_gpio
+                    else count
+                    * (3 if compressed_adc else 4 if kind == 1 else width // 8)
+                )
+                expected_wire = (60 if version == 3 else 48) + encoded_bytes
                 assert block.wire_bytes == frame.header.total_length == expected_wire
                 total += expected_wire
             assert getattr(status, f"{name}_items_dropped") == 0
@@ -544,7 +561,7 @@ def test_all_advertised_synthetic_tuples_and_v2_sessions(cpp, chunks):
                     len(data) if policy else 0
                 )
                 assert getattr(status, f"{name}_codec_raw") == (
-                    len(data) if policy and kind == 2 else 0
+                    len(data) // 2 if policy and kind == 2 else 0
                 )
                 assert getattr(status, f"{name}_codec_deadline_drops") == 0
                 assert getattr(status, f"{name}_codec_resource_drops") == 0
