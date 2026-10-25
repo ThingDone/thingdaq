@@ -14,13 +14,14 @@ related:
 
 # Lifecycle hardware qualification: INCONCLUSIVE
 
-Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682`, firmware `827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d`, build `thingdaq-e0c750868be7c5c2`, serial `20428100`. Six selected cells: **3 PASS / 0 FAIL / 1 INCONCLUSIVE / 2 NOT_RUN**. Release promotion remains a separate task.
+Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682`, firmware `827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d`, build `thingdaq-e0c750868be7c5c2`, serial `20428100`. Six selected cells: **4 PASS / 0 FAIL / 1 INCONCLUSIVE / 1 NOT_RUN**. Release promotion remains a separate task.
 
 | Cell | Grade | Job | Captures | Peak °C |
 | --- | --- | --- | --- | --- |
 | same-boot-20 | PASS | `409c3d90-eb5f-4f2a-a1fe-ae76f7a330dc` | 20 | 50.790 |
 | stall-0 | PASS | `77c1e293-8433-47a9-8496-1b8f652c1b26` | 1 | 53.246 |
 | stall-1 | PASS | `463bf29a-d500-429c-a911-cd8be13d5452` | 1 | 56.316 |
+| soak-1 | PASS | `494d9c0c-0b16-49b4-bc4b-c0a55705ad82` | 1 | 66.755 |
 
 ## Coverage and measurement limits
 
@@ -30,11 +31,16 @@ The machine-readable report retains every status counter, ownership snapshot, te
 
 Fragmented/zero/partial USB writes are exercised in the existing production transport and SDK harnesses. Physical acquisition uses unstimulated inputs and does not establish analog accuracy, external edge fidelity, power, ambient temperature or multi-hour uninterrupted reliability.
 
+## Mixed-version physical probe
+
+Supplemental probe: **PASS**, job `c66497ed-35e6-41ae-ac04-e5f7a646622b`. Six same-boot captures exercise v3 → v2 GPIO8 → v3 → v2 GPIO16 → v3, then serial close/reopen and another v3 capture. Run IDs must remain 1–6; every capture reuses the frozen sample/clock/health oracle. This probe is separate from the six canonical cells.
+
 ## Local verification
 
 - `pytest.log`: 187 passed, 6 skipped, 86 subtests passed in 35.02s.
 - `control-pytest.log`: 258 passed, 13 subtests passed in 21.34s.
+- `grader-pytest.log`: 12 passed in 0.22s.
 
-Freeze: 500 protected files PASS; 1558 historical hashes unchanged. Original failed campaigns remain preserved. Source, SDK, firmware, runner and qualification policy are unchanged.
+Freeze: 500 protected files PASS; 1558 historical hashes unchanged. Original failed campaigns remain preserved. Source, SDK, firmware, frozen runner and qualification policy are unchanged.
 
 Full evidence and measurements: [protocol-v3-lifecycle-hardware.json](protocol-v3-lifecycle-hardware.json).
