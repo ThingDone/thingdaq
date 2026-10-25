@@ -92,12 +92,16 @@ def test_selected_layout_and_wire_accounting(runtime_binary, width, compressed):
                 len(data) if compressed else 0
             )
             assert getattr(status, f"{name}_codec_raw") == (
-                len(data) if compressed and kind == 2 else 0
+                len(data) // 2 if compressed and kind == 2 else 0
             )
             for sequence, frame in enumerate(data):
                 assert frame.header.sequence == sequence
                 assert frame.header.item_count == count
                 assert frame.header.first_sample_ticks == sequence * count * 8
                 assert frame.header.total_length == (
-                    3084 if compressed and kind == 1 else 4092
+                    3084
+                    if compressed and kind == 1
+                    else 62 + width // 8
+                    if compressed and kind == 2 and sequence % 2 == 0
+                    else 4092
                 )
