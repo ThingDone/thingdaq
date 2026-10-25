@@ -16,7 +16,7 @@ related:
 
 # Synthetic recovery and streaming: INCONCLUSIVE
 
-Fresh streaming campaign: **4/56 PASS, 0 FAIL, 52 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **10/56 PASS, 0 FAIL, 46 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -49,6 +49,12 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 | `fallback-0` | PASS | `f6353b13-b675-488a-8c70-a0f1a10a004e` |
 | `fallback-1` | PASS | `cc0b36bb-befc-415c-8cea-d50057f9d063` |
 | `smoke-010001030104000800000c0040420f0040420f00` | PASS | `57c03826-3408-4a5f-93d2-67b47a2989df` |
+| `smoke-010001030104000800010c0040420f0040420f00` | PASS | `76f292f0-b0a0-4a84-9056-3560123120ab` |
+| `smoke-010001030104000801000c0040420f0040420f00` | PASS | `90f6fe90-5f5d-49d9-88b5-7b9c9a6d6e61` |
+| `smoke-010001030104000801010c0040420f0040420f00` | PASS | `35612a17-5bff-4eda-9498-862221d75a9a` |
+| `smoke-010001030104011000000c0040420f0040420f00` | PASS | `8802773e-3398-4793-b611-710326214d51` |
+| `smoke-010001030104011000010c0040420f0040420f00` | PASS | `1cafbfb4-4421-45a8-8362-35e4a9f495bd` |
+| `smoke-010001030104011001000c0040420f0040420f00` | PASS | `0bb8b4e7-c8b0-4677-9815-a6702851e62a` |
 | `smoke-030001030104011000000c0040420f0040420f00` | PASS | `c06338d5-4c0e-4e07-94b9-8f7f958fa796` |
 
 ## Continuation and limits
