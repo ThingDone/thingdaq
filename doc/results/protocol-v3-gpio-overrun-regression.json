@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "created": "2026-10-25",
+  "outcome": "PASS",
+  "scope": "Independent offline regression only; no hardware qualification credit",
+  "failed_job_id": "322b4ac0-309d-4d61-a625-d4ce41cbf104",
+  "baseline_revision": "cbbf330aba2ca9544a94cf635e9447a6b8eb88f6",
+  "corrected_revision": "082228f72cf4a1e65f08141484b68ecd77728a03",
+  "before": {
+    "passed": 1,
+    "failed": 7,
+    "log": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/before-final.log",
+    "command": "PYTHONPATH=.:daq_api/src:.maestro/playbooks/Working/phase06-gpio-regression-20261025 .venv/bin/python -m pytest -q -p baseline_plugin firmware/tests/test_protocol_v3_qualification.py -k 'cpu_admission or worker_cpu_readback'"
+  },
+  "after": {
+    "passed": 16,
+    "failed": 0,
+    "log": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/final-focused.log",
+    "command": "PYTHONPATH=.:daq_api/src .venv/bin/python -m pytest -q firmware/tests/test_protocol_v3_qualification.py firmware/tests/test_rig_http_retry.py -k 'cpu_admission or cpu_allocation_targets or bundled_resource or worker_cpu_readback or queue_and_separate'"
+  },
+  "affected": {
+    "passed": 943,
+    "subtests_passed": 28,
+    "failed": 0,
+    "log": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/affected.log",
+    "command": "PYTHONPATH=.:daq_api/src .venv/bin/python -m pytest -q firmware/tests/test_protocol_v3_qualification.py firmware/tests/test_rig_http_retry.py firmware/tests/test_input_isolation.py firmware/tests/test_packet_buffer_pipeline.py firmware/tests/test_usb_transport.py firmware/tests/test_v3_codec_pipeline.py firmware/tests/test_soak_candidate_freeze.py daq_api/tests/test_python_v3_compatibility.py daq_api/tests/test_stream_consumers_v3.py daq_api/tests/test_transport_reader.py"
+  },
+  "preserved_correction_evidence": {
+    "outcome": "PASS",
+    "verified_count": 23,
+    "paths": [
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/container-cleanup.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/existing-tests.log",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/final-checks.log",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/final-runner-tests.log",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/cpu-allocation.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/firmware.ino.hex",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/preflight.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/prior-status.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/provenance.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/record.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/results.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/rig-program.py",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/start.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/status.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/submission.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/summary.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/preservation.json",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/repro-after.log",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/repro-before.log",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/resource-owner-tests.log",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/run_correction.py",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/test_resource_precondition.py",
+      ".maestro/playbooks/Working/phase06-gpio-correction-20261025/write_report.py"
+    ]
+  },
+  "new_hardware_jobs": [],
+  "historical_streaming": {
+    "PASS": 36,
+    "FAIL": 1,
+    "NOT_RUN": 19
+  },
+  "candidate_requalification": "NOT_RUN",
+  "files": [
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/baseline_plugin.py",
+      "sha256": "05dc573297b449b1c97351ac3c37b1f54c25558f1ec7c8f9f4de9f11d9aeee6b",
+      "size_bytes": 941
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/baseline-rig_protocol_v3_qualification.py",
+      "sha256": "d3adabdd0733dbf21d7e639ef4461f74ffb784a231da854ddc405c98b9f15433",
+      "size_bytes": 21354
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/baseline-qualify_protocol_v3.py",
+      "sha256": "cdafaae1cc8d46342539fd0789f3ecf4850277acaa989ab12ecdef7dc3f0e5fa",
+      "size_bytes": 18145
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/before-final.log",
+      "sha256": "cb126f5715e222673dc79c60070c1d408cb587339a8f9716bb7ada44b5209e67",
+      "size_bytes": 14632
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/final-focused.log",
+      "sha256": "9b80dce005104ce5b1b88ac7c211737e5bf20592238638357cd5f13a6a5d795b",
+      "size_bytes": 115
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/affected.log",
+      "sha256": "2c072d8f4e2af23f511b76cb30ba0c8199dcd1553f805f7c8aa5b7b58d22325d",
+      "size_bytes": 1125
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/preservation.json",
+      "sha256": "d263818138c4b38d8c8ca966b6bb727b23236ada124e877a46d0ff3876512f0e",
+      "size_bytes": 2090
+    },
+    {
+      "path": "firmware/tests/test_protocol_v3_qualification.py",
+      "sha256": "917bb771a10248605ebae1a5e58ad13d1cfd538263e079698014179842f631cd",
+      "size_bytes": 43600
+    },
+    {
+      "path": "firmware/tests/test_rig_http_retry.py",
+      "sha256": "eb6ace2677f5952092fbe76415dc1f4df5ef06346be6328adee60dd9dbb98fbf",
+      "size_bytes": 11782
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/docs.log",
+      "sha256": "836bd87983fd447f8610f57856c07a36da60994dea16adfaaada9f56adc55c1a",
+      "size_bytes": 106
+    }
+  ],
+  "documentation": {
+    "passed": 11,
+    "subtests_passed": 1455,
+    "failed": 0,
+    "log": ".maestro/playbooks/Working/phase06-gpio-regression-20261025/docs.log",
+    "command": "PYTHONPATH=.:daq_api/src .venv/bin/python -m pytest -q daq_api/tests/test_documentation_integrity.py daq_api/tests/test_repository_layout.py"
+  }
+}

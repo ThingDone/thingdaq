@@ -160,10 +160,17 @@ def test_queue_and_separate_5xx_periods_do_not_spend_execution_budget(
         return next(statuses)
 
     monkeypatch.setattr(requests, "post", post)
-    assert rig.wait_for_result("http://rig", "key", "job", tmp_path, 2) == {
-        "results": {"completed": True}
-    }
+    active = []
+    assert rig.wait_for_result(
+        "http://rig",
+        "key",
+        "job",
+        tmp_path,
+        2,
+        on_active=lambda job: active.append((job, clock.now)),
+    ) == {"results": {"completed": True}}
     assert clock.now > 2300
+    assert active == [("job", 1771)]  # Never provision queued/terminal jobs.
     assert all(call[1]["json"]["test_id"] == "job" for call in calls)
     assert (tmp_path / "results.json").exists()
 

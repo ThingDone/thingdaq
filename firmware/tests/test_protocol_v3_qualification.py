@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import importlib
+import io
 import json
+import shlex
 import struct
+import subprocess
 import sys
 import zlib
 from dataclasses import asdict, replace
@@ -37,6 +41,139 @@ sys.path.insert(0, str(TOOLS))
 policy = importlib.import_module("protocol_v3_qualification")
 runner = importlib.import_module("qualify_protocol_v3")
 worker = importlib.import_module("rig_protocol_v3_qualification")
+
+
+@pytest.mark.parametrize(
+    "setup,delay,accepted",
+    [
+        ({"cpu.max": "50000 100000", "affinity": [0, 1]}, 0, False),
+        ({"cpu.max": "200000 100000", "affinity": [0]}, 0, False),
+        ({}, 0, False),
+        ({"cpu.max": "200000 100000", "affinity": [0, 1]}, 0, True),
+        ({"cpu.max": "200000 100000", "affinity": [0, 1]}, 2, True),
+    ],
+    ids=["half-core", "one-cpu-affinity", "missing", "two-cores", "delayed"],
+)
+def test_worker_cpu_admission_before_serial(
+    monkeypatch, capsys, setup, delay, accepted
+):
+    # Reproduce the failed rig's half-core allocation at the actual entry point.
+    # Stub only OS/serial boundaries, retaining the production admission loop.
+    clock = Clock()
+    opened, captures = [], []
+    monkeypatch.setattr(worker.time, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(worker.time, "sleep", clock.sleep)
+    monkeypatch.setattr(
+        worker, "host_cpu", lambda: setup if clock.now >= delay else {}, raising=False
+    )
+    monkeypatch.setattr(
+        worker, "SerialTransport", lambda port: opened.append((port, clock.now))
+    )
+
+    def capture(*args):
+        captures.append(args)
+        return {"outcome": "PASS"}
+
+    monkeypatch.setattr(worker, "run", capture)
+    monkeypatch.setenv("QUALIFICATION_CANDIDATE", "{}")
+    monkeypatch.setenv("QUALIFICATION_CELL", '{"id":"cpu-regression"}')
+    monkeypatch.setenv("SERIAL_PORT", "test-only")
+    assert worker.main() == (0 if accepted else 1)
+    record = json.loads(capsys.readouterr().out.removeprefix("QUALIFICATION "))
+    if accepted:
+        assert opened == [("test-only", delay)]
+        assert len(captures) == 1
+    else:
+        assert opened == captures == []
+        assert clock.now == 30
+        assert record["outcome"] == "FAIL" and record["captures"] == []
+
+
+@pytest.mark.parametrize("fault", [None, "ambiguous", "readback"])
+def test_cpu_allocation_targets_only_accepted_job_and_rechecks_on_resume(
+    monkeypatch, tmp_path, fault
+):
+    job = "4e475671-5925-4e12-908b-c93d8711053a"
+
+    class Container:
+        def __init__(self, name):
+            self.id = name
+            self.attrs = {
+                "Mounts": [{"Source": "/jobs/" + name, "Destination": "/storage"}],
+                "HostConfig": {"CpuQuota": 50000, "CpuPeriod": 100000},
+            }
+            self.updates = []
+
+        def update(self, **kwargs):
+            self.updates.append(kwargs)
+            if fault != "readback":
+                self.attrs["HostConfig"] = {
+                    "CpuQuota": kwargs["cpu_quota"],
+                    "CpuPeriod": kwargs["cpu_period"],
+                }
+
+        def reload(self):
+            pass
+
+    selected, other = Container(job), Container("other-job")
+    containers = []
+    calls = []
+    monkeypatch.setitem(
+        sys.modules,
+        "docker",
+        SimpleNamespace(
+            from_env=lambda: SimpleNamespace(
+                containers=SimpleNamespace(list=lambda: containers)
+            )
+        ),
+    )
+
+    def ssh(command, **kwargs):
+        calls.append(command)
+        assert command[0] == "ssh" and kwargs["timeout"] == 10 and kwargs["check"]
+        output = io.StringIO()
+        # Execute the emitted remote program against fake Docker, not a canned receipt.
+        with contextlib.redirect_stdout(output):
+            exec(shlex.split(command[-1])[-1], {})  # noqa: S102 - trusted runner source
+        return SimpleNamespace(stdout=output.getvalue())
+
+    monkeypatch.setattr(runner.subprocess, "run", ssh)
+    provision = runner.allocate_job_cpu("http://rig.invalid", tmp_path)
+    provision(job)  # Container not created yet: must retry, not cache success.
+    receipt = tmp_path / "cpu-allocation.json"
+    assert not receipt.exists()
+    containers.extend([selected, other])
+    if fault == "ambiguous":
+        containers.append(Container(job))
+    if fault:
+        with pytest.raises(AssertionError):
+            provision(job)
+        assert not receipt.exists()
+        assert other.updates == []
+        if fault == "ambiguous":
+            assert selected.updates == []
+        return
+    provision(job)
+    provision(job)
+    assert len(calls) == 2
+    assert selected.updates == [{"cpu_quota": 200000, "cpu_period": 100000}]
+    assert other.updates == []
+    assert json.loads(receipt.read_text())["job_id"] == job
+    selected.attrs["HostConfig"]["CpuQuota"] = 50000
+    runner.allocate_job_cpu("http://rig.invalid", tmp_path)(job)
+    assert len(calls) == 3 and len(selected.updates) == 2
+    assert json.loads(receipt.read_text())["before_quota"] == 50000
+
+
+def test_bundled_resource_probes_run_without_repository_imports():
+    program = "import sys, types\n" + runner.resource_program()
+    program += (
+        "from rig_release_sdk import host_cpu\n"
+        "from firmware.soak.validator import CpuTracker\n"
+        "assert 'affinity' in host_cpu()\n"
+        "cpu = CpuTracker(); cpu.sample(); assert 'delta' in cpu.summary()\n"
+    )
+    subprocess.run([sys.executable, "-I", "-c", program], check=True)
 
 
 def normal_capabilities():
@@ -839,6 +976,32 @@ def retained_attempt(tmp_path):
         },
     )
     return frozen, tmp_path, directory
+
+
+@pytest.mark.parametrize(
+    "setup",
+    [
+        None,
+        {"cpu.max": "50000 100000", "affinity": [0, 1]},
+        {"cpu.max": "200000 100000", "affinity": [0]},
+    ],
+    ids=["missing", "half-core", "one-cpu-affinity"],
+)
+def test_retained_pass_requires_worker_cpu_readback(retained_attempt, setup):
+    frozen, output, directory = retained_attempt
+    assert runner.retained_records(frozen, output)[0]["outcome"] == "PASS"
+    path = directory / "results.json"
+    saved = json.loads(path.read_text())
+    record = json.loads(saved["results"]["stdout"].removeprefix("QUALIFICATION "))
+    if setup is None:
+        record.pop("host_setup")
+    else:
+        record["host_setup"] = setup
+    saved["results"]["stdout"] = "QUALIFICATION " + json.dumps(record)
+    runner.save(path, saved)
+    result = runner.retained_records(frozen, output)[0]
+    assert result["outcome"] != "PASS"
+    assert "worker CPU allocation" in result["retention_error"]
 
 
 @pytest.mark.parametrize(
