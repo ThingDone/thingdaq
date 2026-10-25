@@ -32,7 +32,7 @@ struct DiagnosticWord {
   }
   void operator=(std::uint32_t value) const {
     volatile std::uint8_t *p = diagnosticBytes() + index * 4U;
-    for (std::size_t i = 0; i < 4; ++i) p[i] = value >> (i * 8U);
+    for (std::size_t i = 0; i < 4; ++i) p[i] = static_cast<std::uint8_t>(value >> (i * 8U));
   }
 };
 struct DiagnosticDetail {

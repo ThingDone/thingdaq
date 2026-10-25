@@ -3344,8 +3344,13 @@ Result encodeV3StatusResponse(const Request& request, std::uint32_t run_id,
       request.request_id <= adc_capture::fault_trace::kDetailRequestBase +
                                 adc_capture::fault_trace::kDetailWords / 2U) {
     const auto trace = adc_capture::fault_trace::snapshot(request.request_id);
-    for (std::size_t i = 0; i < trace.size(); ++i)
-      storeU32(bytes, kStatusResponseAdcFramesProducedOffset + i * 4U, trace[i]);
+    // Keep the normal dropped <= produced response invariants valid for every
+    // diagnostic word, including arbitrary DWT timestamps and zero ERQ masks.
+    storeU64(bytes, kStatusResponseAdcFramesProducedOffset, trace[0]);
+    storeU64(bytes, kStatusResponseAdcFramesDroppedOffset, 0U);
+    storeU64(bytes, kStatusResponseAdcItemsProducedOffset,
+             std::uint64_t{trace[1]} | (std::uint64_t{trace[2]} << 32U));
+    storeU64(bytes, kStatusResponseAdcItemsDroppedOffset, 0U);
   }
 #endif
   const bool stop = request.kind == protocol_v1::CommandKind::kStop;
