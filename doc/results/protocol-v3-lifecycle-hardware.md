@@ -12,9 +12,9 @@ related:
   - '[[protocol-v3-clock-control]]'
 ---
 
-# Lifecycle hardware qualification: INCONCLUSIVE
+# Lifecycle hardware qualification: PASS
 
-Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682`, firmware `827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d`, build `thingdaq-e0c750868be7c5c2`, serial `20428100`. Six selected cells: **5 PASS / 0 FAIL / 1 INCONCLUSIVE / 0 NOT_RUN**. Release promotion remains a separate task.
+Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682`, firmware `827f8304497fcabcbc7b749eca03158b552d5dced674f93562e7642e5504341d`, build `thingdaq-e0c750868be7c5c2`, serial `20428100`. Six selected cells: **6 PASS / 0 FAIL / 0 INCONCLUSIVE / 0 NOT_RUN**. Release promotion remains a separate task.
 
 | Cell | Grade | Job | Captures | Peak °C |
 | --- | --- | --- | --- | --- |
@@ -23,6 +23,7 @@ Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d468
 | stall-1 | PASS | `463bf29a-d500-429c-a911-cd8be13d5452` | 1 | 56.316 |
 | soak-1 | PASS | `494d9c0c-0b16-49b4-bc4b-c0a55705ad82` | 1 | 66.755 |
 | soak-2 | PASS | `fe3aab1a-d798-4e37-b9ca-428c5acf0ae2` | 1 | 67.983 |
+| soak-3 | PASS | `6e578843-79af-4256-bc93-2febec50f412` | 1 | 68.597 |
 
 ## Endurance measurements
 
@@ -30,6 +31,7 @@ Exact candidate `14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d468
 | --- | --- | --- | --- | --- | --- | --- |
 | soak-1 | 600.020 | 600,054,336 | 600,050,304 | 3.075 | 0.478 | 33.017 / 7.483 |
 | soak-2 | 600.020 | 600,054,336 | 600,050,304 | 3.075 | 0.478 | 33.019 / 7.483 |
+| soak-3 | 600.000 | 600,033,168 | 600,030,144 | 3.075 | 0.479 | 33.016 / 7.483 |
 
 Data MB/s uses decimal bytes and includes data-frame wire overhead. Host cores is process CPU seconds / wall seconds over capture/control boundaries. Codec work is measured wall time inside the codec, including preemption. All raw-encoding counts, deadline margins, loss counters and thermal samples are retained in JSON.
 
@@ -51,6 +53,6 @@ Supplemental probe: **PASS**, job `c66497ed-35e6-41ae-ac04-e5f7a646622b`. Six sa
 - `control-pytest.log`: 258 passed, 13 subtests passed in 21.34s.
 - `grader-pytest.log`: 12 passed in 0.22s.
 
-Freeze: 500 protected files PASS; 1558 historical hashes unchanged. Original failed campaigns remain preserved. Source, SDK, firmware, frozen runner and qualification policy are unchanged.
+Freeze: 500 protected files PASS; 1558 historical hashes unchanged. Original failed campaigns remain preserved. Frozen build reserves 33,024 bytes RAM1 for locals and 4,096 bytes RAM2 heap. These are linker/build margins, not measured stack/heap high-water marks. Source, SDK, firmware, frozen runner and qualification policy are unchanged.
 
 Full evidence and measurements: [protocol-v3-lifecycle-hardware.json](protocol-v3-lifecycle-hardware.json).
