@@ -16,7 +16,7 @@ related:
 
 # Synthetic recovery and streaming: INCONCLUSIVE
 
-Fresh streaming campaign: **40/56 PASS, 0 FAIL, 16 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **50/56 PASS, 0 FAIL, 6 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -86,6 +86,16 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 | `smoke-030001030104000801010c0040420f0040420f00` | PASS | `4bd2db50-8254-4861-805d-3960613ac516` |
 | `smoke-030001030104011000000c0040420f0040420f00` | PASS | `c06338d5-4c0e-4e07-94b9-8f7f958fa796` |
 | `smoke-030001030104011000010c0040420f0040420f00` | PASS | `6f2af357-84b1-4cb7-8c7f-fe6121dbb45f` |
+| `smoke-030001030104011001000c0040420f0040420f00` | PASS | `7e0ff445-5a7c-4f02-8504-f8dfad818e84` |
+| `smoke-030001030104011001010c0040420f0040420f00` | PASS | `0147c5c9-598a-48f9-a616-7ac58883dac7` |
+| `smoke-030101030104000800000c0040420f0040420f00` | PASS | `2247a37c-6009-4113-9c41-ed3abe56029b` |
+| `smoke-030101030104000800010c0040420f0040420f00` | PASS | `a37fbc94-1073-4b2f-b38e-58d533e9318d` |
+| `smoke-030101030104000801000c0040420f0040420f00` | PASS | `bec659f1-127b-47c8-b0c5-636c40dbd47f` |
+| `smoke-030101030104000801010c0040420f0040420f00` | PASS | `0ee771fa-47f3-480d-a430-06e75c89dad3` |
+| `smoke-030101030104011000000c0040420f0040420f00` | PASS | `eed77cbc-88b4-4e3d-a5d4-c13d3959c57d` |
+| `smoke-030101030104011000010c0040420f0040420f00` | PASS | `92982cfb-32de-48aa-b67d-04f9cca674b9` |
+| `smoke-030101030104011001000c0040420f0040420f00` | PASS | `0831d5b7-eb9f-4e30-9076-c756c88d80e0` |
+| `smoke-030101030104011001010c0040420f0040420f00` | PASS | `74c4a60e-bf82-401e-a014-dcb583c7122f` |
 
 ## Continuation and limits
 
