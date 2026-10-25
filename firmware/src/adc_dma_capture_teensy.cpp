@@ -14,6 +14,9 @@
 #include <imxrt.h>
 
 #include "board_config.h"
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+#include "checksum_benchmark_teensy.h"
+#endif
 #include "edma_priority_teensy.h"
 #include "gpio_dma_route_teensy.h"
 #include "interrupt_guard_teensy.h"
@@ -23,6 +26,13 @@
   __attribute__((section(section_name), noinline, noipa, used))
 
 namespace thingdaq::adc_capture {
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.diagnostic_bytes")
+std::uint8_t *fault_trace::diagnosticBytes() {
+  static_assert(fault_trace::kDetailWords * 4U <= benchmark::kBufferBytes);
+  return benchmark::teensyOcramBuffer().bytes.data();
+}
+#endif
 
 struct alignas(board::kCacheLineBytes) DescriptorBank {
   std::array<std::array<IMXRT_DMA_TCD_t, board::kAdcDmaDescriptorCount>,
@@ -522,8 +532,14 @@ THINGDAQ_ADC_DMA_TARGET_COLD_CODE(".flashmem.adc_dma.fault_trace")
 void recordFaultTrace(std::uint32_t reason, std::uint32_t adc0 = 0U,
                       std::uint32_t adc1 = 0U, std::uint32_t elapsed = 0U,
                       std::uint32_t polls = 0U) {
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE) || defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
   if (fault_trace::words[0] != 0U) return;
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+  fault_trace::detail[96] = fault_trace::stop_phase;
+  fault_trace::detail[97] = g_pairs_per_buffer;
+  fault_trace::detail[98] = DMA_ERQ;
+  fault_trace::detail[99] = ARM_DWT_CYCCNT;
+#endif
   fault_trace::detail[28] = ARM_DWT_CYCCNT;
   // Failure-only register reads: captured before automatic STOP clears TCDs.
   // DMA continues while these are sampled; this is not an atomic bus snapshot.
@@ -727,6 +743,7 @@ std::uint32_t activeMinorPairs(std::size_t converter) {
   const std::uint16_t biter = tcd.BITER_ELINKNO;
   const std::uint16_t citer = tcd.CITER_ELINKNO;
   if (biter != g_pairs_per_buffer || citer > biter) {
+    recordFaultTrace(5U, static_cast<std::uint32_t>(converter), biter, citer);
     g_ring.recordDmaError(g_epoch, static_cast<std::uint8_t>(converter));
     return 0U;
   }
@@ -739,6 +756,11 @@ bool waitForCompleteStopBoundary() {
   if (!g_hardware_prepared || g_faulted) {
     return false;
   }
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+  fault_trace::stop_phase = 1U;
+  fault_trace::detail[100] = ARM_DWT_CYCCNT;
+  fault_trace::detail[101] = fault_trace::words[0];
+#endif
   ARM_DEMCR |= ARM_DEMCR_TRCENA;
   ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
   const std::uint32_t started = ARM_DWT_CYCCNT;
@@ -771,6 +793,9 @@ bool waitForCompleteStopBoundary() {
       }
       barrier();
       armed = true;
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+      fault_trace::stop_phase = 2U;
+#endif
     }
   }
 
@@ -781,6 +806,11 @@ bool waitForCompleteStopBoundary() {
   }
   const bool completed = armed &&
       (DMA_ERQ & kAdcDmaChannelMask) == 0U;
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+  fault_trace::stop_phase = 3U;
+  fault_trace::detail[102] = ARM_DWT_CYCCNT;
+  fault_trace::detail[103] = completed;
+#endif
   if (!completed) {
     saturatingIncrement(g_stop_errors);
   }
@@ -947,6 +977,10 @@ StopReport stopHardwareAfterTriggers() {
     return report;
   }
 
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+  fault_trace::stop_phase = 4U;
+  fault_trace::detail[104] = ARM_DWT_CYCCNT;
+#endif
 #if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
   const std::uint32_t adc1_mux = *dmamuxRegister(1U);
   const std::uint32_t etc_dma = ADC_ETC_DMA_CTRL;
@@ -972,9 +1006,15 @@ StopReport stopHardwareAfterTriggers() {
        ++converter) {
     stopped[converter].generation = g_current_generations[converter];
     stopped[converter].destination = g_current_destinations[converter];
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+    fault_trace::stop_phase = 5U;
+#endif
     stopped[converter].minor_pairs = activeMinorPairs(converter);
     clearChannelState(converter);
   }
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+  fault_trace::stopped_progress = true;
+#endif
   clearInterruptState();
   g_pair_vector.release();
   g_error_vector.release();

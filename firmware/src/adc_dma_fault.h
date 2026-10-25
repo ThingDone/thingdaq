@@ -6,14 +6,42 @@
 
 namespace thingdaq::adc_capture::fault_trace {
 // Private GPIO-RLE STATUS suffix; never part of the public protocol.
-#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE)
+#if defined(THINGDAQ_EXPERIMENT_GPIO_RLE) || defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
 inline constexpr std::size_t kWords = 3;
 inline volatile std::uint32_t words[kWords]{};
 // Opt-in requests 0xFADC0001..0030 read two immutable diagnostic words.
 // Normal STATUS retains its original 12-byte summary and frame-size limit.
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+inline constexpr std::size_t kDetailWords = 112;
+inline volatile std::uint32_t stop_phase = 0U;
+#else
 inline constexpr std::size_t kDetailWords = 96;
+#endif
 inline constexpr std::uint32_t kDetailRequestBase = 0xFADC0000U;
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC) && defined(__IMXRT1062__)
+// This image borrows the idle OCRAM checksum-benchmark bytes. Access bytes
+// explicitly, so no uint32_t object lifetime or aliasing is assumed. Do not
+// run a checksum benchmark between acquisition prepare and trace retrieval.
+std::uint8_t *diagnosticBytes();
+struct DiagnosticWord {
+  std::size_t index;
+  operator std::uint32_t() const {
+    const volatile std::uint8_t *p = diagnosticBytes() + index * 4U;
+    return p[0] | (std::uint32_t{p[1]} << 8U) |
+           (std::uint32_t{p[2]} << 16U) | (std::uint32_t{p[3]} << 24U);
+  }
+  void operator=(std::uint32_t value) const {
+    volatile std::uint8_t *p = diagnosticBytes() + index * 4U;
+    for (std::size_t i = 0; i < 4; ++i) p[i] = value >> (i * 8U);
+  }
+};
+struct DiagnosticDetail {
+  DiagnosticWord operator[](std::size_t index) const { return {index}; }
+};
+inline constexpr DiagnosticDetail detail{};
+#else
 inline volatile std::uint32_t detail[kDetailWords]{};
+#endif
 // Published only after triggers, DMA requests and completion IRQs are stopped.
 // Successful captures expose their already-recorded phase history too, without
 // adding any work to the acquisition ISR or reporting a synthetic fault.
@@ -76,6 +104,9 @@ inline void retainStoppedProgress(std::uint32_t priorities = 0U,
 }
 inline void reset() {
   stopped_progress = false;
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+  stop_phase = 0U;
+#endif
   for (std::size_t i = 0; i < kWords; ++i) words[i] = 0;
   for (std::size_t i = 0; i < kDetailWords; ++i) detail[i] = 0;
   progress_history.fill(0U);

@@ -3336,6 +3336,18 @@ Result encodeV3StatusResponse(const Request& request, std::uint32_t run_id,
   for (std::size_t i = 0U; i < status.diagnostics.size(); ++i)
     storeU64(bytes, kStatusResponseAdcCodecCompletedOffset + i * 8U, status.diagnostics[i]);
   storeU64(bytes, kStatusResponseDiagnosticValidityOffset, status.diagnostic_validity);
+#if defined(THINGDAQ_ADC_DMA_FAULT_DIAGNOSTIC)
+  // Private diagnostic requests only; ordinary STATUS and STOP are unchanged.
+  // Retrieve after capture, without acquisition-time command traffic.
+  if (request.kind == protocol_v1::CommandKind::kGetStatus &&
+      request.request_id >= adc_capture::fault_trace::kDetailRequestBase &&
+      request.request_id <= adc_capture::fault_trace::kDetailRequestBase +
+                                adc_capture::fault_trace::kDetailWords / 2U) {
+    const auto trace = adc_capture::fault_trace::snapshot(request.request_id);
+    for (std::size_t i = 0; i < trace.size(); ++i)
+      storeU32(bytes, kStatusResponseAdcFramesProducedOffset + i * 4U, trace[i]);
+  }
+#endif
   const bool stop = request.kind == protocol_v1::CommandKind::kStop;
   return encodeFrame(
       responseFields(stop ? protocol_v1::FrameKind::kStopResponse
