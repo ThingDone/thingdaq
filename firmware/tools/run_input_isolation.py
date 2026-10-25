@@ -182,7 +182,9 @@ def is_queued(status):
     )
 
 
-def wait_for_result(service, auth, test_id, evidence_dir, timeout_seconds):
+def wait_for_result(
+    service, auth, test_id, evidence_dir, timeout_seconds, *, on_active=None
+):
     """Queue residence and HTTP retry waits do not consume execution time."""
     active_seconds = 0.0
     previous_queued = True
@@ -212,6 +214,8 @@ def wait_for_result(service, auth, test_id, evidence_dir, timeout_seconds):
                 json.dumps(result, indent=2) + "\n"
             )
             return result
+        if not queued and on_active is not None:
+            on_active(test_id)
         if active_seconds >= timeout_seconds:
             raise RuntimeError(
                 f"job {test_id} exceeded execution deadline; inspect before further submissions"
@@ -226,6 +230,8 @@ def submit_program(
     program: str,
     evidence_dir: Path,
     timeout_seconds: float,
+    *,
+    on_active=None,
 ) -> dict:
     """Submit or recover one job; persist its identity before network activity."""
 
@@ -285,7 +291,10 @@ def submit_program(
             save("start.json", started)
     test_id = started["test_id"]
     print(f"Following {test_id}: {evidence_dir.name}", flush=True)
-    return wait_for_result(service, auth, test_id, evidence_dir, timeout_seconds)
+    options = {} if on_active is None else {"on_active": on_active}
+    return wait_for_result(
+        service, auth, test_id, evidence_dir, timeout_seconds, **options
+    )
 
 
 def resume_saved_program(service, auth, evidence_dir):

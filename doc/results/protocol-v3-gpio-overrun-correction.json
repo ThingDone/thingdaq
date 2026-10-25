@@ -1,0 +1,831 @@
+{
+  "correction": {
+    "acceptance_policy_changed": false,
+    "cpu_period_us": 100000,
+    "cpu_quota_us": 200000,
+    "description": "Allocate two cores only to the accepted job container; require worker readback before serial open; preserve quota, boundary throttling, process CPU, and post-STOP ownership.",
+    "firmware_changed": false,
+    "paths": [
+      "firmware/tests/rig_protocol_v3_qualification.py",
+      "firmware/tools/qualify_protocol_v3.py",
+      "firmware/tools/run_input_isolation.py"
+    ],
+    "sdk_changed": false,
+    "worker_setup_deadline_seconds": 30
+  },
+  "created": "2026-10-25",
+  "diagnostic": {
+    "allocation": {
+      "before_period": 100000,
+      "before_quota": 50000,
+      "container_id": "6202c93cc7913e59b8c4927940abf5a2b4509e3f2c47ed9a54761317e7ed7fb2",
+      "job_id": "2abfcf14-7dd0-4a1d-8317-91e324118eb5",
+      "period": 100000,
+      "quota": 200000
+    },
+    "candidate_sha256": "5d6df850bd97add629502c9126c42eb1483ee2bd05efb1c0b466c55e5a92c1c7",
+    "cell": {
+      "cycles": 1,
+      "id": "smoke-030001030104011000000c0040420f0040420f00",
+      "kind": "smoke",
+      "seconds": 60,
+      "settings_hex": "030001030104011000000c0040420f0040420f00"
+    },
+    "duration_seconds": 60.00723442528397,
+    "firmware_sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+    "gap_items": {
+      "adc": 0,
+      "gpio": 0
+    },
+    "host_after": {
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cpu.max": "200000 100000\n",
+      "cpu.stat": "usage_usec 31553197\nuser_usec 28287996\nsystem_usec 3265200\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 619\nnr_throttled 10\nthrottled_usec 466652\nnr_bursts 0\nburst_usec 0\n",
+      "cpu_count": 4,
+      "cpuset.cpus.effective": "0-3\n",
+      "loadavg": [
+        0.9287109375,
+        0.70166015625,
+        0.63134765625
+      ],
+      "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.41",
+      "python": "3.13.15"
+    },
+    "host_before": {
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cpu.max": "200000 100000\n",
+      "cpu.stat": "usage_usec 631142\nuser_usec 595417\nsystem_usec 35725\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 17\nnr_throttled 10\nthrottled_usec 466652\nnr_bursts 0\nburst_usec 0\n",
+      "cpu_count": 4,
+      "cpuset.cpus.effective": "0-3\n",
+      "loadavg": [
+        0.73876953125,
+        0.61767578125,
+        0.59814453125
+      ],
+      "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.41",
+      "python": "3.13.15"
+    },
+    "host_cpu": {
+      "baseline": {
+        "burst_usec": 0,
+        "core_sched.force_idle_usec": 0,
+        "nice_usec": 0,
+        "nr_bursts": 0,
+        "nr_periods": 17,
+        "nr_throttled": 10,
+        "system_usec": 35725,
+        "throttled_usec": 466652,
+        "usage_usec": 632140,
+        "user_usec": 596415
+      },
+      "coverage": "control boundaries only",
+      "delta": {
+        "burst_usec": 0,
+        "core_sched.force_idle_usec": 0,
+        "nice_usec": 0,
+        "nr_bursts": 0,
+        "nr_periods": 602,
+        "nr_throttled": 0,
+        "system_usec": 3229475,
+        "throttled_usec": 0,
+        "usage_usec": 30921057,
+        "user_usec": 27691581
+      },
+      "final": {
+        "burst_usec": 0,
+        "core_sched.force_idle_usec": 0,
+        "nice_usec": 0,
+        "nr_bursts": 0,
+        "nr_periods": 619,
+        "nr_throttled": 10,
+        "system_usec": 3265200,
+        "throttled_usec": 466652,
+        "usage_usec": 31553197,
+        "user_usec": 28287996
+      },
+      "process_seconds": 30.583873464,
+      "wall_seconds": 60.1831337781623
+    },
+    "host_queue_drops": 0,
+    "host_setup": {
+      "affinity": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "cpu.max": "200000 100000\n",
+      "cpu.stat": "usage_usec 597009\nuser_usec 563347\nsystem_usec 33662\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 11\nnr_throttled 10\nthrottled_usec 466652\nnr_bursts 0\nburst_usec 0\n",
+      "cpu_count": 4,
+      "cpuset.cpus.effective": "0-3\n",
+      "loadavg": [
+        0.73876953125,
+        0.61767578125,
+        0.59814453125
+      ],
+      "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.41",
+      "python": "3.13.15"
+    },
+    "independent_grade": {
+      "completed": true,
+      "error": null,
+      "exit_code": 0,
+      "independent_problems": [],
+      "job_id": "2abfcf14-7dd0-4a1d-8317-91e324118eb5",
+      "outcome": "PASS",
+      "qualification_credit": "NONE"
+    },
+    "info": {
+      "adc_resolution_bits": 12,
+      "board_id": 1,
+      "build_id": "thingdaq-92950ec5f7156586",
+      "clocks": {
+        "adc_clock_hz": 37500000,
+        "cpu_clock_hz": 600000000,
+        "cpu_profile": 1,
+        "ipg_clock_hz": 150000000,
+        "pit_clock_hz": 24000000,
+        "timestamp_hz": 8000000
+      },
+      "firmware_version": "1.2.0",
+      "hardware_serial": "20428100",
+      "mcu_id": 1,
+      "protocol_version": 3,
+      "simulated": false
+    },
+    "inputs": {
+      "runner_sha256": {
+        "firmware/soak/validator.py": "1643a747e55bd9cd82db916319d2446f378b2a796f2c1fc49625dcaa7e5833e9",
+        "firmware/tests/rig_protocol_v3_qualification.py": "6b3bc1408b950dc73a4c772c953bd8bb2791b2704c6b4cf7011f3fa98e8b4bd2",
+        "firmware/tests/rig_release_sdk.py": "b432db0416f803c54c03c76ac4ba2f0dc0d8ae97903f0397a742a7905ee4b4ae",
+        "firmware/tools/protocol_v3_qualification.py": "c39d5b8891cba8f2ffd6b4147a449ab8425e80fafd100a82b0843f69ff7c38c5",
+        "firmware/tools/qualify_protocol_v3.py": "8b22656564c6c40738c912e977310ba49a70e860da22a672e25f6b7e78cd9501",
+        "firmware/tools/run_input_isolation.py": "7a211f58a97fdd11d5202b5aed9cb4e210b61209237faacaf422613f78135eb1"
+      },
+      "schema_sha256": {
+        "protocol-v1.json": "014648d18828c07fd2c8af16c430134bc28c4988d5b95d39613114f35623f222",
+        "protocol-v2.json": "1596bab522a711aa7980b0187d157b550d9ec8f69049d9961c579b1ef2cc9c48",
+        "protocol-v3.json": "ada4cb467d8572147f2a5f418b3b3f43b15de6079c250f5e3ffeb0efb27ecd3c"
+      },
+      "sdk_archive_sha256": "c22e520af516077d4b92527699c6c602dd857d0ef4627c453f5a20be32090f1f",
+      "sdk_version": "1.2.0"
+    },
+    "job_id": "2abfcf14-7dd0-4a1d-8317-91e324118eb5",
+    "outcome": "PASS",
+    "ownership_after_stop": {
+      "adc0_dma_major_loops": 59551,
+      "adc0_dma_results": 60027408,
+      "adc1_dma_major_loops": 59551,
+      "adc1_dma_results": 60027408,
+      "adc_buffers_acquired": 59551,
+      "adc_buffers_completed": 59551,
+      "adc_buffers_released": 59551,
+      "adc_cache_cpu_invalidations": 59551,
+      "adc_cache_dma_discards": 59564,
+      "adc_calibration_cycles": [
+        5923,
+        17679
+      ],
+      "adc_calibration_deadline_us": 10000,
+      "adc_calibration_states": [
+        1,
+        1
+      ],
+      "adc_channels": [
+        7,
+        8
+      ],
+      "adc_clock_divider": 4,
+      "adc_clock_hz": 37500000,
+      "adc_clock_source": 1,
+      "adc_code_max": 4095,
+      "adc_code_min": 0,
+      "adc_completion_mismatches": 0,
+      "adc_configuration_flags": 255,
+      "adc_container_bytes": 2,
+      "adc_conversion_mode": 2,
+      "adc_destination_mismatches": 0,
+      "adc_dma_error_events": 0,
+      "adc_etc_error_events": 0,
+      "adc_etc_error_flags": 0,
+      "adc_framed_bytes_emitted": 243682692,
+      "adc_framed_bytes_framed": 243682692,
+      "adc_framed_bytes_transmitted": 243682692,
+      "adc_frames_consumed": 59551,
+      "adc_frames_dropped": 0,
+      "adc_frames_dropped_after_framing": 0,
+      "adc_frames_dropped_after_promotion": 0,
+      "adc_frames_emitted": 59551,
+      "adc_frames_evicted": 0,
+      "adc_frames_evicted_after_promotion": 0,
+      "adc_frames_framed_pipeline": 59551,
+      "adc_frames_generated": 59551,
+      "adc_frames_transmitted": 59551,
+      "adc_hardware_average_count": 0,
+      "adc_incomplete_buffers": 1,
+      "adc_incomplete_conversions": 0,
+      "adc_initialization_error_flags": 0,
+      "adc_input_max_mv_nominal": 3300,
+      "adc_input_min_mv_nominal": 0,
+      "adc_ipg_clock_hz": 150000000,
+      "adc_items_dropped": 410,
+      "adc_items_emitted": 60027408,
+      "adc_items_framed_pipeline": 60027408,
+      "adc_items_generated": 60027408,
+      "adc_items_transmitted_pipeline": 60027408,
+      "adc_overwritten_conversions": 0,
+      "adc_packer_chronology_errors": 0,
+      "adc_packer_pipeline_errors": 0,
+      "adc_packer_source_errors": 0,
+      "adc_packet_filling_depth": 0,
+      "adc_packet_ready_depth": 0,
+      "adc_packet_ready_high_water": 1,
+      "adc_packet_transmit_depth": 0,
+      "adc_packet_transmit_high_water": 6,
+      "adc_paired_major_loops": 59551,
+      "adc_pairs_captured": 60027818,
+      "adc_pairs_consumed": 60027408,
+      "adc_pairs_delivered": 60027408,
+      "adc_pairs_framed": 60027408,
+      "adc_pairs_transmitted": 60027408,
+      "adc_payload_bytes_dropped": 0,
+      "adc_payload_bytes_emitted": 240109632,
+      "adc_payload_bytes_framed": 240109632,
+      "adc_payload_bytes_produced": 240109632,
+      "adc_payload_bytes_transmitted": 240109632,
+      "adc_peripherals": [
+        1,
+        2
+      ],
+      "adc_pins": [
+        14,
+        15
+      ],
+      "adc_raw_drop_pairs_projected": 0,
+      "adc_raw_gap_pairs": 0,
+      "adc_raw_invariant_errors": 0,
+      "adc_raw_pairs_lost": 410,
+      "adc_raw_ready_depth": 0,
+      "adc_raw_ready_high_water": 1,
+      "adc_raw_ring_overruns": 0,
+      "adc_reference": 1,
+      "adc_reference_mv_nominal": 3300,
+      "adc_resolution_bits": 12,
+      "adc_resource_conflicts": 0,
+      "adc_sample_time_adck": 3,
+      "adc_schedule_exhaustions": 0,
+      "adc_stale_completions": 0,
+      "adc_stale_interrupts": 0,
+      "adc_start_errors": 0,
+      "adc_stop_errors": 0,
+      "adc_stop_pairs_discarded": 410,
+      "adc_trigger": {
+        "adc_etc_ctrl_configured": 0,
+        "ccm_ccgr1_configured": 4244632320,
+        "ccm_ccgr2_configured": 218099763,
+        "ccm_cscmr1_configured": 1729298496,
+        "chain_configured": [
+          8215,
+          16408
+        ],
+        "chain_length": 1,
+        "completion_counts": [
+          1,
+          1
+        ],
+        "completion_delta_cycles": 296,
+        "completion_expected_delta_cycles": 300,
+        "completion_tolerance_cycles": 120,
+        "configuration_flags": 255,
+        "diagnostic_elapsed_cycles": 17748,
+        "done0_1_irq_final": 1048577,
+        "done2_err_irq_final": 0,
+        "dwt_clock_hz": 600000000,
+        "effective_delays": [
+          1,
+          76
+        ],
+        "error_flags": 0,
+        "gpio_master_pit_channel": 0,
+        "gpio_master_pit_load": 5,
+        "gpio_master_rate_hz": 4000000,
+        "gpio_master_tctrl_configured": 0,
+        "initial_delays": [
+          0,
+          75
+        ],
+        "ipg_clock_hz": 150000000,
+        "pair_pit_channel": 1,
+        "pair_pit_load": 3,
+        "pair_rate_hz": 1000000,
+        "pair_tctrl_configured": 4,
+        "phase_ipg_cycles": 75,
+        "pit_clock_hz": 24000000,
+        "pit_mcr_configured": 0,
+        "predivider": 0,
+        "trigger_counter_configured": [
+          0,
+          75
+        ],
+        "trigger_ctrl_configured": [
+          0,
+          0
+        ],
+        "trigger_error_count": 0,
+        "trigger_queues": [
+          0,
+          4
+        ],
+        "xbar_inputs": [
+          57,
+          57
+        ],
+        "xbar_outputs": [
+          103,
+          107
+        ],
+        "xbar_sel_configured": [
+          14592,
+          14592
+        ]
+      },
+      "auxiliary_gpio": {
+        "adc_pair_rate_hz": 1000000,
+        "bank_major_loops": [
+          29775,
+          29775
+        ],
+        "bank_ring_overruns": [
+          0,
+          0
+        ],
+        "bank_samples_captured": [
+          60026400,
+          60026400
+        ],
+        "bank_stale_completions": [
+          0,
+          0
+        ],
+        "buffers_acquired": 29775,
+        "buffers_completed": 29775,
+        "buffers_released": 29775,
+        "cache_cpu_invalidations": 59550,
+        "cache_dma_discards": 59564,
+        "canceled_generations": 2,
+        "cancellation_samples": 0,
+        "count_mismatches": 0,
+        "destination_mismatches": 0,
+        "frame_coverage_ticks": 8096,
+        "generation_skew_events": 0,
+        "generation_skew_samples": 0,
+        "gpio_item_bytes": 1,
+        "gpio_sample_rate_hz": 1000000,
+        "hardware_errors": 0,
+        "invariant_errors": 0,
+        "packet_retention_us_combined": 101200,
+        "packet_retention_us_single_stream": 202400,
+        "paired_major_loops": 29775,
+        "raw_ring_overruns": 0,
+        "ready_depth": [
+          0,
+          0
+        ],
+        "ready_high_water": [
+          1,
+          1
+        ],
+        "resource_conflicts": 0,
+        "samples_captured": 60027818,
+        "samples_delivered": 60026400,
+        "samples_joined": 60026400,
+        "samples_lost": 1418,
+        "schedule_exhaustions": 0,
+        "stale_completions": 0,
+        "stale_dma_completions": 0,
+        "start_errors": 0,
+        "stop_errors": 0,
+        "stop_tail_samples": 1418,
+        "timestamp_mismatches": 0
+      },
+      "bad_checksums": 0,
+      "bad_flags": 0,
+      "bad_lengths": 0,
+      "bad_payloads": 0,
+      "bad_request_ids": 0,
+      "bad_types": 0,
+      "bad_versions": 0,
+      "commands_accepted": 11,
+      "commands_rejected": 0,
+      "configuration": null,
+      "data_checksum_algorithm": 1,
+      "data_frame_bytes": 4096,
+      "data_framed_bytes_transmitted": 365521992,
+      "data_payload_bytes_transmitted": 360162432,
+      "device_state": 1,
+      "gpio_buffers_acquired": 29775,
+      "gpio_buffers_completed": 29775,
+      "gpio_buffers_released": 29775,
+      "gpio_cache_cpu_invalidations": 59550,
+      "gpio_cache_dma_discards": 59564,
+      "gpio_dma_major_loops": 29775,
+      "gpio_duplicate_samples_ignored": 0,
+      "gpio_framed_bytes_emitted": 121839300,
+      "gpio_framed_bytes_framed": 121839300,
+      "gpio_framed_bytes_transmitted": 121839300,
+      "gpio_frames_dropped": 0,
+      "gpio_frames_dropped_after_framing": 0,
+      "gpio_frames_dropped_after_promotion": 0,
+      "gpio_frames_emitted": 29775,
+      "gpio_frames_evicted": 0,
+      "gpio_frames_evicted_after_promotion": 0,
+      "gpio_frames_framed_pipeline": 29775,
+      "gpio_frames_generated": 29775,
+      "gpio_frames_packed": 29775,
+      "gpio_frames_produced": 29775,
+      "gpio_frames_transmitted": 29775,
+      "gpio_hardware_errors": 0,
+      "gpio_items_dropped": 1418,
+      "gpio_items_emitted": 60026400,
+      "gpio_items_framed_pipeline": 60026400,
+      "gpio_items_generated": 60026400,
+      "gpio_items_transmitted_pipeline": 60026400,
+      "gpio_packed_ready_depth": 0,
+      "gpio_packed_ready_high_water": 0,
+      "gpio_packer_chronology_errors": 0,
+      "gpio_packer_drop_samples_projected": 0,
+      "gpio_packer_pipeline_errors": 0,
+      "gpio_packer_samples_dropped": 0,
+      "gpio_packer_source_errors": 0,
+      "gpio_packet_filling_depth": 0,
+      "gpio_packet_ready_depth": 0,
+      "gpio_packet_ready_high_water": 1,
+      "gpio_packet_transmit_depth": 0,
+      "gpio_packet_transmit_high_water": 2,
+      "gpio_payload_bytes_dropped": 0,
+      "gpio_payload_bytes_emitted": 120052800,
+      "gpio_payload_bytes_framed": 120052800,
+      "gpio_payload_bytes_produced": 120052800,
+      "gpio_payload_bytes_transmitted": 120052800,
+      "gpio_processing_cpu_basis_points": 1355,
+      "gpio_raw_drop_samples_projected": 0,
+      "gpio_raw_invariant_errors": 0,
+      "gpio_raw_ready_depth": 0,
+      "gpio_raw_ready_high_water": 1,
+      "gpio_raw_ring_overruns": 0,
+      "gpio_raw_samples_lost": 1418,
+      "gpio_resource_conflicts": 0,
+      "gpio_samples_captured": 60027818,
+      "gpio_samples_delivered": 60026400,
+      "gpio_samples_framed": 60026400,
+      "gpio_samples_packed": 60026400,
+      "gpio_samples_produced": 60026400,
+      "gpio_samples_transmitted": 60026400,
+      "gpio_stale_dma_completions": 0,
+      "gpio_start_errors": 0,
+      "gpio_stop_errors": 0,
+      "gpio_stop_samples_discarded": 1418,
+      "packet_accounted_frame_skew": 0,
+      "packet_capacity_drops_without_evictable_frame": 0,
+      "packet_encoding_rejections": 0,
+      "packet_fairness_deferrals": 0,
+      "packet_frames_promoted": 89326,
+      "packet_invalid_operations": 0,
+      "packet_owned_depth": 0,
+      "packet_owned_high_water": 8,
+      "packet_pool_exhaustions": 0,
+      "packet_pressure_evictions": 0,
+      "packet_ready_depth": 0,
+      "packet_ready_high_water": 2,
+      "packet_ready_queue_rejections": 0,
+      "packet_transmit_depth": 0,
+      "packet_transmit_high_water": 8,
+      "packet_transmit_queue_rejections": 0,
+      "parser_errors": 0,
+      "partial_usb_writes": 0,
+      "response_queue_rejections": 0,
+      "response_reservations_abandoned": 0,
+      "responses_completed": 11,
+      "responses_queued": 11,
+      "source": 0,
+      "state_errors": 0,
+      "stats_generation": 2,
+      "stream_mask": 0,
+      "timeouts": 0,
+      "transport_errors": 0,
+      "usb_active_frame_bytes_sent": 0,
+      "usb_active_frame_size": 0,
+      "usb_command_queue_depth": 0,
+      "usb_command_queue_high_water": 1,
+      "usb_io_errors": 0,
+      "usb_lower_priority_queue_depth": 0,
+      "usb_response_queue_depth": 0,
+      "usb_response_queue_high_water": 1,
+      "usb_rx_stall_events": 0,
+      "usb_short_capacity_deferrals": 64,
+      "usb_tx_stall_events": 232861
+    },
+    "parser_errors": 0,
+    "program_sha256": "bedb8dc73c1a6cf5f60060359268e653527f4b2a7ce8c1dfe96a57e1fc3c3e2d",
+    "status": {
+      "adc_codec_completed": 0,
+      "adc_codec_deadline_drops": 0,
+      "adc_codec_max_age_ticks": 0,
+      "adc_codec_max_work_ticks": 0,
+      "adc_codec_raw": 0,
+      "adc_codec_resource_drops": 0,
+      "adc_codec_work_ticks": 0,
+      "adc_dma_error_events": 0,
+      "adc_encoded_bytes_transmitted": 240109632,
+      "adc_etc_error_events": 0,
+      "adc_frames_dropped": 0,
+      "adc_frames_produced": 59551,
+      "adc_items_dropped": 0,
+      "adc_items_per_frame": 1008,
+      "adc_items_produced": 60027408,
+      "adc_logical_bytes_transmitted": 240109632,
+      "adc_max_frame_bytes": 4092,
+      "adc_raw_invariant_errors": 0,
+      "adc_retention_ticks": 1612800,
+      "adc_wire_bytes_transmitted": 243682692,
+      "gpio_codec_completed": 0,
+      "gpio_codec_deadline_drops": 0,
+      "gpio_codec_max_age_ticks": 0,
+      "gpio_codec_max_work_ticks": 0,
+      "gpio_codec_raw": 0,
+      "gpio_codec_resource_drops": 0,
+      "gpio_codec_work_ticks": 0,
+      "gpio_encoded_bytes_transmitted": 120052800,
+      "gpio_frames_dropped": 0,
+      "gpio_frames_produced": 29775,
+      "gpio_hardware_errors": 0,
+      "gpio_items_dropped": 0,
+      "gpio_items_per_frame": 2016,
+      "gpio_items_produced": 60026400,
+      "gpio_logical_bytes_transmitted": 120052800,
+      "gpio_max_frame_bytes": 4092,
+      "gpio_raw_invariant_errors": 0,
+      "gpio_retention_ticks": 3225600,
+      "gpio_wire_bytes_transmitted": 121839300,
+      "packet_encoding_rejections": 0,
+      "packet_invalid_operations": 0,
+      "packet_ready_high_water": 2,
+      "packet_transmit_high_water": 8,
+      "parser_errors": 0,
+      "pending_frames": 0,
+      "run_id": 1,
+      "state": 1,
+      "transport_errors": 0
+    },
+    "temperatures": [
+      {
+        "attempt": 1,
+        "celsius": 39.123,
+        "host_monotonic_seconds": 5739120.990568163,
+        "phase": "before",
+        "status": "VALID"
+      },
+      {
+        "attempt": 1,
+        "celsius": null,
+        "host_monotonic_seconds": 5739131.181638436,
+        "phase": "running",
+        "status": "NOT_READY"
+      },
+      {
+        "attempt": 2,
+        "celsius": null,
+        "host_monotonic_seconds": 5739131.202288933,
+        "phase": "running",
+        "status": "NOT_READY"
+      },
+      {
+        "attempt": 3,
+        "celsius": 42.193,
+        "host_monotonic_seconds": 5739131.223760146,
+        "phase": "running",
+        "status": "VALID"
+      },
+      {
+        "attempt": 1,
+        "celsius": null,
+        "host_monotonic_seconds": 5739141.243927318,
+        "phase": "running",
+        "status": "NOT_READY"
+      },
+      {
+        "attempt": 2,
+        "celsius": 44.036,
+        "host_monotonic_seconds": 5739141.266065709,
+        "phase": "running",
+        "status": "VALID"
+      },
+      {
+        "attempt": 1,
+        "celsius": 45.264,
+        "host_monotonic_seconds": 5739151.284535577,
+        "phase": "running",
+        "status": "VALID"
+      },
+      {
+        "attempt": 1,
+        "celsius": 47.106,
+        "host_monotonic_seconds": 5739161.294866591,
+        "phase": "running",
+        "status": "VALID"
+      },
+      {
+        "attempt": 1,
+        "celsius": null,
+        "host_monotonic_seconds": 5739171.313617089,
+        "phase": "running",
+        "status": "NOT_READY"
+      },
+      {
+        "attempt": 2,
+        "celsius": 48.948,
+        "host_monotonic_seconds": 5739171.336704428,
+        "phase": "running",
+        "status": "VALID"
+      },
+      {
+        "attempt": 1,
+        "celsius": 50.176,
+        "host_monotonic_seconds": 5739181.587530713,
+        "phase": "after",
+        "status": "VALID"
+      }
+    ],
+    "wire_items": {
+      "adc": 60027408,
+      "gpio": 60026400
+    }
+  },
+  "limits": [
+    "Original FAIL and all diagnostic outcomes remain immutable. Canonical streaming remains 36 PASS / 1 FAIL / 19 NOT_RUN.",
+    "Modified runner inputs invalidate the active freeze. Independent committed regression and candidate refreeze/requalification remain separate tasks.",
+    "Temporary before/after tests are retained locally; only existing test-fixture compatibility updates accompany the production correction.",
+    "CPU statistics cover capture/STOP boundaries. Pre-capture bootstrap throttling is retained in the baseline; capture delta is zero.",
+    "Unstimulated physical acquisition validates transport/control, not analog accuracy or externally driven timing."
+  ],
+  "original_failure": {
+    "candidate_sha256": "5d6df850bd97add629502c9126c42eb1483ee2bd05efb1c0b466c55e5a92c1c7",
+    "job_id": "322b4ac0-309d-4d61-a625-d4ce41cbf104",
+    "outcome": "FAIL",
+    "unchanged": true
+  },
+  "outcome": "PASS",
+  "retained_files": [
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/container-cleanup.json",
+      "sha256": "e27142aa0edf429d806e66bb2018632d4118dc721f527831d3278d6b74d5f313",
+      "size_bytes": 85
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/existing-tests.log",
+      "sha256": "a775e21c637237009b6e16f641aff648f455be4081244a6891b8fc7c36fc6964",
+      "size_bytes": 981
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/final-checks.log",
+      "sha256": "d66aa6246990ec1d025f3e4c6fe4a2d1e3b7c50832edf94224141c53425669ac",
+      "size_bytes": 194
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/final-runner-tests.log",
+      "sha256": "c0c1b1d12bfa5fd461d5858124f2ddc501dfffbacc4317cff91c97bc05077416",
+      "size_bytes": 3080
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/cpu-allocation.json",
+      "sha256": "b8372822d971bfb4a89d8cd37a8a6dcfa9ffbe385b751290f87bc1172ae575d5",
+      "size_bytes": 232
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/firmware.ino.hex",
+      "sha256": "f29d05970b5b49381f4efcd80e2b948e72a41b89a32edbfce6ca00c5fab8fdbf",
+      "size_bytes": 521404
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/preflight.json",
+      "sha256": "9aaa32af7d32724ff6b09faff96b7328fa1106473f88cf0243752ff563fb27fe",
+      "size_bytes": 236
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/prior-status.json",
+      "sha256": "8fc7b348af1f658ccfc9b6a6ea2a3a16ac7d7991485e5b19f0736786eaa7e609",
+      "size_bytes": 587
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/provenance.json",
+      "sha256": "6adb230e032173d72c62fa8c2a15525f9f884261d87ed4f263f949eafa982a77",
+      "size_bytes": 26760
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/record.json",
+      "sha256": "04bef9fd032acada6865c69de876efc1bfb245844014b8bbc1c9d67f27632a02",
+      "size_bytes": 54982
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/results.json",
+      "sha256": "e2c768772041e44ee4e988dd0d115aeb79b9d1260071c612bb3231610d812d3a",
+      "size_bytes": 52156
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/rig-program.py",
+      "sha256": "bedb8dc73c1a6cf5f60060359268e653527f4b2a7ce8c1dfe96a57e1fc3c3e2d",
+      "size_bytes": 457956
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/start.json",
+      "sha256": "b612423128c448d8d2efddadf5df10b0ba54c1a668dfd5d3473c6f83826cb753",
+      "size_bytes": 108
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/status.json",
+      "sha256": "79bdb6acd1891079fa56d6a69f6830c9873abc020214454a889921e2871f8bcb",
+      "size_bytes": 57
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/submission.json",
+      "sha256": "00b9754a7837412e86efdd75dea6dbefc86f22af9b841f221a02df584a1062e6",
+      "size_bytes": 358
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/job-01/summary.json",
+      "sha256": "979a2655e3446f2481ce64b8c7fbe0bc80c03baca4f170b033e2f22b59107d0e",
+      "size_bytes": 196
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/preservation.json",
+      "sha256": "5f23e22745767080671a6bd0059e52cb8e670af6bf2b38280ce2bbdd881afe52",
+      "size_bytes": 318
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/repro-after.log",
+      "sha256": "006ba2e6e18954ad086677bc060e3290380048985a443818578f6ef51ed1b21b",
+      "size_bytes": 98
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/repro-before.log",
+      "sha256": "f659b7dc30447a99d3825eff5f472850c8cd053656bd85b9b38ddf9356e592b5",
+      "size_bytes": 1825
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/resource-owner-tests.log",
+      "sha256": "67c400ca0065f21bf6fbc3cd327bd762e59c6ff21f056671102344161734957a",
+      "size_bytes": 92
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/run_correction.py",
+      "sha256": "57d1db666b4316eb2075294254feaa4bd825eff266959b8ab4f4c959d7042bed",
+      "size_bytes": 4029
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/test_resource_precondition.py",
+      "sha256": "2a4cc6e98c3c06844a1c87a5df9f0ac63c27f3ce14d64e87a87660614ecce52a",
+      "size_bytes": 4305
+    },
+    {
+      "path": ".maestro/playbooks/Working/phase06-gpio-correction-20261025/write_report.py",
+      "sha256": "9b0cd17ad01418155b437b2475631c3e9405b5c5bb3eaab6764f14562efbbfe4",
+      "size_bytes": 4551
+    }
+  ],
+  "schema_version": 1,
+  "scope": "Runner correction validation only; no canonical qualification credit",
+  "source_parent_revision": "cbbf330aba2ca9544a94cf635e9447a6b8eb88f6",
+  "validation": {
+    "existing_affected_tests": 853,
+    "final_runner_temporary_and_documentation_subtests": 1448,
+    "final_runner_temporary_and_documentation_tests": 91,
+    "fixture_correction": "Final worker check initially rejected missing ownership: v3 simulator lacks legacy STATUS. Existing lifecycle fixture now routes this readback through the existing v2 simulator; all final checks pass.",
+    "portable_packet_pressure_reproduction": "PASS: exact 2016-sample/4032-byte GPIO eviction under blocked USB; draining control lossless",
+    "precondition_after": "4 PASS: half-core rejection, two-core admission, exact-job provisioning/resume, isolated telemetry bundling",
+    "precondition_before": "FAIL against cbbf330: half-core worker opens serial; adequate-resource control PASS",
+    "preservation": {
+      "changed_protected_inputs": [
+        "firmware/tests/rig_protocol_v3_qualification.py",
+        "firmware/tests/test_protocol_v3_qualification.py",
+        "firmware/tools/qualify_protocol_v3.py",
+        "firmware/tools/run_input_isolation.py"
+      ],
+      "historical_evidence_files_verified": 63,
+      "staged_artifacts_verified": 5
+    },
+    "resource_owner_subtests": 27,
+    "resource_owner_tests": 28,
+    "target_build": "Unchanged firmware/build inputs and five frozen artifact hashes verified; no target rebuild needed for host-only correction",
+    "target_memory_gate": "PASS on unchanged frozen build; RAM1 locals 33024 bytes, RAM2 heap 4096 bytes"
+  }
+}

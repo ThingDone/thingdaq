@@ -28,6 +28,7 @@ from thingdone_daq._generated import protocol_v2_constants as legacy
 from thingdone_daq.models_v3 import V3Capabilities, V3Settings
 from thingdone_daq.protocol_v2 import TemperatureReading, encode_v2_frame
 from thingdone_daq.protocol_v3 import encode_adc_payload, encode_v3_frame
+from thingdone_daq.simulator import SimulatedDevice
 from thingdone_daq.simulator_v3 import SimulatedV3Device
 from thingdone_daq.transport import InMemoryTransport
 
@@ -262,8 +263,13 @@ def test_worker_lifecycle_executes_and_retains_partial_failure(monkeypatch):
         ),
     )
     receive = device.receive
+    # The v3 simulator lacks the physical firmware's legacy ownership STATUS.
+    # Reuse the v2 wire fixture for this orchestration-only readback.
+    legacy_device = SimulatedDevice(protocol_version=2)
 
     def with_temperature(data):
+        if data[4:6] == bytes((2, legacy.FrameKind.GET_STATUS_REQUEST)):
+            return legacy_device.receive(data)
         if data[4:6] == bytes((2, legacy.FrameKind.GET_TEMPERATURE_REQUEST)):
             return (
                 encode_v2_frame(
@@ -314,7 +320,7 @@ def test_saved_attempt_resume_uses_same_program_and_retains_failure(
     monkeypatch.setenv("FW_RIG_AUTH", "test-only")
     monkeypatch.setattr(runner, "verify_artifacts", lambda *_: b"firmware")
 
-    def submit(service, auth, firmware, program, directory, timeout):
+    def submit(service, auth, firmware, program, directory, timeout, **kwargs):
         calls.append((firmware, program, directory))
         runner.save(
             directory / "submission.json",
@@ -556,6 +562,7 @@ def complete_records(frozen):
             "candidate_sha256": policy.json_hash(frozen),
             "outcome": "PASS",
             "physical": True,
+            "host_setup": {"cpu.max": "200000 100000", "affinity": [0, 1]},
             "info": {**frozen["identity"], "protocol_version": 3, "simulated": False},
             "capabilities_hex": frozen["capabilities_hex"],
             "captures": [],

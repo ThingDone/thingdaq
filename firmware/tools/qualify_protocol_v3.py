@@ -8,15 +8,19 @@ All rig HTTP is delegated to run_input_isolation, including idempotent admission
 from __future__ import annotations
 
 import argparse
+import ast
 import base64
 import io
 import json
 import os
 import re
+import shlex
 import subprocess
+import uuid
 import zipfile
 from dataclasses import replace
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import run_input_isolation as rig
 from protocol_v3_qualification import POLICY, json_hash, matrix, validate_evidence
@@ -34,6 +38,8 @@ RUNNER_INPUTS = (
     POLICY_SOURCE,
     "firmware/tools/qualify_protocol_v3.py",
     "firmware/tools/run_input_isolation.py",
+    "firmware/tests/rig_release_sdk.py",
+    "firmware/soak/validator.py",
 )
 
 
@@ -170,6 +176,40 @@ def prepare_candidate(manifest_path, serial):
     return candidate
 
 
+def resource_program():
+    """Bundle existing boundary probes without copying or importing rig mains.
+
+    Both owners remain standalone rig programs. Select their unchanged function
+    definitions, and freeze the complete source files in RUNNER_INPUTS.
+    """
+    program = ""
+    for module, path, names in (
+        ("rig_release_sdk", "firmware/tests/rig_release_sdk.py", {"host_cpu"}),
+        (
+            "firmware.soak.validator",
+            "firmware/soak/validator.py",
+            {"_cgroup_cpu_statistics", "CpuTracker"},
+        ),
+    ):
+        source = (ROOT / path).read_text()
+        definitions = [
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in names
+        ]
+        if {node.name for node in definitions} != names:
+            raise ValueError(f"missing resource probes in {path}")
+        selected = "import os, platform\nfrom pathlib import Path\n" + "\n\n".join(
+            ast.get_source_segment(source, node) for node in definitions
+        )
+        program += (
+            f"resources = types.ModuleType({module!r})\n"
+            "sys.modules[resources.__name__] = resources\n"
+            f"exec(compile({selected!r}, {path!r}, 'exec'), resources.__dict__)\n"
+        )
+    return program
+
+
 def make_program(candidate, cell):
     package = base64.b64encode(sdk_archive()).decode()
     settings = {
@@ -179,15 +219,76 @@ def make_program(candidate, cell):
     # Follow the existing rig SDK bundling convention. Neither the service nor
     # the worker downloads code or installs a different package at execution.
     return (
-        "import base64, pathlib, sys, tempfile, types\n"
-        "sdk_dir = tempfile.TemporaryDirectory(prefix='thingdaq-qualification-')\n"
-        "sdk_path = pathlib.Path(sdk_dir.name) / 'sdk.zip'\n"
-        f"sdk_path.write_bytes(base64.b64decode({package!r}))\n"
-        "sys.path.insert(0, str(sdk_path))\n"
-        "policy = types.ModuleType('protocol_v3_qualification')\n"
-        "sys.modules[policy.__name__] = policy\n"
-        f"exec(compile({(ROOT / POLICY_SOURCE).read_text()!r}, 'policy.py', 'exec'), policy.__dict__)\n"
-    ) + rig.make_program((ROOT / WORKER).read_text(), settings)
+        (
+            "import base64, pathlib, sys, tempfile, types\n"
+            "sdk_dir = tempfile.TemporaryDirectory(prefix='thingdaq-qualification-')\n"
+            "sdk_path = pathlib.Path(sdk_dir.name) / 'sdk.zip'\n"
+            f"sdk_path.write_bytes(base64.b64decode({package!r}))\n"
+            "sys.path.insert(0, str(sdk_path))\n"
+            "policy = types.ModuleType('protocol_v3_qualification')\n"
+            "sys.modules[policy.__name__] = policy\n"
+            f"exec(compile({(ROOT / POLICY_SOURCE).read_text()!r}, 'policy.py', 'exec'), policy.__dict__)\n"
+        )
+        + resource_program()
+        + rig.make_program((ROOT / WORKER).read_text(), settings)
+    )
+
+
+def allocate_job_cpu(service, directory):
+    """Provision only the accepted job's container; never change service defaults.
+
+    The worker independently waits for/readbacks this allocation before serial
+    open. A resume rechecks live Docker state instead of trusting a saved receipt.
+    Queue waiting stays entirely inside the existing rig request loop.
+    """
+    verified = False
+
+    def provision(test_id):
+        nonlocal verified
+        if verified:
+            return
+        if str(uuid.UUID(test_id)) != test_id:
+            raise ValueError("invalid rig job ID")
+        script = f"""import docker, json
+client = docker.from_env()
+job = {test_id!r}
+matched = [c for c in client.containers.list() if any(
+    m['Destination'] == '/storage' and m['Source'].rstrip('/').endswith('/' + job)
+    for m in c.attrs['Mounts'])]
+assert len(matched) <= 1, 'ambiguous job container'
+for container in matched:
+    before = container.attrs['HostConfig']
+    container.update(cpu_quota=200000, cpu_period=100000)
+    container.reload()
+    after = container.attrs['HostConfig']
+    assert after['CpuQuota'] == 200000 and after['CpuPeriod'] == 100000
+    print(json.dumps(dict(job_id=job, container_id=container.id,
+        before_quota=before['CpuQuota'], before_period=before['CpuPeriod'],
+        quota=after['CpuQuota'], period=after['CpuPeriod'])))
+"""
+        host = os.environ.get("FW_RIG_SSH", f"bill@{urlsplit(service).hostname}")
+        command = shlex.join(
+            ["/home/bill/.virtualenvs/remote_firmware_testing/bin/python", "-c", script]
+        )
+        response = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, command],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        ).stdout.strip()
+        if response:
+            receipt = json.loads(response)
+            if (receipt["job_id"], receipt["quota"], receipt["period"]) != (
+                test_id,
+                200000,
+                100000,
+            ):
+                raise ValueError("job CPU allocation readback mismatch")
+            save(directory / "cpu-allocation.json", receipt)
+            verified = True
+
+    return provision
 
 
 def retained_records(candidate, output):
@@ -228,6 +329,12 @@ def retained_records(candidate, output):
             if len(evidence) != 1:
                 raise ValueError("missing/duplicate worker record")
             record = evidence[0]
+            setup = record.get("host_setup", {})
+            if (
+                setup.get("cpu.max", "").split() != ["200000", "100000"]
+                or len(setup.get("affinity", [])) < 2
+            ):
+                raise ValueError("missing/insufficient worker CPU allocation")
             record["job_id"] = job
             if not (
                 result.get("completed") is True
@@ -283,7 +390,7 @@ def verify_artifacts(candidate, firmware_path, manifest_path):
             "firmware/src",
             "firmware/firmware.ino",
             "firmware/tools",
-            WORKER,
+            *RUNNER_INPUTS,
             "daq_api/src",
             "protocol",
             "tools",
@@ -305,7 +412,7 @@ def verify_artifacts(candidate, firmware_path, manifest_path):
             "firmware/src",
             "firmware/firmware.ino",
             "firmware/tools",
-            WORKER,
+            *RUNNER_INPUTS,
             "daq_api/src",
             "protocol",
             "tools",
@@ -367,7 +474,13 @@ def run_campaign(args, candidate, rows):
         try:
             # Existing helper reconciles saved tag or follows saved job ID.
             rig.submit_program(
-                args.service, auth, firmware, program, directory, planned + 90
+                args.service,
+                auth,
+                firmware,
+                program,
+                directory,
+                planned + 90,
+                on_active=allocate_job_cpu(args.service, directory),
             )
         except Exception as error:
             save(

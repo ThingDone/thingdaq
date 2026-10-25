@@ -16,12 +16,15 @@ from protocol_v3_qualification import (
     json_hash,
     validate_capture,
 )
+from rig_release_sdk import host_cpu
 from thingdone_daq import ADCBlock, DAQConfiguration, GPIOBlock, StreamGap, ThingDAQ
 from thingdone_daq._generated import protocol_v2_constants as v2
 from thingdone_daq.models import GpioClockDiagnosticRequest
 from thingdone_daq.models_v3 import V3Settings
 from thingdone_daq.protocol_v3 import decode_data_payload
 from thingdone_daq.transport import SerialTransport
+
+from firmware.soak.validator import CpuTracker
 
 HEADER = struct.Struct("<IBBHHBBIIIIIQI")
 
@@ -344,6 +347,9 @@ def capture(daq, tap, cell, settings, record):
     before_reader = asdict(daq.reader_counters)
     result["stream_anomalies"] = 0
     result["stall_seconds"] = 0
+    result["host_before"] = host_cpu()
+    cpu = CpuTracker()
+    cpu_started, wall_started = time.process_time(), time.monotonic()
     started_run = False
     try:
         run = legacy_command(daq, 18).run_id if legacy else daq.start()
@@ -399,11 +405,25 @@ def capture(daq, tap, cell, settings, record):
                 legacy_command(daq, 20)
             else:
                 daq.stop()
+        cpu.sample()
+        result["host_after"] = host_cpu()
+        result["host_cpu"] = {
+            **cpu.summary(),
+            "process_seconds": time.process_time() - cpu_started,
+            "wall_seconds": time.monotonic() - wall_started,
+        }
+        # No added acquisition-time commands. Retain ownership even when the
+        # stream raised a gap: the original failure must remain a failure.
+        try:
+            result["ownership_after_stop"] = asdict(legacy_command(daq, 19).value)
+        except Exception as error:  # noqa: BLE001 - preserve the original stream failure
+            result["ownership_error"] = f"{type(error).__name__}: {error}"
         result["oracle"] = tap.snapshot()
         result["parser_errors"] = daq.parser_counters.corruption_events - before_parser
         result["host_queue_drops"] = (
             daq.reader_counters.host_block_queue_drops - before_host
         )
+    require("ownership_error" not in result, "post-STOP ownership unavailable")
     status = legacy_command(daq, 19).value if legacy else daq.status()
     if legacy:
         # v2 STOP reports IDLE before USB drain; wait on actual packet ownership.
@@ -520,6 +540,27 @@ def run(candidate, cell, transport):
 def main():
     candidate = json.loads(os.environ["QUALIFICATION_CANDIDATE"])
     cell = json.loads(os.environ["QUALIFICATION_CELL"])
-    record = run(candidate, cell, SerialTransport(os.environ["SERIAL_PORT"]))
+    # Starts only once the container is executing, so queue residence never
+    # consumes this setup window. Serial must stay closed until readback passes.
+    deadline = time.monotonic() + 30
+    while True:
+        setup = host_cpu()
+        if (
+            setup.get("cpu.max", "").split() == ["200000", "100000"]
+            and len(setup.get("affinity", [])) >= 2
+        ):
+            record = run(candidate, cell, SerialTransport(os.environ["SERIAL_PORT"]))
+            break
+        if time.monotonic() >= deadline:
+            record = {
+                "cell_id": cell["id"],
+                "candidate_sha256": json_hash(candidate),
+                "outcome": "FAIL",
+                "captures": [],
+                "error": "two-core host CPU allocation not established before serial open",
+            }
+            break
+        time.sleep(0.25)
+    record["host_setup"] = setup
     print("QUALIFICATION " + json.dumps(record, sort_keys=True), flush=True)
     return 0 if record["outcome"] == "PASS" else 1
