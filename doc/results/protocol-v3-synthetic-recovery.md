@@ -14,9 +14,9 @@ related:
   - '[[protocol-v3-migration]]'
 ---
 
-# Synthetic recovery and streaming: INCONCLUSIVE
+# Synthetic recovery and streaming: FAIL
 
-Fresh streaming campaign: **50/56 PASS, 0 FAIL, 6 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **50/56 PASS, 1 FAIL, 5 NOT_RUN**. Isolated pre-upgrade SDK: **NOT_RUN**. Whole 63-cell release campaign: **FAIL**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -99,8 +99,35 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 
 ## Continuation and limits
 
-Controller stage at report: `STREAMING_MATRIX`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-synthetic-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-synthetic-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
+Controller stage at report: `FAIL` (exited; historical active notes are superseded). Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-synthetic-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-synthetic-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
 
 Legacy SDK reference is unchanged revision `3a52ead02791019fcdb0b27a8be869effc955aa2`, archive SHA-256 `6f086090943069ed228b529871a7fe03bbccb2e69c611464a31fa80f340e4e20`. Its physical probe follows the complete streaming matrix. New-SDK/old-v1/v2 results are local fixture/simulator evidence; no old firmware image is claimed physically tested. Programming reset is not power removal. Unstimulated acquisition does not measure analog accuracy, external edge fidelity, power or multi-hour continuous reliability.
 
 Exact counters, independent grades, job identities and hashed evidence references are in [the machine-readable report](protocol-v3-synthetic-recovery.json).
+
+## Retained v2 cleanup failure
+
+Job `e942cc96-e44f-43e7-9111-501b25d2fd6e` (`v2-0-1`) is **FAIL**.
+Its 60.005621-second v2 RAW capture contains 60,028,804 ADC pairs and independently
+passes every capture measurement gate: zero drops/gaps/DMA/parser/host errors or
+capture CPU throttling, final IDLE and zero owned packets. The successful v2
+STOP and drain are present in the retained command replies. After those checks,
+the runner's v3 `ThingDAQ` context manager sent an extra v3 STOP while firmware
+still retained v2 mode. Firmware correctly rejected it with `INVALID_STATE`;
+SDK cleanup raised `DAQShutdownError`. The cell remains FAIL despite its passing
+measurements. All subsequent submissions stopped; the controller released its lock.
+
+The actual production firmware runtime reproduces successful v2 STOP/drain,
+read-only v3 queries, then rejection of an extra v3 STOP. An offline actual-SDK
+reproduction gives the same shutdown failure; the v3 control passes. An isolated
+prototype that closes without another STOP only after validated v2 STOP/drain
+passes; injected drain and reader-close failures remain FAIL. These are control
+flow regressions, not physical qualification. No firmware or SDK correction is
+supported by this evidence. Reproduction:
+`.venv/bin/python .maestro/playbooks/Working/phase06-synthetic-corrected-20261025/reproduce_legacy_cleanup.py`.
+
+Do not resume this failed campaign or import its 50 passing cells into another
+candidate. A scoped worker cleanup correction requires a new frozen runner
+candidate and fresh qualification. Five other v2 cells, the isolated old-SDK
+physical probe, lifecycle/endurance and promotion remain pending. No halt marker
+was added. Frozen historical bytes and original failures remain retained.
