@@ -12,6 +12,7 @@ import math
 from dataclasses import asdict, replace
 
 from thingdone_daq._generated import protocol_v3_constants as c
+from thingdone_daq.models import GPIOLayout
 from thingdone_daq.models_v3 import V3Capabilities, V3Settings
 
 POLICY = "public-v3-qualification-1"
@@ -129,6 +130,65 @@ def finite(value):
 
 def valid_counter(value):
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def legacy_stop_tail(status, name, frame_items):
+    """Reconcile bounded unframed physical STOP loss in legacy STATUS.
+
+    Pure standard-library policy so the isolated pre-upgrade SDK probe can
+    bundle this function without importing or upgrading that SDK.
+    """
+    problems = []
+
+    def need(condition, reason):
+        if not condition:
+            problems.append(reason)
+
+    items_produced = status.get(f"{name}_items_generated")
+    if not valid_counter(items_produced):
+        return 0, [f"{name} invalid generated count"]
+    # Legacy generated items count complete packets, while dropped
+    # items also include explicit unframed physical STOP tails.
+    # Reconcile the same bounded tails as the existing soak gate.
+    tail_key = (
+        "adc_stop_pairs_discarded" if name == "adc" else "gpio_stop_samples_discarded"
+    )
+    tail = status.get(tail_key)
+    need(valid_counter(tail), f"{name} missing/invalid STOP tail")
+    tail_items = tail if valid_counter(tail) else 0
+    need(
+        tail_items < frame_items * (2 if name == "adc" else 1),
+        f"{name} STOP tail exceeds bound",
+    )
+    raw_key = "adc_raw_pairs_lost" if name == "adc" else "gpio_raw_samples_lost"
+    need(status.get(raw_key) == tail_items, f"{name} unexplained raw loss")
+    delivered_key = "adc_pairs_delivered" if name == "adc" else "gpio_samples_delivered"
+    need(
+        status.get(delivered_key) == items_produced,
+        f"{name} delivered/packet accounting",
+    )
+    if name == "adc":
+        incomplete = status.get("adc_incomplete_buffers")
+        need(
+            valid_counter(incomplete)
+            and incomplete <= 2
+            and bool(incomplete) == bool(tail_items),
+            "adc incomplete STOP buffers",
+        )
+        for key, limit in (
+            ("adc_completion_mismatches", incomplete),
+            ("adc_incomplete_conversions", tail_items),
+        ):
+            value = status.get(key)
+            need(
+                valid_counter(value) and valid_counter(limit) and value <= limit,
+                f"adc invalid STOP diagnostic: {key}",
+            )
+        need(
+            status.get("adc_pairs_captured") == items_produced + tail_items,
+            "adc captured/STOP-tail accounting",
+        )
+    return tail_items, problems
 
 
 def validate_capture(cell, capture):
@@ -263,6 +323,7 @@ def validate_capture(cell, capture):
                 f"{name} missing independent synthetic source check",
             )
         need(wire["logical_bytes"] == wire["items"] * width, f"{name} logical bytes")
+        stop_tail = 0
         # The independent cursor accounts for leading and internal gaps; final
         # producer counters also bind the otherwise invisible STOP tail.
         if legacy:
@@ -270,6 +331,18 @@ def validate_capture(cell, capture):
             dropped = status[f"{name}_frames_dropped"]
             items_produced = status[f"{name}_items_generated"]
             items_dropped = status[f"{name}_items_dropped"]
+            layout = GPIOLayout.from_mode(settings.aux_bank_mode)
+            frame_items = (
+                layout.adc_items_per_frame if name == "adc" else layout.items_per_frame
+            )
+            need(
+                items_produced == produced * frame_items,
+                f"{name} legacy packet item count",
+            )
+            if settings.source == c.Source.HARDWARE:
+                stop_tail, tail_problems = legacy_stop_tail(status, name, frame_items)
+                problems.extend(tail_problems)
+                items_produced += stop_tail
             need(
                 status[f"{name}_frames_transmitted"] == wire["frames"],
                 f"{name} legacy transmit accounting",
@@ -307,7 +380,11 @@ def validate_capture(cell, capture):
             items_produced - wire["end_item"] == items_dropped - wire["gap_items"],
             f"{name} tail accounting",
         )
-        need(stall or dropped == items_dropped == 0, f"{name} unexpected drops")
+        need(
+            stall
+            or (dropped == 0 and items_dropped == stop_tail and wire["gap_items"] == 0),
+            f"{name} unexpected drops",
+        )
         if cell["seconds"] >= 60 and not stall:
             elapsed = wire["last_host_seconds"] - wire["first_host_seconds"]
             measured = (

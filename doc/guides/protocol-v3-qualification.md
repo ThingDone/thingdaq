@@ -29,6 +29,14 @@ v2 command/decoder path on the same firmware. Historical v1/v2 soak programs,
 private 0x82/0x83 experiments and release-1.1.0 evidence are unchanged.
 See [[protocol-v3]], [[protocol-v3-migration]] and [[protocol-v3-upgrade]].
 
+For physical v2 captures, legacy generated-item counters count complete packets;
+dropped-item counters also include explicit unframed STOP tails. Qualification
+reconciles only bounded tails with matching raw-loss and delivered/captured
+counters: ADC below two frames, GPIO below one frame, with bounded ADC incomplete
+buffer diagnostics. Frame drops, wire gaps and unexplained raw loss still fail.
+This follows the existing physical-stop accounting in the soak validator.
+
+
 ## Candidate preparation and freeze
 
 Commit the firmware, SDK and qualification implementation first. Build from
