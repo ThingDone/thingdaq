@@ -108,6 +108,8 @@ The 2026-10-24 active-controller notes below are historical. The retained contro
 
   - 2026-10-25 live streaming checkpoint: **10/56 PASS, zero FAIL, 46 NOT_RUN**; controller remains active on the same frozen candidate and campaign. Independent pre-upgrade evidence grader: 13 PASS (one valid control, 12 injected faults). Active freeze and 316 historical hashes reverified PASS. Updated `protocol-v3-gpio-streaming.md/json` retain completed-job evidence; do not infer live progress from this checkpoint. Legacy physical check and later tasks remain pending.
 
+  - 2026-10-25 live streaming checkpoint: **20/56 PASS, zero FAIL, 36 NOT_RUN**. All 16 ADC-only advertised hardware/synthetic cells passed; GPIO-only cases are advancing. Same controller/candidate/campaign remain active. Independent replay, active freeze and all 316 historical hashes PASS; completed-job evidence updated in `protocol-v3-gpio-streaming.md/json`. Legacy physical check and later tasks remain pending.
+
 - [ ] Run lifecycle, backpressure, thermal, and endurance qualification:
   - Execute at least twenty same-boot START/STOP/restart cycles, including stop/drain/reconfigure and version-mode changes only between runs. Preserve request correlation and verify final IDLE with all deferred and USB work accounted for.
   - Exercise deliberate bounded host stalls, fragmented/short USB writes where supported by the harness, recovery, and reconnect. Require correct counted drops/gaps for deliberate pressure and no unexplained corruption or stale data.
