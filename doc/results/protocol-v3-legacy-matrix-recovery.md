@@ -16,7 +16,7 @@ related:
 
 # Legacy matrix recovery and streaming: INCONCLUSIVE
 
-Fresh streaming campaign: **5/55 PASS, 0 FAIL, 50 NOT_RUN**. Isolated pre-upgrade SDK: **PASS**. Whole 62-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
+Fresh streaming campaign: **10/55 PASS, 0 FAIL, 45 NOT_RUN**. Isolated pre-upgrade SDK: **PASS**. Whole 62-cell release campaign: **INCONCLUSIVE**. Lifecycle, backpressure, endurance and promotion are separate unchecked tasks.
 
 ## Correction and independent regression
 
@@ -46,6 +46,11 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 | final-identity-validation | PASS | 4f199238-40ce-4ed3-b437-711b08360496 |
 | metadata-grade | PASS | de0a4887-caa0-47e9-be1f-44790ce063d5 |
 | reset_defaults-grade | PASS | ba4acb88-058d-4298-b335-ca02c672a8b0 |
+| `fallback-0` | PASS | `9d37baf6-4740-4494-8be2-170ef9a5bca3` |
+| `fallback-1` | PASS | `c2b79b4f-41f5-4cbf-9b85-f0f29cd69627` |
+| `smoke-010001030104000800000c0040420f0040420f00` | PASS | `0c3f3c69-a751-4c43-9228-88e7ea08d1fc` |
+| `smoke-010001030104000800010c0040420f0040420f00` | PASS | `3d91f4e1-c6f6-42e7-98a4-bd4da4c575ed` |
+| `smoke-030001030104011000000c0040420f0040420f00` | PASS | `d1093f61-3b29-48ea-a8f9-eafa3af55892` |
 | `v2-0-1` | PASS | `a70e9f3c-88da-40d4-abc3-7572fc7cd66d` |
 | `v2-0-2` | PASS | `338c2782-998e-4b63-a64a-f5e53007bc48` |
 | `v2-0-3` | PASS | `7966be1b-dae9-4941-8cef-2df5a4e9acdf` |
@@ -54,7 +59,7 @@ Historical candidate/freeze archived unchanged as `firmware/soak/history/protoco
 
 ## Continuation and limits
 
-Controller stage at report: `ORIGINAL_FAILURE_CELL`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-legacy-matrix-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
+Controller stage at report: `STREAMING_MATRIX`. Controller/probes/logs/frozen artifacts are under `.maestro/playbooks/Working/phase06-legacy-matrix-corrected-20261025/`; fresh campaign is `.maestro/playbooks/Working/protocol-v3-qualification-legacy-matrix-fixed-20261025/`. Inspect live processes, lock and saved job state before resuming `continue_qualification.py --resume`. Follow accepted jobs through the current isolation runner; queue residence has no execution deadline. Never restart the historical failed campaign.
 
 Legacy SDK reference is unchanged revision `3a52ead02791019fcdb0b27a8be869effc955aa2`, archive SHA-256 `6f086090943069ed228b529871a7fe03bbccb2e69c611464a31fa80f340e4e20`. Its physical probe follows the five fresh v2 cells, before the remaining streaming matrix. New-SDK/old-v1/v2 results are local fixture/simulator evidence; no old firmware image is claimed physically tested. Programming reset is not power removal. Unstimulated acquisition does not measure analog accuracy, external edge fidelity, power or multi-hour continuous reliability.
 
