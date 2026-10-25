@@ -78,7 +78,8 @@
   },
   "candidate_sha256": "14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682",
   "controller_state": {
-    "stage": "FROZEN"
+    "candidate_sha256": "14c14a82912a95482bb9146abb06e310b3d7f8c24bec37ef2274d13d4b9d4682",
+    "stage": "IDENTITY"
   },
   "correction_commits": [
     "e6c4492",
