@@ -788,6 +788,12 @@ bool waitForCompleteStopBoundary() {
       for (std::size_t converter = 0U; converter < kConverterCount;
            ++converter) {
         IMXRT_DMA_TCD_t &tcd = hardwareTcd(converter);
+        // A freshly reloaded TCD can still have DONE set. RT1060 eDMA
+        // forces ESG low on a CSR write while DONE is set, turning DLASTSGA
+        // into a destination offset. Clear DONE before preserving ESG with
+        // the DREQ update; the checked CITER headroom excludes retirement.
+        DMA_CDNE = board::kAdcConverterConfigurations[converter].edma_channel;
+        barrier();
         tcd.CSR =
             static_cast<std::uint16_t>(tcd.CSR | DMA_TCD_CSR_DREQ);
       }
