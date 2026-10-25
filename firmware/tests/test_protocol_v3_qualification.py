@@ -219,7 +219,7 @@ def test_matrix_complete_bounded_and_missing_physical_never_passes():
     assert all(s["seconds"] == 60 for s in smoke)
     assert len([r for r in rows if r["kind"] == "soak" and r["seconds"] == 600]) == 3
     assert next(r for r in rows if r["kind"] == "lifecycle")["cycles"] == 20
-    assert len([r for r in rows if r["kind"] == "legacy"]) == 6
+    assert len([r for r in rows if r["kind"] == "legacy"]) == 5
     for row in rows:
         assert (
             runner.rig.validate_program_budget(max(1, row["seconds"]), row["cycles"])
@@ -1387,3 +1387,44 @@ def test_retained_legacy_physical_stop_tail_conservation(fault):
         capture["oracle"]["adc"]["end_item"] += 1
     problems = policy.validate_capture(cell, capture)
     assert bool(problems) == (fault is not None), (fault, problems)
+
+
+def test_legacy_matrix_matches_documented_sdk_contract():
+    rows = [r for r in candidate()["matrix"] if r["kind"] == "legacy"]
+    observed = set()
+    for row in rows:
+        settings = V3Settings.from_bytes(bytes.fromhex(row["settings_hex"]))
+        config = DAQConfiguration(
+            int(settings.stream_mask),
+            int(settings.source),
+            aux_bank_mode=int(settings.aux_bank_mode),
+            rate_profile=4,
+        )
+        observed.add((int(config.aux_bank_mode), int(config.stream_mask)))
+        assert len(config.to_payload(protocol_version=2)) == 16
+    assert observed == {(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)}
+    with pytest.raises(ValueError, match="INPUT mode requires the GPIO stream"):
+        DAQConfiguration(1, 0, aux_bank_mode=1, rate_profile=4)
+
+
+@pytest.mark.parametrize("mode,mask", [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3)])
+def test_legacy_matrix_configuration_on_production_runtime(cpp, mode, mask):  # noqa: F811
+    # Portable runtime has no physical ADC calibration/DMA backend. Exercise
+    # the same legacy layout/control path using its synthetic source.
+    config = DAQConfiguration(mask, 1, aux_bank_mode=mode, rate_profile=4)
+    frames, _ = exchange(
+        cpp,
+        [
+            request(
+                encode_v2_frame(17, config.to_payload(protocol_version=2), request_id=1)
+            ),
+            request(encode_v2_frame(18, request_id=2)),
+            request(encode_v2_frame(20, request_id=3)),
+            request(encode_v2_frame(19, request_id=4)),
+        ],
+    )
+    responses = replies(frames)
+    assert all(responses[i].error_code == 0 for i in range(1, 5))
+    assert responses[1].value == config
+    assert int(responses[4].value.device_state) == 1
+    assert responses[4].value.packet_owned_depth == 0
